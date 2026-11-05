@@ -1,6 +1,7 @@
 {
  "name": "Pirate Gunship",
  "catalogVersion": 1,
+ "power": "ports",
  "parts": [
   {
    "uid": 0,

@@ -35,6 +35,9 @@ export const MAT_UNIT = 100;
 /** Material moves at most this much a second across a link or out of a network */
 const MAT_RATE = 30;
 const BOOST_DRAW = 2.2;
+/** Touch-routed lines (FunctionDef.touch 'relay'): E a second across each edge, and what one with no store holds a cell */
+const TOUCH_LINE_RATE = 200;
+const TOUCH_LINE_HOLDS = 10;
 /** Ticks a second */
 const TPS = 60;
 
@@ -184,6 +187,12 @@ export interface PortsLayout {
   consumers: Int32Array;
   selectors: Int32Array;
   gaugeMax: number;
+  /** Touch generators (FunctionDef.touch 'gen'): touching ones make a block; touchOut[block] is its eu a tick, shared over all its
+   * members' links by what each taker has room for; touchClus the block of each member (its lowest part; -1 a ported
+   * generator), touchNext the next member (-1 the last) */
+  touchOut: Int32Array;
+  touchClus: Int32Array;
+  touchNext: Int32Array;
   /** Totals for ShipDerived.energy and the hangar (E a second) */
   supply: number;
   engineDraw: number;
@@ -264,9 +273,10 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     if (!alive[i]) continue;
     const fn = fns[i], a = area[i], m = mats[i];
     const out = fnOutput(fn, m);
-    if (i === input.core || ((fn.store ?? 0) > 0 && !fn.tank)) {
+    if (i === input.core || ((fn.store ?? 0) > 0 && !fn.tank) || fn.touch === 'relay') {
       role[i] = P_RELAY;
-      cap[i] = toEu(i === input.core ? ((tuning as { energy?: { coreCapacity?: number } }).energy?.coreCapacity ?? 240) : (fn.store ?? 0) * a * out);
+      // (A touch-routed line with no store of its own holds a few ticks' worth, as a Conduit does)
+      cap[i] = toEu(i === input.core ? ((tuning as { energy?: { coreCapacity?: number } }).energy?.coreCapacity ?? 240) : (fn.store ?? 0) > 0 ? (fn.store ?? 0) * a * out : TOUCH_LINE_HOLDS * a);
       if (fn.relayOnly || fn.combiner || fn.pipeThrough) { carrier[i] = 1; matCap[i] = (fn.combiner ? 4 : 2) * MAT_UNIT; }
     } else if (fn.tank) {
       role[i] = P_TANK;
@@ -368,8 +378,31 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   type Port = { part: number; dir: 0 | 1; x: number; y: number; side: Side; nx: number; ny: number; rate: number; link: number; aug: 0 | 1 };
   const ports: Port[] = [];
   const byPart: Port[][] = Array.from({ length: n }, () => []);
+  // Touch-routed parts (FunctionDef.touch: the legacy functions enemy designs are built of) have no ports of their own:
+  // they join whatever touches them (a shared edge, or a shared cell where bespoke pieces overlap), as the old touch
+  // network did. tin: E a second a touch part takes on a link (a relay a line's rate; a consumer its whole intake, a
+  // thruster its boosted burn)
+  const cellParts = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) if (alive[i]) for (const c of input.cells[i]) { const k = key(c[0], c[1]); const a = cellParts.get(k); if (a) { if (!a.includes(i)) a.push(i); } else cellParts.set(k, [i]); }
+  const nbCache = new Map<number, number[]>();
+  /** Parts touching part i (an edge or an overlapping cell), in index order */
+  const nb = (i: number): number[] => {
+    let r = nbCache.get(i);
+    if (r) return r;
+    const s = new Set<number>();
+    for (const c of input.cells[i]) for (const d of [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0]]) for (const j of cellParts.get(key(c[0] + d[0], c[1] + d[1])) ?? []) if (j !== i) s.add(j);
+    r = [...s].sort((a, b) => a - b); nbCache.set(i, r);
+    return r;
+  };
+  const tin = new Float64Array(n);
   for (let i = 0; i < n; i++) {
-    if (!alive[i] || role[i] === P_INERT || role[i] === P_TANK || role[i] === P_SELECTOR || role[i] === P_PIPE) continue;
+    if (!alive[i] || !fns[i].touch) continue;
+    const E = (eu: number) => (eu * TPS) / EU;
+    if (fns[i].touch === 'relay' && role[i] === P_RELAY) tin[i] = TOUCH_LINE_RATE;
+    else if (fns[i].touch === 'in') tin[i] = role[i] === P_THRUSTER ? E(Math.max(rate[i], bBurn[i])) : role[i] === P_TOOL ? 1.5 * E(rate[i]) : role[i] === P_WEAPON ? E(rate[i]) : 0;
+  }
+  for (let i = 0; i < n; i++) {
+    if (!alive[i] || role[i] === P_INERT || role[i] === P_TANK || role[i] === P_SELECTOR || role[i] === P_PIPE || fns[i].touch) continue;
     const ag = role[i] === P_WEAPON && augCap[i] > 0 ? fns[i].augment : undefined;
     const specs: (PortSpec & { aug?: 1 })[] = ag ? [...(fns[i].ports ?? []), { dir: 'in', side: ag.side, cell: ag.cell, rate: ag.rate, aug: 1 }] : fns[i].ports ?? [];
     for (const q of specs) {
@@ -378,6 +411,32 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       if (byPart[i].some((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === dir)) continue;
       const port: Port = { part: i, dir, x: e.x, y: e.y, side: e.side, nx: e.nx, ny: e.ny, rate: q.rate * (role[i] === P_GEN ? health(i) : 1), link: -1, aug: q.aug ? 1 : 0 };
       ports.push(port); byPart[i].push(port);
+    }
+  }
+  // (The core of a touch-routed design is its hub, as it was: it joins every touch part touching it both ways, and its own
+  // ports facing them go)
+  const C = input.core;
+  const coreTouch = C >= 0 && alive[C] && nb(C).some((j) => !!fns[j].touch);
+  if (coreTouch) {
+    const keep = byPart[C].filter((q) => !(cellParts.get(key(q.nx, q.ny)) ?? []).some((j) => !!fns[j].touch));
+    for (const q of byPart[C]) if (!keep.includes(q)) ports.splice(ports.indexOf(q), 1);
+    byPart[C] = keep;
+    tin[C] = TOUCH_LINE_RATE;
+  }
+  const touchGen = (i: number) => alive[i] && role[i] === P_GEN && fns[i].touch === 'gen';
+  // (Touch relays pass power only away from the generators: each one's depth is its hops from a generator or the hub
+  // through touching touch relays, and a touch relay feeds a touching one only if that is deeper, or as deep and later in
+  // the part list. An order, so power flows outward and never bounces back)
+  const touchRelay = (i: number) => alive[i] && role[i] === P_RELAY && (fns[i].touch === 'relay' || (coreTouch && i === C));
+  const INF = 0x7fffffff;
+  const depth = new Int32Array(n).fill(INF);
+  {
+    let front: number[] = [];
+    for (let i = 0; i < n; i++) if (alive[i] && (role[i] === P_GEN || (coreTouch && i === C))) { depth[i] = 0; front.push(i); }
+    for (let d = 1; front.length; d++) {
+      const next: number[] = [];
+      for (const i of front) if (touchGen(i) || touchRelay(i)) for (const j of nb(i)) if (touchRelay(j) && depth[j] > d) { depth[j] = d; next.push(j); }
+      front = next;
     }
   }
   const linkFrom: number[] = [], linkTo: number[] = [], linkCap: number[] = [], linkAug: number[] = [];
@@ -391,7 +450,58 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     linkFrom.push(pa.part); linkTo.push(pb.part); linkCap.push(perTick(Math.min(pa.rate, pb.rate))); linkAug.push(pb.aug);
     pa.link = id; pb.link = id;
   }
+  // (Touch links: a touch generator, or a touch relay, into each touching touch relay further out and each touching touch
+  // consumer; one link a pair)
+  const touchTaker = (j: number) => tin[j] > 0 && (touchRelay(j) || fns[j].touch === 'in');
+  for (let i = 0; i < n; i++) {
+    if (!touchGen(i) && !touchRelay(i)) continue;
+    for (const j of nb(i)) {
+      if (!touchTaker(j)) continue;
+      if (touchRelay(j) && touchRelay(i) && !(depth[i] < depth[j] || (depth[i] === depth[j] && i < j))) continue;
+      linkFrom.push(i); linkTo.push(j); linkCap.push(perTick(Math.min(touchRelay(i) ? TOUCH_LINE_RATE : Infinity, tin[j]))); linkAug.push(0);
+    }
+  }
+  // (The old touch designs were wired as one network (auto-wiring: a part fed the whole ship, whatever lay between), so a
+  // touch consumer with no line of its own is wired to the nearest touch generator or reached relay, through whatever
+  // parts lie between (fewest steps; ties to the lowest part index), a link straight to it; and so is a touch relay no
+  // generator reaches through touch relays)
+  for (let i = 0; i < n; i++) {
+    const relay = touchRelay(i) && depth[i] === INF;
+    if (!relay && (!alive[i] || fns[i].touch !== 'in' || !(tin[i] > 0) || linkTo.includes(i))) continue;
+    const seen = new Set<number>([i]);
+    let front = [i], giver = -1;
+    while (front.length && giver < 0) {
+      const next: number[] = [];
+      for (const k of front) for (const j of nb(k)) {
+        if (seen.has(j)) continue;
+        seen.add(j);
+        if (touchGen(j) || (touchRelay(j) && depth[j] !== INF)) { if (giver < 0 || j < giver) giver = j; }
+        else next.push(j);
+      }
+      front = next.sort((a, b) => a - b);
+    }
+    if (giver < 0) continue;
+    linkFrom.push(giver); linkTo.push(i); linkCap.push(perTick(Math.min(touchRelay(giver) ? TOUCH_LINE_RATE : Infinity, tin[i]))); linkAug.push(0);
+    if (relay) depth[i] = depth[giver] + 1;
+  }
+  // (Touching touch generators make one block, as they did in the old network: the block's output, shared every tick over
+  // all its members' links by what each taker has room for (portsTick). One touching one part gives it all, one touching
+  // three splits it by need; a block never gives more than it makes. touchClus: each member's block (its lowest part),
+  // touchNext: the next member, -1 at the end)
+  const touchOut = new Int32Array(n), touchClus = new Int32Array(n).fill(-1), touchNext = new Int32Array(n).fill(-1);
+  for (let g = 0; g < n; g++) {
+    if (!touchGen(g) || touchClus[g] >= 0) continue;
+    const mem: number[] = [g]; touchClus[g] = g;
+    for (let k = 0; k < mem.length; k++) for (const j of nb(mem[k])) if (touchClus[j] < 0 && touchGen(j)) { touchClus[j] = g; mem.push(j); }
+    mem.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < mem.length; k++) touchNext[mem[k]] = mem[k + 1];
+    let out = 0; for (const j of mem) out += perTick(partSupply(fns[j], area[j], mats[j]) * health(j));
+    touchOut[g] = Math.max(1, out);
+    if (!mem.some((j) => linkFrom.includes(j))) for (const j of mem) openOut[j] = 1;
+  }
   for (const pb of ports) if (pb.dir === 0 && pb.link < 0 && (role[pb.part] === P_WEAPON || role[pb.part] === P_THRUSTER || role[pb.part] === P_TOOL)) openIn[pb.part] = 1;
+  // (A touch consumer is open only with no line at all)
+  for (let i = 0; i < n; i++) if (alive[i] && fns[i].touch === 'in' && tin[i] > 0) openIn[i] = linkTo.includes(i) ? 0 : 1;
   const outStart = new Int32Array(n + 1), inStart = new Int32Array(n + 1);
   const outLink: number[] = [], inLink: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -404,7 +514,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   // a weak one gives a short dash from its buffer); a gun or a tool no more than its own intake, which keeps its rhythm)
   for (let i = 0; i < n; i++) if (role[i] === P_WEAPON || role[i] === P_THRUSTER || role[i] === P_TOOL) {
     let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) if (!linkAug[inLink[x]]) r += linkCap[inLink[x]];
-    rate[i] = role[i] === P_THRUSTER ? r || rate[i] : Math.min(rate[i] || r, r) || rate[i];
+    rate[i] = role[i] === P_THRUSTER ? (fns[i].touch ? Math.min(r, Math.max(rate[i], bBurn[i])) : r) || rate[i] : Math.min(rate[i] || r, r) || rate[i];
   }
 
   // ---- Feed points and networks (union-find; a Selector's points join nothing, they look across)
@@ -460,7 +570,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
     netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
     gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
-    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, supply, engineDraw, weaponDraw,
+    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw,
   };
   L.sig = portsSig(L);
   return L;
@@ -606,7 +716,21 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
   const held = e.held, cap = L.cap, nl = L.links, offer = sOffer, send = sSend;
   // 1. Offer: a generator the cap on every link; a relay what it holds, water-filled over its out links
   for (let l = 0; l < nl; l++) offer[l] = 0;
-  for (const g of L.gens) for (let x = L.outStart[g]; x < L.outStart[g + 1]; x++) { const l = L.outLink[x]; offer[l] = L.linkCap[l]; }
+  for (const g of L.gens) {
+    if (L.touchClus[g] < 0) { for (let x = L.outStart[g]; x < L.outStart[g + 1]; x++) { const l = L.outLink[x]; offer[l] = L.linkCap[l]; } continue; }
+    if (L.touchClus[g] !== g) continue;
+    // (A block of touch generators: its output water-filled over all its members' links, each wanting what its taker has
+    // room for this tick)
+    let cnt = 0;
+    for (let m = g; m >= 0; m = L.touchNext[m]) for (let x = L.outStart[m]; x < L.outStart[m + 1]; x++) {
+      const l = L.outLink[x], t = L.linkTo[l];
+      let room = spaceOf(L, e, t); if (L.role[t] === P_WEAPON && room > L.rate[t]) room = L.rate[t];
+      sList[cnt++] = l; sWant[l] = room < L.linkCap[l] ? room : L.linkCap[l];
+    }
+    if (!cnt) continue;
+    waterfill(cnt, L.touchOut[g]);
+    for (let m = g; m >= 0; m = L.touchNext[m]) for (let x = L.outStart[m]; x < L.outStart[m + 1]; x++) { const l = L.outLink[x]; offer[l] = sWant[l]; }
+  }
   for (const s of L.relays) {
     const a = L.outStart[s], b = L.outStart[s + 1]; if (a === b) continue;
     if (b - a === 1) { const l = L.outLink[a]; offer[l] = held[s] < L.linkCap[l] ? held[s] : L.linkCap[l]; continue; }

@@ -1,6 +1,7 @@
 {
  "name": "Flak Turret III",
  "catalogVersion": 1,
+ "power": "ports",
  "parts": [
   {
    "uid": 0,

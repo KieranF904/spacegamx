@@ -272,6 +272,16 @@ export interface FunctionDef {
   // The ports energy core (power/ports.ts; docs/design/energy-ports-2026-11.md), for ships whose blueprint says `power: 'ports'`
   /** Its power ports, in its own frame (N the nose, `cell` the index along that side, `rate` E a second): power crosses only out → in over a shared edge */
   ports?: { dir: 'in' | 'out'; side: Side; cell?: number; rate: number }[];
+  /**
+   * Touch-routed on the ports core (the legacy functions enemy designs are built of; players can't build them): no ports of
+   * its own; it joins whatever touches it (power/ports.ts buildPortsLayout), so the old touch layouts work without
+   * re-routing. 'gen': gives into every touching relay and consumer, touching generators sharing their output as one block
+   * by what each taker has room for; 'relay': a store (or a 10 E line with no store) passing power only away from the
+   * generators (a touch relay feeds a touching one further out, never back); 'in': a consumer taking its whole intake from
+   * each touching giver. A touch consumer nothing touches is wired straight to the nearest generator, as the old auto-wired
+   * single network did
+   */
+  touch?: 'gen' | 'relay' | 'in';
   /** Weapons: the shape of its draw. `passive` E/s leaked while held, `discharge`/`rest` s its ports shut after a shot / a burst, `burst` lights only when full, `steady` its floor: the E/s its lines must deliver while it fills, or what it gathered collapses.
    * A beam with `pieces` fires in fixed pulses (power/ports.ts portsBeamStep): its buffer is that many equal pieces, a press
    * spends one whole piece and burns for its share of the buffer's burn time, a held trigger chains the next, and `rest` s
