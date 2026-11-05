@@ -11,7 +11,8 @@ Dev-only bots that fly a task on the real server and keep stats: a framework to 
 | `server/src/bots/core/mineTap.ts` | counts the chunks a bot's laser throws (wraps `LootPods.spawnChunk`) |
 | `server/src/bots/drivers/clientDriver.ts` | the simulated player: `server.connect`, `join`, then only `input`, `dock`, `undock`, `itemStore`, `marketSellAll`/`marketSell`. Setup (`devShip`, `/god on`, `/goto`) uses the dev tools |
 | `server/src/bots/drivers/npcDriver.ts` | the server NPC: `ShipBridge.spawnDummy` + `setController`; laser through `stepWeapons`, LootPods' tractor numbers, `Market.sell` |
-| `server/src/bots/tasks/` | `types.ts` (`BotTask`, `TaskDef`), `registry.ts` (by name), `mineAndDeposit.ts` |
+| `server/src/bots/tasks/` | `types.ts` (`BotTask`, `TaskDef`), `registry.ts` (by name), `mineAndDeposit.ts`, `randomFlight.ts` (netcode test traffic: sharp turns, boosts, stops, optional shoot-back) |
+| `server/src/bots/rockeryTools.ts` | the `/rockery` chat command behind the client's Sim tools panel (F7): drones, a still dummy, 1-4 random-flight bot players. How to use: ops-tools.md, "Sim tools" |
 | `server/src/bots/stats/BotStats.ts`, `targets.ts` | trips, phases, rates, JSON lines and the table; ore cost of a target in minutes of the loop |
 | `server/src/bench/playerBot.ts` | the accelerated bench (no real time) |
 

@@ -13,6 +13,7 @@ import {
   InputEncoder,
   CAPS,
 } from '@space-game/common';
+import type { NetSim } from '../dev/netSim';
 
 /** Waits before each reconnect attempt (ms): backs off, then gives up */
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000, 15000];
@@ -29,6 +30,8 @@ export class NetworkManager implements ClientTransport {
   public onFrameEnd: (() => void) | null = null;
   /** Traffic counters (bytes and frames each way), for the network readout */
   readonly traffic = { bytesIn: 0, bytesOut: 0, framesIn: 0, framesOut: 0 };
+  /** Dev builds only (app/devTools.ts installs one): ping, jitter and loss added both ways. Null in production: nothing below runs. */
+  netSim: NetSim | null = null;
 
   /** Hung up on purpose (or the server refused the sign-in): don't reconnect */
   private closing = false;
@@ -113,22 +116,31 @@ export class NetworkManager implements ClientTransport {
         this.resyncAt = performance.now();
         this.send({ type: 'packedResync' });
       }
+      const sim = this.netSim;
       for (const msgs of frames) {
-        // One message failing doesn't lose the rest of the frame (the tick's snapshot among them)
-        for (const msg of msgs) {
-          try {
-            this.onMessage?.(msg);
-          } catch (e) {
-            this.logOnce(typeof msg?.type === 'string' ? msg.type : '(no type)', e);
-          }
-        }
-        try {
-          this.onFrameEnd?.();
-        } catch (e) {
-          this.logOnce('(frame end)', e);
-        }
+        if (!sim) { this.deliverFrame(msgs); continue; }
+        // (Loss takes the snapshots of a frame, nothing else; the frame as a whole is then held for the delay)
+        const kept = sim.rollLoss() ? msgs.filter((m) => m?.type !== 'snapshot') : msgs;
+        sim.route('down', false, () => { if (this.ws === ws) this.deliverFrame(kept); });
       }
     };
+  }
+
+  /** One frame's messages to the game, then its end */
+  private deliverFrame(msgs: ServerMessage[]): void {
+    // One message failing doesn't lose the rest of the frame (the tick's snapshot among them)
+    for (const msg of msgs) {
+      try {
+        this.onMessage?.(msg);
+      } catch (e) {
+        this.logOnce(typeof msg?.type === 'string' ? msg.type : '(no type)', e);
+      }
+    }
+    try {
+      this.onFrameEnd?.();
+    } catch (e) {
+      this.logOnce('(frame end)', e);
+    }
   }
 
   /** Try again after a back-off, or report the connection lost for good */
@@ -174,11 +186,16 @@ export class NetworkManager implements ClientTransport {
   }
 
   send(msg: ClientMessage): void {
+    const sim = this.netSim;
+    // (Lost inputs are dropped before they are encoded: the compact-input stream stays consistent)
+    if (sim && msg.type === 'input' && sim.rollLoss()) return;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const data = msg.type === 'input' ? this.inputs.encode(msg, this.compactInputs) : encodeMessage(msg);
       this.traffic.framesOut++;
       this.traffic.bytesOut += typeof data === 'string' ? data.length : data.byteLength;
-      this.ws.send(data);
+      const ws = this.ws;
+      if (sim) sim.route('up', false, () => { if (this.ws === ws && ws.readyState === WebSocket.OPEN) ws.send(data); });
+      else ws.send(data);
     }
   }
 
