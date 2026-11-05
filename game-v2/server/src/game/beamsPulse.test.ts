@@ -4,7 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Input, InSystem, Position, Velocity, Rotation, isWeaponFn, ServerMessage, replicaAngle, quantizeReplicaAngle, ReplicaMode } from '@space-game/common';
+import { Input, InSystem, Position, Velocity, Rotation, isWeaponFn, ServerMessage, replicaAngle, quantizeReplicaAngle, ReplicaMode, parseBlueprint } from '@space-game/common';
+import { readFileSync } from 'fs';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -19,8 +20,12 @@ const files = readGameDataFiles(dataDir);
 const X = 25000, Y = 20000;
 const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
 
+/** The pool-era starter (a fixture): its guns fed in full, so a beam's damage is its ramp alone (on the ports Sparrow one
+ * Cell Reactor can't keep a Cutter lit, and the damage falls with its fulfilment) */
+const poolSparrow = () => parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+
 /** A pilot whose every gun is this weapon model, held at (X, Y), and what its client is sent */
-function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2) {
+function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2, pool = false) {
   resetGlobals();
   const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
@@ -34,7 +39,7 @@ function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2) {
   const p = server.pilots.get(conn)!;
   // (The starter's guns are Pips, swapped in place as the parity harness does: its mounting rules aren't the point here)
   const ships = server.getShips()!;
-  const bp = ships.get(pid)!.blueprint;
+  const bp = pool ? poolSparrow() : ships.get(pid)!.blueprint;
   let n = 0;
   ships.respawnInPlace(pid, { ...bp, parts: bp.parts.map((q) => ((q.fn === 'cannon_pip' || isWeaponFn(q.fn)) && n++ < guns ? { ...q, fn: model } : q)) });
   if (cargo) p.cargo.push(cargo);
@@ -46,7 +51,7 @@ function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2) {
 
 /** A pilot with this beam and a pirate skiff held `gap` east of it; `burn` steps a tick with the trigger held (or not), and returns what the beam dealt, by part */
 function beamRig(model: string, gap = 400) {
-  const w = pilotWith(model, undefined, 1);
+  const w = pilotWith(model, undefined, 1, true);
   const [skiff] = w.server.enemies.spawnPack(InSystem.systemId[w.pid], { faction: 'pirates', ships: ['pirate_skiff'] }, X + gap, Y);
   const dealt: { part: number; amount: number }[] = [];
   const ships = w.ships as any, hurt = ships.hurt.bind(ships);

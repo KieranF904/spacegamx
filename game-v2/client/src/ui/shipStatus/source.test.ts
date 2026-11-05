@@ -18,9 +18,9 @@ function ship(): ShipState {
   return createShipState(catalog, tuning, 1, load('dev/review-heron.json'), 0);
 }
 
-/** A Sparrow with a clip gun for its cannons */
+/** A Sparrow with a clip gun for its cannons: the pool-era one (a fixture), whose stores, reload draw and feeds these read */
 function clipShip(): ShipState {
-  const b = load('sparrow-t.json');
+  const b = load('fixtures/sparrow-t.json');
   for (const q of b.parts) if (q.fn === 'cannon_pip') q.fn = 'railgun_rail_driver';
   return createShipState(catalog, tuning, 1, b, 0);
 }
