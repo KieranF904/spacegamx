@@ -3,10 +3,11 @@
  * early, nothing fires), the Tesla zaps on a beat while held and chains, and the section 4 numbers.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Input, InSystem, Position, Velocity, isWeaponFn, ServerMessage, replicaAngle, quantizeReplicaAngle, ReplicaMode,
+  parseBlueprint, Input, InSystem, Position, Velocity, isWeaponFn, ServerMessage, replicaAngle, quantizeReplicaAngle, ReplicaMode,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -23,7 +24,7 @@ const X = 25000, Y = 20000;
 const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
 
 /** A pilot whose guns are this weapon model, held at (X, Y) */
-function pilotWith(model: string, guns = 1) {
+function pilotWith(model: string, guns = 1, pool = false) {
   resetGlobals();
   const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
@@ -35,7 +36,8 @@ function pilotWith(model: string, guns = 1) {
   t.send({ type: 'join', username: 'pilot' } as any);
   const pid = t.getPlayerId();
   const ships = server.getShips()!;
-  const bp = ships.get(pid)!.blueprint;
+  // (A pool-era ship when asked: a Tesla burns 170 E/s and a Cell Reactor makes 35, so on the ports starter it sputters)
+  const bp = pool ? parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8')) : ships.get(pid)!.blueprint;
   let n = 0;
   ships.respawnInPlace(pid, { ...bp, parts: bp.parts.map((q) => ((q.fn === 'cannon_pip' || isWeaponFn(q.fn)) && n++ < guns ? { ...q, fn: model } : q)) });
   const hold = () => { Position.x[pid] = X; Position.y[pid] = Y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
@@ -81,7 +83,7 @@ describe('Blackout: a charge that fires itself', () => {
 
 describe('Tesla: a held storm that zaps on a beat', () => {
   function teslaOn(second: boolean) {
-    const w = pilotWith('arc_tesla', 99);
+    const w = pilotWith('arc_tesla', 99, true);
     const sys = InSystem.systemId[w.pid];
     const [a] = w.server.enemies.spawnPack(sys, { faction: 'pirates', ships: ['pirate_skiff'] }, X + 400, Y);
     const [b] = second ? w.server.enemies.spawnPack(sys, { faction: 'pirates', ships: ['pirate_skiff'] }, X + 400, Y + 150) : [-1];

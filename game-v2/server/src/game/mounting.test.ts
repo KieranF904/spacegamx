@@ -33,8 +33,16 @@ function world() {
   return { server, t, got, pid, conn };
 }
 
-/** The starter with the hull behind its left Pip taken away: that Pip is held only by its side (breaks 'back') */
-const broken = (bp: Blueprint): Blueprint => ({ ...JSON.parse(JSON.stringify(bp)), parts: bp.parts.filter((p) => p.uid !== 7 && p.uid !== 9).map((p) => ({ ...p })) });
+/**
+ * The starter with a third Pip added beside its right Pip, over the cell its right reactor held: that Pip is held only
+ * by its side (breaks 'back'), but is still connected. (The reactor at (2,0) is dropped to open the cell behind it.)
+ */
+const broken = (bp: Blueprint): Blueprint => {
+  const pip = bp.parts.find((p) => p.uid === 3)!;
+  const parts = bp.parts.filter((p) => p.uid !== 13).map((p) => ({ ...p }));
+  parts.push({ ...JSON.parse(JSON.stringify(pip)), uid: 14, x: pip.x + 1 });
+  return { ...JSON.parse(JSON.stringify(bp)), parts };
+};
 
 describe('mounting rules on the server', () => {
   it("a saved ship that breaks a rule still loads and flies as it is; the rule is reported, the ship isn't reset", () => {
@@ -49,7 +57,7 @@ describe('mounting rules on the server', () => {
     // Still the broken design (not the starter), both Pips firing
     const live = ships.get(pid)!;
     expect(live.blueprint.parts.map((q) => q.uid).sort((a, b) => a - b)).toEqual(bad.parts.map((q) => q.uid).sort((a, b) => a - b));
-    expect(live.derived.weapons.map((w) => w.uid).sort()).toEqual([2, 3]);
+    expect(live.derived.weapons.map((w) => w.uid).sort((a, b) => a - b)).toEqual([2, 3, 14]);
   });
 
   it('a refit that breaks a rule is refused with the reason; one that keeps them goes in', () => {
