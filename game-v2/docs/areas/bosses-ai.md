@@ -16,6 +16,13 @@ Everything hostile and pilotless: faction packs and nests (Enemies.ts), single-b
 | server/src/game/Enemies.ts | 1371 | god-file: `Enemies` (packs, AI `pilot()`, tick, kills). Banners: "Nests" (~L663), "Memory" (~L831), "The pilot" (~L1048), "Kills and station defence" (~L1247); types at top (`FactionDef`, `SpawnNest`, `PackMemory`, `EnemyHost`) |
 | server/src/game/Mobs.ts | 251 | `Mobs`: circle-hit drones (kamikaze) |
 | server/src/game/Roaming.ts, Arenas.ts | 133, 119 | how nest packs wander (`style`); job arenas (boss `arena: true` via `spawnAt`) |
+| common/src/bosses/ (windows, personal, lifecycle) | ~250 | the rework's shared rules (docs/bosses/rework-2026-11.md 13): weak-point windows and the crack, personal-attack rolls and the loose cap, a lair boss's life states and timings, every enemy's recovery timings |
+| common/src/world/gates.ts | ~120 | boss arenas (systems.json `arena`): the barrier as terrain gate pieces, inside/near tests, where a passing ship is put |
+| server/src/game/arenas/ (ArenaGates, CombatClock) | ~180 | passing a barrier (interact; leaving after 300 quiet ticks), who is inside (the boss's pilots), who was last in combat |
+| server/src/game/bosses/Lifecycle.ts | ~210 | dormant -> waking -> active -> recovering -> healing -> sleeping, tick-stamped (`bossLife`) |
+| server/src/game/brains/fightRules.ts | ~190 | `FightRules` on `StagedBrain`: windows (`signature`), personal attacks (`personal`, `DECISION.PERSONAL`), the cause for the damage log |
+| server/src/game/enemies/recovery.ts | ~80 | every enemy heals out of combat (30 s, then 2 min), lost parts regrown at the end |
+| server/src/game/dev/bossDev.ts | ~260 | the boss tools (`bossDevTool`, dev servers and admins, never production; client `DevBossPanel`, Shift+F9) |
 | common/src/ships/stages.ts | 103 | `stagedIntegrity`, `currentStage`, `stageOf`: stage rules on bespoke pieces (`stage`, `ruin`, `skeleton`, `under`) |
 | common/src/world/nests.ts | 37 | nest positions (orbits) from systems.json `nests` |
 | client/src/ui/BossUI.ts, client/src/ships/BossFx.ts, skeletonBuild.ts | 151, 318 | boss bar/intro card; telegraph and blow-away FX; skeleton frame drawing |
@@ -26,7 +33,8 @@ Everything hostile and pilotless: faction packs and nests (Enemies.ts), single-b
 - `Bosses`: `def(id)`, `of(eid)`, `isAlive(id)`, `eidOf(id)`, `spawn(id)`, `spawnAt(id, num, x, y)`, `inSystem(num)`, `phaseOf`, `stageCover(eid)`, `brainOf(eid)`, `busy(eid)`, `onDamage(target, amount, source)`.
 - `BossBrain` hooks: `orders(base, ship, view)`, `integrity`, `invulnerable`, `taken`, `idle`, `forceShed`, `dispose`. `BrainHost.fire(owner, kind, x, y, angle, damageScale, {target, speed})` is the only way a brain shoots (goes to `Weapons.spawn`).
 - `Enemies`: `spawnPack`, `info(eid)`, `design(type, grade, plating)`, `addBoss`, `pilot`, `capture`/`restore`, `intent(eid, plan)` (SimLod), `onDestroyed`.
-- Wire messages: `bossIntro`, `bossTelegraph`, `bossPhase` (common/src/network/protocol.ts).
+- Wire messages: `bossIntro`, `bossTelegraph`, `bossPhase` (common/src/network/protocol.ts); `bossLife`, `bossWindow`, `bossDev` and the client's `bossDevTool` (common/src/network/bossProtocol.ts).
+- `Bosses`: `life` (Lifecycle), `gates` (ArenaGates), `invulnerable(eid)`, `taken(eid)` (brain x windows), `unhurt` (dev dummies), `devList`/`devOutside`/`devLive`. `BossBrain` gains `windowShare`, `landed`, `fight`; StagedBrain's dev hooks are `BossDevHooks` (kit.ts `devHooks`).
 - Data validators: `bosses.json` strict schema in server/src/data/validateGameData.ts (~L362); `brain` must be in `BRAIN_IDS`.
 
 ## Invariants

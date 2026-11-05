@@ -33,6 +33,8 @@ export interface LifeHost {
   send(num: number, msg: ServerMessage): void;
   /** The fight starts: its title card */
   intro(eid: number): void;
+  /** Its lair heaves as it rises or sinks (dust and rubble where it lies) */
+  heave?(num: number, eid: number): void;
 }
 
 interface Life {
@@ -163,6 +165,7 @@ export class Lifecycle {
     l.state = state;
     l.at = this.host.tick();
     if (state === 'active') this.host.intro(l.eid);
+    if ((state === 'waking' || state === 'sleeping') && l.eid >= 0) this.host.heave?.(l.num, l.eid);
     this.tell(l);
   }
 

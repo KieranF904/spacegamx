@@ -215,6 +215,13 @@ export class Bosses {
       due: (id) => host.tick() >= (this.nextSpawn.get(id) ?? 0),
       send: (num, msg) => host.send(num, msg),
       intro: (eid) => { const b = this.byEid.get(eid); if (b) this.engage(b); },
+      heave: (num, eid) => {
+        const r = this.ships.get(eid)?.derived.radius ?? 400;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + this.rng() * 0.6, d = r * (0.4 + 0.5 * this.rng());
+          host.send(num, { type: 'detonation', kind: 'eruption', x: Math.round(Position.x[eid] + dcos(a) * d), y: Math.round(Position.y[eid] + dsin(a) * d), radius: Math.round(r * 0.45) });
+        }
+      },
     });
   }
 
