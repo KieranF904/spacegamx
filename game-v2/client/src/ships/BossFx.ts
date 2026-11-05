@@ -23,7 +23,7 @@ import { Container, Graphics } from 'pixi.js';
 import { rayTerrain, type ServerBossBeamMessage, type ServerBossTelegraphMessage } from '@space-game/common';
 import { terrainFor } from '../rendering/terrainData';
 import type { GameState } from '../state/GameState';
-import { CRANE_BEAM, CRANE_BITE, drawTell, isTell, tellSound } from './bossTells';
+import { CRANE_BEAM, CRANE_BITE, drawCraneLash, drawTell, isTell, tellSound } from './bossTells';
 
 const COLOR: Record<string, number> = { charge: 0xff2a1a, lance: 0xff2a1a, dash: 0xff9a2a, impact: 0xff6a1a, crystal: 0xffc040, synapse: 0xffd060, ring: 0xffe0a0, vent: 0xffb040,
   // (the Scrap Mother's: hazard yellow for her guns, greyseam green for what pulls, pools and burns)
@@ -231,6 +231,8 @@ export class BossFx {
 
   private drawBeam(g: Graphics, b: Beam, at: { x: number; y: number; angle: number }, dt: number): void {
     const m = b.m, k = b.age / b.life;
+    // (a crane's arm swinging, not a beam: bossTells.ts)
+    if (m.kind === 'crane') { drawCraneLash(g, m, at, k, Math.min(1, b.age / 0.08) * Math.min(1, (b.life - b.age) / 0.15)); return; }
     const a = at.angle + m.a0 + (m.a1 - m.a0) * k;
     const ux = Math.cos(a), uy = Math.sin(a);
     // It burns out against rock (the server stops it there too), or against the first ship in its way

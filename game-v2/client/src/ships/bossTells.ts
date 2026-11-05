@@ -117,6 +117,37 @@ export function drawTell(g: Graphics, m: { kind: string; shape: string; radius?:
   g.moveTo(sx - nx, sy - ny).lineTo(ex - nx, ey - ny).stroke({ color: c, width: 2, alpha: 0.9 * ramp });
 }
 
+/**
+ * The crane's swing (a bossBeam 'crane', drawn instead of a beam): the arm out from her across her front, a three-fingered
+ * claw at its end, the band it hits (from CRANE_BITE of its reach out) lit faint amber, and a faint trail where it has
+ * swept (drawn into BossFx's additive layer: pale steel, not dark). `at` is her middle and heading; `k` how far through the swing (0..1)
+ */
+export function drawCraneLash(g: Graphics, m: { a0: number; a1: number; length: number; width: number }, at: { x: number; y: number; angle: number }, k: number, fade: number): void {
+  const a = at.angle + m.a0 + (m.a1 - m.a0) * k, dir = Math.sign(m.a1 - m.a0) || 1, L = m.length, s0 = L * CRANE_BITE;
+  const ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux;
+  // The trail: the last bit of the sweep, a faint amber fan over the band it hits
+  const back = a - dir * 0.32, steps = 8, fan: number[] = [];
+  for (let i = 0; i <= steps; i++) { const t = back + ((a - back) * i) / steps; fan.push(at.x + Math.cos(t) * L, at.y + Math.sin(t) * L); }
+  for (let i = steps; i >= 0; i--) { const t = back + ((a - back) * i) / steps; fan.push(at.x + Math.cos(t) * s0, at.y + Math.sin(t) * s0); }
+  g.poly(fan).fill({ color: 0xffa53a, alpha: 0.07 * fade });
+  // The band it hits, lit
+  g.moveTo(at.x + ux * s0, at.y + uy * s0).lineTo(at.x + ux * L, at.y + uy * L).stroke({ color: 0xffa53a, width: m.width, alpha: 0.12 * fade });
+  // The arm: dark steel from her hull out, a sheen down it
+  const r0 = s0 * 0.45;
+  g.moveTo(at.x + ux * r0, at.y + uy * r0).lineTo(at.x + ux * (L - 120), at.y + uy * (L - 120)).stroke({ color: 0x5a5650, width: 80, alpha: 0.55 * fade });
+  g.moveTo(at.x + ux * r0 + nx * 14, at.y + uy * r0 + ny * 14).lineTo(at.x + ux * (L - 120) + nx * 14, at.y + uy * (L - 120) + ny * 14).stroke({ color: 0x9a9da2, width: 14, alpha: 0.7 * fade });
+  // Hazard bands near its end
+  for (let s = L - 520; s < L - 160; s += 120) g.moveTo(at.x + ux * s + nx * 40, at.y + uy * s + ny * 40).lineTo(at.x + ux * (s + 50) - nx * 40, at.y + uy * (s + 50) - ny * 40).stroke({ color: 0xc9a23a, width: 26, alpha: 0.8 * fade });
+  // The claw: three fingers splayed at its end
+  const cx = at.x + ux * (L - 100), cy = at.y + uy * (L - 100);
+  for (const f of [-0.55, 0, 0.55]) {
+    const fa = a + f, fx = Math.cos(fa), fy = Math.sin(fa), w = m.width * 0.16;
+    g.poly([cx - fy * w, cy + fx * w, cx + fx * m.width * 0.75, cy + fy * m.width * 0.75, cx + fy * w, cy - fx * w]).fill({ color: 0x6a6258, alpha: 0.6 * fade }).stroke({ color: 0xffb060, width: 6, alpha: 0.8 * fade });
+  }
+  g.circle(cx, cy, m.width * 0.22).fill({ color: 0x6a6258, alpha: 0.6 * fade });
+  g.circle(cx, cy, m.width * 0.08).fill({ color: 0xffa53a, alpha: 0.9 * fade });
+}
+
 /** The crane's swing (a bossBeam 'crane'): its claw bites from this share of its reach out (server brains/scrapMother.ts the same) */
 export const CRANE_BITE = 0.52;
 /** Its lash's colours */
