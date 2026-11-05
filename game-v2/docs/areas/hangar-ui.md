@@ -59,6 +59,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 - HTML panels are built as strings: escape names with `esc()`.
 - `owned(slot)` includes that slot's built parts; ghosts are what you could not pay for. A loaner slot refuses saves unless `grantAll`.
 - Z-order: tooltips use z-index 2100 (`PART_TIP_CSS`); new overlays must sit below or above deliberately.
+- Every design is a ports design (2026-11-05): `rederive` sets `power: 'ports'`, New makes one, and `powerHtml` shows `portsHtml` (client/src/ships/portsReport.ts: generation, stores, unfed parts, open in ports, wasted generator lines). Missing for ports: port glyphs on the grid (in/out triangles, linked/open/clash colours), the live link overlay with E/s, a ports load test (loadTest returns nothing for a ports ship), rotate/flip previews of ports on the ghost, hover per port.
 - Wiring is retired (energy-routing-impl.md D1): no wire tool, no wire drawn on the grid, no spools billed (server `Hangar.save`); a saved `bp.wires` is kept and pruned as parts go, for the old energy system until the switch-over. The power panel/overlay show the old system's networks until P5's energy overlay replaces them. `stored()` in deps is now unused.
 
 ## Related areas
