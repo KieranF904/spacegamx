@@ -1721,7 +1721,7 @@ if (d && this.overlays.com && d.mass > 0) {
     }
 
     // Ghost
-    if (this.mouse) {
+    if (this.mouse && !this.ports.hovering) {
       const cand = this.candidate(this.mouse);
       if (cand) {
         const g = placeGeometry(this.deps.catalog, cand);

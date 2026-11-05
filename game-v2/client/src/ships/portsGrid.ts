@@ -24,6 +24,8 @@ export class PortsGrid {
   private occFor: readonly PlacedGeom[] | null = null;
   private occ = new Map<string, number>();
 
+  /** A port is under the mouse (the part in hand isn't drawn then: a port sits on a part, so it couldn't go there) */
+  get hovering(): boolean { return this.hoverAt >= 0; }
   /** The overlay's layer redraws so far (a check that moving the mouse doesn't redraw it) */
   get redraws(): number { return this.overlay.redraws; }
 

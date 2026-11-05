@@ -144,24 +144,27 @@ export class PortsOverlay {
       ctx.strokeStyle = bad ? RED : ORANGE; ctx.lineWidth = 2; ctx.stroke();
       ctx.setLineDash([]);
       const txt = unfed.has(i) ? 'no power' : `${Math.round(r!.end[i] * 100)}%${r!.brownAt[i] > 0.05 ? ` after ${r!.brownAt[i].toFixed(r!.brownAt[i] < 10 ? 1 : 0)}s` : ''}`;
-      tag(ctx, txt, t.sx(g.centroid[0]), t.sy(g.centroid[1]) + px * 0.32, fs, bad ? '#fca5a5' : '#fdba74', bad ? RED : ORANGE);
+      tag(ctx, txt, t.sx(g.centroid[0]), t.sy(g.centroid[1]), fs, bad ? '#fca5a5' : '#fdba74', bad ? RED : ORANGE);
     }
     // 2. Links: thickness by the E/s each carried in the load test (dim when it carried nothing)
     ctx.lineCap = 'round';
-    const labels: [string, number, number][] = [];
+    const labels: [string, number, number, number, number][] = [];
+    let tan: Vec2 = [0, 0];
     for (const l of pv.links) {
       const f = r ? r.flow[l.id] : l.cap, u = l.cap > 0 ? Math.min(1, f / l.cap) : 0;
       let x0: number, y0: number, x1: number, y1: number;
       if (l.at) {
         const n = SIDE_NORMAL[l.at.side];
+        tan = [-n[1], n[0]];
         x0 = l.at.x + 0.5 - n[0] * 0.15; y0 = l.at.y + 0.5 - n[1] * 0.15; x1 = l.at.x + 0.5 + n[0] * 1.15; y1 = l.at.y + 0.5 + n[1] * 1.15;
       } else {
         const a = geoms[l.from]?.centroid, b = geoms[l.to]?.centroid;
         if (!a || !b) continue;
         [x0, y0, x1, y1] = [a[0], a[1], b[0], b[1]];
+        tan = [0, 0];
       }
       const live = f > 0.05;
-      const wdt = live ? Math.max(1.5, px * (0.05 + 0.17 * u)) : Math.max(1, px * 0.035);
+      const wdt = live ? Math.max(1.5, px * (0.04 + 0.11 * u)) : Math.max(1, px * 0.035);
       ctx.strokeStyle = DARK; ctx.lineWidth = wdt + 2.5;
       ctx.beginPath(); ctx.moveTo(t.sx(x0), t.sy(y0)); ctx.lineTo(t.sx(x1), t.sy(y1)); ctx.stroke();
       ctx.strokeStyle = !live ? GREY : l.aug ? '#c084fc' : u > 0.98 ? '#fde68a' : '#f59e0b';
@@ -169,7 +172,7 @@ export class PortsOverlay {
       if (!l.at) ctx.setLineDash([5, 4]);
       ctx.beginPath(); ctx.moveTo(t.sx(x0), t.sy(y0)); ctx.lineTo(t.sx(x1), t.sy(y1)); ctx.stroke();
       ctx.setLineDash([]); ctx.globalAlpha = 1;
-      if (r && px >= 22 && live) labels.push([`${f < 10 ? f.toFixed(1) : Math.round(f)}`, (x0 + x1) / 2, (y0 + y1) / 2]);
+      if (r && px >= 22 && live) labels.push([`${f < 10 ? f.toFixed(1) : Math.round(f)}`, (x0 + x1) / 2, (y0 + y1) / 2, tan[0], tan[1]]);
     }
     ctx.lineCap = 'butt';
     // 3. Stores: how full each is at the end of the test
@@ -183,12 +186,16 @@ export class PortsOverlay {
       ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(cx - bw / 2, cy - bh / 2, bw, bh);
       ctx.fillStyle = col; ctx.fillRect(cx - bw / 2 + 1.5, cy - bh / 2 + 1.5, Math.max(0, (bw - 3) * fill), bh - 3);
     }
-    // 4. The ports
+    // 4. The ports, then the flow labels on the edges they cross: over the glyph pair zoomed out (the number says it's
+    // linked), beside it zoomed in
     for (const p of pv.ports) glyph(ctx, t, p.x, p.y, p.side, p.dir, portColor(p.state, p.dir), p.state, p.aug);
-    // 5. Flow labels last, over everything
     const lf = Math.max(9, Math.round(px * 0.28));
-    for (const [text, x, y] of labels) tag(ctx, text, t.sx(x), t.sy(y), lf, '#fde68a');
-    // 6. The legend: what's drawn, and which test the flows are from
+    ctx.font = `700 ${lf}px 'Segoe UI', sans-serif`;
+    for (const [text, x, y, ux, uy] of labels) {
+      const off = px >= 40 ? 0.17 * px + ctx.measureText(text).width / 2 + 7 : 0;
+      tag(ctx, text, t.sx(x) + ux * off, t.sy(y) + uy * off, lf, '#fde68a');
+    }
+    // 5. The legend: what's drawn, and which test the flows are from
     const lines = [`ENERGY · ${r ? `${label} test` : 'ports'}`, '▲ out  ▽ in  · line width = E/s carried', 'red: open or clash · orange: wasted · grey: spare'];
     ctx.font = "600 11px 'Segoe UI', sans-serif";
     const lw = Math.max(...lines.map((s) => ctx.measureText(s).width)) + 14, lh = 15, by = v.h - lines.length * lh - 12;
