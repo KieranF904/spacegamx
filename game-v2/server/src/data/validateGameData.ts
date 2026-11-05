@@ -351,6 +351,8 @@ const SHAPES: Record<string, Spec> = {
     seams: arr(obj({ gem: 'string', hardness: 'number', minTier: 'number', weight: 'number' })),
     seamGemChance: 'number',
     'tierEfficiency?': rec('number'),
+    'weaponTierEfficiency?': rec('number'),
+    'weaponLoss?': strict({ wasted: 'number', common: 'string[]', keepOther: 'number' }),
     'crowd?': strict({ window: 'number', default: 'string', profiles: rec(strict({ k: 'number', sharp: 'number', base: 'number', 'hint?': 'boolean' })), 'kByGap?': rec('number') }),
     'outliers?': strict({ chance: 'number', scale: 'number[]', stages: 'number[]', 'exclude?': 'string[]', 'systems?': rec('number'), common: 'number', boost: rec('number'), rare: 'number' }),
     'traces?': rec(obj({ from: 'string[]', per100: 'number[]', 'seamMul?': 'number', 'megaOnly?': 'boolean' })),

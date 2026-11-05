@@ -378,6 +378,24 @@
     "-2": 0.2,
     "-1": 0.5
   },
+  "_weaponTierComment": "Weapons (tools with no mining grade) by the rock's tier (the system's Mk). A starter's two Pips mine Mk I rock at under a third of a Mk I mining laser and waste a lot of it (weaponLoss: half as much again blasted away, and only a third of anything but the common ores kept): enough for the first laser and early builds. Past Mk I they only chip it.",
+  "weaponTierEfficiency": {
+    "1": 1,
+    "2": 0.3,
+    "3": 0.12,
+    "4": 0.06,
+    "5": 0.04
+  },
+  "weaponLoss": {
+    "wasted": 0.5,
+    "common": [
+      "iron_ore",
+      "nickel_ore",
+      "silicate",
+      "ice"
+    ],
+    "keepOther": 0.35
+  },
   "_crowdComment": "Mining lasers sharing a rock (common/src/econ/mining.ts crowdFactor): each laser's extraction x base x g(n), n the mining lasers on the rock in the last `window` ticks (any ships). g peaks at 1 with k lasers on it and the total always rises, more slowly past k; `sharp` (2, 3, ...) climbs more steeply to k and gains less past it. Lasers below the rock's tier find k kByGap times as high. Rock types name their profile (types[t].crowd, else `default`); other weapons and the siphon get no crowd factor.",
   "crowd": {
     "window": 54,
@@ -497,11 +515,11 @@
   "tools": {
     "_comment": "yield: ore extracted per damage relative to damagePerUnit; hardness: hardest rock it cracks",
     "fixed": {
-      "yield": 0.06,
+      "yield": 0.17,
       "hardness": 1
     },
     "turret": {
-      "yield": 0.04,
+      "yield": 0.11,
       "hardness": 1
     },
     "miner": {

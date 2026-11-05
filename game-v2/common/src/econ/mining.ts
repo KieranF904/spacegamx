@@ -32,6 +32,11 @@ export interface MiningTable {
   seamGemChance: number;
   /** A mining laser's yield by (its grade − the rock's tier), clamped to ±2 */
   tierEfficiency?: Record<string, number>;
+  /** Weapons (no mining grade) by the rock's tier (the system's Mk): practical on Mk I rock, much less after */
+  weaponTierEfficiency?: Record<string, number>;
+  /** Weapons waste rock: `wasted` the chance each unit mined blasts another away for nothing; ores not in `common`
+   *  (and gems) come out only `keepOther` of the time */
+  weaponLoss?: { wasted: number; common: string[]; keepOther: number };
   /** Mining lasers sharing a rock (crowdFactor) */
   crowd?: CrowdTable;
   /** The rare outsized rocks (asteroid/generation.ts rolls them; server/src/game/Mining.ts mines them down a stage at a time) */

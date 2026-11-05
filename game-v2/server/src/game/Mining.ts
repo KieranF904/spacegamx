@@ -145,6 +145,10 @@ export class Mining {
           this.warn(miner, `Mk ${MARKS[r.tier]} rock: a Mk ${MARKS[tool.grade]} mining laser alone gets ${pct}% of what a Mk ${MARKS[r.tier]} one would, and ${best}`);
         } else if (crowd.hint && n < lo) this.warn(miner, `Hard rock: ${best}`);
       } else if (eff < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: your Mk ${MARKS[tool.grade]} mining laser gets ${Math.round(eff * 100)}% of what a Mk ${MARKS[r.tier]} one would`);
+    } else {
+      // Guns: worth it on Mk I rock (enough for a first mining laser and early builds), slow work past it
+      eff = this.table.weaponTierEfficiency?.[String(r.tier)] ?? 1;
+      if (eff < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: guns only chip it (${Math.round(eff * 100)}%): fit a mining laser`);
     }
     let owed = (r.progress.get(miner) ?? 0) + (damage * tool.yield * eff) / this.table.damagePerUnit;
     const bag = r.pending.get(miner) ?? {};
@@ -152,10 +156,12 @@ export class Mining {
     let units = 0;
     // (An outlier's stage gives only its share: the rest stays for the next)
     const floor = this.nextStage(r)?.units ?? 0;
+    // Guns are crude: they blast some of the rock away for nothing, and most of what isn't a common ore with it
+    const crude = tool.grade === undefined ? this.table.weaponLoss : undefined;
     while (owed >= 1 && r.left > floor) {
       owed -= 1;
       r.left -= 1;
-      units++;
+      if (crude && r.left > floor && this.rand(r) < crude.wasted) r.left -= 1;
       // A gem from the seam, or an ore the tool can crack (harder ores are left in the rock)
       let id: string;
       if (r.seam && tool.hardness >= r.seam.hardness && this.rand(r) < this.table.seamGemChance) id = r.seam.gem;
@@ -163,6 +169,8 @@ export class Mining {
         id = pickOre(r, this.rand(r));
         if ((this.table.oreHardness[id] ?? 1) > tool.hardness) id = this.softest(r, tool);
       }
+      if (crude && !crude.common.includes(id) && this.rand(r) >= crude.keepOther) continue;
+      units++;
       let n = 1;
       // Skilled miners get more out of the same rock
       // Mining skill (and a wing): the chance of an extra unit
