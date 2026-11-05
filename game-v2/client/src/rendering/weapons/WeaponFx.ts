@@ -329,8 +329,11 @@ export class WeaponFx {
    * stops at the first one it touches, in that frame
    */
   castHit: ((x0: number, y0: number, x1: number, y1: number, owner: number, skip: readonly number[] | null, out: DrawnHit) => boolean) | null = null;
-  /** A shell stopped (or passed, piercing) at a drawn surface: what else shows a hit there (a shield's ripple), by its shell's id and type */
-  onStruck: ((id: number, x: number, y: number, type: number) => void) | null = null;
+  /**
+   * A shell stopped (or passed, piercing) at a drawn surface: what else shows a hit there (a shield's ripple, a rock's
+   * sparks), by its shell's id and type, and what it struck as drawn here (-1: not known, the server's point only)
+   */
+  onStruck: ((id: number, x: number, y: number, type: number, target: number) => void) | null = null;
   private readonly drawn: DrawnHit = { t: 0, x: 0, y: 0, target: -1 };
   /** Ids of ended shells let go (and their spawn tick): a row or hit for one later doesn't bring it back */
   private spent = new Map<number, number>();
@@ -581,12 +584,13 @@ export class WeaponFx {
     // (The server's hit on something not drawn in its way here: the drawn world had the target a little elsewhere, or
     // this shell on another line)
     this.stats.serverLanded++;
+    let target = -1;
     // A piercing round that still has hulls to pass keeps flying (tracer, contrail and line carry on); only its last hit ends it
     if (shot.pierceLeft > 0) shot.pierceLeft--;
     else {
       // Its end, short of the server's point if a drawn surface stands between: from where it was fired to there
       const h = this.drawn;
-      if (this.castHit?.(shot.spawnX, shot.spawnY, x, y, shot.owner, shot.passed, h)) { x = h.x; y = h.y; }
+      if (this.castHit?.(shot.spawnX, shot.spawnY, x, y, shot.owner, shot.passed, h)) { x = h.x; y = h.y; target = h.target; }
       shot.hit = { x, y };
       // (and nothing of it past there: a tracer that had flown on collapses into it)
       const sp = Math.hypot(shot.vx, shot.vy) || 1;
@@ -597,7 +601,7 @@ export class WeaponFx {
       shot.endedAt = this.clock;
     }
     this.impactAt(shot, x, y);
-    this.onStruck?.(shot.id, x, y, shot.type);
+    this.onStruck?.(shot.id, x, y, shot.type, target);
   }
 
   /**
@@ -627,7 +631,7 @@ export class WeaponFx {
       shot.pending = null;
     }
     this.impactAt(shot, x, y);
-    this.onStruck?.(shot.id, x, y, shot.type);
+    this.onStruck?.(shot.id, x, y, shot.type, h.target);
   }
 
   /** Has this shell been drawn (now or lately)? Then its hit effects are drawn where it's seen to strike (onStruck) */

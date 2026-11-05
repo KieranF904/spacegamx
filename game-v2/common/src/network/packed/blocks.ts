@@ -138,9 +138,17 @@ export function projectileBody(io: PackedIO, row: readonly unknown[] | undefined
   return o;
 }
 
-/** A fire event's block body after the owner's wid ([owner, ticksAgo, part, aimQ, ...shell ids], all absolute) */
+/**
+ * A fire event's block body after the owner's wid ([owner, ticksAgo, part, aimQ, ...shell ids], all absolute). The part
+ * field's augmented flag (+ 65536: a ports ship's augmented shot, nearly every shot a Gale fires) goes as a bit of its
+ * own, ahead of the rest: as a number it took three more varint chunks than the part (about 2 B a record)
+ */
 export function fireBody(io: PackedIO, row: readonly number[] | undefined): unknown[] {
-  const o: unknown[] = [0, io.num(row?.[1], 0, 2), io.num(row?.[2], 0, 5), io.num(row?.[3], 0, 6)];
+  const ago = io.num(row?.[1], 0, 2);
+  const p = row?.[2];
+  const aug = io.bit(typeof p === 'number' && p >= 65536 && p < 131072);
+  const part = io.num(row ? (aug ? p! - 65536 : p) : undefined, 0, 5);
+  const o: unknown[] = [0, ago, aug ? (part as number) + 65536 : part, io.num(row?.[3], 0, 6)];
   const k = io.vu(row ? row.length - 4 : 0, 1);
   let id = 0;
   for (let i = 0; i < k; i++) {

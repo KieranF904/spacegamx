@@ -7,6 +7,8 @@
 
 import { wireTables, encodeServerMessage, serverFrame, encodeInputBinary, type ClientInputMessage } from './protocol.js';
 import { packKeyframe } from './replication.js';
+import { PackedIO } from './packed/packedIO.js';
+import { fireBody } from './packed/blocks.js';
 import { CTL, ReplicaMode } from '../ships/replica.js';
 import { CHARGE_GROUPS_AT, CHARGE_GROUPS_LAYOUT, MAX_CHARGE_GROUPS, PILOT_ROW } from '../ships/energy.js';
 import { PORTS_SLOT_LAYOUT } from '../ships/power/ports.js';
@@ -48,6 +50,11 @@ export function computeWireHash(): string {
     { type: 'welcome', playerId: 1, tickRate: 60, serverTime: 5, protocol: 1 },
   ];
   const frame = serverFrame(msgs.map((m) => encodeServerMessage(m as any)));
-  const bytes = [...new Uint8Array(encodeInputBinary(input)), ...frame].map((b) => b.toString(16).padStart(2, '0')).join('');
+  // (and an encode-once fire block, plain and augmented: blocks.ts fireBody, which the base frame above doesn't reach)
+  const io = new PackedIO();
+  io.startWrite();
+  fireBody(io, [2, 1, 3, 100, 50, 51]);
+  fireBody(io, [2, 0, 65538, -570, 3438]);
+  const bytes = [...new Uint8Array(encodeInputBinary(input)), ...frame, ...io.take()].map((b) => b.toString(16).padStart(2, '0')).join('');
   return fnv1a(JSON.stringify(wireTables()) + '|' + bytes + '|' + JSON.stringify(layouts));
 }

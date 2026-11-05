@@ -30,7 +30,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, waypointsFor, ghostWeight, FOCUS_RANGE,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, waypointsFor, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -349,13 +349,26 @@ export class ShipClient {
 
   /**
    * A shell's hit, where it's seen to strike (WeaponFx.onStruck), or where the server says for one not drawn here: a
-   * raised shield's ripple and plating's sparks there, and the hit look a shell with no detonation of its own has
+   * raised shield's ripple and plating's sparks there, and the hit look a shell with no detonation of its own has; on
+   * a rock (`target`, as drawn here), its sparks, which the server no longer sends, and (finding its own hits, so told
+   * no projectileHit for it) its sound: GameServer.hurtAsteroid
    */
-  private struckFx(id: number, x: number, y: number, type: number): void {
+  private struckFx(id: number, x: number, y: number, type: number, target = -1): void {
     this.damageFx?.shieldHit(x, y, this.shellLooks.get(id)?.model);
     // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
     const kind = KIND_OF_TYPE.get(type);
     if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, x, y, 40);
+    if (target >= 0 && this.opts.state.entities.get(target)?.type === EntityType.Asteroid) {
+      this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
+      if (this.selfHits.on) this.opts.sound?.('hit', { x, y }, 0.7, 0.85 + Math.random() * 0.3);
+    }
+  }
+
+  /** About what a shell hits with (a rock's sparks are sized by it), from its gun where known */
+  private shellDamage(id: number): number {
+    const d = this.opts.state.entities.get(id)?.data, ship = d ? this.store.get(d[6]) : undefined;
+    const sh = ship && (d![10] ?? -1) >= 0 ? gunShell(this.store.tuning, ship, d![10]) : null;
+    return sh ? Math.round((sh.def.damage ?? 14) * sh.strength * 10) / 10 : 10;
   }
 
   /** Confirmed hits (docs/design/confirmed-hits.md): what the server's records came to, worked out here */
@@ -767,7 +780,7 @@ export class ShipClient {
     renderer.surfaceAt = (x, y, dx, dy, owner, out) => hitSurface(this.store, this.opts.state, x, y, dx, dy, owner, out);
     // Every drawn shell stops at the first drawn surface it touches (ships/drawnHit.ts), and its hit shows there
     renderer.castHit = (x0, y0, x1, y1, owner, skip, out) => this.drawnWorld.cast(x0, y0, x1, y1, owner, skip, out);
-    renderer.onStruck = (id, x, y, type) => this.struckFx(id, x, y, type);
+    renderer.onStruck = (id, x, y, type, target) => this.struckFx(id, x, y, type, target);
     // A guided shell's guide line runs to your cursor while you hold fire
     renderer.guideTo = () => {
       if (!this.fireHeld) return null;
