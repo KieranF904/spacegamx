@@ -27,7 +27,7 @@ import {
   ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG, placeRows, pairPlace, type CauseRow,
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
-  headAgrees, headHashOfWord, ownStateHash, pilotAimQ, stepOwnShip, ownStructure, seedOwnExtras, unpackOwnSync, remapCharge, NO_OWN_INPUT, type HeadHash,
+  headAgrees, headHashOfWord, ownStateHash, pilotAimQ, cloneCharge, stepOwnShip, ownStructure, seedOwnExtras, unpackOwnSync, remapCharge, NO_OWN_INPUT, type HeadHash,
   type OwnExtras, type OwnInputExtras, type ServerOwnSyncMessage, type SimShipState, type SimEvent, type SimEnv, type FieldEnv, type ReplicaEnv,
 } from '@space-game/common';
 import type { StructSource } from '../ShipStore.js';
@@ -200,18 +200,17 @@ export class OwnTick implements OwnTimeline {
   }
 
   /** Tick t's step done and its causes worked out: what it ended the tick with (a rebuild's stores remapped) */
-  private finish(t: number, rows: CauseRow[] | undefined): void {
+  private finish(t: number): void {
     const s = this.stepped.get(t);
     if (!s) return;
     // (The server said how this tick ended: that, exact (its snapshot steps this tick again after the ownSync came))
     const told = this.synced.get(t);
     if (told) { this.full.set(t, told); return; }
     const x: OwnExtras = { charge: s.charge, guns: s.guns, hazard: s.hazard, jumpPrime: s.jumpPrime };
-    // (A rebuild at the tick's end moves the stores to the new structure, as the server's rebuild does)
-    if (rows?.some((r) => r.row[0] === OWN_CAUSE.REBUILD)) {
-      const was = this.derived(t), now = this.derived(t + 1);
-      if (was && now && was !== now) x.charge = remapCharge(was, now, x.charge);
-    }
+    // (A rebuild at the tick's end (the structure it flies the next tick with isn't this one's) moves the stores to the new
+    // structure, as the server's rebuild does)
+    const was = this.derived(t), now = this.derived(t + 1);
+    if (was && now && was !== now) x.charge = remapCharge(was, now, cloneCharge(x.charge));
     this.full.set(t, x);
   }
 
@@ -368,7 +367,7 @@ export class OwnTick implements OwnTimeline {
 
   after(t: number, body: FlightBody): void {
     const rows = this.rowsAt(t);
-    this.finish(t, rows);
+    this.finish(t);
     if (!rows) return;
     this.fired.set(t, { ...body });
     if (this.fired.size > 64) for (const k of [...this.fired.keys()]) if (k < t - KEEP_TICKS) this.fired.delete(k);

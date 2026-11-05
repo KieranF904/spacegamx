@@ -28,6 +28,12 @@ import type { GameData } from '../data/GameData.js';
 
 /** A pilot's own ship as its client's tick layer should have it at the snapshot's tick (SnapshotBuilder.ownNow) */
 interface OwnNow { x: OwnExtras; hash: number }
+
+/** Its hazards as an ownSync tells them (EMP's end, slowing's end, numb's factor): a change is one its client can't foresee */
+function ownHazardKey(x: OwnExtras, tick: number): string {
+  const h = x.hazard, next = tick + 1;
+  return `${h.empUntil > next ? h.empUntil : 0}|${h.slowUntil > next ? h.slowUntil : 0}|${h.numb}`;
+}
 import type { ClientConnection } from './ClientConnection.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { nextSync, type StructEntry } from '../ships/bridge/structLog.js';
@@ -766,11 +772,14 @@ export class SnapshotBuilder {
       // Its own row: whether it goes, and whether to correct its prediction
       const selfRow = rows.find((r) => r.id === conn.playerId);
       const self = selfRow ? this.selfRowState(conn, selfRow, prevStates) : null;
-      // (Its own ship's full state now: the head hash, its check's expectation, and an ownSync with a correction of its
-      // own ship (its row as a fix: first sight, a late input, a new keyframe version, a hazard changed) or its check
-      // found off (OwnChecks): its stores, guns, hazards and priming put right, exact)
+      // (Its own ship's full state now: the head hash, its check's expectation, and an ownSync (its stores, guns, hazards
+      // and priming put right, exact) when its client can't have them: its check found them off (OwnChecks), first sight,
+      // a new keyframe version (a new ship, a teleport), a late input, or its hazards changed (an EMP, a Frostbite's
+      // slowing, the cold's stage). Anything else off its head hash finds within a second or so, and its check brings it)
       const ownNow = this.ownNow(conn);
-      const syncing = !!ownNow && (!!conn.ownSyncDue || !!self?.fix);
+      const hazKey = ownNow ? ownHazardKey(ownNow.x, this.currentTick) : '';
+      const syncing = !!ownNow && (!!conn.ownSyncDue || hazKey !== conn.ownHazards || (!!self && (!prevStates.has(conn.playerId) || conn.selfLate || self.version !== conn.selfVersion)));
+      if (syncing) conn.ownHazards = hazKey;
       const fire: number[][] = [];
       const covered = new Set<number>();
       // (Its ship keyframed in this snapshot, or its state put right (an ownSync): what its layer built its own shells of

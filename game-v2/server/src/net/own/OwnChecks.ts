@@ -15,6 +15,12 @@ import type { ClientConnection } from '../ClientConnection.js';
 
 /** Snapshots remembered per client (2 s at 20 a second: a check rides its client's next input or goes in 4 s at most) */
 const KEEP = 80;
+/**
+ * Ticks after a fix in which a state hash off isn't fixed again (its full state is hashed: something the server does to
+ * its ship that its client can't work out, a shield taking hits from its stores, would otherwise be put right at every
+ * snapshot; once a second at most it is)
+ */
+const FIX_GAP = 60;
 
 export interface OwnChecksHost {
   tick(): number;
@@ -24,10 +30,10 @@ export interface OwnChecksHost {
   resyncHp(conn: ClientConnection): void;
 }
 
-interface Expect { ticks: number[]; at: Map<number, number>; fixedAt: number }
+interface Expect { ticks: number[]; at: Map<number, number>; fixedAt: number; stateFixedAt: number }
 
 export class OwnChecks {
-  readonly stats = { checks: 0, agreed: 0, bodyOff: 0, hpOff: 0, stale: 0, unknown: 0 };
+  readonly stats = { checks: 0, agreed: 0, bodyOff: 0, hpOff: 0, stale: 0, unknown: 0, cooling: 0 };
   private readonly by = new WeakMap<ClientConnection, Expect>();
 
   constructor(private readonly host: OwnChecksHost) {}
@@ -38,7 +44,7 @@ export class OwnChecks {
    */
   note(conn: ClientConnection, tick: number, own: number, hp: readonly number[] | undefined, extra = 0): void {
     let e = this.by.get(conn);
-    if (!e) this.by.set(conn, (e = { ticks: [], at: new Map(), fixedAt: -Infinity }));
+    if (!e) this.by.set(conn, (e = { ticks: [], at: new Map(), fixedAt: -Infinity, stateFixedAt: -Infinity }));
     // (`extra`: every other ship it holds then, Replication.heldByte, and the homing shells it runs)
     e.at.set(tick, ((own + extra) & 0xff) | ((hp ? ownHpHash(hp) : 0) << 8));
     e.ticks.push(tick);
@@ -57,8 +63,12 @@ export class OwnChecks {
     if (want === undefined) { this.stats.unknown++; return; }
     const bodyOk = (want & 0xff) === (c.body & 0xff), hpOk = want >>> 8 === (c.hp & 15);
     if (bodyOk && hpOk) { this.stats.agreed++; return; }
-    e.fixedAt = this.host.tick();
-    if (!bodyOk) { this.stats.bodyOff++; this.host.rekey(conn); }
+    const now = this.host.tick();
+    // (Its state put right lately: not again till FIX_GAP is up, unless its HP is off too)
+    const cool = !bodyOk && now - e.stateFixedAt < FIX_GAP;
+    if (cool && hpOk) { this.stats.cooling++; return; }
+    e.fixedAt = now;
+    if (!bodyOk && !cool) { this.stats.bodyOff++; e.stateFixedAt = now; this.host.rekey(conn); }
     if (!hpOk) { this.stats.hpOff++; this.host.resyncHp(conn); }
   }
 }

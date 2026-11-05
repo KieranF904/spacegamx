@@ -16,7 +16,8 @@
  *
  * What is hashed (ownStateHash): the own ship's full per-tick state, the one stepper's (ring.ts shipHash's fields):
  * pose, velocity, jump, hold and dodge, the controls it flew (CTL bits incl. power and hazards, aim), priming, its
- * stores, its gun state, and its hazards as ticks left from the next tick (so the server's "not slowed: 0" and a
+ * stores, its gun state (less turret aims: point defence follows what the server sees coming), and its hazards as ticks
+ * left from the next tick (so the server's "not slowed: 0" and a
  * client's "slowed until a tick gone by" agree). Not the structure's version (each end counts its own): a missed
  * rebuild shows in the stores or the pose. Both ends step the same state with the same step (common sim/step.ts:
  * the server's stepMovement and fireWeapons, the client's own layer, OwnTick), so it matches to the bit.
@@ -56,7 +57,7 @@ export function headAgrees(h: HeadHash, ownHash: number | undefined): boolean {
 /** What the own state carries besides its pose and controls (the stores, guns, hazards, priming) */
 export type OwnExtras = Pick<SimShipState, 'charge' | 'guns' | 'hazard' | 'jumpPrime'>;
 
-/** (ownStateHash's scratch: the state as shipHash reads it, hazards as ticks left) */
+/** (ownStateHash's scratch: the state as shipHash reads it, hazards as ticks left, turret aims left out) */
 const SCRATCH: SimShipState = {
   // (ReplicaMode.Player: replica.ts is in this file's import cycle, nothing of it is read while it loads)
   id: 0, mode: 0 as ReplicaMode, body: undefined as unknown as FlightBody, ctl: { bits: 0, q: 0 }, charge: undefined as unknown as SimShipState['charge'],
@@ -71,12 +72,20 @@ const SCRATCH: SimShipState = {
 export function ownStateHash(id: number, body: FlightBody, bits: number, q: number, x: Readonly<OwnExtras>, tick: number): number {
   const s = SCRATCH, next = tick + 1;
   s.id = id; s.body = body; s.ctl.bits = bits; s.ctl.q = q;
-  s.charge = x.charge; s.guns = x.guns; s.jumpPrime = x.jumpPrime;
+  s.charge = x.charge; s.jumpPrime = x.jumpPrime;
+  // (Its guns without their turrets' aims: a point-defence turret follows what the server sees coming, which its client
+  // doesn't know. The rest of the gun state is its own guns' doing, stepped alike on both ends)
+  const g = x.guns, v = GUNS;
+  v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin;
+  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow;
+  s.guns = v;
   s.hazard.empUntil = Math.max(0, x.hazard.empUntil - next);
   s.hazard.slowUntil = Math.max(0, x.hazard.slowUntil - next);
   s.hazard.numb = x.hazard.numb;
   return shipHash(s);
 }
+
+const GUNS: SimShipState['guns'] = { cooldown: [], rounds: [], reload: [], charge: [], spin: [], aim: [], triggerHeld: false, clickAt: -1 };
 
 /** The head's word for its own ship at the snapshot's tick: held, with its state hash (ownStateHash); or not held */
 export function headWord(hash: number | null, flags = 0): number {
