@@ -250,6 +250,8 @@ export class GameState {
   public serverCharge: Charge = { ...FULL_CHARGE };
   /** Replicated ships: a snapshot's keyframes and control changes go here... */
   public onReplication: ((snapshot: ServerSnapshotMessage) => void) | null = null;
+  /** Its own ship on the tick layer at a snapshot's tick, when causes moved it there (CAPS.OWN_SIM: ShipClient.ownTickPose) */
+  public ownTickPose: ((tick: number) => { x: number; y: number; angle: number; vx: number; vy: number; angVel: number } | null) | null = null;
   /** First thing with each snapshot: replicated motion is brought up to date, and fire events become shells */
   public preSnapshot: ((snapshot: ServerSnapshotMessage) => EntityState[]) | null = null;
   /** ...and each frame, every other ship is placed by its replica (true = placed) */
@@ -992,7 +994,7 @@ export class GameState {
     if (!player) return;
     
     const serverState = snapshot.entities.find(e => e.id === this.playerId);
-    if (!serverState) return;
+    if (!serverState) { this.followOwnTick(player, snapshot.tick); return; }
     
     // --- Prediction disagreement: measure BEFORE snapping ---
     // player.x/y = our predicted position; serverState.x/y = authoritative
@@ -1136,6 +1138,35 @@ export class GameState {
       player.renderX = player.x;
       player.renderY = player.y;
     }
+  }
+
+  /**
+   * No own row, but its tick layer worked out what moved its ship in this snapshot's window (CAPS.OWN_SIM: a contact,
+   * a pull, a rebuild's recentring; the server no longer sends a row for those): where the prediction had it at the
+   * snapshot's tick differs from where the tick layer has it, so it's put there and its inputs since replayed, as a
+   * row would have. Its energy and fuel stay the prediction's (a row's own values only come with a row)
+   */
+  private followOwnTick(player: InterpolatedEntity, tick: number): void {
+    const p = this.ownTickPose?.(tick);
+    const was = p && this.selfPoses.get(tick);
+    if (!p || !was) return;
+    const d = Math.abs(was.x - p.x) + Math.abs(was.y - p.y) + Math.abs(was.vx - p.vx) + Math.abs(was.vy - p.vy) + Math.abs(was.angle - p.angle);
+    if (d < 1e-4) return;
+    const oldRenderX = player.renderX, oldRenderY = player.renderY;
+    player.x = p.x; player.y = p.y; player.angle = p.angle; player.vx = p.vx; player.vy = p.vy; player.angVel = p.angVel;
+    this.noteSelf(player, tick);
+    this.pendingInputsByTick = this.pendingInputsByTick.filter((entry) => entry.tick > tick);
+    this.pendingInputsByTick.sort((a, b) => a.tick - b.tick);
+    const charge = this.charge, fuel = this.boostFuel;
+    for (const entry of this.pendingInputsByTick) {
+      this.selfPrev = { x: player.x, y: player.y, angle: player.angle };
+      this.reapplyInput(player, entry.input, entry.tick);
+    }
+    this.charge = charge; this.boostFuel = fuel;
+    const errorX = player.x - oldRenderX, errorY = player.y - oldRenderY, errorDist = Math.hypot(errorX, errorY);
+    if (errorDist > SNAP_THRESHOLD) { player.renderX = player.x; player.renderY = player.y; }
+    else if (errorDist > SMOOTH_THRESHOLD) { player.renderX = oldRenderX + errorX * RECONCILE_SMOOTH; player.renderY = oldRenderY + errorY * RECONCILE_SMOOTH; }
+    else { player.renderX = player.x; player.renderY = player.y; }
   }
 
   /** Replay an unacknowledged input during reconciliation. */

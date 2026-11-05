@@ -613,7 +613,9 @@ export class SnapshotBuilder {
     const d = r.state.data ?? [];
     const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
     const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
-    const version = this.replication.versionOf(r.id);
+    // (A client stepping its own ship (CAPS.OWN_SIM) goes by its own keyframe version: what its tick layer worked out
+    // itself (a contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
+    const version = (ownSimFor(conn.caps) ? this.replication.ownVersionOf(r.id) : undefined) ?? this.replication.versionOf(r.id);
     const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
     const need = fix || key !== conn.selfKey || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS;
     return { need, fix, key, flight, version };

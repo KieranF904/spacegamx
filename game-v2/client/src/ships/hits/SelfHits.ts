@@ -11,7 +11,8 @@
  *   the cast the server's (common hitRules.ts shipSegmentHit), against the ship as this client has it; who may hurt
  *            whom by the server's rule (sidesHurt)
  *
- * It leaves alone what it can't have exactly, and the server tells those (as records): its own ship, debris, a ship
+ * It leaves alone what it can't have exactly, and the server tells those (as records): its own ship (unless it steps
+ * it itself, CAPS.OWN_SIM: then its replica of it is exact too), debris, a ship
  * synced in this frame (rebuilt: its shape changed mid-window) or keyframed (its path did), shells the snapshot removed (rock, expiry, point
  * defence: their end tick isn't known), shells that don't fly straight or arm late, two pilots' fights.
  *
@@ -65,6 +66,11 @@ export interface SelfHitsHost {
   side(id: number): number;
   /** A shell's pass count so far (ConfirmedHits.passesOf) */
   passes(shell: number): number;
+  /**
+   * Does it step its own ship on the tick layer (CAPS.OWN_SIM: own/OwnTick.ts)? Then that replica is exact too, and the
+   * hits on its own ship are its to find as on any other (the server's HitLedger.unfindable agrees)
+   */
+  ownExact?(): boolean;
 }
 
 /** A hit the server told this frame (its record): the shell struck `target` on `tick`, and was spent if `gone` */
@@ -269,11 +275,11 @@ export class SelfHits {
     // (STRICT: the server tells every hit; the told records still go through the layer, at settle)
     if (this.on && !this.rules.strict && from >= 0 && tick > from && tick - from <= 120) {
       this.stats.windows++;
-      const { store } = this.host, me = this.host.self();
+      const { store } = this.host, me = this.host.self(), mine = this.host.ownExact?.() ?? false;
       const targets: number[] = [];
       for (const id of this.host.ships()) {
         const s = store.get(id);
-        if (id !== me && s && s.kind !== 'debris' && !this.synced.has(id)) targets.push(id);
+        if ((id !== me || mine) && s && s.kind !== 'debris' && !this.synced.has(id)) targets.push(id);
       }
       const ids = [...this.shells.keys()].sort((a, b) => a - b);
       for (const s of this.shells.values()) s.win = 0;

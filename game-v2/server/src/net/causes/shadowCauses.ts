@@ -26,6 +26,8 @@ export interface CauseEvent {
     other: number; inStep: boolean; preStep?: boolean; version: number; cver: number; rebuilds: number; before?: boolean;
     /** The other flown by its body (CAPS.BODIES): whether its bodied shadow, as clients running it have it, was the pass's; its version then */
     bodyStep?: boolean; bcver?: number;
+    /** ...and before all its causes that tick (what a pilot's own client reads of it: OwnTick, as preStep) */
+    bodyPreStep?: boolean;
   };
 }
 
@@ -99,6 +101,7 @@ export function settleContacts(events: readonly CauseEvent[], tick: number, shad
     const ob = o?.bodied;
     c.bcver = ob?.cver ?? -1;
     c.bodyStep = !!ob && ob.stepped === tick && same(midOf(ob, tick, events[i].seq));
+    c.bodyPreStep = !!ob && ob.stepped === tick && same(ob.preTick === tick ? ob.pre : ob.body);
   }
 }
 

@@ -297,6 +297,7 @@ private xpFillEl: HTMLElement | null;
     if (!this.proto) {
       this.state.preSnapshot = (m) => this.shipClient.preSnapshot(m);
       this.state.onReplication = (m) => this.shipClient.onReplication(m);
+      this.state.ownTickPose = (t) => this.shipClient.ownTickPose(t);
       this.state.replicaPose = (e, t) => this.shipClient.placeReplica(e, t);
     }
     this.audio = new AudioManager();

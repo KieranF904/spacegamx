@@ -117,6 +117,7 @@ export class FakeHitsClient {
           return (pilot ? SIDE.PILOT : 0) | (k?.side === 1 ? SIDE.WARD : 0) | (k?.side === 2 ? SIDE.PERSON : 0) | (this.reps.isDocked(id) ? SIDE.DOCKED : 0);
         },
         passes: (shell) => this.hits!.passesOf(shell),
+        ownExact: () => !!this.own?.on,
       });
     }
     if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => (this.causes?.heldByte(t) ?? 0) + (this.guides?.byte(t) ?? 0) });
