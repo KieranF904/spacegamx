@@ -53,6 +53,8 @@ export interface ShipState {
   minePaid?: number;
   /** The tick the mining laser's pulse under way ends (energy.ts MINE_CYCLE) */
   mineUntil?: number;
+  /** The share of their draw the mining lasers got this tick (energy.ts payMining: they cut by it) */
+  mineShare?: number;
   /** Turret aim, by part index: radians from the centre of its window */
   aim: number[];
   derived: ShipDerived;

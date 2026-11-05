@@ -118,7 +118,7 @@ describe('mining', () => {
     mining.extract(hard.eid, pid, 500, files.mining.tools.fixed, 0, 0, 1, 0);
     expect(mining.remaining(hard.eid)).toBe(before);
     expect(got.some((m) => m.type === 'toast' && /too hard/i.test((m as any).text))).toBe(true);
-    mining.extract(hard.eid, pid, 60, { yield: files.mining.tools.miner.yield, hardness: 2 }, 0, 0, 1, 0);
+    mining.extract(hard.eid, pid, 60, { yield: files.mining.tools.miner.yield, hardness: 2, grade: 1 }, 0, 0, 1, 0);
     expect(before - mining.remaining(hard.eid)).toBeGreaterThanOrEqual(Math.floor(60 * files.mining.tools.miner.yield / files.mining.damagePerUnit));
   });
 

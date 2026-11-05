@@ -136,7 +136,8 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
     if (ph === -1) continue;
     const mp = ph >= 0 ? pulseProfile(miningPulse(pz!.minePulse[m.part])) : prof, ma = ph >= 0 ? Math.min(mp.ticks - 1, ph) : age;
     const focus = mp.share[ma] * mp.ticks;
-    const fill = ph >= 0 ? pe!.sat[m.part] / 255 : 1;
+    // (Cut by the share of its draw it got: a ports ship's laser its fulfilment, the rest the ship's share for its mining lasers)
+    const fill = ph >= 0 ? pe!.sat[m.part] / 255 : ship.mineShare ?? 1;
     if (m.satisfaction * fill <= 0.01) continue;
     const [x, y] = shipPointToWorld(ship, pose, m.muzzle, cs);
     const facing = pose.angle + Math.PI / 2 + datan2(m.dir[1], m.dir[0]);

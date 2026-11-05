@@ -39,7 +39,7 @@ The **pool** is the core's store plus every battery on a powered network. **Bank
 |---|---|
 | Pip cannon | 8 E/s while firing |
 | Rattler | 12 E/s |
-| Mining Laser | 12 E/s |
+| Mining Laser | 30 E/s while mining (a Cell Reactor runs about one) |
 | Ion Drive | 9 E/s |
 | Afterburner | 8 E/s, 60.8 E/s when boosting |
 | Plasma Drive | 40 E/s |

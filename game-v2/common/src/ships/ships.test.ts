@@ -411,6 +411,30 @@ describe('flow network and solver (M4)', () => {
     expect(dead.mineUntil ?? 0).toBe(0);
   });
 
+  it('a Cell Reactor runs one mining laser; more brown out to the share they get (mineShare, what they cut by), and the Prospector runs its own while thrusting', () => {
+    /** `n` Mk I mining lasers on a core and one Cell Reactor (or the Prospector), mining held from full for `secs`: the last share they got */
+    const run = (b: Blueprint, secs: number, thrusting = false) => {
+      const ship = createShipState(catalog, tuning, 1, b, 0);
+      let charge: Charge = FULL_CHARGE;
+      for (let t = 1; t <= secs * 60; t++) {
+        charge = powerTick(ship.derived, charge, { thrusting, boosting: false, load: gunLoad(ship, t) }, tuning).charge;
+        payMining(ship, true, t, { charge });
+      }
+      return ship.mineShare!;
+    };
+    const rig = (n: number) => bp([
+      p(0, 'sq', 'core', 0, 0), p(1, 'sq', 'power_cell_reactor', 0, 1), p(2, 'sq', 'hull', -1, 0), p(3, 'sq', 'hull', 1, 0), p(4, 'sq', 'hull', -2, 0), p(5, 'sq', 'hull', 2, 0),
+      ...[0, -1, 1, -2].slice(0, n).map((x, i) => p(10 + i, 'sq', 'utility_mining_laser', x, -1, { facing: 'N' as Side })),
+    ]);
+    expect(run(rig(1), 60)).toBe(1);
+    const two = run(rig(2), 60), four = run(rig(4), 60);
+    expect(two).toBeLessThan(0.65);
+    expect(four).toBeLessThan(0.35);
+    // (Two lasers on one reactor mine only a little more than one)
+    expect(2 * two).toBeLessThan(1.3);
+    expect(run(prospectorBp(), 60, true)).toBe(1);
+  });
+
   it('a gun draws its shot\'s energy as it reloads: with nothing to draw on it fires what it was loaded with, then waits', () => {
     const b = sparrow();
     const pose = { x: 0, y: 0, angle: -Math.PI / 2 };
