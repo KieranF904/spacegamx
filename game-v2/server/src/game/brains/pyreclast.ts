@@ -296,10 +296,13 @@ export class PyreclastBrain extends StagedBrain {
     for (let i = 0; i < warn; i++) { this.want = wantFace(heading); yield; }
     if (this.named(this.ship.blueprint.parts[root].piece) < 0) return;
     const sweep = 48, hit = new Set<number>();
+    // (the blade, drawn over its reach only: client BossFx 'scythe')
+    this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'scythe', bodyId: eid, x: 0, y: 0, a0: side * 0.25, a1: side * (Math.PI - 0.25), ticks: sweep, length: Math.round(r + SCYTHE_FAR), width: 220 });
     for (let i = 0; i <= sweep; i++) {
       // (from just off its nose round that side to just off its tail)
       const me = pose(eid), a = me.angle + side * (0.25 + (Math.PI - 0.5) * (i / sweep));
       const ux = dcos(a), uy = dsin(a);
+
       for (const q of this.host.players(this.view.systemNum)) {
         if (hit.has(q)) continue;
         const dx = Position.x[q] - me.x, dy = Position.y[q] - me.y, along = dx * ux + dy * uy, across = Math.abs(dx * uy - dy * ux);
@@ -405,10 +408,10 @@ export class PyreclastBrain extends StagedBrain {
     return { x: m.x, y: m.y };
   }
 
-  /** Its core flares (something's coming out of it) */
-  private *flare(ticks: number, want = wantHold()): Move {
+  /** Its core flares (`ring`: a ring pulse coming) or its seams glow (`seams`: a swarm): something's coming out of it */
+  private *flare(ticks: number, want = wantHold(), kind = 'ring'): Move {
     const at = bodyFrame(this.host, this.view.eid, this.ship, this.core());
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'ring', bodyId: this.view.eid, x: Math.round(at.x), y: Math.round(at.y), radius: 260, ticks });
+    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind, bodyId: this.view.eid, x: Math.round(at.x), y: Math.round(at.y), radius: kind === 'seams' ? 420 : 260, ticks });
     for (let i = 0; i < ticks; i++) { this.want = want; yield; }
   }
 
@@ -462,7 +465,7 @@ export class PyreclastBrain extends StagedBrain {
   private *swarm(): Move {
     const eid = this.view.eid, who = this.view.present?.length ? this.view.present : this.pilots(6000);
     if (!who.length) return;
-    yield* this.flare(72);
+    yield* this.flare(72, wantHold(), 'seams');
     const c = this.coreAt(), a0 = this.host.rng() * Math.PI * 2;
     for (let j = 0; j < 8; j++) {
       const a = a0 + (j / 8) * Math.PI * 2;
