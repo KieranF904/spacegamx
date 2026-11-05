@@ -352,8 +352,10 @@ export class HitLedger {
     if (!owner || !os || os.ship !== owner || os.rebuilds !== owner.rebuilds) return 'owner';
     // (as near as its damage number would go)
     if (!this.host.net.nearClient(conn, h.sys, Position.x[h.target], Position.y[h.target], h.owner)) return 'far';
-    const sh = gunShell(ships.tuning, owner, h.gun);
-    if (!sh) return 'gun';
+    const g = gunShell(ships.tuning, owner, h.gun);
+    if (!g) return 'gun';
+    // (its damage multiplier as this client was told it: a stale one is put right by the record's damage)
+    const sh = { ...g, strength: g.strength * (os.dmg ?? 1) };
     // What it draws at the shell's end must be what the server told (a dry round, out of ammunition, has no effects)
     const fx = hitEndFx(sh.kind, sh.def, h.gone);
     if (fx ? !h.end || h.end.kind !== fx.kind || h.end.radius !== fx.radius : !!h.end) return 'fx';

@@ -19,6 +19,12 @@ export interface ShipState {
   maxHp: number[];
   /** Its parts' HP is scaled from the blueprint's (a boss's hp, a hardened core): clients are sent the true maximums */
   scaledHp?: boolean;
+  /**
+   * A client's copy only: what its shells' damage is scaled by (a boss's `damage` and rage: the server's damage
+   * multiplier, sent on its syncs as `dmg`), so hits by its guns are worked out as the server's land (hitRules.ts
+   * gunShell). Absent = 1. The server keeps its own multiplier apart (ShipBridge.damageMulOf)
+   */
+  dmg?: number;
   /** HP as it was at the last rebuild (what `derived` was computed from; clients rebuild from this) */
   rebuildHp: number[];
   /** Part left this body as debris (its blueprint entry stays for repair) */

@@ -369,7 +369,9 @@ export class SnapshotBuilder {
           kept = next.kept;
           at = next.at;
         }
-        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept };
+        // (Its shells' damage multiplier: on a new ship's sync when it isn't 1, then whenever it changed)
+        const dmg = this.ships.damageMulOf(id), hadDmg = fresh ? 1 : (synced?.dmg ?? 1);
+        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg };
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;
@@ -397,6 +399,7 @@ export class SnapshotBuilder {
           // (A piece of debris new to it: its grace, and whether it knocks at all, as its debris world steps it)
           born: fresh && ship.kind === 'debris' ? ship.spawnTick : undefined,
           aloof: fresh && ship.kind === 'debris' && this.ships.debrisNet.intangible.has(id) ? 1 : undefined,
+          dmg: dmg !== hadDmg ? dmg : undefined,
         });
       }
       if (!hps_ || !synced) continue;

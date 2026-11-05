@@ -49,7 +49,7 @@ export interface ClientConnection {
    * last went (`at`: a client finding its own hits leaves a ship synced in that snapshot to the records, HitLedger);
    * `kept`: the rebuild counts whose structures it keeps by tick, oldest first (CAPS.STRUCTS: every one since went)
    */
-  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number; kept?: number[] }>;
+  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number; kept?: number[]; dmg?: number }>;
   /** Last part HP sent to this client, per ship body */
   shipHpSent: Map<number, number[]>;
   /** Entity names this client has been sent (names go once) */

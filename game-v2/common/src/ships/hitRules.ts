@@ -339,7 +339,7 @@ export function gunShell(tuning: ShipTuning, ship: ShipState, gun: number): GunS
   if (!w) return null;
   const mods = stackMods(ammoByCode(ammo)?.mods, aug ? ship.derived.ports?.augMods[part] : undefined);
   const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[part]?.mods, ammo: mods, grade: w.grade, size: w.size, model: w.model });
-  return { kind: w.kind, def, grade: w.grade ?? 1, strength: w.strength ?? 1 };
+  return { kind: w.kind, def, grade: w.grade ?? 1, strength: (w.strength ?? 1) * (ship.dmg ?? 1) };
 }
 
 // ---- Who may hurt whom, and where a shell meets a ship (client-detected hits, part D) ----

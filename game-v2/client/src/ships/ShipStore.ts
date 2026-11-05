@@ -82,6 +82,10 @@ export class ShipStore implements ShipSource, StructSource {
       ? prev!
       : createShipState(this.catalog, this.tuning, msg.id, msg.blueprint!, 0, { kind: msg.kind });
     ship.kind = msg.kind;
+    // (Its shells' damage multiplier: a new ship's (design or blueprint: the server's first sync of it) as it says, else
+    // only when it says it changed)
+    if (msg.design !== undefined || msg.blueprint) ship.dmg = msg.dmg;
+    else if (msg.dmg !== undefined) ship.dmg = msg.dmg === 1 ? undefined : msg.dmg;
     if (msg.hp) ship.hp = [...msg.hp];
     // (a boss's hull isn't the blueprint's: its true maximums, so full health draws as full)
     if (msg.maxHp && msg.maxHp.length === ship.maxHp.length) ship.maxHp = [...msg.maxHp];
