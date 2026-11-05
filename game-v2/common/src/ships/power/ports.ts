@@ -399,8 +399,13 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     inStart[i] = inLink.length; for (let l = 0; l < linkTo.length; l++) if (linkTo[l] === i) inLink.push(l);
   }
   outStart[n] = outLink.length; inStart[n] = inLink.length;
-  // (A consumer takes at most what its own lines can bring: its main lines; an augment's are its own)
-  for (let i = 0; i < n; i++) if (role[i] === P_WEAPON || role[i] === P_THRUSTER || role[i] === P_TOOL) { let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) if (!linkAug[inLink[x]]) r += linkCap[inLink[x]]; rate[i] = Math.min(rate[i] || r, r) || rate[i]; }
+  // (A consumer takes at most what its own lines can bring: its main lines; an augment's are its own. A thruster takes
+  // all its lines bring (its in ports are rated for its boosted burn: a store or a strong line in front keeps a boost going,
+  // a weak one gives a short dash from its buffer); a gun or a tool no more than its own intake, which keeps its rhythm)
+  for (let i = 0; i < n; i++) if (role[i] === P_WEAPON || role[i] === P_THRUSTER || role[i] === P_TOOL) {
+    let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) if (!linkAug[inLink[x]]) r += linkCap[inLink[x]];
+    rate[i] = role[i] === P_THRUSTER ? r || rate[i] : Math.min(rate[i] || r, r) || rate[i];
+  }
 
   // ---- Feed points and networks (union-find; a Selector's points join nothing, they look across)
   type FP = { part: number; x: number; y: number; side: Side; nx: number; ny: number; joined: number; i: number };
