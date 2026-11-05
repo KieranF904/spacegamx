@@ -44,6 +44,6 @@ export class ReplicaState implements SimShipState, SimCtl {
 }
 
 /** shipHash of a ship's replica state (what the head hash compares): the same on both ends for the same body and controls */
-export function replicaHash(id: number, mode: ReplicaMode, body: FlightBody, bits: number, q: number): number {
+export function replicaStateHash(id: number, mode: ReplicaMode, body: FlightBody, bits: number, q: number): number {
   return shipHash(new ReplicaState(id, mode, body, bits, q));
 }

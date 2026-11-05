@@ -258,6 +258,10 @@ export interface ReplicaCauses {
  */
 export interface ReplicaRewinds {
   rewound(id: number, t: number): void;
+  /** Something is waiting to be worked out before a ship is stepped (pairs to find again, ships to step again) */
+  readonly unsettled?: boolean;
+  /** Work it out (asked only when the set isn't part way through a step: ShipReplicaSet.busy) */
+  settle?(): void;
 }
 
 /**
@@ -452,6 +456,21 @@ export class ShipReplicaSet {
   private stepPre(id: number, r: Rep, t: number, prev: ReplicaState, d: ShipDerived): ReplicaState {
     const have = this.ahead.get(id, t);
     if (have) return have as ReplicaState;
+    this.stepping++;
+    try {
+      return this.stepPreNow(id, r, t, prev, d);
+    } finally {
+      this.stepping--;
+    }
+  }
+
+  /** Steps part way through now (stepPre's, at's, the debris world's): nothing is rewound under them (settle waits) */
+  private stepping = 0;
+  get busy(): boolean {
+    return this.stepping > 0;
+  }
+
+  private stepPreNow(id: number, r: Rep, t: number, prev: ReplicaState, d: ShipDerived): ReplicaState {
     const own = this.own?.id === id ? this.own.src : null;
     const ev = own ? own.ctl(t) : r.events.get(t);
     // (Flown by its body: its controls and push from that, CAPS.BODIES)
@@ -596,11 +615,16 @@ export class ShipReplicaSet {
 
   /** The state at a whole tick, stepping forward as needed (null: unknown ship) */
   at(id: number, tick: number): Step | null {
+    // (What the contact pass left waiting, worked out before anything is read: never part way through a step)
+    if (this.stepping === 0 && this.hook?.unsettled) this.hook.settle?.();
     const r = this.reps.get(id);
     const ring = this.ring;
     if (!r || !ring.size(id)) return null;
     // (Debris steps as a world: all of it to this tick, knocks and all)
-    if (r.mode === ReplicaMode.Drift) this.stepDebrisTo(tick);
+    if (r.mode === ReplicaMode.Drift) {
+      this.stepping++;
+      try { this.stepDebrisTo(tick); } finally { this.stepping--; }
+    }
     const exact = ring.get(id, tick) as ReplicaState | undefined;
     if (exact) return exact;
     let last = this.lastT(id);
@@ -623,6 +647,8 @@ export class ShipReplicaSet {
     if (!d || r.mode === ReplicaMode.Drift) return cur;
     // Don't run away: a ship we haven't heard about for a long time simply waits
     const to = Math.min(tick, last + 600);
+    this.stepping++;
+    try {
     while (last < to) {
       const t = last + 1;
       const pre = this.stepPre(id, r, t, cur, d);
@@ -643,6 +669,9 @@ export class ShipReplicaSet {
       cur = new ReplicaState(id, r.mode, body, pre.bits, pre.q);
       ring.keep(t, cur);
       last = t;
+    }
+    } finally {
+      this.stepping--;
     }
     if (r.events.size > 64) for (const t of r.events.keys()) if (t < last - HISTORY) r.events.delete(t);
     return cur;
