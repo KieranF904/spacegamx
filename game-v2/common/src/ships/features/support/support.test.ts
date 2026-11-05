@@ -15,12 +15,12 @@ import { damagePart } from '../../state.js';
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const sparrowBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
-/** The Sparrow with a Repair Beam above its right gun and a Point Defence Turret in place of its left one */
+/** The Sparrow with a Repair Beam on its right shoulder and a Point Defence Turret in place of its left gun */
 const warden = () => {
   const bp = sparrowBp();
   bp.parts = bp.parts.filter((p) => p.uid !== 2);
   bp.parts.push(
-    { uid: 2, piece: 'sq', fn: 'point_defence_turret', material: 'steel', x: -1, y: 0, rot: 0, flip: false, facing: 'N' } as never,
+    { uid: 2, piece: 'sq', fn: 'point_defence_turret', material: 'steel', x: 0, y: -1, rot: 0, flip: false, facing: 'N' } as never,
     { uid: 50, piece: 'rect2', fn: 'utility_repair_beam', material: 'steel', x: 2, y: -1, rot: 0, flip: false, facing: 'N' } as never,
   );
   return createShipState(catalog, tuning, 1, bp, 0);
@@ -96,19 +96,19 @@ describe('repairAt', () => {
   it('mends the damaged parts nearest the point, nearest first, at most three, never a destroyed one', () => {
     const s = createShipState(catalog, tuning, 1, sparrowBp(), 0);
     const geoms = blueprintGeometry(catalog, s.blueprint);
-    // The right gun (uid 3, at 2,0), its neighbour the hull (uid 8, at 2,1), and the left gun far away (uid 2)
+    // The right reactor (uid 13, at 2,0), its neighbour the hull (uid 8, at 2,1), and the left gun far away (uid 2)
     const idx = (uid: number) => s.blueprint.parts.findIndex((p) => p.uid === uid);
-    for (const u of [3, 8, 2]) damagePart(s, idx(u), s.maxHp[idx(u)] * 0.5, tuning);
+    for (const u of [13, 8, 2]) damagePart(s, idx(u), s.maxHp[idx(u)] * 0.5, tuning);
     damagePart(s, idx(12), Infinity, tuning);
     const before = [...s.hp];
     const got = repairAt(s, geoms, 2.5, 0.5, 5, tuning);
     expect(got).toBeCloseTo(5, 6);
-    expect(s.hp[idx(3)]).toBeCloseTo(before[idx(3)] + 5, 6);
+    expect(s.hp[idx(13)]).toBeCloseTo(before[idx(13)] + 5, 6);
     // More than the nearest needs: on to the next nearest
-    const need = s.maxHp[idx(3)] - s.hp[idx(3)];
+    const need = s.maxHp[idx(13)] - s.hp[idx(13)];
     const more = repairAt(s, geoms, 2.5, 0.5, need + 3, tuning);
     expect(more).toBeCloseTo(need + 3, 6);
-    expect(s.hp[idx(3)]).toBeCloseTo(s.maxHp[idx(3)], 6);
+    expect(s.hp[idx(13)]).toBeCloseTo(s.maxHp[idx(13)], 6);
     expect(s.hp[idx(8)]).toBeCloseTo(before[idx(8)] + 3, 6);
     expect(s.hp[idx(2)]).toBe(before[idx(2)]);
     expect(s.hp[idx(12)]).toBe(0);

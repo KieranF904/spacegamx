@@ -116,9 +116,13 @@ describe('models', () => {
     expect(sparrow.parts.filter((q) => FN(q.fn).model).every((q) => FN(q.fn).unlock?.level === 0)).toBe(true);
     expect(validateBlueprint(catalog, sparrow, tuning, null).errors).toEqual([]);
     const d = createShipState(catalog, tuning, 1, sparrow, 0).derived;
-    // On the ports core: a Cell Reactor straight behind each Pip and each Ion Drive (the starter's answer: one line each)
+    // On the ports core, the core the hub: a Cell Reactor at each side feeds it, and it runs the Pips at its nose and the
+    // Ion Drives behind it through conduits (as the old one's two reactors made power for everything)
     expect(d.ports).toBeDefined();
-    expect(d.energy.supply).toBeCloseTo(4 * FN('generator').produce!, 9);
+    expect(d.energy.supply).toBeCloseTo(2 * FN('generator').produce!, 9);
+    const L = d.ports!, core = sparrow.parts.findIndex((q) => q.fn === 'core');
+    expect(L.gens.length).toBe(2);
+    for (const g of L.gens) expect(Array.from(L.outLink.subarray(L.outStart[g], L.outStart[g + 1]), (l) => L.linkTo[l])).toEqual([core]);
     // Its push: two ion drives, as two thrusters pushed
     expect(d.maxThrust.forward).toBeCloseTo(2 * FN('thruster').thrust!, 6);
     expect(d.weapons).toHaveLength(2);

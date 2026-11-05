@@ -180,8 +180,8 @@ describe('death and rebuilding', () => {
     const park = () => { Position.x[pid] = 40000; Position.y[pid] = 40000; };
     const conn = connOf(server, pid);
     const profile = profileOf(server, pid);
-    // The nose cap hangs off the core alone, so losing it orphans nothing else
-    const hullIdx = ships.get(pid)!.blueprint.parts.findIndex((p) => p.fn === 'hull' && p.piece === 'cap');
+    // The left wing tip hangs off the hull beside it alone, so losing it orphans nothing else
+    const hullIdx = ships.get(pid)!.blueprint.parts.findIndex((p) => p.fn === 'hull' && p.piece === 'tri');
     const restoreTicks = ships.tuning.repair!.restoreTicks + ships.tuning.repair!.intervalTicks * 2;
     const missing = () => ships.get(pid)!.derived.alive.filter((a) => !a).length;
 

@@ -22,14 +22,14 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 const files = readGameDataFiles(dataDir);
 const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
 const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/corsair.json'), 'utf-8'));
-/** The Sparrow with a Burst Strafer on each flank and a Tow Beam under its nose... (a Tug-ish Dancer) */
+/** The Sparrow with a Burst Strafer on each flank and a Tow Beam under its left wing, in place of the wing's armour tip (a Tug-ish Dancer) */
 const fitted: Blueprint = {
   ...sparrow,
   parts: [
-    ...sparrow.parts,
+    ...sparrow.parts.filter((p) => p.uid !== 10),
     { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' },
     { uid: 61, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: -2, y: 0, rot: 0, flip: false, facing: 'W' },
-    { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -1, y: 3, rot: 0, flip: false, facing: 'S' },
+    { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -2, y: 2, rot: 0, flip: false, facing: 'S' },
   ] as Blueprint['parts'],
 };
 

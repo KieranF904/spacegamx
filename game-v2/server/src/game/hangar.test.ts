@@ -365,7 +365,7 @@ describe('repair kits and the quick bar', () => {
     const { server, t, pid, conn, ships, profile, got } = world();
     park(pid);
     const ship = ships.get(pid)!;
-    const hull = ship.blueprint.parts.findIndex((p) => p.fn === 'hull' && p.piece === 'cap');
+    const hull = ship.blueprint.parts.findIndex((p) => p.fn === 'hull' && p.piece === 'tri');
     const gun = ship.blueprint.parts.findIndex((p) => p.fn === 'cannon_pip');
     ships.damagePartFraction(pid, gun, 0.5); // damaged
     ships.damagePartFraction(pid, hull, 1); // lost
@@ -379,7 +379,7 @@ describe('repair kits and the quick bar', () => {
     for (let i = 0; i < 30; i++) { park(pid); server.step(); }
     const s = ships.get(pid)!;
     expect(s.hp[gun]).toBeLessThan(s.maxHp[gun]);
-    // In time: the gun is mended, then the lost cap comes back
+    // In time: the gun is mended, then the lost wing tip comes back
     for (let i = 0; i < 60 * 40 && !ships.get(pid)!.derived.alive[hull]; i++) { park(pid); server.step(); }
     expect(ships.get(pid)!.hp[gun]).toBeCloseTo(ships.get(pid)!.maxHp[gun], 3);
     expect(ships.get(pid)!.derived.alive[hull]).toBe(true);

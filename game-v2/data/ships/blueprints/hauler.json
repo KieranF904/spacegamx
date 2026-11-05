@@ -27,9 +27,9 @@
     {"uid":25,"piece":"block2","fn":"hull","material":"composite","x":-3,"y":13,"rot":0,"flip":false},
     {"uid":26,"piece":"block2","fn":"hull","material":"composite","x":1,"y":13,"rot":0,"flip":false},
     {"uid":27,"piece":"block2","fn":"shield_bulwark_projector","material":"titanium","x":-1,"y":14,"rot":0,"flip":false},
-    {"uid":28,"piece":"block2","fn":"power_fusion_plant","material":"steel","x":-2,"y":19,"rot":2,"flip":false},
-    {"uid":29,"piece":"block2","fn":"power_fusion_plant","material":"steel","x":0,"y":19,"rot":2,"flip":false},
-    {"uid":30,"piece":"block2","fn":"power_fusion_plant","material":"steel","x":2,"y":19,"rot":2,"flip":false},
+    {"uid":28,"piece":"rect2","fn":"power_overclock_reactor","material":"titanium","x":-2,"y":19,"rot":2,"flip":false},
+    {"uid":29,"piece":"rect2","fn":"power_overclock_reactor","material":"titanium","x":0,"y":19,"rot":2,"flip":false},
+    {"uid":30,"piece":"rect2","fn":"power_overclock_reactor","material":"titanium","x":2,"y":19,"rot":2,"flip":false},
     {"uid":32,"piece":"block2","fn":"engine_fusion_torch","material":"cobalt","x":-3,"y":20,"rot":0,"flip":false,"facing":"S"},
     {"uid":33,"piece":"block2","fn":"engine_fusion_torch","material":"cobalt","x":-1,"y":20,"rot":0,"flip":false,"facing":"S"},
     {"uid":34,"piece":"block2","fn":"engine_fusion_torch","material":"cobalt","x":1,"y":20,"rot":0,"flip":false,"facing":"S"},
@@ -97,6 +97,9 @@
     {"uid":116,"piece":"rect2","fn":"hull","material":"composite","x":-1,"y":17,"rot":0,"flip":false},
     {"uid":117,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":2,"y":17,"rot":1,"flip":false},
     {"uid":118,"piece":"rect2","fn":"hull","material":"composite","x":1,"y":16,"rot":0,"flip":false},
-    {"uid":119,"piece":"sq","fn":"hull","material":"composite","x":1,"y":17,"rot":0,"flip":false}
+    {"uid":119,"piece":"sq","fn":"hull","material":"composite","x":1,"y":17,"rot":0,"flip":false},
+    {"uid":120,"piece":"rect2","fn":"armor","material":"alloy","x":-3,"y":18,"rot":0,"flip":false},
+    {"uid":121,"piece":"rect2","fn":"armor","material":"alloy","x":-1,"y":18,"rot":0,"flip":false},
+    {"uid":122,"piece":"rect2","fn":"armor","material":"alloy","x":1,"y":18,"rot":0,"flip":false}
   ]
 }

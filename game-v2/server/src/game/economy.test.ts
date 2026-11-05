@@ -124,9 +124,9 @@ describe('mining', () => {
 
   it('a ship with a mining laser mines with the right mouse button', () => {
     const { server, t, pid, profile } = world();
-    // Mining laser on the nose: swap the cap for a miner
+    // Mining laser on the nose: swap the left Pip (on the core's nose, so the core feeds it) for a miner
     const bp = JSON.parse(JSON.stringify(server.getShips().get(pid)!.blueprint));
-    const cap = bp.parts.find((p: any) => p.piece === 'cap');
+    const cap = bp.parts.find((p: any) => p.fn === 'cannon_pip');
     Object.assign(cap, { piece: 'sq', fn: 'utility_mining_laser', material: 'alloy', facing: 'N' });
     server.pilots.give(server.pilots.connOf(pid)!, { 'part:alloy:utility_mining_laser:sq': 1 }, { toStorage: true, quiet: true });
     (server as any).shipEditAnywhere = true;
