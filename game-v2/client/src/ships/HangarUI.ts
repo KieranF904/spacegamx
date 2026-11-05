@@ -47,6 +47,7 @@ import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
 import { powerReport, pruneWires, DEAD_NET, type PowerReport } from './wireEdit';
 import { portsReport, portsWarnings } from './portsReport';
+import { PortsGrid, portsPanelHtml } from './portsGrid';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -96,7 +97,7 @@ export interface HangarDeps {
   onClose(launch: Blueprint | null): void;
 }
 
-type Overlay = 'connectors' | 'joins' | 'power' | 'com' | 'thrust' | 'arcs';
+type Overlay = 'energy' | 'connectors' | 'joins' | 'power' | 'com' | 'thrust' | 'arcs';
 const DEFAULT_FACING: Record<string, Side> = { thruster: 'S', weapon: 'N', miner: 'N' };
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 /** What a save would change: the parts, the paint, the wiring (absent: auto-wired) */
@@ -125,7 +126,9 @@ export class HangarUI {
   /** A middle-button drag in progress: where it started (screen, view, grid), and whether it's moved enough to be a pan */
   private pan: { x: number; y: number; cx: number; cy: number; at: Vec2; moved: boolean } | null = null;
   private mouse: Vec2 | null = null;
-  private overlays: Record<Overlay, boolean> = { connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
+  private overlays: Record<Overlay, boolean> = { energy: true, connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
+  /** The energy overlay of a ports design (portsOverlay.ts): its layer, the load test it shows, and the port under the mouse */
+  private ports = new PortsGrid();
   /** The power overlay's networks and warnings (from the design's derived state) */
   private power: PowerReport | null = null;
   /** The last load test (local circuits): which, on which design (it's dropped once the design changes), and what it found */
@@ -274,6 +277,7 @@ export class HangarUI {
         if (pan.moved) { this.view.cx = pan.cx - dx / this.view.px; this.view.cy = pan.cy - dy / this.view.px; this.draw(); return; }
       }
       this.mouse = this.toGrid(e);
+      this.ports.hover(this.overlays.energy ? this.derived : null, this.mouse);
       this.draw();
       this.gridTip(e);
     });
@@ -388,6 +392,7 @@ export class HangarUI {
     if (!this.isOpen) return false;
     if (code === 'KeyR') this.sel.rot = ((this.sel.rot + 1) % 4) as Rot;
     else if (code === 'KeyF') this.sel.flip = !this.sel.flip;
+    else if (code === 'KeyE') { this.overlays.energy = !this.overlays.energy; this.renderStats(); }
     else if (code === 'KeyT') {
       const order: (Side | 'auto')[] = ['auto', ...SIDES];
       this.sel.facing = order[(order.indexOf(this.sel.facing) + 1) % order.length];
@@ -859,7 +864,7 @@ export class HangarUI {
 
     const info = document.createElement('div');
     info.style.cssText = 'line-height:1.6; color:#6b7a93; margin:10px 0 8px; font-size:11px;';
-    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks a part up</b><br>R turn · F mirror · T facing · wheel zooms · middle-drag or arrows pan`;
+    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks a part up</b><br>R turn · F mirror · T facing · E energy overlay · wheel zooms · middle-drag or arrows pan`;
     el.append(info);
 
     el.append(foldHeading('Overlays', this.folded.overlays, () => { this.folded.overlays = !this.folded.overlays; this.renderPalette(); }));
@@ -1292,6 +1297,9 @@ export class HangarUI {
       const [item, n] = b.dataset.make!.split(':');
       this.deps.send({ type: 'fabOrder', item, n: Number(n) });
     });
+    // The ports load test's rows pick what the energy overlay shows; its toggle shows or hides it
+    this.stats.querySelectorAll<HTMLElement>('[data-scn]').forEach((b) => b.onclick = () => { this.ports.scenario = b.dataset.scn as typeof this.ports.scenario; this.overlays.energy = true; this.renderStats(); this.renderPalette(); this.draw(); });
+    act('energy', () => { this.overlays.energy = !this.overlays.energy; this.renderStats(); this.renderPalette(); this.draw(); });
     act('all', () => this.deps.send({ type: 'slotBuild', slot: this.slot }));
     act('fly', () => { this.deps.send({ type: 'slotFly', slot: this.slot }); this.close(null); });
     act('clear', () => {
@@ -1360,15 +1368,22 @@ export class HangarUI {
     return html + '<div style="margin-bottom:12px"></div>';
   }
 
-  /** Power on a ports design: what the generators make and the stores hold, and what the routing leaves out (portsReport.ts). No port glyphs or link overlay on the grid yet */
+  /** A part's display name (its model's) by index */
+  private partName(i: number): string {
+    const p = this.bp.parts[i], fn = p && this.deps.catalog.functions.get(p.fn);
+    return fn?.name ?? p?.fn ?? '?';
+  }
+
+  /** Power on a ports design: what the generators make and the stores hold, what the routing leaves out (portsReport.ts), then the load test (portsGrid.ts) */
   private portsHtml(L: NonNullable<ShipDerived['ports']>): string {
     const r = portsReport(L), n0 = (v: number) => Math.round(v).toLocaleString();
-    const name = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
+    const name = (i: number) => this.partName(i);
     const warn = portsWarnings(r, name);
     let html = '<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>';
     html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="Power moves only out of an out port into an in port across a shared edge: generators give at their front, stores take at the back and give at the front, guns and engines take at their back, the core takes at its sides">Generation ${n0(r.supply)}/s · stores hold ${n0(r.store)} · ${r.links} link${r.links === 1 ? '' : 's'}</div>`;
     if (warn.length) html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${warn.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w)}</div>`).join('')}${warn.length > 6 ? `<div style="color:#6b7a93">and ${warn.length - 6} more</div>` : ''}</div>`;
     else html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Every gun, engine and tool is fed.</div>';
+    if (this.derived) html += portsPanelHtml(this.derived, this.ports.scenario, this.overlays.energy, name);
     return html + '<div style="margin-bottom:12px"></div>';
   }
 
@@ -1528,6 +1543,9 @@ export class HangarUI {
 
   /** The part under the mouse on the grid */
   private gridTip(e: MouseEvent): void {
+    // (A port under the mouse, on the energy overlay: its rating, what it links to, the flow on it)
+    const port = this.ports.tip(this.derived, (i) => this.partName(i));
+    if (port) return this.showTip(`port:${this.tipGen}:${port.key}`, port.html, e.clientX, e.clientY);
     const i = this.mouse ? this.partAt(this.mouse) : -1;
     if (i < 0) return this.hideTip();
     const p = this.bp.parts[i];
@@ -1679,7 +1697,9 @@ export class HangarUI {
       }
     }
     // Power: generators, batteries and what lacks power, each network its own colour
-    if (d && this.overlays.power) this.drawPower(d, sx, sy);
+    if (d && !d.ports && this.overlays.power) this.drawPower(d, sx, sy);
+    // Energy (a ports design): ports, links with their flow, stores' fill, what the load test left short (portsGrid.ts)
+    if (d?.ports && this.overlays.energy) this.ports.draw(ctx, d, this.geoms, { px, cx, cy, w, h, dpr });
     if (d && this.overlays.thrust) {
       ctx.strokeStyle = '#7dd3fc';
       ctx.fillStyle = '#7dd3fc';
@@ -1701,7 +1721,7 @@ if (d && this.overlays.com && d.mass > 0) {
     }
 
     // Ghost
-    if (this.mouse) {
+    if (this.mouse && !this.ports.hovering) {
       const cand = this.candidate(this.mouse);
       if (cand) {
         const g = placeGeometry(this.deps.catalog, cand);
@@ -1721,6 +1741,8 @@ if (d && this.overlays.com && d.mass > 0) {
           const arc = mountingOf(this.deps.catalog, cand.fn, this.deps.tuning)?.arc;
           this.drawWindow(computeTurretWindow(all, all.map(() => true), all.length - 1, cand.facing, this.deps.tuning, arc), sx, sy, problem ? 0.4 : 0.8);
         }
+        // Its ports, turned and flipped as it would go, and the parts they would link to (portsGrid.ts)
+        if (!d || d.ports) this.ports.drawGhost(ctx, d, this.geoms, cand, g, this.deps.catalog, { px, cx, cy, w, h, dpr }, !problem, (i) => this.partName(i));
         if (problem) {
           ctx.fillStyle = '#fca5a5';
           ctx.font = '12px sans-serif';
