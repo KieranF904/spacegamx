@@ -74,10 +74,12 @@ export function netCaps(): number {
   const moves = bodies && (flag('moves', 'sg.moves') ?? on(CAPS.MOVES));
   // (contact pairs between ships it holds in step found on its tick layer: no record, own row or sparks sent for them)
   const contacts = causes && (flag('contacts', 'sg.contacts') ?? on(CAPS.CONTACTS));
+  // (its own straight shells worked out here from its own gun step, named by shot id: no fire records or removals of them at their end)
+  const shotIds = ownSim && (flag('shotids', 'sg.shotids') ?? on(CAPS.SHOT_IDS));
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
     | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0)
     | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0) | (launches ? CAPS.LAUNCHES : 0) | (nose ? CAPS.NOSE : 0) | (moves ? CAPS.MOVES : 0)
-    | (contacts ? CAPS.CONTACTS : 0);
+    | (contacts ? CAPS.CONTACTS : 0) | (shotIds ? CAPS.SHOT_IDS : 0);
 }
 
 /**

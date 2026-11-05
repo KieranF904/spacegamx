@@ -16,8 +16,69 @@
  * rows too: their rows carry where they are. Whether a gun fired at all (energy, ammunition, its clip) and its spread
  * are in the event (the shells' ids, the ammunition code; spread is seeded by the shell: shellSeed).
  */
-import { CAPS, firesStraight, gunShell, type FireRecord } from '@space-game/common';
+import { CAPS, firesStraight, gunShell, ownShotWireOf, type FireRecord } from '@space-game/common';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
+
+/** Does this client work its own straight shells out itself, named by shot id (CAPS.SHOT_IDS: common sim/b-shots.ts)? */
+export { shotIdsFor } from '@space-game/common';
+
+/**
+ * A capable client's own shells it works out itself (CAPS.SHOT_IDS; sim foundation 1B): no fire record, no row, and no
+ * removal at the end of their life (it works that out too); a removal it can't derive (a rock strike, point defence)
+ * and its hit records name each by its wire name (ownShotWire: its shot id without the owner). Per client, by entity
+ * id, from the round's fire records till the shell is removed.
+ */
+export class OwnShotLog {
+  private readonly byConn = new WeakMap<object, Map<number, number>>();
+  /** Counters: shells worked out, fire records not sent (and their JSON bytes), removals not sent / still sent */
+  readonly stats = { derived: 0, fireRowsSaved: 0, fireBytesSaved: 0, removalsSaved: 0, removalsSent: 0 };
+
+  /** Can a capable client derive this record of its own (its shells straight from the muzzle, each with a shot id)? */
+  static derivable(ships: ShipBridge, f: FireRecord): boolean {
+    return !!f.shots && f.shots.length === f.ids.length && ownVolleyExact(ships, f);
+  }
+
+  /** A fire record of its own it builds itself: its shells are its own from here (no row, no record) */
+  derive(conn: object, f: FireRecord): void {
+    if (!f.shots || f.shots.length !== f.ids.length) return;
+    let m = this.byConn.get(conn);
+    if (!m) this.byConn.set(conn, (m = new Map()));
+    for (let i = 0; i < f.ids.length; i++) m.set(f.ids[i], ownShotWireOf(f.shots[i]));
+    this.stats.derived += f.ids.length;
+    this.stats.fireRowsSaved++;
+    // (what the record would have cost as JSON: [owner, ago, part+ammo, aimQ, ...ids])
+    this.stats.fireBytesSaved += JSON.stringify([f.owner, 0, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]).length + 1;
+  }
+
+  /** Its wire name for a shell of its own it works out (undefined: not one) */
+  wireOf(conn: object, id: number): number | undefined {
+    return this.byConn.get(conn)?.get(id);
+  }
+
+  has(conn: object, id: number): boolean {
+    return !!this.byConn.get(conn)?.has(id);
+  }
+
+  /**
+   * The shell is removed: its name for the removed list if the client can't work the removal out itself (`early`: the
+   * server's shell had life left: a rock, point defence), else null (expired: the client removes it at the end of its
+   * life itself; `spent`: a hit record ended it). Forgotten either way
+   */
+  removed(conn: object, id: number, early: boolean, spent = false): number | null {
+    const m = this.byConn.get(conn), wire = m?.get(id);
+    if (wire === undefined) return null;
+    m!.delete(id);
+    if (spent) return null;
+    if (early) { this.stats.removalsSent++; return wire; }
+    this.stats.removalsSaved++;
+    return null;
+  }
+
+  /** Spent by a hit record (the record ends it on the client): forgotten */
+  forget(conn: object, id: number): void {
+    this.byConn.get(conn)?.delete(id);
+  }
+}
 
 /** Does this client take its own shells as fire events (and its own ship's replication, to build them from)? */
 export function ownShotsFor(caps: number | undefined): boolean {

@@ -61,8 +61,13 @@
  *   NOSE       (no wire change) mouse-steer with its movement keys pushing along the ship (W the nose), for the view that
  *              follows the heading (client input/viewMode.ts): said by both strafe bits with helm off (ships/flight.ts
  *              noseFrame), a pair no input sent before. Without it such a client's keys push along the world, as ever
+ *   SHOT_IDS   (with OWN_SIM and HITS; sim foundation 1B) its own straight shells are its own: it works out which of its
+ *              guns fired on which tick from its own gun step (sim/guns.ts), builds the shells on its tick layer and names
+ *              each by its shot id (sim/b-shots.ts ownShotWire). It is sent no fire records of its own and no rows or
+ *              removals of those shells at the end of their life; a removal it can't derive (a rock strike) and its hit
+ *              records name them by that shot id (server net/snapshot/ownShots.ts)
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072, LAUNCHES: 262144, NOSE: 524288, MOVES: 1048576, CONTACTS: 2097152 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072, LAUNCHES: 262144, NOSE: 524288, MOVES: 1048576, CONTACTS: 2097152, SHOT_IDS: 4194304 } as const;
 
 /**
  * The caps that are on by default, everywhere (dev and production alike): the server allows these unless NET_CAPS
@@ -71,7 +76,7 @@ export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 
  */
 export const DEFAULT_CAPS: number = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM
   | CAPS.INPUTS | CAPS.BODIES | CAPS.BLOCKS | CAPS.FOCUS | CAPS.CAUSES | CAPS.WAYPOINTS | CAPS.PILOTS | CAPS.CROWD | CAPS.STRUCTS
-  | CAPS.CARGO | CAPS.DEBRIS | CAPS.LAUNCHES | CAPS.NOSE | CAPS.MOVES | CAPS.CONTACTS;
+  | CAPS.CARGO | CAPS.DEBRIS | CAPS.LAUNCHES | CAPS.NOSE | CAPS.MOVES | CAPS.CONTACTS | CAPS.SHOT_IDS;
 
 /** Does this client run the debris it works out from then on (CAPS.DEBRIS)? */
 export function debrisFor(caps: number | undefined): boolean {
