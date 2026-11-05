@@ -355,7 +355,8 @@ describe('the Scrap Mother', () => {
       if (d > Math.PI / 4) away++;
     }
     expect(between).toBeGreaterThan(200);
-    expect(away / between).toBeGreaterThan(0.4);
+    // (her windows and rests are flying too; her moves now hold a heading)
+    expect(away / between).toBeGreaterThan(0.35);
   });
 
   it('she flies as built throughout', () => {

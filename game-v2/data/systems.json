@@ -3298,7 +3298,7 @@
       "id": "sol_scrap_nest",
       "name": "The Scrap Mother's Nest",
       "description": "The Scrap Mother's nest in the Drift: a hollowed asteroid, its chambers worked by scrapborn, her own at its heart behind a barrier. Junk drifts round it, and scrapborn patrol its face.",
-      "danger": 3,
+      "danger": 2,
       "starColor": "#FFDD44",
       "starRadius": 0,
       "position": {
