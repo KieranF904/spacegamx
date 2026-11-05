@@ -2,9 +2,13 @@
  * Join screen - shown after sign-in. There is one main server, so it's a Join button for it, a short
  * description of the game with a few photos, and the development news feed (join/news.json).
  * The server is the one this page belongs to: the dev server on the dev client, the live server on the VPS.
+ * Signed-in pilots also get their inbox (join/InboxPanel.ts): a banner above everything for an unread admin
+ * message, a badge on the Join button, and the inbox below it.
  */
 
 import { LOBBY_URL } from '../network/lobby';
+import { lobbyInbox, type InboxApi } from '../network/inbox';
+import { InboxPanel, type InboxAccount } from './join/InboxPanel';
 import NEWS from './join/news.json';
 import sunRun from './join/sun-run.jpg';
 import planet from './join/planet.jpg';
@@ -40,12 +44,17 @@ export class ServerBrowserUI {
   // Server browser URL (override with VITE_BROWSER_URL at build/dev time)
   private browserUrl = LOBBY_URL;
 
+  /** The inbox (kept across renders: placed into its slots after each) */
+  readonly inbox: InboxPanel;
+
   // Callbacks
   public onServerSelect: ((server: ServerInfo) => void) | null = null;
   public onLogout: (() => void) | null = null;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, inboxApi: InboxApi = lobbyInbox) {
     this.container = container;
+    this.inbox = new InboxPanel(inboxApi);
+    this.inbox.onCounts = () => this.showMailBadge();
 
     this.panel = document.createElement('div');
     this.panel.id = 'server-browser-panel';
@@ -118,6 +127,7 @@ export class ServerBrowserUI {
 
     this.panel.innerHTML = `
       <div class="join-wrap">
+        <div class="inbox-slot-banner"></div>
         <div class="join-box">
           <h1 class="join-title">SPACE GAME</h1>
           <p class="join-blurb">Fly, fight, mine and trade alongside other pilots in one shared galaxy.
@@ -141,8 +151,11 @@ export class ServerBrowserUI {
 
         <button class="join-main-btn" ${main && !this.loading ? '' : 'disabled'}>
           ${main || this.loading ? 'Join' : 'Server offline'}
+          <span class="join-mail-badge" hidden></span>
           <small class="join-server">${this.loading ? 'Finding the server…' : main ? this.escapeHtml(main.name) : 'Try again in a minute'}</small>
         </button>
+
+        <div class="inbox-slot"></div>
 
         <div class="join-foot">
           <div class="join-stats">
@@ -153,7 +166,19 @@ export class ServerBrowserUI {
       </div>
     `;
 
+    this.panel.querySelector('.inbox-slot-banner')?.replaceWith(this.inbox.banner);
+    this.panel.querySelector('.inbox-slot')?.replaceWith(this.inbox.box);
+    this.showMailBadge();
     this.setupEventListeners();
+  }
+
+  /** The Join button's badge: unread mail */
+  private showMailBadge(): void {
+    const badge = this.panel.querySelector<HTMLElement>('.join-mail-badge');
+    if (!badge) return;
+    const { unread } = this.inbox.counts();
+    badge.hidden = unread === 0;
+    badge.textContent = `✉ ${unread} new`;
   }
 
   private renderPing(server: ServerInfo): string {
@@ -243,9 +268,12 @@ export class ServerBrowserUI {
     return div.innerHTML;
   }
 
-  show(): void {
+  /** `account`: the signed-in pilot (their inbox shows); none for a guest */
+  show(account: InboxAccount | null = null): void {
     this.visible = true;
     this.panel.style.display = 'flex';
+    this.inbox.setAccount(account);
+    void this.inbox.refresh();
     this.refresh();
   }
 
