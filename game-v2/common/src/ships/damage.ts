@@ -53,8 +53,13 @@ export function penetrationMul(gap: number, tuning?: ShipTuning): number {
   return lo === hi ? a : a + (b - a) * (gap - lo);
 }
 
-/** A block's armour: its grade (its material's, or a model's tier), and its function's own (armour plate +1) */
-export function partArmour(catalog: Catalog, p: { material: string; fn: string }): number {
+/**
+ * A block's armour: its grade (its material's, or a model's tier), and its function's own (armour plate +1); a
+ * bespoke piece with an `armour` of its own has that outright (a boss's limbs)
+ */
+export function partArmour(catalog: Catalog, p: { material: string; fn: string; piece?: string }): number {
+  const own = p.piece !== undefined ? catalog.pieces.get(p.piece)?.armour : undefined;
+  if (own !== undefined) return own;
   return partGrade(catalog, p) + (catalog.functions.get(p.fn)?.armour ?? 0);
 }
 
@@ -79,7 +84,7 @@ export function weaponHit(kind: string, def: WeaponTuning | undefined, grade: nu
 }
 
 /** Damage × this for `hit` landing on part `p` */
-export function hitMultiplier(catalog: Catalog, tuning: ShipTuning | undefined, p: { material: string; fn: string }, hit: HitInfo): number {
+export function hitMultiplier(catalog: Catalog, tuning: ShipTuning | undefined, p: { material: string; fn: string; piece?: string }, hit: HitInfo): number {
   return penetrationMul(hit.pen - partArmour(catalog, p), tuning) * resistOf(partMaterial(catalog, p), hit.type);
 }
 

@@ -1655,6 +1655,17 @@
       "speed": 2.5,
       "turn": 1,
       "brain": "pyreclast",
+      "stageHp": [23400, 31200, 23400],
+      "limbs": {
+        "scythe_gun": 1200, "wing_flak": 1200, "bay": 1100, "scythe_root": 1300,
+        "horn_gun": 1100, "mortar": 1300, "coil": 1300, "lance": 2000, "vent": 1200, "spine": 1500,
+        "s3_mineral": 2200, "s3_vent_housing": 1300, "s3_aft_vent": 1300
+      },
+      "scanNotes": [
+        "Limbs (its turrets, scythes, bays, mortars, coils, lance, vents and crystal): very heavy plating. Low-penetration guns barely mark them. Each limb works one of its attacks: break it and that attack is gone.",
+        "Vents: very hot. Anything close burns. Heat-resistant plating cuts it.",
+        "Its attacks keep you moving; its openings are short. Ships whose guns and engines share one power supply struggle to do both."
+      ],
       "behaviour": {
         "strafe": 0.6,
         "flee": 0,
@@ -1666,13 +1677,8 @@
       "intro": "A shape the size of a station heaves itself up out of the lava.",
       "phases": [
         {
-          "at": 0.85,
-          "say": "Its brood bays split open."
-        },
-        {
           "at": 0.667,
-          "say": "Its wings tear away.",
-          "enrage": 1.15
+          "say": "Its wings tear away."
         },
         {
           "at": 0.334,
@@ -1680,8 +1686,7 @@
         },
         {
           "at": 0.15,
-          "say": "It's coming apart, and faster for it.",
-          "enrage": 1.3
+          "say": "It's coming apart."
         }
       ],
       "loot": [

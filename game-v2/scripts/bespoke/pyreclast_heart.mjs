@@ -238,7 +238,14 @@ part('core', 'core', GLASS, hex(RC + 0.8), {
   ],
 });
 
-const pieceFile = { _comment: 'The Pyreclast\'s heart (its third stage). Written by scripts/bespoke/pyreclast_heart.mjs: edit that, not this.', pieces };
+// Its limbs (PieceDef `limb`, `armour` outright 5 against its body's 3: scripts/bespoke/pyreclast.mjs): the crystal (its
+// beams) and its three vents (its heat); never what its heart is beaten by
+const LIMBS = new Set(['mineral', 'vent_housing', 'aft_vent']);
+for (const p of pieces) {
+  if (LIMBS.has(p.id.replace(/^pyreclast_s3_/, '').replace(/_[lr]$/, ''))) { p.limb = true; p.armour = 5; } else p.armour = 3;
+}
+
+const pieceFile = { _comment:'The Pyreclast\'s heart (its third stage). Written by scripts/bespoke/pyreclast_heart.mjs: edit that, not this.', pieces };
 const design = { name: 'Pyreclast Heart', catalogVersion: 1, paint: '#2a201c', parts };
 writeFileSync(join(root, 'data/ships/bespoke/pyreclast_heart.json'), JSON.stringify(pieceFile, null, 1) + '\n');
 writeFileSync(join(root, 'data/ships/blueprints/enemy/pyreclast_heart.json'), JSON.stringify(design, null, 1) + '\n');

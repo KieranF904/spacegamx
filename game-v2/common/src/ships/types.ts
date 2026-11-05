@@ -62,6 +62,13 @@ export interface PieceDef {
   stage?: number;
   /** Worn out, it isn't lost: it stays on, ruined (stages.ts RUIN_HP), shots passing it by, until its boss blows its stage away */
   ruin?: boolean;
+  /**
+   * A boss's limb (a turret, a scythe, a vent: what works one of its attacks): it never decides its stage (stages.ts),
+   * so breaking it is extra work that takes that attack away, never progress through the fight
+   */
+  limb?: boolean;
+  /** Its armour outright (damage.ts), in place of its material's grade and its function's own: a boss's heavy limb plating */
+  armour?: number;
 }
 
 /**
@@ -139,7 +146,7 @@ export type SkeletonPart =
   | { kind: 'fins'; poly: Vec2[]; n: number };
 
 export interface BespokeFile {
-  pieces: { id: string; polygon: Vec2[]; mount?: PieceMount; contact?: number; relief?: PieceRelief; turret?: number; detail?: PieceDetail[]; frame?: PieceFrame; skeleton?: PieceSkeleton; under?: boolean; stage?: number; ruin?: boolean }[];
+  pieces: { id: string; polygon: Vec2[]; mount?: PieceMount; contact?: number; relief?: PieceRelief; turret?: number; detail?: PieceDetail[]; frame?: PieceFrame; skeleton?: PieceSkeleton; under?: boolean; stage?: number; ruin?: boolean; limb?: boolean; armour?: number }[];
 }
 
 export type FunctionId = string;

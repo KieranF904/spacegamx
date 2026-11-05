@@ -4,7 +4,7 @@
  *   standing  what a shot can hit: an attached part that isn't a skeleton (shots pass through bones) and isn't ruined
  *   ruined    a `ruin` piece worn out: it stays on (RUIN_HP left), wrecked, until its boss blows its stage away
  *   deciding  what a stage is beaten by: its `ruin` pieces, if it has any (the rest of it can be shot off, but needn't
- *             be), else all of it
+ *             be), else all of it; never a `limb` (breaking one takes its attack away, it never moves the fight on)
  *   current   the earliest stage with a deciding part still standing (hits on a later stage's part go to its nearest)
  *   integrity how whole it is, each stage an equal share of its bar: the current stage's standing deciding hull, and
  *             every stage after it whole (so beating a stage brings it down a share, and a later one isn't a softer one)
@@ -47,7 +47,7 @@ function ruining(catalog: Catalog, ship: ShipState): Set<number> {
 /** Does it decide its stage (a skeleton never does) */
 export function deciding(catalog: Catalog, ship: ShipState, i: number): boolean {
   const pc = catalog.pieces.get(ship.blueprint.parts[i]?.piece);
-  if (!pc?.stage || pc.skeleton) return false;
+  if (!pc?.stage || pc.skeleton || pc.limb) return false;
   return !!pc.ruin || !ruining(catalog, ship).has(pc.stage);
 }
 

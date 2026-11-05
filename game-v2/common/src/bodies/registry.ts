@@ -37,6 +37,9 @@ export interface BodyKind {
 /** The Scrap Mother's flight: her hoard holds off, her mill closes in, her seed is quick (brains/scrapMother.ts) */
 const SCRAP_MOTHER: StagedFlightTables = { range: [2100, 1500, 1200], circle: [0.3, 0.4, 0.55], drive: [0.12, 0.2, 0.3], homeR: 5000 };
 
+/** The Pyreclast's flight: its fortress holds off, its hunter closes in and drives harder, its heart is quick (brains/pyreclast.ts) */
+const PYRECLAST: StagedFlightTables = { range: [2400, 1700, 1300], circle: [0.3, 0.4, 0.55], drive: [0, 0.13, 0.22], homeR: 4600 };
+
 /** A staged boss's body: its flight at its target */
 function staged(brain: string, flight: StagedFlightTables): BodyKind {
   return {
@@ -70,6 +73,7 @@ export const BODY_KINDS: readonly BodyKind[] = [
   // (the Scrap Mother's flight, until she has moves of her own: brains/broodMother.ts)
   staged('brood_mother', SCRAP_MOTHER),
   AI_PILOT,
+  staged('pyreclast', PYRECLAST),
 ];
 
 /** A brain's body kind (-1: none) */

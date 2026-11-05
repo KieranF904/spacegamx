@@ -631,6 +631,16 @@ for (const p of pieces) {
   // (its body isn't shot off piece by piece: worn out, each piece is left a wreck until it blows the lot away)
   if (p.stage === 2) p.ruin = true;
 }
+// Its limbs (PieceDef `limb`): each works one of its attacks, plated far heavier than its body (`armour` outright: 5
+// against its body's 3) and never what a stage is beaten by, so breaking one is extra work that takes its attack away
+// (docs/bosses/rework-2026-11.md 5.2): its wing turrets, flak, bays and scythes' roots; its body's horn guns, mortars,
+// dash coils, lance, vents and spine (its synapse wires). Its heart's are in pyreclast_heart.mjs
+const LIMBS = new Set(['scythe_gun', 'wing_flak', 'bay', 'scythe_root', 'horn_gun', 'mortar', 'coil', 'lance', 'vent', 'spine']);
+const BODY_ARMOUR = 3, LIMB_ARMOUR = 5;
+for (const p of pieces) {
+  if (p.skeleton) continue;
+  if (LIMBS.has(p.id.replace(/^pyreclast_/, '').replace(/_[lr]$/, ''))) { p.limb = true; p.armour = LIMB_ARMOUR; } else p.armour = BODY_ARMOUR;
+}
 const pieceFile = { _comment: 'The Pyreclast\'s own hull (bosses.json boss_pyreclast). Written by scripts/bespoke/pyreclast.mjs: edit that, not this.', pieces };
 // Its heart (its third stage) beneath everything, drawn first, there from the start: scripts/bespoke/pyreclast_heart.mjs
 const heart = JSON.parse(readFileSync(join(root, 'data/ships/blueprints/enemy/pyreclast_heart.json'), 'utf8')).parts;

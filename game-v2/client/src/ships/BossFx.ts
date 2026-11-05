@@ -26,7 +26,13 @@ import type { GameState } from '../state/GameState';
 
 const COLOR: Record<string, number> = { charge: 0xff2a1a, lance: 0xff2a1a, dash: 0xff9a2a, impact: 0xff6a1a, crystal: 0xffc040, synapse: 0xffd060, ring: 0xffe0a0, vent: 0xffb040,
   // (the Scrap Mother's: hazard yellow for her guns, greyseam green for what pulls, pools and burns)
-  rivet: 0xffd040, claw: 0xff3a1a, intake: 0x7affd2, sludge: 0x9cff6a, weld: 0xc8fff0, gather: 0xc8fff0 };
+  rivet: 0xffd040, claw: 0xff3a1a, intake: 0x7affd2, sludge: 0x9cff6a, weld: 0xc8fff0, gather: 0xc8fff0,
+  // (the Pyreclast's rework: a broadside's lanes, a scythe drawing back, a pilot's own lob, flak and spark: each its own)
+  lane: 0xff5030, scythe: 0xd84a2a, lob: 0xff8040, flak: 0xffb870, spark: 0xfff0c0 };
+/** A burning pool's colours: its disc, its heart, its bubbles (greyseam sludge, or ground left burning by magma) */
+const POOL: Record<string, { disc: number; heart: number; bubble: number }> = {
+  pool: { disc: 0x3aa048, heart: 0x9cff6a, bubble: 0xd8ffc0 }, embers: { disc: 0xa02a0a, heart: 0xff7a2a, bubble: 0xffd0a0 },
+};
 /** A beam's colours, outermost glow in: a molten lance, or a heart's crystal */
 const BEAM: Record<string, { halo: number; glow: number; body: number; core: number; flare: number; hot: number }> = {
   lance: { halo: 0xff3a0a, glow: 0xff6a1a, body: 0xffa040, core: 0xfff4e0, flare: 0xff8a3a, hot: 0xfff0d0 },
@@ -136,7 +142,7 @@ export class BossFx {
     if (m.kind === 'vent') { this.drawVent(g, x, at); return; }
     if (m.kind === 'iris') { this.drawVent(g, x, at, IRIS); return; }
     if (m.kind === 'magnet') { this.drawMagnet(g, x, at); return; }
-    if (m.kind === 'pool') { this.drawPool(g, x, at); return; }
+    if (m.kind === 'pool' || m.kind === 'embers') { this.drawPool(g, x, at); return; }
     if (m.shape === 'circle') {
       // (on the ground, or riding the body: `at`)
       const r = m.radius ?? 200, cx = at.x, cy = at.y;
@@ -195,14 +201,14 @@ export class BossFx {
     }
   }
 
-  /** A pool of greyseam sludge, burning a while: a bubbling green disc, fading as it cools */
+  /** A pool burning a while (greyseam sludge, or ground a magma lob left alight): a bubbling disc, fading as it cools */
   private drawPool(g: Graphics, x: Warn, at: { x: number; y: number }): void {
-    const r = x.m.radius ?? 230, k = x.age / x.life, fade = Math.min(1, x.age / 0.15) * (1 - k * k);
-    g.circle(at.x, at.y, r).fill({ color: 0x3aa048, alpha: 0.3 * fade });
-    g.circle(at.x, at.y, r * 0.7).fill({ color: 0x9cff6a, alpha: 0.18 * fade });
+    const r = x.m.radius ?? 230, k = x.age / x.life, fade = Math.min(1, x.age / 0.15) * (1 - k * k), c = POOL[x.m.kind] ?? POOL.pool;
+    g.circle(at.x, at.y, r).fill({ color: c.disc, alpha: 0.3 * fade });
+    g.circle(at.x, at.y, r * 0.7).fill({ color: c.heart, alpha: 0.18 * fade });
     for (let i = 0; i < 5; i++) {
       const a = i * 2.39996 + Math.floor(this.t * 2 + i * 0.37) * 1.3, ph = (this.t * 2 + i * 0.37) % 1, d = r * 0.6 * ((i * 0.618) % 1);
-      g.circle(at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, r * 0.12 * ph).stroke({ color: 0xd8ffc0, width: 2, alpha: 0.6 * (1 - ph) * fade });
+      g.circle(at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, r * 0.12 * ph).stroke({ color: c.bubble, width: 2, alpha: 0.6 * (1 - ph) * fade });
     }
   }
 

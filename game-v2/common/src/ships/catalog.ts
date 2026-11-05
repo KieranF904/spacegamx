@@ -248,6 +248,8 @@ export function bespokePiece(b: BespokeFile['pieces'][number]): PieceDef {
     ...(b.under ? { under: true } : {}),
     ...(b.stage ? { stage: b.stage } : {}),
     ...(b.ruin ? { ruin: true } : {}),
+    ...(b.limb ? { limb: true } : {}),
+    ...(b.armour !== undefined ? { armour: b.armour } : {}),
   };
 }
 

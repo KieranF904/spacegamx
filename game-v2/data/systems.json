@@ -3059,7 +3059,14 @@
             { "item": "cinder_ash", "chance": 0.15, "min": 1, "max": 1 }
           ]
         }
-      ]
+      ],
+      "arena": {
+        "boss": "boss_pyreclast",
+        "centre": { "x": 0, "y": -14000 },
+        "radius": 9000,
+        "barrier": [[-1400, -5000], [2000, -5000]],
+        "outside": { "x": 400, "y": -4300 }
+      }
     },
     {
       "id": "gloam_siege",

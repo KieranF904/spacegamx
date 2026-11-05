@@ -370,6 +370,7 @@ const SHAPES: Record<string, Spec> = {
         'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number', 'intercept?': 'boolean' }),
       })),
       loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
+      'stageHp?': 'number[]', 'limbs?': rec('number'), 'scanNotes?': 'string[]',
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
     })),
   }),

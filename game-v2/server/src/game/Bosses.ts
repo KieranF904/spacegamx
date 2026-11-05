@@ -27,6 +27,7 @@ import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { Enemies, Behaviour, EnemyAi } from './Enemies.js';
 import type { FarPose } from '../ships/SimLod.js';
 import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
+import { stageHpOf } from './bosses/stageHp.js';
 import type { Mobs } from './Mobs.js';
 import type { BossBrain, BrainHost } from './brains/kit.js';
 import { PyreclastBrain } from './brains/pyreclast.js';
@@ -96,6 +97,11 @@ export interface BossDef {
   brain?: string;
   /** Staged: what share of a hit on a later stage's part reaches the current stage's plates (unset: rules.stageCover) */
   stageCover?: number;
+  /** Staged: each stage's deciding HP outright, and each limb's (bosses/stageHp.ts) */
+  stageHp?: number[];
+  limbs?: Record<string, number>;
+  /** What a scan of it tells a pilot (plain and mechanical: no lore), shown on its title card */
+  scanNotes?: string[];
 }
 
 export interface BossesFile {
@@ -313,6 +319,9 @@ export class Bosses {
     this.ships.scaleHp(eid, def.hp);
     // A boss dies when its core does: keep that for the end of the fight, not a lucky shot through a gap
     this.ships.hardenParts(eid, 'core', 2.5);
+    // (Staged: each stage's HP and each limb's outright, the core's x2.5 counted in)
+    const ship = this.ships.get(eid), stagedHp = ship && stageHpOf(this.ships.catalog, ship, def);
+    if (stagedHp) this.ships.setMaxHp(eid, stagedHp);
     this.ships.setDamageScale(eid, def.damage);
     this.enemies.addBoss(eid, id, def.faction, num, { x, y }, def.behaviour);
     if (def.fixed) this.ships.pin(eid);
