@@ -3875,8 +3875,11 @@ this.devTeleport = opts.devTeleport ?? false;
   /** Shots stuck in rock (mining charges): the rock and where on it, until they blow */
   private stuckShots = new Map<number, { asteroid: number; ox: number; oy: number }>();
 
-  /** A shot's damage lands on an asteroid: it mines, the shot is spent, the rock may break */
-  private hurtAsteroid(proj: number, hitAsteroid: number, ownerId: number, damage: number, hitX: number, hitY: number): void {
+  /**
+   * A shot's damage lands on an asteroid: it mines, the shot is spent, the rock may break. `stuck`: a mining charge
+   * that stuck to the rock blowing (no shell is seen striking it then, so its sparks are sent)
+   */
+  private hurtAsteroid(proj: number, hitAsteroid: number, ownerId: number, damage: number, hitX: number, hitY: number, stuck = false): void {
     const systemId = InSystem.systemId[proj];
     const ax = Position.x[hitAsteroid];
     const ay = Position.y[hitAsteroid];
@@ -3892,17 +3895,25 @@ this.devTeleport = opts.devTeleport ?? false;
     }
     addComponent(this.world, Dead, proj);
     this.pendingRemovedEntities.add(proj);
-    this.broadcastProjectileHit(proj, hitX, hitY);
+    // The shell's end, for a client that doesn't find its hits itself: one that does (CAPS.SELF_HITS) has the shell end
+    // where its drawn shell meets the drawn rock (WeaponFx.touch), and on its tick layer the snapshot's removed list
+    // ends it (a removed shell sits its last window out, SelfHits; the server tells any hit in it, HitLedger 'removed').
+    // A stuck charge blowing has no shell seen striking: everyone hears of it
+    this.net.broadcastProjectileHit(proj, hitX, hitY, stuck ? 0 : CAPS.SELF_HITS);
 
-    // Broadcast hit effect at collision point
-    this.broadcastToSystem(systemId, {
-      type: 'effect',
-      effectType: EffectType.LaserHit,
-      x: hitX,
-      y: hitY,
-      entityId: hitAsteroid,
-      data: [damage, 30], // damage, hue (default orange)
-    });
+    // The sparks where a shell strikes rock are every client's own too: it draws them where its drawn shell meets the
+    // drawn rock (client ShipClient.struckFx, from WeaponFx.onStruck). They were a ~28 B effect to everyone in the system
+    // on every hit (docs/audits/rock-bytes-2026-11-05.md). A stuck charge's still go
+    if (stuck) {
+      this.broadcastToSystem(systemId, {
+        type: 'effect',
+        effectType: EffectType.LaserHit,
+        x: hitX,
+        y: hitY,
+        entityId: hitAsteroid,
+        data: [damage, 30], // damage, hue (default orange)
+      });
+    }
 
     // Check if asteroid destroyed
     if (Asteroid.hp[hitAsteroid] <= 0) {
@@ -3930,7 +3941,7 @@ this.devTeleport = opts.devTeleport ?? false;
     this.stuckShots.delete(proj);
     if (hasComponent(this.world, Dead, st.asteroid)) return;
     this.placeAsteroid(st.asteroid);
-    this.hurtAsteroid(proj, st.asteroid, Projectile.ownerId[proj], Projectile.damage[proj], Position.x[st.asteroid] + st.ox, Position.y[st.asteroid] + st.oy);
+    this.hurtAsteroid(proj, st.asteroid, Projectile.ownerId[proj], Projectile.damage[proj], Position.x[st.asteroid] + st.ox, Position.y[st.asteroid] + st.oy, true);
   }
 
   private collisionSystem(): void {
