@@ -49,7 +49,6 @@ import systemsDataForMenu from '../../data/systems.json';
 import { DamageIndicatorUI } from './ui/DamageIndicatorUI';
 import { FloatingRewardsUI } from './ui/FloatingRewardsUI';
 import { ShipClient } from './ships/ShipClient';
-import { netCaps } from './network/netCaps';
 import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
 
@@ -70,7 +69,7 @@ import miningTable from '../../data/mining.json';
 import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
 import { itemIcon } from './ui/itemIcons';
 import { LoadingFlow } from './app/loadingFlow';
-import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE } from '@space-game/common';
+import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, DEFAULT_CAPS } from '@space-game/common';
 
 /** Keys that take the controls back from the autopilot */
 // This build's rock types and belts (both sides generate the same rocks from them); a dev build adds the
@@ -1210,8 +1209,8 @@ this.xpFillEl = document.getElementById('xpFill');
       get loggedIn() { return g.loggedIn; },
       get stationOpen() { return g.stationOpen; },
       get localDead() { return g.localDead; },
-      get compactInputs() { return g.network instanceof NetworkManager && g.network.compactInputs; },
-      get noseThrust() { return g.network instanceof NetworkManager && g.network.noseThrust && viewMode.pinnedAim(g.shipClient.helmMode()); },
+      get compactInputs() { return g.network instanceof NetworkManager; },
+      get noseThrust() { return viewMode.pinnedAim(g.shipClient.helmMode()); },
       get proto() { return g.proto; },
       get menu() { return g.menu; },
       get adminPanel() { return g.adminPanel; },
@@ -1428,14 +1427,14 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     this.shipClient.resetHits();
     if (pending) {
       // Guest
-      this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: netCaps() });
+      this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS });
       this.pendingAuth = null;
     } else if (this.authToken) {
       // Signed in at the lobby: the server checks the token with it
-      this.network.send({ type: 'join', token: this.authToken, username: this.state.playerName, protocol: PROTOCOL_VERSION, caps: netCaps() });
+      this.network.send({ type: 'join', token: this.authToken, username: this.state.playerName, protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS });
     } else {
       // Fallback guest
-      this.network.send({ type: 'join', username: this.state.playerName || 'Player', protocol: PROTOCOL_VERSION, caps: netCaps() });
+      this.network.send({ type: 'join', username: this.state.playerName || 'Player', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS });
     }
     
     // Start ping loop (one per connection: a reconnect replaces it)

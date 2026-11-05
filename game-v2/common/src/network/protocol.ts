@@ -720,8 +720,6 @@ export interface ServerAuthResultMessage {
   /** Contributor rank (admins are contributors too): the contributor tools */
   isContributor?: boolean;
   error?: string;
-  /** The join's caps the server took (hits.ts CAPS) */
-  caps?: number;
 }
 
 export interface ServerAdminStatsMessage {
@@ -1329,17 +1327,16 @@ export interface ServerHitFixMessage {
 }
 
 /**
- * The caps in effect for this client from the snapshot just sent on (hits.ts CAPS): the join's (as the server takes
- * them) and any admin switch. A client finding hits itself (SELF_HITS) starts or stops with the next snapshot.
+ * Its netcode's start, after its first snapshot (every client runs the full set, hits.ts DEFAULT_CAPS): finding its
+ * own hits (SELF_HITS) runs from the snapshot just sent on. Sent again whenever its confirmation level changes.
  */
 export interface ServerNetCapsMessage {
   type: 'netCaps';
-  caps: number;
   /** Coalescing (CAPS.COALESCE): how many ticks a frame with nothing urgent may wait (the client widens its interpolation delay by as much) */
   hold?: number;
   /**
    * Adaptive validation (CAPS.ROUGH): the confirmation level (hits.ts CONFIRM) from the snapshot just sent on; sent
-   * again, with the same caps, whenever it changes. Absent: NORMAL
+   * again whenever it changes. Absent: NORMAL
    */
   lvl?: number;
 }

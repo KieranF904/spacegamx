@@ -7,8 +7,9 @@
  * Drives the client's real input path (client/src/app/inputSend.ts tickInput) with a scripted mouse and keys, sends
  * what it sends through the client's encoder and the server's decoder into a real GameServer, and counts:
  *   up: messages/s, payload B/s, wire estimate (payload + 66 B a message)
- *   down: the bytes of this pilot's control rows (and its status row) to a nearby base-format observer and a nearby
- *         packed observer (packed: a bit-cost model of packedCodec controlsIO)
+ *   down: the bytes of this pilot's control rows to a nearby packed observer (a bit-cost model of packedCodec
+ *         controlsIO). Every client joins with the full caps set (DEFAULT_CAPS; on builds before it, every CAPS bit):
+ *         there is no base-format observer any more
  *   parity: the server's applied controls each tick against what the client predicted for it
  * Works on the code before the compact inputs (no new imports: new symbols are looked up at run time).
  */
@@ -118,15 +119,16 @@ function connect(name: string, caps: number, packed: boolean): { pid: number; li
   link.receive({ type: 'join', username: `probe_${name}`, caps } as never);
   const pid = server.getPlayerId(socket);
   if (name !== 'A') { o = { name, pid, packed, dec: packed ? new PackedDecoder() : undefined, ctlB: 0, ctlNoAimB: 0, ctlRows: 0, ctlEvents: 0, statusB: 0, frameB: 0, frames: 0 }; obs.push(o); }
+  // (Builds with per-client caps say what's in effect; from stage 2 every joined client has the full set)
   const conn = () => [...(S.clients as Map<unknown, { playerId: number; caps?: number }>).values()].find((q) => q.playerId === pid);
-  return { pid, link, o, caps: () => conn()?.caps ?? 0 };
+  return { pid, link, o, caps: () => conn()?.caps ?? caps };
 }
 
 const INPUTS_BIT: number = (CAPS as Record<string, number>).INPUTS ?? 0;
-const A = connect('A', wantCompact ? INPUTS_BIT : 0, false);
+const FULL: number = C.DEFAULT_CAPS ?? Object.values(CAPS as Record<string, number>).reduce((a, b) => a | b, 0);
+const A = connect('A', FULL, false);
 A_pid = A.pid;
-const B = connect('B_legacy', 0, false);
-const P = connect('P_packed', CAPS.PACKED, true);
+const P = connect('P_packed', FULL, true);
 for (let i = 0; i < 30; i++) { server.step(); clock.t += 1000 / 60; }
 const num = InSystem.systemId[A.pid];
 
@@ -138,7 +140,6 @@ if (scenario === 'docked') {
   home = { x: Position.x[st] + 150, y: Position.y[st] };
 }
 place(A.pid, home.x, home.y);
-place(B.pid, home.x + 700, home.y + 500);
 place(P.pid, home.x - 700, home.y + 500);
 
 // ---------------------------------------------------------------- the client: tickInput on a fake host

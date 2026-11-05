@@ -42,7 +42,6 @@ export interface ShipCausesHost {
 const KEEP_TICKS = 600;
 
 export class ShipCauses implements ReplicaCauses {
-  on = false;
   /** Causes by ship, then tick ([kind, ...], with their place among the tick's) */
   private readonly rows = new Map<number, Map<number, CauseRow[]>>();
   /** Ships' structures before their shipSync this frame */
@@ -54,12 +53,12 @@ export class ShipCauses implements ReplicaCauses {
   /** A contact's other as the snapshot found it, by tick and id (it may be gone by the time the replica is stepped: removed in that very snapshot) */
   private readonly kept = new Map<string, ShipState>();
   readonly stats = { rows: 0, failed: 0 };
-  /** Each ship part way through a tick's causes, worked out once (CAPS.CONTACTS: a crowd's pairs read each other) */
+  /** Each ship part way through a tick's causes, worked out once (a crowd's pairs read each other) */
   readonly cursors = new MidCursors();
 
-  /** Finding contact pairs itself (CAPS.CONTACTS) */
+  /** Finding contact pairs itself (ContactWorld) */
   private finds(): boolean {
-    return !!this.host.contacts?.()?.on;
+    return !!this.host.contacts?.();
   }
 
   /** Where ship `id`'s causes on tick t start (its step's body), for the cursors */
@@ -72,21 +71,14 @@ export class ShipCauses implements ReplicaCauses {
   /** The check's byte for each snapshot taken in (by its tick): every ship held then (noteHeld) */
   private readonly held = new Map<number, number>();
 
-  constructor(private readonly host: ShipCausesHost) {}
-
-  /** Switched on or off (netCaps): the replica set asks here after each step, or not */
-  setOn(on: boolean): void {
-    if (on === this.on) return;
-    this.on = on;
-    this.rows.clear();
-    this.until.clear();
-    this.touched.clear();
-    this.host.reps.setCauses(on ? this : null);
+  /** The replica set asks here after each step */
+  constructor(private readonly host: ShipCausesHost) {
+    host.reps.setCauses(this);
   }
 
   /** A ship's structure is about to change (shipSync): the one it flew until now */
   beforeSync(id: number): void {
-    if (!this.on || id === this.host.self()) return;
+    if (id === this.host.self()) return;
     const d = this.host.store.get(id)?.derived;
     if (d) this.before.set(id, d);
   }
@@ -96,7 +88,6 @@ export class ShipCauses implements ReplicaCauses {
    * again from its earliest; a ship keyframed now forgets the ones before (its keyframe is how that tick ended)
    */
   onSnapshot(m: ServerSnapshotMessage): void {
-    if (!this.on) { this.before.clear(); return; }
     const { reps, store } = this.host;
     const keyed = new Set<number>();
     for (const k of m.ships ?? []) { this.drop(k[0], m.tick); keyed.add(k[0]); }
@@ -108,7 +99,7 @@ export class ShipCauses implements ReplicaCauses {
       let earliest = Infinity;
       for (const [t, rows] of ticks) {
         // (Finding contact pairs itself: each row's place in the pass, so the ones it finds go in between, CAUSE_PLACE)
-        if (this.host.contacts?.()?.on) { const pl = placeRows(id, rows.map((r) => r.row)); rows.forEach((r, i) => { r.seq = pl[i]; }); }
+        if (this.host.contacts?.()) { const pl = placeRows(id, rows.map((r) => r.row)); rows.forEach((r, i) => { r.seq = pl[i]; }); }
         mine.set(t, rows);
         earliest = Math.min(earliest, t);
         this.stats.rows += rows.length;
@@ -142,7 +133,6 @@ export class ShipCauses implements ReplicaCauses {
    * debris, none docked), its state at the snapshot's tick (network/causes.ts replicasByte)
    */
   noteHeld(tick: number): void {
-    if (!this.on) return;
     const { reps, store } = this.host, self = this.host.self();
     let sum = 0;
     for (const id of reps.ids()) {

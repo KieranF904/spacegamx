@@ -44,12 +44,12 @@ export class FocusCells {
   private homes = new Map<number, number>();
   /** This round's cells, by system: cell -> ships homed there (body order) */
   private grid = new Map<number, Map<number, number[]>>();
-  /** Counters (the crowd bench, the tests): cells entering and leaving capable clients' focus */
+  /** Counters (the crowd bench, the tests): cells entering and leaving clients' focus */
   readonly stats = { rounds: 0, entered: 0, left: 0 };
 
   constructor(private host: FocusHost) {}
 
-  /** Once a round, before any client's view: home cells and the cells' lists, for the systems with a capable client */
+  /** Once a round, before any client's view: home cells and the cells' lists, for the systems with a client */
   beginRound(systems: ReadonlySet<number>): void {
     this.stats.rounds++;
     this.grid.clear();
@@ -78,7 +78,7 @@ export class FocusCells {
   }
 
   /**
-   * A capable client's view this round (in place of updateShipView): its own ship and the ships homed in its focus
+   * A client's view this round: its own ship and the ships homed in its focus
    * cells. Returns the ships that left its view (they go in the snapshot's `out`)
    */
   view(conn: ClientConnection, system: number, px: number, py: number): number[] {

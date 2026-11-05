@@ -1,13 +1,14 @@
 /**
- * A scene for homing shells on a client's tick layer (CAPS.WAYPOINTS): a real GameServer, a WAYPOINTS client A (its
- * shells compared with the server's on every tick it steps), a legacy observer B, a pilot P to chase, a shooter D and a
- * dummy H. Used by net/guides/guides.test.ts and the measurements (here under bench/: it makes a GameServer, which nothing
+ * A scene for homing shells on a client's tick layer (CAPS.WAYPOINTS): a real GameServer, a client A (its shells
+ * compared with the server's on every tick it steps), a second client B watching nearby (its shells held to the server's
+ * too), a pilot P to chase, a shooter D and a dummy H. Every client has the full caps set; the server's own shells,
+ * tick by tick, are the ground truth. Used by net/guides/guides.test.ts and the measurements (here under bench/: it makes a GameServer, which nothing
  * under net/ may import at runtime).
  */
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, EntityType, encodeMessage, decodeMessage,
+  Position, Velocity, Rotation, InSystem, EntityType, encodeMessage, decodeMessage,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage, type GuideBody,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -21,8 +22,6 @@ import type { Weapons } from '../../game/Weapons.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-export const BASE = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.CAUSES | CAPS.FOCUS | CAPS.BLOCKS;
-export const ALL = BASE | CAPS.WAYPOINTS;
 
 export interface Opts {
   /** Shots: every `every` ticks, from the dummy D at its target `at(w)` (the target's entity) */
@@ -36,7 +35,6 @@ export interface Opts {
   ticks?: number;
   /** Something done on tick t (a drift injected) */
   each?: (t: number, w: World) => void;
-  caps?: number;
   /** Mobs of this kind launched instead (their brain picks who they hunt) */
   mob?: string;
 }
@@ -51,28 +49,24 @@ export function run(o: Opts) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    // (the server allows LAUNCHES too: a client asking for it takes volleys as one row)
-    netCaps: ALL | CAPS.LAUNCHES,
   });
   const ships = server.getShips();
   const weapons = (server as unknown as { weapons: Weapons }).weapons;
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   // The server's shells after each tick, to hold the client's against
   const truth = new Map<string, GuideBody>();
-  const got = { checked: 0, off: 0, firstOff: '' };
-  const A = new FakeHitsClient(server, {
-    name: 'guided', caps: o.caps ?? ALL, env,
-    onGuideStep: (id, t, m) => {
-      const s = truth.get(`${id}:${t}`);
-      if (!s) return;
-      got.checked++;
-      if (s.x !== m.x || s.y !== m.y || s.vx !== m.vx || s.vy !== m.vy || (s.a ?? 0) !== (m.a ?? 0)) { got.off++; if (!got.firstOff) got.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${JSON.stringify(s)}`; }
-    },
-  });
-  const B = new FakeHitsClient(server, { name: 'legacy_obs', caps: 0, env });
-  const P = new FakeHitsClient(server, { name: 'runner', caps: 0, env });
-  // What A and B were sent of the shells: rows, and rows of a shell A runs after its first
-  const rows = { A: 0, Aafter: 0, B: 0, syncs: 0, modes: 0, sent: 0 };
+  const got = { checked: 0, off: 0, firstOff: '' }, gotB = { checked: 0, off: 0, firstOff: '' };
+  const against = (g: typeof got) => (id: number, t: number, m: GuideBody) => {
+    const s = truth.get(`${id}:${t}`);
+    if (!s) return;
+    g.checked++;
+    if (s.x !== m.x || s.y !== m.y || s.vx !== m.vx || s.vy !== m.vy || (s.a ?? 0) !== (m.a ?? 0)) { g.off++; if (!g.firstOff) g.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${JSON.stringify(s)}`; }
+  };
+  const A = new FakeHitsClient(server, { name: 'guided', env, onGuideStep: against(got) });
+  const B = new FakeHitsClient(server, { name: 'watcher_b', env, onGuideStep: against(gotB) });
+  const P = new FakeHitsClient(server, { name: 'runner', env });
+  // What A and B were sent of the shells: rows, and rows of a shell each runs after its first
+  const rows = { A: 0, Aafter: 0, B: 0, Bafter: 0, syncs: 0, modes: 0, sent: 0 };
   const firstRow = new Set<number>();
   const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void }, oa = fa.snapshot.bind(A);
   fa.snapshot = (s) => {
@@ -85,7 +79,11 @@ export function run(o: Opts) {
     oa(s);
   };
   const fb = B as unknown as { snapshot(s: ServerSnapshotMessage): void }, ob = fb.snapshot.bind(B);
-  fb.snapshot = (s) => { for (const e of s.entities) if ((e.type === EntityType.Projectile && weapons.guideOf(e.id)) || e.type === EntityType.Enemy) rows.B++; ob(s); };
+  const firstB = new Set<number>();
+  fb.snapshot = (s) => {
+    for (const e of s.entities) if ((e.type === EntityType.Projectile && weapons.guideOf(e.id)) || e.type === EntityType.Enemy) { rows.B++; if (firstB.has(e.id)) rows.Bafter++; firstB.add(e.id); }
+    ob(s);
+  };
   let seq = 1, pseq = 1, now = -1;
   let chk: ReturnType<NonNullable<FakeHitsClient['own']>['takeCheck']>;
   const input = (f: FakeHitsClient, s: number, c: { forward: boolean; targetAngle: number }, extra?: object) => {
@@ -136,6 +134,6 @@ export function run(o: Opts) {
     step();
   }
   const d = (a: Record<string, number>, b: Record<string, number>) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] - (b[k] ?? 0)]));
-  return { w, got, rows, bytes: { A: A.bytes - a0, B: B.bytes - b0, secs: (o.ticks ?? 500) / 60 }, checks: d(server.ownChecks.stats as never, chk0 as never), net: d(server.guides.stats as never, net0 as never), runner: A.guides?.stats };
+  return { w, got, gotB, rows, bytes: { A: A.bytes - a0, B: B.bytes - b0, secs: (o.ticks ?? 500) / 60 }, checks: d(server.ownChecks.stats as never, chk0 as never), net: d(server.guides.stats as never, net0 as never), runner: A.guides?.stats };
 }
 

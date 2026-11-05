@@ -1,8 +1,8 @@
 /**
  * Decision inputs for the Pyreclast (its rework, docs/bosses/rework-2026-11.md 5): its brain decides on the server, its
- * body (common bodies/registry.ts 'pyreclast') flies it on both sides. A capable client's tick-aligned replica of it is
- * the server's ship bit for bit at every snapshot's tick through its three stages and every move (rolls side-on, holds
- * facing, dashes with a kick, its recoil), with no control rows of it; a legacy observer gets it the old way.
+ * body (common bodies/registry.ts 'pyreclast') flies it on both sides. A client's tick-aligned replica of it is the
+ * server's ship bit for bit at every snapshot's tick through its three stages and every move (rolls side-on, holds
+ * facing, dashes with a kick, its recoil), with no control rows of it: the pilot's, and a second client's watching.
  *
  * The same harness as bodies.test.ts (the Scrap Mother's), for this boss.
  */
@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
+  Position, Velocity, Rotation, InSystem, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -24,7 +24,6 @@ import type { StagedBrain } from '../../game/brains/staged.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
 interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number }
 const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0 });
@@ -37,9 +36,6 @@ interface Opts {
   dropAt?: number;
   /** A second capable client joins at this tick (arriving mid-fight) */
   lateAt?: number;
-  /** The capable client's caps switched off CAPS.BODIES at this tick, and back on at `capsOnAt` (the admin's switch) */
-  capsOffAt?: number;
-  capsOnAt?: number;
   /** It is taken away at this tick (Bosses.remove) */
   removeAt?: number;
   /** Which boss (default the Pyreclast) */
@@ -56,12 +52,11 @@ function fight(o: Opts = {}) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'bodies_a', caps: ALL, env });
-  const B = new FakeHitsClient(server, { name: 'legacy_b', caps: 0, env });
+  const A = new FakeHitsClient(server, { name: 'bodies_a', env });
+  const B = new FakeHitsClient(server, { name: 'watcher_b', env });
   let C: FakeHitsClient | null = null;
   let boss = -1;
   /** The boss's real state at each tick's end */
@@ -76,7 +71,7 @@ function fight(o: Opts = {}) {
       orig(s);
       g.snapshots++;
       if (s.ships?.some((k) => k[0] === boss)) g.keyframes++;
-      if (s.ctl?.some((r) => controlRowId(r) === boss)) { g.ctlRows++; if (capsOff) g.ctlWhileOff++; }
+      if (s.ctl?.some((r) => controlRowId(r) === boss)) g.ctlRows++;
       for (const d of s.decisions ?? []) if (d[0] === boss) { g.decisions++; if (d[2] === DECISION.SYNC) g.syncs++; }
       if (!f.bodies || ![...f.bodies.ids()].includes(boss)) return;
       g.running++;
@@ -87,7 +82,7 @@ function fight(o: Opts = {}) {
       if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) g.off++;
     };
   };
-  let dropped = false, capsOff = false;
+  let dropped = false;
   watch(A, got.A, () => { if (o.dropAt === undefined || dropped || server.getTick() < o.dropAt) return false; dropped = true; return true; });
   watch(B, got.B);
   let seq = 1;
@@ -140,11 +135,9 @@ function fight(o: Opts = {}) {
       const st = brain.stage;
       for (let n = 1; n < 400 && brain.stage === st; n++) brain.forceShed(n);
     }
-    if (o.capsOffAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL & ~CAPS.BODIES; capsOff = true; }
-    if (o.capsOnAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL; capsOff = false; }
     if (o.removeAt === t) server.bosses.remove(boss);
     if (o.lateAt === t) {
-      C = new FakeHitsClient(server, { name: 'bodies_c', caps: ALL, env });
+      C = new FakeHitsClient(server, { name: 'bodies_c', env });
       god(C);
       Position.x[C.pid] = x0 - 600; Position.y[C.pid] = y0 - 1200; Velocity.x[C.pid] = 0; Velocity.y[C.pid] = 0;
       watch(C, got.C);
@@ -160,18 +153,25 @@ describe('decision inputs: the Pyreclast flown by its body on both sides (CAPS.B
     const r = fight({ ticks: 2400, stagesAt: [800, 1600] });
     if (process.env.BODY_DEBUG) console.log('BODIES', JSON.stringify({ got: r.got, stats: r.stats, rep: r.rep, runner: r.A.bodies?.stats }));
     expect(r.brain.stage).toBe(3);
-    expect(r.got.A.running).toBeGreaterThan(500);
-    expect(r.got.A.checked).toBeGreaterThan(500);
+    // (a snapshot only when it has something to say: with every cap on, about every sixth tick for the pilot here)
+    expect(r.got.A.running).toBeGreaterThan(350);
+    expect(r.got.A.checked).toBeGreaterThan(350);
     expect(r.got.A.off).toBe(0);
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.got.A.decisions).toBeGreaterThan(10);
-    // (keyframes of it: the first, and only what its body doesn't model: the stage sheds)
-    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes / 4);
+    // (keyframes of it: its arrival and its body taking it over, and only what its body doesn't model: the two stage sheds, and whatever else the server
+    // says its bodied shadow left the ship for, Replication.bodyStats.why)
+    const left = Object.values(r.rep.why).reduce((a, b) => a + b, 0);
+    expect(r.got.A.keyframes).toBeLessThanOrEqual(2 + 2 + left);
     expect(r.stats.checks).toBeGreaterThan(10);
     expect(r.stats.off).toBe(0);
     expect(r.stats.agreed).toBe(r.stats.checks - r.stats.stale - r.stats.unknown);
-    expect(r.got.B.decisions).toBe(0);
-    expect(r.got.B.running).toBe(0);
+    // The client watching from nearby: it runs it too, the server's ship at every snapshot, no control rows of it
+    expect(r.got.B.decisions).toBeGreaterThan(10);
+    expect(r.got.B.checked).toBeGreaterThan(500);
+    expect(r.got.B.off).toBe(0);
+    expect(r.got.B.ctlRows).toBe(0);
+    expect(r.got.B.keyframes).toBeLessThanOrEqual(2 + 2 + left);
   }, 300_000);
 
   it('a client arriving mid-fight: synced at once, its replica of it exact from there', () => {

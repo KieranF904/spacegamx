@@ -23,7 +23,7 @@ import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { hasComponent } from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, Dead, CAPS, DECISION, inSafeSpace, encodeMessage, decodeMessage, controlRowId, datan2, dcos, dsin,
+  Position, Velocity, Rotation, InSystem, Dead, DECISION, inSafeSpace, encodeMessage, decodeMessage, controlRowId, datan2, dcos, dsin,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
@@ -41,7 +41,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(here, '../../../data');
 const secs = Number(process.argv[2]) || 30;
 const LAT = Number(process.env.LAT ?? 3), DELAY = Number(process.env.DELAY ?? 8);
-const ALLCAPS = Object.values(CAPS).reduce((a, b) => a | b, 0);
 const PILOT = process.env.PILOT ?? 'strafe', FIRE = process.env.FIRE === '1', REAL = process.env.REAL === '1';
 const PACK = (process.env.PACK ?? 'helios_drone,helios_drone,helios_drone').split(',');
 const FACTION = process.env.FACTION ?? 'helios';
@@ -54,13 +53,13 @@ const server = new GameServer({
   scene: 'sectors', autoStart: false,
   ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
   clock: () => clock.t,
-  netCaps: ALLCAPS,
+  crowd: true,
 } as never);
 const ships = server.getShips();
 const T = () => server.getTick();
 const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
 const down: { at: number; data: Uint8Array }[] = [];
-const A = new FakeHitsClient(server, { name: 'fight_a', caps: ALLCAPS, env, defer: (data) => down.push({ at: T() + LAT, data }) });
+const A = new FakeHitsClient(server, { name: 'fight_a', env, defer: (data) => down.push({ at: T() + LAT, data }) });
 const up: { at: number; msg: ClientMessage }[] = [];
 
 const custom = server.enemies.custom as unknown as { live: Map<number, { design: string; move: { move: number; start: number } | null }>; stats: { moves: Record<string, number> } };

@@ -48,8 +48,6 @@ export interface ServerCtx {
   /** Every connection is an admin (proto) / guests are admins (dev server) */
   readonly everyoneAdmin: boolean;
   readonly guestAdmin: boolean;
-  /** The join caps this server takes (common network/hits.ts CAPS) */
-  readonly netCaps: number;
   /** Confirmed hits: a client's HP copy put right (hpResync); a client finding its own hits reports them (input hitReport) */
   readonly hits: { resync(conn: ClientConnection, ids: readonly unknown[]): void; report(conn: ClientConnection, rep: HitReport): void };
   /** A client stepping its own ship checks it (input ownCheck, CAPS.OWN_SIM: net/own/OwnChecks.ts) */

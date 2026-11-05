@@ -26,7 +26,7 @@ try {
     const j = JSON.parse(readFileSync(f, 'utf8'));
     all[sc] = j;
     const d = j.down;
-    console.log(`${sc.padEnd(7)} up ${j.up.msgsPerSec} msg/s, ${j.up.payloadBps} B/s payload, ${j.up.wireBps} B/s wire | ctl rows: base ${d.B_legacy.ctlBps} B/s, packed ${d.P_packed.ctlBps} B/s | parity ${j.parity.same}/${j.parity.ticks}`);
+    console.log(`${sc.padEnd(7)} up ${j.up.msgsPerSec} msg/s, ${j.up.payloadBps} B/s payload, ${j.up.wireBps} B/s wire | ctl rows: packed ${d.P_packed.ctlBps} B/s | parity ${j.parity.same}/${j.parity.ticks}`);
   }
 } finally {
   rmSync(tmp, { recursive: true, force: true });

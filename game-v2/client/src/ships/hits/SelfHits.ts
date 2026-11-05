@@ -129,7 +129,7 @@ export class SelfHits {
   constructor(private host: SelfHitsHost) {}
 
   /**
-   * Switched on or off (netCaps): on, everything starts afresh from the last snapshot, as the server's journal does.
+   * Switched on (the first netCaps after a join): everything starts afresh from the last snapshot, as the server's journal does.
    * Shells already flying sit it out (what they hit before isn't known here): the server tells their hits (HitLedger
    * endSnapshot), as for a shell told the old way
    */

@@ -1,12 +1,13 @@
 /**
- * A fight for decision-input tests (pilots.test.ts, customEnemies.test.ts): a real GameServer, a capable pilot (a fake
- * client with every cap) flying by input messages on time and firing at the nearest hostile, a legacy observer, and
- * packs (or a boss) round them. It checks every hostile the pilot runs against the server's ship at each snapshot's tick.
+ * A fight for decision-input tests (pilots.test.ts, customEnemies.test.ts): a real GameServer, a pilot (a fake client:
+ * every client has the full caps set) flying by input messages on time and firing at the nearest hostile, a second
+ * client watching from nearby, and packs (or a boss) round them. Every hostile either client runs is checked against
+ * the server's ship at each snapshot's tick (the server's own state is the ground truth).
  */
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
+  Position, Velocity, Rotation, InSystem, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage, type ShipState,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
@@ -19,16 +20,12 @@ import { FakeHitsClient } from '../net/hits/fakeHitsClient.testkit.js';
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-export const BODIES = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.CAUSES;
-export const ALL = BODIES | CAPS.PILOTS;
 
 interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ran: Set<number>; offAt: string[]; ops: Record<string, number>; lastTick?: number }
 const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ran: new Set(), offAt: [], ops: {} });
 
 export interface Opts {
   ticks?: number;
-  /** The capable client's caps */
-  caps?: number;
   /** The client loses this snapshot's decisions (the forced miss) */
   dropAt?: number;
   /** Packs: ships each, and where from the pilot (and their faction: pirates by default) */
@@ -56,17 +53,14 @@ export function fight(o: Opts = {}) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    // (mobs on the tick layer too, a volley as one row: a client asking for them, CAPS.WAYPOINTS and LAUNCHES)
-    netCaps: ALL | CAPS.WAYPOINTS | CAPS.LAUNCHES | CAPS.MOVES,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const caps = o.caps ?? ALL;
   /** Every mob's state at each tick's end, and A's mobs (CAPS.WAYPOINTS) against it on every tick it steps them */
   const mobTruth = new Map<string, number[]>();
   const mobs = { checked: 0, off: 0, firstOff: '' };
   const A = new FakeHitsClient(server, {
-    name: 'pilots_a', caps, env,
+    name: 'pilots_a', env,
     onGuideStep: (id, t, m) => {
       const s = mobTruth.get(`${id}:${t}`);
       if (!s) return;
@@ -74,7 +68,7 @@ export function fight(o: Opts = {}) {
       if (s[0] !== m.x || s[1] !== m.y || s[2] !== m.vx || s[3] !== m.vy || s[4] !== (m.a ?? 0)) { mobs.off++; if (!mobs.firstOff) mobs.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${s}`; }
     },
   });
-  const B = new FakeHitsClient(server, { name: 'legacy_b', caps: 0, env });
+  const B = new FakeHitsClient(server, { name: 'watcher_b', env });
   // (every hostile, escorts spawned mid-fight too)
   const foe = { has: (id: number) => ships.has(id) && !!server.enemies.factionOf(id) };
   const foeIds = () => [...ships.bodies.keys()].filter((id) => foe.has(id));

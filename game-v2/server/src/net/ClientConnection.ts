@@ -104,9 +104,8 @@ export interface ClientConnection {
   /** ...as does anything that moves the ship besides its inputs (a new keyframe version), or a status change */
   selfVersion: number;
   selfKey: string;
-  selfSentTick: number;
   /**
-   * Its own row went in the last snapshot only for its HP or now and then (SELF_SAFETY_TICKS), not to correct its
+   * Its own row went in the last snapshot only for its HP, not to correct its
    * prediction or tell it something its flight depends on: a client finding its own hits needn't have it at once
    * (PackedLink urgentFor)
    */
@@ -116,14 +115,11 @@ export interface ClientConnection {
   /** Hash of its ship's state at each recent tick (the client checks its prediction against these) */
   selfHashes: Map<number, number>;
   /**
-   * What it can do beyond the base protocol (common network/hits.ts CAPS): `capsOffered` what its join announced and
-   * this server allows, `capsNext` what it's switched to (join, the admin's `hits` command), `caps` what's in effect
-   * (switched at a snapshot's end: net/hits/HitLedger.ts). Absent: none
+   * Its netcode's start (every client runs the full set, common network/hits.ts DEFAULT_CAPS): set at the end of its
+   * first snapshot, when it's told netCaps (net/hits/HitLedger.ts endSnapshot). Its own hit finding runs from there
    */
-  caps?: number;
-  capsNext?: number;
-  capsOffered?: number;
-  /** Its bit-packed frames while it takes them (CAPS.PACKED: net/snapshot/PackedLink.ts, made and dropped by Outbox) */
+  started?: boolean;
+  /** Its bit-packed frames (net/snapshot/PackedLink.ts, made by Outbox once it has joined) */
   packed?: PackedLink;
   /** Its focus grid (CAPS.FOCUS: net/cells/FocusCells.ts): its focus cells and ring */
   focus?: FocusState;

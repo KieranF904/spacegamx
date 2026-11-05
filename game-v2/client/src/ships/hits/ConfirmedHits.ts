@@ -20,7 +20,7 @@
  * own hit is dropped), then `flush` at the frame's end hands out the messages.
  */
 import {
-  CAPS, DEFAULT_CAPS, unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
+  unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
   type ClientMessage, type ServerMessage, type ServerHitsMessage, type ServerHpCheckMessage, type ShipState, type HitCtx, type PlacedGeom,
   hpWire, type ShellHitRecord, type HitEndFx,
 } from '@space-game/common';
@@ -384,25 +384,4 @@ export class ConfirmedHits {
     }
     return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
   }
-}
-
-/**
- * The caps this client announces in its join: confirmed hits when `?hits=1` (remembered; `?hits=0` turns it off),
- * else what was remembered, else on in a dev build. Client-detected hits (SELF_HITS) go with them unless `?selfhits=0`
- * (remembered; `?selfhits=1` back on). The server takes them only where it allows (the dev server).
- */
-export function clientCaps(): number {
-  const flag = (q: string, key: string): boolean | null => {
-    try {
-      const v = new URLSearchParams(globalThis.location?.search ?? '').get(q);
-      if (v === '0' || v === '1') { globalThis.localStorage?.setItem(key, v); return v === '1'; }
-      const m = globalThis.localStorage?.getItem(key);
-      if (m === '0' || m === '1') return m === '1';
-    } catch { /* no storage: the default */ }
-    return null;
-  };
-  // (on by default in dev and production builds alike: common DEFAULT_CAPS; ?hits=0 / ?selfhits=0 switch them off)
-  const on = flag('hits', 'sg.hits') ?? (DEFAULT_CAPS & CAPS.HITS) !== 0;
-  if (!on) return 0;
-  return CAPS.HITS | (flag('selfhits', 'sg.selfhits') ?? (DEFAULT_CAPS & CAPS.SELF_HITS) !== 0 ? CAPS.SELF_HITS : 0);
 }

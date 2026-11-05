@@ -32,6 +32,10 @@ function world() {
   t.connect();
   t.send({ type: 'join', username: 'salvager' } as any);
   const pid = t.getPlayerId();
+  // (A move's looks (its tells, beams, strikes' looks) are worked out by every client running the boss's body (CAPS.MOVES,
+  // every client), so none go on the wire: the server's own word for them, GameServer.moveFx, is what's watched here,
+  // as every pilot in the system would have been sent it)
+  (server as any).moveFx = (sys: number, _eid: number, _origin: unknown, msg: ServerMessage) => { if (InSystem.systemId[pid] === sys) got.push(msg); };
   const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };
   const num = server['gameData'].getSystemNum(def.system);
   const god = () => server['admin'].god.add(server.pilots.connOf(pid) as any);

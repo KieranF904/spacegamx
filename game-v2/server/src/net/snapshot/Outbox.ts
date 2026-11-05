@@ -7,15 +7,15 @@
  *
  * Per-tick path: no closures or objects beyond what the moved bodies already made; the host's pieces are plain fields.
  *
- * A client with bit-packed frames (CAPS.PACKED) gets the same messages at the same moments through its PackedLink
- * (ClientConnection.packed): each frame a sub-frame of a packed message, and with CAPS.COALESCE frames with nothing
- * urgent wait a few ticks to share one (PackedLink.ts).
+ * A joined client (every one runs the full caps set) gets its messages through its PackedLink (ClientConnection.packed):
+ * each frame a sub-frame of a bit-packed message, frames with nothing urgent waiting a few ticks to share one
+ * (PackedLink.ts). Base-format frames are only for a connection that hasn't joined yet (sign-in answers).
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { BlockStore, CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot } from '@space-game/common';
+import { BlockStore, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TYPES, LAZY_TICKS, FX_RANGE, COALESCE_TICKS } from './constants.js';
-import { PackedLink, quietHits } from './PackedLink.js';
+import { PackedLink } from './PackedLink.js';
 
 /** What the outbox needs of the server (GameServer itself) */
 export interface OutboxHost {
@@ -29,7 +29,7 @@ export class Outbox {
   private readonly clients: ReadonlyMap<ClientSocket, ClientConnection>;
   private readonly host: OutboxHost;
   /**
-   * Encode-once blocks (CAPS.BLOCKS): every packed link's snapshot rows about other entities, each bit-packed once a
+   * Encode-once blocks: every packed link's snapshot rows about other entities, each bit-packed once a
    * snapshot (common network/packed/blocks.ts). SnapshotBuilder tells it what was removed (its wire ids go back)
    */
   readonly blocks = new BlockStore((eid) => InSystem.systemId[eid]);
@@ -85,34 +85,24 @@ export class Outbox {
     }
   }
 
-  /**
-   * A client's packed link while it takes packed frames (made when it switches them on; drained, then dropped, when it
-   * switches them off, so its frames stay in order)
-   */
+  /** A client's packed link once it has joined (made then; before, sign-in answers go as base frames) */
   private packedOf(conn: ClientConnection): PackedLink | null {
-    if ((conn.caps ?? 0) & CAPS.PACKED) {
-      if (!conn.packed) {
-        conn.packed = new PackedLink(conn, this.blocks);
-        // (Effects waiting in the base format go first)
-        const l = this.lazy.get(conn.ws);
-        if (l) { this.lazy.delete(conn.ws); if (conn.ws.isOpen()) conn.ws.send(serverFrame(l.parts)); }
-      }
-      return conn.packed;
+    if (!conn.joined) return null;
+    if (!conn.packed) {
+      conn.packed = new PackedLink(conn, this.blocks);
+      // (Effects waiting in the base format go first)
+      const l = this.lazy.get(conn.ws);
+      if (l) { this.lazy.delete(conn.ws); if (conn.ws.isOpen()) conn.ws.send(serverFrame(l.parts)); }
     }
-    if (conn.packed) {
-      this.countPacked(conn.packed.drain(this.currentTick));
-      conn.packed = undefined;
-      this.packedWaiting.delete(conn);
-    }
-    return null;
+    return conn.packed;
   }
 
   /** A message for a packed client (it has a link: packedOf): as queue does (a pong, or outside a tick or request: at once) */
   private packedQueue(conn: ClientConnection, msg: ServerMessage, bytes: Uint8Array | null): void {
     const link = conn.packed!;
     if (msg.type === 'pong' || !this.batching) { this.countPacked(link.now({ msg, bytes }, this.currentTick)); return; }
-    // (The first snapshot after a hit to or from its ship goes at once; not to a client that finds its own hits)
-    if (msg.type === 'snapshot' && this.hitPilots.delete(conn.playerId) && !quietHits(conn.caps)) link.wantSnapshot = true;
+    // (The first snapshot after a hit to or from its ship goes at once; not once it finds its own hits)
+    if (msg.type === 'snapshot' && this.hitPilots.delete(conn.playerId) && !conn.started) link.wantSnapshot = true;
     link.add({ msg, bytes }, LAZY_TYPES.has(msg.type), this.currentTick);
     this.packedWaiting.add(conn);
   }
@@ -152,13 +142,11 @@ export class Outbox {
       if (!ws.isOpen()) { this.lazy.delete(ws); continue; }
       if (this.currentTick - l.since >= LAZY_TICKS) { ws.send(serverFrame(l.parts)); this.lazy.delete(ws); }
     }
-    // Packed clients: the same frames, as sub-frames (coalesced when they take that)
+    // Packed clients: the same frames, as sub-frames (coalesced)
     for (const conn of this.packedWaiting) {
       const link = conn.packed;
       if (!link || this.clients.get(conn.ws) !== conn) { this.packedWaiting.delete(conn); continue; }
-      if (!this.packedOf(conn)) continue;
-      const coalesce = (conn.caps ?? 0) & CAPS.COALESCE ? COALESCE_TICKS : 0;
-      this.countPacked(link.flush(this.currentTick, coalesce));
+      this.countPacked(link.flush(this.currentTick, COALESCE_TICKS));
       if (!link.waiting) this.packedWaiting.delete(conn);
     }
     // (A hit's snapshot is due within a snapshot's ticks; older marks are for clients that got none. Once a tick)
@@ -170,21 +158,17 @@ export class Outbox {
 
   /** Send the effects still waiting now (tests that look at a tick's messages straight after it) */
   flushLazy(): void {
-    this.flushDamage();
     for (const [ws, l] of this.lazy) if (ws.isOpen()) ws.send(serverFrame(l.parts));
     this.lazy.clear();
     for (const conn of this.packedWaiting) if (conn.packed) this.countPacked(conn.packed.flushLazy(this.currentTick));
   }
 
-  /**
-   * `skipCaps`: leave out the clients with any of these caps on (confirmed hits: they're told their own way); `skip`:
-   * and those it says (a move's look a client works out itself: GameServer.moveFx)
-   */
-  broadcastToSystem(systemId: number, msg: ServerMessage, skipCaps = 0, skip?: (client: ClientConnection) => boolean): void {
+  /** `skip`: leave out the clients it says (a move's look a client works out itself: GameServer.moveFx) */
+  broadcastToSystem(systemId: number, msg: ServerMessage, skip?: (client: ClientConnection) => boolean): void {
     // An effect only for the eye and ear (LAZY_TYPES) that happens somewhere goes only to clients near enough to see it
     if (LAZY_TYPES.has(msg.type)) {
       const at = fxPoint(msg);
-      if (at) { this.broadcastNear(systemId, at[0], at[1], msg, [], skipCaps, skip); return; }
+      if (at) { this.broadcastNear(systemId, at[0], at[1], msg, [], skip); return; }
     }
     const data = encodeServerMessage(msg);
     const byteLen = this.getMessageByteLength(data);
@@ -193,7 +177,6 @@ export class Outbox {
       // (System first: the cheapest check, and it rules out most)
       if (InSystem.systemId[client.playerId] !== systemId) continue;
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
-      if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
       if (skip?.(client)) continue;
       if (this.packedOf(client)) this.packedQueue(client, msg, data);
       else { this.queue(client.ws, data, LAZY_TYPES.has(msg.type)); sent++; }
@@ -205,7 +188,7 @@ export class Outbox {
 
   /**
    * Damage dealt since the last snapshot, summed per target, source and glancing (one number for a burst of hits, not
-   * one each), sent to the clients near the target when the next snapshot goes (flushDamage), to a tenth
+   * one each), handed on when the next snapshot goes (flushDamage) for each client's share (HitLedger.write), to a tenth
    */
   private readonly damageSums = new Map<string, { sys: number; target: number; source: number; glancing: boolean; amount: number }>();
 
@@ -219,28 +202,24 @@ export class Outbox {
   }
 
   /**
-   * The sums the last flushDamage held back from the clients it skipped (`skipCaps`: confirmed hits work out their
-   * own share, net/hits/HitLedger.ts write): theirs to send, until the next flush
+   * The sums the last flushDamage handed on: each client's share, less what its hit records cover, goes after its
+   * snapshot (net/hits/HitLedger.ts write), until the next flush
    */
   heldDamage: { sys: number; target: number; source: number; glancing: boolean; amount: number }[] = [];
 
-  /** The damage summed since the last snapshot: out with it (just before the snapshot, so it rides that frame) */
-  flushDamage(skipCaps = 0): void {
-    this.heldDamage = skipCaps ? [...this.damageSums.values()] : [];
-    for (const e of this.damageSums.values()) {
-      const amount = Math.round(e.amount * 10) / 10;
-      if (amount <= 0) continue;
-      this.broadcastNear(e.sys, Position.x[e.target], Position.y[e.target], damageMessage(e, amount), [e.source], skipCaps);
-    }
+  /** The damage summed since the last snapshot, handed on for the clients' shares (just before the snapshot) */
+  flushDamage(): void {
+    this.heldDamage = [...this.damageSums.values()];
     this.damageSums.clear();
   }
 
-  broadcastProjectileHit(proj: number, x: number, y: number, skipCaps = 0): void {
-    this.broadcastNear(InSystem.systemId[proj], x, y, projectileHitMessage(proj, x, y), [], skipCaps);
+  /** A shell's end told to everyone near (one that hit no ship: a rock, a station; or a stuck shell) */
+  broadcastProjectileHit(proj: number, x: number, y: number): void {
+    this.broadcastNear(InSystem.systemId[proj], x, y, projectileHitMessage(proj, x, y));
   }
 
   /** Clients in a system near a point (combat effects: nobody further out has the ships involved) */
-  broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = [], skipCaps = 0, skip?: (client: ClientConnection) => boolean): void {
+  broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = [], skip?: (client: ClientConnection) => boolean): void {
     const data = encodeServerMessage(msg);
     // (A part of a piece of debris crumbling: a client running the piece (or told to, its check on the way) shows that
     // itself, CAPS.DEBRIS)
@@ -250,7 +229,6 @@ export class Outbox {
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
       const pid = client.playerId;
       if (dhypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
-      if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
       if (crumble >= 0 && (client.debrisLive?.has(crumble) || client.debrisHeld.get(crumble)?.live)) continue;
       if (skip?.(client)) continue;
       if (this.packedOf(client)) { this.packedQueue(client, msg, data); continue; }

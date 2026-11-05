@@ -13,7 +13,6 @@
  *   OWN_SHOT_WIRE0 + (tick mod 2^16) · 2^13 + slot · 2^5 + barrel        (< 2^31)
  */
 
-import { CAPS } from '../network/hits.js';
 import { SHOT_ID_BARRELS, SHOT_ID_SLOTS, SHOT_ID_TICKS, shotIdParts } from './events.js';
 
 /** Where own shells' wire names start (bit 30 and bit 29 set: clear of entity ids and of MoveRunner's 0x40000000 ids for 2^29 shells) */
@@ -36,11 +35,3 @@ export function isOwnShotWire(id: number): boolean {
   return id >= OWN_SHOT_WIRE0 && id < 2 ** 31;
 }
 
-/**
- * Does this client work its own straight shells out itself, named by shot id (CAPS.SHOT_IDS, with OWN_SIM, OWN_SHOTS
- * and HITS: it builds them on its tick layer from its own ship, and its hits name them)?
- */
-export function shotIdsFor(caps: number | undefined): boolean {
-  const need = CAPS.SHOT_IDS | CAPS.OWN_SIM | CAPS.OWN_SHOTS | CAPS.HITS;
-  return ((caps ?? 0) & need) === need;
-}

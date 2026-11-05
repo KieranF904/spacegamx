@@ -12,9 +12,7 @@
  */
 import { dcos, dsin } from '../math/detTrig.js';
 import { dequantizeCursorAngle } from '../network/cursorState.js';
-import { CAPS } from '../network/hits.js';
 import { FLIGHT_MOB, GUIDE_KQ, GUIDE_Q, guideKind, newGuide, qGuide, type Guide, type GuideBody, type GuideKind } from './waypoints.js';
-import { waypointsFor } from './records.js';
 
 /** Ids as the first, then each one's gap from the one before (ships/debris.ts packIds) */
 const packIds = (ids: readonly number[]) => ids.map((id, i) => (i ? id - ids[i - 1] : id));
@@ -25,11 +23,6 @@ export interface LaunchPattern { x: number; y: number; line: number; n: number; 
 
 /** Mobs a volley lays at most (a guide row is 24 numbers at most: guideRowOk) */
 export const LAUNCH_MAX = 10;
-
-/** Does this client take volleys as LAUNCH rows (CAPS.LAUNCHES, running mobs: CAPS.WAYPOINTS)? */
-export function launchesFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.LAUNCHES) !== 0 && waypointsFor(caps);
-}
 
 /** The pattern with its point put on the guide grid (as the row carries it) */
 export function launchPattern(x: number, y: number, line: number, n: number, ring: boolean, gap: number): LaunchPattern {

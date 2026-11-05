@@ -7,7 +7,7 @@
  *   client's view of them (what changed since its last), replicated ship motion, fire events, ship structure
  *   (`sendShipUpdates`), stations and portals once, removals; then the map dots.
  * - `sendMapDots`: the system map's ships past the ship view, to clients with the map open.
- * - `updateShipView`: which of a system's ships a client sees.
+ * - its view of the ships: its focus cells (net/cells/FocusCells.ts), and those away (net/cells/AwayNet.ts).
  * - `enterSystem`: a client's first snapshot in a system (briefings, the asteroid seed, a clean slate).
  * - `sendPlayerState` / `sendSystemInfo`: HUD numbers, and the system visuals when the system changes.
  *
@@ -20,7 +20,7 @@ import {
   ASTEROID_SEED, MAP_DOT_SLACK, MAP_PT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packSheds, packRanges, DEBRIS_STATUS, TICK_RATE,
-  FOCUS_RANGE, RING_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor, debrisFor, FEED_TIERS, feedMidRadius,
+  FOCUS_RANGE, RING_RANGE, CROWD_BASE_WINDOW, FEED_TIERS, feedMidRadius,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
   headWord, HEAD_HASH_ROW,
 } from '@space-game/common';
@@ -39,10 +39,10 @@ import type { LootPods } from '../game/LootPods.js';
 import type { ServerFeatures } from '../ships/features/host.js';
 import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
-import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS, FX_RANGE as FX_NEAR } from './snapshot/constants.js';
+import { SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS, FX_RANGE as FX_NEAR } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
-import { ownShotsFor, ownVolleyExact, ownSimFor, shotIdsFor, OwnShotLog } from './snapshot/ownShots.js';
-import { bodiesFor, pilotsFor, movesFor, focusFor, causesFor, contactsFor, waypointsFor, launchesFor, replicasByte, jumpPhase, jumpTuning, CAPS } from '@space-game/common';
+import { ownVolleyExact, OwnShotLog } from './snapshot/ownShots.js';
+import { replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import { AwayNet } from './cells/AwayNet.js';
 import type { CrowdControl } from './crowd/CrowdControl.js';
@@ -145,7 +145,7 @@ export interface SnapshotHost {
   readonly pendingRemovedEntities: Map<number, number>;
   /** Each pilot's entities as last sent (playerId -> entity id -> key) */
   readonly lastEntityStates: Map<number, Map<number, string>>;
-  /** Confirmed hits (net/hits/HitLedger.ts): a capable client's records, after its snapshot and before its HP */
+  /** Confirmed hits (net/hits/HitLedger.ts): a client's records, after its snapshot and before its HP */
   readonly hits?: HitLedger | null;
   /** Pilots' checks of their own ships (CAPS.OWN_SIM): what each snapshot should come to (net/own/OwnChecks.ts) */
   readonly ownChecks?: OwnChecks | null;
@@ -197,13 +197,13 @@ export class SnapshotBuilder {
   private readonly crowd: CrowdControl | null;
   /** Each fire event's row this snapshot (one array for every client, so it's encoded once: CAPS.BLOCKS) */
   private fireRows = new WeakMap<object, number[]>();
-  /** Capable pilots' own shells they work out themselves, named by shot id (CAPS.SHOT_IDS: snapshot/ownShots.ts) */
+  /** Pilots' own shells they work out themselves, named by shot id (CAPS.SHOT_IDS: snapshot/ownShots.ts) */
   readonly ownShotLog = new OwnShotLog();
   /** The server itself, for its tick (read, never held) */
   private readonly ticks: { readonly currentTick: number };
-  /** The focus grid (CAPS.FOCUS: net/cells/FocusCells.ts): capable clients' views by cell, in place of the circle */
+  /** The focus grid (CAPS.FOCUS: net/cells/FocusCells.ts): clients' views by cell */
   readonly focus: FocusCells;
-  /** Ships out of capable clients' views that both ends keep (CAPS.FOCUS: net/cells/AwayNet.ts): back, only what changed */
+  /** Ships out of clients' views that both ends keep (CAPS.FOCUS: net/cells/AwayNet.ts): back, only what changed */
   readonly away: AwayNet;
 
   constructor(host: SnapshotHost, ticks: { readonly currentTick: number }) {
@@ -341,7 +341,7 @@ export class SnapshotBuilder {
     const hps: [number, [number, number][]][] = [];
     // (Debris it's working out itself waits for its confirmation: ackDebris)
     // Ships out of view wait (the client keeps what it had, and catches up when one comes back). The view was
-    // made this snapshot from the system's bodies in their order (updateShipView), so this goes in that order too
+    // made this snapshot from the system's bodies in their order (FocusCells.view), so this goes in that order too
     // (Debris it runs itself, CAPS.DEBRIS: let go once out of view or gone; told once something else touched it)
     const live = conn.debrisLive;
     if (live?.size) for (const id of live) if (!conn.shipView.has(id) || !this.ships.has(id)) live.delete(id);
@@ -365,13 +365,9 @@ export class SnapshotBuilder {
       if (syncs && (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds)) {
         const fresh = !synced || synced.ship !== ship;
         // (Keeping each structure by its tick, CAPS.STRUCTS: the ones between go first, in order, each with its tick)
-        let kept: number[] | undefined, at: number | undefined;
-        if (structsFor(conn.caps)) {
-          const next = nextSync(this.ships.structLog, id, ship, synced);
-          for (const e of next.between) this.sendBetween(conn, id, ship, e);
-          kept = next.kept;
-          at = next.at;
-        }
+        const next = nextSync(this.ships.structLog, id, ship, synced);
+        for (const e of next.between) this.sendBetween(conn, id, ship, e);
+        const kept: number[] | undefined = next.kept, at: number | undefined = next.at;
         // (Its shells' damage multiplier: on a new ship's sync when it isn't 1, then whenever it changed)
         const dmg = this.ships.damageMulOf(id), hadDmg = fresh ? 1 : (synced?.dmg ?? 1);
         synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg };
@@ -600,15 +596,14 @@ export class SnapshotBuilder {
     if (!ship || !ctl) return;
     // (Docked, its shadow: what its last keyframe carried, Replication.stepOwn)
     const body = this.replication.ownHeld(id) ?? { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
-    // (CAPS.CAUSES: every other ship it holds goes in the check too)
-    let held = causesFor(conn.caps) ? this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined) : 0;
-    // (CAPS.WAYPOINTS: the homing shells it runs too; off, they're all SYNCed again)
-    if (this.guides && waypointsFor(conn.caps)) held += replicasByte(this.guides.heldSum(conn));
+    // (Every other ship it holds goes in the check too, and the homing shells it runs)
+    let held = this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined);
+    if (this.guides) held += replicasByte(this.guides.heldSum(conn));
     this.ownChecks!.note(conn, this.currentTick, body, ctl.bits, ctl.q, conn.shipHpSent.get(id), held);
   }
 
   /**
-   * The head hash for a client stepping its own ship (CAPS.OWN_SIM; common sim/headHash.ts): its own ship as it is
+   * The head hash (every client steps its own ship; common sim/headHash.ts): its own ship as it is
    * now, its tick layer's (the real ship and the controls it flew), unless it isn't held (docked, dead, not yet known
    * to it). `keyed`: its own ship's keyframe goes in this snapshot (nothing to compare)
    */
@@ -624,7 +619,7 @@ export class SnapshotBuilder {
 
   /**
    * A client's own row this snapshot: whether it goes (`need`: its prediction needs correcting, its status changed, its
-   * warmth too, or now and then) and whether as a correction (`fix`: forced, an input applied late, a new keyframe
+   * warmth too) and whether as a correction (`fix`: forced, an input applied late, a new keyframe
    * version, first sight, or a change to what its flight depends on, apart from its HP: its slowing ending too,
    * features/weaponry)
    */
@@ -632,13 +627,13 @@ export class SnapshotBuilder {
     const d = r.state.data ?? [];
     const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
     const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
-    // (A client stepping its own ship (CAPS.OWN_SIM) goes by its own keyframe version: what its tick layer worked out
-    // itself (a contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
-    const version = (ownSimFor(conn.caps) ? this.replication.ownVersionOf(r.id) : undefined) ?? this.replication.versionOf(r.id);
+    // (Its client steps its own ship, so it goes by its own keyframe version: what its tick layer worked out itself (a
+    // contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
+    const version = this.replication.ownVersionOf(r.id) ?? this.replication.versionOf(r.id);
     const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
-    // (Now and then just in case, unless its snapshots carry the head hash (CAPS.OWN_SIM: sim/headHash.ts): a client
-    // that disagrees with it checks at once, and the fix brings the row)
-    const need = fix || key !== conn.selfKey || (!ownSimFor(conn.caps) && this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS);
+    // (No copy now and then just in case: its snapshots carry the head hash (sim/headHash.ts), a client that disagrees
+    // with it checks at once, and the fix brings the row)
+    const need = fix || key !== conn.selfKey;
     return { need, fix, key, flight, version };
   }
 
@@ -692,9 +687,9 @@ export class SnapshotBuilder {
     this.syncWire.clear();
     const bySystem = new Map<number, SnapRow[]>();
     this.replication.beginSnapshot(due);
-    // (The focus grid's home cells, for the systems with a client holding cells: CAPS.FOCUS)
+    // (The focus grid's home cells, for the systems with a client in them)
     const focusSystems = new Set<number>();
-    for (const conn of this.clients.values()) if (focusFor(conn.caps) && hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
+    for (const conn of this.clients.values()) if (hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
     if (focusSystems.size) this.focus.beginRound(focusSystems);
     const crowd = this.crowd;
     let t0 = crowd ? performance.now() : 0;
@@ -727,46 +722,32 @@ export class SnapshotBuilder {
       const px = Position.x[conn.playerId], py = Position.y[conn.playerId];
       // Debris it can work out itself: told how (first, before the ship's own sync), and held back till it confirms
       this.holdDebris(conn);
-      // Ships that left its view: it forgets them, and gets each again on its own when it comes back
-      // (Holding cells, CAPS.FOCUS: the ships homed in its focus cells, net/cells/FocusCells.ts)
-      if (conn.focus && !focusFor(conn.caps)) { this.focus.reset(conn); this.away.reset(conn); }
-      const focusOn = focusFor(conn.caps);
-      const out = focusOn ? this.focus.view(conn, playerSystemId, px, py) : this.updateShipView(conn, playerSystemId, px, py);
-      // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back.
-      // Holding cells it keeps them while they're away, and gets only what changed when they're back: net/cells/AwayNet.ts)
-      const goneAway = focusOn ? this.away.round(conn, this.currentTick, conn.shipView, out, prevStates) : null;
-      if (!focusOn) for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
-      // Ship motion: keyframes where needed, control changes otherwise (its own ship's too, when it builds its own
-      // shells: its confirmed ship, beside its prediction, snapshot/ownShots.ts)
-      const ownShots = ownShotsFor(conn.caps);
-      // Bosses flown by their bodies on its tick layer (CAPS.BODIES): their decisions, and from here no rows or drive keyframes of them
-      const bodies = this.bodies && bodiesFor(conn.caps) ? this.bodies : null;
-      // (its caps switched it off: none run there any more, BodyNet.drop)
-      if (!bodies) this.bodies?.drop(conn);
-      // (Other ships' causes on its tick layer, CAPS.CAUSES: keyframes only where they don't explain a ship's path)
-      const causes = causesFor(conn.caps);
+      // Ships that left its view: the ships homed in its focus cells (net/cells/FocusCells.ts); it keeps them while
+      // they're away, and gets only what changed when they're back (net/cells/AwayNet.ts)
+      const out = this.focus.view(conn, playerSystemId, px, py);
+      const goneAway = this.away.round(conn, this.currentTick, conn.shipView, out, prevStates);
+      // Ship motion: keyframes where needed, control changes and causes otherwise (its own ship's too: its confirmed
+      // ship, stepped on its tick layer, snapshot/ownShots.ts)
+      // Bosses flown by their bodies on its tick layer: their decisions, and from here no rows or drive keyframes of them
+      const bodies = this.bodies;
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
-        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes), pilotsFor(conn.caps), movesFor(conn.caps));
-      // Homing shells and mobs on its tick layer (CAPS.WAYPOINTS): their SYNCs and records, and from here no rows of them
-      const guidesOn = this.guides && waypointsFor(conn.caps) ? this.guides : null;
-      if (!guidesOn) this.guides?.drop(conn);
+        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown));
+      // Homing shells and mobs on its tick layer: their SYNCs and records, and from here no rows of them
+      const guidesOn = this.guides;
       const guided = guidesOn?.forClient(conn, {
         self: conn.playerId, systemId: playerSystemId,
         near: (e) => !fartherThan(Position.x[e] - px, Position.y[e] - py, SNAP_PROJECTILE_RANGE),
         holds: (e) => conn.shipView.has(e) && conn.repKnown.has(e),
-        rekeyed: (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes),
-        launches: launchesFor(conn.caps),
+        rekeyed: (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown),
       }, this.currentTick);
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined,
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, (id) => this.keptAfter(conn, id, playerSystemId),
         // (A ship a body it runs reads, keyframed now: the body's ship goes again too, Replication.forClient)
-        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined, cargoFor(conn.caps), conn.debrisLive,
-        // (Contact pairs it finds itself, CAPS.CONTACTS: since its last snapshot, the window it works them out over)
-        contactsFor(conn.caps) ? { since: conn.lastSnapshotSentTick } : undefined);
+        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined, conn.debrisLive,
+        // (Contact pairs it finds itself: since its last snapshot, the window it works them out over)
+        conn.lastSnapshotSentTick);
       // (...and their sparks it draws itself: the rest go now, Replication.contactFxFor)
-      if ((conn.caps ?? 0) & CAPS.CONTACTS) {
-        for (const m of this.replication.contactFxFor(conn, playerSystemId, rep.found ?? null, this.currentTick)) {
-          if (!fartherThan(m.x - px, m.y - py, FX_NEAR)) this.send(conn.ws, m);
-        }
+      for (const m of this.replication.contactFxFor(conn, playerSystemId, rep.found ?? null, this.currentTick)) {
+        if (!fartherThan(m.x - px, m.y - py, FX_NEAR)) this.send(conn.ws, m);
       }
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
@@ -778,17 +759,16 @@ export class SnapshotBuilder {
       const fire: number[][] = [];
       const covered = new Set<number>();
       // (its own straight shells it works out itself, CAPS.SHOT_IDS: no record, no row, named by shot id in its hits and removals)
-      const shotIds = shotIdsFor(conn.caps);
-      if (shotIds && this.hits && !this.hits.shellName) { const log = this.ownShotLog; this.hits.shellName = (c, id) => log.wireOf(c, id) ?? id; }
+      if (this.hits && !this.hits.shellName) { const log = this.ownShotLog; this.hits.shellName = (c, id) => log.wireOf(c, id) ?? id; }
       for (const f of this.ships.fired) {
-        if (f.owner === conn.playerId && shotIds && OwnShotLog.derivable(this.ships, f)) {
+        if (f.owner === conn.playerId && OwnShotLog.derivable(this.ships, f)) {
           this.ownShotLog.derive(conn, f);
           // (its ship keyframed in this window: what its layer built them from isn't the server's; their hits are told, as rows' are. Client ShipClient.ownShells)
           if (keyed.has(f.owner)) for (const id of f.ids) this.hits?.rowShell(conn, id);
           continue;
         }
         // (its own, CAPS.OWN_SIM: not one fired before a rebuild in this window: it's built from the structure it has now)
-        if (f.owner === conn.playerId) { if (!ownShots || keyed.has(f.owner) || !conn.repKnown.has(f.owner) || !ownVolleyExact(this.ships, f) || (rep.ownRebuild !== undefined && f.tick <= rep.ownRebuild)) continue; }
+        if (f.owner === conn.playerId) { if (keyed.has(f.owner) || !conn.repKnown.has(f.owner) || !ownVolleyExact(this.ships, f) || (rep.ownRebuild !== undefined && f.tick <= rep.ownRebuild)) continue; }
         else if (!conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
         if (InSystem.systemId[f.owner] !== playerSystemId) continue;
         // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, power/ports.ts)
@@ -804,7 +784,7 @@ export class SnapshotBuilder {
         if (conn.debrisRowOk.size && conn.debrisRowOk.delete(r.id) && r.key === DEBRIS_ROW_KEY) { newStates.set(r.id, r.key); continue; }
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
         // (its own shell it works out itself, CAPS.SHOT_IDS: no row, ever)
-        if (r.kind === 'projectile' && shotIds && this.ownShotLog.has(conn, r.id)) continue;
+        if (r.kind === 'projectile' && this.ownShotLog.has(conn, r.id)) continue;
         // (a body's move's straight shell it makes itself, CAPS.MOVES: no row, nor a removal)
         if (r.kind === 'projectile' && bodies?.shellDerived(conn, conn.playerId, r.id, prevStates.has(r.id))) continue;
         // (a homing shell it runs, its row once sent: it flies it itself)
@@ -827,7 +807,6 @@ export class SnapshotBuilder {
           conn.selfVersion = self.version;
           conn.selfKey = self.key;
           conn.selfFlight = self.flight;
-          conn.selfSentTick = this.currentTick;
         }
         let v = r.other && r.id !== conn.playerId ? r.other : r;
         if (r.id !== conn.playerId) {
@@ -849,11 +828,11 @@ export class SnapshotBuilder {
         }
       }
       // Ship structure: full sync on first sight and after every rebuild, HP deltas otherwise
-      // (A client taking confirmed hits: its HP after its records, below; first, what it'll make of each hit)
-      const hitsOn = !!this.hits?.wants(conn);
+      // (Confirmed hits: its HP after its records, below; first, what it'll make of each hit)
+      const hitsOn = !!this.hits;
       this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
       // (Hits on a ship its causes moved this window are told, as on one keyframed: its client leaves them, SelfHits.onCaused)
-      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || (shotIds && this.ownShotLog.has(conn, id)), rep.caused ? new Set([...keyed, ...rep.caused]) : keyed) : null;
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id), rep.caused ? new Set([...keyed, ...rep.caused]) : keyed) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {
@@ -888,7 +867,7 @@ export class SnapshotBuilder {
       // (its own shells it works out, CAPS.SHOT_IDS: removed by their shot-id names, and only those it can't work out)
       let renamed: Map<number, number> | null = null;
       for (const [eid] of this.pendingRemovedEntities) {
-        if (shotIds && this.ownShotLog.has(conn, eid)) {
+        if (this.ownShotLog.has(conn, eid)) {
           // (ended before its life did: a rock, point defence. Expired: its client removes it itself; spent by a hit: its record says so)
           const wire = this.ownShotLog.removed(conn, eid, Lifetime.remaining[eid] > 0, !!gone?.has(eid));
           if (wire !== null) { removed.push(eid); (renamed ??= new Map()).set(eid, wire); }
@@ -903,8 +882,8 @@ export class SnapshotBuilder {
         conn.sentNames.delete(eid);
         conn.mapNamed.delete(eid);
       }
-      // (Ships it kept while they were away that are gone: told by id, CAPS.FOCUS)
-      if (goneAway?.length) for (const id of goneAway) if (!removed.includes(id)) removed.push(id);
+      // (Ships it kept while they were away that are gone: told by id)
+      if (goneAway.length) for (const id of goneAway) if (!removed.includes(id)) removed.push(id);
       if (hitsOn && removed.length) this.hits!.dropShells(conn, removed);
       if (renamed) for (let i = 0; i < removed.length; i++) removed[i] = renamed.get(removed[i]) ?? removed[i];
 
@@ -934,16 +913,16 @@ export class SnapshotBuilder {
         decisions: decisions?.length ? decisions : undefined,
         causes: rep.causes,
         guides: guided?.rows.length ? guided.rows : undefined,
-        hh: ownSimFor(conn.caps) ? this.headHash(conn, keyed.has(conn.playerId)) : undefined,
+        hh: this.headHash(conn, keyed.has(conn.playerId)),
       });
 
       conn.forceSnapshot = false;
       conn.lastSnapshotSentTick = this.currentTick;
       this.lastEntityStates.set(conn.playerId, newStates);
       if (hitsOn) this.afterHits(conn, playerSystemId);
-      // What its check of its own ship should say for this snapshot (CAPS.OWN_SIM: net/own/OwnChecks.ts)
-      if (this.ownChecks && ownSimFor(conn.caps) && conn.repKnown.has(conn.playerId)) this.noteOwn(conn);
-      // ...and of the bodies it runs (CAPS.BODIES: net/decisions/BodyNet.ts)
+      // What its check of its own ship should say for this snapshot (net/own/OwnChecks.ts)
+      if (this.ownChecks && conn.repKnown.has(conn.playerId)) this.noteOwn(conn);
+      // ...and of the bodies it runs (net/decisions/BodyNet.ts)
       bodies?.note(conn, this.currentTick);
     }
 
@@ -1077,7 +1056,7 @@ export class SnapshotBuilder {
         if (unsure && !told) continue;
         const until = now + DEBRIS_ACK_TICKS + 2 * Math.ceil(conn.ping / (1000 / TICK_RATE));
         // (Its to run from their spawn, CAPS.DEBRIS: pieces of a ship, or of a piece it runs: it knows when each part crumbles)
-        const l = debrisFor(conn.caps) && (sp.ship.kind !== 'debris' || runs);
+        const l = sp.ship.kind !== 'debris' || runs;
         // (A piece crumbled already, before the split is told: one not run there would be worked out as it was spawned,
         // and its sync, before the snapshot, would come ahead of it: the split goes in full)
         if (!l && sp.ids.some(rebuilt)) continue;
@@ -1199,26 +1178,6 @@ export class SnapshotBuilder {
       if (!full && !dots.length && !routes.length && !info.length && !gone.length && !names.length && !pts.length) continue;
       this.send(conn.ws, { type: 'mapDots', tick: now, dots, ...(routes.length ? { routes } : {}), ...(info.length ? { info } : {}), ...(gone.length ? { gone } : {}), ...(names.length ? { names } : {}), ...(full ? { full: 1 as const } : {}), ...(pts.length ? { pts } : {}) });
     }
-  }
-
-  /**
-   * Which of a system's ships a client sees (see SHIP_VIEW_IN): updates its view
-   * and returns the ships that just left it.
-   */
-  updateShipView(conn: ClientConnection, systemId: number, px: number, py: number): number[] {
-    const was = conn.shipView;
-    const now = new Set<number>();
-    const party = this.party.partyId(conn) ? new Set(this.party.members(conn).map((m) => m.playerId)) : null;
-    const target = this.ships.targetOf(conn.playerId);
-    const left: number[] = [];
-    for (const eid of this.ships.bodies.keys()) {
-      if (InSystem.systemId[eid] !== systemId) continue;
-      if (eid === conn.playerId || nearerThan(Position.x[eid] - px, Position.y[eid] - py, was.has(eid) ? SHIP_VIEW_OUT : SHIP_VIEW_IN) || party?.has(eid) || eid === target) now.add(eid);
-      else if (was.has(eid)) left.push(eid);
-    }
-    // (Ships gone from the system entirely are removals, sent as before)
-    conn.shipView = now;
-    return left;
   }
 
   /** A client's first snapshot in a system: world events, the asteroid seed, and a clean slate */

@@ -33,11 +33,6 @@ export interface OwnTickHost {
   /** Its own ship's id */
   self(): number;
   tuning: ShipTuning;
-  /**
-   * Is anything stepping on its layer able to read its ship before a snapshot's structure and causes are in (a boss's
-   * body reading its target, CAPS.BODIES)? Then each snapshot steps it again from just after the last. Unset: always
-   */
-  restep?(): boolean;
   /** What its check's state byte adds for a snapshot (CAPS.CAUSES: every other ship it holds, ShipCauses.heldByte) */
   extraHash?(tick: number): number | undefined;
   /** The contact pairs it finds itself (CAPS.CONTACTS), when it does */
@@ -52,7 +47,9 @@ const KEEP_TICKS = 600;
 const CLEAN_TICKS = 600;
 
 export class OwnTick implements OwnTimeline {
+  /** Its own replica is stepped from here (from its welcome: start); before that there is no ship of its own */
   on = false;
+  private id = -1;
   /** Control changes by tick: its inputs (by target tick), and the server's where it said */
   private readonly ctls = new Map<number, [number, number]>();
   /** Causes by tick ([kind, ...]) */
@@ -81,17 +78,19 @@ export class OwnTick implements OwnTimeline {
 
   constructor(private readonly host: OwnTickHost) {}
 
-  /** Switched on or off (netCaps): its own replica is stepped from here, or from rows again */
-  setOn(on: boolean): void {
-    if (on === this.on) return;
-    this.on = on;
+  /** Its pilot is known (welcome): its own replica is stepped from here from now on (again, if its ship changed) */
+  start(): void {
+    const id = this.host.self();
+    if (this.on && id === this.id) return;
+    this.on = true;
+    this.id = id;
     this.causes.clear();
     this.until = null;
     this.keyed = false;
-    this.host.reps.setOwn(this.host.self(), on ? this : null);
+    this.host.reps.setOwn(id, this);
   }
 
-  /** An input it sent (kept whether or not it's on: switched on, the inputs already sent ahead are needed) */
+  /** An input it sent (kept from before its start too: the inputs already sent ahead are needed) */
   noteInput(msg: ClientInputMessage): void {
     const t = msg.targetTick;
     if (t === undefined) return;
@@ -120,8 +119,8 @@ export class OwnTick implements OwnTimeline {
     // (Its head hash: judged once the snapshot is all in, at the next check)
     if (m.hh !== undefined) this.head = { tick: m.tick, h: headHashOfWord(m.hh) };
     // (What it stepped past the last snapshot is stepped again: something may have asked for its ship there before this
-    // frame's structure and causes were in, a boss's body reading its target, CAPS.BODIES)
-    let earliest = (this.host.restep?.() ?? true) ? prev + 1 : Infinity;
+    // frame's structure and causes were in, a boss's body reading its target)
+    let earliest = prev + 1;
     if (m.ships?.some((k) => k[0] === self)) {
       // (A keyframe of its own ship after the first: the server had to put it right)
       if (this.keyed) { this.stats.fixes++; this.level = CONFIRM.STRICT; this.levelSince = m.tick; }
@@ -180,10 +179,9 @@ export class OwnTick implements OwnTimeline {
     if (rows) cargoBefore(body, rows);
   }
 
-  /** Finding contact pairs itself (CAPS.CONTACTS: ContactWorld) */
+  /** Finding contact pairs itself (ContactWorld) */
   private finds(): ContactWorld | null {
-    const w = this.host.contacts?.();
-    return w?.on ? w : null;
+    return this.host.contacts?.() ?? null;
   }
 
   /**

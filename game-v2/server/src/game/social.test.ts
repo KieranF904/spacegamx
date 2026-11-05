@@ -32,7 +32,11 @@ function world(clock = { t: 1_000_000 }) {
     t.send({ type: 'join', username: name } as any);
     const pid = () => t.getPlayerId();
     const conn = server.pilots.connOf(pid())!;
-    const last = <T extends ServerMessage['type']>(type: T) => [...got].reverse().find((m) => m.type === type) as Extract<ServerMessage, { type: T }> | undefined;
+    // (What it has been sent so far: its coalesced frames go now, as they would within a few ticks, net/snapshot/PackedLink.ts)
+    const last = <T extends ServerMessage['type']>(type: T) => {
+      (server.pilots.connOf(pid()) as any)?.packed?.drain(server.getTick());
+      return [...got].reverse().find((m) => m.type === type) as Extract<ServerMessage, { type: T }> | undefined;
+    };
     return { t, got, pid, conn, profile: () => server.pilots.get(conn)!, last, send: (m: any) => t.send(m) };
   };
   const a = pilot('Ash');

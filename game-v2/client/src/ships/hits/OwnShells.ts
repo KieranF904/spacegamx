@@ -32,7 +32,6 @@ export interface OwnShellsHost {
 const KEEP_TICKS = 600;
 
 export class OwnShells {
-  on = false;
   private fires: OwnFire[] = [];
   /** Shells built and not yet removed: the tick their life ends on (inclusive) */
   private live = new Map<number, number>();
@@ -41,12 +40,6 @@ export class OwnShells {
   readonly stats = { fires: 0, shells: 0, expired: 0, unbuilt: 0 };
 
   constructor(private readonly host: OwnShellsHost) {}
-
-  setOn(on: boolean): void {
-    if (on === this.on) return;
-    this.on = on;
-    this.reset();
-  }
 
   reset(): void {
     this.fires = [];
@@ -62,7 +55,6 @@ export class OwnShells {
 
   /** Your prediction fired a volley on tick `f.tick` (once per tick: predictions never replay) */
   fired(f: OwnFire): void {
-    if (!this.on) return;
     this.fires.push(f);
     this.stats.fires++;
   }
@@ -75,7 +67,6 @@ export class OwnShells {
   snapshot(tick: number, removed: number[], keyed: boolean): EntityState[] {
     this.fresh.clear();
     const out: EntityState[] = [];
-    if (!this.on) return out;
     const me = this.host.self(), ship = this.host.ship(me);
     let keep = 0;
     for (const f of this.fires) {

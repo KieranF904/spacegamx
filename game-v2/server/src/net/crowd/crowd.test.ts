@@ -1,7 +1,7 @@
 /**
  * Crowd fallbacks (CAPS.CROWD; server net/crowd/CrowdControl.ts, common network/crowd.ts).
  *
- * A real GameServer with two pilots flying (and firing) by inputs, a watcher with every cap and a legacy watcher. Each
+ * A real GameServer with two pilots flying (and firing) by inputs and a watcher (every client has every cap). Each
  * level is forced in turn and undone: every ship on the watcher's tick layer is checked against the server's at every
  * snapshot's tick, through every switch. The automatic levels are checked on CrowdControl alone with made-up costs.
  */
@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, Input, CAPS, ReplicaMode, replicaAngle, quantizeReplicaAngle, encodeMessage, decodeMessage, CELL_SIZE, CROWD_LEVELS, CROWD_MAX_LEVEL, crowdStage, ghostWeight,
+  Position, Velocity, Rotation, InSystem, Input, ReplicaMode, replicaAngle, quantizeReplicaAngle, encodeMessage, decodeMessage, CELL_SIZE, CROWD_LEVELS, CROWD_MAX_LEVEL, crowdStage, ghostWeight,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage, type ServerMessage, type ServerCrowdMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -24,9 +24,8 @@ import type { ClientConnection } from '../ClientConnection.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const ALL = 32767;
 
-interface Seen { snaps: number[]; legacySnaps: number[]; checked: number; offIds: string[]; ownKf: number[]; fixes: number; crowd: ServerCrowdMessage[] }
+interface Seen { snaps: number[]; checked: number; offIds: string[]; ownKf: number[]; fixes: number; crowd: ServerCrowdMessage[] }
 
 function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
   resetGlobals();
@@ -37,15 +36,14 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL,
+    crowd: true,
   });
   server.crowd!.auto = false;
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'watcher', caps: ALL, env });
-  const L = new FakeHitsClient(server, { name: 'legacy', caps: 0, env });
-  const P = [new FakeHitsClient(server, { name: 'pilot_b', caps: 0, env }), new FakeHitsClient(server, { name: 'pilot_c', caps: 0, env })];
+  const A = new FakeHitsClient(server, { name: 'watcher', env });
+  const P = [new FakeHitsClient(server, { name: 'pilot_b', env }), new FakeHitsClient(server, { name: 'pilot_c', env })];
   const truth = new Map<number, Map<number, number[]>>();
-  const seen: Seen = { snaps: [], legacySnaps: [], checked: 0, offIds: [], ownKf: [], fixes: 0, crowd: [] };
+  const seen: Seen = { snaps: [], checked: 0, offIds: [], ownKf: [], fixes: 0, crowd: [] };
   const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void; handle(m: ServerMessage): void };
   const oSnap = fa.snapshot.bind(A), oHandle = fa.handle.bind(A);
   fa.handle = (m) => {
@@ -58,9 +56,6 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
     seen.snaps.push(s.tick);
     if (seen.snaps.length > 3 && (s.ships ?? []).some((k) => k[0] === A.pid)) { seen.ownKf.push(s.tick); if (process.env.CROWD_DEBUG) console.log('OWNKF', s.tick, JSON.stringify((server.replication as unknown as { ownStats: unknown }).ownStats)); }
   };
-  const fl = L as unknown as { snapshot(s: ServerSnapshotMessage): void };
-  const lSnap = fl.snapshot.bind(L);
-  fl.snapshot = (s) => { lSnap(s); seen.legacySnaps.push(s.tick); };
   /** Every ship A holds on its tick layer against the server's at the tick its last snapshot was for */
   const check = () => {
     const t = A.snapTick, tr = truth.get(t);
@@ -101,12 +96,15 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
     truth.set(now(), m);
     truth.delete(now() - 64);
     clock.t += 1000 / 60;
-    for (const f of [A, L, ...P]) f.flushUp();
+    // (The pilots only take what they owe (resyncs): flushUp's report rides an input of its own with no target tick, applied
+    // at once and counted late; they fire nothing, and their inputs are the ones fly() sends)
+    A.flushUp();
+    for (const f of P) for (const m of f.outbox.splice(0)) f.link!.receive(m);
     check();
-    if (where) for (const f of [A, L]) { Position.x[f.pid] = where[0]; Position.y[f.pid] = where[1]; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; }
+    if (where) for (const f of [A]) { Position.x[f.pid] = where[0]; Position.y[f.pid] = where[1]; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; }
   };
   for (let i = 0; i < 10; i++) step();
-  for (const f of [A, L, ...P]) { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); c.isAdmin = false; }
+  for (const f of [A, ...P]) { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); c.isAdmin = false; }
   // A cell's middle well out from the sun; one pilot beside the watchers, one in a cell 12-20 km east (in a 19 km focus, not a 10 km one)
   const x0 = Math.floor((Position.x[A.pid] + 60000) / CELL_SIZE) * CELL_SIZE + CELL_SIZE / 2, y0 = Math.floor((Position.y[A.pid] + 60000) / CELL_SIZE) * CELL_SIZE + CELL_SIZE / 2;
   const far = o.far ?? 17500;
@@ -122,7 +120,7 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
   if (o.free) { step(); where = null; }
   const run = (n: number) => { for (let i = 0; i < n; i++) step(); };
   const system = () => InSystem.systemId[A.pid];
-  return { server, A, L, P, seen, run, now, truth, conn: server.pilots.connOf(A.pid)! as ClientConnection, system };
+  return { server, A, P, seen, run, now, truth, conn: server.pilots.connOf(A.pid)! as ClientConnection, system };
 }
 
 const gaps = (ticks: number[]) => ticks.slice(1).map((t, i) => t - ticks[i]);
@@ -168,21 +166,18 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     w.run(90);
     const sys = w.system();
     const at = () => w.seen.snaps.length;
-    const lat = () => w.seen.legacySnaps.length;
     w.server.crowd!.force(sys, 4);
     const s4 = at(), t4 = w.server.getTick();
     w.run(120);
-    const s5 = at(), l5 = lat();
+    const s5 = at();
     w.server.crowd!.force(sys, 5);
     w.run(180);
-    const s0 = at(), l0 = lat(), t0 = w.server.getTick();
+    const s0 = at(), t0 = w.server.getTick();
     w.server.crowd!.force(sys, 0);
     w.run(120);
     expect(gaps(w.seen.snaps.slice(s4 + 1, s5))).toEqual(Array(s5 - s4 - 2).fill(6));
     expect(gaps(w.seen.snaps.slice(s5 + 1, s0))).toEqual(Array(s0 - s5 - 2).fill(9));
     expect(gaps(w.seen.snaps.slice(s0 + 1))).toEqual(Array(w.seen.snaps.length - s0 - 2).fill(3));
-    // (A legacy client's snapshot is left out of a round with nothing in it for it: what goes is on the window's beat)
-    expect(gaps(w.seen.legacySnaps.slice(l5 + 1, l0)).every((g) => g % 9 === 0)).toBe(true);
     expect(w.seen.crowd.map((m) => m.w)).toEqual([6, 9, 3]);
     expect(w.seen.checked).toBeGreaterThan(300);
     expect(w.seen.offIds).toEqual([]);
@@ -234,7 +229,7 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
   it('travel into a dilated system and out: told its clock on arrival, its ticks from then; exact while there', () => {
     const w = world({ fire: true, far: 1500, free: true });
     const env = (id: number) => (w.server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-    const X = new FakeHitsClient(w.server, { name: 'traveller', caps: ALL, env });
+    const X = new FakeHitsClient(w.server, { name: 'traveller', env });
     const msgs: ServerCrowdMessage[] = [];
     const xs: number[] = [];
     const fx = X as unknown as { snapshot(s: ServerSnapshotMessage): void; handle(m: ServerMessage): void };
@@ -283,7 +278,7 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
 
   it('automatic: over budget it goes up a level at a time, holds, and comes down in reverse without flapping', () => {
     const sent: { lv: number; tick: number }[] = [];
-    const conn = { caps: CAPS.CROWD } as ClientConnection;
+    const conn = {} as ClientConnection;
     const cc = new CrowdControl({ clients: () => [conn], systemOf: () => 7, send: (_c, m) => sent.push(m), tickOf: () => 1000, setRate: () => {} });
     const lv: number[] = [];
     let k = 0;

@@ -3,7 +3,7 @@
  * the base format, in order, and the next packed message starts afresh, so the client's reader stays in step.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { BlockStore, CAPS, PackedEncoder, ServerFrameReader, type ServerMessage } from '@space-game/common';
+import { BlockStore, PackedEncoder, ServerFrameReader, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { PackedLink } from './PackedLink.js';
 
@@ -49,10 +49,10 @@ describe('PackedLink', () => {
     expect(link.waiting).toBe(false);
   });
 
-  it('encode-once blocks (CAPS.BLOCKS): snapshots go as blocks, undeflated; a failed encode resets the blocks too', () => {
+  it('encode-once blocks (every link): snapshots go as blocks, undeflated; a failed encode resets the blocks too', () => {
     const sent: { d: Uint8Array; raw: boolean }[] = [];
     const conn = {
-      playerId: 9, caps: CAPS.PACKED | CAPS.BLOCKS,
+      playerId: 9,
       ws: { isOpen: () => true, send: (d: Uint8Array, o?: { raw?: boolean }) => { sent.push({ d: Uint8Array.from(d), raw: !!o?.raw }); } },
     } as unknown as ClientConnection;
     const link = new PackedLink(conn, new BlockStore(() => 1));
@@ -81,10 +81,5 @@ describe('PackedLink', () => {
     read();
     expect(xs).toEqual([100, 103, 106, 109]);
     expect(reader.needsResync).toBe(false);
-    // Without BLOCKS: deflated as ever
-    (conn as { caps: number }).caps = CAPS.PACKED;
-    link.add({ msg: snap(15, 112) }, false, 15);
-    link.flush(15, 0);
-    expect(sent[0].raw).toBe(false);
   });
 });

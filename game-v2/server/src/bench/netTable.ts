@@ -132,6 +132,8 @@ async function runCase(sc: string): Promise<void> {
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
     netCaps: caps,
+    // (crowd fallbacks: on in the real server; older builds took them with netCaps CROWD)
+    crowd: true,
   } as never);
   const ships = server.getShips();
   const T = () => server.getTick();

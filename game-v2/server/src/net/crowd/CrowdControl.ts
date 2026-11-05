@@ -7,12 +7,12 @@
  * gap between the two is wider than any one level's saving, and every change holds for a dwell, so levels don't flap.
  * A dev force (F9 crowd, admin `crowd`) pins a system's level.
  *
- * Every change goes to the system's CAPS.CROWD clients as a crowd message stamped with the system tick it takes effect
+ * Every change goes to the system's clients (CAPS.CROWD, every one) as a crowd message stamped with the system tick it takes effect
  * from (a rate change CROWD_RATE_LEAD ticks ahead, so the client's clock turns where the server's does). A client
  * entering a system is told its level. Nothing here touches the simulation: the window is read by the snapshot rounds,
  * the focus radius by the focus grid, and the rate by the system clocks (sim/SystemClocks.ts).
  */
-import { InSystem, CROWD_BASE_WINDOW, CROWD_LEVELS, CROWD_MAX_LEVEL, CROWD_RATE_LEAD, crowdLevel, crowdFor, TICK_RATE, type CrowdLevel, type ServerCrowdMessage } from '@space-game/common';
+import { InSystem, CROWD_BASE_WINDOW, CROWD_LEVELS, CROWD_MAX_LEVEL, CROWD_RATE_LEAD, crowdLevel, TICK_RATE, type CrowdLevel, type ServerCrowdMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 
 /** A system over this (ms of server time per base tick, smoothed) goes up a level */
@@ -177,7 +177,6 @@ export class CrowdControl {
 
   /** Tell a client its system's level (`always`: even if it's what it was last told) */
   tell(conn: ClientConnection, system: number, always = false): void {
-    if (!crowdFor(conn.caps)) return;
     const s = this.systems.get(system), lv = s?.lv ?? 0;
     if (!always && (this.told.get(conn) ?? 0) === lv) return;
     this.told.set(conn, lv);
@@ -194,7 +193,6 @@ export class CrowdControl {
     if (this.levelOf(system) === 0 && (this.told.get(conn) ?? 0) === 0 && !own && !this.ownTold.has(conn)) return;
     if (own) this.ownTold.add(conn); else this.ownTold.delete(conn);
     const s = this.systems.get(system), lv = s?.lv ?? 0, L = crowdLevel(lv);
-    if (!crowdFor(conn.caps)) return;
     this.told.set(conn, lv);
     // (Its tick now and the rate now: a rate said ahead and not yet in effect comes with the change when it is)
     this.host.send(conn, { type: 'crowd', tick: this.host.tickOf(system), lv, f: L.focus, w: L.window, r: this.host.rateOf?.(system) ?? L.rate });

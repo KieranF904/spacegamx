@@ -4,13 +4,13 @@
  * ticks, and works out the causes the server tells it (pulls, contacts, rebuilds); it is sent no control rows or
  * keyframes of its own ship while that holds, and its check (a hash on its inputs) agrees every time.
  *
- * A real GameServer; the pilot (a fake client with OWN_SIM) flies by input messages, on time, a legacy observer watches.
+ * A real GameServer; the pilot (a fake client, full caps) flies by input messages, on time.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, encodeMessage, decodeMessage, ServerFrameReader, controlRowId,
+  Position, Velocity, Rotation, InSystem, encodeMessage, decodeMessage, ServerFrameReader, controlRowId,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -24,7 +24,6 @@ import { stationQuery } from '../../game/Docking.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM;
 
 interface Opts {
   /** What else happens on a tick, before it (a dummy brought up against it, an EMP) */
@@ -38,10 +37,8 @@ interface Opts {
   /** A hitch: no inputs sent from `from` until `to`, then those ticks' inputs all at once (late), the controls it had before (`same`) or changed */
   hitch?: { from: number; to: number; same: boolean };
   ticks?: number;
-  /** Caps it takes besides ALL (CAPS.CARGO) */
-  caps?: number;
-  /** An observer with these caps near it: its replica of A checked at each snapshot, and A's keyframes to it counted */
-  watch?: number;
+  /** An observer near it: its replica of A checked at each snapshot, and A's keyframes to it counted */
+  watch?: boolean;
 }
 interface World { server: GameServer; A: FakeHitsClient; target: number; x0: number; y0: number }
 
@@ -54,13 +51,11 @@ function fly(o: Opts = {}) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL | CAPS.CAUSES | CAPS.CARGO,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'own_sim', caps: ALL | (o.caps ?? 0), env });
-  const B = new FakeHitsClient(server, { name: 'legacy_obs', caps: 0, env });
-  const C = o.watch !== undefined ? new FakeHitsClient(server, { name: 'watch', caps: o.watch, env }) : null;
+  const A = new FakeHitsClient(server, { name: 'own_sim', env });
+  const C = o.watch ? new FakeHitsClient(server, { name: 'watch', env }) : null;
   const seen = { keyframes: 0, checked: 0, off: 0 };
   if (C) {
     const fc = C as unknown as { snapshot(s: ServerSnapshotMessage): void };
@@ -88,7 +83,7 @@ function fly(o: Opts = {}) {
     // (Its own row: a correction of its drawn prediction; the causes' moves it works out itself, so none rides with them)
     if (s.entities.some((e) => e.id === A.pid)) { got.ownRows++; if (s.own?.length) got.causedRows++; }
     const st = A.reps.at(A.pid, s.tick)?.body, r = truth.get(s.tick);
-    if (A.own?.on && st && r) { got.checked++; if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) got.off++; }
+    if (A.own.on && st && r) { got.checked++; if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) got.off++; }
   };
   void ServerFrameReader;
   let seq = 1, lastT = -1;
@@ -115,26 +110,24 @@ function fly(o: Opts = {}) {
     A.noteInput(dec);
     A.link!.receive(dec);
   };
-  let chk: ReturnType<NonNullable<FakeHitsClient['own']>['takeCheck']>;
+  let chk: ReturnType<FakeHitsClient['own']['takeCheck']>;
   const step = (t: number) => {
     send(t);
     server.step();
     truth.set(server.getTick(), [Position.x[A.pid], Position.y[A.pid], Velocity.x[A.pid], Velocity.y[A.pid], Rotation.angle[A.pid]]);
     clock.t += 1000 / 60;
-    chk = A.own?.takeCheck(true, server.getTick());
-    const rep = A.selfHits?.takeReport(true);
+    chk = A.own.takeCheck(true, server.getTick());
+    const rep = A.selfHits.takeReport(true);
     if (rep) server.hits.report(server.pilots.connOf(A.pid)! as never, rep);
     for (const m of A.outbox.splice(0)) A.link?.receive(m);
-    B.flushUp();
     C?.flushUp();
   };
   for (let i = 0; i < 20; i++) step(-1);
-  for (const f of [A, B]) { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); c.isAdmin = false; }
+  { const c = server.pilots.connOf(A.pid)! as unknown as { isAdmin: boolean }; c.isAdmin = true; server.admin.run(c as never, 'god', { on: 'on' }); c.isAdmin = false; }
   const num = InSystem.systemId[A.pid];
   ships.respawnInPlace(A.pid, ships.library.get('sparrow-t')!);
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
-  Position.x[B.pid] = x0 - 300; Position.y[B.pid] = y0 + 400;
   if (C) { Position.x[C.pid] = x0 - 300; Position.y[C.pid] = y0 - 400; Velocity.x[C.pid] = 0; Velocity.y[C.pid] = 0; }
   const target = ships.spawnDummy(ships.library.get('hauler')!, x0 + 700, y0, 0, num);
   const w: World = { server, A, target, x0, y0 };
@@ -158,7 +151,7 @@ function fly(o: Opts = {}) {
   const at0 = { ...got }, own0 = { ...server.replication.ownStats }, chk0 = { ...server.ownChecks.stats };
   for (let t = 40; t < (o.ticks ?? 600); t++) { now = t; o.each?.(t, w); step(t); }
   const d = (a: Record<string, number>, b: Record<string, number>) => Object.fromEntries(Object.keys(a).filter((k) => typeof a[k] === 'number').map((k) => [k, a[k] - (b[k] ?? 0)]));
-  return { w, reb, seen: d(seen, seen0), got: d(got, at0), own: d(server.replication.ownStats as never, own0 as never), checks: d(server.ownChecks.stats as never, chk0 as never), journal: server.hits.journalStats([server.pilots.connOf(A.pid)!]) };
+  return { w, reb, seen: d(seen, seen0), got: d(got, at0), own: d(server.replication.ownStats as never, own0 as never), checks: d(server.ownChecks.stats as never, chk0 as never), journal: server.hits.journalStats([server.pilots.connOf(A.pid)! as never]) };
 }
 
 /** Ore into its hold every 60 ticks (the hold's mass changes: it flies heavier from its next step) */
@@ -170,9 +163,8 @@ function loadUp(t: number, w: World): void {
 }
 
 describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
-  it('its hold filling: a CARGO cause (CAPS.CARGO), no keyframe of its ship to it or a watcher; without the cap, keyframes', () => {
-    const watch = ALL | CAPS.CAUSES | CAPS.CARGO;
-    const r = fly({ caps: CAPS.CARGO, watch, each: loadUp });
+  it('its hold filling: a CARGO cause (CAPS.CARGO), no keyframe of its ship to it or a watcher', () => {
+    const r = fly({ watch: true, each: loadUp });
     expect(r.own.cargo).toBeGreaterThan(5);
     expect(r.got.keyframes).toBe(0);
     expect(r.got.off).toBe(0);
@@ -180,25 +172,23 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.seen.checked).toBeGreaterThan(50);
     expect(r.seen.off).toBe(0);
     expect(r.seen.keyframes).toBe(0);
-    // (Without it: a keyframe of its ship at every load, to it and to the watcher)
-    const old = fly({ watch: ALL | CAPS.CAUSES, each: loadUp });
-    expect(old.got.keyframes).toBeGreaterThan(5);
-    expect(old.seen.keyframes).toBeGreaterThan(5);
-    expect(old.got.off).toBe(0);
   }, 120_000);
 
   it('flown by its own inputs: no control rows or keyframes of its own ship, its layer the server\'s ship, its checks agreeing', () => {
     const r = fly();
-    expect(r.got.snapshots).toBeGreaterThan(50);
+    // (A snapshot goes only when there's something to say: no rows, keyframes or control rows of its own ship, and since
+    // SHOT_IDS no fire records of its own shells either, so a pilot alone with a parked dummy gets one now and then:
+    // its layer is checked at each)
+    expect(r.got.snapshots).toBeGreaterThan(5);
     expect(r.got.keyframes).toBe(0);
     expect(r.got.ctlRows).toBe(0);
-    expect(r.got.checked).toBeGreaterThan(40);
+    expect(r.got.checked).toBeGreaterThan(5);
     expect(r.got.off).toBe(0);
     expect(r.checks.checks).toBeGreaterThan(5);
     expect(r.checks.agreed).toBe(r.checks.checks - r.checks.stale);
     // (Every snapshot's head hash agreed with its layer: sim/headHash.ts)
-    expect(r.w.A.own!.stats.heads).toBeGreaterThan(40);
-    expect(r.w.A.own!.stats.headMisses).toBe(0);
+    expect(r.w.A.own.stats.heads).toBeGreaterThan(5);
+    expect(r.w.A.own.stats.headMisses).toBe(0);
     expect(r.journal.disagreed).toBe(0);
   }, 120_000);
 
@@ -211,11 +201,11 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
         if (t === 300) { Position.x[w.target] = Position.x[w.A.pid] + 40; Position.y[w.target] = Position.y[w.A.pid]; Velocity.x[w.target] = -2; }
       },
     });
-    if (process.env.OWN_DEBUG) console.log('OWN', JSON.stringify({ got: r.got, own: r.own, checks: r.checks, client: r.w.A.own?.stats }));
+    if (process.env.OWN_DEBUG) console.log('OWN', JSON.stringify({ got: r.got, own: r.own, checks: r.checks, client: r.w.A.own.stats }));
     expect(r.own.pull).toBeGreaterThan(50);
     expect(r.own.contact).toBeGreaterThan(0);
     expect(r.got.causes).toBeGreaterThan(50);
-    // (no own row for what its causes moved: only now and then, SELF_SAFETY_TICKS)
+    // (no own row for what its causes moved: its snapshots carry the head hash instead, sim/headHash.ts)
     expect(r.got.causedRows).toBeLessThan(r.got.causes / 10);
     expect(r.got.off).toBe(0);
     expect(r.got.ctlRows).toBe(0);
@@ -249,7 +239,7 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
         if (t === 200) { for (const i of wing(w).slice(0, 2)) ships.damagePartFraction(w.A.pid, i, 1); ships.repair(w.A.pid); ships.damagePartFraction(w.A.pid, wing(w)[0], 1); }
       },
     });
-    if (process.env.OWN_DEBUG) console.log('OWN', JSON.stringify({ reb: r.reb, got: r.got, own: r.own, checks: r.checks, client: r.w.A.own?.stats }));
+    if (process.env.OWN_DEBUG) console.log('OWN', JSON.stringify({ reb: r.reb, got: r.got, own: r.own, checks: r.checks, client: r.w.A.own.stats }));
     expect(r.reb.repeats).toBe(0);
     expect(r.reb.own).toBeGreaterThanOrEqual(5);
     expect(r.own.rebuild).toBeGreaterThanOrEqual(3);
@@ -263,9 +253,9 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     const r = fly({ dropAt: 150, pull: (t) => (t > 100 && t < 200 ? [0.02, 0.03] : null) });
     expect(r.checks.bodyOff).toBeGreaterThan(0);
     expect(r.got.keyframes).toBeGreaterThan(0);
-    expect(r.w.A.own!.stats.fixes).toBeGreaterThan(0);
+    expect(r.w.A.own.stats.fixes).toBeGreaterThan(0);
     // (The head hash caught it as well: its check went at once)
-    expect(r.w.A.own!.stats.headMisses).toBeGreaterThan(0);
+    expect(r.w.A.own.stats.headMisses).toBeGreaterThan(0);
     // (put right: the last snapshots' own layer is the server's again)
     expect(r.got.off).toBeLessThan(40);
   }, 120_000);
@@ -297,7 +287,7 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
       },
     });
     expect(station).toBeGreaterThanOrEqual(0);
-    expect(r.w.A.own!.stats.headMisses).toBe(0);
+    expect(r.w.A.own.stats.headMisses).toBe(0);
     // (the move beside the station, docking, undocking: no more)
     expect(r.got.keyframes).toBeLessThanOrEqual(4);
     expect(r.checks.checks).toBeGreaterThan(5);

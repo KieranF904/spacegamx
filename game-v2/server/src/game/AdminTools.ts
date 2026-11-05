@@ -29,9 +29,6 @@ export interface AdminConn {
   /** The owner rank (isAdmin is true for an owner too) */
   isOwner?: boolean;
   ping: number;
-  /** Join caps in effect, and switched to (common network/hits.ts CAPS: confirmed hits) */
-  caps?: number;
-  capsNext?: number;
   /** Contributor rank (ContributorNotes) */
   isContributor?: boolean;
   /** Their account (null: a guest) */
@@ -82,8 +79,6 @@ export interface AdminHost {
   freeBuildAllowed?(): boolean;
   /** Someone's free build was switched on or off: tell their hangar */
   freeBuildChanged?(c: AdminConn): void;
-  /** Confirmed hits on or off for someone (false: their client didn't offer them, or the server doesn't take them) */
-  setHits?(c: AdminConn, on: boolean): boolean;
   /** Confirmed hits' counters (net/hits/HitLedger.ts) */
   hitStats?(): { hits: number; records: number; legacy: number; d: number; s: number; i: number; checks: number; why: Record<string, number> };
   /** Crowd fallbacks in their system (net/crowd/CrowdControl.ts admin): `to` a level, 'auto', or '' (the status) */
@@ -327,16 +322,10 @@ export class AdminTools {
       }
 
       case 'hits': {
-        // Confirmed hits (docs/design/confirmed-hits.md): switch someone's, or show the counters
-        const t = target();
-        if (a.on === undefined || a.on === '') {
-          const st = this.host.hitStats?.();
-          const on = !!((t.capsNext ?? t.caps ?? 0) & 1);
-          return { ok: true, text: `Confirmed hits ${on ? 'on' : 'off'} for ${t.username}${st ? ` · hits ${st.hits}, records ${st.records}, old way ${st.legacy} ${JSON.stringify(st.why)}, D ${st.d} S ${st.s} I ${st.i}, checks ${st.checks}` : ''}` };
-        }
-        const on = onOff(a.on, false);
-        if (!this.host.setHits?.(t, on)) return { ok: false, text: `${t.username}'s client didn't offer confirmed hits (or this server doesn't take them)` };
-        return { ok: true, text: `Confirmed hits ${on ? 'on' : 'off'} for ${t.username} (from the next snapshot)` };
+        // Confirmed hits' counters (docs/design/confirmed-hits.md; every client takes them: there's no switch)
+        const st = this.host.hitStats?.();
+        if (!st) return { ok: false, text: 'No hit counters on this server' };
+        return { ok: true, text: `Confirmed hits · hits ${st.hits}, records ${st.records}, old way ${st.legacy} ${JSON.stringify(st.why)}, D ${st.d} S ${st.s} I ${st.i}, checks ${st.checks}` };
       }
 
       case 'crowd': {
@@ -653,10 +642,7 @@ export class AdminTools {
       }
       case 'freebuild': return { cmd, args: { on: a[0] } };
       case 'crowd': return { cmd, args: { to: a[0] ?? '' } };
-      case 'hits': {
-        const flag = a[0] === 'on' || a[0] === 'off' ? a.shift() : undefined;
-        return { cmd, args: { on: flag, player: a[0] } };
-      }
+      case 'hits': return { cmd, args: {} };
       case 'credits': case 'xp': case 'skillpoints': return { cmd, args: { n: a[0], player: a[1] } };
       case 'codex': return { cmd, args: a.length > 1 ? { player: a[0], what: a[1] } : { what: a[0] } };
       case 'give': {

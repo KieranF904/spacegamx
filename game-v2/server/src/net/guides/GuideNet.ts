@@ -51,8 +51,6 @@ export interface GuideView {
   holds(eid: number): boolean;
   /** This snapshot brings it a keyframe of that ship (what it had of it this window was off) */
   rekeyed(eid: number): boolean;
-  /** It takes a volley as one LAUNCH row (CAPS.LAUNCHES) */
-  launches?: boolean;
 }
 
 /** A volley laid at once: its tick, its LAUNCH args, its mobs' ids (each one's birth: an id reused is another's) */
@@ -122,7 +120,8 @@ export class GuideNet {
   /** One snapshot's guide rows for a client ([id, dt, op, ...args]); `active`: it runs one (a snapshot must go) */
   forClient(conn: object, v: GuideView, tick: number): { rows: number[][]; active: boolean } {
     const c = this.client(conn), rows: number[][] = [], seen = new Set<number>();
-    if (v.launches) this.launchRows(c, v, tick, rows);
+    // (a volley as one LAUNCH row, CAPS.LAUNCHES)
+    this.launchRows(c, v, tick, rows);
     for (const { eid, g, born, body, system } of this.shells(tick)) {
       let run = c.runs.get(eid);
       // (its id was another shell's: that one is gone, this one is new to it)
@@ -190,11 +189,6 @@ export class GuideNet {
   resync(conn: object): void {
     const c = this.clients.get(conn);
     if (c?.runs.size) { c.runs.clear(); this.stats.resyncs++; }
-  }
-
-  /** It no longer runs shells (its caps switched off CAPS.WAYPOINTS): rows again, and SYNCs when it comes back */
-  drop(conn: object): void {
-    this.clients.get(conn)?.runs.clear();
   }
 
   /** Logs of shells that are gone */

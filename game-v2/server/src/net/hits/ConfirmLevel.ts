@@ -9,7 +9,7 @@
  *
  * A level steps down one after CLEAN_TICKS with no disagreement at it (STRICT -> NORMAL -> ROUGH); a disagreement
  * starts the stretch again. A change takes effect at a snapshot's end, on both sides at once (HitLedger.endSnapshot
- * sends netCaps.lvl), as a caps switch does. Without ROUGH a client stays NORMAL.
+ * sends netCaps.lvl).
  *
  * Three numbers a client: what the server keeps beyond part D's journal.
  */
@@ -28,7 +28,7 @@ export class ConfirmLevel {
   /** Changes, [tick, level] (the probe, tests; the last 64) */
   readonly history: [number, number][] = [];
 
-  constructor(now: number, readonly adaptive: boolean) {
+  constructor(now: number) {
     this.since = now;
   }
 
@@ -43,14 +43,13 @@ export class ConfirmLevel {
 
   /** A correction went: STRICT from the next snapshot */
   corrected(now: number): void {
-    if (!this.adaptive) return;
     this.next = CONFIRM.STRICT;
     this.since = now;
   }
 
   /** Each snapshot: a clean stretch long enough steps it down a level (from the next snapshot) */
   step(now: number): void {
-    if (!this.adaptive || this.next !== this.level || this.level === CONFIRM.ROUGH) return;
+    if (this.next !== this.level || this.level === CONFIRM.ROUGH) return;
     if (now - this.since >= CLEAN_TICKS) this.next = this.level - 1;
   }
 

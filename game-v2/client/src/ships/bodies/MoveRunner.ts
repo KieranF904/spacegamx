@@ -54,7 +54,6 @@ const NOBODY: MovePose = { x: 0, y: 0, angle: 0, vx: 0, vy: 0 };
 const asPose = (b: FlightBody | null | undefined): MovePose | null => (b ? { x: b.x, y: b.y, angle: b.angle, vx: b.vx, vy: b.vy } : null);
 
 export class MoveRunner {
-  on = false;
   private readonly runs = new Map<number, Run>();
   private readonly shells = new Map<number, LocalShell>();
   private nextId = LOCAL_ID0;
@@ -69,13 +68,7 @@ export class MoveRunner {
     this.customs = customMoves(() => Infinity);
   }
 
-  setOn(on: boolean): void {
-    if (this.on === on) return;
-    this.on = on;
-    if (!on) this.reset();
-  }
-
-  /** A connection afresh, or switched off: nothing runs, its shells go */
+  /** A connection afresh: nothing runs, its shells go */
   reset(): void {
     this.runs.clear();
     for (const id of this.shells.keys()) this.gone.push(id);
@@ -87,29 +80,27 @@ export class MoveRunner {
    * shells it made (projectile rows) and those whose time is up (removals) for the snapshot
    */
   advance(tick: number, self: number): { rows: EntityState[]; removed: number[] } {
-    if (this.on) {
-      const bodies = this.host.bodies;
-      for (const id of [...this.runs.keys()]) if (!bodies.view(id)) this.runs.delete(id);
-      for (const id of bodies.ids()) {
-        const v = bodies.view(id)!;
-        let run = this.runs.get(id);
-        if (!run || run.since !== v.syncTick) {
-          const s = v.state(v.syncTick);
-          if (!s) continue;
-          const made = this.makeRun(id, s.kind, v.syncTick);
-          if (!made) continue;
-          this.runs.set(id, (run = made));
-        }
-        for (let t = Math.max(run.through + 1, run.since + 1); t <= tick; t++) {
-          const s = v.state(t);
-          if (!s?.on) break;
-          run.host.t = t;
-          run.host.n = 0;
-          if (run.staged) this.stepStaged(run, id, t, s.target, s.stage, v.state(t - 1)?.side ?? s.side, s.homeX, s.homeY, s.hold ?? MOVES_HOLD.RUN, v.at(t), self);
-          else if (run.custom && s.target >= 0) this.stepCustom(run, id, t, s.target, s.want, s.gone);
-        }
-        run.through = Math.max(run.through, tick);
+    const bodies = this.host.bodies;
+    for (const id of [...this.runs.keys()]) if (!bodies.view(id)) this.runs.delete(id);
+    for (const id of bodies.ids()) {
+      const v = bodies.view(id)!;
+      let run = this.runs.get(id);
+      if (!run || run.since !== v.syncTick) {
+        const s = v.state(v.syncTick);
+        if (!s) continue;
+        const made = this.makeRun(id, s.kind, v.syncTick);
+        if (!made) continue;
+        this.runs.set(id, (run = made));
       }
+      for (let t = Math.max(run.through + 1, run.since + 1); t <= tick; t++) {
+        const s = v.state(t);
+        if (!s?.on) break;
+        run.host.t = t;
+        run.host.n = 0;
+        if (run.staged) this.stepStaged(run, id, t, s.target, s.stage, v.state(t - 1)?.side ?? s.side, s.homeX, s.homeY, s.hold ?? MOVES_HOLD.RUN, v.at(t), self);
+        else if (run.custom && s.target >= 0) this.stepCustom(run, id, t, s.target, s.want, s.gone);
+      }
+      run.through = Math.max(run.through, tick);
     }
     for (const [id, sh] of this.shells) if (tick >= sh.until) { this.shells.delete(id); this.gone.push(id); }
     const out = { rows: this.rows, removed: this.gone };

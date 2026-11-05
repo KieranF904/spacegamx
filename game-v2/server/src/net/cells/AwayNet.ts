@@ -1,7 +1,7 @@
 /**
  * Ships away, the server side (CAPS.FOCUS; common network/cells.ts AwayShips; client ships/cells/ShipMemory.ts).
  *
- * A ship leaving a capable client's view (its cell left the focus, or it left a focus cell: one path) is remembered at
+ * A ship leaving a client's view (its cell left the focus, or it left a focus cell: one path) is remembered at
  * both ends for minutes. The server keeps, per client, the tick it left and its status row's key as last sent; what it
  * last sent of the ship's structure and part HP stays where it always is (ClientConnection.shipSynced, shipHpSent) and
  * its name in sentNames. When it comes back the client is sent only what changed since it left:
@@ -47,7 +47,7 @@ export class AwayNet {
   /**
    * After its view this round, before its snapshot: ships back in view get their row key as last sent back in `rows`
    * (its last snapshot's keys: the row goes again only if it changed); ships leaving it (`out`) are kept, or forgotten
-   * as a legacy client forgets them. Sends the `cells` message (before the snapshot) when anything came or went.
+   * (forgotten: its structure and name go again when it comes back). Sends the `cells` message (before the snapshot) when anything came or went.
    * Returns the ships away that are gone from the world (destroyed, or gone while it had no snapshots): they go in the
    * snapshot's removals
    */

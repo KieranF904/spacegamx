@@ -42,7 +42,7 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Lifetime, Player, Input, Boost, Inventory, Projectile, Bullet, Laser,
   Pulse, MiningShot, AI, Enemy, NPC, Asteroid, Station, Portal, DroppedItem, Dead, OwnedBy, InSystem,
-  encodeMessage, decodeMessage, decodeServerFrame, parseBlueprint,
+  encodeMessage, decodeMessage, ServerFrameReader, parseBlueprint,
   type ClientMessage, type ClientSocket, type Blueprint,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
@@ -173,13 +173,15 @@ function scenario(): Result {
   const pilots = specs.map((spec) => {
     const hash: Hash = createHash('sha256');
     const counter = { frames: 0, types: {} as Record<string, number>, texts: [] as string[] };
+    // (Bit-packed messages once joined, every client running the full caps set; base-format frames before)
+    const reader = new ServerFrameReader();
     const socket: ClientSocket = {
       isOpen: () => true,
       send: (data) => {
         const bytes = typeof data === 'string' ? Buffer.from(data, 'utf-8') : Buffer.from(data instanceof Uint8Array ? data : new Uint8Array(data));
         hash.update(bytes);
         counter.frames++;
-        for (const m of decodeServerFrame(data)) {
+        for (const msgs of reader.read(bytes)) for (const m of msgs) {
           counter.types[m.type] = (counter.types[m.type] ?? 0) + 1;
           if (m.type === 'systemMessage') counter.texts.push(String((m as { text?: unknown }).text));
         }

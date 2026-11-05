@@ -187,7 +187,7 @@ describe('inputSend: an input-script replay', () => {
 });
 
 describe('inputSend: the four control / view combinations (input/viewMode.ts)', () => {
-  // (What Game's noseThrust getter is: the server took CAPS.NOSE and the aim is pinned, viewMode.pinnedAim)
+  // (What Game's noseThrust getter is: the aim is pinned, viewMode.pinnedAim)
   const combos: [string, boolean, CameraMode][] = [
     ['mouse + north up', false, 'north'],
     ['helm + follow heading', true, 'heading'],
@@ -197,17 +197,17 @@ describe('inputSend: the four control / view combinations (input/viewMode.ts)', 
   const keysOf = (m: ClientInputMessage) => [m.forward, m.backward, m.left, m.right, m.strafeLeft, m.strafeRight, m.helm];
 
   it.each(combos)('%s', (name, helm, camera) => {
-    for (const caps of [true, false]) {
+    {
       const { ctx, sc, sent, tick } = fakeCtx();
       const v = new ViewMode(() => camera);
-      (ctx as unknown as { noseThrust: boolean }).noseThrust = caps && v.pinnedAim(helm);
+      (ctx as unknown as { noseThrust: boolean }).noseThrust = v.pinnedAim(helm);
       sc.helm = helm;
       sc.keys.add('KeyW'); sc.keys.add('KeyD'); sc.keys.add('KeyQ');
       tick();
       const m = sent[sent.length - 1];
-      const nose = caps && name === 'mouse + follow heading';
+      const nose = name === 'mouse + follow heading';
       // Helm (either view): W along the nose, D turns, Q strafes. Mouse: W/D as they are, along the screen; with the
-      // view on the heading (and the server taking it) both strafe bits say "along the ship" (common flight.ts noseFrame)
+      // view on the heading both strafe bits say "along the ship" (common flight.ts noseFrame)
       expect(keysOf(m)).toEqual(helm ? [true, false, false, true, true, false, true] : [true, false, false, true, nose, nose, false]);
       expect(noseFrame(m)).toBe(nose);
       // The view never changes the aim the input carries: the cursor's world point (renderer.screenToWorld) is all it reads

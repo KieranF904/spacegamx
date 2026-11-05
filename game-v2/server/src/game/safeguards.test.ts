@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
-import { Position, Input, InSystem, ServerMessage, parseBlueprint, Station as StationComp, PROTOCOL_VERSION, ghostBill, Blueprint, partItemId, registeredFunction, MATERIAL_LEVEL } from '@space-game/common';
+import { Position, Input, InSystem, ServerMessage, parseBlueprint, Station as StationComp, PROTOCOL_VERSION, DEFAULT_CAPS, CAPS, ghostBill, Blueprint, partItemId, registeredFunction, MATERIAL_LEVEL } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -125,12 +125,17 @@ describe('connections', () => {
     expect(Input.forward[w.pid]).toBe(0);
   });
 
-  it('a client built for another protocol is turned away', () => {
+  it('a client built for another protocol, or without the full caps set, is turned away', () => {
     const w = world(false);
     const conn = [...(w.server as any).clients.values()][0];
     w.t.send({ type: 'join', username: 'old', protocol: PROTOCOL_VERSION + 1 } as any);
     expect(conn.joined).toBe(false);
-    w.t.send({ type: 'join', username: 'new', protocol: PROTOCOL_VERSION } as any);
+    // (the right protocol but not every cap: there's no base protocol to fall back on)
+    w.t.send({ type: 'join', username: 'part', protocol: PROTOCOL_VERSION } as any);
+    expect(conn.joined).toBe(false);
+    w.t.send({ type: 'join', username: 'part', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS & ~CAPS.PACKED } as any);
+    expect(conn.joined).toBe(false);
+    w.t.send({ type: 'join', username: 'new', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS } as any);
     expect(conn.joined).toBe(true);
     expect((w.got.find((m) => m.type === 'welcome') as any).protocol).toBe(PROTOCOL_VERSION);
   });

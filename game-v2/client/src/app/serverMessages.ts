@@ -54,7 +54,7 @@ import type { ProtoHooks } from '../Game';
 /** What the message handlers read and write on the game (Game supplies it as getters/setters) */
 export interface MessageHost {
   readonly proto: ProtoHooks | null;
-  readonly network: { disconnect(): void; useCaps?(caps: number): void };
+  readonly network: { disconnect(): void };
   readonly state: GameState;
   readonly pilot: PilotState;
   readonly renderer: Renderer;
@@ -119,6 +119,7 @@ function welcome(h: MessageHost, msg: Msg<'welcome'>): void {
     return;
   }
   h.state.playerId = msg.playerId;
+  h.shipClient.onWelcome();
   h.state.tickRate = msg.tickRate;
   if (msg.threats) h.state.threats = msg.threats;
   if (msg.regionThreats) h.state.regionThreats = msg.regionThreats;
@@ -374,11 +375,11 @@ const TABLE: Handlers = {
   // (Confirmed hits: each record handled as the messages it stands for, ships/hits/ConfirmedHits.ts)
   hits: (h, msg) => { h.shipClient.onHits(msg, (m) => handleServerMessage(h, m)); },
   hpCheck: (h, msg) => { h.shipClient.onHpCheck(msg); },
-  // (Client-detected hits, part D: a correction, and the caps in effect from the next snapshot)
+  // (Client-detected hits, part D: a correction; netCaps: finding them starts, and its confirmation level)
   hitFix: (h, msg) => { h.shipClient.onHitFix(msg, (m) => handleServerMessage(h, m)); },
-  // (Its system's crowd level, CAPS.CROWD: the focus radius and fade, the window, its clock's rate from a tick)
+  // (Its system's crowd level: the focus radius and fade, the window, its clock's rate from a tick)
   crowd: (h, msg) => { h.state.onCrowd(msg); },
-  netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.caps, msg.lvl); h.network.useCaps?.(msg.caps); h.state.coalesceMs = coalesceDelayMs(msg.caps, msg.hold, msg.lvl); },
+  netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);
     h.audio.play('hit', msg.x, msg.y, { pitch: 0.85 + Math.random() * 0.3, volume: 0.7 });

@@ -254,11 +254,22 @@ describe('simulation level of detail', () => {
     const both = () => { w.hold(120000, 0); Position.x[p2] = -120000; Position.y[p2] = -60000; Velocity.x[p2] = Velocity.y[p2] = 0; };
     w.step(DEMOTE_AFTER + DEMOTE_CHECK * 2, both);
     expect(w.bridge.isDormant(foe)).toBe(true);
-    const dots = () => w.got.filter((m): m is ServerMapDotsMessage => m.type === 'mapDots');
-    // Map closed: nothing sent
-    expect(dots().length).toBe(0);
+    const all = () => w.got.filter((m): m is ServerMapDotsMessage => m.type === 'mapDots');
+    // (With its map shut a client holding focus cells (every client) gets mapDots for its ghosts, the ring's ships out to
+    // 35 km (net/cells/FocusCells.ts): nothing of these two, far past it. Those before the map opens aren't this test's)
+    const ids = (m: ServerMapDotsMessage) => {
+      const s = new Set<number | string>([...unpackMapLegs(m.dots).map((r) => r.id), ...unpackMapRoutes(m.routes ?? [], m.tick).map((r) => r.id), ...unpackMapInfo(m.info ?? []).map((d) => d.id), ...(m.names ?? [])]);
+      for (let i = 0; i + MAP_PT_STRIDE <= (m.pts ?? []).length; i += MAP_PT_STRIDE) s.add(m.pts![i]);
+      return s;
+    };
+    const neither = (ms: ServerMapDotsMessage[]) => ms.every((m) => !ids(m).has(foe) && !ids(m).has(p2) && !ids(m).has('faraway'));
+    // Map closed: nothing of them sent
+    expect(neither(all())).toBe(true);
+    const shut = all().length;
+    const dots = () => all().slice(shut);
     w.t.send({ type: 'mapView', open: true } as any);
-    w.step(5, both);
+    // (its next round, then up to a coalescing hold: net/snapshot/PackedLink.ts)
+    w.step(12, both);
     expect(dots().length).toBe(1);
     const first = dots()[0];
     expect(first.full).toBe(1);
@@ -308,11 +319,11 @@ describe('simulation level of detail', () => {
     expect(legs.has(foe) || dots().some((m) => m.gone?.includes(foe))).toBe(true);
     for (const m of dots()) take(m);
     expect(legs.has(foe)).toBe(false);
-    // Closed again: nothing more
+    // Closed again: nothing more of them
     w.t.send({ type: 'mapView', open: false } as any);
     const n = dots().length;
     w.step(130, both);
-    expect(dots().length).toBe(n);
+    expect(neither(dots().slice(n))).toBe(true);
   });
 
   it("a distant ship's route is the same whether it's looked at every tick or once a minute", () => {

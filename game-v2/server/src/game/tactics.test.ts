@@ -45,18 +45,32 @@ describe('arrivals: nothing appears out of nowhere beside you', () => {
     const gates = w.gd.getSystem('ashfall')!.portals.map((p) => p.position);
     const seen = new Set<number>();
     let far = 0, shown = 0;
+    // (Each one judged a few ticks after it turned up: an effect can wait for the next frame, and frames with nothing
+    // urgent are coalesced, every client taking them, net/snapshot/PackedLink.ts. Where it was is noted as it turned up)
+    let steps = 0;
+    const pending: { e: number; x: number; y: number; at: { x: number; y: number }; step: number; from: number }[] = [];
+    const judge = (all = false) => {
+      for (let i = 0; i < pending.length; i++) {
+        const p = pending[i];
+        if (!all && steps - p.step < 8) continue;
+        pending.splice(i--, 1);
+        const fx = got.slice(p.from).filter((m) => m.type === 'effect' && ((m as any).effectType === EffectType.WarpIn || (m as any).effectType === EffectType.WarpOut)) as any[];
+        const near = (q: { x: number; y: number }, r: number) => Math.hypot(p.x - q.x, p.y - q.y) < r;
+        const fromBase = near(lair, 2500) || gates.some((g) => near(g, 2500));
+        const withFx = fx.some((m) => near(m, 1500));
+        if (!near(p.at, FOCUS_RANGE)) far++;
+        else if (withFx) shown++;
+        expect(fromBase || withFx || !near(p.at, FOCUS_RANGE), `enemy ${p.e} turned up ${Math.round(Math.hypot(p.x - p.at.x, p.y - p.at.y))} away`).toBe(true);
+      }
+    };
     const look = (at: { x: number; y: number }, from: number) => {
-      const fx = got.slice(from).filter((m) => m.type === 'effect' && ((m as any).effectType === EffectType.WarpIn || (m as any).effectType === EffectType.WarpOut)) as any[];
+      steps++;
       for (const e of foes(w)) {
         if (seen.has(e) || InSystem.systemId[e] !== num) continue;
         seen.add(e);
-        const near = (p: { x: number; y: number }, r: number) => Math.hypot(Position.x[e] - p.x, Position.y[e] - p.y) < r;
-        const fromBase = near(lair, 2500) || gates.some((g) => near(g, 2500));
-        const withFx = fx.some((m) => near(m, 1500));
-        if (!near(at, FOCUS_RANGE)) far++;
-        else if (withFx) shown++;
-        expect(fromBase || withFx || !near(at, FOCUS_RANGE), `enemy ${e} turned up ${Math.round(Math.hypot(Position.x[e] - at.x, Position.y[e] - at.y))} away`).toBe(true);
+        pending.push({ e, x: Position.x[e], y: Position.y[e], at: { ...at }, step: steps, from });
       }
+      judge();
     };
     // Flying in from far out: a nest's packs turn up at the load range, well past the radar
     const nest0 = w.enemies.nest(num, 'ashfall_nest_scrap')!;
@@ -71,6 +85,7 @@ describe('arrivals: nothing appears out of nowhere beside you', () => {
       w.step();
       look(at, from);
     }
+    judge(true);
     expect(far).toBeGreaterThan(0);
     // Jumped in beside another nest: what's loaded inside the focus range is seen warping in
     const dig = w.enemies.nest(num, 'ashfall_dig_cinderjack')!;
@@ -78,6 +93,8 @@ describe('arrivals: nothing appears out of nowhere beside you', () => {
     const before = shown, from = got.length;
     (w.server as any).travelTo(conn, num, at.x, at.y, false);
     for (let i = 0; i < 30; i++) { hold(pid, at.x, at.y); w.step(); look(at, from); }
+    for (let i = 0; i < 8; i++) { hold(pid, at.x, at.y); w.step(); }
+    judge(true);
     expect(shown).toBeGreaterThan(before);
   });
 

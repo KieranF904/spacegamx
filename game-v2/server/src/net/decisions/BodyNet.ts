@@ -16,7 +16,7 @@
  * A body is only as exact as what it reads: a target whose replica was off on a client this window (it gets a
  * keyframe of it) costs that client a keyframe of the boss too.
  */
-import { DECISION, BODY_KINDS, MOVES_HOLD, MOVE_OPS, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody, type MoveOrigin } from '@space-game/common';
+import { DECISION, BODY_KINDS, MOVES_HOLD, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody, type MoveOrigin } from '@space-game/common';
 
 /** Decisions kept a boss (ticks): longer than any client's snapshots are apart */
 const KEEP_TICKS = 600;
@@ -46,8 +46,7 @@ interface Client {
   runs: Set<number>;
   /** The tick each was synced at (CAPS.MOVES: a move it works out is one decided after it) */
   since: Map<number, number>;
-  /** It works out the moves of the bodies it runs (CAPS.MOVES), and the move shells it made itself so (no rows of them) */
-  moves: boolean;
+  /** The move shells it made itself (it works out the moves of the bodies it runs, CAPS.MOVES: no rows of them) */
   derived: Set<number>;
   /** The last snapshot tick it was sent decisions to */
   through: number;
@@ -88,7 +87,7 @@ export class BodyNet {
 
   private client(conn: object): Client {
     let c = this.clients.get(conn);
-    if (!c) this.clients.set(conn, (c = { runs: new Set(), since: new Map(), moves: false, derived: new Set(), through: -Infinity, from: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
+    if (!c) this.clients.set(conn, (c = { runs: new Set(), since: new Map(), derived: new Set(), through: -Infinity, from: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
     return c;
   }
 
@@ -100,7 +99,7 @@ export class BodyNet {
    */
   derives(conn: object, self: number, eid: number, origin: MoveOrigin): boolean {
     const c = this.clients.get(conn);
-    if (!c?.moves || !c.runs.has(eid) || (origin.who >= 0 && origin.who !== self)) return false;
+    if (!c || !c.runs.has(eid) || (origin.who >= 0 && origin.who !== self)) return false;
     return origin.t > (c.since.get(eid) ?? Infinity);
   }
 
@@ -148,9 +147,8 @@ export class BodyNet {
    * SYNC). `rekeyed(id)`: this snapshot brings it a keyframe of that ship (what it had of it this window was off): a
    * boss whose target that is gets one too, as its body read the target off
    */
-  forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean, pilots = false, moves = false): number[][] {
+  forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean): number[][] {
     const c = this.client(conn), rows: number[][] = [];
-    c.moves = moves;
     // (In its view now: a ship leaving it this snapshot (known, not in view) is gone from the client from here, so a
     // body reading it would fly blind from this tick: off now, with a keyframe, not a keyframe every snapshot it stays out)
     const holds = (id: number) => id === self || view(id);
@@ -159,20 +157,20 @@ export class BodyNet {
       const s = b.state, kind = BODY_KINDS[s.kind];
       const runs = c.runs.has(eid);
       if (!runs && (!s.on || systemOf(eid) !== systemId)) continue;
-      // (Every ship its body reads held: its target, a pack's other ships. The enemy AI's pilots only with CAPS.PILOTS)
+      // (Every ship its body reads held: its target, a pack's other ships)
       const reads = kind?.reads(eid, s) ?? [];
       // (A pack's ship it reads shot down while it runs it: what it made of it this window was off, so it goes again with
       // a keyframe; its next order no longer reads it. One alive out of view: off, as for any read it doesn't hold)
       const gone = runs && kind?.pilot ? reads.filter((r) => r !== s.target && !this.host.has(r)) : [];
-      const can = !!kind && s.on && (pilots || !kind.pilot) && systemOf(eid) === systemId && view(eid) && reads.every((r) => holds(r) || gone.includes(r));
+      const can = !!kind && s.on && systemOf(eid) === systemId && view(eid) && reads.every((r) => holds(r) || gone.includes(r));
       if (can && runs && (gone.length || b.dropped.some(([t, r]) => t > c.through && (!this.host.has(r) || !holds(r))))) { rekey(known, eid); this.stats.targetKeyed++; }
       if (can && !runs) {
         rows.push([eid, 0, DECISION.SYNC, ...syncArgs(s)]);
         // (its drive EMP'd or slowed now: a SYNC clears that, so it goes after)
         if ((s.empUntil ?? 0) > tick || (s.slowUntil ?? 0) > tick) rows.push([eid, 0, DECISION.STATUS, Math.max(0, (s.empUntil ?? 0) - tick), Math.max(0, (s.slowUntil ?? 0) - tick)]);
         // (its moves held or stopped now, a custom enemy's pieces gone as its moves read them: a SYNC says nothing of those, CAPS.MOVES)
-        if (moves && (s.hold ?? MOVES_HOLD.RUN) !== MOVES_HOLD.RUN) rows.push([eid, 0, DECISION.HOLD, s.hold!]);
-        if (moves && s.gone !== undefined) rows.push([eid, 0, DECISION.GONE, s.gone]);
+        if ((s.hold ?? MOVES_HOLD.RUN) !== MOVES_HOLD.RUN) rows.push([eid, 0, DECISION.HOLD, s.hold!]);
+        if (s.gone !== undefined) rows.push([eid, 0, DECISION.GONE, s.gone]);
         rekey(known, eid);
         c.runs.add(eid);
         c.since.set(eid, tick);
@@ -184,8 +182,6 @@ export class BodyNet {
         for (const d of b.log) {
           if (d[0] <= c.through) continue;
           if (d[0] > tick) break;
-          // (its moves' decisions only to a client working them out, CAPS.MOVES)
-          if (!moves && MOVE_OPS.has(d[1])) continue;
           rows.push([eid, d[0] - tick, ...d.slice(1)]);
         }
       } else if (runs) {
@@ -249,18 +245,6 @@ export class BodyNet {
     this.clients.get(conn)?.runs.clear();
   }
 
-  /**
-   * It no longer runs bodies (its caps switched off CAPS.BODIES, or OWN_SIM: the client stopped every body, BodyRunner.
-   * setOn): it runs none here either, so its rows and keyframes come the old way, its hits aren't 'body' ones, and when
-   * the cap comes back each boss starts with a SYNC again
-   */
-  drop(conn: object): void {
-    const c = this.clients.get(conn);
-    if (!c?.runs.size) return;
-    c.runs.clear();
-    c.expect.clear();
-    c.ticks.length = 0;
-  }
 }
 
 /**

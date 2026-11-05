@@ -11,7 +11,6 @@ import {
   DisconnectInfo,
   PROTOCOL_MISMATCH_CLOSE,
   InputEncoder,
-  CAPS,
 } from '@space-game/common';
 import type { NetSim } from '../dev/netSim';
 
@@ -37,16 +36,12 @@ export class NetworkManager implements ClientTransport {
   private closing = false;
   /** Message types that failed to handle, each logged once */
   private failedTypes = new Set<string>();
-  /** Reads base-format frames and bit-packed messages (CAPS.PACKED: one or more frames each); one per socket */
+  /** Reads base-format frames and bit-packed messages (one or more frames each); one per socket */
   private reader = new ServerFrameReader();
   /** When it last asked the server to start its packed frames afresh (performance.now) */
   private resyncAt = -Infinity;
   /** Inputs on this socket (compact ones say what changed since the last: common network/inputCompact.ts); one per socket */
   private inputs = new InputEncoder();
-  /** The server took CAPS.INPUTS for this socket (its netCaps): inputs go compact, by app/inputCompactSend.ts's rules */
-  compactInputs = false;
-  /** The server took CAPS.NOSE for this socket: mouse-steer's keys may push along the ship (common flight.ts noseFrame) */
-  noseThrust = false;
 
   connect(url: string): void {
     this.connectSocket(url, false);
@@ -71,8 +66,6 @@ export class NetworkManager implements ClientTransport {
     this.ws = ws;
     this.reader = new ServerFrameReader();
     this.inputs = new InputEncoder();
-    this.compactInputs = false;
-    this.noseThrust = false;
     ws.binaryType = 'arraybuffer'; // Enable binary message handling
 
     ws.onopen = () => {
@@ -101,7 +94,7 @@ export class NetworkManager implements ClientTransport {
     ws.onmessage = (event) => {
       if (this.ws !== ws) return;
       // Handle both binary (ArrayBuffer) and text (string) messages
-      // A frame may carry one message or a tick's worth; a packed message (CAPS.PACKED) one or more frames
+      // A frame may carry one message or a tick's worth; a packed message one or more frames
       this.traffic.framesIn++;
       this.traffic.bytesIn += typeof event.data === 'string' ? event.data.length : (event.data as ArrayBuffer).byteLength;
       let frames: ServerMessage[][];
@@ -190,19 +183,13 @@ export class NetworkManager implements ClientTransport {
     // (Lost inputs are dropped before they are encoded: the compact-input stream stays consistent)
     if (sim && msg.type === 'input' && sim.rollLoss()) return;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const data = msg.type === 'input' ? this.inputs.encode(msg, this.compactInputs) : encodeMessage(msg);
+      const data = msg.type === 'input' ? this.inputs.encode(msg, true) : encodeMessage(msg);
       this.traffic.framesOut++;
       this.traffic.bytesOut += typeof data === 'string' ? data.length : data.byteLength;
       const ws = this.ws;
       if (sim) sim.route('up', false, () => { if (this.ws === ws && ws.readyState === WebSocket.OPEN) ws.send(data); });
       else ws.send(data);
     }
-  }
-
-  /** The caps the server says are in effect (netCaps) */
-  useCaps(caps: number): void {
-    this.compactInputs = !!(caps & CAPS.INPUTS);
-    this.noseThrust = !!(caps & CAPS.NOSE);
   }
 
   isConnected(): boolean {

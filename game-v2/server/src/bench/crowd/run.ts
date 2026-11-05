@@ -1,9 +1,9 @@
 /**
- * Crowd bench: one case. A seeded server, N bot pilots (a few of them full probe clients, the rest counting sockets, legacy
- * or bit-packed), a layout, the measured seconds. Returns the numbers (timings, bytes, messages, agreement).
+ * Crowd bench: one case. A seeded server, N bot pilots (a few of them full probe clients, the rest counting sockets: every
+ * one joins with the full caps set, there's no other), a layout, the measured seconds. Returns the numbers (timings, bytes, messages, agreement).
  */
 import { createDeflateRaw, constants as zc } from 'zlib';
-import { Position, InSystem, CAPS, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
+import { Position, InSystem, DEFAULT_CAPS, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
 import { makeServer, clock, rng, Scene, controlsFor, applyDirect, type Layout } from './world.js';
 import { Probe, PoseRing, classifier } from './probe.js';
 
@@ -11,14 +11,11 @@ export interface CaseOpts {
   layout: Layout;
   n: number;
   secs: number;
-  /** The counting sockets: 'legacy' (no caps), 'packed' (PACKED | COALESCE, nothing they owe), 'blocks' (and BLOCKS) or 'focus' (and FOCUS) */
-  bulk: 'legacy' | 'packed' | 'blocks' | 'focus';
   /** Full probe clients among the n */
   probes: number;
   /** Crowd fallbacks on, automatic (CAPS.CROWD): the levels the scene's system reaches, and its cost settling */
   crowd?: boolean;
-  /** The probes' caps (default everything) and latency in ticks */
-  caps: number;
+  /** The probes' latency in ticks */
   lat: number;
   warm: number;
   /** Bulk sockets whose frames are kept to be deflated (the wire figure) */
@@ -59,9 +56,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  // (Every cap the probes may ask for; crowd fallbacks only with --crowd: STRUCTS, CARGO and DEBRIS were left out before;
-  // CONTACTS, a probe finding contact pairs itself, only when its --caps ask)
-  const server = makeServer((o.crowd ? 524287 : 524287 & ~16384) | CAPS.CONTACTS);
+  // (Every client runs the full caps set; crowd fallbacks only with --crowd)
+  const server = makeServer(!!o.crowd);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
@@ -106,14 +102,13 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const sysTick = () => (sysNum >= 0 && server.clocks ? server.clocks.tickOf(sysNum) : server.getTick());
   const ring = new PoseRing(server, sysTick);
   const klass = classifier(server, () => scene?.bossId ?? -1);
-  const bulkCaps = o.bulk === 'packed' ? 4 | 8 : o.bulk === 'blocks' ? 4 | 8 | 512 : o.bulk === 'focus' ? 4 | 8 | 512 | 1024 : 0;
   const counters = new Map<number, Counter>();
   const sampledBulk = new Set<number>();
   const probes = new Map<number, Probe>();
   const pids: number[] = [];
   for (let i = 0; i < o.n; i++) {
     if (probeIdx.has(i)) {
-      const p = new Probe(server, `probe${i}`, o.caps, o.lat, ring, klass, 0, sysTick);
+      const p = new Probe(server, `probe${i}`, o.lat, ring, klass, 0, sysTick);
       probes.set(i, p);
       pids.push(p.pid);
     } else {
@@ -132,7 +127,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
         },
       };
       const link = server.connect(socket);
-      link.receive({ type: 'join', username: `bot${i}`, ...(bulkCaps ? { caps: bulkCaps } : {}) } as ClientMessage);
+      // (the full caps set, owing nothing back: no hit reports or own checks, so its share may carry corrections)
+      link.receive({ type: 'join', username: `bot${i}`, caps: DEFAULT_CAPS } as ClientMessage);
       counters.set(i, c);
       pids.push(server.getPlayerId(socket));
     }
@@ -200,13 +196,12 @@ export async function runCase(o: CaseOpts): Promise<any> {
     const d = raw ? frames.reduce((n, f) => n + (f[0] === 4 ? f.length : 0), 0) + (await deflated(frames.filter((f) => f[0] !== 4))) : await deflated(frames);
     return d / secs + (WS_HEADER * msgs) / secs;
   };
-  const blocksOn = (caps: number) => (caps & (4 | 512)) === (4 | 512);
   const bulkSampled = [...sampledBulk].map((i) => counters.get(i)!);
   const bulkWire: number[] = [];
   // (What deflating a bulk client's frames costs the server, per message as permessage-deflate does: timed on the
-  // sampled sockets, times the bulk clients, per tick. CAPS.BLOCKS frames go undeflated, so for those it's saved)
+  // sampled sockets, times the bulk clients, per tick. Encode-once (CAPS.BLOCKS) frames go undeflated, so it's saved)
   const d0 = performance.now();
-  for (const c of bulkSampled) bulkWire.push(await wireOf(c.frames, c.msgs, blocksOn(bulkCaps)));
+  for (const c of bulkSampled) bulkWire.push(await wireOf(c.frames, c.msgs, true));
   const deflateMsPerTick = bulkSampled.length ? ((performance.now() - d0) / bulkSampled.length) * counters.size / (secs * 60) : 0;
   const subOf = (subs: Record<string, number>[]) => {
     const t: Record<string, number> = {};
@@ -217,7 +212,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   for (const c of bulkSampled) for (const [t, b] of Object.entries(c.sub)) sub[t] = (sub[t] ?? 0) + b / secs / Math.max(1, bulkSampled.length);
   const probeList = [...probes.values()];
   const probeWire: number[] = [];
-  for (const p of probeList) probeWire.push(await wireOf(p.frames, p.messages, blocksOn(o.caps)));
+  for (const p of probeList) probeWire.push(await wireOf(p.frames, p.messages, true));
   const bytesBlock = (raw: number[], wire: number[], msgs: number[]) => ({
     clients: raw.length, rawBpsMean: Math.round(mean(raw)), rawBpsP95: Math.round(pct(raw, 0.95)), rawBpsMax: Math.round(Math.max(0, ...raw)),
     wireBpsMean: Math.round(mean(wire)), wireSampled: wire.length, msgsPerSecMean: r2(mean(msgs)),
@@ -226,11 +221,11 @@ export async function runCase(o: CaseOpts): Promise<any> {
   for (const p of probeList) for (const [kk, a] of Object.entries(p.agree)) { const e = (agree[kk] ??= { checked: 0, off: 0, offNoKf: 0 }); e.checked += a.checked; e.off += a.off; e.offNoKf += a.offNoKf; }
   const hitsDiff = numericDiff(snap(srv.hits.stats), hits0);
   const out = {
-    layout: o.layout, n: o.n, secs, bulk: o.bulk, probes: k, caps: o.caps, lat: o.lat,
+    layout: o.layout, n: o.n, secs, probes: k, caps: DEFAULT_CAPS, lat: o.lat,
     scene: { alive, hostiles: srv.enemies.count(scene.num), boss: scene.bossId >= 0 && ships.has(scene.bossId), ships: ships.bodies.size },
     timing: { ...timing, deflateMsPerTickEst: r2(deflateMsPerTick) },
     bytes: {
-      legacyOrBulk: { kind: o.bulk, ...bytesBlock(bulkRaw, bulkWire, bulkMsgs), subTypesBps: Object.fromEntries(Object.entries(sub).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, b]) => [t, Math.round(b)])) },
+      legacyOrBulk: { kind: 'full', ...bytesBlock(bulkRaw, bulkWire, bulkMsgs), subTypesBps: Object.fromEntries(Object.entries(sub).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, b]) => [t, Math.round(b)])) },
       capable: { ...bytesBlock(probeList.map((p) => p.rawBytes / secs), probeWire, probeList.map((p) => p.messages / secs)), subTypesBps: subOf(probeList.map((p) => p.sub)),
         debrisBps: Object.fromEntries(Object.entries(subOf(probeList.map((p) => Object.fromEntries(Object.entries(p.sub).filter(([t]) => t.endsWith(':debris')))))).map(([t, b]) => [t.replace(':debris', ''), b])) },
       capableUp: { msgsPerSec: r2(mean(probeList.map((p) => p.upMsgs / secs))), bps: Math.round(mean(probeList.map((p) => p.upBytes / secs))) },

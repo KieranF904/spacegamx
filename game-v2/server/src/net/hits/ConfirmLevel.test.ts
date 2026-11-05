@@ -19,7 +19,7 @@ function run(l: ConfirmLevel, from: number, to: number, at?: (t: number) => void
 
 describe('confirmation levels (part E)', () => {
   it('starts NORMAL and goes ROUGH after a clean stretch, no sooner', () => {
-    const l = new ConfirmLevel(0, true);
+    const l = new ConfirmLevel(0);
     expect(l.level).toBe(CONFIRM.NORMAL);
     expect(run(l, 3, CLEAN_TICKS - 3)).toEqual([]);
     expect(run(l, CLEAN_TICKS, CLEAN_TICKS + 30)).toEqual([CONFIRM.ROUGH]);
@@ -27,13 +27,13 @@ describe('confirmation levels (part E)', () => {
   });
 
   it('a disagreement starts the clean stretch again', () => {
-    const l = new ConfirmLevel(0, true);
+    const l = new ConfirmLevel(0);
     expect(run(l, 3, 900, (t) => { if (t === 300) l.disagreed(t); })).toEqual([CONFIRM.ROUGH]);
     expect(l.history[0][0]).toBeGreaterThanOrEqual(300 + CLEAN_TICKS);
   });
 
   it('a correction at any level means STRICT from the next snapshot; then NORMAL, then ROUGH, a clean stretch each', () => {
-    const l = new ConfirmLevel(0, true);
+    const l = new ConfirmLevel(0);
     run(l, 3, 700);
     expect(l.level).toBe(CONFIRM.ROUGH);
     l.corrected(702);
@@ -49,17 +49,11 @@ describe('confirmation levels (part E)', () => {
   });
 
   it('a correction while STRICT keeps it STRICT for a clean stretch more', () => {
-    const l = new ConfirmLevel(0, true);
+    const l = new ConfirmLevel(0);
     l.corrected(3);
     l.apply(3);
     expect(run(l, 6, 500, (t) => { if (t === 450) l.corrected(t); })).toEqual([]);
     expect(run(l, 503, 450 + CLEAN_TICKS - 3)).toEqual([]);
     expect(run(l, 450 + CLEAN_TICKS, 450 + CLEAN_TICKS + 30)).toEqual([CONFIRM.NORMAL]);
-  });
-
-  it('without CAPS.ROUGH: NORMAL for good', () => {
-    const l = new ConfirmLevel(0, false);
-    expect(run(l, 3, 3000, (t) => { if (t === 900) l.corrected(t); })).toEqual([]);
-    expect(l.level).toBe(CONFIRM.NORMAL);
   });
 });

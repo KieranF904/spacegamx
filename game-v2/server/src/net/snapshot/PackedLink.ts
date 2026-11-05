@@ -1,5 +1,5 @@
 /**
- * One client's bit-packed frames (CAPS.PACKED) and their coalescing (CAPS.COALESCE): what Outbox does for a base-format
+ * One client's bit-packed frames and their coalescing (every joined client: the full caps set): what Outbox does for a base-format
  * client (a frame per flush, effects that wait LAZY_TICKS for the next one), but each frame becomes a sub-frame of a
  * packed WebSocket message (common network/packed), and with coalescing a sub-frame with nothing urgent in it waits up
  * to COALESCE_TICKS for the next, so several ticks share one message's headers (~66 B on the wire each).
@@ -7,7 +7,7 @@
  * Urgent (sent at once, with whatever waits before it): anything but the tick's stream (CAN_WAIT: answers to requests,
  * deaths, corrections, boss warnings...), a snapshot that corrects the client's own ship (its row or a keyframe), damage
  * to or from it, and the first snapshot after a hit to or from its ship (`wantSnapshot`: Outbox.addDamage marks it).
- * A client that finds its own hits (CAPS.HITS + CAPS.SELF_HITS: `quietHits`) gets none of the hit ones, nor its own
+ * A client finding its own hits (from its start: ClientConnection.started) gets none of the hit ones, nor its own
  * row when it went only for its HP or as the periodic safety copy (ClientConnection.selfRowQuiet): it draws its
  * own shells' impacts from what it finds as the snapshot comes, and others' shells (drawn a coalescing hold behind on
  * its interpolated timeline) land when their drawn heads get there, so a hit's frame waiting COALESCE_TICKS changes
@@ -15,7 +15,7 @@
  *
  * The bytes go out through the client's own socket; Outbox counts them.
  */
-import { CAPS, PackedEncoder, encodeServerMessage, serverFrame, type BlockStore, type PackedPart, type ServerMessage } from '@space-game/common';
+import { PackedEncoder, encodeServerMessage, serverFrame, type BlockStore, type PackedPart, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TICKS } from './constants.js';
 
@@ -42,17 +42,7 @@ export function urgentFor(msg: ServerMessage, pid: number, quietHits = false): s
   return null;
 }
 
-/** A client that finds its own hits (part D): nothing about its hits is urgent */
-export function quietHits(caps: number | undefined): boolean {
-  return ((caps ?? 0) & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS);
-}
-
 const RAW = { raw: true } as const;
-
-/** Does this client take its snapshots in encode-once blocks (CAPS.BLOCKS, with PACKED: common network/packed/blocks.ts)? */
-export function blocksFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & (CAPS.PACKED | CAPS.BLOCKS)) === (CAPS.PACKED | CAPS.BLOCKS);
-}
 
 export class PackedLink {
   readonly enc: PackedEncoder;
@@ -77,7 +67,7 @@ export class PackedLink {
 
   /** A snapshot's blocks are made as it's queued (in snapshot order, whenever its frame goes) */
   private prepare(part: PackedPart): void {
-    if (part.msg.type === 'snapshot' && blocksFor(this.conn.caps)) this.enc.prepare(part.msg, this.conn.playerId);
+    if (part.msg.type === 'snapshot') this.enc.prepare(part.msg, this.conn.playerId);
   }
 
   /** Anything waiting (this flush's messages, effects, sub-frames held back) */
@@ -92,7 +82,7 @@ export class PackedLink {
       if (!this.lazy.length) this.lazySince = tick;
       this.lazy.push(part);
     } else this.box.push(part);
-    const quiet = quietHits(this.conn.caps);
+    const quiet = !!this.conn.started;
     let why = urgentFor(part.msg, this.conn.playerId, quiet);
     // (its own row only for its HP, or now and then: not a correction)
     if (why === 'ownRow' && quiet && this.conn.selfRowQuiet) why = null;
@@ -132,7 +122,7 @@ export class PackedLink {
     return this.held.length ? this.emit() : 0;
   }
 
-  /** Everything goes now (the client switched packed frames off: the base format follows) */
+  /** Everything goes now (tests that read every frame) */
   drain(tick: number): number {
     if (this.box.length || this.lazy.length) this.hold(this.lazy.concat(this.box), tick);
     this.box = [];
@@ -176,7 +166,7 @@ export class PackedLink {
     this.heldSince = -1;
     this.urgent = false;
     // (Encode-once frames go undeflated: bit-packed already, and deflate is per socket: docs/design/awareness-model.md 7.6)
-    if (this.conn.ws.isOpen()) this.conn.ws.send(data, blocksFor(this.conn.caps) ? RAW : undefined);
+    if (this.conn.ws.isOpen()) this.conn.ws.send(data, RAW);
     return data.length;
   }
 

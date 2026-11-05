@@ -1,13 +1,13 @@
 /**
- * Confirmed hits, the server's side (docs/design/confirmed-hits.md part C). A client that announced CAPS.HITS is told
- * "shell s hit part p of ship t" (common network/hits.ts, about 3 bytes) instead of the hit's projectileHit, damage,
- * shipHps entry, removal and effects, and works those out itself with the shared rules (common ships/hitRules.ts).
- * Every other client gets exactly today's messages, at the same moments.
+ * Confirmed hits, the server's side (docs/design/confirmed-hits.md part C). Every client (CAPS.HITS is part of the full
+ * set) is told "shell s hit part p of ship t" (common network/hits.ts, about 3 bytes) instead of the hit's projectileHit,
+ * damage, shipHps entry, removal and effects, and works those out itself with the shared rules (common ships/hitRules.ts).
+ * A hit it can't work out goes to it the old way (its projectileHit, damage and effects: `write`).
  *
- *   shellHit  a shell hit a ship (bridge hitProjectile): legacy clients are told now; the hit is kept for the rest
+ *   shellHit  a shell hit a ship (bridge hitProjectile): the hit is kept for the snapshot
  *   hitFx     what the hit set off that a client can work out (fire, a pierce flash, the shell's burst): same
  *   end       the shell is spent
- *   plan      per capable client, as its snapshot is built: which hits it can work out (else they go the old way),
+ *   plan      per client, as its snapshot is built: which hits it can work out (else they go the old way),
  *             what it will get wrong (the record's extras), and its copy of the part HP (ClientConnection.shipHpSent)
  *             brought to what it will have, so the shipHps after the records corrects anything it got wrong
  *   write     after its snapshot: its damage sums less what the records cover, the records, the hits gone the old way
@@ -15,8 +15,8 @@
  *   check     one ship a second it worked out: the server's copy of its HP as a checksum (hpCheck); a client that
  *             disagrees asks for them all again (hpResync)
  *
- * Switching a client's caps takes effect at a snapshot's end (endSnapshot), so a hit is never told both ways; the
- * client is told (netCaps).
+ * A client's own hit finding starts at the end of its first snapshot (endSnapshot), so a hit is never told both ways;
+ * the client is told (netCaps).
  *
  * Client-detected hits (part D, CAPS.SELF_HITS on top of HITS): such a client finds most of its hits itself. `plan`
  * splits its hits into those it can find (the shell's line and the ship's pose are exact on its tick-faithful layer:
@@ -30,7 +30,7 @@
  */
 import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
-  CAPS, Position, Projectile, InSystem, Player, Radius, Dead, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
+  Position, Projectile, InSystem, Player, Radius, Dead, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
   firesStraight, unwrapTick14, CONFIRM, confirmRules,
   type ClientSocket, type ServerMessage, type ShellHitRecord, type ShipState, type HitReport,
 } from '@space-game/common';
@@ -40,7 +40,6 @@ import { damageMessage, projectileHitMessage, type Outbox } from '../snapshot/Ou
 import { COALESCE_TICKS } from '../snapshot/constants.js';
 import { SelfHitJournal, type JournalHit } from './SelfHitJournal.js';
 import { ConfirmLevel } from './ConfirmLevel.js';
-import { ownSimFor } from '../snapshot/ownShots.js';
 
 /** What the ledger needs of the server (GameServer itself) */
 export interface HitLedgerHost {
@@ -73,11 +72,11 @@ interface Hit extends ShellHitInfo {
   igniteTicks: number;
   /** The detonation it was told with (a pierce pass, its end), or null */
   end: { kind: string; radius: number } | null;
-  /** The effect messages it set off (sent to legacy clients at once; to a capable one only if it goes the old way) */
+  /** The effect messages it set off (sent to a client only if the hit goes to it the old way) */
   fx: ServerMessage[];
 }
 
-/** One capable client's share of a snapshot's hits */
+/** One client's share of a snapshot's hits */
 interface Plan {
   recs: ShellHitRecord[];
   /** Each record's damage sum (target, source, glancing) */
@@ -108,8 +107,6 @@ const REPORT_SLACK = 12;
 const NORMAL_REPORT_EVERY = confirmRules(CONFIRM.NORMAL).reportEvery;
 
 export class HitLedger {
-  /** Some client has HITS on this snapshot (else every hit goes as ever, and nothing is kept) */
-  private on = false;
   private hits: Hit[] = [];
   /** Each shell's latest hit this snapshot */
   private byProj = new Map<number, Hit>();
@@ -122,7 +119,7 @@ export class HitLedger {
   private checks = new WeakMap<ClientConnection, { due: Set<number>; at: number }>();
   /** Per client finding its own hits: its journal (SelfHitJournal) */
   private journals = new WeakMap<ClientConnection, SelfHitJournal>();
-  /** ...and its confirmation level (part E: ConfirmLevel; NORMAL for good without CAPS.ROUGH) */
+  /** ...and its confirmation level (part E: ConfirmLevel) */
   private levels = new WeakMap<ClientConnection, ConfirmLevel>();
   /**
    * ...and shells with a hit told it the old way: it doesn't know what they passed through, so it drops them (their
@@ -151,31 +148,20 @@ export class HitLedger {
     return this.shellName ? this.shellName(conn, proj) : proj;
   }
 
-  /** Does this snapshot keep hits (some client takes records)? */
-  get active(): boolean {
-    return this.on;
-  }
-
-  /** Is this client taking records this snapshot? */
-  wants(conn: ClientConnection): boolean {
-    return this.on && !!((conn.caps ?? 0) & CAPS.HITS);
-  }
-
-  /** Is this client finding its hits itself this snapshot (part D)? */
+  /** Is this client finding its hits itself (part D)? From the end of its first snapshot (endSnapshot) */
   finds(conn: ClientConnection): boolean {
-    return this.wants(conn) && !!((conn.caps ?? 0) & CAPS.SELF_HITS);
+    return !!conn.started;
   }
 
   // ---- During the tick ----
 
-  /** A projectile hit something at (x, y) (with `hit`: a shell on a ship) */
+  /** A projectile hit something at (x, y) (with `hit`: a shell on a ship; without, a rock or the like: told to everyone near) */
   shellHit(proj: number, x: number, y: number, hit?: ShellHitInfo): void {
-    if (!this.on || !hit) {
+    if (!hit) {
       this.last = null;
       this.host.net.broadcastProjectileHit(proj, x, y);
       return;
     }
-    this.host.net.broadcastProjectileHit(proj, x, y, CAPS.HITS);
     const h: Hit = {
       ...hit, proj, owner: Projectile.ownerId[proj], gun: Projectile.gun[proj], sys: InSystem.systemId[proj], tick: this.host.currentTick,
       x, y, gone: false, state: this.host.getShips().get(hit.target), ignite: -1, igniteTicks: 0, end: null, fx: [],
@@ -186,14 +172,13 @@ export class HitLedger {
     this.stats.hits++;
   }
 
-  /** What the hit just made set off (Weapons.atHit): told to legacy clients now, kept for the rest. False: not ours */
+  /** What the hit just made set off (Weapons.atHit): kept with the hit (sent only where it goes the old way). False: not ours */
   hitFx(proj: number, msg: ServerMessage): boolean {
     const h = this.last;
-    if (!this.on || !h || h.proj !== proj) return false;
+    if (!h || h.proj !== proj) return false;
     if (msg.type === 'ignite') { h.ignite = msg.part; h.igniteTicks = msg.ticks; }
     else if (msg.type === 'detonation') h.end = { kind: msg.kind, radius: msg.radius };
     h.fx.push(msg);
-    this.host.net.broadcastToSystem(h.sys, msg, CAPS.HITS);
     return true;
   }
 
@@ -208,10 +193,9 @@ export class HitLedger {
   /**
    * Works out what this client will make of each hit, in order (its HP copy is brought to that), and which go the
    * old way. `known`: shells it has (a row, or a fire event, now or before). Returns the shells the records end
-   * (left out of its removed list); null if it takes no records.
+   * (left out of its removed list).
    */
-  plan(conn: ClientConnection, known: (id: number) => boolean, keyframed?: ReadonlySet<number>): ReadonlySet<number> | null {
-    if (!this.wants(conn)) return null;
+  plan(conn: ClientConnection, known: (id: number) => boolean, keyframed?: ReadonlySet<number>): ReadonlySet<number> {
     const plan: Plan = { recs: [], keys: [], legacy: [], gone: new Set(), covered: new Map(), shown: new Map(), own: [], hits: [] };
     this.plans.set(conn, plan);
     if (!this.hits.length) return plan.gone;
@@ -254,7 +238,7 @@ export class HitLedger {
   }
 
   /**
-   * Can a client finding its own hits find this one exactly (part D)? Not on its own ship (unless it steps it itself, CAPS.OWN_SIM), debris, or a ship synced to
+   * Can a client finding its own hits find this one exactly (part D)? Not on debris, or a ship synced to
    * it this snapshot (a rebuild changed its shape mid-window) or keyframed (its path changed: where it was before the
    * keyframe's tick is the client's guess); not by a shell the snapshot will remove (its end tick
    * isn't known), a great orb, one that doesn't fly straight or arms late; not between two pilots
@@ -269,8 +253,6 @@ export class HitLedger {
     const world = this.host.world;
     // (STRICT: a client that needed correcting is told every hit for a while: part E)
     if (this.levels.get(conn)?.rules.strict) return 'strict';
-    // (Its own ship: exact on its tick layer only when it steps it itself, CAPS.OWN_SIM; client SelfHits.ownExact)
-    if (h.target === conn.playerId && !ownSimFor(conn.caps)) return 'self';
     // (A boss its body flies here: how much of a hit it takes (braced, laid open, between stages) is still its brain's,
     // until its body has its hit rules too: decision inputs build stage 4)
     if (this.host.bodies?.toldHits(conn, h.target)) return 'body';
@@ -331,7 +313,7 @@ export class HitLedger {
   /** A finding client's confirmation level (part E), made with its journal */
   levelOf(conn: ClientConnection): ConfirmLevel {
     let l = this.levels.get(conn);
-    if (!l) this.levels.set(conn, (l = new ConfirmLevel(this.host.currentTick, !!((conn.caps ?? 0) & CAPS.ROUGH))));
+    if (!l) this.levels.set(conn, (l = new ConfirmLevel(this.host.currentTick)));
     return l;
   }
 
@@ -422,7 +404,7 @@ export class HitLedger {
       const amount = Math.round(e.amount * 10) / 10;
       // (The records say it all: it sums them itself. Something else too, a blast: the sum goes as ever, the records show no number.
       // So too where its sum of the records would round otherwise than the server's (a shield's records carry their tenths,
-      // rounded one by one): the number it shows is the legacy clients')
+      // rounded one by one): the number it shows is the server's sum)
       if (cov > 0 && e.amount - cov <= 0.05 && Math.round((plan.shown.get(key) ?? 0) * 10) / 10 === amount) continue;
       if (cov > 0) (quiet ??= new Set()).add(key);
       if (amount > 0) net.send(conn.ws, damageMessage(e, amount));
@@ -450,8 +432,8 @@ export class HitLedger {
   /** A client finding its own hits: what it must have answered for by now, judged; a lasting disagreement put right */
   private judge(conn: ClientConnection): void {
     const now = this.host.currentTick;
-    // (A client whose frames are coalesced may hear a window COALESCE_TICKS later: net/snapshot/PackedLink.ts)
-    const held = ((conn.caps ?? 0) & (CAPS.PACKED | CAPS.COALESCE)) === (CAPS.PACKED | CAPS.COALESCE) ? COALESCE_TICKS : 0;
+    // (Its frames are coalesced: it may hear a window COALESCE_TICKS later, net/snapshot/PackedLink.ts)
+    const held = COALESCE_TICKS;
     // (Its level's report spacing beyond part D's, and STRICT's later frames: part E)
     const level = this.levelOf(conn), rules = level.rules, journal = this.journalOf(conn);
     const slack = Math.max(0, rules.reportEvery - NORMAL_REPORT_EVERY) + rules.delayTicks;
@@ -508,7 +490,7 @@ export class HitLedger {
     if (o?.size) for (const id of ids) o.delete(id);
   }
 
-  /** The snapshot's gone: drop its hits, switch any client's caps, and see whether the next one keeps hits */
+  /** The snapshot's gone: drop its hits, start any client that joined since (its own hit finding), apply level changes */
   endSnapshot(skip?: { has(system: number): boolean; readonly size: number } | null): void {
     // (A round for some systems only, crowd fallbacks: the others' hits wait for theirs)
     if (skip?.size) {
@@ -521,33 +503,24 @@ export class HitLedger {
     }
     this.plans.clear();
     this.last = null;
-    let on = false;
     for (const c of this.host.clients.values()) {
-      if (skip?.size && skip.has(InSystem.systemId[c.playerId])) { if ((c.caps ?? 0) & CAPS.HITS) on = true; continue; }
-      if (c.capsNext !== undefined && c.capsNext !== c.caps) {
-        const was = c.caps ?? 0;
-        c.caps = c.capsNext;
-        if (!(c.caps & CAPS.HITS)) { this.passes.delete(c); this.checks.delete(c); }
-        // (Finding its own hits starts afresh from this snapshot on both sides; the client is told from when. Shells
+      if (skip?.size && skip.has(InSystem.systemId[c.playerId])) continue;
+      if (c.joined && !c.started) {
+        c.started = true;
+        // (Finding its own hits starts from this snapshot on both sides; the client is told from when. Shells
         // already flying are told on both sides: what they hit before isn't on its layer, SelfHits.setOn)
         this.journals.delete(c);
         this.levels.delete(c);
-        this.oldWayShells.delete(c);
-        const both = CAPS.HITS | CAPS.SELF_HITS;
-        if ((c.caps & both) === both && (was & both) !== both) {
-          const told = new Set<number>(), sys = InSystem.systemId[c.playerId];
-          for (const id of shellQuery(this.host.world)) if (InSystem.systemId[id] === sys) told.add(id);
-          this.oldWayShells.set(c, told);
-        }
-        if (was !== c.caps) this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps, ...(c.caps & CAPS.COALESCE ? { hold: COALESCE_TICKS } : {}) });
-      } else if ((c.caps ?? 0) & CAPS.ROUGH && this.finds(c) && this.levelOf(c).apply(this.host.currentTick)) {
+        const told = new Set<number>(), sys = InSystem.systemId[c.playerId];
+        for (const id of shellQuery(this.host.world)) if (InSystem.systemId[id] === sys) told.add(id);
+        this.oldWayShells.set(c, told);
+        this.host.net.send(c.ws, { type: 'netCaps', hold: COALESCE_TICKS });
+      } else if (this.finds(c) && this.levelOf(c).apply(this.host.currentTick)) {
         // (Its confirmation level changes from the next snapshot, on both sides at once: part E)
         this.stats.levels[this.levelOf(c).level]++;
-        this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps!, ...(c.caps! & CAPS.COALESCE ? { hold: COALESCE_TICKS } : {}), lvl: this.levelOf(c).level });
+        this.host.net.send(c.ws, { type: 'netCaps', hold: COALESCE_TICKS, lvl: this.levelOf(c).level });
       }
-      if ((c.caps ?? 0) & CAPS.HITS) on = true;
     }
-    this.on = on;
   }
 
   /**

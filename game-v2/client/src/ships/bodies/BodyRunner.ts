@@ -36,20 +36,12 @@ interface Run {
 }
 
 export class BodyRunner {
-  on = false;
   private readonly runs = new Map<number, Run>();
   private snapTick = -Infinity;
   private lastCheck = { tick: -Infinity, snap: -Infinity };
   readonly stats = { syncs: 0, offs: 0, decisions: 0, blind: 0, checks: 0 };
 
   constructor(private readonly host: BodyRunnerHost) {}
-
-  /** Switched on or off (netCaps): off, every boss goes back to its rows */
-  setOn(on: boolean): void {
-    if (this.on === on) return;
-    this.on = on;
-    if (!on) for (const id of [...this.runs.keys()]) this.stop(id);
-  }
 
   /**
    * A connection afresh (a reconnect: the server's BodyNet starts with none run): every boss back to its rows, until
@@ -86,7 +78,6 @@ export class BodyRunner {
   onSnapshot(tick: number, rows: readonly (readonly number[])[] | undefined): void {
     const prev = this.snapTick;
     this.snapTick = tick;
-    if (!this.on) return;
     for (const row of rows ?? []) {
       const [id, dt, op] = row, t = tick + dt, args = row.slice(3);
       if (op === DECISION.SYNC) {
@@ -172,7 +163,7 @@ export class BodyRunner {
 
   /** Its check, if one is due (`riding`: an input goes anyway): the low byte of its bodies' hashes at the last snapshot's tick */
   takeCheck(riding: boolean, tick: number): { hash: number; tick: number } | undefined {
-    if (!this.on || !riding || !this.runs.size || this.snapTick === this.lastCheck.snap || tick - this.lastCheck.tick < CHECK_EVERY) return undefined;
+    if (!riding || !this.runs.size || this.snapTick === this.lastCheck.snap || tick - this.lastCheck.tick < CHECK_EVERY) return undefined;
     let sum = 0;
     for (const [id, run] of this.runs) {
       const st = this.host.reps.at(id, this.snapTick), s = this.stateAt(run, this.snapTick);

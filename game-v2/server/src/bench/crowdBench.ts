@@ -6,8 +6,9 @@
  *
  *   npm run bench:crowd                    quick: n 20 and 50; spread, ball, boss(20); ~10 s measured each
  *   npm run bench:crowd -- --full          n 20, 50, 100, 300 (boss: 20), 15 s each
- *   --n 20,100  --layouts spread,ball,cruise  --secs 10  --bulk packed|blocks|focus  --caps 2047  --probes 4  --out file.json
- *   (cruise: pilots flying out and back over 24 km, the focus grid's churn; caps 2047 = with CAPS.FOCUS)
+ *   --n 20,100  --layouts spread,ball,cruise  --secs 10  --probes 4  --out file.json
+ *   (cruise: pilots flying out and back over 24 km, the focus grid's churn; every client runs the full caps set,
+ *   DEFAULT_CAPS: probes and counting sockets alike)
  *   --case <layout>:<n>                    one case in this process (what the matrix runs), prints one JSON line
  *   --crowd                                crowd fallbacks on and automatic (CAPS.CROWD, probes with every cap): each
  *                                          second's level and base-tick time, where it settled (try --secs 40)
@@ -17,6 +18,7 @@ import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { runCase, type CaseOpts } from './crowd/run.js';
 import { LAYOUTS, type Layout } from './crowd/world.js';
+import { DEFAULT_CAPS } from '@space-game/common';
 
 const argv = process.argv.slice(2);
 const arg = (name: string, d?: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : d; };
@@ -24,9 +26,8 @@ const flag = (name: string) => argv.includes(`--${name}`);
 
 const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
-  layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed' | 'blocks' | 'focus'),
-  crowd: flag('crowd'),
-  probes: Number(arg('probes', '4')), caps: Number(arg('caps', flag('crowd') ? '524287' : '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
+  layout, n, secs: Number(arg('secs', full ? '15' : '10')),   crowd: flag('crowd'),
+  probes: Number(arg('probes', '4')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
 });
 
 const one = arg('case');
@@ -64,7 +65,7 @@ const rows = results.map((r) => [
 ].map(String));
 const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
 const line = (r: string[]) => r.map((c, i) => c.padStart(w[i])).join('  ');
-console.log(`\nbulk sockets: ${arg('bulk', 'legacy')}; probes: ${arg('probes', '4')} (caps ${opts('ball', 0).caps}, latency ${arg('lat', '3')} ticks)\n`);
+console.log(`\nbulk sockets and probes: the full caps set (DEFAULT_CAPS ${DEFAULT_CAPS}); probes: ${arg('probes', '4')} (latency ${arg('lat', '3')} ticks)\n`);
 console.log(line(head)); console.log(w.map((x) => '-'.repeat(x)).join('  ')); for (const r of rows) console.log(line(r));
 
 console.log('\ndebris: pieces mean/max, server step ms/tick, probe client debris-world ms/tick, capable debris B/s by type, debris corrections, off/checked (no keyframe)');
@@ -84,4 +85,4 @@ if (flag('crowd')) {
 }
 
 const out = arg('out');
-if (out) writeFileSync(out, JSON.stringify({ when: new Date().toISOString().slice(0, 10), mode: full ? 'full' : 'quick', bulk: arg('bulk', 'legacy'), results }, null, 1));
+if (out) writeFileSync(out, JSON.stringify({ when: new Date().toISOString().slice(0, 10), mode: full ? 'full' : 'quick', bulk: 'full', results }, null, 1));

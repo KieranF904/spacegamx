@@ -30,8 +30,8 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding, jumpGo, jumpChargeNeed,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
-  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, gunsTick, gunControls, miningTick, GUN_FX, simAim, simAimQ, shotIdsFor, ammoCodeOfMods, fireVolley, type SimEvent, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, movesFor, focusFor, causesFor, contactsFor, waypointsFor, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
+  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, gunsTick, gunControls, miningTick, GUN_FX, simAim, simAimQ, ammoCodeOfMods, fireVolley, type SimEvent, firesStraight, partWeaponDef,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, SIDE, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -198,7 +198,7 @@ export class ShipClient {
 
   constructor(private opts: ShipClientOptions) {
     this.store = new ShipStore(opts.catalog, opts.tuning);
-    this.debris = new DebrisSplits({ store: this.store, reps: () => this.replicas, splitPose: () => (this.causes.on ? (id, t) => this.causes.beforeRebuild(id, t) : null), crumbled: (m) => this.damageFx?.onPartDestroyed(m) });
+    this.debris = new DebrisSplits({ store: this.store, reps: () => this.replicas, splitPose: () => (id, t) => this.causes.beforeRebuild(id, t), crumbled: (m) => this.damageFx?.onPartDestroyed(m) });
     this.features = new ClientFeatures(CLIENT_FEATURES, {
       catalog: opts.catalog,
       playerId: () => opts.state.playerId,
@@ -305,26 +305,26 @@ export class ShipClient {
       ownExact: () => this.own.on,
     });
     this.ownShells = new OwnShells({ self: () => opts.state.playerId, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, firePose: (t) => this.own.firePose(t) });
-    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
+    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
     this.bodies = new BodyRunner({ reps: this.replicas });
-    // (Their moves worked out here, CAPS.MOVES: ships/bodies/MoveRunner.ts)
+    // (Their moves worked out here: ships/bodies/MoveRunner.ts)
     this.moves = new MoveRunner({
       reps: this.replicas, bodies: this.bodies, store: this.store, tuning: opts.tuning, terrain: () => this.terrain,
       custom: (factionsData as { custom?: { designs: Record<string, CustomStats> } }).custom,
     });
-    // (Homing shells on the tick layer, CAPS.WAYPOINTS: ships/guides/GuideRunner.ts)
+    // (Homing shells on the tick layer: ships/guides/GuideRunner.ts)
     this.guides = new GuideRunner({ reps: this.replicas });
-    // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
+    // (Other ships' causes on the tick layer: ships/causes/ShipCauses.ts)
     this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning, contacts: () => this.contacts });
-    // (Contact pairs found on the tick layer, CAPS.CONTACTS: ships/causes/ContactWorld.ts)
+    // (Contact pairs found on the tick layer: ships/causes/ContactWorld.ts)
     this.contacts = new ContactWorld({
       reps: this.replicas, store: this.store, self: () => opts.state.playerId, ownOn: () => this.own.on, tuning: opts.tuning,
       derivedAt: (id, t) => (id === opts.state.playerId ? this.own.derived(t) : this.causes.derived(id, t) ?? this.store.get(id)?.derived),
       mid: (id, t, place) => (id === opts.state.playerId ? this.own.midAt(t, place) : this.causes.midOf(id, t, place)),
       forget: (t) => { this.causes.cursors.forget(t); this.own.cursors.forget(t); },
     });
-    // (Ships out of view kept a while, structure and status row: CAPS.FOCUS, ships/cells/ShipMemory.ts)
+    // (Ships out of view kept a while, structure and status row: ships/cells/ShipMemory.ts)
     this.away = new ShipMemory<InterpolatedEntity>({
       entity: (id) => opts.state.entities.get(id),
       // (Back as it was left: placed by its keyframe, which comes in the snapshot just after)
@@ -333,36 +333,32 @@ export class ShipClient {
     });
   }
 
-  /** Ships out of view it keeps (CAPS.FOCUS): back, the server sends only what changed */
+  /** Ships out of view it keeps: back, the server sends only what changed */
   readonly away: ShipMemory<InterpolatedEntity>;
-  /** Other ships' causes (CAPS.CAUSES) */
+  /** Other ships' causes */
   private readonly causes: ShipCauses;
   private readonly contacts: ContactWorld;
-  /** The ships the pairs it found itself touched in the last snapshot's window (CAPS.CONTACTS: their hits told) */
+  /** The ships the pairs it found itself touched in the last snapshot's window (their hits told) */
   private touched: Set<number> | undefined;
-  /** Holding the focus grid's cells (CAPS.FOCUS, netCaps): ships from 18 km out are drawn as ghosts, the ring's too */
-  private focusOn = false;
   private ghosts: GhostLayer | null = null;
   private ghostList: Ghost[] = [];
   private ghostOwn = { x: 0, y: 0 };
-  /** The focus radius in effect (a crowd shrinks it: GameState.crowd, CAPS.CROWD): the ghost fade is its last km */
+  /** The focus radius in effect (a crowd shrinks it: GameState.crowd): the ghost fade is its last km */
   private ghostFocus = FOCUS_RANGE;
 
-  /** The focus grid's ghosts this frame (CAPS.FOCUS): the ring's ships from their legs, and held ships 18 km off and more */
+  /** The focus grid's ghosts this frame: the ring's ships from their legs, and held ships 18 km off and more */
   private drawGhosts(): void {
     const { state } = this.opts, scene = this.scene;
     if (!this.ghosts || !scene) return;
     const list = this.ghostList;
     list.length = 0;
-    if (this.focusOn) {
-      for (const [id, e] of state.entities) {
-        if (id === state.playerId || (e.type !== EntityType.Player && e.type !== EntityType.ShipBody) || !this.store.get(id)) continue;
-        const w = ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus);
-        if (w > 0) list.push({ x: e.renderX, y: e.renderY, kind: e.type === EntityType.Player ? 4 : e.data?.[0] ?? 0, rank: e.type === EntityType.ShipBody ? (e.data?.[4] ?? 0) : 0, w });
-      }
-      for (const f of state.farShips.list(state.systemId, state.getRawServerTick(), (id) => state.entities.has(id) || id === state.playerId)) {
-        list.push({ x: f.renderX, y: f.renderY, kind: f.kind, rank: f.rank, w: 1 });
-      }
+    for (const [id, e] of state.entities) {
+      if (id === state.playerId || (e.type !== EntityType.Player && e.type !== EntityType.ShipBody) || !this.store.get(id)) continue;
+      const w = ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus);
+      if (w > 0) list.push({ x: e.renderX, y: e.renderY, kind: e.type === EntityType.Player ? 4 : e.data?.[0] ?? 0, rank: e.type === EntityType.ShipBody ? (e.data?.[4] ?? 0) : 0, w });
+    }
+    for (const f of state.farShips.list(state.systemId, state.getRawServerTick(), (id) => state.entities.has(id) || id === state.playerId)) {
+      list.push({ x: f.renderX, y: f.renderY, kind: f.kind, rank: f.rank, w: 1 });
     }
     this.ghosts.draw(list, scene.getZoom(), (x, y) => scene.inView(x, y, 400));
   }
@@ -411,15 +407,15 @@ export class ShipClient {
   readonly hits: ConfirmedHits;
   /** Client-detected hits (part D): the hits found here on the tick-faithful layer, and the chain reported */
   readonly selfHits: SelfHits;
-  /** Your own straight shells worked out here, named by shot id (CAPS.SHOT_IDS: hits/OwnShells.ts) */
+  /** Your own straight shells worked out here, named by shot id (hits/OwnShells.ts) */
   readonly ownShells: OwnShells;
-  /** Its own ship on the tick-aligned layer, stepped from its own inputs and the causes it's told (CAPS.OWN_SIM: own/OwnTick.ts) */
+  /** Its own ship on the tick-aligned layer, stepped from its own inputs and the causes it's told (own/OwnTick.ts) */
   readonly own: OwnTick;
-  /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (CAPS.BODIES: bodies/BodyRunner.ts) */
+  /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (bodies/BodyRunner.ts) */
   readonly bodies: BodyRunner;
-  /** Their moves' looks and straight shells worked out on the tick-aligned layer (CAPS.MOVES: bodies/MoveRunner.ts) */
+  /** Their moves' looks and straight shells worked out on the tick-aligned layer (bodies/MoveRunner.ts) */
   readonly moves: MoveRunner;
-  /** Homing shells flown on the tick-aligned layer by the waypoint law (CAPS.WAYPOINTS: guides/GuideRunner.ts) */
+  /** Homing shells flown on the tick-aligned layer by the waypoint law (guides/GuideRunner.ts) */
   readonly guides: GuideRunner;
   /** The tick of the snapshot last applied (a confirmed hit's tick counts back from it) */
   private snapTick = 0;
@@ -476,23 +472,20 @@ export class ShipClient {
     this.debris.reset();
   }
 
+  /** Its pilot is known (welcome, a respawn's too): its own ship is stepped on its tick layer from its own inputs */
+  onWelcome(): void {
+    this.own.start();
+  }
+
   /**
-   * The caps in effect (netCaps): finding hits here starts (or stops) with the next snapshot; with CAPS.ROUGH, the
-   * confirmation level too (`lvl`: how often it reports; at STRICT the server tells every hit)
+   * netCaps: the first after a join says finding hits here starts with the next snapshot (the server's journal starts
+   * there too); each says the confirmation level (`lvl`: how often it reports; at STRICT the server tells every hit)
    */
-  onNetCaps(caps: number, lvl?: number): void {
-    // (the snapshot before it was the old caps': its window searched as they were)
+  onNetCaps(lvl?: number): void {
+    // (the snapshot before it was searched as it was)
     this.findHits();
-    this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
-    this.selfHits.setLevel(caps & CAPS.ROUGH ? lvl : undefined);
-    this.own.setOn(ownSimCaps(caps));
-    this.ownShells.setOn(shotIdsFor(caps));
-    this.focusOn = focusFor(caps);
-    this.bodies.setOn(bodiesFor(caps));
-    this.moves.setOn(movesFor(caps));
-    this.guides.setOn(waypointsFor(caps));
-    this.causes.setOn(causesFor(caps));
-    this.contacts.setOn(contactsFor(caps));
+    this.selfHits.setOn(true, this.snapTick);
+    this.selfHits.setLevel(lvl);
   }
 
   /**
@@ -640,35 +633,33 @@ export class ShipClient {
    */
   preSnapshot(m: ServerSnapshotMessage): EntityState[] {
     this.snapTick = m.tick;
-    // (its own contact pass's window: who it leaves out, CAPS.CONTACTS; before the keyframes go in)
+    // (its own contact pass's window: who it leaves out; before the keyframes go in)
     this.contacts.beginSnapshot(m);
     this.replicas.apply(m.tick, m.ships, m.ctl);
-    // (its own ship's causes and controls, CAPS.OWN_SIM: before its own fire events are built from it)
+    // (its own ship's causes and controls: before its own fire events are built from it)
     this.own.onSnapshot(m);
     if (m.own?.length) this.ownCausedAt = m.tick;
-    // (other ships' causes, CAPS.CAUSES: before their fire events are built from them)
+    // (other ships' causes: before their fire events are built from them)
     this.causes.onSnapshot(m);
-    // (bosses' decisions, CAPS.BODIES: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
+    // (bosses' decisions: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
     this.bodies.onSnapshot(m.tick, m.decisions);
     // (splits that waited for them, and for the decisions: their parents' poses as the server split them)
     this.debris.flush(new Set(m.ships?.map((k) => k[0])));
     const out: EntityState[] = [];
     // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
     out.push(...this.debris.takeRows());
-    // (bodies' moves through this window, CAPS.MOVES: their straight shells as rows, those spent gone; their looks at the frame's end)
+    // (bodies' moves through this window: their straight shells as rows, those spent gone; their looks at the frame's end)
     const mv = this.moves.advance(m.tick, this.opts.state.playerId);
     out.push(...mv.rows);
     if (mv.removed.length) m.removed.push(...mv.removed);
-    // (homing shells, CAPS.WAYPOINTS: flown on the tick layer from their SYNCs and waypoints; drawn where it has them)
+    // (homing shells: flown on the tick layer from their SYNCs and waypoints; drawn where it has them)
     this.guides.onSnapshot(m.tick, m.guides);
     out.push(...this.guides.draw(m.tick, m.entities, (id) => this.opts.state.entities.get(id)?.data));
-    // (your own straight shells, CAPS.SHOT_IDS: built here from your own gun step's volleys, at your confirmed ship, named by
+    // (your own straight shells: built here from your own gun step's volleys, at your confirmed ship, named by
     // shot id; those whose life has ended removed here, the server sending no removal for them: hits/OwnShells.ts)
-    if (this.ownShells.on) {
-      const keyed = !!m.ships?.some((k) => k[0] === this.opts.state.playerId), ended: number[] = [];
-      out.push(...this.ownShells.snapshot(m.tick, ended, keyed));
-      if (ended.length) { m.removed.push(...ended); this.selfHits.onRemoved(ended); }
-    }
+    const keyed = !!m.ships?.some((k) => k[0] === this.opts.state.playerId), ended: number[] = [];
+    out.push(...this.ownShells.snapshot(m.tick, ended, keyed));
+    if (ended.length) { m.removed.push(...ended); this.selfHits.onRemoved(ended); }
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
@@ -695,11 +686,11 @@ export class ShipClient {
         continue;
       }
       const ship = this.store.get(owner);
-      // (Your own shells too (CAPS.OWN_SHOTS): from your confirmed ship, replicated to you as to everyone, not your
-      // prediction: the tick-aligned layer counts from the server's ship. Your drawn shells are your prediction's, WeaponFx)
-      // (with CAPS.OWN_SIM, where it was as its guns fired: before that tick's pulls and contacts, OwnTick.firePose)
+      // (Your own shells that come as fire events (not built by OwnShells): from your ship on the tick layer where it was
+      // as its guns fired, before that tick's pulls and contacts (OwnTick.firePose), not your prediction. Your drawn
+      // shells are your prediction's, WeaponFx)
       const fp = owner === this.opts.state.playerId && this.own.on ? this.own.firePose(tick) : null;
-      // (another ship where it was as its guns fired: before that tick's causes, CAPS.CAUSES)
+      // (another ship where it was as its guns fired: before that tick's causes)
       const pose = fp ?? this.replicas.preAt(owner, tick), st = pose ? { body: pose } : null;
       if (!ship || !st) continue;
       this.chargeTells.delete(owner * 256 + part);
@@ -828,11 +819,11 @@ export class ShipClient {
       id === this.opts.state.playerId ? this.localThrustCommand() : null,
     // Docked ships are inside their station: yours while you're berthed, others as the server says
     (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)), this.features);
-    // (Holding cells, CAPS.FOCUS: a ship 18 km off and more fades to its ghost, GhostLayer; the drawn own ship's place, drawGhosts)
+    // (Holding cells: a ship 18 km off and more fades to its ghost, GhostLayer; the drawn own ship's place, drawGhosts)
     this.renderer.ghostOf = (id) => {
       // (A lair boss rising out of its lair or sinking back: ships/bossLife.ts)
       const rise = bossRise(id, this.opts.state.renderTickNow);
-      if (!this.focusOn || id === this.opts.state.playerId) return 1 - rise;
+      if (id === this.opts.state.playerId) return 1 - rise;
       const e = this.opts.state.entities.get(id);
       const g = e ? ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus) : 0;
       return 1 - (1 - g) * rise;
@@ -1026,8 +1017,8 @@ export class ShipClient {
       if (!firesStraight(pdef)) continue;
       const aug = (e as { aug?: 1 }).aug, ammo = ammoCodeOfMods(this.ownAmmo?.(w.kind));
       const fire = { owner: player.id, tick, part: w.part, aimQ: e.aimQ, ammo, aug };
-      // (your own shells on the tick layer, CAPS.SHOT_IDS: this volley's, built when a snapshot covers its tick)
-      if (this.ownShells?.on && this.ownShells.derivable(ship, w.part + 256 * ammo + (aug ? 65536 : 0))) this.ownShells.fired({ tick, part: w.part, aimQ: e.aimQ, ammo, aug });
+      // (your own shells on the tick layer: this volley's, built when a snapshot covers its tick)
+      if (this.ownShells?.derivable(ship, w.part + 256 * ammo + (aug ? 65536 : 0))) this.ownShells.fired({ tick, part: w.part, aimQ: e.aimQ, ammo, aug });
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
       const v = fireVolley(fire, ship, { ...pose, vx: player.vx, vy: player.vy }, this.opts.tuning);
       if (!v) continue;
@@ -1290,8 +1281,8 @@ export class ShipClient {
       case 'projectileHit':
         // (Told the old way: a hit found here for this shell wasn't one)
         if (this.selfHits.on && !this.handingOut) { this.hits.oldWay(msg.id); this.selfHits.drop(msg.id); }
-        // (a shell it doesn't have: one a body's move fired, made here, CAPS.MOVES: the one there goes)
-        if (this.moves.on && !this.opts.state.entities.has(msg.id)) this.moves.struck(msg.x, msg.y, this.snapTick);
+        // (a shell it doesn't have: one a body's move fired, made here: the one there goes)
+        if (!this.opts.state.entities.has(msg.id)) this.moves.struck(msg.x, msg.y, this.snapTick);
         // (A shell drawn here shows its hit where it's seen to strike, struckFx; the server's only confirms it)
         if (!this.scene?.drawsShell(msg.id)) this.struckFx(msg.id, msg.x, msg.y, this.opts.state.entities.get(msg.id)?.data?.[0] ?? -1);
         return false; // the game stops the tracer and throws the sparks

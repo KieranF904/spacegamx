@@ -1,16 +1,17 @@
 /**
  * The enemy AI's pilots as shared bodies (CAPS.PILOTS; common bodies/aiPilot.ts, server game/brains/aiPilot.ts,
  * docs/design/decision-inputs.md 6.5): Enemies' commander decides on the server (state, target, waypoint, strafe side,
- * aim error), the pilot flies each ship on both sides. A capable client's tick-aligned replica of every hostile it runs
- * is the server's ship bit for bit at every snapshot's tick (patrolling, closing in, strafing round it as a pack,
- * breaking off), with no control rows of it; a legacy observer gets them the old way; a lost decision is caught by the
- * check and put right; a client without CAPS.PILOTS runs none.
+ * aim error), the pilot flies each ship on both sides. A client's tick-aligned replica of every hostile it runs is the
+ * server's ship bit for bit at every snapshot's tick (patrolling, closing in, strafing round it as a pack, breaking
+ * off), with no control rows of it, for the pilot and for a second client watching; a lost decision is caught by the
+ * check and put right.
  *
- * A real GameServer; the pilot (a fake client with every cap) flies by input messages, on time, firing at the nearest.
+ * A real GameServer; the pilot (a fake client, full caps as every client) flies by input messages, on time, firing at
+ * the nearest. The ground truth is the server's own ships, tick by tick.
  */
 import { describe, it, expect } from 'vitest';
 import { DECISION } from '@space-game/common';
-import { fight, BODIES } from '../../testkits/decisionFight.testkit.js';
+import { fight } from '../../testkits/decisionFight.testkit.js';
 
 describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides (CAPS.PILOTS)', () => {
   it('a pirate fight: every hostile the client runs is the server\'s ship at every snapshot, no control rows of them, checks agreeing', () => {
@@ -23,11 +24,14 @@ describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides
     expect(r.got.A.decisions).toBeGreaterThan(10);
     expect(r.stats.checks).toBeGreaterThan(10);
     expect(r.stats.off).toBe(0);
-    // (keyframes of them: the first, and what their bodies don't model)
-    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes / 2 + 10);
-    // The legacy observer: them the old way, no decisions
-    expect(r.got.B.decisions).toBe(0);
-    expect(r.got.B.running).toBe(0);
+    // (keyframes of them: each one's first sight (its SYNC), and what their bodies don't model: the server's own count of
+    // its bodied shadows leaving the ship, Replication.bodyStats, bounds the rest)
+    expect(r.got.A.keyframes).toBeLessThanOrEqual(r.got.A.syncs + Object.values(r.rep.why).reduce((a, b) => a + b, 0) + 5);
+    // The client watching from nearby: the same hostiles run, the server's ships too at every snapshot, no control rows
+    expect(r.got.B.ran.size).toBeGreaterThanOrEqual(3);
+    expect(r.got.B.checked).toBeGreaterThan(500);
+    expect(r.got.B.off).toBe(0);
+    expect(r.got.B.ctlRows).toBe(0);
   }, 240_000);
 
   it("EMP'd and slowed mid-fight (struck, then struck again before it wore off): a STATUS each, its body flies it crippled, no keyframe of it", () => {
@@ -49,7 +53,8 @@ describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides
     // (its shadow, as the clients running it fly it, never left the ship: no keyframe for what it was struck by, only
     // each one's first sight; nor of its pack's, whose bodies read it)
     expect(Object.values(r.rep.why).reduce((a, b) => a + b, 0)).toBe(0);
-    expect(r.rep.keyframes).toBe(r.got.A.syncs);
+    // (the server's bodied keyframes, to both clients: each one's first sight of each, nothing else)
+    expect(r.rep.keyframes).toBe(r.got.A.syncs + r.got.B.syncs);
     expect(r.stats.targetKeyed).toBe(0);
   }, 240_000);
 
@@ -57,12 +62,6 @@ describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides
     const r = fight({ ticks: 800, dropAt: 400 });
     expect(r.stats.off).toBeGreaterThan(0);
     expect(r.got.A.off).toBeLessThan(60);
-  }, 240_000);
-
-  it('a client with bodies but not CAPS.PILOTS runs none of them: their rows the old way', () => {
-    const r = fight({ ticks: 500, caps: BODIES });
-    expect(r.got.A.ran.size).toBe(0);
-    expect(r.got.A.decisions).toBe(0);
   }, 240_000);
 
   it("a boss the enemy AI flies (Rustjaw): it and the escorts its phases bring are the server's ships at every snapshot, no control rows", () => {

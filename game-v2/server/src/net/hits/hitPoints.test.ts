@@ -7,7 +7,7 @@
  * with the target's pose on the hit's own tick and no pose at all for the client's ship, NPC fights drew hits up to
  * ~35 units off (six of 18 here more than 20 off: every hit on the client's own ship).
  *
- * A real GameServer and the fake client (fakeHitsClient.testkit.ts) taking confirmed hits for everything (CAPS.HITS);
+ * A real GameServer and the fake client (fakeHitsClient.testkit.ts, full caps: its own hits found or told);
  * each impact it was shown is compared with the server's projectileHit for that shell.
  *
  * What this client isn't told can move a ship after a shell struck it: a contact or a pull on its own ship (the Hookboat's
@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Input, InSystem, CAPS, ReplicaMode, replicaAngle, quantizeReplicaAngle, type ReplicaEnv, type ServerSnapshotMessage,
+  Position, Velocity, Input, InSystem, ReplicaMode, replicaAngle, quantizeReplicaAngle, type ReplicaEnv, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
@@ -46,11 +46,10 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
         scene: 'sectors', autoStart: false,
         ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
         clock: () => clock.t,
-        netCaps: CAPS.HITS,
       });
       const ships = server.getShips();
       const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-      const A = new FakeHitsClient(server, { name: 'hit_points', caps: CAPS.HITS, env });
+      const A = new FakeHitsClient(server, { name: 'hit_points', env });
       // The server's point for each shell's hits on ships, and the tick
       const truth = new Map<number, { x: number; y: number; target: number; tick: number }[]>();
       const ledger = server.hits as unknown as { shellHit(p: number, x: number, y: number, h?: { target: number }): void };
@@ -117,7 +116,8 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
       let onSelf = 0, onOthers = 0, close = 0, moved = 0;
       const off: string[] = [];
       for (const m of A.impacts) {
-        const l = truth.get(m.id);
+        // (its own shells it worked out are named by shot id: the server's entity id from its records, ownWire)
+        const l = truth.get(A.ownWire.get(m.id) ?? m.id);
         if (!l) continue;
         let e = Infinity, tgt = -1, tick = -1;
         for (const s of l) { const d = Math.hypot(s.x - m.x, s.y - m.y); if (d < e) { e = d; tgt = s.target; tick = s.tick; } }

@@ -1,15 +1,16 @@
 /**
  * Other ships' causes (CAPS.CAUSES; common network/causes.ts, server net/causes/shadowCauses.ts, client
- * ships/causes/ShipCauses.ts). Ships near a client grind against each other and lose parts; a client taking causes is
- * sent each contact once for both ships and each rebuild, works them out on its tick layer, and holds every ship
- * exactly as the server has it on every tick, with no keyframe of a ship it already holds. A legacy client watching
- * the same fight gets keyframes, as before.
+ * ships/causes/ShipCauses.ts). Ships near a client grind against each other and lose parts; a client (every one takes
+ * causes: the full caps set) is sent each contact once for both ships and each rebuild, works them out on its tick
+ * layer, and holds every ship exactly as the server has it on every tick (the server's own ships are the ground truth),
+ * with no keyframe of a ship it already holds bar what the server itself counts as unworkable. A second client watching
+ * the same fight holds them exactly too.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { readFileSync } from 'fs';
-import { Position, Velocity, Rotation, InSystem, CAPS, type ReplicaEnv, type ServerSnapshotMessage } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, type ReplicaEnv, type ServerSnapshotMessage } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
@@ -20,11 +21,10 @@ import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const BASE = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
 interface Seen { held: number; keyframes: number; entries: number; records: number; checked: number; off: number; offTicks: number; lastOff: number }
 
-function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
+function fight(dropAt = -1, hurtEvery = 45) {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -33,12 +33,11 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: 4095 | CAPS.STRUCTS | CAPS.CONTACTS,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'causes', caps: caps | extra, env });
-  const B = new FakeHitsClient(server, { name: 'legacy', caps: 0, env });
+  const A = new FakeHitsClient(server, { name: 'causes', env });
+  const B = new FakeHitsClient(server, { name: 'watcher', env });
   for (let i = 0; i < 30; i++) { server.step(); clock.t += 1000 / 60; }
   const sys = InSystem.systemId[A.pid];
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
@@ -121,7 +120,7 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
     const chk = A.own?.takeCheck(true, server.getTick());
     if (chk) checks.check(server.pilots.connOf(A.pid), chk);
     // (Finding its own pairs: each tick's as the server's pass had them, among the ships it took; sim/c-contactCache.ts)
-    if (measuring && A.contacts?.on) for (let t = server.getTick() - 30; t <= server.getTick(); t++) {
+    if (measuring) for (let t = server.getTick() - 30; t <= server.getTick(); t++) {
       if (pairsSeen.has(t)) continue;
       const mine = A.contacts.passAt(t), theirs = ships.contactLog.at(t, sys);
       if (!mine || !theirs) continue;
@@ -133,7 +132,7 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
       if (JSON.stringify(mine.pairs.flat()) !== JSON.stringify(want)) pairs.differ++;
     }
   }
-  const finds = A.contacts ? [...A.contacts.cache.finds.values()] : [];
+  const finds = [...A.contacts.cache.finds.values()];
   pairs.ticks = finds.length;
   pairs.once = finds.filter((n) => n === 1).length;
   pairs.found = finds.reduce((s, n) => s + n, 0);
@@ -142,8 +141,9 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
 }
 
 describe('other ships\' causes (CAPS.CAUSES)', () => {
-  it('a client taking them holds every ship exactly, every tick, with no keyframe of one it holds; a legacy one is keyframed', () => {
-    const { a, b, stats, client, checks } = fight(BASE, CAPS.CAUSES);
+  it('a client holds every ship exactly, every tick, keyframed only where the server couldn\'t have it work the causes out', () => {
+    const { a, b, stats, client, checks } = fight();
+    if (process.env.CONTACTS_DEBUG) console.log('CAUSES', JSON.stringify({ a, b, stats }));
     expect(checks.bodyOff).toBe(0);
     expect(checks.agreed).toBeGreaterThan(10);
     // (the fight had contacts and rebuilds to tell)
@@ -152,26 +152,19 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(client?.failed).toBe(0);
     expect(a.checked).toBeGreaterThan(5000);
     expect(a.offTicks).toBe(0);
-    // (Only what it couldn't work out: a ship that touched one rebuilt twice in a window, the structure between not had.
-    // Stage 3: 50x -> 40x: the fight itself moved with the Stage 1 merge (A's aim rule for AI ships); 17 vs 777 and
-    // every tick still exact)
-    expect(a.keyframes * 40).toBeLessThan(b.keyframes);
-    // The legacy observer: keyframes for what the causes moved, and none of the records
-    expect(b.records).toBe(0);
-    expect(b.keyframes).toBeGreaterThan(20);
-  }, 120_000);
-
-  it('the same through encode-once blocks and the focus grid (the dev server caps)', () => {
-    const { a, b, client } = fight(BASE | CAPS.BLOCKS | CAPS.FOCUS, CAPS.CAUSES);
-    expect(a.records).toBeGreaterThan(20);
-    expect(client?.failed).toBe(0);
-    expect(a.checked).toBeGreaterThan(5000);
-    expect(a.offTicks).toBe(0);
-    expect(a.keyframes * 40).toBeLessThan(b.keyframes);
+    // (Only what it couldn't work out. Before stage 2 this was held against a legacy client's keyframes (17 vs 777: 40x);
+    // now against the server's own counts: the ticks whose causes it worked out instead of keyframing, against keyframes
+    // of ships the client already held, which come only of windows the server judged unworkable (or a check's fix))
+    expect(a.keyframes).toBeLessThanOrEqual(stats.unworkable + checks.bodyOff + 5);
+    expect(a.keyframes * 20).toBeLessThan(stats.worked);
+    // The second client watching: the same records, every ship it holds exact too
+    expect(b.records).toBeGreaterThan(20);
+    expect(b.checked).toBeGreaterThan(5000);
+    expect(b.offTicks).toBe(0);
   }, 120_000);
 
   it('a client that misses some causes is caught by its check and put right: every ship it holds again', () => {
-    const { a, checks } = fight(BASE, CAPS.CAUSES, 400);
+    const { a, checks } = fight(400);
     expect(a.offTicks).toBeGreaterThan(0);
     expect(checks.bodyOff).toBeGreaterThan(0);
     // (off only until the check's keyframes came: none in the last 300 ticks)
@@ -179,25 +172,21 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(checks.agreed).toBeGreaterThan(10);
   }, 120_000);
 
-  it('rebuilt twice in a window: a client keeping each structure (CAPS.STRUCTS) works it out; without, a keyframe', () => {
+  it('rebuilt twice in a window: the client keeps each structure (CAPS.STRUCTS) and works it out, no keyframe for it', () => {
     // (the hauler hurt every other tick: a rebuild each time, two or more in every snapshot window)
-    const kept = fight(BASE, CAPS.CAUSES | CAPS.STRUCTS, -1, 2);
+    const kept = fight(-1, 2);
     expect(kept.stats.failed).toEqual({});
     expect(kept.client?.failed).toBe(0);
     expect(kept.a.offTicks).toBe(0);
     expect(kept.checks.bodyOff).toBe(0);
-    const plain = fight(BASE, CAPS.CAUSES, -1, 2);
-    expect(plain.a.offTicks).toBe(0);
-    // (every window's causes worked out with the structures kept; without them, those windows' ships keyframed)
+    // (every window's causes worked out with the structures kept: the server judged none unworkable)
     expect(kept.stats.unworkable).toBe(0);
-    expect(plain.stats.unworkable).toBeGreaterThan(5);
-    expect(kept.a.keyframes).toBeLessThan(plain.a.keyframes);
+    expect(kept.stats.worked).toBeGreaterThan(50);
   }, 240_000);
 
   it('finding contact pairs itself (CAPS.CONTACTS): the same ships exactly, with the pairs between ships it holds as no record', () => {
-    const told = fight(BASE, CAPS.CAUSES | CAPS.STRUCTS);
-    const found = fight(BASE, CAPS.CAUSES | CAPS.STRUCTS | CAPS.CONTACTS);
-    if (process.env.CONTACTS_DEBUG) console.log('CONTACTS', JSON.stringify({ told: { a: told.a, stats: told.stats }, found: { a: found.a, stats: found.stats, contacts: found.contacts, world: found.world, client: found.client, own: found.own, fx: found.fx, fxMsgs: found.fxMsgs } }));
+    const found = fight();
+    if (process.env.CONTACTS_DEBUG) console.log('CONTACTS', JSON.stringify({ found: { a: found.a, stats: found.stats, contacts: found.contacts, world: found.world, client: found.client, own: found.own, fx: found.fx, fxMsgs: found.fxMsgs } }));
     expect(found.client?.failed).toBe(0);
     expect(found.own?.failed ?? 0).toBe(0);
     expect(found.checks.bodyOff).toBe(0);
@@ -208,8 +197,10 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(found.contacts.found).toBeGreaterThan(50);
     expect(found.world?.reentry).toBe(0);
     expect(found.fx).toBeGreaterThan(0);
-    expect(found.a.records * 2).toBeLessThan(told.a.records);
-    expect(found.a.keyframes).toBeLessThanOrEqual(told.a.keyframes);
+    // (most of the window's contacts left out of the records: the server's own count of those it left to the client
+    // against the records it still sent; before stage 2 this was held against a client told every pair)
+    expect(found.contacts.records).toBeGreaterThan(found.a.records);
+    expect(found.a.keyframes).toBeLessThanOrEqual(found.stats.unworkable + found.checks.bodyOff + 5);
     // (Its pairs each tick are the server's pass's among the ships it took, found once a tick but for ticks stepped
     // again: sim/c-contactCache.ts)
     expect(found.pairs.compared).toBeGreaterThan(500);
@@ -218,11 +209,4 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(found.pairs.once).toBeGreaterThan(found.pairs.ticks * 0.9);
     expect(found.pairs.found).toBeLessThan(found.pairs.ticks * 1.2);
   }, 240_000);
-
-  it('without the cap, the same client is keyframed as before', () => {
-    const { a } = fight(BASE);
-    expect(a.records).toBe(0);
-    expect(a.keyframes).toBeGreaterThan(20);
-    expect(a.off).toBe(0);
-  }, 120_000);
 });

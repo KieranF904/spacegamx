@@ -39,10 +39,6 @@ export class DebrisNet {
   readonly told = new Set<number>();
   /** What ships shed this tick, to leave at the rebuild point (bridge/rebuild.ts shed, rebuildNow) */
   readonly sheds = new Map<number, ShedSpec[]>();
-  /** Pieces recentred by a rebuild since the last snapshot (a client that can't work that out knocks them wrong meanwhile) */
-  readonly recentred = new Set<number>();
-  /** ...and those, with what's near them and what they knocked into: off for such a client till their keyframes (Replication) */
-  readonly offLegacy = new Set<number>();
   /** Pairs that knocked this tick (Replication: a client with one but not the other gets a keyframe) */
   pairs: [number, number][] = [];
   /** Each piece as the shared step left it this tick, and as the tick left it (both rounded) */
@@ -136,7 +132,6 @@ export class DebrisNet {
    * out, so it's where the shared rules leave it, not moved by something else
    */
   shifted(eid: number, body: FlightBody): void {
-    this.recentred.add(eid);
     if (!this.expect.has(eid)) return;
     const q = copy(body);
     quantizeShipBody(q);
@@ -157,9 +152,6 @@ export class DebrisNet {
     // there. Every piece within reach of an off one is off too, and so is what knocks into one: its keyframe goes with
     // the other's)
     if (this.touched.size) this.spread(b, this.touched);
-    // (Recentred by a rebuild: a client that neither runs the piece nor recentres it from its syncs has it where it was
-    // till its keyframe, and what's near it off with it: Replication)
-    if (this.recentred.size) { for (const id of this.recentred) this.offLegacy.add(id); this.spread(b, this.offLegacy); }
   }
 
   /** Debris within reach of a piece in `set` (their circles closer than NEAR_SLACK), and what knocked into one, join it */
@@ -198,9 +190,7 @@ export class DebrisNet {
 
   /** The snapshot took them (keyframes) */
   clearTouched(due?: (eid: number) => boolean): void {
-    if (due) { for (const s of [this.touched, this.recentred, this.offLegacy]) for (const id of [...s]) if (due(id)) s.delete(id); return; }
+    if (due) { for (const id of [...this.touched]) if (due(id)) this.touched.delete(id); return; }
     this.touched.clear();
-    this.recentred.clear();
-    this.offLegacy.clear();
   }
 }

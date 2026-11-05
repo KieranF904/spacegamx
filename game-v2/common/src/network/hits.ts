@@ -6,8 +6,8 @@
  */
 
 /**
- * What a client can do beyond the base protocol, announced in `join.caps` (a bit mask). The server accepts only the
- * bits it allows (GameServer netCaps). Later islands take the next bits.
+ * What a client does, announced in `join.caps` (a bit mask). Every bit is required (DEFAULT_CAPS, fullCaps): the
+ * names below say what each part of the netcode is, not a switch. Later islands take the next bits.
  *
  *   HITS       confirmed hits: told "shell s hit part p of ship t", works out the rest (part C)
  *   SELF_HITS  client-detected hits (part D, needs HITS): finds its shells' hits itself on its tick-faithful layer and
@@ -70,37 +70,17 @@
 export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072, LAUNCHES: 262144, NOSE: 524288, MOVES: 1048576, CONTACTS: 2097152, SHOT_IDS: 4194304 } as const;
 
 /**
- * The caps that are on by default, everywhere (dev and production alike): the server allows these unless NET_CAPS
- * says otherwise, and a client offers each of them unless its `?flag=0` (client network/netCaps.ts) switches it off.
- * One mask, so the dev stage and the live game run the same netcode. A new cap is off until it is added here.
+ * The full set: every client offers all of these in its join, and the server refuses a join that lacks any of them
+ * with the protocol mismatch close (server net/auth.ts). There is no base protocol and no per-cap fallback any more
+ * (sim foundation stage 2): one netcode, every bit on. A new cap goes here, with a protocol bump.
  */
 export const DEFAULT_CAPS: number = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM
   | CAPS.INPUTS | CAPS.BODIES | CAPS.BLOCKS | CAPS.FOCUS | CAPS.CAUSES | CAPS.WAYPOINTS | CAPS.PILOTS | CAPS.CROWD | CAPS.STRUCTS
   | CAPS.CARGO | CAPS.DEBRIS | CAPS.LAUNCHES | CAPS.NOSE | CAPS.MOVES | CAPS.CONTACTS | CAPS.SHOT_IDS;
 
-/** Does this client run the debris it works out from then on (CAPS.DEBRIS)? */
-export function debrisFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.DEBRIS) !== 0;
-}
-
-/** Does this client take a hold's mass changing as a CARGO cause (CAPS.CARGO)? */
-export function cargoFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.CARGO) !== 0;
-}
-
-/** Does this client keep every structure a ship flew, by its rebuild tick (CAPS.STRUCTS, with CAUSES)? */
-export function structsFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & (CAPS.STRUCTS | CAPS.CAUSES)) === (CAPS.STRUCTS | CAPS.CAUSES);
-}
-
-/** Does this client take its system's crowd level (CAPS.CROWD)? */
-export function crowdFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.CROWD) !== 0;
-}
-
-/** Does this client hold the focus grid's cells rather than the view circle (CAPS.FOCUS)? */
-export function focusFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.FOCUS) !== 0;
+/** Does a join's caps offer the full set (DEFAULT_CAPS)? Anything less is refused at join */
+export function fullCaps(caps: unknown): boolean {
+  return typeof caps === 'number' && (caps & DEFAULT_CAPS) === DEFAULT_CAPS;
 }
 
 /**

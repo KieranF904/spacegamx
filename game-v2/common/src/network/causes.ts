@@ -19,23 +19,7 @@
  * server's choice exactly: what it can't work out goes as a keyframe). A client without the cap gets a keyframe of every
  * ship a cause moved, as before.
  */
-import { CAPS } from './hits.js';
-import { ownSimCaps, OWN_CAUSE, CONTACT_FLAG } from './ownTick.js';
-
-/** Does this client take other ships' causes (CAPS.CAUSES, on the own ship's: OWN_SIM)? */
-export function causesFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.CAUSES) !== 0 && ownSimCaps(caps);
-}
-
-/**
- * Does this client find contact pairs on its tick layer itself (CAPS.CONTACTS, with CAUSES)? Then a pair whose both
- * ships it holds in step goes neither as a record nor as an own row, nor as its `contact` sparks: it works the pair out
- * from its replicas (common ships/contactPass.ts, client ships/causes/ContactWorld.ts). What it can't (a ship it doesn't
- * hold, one keyframed now, one the server says to leave out) still comes as records.
- */
-export function contactsFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.CONTACTS) !== 0 && causesFor(caps);
-}
+import { OWN_CAUSE, CONTACT_FLAG } from './ownTick.js';
 
 /**
  * A CONTACT record naming one ship twice, [ago, 1, id, id, 0], is no contact: the ship is LEFT OUT of this client's

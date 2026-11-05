@@ -1,5 +1,5 @@
 /**
- * Contact pairs found on this client's tick layer (CAPS.CONTACTS; common network/causes.ts contactsFor). The server's
+ * Contact pairs found on this client's tick layer (CAPS.CONTACTS; common network/causes.ts). The server's
  * contact pass (bridge/flight.ts resolveContacts) takes, each tick, every candidate pair of ships in a system in order
  * of their ids (common ships/contactPass.ts). For the ships this client holds in step, it takes the same pairs from its
  * replicas, as they were after that tick's step: a pair of two such ships comes as no record at all. Each ship's pairs
@@ -67,7 +67,6 @@ const KEEP_TICKS = 600;
 const MEMO_TICKS = KEEP_TICKS;
 
 export class ContactWorld implements ReplicaRewinds {
-  on = false;
   /** The snapshots' windows: their ticks and the ships each leaves out */
   private windows: { from: number; to: number; out: Set<number> }[] = [];
   private readonly memo = new Map<number, Memo>();
@@ -77,7 +76,7 @@ export class ContactWorld implements ReplicaRewinds {
   readonly cache = new ContactPairCache((t) => this.find(t), MEMO_TICKS);
   /** Ticks up to this are final (their snapshot is in) */
   private final = -Infinity;
-  /** Nothing is worked out here up to this tick (switched on after it: the server told those) */
+  /** Nothing is worked out here up to this tick: its first snapshot's (it held nothing before it; the server told those) */
   private since = -Infinity;
   private snapTick = -Infinity;
   private readonly busy = new Set<number>();
@@ -95,23 +94,9 @@ export class ContactWorld implements ReplicaRewinds {
    */
   readonly stats = { ticks: 0, pairs: 0, touched: 0, fx: 0, cascades: 0, restepped: 0, kept: 0, reentry: 0 };
 
-  constructor(private readonly host: ContactWorldHost) {}
-
-  /** Switched on or off (netCaps): every ship is stepped again (what it took from rows it now takes itself, or back) */
-  setOn(on: boolean): void {
-    if (on === this.on) return;
-    this.on = on;
-    this.memo.clear();
-    this.was.clear();
-    this.queued.clear();
-    this.bodies.clear();
-    this.cache.clear();
-    this.windows = [];
-    this.since = on ? this.snapTick : -Infinity;
-    this.final = this.since;
-    const reps = this.host.reps;
-    reps.setRewinds(on ? this : null);
-    for (const id of [...reps.ids()]) reps.rewind(id, this.since + 1);
+  /** The replica set tells it of every ship stepped again */
+  constructor(private readonly host: ContactWorldHost) {
+    host.reps.setRewinds(this);
   }
 
   clear(): void {
@@ -122,6 +107,8 @@ export class ContactWorld implements ReplicaRewinds {
     this.cache.clear();
     this.windows = [];
     this.fxLast.clear();
+    // (a connection afresh: its first snapshot starts it again)
+    this.final = this.since = this.snapTick = -Infinity;
   }
 
   /**
@@ -131,7 +118,8 @@ export class ContactWorld implements ReplicaRewinds {
   beginSnapshot(m: ServerSnapshotMessage): void {
     const prev = this.snapTick;
     this.snapTick = m.tick;
-    if (!this.on) return;
+    // (Its first snapshot: nothing held before it, so nothing to find up to it; the server sends that window's pairs)
+    if (prev === -Infinity) { this.since = this.final = m.tick; return; }
     const out = new Set<number>();
     for (const k of m.ships ?? []) out.add(k[0]);
     for (const id of m.removed ?? []) out.add(id);
@@ -152,7 +140,6 @@ export class ContactWorld implements ReplicaRewinds {
   endSnapshot(tick: number): { touched: Set<number>; fx: ContactFx[]; own: boolean } {
     const touched = new Set<number>(), fx: ContactFx[] = [];
     let own = false;
-    if (!this.on) return { touched, fx, own };
     this.settle();
     const from = this.final + 1, self = this.host.self();
     for (let t = from; t <= tick; t++) {
@@ -181,7 +168,7 @@ export class ContactWorld implements ReplicaRewinds {
 
   /** Did ship `id` take part in tick t's pairs found here (it has causes then)? */
   involved(id: number, t: number): boolean {
-    return this.on && this.pairsAt(t).rows.has(id);
+    return this.pairsAt(t).rows.has(id);
   }
 
   /** Tick t's pass as found here, if it has been (tests, the dev overlay): its ships and pairs */
@@ -191,13 +178,12 @@ export class ContactWorld implements ReplicaRewinds {
 
   /** Ship `id`'s rows for tick t's pairs found here, each with its place in the pass (undefined: none) */
   rowsFor(id: number, t: number): CauseRow[] | undefined {
-    return this.on ? this.pairsAt(t).rows.get(id) : undefined;
+    return this.pairsAt(t).rows.get(id);
   }
 
   // ---- ReplicaRewinds ----
 
   rewound(id: number, t: number): void {
-    if (!this.on) return;
     this.host.forget?.(t);
     const from = Math.max(t, this.final + 1);
     // (Already being stepped again from here or before in this cascade)
@@ -221,7 +207,7 @@ export class ContactWorld implements ReplicaRewinds {
    * asks before it steps anything, when it isn't part way through a step; every snapshot's end)
    */
   settle(): void {
-    if (this.settling || !this.on || this.host.reps.busy) return;
+    if (this.settling || this.host.reps.busy) return;
     this.settling = true;
     try {
       for (let guard = 0; (this.was.size || this.queued.size) && guard < 64; guard++) {

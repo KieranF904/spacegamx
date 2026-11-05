@@ -43,7 +43,6 @@ interface Run {
 }
 
 export class GuideRunner {
-  on = false;
   private readonly runs = new Map<number, Run>();
   /** Each snapshot's shells as it ended ([id, hash]), for its check: summed when it's asked for (byte) */
   private readonly held = new Map<number, [number, number][]>();
@@ -52,12 +51,6 @@ export class GuideRunner {
   readonly stats = { syncs: 0, offs: 0, records: 0, plans: 0, blind: 0, steps: 0, launches: 0 };
 
   constructor(private readonly host: GuideRunnerHost) {}
-
-  setOn(on: boolean): void {
-    if (this.on === on) return;
-    this.on = on;
-    if (!on) this.reset();
-  }
 
   /** A connection afresh: the server's GuideNet runs none for it, so neither does this */
   reset(): void {
@@ -79,7 +72,6 @@ export class GuideRunner {
 
   /** A snapshot's guide rows, after its keyframes, causes and decisions went in: then every shell to its tick */
   onSnapshot(tick: number, rows: readonly (readonly number[])[] | undefined): void {
-    if (!this.on) return;
     for (const row of rows ?? []) {
       if (!guideRowOk(row)) continue;
       const [id, dt, op] = row, t = tick + dt, args = row.slice(3);
@@ -140,7 +132,6 @@ export class GuideRunner {
 
   /** After a snapshot's removals: the shells it runs as that tick ended, for its check */
   noteHeld(tick: number): void {
-    if (!this.on) return;
     this.dead.clear();
     const list: [number, number][] = [];
     for (const [id, r] of this.runs) if (r.last === tick) list.push([id, guideHash(id, r.m)]);

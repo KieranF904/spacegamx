@@ -21,14 +21,15 @@ export function rng(seed: number): () => number {
 }
 
 export const clock = { t: 1_000_000 };
-export function makeServer(netCaps: number): GameServer {
+/** `crowd`: crowd fallbacks on (GameServerOptions.crowd; every client takes them, the full caps set) */
+export function makeServer(crowd = false): GameServer {
   return new GameServer({
     gameData: new GameData(readGameDataFiles(dataDir)),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps,
+    crowd,
   } as never);
 }
 

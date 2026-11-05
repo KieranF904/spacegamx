@@ -1,17 +1,18 @@
 /**
  * Decision inputs (CAPS.BODIES; common bodies/, client ships/bodies/BodyRunner.ts, docs/design/decision-inputs.md):
- * the Scrap Mother's brain decides on the server, her body flies her on both sides. A capable client's tick-aligned
- * replica of her is the server's ship bit for bit at every snapshot's tick through her three stages, with no control
- * rows of her and keyframes only where her body doesn't model what moved her (a stage shed, a contact); a legacy
- * observer gets her the old way, unchanged; a decision the client lost is caught by its check and put right.
+ * the Scrap Mother's brain decides on the server, her body flies her on both sides. A client's tick-aligned replica of
+ * her is the server's ship bit for bit at every snapshot's tick through her three stages (the pilot's, and a second
+ * client's watching), with no control rows of her and keyframes only where her body doesn't model what moved her (a
+ * stage shed, a contact: the server's own log of what moved her); a decision the client lost is caught by its check and
+ * put right.
  *
- * A real GameServer; the pilot (a fake client with every cap) flies by input messages, on time, firing at her.
+ * A real GameServer; the pilot (a fake client, full caps as every client) flies by input messages, on time, firing at her.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
+  Position, Velocity, Rotation, InSystem, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -25,10 +26,9 @@ import type { StagedBrain } from '../../game/brains/staged.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
-interface Got { snapshots: number; checked: number; off: number; keyframes: number; unexplained: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number; keyWhileOff: number }
-const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, unexplained: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0, keyWhileOff: 0 });
+interface Got { snapshots: number; checked: number; off: number; keyframes: number; unexplained: number; ctlRows: number; decisions: number; syncs: number; running: number; movedKeyframes: number }
+const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, unexplained: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, movedKeyframes: 0 });
 
 interface Opts {
   ticks?: number;
@@ -38,9 +38,6 @@ interface Opts {
   dropAt?: number;
   /** A second capable client joins at this tick (arriving mid-fight) */
   lateAt?: number;
-  /** The capable client's caps switched off CAPS.BODIES at this tick, and back on at `capsOnAt` (the admin's switch) */
-  capsOffAt?: number;
-  capsOnAt?: number;
   /** She's taken away at this tick (Bosses.remove: her arena emptied) */
   removeAt?: number;
 }
@@ -54,19 +51,18 @@ function fight(o: Opts = {}) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'bodies_a', caps: ALL, env });
-  const B = new FakeHitsClient(server, { name: 'legacy_b', caps: 0, env });
+  const A = new FakeHitsClient(server, { name: 'bodies_a', env });
+  const B = new FakeHitsClient(server, { name: 'watcher_b', env });
   let C: FakeHitsClient | null = null;
   let boss = -1;
   /** The boss's real state at each tick's end */
   const truth = new Map<number, number[]>();
   const got = { A: zero(), B: zero(), C: zero() };
   const now = () => (ships.has(boss) ? [Position.x[boss], Position.y[boss], Velocity.x[boss], Velocity.y[boss], Rotation.angle[boss], ships.get(boss)!.angVel] : undefined);
-  /** Ticks something her body doesn't model moved her: a contact, or a rebuild (a part lost, a stage shed) */
+  /** Ticks something her body doesn't model moved her, from the server's own causes log: a contact, or a rebuild (a part lost, a stage shed) */
   const unmodelled = new Set<number>();
   const watch = (f: FakeHitsClient, g: Got, drop?: () => boolean) => {
     const fa = f as unknown as { snapshot(s: ServerSnapshotMessage): void };
@@ -83,8 +79,8 @@ function fight(o: Opts = {}) {
       if (s.decisions?.some(flying) && drop?.()) s = { ...s, decisions: s.decisions.filter((d) => !flying(d)) };
       orig(s);
       g.snapshots++;
-      if (s.ships?.some((k) => k[0] === boss)) { g.keyframes++; if (!moved) g.unexplained++; if (capsOff) g.keyWhileOff++; }
-      if (s.ctl?.some((r) => controlRowId(r) === boss)) { g.ctlRows++; if (capsOff) g.ctlWhileOff++; }
+      if (s.ships?.some((k) => k[0] === boss)) { g.keyframes++; if (!moved) g.unexplained++; if (moved) g.movedKeyframes++; }
+      if (s.ctl?.some((r) => controlRowId(r) === boss)) g.ctlRows++;
       for (const d of s.decisions ?? []) if (d[0] === boss) { g.decisions++; if (d[2] === DECISION.SYNC) g.syncs++; }
       if (!f.bodies || ![...f.bodies.ids()].includes(boss)) return;
       g.running++;
@@ -95,7 +91,7 @@ function fight(o: Opts = {}) {
       if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) g.off++;
     };
   };
-  let dropped = false, capsOff = false;
+  let dropped = false;
   watch(A, got.A, () => { if (o.dropAt === undefined || dropped || server.getTick() < o.dropAt) return false; dropped = true; return true; });
   watch(B, got.B);
   let seq = 1;
@@ -153,11 +149,9 @@ function fight(o: Opts = {}) {
       for (let n = 1; n < 400 && brain.stage === st; n++) brain.forceShed(n);
       unmodelled.add(server.getTick());
     }
-    if (o.capsOffAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL & ~CAPS.BODIES; capsOff = true; }
-    if (o.capsOnAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL; capsOff = false; }
     if (o.removeAt === t) server.bosses.remove(boss);
     if (o.lateAt === t) {
-      C = new FakeHitsClient(server, { name: 'bodies_c', caps: ALL, env });
+      C = new FakeHitsClient(server, { name: 'bodies_c', env });
       god(C);
       Position.x[C.pid] = x0 - 600; Position.y[C.pid] = y0 - 1200; Velocity.x[C.pid] = 0; Velocity.y[C.pid] = 0;
       watch(C, got.C);
@@ -173,8 +167,9 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
     const r = fight({ ticks: 1500, stagesAt: [500, 1000] });
     if (process.env.BODY_DEBUG) console.log('BODIES', JSON.stringify({ got: r.got, stats: r.stats, rep: r.rep, runner: r.A.bodies?.stats }));
     expect(r.brain.stage).toBe(3);
-    expect(r.got.A.running).toBeGreaterThan(300);
-    expect(r.got.A.checked).toBeGreaterThan(300);
+    // (a snapshot only when it has something to say: with every cap on, about every sixth tick for the pilot here)
+    expect(r.got.A.running).toBeGreaterThan(200);
+    expect(r.got.A.checked).toBeGreaterThan(200);
     expect(r.got.A.off).toBe(0);
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.got.A.decisions).toBeGreaterThan(5);
@@ -182,15 +177,18 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
     // twice in stage two, and these pilots sit in her way. How many contacts there are is the world's (the starter's shape
     // moves where she grinds: on the idle observer, 1 tick of contact or 123), so each keyframe is matched to one)
     // (the two that aren't: her arrival, and her body taking her over on the client)
-    expect(r.got.A.unexplained).toBeLessThanOrEqual(2);
-    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes);
+    // (and a keyframe of her where the server rekeyed her for a ship her body reads that was keyframed: its own count, BodyNet targetKeyed)
+    expect(r.got.A.unexplained).toBeLessThanOrEqual(2 + r.stats.targetKeyed);
+    expect(r.got.A.keyframes).toBe(r.got.A.movedKeyframes + r.got.A.unexplained);
     expect(r.stats.checks).toBeGreaterThan(10);
     expect(r.stats.off).toBe(0);
     expect(r.stats.agreed).toBe(r.stats.checks - r.stats.stale - r.stats.unknown);
-    // The legacy observer: her the old way (rows and keyframes), no decisions
-    expect(r.got.B.decisions).toBe(0);
-    expect(r.got.B.running).toBe(0);
-    expect(r.got.B.keyframes).toBeGreaterThan(50);
+    // The client watching from nearby: her replica the server's ship too, by her decisions, no control rows of her
+    expect(r.got.B.decisions).toBeGreaterThan(5);
+    expect(r.got.B.checked).toBeGreaterThan(300);
+    expect(r.got.B.off).toBe(0);
+    expect(r.got.B.ctlRows).toBe(0);
+    expect(r.got.B.unexplained).toBeLessThanOrEqual(2 + r.stats.targetKeyed);
   }, 240_000);
 
   it('a decision lost: its check catches it, a SYNC and a keyframe put it right', () => {
@@ -208,30 +206,16 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
     expect(r.got.C.checked).toBeGreaterThan(100);
     expect(r.got.C.off).toBe(0);
     expect(r.got.C.ctlRows).toBe(0);
-  }, 240_000);
-
-  it('the cap switched off mid-fight: her rows the old way, no checks judged; back on: a SYNC, her replica exact again', () => {
-    const r = fight({ ticks: 900, capsOffAt: 300, capsOnAt: 550 });
-    const conn = r.server.pilots.connOf(r.A.pid)!;
-    // (off: the client runs her no longer, nor does the server think it does: her rows came again, or her keyframes
-    // while her drive pushes her, which rows can't carry)
-    expect(r.got.A.ctlWhileOff + r.got.A.keyWhileOff).toBeGreaterThan(0);
-    // (on again: synced afresh, her replica the server's ship from there, the checks agreeing)
-    expect(r.got.A.syncs).toBeGreaterThan(1);
-    expect(r.A.bodies!.on).toBe(true);
-    expect([...r.A.bodies!.ids()]).toContain(r.boss);
-    expect(r.server.bodies.runs(conn, r.boss)).toBe(true);
-    expect(r.got.A.off).toBe(0);
-    expect(r.stats.off).toBe(0);
     // (a reconnect: the client lets every body go, until the new connection SYNCs it, ShipClient.resetHits)
-    r.A.bodies!.reset();
-    expect([...r.A.bodies!.ids()]).toEqual([]);
+    expect([...r.A.bodies.ids()]).toContain(r.boss);
+    r.A.bodies.reset();
+    expect([...r.A.bodies.ids()]).toEqual([]);
   }, 240_000);
 
   it('taken away mid-fight: her decisions forgotten at once (her id may be another ship\'s later), the client stops her', () => {
     const r = fight({ ticks: 500, removeAt: 400 });
     expect(r.tracked).toBe(false);
-    expect([...r.A.bodies!.ids()]).not.toContain(r.boss);
+    expect([...r.A.bodies.ids()]).not.toContain(r.boss);
     expect(r.server.bodies.runs(r.server.pilots.connOf(r.A.pid)!, r.boss)).toBe(false);
   }, 240_000);
 });

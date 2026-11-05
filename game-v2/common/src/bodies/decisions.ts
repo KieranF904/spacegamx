@@ -39,15 +39,11 @@
  */
 
 import { quantizeCursorAngle } from '../network/cursorState.js';
-import { ownSimCaps } from '../network/ownTick.js';
-import { CAPS } from '../network/hits.js';
 import { CTL } from '../ships/replica.js';
 
 export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6, STATUS: 7, MOVE: 8, HARASS: 9, CAP: 10, WINDOW: 11, HOLD: 12, PART: 13, GONE: 14 } as const;
 /** Ops there are (a row whose op is past this is dropped) */
 export const DECISION_OPS = 15;
-/** The ops only a client running bodies' moves takes (CAPS.MOVES: the others aren't sent them) */
-export const MOVE_OPS: ReadonlySet<number> = new Set([DECISION.MOVE, DECISION.HARASS, DECISION.CAP, DECISION.WINDOW, DECISION.HOLD, DECISION.PART, DECISION.GONE]);
 /** HOLD's modes */
 export const MOVES_HOLD = { RUN: 0, PAUSE: 1, STOP: 2 } as const;
 
@@ -161,24 +157,3 @@ export function decisionRowOk(row: unknown): row is number[] {
   return row[0] >= 0 && row[2] >= 0 && row[2] < DECISION_OPS;
 }
 
-/** Do these caps have the client run bosses' bodies (CAPS.BODIES, with OWN_SIM: a body reads its own ship there)? */
-export function bodiesFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.BODIES) !== 0 && ownSimCaps(caps);
-}
-
-/**
- * Do these caps have the client run its bodies' moves too (CAPS.MOVES, with BODIES): their tells, beams, strikes' looks
- * and straight shells worked out from MOVE, HARASS, PERSONAL and custom orders, not sent (decision-inputs stage 4)
- */
-export function movesFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.MOVES) !== 0 && bodiesFor(caps);
-}
-
-/**
- * Do these caps have the client run the enemy AI's pilots too (CAPS.PILOTS, with BODIES and CAUSES)? Without other
- * ships' causes a pilot's body reads targets that contacts keyframe mid-window, and its client's AI ships came off
- * its tick layer (the crowd bench, ball 50: 12 AI ticks off without a keyframe), so such a client gets control rows
- */
-export function pilotsFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & (CAPS.PILOTS | CAPS.CAUSES)) === (CAPS.PILOTS | CAPS.CAUSES) && bodiesFor(caps);
-}

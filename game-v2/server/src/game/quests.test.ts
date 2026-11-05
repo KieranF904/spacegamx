@@ -36,7 +36,11 @@ function world(clock = { t: 1_000_000 }, store = new MemoryProfileStore()) {
   const pid = t.getPlayerId();
   const conn = server.pilots.connOf(pid)!;
   const profile = () => server.pilots.get(conn)!;
-  const last = <T extends ServerMessage['type']>(type: T) => [...got].reverse().find((m) => m.type === type) as Extract<ServerMessage, { type: T }> | undefined;
+  // (What it has been sent so far: its coalesced frames go now, as they would within a few ticks, net/snapshot/PackedLink.ts)
+  const last = <T extends ServerMessage['type']>(type: T) => {
+    (conn as any).packed?.drain(server.getTick());
+    return [...got].reverse().find((m) => m.type === type) as Extract<ServerMessage, { type: T }> | undefined;
+  };
   return { server, t, got, pid, conn, profile, clock, last, w: server.getWorld(), store };
 }
 

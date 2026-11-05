@@ -72,12 +72,12 @@ export class Probe {
   private readonly seen = new Set<number>();
   private readonly fresh = new Set<number>();
 
-  constructor(private server: GameServer, readonly name: string, caps: number, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
+  constructor(private server: GameServer, readonly name: string, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
     /** Its system's tick (its own clock once dilated, --crowd: latency is counted in its ticks too) */
     private tick: () => number = () => server.getTick()) {
     const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
     this.fake = new FakeHitsClient(server, {
-      name, caps, env,
+      name, env,
       defer: (data) => {
         if (this.measuring) {
           this.frames.push(Buffer.from(data)); this.rawBytes += data.length; this.messages++;

@@ -5,7 +5,7 @@
  * mismatch closes the socket (4002). `conn.joined = true` still comes before the first await.
  */
 import type { IncomingMessage, ServerResponse } from 'http';
-import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON } from '@space-game/common';
+import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON, fullCaps } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
 import type { HandlerRegistry } from './dispatch.js';
 import type { ServerCtx } from './ServerCtx.js';
@@ -28,14 +28,14 @@ export function registerAuthHandlers(t: HandlerRegistry): void {
 export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
   // A client built for another wire format can't talk to us: it shows "new version, reload"
   // (one that doesn't say predates the handshake, and the format it knows hasn't changed since)
-  if (msg.protocol !== undefined && msg.protocol !== PROTOCOL_VERSION) {
+  // Nor can one without the full netcode (common network/hits.ts DEFAULT_CAPS): there's no base protocol to fall back
+  // on. A join that says neither its protocol nor its caps is an in-process tool (tests, benches, bots): it gets the full set
+  const said = msg.protocol !== undefined || msg.caps !== undefined;
+  if ((msg.protocol !== undefined && msg.protocol !== PROTOCOL_VERSION) || (said && !fullCaps(msg.caps))) {
     conn.ws.close?.(PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON);
     return;
   }
   conn.joined = true;
-  // What it can do beyond the base protocol, as far as this server takes it (confirmed hits: common network/hits.ts)
-  conn.capsOffered = (typeof msg.caps === 'number' ? msg.caps : 0) & ctx.netCaps;
-  conn.capsNext = conn.capsOffered;
   if (msg.token) {
     // Authenticated join - validate token
     const { user, error } = ctx.userDB.checkSession
@@ -83,7 +83,6 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     isAdmin: conn.isAdmin,
     ...(conn.isOwner ? { isOwner: true } : {}),
     isContributor: ctx.contrib.allowed(conn),
-    ...(conn.capsOffered ? { caps: conn.capsOffered } : {}),
   });
 }
 

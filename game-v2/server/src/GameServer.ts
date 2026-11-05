@@ -121,7 +121,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { portsSwitchFeeds, CAPS, causesFor } from '@space-game/common';
+import { portsSwitchFeeds } from '@space-game/common';
 import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, starterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
@@ -188,7 +188,6 @@ import { OwnChecks } from './net/own/OwnChecks.js';
 import { BodyNet } from './net/decisions/BodyNet.js';
 import { GuideNet } from './net/guides/GuideNet.js';
 import type { BodyState, MoveOrigin } from '@space-game/common';
-import { ownSimFor } from './net/snapshot/ownShots.js';
 import { CrowdControl } from './net/crowd/CrowdControl.js';
 import { SystemClocks, SimPass, rebaseShipTicks } from './sim/SystemClocks.js';
 import { SnapshotBuilder, type RoundSkip, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
@@ -498,8 +497,8 @@ export interface GameServerOptions {
   everyoneAdmin?: boolean;
   /** Guests (not signed in) are admins: the dev server only. Refused outright under NODE_ENV=production. */
   guestAdmin?: boolean;
-  /** The join caps this server takes (common network/hits.ts CAPS): confirmed hits on the dev server (index.ts) */
-  netCaps?: number;
+  /** Crowd fallbacks (net/crowd/CrowdControl.ts, measured from tick cost): on in the real server (index.ts); tests and benches opt in */
+  crowd?: boolean;
   /** Designs every guest finds in their hangar: the dev server only, like guestAdmin */
   guestShips?: Blueprint[];
   /** Modular ships: every player flies one. */
@@ -686,7 +685,7 @@ export class GameServer implements ServerCtx {
 
   /** Outgoing messages: outboxes, lazy effects, broadcasts, byte counters (net/snapshot/Outbox.ts) */
   readonly net: Outbox;
-  /** Confirmed hits: what capable clients are told of shells' hits on ships instead (net/hits/HitLedger.ts) */
+  /** Confirmed hits: what clients are told of shells' hits on ships instead (net/hits/HitLedger.ts) */
   readonly hits: HitLedger;
   /** Pilots' own ships on their clients' tick-aligned layer: the checks they send of them (CAPS.OWN_SIM, net/own/OwnChecks.ts) */
   readonly ownChecks: OwnChecks;
@@ -694,11 +693,9 @@ export class GameServer implements ServerCtx {
   readonly bodies: BodyNet;
   /** Homing shells for the clients that run them on their tick layers (CAPS.WAYPOINTS, net/guides/GuideNet.ts) */
   readonly guides: GuideNet;
-  /** The join caps this server takes (GameServerOptions.netCaps) */
-  readonly netCaps: number;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
   readonly snapshots: SnapshotBuilder;
-  /** Crowd fallbacks (CAPS.CROWD allowed: net/crowd/CrowdControl.ts): each system's level, from its measured cost */
+  /** Crowd fallbacks (net/crowd/CrowdControl.ts; the crowd option): each system's level, from its measured cost */
   readonly crowd: CrowdControl | null;
   /** Systems' own clocks (crowd dilation: sim/SystemClocks.ts) */
   readonly clocks: SystemClocks | null;
@@ -724,8 +721,8 @@ export class GameServer implements ServerCtx {
     this.hits = new HitLedger(this);
     this.ownChecks = new OwnChecks({
       tick: () => this.currentTick,
-      // (CAPS.CAUSES: its check covers every ship it holds, so all of them go again: OwnChecks)
-      rekey: (conn) => { if (causesFor(conn.caps)) conn.repKnown.clear(); else conn.repKnown.delete(conn.playerId); this.guides.resync(conn); },
+      // (Its check covers every ship it holds, so all of them go again: OwnChecks)
+      rekey: (conn) => { conn.repKnown.clear(); this.guides.resync(conn); },
       resyncHp: (conn) => { conn.shipHpSent.delete(conn.playerId); conn.shipSynced.delete(conn.playerId); },
     });
     this.bodies = new BodyNet({
@@ -738,7 +735,6 @@ export class GameServer implements ServerCtx {
     });
     // (what flies by the waypoint law: homing shells and mobs)
     this.guides = new GuideNet({ tick: () => this.currentTick, sources: () => [this.weapons, this.mobs], systemOf: (eid) => InSystem.systemId[eid] });
-    this.netCaps = opts.netCaps ?? 0;
     this.gameData = opts.gameData;
     this.adminServer = opts.adminServer || null;
     this.userDB = opts.userDB;
@@ -1024,7 +1020,7 @@ export class GameServer implements ServerCtx {
         return out;
       },
       // (A pilot's client stepping its own ship, CAPS.OWN_SIM: network/ownTick.ts)
-      ownSim: (eid) => ownSimFor(this.liveConn(eid)?.caps),
+      ownSim: (eid) => !!this.liveConn(eid),
       ownControls: (eid) => this.liveConn(eid)?.ownCtl ?? null,
       ownLate: (eid) => { const c = this.liveConn(eid); if (!c?.ownLate) return false; c.ownLate = false; return true; },
     }, this.ships);
@@ -1076,8 +1072,8 @@ export class GameServer implements ServerCtx {
 this.devTeleport = opts.devTeleport ?? false;
     if (opts.devRange && this.devTeleport && process.env.NODE_ENV !== 'production') this.range = this.createRange(opts.devRange);
     
-    // Crowd fallbacks (net/crowd/CrowdControl.ts), where the server allows them
-    this.crowd = this.netCaps & CAPS.CROWD ? new CrowdControl({
+    // Crowd fallbacks (net/crowd/CrowdControl.ts), where the server runs them
+    this.crowd = opts.crowd ? new CrowdControl({
       clients: () => this.clients.values(),
       systemOf: (conn) => (hasComponent(this.world, Player, conn.playerId) ? InSystem.systemId[conn.playerId] : -1),
       send: (conn, msg) => this.send(conn.ws, msg),
@@ -1665,10 +1661,10 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /**
    * A body's move's look (a telegraph, a beam, a strike's look, a launch flash; decision-inputs stage 4): to every
-   * client in the system but those working it out themselves (CAPS.MOVES, net/decisions/BodyNet.ts derives)
+   * client in the system but those working it out themselves (net/decisions/BodyNet.ts derives)
    */
   private moveFx(num: number, eid: number, origin: MoveOrigin, msg: ServerMessage): void {
-    this.net.broadcastToSystem(num, msg, 0, (c) => this.bodies.derives(c, c.playerId, eid, origin));
+    this.net.broadcastToSystem(num, msg, (c) => this.bodies.derives(c, c.playerId, eid, origin));
   }
 
   /** A body's move's straight shell (seeded, so its clients make the same one): its row not to those working it out */
@@ -2084,13 +2080,6 @@ this.devTeleport = opts.devTeleport ?? false;
       contributors: () => this.contrib.contributors().map((r) => r.username),
       accounts: this.userDB.admin ?? null,
       freeBuildAllowed: () => this.freeBuildAllowed,
-      // (Confirmed hits for a pilot whose client offered them: at the next snapshot's end, net/hits/HitLedger.ts)
-      setHits: (c, on) => {
-        const conn = C(c);
-        if (on && !((conn.capsOffered ?? 0) & CAPS.HITS)) return false;
-        conn.capsNext = on ? (conn.capsNext ?? 0) | CAPS.HITS : (conn.capsNext ?? 0) & ~CAPS.HITS;
-        return true;
-      },
       hitStats: () => this.hits.stats,
       crowd: (c, to) => this.crowd?.admin(InSystem.systemId[C(c).playerId], to) ?? { ok: false, text: "This server doesn't take crowd fallbacks" },
       freeBuildChanged: (c) => this.hangar.send(C(c)),
@@ -2519,7 +2508,7 @@ this.devTeleport = opts.devTeleport ?? false;
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
         this.net.addDamage(InSystem.systemId[targetEid], targetEid, amount, sourceEid, !!glancing);
       },
-      // (A shell's hit on a ship: confirmed hits tell capable clients their own way, net/hits/HitLedger.ts)
+      // (A shell's hit on a ship: confirmed hits tell clients their own way, net/hits/HitLedger.ts)
       notifyProjectileHit: (proj, x, y, hit) => this.hits.shellHit(proj, x, y, hit),
       onShipDestroyed: (eid, lastHitBy, ship) => {
         this.enemies.onDestroyed(eid, lastHitBy, ship);
@@ -2538,8 +2527,7 @@ this.devTeleport = opts.devTeleport ?? false;
       notifyContact: (e) => {
         const r = (v: number) => Math.round(v * 100) / 100;
         const msg = { type: 'contact' as const, x: r(e.x), y: r(e.y), nx: r(e.nx), ny: r(e.ny), speed: r(e.speed) };
-        // (A client finding contact pairs itself draws those sparks itself: it's handed the rest with its snapshot, CAPS.CONTACTS)
-        this.net.broadcastNear(e.systemId, e.x, e.y, msg, [], CAPS.CONTACTS);
+        // (Every client finds contact pairs itself and draws those sparks itself: it's handed the rest with its snapshot)
         this.replication.noteContactFx(e.tick, e.systemId, e.a, e.b, msg);
       },
       payRebuild: (eid, part) => this.pilots.payRebuild(eid, part),
@@ -2930,7 +2918,6 @@ this.devTeleport = opts.devTeleport ?? false;
       selfLate: false,
       selfVersion: 0,
       selfKey: '',
-      selfSentTick: -1e9,
       selfHashes: new Map(),
     };
     
@@ -3396,7 +3383,6 @@ this.devTeleport = opts.devTeleport ?? false;
     conn.aheadHashes.clear();
     conn.selfHashes.clear();
     conn.liveTick += delta;
-    conn.selfSentTick += delta;
     conn.lastSnapshotSentTick += delta;
     const rift = this.riftCooldown.get(eid);
     if (rift !== undefined) this.riftCooldown.set(eid, rift + delta);
@@ -3917,11 +3903,11 @@ this.devTeleport = opts.devTeleport ?? false;
     }
     addComponent(this.world, Dead, proj);
     this.pendingRemovedEntities.add(proj);
-    // The shell's end, for a client that doesn't find its hits itself: one that does (CAPS.SELF_HITS) has the shell end
-    // where its drawn shell meets the drawn rock (WeaponFx.touch), and on its tick layer the snapshot's removed list
-    // ends it (a removed shell sits its last window out, SelfHits; the server tells any hit in it, HitLedger 'removed').
-    // A stuck charge blowing has no shell seen striking: everyone hears of it
-    this.net.broadcastProjectileHit(proj, hitX, hitY, stuck ? 0 : CAPS.SELF_HITS);
+    // The shell's end: every client finds its hits itself, so it has the shell end where its drawn shell meets the
+    // drawn rock (WeaponFx.touch), and on its tick layer the snapshot's removed list ends it (a removed shell sits its
+    // last window out, SelfHits; the server tells any hit in it, HitLedger 'removed'). A stuck charge blowing has no
+    // shell seen striking: everyone hears of it
+    if (stuck) this.net.broadcastProjectileHit(proj, hitX, hitY);
 
     // The sparks where a shell strikes rock are every client's own too: it draws them where its drawn shell meets the
     // drawn rock (client ShipClient.struckFx, from WeaponFx.onStruck). They were a ~28 B effect to everyone in the system
@@ -4453,8 +4439,8 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /** A snapshot to every client, then the map's dots (net/SnapshotBuilder.ts; netBench and tests wrap this name) */
   private sendSnapshots(skip: RoundSkip | null = null): void {
-    // (The damage summed since the last one goes first, to ride the same frame; confirmed hits' clients get theirs after their records)
-    this.net.flushDamage(this.hits.active ? CAPS.HITS : 0);
+    // (The damage summed since the last one is handed on: each client gets its share after its hit records, HitLedger.write)
+    this.net.flushDamage();
     // (Its hits are dropped even if the snapshot fails part way: never told twice. `skip`: systems whose wider window
     // hasn't come round, crowd fallbacks: theirs wait)
     try { this.snapshots.sendSnapshots(skip); } finally { this.hits.endSnapshot(skip); }

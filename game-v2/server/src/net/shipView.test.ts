@@ -12,7 +12,7 @@ import { createShipBridge } from '../proto/createProtoServer.js';
 const dataDir = join(__dirname, '../../../data');
 
 describe('ships in and out of view', () => {
-  it('a ship that left your view is synced afresh when you come back to it (never an invisible hull)', () => {
+  it('a ship that left your view comes back with its structure: kept while away, or synced afresh (never an invisible hull)', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
     const server = new GameServer({
       gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
@@ -32,11 +32,17 @@ describe('ships in and out of view', () => {
     const wx = Position.x[wreck.eid], wy = Position.y[wreck.eid];
     at(wx + 3000, wy, 30);
     expect(synced()).toBe(true);
-    // Far out of view, long enough for the client to forget it
-    at(wx + 120000, wy, 30);
+    // Far out of view: it leaves the client's focus cells, and the client is told it keeps it (net/cells/AwayNet.ts: a
+    // `cells` message, k), its structure and HP with it
     got.length = 0;
-    // Back beside it: its structure comes again
+    at(wx + 120000, wy, 30);
+    const kept = got.some((m) => m.type === 'cells' && ((m as any).k ?? []).includes(wreck.eid));
+    got.length = 0;
+    // Back beside it: held again, with the structure it kept, or synced afresh if it wasn't kept
     at(wx + 3000, wy, 30);
-    expect(synced()).toBe(true);
+    const conn = (server as any).pilots.connOf(pid);
+    expect(conn.shipView.has(wreck.eid)).toBe(true);
+    expect(kept || synced()).toBe(true);
+    if (kept) expect(got.some((m) => m.type === 'cells' && ((m as any).b ?? []).includes(wreck.eid))).toBe(true);
   });
 });

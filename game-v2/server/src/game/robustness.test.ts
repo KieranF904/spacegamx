@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import type { ClientSocket, ServerMessage } from '@space-game/common';
-import { decodeServerFrame, Player, Dead, bountyIds, Input, CURSOR_DIST_MAX } from '@space-game/common';
+import { ServerFrameReader, Player, Dead, bountyIds, Input, CURSOR_DIST_MAX } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { clientBlueprint } from '../net/handlers/shipEdit.js';
 import { GameData } from '../data/GameData.js';
@@ -36,7 +36,9 @@ function makeServer(userDB: Record<string, unknown> = {}) {
 function rawClient(server: GameServer) {
   let open = true;
   const got: ServerMessage[] = [];
-  const socket: ClientSocket = { isOpen: () => open, send: (d) => { for (const m of decodeServerFrame(d)) got.push(m); }, close: () => { open = false; } };
+  // (bit-packed messages once joined, every client running the full caps set; base frames before)
+  const reader = new ServerFrameReader();
+  const socket: ClientSocket = { isOpen: () => open, send: (d) => { for (const msgs of reader.read(d as Uint8Array)) got.push(...msgs); }, close: () => { open = false; } };
   const link = server.connect(socket);
   return { link, got, socket, close: () => { open = false; link.close(); } };
 }

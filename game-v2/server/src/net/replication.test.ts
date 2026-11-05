@@ -4,7 +4,7 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, InSystem, ServerMessage, ShipReplicaSet, ReplicaMode, replicaAngle, quantizeReplicaAngle,
   rebuildVolley, Player, Projectile, createShipState, stepGuns, volleyShells, firesStraight, weaponDef, isWeaponFn,
-  parseBlueprint, stackMods, TELL_CHARGE_START, TELL_CHARGE_CANCEL, type Blueprint, type Charge, type PortsState,
+  parseBlueprint, stackMods, TELL_CHARGE_START, TELL_CHARGE_CANCEL, type Blueprint, type Charge, type PortsState, type ReplicaEnv, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { readFileSync } from 'fs';
 import { hasComponent } from 'bitecs';
@@ -14,6 +14,7 @@ import { LocalTransport } from './LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
+import { FakeHitsClient } from './hits/fakeHitsClient.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -46,20 +47,56 @@ function world() {
   return { server, a: join('Ash'), b: join('Bree') };
 }
 
+/**
+ * A watcher with the client's whole tick layer (FakeHitsClient: keyframes, control rows, causes, contact pairs, bodies),
+ * as every client is now: what it holds of each ship, against the server's own state of that ship at the snapshot's tick
+ */
+function watcher(server: GameServer, name: string, after?: (s: ServerSnapshotMessage, w: FakeHitsClient) => void) {
+  const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
+  const w = new FakeHitsClient(server, { name, env });
+  // (each tick's state as the step left it: a frame may wait a few ticks, coalesced)
+  const truth = new Map<number, Map<number, number[]>>();
+  const stats = { checked: 0, keyframes: 0, controls: 0, causes: 0, mismatches: [] as string[] };
+  const step = server.step.bind(server);
+  server.step = () => {
+    step();
+    const m = new Map<number, number[]>();
+    for (const [eid] of server.getShips().bodies) m.set(eid, [Position.x[eid], Position.y[eid], Velocity.x[eid], Velocity.y[eid], Rotation.angle[eid]]);
+    truth.set(server.getTick(), m);
+    truth.delete(server.getTick() - 64);
+    w.flushUp();
+  };
+  const fw = w as unknown as { snapshot(s: ServerSnapshotMessage): void };
+  const oSnap = fw.snapshot.bind(w);
+  fw.snapshot = (s) => {
+    oSnap(s);
+    after?.(s, w);
+    stats.keyframes += s.ships?.length ?? 0;
+    stats.controls += s.ctl?.length ?? 0;
+    stats.causes += s.causes?.length ?? 0;
+    const tr = truth.get(s.tick);
+    if (!tr) return;
+    for (const id of w.reps.ids()) {
+      if (id === w.pid) continue;
+      const st = w.reps.at(id, s.tick)?.body, r = tr.get(id);
+      if (!st || !r) continue;
+      stats.checked++;
+      if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) stats.mismatches.push(`ship ${id} at tick ${s.tick}: (${st.x}, ${st.y}) vs (${r[0]}, ${r[1]})`);
+    }
+  };
+  return { w, stats, pid: () => w.pid };
+}
+
 describe('ship replication', () => {
-  it('a client rebuilds every other ship exactly from keyframes and control changes alone', () => {
-    const { server, a, b } = world();
-    const ships = server.getShips();
-    const sys = server['gameData'].getSystemByNum(InSystem.systemId[b.pid()]);
-    // (Its environment as a client's: gravity, the central body, the stillstones and the hazards, as the server steps its shadows)
-    const replicas = new ShipReplicaSet(ships.tuning, (id) => ships.get(id)?.derived, () => (server as any).replicaEnv(InSystem.systemId[b.pid()]));
+  it('a client rebuilds every other ship exactly from keyframes, control changes and causes, against the server\'s state', () => {
+    const { server, a } = world();
+    // (Bree: the client's whole tick layer, checked against the server's own state at every snapshot's tick)
+    const { stats, pid } = watcher(server, 'Bree_watch');
+    const b = { pid };
     // Bree watches from a distance; Ash flies about near a pack of hostiles
     Position.x[b.pid()] = 26000; Position.y[b.pid()] = 22000;
     Position.x[a.pid()] = 25000; Position.y[a.pid()] = 20000;
     server.enemies.spawnPack(InSystem.systemId[a.pid()], { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff'] }, 27000, 21000);
-    let checked = 0, keyframes = 0, controls = 0;
-    const mismatches: string[] = [];
-    let seen = 0;
     for (let i = 0; i < 60 * 15; i++) {
       const p = a.pid();
       // Ash changes course now and then, and the aim sweeps (on the replicated grid, as a real client's is)
@@ -69,31 +106,16 @@ describe('ship replication', () => {
       Input.targetAngle[p] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(i * 0.01));
       Position.x[b.pid()] = 26000; Position.y[b.pid()] = 22000; Velocity.x[b.pid()] = 0; Velocity.y[b.pid()] = 0;
       server.step();
-      for (; seen < b.got.length; seen++) {
-        const m = b.got[seen];
-        if (m.type !== 'snapshot') continue;
-        keyframes += m.ships?.length ?? 0;
-        controls += m.ctl?.length ?? 0;
-        replicas.apply(m.tick, m.ships, m.ctl);
-        for (const id of replicas.ids()) {
-          if (!ships.has(id)) { replicas.remove(id); continue; }
-          const s = replicas.at(id, m.tick)!.body;
-          checked++;
-          if (s.x !== Position.x[id] || s.y !== Position.y[id] || s.vx !== Velocity.x[id] || s.vy !== Velocity.y[id] || s.angle !== Rotation.angle[id]) {
-            mismatches.push(`ship ${id} at tick ${m.tick}: (${s.x}, ${s.y}) vs (${Position.x[id]}, ${Position.y[id]})`);
-          }
-        }
-      }
     }
-    console.log(`replication test: ${checked} ship states checked, ${keyframes} keyframes, ${controls} control rows`);
-    expect(mismatches.slice(0, 5)).toEqual([]);
-    expect(checked).toBeGreaterThan(200);
-    expect(controls).toBeGreaterThan(keyframes);
+    console.log(`replication test: ${stats.checked} ship states checked, ${stats.keyframes} keyframes, ${stats.controls} control rows, ${stats.causes} cause rows`);
+    expect(stats.mismatches.slice(0, 5)).toEqual([]);
+    expect(stats.checked).toBeGreaterThan(200);
+    expect(stats.controls).toBeGreaterThan(stats.keyframes);
   });
 });
 
-describe('ship view', () => {
-  it('a far ship costs nothing; coming into view it is sent on its own, and leaving it is forgotten', () => {
+describe('ship view (the focus grid: net/cells/FocusCells.ts)', () => {
+  it('a far ship costs nothing; coming into its focus cells it is sent on its own, and leaving it is told once', () => {
     const { server, a, b } = world();
     const snaps = () => b.got.filter((m) => m.type === 'snapshot') as any[];
     const keyed = () => snaps().flatMap((m) => (m.ships ?? []).filter((k: number[]) => k[0] === a.pid()));
@@ -108,49 +130,70 @@ describe('ship view', () => {
       || m.entities.some((e: any) => e.id === id);
     expect(snaps().some((m) => about(m, a.pid()))).toBe(false);
     expect(b.got.some((m) => m.type === 'shipSync' && (m as any).id === a.pid())).toBe(false);
-    // Ash comes to rest; Bree flies over: one keyframe for that ship (and its status row) and that's it
+    // Ash comes to rest; Bree flies over (5 km off: inside its focus cells): one keyframe for that ship (and its status row) and that's it
     Input.forward[a.pid()] = 0; Velocity.x[a.pid()] = 0; Velocity.y[a.pid()] = 0;
     for (let i = 0; i < 30; i++) { at(20000); server.step(); }
     b.got.length = 0;
-    for (let i = 0; i < 30; i++) { at(Position.x[a.pid()] - 30000); server.step(); }
+    for (let i = 0; i < 30; i++) { at(Position.x[a.pid()] - 5000); server.step(); }
     expect(keyed().length).toBe(1);
     expect(snaps().some((m) => m.entities.some((e: any) => e.id === a.pid()))).toBe(true);
     expect(b.got.some((m) => m.type === 'shipSync' && (m as any).id === a.pid())).toBe(true);
-    // Bree leaves: she's told to forget it, once
+    // Bree leaves: it's out of her view, told once (she keeps it away: net/cells/AwayNet.ts), and nothing more of it comes
     b.got.length = 0;
     for (let i = 0; i < 30; i++) { at(20000); server.step(); }
     expect(snaps().filter((m) => (m.out ?? []).includes(a.pid())).length).toBe(1);
     expect(keyed().length).toBe(0);
-    // A party member is always in view
-    a.t.send({ type: 'partyInvite', name: 'Bree' } as any);
-    b.t.send({ type: 'partyRespond', accept: true } as any);
-    b.got.length = 0;
-    for (let i = 0; i < 6; i++) { at(20000); server.step(); }
-    expect(keyed().length).toBe(1);
+    // (A party member out of the focus is a ghost now, not held: the 40 km circle's "always in view" went with it)
   });
 });
 
 describe('fire events', () => {
   for (const mode of ['plain', 'modded', 'ammo'] as const) it(`a client builds every shell from fire events alone, where the server has it${mode === 'modded' ? ' (guns with mods: an extra burst, tighter, faster)' : mode === 'ammo' ? ' (firing high-velocity shells)' : ''}`, () => {
     const modded = mode === 'modded';
-    const { server, a, b } = world();
+    const { server, a } = world();
     const ships = server.getShips();
     if (modded) {
       for (const q of ships.get(a.pid())!.blueprint.parts) if (isWeaponFn(q.fn)) q.mods = { add: { burst: 2, pierce: 1 }, mul: { spread: -0.5, speed: 0.2, damage: -0.1 } };
     }
     if (mode === 'ammo') server.pilots.get(server.pilots.connOf(a.pid())!)!.cargo.push({ id: 'cannon_hv', n: 5 });
     let ammoShots = 0;
-    const sys = server['gameData'].getSystemByNum(InSystem.systemId[b.pid()]);
-    // (Its environment as a client's: gravity, the central body, the stillstones and the hazards, as the server steps its shadows)
-    const replicas = new ShipReplicaSet(ships.tuning, (id) => ships.get(id)?.derived, () => (server as any).replicaEnv(InSystem.systemId[b.pid()]));
-    // Bree watches; Ash fights a pack that shoots back (pilotless and pilot shots both)
-    Position.x[b.pid()] = 26000; Position.y[b.pid()] = 23000;
-    Position.x[a.pid()] = 25000; Position.y[a.pid()] = 20000;
-    // (Their shots only: the system's own nests have ships out too, and this is about these two sides)
-    const fighting = new Set([a.pid(), ...server.enemies.spawnPack(InSystem.systemId[a.pid()], { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'] }, 26500, 20600)]);
     let built = 0, rows = 0, worst = 0;
     const misses: string[] = [];
-    let seen = 0;
+    // (Their shots only: the system's own nests have ships out too, and this is about these two sides)
+    const fighting = new Set<number>();
+    // Bree watches with the client's tick layer (its replicas as the server's, causes and all): each fire event's
+    // shells rebuilt from the firing ship's replica as the shot left it, against the server's own shells
+    const b = watcher(server, 'Bree_watch', (m, w) => {
+      rows += m.entities.filter((e) => e.type === 7).length;
+      for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
+        if (!fighting.has(owner)) continue;
+        const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256);
+        if (ammo) ammoShots++;
+        const body = w.reps.preAt(owner, tick);
+        // (the structure it fired with: a gun shot away later in the window is still on it then, as the client keeps
+        // each structure by its rebuild tick, ShipStore.derivedAt)
+        const now = ships.get(owner), was = now && w.store.derivedAt(owner, tick);
+        const ship = now && was ? Object.assign(Object.create(now), { derived: was }) : now;
+        if (!body || !ship) { misses.push(`no pose for ${owner}`); continue; }
+        const v = rebuildVolley({ owner, tick, part, aimQ, ids, ammo }, ship, body, ships.tuning);
+        if (!v) { misses.push(`no volley for ${owner} part ${part}`); continue; }
+        const moved = hasComponent(server['world'], Player, owner) ? 1 : 0;
+        for (const s of v.shells) {
+          // (already hit something; or gone and its id since reused for another ship's shot)
+          if (!hasComponent(server['world'], Projectile, s.id) || Projectile.ownerId[s.id] !== owner) continue;
+          // (the shell now, the server's step since the snapshot's tick: a frame may wait, coalesced)
+          const age = server.getTick() - tick + moved;
+          const err = Math.max(Math.abs(s.x + s.vx * age - Position.x[s.id]), Math.abs(s.y + s.vy * age - Position.y[s.id]),
+            Math.abs(s.vx - Velocity.x[s.id]) * 100, Math.abs(s.vy - Velocity.y[s.id]) * 100);
+          worst = Math.max(worst, err);
+          built++;
+        }
+      }
+    });
+    // Ash fights a pack that shoots back (pilotless and pilot shots both)
+    Position.x[b.pid()] = 26000; Position.y[b.pid()] = 23000;
+    Position.x[a.pid()] = 25000; Position.y[a.pid()] = 20000;
+    for (const id of [a.pid(), ...server.enemies.spawnPack(InSystem.systemId[a.pid()], { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'] }, 26500, 20600)]) fighting.add(id);
     for (let i = 0; i < 60 * 12; i++) {
       const p = a.pid();
       Input.forward[p] = (i % 200) < 100 ? 1 : 0;
@@ -158,32 +201,6 @@ describe('fire events', () => {
       Input.targetAngle[p] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Math.atan2(20600 - Position.y[p], 26500 - Position.x[p]) + Math.sin(i / 40) * 0.3));
       Position.x[b.pid()] = 26000; Position.y[b.pid()] = 23000; Velocity.x[b.pid()] = 0; Velocity.y[b.pid()] = 0;
       server.step();
-      for (; seen < b.got.length; seen++) {
-        const m = b.got[seen];
-        if (m.type !== 'snapshot') continue;
-        replicas.apply(m.tick, m.ships, m.ctl);
-        rows += m.entities.filter((e) => e.type === 7).length;
-        for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
-          if (!fighting.has(owner)) continue;
-          const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256);
-          if (ammo) ammoShots++;
-          const st = replicas.at(owner, tick);
-          const ship = ships.get(owner);
-          if (!st || !ship) { misses.push(`no pose for ${owner}`); continue; }
-          const v = rebuildVolley({ owner, tick, part, aimQ, ids, ammo }, ship, st.body, ships.tuning);
-          if (!v) { misses.push(`no volley for ${owner} part ${part}`); continue; }
-          const moved = hasComponent(server['world'], Player, owner) ? 1 : 0;
-          for (const s of v.shells) {
-            // (already hit something; or gone and its id since reused for another ship's shot)
-            if (!hasComponent(server['world'], Projectile, s.id) || Projectile.ownerId[s.id] !== owner) continue;
-            const age = m.tick - tick + moved;
-            const err = Math.max(Math.abs(s.x + s.vx * age - Position.x[s.id]), Math.abs(s.y + s.vy * age - Position.y[s.id]),
-              Math.abs(s.vx - Velocity.x[s.id]) * 100, Math.abs(s.vy - Velocity.y[s.id]) * 100);
-            worst = Math.max(worst, err);
-            built++;
-          }
-        }
-      }
     }
     console.log(`fire events (${mode}): ${built} shells built (${ammoShots} with ammunition), ${rows} sent as rows, worst error ${worst.toFixed(4)}`);
     if (mode === 'ammo') expect(ammoShots).toBeGreaterThan(10);

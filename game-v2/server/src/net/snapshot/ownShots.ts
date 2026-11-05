@@ -1,5 +1,5 @@
 /**
- * A pilot's own shells as fire events (CAPS.OWN_SHOTS; docs/design/confirmed-hits.md, follow-ups F2 and F3). Before, a
+ * A pilot's own shells as fire events (CAPS.OWN_SHOTS, every client; docs/design/confirmed-hits.md, follow-ups F2 and F3). Before, a
  * client's own shells came as projectile rows: spawn to 0.1, velocity to 0.01, ~2 B a shell more than another ship's
  * (its gun), and off the server's line by a fraction of a unit after a second of flight, which made nearly every hit
  * the client found wrongly. A fire event says only which gun fired on which tick, with what aim and ammunition, and the
@@ -16,14 +16,11 @@
  * rows too: their rows carry where they are. Whether a gun fired at all (energy, ammunition, its clip) and its spread
  * are in the event (the shells' ids, the ammunition code; spread is seeded by the shell: shellSeed).
  */
-import { CAPS, firesStraight, gunShell, ownShotWireOf, type FireRecord } from '@space-game/common';
+import { firesStraight, gunShell, ownShotWireOf, type FireRecord } from '@space-game/common';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 
-/** Does this client work its own straight shells out itself, named by shot id (CAPS.SHOT_IDS: common sim/b-shots.ts)? */
-export { shotIdsFor } from '@space-game/common';
-
 /**
- * A capable client's own shells it works out itself (CAPS.SHOT_IDS; sim foundation 1B): no fire record, no row, and no
+ * A client's own shells it works out itself (CAPS.SHOT_IDS; sim foundation 1B): no fire record, no row, and no
  * removal at the end of their life (it works that out too); a removal it can't derive (a rock strike, point defence)
  * and its hit records name each by its wire name (ownShotWire: its shot id without the owner). Per client, by entity
  * id, from the round's fire records till the shell is removed.
@@ -33,7 +30,7 @@ export class OwnShotLog {
   /** Counters: shells worked out, fire records not sent (and their JSON bytes), removals not sent / still sent */
   readonly stats = { derived: 0, fireRowsSaved: 0, fireBytesSaved: 0, removalsSaved: 0, removalsSent: 0 };
 
-  /** Can a capable client derive this record of its own (its shells straight from the muzzle, each with a shot id)? */
+  /** Can its client derive this record of its own (its shells straight from the muzzle, each with a shot id)? */
   static derivable(ships: ShipBridge, f: FireRecord): boolean {
     return !!f.shots && f.shots.length === f.ids.length && ownVolleyExact(ships, f);
   }
@@ -80,11 +77,6 @@ export class OwnShotLog {
   }
 }
 
-/** Does this client take its own shells as fire events (and its own ship's replication, to build them from)? */
-export function ownShotsFor(caps: number | undefined): boolean {
-  return !!((caps ?? 0) & CAPS.OWN_SHOTS);
-}
-
 /** Can the pilot's client build this volley of its own exactly? (shells, flying straight from the muzzle) */
 export function ownVolleyExact(ships: ShipBridge, f: FireRecord): boolean {
   // (no shells: a charge gun's tell or a pulse, which its own gun state shows)
@@ -92,12 +84,4 @@ export function ownVolleyExact(ships: ShipBridge, f: FireRecord): boolean {
   const ship = ships.get(f.owner);
   const sh = ship ? gunShell(ships.tuning, ship, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0)) : null;
   return !!sh && firesStraight(sh.def) && !sh.def.lob && !sh.def.arm;
-}
-
-/**
- * Does this client step its own ship itself (CAPS.OWN_SIM, with OWN_SHOTS: common network/ownTick.ts)? Then it isn't
- * sent its own ship's control rows or keyframes but the causes of what moved it, and checks it (net/own/OwnChecks.ts)
- */
-export function ownSimFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & (CAPS.OWN_SHOTS | CAPS.OWN_SIM)) === (CAPS.OWN_SHOTS | CAPS.OWN_SIM);
 }

@@ -16,8 +16,6 @@
  *
  * WP and NEXT go only to a client in "sent" mode for that tick; the rest to every client running it.
  */
-import { CAPS } from '../network/hits.js';
-import { ownSimCaps } from '../network/ownTick.js';
 import { replicaHash } from '../network/causes.js';
 import {
   FLIGHT_MISSILE, FLIGHT_MOB, GUIDE_KQ, GUIDE_Q, WP_GRID, guideLost, guideKind, guideRetarget, newGuide, type Guide, type GuideBody, type Waypoint,
@@ -28,11 +26,6 @@ export const GUIDE = { SYNC: 0, WP: 1, NEXT: 2, LOST: 3, MODE: 4, OFF: 5, TARGET
 export const GUIDE_OPS = 8;
 /** A missile's mode for a tick: it plans its waypoints itself, or takes the server's */
 export const MODE_DERIVED = 0, MODE_SENT = 1;
-
-/** Does this client run homing shells on its tick-aligned layer (CAPS.WAYPOINTS, with OWN_SIM: it reads its own ship)? */
-export function waypointsFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.WAYPOINTS) !== 0 && ownSimCaps(caps);
-}
 
 const g4 = (v: number, from: number) => Math.round(v / WP_GRID) - Math.round(from / WP_GRID);
 

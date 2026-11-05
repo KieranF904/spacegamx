@@ -20,7 +20,6 @@ import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';
 import { BotManager } from './bots/index.js';
 import { installRockeryTools } from './bots/rockeryTools.js';
-import { DEFAULT_CAPS } from '@space-game/common';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -84,10 +83,8 @@ const gameServer = new GameServer({
   devRange: DEV_MODE ? loadRangeConfig(dataPath) : undefined,
   // Everyone (guests and signed-in pilots) is an admin on the dev server (never in production: GameServer refuses it there too)
   guestAdmin: DEV_MODE,
-  // The netcode caps this server allows a client that offers them (common network/hits.ts CAPS): DEFAULT_CAPS, the same in
-  // dev and production; NET_CAPS (a bit mask: 1 confirmed hits, 2 client-detected, 4 packed, 8 coalesced, 16 own shots as
-  // fire events, 32 adaptive validation, 64 its own ship stepped by itself, 128 compact inputs, ... 0 none) overrides it
-  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEFAULT_CAPS,
+  // Crowd fallbacks (net/crowd/CrowdControl.ts): every client takes them (the full caps set is required at join)
+  crowd: true,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
   // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)

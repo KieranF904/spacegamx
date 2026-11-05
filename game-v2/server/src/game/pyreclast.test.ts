@@ -28,13 +28,20 @@ function world() {
     autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
   });
+  const pilots: { pid: number; got: ServerMessage[] }[] = [];
+  // (A move's looks (its tells, beams, strikes' looks) are worked out by every client running the boss's body (CAPS.MOVES,
+  // every client), so none go on the wire: the server's own word for them, GameServer.moveFx, is what's watched here,
+  // as every pilot in the system would have been sent it)
+  (server as any).moveFx = (sys: number, _eid: number, _origin: unknown, msg: ServerMessage) => { for (const p of pilots) if (InSystem.systemId[p.pid] === sys) p.got.push(msg); };
   const join_ = (name: string) => {
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];
     t.onMessage = (m) => got.push(m);
     t.connect();
     t.send({ type: 'join', username: name } as any);
-    return { pid: t.getPlayerId(), got };
+    const p = { pid: t.getPlayerId(), got };
+    pilots.push(p);
+    return p;
   };
   const { pid, got } = join_('slayer');
   const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };

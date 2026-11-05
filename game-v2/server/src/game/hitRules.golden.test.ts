@@ -47,6 +47,10 @@ function setup() {
   const sent: ServerMessage[] = [];
   const broadcast = weapons.host.broadcast.bind(weapons.host);
   weapons.host.broadcast = (n: number, m: ServerMessage) => { sent.push(m); broadcast(n, m); };
+  // (What a shell's hit on a ship sets off is kept with the hit for its clients (every client takes confirmed hits,
+  // net/hits/HitLedger.ts hitFx), not broadcast: the same messages, in the same order, counted here as they were)
+  const hitFx = weapons.host.hitFx.bind(weapons.host);
+  weapons.host.hitFx = (proj: number, m: ServerMessage) => { const kept = hitFx(proj, m); if (kept) sent.push(m); return kept; };
   let broken = 0;
   const shieldBroken = host.shieldBroken;
   host.shieldBroken = (eid: number) => { broken++; shieldBroken?.(eid); };

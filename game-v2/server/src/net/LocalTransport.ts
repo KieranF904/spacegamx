@@ -26,7 +26,7 @@ export class LocalTransport implements ClientTransport {
 
   private link: ClientLink | null = null;
   private open = false;
-  /** Base-format frames and bit-packed messages (one or more frames each, when the client takes CAPS.PACKED) */
+  /** Bit-packed messages (one or more frames each), and base-format frames before its join */
   private reader = new ServerFrameReader();
   private readonly socket: ClientSocket = {
     isOpen: () => this.open,

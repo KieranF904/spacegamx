@@ -46,10 +46,10 @@ export interface InputSendHost {
   readonly stationOpen: boolean;
   /** Our ship is gone (the death screen): the server takes no input for it */
   readonly localDead?: boolean;
-  /** The server took CAPS.INPUTS: compact inputs, by inputCompactSend.ts's rules */
+  /** Compact inputs, by inputCompactSend.ts's rules (a socket's encoder: not the local transport) */
   readonly compactInputs?: boolean;
   /**
-   * Mouse-steer with the view on the heading (input/viewMode.ts pinnedAim) and the server took CAPS.NOSE: the movement
+   * Mouse-steer with the view on the heading (input/viewMode.ts pinnedAim): the movement
    * keys push along the ship, said by both strafe bits (common flight.ts noseFrame)
    */
   readonly noseThrust?: boolean;

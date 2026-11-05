@@ -28,12 +28,7 @@ import type { Vec2 } from '../ships/types.js';
 import { quantizeShipBody, SHIP_PRECISION } from '../ships/physics.js';
 import { contactPieces, contactPair, recentreShift, type ContactBody } from '../ships/contact.js';
 import { dpow, dhypot } from '../math/detTrig.js';
-import { hpChecksum, CONFIRM, CAPS } from './hits.js';
-
-/** Do these caps have the client step its own ship itself (OWN_SIM, with OWN_SHOTS)? */
-export function ownSimCaps(caps: number | undefined): boolean {
-  return ((caps ?? 0) & (CAPS.OWN_SHOTS | CAPS.OWN_SIM)) === (CAPS.OWN_SHOTS | CAPS.OWN_SIM);
-}
+import { hpChecksum, CONFIRM } from './hits.js';
 
 /** A tick-layer cause's kind (a snapshot's `own` row's second value) */
 export const OWN_CAUSE = { PULL: 0, CONTACT: 1, REBUILD: 2, CARGO: 3 } as const;

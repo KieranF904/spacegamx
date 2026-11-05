@@ -7,9 +7,9 @@
  * of two drives). No control rows of them; every body check agrees.
  */
 import { describe, it, expect } from 'vitest';
-import { CAPS, Position, customGroups } from '@space-game/common';
+import { Position, customGroups } from '@space-game/common';
 import type { GameServer } from '../../GameServer.js';
-import { fight, ALL } from '../../testkits/decisionFight.testkit.js';
+import { fight } from '../../testkits/decisionFight.testkit.js';
 
 /** What each design loses mid-fight: the pieces that change how it flies */
 const LOSE: Record<string, string[]> = {
@@ -33,9 +33,9 @@ function closeIn(t: number, server: GameServer, foes: number[]) {
   }
 }
 
-function run(packs: { ships: string[]; dx: number; dy: number; faction: string }[], lose: boolean, ticks = 1500, caps?: number) {
+function run(packs: { ships: string[]; dx: number; dy: number; faction: string }[], lose: boolean, ticks = 1500) {
   return fight({
-    ticks, packs, caps, loseAt: lose ? 700 : undefined, prey: true, each: closeIn,
+    ticks, packs, loseAt: lose ? 700 : undefined, prey: true, each: closeIn,
     lose: (ship, uid) => {
       const name = ship.blueprint.name, part = ship.blueprint.parts.find((p) => p.uid === uid);
       if (!part || part.group === undefined || !LOSE[name]) return false;
@@ -67,7 +67,7 @@ describe('custom enemies: their moves and lost pieces on the tick layer (CAPS.PI
     const r = run([
       { ships: ['scrap_crawler', 'rivet_sower'], dx: 1100, dy: 600, faction: 'scrapborn' },
       { ships: ['slag_ray', 'clinker'], dx: -1400, dy: -500, faction: 'cinder' },
-    ], false, 1500, ALL | CAPS.WAYPOINTS | CAPS.LAUNCHES);
+    ], false, 1500);
     const moves = r.server.enemies.custom.stats.moves;
     if (process.env.BODY_DEBUG) console.log('DENS', JSON.stringify({ moves, got: { ...r.got.A, ran: r.got.A.ran.size }, stats: r.stats }));
     for (const m of ['scrap_crawler.pull', 'rivet_sower.lay', 'slag_ray.pass', 'clinker.volley']) expect(moves[m] ?? 0, m).toBeGreaterThan(0);

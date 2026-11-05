@@ -369,7 +369,12 @@ describe('turrets and helm in the engine', () => {
 describe('ship collisions (M5)', () => {
   // Two dummies nose to nose 80 units apart, closing at `speed` each
   function ram(speed: number) {
-    const { bridge, run, received } = setup();
+    const { server, bridge, run } = setup();
+    // (A contact's sparks: every client finds the pairs it holds itself and draws theirs, the rest come with its snapshot
+    // (Replication.contactFxFor); the server's own note of each is what's counted here)
+    const received: ServerMessage[] = [];
+    const rep = (server as any).replication, note = rep.noteContactFx.bind(rep);
+    rep.noteContactFx = (tick: number, sys: number, a: number, b: number, msg: ServerMessage) => { received.push(msg); note(tick, sys, a, b, msg); };
     const a = bridge!.spawnDummy(sparrow, 0, 1000, -Math.PI / 2);  // faces up
     // Nose to nose, 50 units apart whatever the cell size (the nose is the cap at grid y = -1)
     const nose = (bridge!.get(a)!.derived.com[1] + 1) * tuning.cellSize;

@@ -6,13 +6,13 @@
  * cells is moved away from them and back. Every ship on its tick layer is checked against the server's ship at every
  * snapshot's tick: entering, leaving and coming back must all be exact. Coming back, a ship it kept gets its keyframe
  * and only what changed: no blueprint, no full sync, no status row with its place unless something in it changed.
- * A legacy observer alongside keeps the 40 km circle.
+ * Every client holds cells (the 40 km view circle is gone with the per-cap fallbacks).
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, encodeMessage, decodeMessage, CELL_SIZE, focusCells, cellAt, AWAY_TICKS,
+  Position, Velocity, Rotation, InSystem, encodeMessage, decodeMessage, CELL_SIZE, focusCells, cellAt, AWAY_TICKS,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage, type ServerMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -32,7 +32,7 @@ interface Seen {
   about: Map<number, [number, string][]>;
 }
 
-function world(caps: number, o: { dir?: (t: number, k: number) => number; at?: (x0: number, y0: number, k: number) => [number, number] } = {}) {
+function world(o: { dir?: (t: number, k: number) => number; at?: (x0: number, y0: number, k: number) => [number, number] } = {}) {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -41,12 +41,10 @@ function world(caps: number, o: { dir?: (t: number, k: number) => number; at?: (
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: caps | CAPS.HITS | CAPS.PACKED | CAPS.BLOCKS | CAPS.OWN_SHOTS | CAPS.OWN_SIM,
   });
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'watcher', caps, env });
-  const L = new FakeHitsClient(server, { name: 'legacy', caps: 0, env });
-  const P = [new FakeHitsClient(server, { name: 'pilot_b', caps: 0, env }), new FakeHitsClient(server, { name: 'pilot_c', caps: 0, env })];
+  const A = new FakeHitsClient(server, { name: 'watcher', env });
+  const P = [new FakeHitsClient(server, { name: 'pilot_b', env }), new FakeHitsClient(server, { name: 'pilot_c', env })];
   const truth = new Map<number, Map<number, number[]>>();
   const seen: Seen = { snapshots: 0, checked: 0, off: 0, offIds: [], keyframes: new Map(), cells: [], about: new Map() };
   const note = (id: number, what: string) => { let l = seen.about.get(id); if (!l) seen.about.set(id, (l = [])); l.push([server.getTick(), what]); };
@@ -94,18 +92,18 @@ function world(caps: number, o: { dir?: (t: number, k: number) => number; at?: (
     truth.set(server.getTick(), m);
     truth.delete(server.getTick() - 64);
     clock.t += 1000 / 60;
-    for (const f of [A, L, ...P]) f.flushUp();
+    for (const f of [A, ...P]) f.flushUp();
     check();
-    if (where) for (const f of [A, L]) { Position.x[f.pid] = where[0]; Position.y[f.pid] = where[1]; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; }
+    if (where) for (const f of [A]) { Position.x[f.pid] = where[0]; Position.y[f.pid] = where[1]; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; }
   };
   for (let i = 0; i < 10; i++) step();
-  for (const f of [A, L, ...P]) { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); c.isAdmin = false; }
+  for (const f of [A, ...P]) { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); c.isAdmin = false; }
   // Somewhere quiet: a cell's middle well out from the sun
   const x0 = Math.floor((Position.x[A.pid] + 60000) / CELL_SIZE) * CELL_SIZE + CELL_SIZE / 2, y0 = Math.floor((Position.y[A.pid] + 60000) / CELL_SIZE) * CELL_SIZE + CELL_SIZE / 2;
   P.forEach((f, k) => { const p = o.at ? o.at(x0, y0, k) : [x0 - 600 + 1200 * k, y0 + 300]; Position.x[f.pid] = p[0]; Position.y[f.pid] = p[1]; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; });
   where = [x0, y0];
   const run = (n: number, at?: [number, number]) => { if (at) where = at; for (let i = 0; i < n; i++) step(); };
-  return { server, A, L, P, seen, run, x0, y0, conn: server.pilots.connOf(A.pid)!, lconn: server.pilots.connOf(L.pid)! };
+  return { server, A, P, seen, run, x0, y0, conn: server.pilots.connOf(A.pid)! };
 }
 
 const away = (w: { x0: number; y0: number }): [number, number] => [w.x0 + 46000, w.y0];
@@ -114,17 +112,16 @@ const away = (w: { x0: number; y0: number }): [number, number] => [w.x0 + 46000,
 const since = (w: { seen: Seen }, id: number, t: number) => (w.seen.about.get(id) ?? []).filter(([at]) => at > t).map(([, what]) => what);
 
 describe('the focus grid and ships away (CAPS.FOCUS)', () => {
-  it('holds the ships homed in its focus cells only; ships leaving are kept at both ends; the legacy client keeps its 40 km circle', () => {
-    const w = world(CAPS.FOCUS);
+  it('holds the ships homed in its focus cells only; ships leaving are kept at both ends', () => {
+    const w = world();
     w.run(60);
     const [b, c] = w.P.map((p) => p.pid);
     expect(w.conn.shipView.has(b) && w.conn.shipView.has(c)).toBe(true);
-    // 30 km off: past every focus cell round them, inside the legacy circle
+    // 30 km off: past every focus cell round them (inside the old 40 km circle)
     w.run(30, [w.x0 + 30000, w.y0 + 8000]);
     const f = new Set(focusCells(w.x0 + 30000, w.y0 + 8000));
     expect(f.has(cellAt(Position.x[b], Position.y[b]))).toBe(false);
     expect(w.conn.shipView.has(b)).toBe(false);
-    expect(w.lconn.shipView.has(b)).toBe(true);
     expect(w.A.reps.has(b)).toBe(false);
     expect(w.A.away.has(b)).toBe(true);
     expect(w.conn.away?.has(b)).toBe(true);
@@ -136,11 +133,10 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   });
 
   it.each([
-    ['plain frames, 2.5 s away', CAPS.FOCUS, 150],
-    ['every cap (packed, blocks, own ship, bodies), 2.5 s away', 2047, 150],
-    ['every cap, 40 s away (past the old 10 s hold)', 2047, 2400],
-  ])('leaves and comes back: a keyframe and only what changed, no replay, exact (%s)', (_, caps, ticks) => {
-    const w = world(caps);
+    ['2.5 s away', 150],
+    ['40 s away (past the old 10 s hold)', 2400],
+  ])('leaves and comes back: a keyframe and only what changed, no replay, exact (%s)', (_, ticks) => {
+    const w = world();
     w.run(90);
     const ids = w.P.map((p) => p.pid);
     w.run(ticks, away(w));
@@ -166,7 +162,7 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   });
 
   it('part HP changed while away: only the change goes back; a ship destroyed while away is told by id', () => {
-    const w = world(2047);
+    const w = world();
     w.run(90);
     const [b, c] = w.P.map((p) => p.pid);
     w.run(150, away(w));
@@ -188,7 +184,7 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   });
 
   it('let go by age at both ends at once; back after that, they come as new', () => {
-    const w = world(CAPS.FOCUS);
+    const w = world();
     w.run(90);
     const ids = w.P.map((p) => p.pid);
     w.run(AWAY_TICKS + 120, away(w));
@@ -204,7 +200,7 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   }, 60_000);
 
   it('dithering on the 19 km edge: out and back again and again, both ends agree, exact', () => {
-    const w = world(CAPS.FOCUS);
+    const w = world();
     w.run(60);
     // The pilots' cell's near edge is 19 km off at x = cell start - 19,000: hop either side of it
     const edge = Math.floor(w.x0 / CELL_SIZE) * CELL_SIZE - 19000;
@@ -219,7 +215,7 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   it('ships crossing the border between a focus cell and one past it: out and in again, exact on both sides', () => {
     // The pilots fly north and south (forward is -y) across their cell's north border, the watcher south of them so that
     // cell is in focus and the next one north is not
-    const w = world(2047, { dir: (t) => [1, -1, -1, 1][Math.floor(t / 90) % 4], at: (x0, y0, k) => [x0 - 300 + 600 * k, y0 - CELL_SIZE / 2 + 300 + 100 * k] });
+    const w = world({ dir: (t) => [1, -1, -1, 1][Math.floor(t / 90) % 4], at: (x0, y0, k) => [x0 - 300 + 600 * k, y0 - CELL_SIZE / 2 + 300 + 100 * k] });
     const top = Math.floor(w.y0 / CELL_SIZE) * CELL_SIZE;
     const spot: [number, number] = [w.x0, top + CELL_SIZE + 19000 - 3000];
     expect(focusCells(...spot)).toContain(cellAt(w.x0, w.y0));
@@ -238,7 +234,7 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   });
 
   it("a jump's burn is a transit: the focus holds still till it ends, then changes once", () => {
-    const w = world(CAPS.FOCUS);
+    const w = world();
     w.run(60);
     const focus = w.server.snapshots.focus as unknown as { host: { transit(eid: number): boolean } };
     let burning = true;
@@ -256,7 +252,7 @@ describe('the focus grid and ships away (CAPS.FOCUS)', () => {
   });
 
   it('a new system starts afresh (nothing kept from before the jump)', () => {
-    const w = world(CAPS.FOCUS);
+    const w = world();
     w.run(60);
     w.run(60, away(w));
     expect(w.conn.away?.size).toBeGreaterThan(0);

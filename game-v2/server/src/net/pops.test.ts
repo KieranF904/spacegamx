@@ -74,7 +74,8 @@ describe('hostile populations on the wire', () => {
     const eid = dock.slots[slot].ships[0];
     const bridge = w.server.getShips();
     bridge.damagePartFraction(eid, bridge.get(eid)!.blueprint.parts.findIndex((p) => p.fn === 'core'), 1);
-    w.step(5);
+    // (a few ticks more than its round: frames with nothing urgent wait up to COALESCE_TICKS, every client's are packed)
+    w.step(10);
     const after = w.pops().slice(n0);
     expect(after.length).toBe(1);
     expect(after[0].full).toBeUndefined();

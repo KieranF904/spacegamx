@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { readFileSync } from 'fs';
-import { Position, Velocity, InSystem, CAPS, type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage } from '@space-game/common';
+import { Position, Velocity, InSystem, type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
@@ -18,7 +18,6 @@ import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const CAPS_ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.CAUSES | CAPS.STRUCTS;
 
 describe('debris a client works out itself', () => {
   it('a piece gone before its confirmation arrives is still removed on the client', () => {
@@ -30,11 +29,10 @@ describe('debris a client works out itself', () => {
       scene: 'sectors', autoStart: false,
       ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
       clock: () => clock.t,
-      netCaps: CAPS_ALL,
     });
     const ships = server.getShips();
     const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-    const A = new FakeHitsClient(server, { name: 'acks', caps: CAPS_ALL, env });
+    const A = new FakeHitsClient(server, { name: 'acks', env });
     const step = () => { server.step(); clock.t += 1000 / 60; };
     for (let i = 0; i < 30; i++) step();
     const sys = InSystem.systemId[A.pid];

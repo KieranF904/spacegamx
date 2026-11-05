@@ -441,7 +441,7 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     Position.y[eid] += w[1];
   }
   // (A piece of debris recentred: clients running it work that out (its crumbling, common ships/debrisLife.ts), and
-  // clients keeping each structure by tick recentre it from its sync (CAPS.STRUCTS); the rest get a keyframe, Replication)
+  // clients keep each structure by tick to recentre it from its sync (CAPS.STRUCTS))
   if (ship.kind === 'debris') b.debrisNet.shifted(eid, b.readBody(eid, ship));
   // (A client recentres its tick-aligned replica alike, from the structures it has: its own ship, network/ownTick.ts
   // REBUILD; any other it holds, CAPS.CAUSES; a rebuild that changes nothing it flies or touches with isn't one for it)
