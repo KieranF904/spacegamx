@@ -22,7 +22,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 const STRUCTS = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.CAUSES | CAPS.STRUCTS;
 const RUNS = STRUCTS | CAPS.DEBRIS;
 
-interface Seen { kfRun: number; syncRun: number; crumbleRun: number; checked: number; off: string[]; keyframes: number }
+interface Seen { kfAt: [number, number][]; kfRun: number; syncRun: number; crumbleRun: number; checked: number; off: string[]; keyframes: number }
 
 /** A server, three clients (runs its debris, keeps structures, legacy) and what each was sent and holds, checked */
 function world() {
@@ -42,8 +42,13 @@ function world() {
   const C = new FakeHitsClient(server, { name: 'structs', caps: STRUCTS, env });
   const B = new FakeHitsClient(server, { name: 'legacy', caps: 0, env });
   const fakes = [A, C, B];
-  const seen = new Map<FakeHitsClient, Seen>(fakes.map((f) => [f, { kfRun: 0, syncRun: 0, crumbleRun: 0, checked: 0, off: [], keyframes: 0 }]));
+  const seen = new Map<FakeHitsClient, Seen>(fakes.map((f) => [f, { kfAt: [], kfRun: 0, syncRun: 0, crumbleRun: 0, checked: 0, off: [], keyframes: 0 }]));
   let seq = 1;
+  // (Pieces knocked by one gone that tick or out of the running client's view: what it has of the other may not be how
+  // that one ended (its removal can come before it stepped there), so the server keyframes it: Replication.forClient)
+  // (told after the snapshot's step, so counted at the end)
+  const excused = new Map<number, number[]>();
+  const excuse = (id: number, tick: number) => !!excused.get(id)?.some((t) => t > tick - 30 && t <= tick);
   // (Each piece's state as each tick left it: frames may wait a few ticks, coalesced)
   const real = new Map<number, Map<number, number[]>>();
   const step = () => {
@@ -76,7 +81,7 @@ function world() {
       oh(m);
     };
     fa.snapshot = (m) => {
-      for (const k of m.ships ?? []) { if (f.debris.lives.has(k[0])) s.kfRun++; if (ships.get(k[0])?.kind === 'debris') s.keyframes++; }
+      for (const k of m.ships ?? []) { if (f.debris.lives.has(k[0])) s.kfAt.push([k[0], m.tick]); if (ships.get(k[0])?.kind === 'debris') s.keyframes++; }
       os(m);
       for (const id of f.reps.ids()) {
         // (A frame that went at once: sent at the tick's end, the state now)
@@ -95,10 +100,15 @@ function world() {
     for (let t = 0; t < ticks; t++) {
       each(t);
       step();
+      const view = server.pilots.connOf(A.pid)!.shipView, out = (x: number) => !ships.has(x) || !view.has(x);
+      const note = (id: number) => { let l = excused.get(id); if (!l) excused.set(id, (l = [])); l.push(server.getTick()); };
+      for (const [a, c] of ships.debrisNet.pairs) { if (out(a) !== out(c)) note(out(a) ? c : a); }
+      // (...and what knocks into one of those: its keyframe goes with the other's)
+      for (let more = true, n = 0; more && n < 8; n++) { more = false; for (const [a, c] of ships.debrisNet.pairs) { const ea = excuse(a, server.getTick()), ec = excuse(c, server.getTick()); if (ea !== ec) { note(ea ? c : a); more = true; } } }
       for (const [a, c] of ships.debrisNet.pairs) for (const id of [a, c]) { const age = server.getTick() - (ships.get(id)?.spawnTick ?? -1e9); if (age > DEBRIS_GRACE_TICKS && age <= DEBRIS_GRACE_TICKS + 60) pairsYoung.justPast++; }
     }
   };
-  return { server, ships, A, B, C, sys, x0, y0, run, seen: (f: FakeHitsClient) => seen.get(f)!, pairsYoung };
+  return { server, ships, A, B, C, sys, x0, y0, run, seen: (f: FakeHitsClient) => { const s = seen.get(f)!; s.kfRun = s.kfAt.filter(([id, t]) => !excuse(id, t)).length; return s; }, pairsYoung };
 }
 
 function fight(ticks: number) {

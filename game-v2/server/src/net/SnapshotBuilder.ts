@@ -945,8 +945,11 @@ export class SnapshotBuilder {
     this.hits!.check(conn);
   }
 
-  /** Debris confirmations: right, wrong (sent in full instead), and never (sent in full when its time ran out) */
-  readonly debrisAcks = { ok: 0, wrong: 0, late: 0, gone: 0 };
+  /**
+   * Debris confirmations: right, wrong (sent in full instead), never (sent in full when its time ran out), and rebuilt
+   * (crumbled before it was confirmed, for a client not running it: sent in full)
+   */
+  readonly debrisAcks = { ok: 0, wrong: 0, late: 0, gone: 0, rebuilt: 0 };
 
   /**
    * Splits this client can work out itself (common ships/debris.ts deriveSplit): it has the ship as it was (its last
@@ -956,12 +959,16 @@ export class SnapshotBuilder {
    */
   private holdDebris(conn: ClientConnection): void {
     const now = this.currentTick;
+    const net = this.ships.debrisNet, live = conn.debrisLive;
+    // (Rebuilt since its spawn (a crumble): a client that doesn't run it can't work that out, nor get its sync while held)
+    const rebuilt = (id: number) => { const ship = this.ships.bodies.get(id); return !!ship && ship.rebuilds !== net.spawns.get(id)?.rebuilds; };
     for (const [id, h] of conn.debrisHeld) {
       // (A piece removed meanwhile stays held till the removal goes: it has it)
       if (h.until < now && this.ships.has(id)) { conn.debrisHeld.delete(id); this.debrisAcks.late++; }
       else if (h.until < now - 600) conn.debrisHeld.delete(id);
+      // (...crumbled in its hold: it goes in full now, as any ship does, its structure from a sync and its place a keyframe)
+      else if (!h.live && rebuilt(id)) { conn.debrisHeld.delete(id); this.debrisAcks.rebuilt++; }
     }
-    const net = this.ships.debrisNet, live = conn.debrisLive;
     for (const [parent, splits] of net.splits) {
       // (Its own ship's too: the split says where it was)
       const own = parent === conn.playerId;
@@ -989,6 +996,9 @@ export class SnapshotBuilder {
         const until = now + DEBRIS_ACK_TICKS + 2 * Math.ceil(conn.ping / (1000 / TICK_RATE));
         // (Its to run from their spawn, CAPS.DEBRIS: pieces of a ship, or of a piece it runs: it knows when each part crumbles)
         const l = debrisFor(conn.caps) && (sp.ship.kind !== 'debris' || runs);
+        // (A piece crumbled already, before the split is told: one not run there would be worked out as it was spawned,
+        // and its sync, before the snapshot, would come ahead of it: the split goes in full)
+        if (!l && sp.ids.some(rebuilt)) continue;
         sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: whole ? [...sp.hp![k]] : sp.groups[k].map((i) => had[i] ?? 0), live: l }));
         // (A ship destroyed, or its own: where it was, for what it has of it then isn't sure to be the server's)
         const at = told && sp.pose ? [sp.pose.x, sp.pose.y, sp.pose.angle, sp.pose.vx, sp.pose.vy, sp.pose.angVel] : undefined;

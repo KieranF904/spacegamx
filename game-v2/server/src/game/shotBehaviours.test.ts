@@ -71,13 +71,17 @@ describe('weaponry endAtAim: bursts at the aim distance', () => {
     const d = Math.hypot(boom.x - X, boom.y - Y);
     expect(d).toBeGreaterThan(750);
     expect(d).toBeLessThan(1050);
-    // The row its client got: an end tick after it was fired, and the straight line run to it lands on the burst
+    // Each row its client got: an end tick after it was fired, and the straight line run to it lands on a burst (each
+    // gun's shell has its own spread, so its own end tick: which burst is whose is by place, not by the order sent)
+    const booms = w.detonations('flak');
     const rows = projectileRows(w.got).filter((e) => e.data[0] === WEAPON_KIND_TYPE.flak && e.data[6] === w.pid);
     expect(rows.length).toBeGreaterThan(0);
-    const r = rows[0], [spawnTick, sx, sy, end] = [r.data[3], r.data[4], r.data[5], r.data[9]];
-    expect(end).toBeGreaterThan(spawnTick);
-    const ex = sx + r.vx * (end - spawnTick), ey = sy + r.vy * (end - spawnTick);
-    expect(Math.hypot(ex - boom.x, ey - boom.y)).toBeLessThan(40);
+    for (const r of rows) {
+      const [spawnTick, sx, sy, end] = [r.data[3], r.data[4], r.data[5], r.data[9]];
+      expect(end).toBeGreaterThan(spawnTick);
+      const ex = sx + r.vx * (end - spawnTick), ey = sy + r.vy * (end - spawnTick);
+      expect(Math.min(...booms.map((b) => Math.hypot(ex - b.x, ey - b.y)))).toBeLessThan(40);
+    }
   });
 
   it('a plain flak gun (Burst) still flies its whole fuse life and sends no end tick', () => {

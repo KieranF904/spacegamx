@@ -1,8 +1,8 @@
 {
   "direct": {
-    "hash": "339b6dde47bc59db",
+    "hash": "d56c4aa753d41694",
     "rows": 420,
-    "dealt": 14043.968108583978,
+    "dealt": 14816.121310689176,
     "sample": [
       [
         0,
@@ -163,9 +163,9 @@
     ]
   },
   "shells": {
-    "hash": "8f857ca8bda92d62",
+    "hash": "c28fb1ab0c67fd23",
     "rows": 1896,
-    "dealt": 43637763.6915853,
+    "dealt": 43635870.54952836,
     "sample": [
       [
         2,
