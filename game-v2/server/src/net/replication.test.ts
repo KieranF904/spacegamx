@@ -90,9 +90,9 @@ describe('ship view', () => {
     const { server, a, b } = world();
     const snaps = () => b.got.filter((m) => m.type === 'snapshot') as any[];
     const keyed = () => snaps().flatMap((m) => (m.ships ?? []).filter((k: number[]) => k[0] === a.pid()));
-    // Bree is the one who moves about (her own ship is hers to predict); Ash sits at 90 km
+    // Bree is the one who moves about (her own ship is hers to predict); Ash sits at 72 km (inside inner Sol: the packs out past it leave it be)
     const at = (x: number) => { Position.x[b.pid()] = x; Position.y[b.pid()] = 20000; Velocity.x[b.pid()] = 0; Velocity.y[b.pid()] = 0; };
-    Position.x[a.pid()] = 90000; Position.y[a.pid()] = 20000;
+    Position.x[a.pid()] = 72000; Position.y[a.pid()] = 20000;
     for (let i = 0; i < 30; i++) { at(20000); server.step(); }
     // Ash flies about out there: nothing about Ash's ship reaches Bree
     b.got.length = 0;

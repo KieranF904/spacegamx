@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Input, ServerMessage, unpackMapLegs, unpackMapRoutes, unpackMapInfo, legAt, patrolNext, MAP_DOT_SLACK, type ServerMapDotsMessage, type Leg, type Patrol, type PatrolState } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Input, ServerMessage, unpackMapLegs, unpackMapRoutes, unpackMapInfo, legAt, patrolNext, MAP_DOT_SLACK, MAP_PT_STRIDE, FEED_TIERS, type ServerMapDotsMessage, type Leg, type Patrol, type PatrolState } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -240,7 +240,7 @@ describe('simulation level of detail', () => {
     expect(tFar / tLive).toBeLessThan(1.4);
   });
 
-  it('far ships and other pilots reach the system map (mapDots) while it is open: a leg or a patrol each, sent again only when it changes', () => {
+  it('far ships and other pilots reach the system map (mapDots) while it is open: a leg or a patrol each, sent again only when it changes; hostiles as places at their tier', () => {
     const w = world();
     const sol = w.num('sol');
     inSol(w, 120000, 0);
@@ -264,7 +264,13 @@ describe('simulation level of detail', () => {
     expect(first.full).toBe(1);
     // The client's view of a dot: the last leg it was sent carried on from then, or its patrol's legs worked out (as FarShips does)
     const legs = new Map<number, { leg: Leg; tick: number; patrol?: { p: Patrol; s: PatrolState } }>();
+    const pts = new Map<number, { x: number; y: number; tick: number }[]>();
     const take = (m: ServerMapDotsMessage) => {
+      for (let i = 0; i + MAP_PT_STRIDE <= (m.pts ?? []).length; i += MAP_PT_STRIDE) {
+        const [id, x, y] = m.pts!.slice(i, i + 3);
+        pts.set(id, [...(pts.get(id) ?? []), { x: x * 10, y: y * 10, tick: m.tick }]);
+        legs.set(id, { leg: { x: x * 10, y: y * 10, vx: 0, vy: 0, wx: 0, wy: 0, thrust: -1 }, tick: m.tick });
+      }
       for (const r of unpackMapLegs(m.dots)) legs.set(r.id, { leg: r.leg, tick: m.tick });
       for (const r of unpackMapRoutes(m.routes ?? [], m.tick)) legs.set(r.id, { leg: r.state.leg, tick: r.state.t0, patrol: { p: r.patrol, s: r.state } });
       for (const id of m.gone ?? []) legs.delete(id);
@@ -279,19 +285,21 @@ describe('simulation level of detail', () => {
     expect(unpackMapInfo(first.info ?? []).find((d) => d.id === p2)?.kind).toBe(4);
     expect(first.names).toContain(foe);
     expect(first.names).toContain('faraway');
-    // On patrol round where it was spawned: sent as its patrol, drawn exactly where it is
-    expect(legs.get(foe)?.patrol).toBeTruthy();
-    expect(Math.hypot(drawn(foe).x - w.at(foe).x, drawn(foe).y - w.at(foe).y)).toBeLessThan(1);
-    // A minute on: always exactly where it is, its patrol never sent again (nor named), however many legs it flies
-    let resent = 0;
+    // A hostile goes as its place (not a route: it's loaded and active, not this client's to work out), where it is
+    expect(legs.get(foe)?.patrol).toBeFalsy();
+    expect(pts.get(foe)?.length).toBe(1);
+    expect(Math.hypot(drawn(foe).x - w.at(foe).x, drawn(foe).y - w.at(foe).y)).toBeLessThan(10);
+    // A minute on: past inner Sol's line it's sent at most every 5 s (FEED_TIERS.farTicks), never named again
     for (let s = 0; s < 60; s++) {
       const n = dots().length;
       w.step(60, both);
-      for (const m of dots().slice(n)) { take(m); if (unpackMapLegs(m.dots).concat(unpackMapRoutes(m.routes ?? [], m.tick) as any).some((r) => r.id === foe)) resent++; expect(m.names?.includes(foe) ?? false).toBe(false); }
-      expect(Math.hypot(drawn(foe).x - w.at(foe).x, drawn(foe).y - w.at(foe).y)).toBeLessThan(1);
+      for (const m of dots().slice(n)) { take(m); expect(unpackMapLegs(m.dots).concat(unpackMapRoutes(m.routes ?? [], m.tick) as any).some((r) => r.id === foe)).toBe(false); expect(m.names?.includes(foe) ?? false).toBe(false); }
       expect(Math.hypot(drawn(p2).x - Position.x[p2], drawn(p2).y - Position.y[p2])).toBeLessThan(MAP_DOT_SLACK);
     }
-    expect(resent).toBe(0);
+    const sent = pts.get(foe)!;
+    expect(sent.length).toBeGreaterThan(3);
+    expect(sent.length).toBeLessThanOrEqual(1 + 60 / 5);
+    for (let i = 1; i < sent.length; i++) expect(sent[i].tick - sent[i - 1].tick).toBeGreaterThanOrEqual(FEED_TIERS.farTicks - 1);
     // In view, it's an entity (not a dot)
     const p = w.at(foe);
     w.step(66, () => { w.hold(p.x + 20000, p.y); Position.x[p2] = -120000; Position.y[p2] = -60000; });
