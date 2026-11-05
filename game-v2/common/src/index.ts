@@ -69,3 +69,5 @@ export * from './bodies/index.js';
 export * from './bosses/index.js';
 // Scheduled waypoints: homing shells flown by the shared law on both sides (docs/design/awareness-model.md 6.3)
 export * from './guidance/index.js';
+// The sim foundation: one deterministic ship stepper, its events, inputs, timeline, state ring (sim/index.ts)
+export * from './sim/index.js';
