@@ -27,7 +27,7 @@ import {
   ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG, placeRows, pairPlace, type CauseRow,
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
-  headAgrees, headHashOfWord, ownStateHash, pilotAimQ, cloneCharge, stepOwnShip, ownStructure, seedOwnExtras, unpackOwnSync, remapCharge, NO_OWN_INPUT, type HeadHash,
+  headAgrees, headHashOfWord, ownStateHash, pilotAimQ, cloneCharge, stepOwnShip, ownStructure, seedOwnExtras, unpackOwnSync, ownSyncHazards, remapCharge, NO_OWN_INPUT, type HeadHash, type HazardState,
   type OwnExtras, type OwnInputExtras, type ServerOwnSyncMessage, type SimShipState, type SimEvent, type SimEnv, type FieldEnv, type ReplicaEnv,
 } from '@space-game/common';
 import type { StructSource } from '../ShipStore.js';
@@ -109,6 +109,8 @@ export class OwnTick implements OwnTimeline {
   syncedAt = -Infinity;
   /** The server's extras by the tick they ended (ownSync): a step of that tick ends with these, whatever it worked out */
   private readonly synced = new Map<number, OwnExtras>();
+  /** ...or its hazards alone (an ownSync of them: packOwnHazards): that tick ends with these, the rest its own */
+  private readonly hazTold = new Map<number, HazardState>();
   /** What it starts from with nothing earlier (its record's gun state, full stores) */
   private seed: OwnExtras | null = null;
 
@@ -128,6 +130,7 @@ export class OwnTick implements OwnTimeline {
     this.confirmedTo = -Infinity;
     this.syncedAt = -Infinity;
     this.synced.clear();
+    this.hazTold.clear();
     this.seed = null;
     this.host.reps.setOwn(id, this);
   }
@@ -206,7 +209,7 @@ export class OwnTick implements OwnTimeline {
     // (The server said how this tick ended: that, exact (its snapshot steps this tick again after the ownSync came))
     const told = this.synced.get(t);
     if (told) { this.full.set(t, told); return; }
-    const x: OwnExtras = { charge: s.charge, guns: s.guns, hazard: s.hazard, jumpPrime: s.jumpPrime };
+    const x: OwnExtras = { charge: s.charge, guns: s.guns, hazard: this.hazTold.get(t) ?? s.hazard, jumpPrime: s.jumpPrime };
     // (A rebuild at the tick's end (the structure it flies the next tick with isn't this one's) moves the stores to the new
     // structure, as the server's rebuild does)
     const was = this.derived(t), now = this.derived(t + 1);
@@ -250,6 +253,17 @@ export class OwnTick implements OwnTimeline {
    */
   onOwnSync(m: ServerOwnSyncMessage): void {
     if (!this.on) return;
+    if (!m.c) {
+      // (Its hazards alone: a hazard the server decided. That tick ends with them, and it's stepped again from the next;
+      // the ticks it already flew under it come with the snapshot's control row. Its own shells' window is still its own)
+      const h = ownSyncHazards(m), had = this.full.get(m.t);
+      this.hazTold.set(m.t, h);
+      if (this.hazTold.size > 8) this.hazTold.delete(this.hazTold.keys().next().value!);
+      if (had) this.full.set(m.t, { ...had, hazard: h });
+      this.stats.syncs++;
+      this.host.reps.rewind(this.host.self(), m.t + 1);
+      return;
+    }
     const x = unpackOwnSync(m), ship = this.host.store.get(this.host.self());
     if (ship) x.charge = seedOwnExtras({ derived: ship.derived }, x.charge).charge;
     this.full.set(m.t, x);

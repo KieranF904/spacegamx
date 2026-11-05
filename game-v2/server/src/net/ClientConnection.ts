@@ -2,7 +2,7 @@
  * One client's connection state (GameServer.connect builds it). Its own file so message handlers and modules can
  * import the type without importing GameServer.
  */
-import type { ClientSocket, Blueprint, ShipState, Leg } from '@space-game/common';
+import type { ClientSocket, Blueprint, ShipState, Leg, HazardState } from '@space-game/common';
 import type { PackedLink } from './snapshot/PackedLink.js';
 import type { FocusState } from './cells/FocusCells.js';
 import type { AwayShips } from '@space-game/common';
@@ -103,8 +103,8 @@ export interface ClientConnection {
   ownLate?: boolean;
   /** Its check found its own ship's state off (OwnChecks): an ownSync goes with the next snapshot (SnapshotBuilder) */
   ownSyncDue?: boolean;
-  /** Its own ship's hazards as its last ownSync told them (SnapshotBuilder ownHazardKey) */
-  ownHazards?: string;
+  /** Its own ship's hazards as its last ownSync told them (SnapshotBuilder ownHazardKey runs them on to now) */
+  ownHazards?: HazardState;
   /** Its own shells (CAPS.SHOT_IDS) since the last snapshot it was sent: told, all of them, if that window's own ship was put right */
   ownWindow?: number[];
   /** ...as does anything that moves the ship besides its inputs (a new keyframe version), or a status change */

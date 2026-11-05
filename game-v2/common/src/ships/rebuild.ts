@@ -9,7 +9,7 @@ import type { Blueprint, FireSpec, FunctionDef, MaterialDef, Vec2, WeaponMods, W
 import type { Catalog } from './catalog.js';
 import { designOf, newDesign, wholeBuilt, turretFrameOf, wholeExhaust, wholeTurret, type DesignInfo } from './design.js';
 import { floodFill, partMount } from './blueprint.js';
-import { ShipTuning, healthFactor } from './tuning.js';
+import { ShipTuning, partHealth } from './tuning.js';
 import { type TurretRays, type TurretWindow, castTurret } from './turret.js';
 import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
 import { fnOutput, isEngine, partDemand, partGrade, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
@@ -421,7 +421,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const networks: FlowNetwork[] = wn.nets.map((g) => {
     let supply = 0, powered = false, stored = false;
     for (const i of g) {
-      if ((fns[i].produce ?? 0) > 0) { powered = true; supply += partSupply(fns[i], area[i], mats[i]) * healthFactor(hp[i] / maxHp[i], tuning); }
+      if ((fns[i].produce ?? 0) > 0) { powered = true; supply += partSupply(fns[i], area[i], mats[i]) * partHealth(hp[i], maxHp[i], tuning); }
       // (Energy routing's relays, the Conduit and Diode, store nothing for the old flow: circuits.ts leaves them out of the pool)
       if ((fns[i].store ?? 0) > 0 && !fns[i].relayOnly && !fns[i].oneWay) stored = true;
     }
@@ -642,7 +642,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   }
 
   // ---- The power layout (circuits.ts): the ship's pool and the banks, worked out here once, run by energy.ts every tick
-  const health = hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning));
+  const health = hp.map((h, i) => partHealth(h, maxHp[i], tuning));
   // (A ports design runs on the ports core instead, power/ports.ts: power crosses only through the parts' ports, and the old
   // layout is left out, so everything that reads `power` must do without it)
   const ports = blueprint.power === 'ports'

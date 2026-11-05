@@ -37,6 +37,8 @@ interface Opts {
   /** A hitch: no inputs sent from `from` until `to`, then those ticks' inputs all at once (late), the controls it had before (`same`) or changed */
   hitch?: { from: number; to: number; same: boolean };
   ticks?: number;
+  /** Its ship (a library blueprint; the Sparrow T if not said) */
+  ship?: string;
   /** An observer near it: its replica of A checked at each snapshot, and A's keyframes to it counted */
   watch?: boolean;
 }
@@ -69,7 +71,9 @@ function fly(o: Opts = {}) {
     };
   }
   // What A was sent of its own ship, and its own layer against the server's ship at each snapshot's tick
-  const got = { keyframes: 0, ctlRows: 0, causes: 0, snapshots: 0, off: 0, checked: 0, ownRows: 0, causedRows: 0 };
+  const got = { keyframes: 0, ctlRows: 0, causes: 0, snapshots: 0, off: 0, checked: 0, ownRows: 0, causedRows: 0, syncs: 0, hazSyncs: 0, headMisses: 0 };
+  // (The ownSyncs it was sent: its whole state put right, or its hazards alone; and its head hashes it disagreed with)
+  { const ot = A.own, o2 = ot.onOwnSync.bind(ot); ot.onOwnSync = (m) => { if (m.c) got.syncs++; else got.hazSyncs++; o2(m); }; }
   const truth = new Map<number, number[]>();
   const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void };
   const oSnap = fa.snapshot.bind(A);
@@ -117,6 +121,7 @@ function fly(o: Opts = {}) {
     truth.set(server.getTick(), [Position.x[A.pid], Position.y[A.pid], Velocity.x[A.pid], Velocity.y[A.pid], Rotation.angle[A.pid]]);
     clock.t += 1000 / 60;
     chk = A.own.takeCheck(true, server.getTick());
+    got.headMisses = A.own.stats.headMisses;
     const rep = A.selfHits.takeReport(true);
     if (rep) server.hits.report(server.pilots.connOf(A.pid)! as never, rep);
     for (const m of A.outbox.splice(0)) A.link?.receive(m);
@@ -125,7 +130,7 @@ function fly(o: Opts = {}) {
   for (let i = 0; i < 20; i++) step(-1);
   { const c = server.pilots.connOf(A.pid)! as unknown as { isAdmin: boolean }; c.isAdmin = true; server.admin.run(c as never, 'god', { on: 'on' }); c.isAdmin = false; }
   const num = InSystem.systemId[A.pid];
-  ships.respawnInPlace(A.pid, ships.library.get('sparrow-t')!);
+  ships.respawnInPlace(A.pid, ships.library.get(o.ship ?? 'sparrow-t')!);
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
   if (C) { Position.x[C.pid] = x0 - 300; Position.y[C.pid] = y0 - 400; Velocity.x[C.pid] = 0; Velocity.y[C.pid] = 0; }
@@ -219,6 +224,33 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.got.ctlRows).toBeGreaterThan(0);
     expect(r.got.off).toBe(0);
     expect(r.checks.bodyOff).toBe(0);
+    // (Its full state stays exact: the EMP is told as its hazards alone, once, as it lands; its end it works out itself)
+    expect(r.got.headMisses).toBe(0);
+    expect(r.got.syncs).toBe(0);
+    expect(r.got.hazSyncs).toBe(1);
+  }, 120_000);
+
+  // (Found in the net table's Scrap Mother fight, docs/audits/sim-foundation-after-2026-11-06.md: the server held parts
+  // it had restored dead, its client's step refilled them, an ownSync about once a second. Its other cause there, a
+  // damaged generator's output from exact HP against its client's tenths: common power/ports.test.ts)
+  const engines = (w: World) => {
+    const s = w.server.getShips().get(w.A.pid)!;
+    return s.blueprint.parts.map((p, i) => (/engine|drive|thruster/.test(p.fn) && s.derived.alive[i] ? i : -1)).filter((i) => i >= 0);
+  };
+  it('its hull restored over parts it lost (scaleHp, as the benches keep a pilot alive): rebuilt, its full state exact', () => {
+    const r = fly({
+      ship: 'halberd',
+      each: (t, w) => {
+        const ships = w.server.getShips();
+        if (t === 150 || t === 330) for (const i of engines(w).slice(0, 3)) ships.damagePartFraction(w.A.pid, i, 1);
+        if (t === 210 || t === 390) ships.scaleHp(w.A.pid, 1);
+      },
+    });
+    expect(r.own.rebuild).toBeGreaterThanOrEqual(4);
+    expect(r.got.headMisses).toBe(0);
+    expect(r.got.syncs).toBe(0);
+    expect(r.checks.bodyOff).toBe(0);
+    expect(r.got.off).toBe(0);
   }, 120_000);
 
   it('rebuilt at one point a tick: parts lost, healed, repaired and regrown between ticks and mid-tick, once each tick, its layer exact', () => {

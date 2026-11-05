@@ -22,16 +22,20 @@ import {
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packSheds, packRanges, DEBRIS_STATUS, TICK_RATE,
   FOCUS_RANGE, RING_RANGE, CROWD_BASE_WINDOW, FEED_TIERS, feedMidRadius,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
-  headWord, HEAD_HASH_ROW, ownStateHash, ownBodyHash, packOwnSync, type OwnExtras,
+  headWord, HEAD_HASH_ROW, ownStateHash, ownBodyHash, packOwnSync, packOwnHazards, type OwnExtras, type HazardState,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 
 /** A pilot's own ship as its client's tick layer should have it at the snapshot's tick (SnapshotBuilder.ownNow) */
 interface OwnNow { x: OwnExtras; hash: number }
 
-/** Its hazards as an ownSync tells them (EMP's end, slowing's end, numb's factor): a change is one its client can't foresee */
-function ownHazardKey(x: OwnExtras, tick: number): string {
-  const h = x.hazard, next = tick + 1;
+/**
+ * Its hazards as they stand for its next tick (EMP's end, slowing's end, numb's factor), from what its last ownSync told
+ * it or from the server's now: the two differ only on a change its client can't foresee. A hazard running out isn't one:
+ * its client runs it out itself, on the same tick
+ */
+function ownHazardKey(h: Readonly<HazardState>, tick: number): string {
+  const next = tick + 1;
   return `${h.empUntil > next ? h.empUntil : 0}|${h.slowUntil > next ? h.slowUntil : 0}|${h.numb}`;
 }
 import type { ClientConnection } from './ClientConnection.js';
@@ -774,18 +778,21 @@ export class SnapshotBuilder {
       const self = selfRow ? this.selfRowState(conn, selfRow, prevStates) : null;
       // (Its own ship's full state now: the head hash, its check's expectation, and an ownSync (its stores, guns, hazards
       // and priming put right, exact) when its client can't have them: its check found them off (OwnChecks), first sight,
-      // a new keyframe version (a new ship, a teleport), a late input, or its hazards changed (an EMP, a Frostbite's
-      // slowing, the cold's stage). Anything else off its head hash finds within a second or so, and its check brings it)
+      // a new keyframe version (a new ship, a teleport) or a late input. Its hazards changed (an EMP, a Frostbite's slowing,
+      // the cold's stage: the server's decision) and nothing else: an ownSync of them alone, the rest its client's own to step.
+      // Anything else off its head hash finds within a second or so, and its check brings it)
       const ownNow = this.ownNow(conn);
-      const hazKey = ownNow ? ownHazardKey(ownNow.x, this.currentTick) : '';
-      const syncing = !!ownNow && (!!conn.ownSyncDue || hazKey !== conn.ownHazards || (!!self && (!prevStates.has(conn.playerId) || conn.selfLate || self.version !== conn.selfVersion)));
-      if (syncing) conn.ownHazards = hazKey;
+      // (its hazards as last told, run on to now as its client runs them, against the server's)
+      const hazChanged = !!ownNow && (!conn.ownHazards || ownHazardKey(conn.ownHazards, this.currentTick) !== ownHazardKey(ownNow.x.hazard, this.currentTick));
+      const fullSync = !!ownNow && (!!conn.ownSyncDue || (!!self && (!prevStates.has(conn.playerId) || conn.selfLate || self.version !== conn.selfVersion)));
+      const hazSync = hazChanged && !fullSync, syncing = fullSync || hazSync;
+      if (syncing) conn.ownHazards = { ...ownNow!.x.hazard };
       const fire: number[][] = [];
       const covered = new Set<number>();
       // (Its ship keyframed in this snapshot, or its state put right (an ownSync): what its layer built its own shells of
       // the window from isn't the server's; their hits are told, as rows' are, every one since the last snapshot it got.
       // Client ShipClient.preSnapshot, OwnShells.snapshot's `keyed`)
-      const ownTold = keyed.has(conn.playerId) || syncing;
+      const ownTold = keyed.has(conn.playerId) || fullSync;
       // (its own straight shells it works out itself, CAPS.SHOT_IDS: no record, no row, named by shot id in its hits and removals)
       if (this.hits && !this.hits.shellName) { const log = this.ownShotLog; this.hits.shellName = (c, id) => log.wireOf(c, id) ?? id; }
       for (const f of this.ships.fired) {
@@ -932,7 +939,7 @@ export class SnapshotBuilder {
       }
 
       // (The ownSync goes first: its client takes it before the snapshot's own processing, OwnTick.onOwnSync)
-      if (syncing) { this.send(conn.ws, packOwnSync(this.currentTick, ownNow!.x)); this.ownSyncs++; }
+      if (syncing) { this.send(conn.ws, fullSync ? packOwnSync(this.currentTick, ownNow!.x) : packOwnHazards(this.currentTick, ownNow!.x.hazard)); this.ownSyncs++; }
       if (ownNow) conn.ownSyncDue = false;
       this.send(conn.ws, {
         type: 'snapshot',

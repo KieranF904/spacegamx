@@ -137,12 +137,19 @@ export function installGhost(b: BridgeCtx, eid: number, uid: number): boolean {
   return true;
 }
 
-/** Make a ship tougher (elite enemies): every part's max HP × k, at full HP */
+/**
+ * Make a ship tougher (elite enemies): every part's max HP × k, at full HP. On a ship that has lost parts (the benches
+ * keep a pilot alive with it) the parts it brings back are rebuilt at the tick's rebuild point, as a repair's are:
+ * otherwise the ship flies on its old structure (engines and stores of parts it has back left dead) while its HP, and
+ * its client's rebuild from that HP, say they're there
+ */
 export function scaleHp(b: BridgeCtx, eid: number, k: number): void {
   const ship = b.bodies.get(eid);
   if (!ship) return;
+  const down = ship.hp.some((h, i) => !(h > 0) || !ship.derived.alive[i]);
   ship.maxHp = ship.maxHp.map((h) => h * k);
   ship.hp = [...ship.maxHp];
+  if (down) b.markRebuild(eid, ship);
   ship.rebuildHp = [...ship.hp];
   if (k !== 1) ship.scaledHp = true;
 }

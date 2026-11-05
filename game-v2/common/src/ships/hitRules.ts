@@ -22,7 +22,7 @@
 
 import type { Catalog } from './catalog.js';
 import type { ShipState } from './state.js';
-import type { ShipTuning, WeaponTuning } from './tuning.js';
+import { hpWire, type ShipTuning, type WeaponTuning } from './tuning.js';
 import { geomContainsPoint, type PlacedGeom } from './grid.js';
 import type { Vec2 } from './types.js';
 import { damagePart } from './state.js';
@@ -112,10 +112,8 @@ export function newPartHit(): PartHitResult {
   return { part: -1, dealt: 0, soak: 0, broke: false, through: 1, share: 1, glancing: false };
 }
 
-/** Part HP on the wire: to a tenth, never rounded down to nothing */
-export function hpWire(h: number): number {
-  return h <= 0 ? 0 : Math.max(0.1, Math.round(h * 10) / 10);
-}
+/** (Part HP on the wire: tuning.ts, beside the health it decides) */
+export { hpWire };
 
 /** Does a shell of this kind do anything at its end a detonation has to tell (a burst, an EMP, shards, a pull, fire)? */
 export function bursts(def: WeaponTuning): boolean {

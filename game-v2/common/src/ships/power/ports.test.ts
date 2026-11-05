@@ -10,7 +10,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import type { Side } from '../types.js';
 import { join } from 'node:path';
 import { parseBlueprint, validateBlueprint } from '../blueprint.js';
-import { createShipState } from '../state.js';
+import { createShipState, rebuildShip } from '../state.js';
+import { hpWire } from '../tuning.js';
 import { stepGuns } from '../guns.js';
 import { powerTick, remapCharge, type Charge } from '../energy.js';
 import { SHIP_DATA_DIR } from '../testData.js';
@@ -222,5 +223,28 @@ describe('arming a ship (design doc section 17)', () => {
     expect(n.get(inner)).toBeGreaterThan(10);
     expect(a.get(inner)).toBe(n.get(inner));
     expect(a.get(outer) ?? 0).toBe(0);
+  });
+});
+
+describe('a damaged generator on both ends', () => {
+  // (The server rebuilds from its exact part HP, a client from the tenths its sync carried (hpWire): a generator's output
+  // is worked out from the wire's tenths on both (tuning.ts partHealth), or a ship with a damaged generator has stores a
+  // hair apart at each end and its client's full-state hash misses: the net table's Scrap Mother fight)
+  it('the Halberd rebuilt from its exact HP and from its wire HP: the same layout, rates and link caps', () => {
+    const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/halberd.json'), 'utf8'));
+    const server = createShipState(catalog, tuning, 1, bp, 0), client = createShipState(catalog, tuning, 1, bp, 0);
+    const role = server.derived.ports!.role, gens = [...role.keys()].filter((i) => role[i] === P_GEN);
+    expect(gens.length).toBeGreaterThan(2);
+    // (each left just under a tenth's rounding: as far from its client's copy as the wire lets it be)
+    gens.forEach((i, k) => { server.hp[i] = Math.round(server.maxHp[i] * (0.15 + 0.1 * k) * 10) / 10 + 0.0499; });
+    server.dirty = true;
+    rebuildShip(server, catalog, tuning);
+    client.hp = server.hp.map(hpWire);
+    client.dirty = true;
+    rebuildShip(client, catalog, tuning);
+    const L = server.derived.ports!, C = client.derived.ports!;
+    for (const k of ['role', 'cap', 'rate', 'intake', 'burn', 'linkCap', 'linkFrom', 'linkTo'] as const) expect(Array.from(C[k] as ArrayLike<number>), k).toEqual(Array.from(L[k] as ArrayLike<number>));
+    expect(C.ports.map((p) => p.rate)).toEqual(L.ports.map((p) => p.rate));
+    expect(client.derived.energy).toEqual(server.derived.energy);
   });
 });

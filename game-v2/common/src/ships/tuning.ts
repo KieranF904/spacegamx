@@ -242,3 +242,17 @@ export interface WeaponTuning {
 export function healthFactor(f: number, t: ShipTuning): number {
   return f <= 0 ? 0 : t.health.floor + t.health.slope * Math.min(1, f);
 }
+
+/** Part HP on the wire: to a tenth, never rounded down to nothing */
+export function hpWire(h: number): number {
+  return h <= 0 ? 0 : Math.max(0.1, Math.round(h * 10) / 10);
+}
+
+/**
+ * A part's output against its health, as a rebuild works it out (rebuild.ts): from its HP as the wire carries it (hpWire),
+ * on both ends. A client rebuilds a ship from the HP its sync carried (to a tenth), so the server derives from the same
+ * tenths, or a damaged generator makes a hair more or less on one end and the stores it feeds drift apart
+ */
+export function partHealth(hp: number, maxHp: number, t: ShipTuning): number {
+  return healthFactor(hpWire(hp) / (hpWire(maxHp) || 1), t);
+}

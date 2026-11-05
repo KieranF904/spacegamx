@@ -6,7 +6,7 @@
  *
  * The state besides the pose and controls (`OwnExtras`: stores, guns, hazards, priming) is kept by the client per
  * tick and put right exactly by an `ownSync` (packOwnSync/unpackOwnSync) when the server's head hash or the client's
- * own check says it is off (headHash.ts ownStateHash).
+ * own check says it is off (headHash.ts ownStateHash). A hazard it couldn't foresee is told alone (packOwnHazards).
  */
 
 import type { FlightBody } from '../ships/flight.js';
@@ -14,7 +14,7 @@ import type { ShipState } from '../ships/state.js';
 import type { ShipDerived } from '../ships/rebuild.js';
 import { ensurePortsCharge, type Charge } from '../ships/energy.js';
 import type { PortsState } from '../ships/power/ports.js';
-import { cloneCharge, newGunState, NO_HAZARD, type GunState, type SimShipState, type SimStructure } from './state.js';
+import { cloneCharge, newGunState, NO_HAZARD, type GunState, type HazardState, type SimShipState, type SimStructure } from './state.js';
 import { simAimQ, type SimInput } from './input.js';
 import { replicaAngle, quantizeReplicaAngle } from '../network/replication.js';
 import type { SimEnv } from './env.js';
@@ -104,19 +104,23 @@ export function ownStructure(derived: ShipDerived, ship: Readonly<ShipState>): S
 
 /**
  * `ownSync` (a plain message, server to its pilot's client): its own ship's extras at the end of tick `t`, exact (the
- * stores, the gun state, hazards as ticks left after t, priming). Its pose and controls go by its keyframe
+ * stores, the gun state, hazards as ticks left after t, priming). Its pose and controls go by its keyframe.
+ *
+ * Or its hazards alone (`c`, `g` and `p` absent: packOwnHazards): a hazard it couldn't foresee (an EMP, a Frostbite's
+ * slowing, the cold's stage) is the server's decision, and the rest of its state is still its own to step. The ticks
+ * it already flew under it come with the server's control row's hazard bits (stepOwnShip keeps them)
  */
 export interface ServerOwnSyncMessage {
   type: 'ownSync';
   t: number;
   /** The stores */
-  c: Charge;
+  c?: Charge;
   /** The gun state */
-  g: GunState;
+  g?: GunState;
   /** Hazards: EMP and slowed ticks left from t + 1, numb's control factor */
   h: [number, number, number];
   /** Priming */
-  p: number;
+  p?: number;
 }
 
 /** A ports ship's stores' typed arrays as plain ones (the wire carries arrays), and back */
@@ -137,12 +141,29 @@ export function packOwnSync(t: number, x: Readonly<OwnExtras>): ServerOwnSyncMes
   delete c.row;
   if (c.e) c.e = portsOut(c.e);
   const next = t + 1;
-  return { type: 'ownSync', t, c, g: cloneOwnExtras(x).guns, h: [Math.max(0, x.hazard.empUntil - next), Math.max(0, x.hazard.slowUntil - next), x.hazard.numb], p: x.jumpPrime };
+  return { type: 'ownSync', t, c, g: cloneOwnExtras(x).guns, h: hazardsOut(t, x.hazard), p: x.jumpPrime };
 }
 
-export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
+/** An ownSync of its hazards alone (see ServerOwnSyncMessage) */
+export function packOwnHazards(t: number, h: Readonly<HazardState>): ServerOwnSyncMessage {
+  return { type: 'ownSync', t, h: hazardsOut(t, h) };
+}
+
+function hazardsOut(t: number, h: Readonly<HazardState>): [number, number, number] {
+  const next = t + 1;
+  return [Math.max(0, h.empUntil - next), Math.max(0, h.slowUntil - next), h.numb];
+}
+
+/** An ownSync's hazards as of the end of tick m.t (not EMP'd or slowed: 0, as the server's own state has it then) */
+export function ownSyncHazards(m: ServerOwnSyncMessage): HazardState {
   const next = m.t + 1, h = m.h ?? [0, 0, 1];
-  const g = m.g;
+  return { empUntil: h[0] > 0 ? next + h[0] : 0, slowUntil: h[1] > 0 ? next + h[1] : 0, numb: h[2] };
+}
+
+/** Its full extras (an ownSync with its stores: `c` there; one of its hazards alone has none) */
+export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
+  const g = m.g ?? {} as Partial<GunState>;
+  if (!m.c) throw new Error('ownSync: hazards only');
   // (Absent scalars come back undefined, as they went)
   const guns: GunState = {
     cooldown: [...(g.cooldown ?? [])], rounds: [...(g.rounds ?? [])], reload: [...(g.reload ?? [])], charge: [...(g.charge ?? [])], spin: [...(g.spin ?? [])], aim: [...(g.aim ?? [])],
@@ -151,8 +172,6 @@ export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
   const charge: Charge = { ...m.c, b: [...(m.c.b ?? [])] };
   if (m.c.e) charge.e = portsIn(m.c.e);
   return {
-    charge: cloneCharge(charge), guns, jumpPrime: m.p ?? 0,
-    // (Not EMP'd or slowed: 0, as the server's own state has it then)
-    hazard: { empUntil: h[0] > 0 ? next + h[0] : 0, slowUntil: h[1] > 0 ? next + h[1] : 0, numb: h[2] },
+    charge: cloneCharge(charge), guns, jumpPrime: m.p ?? 0, hazard: ownSyncHazards(m),
   };
 }
