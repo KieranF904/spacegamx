@@ -11,6 +11,7 @@
  */
 
 import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '@space-game/common';
+import { bossRise, clearBossLives } from './bossLife';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -725,9 +726,12 @@ export class ShipClient {
     (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)), this.features);
     // (Holding cells, CAPS.FOCUS: a ship 18 km off and more fades to its ghost, GhostLayer; the drawn own ship's place, drawGhosts)
     this.renderer.ghostOf = (id) => {
-      if (!this.focusOn || id === this.opts.state.playerId) return 0;
+      // (A lair boss rising out of its lair or sinking back: ships/bossLife.ts)
+      const rise = bossRise(id, this.opts.state.renderTickNow);
+      if (!this.focusOn || id === this.opts.state.playerId) return 1 - rise;
       const e = this.opts.state.entities.get(id);
-      return e ? ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus) : 0;
+      const g = e ? ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus) : 0;
+      return 1 - (1 - g) * rise;
     };
     renderer.onMuzzle = (owner, x, y, power) => {
       this.renderer?.kick(owner, x, y, power);
@@ -1171,6 +1175,8 @@ export class ShipClient {
         this.central = msg.centralBody;
         // A surface's rock (pushed out of it in prediction, as the server does)
         this.terrain = terrainFor(msg.systemId);
+        // (Another system: no lair boss of the last one is rising or sinking here)
+        clearBossLives();
         this.lodestones = msg.lodestones ?? [];
         this.hazardSys = msg.hazardRatings ? { hazardRatings: msg.hazardRatings, starRadius: msg.hazardRadius, centralBody: { type: msg.centralBody.type } } : null;
         return false; // the game also handles it

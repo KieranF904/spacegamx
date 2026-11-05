@@ -10,6 +10,8 @@
  * every type in server/src/golden/serverMessages.json is in HANDLERS and the table has nothing else.
  */
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
+import { noteBossLife } from '../ships/bossLife';
+import { devFeeds } from './devFeeds';
 import { showHitTick } from '../ui/HitTick';
 import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
@@ -356,6 +358,13 @@ const TABLE: Handlers = {
     if (msg.text) h.bossUI.onPhase(msg.text);
   },
   bossDefeated: (h, msg) => { h.bossUI.defeated(msg.name); },
+  // (A lair boss waking, sinking back, gone: drawn from its tick, ships/bossLife.ts)
+  bossLife: (h, msg) => {
+    noteBossLife(msg);
+    if (msg.state === 'waking') h.audio.playUI('warning', 0.6);
+  },
+  bossWindow: (h, msg) => { h.bossUI.window(msg); },
+  bossDev: (_h, msg) => { devFeeds.bossDev?.(msg); },
   questStep: (h, msg) => {
     h.quests.stepDone(msg.text);
     h.toasts.show(`Next: ${msg.text}`, 'info');

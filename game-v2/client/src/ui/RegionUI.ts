@@ -9,7 +9,7 @@
  *           ship, the interact key asks twice.
  */
 
-import { regionAt, threatLevel, type StarSystemData, type SystemRegionData } from '@space-game/common';
+import { regionAt, threatLevel, insideArena, nearGate, GATE, type StarSystemData, type SystemRegionData } from '@space-game/common';
 import { threatTag } from './threat';
 
 const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -146,6 +146,25 @@ export class RegionUI {
     this.bannerTimer = performance.now() + 4000;
   }
 
+  /** Near a boss arena's barrier (common world/gates.ts): how to pass it, its card. False when not near one */
+  private barrier(ctx: RegionContext): boolean {
+    const a = ctx.sys.arena;
+    if (!a || !nearGate(a, ctx.x, ctx.y)) return false;
+    const inside = insideArena(a, ctx.x, ctx.y);
+    const key = `arena|${inside}|${ctx.interactKey}`;
+    if (key === this.gateKey) return true;
+    this.gateKey = key;
+    const k = `<kbd>${esc(ctx.interactKey)}</kbd>`;
+    this.gate.className = 'rg-gate' + (inside ? '' : ' warn');
+    this.gate.innerHTML = `<div class="rg-k">Barrier</div>`
+      + `<div class="rg-n">${inside ? 'The way out' : 'The way in'}</div>`
+      + `<div class="rg-u">${inside
+        ? `Press ${k} to pass. You must be out of combat for ${GATE.quiet / 60} s first (no damage dealt or taken).`
+        : `Press ${k} to pass. Nothing crosses the barrier either way, shots included; leaving again needs ${GATE.quiet / 60} s out of combat.`}</div>`;
+    this.gate.style.display = 'block';
+    return true;
+  }
+
   private updateGate(ctx: RegionContext): void {
     let best: { target: string; x: number; y: number; rift: boolean; d: number } | null = null;
     for (const p of ctx.sys.portals ?? []) {
@@ -160,6 +179,7 @@ export class RegionUI {
     if (!best || !to || to.private) {
       this.near = null;
       this.asked = null;
+      if (this.barrier(ctx)) return;
       if (this.gateKey) { this.gate.style.display = 'none'; this.gateKey = ''; }
       return;
     }

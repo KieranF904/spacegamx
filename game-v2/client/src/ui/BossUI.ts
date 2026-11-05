@@ -1,10 +1,12 @@
 /**
  * Boss presentation: a health bar across the top while a boss is near (its
  * name, title, hull and the phase marks), a title card when the fight starts,
- * and a victory card when it falls.
+ * and a victory card when it falls. Under the bar, a weak-point window's meter
+ * (common bosses/windows.ts): its cap filling as damage lands, the time left
+ * running down, and a flash when it cracks.
  */
 
-import { EntityType, huntedBoss } from '@space-game/common';
+import { EntityType, huntedBoss, WINDOW, type ServerBossWindowMessage } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import { setStyle } from './domWrite';
 import bossData from '../../../data/bosses.json';
@@ -32,6 +34,13 @@ function inject(): void {
 .bb-bar > s { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(0,0,0,0.65); }
 .bb.hit .bb-bar { animation: bbhit .5s; }
 @keyframes bbhit { 0% { box-shadow: 0 0 30px rgba(255, 220, 120, 0.9); } 100% { box-shadow: 0 0 18px rgba(255, 90, 30, 0.25); } }
+.bb-w { position: relative; margin: 4px auto 0; width: 62%; height: 7px; border-radius: 3px; background: rgba(10, 18, 14, 0.8);
+  border: 1px solid rgba(160, 255, 200, 0.5); overflow: hidden; display: none; box-shadow: 0 0 12px rgba(80, 255, 170, 0.25); }
+.bb-w > i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #b8ffd8, #2fbf7f); transition: width .12s; }
+.bb-w > u { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(255, 255, 255, 0.75); }
+.bb-w.crack { border-color: #fff3b0; box-shadow: 0 0 22px rgba(255, 240, 150, 0.8); }
+.bb-w.crack > i { background: linear-gradient(180deg, #fff6c8, #e8b84a); }
+.bb-wl { font-size: 10px; letter-spacing: 3px; color: #a8f0c8; margin-top: 2px; min-height: 12px; text-shadow: 0 1px 3px #000; display: none; }
 .bb-p { margin-top: 4px; font-size: 11px; color: #fca5a5; letter-spacing: 1px; min-height: 14px; text-shadow: 0 1px 3px #000; }
 
 .bt { position: fixed; left: 0; right: 0; top: 118px; z-index: 3100; pointer-events: none; display: flex; justify-content: center; }
@@ -59,6 +68,12 @@ export class BossUI {
   private current = -1;
   private lastHull = 100;
   private phaseTimer: number | null = null;
+  private meter!: HTMLElement;
+  private meterFill!: HTMLElement;
+  private meterTime!: HTMLElement;
+  private meterLabel!: HTMLElement;
+  /** The open window (bossWindow), by its boss */
+  private win: ServerBossWindowMessage | null = null;
   hidden = false;
 
   /** Is the boss bar up (other panels make room) */
@@ -70,7 +85,11 @@ export class BossUI {
     inject();
     this.bar = document.createElement('div');
     this.bar.className = 'bb';
-    this.bar.innerHTML = '<div class="bb-n"></div><div class="bb-t"></div><div class="bb-bar"><b></b><i></i><span></span></div><div class="bb-p"></div>';
+    this.bar.innerHTML = '<div class="bb-n"></div><div class="bb-t"></div><div class="bb-bar"><b></b><i></i><span></span></div><div class="bb-w"><i></i><u></u></div><div class="bb-wl"></div><div class="bb-p"></div>';
+    this.meter = this.bar.querySelector('.bb-w')!;
+    this.meterFill = this.bar.querySelector('.bb-w > i')!;
+    this.meterTime = this.bar.querySelector('.bb-w > u')!;
+    this.meterLabel = this.bar.querySelector('.bb-wl')!;
     this.name = this.bar.querySelector('.bb-n')!;
     this.title = this.bar.querySelector('.bb-t')!;
     this.fill = this.bar.querySelector('.bb-bar > i')!;
@@ -118,6 +137,34 @@ export class BossUI {
       this.bar.classList.add('hit');
     }
     this.lastHull = hull;
+    this.drawWindow(best.id);
+  }
+
+  /** A weak-point window opened, filled, cracked or closed */
+  window(msg: ServerBossWindowMessage): void {
+    const was = this.win;
+    this.win = msg.ticks > 0 ? msg : null;
+    if (msg.crack && !was?.crack) this.sound('level_up', 0.5);
+    else if (msg.ticks > 0 && (!was || was.at !== msg.at)) this.sound('warning', 0.35);
+  }
+
+  /** The meter under the bar, for the boss the bar is showing */
+  private drawWindow(boss: number): void {
+    const w = this.win;
+    const left = w ? w.at + w.ticks - this.state.renderTickNow : 0;
+    if (!w || w.bodyId !== boss || left <= 0) {
+      if (w && left <= 0) this.win = null;
+      setStyle(this.meter, 'display', 'none');
+      setStyle(this.meterLabel, 'display', 'none');
+      return;
+    }
+    setStyle(this.meter, 'display', 'block');
+    setStyle(this.meterLabel, 'display', 'block');
+    this.meter.classList.toggle('crack', !!w.crack);
+    setStyle(this.meterFill, 'width', `${Math.round((w.fill / WINDOW.steps) * 100)}%`);
+    setStyle(this.meterTime, 'width', `${Math.max(0, Math.min(100, (left / w.ticks) * 100)).toFixed(1)}%`);
+    const text = w.crack ? 'CRACKED · STAGGERED' : `WEAK POINT · ${(left / 60).toFixed(1)} s`;
+    if (this.meterLabel.textContent !== text) this.meterLabel.textContent = text;
   }
 
   onPhase(text: string): void {

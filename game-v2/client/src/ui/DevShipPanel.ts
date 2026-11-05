@@ -29,13 +29,13 @@ function kit(bp: Plan): { text: string; mines: boolean } {
 export class DevShipPanel {
   private el = document.createElement('div');
   private readonly onKey = (e: KeyboardEvent) => {
-    if (e.code !== 'F9') return;
+    if (e.code !== 'F9' || e.shiftKey) return;
     e.preventDefault();
     this.el.style.display = this.el.style.display === 'none' ? 'block' : 'none';
   };
 
   /** `ships`: the plan library by file name; `swap`: fly one of them (or, with none, your own); `boss`: wear the nearest boss down, or reset it; `range`: go to the weapons range (F10 has its panel) */
-  constructor(ships: Record<string, Plan>, private swap: (ship?: string) => void, boss?: (wear?: number, reset?: boolean) => void, range?: () => void) {
+  constructor(ships: Record<string, Plan>, private swap: (ship?: string) => void, boss?: (wear?: number, reset?: boolean) => void, range?: () => void, bossTools?: () => void) {
     Object.assign(this.el.style, {
       position: 'fixed', left: '16px', top: '70px', width: '330px', maxHeight: '70vh', overflowY: 'auto', padding: '12px 14px', zIndex: '9000', display: 'none',
       background: 'rgba(8, 14, 24, 0.94)', border: '1px solid #2c4a66', borderRadius: '6px', color: '#cfe3f5',
@@ -90,6 +90,8 @@ export class DevShipPanel {
         row.appendChild(b);
       }
       this.el.append(head, row);
+      // (the boss tools: stages, moves, windows, dummies, slow motion, the damage log: DevBossPanel, Shift+F9)
+      if (bossTools) this.button('Boss tools (Shift+F9)', 'Stage and move jumps, windows, dummy pilots, slow motion, damage log', false, bossTools).style.marginTop = '8px';
     }
 
     document.body.appendChild(this.el);

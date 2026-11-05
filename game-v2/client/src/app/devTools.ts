@@ -1,10 +1,12 @@
 /**
- * Dev-only panels (F8 render tuning, F9 ship swap, F10 weapons range). Kept apart from the window registry so the import.meta.env.DEV
+ * Dev-only panels (F8 render tuning, F9 ship swap, Shift+F9 boss tools, F10 weapons range). Kept apart from the window registry so the import.meta.env.DEV
  * guard and the eager blueprint glob are tree-shaken from the deployed build.
  */
 import { RenderTuningPanel } from '../ui/RenderTuningPanel';
 import { DevShipPanel } from '../ui/DevShipPanel';
 import { DevRangePanel, type RangeGun } from '../ui/DevRangePanel';
+import { DevBossPanel } from '../ui/DevBossPanel';
+import { devFeeds } from './devFeeds';
 import shipModels from '../../../data/ships/models.json';
 import type { Renderer } from '../rendering/Renderer';
 import type { ClientTransport } from '@space-game/common';
@@ -16,8 +18,11 @@ export function installDevTools(host: { readonly renderer: Renderer; readonly ne
       // (Grouped: a ports design (`power: 'ports'`) first, then the library, then the dev test ships; one marked `retired` isn't listed)
       const library = import.meta.glob(['../../../data/ships/blueprints/*.json', '../../../data/ships/blueprints/dev/*.json'], { eager: true, import: 'default' }) as Record<string, { name: string; parts: { fn: string }[]; power?: string; retired?: unknown }>;
       const groupOf = (path: string, bp: { power?: string }) => (bp.power === 'ports' ? 'Ports energy' : path.includes('/dev/') ? 'Dev test ships' : 'Library');
+      // The boss tools (Shift+F9): its state comes back as bossDev (app/devFeeds.ts)
+      const bossTools = new DevBossPanel((m) => host.network.send({ type: 'bossDevTool', ...m }));
+      devFeeds.bossDev = (msg) => bossTools.update(msg);
       new DevShipPanel(Object.fromEntries(Object.entries(library).filter(([, bp]) => !bp.retired).map(([path, bp]) => [path.replace(/^.*\//, '').replace(/\.json$/, ''), { ...bp, group: groupOf(path, bp) }])), (ship) => host.network.send({ type: 'devShip', ship }),
-        (wear, reset) => host.network.send({ type: 'devBoss', wear, reset }), () => host.network.send({ type: 'devRange', action: 'go' }));
+        (wear, reset) => host.network.send({ type: 'devBoss', wear, reset }), () => host.network.send({ type: 'devRange', action: 'go' }), () => bossTools.toggle());
       // Weapons range (F10): every weapon model to arm a test rig with, the readout, ideal ammo
       const NO_TARGET = new Set(['repair', 'point_defence']);
       const guns: RangeGun[] = (shipModels as unknown as { models: { id: string; name: string; weapon?: string; grade?: number; mount?: string; fire?: { model?: string } }[] }).models
