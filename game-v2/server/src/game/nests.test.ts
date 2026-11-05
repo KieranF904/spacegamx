@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, EffectType, NEST_RADIUS, ServerMessage, ghostShip } from '@space-game/common';
+import { Position, Velocity, InSystem, EffectType, NEST_RADIUS, ServerMessage, ghostShip, LURE_RAMP, type ServerPopsMessage } from '@space-game/common';
+import { Populations } from '../../../client/src/state/Populations.js';
 import { GameServer } from '../GameServer.js';
 import { GameData, type GameDataFiles } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -86,7 +87,7 @@ describe('nests', () => {
     expect(loaded).toBe(def.packs);
   });
 
-  it('lost ships come back one at a time at its spawn rate, seen launching from the nest', () => {
+  it('lost ships come back one at a time, a pack refilling in about its spawn rate, seen launching from the nest', () => {
     const { step, got, nest, watch, kill, enemies, num } = world();
     const def = (files.factions as any).spawns.ashfall.nests.find((q: any) => q.id === DIG);
     const every = (def.respawnSeconds ?? (files.factions as any).rules.respawnSeconds) * 60;
@@ -103,13 +104,23 @@ describe('nests', () => {
     step(30, () => { watch(DIG); seen(); });
     const lost = pack.length + 1;
     expect(alive()).toBe(full - lost);
-    for (let k = 1; k <= lost; k++) {
-      step(every, () => { watch(DIG); seen(); });
-      expect(alive()).toBe(Math.min(full, full - lost + k));
+    // One ship at a time, each respawnSeconds / its pack's size apart: the hurt pack's one first, then the wiped one's
+    // (whatever group it comes back as) a ship every respawnSeconds / its size: a pack's worth in about respawnSeconds
+    // (A wiped-out pack may come back as another group, of another size: full is every slot whole)
+    const whole = () => enemies.population(num, DIG)!.slots.every((s) => s.group >= 0 && s.alive === (1 << def.groups[s.group].ships.length) - 1);
+    let t = 0, back = full - lost;
+    while (!whole() && t < every * 4) {
+      step(30, () => { watch(DIG); seen(); });
+      t += 30;
+      expect(alive() - back).toBeLessThanOrEqual(1);
+      back = alive();
       expect(nest(DIG).packs.flat().length).toBe(alive());
     }
+    expect(whole()).toBe(true);
+    expect(t).toBeGreaterThan(every * 0.9);
+    expect(t).toBeLessThan(every * 1.6 + 120);
     // (Each one out of the hull, seen launching)
-    expect(flashes).toBe(lost);
+    expect(flashes).toBe(alive() - (full - lost));
   });
 
   it("a pack nobody's near goes back to a ghost, as it was: leaving and coming back doesn't restock it", () => {
@@ -121,7 +132,7 @@ describe('nests', () => {
     const was = enemies.population(num, DIG)!.slots.map((s) => s.alive);
     const ships = nest(DIG).packs.flat().length;
     // Gone a long way off: nothing of it's simulated any more, but it's all still there, short as it was
-    step(60 * 25, () => watch(DIG, 90000));
+    step(60 * 10, () => watch(DIG, 90000));
     expect(nest(DIG).packs.length).toBe(0);
     expect(enemies.population(num, DIG)!.slots.every((s) => !s.loaded)).toBe(true);
     expect(enemies.population(num, DIG)!.slots.map((s) => s.alive)).toEqual(was);
@@ -273,6 +284,55 @@ describe('nests', () => {
     step(60 * 60, () => hold(40000, 0));
     expect(enemies.nest(sol, CAMP)!.packs.length).toBe(0);
     expect(enemies.population(sol, CAMP)!.slots).toEqual([{ group: 0, alive: 3, loaded: false, ships: [] }]);
+  }, 120000);
+
+  it('a ghost loaded within sight of a pilot comes in as a warp-in looks; one loaded at the edge of its reach just appears', () => {
+    const { step, got, enemies, num, hold, watch } = world();
+    const slot = enemies.population(num, DIG)!.slots.findIndex((s) => !s.loaded && s.alive);
+    expect(slot).toBeGreaterThanOrEqual(0);
+    got.length = 0;
+    // Dropped right by it (a jump, a gate): its ships fade in where they are
+    step(40, () => { const g = enemies.ghostAt(num, DIG, slot)!; hold(g.x + 5000, g.y); });
+    const s = enemies.population(num, DIG)!.slots[slot];
+    expect(s.loaded).toBe(true);
+    const warps = got.filter((m) => m.type === 'effect' && (m as any).effectType === EffectType.WarpIn);
+    for (const eid of s.ships) expect(warps.some((m: any) => Math.hypot(m.x - Position.x[eid], m.y - Position.y[eid]) < 400)).toBe(true);
+    // Come on from far off (the next world): loaded out past sight, nothing to see
+    const w2 = world();
+    w2.got.length = 0;
+    w2.step(60 * 3, () => w2.watch(DIG, 30000));
+    expect(w2.nest(DIG).packs.length).toBeGreaterThan(0);
+    expect(w2.got.some((m) => m.type === 'effect' && (m as any).effectType === EffectType.WarpIn)).toBe(false);
+    void watch;
+  });
+
+  it("a nomad's ghost drifts round towards its band's pilots, and a client told only the pops draws it the same", () => {
+    const CAMP = 'sol_camp_lanes';
+    const { server, step, enemies, hold, got } = world((f) => {
+      f.factions.spawns.sol.nests = [{ id: CAMP, packs: 1, respawnSeconds: 10, style: 'nomad', groups: [{ faction: 'redtooth', ships: ['redtooth_cutter', 'redtooth_cutter'], weight: 1 }] }];
+    });
+    const pid = (server as any).clients.values().next().value.playerId;
+    const sol = server.gameData.getSystemNum('sol');
+    const g0 = enemies.ghostAt(sol, CAMP, 0)!, r = Math.hypot(g0.x, g0.y);
+    // A pilot in its band, a third of the way round from it: far past its reach
+    const a = Math.atan2(g0.y, g0.x) + 2.1, spot = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+    const off = () => { const g = enemies.ghostAt(sol, CAMP, 0)!; return Math.abs(Math.atan2(Math.sin(Math.atan2(g.y, g.x) - a), Math.cos(Math.atan2(g.y, g.x) - a))); };
+    (server as any).travelTo(server.pilots.connOf(pid), sol, spot.x, spot.y, false);
+    step(130, () => hold(spot.x, spot.y));
+    const d0 = off();
+    expect(d0).toBeGreaterThan(1.5);
+    step(LURE_RAMP / 2, () => hold(spot.x, spot.y));
+    // Half way: drawn round some, and a client with only what it was sent has it in the same place
+    expect(off()).toBeLessThan(d0 - 0.5);
+    expect(enemies.population(sol, CAMP)!.slots[0].loaded).toBe(false);
+    const client = new Populations((enemies as any).data.spawns, Object.keys((enemies as any).data.factions));
+    for (const m of got.filter((q): q is ServerPopsMessage => q.type === 'pops')) client.apply(m, 'sol');
+    const g = enemies.ghostAt(sol, CAMP, 0)!;
+    const drawn = client.ghosts('sol', server.gameData.getSystem('sol'), server.getTick());
+    expect(drawn.map((q) => [Math.round(q.x), Math.round(q.y)])).toEqual([0, 1].map((k) => { const p = ghostShip(g, k); return [Math.round(p.x), Math.round(p.y)]; }));
+    // On: it comes all the way to the pilot's part of the system (and is loaded there)
+    step(LURE_RAMP / 2 + 600, () => hold(spot.x, spot.y));
+    expect(off()).toBeLessThan(0.45);
   }, 120000);
 
   it("Ashfall's nests mix small, medium and rare heavy hostiles", () => {

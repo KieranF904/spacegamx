@@ -35,9 +35,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 52;
+export const PROTOCOL_VERSION = 53;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '87be1bdd';
+export const PROTOCOL_WIRE_HASH = '26ab697f';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -974,6 +974,8 @@ export interface ServerPopsMessage {
   type: 'pops';
   p: number[];
   full?: 1;
+  /** Nomads' lures of the spawners in `p` that have one: [spawner index, l1, s1, l2, s2] each (common Lure, packLure) */
+  n?: number[];
 }
 export const MAP_DOT_STRIDE = 8;
 export const MAP_ROUTE_STRIDE = 13;
@@ -1741,7 +1743,7 @@ const COMPACT: [string, string[]][] = [
   // (Appended, protocol 41: a system's crowd level, crowd.ts)
   ['crowd', ['tick', 'lv', 'f', 'w', 'r']],
   // (Appended, protocol 51: hostile populations, populations.ts; mapDots' pts follow its other fields)
-  ['pops', ['p', 'full']],
+  ['pops', ['p', 'full', 'n']],
 ];
 
 /**

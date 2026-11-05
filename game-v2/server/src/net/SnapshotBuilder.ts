@@ -929,11 +929,12 @@ export class SnapshotBuilder {
       const num = InSystem.systemId[conn.playerId];
       if (conn.popsFresh) {
         conn.popsFresh = false;
-        this.send(conn.ws, { type: 'pops', p: this.enemies.popRows(num), full: 1 });
+        const all = this.enemies.popRows(num);
+        this.send(conn.ws, { type: 'pops', p: all.p, full: 1, ...(all.n.length ? { n: all.n } : {}) });
         continue;
       }
       const rows = changed.get(num);
-      if (rows?.length) this.send(conn.ws, { type: 'pops', p: rows });
+      if (rows?.p.length) this.send(conn.ws, { type: 'pops', p: rows.p, ...(rows.n.length ? { n: rows.n } : {}) });
     }
   }
 
