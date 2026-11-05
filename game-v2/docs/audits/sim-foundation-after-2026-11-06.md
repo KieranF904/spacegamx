@@ -96,3 +96,72 @@ the pilot's own ship off every tick: an own row and a keyframe every round. Over
   hazards and priming in play.
 - `server/src/net/own/ownSim.test.ts`: the fake client's own layer is checked against the server at every snapshot's
   head hash (full state), with 0 misses.
+
+## Follow-up: the mother and custom corrections (2026-11-06)
+
+Stage 3b left mother at +18% and custom at +23% against pre-3b. The full-state head hash was finding real
+differences between the server and the client's own step. Found by diffing the server's `ownExtras` against the fake
+client's `OwnTick` extras at every snapshot tick in the net table's own scenarios. There were three causes, and none
+of them was a Scrap Mother attack or a shield.
+
+**mother, cause 1: a heal that skipped the rebuild.** From tick 792 the server held the plasma drive, four ion drives
+and one augment buffer at 0, while its own HP for those parts was full. The bench keeps the pilot alive with
+`ships.scaleHp(A, 1)` once a second. That set every part's HP back to full but left the structure alone: parts that had
+been shot off stayed dead in `derived.alive`, so the server flew with dead engines and never refilled their stores. The
+client got the full HP through its HP check, rebuilt from it, and found the engines alive. Its step refilled them, the
+hash missed, and an ownSync put them back to 0, about once a second (`FIX_GAP`).
+
+- Fix: `bridge/damage.ts scaleHp` marks a rebuild when it brings back a part that was down, as a repair does.
+- All the game's own callers use it at spawn, where nothing is down, so nothing changes for them.
+
+**mother, cause 2: generator output from exact HP against the client's tenths.** With cause 1 fixed, one miss was
+left: an augment buffer 1 unit off after a rebuild. A rebuild works out a damaged generator's output from its HP
+(`healthFactor`). The server used exact HP, and the client used the HP its shipSync carried, which `hpWire` rounds to a
+tenth. So the generator rates and link caps came out a hair apart, and the stores they fed drifted.
+
+- Fix: `common/ships/tuning.ts partHealth`. Both ends now derive from the wire's tenths (`hpWire`, moved there from
+  hitRules.ts, which re-exports it).
+
+**custom: hazard ownSyncs.** custom had no head misses. Its extra bytes were ownSyncs sent for the hazards, and each one
+carried the Sunspear's whole ports state (about 1.8 KB).
+
+- Each EMP got two: one when it landed and one when it ran out. The end is no change, because the client runs the
+  hazard out itself on the same tick. The server compared a key in which an EMP that had run out read as 0.
+  SnapshotBuilder now carries the told hazards forward to the current tick before comparing.
+- The one that is needed, the EMP landing, is now a hazards-only ownSync (`packOwnHazards`: `t` and `h`, no stores or
+  guns). It is the server's decision. The ticks already flown under it come with the control row's hazard bits, and the
+  client's `OwnTick` sets that tick's hazards and steps again from the next tick.
+- The own-shell window is not reopened for a hazards-only sync. The wire tables are unchanged (protocol.test green). A
+  protocol-56 client would choke on a hazards-only ownSync. Nothing is deployed (the deploy freeze), so no bump was
+  made.
+
+Reproduction (`net/own/ownSim.test.ts`): "its hull restored over parts it lost" (Halberd, engines shot off, then
+`scaleHp`) has 0 head misses and 0 ownSyncs. Before the fix it fails. The EMP test now also expects 0 head misses, 0
+full ownSyncs and exactly 1 hazards-only one. Cause 2 is pinned in `common/ships/power/ports.test.ts` "a damaged
+generator on both ends": the Halberd rebuilt from exact HP and from its wire HP gives the same layout, rates and link
+caps. Before the fix it fails.
+
+In the net table, measured with the same probe as Stage 3b:
+
+- **mother:** 123 head misses, 9 state fixes and 100 "cooling" checks before. After: 0 head misses, 0 state fixes,
+  and no ownSync after the two at first sight.
+- **custom:** the 2 EMP-end ownSyncs are gone, and the 2 EMP onsets are hazards-only.
+- **pirates and pyreclast:** 0 head misses.
+
+`cd game-v2/server && npm run bench:table`. Before is refactor/split bf16c1a, run from a git archive. After is this
+fix. B/s except msgs/s:
+
+| scenario | pre-3b payload | before payload | **after payload** | before msgs/s | **after msgs/s** | before wire | **after wire** | up (before / after) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| mother | 1899 | 2233 | **1653** | 15.25 | **15.15** | 3239 | **2653** | 620 / 580 |
+| custom | 1180 | 1448 | **1190** | 10.85 | **10.90** | 2165 | **1910** | 571 / 561 |
+| pyreclast | 327 | 327 | **330** | 0.75 | **0.75** | 376 | **380** | 341 / 342 |
+| pirates | 634 | 634 | **639** | 8.35 | **8.25** | 1185 | **1184** | 683 / 685 |
+
+All other rows (idle, cruise, crowd-20/50/100, rock-starter, rock-gale, map, reentry) are unchanged to the byte.
+
+- **mother: −26% against before, and now −13% below pre-3b.** Before Stage 3b, the client's stores there were wrong and
+  were never put right. Now they are right and cost nothing.
+- **custom: back to pre-3b.** The +10 B/s left is the head-hash floor.
+- **pyreclast and pirates** move by a few bytes because the fights play out a little differently. Those pilots' rebuilt
+  generators now make what the wire's tenths say.
