@@ -28,6 +28,35 @@ for (const i of (itemsData as unknown as { items: { id: string; color: string; f
 export const GAS_TYPES = new Set(Object.entries((miningData as unknown as { types: Record<string, { gas?: boolean }> }).types).filter(([, t]) => t.gas).map(([id]) => id));
 const GEM_COLOR: Record<string, number> = { ruby: 0xff3355, sapphire: 0x3d7bff, emerald: 0x2ee59d, void_opal: 0xc28bff };
 
+/** A vector's length (Math.hypot's, without its slow general path: rocks are built by the hundred) */
+function norm(x: number, y: number, z = 0): number {
+  return Math.sqrt(x * x + y * y + z * z);
+}
+
+/** A colour times k (each channel, clamped) */
+function scale(c: number, k: number): number {
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return (ch((c >> 16) & 255) << 16) | (ch((c >> 8) & 255) << 8) | ch(c & 255);
+}
+
+/**
+ * A rock's own shade of its ore's colour (from its id: the same every time): a little lighter or darker, nudged
+ * warmer or cooler, a touch greyer, so a belt of one ore isn't all one colour. Ice goes further: each body its
+ * own ice, from clean blue-white through grey-green to dirty, dusty ice
+ */
+function toneOf(color: number, id: number, ice = false): number {
+  const r = mulberry32(hashString(`asteroid-tone:${id}`));
+  const value = 0.8 + r() * 0.38, warm = r() - 0.5, grey = r();
+  const l = (((color >> 16) & 255) * 0.3 + ((color >> 8) & 255) * 0.5 + (color & 255) * 0.2) | 0;
+  let c = mix(color, warm > 0 ? 0xa8805a : 0x6f8096, Math.abs(warm) * 0.5);
+  c = mix(c, (l << 16) | (l << 8) | l, grey * 0.3);
+  if (ice) {
+    const kind = r(), k = 0.35 + r() * 0.45;
+    c = mix(c, kind < 0.3 ? 0xd2e6f0 : kind < 0.55 ? 0x93b2a6 : kind < 0.8 ? 0x8d918f : 0x8a8070, k);
+  }
+  return scale(c, value);
+}
+
 function mix(a: number, b: number, t: number): number {
   const r = ((a >> 16) & 255) * (1 - t) + ((b >> 16) & 255) * t;
   const g = ((a >> 8) & 255) * (1 - t) + ((b >> 8) & 255) * t;
@@ -43,15 +72,15 @@ export interface AsteroidSeams {
 
 /**
  * How smoothly a rock's facets blend into each other (0 crisp … 1 smooth):
- * crystal is cut glass, ice nearly so, hard rock and metal have edges, and
+ * crystal is cut glass, ice is worn soft between sharp fractures, hard rock and metal have edges, and
  * loose stony rock is rounded. Mixed rocks blend by their ore weights.
  */
 const ORE_SMOOTHING: Record<string, number> = {
-  crystal: 0, ice: 0.2, titanium_ore: 0.35, cobalt_ore: 0.35, nickel_ore: 0.5, iron_ore: 0.55,
+  crystal: 0, ice: 0.45, titanium_ore: 0.35, cobalt_ore: 0.35, nickel_ore: 0.5, iron_ore: 0.55,
   copper_ore: 0.6, helium3: 0.7, silicate: 0.85,
 };
 /** Some kinds of asteroid have a character whatever their ore mix */
-const TYPE_SMOOTHING: Record<string, number> = { asteroid_crystal: 0.05, asteroid_ice: 0.2, comet: 0.3 };
+const TYPE_SMOOTHING: Record<string, number> = { asteroid_crystal: 0.05, asteroid_ice: 0.45, comet: 0.5 };
 
 export function rockSmoothing(comp?: Composition): number {
   if (!comp) return 0.65;
@@ -89,15 +118,15 @@ export interface AsteroidRock {
  * surface: how far it is from the centre over the surface (u, v), so the
  * relief runs over the rock's shape rather than straight across it.
  */
-type RockPoint = { x: number; y: number; z: number; rim: boolean; s: number[]; avg: number[] };
+type RockPoint = { x: number; y: number; z: number; rim: boolean; s: number[]; avg: number[]; /** How open to the sky (rockOcclusion), and its sums while it's worked out */ ao: number; oz: number; ol: number; on: number };
 type RockTri = [RockPoint, RockPoint, RockPoint];
 
 function rockShape(outline: { x: number; y: number }[], jitter: () => number) {
   const n = outline.length;
   let size = 0;
-  for (const p of outline) size = Math.max(size, Math.hypot(p.x, p.y));
+  for (const p of outline) size = Math.max(size, norm(p.x, p.y));
   type P = RockPoint;
-  const point = (x: number, y: number, z: number, rim: boolean): P => ({ x, y, z, rim, s: [0, 0, 0], avg: [0, 0, 0] });
+  const point = (x: number, y: number, z: number, rim: boolean): P => ({ x, y, z, rim, s: [0, 0, 0], avg: [0, 0, 0], ao: 1, oz: 0, ol: 0, on: 0 });
   const centre = point((jitter() - 0.5) * size * 0.2, (jitter() - 0.5) * size * 0.2, size * (0.75 + jitter() * 0.3), false);
   const inner: P[] = [];
   for (let i = 0; i < n; i++) {
@@ -105,8 +134,8 @@ function rockShape(outline: { x: number; y: number }[], jitter: () => number) {
     inner.push(point(((p.x + q.x) / 2) * t + centre.x * (1 - t), ((p.y + q.y) / 2) * t + centre.y * (1 - t), size * (0.45 + jitter() * 0.35), false));
   }
   const rim = outline.map((p) => point(p.x, p.y, size * jitter() * 0.12, true));
-  const d3 = (a: P, b: P) => Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-  const along = (p: P, len: number) => { const dx = p.x - centre.x, dy = p.y - centre.y, l = Math.hypot(dx, dy) || 1; return [(dx / l) * len, (dy / l) * len, p.z / size]; };
+  const d3 = (a: P, b: P) => norm(b.x - a.x, b.y - a.y, b.z - a.z);
+  const along = (p: P, len: number) => { const dx = p.x - centre.x, dy = p.y - centre.y, l = norm(dx, dy) || 1; return [(dx / l) * len, (dy / l) * len, p.z / size]; };
   centre.s = [0, 0, centre.z / size];
   inner.forEach((p) => { p.s = along(p, d3(centre, p)); });
   rim.forEach((p, i) => {
@@ -120,7 +149,7 @@ function rockShape(outline: { x: number; y: number }[], jitter: () => number) {
   }
   // How much longer the way over the surface is than straight across, and the inner ring's mean height (for crater bowls)
   let stretch = 0, innerZ = 0;
-  for (const p of inner) { stretch += d3(centre, p) / (Math.hypot(p.x - centre.x, p.y - centre.y) || 1); innerZ += p.z; }
+  for (const p of inner) { stretch += d3(centre, p) / (norm(p.x - centre.x, p.y - centre.y) || 1); innerZ += p.z; }
   stretch /= n; innerZ /= n;
   const surfaceAt = (x: number, y: number) => [(x - centre.x) * stretch, (y - centre.y) * stretch, (innerZ / size) * 0.95];
   return { tris, surfaceAt };
@@ -132,13 +161,13 @@ function shadeRock(tris: RockTri[]): number[][] {
     const ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z, vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
-    const l = Math.hypot(nx, ny, nz) || 1;
+    const l = norm(nx, ny, nz) || 1;
     return [nx / l, ny / l, nz / l];
   });
   const points = new Set<RockPoint>();
   for (const t of tris) for (const p of t) { if (!points.has(p)) { points.add(p); p.avg = [0, 0, 0]; } }
   tris.forEach((t, i) => { for (const p of t) for (let k = 0; k < 3; k++) p.avg[k] += faces[i][k]; });
-  for (const p of points) { const l = Math.hypot(p.avg[0], p.avg[1], p.avg[2]) || 1; for (let k = 0; k < 3; k++) p.avg[k] /= l; }
+  for (const p of points) { const l = norm(p.avg[0], p.avg[1], p.avg[2]) || 1; for (let k = 0; k < 3; k++) p.avg[k] /= l; }
   return faces;
 }
 
@@ -160,15 +189,15 @@ function refineRock(tris: RockTri[], levels: number, rnd: () => number): RockTri
     const mid = (a: RockPoint, b: RockPoint): RockPoint => {
       const m = mids.get(a)?.get(b) ?? mids.get(b)?.get(a);
       if (m) return m;
-      const len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), rim = a.rim && b.rim;
+      const len = norm(b.x - a.x, b.y - a.y, b.z - a.z), rim = a.rim && b.rim;
       let x = (a.x + b.x) / 2, y = (a.y + b.y) / 2, z = (a.z + b.z) / 2;
       if (rim) {
-        const r = Math.hypot(x, y) || 1, d = (rnd() - 0.65) * len * 0.12;
+        const r = norm(x, y) || 1, d = (rnd() - 0.65) * len * 0.12;
         x += (x / r) * d; y += (y / r) * d; z = Math.max(0, z + (rnd() - 0.5) * len * 0.05);
       } else {
         x += (rnd() - 0.5) * len * 0.06; y += (rnd() - 0.5) * len * 0.06; z += (rnd() - 0.45) * len * 0.28;
       }
-      const p: RockPoint = { x, y, z, rim, s: [(a.s[0] + b.s[0]) / 2, (a.s[1] + b.s[1]) / 2, (a.s[2] + b.s[2]) / 2], avg: [0, 0, 1] };
+      const p: RockPoint = { x, y, z, rim, s: [(a.s[0] + b.s[0]) / 2, (a.s[1] + b.s[1]) / 2, (a.s[2] + b.s[2]) / 2], avg: [0, 0, 1], ao: 1, oz: 0, ol: 0, on: 0 };
       if (!mids.has(a)) mids.set(a, new Map());
       mids.get(a)!.set(b, p);
       return p;
@@ -181,6 +210,39 @@ function refineRock(tris: RockTri[], levels: number, rnd: () => number): RockTri
     tris = next;
   }
   return tris;
+}
+
+/**
+ * How open each point of the close-in shape is to the sky (its colour is multiplied by it): a point sunk below its
+ * neighbours is darker (a hollow catches less light), one standing above them a little lighter (worn edges). The
+ * rim keeps its own colour. Worked out once, when the rock is built: nothing for the GPU.
+ */
+function rockOcclusion(tris: RockTri[]): void {
+  // (each inner point's neighbours' summed height, summed distance and count; every edge counted from both ends)
+  const add = (p: RockPoint, q: RockPoint) => {
+    const dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z, len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (!p.rim) { p.oz += q.z; p.ol += len; p.on++; }
+    if (!q.rim) { q.oz += p.z; q.ol += len; q.on++; }
+  };
+  for (const [a, b, c] of tris) { add(a, b); add(b, c); add(c, a); }
+  for (const t of tris) for (const p of t) {
+    if (p.rim || !p.on) continue;
+    const k = (p.z - p.oz / p.on) / (p.ol / p.on || 1);
+    p.ao = Math.max(0.72, Math.min(1.1, 1 + k * 0.9));
+    p.on = 0;
+  }
+}
+
+/** The way the close-in shape faces at (x, y): its triangle there (seen from above), or straight up if none */
+function surfaceFacing(tris: RockTri[], faces: number[][]): (x: number, y: number) => number[] {
+  return (x, y) => {
+    for (let i = 0; i < tris.length; i++) {
+      const [a, b, c] = tris[i];
+      const d1 = (x - b.x) * (a.y - b.y) - (a.x - b.x) * (y - b.y), d2 = (x - c.x) * (b.y - c.y) - (b.x - c.x) * (y - c.y), d3 = (x - a.x) * (c.y - a.y) - (c.x - a.x) * (y - a.y);
+      if ((d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0)) return faces[i];
+    }
+    return [0, 0, 1];
+  };
 }
 
 /**
@@ -210,11 +272,11 @@ export function drawAsteroid(container: Container, id: number, size: number, com
   const jitter = mulberry32(hashString(`asteroid-normals:${id}`));
   const base = comp ? ORE_COLOR[comp.primary] ?? 0x777777 : [0x666666, 0x886644, 0x4488aa][Math.floor(rng() * 3)];
   const hard = (comp?.hardness ?? 1) >= 2;
-  const fill = hard ? mix(base, 0x1a1d24, 0.25) : base;
-  // Hard rock: a sharper-edged rim
-  const edge = mix(fill, 0xffffff, hard ? 0.22 : 0.12), smooth = rockSmoothing(comp);
   // Its material, its own seed (turning and shifting the relief), and greyseam: one rock in three (or the system's share), never in ice
-  const material = rockMaterial(comp);
+  const material = rockMaterial(comp), ice = material === 'ice';
+  const fill = toneOf(hard ? mix(base, 0x1a1d24, 0.25) : base, id, ice);
+  // Hard rock: a sharper-edged rim; ice: a frosted one, lit through
+  const edge = mix(fill, 0xffffff, ice ? 0.34 : hard ? 0.22 : 0.12), smooth = rockSmoothing(comp);
   const veined = !!comp && material !== 'ice' && !NO_GREYSEAM.has(comp.type) && comp.primary !== 'ice' && size >= 14 && mulberry32(hashString(`greyseam:${id}`))() <= greyseam;
   const seed = mulberry32(hashString(`rock-detail:${id}`))();
   const mat = [ROCK_MATERIALS.indexOf(material), seed, veined ? 0.9 : 0, 0], light = [mat[0], seed, 0, 1];
@@ -222,7 +284,7 @@ export function drawAsteroid(container: Container, id: number, size: number, com
   const { tris: coarse, surfaceAt } = rockShape(verts, jitter);
   const full = rock.geometry;
   // Small on screen: the coarse shape's points, each shared by its triangles, smooth
-  shadeRock(coarse);
+  const coarseFaces = shadeRock(coarse);
   const at = new Map<object, number>();
   const shared = (p: RockPoint) => {
     let k = at.get(p);
@@ -234,19 +296,33 @@ export function drawAsteroid(container: Container, id: number, size: number, com
   const levels = rockDetailLevels(size);
   const tris = refineRock(coarse, levels, mulberry32(hashString(`rock-shape:${id}`)));
   const faces = shadeRock(tris);
+  rockOcclusion(tris);
+  if (ice) {
+    // Grit frozen into the ice: dark inclusions at some of its points (seeded, so the same every time)
+    const grit = mulberry32(hashString(`ice-grit:${id}`)), dirt = 0.12 + grit() * 0.3, seen = new Set<RockPoint>();
+    for (const t of tris) for (const p of t) {
+      if (p.rim || seen.has(p)) continue;
+      seen.add(p);
+      if (grit() < dirt) p.ao *= 0.5 + grit() * 0.3;
+    }
+  }
   tris.forEach((t, i) => {
     const f = faces[i];
     const ids = t.map((p) => {
       const nx = f[0] + (p.avg[0] - f[0]) * smooth, ny = f[1] + (p.avg[1] - f[1]) * smooth, nz = f[2] + (p.avg[2] - f[2]) * smooth;
-      const l = Math.hypot(nx, ny, nz) || 1;
-      return full.rockVertex(p.x, p.y, [nx / l, ny / l, nz / l], p.rim ? edge : fill, [p.s[0] / size, p.s[1] / size, p.s[2], size], p.avg, mat);
+      const l = norm(nx, ny, nz) || 1;
+      return full.rockVertex(p.x, p.y, [nx / l, ny / l, nz / l], p.rim ? edge : scale(fill, p.ao), [p.s[0] / size, p.s[1] / size, p.s[2], size], p.avg, mat);
     });
     full.tri(ids[0], ids[1], ids[2]);
   });
 
-  // Craters (kept well inside the outline): a rim tilted inwards, so it's lit on the far side
-  const inside = (x: number, y: number, k: number) => { const l = Math.hypot(x, y), m = size * k; return l > m ? [(x / l) * m, (y / l) * m] : [x, y]; };
-  const bowl = mix(fill, 0x000000, 0.18), up = [0, 0, 1];
+  // Craters (kept well inside the outline): a rim tilted inwards, so it's lit on the far side. Its lip takes the
+  // rock's own colour and leans with the surface round it, so the bowl sinks into the rock rather than sitting on it
+  const inside = (x: number, y: number, k: number) => { const l = norm(x, y), m = size * k; return l > m ? [(x / l) * m, (y / l) * m] : [x, y]; };
+  // (ice is lit through: its hollows stay light)
+  const bowl = mix(fill, 0x000000, material === 'ice' ? 0.16 : 0.4), lip = mix(fill, 0x000000, 0.1), up = [0, 0, 1];
+  // (the big shape's lean there: the coarse triangles, a few dozen, are enough and quick to search)
+  const facing = surfaceFacing(coarse, coarseFaces);
   // (more on a big rock, and smaller)
   for (let b = 0; b < 4 + levels * 5; b++) {
     const r = 3 + (rng() * size * 0.12) / (1 + levels * 0.6);
@@ -254,8 +330,9 @@ export function drawAsteroid(container: Container, id: number, size: number, com
     const sc = surfaceAt(cx, cy), ring: number[] = [];
     const c0 = full.rockVertex(cx, cy, up, bowl, [sc[0] / size, sc[1] / size, sc[2], size], up, mat);
     for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2, tilt = 0.6, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r, s = surfaceAt(x, y);
-      ring.push(full.rockVertex(x, y, [-Math.cos(a) * tilt, -Math.sin(a) * tilt, Math.sqrt(1 - tilt * tilt)], bowl, [s[0] / size, s[1] / size, s[2], size], up, mat));
+      const a = (i / 7) * Math.PI * 2, tilt = 0.9, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r, s = surfaceAt(x, y), g = facing(x, y);
+      const nx = g[0] - Math.cos(a) * tilt, ny = g[1] - Math.sin(a) * tilt, nz = g[2], l = norm(nx, ny, nz) || 1;
+      ring.push(full.rockVertex(x, y, [nx / l, ny / l, nz / l], lip, [s[0] / size, s[1] / size, s[2], size], up, mat));
     }
     for (let i = 0; i < 7; i++) full.tri(c0, ring[i], ring[(i + 1) % 7]);
   }
