@@ -51,6 +51,8 @@ interface Client {
   derived: Set<number>;
   /** The last snapshot tick it was sent decisions to */
   through: number;
+  /** ...and the one before it: this snapshot's window, after forClient (readersOf) */
+  from: number;
   expect: Map<number, number>;
   ticks: number[];
   fixedAt: number;
@@ -86,7 +88,7 @@ export class BodyNet {
 
   private client(conn: object): Client {
     let c = this.clients.get(conn);
-    if (!c) this.clients.set(conn, (c = { runs: new Set(), since: new Map(), moves: false, derived: new Set(), through: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
+    if (!c) this.clients.set(conn, (c = { runs: new Set(), since: new Map(), moves: false, derived: new Set(), through: -Infinity, from: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
     return c;
   }
 
@@ -177,7 +179,8 @@ export class BodyNet {
         this.stats.syncs++;
       } else if (can) {
         // (a ship it reads was off on this client this window: so was what its body made of it)
-        if (rekeyed && reads.some(rekeyed)) { rekey(known, eid); this.stats.targetKeyed++; }
+        // (one it stopped reading this window too: a target lost or swapped since the last snapshot was read till then)
+        if (rekeyed && (reads.some(rekeyed) || b.dropped.some(([t, r]) => t > c.through && rekeyed(r)))) { rekey(known, eid); this.stats.targetKeyed++; }
         for (const d of b.log) {
           if (d[0] <= c.through) continue;
           if (d[0] > tick) break;
@@ -192,6 +195,7 @@ export class BodyNet {
       }
     }
     for (const eid of c.runs) if (!this.bosses.has(eid)) c.runs.delete(eid);
+    c.from = c.through;
     c.through = tick;
     this.stats.rows += rows.length;
     return rows;
@@ -205,7 +209,8 @@ export class BodyNet {
     for (const eid of c.runs) {
       const b = this.bosses.get(eid);
       if (!b || ids.has(eid)) continue;
-      if (BODY_KINDS[b.state.kind]?.reads(eid, b.state).some((r) => ids.has(r))) { out.push(eid); this.stats.targetKeyed++; }
+      // (or read it this window: a target lost or swapped since the last snapshot)
+      if (BODY_KINDS[b.state.kind]?.reads(eid, b.state).some((r) => ids.has(r)) || b.dropped.some(([t, r]) => t > c.from && ids.has(r))) { out.push(eid); this.stats.targetKeyed++; }
     }
     return out;
   }
