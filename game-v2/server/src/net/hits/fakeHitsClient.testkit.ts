@@ -16,7 +16,7 @@ import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.j
 import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
 import { BodyRunner } from '../../../../client/src/ships/bodies/BodyRunner.js';
 import { GuideRunner } from '../../../../client/src/ships/guides/GuideRunner.js';
-import { CellCache } from '../../../../client/src/ships/cells/CellCache.js';
+import { ShipMemory } from '../../../../client/src/ships/cells/ShipMemory.js';
 import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
 import { bodiesFor, causesFor, waypointsFor, type GuideBody } from '@space-game/common';
@@ -54,8 +54,8 @@ export class FakeHitsClient {
   /** Homing shells flown on its tick-aligned layer (CAPS.WAYPOINTS: client ships/guides/GuideRunner.ts) */
   readonly guides: GuideRunner | null = null;
   readonly shells = new Map<number, HitShell>();
-  /** Dropped cells it keeps (CAPS.FOCUS: client ships/cells/CellCache.ts) */
-  readonly cells: CellCache;
+  /** Ships out of view it keeps (CAPS.FOCUS: client ships/cells/ShipMemory.ts): their entity kinds here */
+  readonly away: ShipMemory<{ type: number; side: number }>;
   /** Other ships' causes on its tick-aligned layer (CAPS.CAUSES: client ships/causes/ShipCauses.ts) */
   readonly causes: ShipCauses | null = null;
   /** Debris it works out itself (debrisSplit), as the game client does */
@@ -123,7 +123,7 @@ export class FakeHitsClient {
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
     if (waypointsFor(opts.caps)) this.guides = new GuideRunner({ reps: this.reps, onStep: opts.onGuideStep });
     if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), ownMid: (t, o) => (this.own?.on ? this.own.midOf(t, o) : null), tuning: ships.tuning });
-    this.cells = new CellCache({ reps: this.reps, send: (m) => this.outbox.push(m), forget: (id) => this.bodies?.remove(id) });
+    this.away = new ShipMemory({ entity: (id) => this.kinds.get(id), restore: (id, e) => this.kinds.set(id, e), send: (m) => this.outbox.push(m) });
     const socket: ClientSocket = {
       isOpen: () => true,
       send: (data) => {
@@ -210,7 +210,7 @@ export class FakeHitsClient {
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
       case 'debrisSplit': this.debris.onSplit(m); break;
-      case 'cells': this.cells.onCells(m); break;
+      case 'cells': this.away.onCells(m); break;
       case 'hits':
         this.findHits(m.h);
         if (this.selfHits?.on) this.hits!.told(m, this.snapTick);
@@ -284,6 +284,7 @@ export class FakeHitsClient {
     }
     // (as ShipClient: the ledger sees the removed list before the shells go)
     this.hits?.forget(s.removed);
+    this.away.onSnapshot(s.tick, s.removed);
     this.selfHits?.onRemoved(s.removed);
     for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); this.guides?.remove(id, s.tick); }
     for (const id of s.out ?? []) { this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }

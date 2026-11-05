@@ -62,6 +62,15 @@ export class Probe {
   readonly debrisOffs: object[] = [];
   /** Pieces of debris it was sent (a removal's id is one after the piece is gone) */
   private readonly debrisSeen = new Set<number>();
+  /**
+   * Re-entry (CAPS.FOCUS): ships back on its tick layer that it had held before. How many, the bytes about them as they
+   * came back (the cells messages, their syncs, status rows and keyframes in that snapshot), and the client time of
+   * each one's first step once back (from its keyframe: nothing to catch up)
+   */
+  readonly reentry = { ships: 0, bytes: 0, cellsBytes: 0, syncBytes: 0, syncFreshBytes: 0, rowBytes: 0, keyBytes: 0, firstSteps: 0, firstStepMs: 0, maxStepMs: 0 };
+  /** Ships it has held at some point, and ships back and not yet stepped */
+  private readonly seen = new Set<number>();
+  private readonly fresh = new Set<number>();
 
   constructor(private server: GameServer, readonly name: string, caps: number, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
     /** Its system's tick (its own clock once dilated, --crowd: latency is counted in its ticks too) */
@@ -79,7 +88,32 @@ export class Probe {
     this.pid = this.fake.pid;
     this.lat = lat;
     const f = this.fake as any, oSnap = f.snapshot.bind(f), oHandle = f.handle.bind(f);
+    const len = (m: unknown) => { const e = encodeMessage(m as ClientMessage) as string | ArrayBuffer; return typeof e === 'string' ? e.length : e.byteLength; };
+    const isShipRow = (e: { type: number }) => e.type === EntityType.Player || e.type === EntityType.ShipBody;
     f.handle = (m: any) => {
+      // (Re-entry, CAPS.FOCUS: what came about ships it had held before and doesn't hold now)
+      const back = (id: number) => id !== this.pid && this.seen.has(id) && !f.reps.has(id);
+      if (this.measuring) {
+        const r = this.reentry;
+        if (m.type === 'cells') { const n = len(m); r.cellsBytes += n; r.bytes += n; }
+        else if (m.type === 'shipSync' && back(m.id)) { const n = len(m); r.syncBytes += n; r.bytes += n; if (m.blueprint || m.design !== undefined) r.syncFreshBytes += n; }
+        else if (m.type === 'snapshot') {
+          const ent = new Set<number>();
+          for (const k of m.ships ?? []) if (back(k[0])) ent.add(k[0]);
+          for (const e of m.entities ?? []) if (isShipRow(e) && back(e.id)) ent.add(e.id);
+          if (ent.size) {
+            const all = len(m), noKey = len({ ...m, ships: m.ships?.filter((k: number[]) => !ent.has(k[0])) });
+            const none = len({ ...m, ships: m.ships?.filter((k: number[]) => !ent.has(k[0])), entities: m.entities?.filter((e: { id: number }) => !ent.has(e.id)) });
+            r.keyBytes += all - noKey; r.rowBytes += noKey - none; r.bytes += all - none;
+            r.ships += ent.size;
+            for (const id of ent) this.fresh.add(id);
+          }
+        }
+      }
+      if (m.type === 'snapshot') {
+        for (const k of m.ships ?? []) this.seen.add(k[0]);
+        for (const e of m.entities ?? []) if (isShipRow(e)) this.seen.add(e.id);
+      }
       if (this.measuring) {
         const id = m.id ?? m.bodyId, t = m.type === 'debrisSplit' || (id !== undefined && (m.kind === 'debris' || server.getShips().get(id)?.kind === 'debris')) ? (m.type === 'shipSync' ? (m.blueprint ? 'shipSync+bp' : m.hp ? 'shipSync+new' : 'shipSync+re') : m.type) + ':debris' : m.type;
         const n = encodeMessage(m).length;
@@ -97,6 +131,15 @@ export class Probe {
     // (The client's debris world: drift and knocks stepped, and stepped again from a keyframe or new piece)
     const reps = f.reps, oDeb = reps.stepDebrisTo.bind(reps);
     reps.stepDebrisTo = (to: number) => { const t0 = performance.now(); try { return oDeb(to); } finally { if (this.measuring) this.debrisMs += performance.now() - t0; } };
+    const oAt = reps.at.bind(reps);
+    reps.at = (id: number, t: number) => {
+      if (!this.fresh.delete(id)) return oAt(id, t);
+      const t0 = performance.now();
+      try { return oAt(id, t); } finally {
+        const ms = performance.now() - t0, r = this.reentry;
+        if (this.measuring) { r.firstSteps++; r.firstStepMs += ms; r.maxStepMs = Math.max(r.maxStepMs, ms); }
+      }
+    };
     f.snapshot = (s: any) => {
       const held = new Set<number>(f.reps.ids());
       const kf = new Set<number>((s.ships ?? []).map((k: number[]) => k[0]));

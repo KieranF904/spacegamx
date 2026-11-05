@@ -152,7 +152,7 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     expect(m.tick).toBeGreaterThan(0);
     expect(w.conn.shipView.has(far)).toBe(false);
     expect(w.conn.shipView.has(near)).toBe(true);
-    expect(w.A.cells.has(far)).toBe(true);
+    expect(w.A.away.has(far)).toBe(true);
     w.run(60);
     w.server.crowd!.force(sys, 0);
     w.run(60);

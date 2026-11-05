@@ -26,7 +26,7 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | server/src/net/SnapshotBuilder.ts | 828 | the snapshot path (`SnapshotBuilder`, built once from a `SnapshotHost`): `sendSnapshots`, `systemRows` (the pilot row), `sendShipUpdates`, `rowKey`/`internKey`, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo`; `SnapRow`, `designHash` (`hpWire` is common hitRules.ts), the player/projectile/pod queries |
 | server/src/net/snapshot/Outbox.ts, constants.ts | 177 / 27 | the sending side: `send`, `queue`, `flushOutbox`, `flushLazy` (the lazy effects), `broadcastToSystem` (an eye-and-ear effect, `LAZY_TYPES`, with a place goes `broadcastNear` instead: `fxPoint`), `broadcastNear`, `broadcastProjectileHit`, `addDamage`/`flushDamage` (damage summed per target, source and glancing till the next snapshot, to a tenth), the byte counters; the snapshot tuning (`LAZY_TYPES`/`LAZY_TICKS`, `SHIP_VIEW_IN/OUT`, `SELF_SAFETY_TICKS`, `DEBRIS_ACK_TICKS`, ranges). GameServer keeps one-line delegates (`send`, `flushOutbox`, `sendSnapshots`, ...) |
 | common/src/ships/debris.ts, common/src/math/detTrig.ts | 352 / 389 | debris both sides work out alike: a split's pieces (`deriveSplit`, sheds `ShedSpec`/`packSheds`/`shedCrumble`, the grace `DEBRIS_GRACE_TICKS`/`debrisYoung`, `splitPose`, `splitRng`, `debrisSpin`, `debrisMotion`, `debrisHash`), the drift and push-only knocks (`stepDebrisWorld`, `stepDebrisBody`), the wire packing (`packIds`, `packRuns`); deterministic `dsin`/`dcos`/`dsincos`/`datan2`/`dhypot`/`dexp`/`dlog`/`dlog2`/`dpow` (only exact operations: the same bits in every engine), which flight and shells use too (docs/design/deterministic-maths.md; checked across engines by `npm run det:engines`) |
-| common/src/network/cells.ts | 170 | the focus grid (protocol 38, `CAPS.FOCUS` 1024): cells, home cells, focus/ring, ghost weight, the dropped-cell hashes and log wire form |
+| common/src/network/cells.ts | 170 | the focus grid (protocol 38, `CAPS.FOCUS` 1024): cells, home cells, focus/ring, ghost weight, the ships-away list both ends keep (`AwayShips`, protocol 49) |
 | common/src/network/hits.ts | 100 | confirmed hits on the wire: `CAPS` (the join's bit mask), `ShellHitRecord`, `packHits`/`unpackHits`, `hpChecksum` |
 | server/src/net/hits/HitLedger.ts | 475 | confirmed hits, the server side: `shellHit`/`hitFx`/`end` during the tick, then per capable client `plan` (in the snapshot loop; for a client finding its own, which hits it can find: `unfindable`), `write` (after its snapshot; then `judge` its journal, a `hitFix` if need be), `check` (after its HP); `report` (a client's hit report); `endSnapshot` switches caps and tells the client (`netCaps`). `confirmedHits.test.ts` beside it is the parity test |
 | client/src/ships/hits/ConfirmedHits.ts | 370 | confirmed hits, the client side: `expand` (a record into the messages the server would have sent, HP into the ship store), `check` (hpCheck), `clientCaps()` (the `?hits=0|1` and `?selfhits=0|1` switches); for client-detected hits `own` / `told` / `oldWay` / `flushPending` (a frame's hits) and `corrected` (a hitFix) |
@@ -97,20 +97,22 @@ Dev builds (`?focus=0|1`). Shared rules in common network/cells.ts: 8,192-unit c
 home cell (changes 256 past the border), the focus (every cell whose nearest point is within 19 km of the client's ship,
 flat, no hysteresis) and the ring (within 35 km). Server net/cells/FocusCells.ts (built by SnapshotBuilder, `focus`):
 once a round the home cells and each cell's ships (systems with a capable client only); a capable client's
-`shipView` is its own ship plus the ships homed in its held focus cells (`view`, in place of `updateShipView`'s 40/48 km
-circle, party and target included). A cell leaving the focus keeps its ships in view for that snapshot, then a `cells`
-message after it (`d`: [cell, n, ids]) drops them: the client (client ships/cells/CellCache.ts, shared with the fake
-clients) detaches their replicas as of that tick (`ShipReplicaSet.detach`) with a hash (`cellMemberHash`/`cellHash`) and
-keeps them 10 s (their structure stays in the ShipStore; the server keeps `shipSynced`/`shipHpSent` for them). The
-server records each such ship's keyframe version and hash once per (cell, tick), shared. A dropped cell back in focus
-within the hold is pending (`b`: [cell, T]; its ships out of view, ghosts) till the client's `cellCache` [cell, T, hash
-or 0] or a timeout (30 ticks + 2 pings): a matching hash, with the ships' control changes since T (every Replication
-shadow keeps its last 12 s: `eventsSince`) smaller than an entry (40 B a ship), goes back as a log (`l`: [cell, T, n, (id,
-k, (dt, bits, q) x k) x n]) and the client attaches and fast-forwards them (`ShipReplicaSet.attach`, at most 600 ticks);
-otherwise `l` with none and they enter as new (keyframes, rows; syncs only if rebuilt). Ghosts: with the map shut a
-capable client still gets `mapDots`, for ships homed in its ring, focus or pending cells it doesn't hold, its party and
-its target (`FocusCells.ghost`); the client draws them as markers (client ships/cells/GhostLayer.ts) and fades held
-ships from hull to marker over 18-19 km (`ShipRenderer.ghostOf`). A new system, death or switching the cap off starts it
+`shipView` is its own ship plus the ships homed in its focus cells (`view`, in place of `updateShipView`'s 40/48 km
+circle). **Ships away** (net/cells/AwayNet.ts, client ships/cells/ShipMemory.ts, shared rule common cells.ts
+`AwayShips`): a ship leaving its view (its cell left the focus, or it left a focus cell: one path) goes in the
+snapshot's `out` as before, but both ends remember it for `AWAY_TICKS` (5 min), at most `AWAY_CAP` (256) a client,
+oldest let go first, by the same rule on both sides so letting go goes unsaid. The client keeps its structure (the
+ShipStore doesn't prune it) and its status row (entity); the server keeps what it sent (`shipSynced`, `shipHpSent`,
+`sentNames`) and its row key (`ClientConnection.away`). A `cells` message just before the snapshot says `b` (back in
+view: put the row back) then `k` (leaving: keep it). Back, it gets its keyframe (movement, full precision: `repKnown`
+forgot it on leaving), its row only if the key changed (stripped of its place), part HP as `shipHps` changes and a
+rebuild as a light sync, never its blueprint unless the ship was replaced by a design the client hasn't seen. Nothing
+is replayed: no client catching up. A ship destroyed or gone while away goes in the snapshot's `removed`. Debris
+isn't kept. A `b` for a ship the client has nothing of (cleared when the server didn't) sends `shipNeed`, which also
+resends its row and name. Ghosts: with the map shut a capable client still gets `mapDots`, for ships homed in its
+ring or focus cells it doesn't hold, its party and its target (`FocusCells.ghost`); the client draws them as markers
+(client ships/cells/GhostLayer.ts) and fades held ships from hull to marker over 18-19 km (`ShipRenderer.ghostOf`). A
+new system, a new connection or switching the cap off starts it
 afresh. Tests: server/src/net/cells/focusCells.test.ts; bench: `npm run bench:crowd -- --layouts cruise --caps 2047 --bulk focus`.
 
 ### Encode-once blocks (protocol 37, `CAPS.BLOCKS` 512, docs/design/awareness-model.md 7.6)
@@ -278,7 +280,7 @@ Debris then drifts and knocks into other debris only (ships ignore it), push onl
 - `npx vitest run server/src/proto server/src/game/robustness.test.ts` : transport and hostile input.
 - `npx vitest run common/src/guidance server/src/net/guides` : homing shells and mobs on the tick layer (CAPS.WAYPOINTS): derived, sent, the switch, a drift caught, legacy rows; a volley of mines as LAUNCH rows (CAPS.LAUNCHES).
 - Bandwidth bench: `cd server && npm run bench:net` (server/src/bench/netBench.ts).
-- `npx vitest run server/src/net/cells client/src/ships/cells` : the focus grid (leaving and coming back with and without the cache, a bad hash, the 19 km edge, jumps, a new system; the cache's hash covers only the ships it kept).
+- `npx vitest run server/src/net/cells client/src/ships/cells common/src/network/cells.test.ts` : the focus grid and ships away (leaving and coming back after 2.5 s and 40 s with only what changed, HP changed and a ship destroyed while away, let go by age, the 19 km edge, cell borders, jumps, a new system; both ends' lists agree).
 - `npx vitest run server/src/net/causes server/src/net/own server/src/net/decisions server/src/net/debris server/src/net/crowd` : causes, the own ship, bodies and AI pilots, debris lives, crowd fallbacks; every held ship exact at every snapshot.
 - Crowd bench: `cd server && npm run bench:crowd -- --full --bulk focus --caps 245759` (every cap but CROWD), `--crowd` for the fallbacks. A caps matrix (each bit off in turn, `--case ball:50 --caps N`) is how the review checked each bit restores the old path; numbers in docs/audits/netcode-all-2026-11.md.
 

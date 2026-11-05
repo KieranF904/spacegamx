@@ -11,7 +11,7 @@ export interface CaseOpts {
   layout: Layout;
   n: number;
   secs: number;
-  /** The counting sockets: 'legacy' (no caps), 'packed' (PACKED | COALESCE, nothing they owe), 'blocks' (and BLOCKS) or 'focus' (and FOCUS: they never answer an offer back) */
+  /** The counting sockets: 'legacy' (no caps), 'packed' (PACKED | COALESCE, nothing they owe), 'blocks' (and BLOCKS) or 'focus' (and FOCUS) */
   bulk: 'legacy' | 'packed' | 'blocks' | 'focus';
   /** Full probe clients among the n */
   probes: number;
@@ -161,7 +161,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   // ---- measure ----
   measuring = true;
   for (const p of probes.values()) p.measuring = true;
-  const focus0 = snap(srv.snapshots.focus.stats), cells0 = [...probes.values()].map((p) => snap(p.fake.cells.stats));
+  const focus0 = snap(srv.snapshots.focus.stats), away0 = snap(srv.snapshots.away.stats), mem0 = [...probes.values()].map((p) => snap(p.fake.away.stats));
   const held: number[] = [];
   const hits0 = snap(srv.hits.stats), reasons0 = snap(srv.replication.reasons), bodies0 = snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats });
   const m0 = server.getTick();
@@ -249,11 +249,20 @@ export async function runCase(o: CaseOpts): Promise<any> {
       server: { ownChecks: snap(srv.snapshots.ownChecks?.stats ?? {}), causes: snap(srv.replication.causeStats), own: snap(srv.replication.ownStats), hits: hitsDiff, reasons: numericDiff(snap(srv.replication.reasons), reasons0), bodies: numericDiff(snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats }), bodies0) },
     },
     focus: (() => {
-      const d = numericDiff(snap(srv.snapshots.focus.stats), focus0), c: Record<string, number> = {};
-      [...probes.values()].forEach((p, i) => { for (const [kk, v] of Object.entries(numericDiff(snap(p.fake.cells.stats), cells0[i]))) c[kk] = (c[kk] ?? 0) + (v as number); });
+      const d = numericDiff(snap(srv.snapshots.focus.stats), focus0), a = numericDiff(snap(srv.snapshots.away.stats), away0), c: Record<string, number> = {};
+      [...probes.values()].forEach((p, i) => { for (const [kk, v] of Object.entries(numericDiff(snap(p.fake.away.stats), mem0[i]))) c[kk] = (c[kk] ?? 0) + (v as number); });
       const per = (v: number) => r2(v / secs);
-      return { heldMean: r2(mean(held)), server: d, probes: c, dropsPerSec: per(d.drops ?? 0), entriesPerSec: per(d.entries ?? 0), offersPerSec: per(d.offers ?? 0), logsPerSec: per(d.logs ?? 0),
-        logShipsPerSec: per(d.logShips ?? 0), refused: (d.refusedHash ?? 0) + (d.refusedSize ?? 0) + (d.refusedLate ?? 0) + (d.refusedNone ?? 0) };
+      // (server: every capable client's cells and ships away; probes: what their memories did, summed)
+      return { heldMean: r2(mean(held)), server: d, away: a, probes: c, cellsLeftPerSec: per(d.left ?? 0), keptPerSec: per(a.kept ?? 0), backPerSec: per(a.back ?? 0), missed: c.missed ?? 0 };
+    })(),
+    // (Re-entry, CAPS.FOCUS: ships back on a probe's tick layer it had held before, summed over the probes)
+    reentry: (() => {
+      const t: Record<string, number> = {};
+      for (const p of probeList) for (const [kk, v] of Object.entries(p.reentry)) t[kk] = kk === 'maxStepMs' ? Math.max(t[kk] ?? 0, v) : (t[kk] ?? 0) + v;
+      const ships = t.ships || 1;
+      return { ...Object.fromEntries(Object.entries(t).map(([kk, v]) => [kk, r2(v)])), perProbeShipsPerSec: r2(t.ships / secs / Math.max(1, probeList.length)),
+        bytesPerShip: r2(t.bytes / ships), bytesPerProbePerSec: r2(t.bytes / secs / Math.max(1, probeList.length)),
+        firstStepUsMean: r2((t.firstStepMs / Math.max(1, t.firstSteps)) * 1000), firstStepMsPerProbePerSec: r2(t.firstStepMs / secs / Math.max(1, probeList.length)) };
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
     probeDebrisMsPerTick: r2(mean(probeList.map((p) => p.debrisMs / ticks))),

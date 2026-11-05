@@ -5,15 +5,11 @@
  * FOCUS_RANGE of its ship (one flat threshold, no hysteresis, whatever the zoom): the ships homed there are on its tick
  * layer. Its **ring** is every other cell within RING_RANGE: ghosts only (map-dot legs), nothing simulated.
  *
- * A cell leaving the focus is dropped, and the client keeps what it had of it (its replicas, as of the drop's tick) for
- * CELL_HOLD_TICKS. When the cell comes back the server asks for a hash of that (cellMemberHash, cellHash); if it is what
- * the server recorded and the control changes since are smaller than a fresh entry, they go instead (a log) and the
- * client fast-forwards. Nothing here is on a simulation path: it is what is sent, never how anything moves.
+ * A ship leaving a client's view (its cell left the focus, or it left the cell) is remembered at both ends for minutes
+ * (AwayShips): when it comes back the client is sent only what changed since it left (a keyframe always, its row, HP and
+ * structure only if they changed), never replayed. Nothing here is on a simulation path: it is what is sent, never how
+ * anything moves.
  */
-import type { FlightBody } from '../ships/flight.js';
-import { SHIP_PRECISION } from '../ships/physics.js';
-import { dpow } from '../math/detTrig.js';
-
 /** A cell's side (world units): 2^13 */
 export const CELL_SIZE = 8192;
 /** A cell is in a client's focus when its nearest point is within this of the client's ship */
@@ -26,10 +22,6 @@ export const GHOST_FADE_FROM = 18000;
 export const GHOST_FADE_TO = 19000;
 /** A ship's home cell changes only once it is this far into the next */
 export const CELL_HOME_SLACK = 256;
-/** A dropped cell is kept (client) and its re-entry offered (server) for this long (ticks: 10 s) */
-export const CELL_HOLD_TICKS = 600;
-/** The client fast-forwards a returning cell at most this many ticks (longer: it asks for an entry instead) */
-export const CELL_REPLAY_CAP = 600;
 
 /** Cell coordinates are offset by this in a key (a system is far smaller than ±4096 cells: ±33,000 km) */
 const OFF = 4096;
@@ -115,70 +107,70 @@ export function ghostWeight(dist: number, focus = FOCUS_RANGE): number {
   return dist <= from ? 0 : dist >= to ? 1 : (dist - from) / (to - from);
 }
 
-// ---- The dropped-cell cache's check ----
+// ---- Ships away: out of a client's view and remembered at both ends ----
 
-const qv = (v: number, places: number) => Math.round(v * dpow(10, places));
-const mix = (h: number, v: number) => Math.imul(h ^ (v | 0), 0x9e3779b1) ^ (Math.imul(h, 0x85ebca6b) >>> 13);
-
-/** One ship's replica at a tick as a 32-bit hash: its body (as rounded each tick) and the controls it flew that tick */
-export function cellMemberHash(id: number, b: FlightBody, bits: number, q: number): number {
-  let h = mix(0x7f4a7c15, id);
-  h = mix(h, qv(b.x, SHIP_PRECISION.pos)); h = mix(h, qv(b.y, SHIP_PRECISION.pos));
-  h = mix(h, qv(b.vx, SHIP_PRECISION.vel)); h = mix(h, qv(b.vy, SHIP_PRECISION.vel));
-  h = mix(h, qv(b.angle, SHIP_PRECISION.angle)); h = mix(h, qv(b.angVel, SHIP_PRECISION.angVel));
-  h = mix(h, b.jump ?? 0); h = mix(h, qv(b.jumpScale ?? 1, 4)); h = mix(h, qv(b.cargo ?? 0, 2)); h = mix(h, (b.dodge ?? 0) * 16 + (b.dodgeDir ?? 0));
-  h = mix(h, bits); h = mix(h, q);
-  h ^= h >>> 15;
-  return Math.imul(h, 0x2c1b3c6d) >>> 0;
-}
-
-/** A dropped cell's hash: its ships' member hashes in id order (`members`: [id, hash], any order). Never 0 (0 says "none") */
-export function cellHash(members: readonly (readonly [number, number])[]): number {
-  const sorted = [...members].sort((a, b) => a[0] - b[0]);
-  let h = 0x2545f491;
-  for (const [id, m] of sorted) { h = mix(h, id); h = mix(h, m); }
-  h ^= h >>> 16;
-  return (h >>> 0) || 1;
-}
+/** A ship that left a client's view is remembered (both ends) this long after it left (ticks: 5 minutes) */
+export const AWAY_TICKS = 5 * 60 * 60;
+/** ...and at most this many at once (the one that left first is let go first) */
+export const AWAY_CAP = 256;
 
 /**
- * The wire forms (the `cells` message after a snapshot, CAPS.FOCUS):
- * - `d` drops: [cell, n, id × n] per cell: these ships left its focus with the snapshot just sent; keep them as of its tick
- * - `b` back:  [cell, T] per cell: a cell it dropped at T is in its focus again; answer with cellCache [cell, T, hash or 0]
- * - `l` logs:  [cell, T, n, (id, k, (tick - T, bits, q) × k) × n] per cell: put these back, with the control changes since
- *   T (through the snapshot's tick), and forget the rest of that cell; n = 0: forget it all (they come as new)
+ * Ships out of a client's view that both ends remember (CAPS.FOCUS): the client keeps each one's structure and status
+ * row, the server what it last sent of it (its sync, part HP, row, name). Both keep the same list by the same rule, fed
+ * the same changes in the same order (the `cells` message before a snapshot: `b` back, then `k` kept; the snapshot's
+ * removals), so neither has to tell the other what it let go: each sweeps by age (`sweep`, at the tick of the round or
+ * message) and caps by count (`leave`), the oldest first. Insertion order is leaving order, so ages run oldest first.
  */
-export interface CellLogShip { id: number; events: [number, number, number][] }
+export class AwayShips<T> {
+  private m = new Map<number, { tick: number; v: T }>();
 
-export function packCellLog(out: number[], cell: number, T: number, ships: readonly CellLogShip[]): void {
-  out.push(cell, T, ships.length);
-  for (const s of ships) {
-    out.push(s.id, s.events.length);
-    for (const [t, bits, q] of s.events) out.push(t - T, bits, q);
+  get size(): number {
+    return this.m.size;
   }
-}
 
-export function unpackCellLogs(l: readonly number[]): { cell: number; T: number; ships: CellLogShip[] }[] {
-  const out: { cell: number; T: number; ships: CellLogShip[] }[] = [];
-  let i = 0;
-  while (i + 2 < l.length) {
-    const cell = l[i++], T = l[i++], n = l[i++], ships: CellLogShip[] = [];
-    for (let s = 0; s < n && i + 1 < l.length; s++) {
-      const id = l[i++], k = l[i++], events: [number, number, number][] = [];
-      for (let e = 0; e < k && i + 2 < l.length; e++) { events.push([T + l[i], l[i + 1], l[i + 2]]); i += 3; }
-      ships.push({ id, events });
+  has(id: number): boolean {
+    return this.m.has(id);
+  }
+
+  get(id: number): T | undefined {
+    return this.m.get(id)?.v;
+  }
+
+  ids(): IterableIterator<number> {
+    return this.m.keys();
+  }
+
+  /** Left its view with the snapshot of `tick`; past the cap the oldest go (`gone` each) */
+  leave(id: number, tick: number, v: T, gone?: (id: number, v: T) => void): void {
+    this.m.delete(id);
+    this.m.set(id, { tick, v });
+    while (this.m.size > AWAY_CAP) {
+      const [first, e] = this.m.entries().next().value as [number, { tick: number; v: T }];
+      this.m.delete(first);
+      gone?.(first, e.v);
     }
-    out.push({ cell, T, ships });
   }
-  return out;
+
+  /** Back in view, or gone: no longer away (what was kept of it) */
+  take(id: number): T | undefined {
+    const e = this.m.get(id);
+    if (!e) return undefined;
+    this.m.delete(id);
+    return e.v;
+  }
+
+  /** Let go of what left more than AWAY_TICKS before `tick` (`gone` each) */
+  sweep(tick: number, gone?: (id: number, v: T) => void): void {
+    for (const [id, e] of this.m) {
+      if (tick - e.tick <= AWAY_TICKS) break;
+      this.m.delete(id);
+      gone?.(id, e.v);
+    }
+  }
+
+  clear(gone?: (id: number, v: T) => void): void {
+    if (gone) for (const [id, e] of this.m) gone(id, e.v);
+    this.m.clear();
+  }
 }
 
-/** A cell log's size on the wire, roughly (bytes): what's weighed against an entry */
-export function cellLogBytes(ships: readonly CellLogShip[]): number {
-  let n = 4;
-  for (const s of ships) n += 4 + 5 * s.events.length;
-  return n;
-}
-
-/** An entry's size, roughly, per ship (a keyframe and a status row with where it is: bytes) */
-export const CELL_ENTRY_BYTES = 40;

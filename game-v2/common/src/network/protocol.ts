@@ -35,9 +35,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 48;
+export const PROTOCOL_VERSION = 49;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '769e8cb2';
+export const PROTOCOL_WIRE_HASH = '6ce1576f';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -241,7 +241,6 @@ export type ClientMessage =
   | ClientAuthRegisterMessage
   | ClientStateHashMessage
   | ClientHpResyncMessage
-  | ClientCellCacheMessage
   | ClientPackedResyncMessage
   | ClientShipEditMessage
   | ClientDockMessage
@@ -1408,16 +1407,16 @@ export interface ServerDebrisSplitMessage {
 }
 
 /**
- * The focus grid's changes after a snapshot (CAPS.FOCUS, protocol 38; wire forms in cells.ts): `d` cells dropped with
- * the snapshot of `tick` (keep their ships as of it), `b` dropped cells back in focus (answer cellCache), `l` logs
- * (put a kept cell's ships back and fast-forward them through `tick`)
+ * Ships leaving and coming back into its view (CAPS.FOCUS, network/cells.ts AwayShips), sent just before the snapshot of
+ * `tick`, applied in this order: `b` ids away that are in its view again with that snapshot (put back what was kept of
+ * them: their keyframe is in the snapshot, their row only if it changed, structure and HP only as syncs of what
+ * changed); `k` ids leaving its view with it (in its `out`): keep their structure and status row
  */
 export interface ServerCellsMessage {
   type: 'cells';
   tick: number;
-  d?: number[];
   b?: number[];
-  l?: number[];
+  k?: number[];
 }
 
 /**
@@ -1432,12 +1431,6 @@ export interface ServerCrowdMessage {
   f: number;
   w: number;
   r: number;
-}
-
-/** What it kept of dropped cells the server asked about (cells `b`): [cell, T, hash (0: none kept)] per cell (CAPS.FOCUS) */
-export interface ClientCellCacheMessage {
-  type: 'cellCache';
-  c: number[];
 }
 
 /** The client has no blueprint for this ship (it was dropped): send a full sync */
@@ -1717,7 +1710,7 @@ const COMPACT: [string, string[]][] = [
   // (Appended, protocol 30: the dev weapons range's readout, a row per changed dummy)
   ['rangeRow', ['i', 'dead', 'hull', 'shield', 'dmg5', 'dps', 'fight', 'total', 'ttk']],
   // (Appended, protocol 38: the focus grid's drops, offers and logs, cells.ts)
-  ['cells', ['tick', 'd', 'b', 'l']],
+  ['cells', ['tick', 'b', 'k']],
   // (Appended, protocol 41: a system's crowd level, crowd.ts)
   ['crowd', ['tick', 'lv', 'f', 'w', 'r']],
 ];

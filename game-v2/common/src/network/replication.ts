@@ -142,9 +142,6 @@ export function unpackControlRow(row: ControlRow, base: number): [number, number
 
 interface Step { body: FlightBody; bits: number; q: number }
 
-/** A ship's timeline taken out of a replica set (detach), opaque: only `attach` reads it */
-export interface ReplicaHold { readonly __hold: unique symbol }
-
 interface Rep {
   mode: ReplicaMode;
   dock?: { station: number; ox: number; oy: number };
@@ -433,35 +430,6 @@ export class ShipReplicaSet {
   clear(): void {
     this.reps.clear();
     this.pres.clear();
-  }
-
-  /**
-   * Take a ship out as it is (the focus grid's dropped-cell cache, CAPS.FOCUS: network/cells.ts), to be put back with
-   * `attach`. Null: not held, or debris (stepped as a world, never kept apart)
-   */
-  detach(id: number): ReplicaHold | null {
-    const r = this.reps.get(id);
-    if (!r || r.mode === ReplicaMode.Drift || !r.hist.size) return null;
-    this.reps.delete(id);
-    return r as unknown as ReplicaHold;
-  }
-
-  /** Put a detached ship back with the control changes it missed since ([tick, bits, q], in tick order) */
-  attach(id: number, hold: ReplicaHold, events: readonly (readonly [number, number, number])[]): void {
-    const r = hold as unknown as Rep;
-    r.fixes = undefined;
-    r.drawn = undefined;
-    for (const [t, bits, q] of events) {
-      if (t <= r.kf) continue;
-      r.events.set(t, [bits, q]);
-      r.q = q;
-      if (t <= r.last) {
-        for (const h of [...r.hist.keys()]) if (h >= t && h !== r.kf) r.hist.delete(h);
-        r.last = Math.max(...r.hist.keys(), -Infinity);
-      }
-    }
-    r.raw = undefined;
-    this.reps.set(id, r);
   }
 
   ids(): IterableIterator<number> {

@@ -43,6 +43,7 @@ import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
 import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, launchesFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
+import { AwayNet } from './cells/AwayNet.js';
 import type { CrowdControl } from './crowd/CrowdControl.js';
 import { SimPass } from '../sim/SystemClocks.js';
 
@@ -199,6 +200,8 @@ export class SnapshotBuilder {
   private readonly ticks: { readonly currentTick: number };
   /** The focus grid (CAPS.FOCUS: net/cells/FocusCells.ts): capable clients' views by cell, in place of the circle */
   readonly focus: FocusCells;
+  /** Ships out of capable clients' views that both ends keep (CAPS.FOCUS: net/cells/AwayNet.ts): back, only what changed */
+  readonly away: AwayNet;
 
   constructor(host: SnapshotHost, ticks: { readonly currentTick: number }) {
     this.world = host.world;
@@ -240,17 +243,14 @@ export class SnapshotBuilder {
       has: (eid) => this.ships.has(eid),
       partyOf: (conn) => (this.party.partyId(conn) ? this.party.members(conn).map((m) => m.playerId) : []),
       targetOf: (eid) => this.ships.targetOf(eid),
-      runsBody: (conn, eid) => !!this.bodies && bodiesFor(conn.caps) && this.bodies.runs(conn, eid),
-      send: (conn, msg) => this.send(conn.ws, msg),
-      rowsSent: (conn) => this.lastEntityStates.get(conn.playerId),
       transit: (eid) => jumpPhase(this.ships.get(eid)?.jump ?? 0, jumpTuning(this.ships.tuning)).phase === 'burn',
       focusOf: (system) => this.crowd?.focusOf(system) ?? FOCUS_RANGE,
-    }, this.replication);
-  }
-
-  /** A client's answer about cells it dropped (cellCache, CAPS.FOCUS) */
-  cellCache(conn: ClientConnection, c: readonly unknown[]): void {
-    this.focus.reply(conn, c);
+    });
+    this.away = new AwayNet({
+      keeps: (conn, id) => this.ships.bodies.get(id)?.kind !== 'debris' && conn.shipSynced.has(id) && !conn.debrisHeld.has(id),
+      has: (id) => this.ships.has(id),
+      send: (conn, msg) => this.send(conn.ws, msg),
+    });
   }
 
   private get currentTick(): number {
@@ -672,7 +672,7 @@ export class SnapshotBuilder {
     // (The focus grid's home cells, for the systems with a client holding cells: CAPS.FOCUS)
     const focusSystems = new Set<number>();
     for (const conn of this.clients.values()) if (focusFor(conn.caps) && hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
-    if (focusSystems.size) this.focus.beginRound(this.currentTick, focusSystems);
+    if (focusSystems.size) this.focus.beginRound(focusSystems);
     const crowd = this.crowd;
     let t0 = crowd ? performance.now() : 0;
 
@@ -706,10 +706,13 @@ export class SnapshotBuilder {
       this.holdDebris(conn);
       // Ships that left its view: it forgets them, and gets each again on its own when it comes back
       // (Holding cells, CAPS.FOCUS: the ships homed in its focus cells, net/cells/FocusCells.ts)
-      if (conn.focus && !focusFor(conn.caps)) this.focus.reset(conn);
-      const out = focusFor(conn.caps) ? this.focus.view(conn, playerSystemId, px, py) : this.updateShipView(conn, playerSystemId, px, py);
-      // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back)
-      for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
+      if (conn.focus && !focusFor(conn.caps)) { this.focus.reset(conn); this.away.reset(conn); }
+      const focusOn = focusFor(conn.caps);
+      const out = focusOn ? this.focus.view(conn, playerSystemId, px, py) : this.updateShipView(conn, playerSystemId, px, py);
+      // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back.
+      // Holding cells it keeps them while they're away, and gets only what changed when they're back: net/cells/AwayNet.ts)
+      const goneAway = focusOn ? this.away.round(conn, this.currentTick, conn.shipView, out, prevStates) : null;
+      if (!focusOn) for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
       // Ship motion: keyframes where needed, control changes otherwise (its own ship's too, when it builds its own
       // shells: its confirmed ship, beside its prediction, snapshot/ownShots.ts)
       const ownShots = ownShotsFor(conn.caps);
@@ -848,6 +851,8 @@ export class SnapshotBuilder {
         conn.sentNames.delete(eid);
         conn.mapNamed.delete(eid);
       }
+      // (Ships it kept while they were away that are gone: told by id, CAPS.FOCUS)
+      if (goneAway?.length) for (const id of goneAway) if (!removed.includes(id)) removed.push(id);
       if (hitsOn && removed.length) this.hits!.dropShells(conn, removed);
 
       // HUD numbers (fuel, XP) once a second, whether or not anything else goes (the round in each second's first window)
@@ -859,7 +864,6 @@ export class SnapshotBuilder {
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
         if (hitsOn) this.afterHits(conn, playerSystemId);
-        if (conn.focus) this.focus.after(conn);
         continue;
       }
 
@@ -887,8 +891,6 @@ export class SnapshotBuilder {
       if (this.ownChecks && ownSimFor(conn.caps) && conn.repKnown.has(conn.playerId)) this.noteOwn(conn);
       // ...and of the bodies it runs (CAPS.BODIES: net/decisions/BodyNet.ts)
       bodies?.note(conn, this.currentTick);
-      // (Cells leaving its focus dropped, cells back settled: CAPS.FOCUS)
-      if (conn.focus) this.focus.after(conn);
     }
 
     if (crowd) { crowd.charge(this.chargeTo, performance.now() - t0); this.chargeTo = -1; }
@@ -1132,6 +1134,7 @@ export class SnapshotBuilder {
     conn.lastSystemId = playerSystemId;
     this.crowd?.enter(conn, playerSystemId);
     this.focus.reset(conn);
+    this.away.reset(conn);
     for (const m of this.events.briefing(playerSystemId)) this.send(conn.ws, m);
     for (const m of this.surfaces.briefing(playerSystemId)) this.send(conn.ws, m);
     conn.knownEntities.clear();

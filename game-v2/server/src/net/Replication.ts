@@ -22,7 +22,7 @@
 import {
   Position, Velocity, Rotation, InSystem, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
   replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, cargoBefore, quantizeShipBody, OWN_CAUSE,
-  type ShipState, CELL_HOLD_TICKS, cellMemberHash, replicaHash, replicasByte,
+  type ShipState, replicaHash, replicasByte,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { OwnCause } from '../ships/bridge/ownCauses.js';
@@ -126,12 +126,7 @@ interface Shadow {
    * runs the body is sent a keyframe only when this leaves the real ship (a contact, a shed, an EMP), never rows
    */
   bodied?: { body: FlightBody; version: number; cver: number; gen: number; diverged: boolean; caused: boolean; rebuilds: number; stepped?: number; pre?: FlightBody; preTick?: number; worked?: WorkedCauses; workedTick?: number };
-  /** Its control changes of earlier windows, [tick, bits, q], the last CELL_HOLD_TICKS and more (the focus grid's logs, CAPS.FOCUS) */
-  log?: number[];
 }
-
-/** How far back control changes are kept for the focus grid's logs (ticks): the hold, and a second to answer in */
-const LOG_TICKS = CELL_HOLD_TICKS + 120;
 
 const sameDock = (a: Shadow['dock'], b: Shadow['dock']) => (!a && !b) || (!!a && !!b && a.station === b.station && a.ox === b.ox && a.oy === b.oy);
 
@@ -394,25 +389,6 @@ export class Replication {
   }
 
   /**
-   * A ship as every holder of it has it now (the focus grid's dropped-cell record, CAPS.FOCUS): its keyframe version and
-   * the hash of its shadow and controls (cells.ts cellMemberHash). Null: no shadow, debris (stepped as a world), docked, or off its path
-   */
-  cellMember(eid: number): { version: number; h: number } | null {
-    const s = this.shadows.get(eid);
-    // (Docked ones ride their station, their shadow not stepped: they come back as new)
-    if (!s || s.mode === ReplicaMode.Drift || s.mode === ReplicaMode.Docked || s.diverged) return null;
-    return { version: s.version, h: cellMemberHash(eid, s.body, s.bits, s.q) };
-  }
-
-  /** Its control changes after tick T, through this window's ([tick, bits, q]: a dropped cell's log, CAPS.FOCUS) */
-  eventsSince(eid: number, T: number): [number, number, number][] {
-    const s = this.shadows.get(eid), out: [number, number, number][] = [];
-    if (!s) return out;
-    for (const a of [s.log ?? [], s.events]) for (let i = 0; i + 2 < a.length; i += 3) if (a[i] > T) out.push([a[i], a[i + 1], a[i + 2]]);
-    return out;
-  }
-
-  /**
    * The check's byte for every ship a CAUSES client holds now (its own check adds it, network/causes.ts replicasByte):
    * the shadow it has of each (in step: its causes clients' version; one its body flies there, that one), no debris, none docked
    */
@@ -494,12 +470,9 @@ export class Replication {
     if (due) { let n = 0; for (const k of this.knocks) if (!due(k[0]) && !due(k[1])) this.knocks[n++] = k; this.knocks.length = n; }
     else this.knocks.length = 0;
     this.ships.debrisNet.clearTouched(due);
-    const keep = this.host.tick() - LOG_TICKS;
     for (const [eid, s] of this.shadows) {
       if (due && !due(eid)) continue;
-      // (Kept a while for the focus grid's logs: a dropped cell's ships fast-forward from them)
-      if (s.events.length) { (s.log ??= []).push(...s.events); s.events = []; }
-      if (s.log) { let n = 0; while (n < s.log.length && s.log[n] < keep) n += 3; if (n) s.log.splice(0, n); }
+      if (s.events.length) s.events = [];
       s.qSent = s.q;
       if (s.causes.length) { s.causes = []; s.worked = undefined; }
       if (s.own) {

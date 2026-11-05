@@ -17,7 +17,10 @@ to the working tree on `refactor/split` at 764619d.
   depends on it.
 - **Ring = every cell within 35 km**, ghosts only, not simulated, flat threshold. About 75 cells in all, so about 48
   beyond the focus.
-- **Dropped-cell cache.** When a cell leaves the focus the client keeps its state, stamped with the drop tick, for 10 s.
+- **Dropped-cell cache.** (Superseded 2026-11-05, protocol 49: no log or replay. A ship leaving view is remembered at
+  both ends for minutes and comes back with its keyframe and only what changed since: docs/areas/networking.md "The
+  focus grid", docs/audits/focus-reentry-deltas-2026-11-05.md. The original text follows.)
+  When a cell leaves the focus the client keeps its state, stamped with the drop tick, for 10 s.
   On re-entry it sends (cell, tick T, hash H). If the server's recorded hash for that cell at T matches and the cell's log
   since T is smaller than a snapshot, the server sends the log (inputs, decision inputs, entry records) since T and the
   client fast-forwards. Otherwise it sends a snapshot. The server keeps per-cell encoded logs for the hold period, shared,
