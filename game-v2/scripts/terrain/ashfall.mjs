@@ -2,7 +2,9 @@
  * The Pyreclast's cavern under Ashfall (data/terrain/ashfall_cavern.json): one
  * mass of rock with a valley carved through it: a basin in the south where you
  * come down (open behind it: the way back up to the surface), a long winding canyon north, and an
- * arena at its end where the Pyreclast waits. Run: node scripts/terrain/ashfall.mjs [preview.svg]
+ * arena at its end where the Pyreclast waits; off the canyon's west bend, through a tunnel, the Kiln
+ * (a side chamber: its vents and its cache are data/systems.json's ashfall_cavern `den`, the server's
+ * game/dens). Run: node scripts/terrain/ashfall.mjs [preview.svg]
  *
  *   cliff  the valley's outline, traced round the open ground (ragged), each
  *          point with the way into the rock: the client draws terraced cliffs
@@ -13,12 +15,19 @@
  *   rocks  boulders along the walls, half sunk in them, and the arena's pillars
  *          (solid; cover from the lance)
  *   streams  lava running over the floor (look only): one down from the vault
- *          and along the canyon, a couple welling out of its walls
+ *          and along the canyon, a couple welling out of its walls; in the Kiln,
+ *          glowing cracks out from its vents and a ring of slag round its cache
+ *   holes  the Kiln's vents: black glass, falling away (look only)
+ *
+ * The Kiln is drawn from its own dice (rnd3), after everything else, so the rest
+ * of the cavern is as it was before it: the canyon's boulders are still laid along
+ * its outline without the Kiln (bar those the tunnel now cuts through), the
+ * vault's pillars and the streams are unchanged.
  *
  * World units; the surface is RADIUS across.
  */
 
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -38,6 +47,15 @@ const HALF = (t) => 1900 + 500 * Math.sin(t * 11) + 300 * Math.sin(t * 23 + 1);
 const BASIN = 4200;
 /** How far into the rock its solid mass reaches from the valley's outline */
 const DEPTH = 5200;
+/** The Kiln: a side chamber off the canyon's west bend (its middle, its size), and the tunnel into it from the canyon */
+const KILN = [-10500, 9000];
+const KILN_R = 4500;
+const TUNNEL = [[-3500, 7800], KILN];
+const TUNNEL_HALF = 1500;
+/** Its vents and its cache, where the server has them (data/systems.json ashfall_cavern `den`) */
+const den = JSON.parse(readFileSync(join(root, 'data/systems.json'), 'utf8')).systems.find((s) => s.id === 'ashfall_cavern')?.den ?? [];
+const VENTS = den.find((f) => f.kind === 'vents')?.at ?? [];
+const CACHE = den.find((f) => f.kind === 'cache') ?? { x: KILN[0], y: KILN[1] };
 
 // Smooth value noise, for the outline's raggedness
 const H = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -60,79 +78,101 @@ function toPath(x, y) {
   }
   return { d: best, t: at };
 }
-/** Open ground (with the outline's raggedness): the canyon, the arena, the basin, and the way south out of it */
-function open(x, y) {
+/** Distance from a point to a segment */
+function segDist(x, y, [ax, ay], [bx, by]) {
+  const ex = bx - ax, ey = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey)));
+  return Math.hypot(x - (ax + ex * t), y - (ay + ey * t));
+}
+/** Open ground (with the outline's raggedness): the canyon, the arena, the basin, and the way south out of it; with `kiln`, the Kiln and its tunnel too */
+function open(x, y, kiln = true) {
   const n = rough(x, y);
   const p = toPath(x, y);
   if (p.d < HALF(p.t) + n * 0.6) return true;
   if (Math.hypot(x - ARENA[0], y - ARENA[1]) < ARENA_R + n) return true;
   if (Math.hypot(x - ENTRY[0], y - ENTRY[1]) < BASIN + n * 0.7) return true;
   if (y > ENTRY[1] && Math.abs(x) < 2600 + n * 0.4) return true;
-  return false;
+  if (!kiln) return false;
+  if (Math.hypot(x - KILN[0], y - KILN[1]) < KILN_R + n * 0.7) return true;
+  return segDist(x, y, TUNNEL[0], TUNNEL[1]) < TUNNEL_HALF + n * 0.4;
 }
 
 // ---- The valley's outline: the open ground on a grid, its edge traced round ----
 const G = 300, LO = -RADIUS - 3000, N = Math.ceil((2 * RADIUS + 6000) / G);
-const cell = new Uint8Array(N * N);
-for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) cell[j * N + i] = open(LO + (i + 0.5) * G, LO + (j + 0.5) * G) ? 1 : 0;
-const at = (i, j) => (i < 0 || j < 0 || i >= N || j >= N ? 0 : cell[j * N + i]);
-// Keep only the valley itself (the open blob round the arena): flood from it
-const keep = new Uint8Array(N * N), stack = [[Math.floor((ARENA[0] - LO) / G), Math.floor((ARENA[1] - LO) / G)]];
-while (stack.length) {
-  const [i, j] = stack.pop();
-  if (!at(i, j) || keep[j * N + i]) continue;
-  keep[j * N + i] = 1;
-  stack.push([i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]);
-}
-const inside = (i, j) => (i < 0 || j < 0 || i >= N || j >= N ? 0 : keep[j * N + i]);
-// Trace its edge (cell corners, walking with the valley on the left)
-let si = -1, sj = -1;
-for (let j = 0; j < N && si < 0; j++) for (let i = 0; i < N; i++) if (inside(i, j)) { si = i; sj = j; break; }
-const loop = [];
-{
-  // Corner-based tracing: start at the top-left corner of the first cell, heading east along its top edge
-  let x = si, y = sj, dir = 0; // 0 east, 1 south, 2 west, 3 north (corner coordinates)
-  const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
-  const x0 = x, y0 = y;
-  for (let guard = 0; guard < 400000; guard++) {
-    loop.push([x, y]);
-    x += DX[dir]; y += DY[dir];
-    if (x === x0 && y === y0) break;
-    // The four cells round corner (x, y): which way does the edge go on (valley on the right of travel)
-    const tl = inside(x - 1, y - 1), tr = inside(x, y - 1), bl = inside(x - 1, y), br = inside(x, y);
-    const turn = (d) => {
-      // Is the edge leaving the corner in direction d (inside on the right, outside on the left)
-      if (d === 0) return br && !tr;
-      if (d === 1) return bl && !br;
-      if (d === 2) return tl && !bl;
-      return tr && !tl;
-    };
-    // Prefer turning right, then straight, then left
-    for (const d of [(dir + 1) % 4, dir, (dir + 3) % 4]) if (turn(d)) { dir = d; break; }
+/** The valley's cells (the open blob round the arena, flooded from it), with or without the Kiln */
+function valleyCells(kiln) {
+  const cell = new Uint8Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) cell[j * N + i] = open(LO + (i + 0.5) * G, LO + (j + 0.5) * G, kiln) ? 1 : 0;
+  const at = (i, j) => (i < 0 || j < 0 || i >= N || j >= N ? 0 : cell[j * N + i]);
+  // Keep only the valley itself (the open blob round the arena): flood from it
+  const keep = new Uint8Array(N * N), stack = [[Math.floor((ARENA[0] - LO) / G), Math.floor((ARENA[1] - LO) / G)]];
+  while (stack.length) {
+    const [i, j] = stack.pop();
+    if (!at(i, j) || keep[j * N + i]) continue;
+    keep[j * N + i] = 1;
+    stack.push([i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]);
   }
+  return (i, j) => (i < 0 || j < 0 || i >= N || j >= N ? 0 : keep[j * N + i]);
 }
-// To world, simplified (a point every ~400), smoothed a little
-let outline = loop.map(([x, y]) => [LO + x * G, LO + y * G]);
-const step = 2;
-outline = outline.filter((_, i) => i % step === 0);
-for (let pass = 0; pass < 2; pass++) outline = outline.map((p, i) => {
-  const a = outline[(i + outline.length - 1) % outline.length], b = outline[(i + 1) % outline.length];
-  return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4];
-});
-// Which way the rock lies from each point: away from the valley (its outward normal, smoothed)
-let area = 0;
-for (let i = 0; i < outline.length; i++) { const p = outline[i], q = outline[(i + 1) % outline.length]; area += p[0] * q[1] - q[0] * p[1]; }
-const sgn = area >= 0 ? 1 : -1;
-const normals = outline.map((p, i) => {
-  const a = outline[(i + outline.length - 3) % outline.length], b = outline[(i + 3) % outline.length];
-  const ex = b[0] - a[0], ey = b[1] - a[1], l = Math.hypot(ex, ey) || 1;
-  return [(-ey / l) * sgn, (ex / l) * sgn];
-});
-// (pointing out of the valley: check against a point just inside)
-{
-  const p = outline[0], n = normals[0], i = Math.floor((p[0] - n[0] * 400 - LO) / G), j = Math.floor((p[1] - n[1] * 400 - LO) / G);
-  if (!inside(i, j)) for (const n2 of normals) { n2[0] = -n2[0]; n2[1] = -n2[1]; }
+/** The valley's outline (simplified, smoothed) and the way into the rock at each point */
+function trace(inside) {
+  // Trace its edge (cell corners, walking with the valley on the left)
+  let si = -1, sj = -1;
+  for (let j = 0; j < N && si < 0; j++) for (let i = 0; i < N; i++) if (inside(i, j)) { si = i; sj = j; break; }
+  const loop = [];
+  {
+    // Corner-based tracing: start at the top-left corner of the first cell, heading east along its top edge
+    let x = si, y = sj, dir = 0; // 0 east, 1 south, 2 west, 3 north (corner coordinates)
+    const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+    const x0 = x, y0 = y;
+    for (let guard = 0; guard < 400000; guard++) {
+      loop.push([x, y]);
+      x += DX[dir]; y += DY[dir];
+      if (x === x0 && y === y0) break;
+      // The four cells round corner (x, y): which way does the edge go on (valley on the right of travel)
+      const tl = inside(x - 1, y - 1), tr = inside(x, y - 1), bl = inside(x - 1, y), br = inside(x, y);
+      const turn = (d) => {
+        // Is the edge leaving the corner in direction d (inside on the right, outside on the left)
+        if (d === 0) return br && !tr;
+        if (d === 1) return bl && !br;
+        if (d === 2) return tl && !bl;
+        return tr && !tl;
+      };
+      // Prefer turning right, then straight, then left
+      for (const d of [(dir + 1) % 4, dir, (dir + 3) % 4]) if (turn(d)) { dir = d; break; }
+    }
+  }
+  // To world, simplified (a point every ~400), smoothed a little
+  let outline = loop.map(([x, y]) => [LO + x * G, LO + y * G]);
+  const step = 2;
+  outline = outline.filter((_, i) => i % step === 0);
+  for (let pass = 0; pass < 2; pass++) outline = outline.map((p, i) => {
+    const a = outline[(i + outline.length - 1) % outline.length], b = outline[(i + 1) % outline.length];
+    return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4];
+  });
+  // Which way the rock lies from each point: away from the valley (its outward normal, smoothed)
+  let area = 0;
+  for (let i = 0; i < outline.length; i++) { const p = outline[i], q = outline[(i + 1) % outline.length]; area += p[0] * q[1] - q[0] * p[1]; }
+  const sgn = area >= 0 ? 1 : -1;
+  const normals = outline.map((p, i) => {
+    const a = outline[(i + outline.length - 3) % outline.length], b = outline[(i + 3) % outline.length];
+    const ex = b[0] - a[0], ey = b[1] - a[1], l = Math.hypot(ex, ey) || 1;
+    return [(-ey / l) * sgn, (ex / l) * sgn];
+  });
+  // (pointing out of the valley: check against a point just inside)
+  {
+    const p = outline[0], n = normals[0], i = Math.floor((p[0] - n[0] * 400 - LO) / G), j = Math.floor((p[1] - n[1] * 400 - LO) / G);
+    if (!inside(i, j)) for (const n2 of normals) { n2[0] = -n2[0]; n2[1] = -n2[1]; }
+  }
+  return { outline, normals };
 }
+const inside = valleyCells(true);
+/** The valley as it was before the Kiln (its boulders are laid along this outline, as they always were) */
+const insideOld = valleyCells(false);
+const { outline, normals } = trace(inside);
+const old = trace(insideOld);
+const cellOf = (x, y) => [Math.floor((x - LO) / G), Math.floor((y - LO) / G)];
+/** Open ground the Kiln added (its chamber and tunnel, and the gap in the canyon's wall where the tunnel leaves it) */
+const added = (x, y) => { const [i, j] = cellOf(x, y); return !!inside(i, j) && !insideOld(i, j); };
 
 // ---- The mass: triangles from the outline into the rock ----
 const mass = [];
@@ -159,23 +199,30 @@ for (let gx = -RADIUS - 3000; gx <= RADIUS + 3000; gx += FC) {
 }
 
 // ---- Boulders along the walls (half sunk in them), the arena's pillars ----
-function rock(x, y, r, sides = 6 + Math.floor(rnd() * 3)) {
-  const a0 = rnd() * Math.PI * 2, pts = [];
+function rock(x, y, r, sides = 6 + Math.floor(rnd() * 3), R = rnd) {
+  const a0 = R() * Math.PI * 2, pts = [];
   for (let k = 0; k < sides; k++) {
-    const a = a0 + (k / sides) * Math.PI * 2 + (rnd() - 0.5) * 0.3, d = r * (0.8 + 0.2 * rnd());
+    const a = a0 + (k / sides) * Math.PI * 2 + (R() - 0.5) * 0.3, d = r * (0.8 + 0.2 * R());
     pts.push([round(x + Math.cos(a) * d), round(y + Math.sin(a) * d)]);
   }
   return pts;
 }
+/** A boulder standing in what the Kiln opened up (where the tunnel cuts through the canyon's old wall): left out */
+const inTheWay = (pts) => pts.some(([x, y]) => added(x, y));
 const rocks = [];
-for (let i = 0; i < outline.length; i += 3) {
+// (Along the outline without the Kiln, with the same dice as ever: each is rolled whether it's kept or not)
+for (let i = 0; i < old.outline.length; i += 3) {
   if (rnd() < 0.45) continue;
-  const p = outline[i], n = normals[i], r = 260 + rnd() * 520;
+  const p = old.outline[i], n = old.normals[i], r = 260 + rnd() * 520;
   // (not in the way out south)
   if (p[1] > ENTRY[1] + 1500) continue;
-  rocks.push(rock(p[0] + n[0] * r * 0.2, p[1] + n[1] * r * 0.2, r));
+  const big = rock(p[0] + n[0] * r * 0.2, p[1] + n[1] * r * 0.2, r);
+  if (!inTheWay(big)) rocks.push(big);
   // a smaller one beside it, now and then
-  if (rnd() < 0.4) rocks.push(rock(p[0] - n[0] * r * 0.5 + (rnd() - 0.5) * r, p[1] - n[1] * r * 0.5 + (rnd() - 0.5) * r, r * 0.4));
+  if (rnd() < 0.4) {
+    const small = rock(p[0] - n[0] * r * 0.5 + (rnd() - 0.5) * r, p[1] - n[1] * r * 0.5 + (rnd() - 0.5) * r, r * 0.4);
+    if (!inTheWay(small)) rocks.push(small);
+  }
 }
 for (let k = 0; k < 8; k++) {
   const a = (k / 8) * Math.PI * 2 + 0.3 + (rnd() - 0.5) * 0.4, d = 4300 + rnd() * 1500;
@@ -197,7 +244,8 @@ function along(s) {
     run += l;
   }
 }
-const openAt = (x, y) => inside(Math.floor((x - LO) / G), Math.floor((y - LO) / G));
+// (The canyon's own streams find its walls as they were: the Kiln's tunnel leaves the canyon away from them)
+const openAt = (x, y) => insideOld(Math.floor((x - LO) / G), Math.floor((y - LO) / G));
 /** Smooth a line of control points through Catmull-Rom, a point every ~`step` */
 function spline(ctrl, step = 220) {
   const out = [];
@@ -214,8 +262,8 @@ function spline(ctrl, step = 220) {
   return out;
 }
 /** A stream along `ctrl`, `w` wide at its fullest (narrower where it wells up and where it thins out), wandering a little */
-function stream(ctrl, w) {
-  const pts = spline(ctrl), n = pts.length;
+function stream(ctrl, w, step = 220) {
+  const pts = spline(ctrl, step), n = pts.length;
   // (a wander across its line, so it never runs ruler-straight)
   const wob = pts.map((p, i) => {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], ex = b[0] - a[0], ey = b[1] - a[1], l = Math.hypot(ex, ey) || 1;
@@ -246,13 +294,55 @@ for (const f of [0.5, 0.31]) {
   streams.push(stream([wall, [a.x - a.dy * sx * d * 0.55, a.y + a.dx * sx * d * 0.55], side(f - 0.03, -sx * 300), side(f - 0.07, sx * 200), side(f - 0.11, 0)], 110 + rnd2() * 40));
 }
 
+// ---- The Kiln (its own dice, after everything else) ----
+let seed3 = 4512;
+const rnd3 = () => { seed3 = (seed3 * 1664525 + 1013904223) >>> 0; return seed3 / 4294967296; };
+// Boulders along its walls, as the canyon's are laid
+for (let i = 0; i < outline.length; i += 3) {
+  const p = outline[i], n = normals[i];
+  // (its walls: the outline where the floor just inside it is what the Kiln opened up)
+  if (!added(p[0] - n[0] * 450, p[1] - n[1] * 450)) continue;
+  if (rnd3() < 0.45) continue;
+  const r = 260 + rnd3() * 520;
+  rocks.push(rock(p[0] + n[0] * r * 0.2, p[1] + n[1] * r * 0.2, r, 6 + Math.floor(rnd3() * 3), rnd3));
+  if (rnd3() < 0.4) rocks.push(rock(p[0] - n[0] * r * 0.5 + (rnd3() - 0.5) * r, p[1] - n[1] * r * 0.5 + (rnd3() - 0.5) * r, r * 0.4, 6 + Math.floor(rnd3() * 3), rnd3));
+}
+/** The vents: each a mouth of black glass (a hole), cracks glowing out from it across the floor */
+const VENT_R = 190;
+const holes = [];
+for (const [vx, vy] of VENTS) {
+  const sides = 9, a0 = rnd3() * Math.PI * 2, pts = [];
+  for (let k = 0; k < sides; k++) {
+    const a = a0 + (k / sides) * Math.PI * 2, d = VENT_R * (0.75 + 0.4 * rnd3());
+    pts.push([round(vx + Math.cos(a) * d), round(vy + Math.sin(a) * d)]);
+  }
+  holes.push(pts);
+  // Three or four cracks, each from under its rim out across the glass, wandering; fanned away from the cache (its ring stays clear)
+  const cracks = 3 + (rnd3() < 0.5 ? 1 : 0), out = Math.atan2(vy - CACHE.y, vx - CACHE.x);
+  for (let k = 0; k < cracks; k++) {
+    let a = out + ((k + 0.5) / cracks - 0.5) * 2.6 + (rnd3() - 0.5) * 0.4, d = VENT_R * 0.6;
+    const ctrl = [[vx + Math.cos(a) * d, vy + Math.sin(a) * d]], len = 650 + rnd3() * 450;
+    while (d < len) { d += 160 + rnd3() * 120; a += (rnd3() - 0.5) * 0.7; ctrl.push([vx + Math.cos(a) * d, vy + Math.sin(a) * d]); }
+    streams.push(stream(ctrl, 46 + rnd3() * 22, 120));
+  }
+}
+// A ring of slag round the cache, broken into arcs (the crust itself is the server's: a body you break open)
+{
+  const arcs = 4, R = 420;
+  for (let k = 0; k < arcs; k++) {
+    const a0 = (k / arcs) * Math.PI * 2 + rnd3() * 0.4, span = 0.9 + rnd3() * 0.4, ctrl = [];
+    for (let m = 0; m <= 6; m++) { const a = a0 + (span * m) / 6, r = R + (rnd3() - 0.5) * 70; ctrl.push([CACHE.x + Math.cos(a) * r, CACHE.y + Math.sin(a) * r]); }
+    streams.push(stream(ctrl, 70 + rnd3() * 20, 120));
+  }
+}
+
 mkdirSync(join(root, 'data/terrain'), { recursive: true });
 writeFileSync(join(root, 'data/terrain/ashfall_cavern.json'), JSON.stringify({
   _comment: 'The Pyreclast\'s cavern under Ashfall (common/src/terrain.ts). Written by scripts/terrain/ashfall.mjs: edit that, not this.',
   cliff: outline.map((p) => p.map(round)), cliffIn: normals.map(([x, y]) => [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000]),
-  mass, fill, rocks, streams,
+  mass, fill, rocks, streams, holes,
 }) + '\n');
-console.log(`outline ${outline.length} points, ${mass.length} mass triangles, ${fill.length} fill, ${rocks.length} rocks, ${streams.length} streams`);
+console.log(`outline ${outline.length} points, ${mass.length} mass triangles, ${fill.length} fill, ${rocks.length} rocks, ${streams.length} streams, ${holes.length} vents`);
 
 const out = process.argv[2];
 if (out) {
@@ -260,7 +350,9 @@ if (out) {
   const poly = (ps, fillc, stroke = 'none') => `<polygon points="${ps.map(([x, y]) => T(x, y)).join(' ')}" fill="${fillc}" stroke="${stroke}" stroke-width="0.5"/>`;
   const parts = [`<circle cx="${W / 2}" cy="${W / 2}" r="${RADIUS * s}" fill="#5a2a1a"/>`, ...fill.map((p) => poly(p, '#2a2226')), ...mass.map((p) => poly(p, '#3a3036')),
     `<polyline points="${outline.map(([x, y]) => T(x, y)).join(' ')}" fill="none" stroke="#ff8a3a" stroke-width="1.5"/>`, ...rocks.map((p) => poly(p, '#55474d', '#120c0e')),
-    ...streams.map((t) => `<polyline points="${t.pts.map(([x, y]) => T(x, y)).join(' ')}" fill="none" stroke="#ffb040" stroke-width="${(t.w[t.w.length >> 1] * s * 1.4).toFixed(1)}"/>`)];
+    ...streams.map((t) => `<polyline points="${t.pts.map(([x, y]) => T(x, y)).join(' ')}" fill="none" stroke="#ffb040" stroke-width="${Math.max(0.6, t.w[t.w.length >> 1] * s * 1.4).toFixed(1)}"/>`),
+    ...holes.map((p) => poly(p, '#000000', '#ff5a1a'))];
   parts.push(`<circle cx="${ENTRY[0] * s + W / 2}" cy="${ENTRY[1] * s + W / 2}" r="12" fill="#4ade80"/><circle cx="${ARENA[0] * s + W / 2}" cy="${ARENA[1] * s + W / 2}" r="22" fill="#ff3a12"/>`);
+  if (VENTS.length) parts.push(`<circle cx="${CACHE.x * s + W / 2}" cy="${CACHE.y * s + W / 2}" r="5" fill="#ffd166"/>`);
   writeFileSync(out, `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W}" style="background:#07070a">${parts.join('')}</svg>`);
 }

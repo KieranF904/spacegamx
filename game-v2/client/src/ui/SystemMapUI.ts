@@ -1285,8 +1285,9 @@ export class SystemMapUI {
       this.hits.push({ kind: 'wayin', pocket: pk, x: e.x, y: e.y, sx: x, sy: y });
     }
 
-    // Hostile nests: a triangle in a ring in their faction's colour, and the name
+    // Hostile nests: a triangle in a ring in their faction's colour, and the name (not a den's hidden posts)
     for (const n of sys?.nests ?? []) {
+      if (n.hidden) continue;
       const pos = nestPosition(n, sys?.planets, this.state.getRawServerTick());
       const x = sx(pos.x), y = sy(pos.y), col = FACTIONS[n.faction]?.color ?? '#f87171';
       ctx.save();

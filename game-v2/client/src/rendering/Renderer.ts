@@ -637,7 +637,7 @@ export class Renderer {
       this.scenery.set(sys?.comets ?? [], sys?.structures ?? [], sys?.lodestones ?? []);
       // (and the ways into pockets from here: a boss's nest, drawn as one)
       this.wayIns = pocketsFrom((systemsData as { systems: StarSystemData[] }).systems, this.currentSystemId).map(entranceNest).filter((n) => n !== null);
-      this.nests.set([...(sys?.nests ?? []), ...this.wayIns], sys?.planets);
+      this.nests.set([...(sys?.nests ?? []).filter((n) => !n.hidden), ...this.wayIns], sys?.planets);
     }
     this.scenery.update(delta, this.state.getRawServerTick(), view, this.lodestoneGlow ?? undefined);
     this.nests.update(delta, this.state.getRawServerTick(), view);
@@ -1969,7 +1969,7 @@ export class Renderer {
     // Hostile nests: a triangle in their faction's colour
     const nestList = this.nestScratch;
     nestList.length = 0;
-    for (const n of this.sys.data?.nests ?? []) nestList.push(n);
+    for (const n of this.sys.data?.nests ?? []) if (!n.hidden) nestList.push(n);
     for (const n of this.wayIns) nestList.push(n);
     for (const n of nestList) {
       const at = nestPosition(n, this.sys.data?.planets, this.state.getRawServerTick());

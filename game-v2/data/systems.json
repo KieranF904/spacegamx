@@ -3018,7 +3018,48 @@
         "count": 0
       },
       "stations": [],
-      "portals": []
+      "portals": [],
+      "nests": [
+        { "id": "cavern_canyon_south", "name": "Canyon floor", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 2358, "phase": 1.012197, "period": 0 } },
+        { "id": "cavern_canyon_bend", "name": "West bend", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 7289, "phase": 1.957672, "period": 0 } },
+        { "id": "cavern_canyon_mid", "name": "Canyon floor", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 13933, "phase": 1.408597, "period": 0 } },
+        { "id": "cavern_canyon_north", "name": "Canyon floor", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 17183, "phase": 1.424784, "period": 0 } },
+        { "id": "cavern_kiln_floor", "name": "The Kiln", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 15241, "phase": 2.509902, "period": 0 } },
+        { "id": "cavern_kiln_tunnel", "name": "The Kiln's tunnel", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 11336, "phase": 2.293776, "period": 0 } }
+      ],
+      "den": [
+        {
+          "kind": "vents",
+          "id": "kiln_vents",
+          "at": [[-9721, 9450], [-10500, 9900], [-11279, 9450], [-11279, 8550], [-10500, 8100], [-9721, 8550]],
+          "order": [0, 3, 1, 4, 2, 5],
+          "every": 120,
+          "tell": 90,
+          "burn": 180,
+          "radius": 600,
+          "dps": 14,
+          "pen": 3
+        },
+        {
+          "kind": "cache",
+          "id": "kiln_cache",
+          "name": "Slag Crust",
+          "x": -10500,
+          "y": 9000,
+          "cells": 11,
+          "material": "pyre_steel",
+          "paint": "#3b2b27",
+          "hp": 3600,
+          "everyMinutes": 20,
+          "regrowSeconds": 120,
+          "loot": [
+            { "item": "ceramic_plate", "chance": 1, "min": 2, "max": 4 },
+            { "item": "coolant", "chance": 1, "min": 2, "max": 4 },
+            { "item": "titanium_plate", "chance": 0.8, "min": 1, "max": 3 },
+            { "item": "cinder_ash", "chance": 0.15, "min": 1, "max": 1 }
+          ]
+        }
+      ]
     },
     {
       "id": "gloam_siege",

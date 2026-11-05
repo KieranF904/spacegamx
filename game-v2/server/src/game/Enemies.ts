@@ -836,7 +836,8 @@ export class Enemies {
     const a = this.rng() * Math.PI * 2, c = dcos(a), s = dsin(a);
     const from = out ? NEST_RADIUS + (n.roam ?? 2400) * (0.3 + 0.7 * this.rng()) : NEST_RADIUS;
     const mx = at.x + c * from, my = at.y + s * from;
-    if (!out) this.host.effect?.(num, mx, my, 'launch');
+    // (A hidden nest has no hull to launch from: a den's post)
+    if (!out && !n.place?.hidden) this.host.effect?.(num, mx, my, 'launch');
     const eids = this.spawnPack(num, g, mx, my);
     const pack = eids.length ? this.packs.get(this.enemies.get(eids[0])!.pack) : undefined;
     if (!pack) return eids;

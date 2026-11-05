@@ -297,6 +297,14 @@
           "xp": 260,
           "credits": 135
         },
+        "slag_ray": {
+          "xp": 240,
+          "credits": 110
+        },
+        "clinker": {
+          "xp": 300,
+          "credits": 150
+        },
         "boss_cinder_warden": {
           "xp": 1200,
           "credits": 240
@@ -2185,6 +2193,44 @@
             }
           ]
         }
+      ]
+    },
+    "ashfall_cavern": {
+      "_comment": "The Pyreclast's den (docs/bosses/rework-2026-11.md 9.2-9.3): packs posted at hidden nests (systems.json, fixed: orbit period 0), anchored round them in open ground: Slag Ray pairs and Clinker + Ray packs along the canyon, the Kiln's own four (two Clinkers on its floor, two Rays at its tunnel). The basin and the vault's mouth stay clear.",
+      "grade": 3,
+      "packs": 0,
+      "groups": [
+        { "faction": "cinder", "ships": ["slag_ray", "slag_ray"], "weight": 5 },
+        { "faction": "cinder", "ships": ["clinker", "slag_ray"], "weight": 4 },
+        { "faction": "cinder", "ships": ["clinker", "clinker"], "weight": 1 }
+      ],
+      "nests": [
+        { "id": "cavern_canyon_south", "packs": 1, "respawnSeconds": 180, "leash": 3500, "roam": 700, "style": "anchored", "groups": [
+          { "faction": "cinder", "ships": ["slag_ray", "slag_ray"], "weight": 5 },
+          { "faction": "cinder", "ships": ["clinker", "slag_ray"], "weight": 4 },
+          { "faction": "cinder", "ships": ["clinker", "clinker"], "weight": 1 }
+        ] },
+        { "id": "cavern_canyon_bend", "packs": 1, "respawnSeconds": 180, "leash": 3500, "roam": 700, "style": "anchored", "groups": [
+          { "faction": "cinder", "ships": ["slag_ray", "slag_ray"], "weight": 5 },
+          { "faction": "cinder", "ships": ["clinker", "slag_ray"], "weight": 4 },
+          { "faction": "cinder", "ships": ["clinker", "clinker"], "weight": 1 }
+        ] },
+        { "id": "cavern_canyon_mid", "packs": 1, "respawnSeconds": 180, "leash": 3500, "roam": 700, "style": "anchored", "groups": [
+          { "faction": "cinder", "ships": ["slag_ray", "slag_ray"], "weight": 5 },
+          { "faction": "cinder", "ships": ["clinker", "slag_ray"], "weight": 4 },
+          { "faction": "cinder", "ships": ["clinker", "clinker"], "weight": 1 }
+        ] },
+        { "id": "cavern_canyon_north", "packs": 1, "respawnSeconds": 180, "leash": 3500, "roam": 700, "style": "anchored", "groups": [
+          { "faction": "cinder", "ships": ["slag_ray", "slag_ray"], "weight": 5 },
+          { "faction": "cinder", "ships": ["clinker", "slag_ray"], "weight": 4 },
+          { "faction": "cinder", "ships": ["clinker", "clinker"], "weight": 1 }
+        ] },
+        { "id": "cavern_kiln_floor", "packs": 1, "respawnSeconds": 180, "leash": 3500, "roam": 700, "style": "anchored", "groups": [
+          { "faction": "cinder", "ships": ["clinker", "clinker"], "weight": 1 }
+        ] },
+        { "id": "cavern_kiln_tunnel", "packs": 1, "respawnSeconds": 180, "leash": 3500, "roam": 700, "style": "anchored", "groups": [
+          { "faction": "cinder", "ships": ["slag_ray", "slag_ray"], "weight": 1 }
+        ] }
       ]
     },
     "ashfall": {

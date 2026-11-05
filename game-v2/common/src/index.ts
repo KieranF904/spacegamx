@@ -43,6 +43,7 @@ export * from './world/nests.js';
 export * from './world/pockets.js';
 export * from './world/contributorNotes.js';
 export * from './world/gates.js';
+export * from './world/denVents.js';
 
 
 // Game systems
