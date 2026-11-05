@@ -44,7 +44,7 @@ export function readerHtml(m: InboxMessage | null): string {
   if (!m) return '<div class="inbox-hint">Pick a message to read it.</div>';
   return `
     <div class="inbox-read-subject">${escapeHtml(m.subject)}</div>
-    <div class="inbox-read-meta">From <b>${escapeHtml(fromLabel(m.from))}</b> · ${escapeHtml(formatWhen(m.createdAt))}${m.important ? ' · <span class="inbox-tag">admin</span>' : ''}</div>
+    <div class="inbox-read-meta">From <b>${escapeHtml(fromLabel(m.from))}</b> · ${escapeHtml(formatWhen(m.createdAt))}${m.important ? ` · <span class="inbox-tag">${m.from === 'system' ? 'important' : 'admin'}</span>` : ''}</div>
     <div class="inbox-read-body">${escapeHtml(m.body)}</div>
     <div class="inbox-read-actions"><button type="button" class="inbox-btn inbox-delete" data-id="${Number(m.id)}">Delete</button></div>`;
 }
