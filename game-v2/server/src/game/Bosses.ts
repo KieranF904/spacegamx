@@ -27,6 +27,7 @@ import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { Enemies, Behaviour, EnemyAi } from './Enemies.js';
 import type { FarPose } from '../ships/SimLod.js';
 import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
+import { stageHpOf } from './bosses/stageHp.js';
 import type { Mobs } from './Mobs.js';
 import type { BossBrain, BrainHost } from './brains/kit.js';
 import { PyreclastBrain } from './brains/pyreclast.js';
@@ -34,7 +35,6 @@ import { ScrapMotherBrain } from './brains/scrapMother.js';
 import { BroodMotherBrain } from './brains/broodMother.js';
 import { SimPass } from '../sim/SystemClocks.js';
 import { Lifecycle } from './bosses/Lifecycle.js';
-import { applyStageHp } from './bosses/stageHp.js';
 import type { ArenaGates } from './arenas/ArenaGates.js';
 import { LIFE_ASLEEP_RESET, type ArenaDef, type LifeState } from '@space-game/common';
 
@@ -97,8 +97,16 @@ export interface BossDef {
   brain?: string;
   /** Staged: what share of a hit on a later stage's part reaches the current stage's plates (unset: rules.stageCover) */
   stageCover?: number;
-  /** Staged: each stage's deciding HP (its deciding parts rescaled to sum to it, the core's x2.5 counted): bosses/stageHp.ts */
+  /** Staged: each stage's deciding HP outright, and each limb's (bosses/stageHp.ts) */
   stageHp?: number[];
+  limbs?: Record<string, number>;
+  /** Records (data/codex.json) a pilot finds on meeting it: what a scan of it shows, how to dodge its attacks (plain, no lore) */
+  codex?: string[];
+  /**
+   * Plain hints, each told a pilot the first time it happens to them in a fight (by kind: `glancing`, a hit of theirs
+   * barely through its plating; others its brain names, BrainHost.hint)
+   */
+  hints?: Record<string, string>;
 }
 
 export interface BossesFile {
@@ -139,6 +147,10 @@ export interface BossHost {
   terrain?(systemNum: number): import('@space-game/common').Terrain | undefined;
   /** It's dead, and these players had a hand in it */
   defeated?(boss: string, def: BossDef, players: number[]): void;
+  /** These players met it (its fight started with them there, or they joined it): its `codex` records are theirs */
+  encountered?(def: BossDef, players: number[]): void;
+  /** A notice to one player (a boss's plain hints: BossDef `hints`) */
+  toast?(player: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad'): void;
   /** Pilots who've been mending this one (Repair Beams: ships/features/support/Support.ts): a boss counts them among its winners */
   supportersOf?(player: number): number[];
   /** A brain's decision for its body (BrainHost.decide): to the clients that run bodies (net/decisions/BodyNet.ts) */
@@ -166,6 +178,8 @@ interface Live {
   brain?: BossBrain;
   /** Pilots in its system who've been told what phase it's in (a pilot arriving mid-fight is told: their client draws it so) */
   told: Set<number>;
+  /** Hints a pilot has been told this fight (`pilot:kind`) */
+  hinted: Set<string>;
   /** Where it was put (its lair, or an arena's spot): its brain keeps near it */
   home: { x: number; y: number };
   /** Damage dealt by each player, and when they last hit */
@@ -316,18 +330,20 @@ export class Bosses {
     this.ships.scaleHp(eid, def.hp);
     // A boss dies when its core does: keep that for the end of the fight, not a lucky shot through a gap
     this.ships.hardenParts(eid, 'core', 2.5);
-    if (def.stageHp) applyStageHp(this.ships, eid, def.stageHp);
+    // (Staged: each stage's HP and each limb's outright, the core's x2.5 counted in)
+    const ship = this.ships.get(eid), stagedHp = ship && stageHpOf(this.ships.catalog, ship, def);
+    if (stagedHp) this.ships.setMaxHp(eid, stagedHp);
     this.ships.setDamageScale(eid, def.damage);
     this.enemies.addBoss(eid, id, def.faction, num, { x, y }, def.behaviour);
     if (def.fixed) this.ships.pin(eid);
     const b: Live = {
       key, id, def, eid, systemNum: num, phase: 0, rage: 1, blinkEvery: 0, nextBlink: 0, nova: null, nextNova: 0, novaAt: -1,
-      engaged: false, dealt: new Map(), home: { x, y }, told: new Set(),
+      engaged: false, dealt: new Map(), home: { x, y }, told: new Set(), hinted: new Set(),
     };
     const make = def.brain ? BRAINS[def.brain] : undefined;
     if (make) {
       // Its brain flies it, from what the enemy AI would do (who to fight, where its turrets aim)
-      const brain = make(this.brainHost());
+      const brain = make(this.brainHost(b));
       b.brain = brain;
       this.ships.setController(eid, (id, ship) => {
         const base = this.enemies.pilot(id, ship);
@@ -346,7 +362,7 @@ export class Bosses {
     return eid;
   }
 
-  private brainHost(): BrainHost {
+  private brainHost(b: Live): BrainHost {
     const host = this.host, self = this;
     return {
       tick: () => host.tick(),
@@ -359,6 +375,7 @@ export class Bosses {
       players: (num) => host.players(num),
       terrain: (num) => host.terrain?.(num),
       decide: host.decide ? (eid, op, args, state) => host.decide!(eid, op, args, state) : undefined,
+      hint: (player, kind) => this.hint(b, player, kind),
     };
   }
 
@@ -370,14 +387,24 @@ export class Bosses {
     return n;
   }
 
-  /** Damage report from the ship bridge: who's fighting a boss */
-  onDamage(target: number, amount: number, source: number): void {
+  /** A plain hint (BossDef `hints`), told a pilot the first time it happens to them this fight */
+  private hint(b: Live, player: number, kind: string): void {
+    const text = b.def.hints?.[kind], key = `${player}:${kind}`;
+    if (!text || b.hinted.has(key)) return;
+    b.hinted.add(key);
+    this.host.toast?.(player, text, 'info');
+  }
+
+  /** Damage report from the ship bridge: who's fighting a boss (`glancing`: the hit barely got through its plating) */
+  onDamage(target: number, amount: number, source: number, glancing = false): void {
     const b = this.byEid.get(target);
     if (!b) return;
     // (Its windows count every hit, the dev tools' dummies' too)
     b.brain?.landed?.(amount);
     if (source < 0 || !this.host.players(b.systemNum).includes(source)) return;
     const now = this.host.tick();
+    if (!b.dealt.has(source) && b.def.codex) this.host.encountered?.(b.def, [source]);
+    if (glancing) this.hint(b, source, 'glancing');
     const d = b.dealt.get(source) ?? { amount: 0, last: now };
     d.amount += amount;
     d.last = now;
@@ -390,6 +417,7 @@ export class Bosses {
     if (b.engaged) return;
     b.engaged = true;
     this.host.send(b.systemNum, { type: 'bossIntro', bodyId: b.eid, name: b.def.name, title: b.def.title, text: b.def.intro });
+    if (b.def.codex) this.host.encountered?.(b.def, this.host.players(b.systemNum));
   }
 
   tick(): void {

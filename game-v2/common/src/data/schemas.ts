@@ -316,6 +316,8 @@ export interface NestData {
   description?: string;
   /** Drawn this many times its size (a pocket's way in: world/pockets.ts entranceNest) */
   scale?: number;
+  /** No structure to see (a den's posts: its packs keep to the spot, nothing is drawn there or on the maps) */
+  hidden?: boolean;
 }
 
 /** A civilian ship flying a loop between stations (pilotless, server-driven). */
@@ -511,7 +513,49 @@ export interface StarSystemData {
   /** Hostile nests: where its packs launch from */
   nests?: NestData[];
   traffic?: TrafficData[];
+  /** A boss den's features (server game/dens: a registry by `kind`), e.g. the Pyreclast cavern's Kiln */
+  den?: DenFeatureData[];
 }
+
+/**
+ * A floor of vents erupting in a fixed cycle from the server tick (world/denVents.ts): vent `order[k]` starts its
+ * tell at tick k × `every` into each cycle of `order.length × every`, burns from `tell` ticks after that for `burn`
+ * ticks, setting fire to every pilot within `radius` (`dps` thermal, at penetration `pen`)
+ */
+export interface DenVentsData {
+  kind: 'vents';
+  id: string;
+  at: [number, number][];
+  order: number[];
+  every: number;
+  tell: number;
+  burn: number;
+  radius: number;
+  dps: number;
+  pen: number;
+}
+
+/**
+ * A crust holding loot (a pinned body of `material` armour blocks, `cells` across, painted `paint`): `hp` dealt by
+ * pilots cracks it; each who hurt it gets `loot` (rolled per pilot, at most once per `everyMinutes`), and it grows
+ * back `regrowSeconds` later
+ */
+export interface DenCacheData {
+  kind: 'cache';
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  cells: number;
+  material: string;
+  paint?: string;
+  hp: number;
+  everyMinutes: number;
+  regrowSeconds: number;
+  loot: { item: string; chance: number; min: number; max: number }[];
+}
+
+export type DenFeatureData = DenVentsData | DenCacheData;
 
 // ============================================
 // ENEMY DATA

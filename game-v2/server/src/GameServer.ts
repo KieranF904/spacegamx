@@ -151,6 +151,7 @@ import { ArenaGates } from './game/arenas/ArenaGates.js';
 import { CombatClock } from './game/arenas/CombatClock.js';
 import { BossDev } from './game/dev/bossDev.js';
 import { EnemyRecovery } from './game/enemies/recovery.js';
+import { Dens } from './game/dens/Dens.js';
 import { Mobs, MobsFile } from './game/Mobs.js';
 import { Events } from './game/Events.js';
 import { AdminTools, type AdminConn, type AdminHost } from './game/AdminTools.js';
@@ -643,6 +644,8 @@ export class GameServer implements ServerCtx {
   readonly recovery: EnemyRecovery;
   /** (dev) The boss tools: dev servers and admins only (game/dev/bossDev.ts) */
   readonly bossDev: BossDev<ClientConnection>;
+  /** Boss dens' features: the Kiln's vents and cache (game/dens, systems.json `den`) */
+  readonly dens: Dens;
   /** Single-body enemies (data/mobs.json): what boss bays launch */
   readonly mobs: Mobs;
   readonly events: Events;
@@ -934,6 +937,20 @@ export class GameServer implements ServerCtx {
       },
       rateOf: (num) => this.clocks?.rateOf(num) ?? 60,
       live: (conn) => this.clients.has(conn.ws),
+    });
+    const bossHost = this.createBossHost();
+    this.dens = new Dens({
+      tick: () => this.currentTick, ships: this.ships, players: bossHost.players, send: bossHost.send, terrain: bossHost.terrain,
+      systems: () => this.gameData.getAllSystems().filter((s) => s.den?.length).map((s) => ({ num: this.gameData.getSystemNum(s.id), den: s.den! })),
+      who: (eid) => this.pilots.connOf(eid)?.username ?? null,
+      toast: (eid, text, kind) => { const pc = this.pilots.connOf(eid); if (pc) this.pilots.toast(pc, text, kind); },
+      reward: (eid, items, text) => {
+        const pc = this.pilots.connOf(eid);
+        if (!pc) return;
+        this.pilots.give(pc, items, { toStorage: true, source: 'den', at: { x: Position.x[eid], y: Position.y[eid] } });
+        this.pilots.toast(pc, text, 'good');
+        this.pilots.saveNow(pc);
+      },
     });
     this.enemies.mobs = this.mobs;
     this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile);
@@ -1707,6 +1724,10 @@ this.devTeleport = opts.devTeleport ?? false;
         const who = names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0] ?? 'someone';
         this.achievements.post(`${def.name} has fallen to ${who}${this.hunted()?.id === boss ? ' (the hunted boss!)' : ''}`, 'boss');
       },
+      encountered: (def: { codex?: string[] }, players: number[]) => {
+        for (const p of players) { const c = this.pilots.connOf(p); if (c && def.codex) this.codex.unlock(c, def.codex); }
+      },
+      toast: (player: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad') => { const c = this.pilots.connOf(player); if (c) this.pilots.toast(c, text, kind); },
     };
   }
 
@@ -2470,7 +2491,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.combat.note(targetEid, sourceEid, this.currentTick);
         this.bossDev?.onDamage(targetEid, amount, sourceEid);
         this.recovery?.hurt(targetEid, sourceEid);
-        this.bosses?.onDamage(targetEid, amount, sourceEid);
+        this.bosses?.onDamage(targetEid, amount, sourceEid, !!glancing);
+        this.dens?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
         this.net.addDamage(InSystem.systemId[targetEid], targetEid, amount, sourceEid, !!glancing);
@@ -3569,7 +3591,7 @@ this.devTeleport = opts.devTeleport ?? false;
       { name: 'weaponSystem', pass: true, phase: 'combat', run: () => this.weaponSystem() },
       { name: 'projectileSystem', pass: true, phase: 'combat', run: () => this.projectileSystem() },
       { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); this.recovery.tick(); } },
-      { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.bosses.tick(); this.bossDev.tick(); } },
+      { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.bosses.tick(); this.bossDev.tick(); this.dens.tick(); } },
       { name: 'mobs', pass: true, phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
       { name: 'events', phase: 'combat', scene: 'sectors', run: () => this.events.tick() },
       { name: 'surfaces', phase: 'combat', scene: 'sectors', run: () => this.surfaces.tick() },
@@ -4319,7 +4341,8 @@ this.devTeleport = opts.devTeleport ?? false;
     if (d) return { name: d.data.name, kind: 1 };
     const t = this.traffic.find((x) => x.eid === eid);
     if (t) return { name: t.data.name, kind: 2 };
-    return undefined;
+    const den = this.dens?.nameOf(eid);
+    return den ? { name: den, kind: 1 } : undefined;
   }
 
   private lifetimeSystem(): void {

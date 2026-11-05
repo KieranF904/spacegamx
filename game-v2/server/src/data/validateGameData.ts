@@ -369,7 +369,8 @@ const SHAPES: Record<string, Spec> = {
         at: 'number', 'say?': 'string', 'escorts?': 'string[]', 'enrage?': 'number', 'heal?': 'number', 'blink?': 'number',
         'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number', 'intercept?': 'boolean' }),
       })),
-      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number', 'stageHp?': 'number[]',
+      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
+      'stageHp?': 'number[]', 'limbs?': rec('number'), 'codex?': 'string[]', 'hints?': rec('string'),
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
     })),
   }),
@@ -463,7 +464,14 @@ const SHAPES: Record<string, Spec> = {
       'nests?': arr(strict({
         id: 'string', name: 'string', faction: 'string', kind: oneOf('dig', 'scrap', 'den', 'roost', 'sift', 'shrine', 'knot', 'dock'),
         'around?': 'string', 'moon?': 'number', orbit: strict({ radius: 'number', phase: 'number', period: 'number' }), 'description?': 'string',
+        'hidden?': 'boolean',
       })),
+      // (A boss den's features, by kind: server game/dens, common DenFeatureData)
+      'den?': arr((v, path, c) => {
+        if (isObj(v) && v.kind === 'vents') check(c, strict({ kind: 'string', id: 'string', at: arr(arr('number')), order: 'number[]', every: 'number', tell: 'number', burn: 'number', radius: 'number', dps: 'number', pen: 'number' }), v, path);
+        else if (isObj(v) && v.kind === 'cache') check(c, strict({ kind: 'string', id: 'string', name: 'string', x: 'number', y: 'number', cells: 'number', material: 'string', 'paint?': 'string', hp: 'number', everyMinutes: 'number', regrowSeconds: 'number', loot: arr(strict({ item: 'string', chance: 'number', min: 'number', max: 'number' })) }), v, path);
+        else c.err(join(path, 'kind'), 'a den feature is `vents` or `cache`');
+      }),
       'traffic?': arr(obj({ id: 'string', name: 'string', blueprint: 'string', route: 'string[]' })),
     })),
   }),
@@ -821,6 +829,19 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
         if (isObj(ar.outside) && isObj(ar.centre) && typeof ar.radius === 'number' && dhypot(ar.outside.x - ar.centre.x, ar.outside.y - ar.centre.y) <= ar.radius + 100) c.err(`${P}.arena.outside`, 'inside the arena: a pilot put out would be put back in', F);
         if (ar.barrier !== undefined && (!Array.isArray(ar.barrier) || ar.barrier.length !== 2 || ar.barrier.some((p: unknown) => !Array.isArray(p) || p.length !== 2))) c.err(`${P}.arena.barrier`, 'two points, [[x, y], [x, y]]', F);
       }
+      // A den's features: its vents' cycle takes each vent once; a cache's crust is a material, its loot items
+      list(s?.den).forEach((d, j) => {
+        const dp = `${P}.den[${j}]`;
+        if (d?.kind === 'vents') {
+          const n = list(d.at).length, order = list(d.order);
+          if (order.length !== n || new Set(order).size !== n || order.some((i) => !(Number.isInteger(i) && i >= 0 && i < n))) c.err(`${dp}.order`, `each of its ${n} vents once (0..${n - 1})`, F);
+          if (!(d.every > 0 && d.tell >= 0 && d.burn > 0)) c.err(dp, '`every` and `burn` above 0', F);
+        } else if (d?.kind === 'cache') {
+          material(F, `${dp}.material`, d.material);
+          list(d.loot).forEach((l, k) => { item(F, `${dp}.loot[${k}].item`, l?.item); if (!(l?.min >= 1 && l?.max >= l?.min && l?.chance > 0 && l?.chance <= 1)) c.err(`${dp}.loot[${k}]`, 'chance 0..1, 1 <= min <= max', F); });
+          if (!(d.hp > 0 && d.cells >= 3)) c.err(dp, '`hp` above 0, at least 3 `cells` across', F);
+        }
+      });
       list(s?.planets).forEach((pl, j) => {
         const pp = `${P}.planets[${j}]`;
         const target = (id: unknown, path: string, moon?: number) => {
@@ -1131,6 +1152,8 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
 
   // codex.json: what each record waits for
   list(f.codex?.entries).forEach((e, i) => cond('codex.json', `entries[${i}].unlock`, e?.unlock));
+  // (a boss's records, found on meeting it)
+  for (const [id, b] of bosses) list((b as { codex?: unknown } | undefined)?.codex).forEach((r, i) => record('bosses.json', `bosses.${id}.codex[${i}]`, r));
 
   // achievements.json
   list(f.achievements?.ribbons).forEach((r, i) => {

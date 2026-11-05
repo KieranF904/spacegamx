@@ -250,7 +250,7 @@
       },
       "pen": -0.5
     },
-    "magma": {"type": "projectile", "speed": 32, "damage": 30, "life": 200, "size": 5.2, "spread": 1.2, "splash": {"radius": 240, "damage": 34}, "ignite": {"dps": 12, "ticks": 180, "radius": 1}, "stagger": true, "pen": -0.5},
+    "magma": {"type": "projectile", "speed": 16, "damage": 30, "life": 230, "size": 5.2, "spread": 1.2, "splash": {"radius": 240, "damage": 34}, "ignite": {"dps": 12, "ticks": 180, "radius": 1}, "stagger": true, "pen": -0.5},
     "charge": {
       "type": "projectile",
       "speed": 20,

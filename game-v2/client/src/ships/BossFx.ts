@@ -27,14 +27,24 @@ import { CRANE_BEAM, CRANE_BITE, drawCraneLash, drawTell, isTell, tellSound } fr
 
 const COLOR: Record<string, number> = { charge: 0xff2a1a, lance: 0xff2a1a, dash: 0xff9a2a, impact: 0xff6a1a, crystal: 0xffc040, synapse: 0xffd060, ring: 0xffe0a0, vent: 0xffb040,
   // (the Scrap Mother's: hazard yellow for her guns, greyseam green for what pulls, pools and burns)
-  rivet: 0xffd040, claw: 0xff3a1a, intake: 0x7affd2, sludge: 0x9cff6a, weld: 0xc8fff0, gather: 0xc8fff0 };
+  rivet: 0xffd040, claw: 0xff3a1a, intake: 0x7affd2, sludge: 0x9cff6a, weld: 0xc8fff0, gather: 0xc8fff0,
+  // (the Pyreclast's rework: a broadside's lanes, a scythe drawing back, a pilot's own lob, flak and spark: each its own)
+  lane: 0xff5030, scythe: 0xd84a2a, lob: 0xff8040, flak: 0xffb870, spark: 0xfff0c0, seams: 0xff9a50 };
+/** A burning pool's colours: its disc, its heart, its bubbles (greyseam sludge, or ground left burning by magma) */
+const POOL: Record<string, { disc: number; heart: number; bubble: number }> = {
+  pool: { disc: 0x3aa048, heart: 0x9cff6a, bubble: 0xd8ffc0 }, embers: { disc: 0xa02a0a, heart: 0xff7a2a, bubble: 0xffd0a0 },
+};
 /** A beam's colours, outermost glow in: a molten lance, or a heart's crystal */
 const BEAM: Record<string, { halo: number; glow: number; body: number; core: number; flare: number; hot: number }> = {
   lance: { halo: 0xff3a0a, glow: 0xff6a1a, body: 0xffa040, core: 0xfff4e0, flare: 0xff8a3a, hot: 0xfff0d0 },
   crystal: { halo: 0xff5a0a, glow: 0xff9a1a, body: 0xffd060, core: 0xfffbe8, flare: 0xffb040, hot: 0xfff6d8 },
   weld: { halo: 0x1aa080, glow: 0x3affc0, body: 0x9affe0, core: 0xf4fffb, flare: 0x6affd0, hot: 0xeafff8 },
   crane: CRANE_BEAM,
+  // (the Pyreclast's scythe: a molten blade swept round it, drawn only over its reach)
+  scythe: { halo: 0x8a1a0a, glow: 0xd8401a, body: 0xff7a3a, core: 0xffd8b0, flare: 0xff6a2a, hot: 0xffe0c0 },
 };
+/** A scythe's blade: the outer stretch of its beam (server brains/pyreclast.ts SCYTHE_FAR - SCYTHE_NEAR); inside it, nothing */
+const SCYTHE_BLADE = 2500;
 /** The lance's charge sound's length to its fire (sfx.ts boss_charge): played faster for a shorter charge */
 const CHARGE_SOUND = 2.7;
 /** The same for a magma ball's swelling (sfx.ts magma_charge) */
@@ -141,7 +151,7 @@ export class BossFx {
     if (m.kind === 'vent') { this.drawVent(g, x, at); return; }
     if (m.kind === 'iris') { this.drawVent(g, x, at, IRIS); return; }
     if (m.kind === 'magnet') { this.drawMagnet(g, x, at); return; }
-    if (m.kind === 'pool') { this.drawPool(g, x, at); return; }
+    if (m.kind === 'pool' || m.kind === 'embers') { this.drawPool(g, x, at); return; }
     if (m.shape === 'circle') {
       // (on the ground, or riding the body: `at`)
       const r = m.radius ?? 200, cx = at.x, cy = at.y;
@@ -200,14 +210,14 @@ export class BossFx {
     }
   }
 
-  /** A pool of greyseam sludge, burning a while: a bubbling green disc, fading as it cools */
+  /** A pool burning a while (greyseam sludge, or ground a magma lob left alight): a bubbling disc, fading as it cools */
   private drawPool(g: Graphics, x: Warn, at: { x: number; y: number }): void {
-    const r = x.m.radius ?? 230, k = x.age / x.life, fade = Math.min(1, x.age / 0.15) * (1 - k * k);
-    g.circle(at.x, at.y, r).fill({ color: 0x3aa048, alpha: 0.3 * fade });
-    g.circle(at.x, at.y, r * 0.7).fill({ color: 0x9cff6a, alpha: 0.18 * fade });
+    const r = x.m.radius ?? 230, k = x.age / x.life, fade = Math.min(1, x.age / 0.15) * (1 - k * k), c = POOL[x.m.kind] ?? POOL.pool;
+    g.circle(at.x, at.y, r).fill({ color: c.disc, alpha: 0.3 * fade });
+    g.circle(at.x, at.y, r * 0.7).fill({ color: c.heart, alpha: 0.18 * fade });
     for (let i = 0; i < 5; i++) {
       const a = i * 2.39996 + Math.floor(this.t * 2 + i * 0.37) * 1.3, ph = (this.t * 2 + i * 0.37) % 1, d = r * 0.6 * ((i * 0.618) % 1);
-      g.circle(at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, r * 0.12 * ph).stroke({ color: 0xd8ffc0, width: 2, alpha: 0.6 * (1 - ph) * fade });
+      g.circle(at.x + Math.cos(a) * d, at.y + Math.sin(a) * d, r * 0.12 * ph).stroke({ color: c.bubble, width: 2, alpha: 0.6 * (1 - ph) * fade });
     }
   }
 
@@ -235,12 +245,13 @@ export class BossFx {
     if (m.kind === 'crane') { drawCraneLash(g, m, at, k, Math.min(1, b.age / 0.08) * Math.min(1, (b.life - b.age) / 0.15)); return; }
     const a = at.angle + m.a0 + (m.a1 - m.a0) * k;
     const ux = Math.cos(a), uy = Math.sin(a);
-    // It burns out against rock (the server stops it there too), or against the first ship in its way
+    // It burns out against rock (the server stops it there too), or against the first ship in its way (a scythe's blade sweeps through)
     const rock = m.length * rayTerrain(terrainFor(this.state.systemId), at.x, at.y, at.x + ux * m.length, at.y + uy * m.length);
+    const blade = m.kind === 'scythe', inner = blade ? Math.max(0, m.length - SCYTHE_BLADE) : 0;
     let len = rock, onShip = -1;
     // (a crane's lash bites from a quarter out: close in, it passes over)
     const bite = m.kind === 'crane' ? m.length * CRANE_BITE : 0;
-    for (const e of this.state.entities.values()) {
+    if (!blade) for (const e of this.state.entities.values()) {
       if (!SHIPS.has(e.type) || e.id === m.bodyId) continue;
       const along = (e.renderX - at.x) * ux + (e.renderY - at.y) * uy;
       if (along <= bite || along >= len) continue;
@@ -251,15 +262,17 @@ export class BossFx {
     // Up to full in a moment, off at the end
     const on = Math.min(1, b.age / 0.08) * Math.min(1, (b.life - b.age) / 0.12);
     const flick = 0.85 + 0.15 * Math.sin(this.t * 55);
-    const s0 = Math.min(len, bite), sx = at.x + ux * s0, sy = at.y + uy * s0;
+    const s0 = Math.min(len, blade ? inner : bite), sx = at.x + ux * s0, sy = at.y + uy * s0;
     const line = (width: number, color: number, alpha: number) => g.moveTo(sx, sy).lineTo(ex, ey).stroke({ color, width, alpha: alpha * on });
     const p = BEAM[m.kind ?? 'lance'] ?? BEAM.lance;
     line(m.width * 3.2, p.halo, 0.14 * flick);
     line(m.width * 1.6, p.glow, 0.4 * flick);
     line(m.width * 0.8, p.body, 0.7);
     line(m.width * 0.28, p.core, 0.95);
-    g.circle(sx, sy, m.width * (s0 ? 0.6 : 1.4)).fill({ color: p.flare, alpha: 0.5 * on });
-    g.circle(sx, sy, m.width * (s0 ? 0.3 : 0.6)).fill({ color: p.hot, alpha: 0.9 * on });
+    if (!blade) {
+      g.circle(sx, sy, m.width * (s0 ? 0.6 : 1.4)).fill({ color: p.flare, alpha: 0.5 * on });
+      g.circle(sx, sy, m.width * (s0 ? 0.3 : 0.6)).fill({ color: p.hot, alpha: 0.9 * on });
+    }
     const struck = len < m.length - 1;
     if (!struck) return;
     // The strike: a white-hot flare, a halo, shock rings thrown off, sparks and molten spatter sprayed back

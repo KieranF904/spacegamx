@@ -32,6 +32,8 @@ export interface BrainHost {
    * clients that run the body (server/src/net/decisions). Absent: nobody runs bodies (tests)
    */
   decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
+  /** A plain hint to one pilot, the first time this fight (its text: bosses.json `hints`, by kind). Absent: none */
+  hint?(player: number, kind: string): void;
 }
 
 /** A brain's view of its boss right now */
