@@ -26,6 +26,8 @@ export interface FlightBody {
   jump?: number;
   /** This jump's burn as a fraction of a full-power one (set when the burn starts: jumpBurnSpeed) */
   jumpScale?: number;
+  /** A replica's stillstone priming (jumpFields.ts stepPrime), as replicaStep keeps it: carried, not sent; absent = 0 (sim/step.ts) */
+  jumpPrime?: number;
   /** Mass of the cargo in the hold (load.ts): carried, not stepped; absent = 0 */
   cargo?: number;
   /** Burst Strafer (features/strafer): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local); absent = 0 */

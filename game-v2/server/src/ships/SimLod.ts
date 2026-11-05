@@ -38,10 +38,10 @@
  */
 
 import {
-  InSystem, Position, Velocity, Rotation, FRICTION, BOOST_FACTOR, WORLD_SIZE, CARRY,
-  stepFlight, FULL_CHARGE, legAt, legFrom, legTo, legArrival, coastLeg, nextSeed, MIN_LEG, PATROL_ARRIVE,
+  InSystem, Position, Velocity, Rotation, WORLD_SIZE, CARRY,
+  stepShipMotion, SimShipView, aimQ, NO_FIELDS, NO_INPUT, ReplicaMode, CTL, FULL_CHARGE, legAt, legFrom, legTo, legArrival, coastLeg, nextSeed, MIN_LEG, PATROL_ARRIVE,
   patrolOf, patrolPoint, patrolFrom, patrolNext,
-  type Leg, type Motion, type Patrol, type PatrolState, type ShipDerived, type ShipState, type Blueprint, type ShipTuning, datan2, dcos, dhypot, dsin,
+  type SimEnv, type SimInput, type StepHazards, type FlightBody, type Leg, type Motion, type Patrol, type PatrolState, type ShipDerived, type ShipState, type Blueprint, type ShipTuning, datan2, dcos, dhypot, dsin,
 } from '@space-game/common';
 import type { ShipBridge } from './ShipBridge.js';
 import { SimPass } from '../sim/SystemClocks.js';
@@ -114,10 +114,10 @@ const MAX_LEGS = 5000;
 /** A design's cruise speed (world units a tick, engines full on) and turn rate (radians a tick) */
 export interface Cruise { speed: number; turn: number }
 
-const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 
 /**
- * Its cruise speed and turn rate, measured once by flying it (stepFlight, no
+ * Its cruise speed and turn rate, measured once by flying it (the one stepper's motion, sim/step.ts, as a pilotless
+ * ship: no
  * gravity): full thrust from rest until it stops gaining, and a quarter turn
  * from still. Cached by blueprint and what changes how it flies.
  */
@@ -140,25 +140,34 @@ export function cruiseOf(ship: ShipState, tuning: ShipTuning): Cruise {
 function measureCruise(d: ShipDerived, tuning: ShipTuning): Cruise {
   if (!(d.mass > 0)) return { speed: 0, turn: 0 };
   const up = -Math.PI / 2;
-  const boost = { charge: FULL_CHARGE, drainRate: 0 };
-  const body = { x: 0, y: 0, vx: 0, vy: 0, angle: up, angVel: 0, jump: 0 };
-  const go = { forward: true, backward: false, left: false, right: false, boost: false, targetAngle: up };
+  const env: SimEnv = { tick: 0, tuning, gravity: null, fields: NO_FIELDS, terrain: null };
+  const fly = (b: FlightBody, input: SimInput) => {
+    const s = CRUISE_VIEW.load(0, ReplicaMode.Pilotless, b, d, undefined, FULL_CHARGE, false);
+    env.tick++;
+    stepShipMotion(s, input, env, CALM);
+  };
+  const body: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: up, angVel: 0, jump: 0 };
+  const go: SimInput = { ...NO_INPUT, bits: CTL.forward, q: aimQ(up) };
   let speed = 0;
   for (let i = 0; i < 1200; i++) {
-    stepFlight(body, go, d, tuning, boost, K);
+    fly(body, go);
     const s = dhypot(body.vx, body.vy);
     if (i > 60 && s - speed < 1e-4) { speed = s; break; }
     speed = s;
   }
-  const turnBody = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0, jump: 0 };
-  const hold = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: Math.PI / 2 };
+  const turnBody: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0, jump: 0 };
+  const hold: SimInput = { ...NO_INPUT, q: aimQ(Math.PI / 2) };
   let ticks = 0;
   for (; ticks < 1200; ticks++) {
-    stepFlight(turnBody, hold, d, tuning, boost, K);
+    fly(turnBody, hold);
     if (Math.abs(turnBody.angle - Math.PI / 2) < 0.05) break;
   }
   return { speed, turn: (Math.PI / 2) / Math.max(1, ticks + 1) };
 }
+
+/** (measureCruise's scratch: the view it flies, and no hazards) */
+const CRUISE_VIEW = new SimShipView();
+const CALM: StepHazards = { emp: false, slowed: false, numb: 1 };
 
 const wrap = (a: number) => datan2(dsin(a), dcos(a));
 

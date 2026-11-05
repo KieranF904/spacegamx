@@ -10,11 +10,11 @@
 
 import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
-  stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, ReplicaMode, CTL,
+  Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
+  stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, lastStep, SimShipView, pilotInput,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  buildFlightInputs, newFlightControls, chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactCandidates, contactFxDue,
-  type ShipState, type GravityWell, type FlightConstants, type FlightInputSource,
+  chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactCandidates, contactFxDue,
+  type ShipState, type GravityWell, type FlightConstants, type FlightInputSource, type SimEnv, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
@@ -35,7 +35,6 @@ function heldInputs(): { name: string; field: ArrayLike<number> }[] {
     return { name, field };
   });
 }
-const MOVE_CTL = newFlightControls();
 /** resolveContacts' scratch: a system's candidate pairs */
 const CAND: number[] = [];
 const NONE: readonly number[] = [];
@@ -203,34 +202,40 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   body.cargo = quantizeCargo((b.host.cargoMass?.(eid) ?? 0) + (b.host.featureCargo?.(eid) ?? 0));
   // (Changed since its last step, a pickup, a sale, a tow: its clients fly the new mass from this step on, CAPS.CARGO)
   if (body.cargo !== had) b.ownCauses.add(eid, { kind: 3, cargo: body.cargo });
-  // (Part features' held inputs, a Burst Strafer's dodge, come with the keys: readInputsInto)
-  const q = quantizeReplicaAngle(Input.targetAngle[eid]);
-  // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
-  const emp = b.isEmped(eid);
-  // The controls the step reads (flightInputs.ts: jump && !emp, jumpDist = cursorDist); the replica's bits read the same
-  const controls = buildFlightInputs(readInputsInto(eid, MOVE_SRC), emp, MOVE_CTL);
-  // Numb with cold, the drive is sluggish (warmth.ts): its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb
-  const cold = b.coldStage(eid);
-  // Slowed by a Frostbite's beam (features/weaponry): after the cold, before an EMP, as its prediction and replicas (CTL.slowed) have it
-  const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
-  const hazard = withSlowed(withNumb(b.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold), slowed);
-  b.replicaCtl.set(eid, {
-    mode: ReplicaMode.Player, q, derived: ship.derived,
-    bits: controlBits(controls) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0) | (slowed ? CTL.slowed : 0),
-  });
-  // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
-  // cooldown and a lodestone's priming from where it ends (the pilot's prediction runs the same: ShipClient.predict)
-  const jt = jumpTuning(b.tuning);
-  let res!: ReturnType<typeof stepShipPhysics>;
-  ship.jumpPrime = pilotJumpStep(body, ship.jumpPrime ?? 0, b.host.jumpFields?.(eid) ?? NO_FIELDS, b.host.getTick(), ship.derived.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-    res = stepShipPhysics(body, controls, ship.derived, b.tuning, { charge: b.chargeOf(eid), drainRate: 1, load: gunLoadTick(ship, b.host.getTick()), tick: b.host.getTick() }, b.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, b.host.terrainAt?.(eid));
-  });
-  b.setCharge(eid, res.charge);
-  // (What the engines got, and a boost the stores refused, go in the replicated controls: replicas have no charge)
-  if (res.ctlPower) b.replicaCtl.get(eid)!.bits |= res.ctlPower;
+  // One tick of the one stepper (common sim/step.ts stepShip), in place on a view of the ship: the hazard chain (the env
+  // hazard, numb with cold, slowed by a Frostbite's beam, an EMP's crippled drive and no jump starting), the charging
+  // fields round the flight (range boost from where it starts, a faster cooldown and a stillstone's priming from where it
+  // ends), the aim on the replicated grid. The pilot's prediction (ShipClient.predict) and every replica step the same
+  const tick = b.host.getTick();
+  const s = MOVE_VIEW.load(eid, ReplicaMode.Player, body, ship.derived, ship, b.chargeOf(eid), true, ship.jumpPrime ?? 0);
+  s.hazard.empUntil = b.empUntil.get(eid) ?? 0;
+  s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
+  // (Numb: its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb)
+  s.hazard.numb = b.coldStage(eid).control;
+  stepShip(s, pilotInput(readInputsInto(eid, MOVE_SRC), MOVE_IN), moveEnv(b, eid, tick), s);
+  ship.jumpPrime = s.jumpPrime;
+  b.setCharge(eid, s.charge);
+  // (What it flew: its keys, its hazards' bits, the engines' power and a boost the stores refused: replicas have no charge)
+  b.replicaCtl.set(eid, { mode: ReplicaMode.Player, q: s.ctl.q, derived: ship.derived, bits: s.ctl.bits });
   b.writeBody(eid, ship, body);
-  if (res.isBoosting) Boost.lastUseTick[eid] = b.host.getTick();
+  if (lastStep.isBoosting) Boost.lastUseTick[eid] = tick;
   return true;
+}
+
+/** stepMovement's scratch: the view, its input and env (reused every call; the step keeps none of them) */
+const MOVE_VIEW = new SimShipView();
+const MOVE_IN = pilotInput(MOVE_SRC);
+const MOVE_FIELDS: FieldEnv = { central: null };
+const MOVE_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: MOVE_FIELDS, terrain: null };
+let moveEid = 0, moveB: BridgeCtx | undefined;
+const moveHazard = (d: ShipDerived, x: number, y: number) => moveB!.host.hazardFlight?.(moveEid, d, x, y);
+function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {
+  const f = b.host.jumpFields?.(eid) ?? NO_FIELDS;
+  MOVE_FIELDS.central = f.central; MOVE_FIELDS.lodestones = f.lodestones;
+  moveB = b; moveEid = eid;
+  MOVE_ENV.tick = tick; MOVE_ENV.tuning = b.tuning; MOVE_ENV.gravity = b.host.gravityAt(eid); MOVE_ENV.terrain = b.host.terrainAt?.(eid) ?? null;
+  MOVE_ENV.hazard = b.host.hazardFlight ? moveHazard : undefined;
+  return MOVE_ENV;
 }
 
 export function addToSpatialGrid(b: BridgeCtx, add: (eid: number, x: number, y: number, r: number) => void): void {

@@ -17,7 +17,8 @@ import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { boostOf, buildFlightInputs, newFlightControls, payMining, gunLoadTick, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
+import { stepShip, SimShipView, pilotInput, ReplicaMode, type SimInput, type SimEnv, type FieldEnv } from '@space-game/common';
+import { boostOf, payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -25,9 +26,9 @@ import { setHtml, setStyle } from '../ui/domWrite';
 import type { Application } from 'pixi.js';
 import {
   Blueprint, Catalog, ClientInputMessage, ClientMessage, EntityType, InventoryStub, ServerMessage, ShipTuning,
-  stationInteractRadius, stepShipPhysics, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
+  stationInteractRadius, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding, jumpGo, jumpChargeNeed,
-  jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
+  jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
   type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, movesFor, focusFor, causesFor, contactsFor, waypointsFor, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
@@ -117,7 +118,11 @@ export interface ShipClientOptions {
 }
 
 /** predict's controls scratch (reused every call; the step never keeps it) */
-const PREDICT_CTL = newFlightControls();
+/** predict's scratch: the view it steps, its input and env (reused every call; the step keeps none of them) */
+const PREDICT_VIEW = new SimShipView();
+const PREDICT_IN: SimInput = { bits: 0, q: 0, jumpDist: 0, fire: false, fireAlt: false, aimDist: 0 };
+const PREDICT_FIELDS: FieldEnv = { central: null };
+const PREDICT_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PREDICT_FIELDS, terrain: null };
 
 export class ShipClient {
   readonly store: ShipStore;
@@ -1520,21 +1525,21 @@ export class ShipClient {
     }
     // (The hold's mass and the Burst Strafer's counter and way, as the server flies them: load.ts, strafer.ts)
     const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, cargo: player.cargoMass ?? 0, dodge: player.dodge ?? 0, dodgeDir: player.dodgeDir ?? 0 };
-    // Hit by an EMP (or frozen through): the drive crippled and no jump starting, exactly as the server has it (ShipBridge.stepMovement)
-    const emp = tick < (player.empUntil ?? 0);
-    // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells; then slowed by a Frostbite's
-    // beam, from the slowed ticks it tells: features/weaponry, flight.ts withSlowed)
-    const hazard = withSlowed(withNumb(this.hazardFor(ship.derived, player.x, player.y), warmthStage(player.warmth ?? 100)), tick < (player.slowUntil ?? 0));
-    // Charging fields round the step, exactly as the server has them (ShipBridge.stepMovement): the range boost from
-    // where it starts, then a faster cooldown and a lodestone's priming from where it ends
-    let res!: ReturnType<typeof stepShipPhysics>;
     // (A ports ship's charge is its parts' state: made once, and read from the row the server sent: energy.ts)
     ensurePortsCharge(ship.derived, charge);
-    player.jumpPrime = pilotJumpStep(body, player.jumpPrime ?? 0, { central: this.central, lodestones: this.lodestones }, tick,
-      ship.derived.jumpCooldown || this.jump.cooldownTicks, this.jump, (rangeBoost) => {
-        // (The controls built as the server builds them: flightInputs.ts. The aim goes in as the message has it)
-        res = stepShipPhysics(body, buildFlightInputs(input, emp, PREDICT_CTL), ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoadTick(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
-      });
+    // One tick of the one stepper (common sim/step.ts stepShip), exactly as the server steps it (bridge/flight.ts
+    // stepMovement), in place on a view of the ship: the hazard chain (the env hazard, numb with cold from the warmth the
+    // server tells, slowed from the slowed ticks it tells, an EMP's crippled drive and no jump starting), the charging
+    // fields round the flight, the aim on the replicated grid, the controls built as the server builds them
+    const s = PREDICT_VIEW.load(player.id, ReplicaMode.Player, body, ship.derived, ship, charge, true, player.jumpPrime ?? 0);
+    s.hazard.empUntil = player.empUntil ?? 0;
+    s.hazard.slowUntil = player.slowUntil ?? 0;
+    s.hazard.numb = warmthStage(player.warmth ?? 100).control;
+    const env = PREDICT_ENV;
+    env.tick = tick; env.tuning = this.opts.tuning; env.gravity = this.gravity; env.terrain = this.terrain; env.hazard = this.hazardFor;
+    PREDICT_FIELDS.central = this.central; PREDICT_FIELDS.lodestones = this.lodestones;
+    stepShip(s, pilotInput(input, PREDICT_IN), env, s);
+    player.jumpPrime = s.jumpPrime;
     player.jumpScale = body.jumpScale;
     player.x = body.x;
     player.y = body.y;
@@ -1545,7 +1550,7 @@ export class ShipClient {
     player.jump = body.jump;
     player.dodge = body.dodge ?? 0;
     player.dodgeDir = body.dodgeDir ?? 0;
-    return res.charge;
+    return s.charge;
   }
 
   /** All your ship's stored energy as one percentage (the HUD's gauge) */
