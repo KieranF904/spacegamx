@@ -1,16 +1,18 @@
 /**
- * The focus grid (CAPS.FOCUS; server net/cells/FocusCells.ts, client ships/cells/CellCache.ts, common network/cells.ts).
+ * The focus grid and ships away (CAPS.FOCUS; server net/cells/FocusCells.ts and AwayNet.ts, client ships/cells/ShipMemory.ts,
+ * common network/cells.ts).
  *
  * A real GameServer; two pilots fly about by inputs (their controls change every 40 ticks), and an observer holding
  * cells is moved away from them and back. Every ship on its tick layer is checked against the server's ship at every
- * snapshot's tick: entering, leaving and coming back (from its kept cell, fast-forwarded from the log, and as new) must
- * all be exact. A legacy observer alongside keeps the 40 km circle.
+ * snapshot's tick: entering, leaving and coming back must all be exact. Coming back, a ship it kept gets its keyframe
+ * and only what changed: no blueprint, no full sync, no status row with its place unless something in it changed.
+ * A legacy observer alongside keeps the 40 km circle.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, CAPS, encodeMessage, decodeMessage, CELL_SIZE, focusCells, cellAt,
+  Position, Velocity, Rotation, InSystem, CAPS, encodeMessage, decodeMessage, CELL_SIZE, focusCells, cellAt, AWAY_TICKS,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage, type ServerMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -24,9 +26,13 @@ const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
-interface Seen { snapshots: number; checked: number; off: number; offIds: string[]; keyframes: Map<number, number>; cells: ServerMessage[] }
+interface Seen {
+  snapshots: number; checked: number; off: number; offIds: string[]; keyframes: Map<number, number>; cells: ServerMessage[];
+  /** Every message about a ship by its id, in order: [tick, what] (sync+bp, sync, hps, row+pos, row) */
+  about: Map<number, [number, string][]>;
+}
 
-function world(caps: number, o: { corrupt?: boolean; dir?: (t: number, k: number) => number; at?: (x0: number, y0: number, k: number) => [number, number] } = {}) {
+function world(caps: number, o: { dir?: (t: number, k: number) => number; at?: (x0: number, y0: number, k: number) => [number, number] } = {}) {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -42,13 +48,15 @@ function world(caps: number, o: { corrupt?: boolean; dir?: (t: number, k: number
   const L = new FakeHitsClient(server, { name: 'legacy', caps: 0, env });
   const P = [new FakeHitsClient(server, { name: 'pilot_b', caps: 0, env }), new FakeHitsClient(server, { name: 'pilot_c', caps: 0, env })];
   const truth = new Map<number, Map<number, number[]>>();
-  const seen: Seen = { snapshots: 0, checked: 0, off: 0, offIds: [], keyframes: new Map(), cells: [] };
+  const seen: Seen = { snapshots: 0, checked: 0, off: 0, offIds: [], keyframes: new Map(), cells: [], about: new Map() };
+  const note = (id: number, what: string) => { let l = seen.about.get(id); if (!l) seen.about.set(id, (l = [])); l.push([server.getTick(), what]); };
   const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void; handle(m: ServerMessage): void };
   const oSnap = fa.snapshot.bind(A), oHandle = fa.handle.bind(A);
   fa.handle = (m) => {
     if (m.type === 'cells') seen.cells.push(m);
-    // (A cache gone bad: its answers' hashes off by one)
-    if (m.type === 'cells' && o.corrupt && m.b) { oHandle(m); for (const r of A.outbox) if (r.type === 'cellCache') r.c = r.c.map((v, i) => (i % 3 === 2 && v ? v ^ 1 : v)); return; }
+    if (m.type === 'shipSync') note(m.id, m.blueprint || m.design ? 'sync+bp' : m.hp ? 'sync+hp' : 'sync');
+    if (m.type === 'shipHps') for (const [id] of m.ships ?? []) note(id, 'hps');
+    if (m.type === 'snapshot') for (const e of m.entities) note(e.id, e.x !== undefined ? 'row+pos' : 'row');
     oHandle(m);
   };
   fa.snapshot = (s) => {
@@ -102,8 +110,11 @@ function world(caps: number, o: { corrupt?: boolean; dir?: (t: number, k: number
 
 const away = (w: { x0: number; y0: number }): [number, number] => [w.x0 + 46000, w.y0];
 
-describe('the focus grid (CAPS.FOCUS)', () => {
-  it('holds the ships homed in its focus cells only; the legacy client keeps its 40 km circle', () => {
+/** What A was told about a ship since tick t */
+const since = (w: { seen: Seen }, id: number, t: number) => (w.seen.about.get(id) ?? []).filter(([at]) => at > t).map(([, what]) => what);
+
+describe('the focus grid and ships away (CAPS.FOCUS)', () => {
+  it('holds the ships homed in its focus cells only; ships leaving are kept at both ends; the legacy client keeps its 40 km circle', () => {
     const w = world(CAPS.FOCUS);
     w.run(60);
     const [b, c] = w.P.map((p) => p.pid);
@@ -115,69 +126,96 @@ describe('the focus grid (CAPS.FOCUS)', () => {
     expect(w.conn.shipView.has(b)).toBe(false);
     expect(w.lconn.shipView.has(b)).toBe(true);
     expect(w.A.reps.has(b)).toBe(false);
-    expect(w.A.cells.has(b)).toBe(true);
-    // ...and they're its ghosts (map-dot legs) with its map shut
-    expect(w.seen.cells.some((m) => m.type === 'cells' && (m.d ?? []).includes(b))).toBe(true);
+    expect(w.A.away.has(b)).toBe(true);
+    expect(w.conn.away?.has(b)).toBe(true);
+    // (what it was sent of it stays: its sync and HP)
+    expect(w.conn.shipSynced.has(b) && w.conn.shipHpSent.has(b)).toBe(true);
+    expect(w.seen.cells.some((m) => m.type === 'cells' && (m.k ?? []).includes(b))).toBe(true);
+    expect([...w.A.away.ids()].sort()).toEqual([...w.conn.away!.ids()].sort());
     expect(w.seen.off).toBe(0);
   });
 
   it.each([
-    ['plain frames', CAPS.FOCUS],
-    ['every cap (packed, blocks, own ship, bodies)', 2047],
-  ])('leaves and comes back within the hold: put back from its kept cell and a log, no keyframes, exact (%s)', (_, caps) => {
+    ['plain frames, 2.5 s away', CAPS.FOCUS, 150],
+    ['every cap (packed, blocks, own ship, bodies), 2.5 s away', 2047, 150],
+    ['every cap, 40 s away (past the old 10 s hold)', 2047, 2400],
+  ])('leaves and comes back: a keyframe and only what changed, no replay, exact (%s)', (_, caps, ticks) => {
     const w = world(caps);
     w.run(90);
     const ids = w.P.map((p) => p.pid);
-    if (process.env.FOCUS_DEBUG) console.log('POS', ids.map((id) => [Position.x[id] - w.x0, Position.y[id] - w.y0, Velocity.x[id], w.server.pilots.connOf(id)?.docked]));
-    const kf0 = ids.map((id) => w.seen.keyframes.get(id) ?? 0);
-    w.run(150, away(w));
-    expect(ids.every((id) => w.A.cells.has(id))).toBe(true);
+    w.run(ticks, away(w));
+    expect(ids.every((id) => w.A.away.has(id) && !w.A.reps.has(id))).toBe(true);
+    // (Flown off meanwhile: put back where it'll see them, as they might have flown back)
+    w.P.forEach((f, k) => { Position.x[f.pid] = w.x0 - 600 + 1200 * k; Position.y[f.pid] = w.y0 + 300; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; });
+    const kf0 = ids.map((id) => w.seen.keyframes.get(id) ?? 0), t0 = w.server.getTick();
     w.run(150, [w.x0, w.y0]);
-    const st = w.server.snapshots.focus.stats;
-    if (process.env.FOCUS_DEBUG) console.log(ids, JSON.stringify(st), JSON.stringify(w.A.cells.stats), w.seen.cells.map((m) => JSON.stringify(m)).join(' | '), JSON.stringify(w.server.replication.reasons));
-    expect(st.offers).toBeGreaterThan(0);
-    expect(st.logs).toBeGreaterThan(0);
-    expect(st.logShips).toBeGreaterThanOrEqual(2);
-    expect(st.logEvents).toBeGreaterThan(0);
-    expect(w.A.cells.stats.restored).toBeGreaterThanOrEqual(2);
-    expect(ids.every((id) => w.A.reps.has(id))).toBe(true);
-    // (no entry keyframe for them: they came back from what it kept)
-    expect(ids.map((id) => w.seen.keyframes.get(id) ?? 0)).toEqual(kf0);
-    expect(w.seen.checked).toBeGreaterThan(500);
+    expect(ids.every((id) => w.A.reps.has(id) && !w.A.away.has(id))).toBe(true);
+    expect(w.seen.cells.some((m) => m.type === 'cells' && ids.every((id) => (m.b ?? []).includes(id)))).toBe(true);
+    // (its movement from a keyframe each...)
+    expect(ids.map((id, i) => (w.seen.keyframes.get(id) ?? 0) - kf0[i]).every((n) => n >= 1)).toBe(true);
+    // (...and nothing else it had: no blueprint, no full sync, no row with its place)
+    for (const id of ids) {
+      const told = since(w, id, t0);
+      expect(told).not.toContain('sync+bp');
+      expect(told).not.toContain('sync+hp');
+      expect(told).not.toContain('row+pos');
+    }
+    expect(w.A.away.stats.missed).toBe(0);
+    expect(w.seen.checked).toBeGreaterThan(300);
     expect(w.seen.offIds).toEqual([]);
   });
 
-  it('back after the hold, or with a cache gone bad: they come as new, still exact', () => {
-    for (const o of [{ long: true }, { corrupt: true }]) {
-      const w = world(CAPS.FOCUS, o);
-      w.run(90);
-      const ids = w.P.map((p) => p.pid);
-      const kf0 = ids.map((id) => w.seen.keyframes.get(id) ?? 0);
-      w.run(o.long ? 700 : 150, away(w));
-      w.run(150, [w.x0, w.y0]);
-      const st = w.server.snapshots.focus.stats;
-      expect(st.logs).toBe(0);
-      if (o.corrupt) expect(st.refusedHash).toBeGreaterThan(0);
-      else expect(st.offers).toBe(0);
-      expect(ids.every((id) => w.A.reps.has(id))).toBe(true);
-      expect(ids.map((id, i) => (w.seen.keyframes.get(id) ?? 0) - kf0[i]).every((n) => n >= 1)).toBe(true);
-      expect(w.seen.offIds).toEqual([]);
-    }
+  it('part HP changed while away: only the change goes back; a ship destroyed while away is told by id', () => {
+    const w = world(2047);
+    w.run(90);
+    const [b, c] = w.P.map((p) => p.pid);
+    w.run(150, away(w));
+    const ship = w.server.getShips().get(b)!;
+    const part = ship.hp.findIndex((h) => h > 20);
+    ship.hp[part] -= 7;
+    w.server.getShips().removeShip(c);
+    const t0 = w.server.getTick();
+    w.run(150, [w.x0, w.y0]);
+    const told = since(w, b, t0);
+    expect(told.includes('hps') || told.includes('sync')).toBe(true);
+    expect(told).not.toContain('sync+bp');
+    expect(told).not.toContain('sync+hp');
+    expect(w.A.store.get(b)!.hp[part]).toBeCloseTo(ship.hp[part], 1);
+    expect(w.A.away.has(c)).toBe(false);
+    expect(w.conn.away?.has(c) ?? false).toBe(false);
+    expect(w.A.away.stats.removed).toBe(1);
+    expect(w.seen.offIds).toEqual([]);
   });
 
-  it('dithering on the 19 km edge: drops and returns are logs, and the ships stay exact', () => {
+  it('let go by age at both ends at once; back after that, they come as new', () => {
+    const w = world(CAPS.FOCUS);
+    w.run(90);
+    const ids = w.P.map((p) => p.pid);
+    w.run(AWAY_TICKS + 120, away(w));
+    // (the server sweeps each round, the client at each snapshot or cells message)
+    expect(ids.some((id) => w.conn.away?.has(id))).toBe(false);
+    w.P.forEach((f, k) => { Position.x[f.pid] = w.x0 - 600 + 1200 * k; Position.y[f.pid] = w.y0 + 300; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; });
+    const t0 = w.server.getTick();
+    w.run(150, [w.x0, w.y0]);
+    expect(ids.some((id) => w.A.away.has(id))).toBe(false);
+    for (const id of ids) expect(since(w, id, t0)).toContain('row+pos');
+    expect(w.A.away.stats.missed).toBe(0);
+    expect(w.seen.offIds).toEqual([]);
+  }, 60_000);
+
+  it('dithering on the 19 km edge: out and back again and again, both ends agree, exact', () => {
     const w = world(CAPS.FOCUS);
     w.run(60);
     // The pilots' cell's near edge is 19 km off at x = cell start - 19,000: hop either side of it
     const edge = Math.floor(w.x0 / CELL_SIZE) * CELL_SIZE - 19000;
-    for (let k = 0; k < 6; k++) w.run(45, [edge + (k % 2 ? 300 : -300) - 2000 * 0, w.y0]);
-    const st = w.server.snapshots.focus.stats;
-    if (process.env.FOCUS_DEBUG) console.log(JSON.stringify(st), JSON.stringify(w.A.cells.stats));
-    expect(st.drops).toBeGreaterThanOrEqual(2);
-    expect(st.logs).toBeGreaterThanOrEqual(1);
+    for (let k = 0; k < 6; k++) w.run(45, [edge + (k % 2 ? 300 : -300), w.y0]);
+    const st = w.server.snapshots.away.stats;
+    expect(st.kept).toBeGreaterThanOrEqual(2);
+    expect(st.back).toBeGreaterThanOrEqual(2);
+    expect([...w.A.away.ids()].sort()).toEqual([...(w.conn.away?.ids() ?? [])].sort());
+    expect(w.A.away.stats.missed).toBe(0);
     expect(w.seen.offIds).toEqual([]);
   });
-
   it('ships crossing the border between a focus cell and one past it: out and in again, exact on both sides', () => {
     // The pilots fly north and south (forward is -y) across their cell's north border, the watcher south of them so that
     // cell is in focus and the next one north is not
@@ -205,26 +243,26 @@ describe('the focus grid (CAPS.FOCUS)', () => {
     const focus = w.server.snapshots.focus as unknown as { host: { transit(eid: number): boolean } };
     let burning = true;
     focus.host.transit = () => burning;
-    const d0 = w.server.snapshots.focus.stats.drops, cells0 = new Set(w.conn.focus!.cells);
+    const d0 = w.server.snapshots.focus.stats.left, cells0 = new Set(w.conn.focus!.cells);
     // (flown 30 km in steps, as a burn carries it)
     for (let k = 1; k <= 10; k++) w.run(9, [w.x0 + 3000 * k, w.y0]);
-    expect(w.server.snapshots.focus.stats.drops).toBe(d0);
+    expect(w.server.snapshots.focus.stats.left).toBe(d0);
     expect([...w.conn.focus!.cells]).toEqual([...cells0]);
     burning = false;
     w.run(6);
-    expect(w.server.snapshots.focus.stats.drops).toBeGreaterThan(d0);
+    expect(w.server.snapshots.focus.stats.left).toBeGreaterThan(d0);
     expect(w.conn.focus!.cells).not.toEqual(cells0);
     expect(w.seen.offIds).toEqual([]);
   });
 
-  it('a new system starts afresh (no offer from before the jump)', () => {
+  it('a new system starts afresh (nothing kept from before the jump)', () => {
     const w = world(CAPS.FOCUS);
     w.run(60);
     w.run(60, away(w));
-    expect(w.conn.focus?.dropped.size).toBeGreaterThan(0);
+    expect(w.conn.away?.size).toBeGreaterThan(0);
     w.conn.lastSystemId = -1;
     w.run(3);
-    expect(w.conn.focus?.dropped.size ?? 0).toBe(0);
+    expect(w.conn.away?.size ?? 0).toBe(0);
     expect(InSystem.systemId[w.A.pid]).toBe(w.conn.lastSystemId);
   });
 });

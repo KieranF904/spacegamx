@@ -51,10 +51,6 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
   t.on('packedResync', (ctx, conn) => {
     conn.packed?.resync();
   });
-  // (What it kept of cells it dropped, CAPS.FOCUS: net/cells/FocusCells.ts)
-  t.on('cellCache', (ctx, conn, msg) => {
-    if (Array.isArray(msg.c)) ctx.snapshots.cellCache(conn, msg.c);
-  });
   t.on('mapView', (ctx, conn, msg) => {
     // (Opened: the far ships at once, then once a second while it's open)
     conn.mapOpen = msg.open === true;

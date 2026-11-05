@@ -63,7 +63,7 @@ export interface ServerCtx {
   /** Wall clock (ms); tests pass a fake one */
   readonly clock: () => number;
   /** The snapshot path, for what a client confirms of it (debris it worked out) and tells it (cells it kept: CAPS.FOCUS) */
-  readonly snapshots: Pick<SnapshotBuilder, 'ackDebris' | 'cellCache'>;
+  readonly snapshots: Pick<SnapshotBuilder, 'ackDebris'>;
 
   // ---- verbs ----
   send(ws: ClientSocket, msg: ServerMessage): void;

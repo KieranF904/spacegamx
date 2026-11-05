@@ -38,3 +38,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 46 (2026-11-04): debrisSplit s: a destroyed ship's pose as its split took it
 - 47 (2026-11-04): debrisSplit c, h: a split whose parent the client has rebuilt since says its centre of mass and the pieces' HP
 - 48 (2026-11-04): custom enemies: the Maw's and the pirates' own materials (maw_slate, maw_glass, pirate_plate, pirate_paint)
+- 49 (2026-11-05): focus re-entry deltas: cells message is now {tick, b, k} before the snapshot (ships back, ships kept); cellCache removed

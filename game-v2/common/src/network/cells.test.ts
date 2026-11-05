@@ -1,10 +1,10 @@
 /**
- * The focus grid's geometry and the dropped-cell cache's wire forms (network/cells.ts, CAPS.FOCUS)
+ * The focus grid's geometry and the ships-away list both ends keep (network/cells.ts, CAPS.FOCUS)
  */
 import { describe, it, expect } from 'vitest';
 import {
   CELL_SIZE, FOCUS_RANGE, RING_RANGE, CELL_HOME_SLACK, focusCellKey, focusCellXY, cellAt, homeCell, cellDist2, focusCells, ringCells,
-  cellMemberHash, cellHash, packCellLog, unpackCellLogs, ghostWeight,
+  ghostWeight, AwayShips, AWAY_TICKS, AWAY_CAP,
 } from './cells.js';
 
 describe('focus grid cells', () => {
@@ -51,22 +51,22 @@ describe('focus grid cells', () => {
     expect(ghostWeight(30000)).toBe(1);
   });
 
-  it('a cell hash is the same in any member order, moves with any member, never 0', () => {
-    const b = { x: 10.25, y: -3.5, vx: 1.0001, vy: 0, angle: 0.12345, angVel: 0 };
-    const a = cellMemberHash(5, b, 3, 7), c = cellMemberHash(9, b, 3, 7);
-    expect(cellHash([[5, a], [9, c]])).toBe(cellHash([[9, c], [5, a]]));
-    expect(cellMemberHash(5, { ...b, x: 10.26 }, 3, 7)).not.toBe(a);
-    expect(cellMemberHash(5, b, 3, 8)).not.toBe(a);
-    expect(cellHash([])).not.toBe(0);
-  });
-
-  it('logs round-trip', () => {
-    const out: number[] = [];
-    packCellLog(out, focusCellKey(2, -3), 1000, [{ id: 7, events: [[1003, 5, 100], [1100, 0, 90]] }, { id: 8, events: [] }]);
-    packCellLog(out, focusCellKey(1, 1), 1200, []);
-    expect(unpackCellLogs(out)).toEqual([
-      { cell: focusCellKey(2, -3), T: 1000, ships: [{ id: 7, events: [[1003, 5, 100], [1100, 0, 90]] }, { id: 8, events: [] }] },
-      { cell: focusCellKey(1, 1), T: 1200, ships: [] },
-    ]);
+  it('ships away: swept by age and capped by count, oldest first, the same at both ends', () => {
+    const a = new AwayShips<string>(), b = new AwayShips<number>();
+    const goneA: number[] = [], goneB: number[] = [];
+    // (The same changes in the same order: both let the same ships go, without telling each other)
+    for (let i = 0; i < AWAY_CAP + 10; i++) { a.leave(i, 100 + i, `s${i}`, (id) => goneA.push(id)); b.leave(i, 100 + i, i, (id) => goneB.push(id)); }
+    expect(goneA).toEqual([...Array(10).keys()]);
+    expect(goneB).toEqual(goneA);
+    expect(a.size).toBe(AWAY_CAP);
+    // (Back: taken out; leaving again puts it last)
+    expect(a.take(20)).toBe('s20');
+    expect(a.has(20)).toBe(false);
+    a.leave(11, 5000, 'again');
+    expect([...a.ids()].at(-1)).toBe(11);
+    a.sweep(100 + 15 + AWAY_TICKS, (id) => goneA.push(id));
+    // (Left at ticks 110..115 (bar 11, left again later): more than AWAY_TICKS ago at 115 + AWAY_TICKS: 110..114)
+    expect(goneA.slice(10)).toEqual([10, 12, 13, 14]);
+    expect(a.get(11)).toBe('again');
   });
 });

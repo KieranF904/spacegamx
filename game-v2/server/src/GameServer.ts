@@ -3118,8 +3118,10 @@ this.devTeleport = opts.devTeleport ?? false;
       this.handleDevRange(conn, msg);
     });
     t.on('shipNeed', (_ctx, conn, msg) => {
-      // The client lost a ship's blueprint: the next snapshot sends it in full
+      // The client lost a ship's blueprint (or a ship it kept while away, CAPS.FOCUS): the next snapshot sends it in full
       conn.shipSynced.delete(Number(msg.id));
+      conn.sentNames.delete(Number(msg.id));
+      this.lastEntityStates.get(conn.playerId)?.delete(Number(msg.id));
       const bp = this.ships.get(Number(msg.id))?.blueprint;
       if (bp) conn.designs.delete(designHash(bp));
     });

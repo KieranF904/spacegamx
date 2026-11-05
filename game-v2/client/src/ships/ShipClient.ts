@@ -66,7 +66,7 @@ import { boundKeyName } from '../input/keybindings';
 import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
 import type { QualityProfile } from '../settings/quality';
-import { CellCache } from './cells/CellCache';
+import { ShipMemory } from './cells/ShipMemory';
 import { GhostLayer, type Ghost } from './cells/GhostLayer';
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
@@ -294,12 +294,17 @@ export class ShipClient {
     this.guides = new GuideRunner({ reps: this.replicas });
     // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
     this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning });
-    // (Cells dropped from its focus, kept a while: CAPS.FOCUS, ships/cells/CellCache.ts)
-    this.cells = new CellCache({ reps: this.replicas, send: (m) => opts.send(m), forget: (id) => { this.bodies.remove(id); opts.state.entities.delete(id); } });
+    // (Ships out of view kept a while, structure and status row: CAPS.FOCUS, ships/cells/ShipMemory.ts)
+    this.away = new ShipMemory<InterpolatedEntity>({
+      entity: (id) => opts.state.entities.get(id),
+      // (Back as it was left: placed by its keyframe, which comes in the snapshot just after)
+      restore: (id, e) => { e.hist = undefined; opts.state.entities.set(id, e); },
+      send: (m) => opts.send(m),
+    });
   }
 
-  /** Dropped cells kept on the side (CAPS.FOCUS): their ships come back from here, fast-forwarded */
-  readonly cells: CellCache;
+  /** Ships out of view it keeps (CAPS.FOCUS): back, the server sends only what changed */
+  readonly away: ShipMemory<InterpolatedEntity>;
   /** Other ships' causes (CAPS.CAUSES) */
   private readonly causes: ShipCauses;
   /** Holding the focus grid's cells (CAPS.FOCUS, netCaps): ships from 18 km out are drawn as ghosts, the ring's too */
@@ -404,7 +409,7 @@ export class ShipClient {
 
   /** A connection afresh: confirmed and client-detected hits start over, as the server's do, and so do bosses' bodies (BodyRunner.reset) */
   resetHits(): void {
-    this.cells.clear();
+    this.away.clear();
     this.hits.reset();
     this.selfHits.reset();
     this.bodies.reset();
@@ -1097,7 +1102,7 @@ export class ShipClient {
         this.debris.onSplit(msg);
         return true;
       case 'cells':
-        this.cells.onCells(msg);
+        this.away.onCells(msg);
         return true;
       case 'shipSync':
         this.debris.onSync(msg);
@@ -1211,6 +1216,7 @@ export class ShipClient {
         return true;
       case 'snapshot':
         for (const id of msg.removed) this.store.remove(id);
+        this.away.onSnapshot(msg.tick, msg.removed);
         this.hits.forget(msg.removed);
         this.selfHits.onRemoved(msg.removed);
         return false;
@@ -1494,8 +1500,8 @@ export class ShipClient {
   /** Once per frame, after interpolation. */
   update(now: number): void {
     const { state } = this.opts;
-    // (a ship in a kept cell keeps its structure: it comes back without a sync)
-    this.store.prune((id) => state.entities.has(id) || this.cells.has(id), now);
+    // (a ship kept while away keeps its structure: it comes back without a sync)
+    this.store.prune((id) => state.entities.has(id) || this.away.has(id), now);
 
     // (The last ship flown, for the hangar while its sync is away)
     const mine = this.store.get(state.playerId);
