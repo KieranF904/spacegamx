@@ -833,3 +833,47 @@ describe('rumours', () => {
     expect(p.quests.rumours ?? []).not.toContain('drift_03');
   });
 });
+
+describe('quests: the v5 ship wipe', () => {
+  /** A v4 save on account 9: Sparrow in slot 1, a built Prospector in slot 2 (flown when `flyProspector`), these jobs in progress */
+  async function wiped(active: Record<string, { stage: number; progress: number }>, flyProspector = false) {
+    const store = new MemoryProfileStore();
+    const w = world(undefined, store);
+    const base = JSON.parse(JSON.stringify(w.profile()));
+    const prospector = { blueprint: JSON.parse(JSON.stringify(w.server.getShips().library.get('prospector'))), hp: {}, ghosts: [], plan: 'prospector' };
+    const hangar = [base.ship, prospector, null, null, null];
+    await store.save(9, {
+      ...base, version: 4, xp: 2000, hangar, ship: hangar[flyProspector ? 1 : 0], activeSlot: flyProspector ? 1 : 0, plans: ['sparrow-t', 'prospector'],
+      quests: { active, done: ['main_01', ...(active.main_03 ? ['main_02'] : [])], known: ['main_01', 'main_02', 'main_03'], flags: ['starter_bonds'] },
+    });
+    (w.conn as any).userId = 9;
+    await w.server.pilots.login(w.conn, 9);
+    return w;
+  }
+
+  it('main_02 part-way (its Prospector wiped) goes back to starting the Prospector, and can be finished from there', async () => {
+    for (const stage of [1, 2]) {
+      const w = await wiped({ main_02: { stage, progress: 0 } }, stage === 2);
+      const { profile, t, server, pid, got } = w;
+      expect(profile().version).toBe(5);
+      expect(profile().hangar[1]).toBeNull();
+      expect(profile().ship.plan).toBe('sparrow-t');
+      expect(profile().quests.active.main_02.stage).toBe(0);
+      expect(profile().plans).toContain('prospector');
+      // The refund notice, once, and gone from the save
+      expect(got.some((m) => m.type === 'toast' && /new power core/.test((m as any).text))).toBe(true);
+      expect(profile().notices).toBeUndefined();
+      // Start it again: on to the build step
+      t.send({ type: 'slotSave', slot: 1, blueprint: server.getShips().library.get('prospector')!, plan: 'prospector' } as any);
+      goTo(server, pid, 'sol_station_central');
+      expect(profile().quests.active.main_02.stage).toBe(1);
+    }
+  });
+
+  it('main_03 keeps its place: the refit step checks the ship flown now, the kills keep their count', async () => {
+    let w = await wiped({ main_03: { stage: 0, progress: 0 } });
+    expect(w.profile().quests.active.main_03).toEqual(expect.objectContaining({ stage: 0 }));
+    w = await wiped({ main_03: { stage: 1, progress: 2 } });
+    expect(w.profile().quests.active.main_03).toEqual(expect.objectContaining({ stage: 1, progress: 2 }));
+  });
+});

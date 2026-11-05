@@ -330,6 +330,7 @@ export class Quests {
       this.pilots.markDirty(conn);
       this.pilots.toast(conn, `${q.name} has changed since you took it: it starts again from the first step`, 'info');
     }
+    this.rewindShipSteps(conn, p);
     const window = Math.floor(this.host.now() / BOUNTY_WINDOW_MS);
     p.quests.done = p.quests.done.filter((id) => !Quests.generated(id) || Number(id.split(':')[2]) >= window - 1);
     // Beginner jobs are known from the start
@@ -413,9 +414,12 @@ export class Quests {
         if (p && !this.checkReveals(conn, p)) this.send(conn);
         return;
       }
-      case 'refit':
-        this.checkConditions(conn, this.pilots.get(conn));
+      case 'refit': {
+        const p = this.pilots.get(conn);
+        if (p) this.rewindShipSteps(conn, p);
+        this.checkConditions(conn, p);
         return;
+      }
       case 'login':
         this.onLogin(conn);
         return;
@@ -440,6 +444,24 @@ export class Quests {
     if (changed) {
       this.pilots.markDirty(conn);
       this.send(conn);
+    }
+  }
+
+  /**
+   * A job at a build or fly step whose ship is gone from the hangar (scrapped, or the v5 ship wipe) goes back to
+   * its step that starts that ship, so what it asks for next is something the pilot can do
+   */
+  private rewindShipSteps(conn: PilotConn, p: PlayerProfile): void {
+    for (const [id, st] of Object.entries(p.quests.active)) {
+      const steps = this.def(id)?.steps;
+      const s = steps?.[st.stage];
+      if (!steps || !s || (s.type !== 'build' && s.type !== 'fly')) continue;
+      if (p.hangar.some((r) => r?.plan === s.plan)) continue;
+      const to = steps.findIndex((t, i) => i < st.stage && t.type === 'slot' && t.plan === s.plan);
+      if (to < 0) continue;
+      st.stage = to;
+      st.progress = 0;
+      this.pilots.markDirty(conn);
     }
   }
 

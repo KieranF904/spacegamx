@@ -223,7 +223,7 @@ export class Pilots {
     // A save we can't make sense of is kept as it is (never saved over), like one we couldn't read
     let profile: PlayerProfile;
     try {
-      profile = raw ? migrateProfile(raw, this.opts.starter, this.econ.ships) : newProfile(this.opts.starter);
+      profile = raw ? migrateProfile(raw, this.opts.starter, this.econ.ships, { econ: this.econ }) : newProfile(this.opts.starter);
     } catch (e) {
       s.loading = true;
       console.error(`[Pilots] could not migrate profile ${userId}:`, e);
@@ -231,13 +231,15 @@ export class Pilots {
       return;
     }
     s.profile = profile;
-    s.dirty = !raw;
+    // (An upgraded save is written back at once: a migration never runs twice)
+    s.dirty = !raw || (raw as { version?: unknown }).version !== profile.version;
     if (this.structureToMaterials(s.profile)) s.dirty = true;
     if (this.grantStarterBonds(s.profile)) s.dirty = true;
     if (refundRetiredSkills(s.profile)) s.dirty = true;
     this.applyProfile(s, true);
     this.sendWreck(s);
     if (!raw) this.toast(conn, 'Welcome, pilot. Your Sparrow is fuelled and ready at Sol Central.', 'good');
+    this.showNotices(s);
     this.emit(conn, { type: 'login' });
   }
 
@@ -1023,6 +1025,20 @@ export class Pilots {
     const n = this.death.starterBonds;
     if (n > 0) addTo(p.storage, 'insurance_bond', n);
     return true;
+  }
+
+  /** One-time messages left on the profile (a migration's: the v5 ship wipe's refund), shown once and cleared */
+  private showNotices(s: Session): void {
+    const list = s.profile.notices;
+    if (!list?.length) return;
+    for (const n of list) {
+      const items = Object.entries(n.items ?? {}).sort((a, b) => b[1] - a[1]);
+      const shown = items.slice(0, 12).map(([id, k]) => `${k} ${this.econ.items.get(id)?.name ?? id}`);
+      if (items.length > shown.length) shown.push(`and ${items.length - shown.length} more`);
+      this.toast(s.conn, shown.length ? `${n.text}: ${shown.join(', ')}` : n.text, 'info');
+    }
+    delete s.profile.notices;
+    s.dirty = true;
   }
 
   /** A free starter ship, lent while your own is rebuilt */

@@ -17,6 +17,9 @@ import { unlocks } from './unlocks.js';
 import type { TraceLedger } from './traces.js';
 import type { Outpost } from './outpost.js';
 import type { ShipLoadout } from './loadout.js';
+import type { Economy } from './economy.js';
+import { partItemId } from './items.js';
+import { salvageParts } from './salvage.js';
 
 /** An order at the fabricator: `n` of `item`, `made` so far */
 export interface FabOrder { id: number; item: string; n: number; made: number }
@@ -64,6 +67,17 @@ function cleanTraces(v: unknown): { traces?: TraceLedger } {
 }
 
 /** Records (absent from older saves: none found yet); only found ones can be fresh */
+function cleanNotices(v: unknown): { notices?: ProfileNotice[] } {
+  const out: ProfileNotice[] = [];
+  for (const n of Array.isArray(v) ? v : []) {
+    const r = rec<unknown>(n);
+    if (typeof r.text !== 'string') continue;
+    const items = Object.fromEntries(Object.entries(rec<unknown>(r.items)).filter(([, k]) => typeof k === 'number' && k > 0)) as Bag;
+    out.push({ text: r.text, ...(Object.keys(items).length ? { items } : {}) });
+  }
+  return out.length ? { notices: out } : {};
+}
+
 function cleanCodex(v: unknown): PlayerProfile['codex'] {
   const r = rec<unknown>(v);
   const found = [...new Set(strs(r.found))];
@@ -72,7 +86,7 @@ function cleanCodex(v: unknown): PlayerProfile['codex'] {
 
 export const QUICKBAR_SLOTS = 5;
 
-export const PROFILE_VERSION = 4;
+export const PROFILE_VERSION = 5;
 
 /** A ship as saved: its design and each part's HP fraction by uid (absent = full, 0 = destroyed) */
 export interface ShipRecord {
@@ -181,9 +195,14 @@ export interface PlayerProfile {
   ammo?: { open: Record<string, number>; load: Record<string, number>; prefer?: Record<string, string> };
   /** Records found (data/codex.json ids, in the order found), and those not opened yet */
   codex: { found: string[]; fresh: string[] };
+  /** One-time messages for the next login (Pilots.login shows them, then clears them); absent when none */
+  notices?: ProfileNotice[];
   createdAt: string;
   updatedAt: string;
 }
+
+/** A one-time message: its text, and the items it lists (shown by name) */
+export interface ProfileNotice { text: string; items?: Bag }
 
 export interface StarterKit {
   blueprint: Blueprint;
@@ -192,6 +211,22 @@ export interface StarterKit {
   storage: Bag;
   home: string;
   position: { system: string; x: number; y: number };
+}
+
+/** What a brand-new pilot starts with, around the starter ship (GameServer, and the db scripts, so they never drift apart) */
+export function starterKit(blueprint: Blueprint): StarterKit {
+  return {
+    blueprint,
+    planFile: 'sparrow-t',
+    credits: 300,
+    storage: {
+      iron_ore: 40, nickel_ore: 20, silicate: 20, copper_ore: 10,
+      alloy_plate: 14, copper_wire: 6, repair_kit: 2, boost_cell: 2,
+    },
+    home: 'sol_station_central',
+    // (Inside the star, so never "where they left off": a new pilot appears at their home station, Pilots.homePoint)
+    position: { system: 'sol', x: 0, y: 0 },
+  };
 }
 
 export function newProfile(kit: StarterKit, now = new Date().toISOString()): PlayerProfile {
@@ -309,13 +344,134 @@ export function migrateProfileParts(p: PlayerProfile, catalog: Catalog): void {
   for (const [id, n] of Object.entries(refund)) addTo(p.storage, id, n);
 }
 
+/** What the v5 ship wipe did to one profile (scripts/db/shipWipe.ts reports it; the pilot gets a notice) */
+export interface ShipWipeReport {
+  /** Ship records gone: hangar slots (the active ship among them, loaners too) */
+  slotsDeleted: number;
+  designsDeleted: number;
+  /** What went to storage for them: built parts broken down to materials, socketed gems as they are */
+  refund: Bag;
+  /** The hold, moved to storage */
+  cargoMoved: Bag;
+  /** Fabricator jobs that were for a ship: kept, their output going to storage */
+  jobsDetached: number;
+  debtForgiven: number;
+  /** Leftover plan:* items (plans are no longer items), from the hold, storage and the quick bar */
+  planItemsDropped: Bag;
+  /** Ship plans no longer known */
+  plansDropped: string[];
+}
+
+/** Plans kept through the ship wipe beyond the starter's, if the pilot already knew them (main_02 builds the Prospector) */
+export const SHIP_WIPE_KEPT_PLANS = ['prospector'];
+
+const addBag = (bag: Bag, id: string, n: number) => { if (n > 0) bag[id] = (bag[id] ?? 0) + n; };
+
+/**
+ * (v5) Every ship goes (Kieran, 2026-11: the ports power core reworks them
+ * all): hangar slots (the active ship too), designs, the v1 roster, the wreck
+ * marker and the ships' ammo loadouts. Each record's built parts come back
+ * to storage broken down to raw materials, in full (salvageParts at 1): not
+ * a part still a ghost (never had, or lost and not rebuilt yet: its salvage
+ * was given when it went down), nor one at 0 HP, nor anything of a loaner.
+ * Every socketed gem comes back as itself, but one on a part at 0 HP (a gem
+ * is lost with its part). The one free stock starter (a Sparrow T
+ * not lost) gives back only the parts it has beyond the starter's. The pilot
+ * gets a fresh starter from `kit` (the starter as it is now) in slot 1, at
+ * home, with their hold moved to storage. Rebuild debt is forgiven, leftover
+ * plan:* items go, and the plans known are trimmed to the starter's (and the
+ * Prospector, if known). Fabricator jobs for a ship are kept, for storage.
+ * Logins, levels, credits, storage, quests, reputation and skills stay.
+ */
+export function migrateProfileShips(p: PlayerProfile, econ: Economy, kit: StarterKit): ShipWipeReport {
+  const refund: Bag = {};
+  const records = [...new Set([...p.hangar, p.ship, ...p.roster])].filter((r): r is ShipRecord => !!r);
+  // The free starter: its stock parts (once, for the first Sparrow T not lost)
+  let stock: Bag | null = {};
+  for (const q of kit.blueprint.parts) addBag(stock, partItemId(q), 1);
+  for (const rec of records) {
+    if (rec.loaner) continue;
+    const ghosts = new Set(rec.ghosts ?? []);
+    const hp = (uid: number) => rec.hp?.[uid];
+    let built = rec.blueprint.parts.filter((q) => !ghosts.has(q.uid));
+    if (stock && !rec.lost && rec.plan === kit.planFile) {
+      // (A stock part taken out of a damaged one first: what's left is what was added)
+      const left = stock;
+      built = [...built].sort((a, b) => (hp(a.uid) === 0 ? 0 : 1) - (hp(b.uid) === 0 ? 0 : 1)).filter((q) => {
+        const id = partItemId(q);
+        if ((left[id] ?? 0) <= 0) return true;
+        left[id]--;
+        return false;
+      });
+      stock = null;
+    }
+    for (const [id, n] of Object.entries(salvageParts(econ, built.filter((q) => hp(q.uid) !== 0), 1))) addBag(refund, id, n);
+    // (A gem is lost with its part: none back from one at 0 HP)
+    for (const q of rec.blueprint.parts) if (hp(q.uid) !== 0) for (const g of q.gems ?? []) addBag(refund, g, 1);
+  }
+  const report: ShipWipeReport = {
+    slotsDeleted: records.length,
+    designsDeleted: (p.designs ?? []).filter(Boolean).length,
+    refund,
+    cargoMoved: {},
+    jobsDetached: 0,
+    debtForgiven: p.debt ?? 0,
+    planItemsDropped: {},
+    plansDropped: [],
+  };
+  // Plans aren't items any more: what's left of them goes
+  const isPlan = (id: string) => id.startsWith('plan:');
+  for (const list of [p.cargo, p.storage]) for (const s of list) if (isPlan(s.id)) addBag(report.planItemsDropped, s.id, s.n);
+  p.cargo = p.cargo.filter((s) => !isPlan(s.id));
+  p.storage = p.storage.filter((s) => !isPlan(s.id));
+  p.quickbar = p.quickbar.map((id) => (id && isPlan(id) ? null : id));
+  // The hold to storage
+  for (const s of p.cargo) { addBag(report.cargoMoved, s.id, s.n); addTo(p.storage, s.id, s.n); }
+  p.cargo = [];
+  for (const [id, n] of Object.entries(refund)) addTo(p.storage, id, n);
+  // Jobs keep running, for storage
+  p.jobs = p.jobs.map((j) => {
+    if (j.for === undefined && j.slot === undefined) return j;
+    report.jobsDetached++;
+    const { for: _for, slot: _slot, ...rest } = j;
+    return rest;
+  });
+  delete p.designs;
+  delete p.wreck;
+  delete p.debt;
+  p.roster = [];
+  const plans = [kit.planFile, ...SHIP_WIPE_KEPT_PLANS.filter((f) => f !== kit.planFile && p.plans.includes(f))];
+  report.plansDropped = p.plans.filter((f) => !plans.includes(f));
+  p.plans = plans;
+  // A fresh starter in slot 1, the rest empty
+  p.hangar = Array.from({ length: unlocks(p).hangarSlots }, () => null);
+  setActiveShip(p, { blueprint: JSON.parse(JSON.stringify(kit.blueprint)), hp: {}, ghosts: [], plan: kit.planFile }, 0);
+  // Home: the starter kit's position is inside the star, so they appear at their home station (Pilots.homePoint)
+  p.position = { ...kit.position };
+  const parts = [`Every ship has been rebuilt for the new power core, so your hangar has been reset: you have a fresh ${kit.blueprint.name} in slot 1, docked at home.`];
+  if (report.debtForgiven) parts.push(`Your rebuild loan (${report.debtForgiven} credits) is forgiven.`);
+  if (Object.keys(report.cargoMoved).length) parts.push('Your hold was moved to storage.');
+  parts.push(Object.keys(refund).length ? 'Your old ships were broken down into storage' : 'Your old ships had nothing to break down beyond the starter\'s parts');
+  (p.notices ??= []).push({ text: parts.join(' '), ...(Object.keys(refund).length ? { items: { ...refund } } : {}) });
+  return report;
+}
+
+/** What migrateProfile can be given beyond the kit */
+export interface MigrateOptions {
+  /** The economy (item and recipe books): the v5 ship wipe needs it to break ships down. Without it a save older than v5 keeps its ships (and its version, to be upgraded later) */
+  econ?: Economy;
+  /** Told what the ship wipe did, when it runs */
+  onShipWipe?: (r: ShipWipeReport) => void;
+}
+
 /**
  * Bring any saved profile up to the current version, filling anything missing
  * from a fresh profile. Unknown or broken fields fall back to defaults rather
  * than failing the login. Without the ship catalogue (`catalog`) a save older
- * than v4 keeps its parts as they are (and its version, to be upgraded later).
+ * than v4 keeps its parts as they are (and its version, to be upgraded later);
+ * without the economy (`opts.econ`) a save older than v5 keeps its ships.
  */
-export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog): PlayerProfile {
+export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog, opts: MigrateOptions = {}): PlayerProfile {
   const base = newProfile(kit);
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Record<string, unknown>;
@@ -354,6 +510,7 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog)
     ...cleanAmmo(r.ammo),
     ...cleanOutpost(r.outpost),
     codex: cleanCodex(r.codex),
+    ...cleanNotices(r.notices),
     ...(Array.isArray(r.fabOrders) ? { fabOrders: (r.fabOrders as FabOrder[]).filter((o) => o && typeof o.item === 'string' && typeof o.n === 'number').map((o) => ({ id: num(o.id, 0), item: o.item, n: Math.floor(o.n), made: Math.floor(num(o.made, 0)) })) } : {}),
     ...(Array.isArray(r.designs) ? { designs: (r.designs as unknown[]).map((b) => (b && typeof b === 'object' && Array.isArray((b as Blueprint).parts) && typeof (b as Blueprint).name === 'string' ? (b as Blueprint) : null)) } : {}),
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : base.createdAt,
@@ -374,8 +531,14 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog)
   retireSchematics(out);
   // Models (v4)
   if (was < 4) {
-    if (catalog) migrateProfileParts(out, catalog);
-    else out.version = Math.min(was, 3);
+    if (!catalog) { out.version = Math.min(was, 3); return out; }
+    migrateProfileParts(out, catalog);
+  }
+  // Ships wiped (v5)
+  if (was < 5) {
+    if (!opts.econ) { out.version = 4; return out; }
+    const r = migrateProfileShips(out, opts.econ, kit);
+    opts.onShipWipe?.(r);
   }
   return out;
 }

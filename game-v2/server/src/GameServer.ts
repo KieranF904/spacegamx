@@ -122,7 +122,7 @@ import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
 import { portsSwitchFeeds, CAPS, causesFor } from '@space-game/common';
-import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
+import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, starterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
@@ -1241,18 +1241,7 @@ this.devTeleport = opts.devTeleport ?? false;
   /** The engine services modular ships use (entities, base shot, damage events). */
   /** What a brand-new pilot starts with */
   private starterKit(): StarterKit {
-    return {
-      blueprint: this.ships.playerBlueprint,
-      planFile: 'sparrow-t',
-      credits: 300,
-      storage: {
-        iron_ore: 40, nickel_ore: 20, silicate: 20, copper_ore: 10,
-        alloy_plate: 14, copper_wire: 6, repair_kit: 2, boost_cell: 2,
-      },
-      home: 'sol_station_central',
-      // (Inside the star, so never "where they left off": a new pilot appears at their home station, Pilots.homePoint)
-      position: { system: 'sol', x: 0, y: 0 },
-    };
+    return starterKit(this.ships.playerBlueprint);
   }
 
   /** Just outside the starter station's docking ring (Sol Central), wherever it is on its orbit */
