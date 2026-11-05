@@ -45,6 +45,11 @@ export class OwnCauses {
     return this.seq++;
   }
 
+  /** The next place, without taking it (where the contact pass begins: a pull after it came after the pass) */
+  peek(): number {
+    return this.seq;
+  }
+
   add(eid: number, c: OwnCause): void {
     c.seq ??= this.seq++;
     let l = this.now.get(eid);

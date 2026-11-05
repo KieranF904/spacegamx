@@ -3,7 +3,7 @@
  * or bit-packed), a layout, the measured seconds. Returns the numbers (timings, bytes, messages, agreement).
  */
 import { createDeflateRaw, constants as zc } from 'zlib';
-import { Position, InSystem, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
+import { Position, InSystem, CAPS, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
 import { makeServer, clock, rng, Scene, controlsFor, applyDirect, type Layout } from './world.js';
 import { Probe, PoseRing, classifier } from './probe.js';
 
@@ -59,8 +59,9 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  // (Every cap the probes may ask for; crowd fallbacks only with --crowd: STRUCTS, CARGO and DEBRIS were left out before)
-  const server = makeServer(o.crowd ? 524287 : 524287 & ~16384);
+  // (Every cap the probes may ask for; crowd fallbacks only with --crowd: STRUCTS, CARGO and DEBRIS were left out before;
+  // CONTACTS, a probe finding contact pairs itself, only when its --caps ask)
+  const server = makeServer((o.crowd ? 524287 : 524287 & ~16384) | CAPS.CONTACTS);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----

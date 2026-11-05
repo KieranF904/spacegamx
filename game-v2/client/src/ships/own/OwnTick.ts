@@ -17,11 +17,13 @@
  */
 import {
   applyOwnCauses, applyCauseRows, cargoBefore, buildFlightInputs, controlBits, quantizeReplicaAngle, unpackControlRow, controlRowId, ownBodyHash, ownHpHash,
-  ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
+  ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG, placeRows, pairPlace, type CauseRow,
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
 } from '@space-game/common';
 import type { StructSource } from '../ShipStore.js';
+import type { ContactWorld } from '../causes/ContactWorld.js';
+import { MidCursors } from '../causes/MidCursors.js';
 
 export interface OwnTickHost {
   /** The ships' structures (its own and the others it touches) */
@@ -37,6 +39,10 @@ export interface OwnTickHost {
   restep?(): boolean;
   /** What its check's state byte adds for a snapshot (CAPS.CAUSES: every other ship it holds, ShipCauses.heldByte) */
   extraHash?(tick: number): number | undefined;
+  /** The contact pairs it finds itself (CAPS.CONTACTS), when it does */
+  contacts?(): ContactWorld | null;
+  /** Another ship on tick t just before the cause at `place` (ShipCauses.midOf): what a pair found here reads of it */
+  otherMid?(id: number, t: number, place: number): FlightBody | null;
 }
 
 /** Ticks of inputs kept (a snapshot window is never this far behind the inputs it needs) */
@@ -168,13 +174,43 @@ export class OwnTick implements OwnTimeline {
     if (rows) cargoBefore(body, rows);
   }
 
+  /** Finding contact pairs itself (CAPS.CONTACTS: ContactWorld) */
+  private finds(): ContactWorld | null {
+    const w = this.host.contacts?.();
+    return w?.on ? w : null;
+  }
+
+  /**
+   * Its causes on tick t in the order the server's step had them: those told and (CAPS.CONTACTS) the pairs found here,
+   * each by its place in the pass
+   */
+  rowsAt(t: number): CauseRow[] | undefined {
+    const told = this.causes.get(t), w = this.finds();
+    if (!w) return told?.map((row, i) => ({ seq: i, row }));
+    const self = this.host.self(), found = w.rowsFor(self, t);
+    const pl = told ? placeRows(self, told) : [];
+    const all: CauseRow[] = told ? told.map((row, i) => ({ seq: pl[i], row })) : [];
+    if (found) {
+      const have = new Set<number>();
+      for (const r of all) if (r.row[0] === OWN_CAUSE.CONTACT) have.add(r.seq);
+      for (const r of found) if (!have.has(r.seq)) all.push(r);
+      all.sort((a, b) => a.seq - b.seq);
+    }
+    return all.length ? all : undefined;
+  }
+
   after(t: number, body: FlightBody): void {
-    const rows = this.causes.get(t);
+    const rows = this.rowsAt(t);
     if (!rows) return;
     this.fired.set(t, { ...body });
     if (this.fired.size > 64) for (const k of [...this.fired.keys()]) if (k < t - KEEP_TICKS) this.fired.delete(k);
-    if (!applyOwnCauses(body, rows, this.env(t))) this.stats.failed++;
+    // (Finding pairs itself: through its cursor, the states others read of it kept, MidCursors)
+    if (this.finds()) { if (!this.cursors.after(this.host.self(), t, body, () => ({ pre: body, rows, env: this.env(t) }))) this.stats.failed++; return; }
+    if (!applyOwnCauses(body, rows.map((r) => r.row), this.env(t))) this.stats.failed++;
   }
+
+  /** Its ship part way through a tick's causes, worked out once (CAPS.CONTACTS) */
+  readonly cursors = new MidCursors();
 
   private env(t: number): OwnCauseEnv {
     const { store, reps, tuning } = this.host;
@@ -185,8 +221,10 @@ export class OwnTick implements OwnTimeline {
       restitution: tuning.collision?.restitution ?? 0.3,
       self: self && d ? shapeOf(self, d, store.geometry(self)) : null,
       other: (id) => {
-        // (Its replica on that tick before its own causes there: CAPS.CAUSES works them out on it, ShipReplicaSet.preAt)
-        const ship = store.get(id) ?? this.kept.get(t + ':' + id), at = reps.preAt(id, t);
+        // (Its replica on that tick before its own causes there: CAPS.CAUSES works them out on it, ShipReplicaSet.preAt;
+        // finding pairs itself, CAPS.CONTACTS, as the pass had it just before this pair: its causes before it too)
+        const w = this.finds();
+        const ship = store.get(id) ?? this.kept.get(t + ':' + id), at = w && this.host.otherMid ? this.host.otherMid(id, t, pairPlace(this.host.self(), id)) : reps.preAt(id, t);
         // (No replica of it left, removed in that snapshot: the row carries its state, the server sees to that)
         return ship ? { shape: shapeOf(ship, store.derivedAt?.(id, t) ?? this.touched.get(t + ':' + id) ?? ship.derived, store.geometry(ship)), body: at ? { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } : { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } } : null;
       },
@@ -203,6 +241,7 @@ export class OwnTick implements OwnTimeline {
    * before that contact (a contact another ship's replica works out with it, ShipCauses)
    */
   midOf(t: number, other: number): FlightBody | null {
+    if (this.finds()) return this.midAt(t, pairPlace(this.host.self(), other));
     const pre = this.host.reps.preAt(this.host.self(), t);
     const rows = this.causes.get(t);
     const at = rows?.findIndex((r) => r[0] === OWN_CAUSE.CONTACT && r[1] === other) ?? -1;
@@ -212,11 +251,25 @@ export class OwnTick implements OwnTimeline {
     return body;
   }
 
+  /** Its ship on tick t just before the cause at `place` (CAPS.CONTACTS: its causes before that one, unrounded) */
+  midAt(t: number, place: number): FlightBody | null {
+    if (this.finds()) {
+      const self = this.host.self();
+      return this.cursors.mid(self, t, place, () => { const pre = this.host.reps.preAt(self, t); return pre && { pre, rows: this.rowsAt(t) ?? [], env: this.env(t) }; });
+    }
+    const pre = this.host.reps.preAt(this.host.self(), t);
+    const earlier = this.rowsAt(t)?.filter((r) => r.seq < place);
+    if (!pre || !earlier?.length) return pre;
+    const body = { ...pre };
+    if (!applyCauseRows(body, earlier.map((r) => r.row), this.env(t))) this.stats.failed++;
+    return body;
+  }
+
   /** Where its ship was as its guns fired on tick t (its fire events' shells are built from this, ShipClient.preSnapshot) */
   firePose(t: number): FlightBody | null {
     const st = this.host.reps.at(this.host.self(), t);
     if (!st) return null;
-    return (this.causes.has(t) ? this.fired.get(t) : undefined) ?? st.body;
+    return (this.rowsAt(t) ? this.fired.get(t) : undefined) ?? st.body;
   }
 
   // ---- Its check ----

@@ -12,6 +12,8 @@
  * orders, with bodies: common bodies/aiPilot.ts) and `?crowd=0|1` (its system's crowd fallbacks: common network/crowd.ts)
  * and `?nose=0|1` (mouse-steer's keys along the ship when the view follows the heading: client input/viewMode.ts)
  * and `?moves=0|1` (bodies' moves worked out here, with bodies: common bodies/moves/).
+ * and `?contacts=0|1` (contact pairs between ships it holds found on its tick layer, with causes: common network/causes.ts
+ * contactsFor, client ships/causes/ContactWorld.ts).
  * The server takes what it allows (netCaps).
  */
 import { CAPS, DEFAULT_CAPS, TICK_MS, confirmRules } from '@space-game/common';
@@ -70,9 +72,12 @@ export function netCaps(): number {
   const nose = flag('nose', 'sg.nose') ?? on(CAPS.NOSE);
   // (bodies' moves worked out here: their tells, beams and straight shells from the decisions, decision-inputs stage 4)
   const moves = bodies && (flag('moves', 'sg.moves') ?? on(CAPS.MOVES));
+  // (contact pairs between ships it holds in step found on its tick layer: no record, own row or sparks sent for them)
+  const contacts = causes && (flag('contacts', 'sg.contacts') ?? on(CAPS.CONTACTS));
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
     | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0)
-    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0) | (launches ? CAPS.LAUNCHES : 0) | (nose ? CAPS.NOSE : 0) | (moves ? CAPS.MOVES : 0);
+    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0) | (launches ? CAPS.LAUNCHES : 0) | (nose ? CAPS.NOSE : 0) | (moves ? CAPS.MOVES : 0)
+    | (contacts ? CAPS.CONTACTS : 0);
 }
 
 /**

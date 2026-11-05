@@ -27,7 +27,7 @@ import type { PlacedGeom } from '../ships/grid.js';
 import type { Vec2 } from '../ships/types.js';
 import { quantizeShipBody, SHIP_PRECISION } from '../ships/physics.js';
 import { contactPieces, contactPair, recentreShift, type ContactBody } from '../ships/contact.js';
-import { dpow } from '../math/detTrig.js';
+import { dpow, dhypot } from '../math/detTrig.js';
 import { hpChecksum, CONFIRM, CAPS } from './hits.js';
 
 /** Do these caps have the client step its own ship itself (OWN_SIM, with OWN_SHOTS)? */
@@ -50,6 +50,11 @@ export const CONTACT_FLAG = {
   SELF_PINNED: 8,
   /** The other was rebuilt after the contact, in this window: it had the structure from before (the client's, before its shipSync) */
   OTHER_BEFORE: 16,
+  /**
+   * A candidate pair the client found itself (CAPS.CONTACTS, never on the wire): taken only when the two centres are
+   * within both reaches, as the server's pass takes a candidate (bridge/flight.ts resolveContacts)
+   */
+  CHECK: 32,
 } as const;
 
 /** TEMPORARY (with boss decisions as inputs it goes): a pull's push, rounded to this many places so it is sent exactly */
@@ -115,6 +120,8 @@ export function applyCauseRows(body: FlightBody, rows: readonly (readonly number
         const o = env.other(id), self = env.self;
         if (!o || !self) { ok = false; break; }
         const ob = flags & CONTACT_FLAG.STATE ? { x: r[3], y: r[4], angle: r[5], vx: r[6], vy: r[7] } : { ...o.body };
+        // (A candidate it found itself: the pass skips one whose centres are further apart than both reaches)
+        if (flags & CONTACT_FLAG.CHECK && (flags & CONTACT_FLAG.SECOND ? dhypot(body.x - ob.x, body.y - ob.y) : dhypot(ob.x - body.x, ob.y - body.y)) > (flags & CONTACT_FLAG.SECOND ? o.shape.radius + self.radius : self.radius + o.shape.radius)) break;
         const ps = contactPieces(self.geom, self.alive, self.com, env.cellSize, body, self.big ? { x: ob.x, y: ob.y, r: o.shape.radius } : undefined);
         const po = contactPieces(o.shape.geom, o.shape.alive, o.shape.com, env.cellSize, ob, o.shape.big ? { x: body.x, y: body.y, r: self.radius } : undefined);
         const invS = flags & CONTACT_FLAG.SELF_PINNED ? 0 : 1 / self.mass, invO = flags & CONTACT_FLAG.OTHER_PINNED ? 0 : 1 / o.shape.mass;

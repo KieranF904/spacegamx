@@ -27,6 +27,54 @@ export function causesFor(caps: number | undefined): boolean {
   return ((caps ?? 0) & CAPS.CAUSES) !== 0 && ownSimCaps(caps);
 }
 
+/**
+ * Does this client find contact pairs on its tick layer itself (CAPS.CONTACTS, with CAUSES)? Then a pair whose both
+ * ships it holds in step goes neither as a record nor as an own row, nor as its `contact` sparks: it works the pair out
+ * from its replicas (common ships/contactPass.ts, client ships/causes/ContactWorld.ts). What it can't (a ship it doesn't
+ * hold, one keyframed now, one the server says to leave out) still comes as records.
+ */
+export function contactsFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.CONTACTS) !== 0 && causesFor(caps);
+}
+
+/**
+ * A CONTACT record naming one ship twice, [ago, 1, id, id, 0], is no contact: the ship is LEFT OUT of this client's
+ * own contact pass for the snapshot's whole window (CAPS.CONTACTS), its pairs come as records. The server leaves out a
+ * ship it can't vouch the client has as its contact pass had it (pinned, rebuilt where the client lacks the structure,
+ * pulled after the pass, or out of the pass while the client would take it)
+ */
+export function isLeftOut(r: readonly number[]): boolean {
+  return r[1] === OWN_CAUSE.CONTACT && r[2] === r[3];
+}
+
+/**
+ * Where a cause sits among a tick's on a client finding contact pairs itself (CAPS.CONTACTS), so the pairs it found
+ * and the ones it was told interleave as the server's pass took them: pulls before the pass (their place in the list),
+ * then each pair by its ships' ids (lower first: common ships/contactPass.ts), then what comes after the pass (a
+ * rebuild's recentring)
+ */
+export const CAUSE_PLACE = { PASS: 2 ** 45, AFTER: 2 ** 46 } as const;
+
+/** A contact pair's place in the pass (its ships' ids, either way round) */
+export function pairPlace(a: number, b: number): number {
+  return CAUSE_PLACE.PASS + Math.min(a, b) * 4194304 + Math.max(a, b);
+}
+
+/**
+ * A ship's told rows on one tick, in the order the server listed them, given their places: before the first contact a
+ * row is before the pass, a contact by its pair, anything after a contact after the pass
+ */
+export function placeRows(id: number, rows: readonly number[][]): number[] {
+  const out: number[] = [];
+  let pass = false;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r[0] === OWN_CAUSE.CONTACT) { pass = true; out.push(pairPlace(id, r[1])); }
+    else out.push(r[0] === OWN_CAUSE.REBUILD || pass ? CAUSE_PLACE.AFTER + i : i);
+  }
+  return out;
+}
+
 /** A CONTACT record's flags */
 export const PAIR = {
   A_PINNED: 1,
@@ -61,6 +109,7 @@ export function causesByShip(rows: readonly (readonly number[])[] | undefined, s
     const t = snapTick - r[0], kind = r[1];
     if (kind !== OWN_CAUSE.CONTACT) { if (takes(r[2])) put(r[2], t, [kind, ...r.slice(3)]); continue; }
     const a = r[2], b = r[3], f = r[4];
+    if (a === b) continue;
     const sa = f & PAIR.A_STATE ? r.slice(5, 10) : null, sb = f & PAIR.B_STATE ? r.slice(sa ? 10 : 5, sa ? 15 : 10) : null;
     if (takes(a)) {
       put(a, t, [OWN_CAUSE.CONTACT, b, (f & PAIR.B_PINNED ? CONTACT_FLAG.OTHER_PINNED : 0) | (f & PAIR.A_PINNED ? CONTACT_FLAG.SELF_PINNED : 0)

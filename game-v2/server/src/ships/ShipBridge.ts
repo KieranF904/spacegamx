@@ -28,6 +28,7 @@ import * as plt from './bridge/pilotless.js';
 import { DebrisNet } from './bridge/debrisNet.js';
 import { StructLog } from './bridge/structLog.js';
 import { OwnCauses } from './bridge/ownCauses.js';
+import { ContactLog } from '../net/causes/contactLog.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -51,6 +52,8 @@ export class ShipBridge {
   readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived']; body?: PilotOrders['body'] }>();
   /** What moved each pilot's ship this tick besides its controls (CAPS.OWN_SIM: Replication hands them to its client as causes) */
   readonly ownCauses = new OwnCauses();
+  /** Each tick's contact pass as a client finding its own pairs needs it (CAPS.CONTACTS: net/causes/contactLog.ts) */
+  readonly contactLog = new ContactLog();
   /** Repair kits only work on a ship holding still (world units per tick) */
   static readonly KIT_STILL_SPEED = 0.8;
   /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */

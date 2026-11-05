@@ -86,8 +86,9 @@ function run(sc: Scenario) {
   place(A.pid, x0, y0);
   place(B.pid, x0 - 300, y0 + 400);
   place(C.pid, x0 - 300, y0 - 400);
-  // (Piercing two: the old unarmed, unshielded Hauler, so the slugs reach the second hull whatever the world's freighters carry)
-  const freighter = sc.behind ? ships.devDesigns['target-freighter'] : ships.library.get('hauler')!;
+  // (The old unarmed, unshielded Hauler, whatever the world's freighters carry now: the library Hauler's shield would
+  // make every hit the server's to tell; a scenario that wants a shield sets one)
+  const freighter = ships.devDesigns['target-freighter'];
   const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : ships.spawnDummy(freighter, x0 + 700, y0, 0, num);
   if (sc.behind) ships.spawnDummy(freighter, x0 + 1300, y0, 0, num);
   const ship = ships.get(target)!;

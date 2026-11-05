@@ -2532,7 +2532,10 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       notifyContact: (e) => {
         const r = (v: number) => Math.round(v * 100) / 100;
-        this.broadcastNear(e.systemId, e.x, e.y, { type: 'contact', x: r(e.x), y: r(e.y), nx: r(e.nx), ny: r(e.ny), speed: r(e.speed) });
+        const msg = { type: 'contact' as const, x: r(e.x), y: r(e.y), nx: r(e.nx), ny: r(e.ny), speed: r(e.speed) };
+        // (A client finding contact pairs itself draws those sparks itself: it's handed the rest with its snapshot, CAPS.CONTACTS)
+        this.net.broadcastNear(e.systemId, e.x, e.y, msg, [], CAPS.CONTACTS);
+        this.replication.noteContactFx(e.tick, e.systemId, e.a, e.b, msg);
       },
       payRebuild: (eid, part) => this.pilots.payRebuild(eid, part),
       payRepair: (eid, hp) => this.pilots.payRepair(eid, hp, this.repairRate(eid)),

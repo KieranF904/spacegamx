@@ -20,7 +20,8 @@ import { ShipMemory } from '../../../../client/src/ships/cells/ShipMemory.js';
 import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
 import { MoveRunner } from '../../../../client/src/ships/bodies/MoveRunner.js';
-import { bodiesFor, causesFor, movesFor, waypointsFor, type GuideBody, type CustomStats } from '@space-game/common';
+import { ContactWorld, type ContactFx } from '../../../../client/src/ships/causes/ContactWorld.js';
+import { bodiesFor, causesFor, contactsFor, movesFor, waypointsFor, type GuideBody, type CustomStats } from '@space-game/common';
 import factionsFile from '../../../../data/factions.json' with { type: 'json' };
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
@@ -71,6 +72,11 @@ export class FakeHitsClient {
   readonly causes: ShipCauses | null = null;
   /** Debris it works out itself (debrisSplit), as the game client does */
   readonly debris: DebrisSplits;
+  /** Contact pairs it finds itself (CAPS.CONTACTS: client ships/causes/ContactWorld.ts) */
+  readonly contacts: ContactWorld | null = null;
+  /** The sparks it drew for them (the server's `contact` messages for the rest: `contactMsgs`) */
+  readonly contactFx: ContactFx[] = [];
+  contactMsgs = 0;
   /** Entity types and ship-body status data, as the snapshots said */
   private kinds = new Map<number, { type: number; side: number }>();
   snapTick = 0;
@@ -131,7 +137,8 @@ export class FakeHitsClient {
         ownExact: () => !!this.own?.on,
       });
     }
-    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => (this.causes?.heldByte(t) ?? 0) + (this.guides?.byte(t) ?? 0) });
+    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => (this.causes?.heldByte(t) ?? 0) + (this.guides?.byte(t) ?? 0),
+      contacts: () => this.contacts, otherMid: (id, t, place) => this.causes ? this.causes.midOf(id, t, place) : this.reps.preAt(id, t) });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
     if (this.bodies && movesFor(opts.caps)) {
       this.moves = new MoveRunner({
@@ -140,7 +147,15 @@ export class FakeHitsClient {
       });
     }
     if (waypointsFor(opts.caps)) this.guides = new GuideRunner({ reps: this.reps, onStep: opts.onGuideStep });
-    if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), ownMid: (t, o) => (this.own?.on ? this.own.midOf(t, o) : null), tuning: ships.tuning });
+    if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), ownMid: (t, o) => (this.own?.on ? this.own.midOf(t, o) : null), tuning: ships.tuning, contacts: () => this.contacts });
+    if (contactsFor(opts.caps)) {
+      this.contacts = new ContactWorld({
+        reps: this.reps, store: this.store, self: () => this.pid, ownOn: () => !!this.own?.on, tuning: ships.tuning,
+        derivedAt: (id, t) => (id === this.pid ? this.own?.derived(t) : this.causes?.derived(id, t) ?? this.store.get(id)?.derived),
+        mid: (id, t, place) => (id === this.pid ? this.own?.midAt(t, place) ?? null : this.causes?.midOf(id, t, place) ?? null),
+        forget: (t) => { this.causes?.cursors.forget(t); this.own?.cursors.forget(t); },
+      });
+    }
     this.away = new ShipMemory({ entity: (id) => this.kinds.get(id), restore: (id, e) => this.kinds.set(id, e), send: (m) => this.outbox.push(m) });
     const socket: ClientSocket = {
       isOpen: () => true,
@@ -225,6 +240,7 @@ export class FakeHitsClient {
         this.moves?.setOn(movesFor(m.caps));
         this.guides?.setOn(waypointsFor(m.caps));
         this.causes?.setOn(causesFor(m.caps));
+        this.contacts?.setOn(contactsFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
@@ -258,6 +274,7 @@ export class FakeHitsClient {
         break;
       case 'detonation': this.detonations++; this.fxSent.push({ tick: this.snapTick, msg: m }); break;
       case 'bossTelegraph': case 'bossBeam': case 'bossWindow': case 'effect': this.fxSent.push({ tick: this.snapTick, msg: m }); break;
+      case 'contact': this.contactMsgs++; break;
     }
   }
 
@@ -265,6 +282,8 @@ export class FakeHitsClient {
     this.findHits();
     this.snapTick = s.tick;
     this.sawSnapshot = true;
+    // (its own contact pass's window: who it leaves out, CAPS.CONTACTS; before the keyframes go in)
+    this.contacts?.beginSnapshot(s);
     this.reps.apply(s.tick, s.ships, s.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM, before its fire events are built from it)
     this.own?.onSnapshot(s);
@@ -318,6 +337,9 @@ export class FakeHitsClient {
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
     for (const id of this.reps.ids()) this.reps.at(id, s.tick);
+    // (the pairs it found itself through the window: their ships' hits told, their sparks drawn, CAPS.CONTACTS)
+    const found = this.contacts?.endSnapshot(s.tick);
+    if (found) this.contactFx.push(...found.fx);
     // (the ships it holds now, for its check: CAPS.CAUSES)
     this.causes?.noteHeld(s.tick);
     this.guides?.noteHeld(s.tick);
@@ -325,6 +347,7 @@ export class FakeHitsClient {
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
       this.selfHits.onCaused(s.causes);
+      this.selfHits.onTouched(found?.touched);
       for (const id of this.bodies?.told() ?? []) this.selfHits.onSync(id);
       this.selfHits.open(s.tick);
     }

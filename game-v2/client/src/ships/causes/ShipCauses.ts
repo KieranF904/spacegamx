@@ -11,13 +11,18 @@
  *              its structure as it was then (OTHER_BEFORE: from before this frame's shipSync)
  *
  * The own ship's causes are OwnTick's (ships/own/OwnTick.ts); it is never one of these.
+ *
+ * Finding contact pairs itself (CAPS.CONTACTS: ContactWorld), a ship's pairs with ships it holds in step come as no
+ * record; they go in among its told causes by their place in the pass (CAUSE_PLACE: rowsAt), and are worked out alike.
  */
 import {
-  applyOwnCauses, applyCauseRows, cargoBefore, causesByShip, replicaHash, replicasByte, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
+  applyOwnCauses, applyCauseRows, cargoBefore, causesByShip, replicaHash, replicasByte, placeRows, pairPlace, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
   type ReplicaCauses, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type Vec2,
 } from '@space-game/common';
 import type { StructSource } from '../ShipStore.js';
+import type { ContactWorld } from './ContactWorld.js';
+import { MidCursors } from './MidCursors.js';
 
 export interface ShipCausesHost {
   store: StructSource;
@@ -29,6 +34,8 @@ export interface ShipCausesHost {
   /** Its own ship on tick t as the contact pass had it when it touched `other` (OwnTick.midOf) */
   ownMid?(t: number, other: number): FlightBody | null;
   tuning: ShipTuning;
+  /** The contact pairs it finds itself (CAPS.CONTACTS), when it does */
+  contacts?(): ContactWorld | null;
 }
 
 /** Ticks of causes kept (a window is never this far back) */
@@ -47,6 +54,21 @@ export class ShipCauses implements ReplicaCauses {
   /** A contact's other as the snapshot found it, by tick and id (it may be gone by the time the replica is stepped: removed in that very snapshot) */
   private readonly kept = new Map<string, ShipState>();
   readonly stats = { rows: 0, failed: 0 };
+  /** Each ship part way through a tick's causes, worked out once (CAPS.CONTACTS: a crowd's pairs read each other) */
+  readonly cursors = new MidCursors();
+
+  /** Finding contact pairs itself (CAPS.CONTACTS) */
+  private finds(): boolean {
+    return !!this.host.contacts?.()?.on;
+  }
+
+  /** Where ship `id`'s causes on tick t start (its step's body), for the cursors */
+  private start(id: number, t: number): { pre: FlightBody; rows: CauseRow[]; env: OwnCauseEnv } | null {
+    const pre = this.host.reps.preAt(id, t);
+    if (!pre) return null;
+    const rows = this.rowsAt(id, t) ?? [];
+    return { pre, rows, env: this.env(id, t, rows) };
+  }
   /** The check's byte for each snapshot taken in (by its tick): every ship held then (noteHeld) */
   private readonly held = new Map<number, number>();
 
@@ -85,6 +107,8 @@ export class ShipCauses implements ReplicaCauses {
       if (!mine) this.rows.set(id, (mine = new Map()));
       let earliest = Infinity;
       for (const [t, rows] of ticks) {
+        // (Finding contact pairs itself: each row's place in the pass, so the ones it finds go in between, CAUSE_PLACE)
+        if (this.host.contacts?.()?.on) { const pl = placeRows(id, rows.map((r) => r.row)); rows.forEach((r, i) => { r.seq = pl[i]; }); }
         mine.set(t, rows);
         earliest = Math.min(earliest, t);
         this.stats.rows += rows.length;
@@ -142,6 +166,7 @@ export class ShipCauses implements ReplicaCauses {
   }
 
   clear(): void {
+    this.cursors.clear();
     this.rows.clear();
     this.until.clear();
     this.touched.clear();
@@ -168,7 +193,23 @@ export class ShipCauses implements ReplicaCauses {
   }
 
   has(id: number, t: number): boolean {
-    return !!this.rows.get(id)?.has(t);
+    return !!this.rows.get(id)?.has(t) || !!this.host.contacts?.()?.involved(id, t);
+  }
+
+  /**
+   * A ship's causes on tick t, in the order the server's step had them: those told, and (CAPS.CONTACTS) the pairs found
+   * here, each by its place in the pass (a pair told isn't one found: told wins)
+   */
+  rowsAt(id: number, t: number): CauseRow[] | undefined {
+    const told = this.rows.get(id)?.get(t);
+    const found = this.host.contacts?.()?.rowsFor(id, t);
+    if (!found) return told;
+    if (!told) return found;
+    const have = new Set<number>();
+    for (const r of told) if (r.row[0] === OWN_CAUSE.CONTACT) have.add(pairPlace(id, r.row[1]));
+    const all = [...told, ...found.filter((r) => !have.has(r.seq))];
+    all.sort((a, b) => a.seq - b.seq);
+    return all;
   }
 
   preStep(id: number, t: number, body: FlightBody): void {
@@ -177,7 +218,8 @@ export class ShipCauses implements ReplicaCauses {
   }
 
   after(id: number, t: number, body: FlightBody): void {
-    const rows = this.rows.get(id)?.get(t);
+    if (this.finds()) { if (!this.cursors.after(id, t, body, () => this.start(id, t))) this.stats.failed++; return; }
+    const rows = this.rowsAt(id, t);
     if (rows && !applyOwnCauses(body, rows.map((r) => r.row), this.env(id, t, rows))) this.stats.failed++;
   }
 
@@ -186,7 +228,7 @@ export class ShipCauses implements ReplicaCauses {
    * pieces start, DebrisSplits); null: no causes of it that tick here (its replica's state is it)
    */
   beforeRebuild(id: number, t: number): FlightBody | null {
-    const rows = this.rows.get(id)?.get(t);
+    const rows = this.rowsAt(id, t);
     if (!rows) return null;
     // (No rebuild among them, a death's say: after them all, unrounded)
     const row = rows.find((r) => r.row[0] === OWN_CAUSE.REBUILD);
@@ -197,9 +239,10 @@ export class ShipCauses implements ReplicaCauses {
    * A ship's body on tick t just before the cause at `seq` (the contact pass had it so): before the tick's causes, then
    * its causes before that one, unrounded. Its own ship's: before its causes (the server sends the state otherwise)
    */
-  private midOf(id: number, t: number, seq: number): FlightBody | null {
+  midOf(id: number, t: number, seq: number): FlightBody | null {
+    if (this.finds() && id !== this.host.self()) return this.cursors.mid(id, t, seq, () => this.start(id, t));
     const pre = this.host.reps.preAt(id, t);
-    const rows = id === this.host.self() ? undefined : this.rows.get(id)?.get(t);
+    const rows = id === this.host.self() ? undefined : this.rowsAt(id, t);
     const earlier = rows?.filter((r) => r.seq < seq);
     if (!pre || !earlier?.length) return pre;
     const body = { ...pre };

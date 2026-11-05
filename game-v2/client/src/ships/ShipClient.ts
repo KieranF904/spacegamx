@@ -30,7 +30,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, movesFor, focusFor, causesFor, waypointsFor, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, movesFor, focusFor, causesFor, contactsFor, waypointsFor, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -58,6 +58,7 @@ import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
 import { OwnTick } from './own/OwnTick';
 import { ShipCauses } from './causes/ShipCauses';
+import { ContactWorld } from './causes/ContactWorld';
 import { DebrisSplits } from './debris/DebrisSplits';
 import { BodyRunner } from './bodies/BodyRunner';
 import { MoveRunner } from './bodies/MoveRunner';
@@ -294,7 +295,8 @@ export class ShipClient {
       passes: (shell) => this.hits.passesOf(shell),
       ownExact: () => this.own.on,
     });
-    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t) });
+    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
+      contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
     this.bodies = new BodyRunner({ reps: this.replicas });
     // (Their moves worked out here, CAPS.MOVES: ships/bodies/MoveRunner.ts)
     this.moves = new MoveRunner({
@@ -304,7 +306,14 @@ export class ShipClient {
     // (Homing shells on the tick layer, CAPS.WAYPOINTS: ships/guides/GuideRunner.ts)
     this.guides = new GuideRunner({ reps: this.replicas });
     // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
-    this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning });
+    this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning, contacts: () => this.contacts });
+    // (Contact pairs found on the tick layer, CAPS.CONTACTS: ships/causes/ContactWorld.ts)
+    this.contacts = new ContactWorld({
+      reps: this.replicas, store: this.store, self: () => opts.state.playerId, ownOn: () => this.own.on, tuning: opts.tuning,
+      derivedAt: (id, t) => (id === opts.state.playerId ? this.own.derived(t) : this.causes.derived(id, t) ?? this.store.get(id)?.derived),
+      mid: (id, t, place) => (id === opts.state.playerId ? this.own.midAt(t, place) : this.causes.midOf(id, t, place)),
+      forget: (t) => { this.causes.cursors.forget(t); this.own.cursors.forget(t); },
+    });
     // (Ships out of view kept a while, structure and status row: CAPS.FOCUS, ships/cells/ShipMemory.ts)
     this.away = new ShipMemory<InterpolatedEntity>({
       entity: (id) => opts.state.entities.get(id),
@@ -318,6 +327,9 @@ export class ShipClient {
   readonly away: ShipMemory<InterpolatedEntity>;
   /** Other ships' causes (CAPS.CAUSES) */
   private readonly causes: ShipCauses;
+  private readonly contacts: ContactWorld;
+  /** The ships the pairs it found itself touched in the last snapshot's window (CAPS.CONTACTS: their hits told) */
+  private touched: Set<number> | undefined;
   /** Holding the focus grid's cells (CAPS.FOCUS, netCaps): ships from 18 km out are drawn as ghosts, the ring's too */
   private focusOn = false;
   private ghosts: GhostLayer | null = null;
@@ -446,6 +458,7 @@ export class ShipClient {
     this.moves.reset();
     this.guides.reset();
     this.causes.clear();
+    this.contacts.clear();
     this.debris.reset();
   }
 
@@ -464,6 +477,7 @@ export class ShipClient {
     this.moves.setOn(movesFor(caps));
     this.guides.setOn(waypointsFor(caps));
     this.causes.setOn(causesFor(caps));
+    this.contacts.setOn(contactsFor(caps));
   }
 
   /**
@@ -486,6 +500,8 @@ export class ShipClient {
     }
     this.selfHits.onKeyframes(m.ships);
     this.selfHits.onCaused(m.causes);
+    this.selfHits.onTouched(this.touched);
+    this.touched = undefined;
     // (a boss its body flies here: its hits are the server's records until its body has its hit rules, HitLedger 'body')
     for (const id of this.bodies.told()) this.selfHits.onSync(id);
     // (searched once this frame's told records are in: findHits)
@@ -606,6 +622,8 @@ export class ShipClient {
    */
   preSnapshot(m: ServerSnapshotMessage): EntityState[] {
     this.snapTick = m.tick;
+    // (its own contact pass's window: who it leaves out, CAPS.CONTACTS; before the keyframes go in)
+    this.contacts.beginSnapshot(m);
     this.replicas.apply(m.tick, m.ships, m.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM: before its own fire events are built from it)
     this.own.onSnapshot(m);
@@ -725,6 +743,11 @@ export class ShipClient {
     for (const id of m.out ?? []) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
     // (the ships it holds now, for its check: CAPS.CAUSES)
     this.causes.noteHeld(m.tick);
+    // (the pairs it found itself through the window: their ships' hits told, their sparks drawn, CAPS.CONTACTS)
+    const found = this.contacts.endSnapshot(m.tick);
+    this.touched = found.touched;
+    for (const fx of found.fx) this.damageFx?.onContact({ type: 'contact', ...fx });
+    if (found.own) this.ownCausedAt = m.tick;
     for (const id of m.removed) this.guides.remove(id, m.tick);
     // (the shells it runs now, for its check: CAPS.WAYPOINTS)
     this.guides.noteHeld(m.tick);

@@ -60,3 +60,5 @@ export * from './debris.js';
 // ...and its life after its spawn (crumbling), for a client running it (CAPS.DEBRIS): ships/debrisLife.ts
 export * from './debrisLife.js';
 export * from './contact.js';
+// Which pairs a tick's contact pass takes, alike on the server and a client deriving them (CAPS.CONTACTS)
+export * from './contactPass.js';
