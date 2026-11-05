@@ -25,6 +25,8 @@ import { ReplicaMode, ReplicaControls, ReplicaEnv, FlightBody, ShipTuning, ShipD
 import { stepDebrisWorld, type DebrisBody } from '../ships/debris.js';
 import { SHIP_FLIGHT_CONSTANTS } from '../ships/physics.js';
 import type { Vec2 } from '../ships/types.js';
+import { StateRing } from '../sim/ring.js';
+import { ReplicaState } from '../sim/c-replicaState.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
@@ -140,16 +142,14 @@ export function unpackControlRow(row: ControlRow, base: number): [number, number
 // The receiving side: every ship's timeline, stepped on demand
 // ---------------------------------------------------------------------------
 
-interface Step { body: FlightBody; bits: number; q: number }
+/** A ship's state at a tick, as `at` gives it (the ring's ReplicaState: its body and the controls it flew) */
+export interface Step { readonly body: FlightBody; readonly bits: number; readonly q: number }
 
 interface Rep {
   mode: ReplicaMode;
   dock?: { station: number; ox: number; oy: number };
   /** Control changes not yet folded into a stepped state: tick → [bits, q] */
   events: Map<number, [number, number]>;
-  /** Stepped states by tick (a window), the newest at `last` */
-  hist: Map<number, Step>;
-  last: number;
   /** The latest keyframe's tick (nothing before it can change) */
   kf: number;
   /** The newest aim it was sent (control rows give aims as steps from it) */
@@ -268,6 +268,26 @@ export interface ReplicaRewinds {
  */
 export class ShipReplicaSet {
   private reps = new Map<number, Rep>();
+  /**
+   * Every ship's stepped states, a ReplicaState per tick (sim/ring.ts: the window, HISTORY + 1 ticks), the newest its
+   * last stepped tick (sim foundation 1C: was each Rep's hist and last)
+   */
+  readonly ring = new StateRing(HISTORY + 1);
+  /**
+   * Each ship's state after a tick's step and before that tick's causes, where it had any (its own ship: every tick;
+   * preAt). Was ownPre and pres
+   */
+  private readonly pre = new StateRing(HISTORY + 1);
+  /**
+   * A tick's step worked out ahead of the ship being stepped to it (preAt: what the contact pass and bodies read of it
+   * there, before that tick's causes): the step then takes it as it is. Was pend
+   */
+  private readonly ahead = new StateRing(HISTORY + 1);
+
+  /** The last tick ship `id` is stepped to (-Infinity: none held) */
+  private lastT(id: number): number {
+    return this.ring.last(id) ?? -Infinity;
+  }
 
   constructor(
     private tuning: ShipTuning,
@@ -291,7 +311,9 @@ export class ShipReplicaSet {
 
   /** A piece of debris worked out here (common ships/debris.ts deriveSplit): it starts at `tick` as `body` */
   spawnDebris(id: number, tick: number, body: FlightBody): void {
-    this.reps.set(id, { mode: ReplicaMode.Drift, events: new Map(), hist: new Map([[tick, { body: cloneBody(body), bits: 0, q: 0 }]]), last: tick, kf: tick, q: 0 });
+    this.reps.set(id, { mode: ReplicaMode.Drift, events: new Map(), kf: tick, q: 0 });
+    this.ring.remove(id); this.pre.remove(id); this.ahead.remove(id);
+    this.ring.keep(tick, new ReplicaState(id, ReplicaMode.Drift, cloneBody(body), 0, 0));
     this.dDirty = Math.min(this.dDirty, tick);
   }
 
@@ -304,16 +326,15 @@ export class ShipReplicaSet {
   private stepDebrisTo(to: number): void {
     if (to <= this.dLast && this.dDirty > this.dLast) return;
     const drift: [number, Rep][] = [];
-    for (const e of this.reps) if (e[1].mode === ReplicaMode.Drift && e[1].hist.size) drift.push(e);
+    const ring = this.ring;
+    for (const e of this.reps) if (e[1].mode === ReplicaMode.Drift && ring.size(e[0])) drift.push(e);
     if (!drift.length) { this.dLast = Math.max(this.dLast, to); this.dDirty = Infinity; return; }
     drift.sort((a, b) => a[0] - b[0]);
     let from = Math.min(this.dLast, this.dDirty);
     if (from === -Infinity) { from = Infinity; for (const [, r] of drift) from = Math.min(from, r.kf); }
     // (Stepped again from `from`: what came after it goes, bar keyframes)
-    for (const [, r] of drift) {
-      let last = -Infinity;
-      for (const t of [...r.hist.keys()]) { if (t > from && t !== r.kf) r.hist.delete(t); else if (t > last) last = t; }
-      r.last = last;
+    for (const [id, r] of drift) {
+      this.dropKeepingKf(id, r, from + 1);
       rewrote(r, from + 1);
     }
     const env = this.env();
@@ -326,7 +347,7 @@ export class ShipReplicaSet {
       for (const [id, r] of drift) {
         // (its keyframe or spawn is this tick's end: kept as it is)
         if (r.kf === t) continue;
-        const prev = r.hist.get(t - 1);
+        const prev = ring.get(id, t - 1);
         if (!prev || this.debris?.gone?.(id, t)) continue;
         const shape = this.debris?.shape(id, t);
         list.push({ id, body: cloneBody(prev.body), mass: shape?.mass ?? 0, radius: shape?.radius ?? 0, com: shape?.com ?? [0, 0], pieces: shape?.pieces ?? [], born: shape?.born });
@@ -336,14 +357,20 @@ export class ShipReplicaSet {
       for (let i = 0; i < list.length; i++) {
         // (A piece it runs: its rebuild point; nothing left of it, it has no state at t's end, and isn't stepped again)
         if (this.debris?.after && !this.debris.after(list[i].id, t, list[i].body)) continue;
-        reps[i].hist.set(t, { body: list[i].body, bits: 0, q: 0 });
-        reps[i].last = t;
+        ring.keep(t, new ReplicaState(list[i].id, ReplicaMode.Drift, list[i].body, 0, 0));
       }
     }
-    // (Stepped again from `from`, it's been stepped to `end` only: what came after went in the rewind)
+    // (Stepped again from `from`, it's been stepped to `end` only: what came after went in the rewind. The ring keeps
+    // the window)
     this.dLast = end;
     this.dDirty = Infinity;
-    for (const [, r] of drift) for (const t of r.hist.keys()) if (t < end - HISTORY) r.hist.delete(t);
+  }
+
+  /** A ship's states from tick t on go, bar its keyframe's */
+  private dropKeepingKf(id: number, r: Rep, t: number): void {
+    const kf = r.kf >= t ? this.ring.get(id, r.kf) : undefined;
+    this.ring.dropFrom(id, t);
+    if (kf) this.ring.keep(r.kf, kf as ReplicaState, id);
   }
 
   has(id: number): boolean {
@@ -364,20 +391,11 @@ export class ShipReplicaSet {
     this.rewind(id, -Infinity);
   }
 
-  /** The own ship's state after each tick's step and before that tick's causes (preAt) */
-  private ownPre = new Map<number, FlightBody>();
-
-  /** Other ships' causes (CAPS.CAUSES), and each such ship's state after a tick's step and before that tick's causes */
+  /** Other ships' causes (CAPS.CAUSES): each such ship's state after a tick's step and before its causes goes in `pre` */
   private causes: ReplicaCauses | null = null;
-  private pres = new Map<number, Map<number, FlightBody>>();
-  /**
-   * A tick's step worked out ahead of the ship being stepped to it (preAt: what the contact pass and bodies read of it
-   * there, before that tick's causes): the step then takes it as it is
-   */
-  private pend = new Map<number, Map<number, Step>>();
   setCauses(src: ReplicaCauses | null): void {
     this.causes = src;
-    this.pres.clear();
+    for (const id of [...this.pre.ids()]) if (this.own?.id !== id) this.pre.remove(id);
     for (const id of this.reps.keys()) if (this.own?.id !== id) this.rewind(id, -Infinity);
   }
 
@@ -389,10 +407,8 @@ export class ShipReplicaSet {
 
   /** A ship's stepped states from tick t on are gone: what was worked out ahead of them goes too */
   private dropped(id: number, t: number): void {
-    const pm = this.pend.get(id);
-    if (pm) for (const k of pm.keys()) if (k >= t) pm.delete(k);
-    const pr = this.pres.get(id);
-    if (pr) for (const k of pr.keys()) if (k >= t) pr.delete(k);
+    this.ahead.dropFrom(id, t);
+    this.pre.dropFrom(id, t);
     this.hook?.rewound(id, t);
   }
 
@@ -403,7 +419,7 @@ export class ShipReplicaSet {
 
   /** The last tick it has been stepped to (undefined: not held) */
   lastOf(id: number): number | undefined {
-    return this.reps.get(id)?.last;
+    return this.reps.has(id) ? this.lastT(id) : undefined;
   }
 
   /**
@@ -414,28 +430,28 @@ export class ShipReplicaSet {
   preAt(id: number, t: number): FlightBody | null {
     const r = this.reps.get(id);
     if (!r) return null;
-    if (r.last >= t) {
-      // (Its own ship: kept as it was stepped. Any other: kept when it had causes then, else its state is it)
-      if (this.own?.id === id) return this.ownPre.get(t) ?? this.at(id, t)?.body ?? null;
-      return this.pres.get(id)?.get(t) ?? this.at(id, t)?.body ?? null;
+    let last = this.lastT(id);
+    if (last >= t) {
+      // (Kept as it was stepped where it had causes then (its own ship: always); otherwise its state is it)
+      return this.pre.get(id, t)?.body ?? this.at(id, t)?.body ?? null;
     }
     // (Not stepped to t yet, or being stepped to it now: t's step, without its causes, worked out once: stepPre)
     const d = this.derived(id);
     if (!d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift || t <= r.kf) return this.at(id, t)?.body ?? null;
-    const prev = r.last === t - 1 ? r.hist.get(t - 1) : this.at(id, t - 1);
-    if (!prev || r.last !== t - 1) return prev?.body ?? null;
-    return this.stepPre(id, r, t, prev, d).body;
+    const prev = last === t - 1 ? this.ring.get(id, t - 1) : this.at(id, t - 1);
+    last = this.lastT(id);
+    if (!prev || last !== t - 1) return prev?.body ?? null;
+    return this.stepPre(id, r, t, prev as ReplicaState, d).body;
   }
 
   /**
    * Tick t's step of a ship from its state at t - 1, before that tick's causes: its controls (its own inputs, its
-   * body's, or its rows), the hold's mass it flies with, its structure then. Worked out once (pend) whoever asks first:
-   * the step itself (at) or something reading it there before (preAt: a body reading its target, the contact pass)
+   * body's, or its rows), the hold's mass it flies with, its structure then. Worked out once (`ahead`) whoever asks
+   * first: the step itself (at) or something reading it there before (preAt: a body reading its target, the contact pass)
    */
-  private stepPre(id: number, r: Rep, t: number, prev: Step, d: ShipDerived): Step {
-    let pm = this.pend.get(id);
-    const have = pm?.get(t);
-    if (have) return have;
+  private stepPre(id: number, r: Rep, t: number, prev: ReplicaState, d: ShipDerived): ReplicaState {
+    const have = this.ahead.get(id, t);
+    if (have) return have as ReplicaState;
     const own = this.own?.id === id ? this.own.src : null;
     const ev = own ? own.ctl(t) : r.events.get(t);
     // (Flown by its body: its controls and push from that, CAPS.BODIES)
@@ -448,10 +464,8 @@ export class ShipReplicaSet {
     if (own) own.preStep?.(t, body);
     else cs?.preStep?.(id, t, body);
     replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own ? own.derived(t) : cs?.derived(id, t)) || d, this.tuning, this.env(), t);
-    const st: Step = { body, bits, q };
-    if (!pm) this.pend.set(id, (pm = new Map()));
-    pm.set(t, st);
-    if (pm.size > 64) for (const k of pm.keys()) if (k < t - HISTORY) pm.delete(k);
+    const st = new ReplicaState(id, r.mode, body, bits, q);
+    this.ahead.keep(t, st);
     return st;
   }
 
@@ -466,11 +480,10 @@ export class ShipReplicaSet {
     const r = this.reps.get(id);
     if (!r) return;
     // (Not stepped there yet: only what was worked out ahead of it, preAt, goes)
-    if (t > r.last) { this.dropped(id, t); return; }
+    if (t > this.lastT(id)) { this.dropped(id, t); return; }
     // (Debris steps as a world, from where it was rewound to: stepDebrisTo does its own)
     const from = r.mode === ReplicaMode.Drift ? t : Math.max(t, r.kf + 1);
-    for (const h of [...r.hist.keys()]) if (h >= from && h !== r.kf) r.hist.delete(h);
-    r.last = Math.max(...r.hist.keys(), -Infinity);
+    this.dropKeepingKf(id, r, from);
     rewrote(r, from);
     this.dropped(id, from);
     // (Debris steps as a world (stepDebrisTo): left as it is, the world, already past t, never stepped it again: frozen)
@@ -483,7 +496,7 @@ export class ShipReplicaSet {
    */
   docked(id: number): Step | null {
     const r = this.reps.get(id);
-    return r && r.mode === ReplicaMode.Docked ? r.hist.get(r.last) ?? null : null;
+    return r && r.mode === ReplicaMode.Docked ? this.ring.get(id, this.lastT(id)) as ReplicaState ?? null : null;
   }
 
   /** Its replica's mode as last heard (undefined: not held): a pilot's is stepped before other ships each tick */
@@ -498,14 +511,16 @@ export class ShipReplicaSet {
 
   remove(id: number): void {
     if (this.reps.delete(id)) this.dropped(id, -Infinity);
-    this.pres.delete(id);
-    this.pend.delete(id);
+    this.ring.remove(id);
+    this.pre.remove(id);
+    this.ahead.remove(id);
   }
 
   clear(): void {
     for (const id of [...this.reps.keys()]) this.remove(id);
-    this.pres.clear();
-    this.pend.clear();
+    this.ring.clear();
+    this.pre.clear();
+    this.ahead.clear();
   }
 
   ids(): IterableIterator<number> {
@@ -515,21 +530,20 @@ export class ShipReplicaSet {
   /** A snapshot's keyframes and control changes */
   apply(tick: number, ships?: KeyframeRow[], ctl?: ControlRow[]): void {
     // (Steps worked out ahead, preAt, read what came before this snapshot and its frame's structures: worked out afresh)
-    this.pend.clear();
+    this.ahead.clear();
     for (const row of ships ?? []) {
       const k = unpackKeyframe(row);
       let r = this.reps.get(k.id);
-      if (!r) { r = { mode: k.mode, events: new Map(), hist: new Map(), last: tick, kf: tick, q: k.q }; this.reps.set(k.id, r); }
+      if (!r) { r = { mode: k.mode, events: new Map(), kf: tick, q: k.q }; this.reps.set(k.id, r); this.ring.remove(k.id); }
       else this.correction(k.id, r, tick, k);
       r.q = k.q;
       r.mode = k.mode;
       r.dock = k.dock;
       // The new path starts here; what came before stays (we may still be drawing it)
-      for (const t of [...r.hist.keys()]) if (t >= tick) r.hist.delete(t);
+      this.ring.dropFrom(k.id, tick);
       this.dropped(k.id, tick);
       for (const t of [...r.events.keys()]) if (t <= tick) r.events.delete(t);
-      r.hist.set(tick, { body: k.body, bits: k.ctl.bits, q: k.q });
-      r.last = tick;
+      this.ring.keep(tick, new ReplicaState(k.id, k.mode, k.body, k.ctl.bits, k.q));
       r.kf = tick;
       // (Its keyframe's own correction bends it (correction): not this path's being stepped again)
       r.moved = false;
@@ -549,15 +563,14 @@ export class ShipReplicaSet {
         if (t <= r.kf) continue;
         r.events.set(t, [bits, q]);
         // Already stepped past it: rewind to just before
-        if (t <= r.last) {
-          for (const h of [...r.hist.keys()]) if (h >= t) r.hist.delete(h);
-          r.last = Math.max(...r.hist.keys(), -Infinity);
+        if (t <= this.lastT(id)) {
+          this.ring.dropFrom(id, t);
           rewrote(r, t);
         }
         // (a step worked out ahead for it, preAt, read the old controls)
         this.dropped(id, t);
       }
-      if (!r.hist.size) this.reps.delete(id); // nothing to replay from: wait for a keyframe
+      if (!this.ring.size(id)) this.reps.delete(id); // nothing to replay from: wait for a keyframe
     }
   }
 
@@ -569,9 +582,9 @@ export class ShipReplicaSet {
   private correction(id: number, r: Rep, tick: number, k: Keyframe): void {
     // (A path rewritten from here on: corrections at or after it went with it)
     if (r.fixes) { r.fixes = r.fixes.filter((f) => f.t < tick); if (!r.fixes.length) r.fixes = undefined; }
-    if (!r.hist.size || tick <= r.kf || k.mode !== r.mode || k.mode === ReplicaMode.Docked || tick - r.last > GAP_MAX) return;
+    if (!this.ring.size(id) || tick <= r.kf || k.mode !== r.mode || k.mode === ReplicaMode.Docked || tick - this.lastT(id) > GAP_MAX) return;
     const was = this.at(id, tick);
-    if (!was || r.hist.get(tick) !== was) return;
+    if (!was || (this.ring.get(id, tick) as Step | undefined) !== was) return;
     const dx = was.body.x - k.body.x, dy = was.body.y - k.body.y;
     let da = was.body.angle - k.body.angle;
     while (da > Math.PI) da -= 2 * Math.PI;
@@ -584,56 +597,54 @@ export class ShipReplicaSet {
   /** The state at a whole tick, stepping forward as needed (null: unknown ship) */
   at(id: number, tick: number): Step | null {
     const r = this.reps.get(id);
-    if (!r || !r.hist.size) return null;
+    const ring = this.ring;
+    if (!r || !ring.size(id)) return null;
     // (Debris steps as a world: all of it to this tick, knocks and all)
     if (r.mode === ReplicaMode.Drift) this.stepDebrisTo(tick);
-    const exact = r.hist.get(tick);
+    const exact = ring.get(id, tick) as ReplicaState | undefined;
     if (exact) return exact;
-    if (tick < r.last) {
+    let last = this.lastT(id);
+    if (tick < last) {
       // Before the window (or a gap): the earliest we have
-      let best: Step | null = null, bt = Infinity;
-      for (const [t, s] of r.hist) if (t >= tick && t < bt) { bt = t; best = s; }
-      return best ?? r.hist.get(r.last)!;
+      let bt = Infinity;
+      for (const t of ring.ticks(id)) if (t >= tick && t < bt) bt = t;
+      return (ring.get(id, bt) ?? ring.get(id, last)!) as ReplicaState;
     }
     const own = this.own?.id === id ? this.own.src : null;
     const driver = this.drivers.get(id);
     const d = this.derived(id);
-    let cur = r.hist.get(r.last)!;
+    let cur = ring.get(id, last)! as ReplicaState;
     if (r.mode === ReplicaMode.Docked) {
       const st = r.dock && this.stationAt?.(r.dock.station, tick);
       if (!st) return cur;
       const body = { ...cloneBody(cur.body), x: st.x + r.dock!.ox, y: st.y + r.dock!.oy, vx: 0, vy: 0 };
-      return { body, bits: cur.bits, q: cur.q };
+      return new ReplicaState(id, r.mode, body, cur.bits, cur.q);
     }
     if (!d || r.mode === ReplicaMode.Drift) return cur;
     // Don't run away: a ship we haven't heard about for a long time simply waits
-    const to = Math.min(tick, r.last + 600);
-    while (r.last < to) {
-      const t = r.last + 1;
+    const to = Math.min(tick, last + 600);
+    while (last < to) {
+      const t = last + 1;
       const pre = this.stepPre(id, r, t, cur, d);
       const body = cloneBody(pre.body);
       const cs = own ? null : this.causes;
       if (own) {
-        this.ownPre.set(t, cloneBody(body));
-        this.ownPre.delete(t - 64);
+        // (Its own ship: what it was before its causes is kept every tick, for preAt)
+        this.pre.keep(t, pre);
         own.after(t, body);
       } else if (cs?.has(id, t)) {
         // (Its causes on this tick, CAPS.CAUSES: what it was before them is kept, for a contact another ship works out)
-        let p = this.pres.get(id);
-        if (!p) this.pres.set(id, (p = new Map()));
-        p.set(t, pre.body);
-        if (p.size > 64) for (const k of p.keys()) if (k < t - HISTORY) p.delete(k);
+        this.pre.keep(t, pre);
         cs.after(id, t, body);
-      } else this.pres.get(id)?.delete(t);
+      } else this.pre.delete(id, t);
       // (Asked of it ahead while its causes were worked out: done with now)
-      this.pend.get(id)?.delete(t);
+      this.ahead.delete(id, t);
       driver?.after?.(t, body);
-      cur = { body, bits: pre.bits, q: pre.q };
-      r.hist.set(t, cur);
-      r.last = t;
+      cur = new ReplicaState(id, r.mode, body, pre.bits, pre.q);
+      ring.keep(t, cur);
+      last = t;
     }
-    for (const t of r.hist.keys()) if (t < r.last - HISTORY) r.hist.delete(t);
-    for (const t of r.events.keys()) if (t < r.last - HISTORY) r.events.delete(t);
+    if (r.events.size > 64) for (const t of r.events.keys()) if (t < last - HISTORY) r.events.delete(t);
     return cur;
   }
 
@@ -644,13 +655,13 @@ export class ShipReplicaSet {
     // state, not standing at it until the view reaches its tick (it stood there, then went on: a snap and a stall). Not
     // debris (nothing before it split), a docked ship or one mid-jump; at most BACK_TICKS back
     const r = this.reps.get(id);
-    if (r && r.hist.size && !r.hist.has(f) && r.mode !== ReplicaMode.Drift && r.mode !== ReplicaMode.Docked) {
-      let first = Infinity;
-      for (const k of r.hist.keys()) if (k < first) first = k;
-      const s = first > f ? r.hist.get(first)! : null;
+    const ring = this.ring;
+    if (r && ring.size(id) && !ring.has(id, f) && r.mode !== ReplicaMode.Drift && r.mode !== ReplicaMode.Docked) {
+      const first = ring.first(id)!;
+      const s = first > f ? ring.get(id, first)! : null;
       if (s && !s.body.jump) {
         const back = Math.min(BACK_TICKS, first - t);
-        return { x: s.body.x - s.body.vx * back, y: s.body.y - s.body.vy * back, angle: s.body.angle - s.body.angVel * back, b: s };
+        return { x: s.body.x - s.body.vx * back, y: s.body.y - s.body.vy * back, angle: s.body.angle - s.body.angVel * back, b: s as ReplicaState };
       }
     }
     const a = this.at(id, f);
