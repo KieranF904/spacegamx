@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '@space-game/common';
+import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '@space-game/common';
 import { bossRise, clearBossLives } from './bossLife';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
@@ -18,7 +18,7 @@ import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
 import { stepShip, SimShipView, pilotInput, ReplicaMode, type SimInput, type SimEnv, type FieldEnv } from '@space-game/common';
-import { boostOf, payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
+import { boostOf, buildFlightInputs, newFlightControls, gunLoadTick, payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -30,7 +30,7 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding, jumpGo, jumpChargeNeed,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
-  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
+  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, gunsTick, gunControls, miningTick, GUN_FX, simAim, simAimQ, shotIdsFor, ammoCodeOfMods, fireVolley, type SimEvent, firesStraight, partWeaponDef,
   type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, movesFor, focusFor, causesFor, contactsFor, waypointsFor, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
@@ -57,6 +57,7 @@ import { hitSurface } from './hitSurface';
 import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
+import { OwnShells } from './hits/OwnShells';
 import { OwnTick } from './own/OwnTick';
 import { ShipCauses } from './causes/ShipCauses';
 import { ContactWorld } from './causes/ContactWorld';
@@ -123,6 +124,9 @@ const PREDICT_VIEW = new SimShipView();
 const PREDICT_IN: SimInput = { bits: 0, q: 0, jumpDist: 0, fire: false, fireAlt: false, aimDist: 0 };
 const PREDICT_FIELDS: FieldEnv = { central: null };
 const PREDICT_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PREDICT_FIELDS, terrain: null };
+
+/** The gun step's events on a predicted tick (ShipClient.predictGuns' scratch) */
+const GUN_EVENTS: SimEvent[] = [];
 
 export class ShipClient {
   readonly store: ShipStore;
@@ -300,6 +304,7 @@ export class ShipClient {
       passes: (shell) => this.hits.passesOf(shell),
       ownExact: () => this.own.on,
     });
+    this.ownShells = new OwnShells({ self: () => opts.state.playerId, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, firePose: (t) => this.own.firePose(t) });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
     this.bodies = new BodyRunner({ reps: this.replicas });
@@ -406,6 +411,8 @@ export class ShipClient {
   readonly hits: ConfirmedHits;
   /** Client-detected hits (part D): the hits found here on the tick-faithful layer, and the chain reported */
   readonly selfHits: SelfHits;
+  /** Your own straight shells worked out here, named by shot id (CAPS.SHOT_IDS: hits/OwnShells.ts) */
+  readonly ownShells: OwnShells;
   /** Its own ship on the tick-aligned layer, stepped from its own inputs and the causes it's told (CAPS.OWN_SIM: own/OwnTick.ts) */
   readonly own: OwnTick;
   /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (CAPS.BODIES: bodies/BodyRunner.ts) */
@@ -452,6 +459,7 @@ export class ShipClient {
     for (const id of r.ships) this.fillHull(id);
     for (const id of r.gone) { this.opts.state.removeShell(id); this.guides.remove(id); }
     this.selfHits.spent(r.gone);
+    this.ownShells.gone(r.gone);
   }
 
   /** A connection afresh: confirmed and client-detected hits start over, as the server's do, and so do bosses' bodies (BodyRunner.reset) */
@@ -459,6 +467,7 @@ export class ShipClient {
     this.away.clear();
     this.hits.reset();
     this.selfHits.reset();
+    this.ownShells.reset();
     this.bodies.reset();
     this.moves.reset();
     this.guides.reset();
@@ -477,6 +486,7 @@ export class ShipClient {
     this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
     this.selfHits.setLevel(caps & CAPS.ROUGH ? lvl : undefined);
     this.own.setOn(ownSimCaps(caps));
+    this.ownShells.setOn(shotIdsFor(caps));
     this.focusOn = focusFor(caps);
     this.bodies.setOn(bodiesFor(caps));
     this.moves.setOn(movesFor(caps));
@@ -499,7 +509,10 @@ export class ShipClient {
       for (const e of m.entities) {
         const d = e.data;
         if (e.type !== EntityType.Projectile) continue;
-        if (!fired.has(e.id)) this.selfHits.row(e.id);
+        // (your own built here, CAPS.SHOT_IDS: exact, unless your ship was keyframed in the window: then told, as the server has it)
+        const own = this.ownShells.freshExact(e.id);
+        if (own === false) { this.selfHits.row(e.id); continue; }
+        if (!fired.has(e.id) && own === undefined) this.selfHits.row(e.id);
         else if (d && (d[10] ?? -1) >= 0) this.selfHits.addShell(e.id, d[6], d[10], d[3], d[4], d[5], e.vx ?? 0, e.vy ?? 0, d[7]);
       }
     }
@@ -649,6 +662,13 @@ export class ShipClient {
     // (homing shells, CAPS.WAYPOINTS: flown on the tick layer from their SYNCs and waypoints; drawn where it has them)
     this.guides.onSnapshot(m.tick, m.guides);
     out.push(...this.guides.draw(m.tick, m.entities, (id) => this.opts.state.entities.get(id)?.data));
+    // (your own straight shells, CAPS.SHOT_IDS: built here from your own gun step's volleys, at your confirmed ship, named by
+    // shot id; those whose life has ended removed here, the server sending no removal for them: hits/OwnShells.ts)
+    if (this.ownShells.on) {
+      const keyed = !!m.ships?.some((k) => k[0] === this.opts.state.playerId), ended: number[] = [];
+      out.push(...this.ownShells.snapshot(m.tick, ended, keyed));
+      if (ended.length) { m.removed.push(...ended); this.selfHits.onRemoved(ended); }
+    }
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
@@ -972,30 +992,46 @@ export class ShipClient {
     const ship = this.store.get(player.id);
     this.ownBeams?.clear();
     if (!ship || ship.kind !== 'ship' || this.docked || !this.scene) return null;
-    // (No firing mid-jump, nor knocked out by an EMP: ShipBridge.stepWeapons)
+    // (No firing mid-jump, nor knocked out by an EMP: ShipBridge.stepWeapons; the trigger as the step reads it, common sim/guns.ts)
     const burning = jumpPhase(player.jump ?? 0, this.jump).phase === 'burn' || tick < (player.empUntil ?? 0);
-    const hasMiners = ship.derived.miners.length > 0;
-    const firing = (input.fireLeft || (input.fireRight && !hasMiners)) && !burning;
-    this.fireHeld = firing;
+    const c = gunControls(ship, !!input.fireLeft, !!input.fireRight, burning);
+    this.fireHeld = c.firing;
     const pose = { x: player.x, y: player.y, angle: player.angle };
     // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
     ensurePortsCharge(ship.derived, charge);
     const energy = { charge };
-    // (Guns never read warmth: rework 2026-11)
-    const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
-    if (this.ownBeams) for (const w of beams) this.ownBeams.add(w.part);
+    // The step's gun phase (common sim/guns.ts gunsTick: the server's fireWeapons runs the same), aimed on the one aim
+    // rule, simAim(q): what the server's pilot fires at (its Input.targetAngle is fround(dequantize(q)) off the wire).
+    // It returns events; they're drawn here, after the step. (Never on a replay: each predicted tick once, no dedupe needed.
+    // Guns never read warmth: rework 2026-11)
+    const events = GUN_EVENTS;
+    events.length = 0;
+    gunsTick(ship, player.id, pose, { firing: c.firing, aimWorld: simAim(simAimQ(input.targetAngle)), aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning, events);
     // (What the guns hold now, for the server's gun-state correction: gunSync.ts)
     this.gunSync.record(ship, tick);
     this.gunFeel.own(ship, tick);
-    for (const { w } of pulses) this.beamFx?.startPulse(player.id, w.part, tick);
-    if (burning) ship.mineUntil = 0;
-    payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy, burning);
-    for (const { w, shot, aug } of shots) {
+    miningTick(ship, player.id, pose, c, tick, energy, events);
+    for (const e of events) {
+      if (e.k === 'fx') {
+        if (e.fx === GUN_FX.beam) this.ownBeams?.add(e.part);
+        else if (e.fx === GUN_FX.pulse) this.beamFx?.startPulse(player.id, e.part, tick);
+        continue;
+      }
+      // (a volley: its first barrel's event builds it)
+      if (e.k !== 'fire' || e.barrel !== 0) continue;
+      const w = ship.derived.weapons.find((x) => x.part === e.slot);
+      if (!w) continue;
       // (Homing missiles change course: those the server sends as they fly)
       const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w);
       if (!firesStraight(pdef)) continue;
+      const aug = (e as { aug?: 1 }).aug, ammo = ammoCodeOfMods(this.ownAmmo?.(w.kind));
+      const fire = { owner: player.id, tick, part: w.part, aimQ: e.aimQ, ammo, aug };
+      // (your own shells on the tick layer, CAPS.SHOT_IDS: this volley's, built when a snapshot covers its tick)
+      if (this.ownShells?.on && this.ownShells.derivable(ship, w.part + 256 * ammo + (aug ? 65536 : 0))) this.ownShells.fired({ tick, part: w.part, aimQ: e.aimQ, ammo, aug });
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
-      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, stackMods(this.ownAmmo?.(w.kind), aug))) {
+      const v = fireVolley(fire, ship, { ...pose, vx: player.vx, vy: player.vy }, this.opts.tuning);
+      if (!v) continue;
+      for (const s of v.shells) {
         this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, s.life), arm: pdef.arm, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }

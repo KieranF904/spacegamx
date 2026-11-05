@@ -12,9 +12,9 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
   pointInConvex, shipPointToWorld,
-  WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, stepGuns, ammoCode, outputOf, payMining, MINE_CYCLE,
+  WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, ammoCode, outputOf, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
-  endsAtAim, aimReach, buildShot,
+  endsAtAim, aimReach, buildShot, gunsTick, gunControls, miningTick, shotId, SHOT_ID_BARRELS, SHOT_ID_SLOTS, SHOT_ID_OWNERS, type SimEvent,
 } from '@space-game/common';
 import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
 import { lastHurtSoak } from './damage.js';
@@ -97,16 +97,18 @@ export function stepWeapons(b: BridgeCtx, eid: number): boolean {
   if (!ship || ship.kind !== 'ship') return false;
   // No firing mid-jump (the guns would be left behind by their own shots), nor from inside a station
   const jumping = b.isJumping(ship) || b.isEmped(eid) || !!b.host.sheltered?.(eid);
-  const hasMiners = ship.derived.miners.length > 0;
-  const firing = (Input.fireLeft[eid] === 1 || (Input.fireRight[eid] === 1 && !hasMiners)) && !jumping;
+  // (the trigger as the step reads it: common sim/guns.ts gunControls; aimed on the one aim rule, simAim(q), which a
+  // pilot's Input.targetAngle already is: fround(dequantize(q)) off the wire)
+  const c = gunControls(ship, Input.fireLeft[eid] === 1, Input.fireRight[eid] === 1, jumping);
   // Shots spend stored energy (energy.ts); then the mining lasers pay for their segment from what's left
   const energy = { charge: b.chargeOf(eid) };
-  b.fireWeapons(eid, ship, firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy);
-  if (jumping) ship.mineUntil = 0;
-  const mining = payMining(ship, Input.fireRight[eid] === 1 && hasMiners && !jumping, b.host.getTick(), energy, jumping);
-  // (A ports ship's mining laser starting a pulse: a fire event with no shells, so every client draws it from this tick, at its fulfilment)
-  const pz = ship.derived.ports, pe = energy.charge.e;
-  if (mining && pz && pe) for (const m of ship.derived.miners) if (portsMinePhase(pz, pe, m.part) === 0) b.fired.push({ owner: eid, tick: b.host.getTick(), part: m.part, aimQ: pe.sat[m.part], ids: [], ammo: TELL_MINE_PULSE });
+  b.fireWeapons(eid, ship, c.firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy);
+  const tick = b.host.getTick();
+  GUN_EVENTS.length = 0;
+  const mining = miningTick(ship, eid, b.pose(eid), c, tick, energy, GUN_EVENTS);
+  // (A ports ship's mining laser starting a pulse (the step's 'minePulse' fx): a fire event with no shells, so every client draws it from this tick, at its fulfilment)
+  const pe = energy.charge.e;
+  if (pe) for (const e of GUN_EVENTS) if (e.k === 'fx' && e.fx === 'minePulse') b.fired.push({ owner: eid, tick, part: e.part, aimQ: pe.sat[e.part], ids: [], ammo: TELL_MINE_PULSE });
   b.setCharge(eid, energy.charge);
   b.stepMiners(eid, ship, mining, Input.targetAngle[eid], Input.cursorDist[eid]);
   return true;
@@ -185,8 +187,10 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   const pose = b.pose(eid);
   const def = (w: WeaponInfo) => partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w);
   let beamHit = -1;
-  // The guns' tick (shared with the pilot's client, which fires its own shells on the same tick: guns.ts)
-  const { shots, beams, pulses, tells } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy }, tick, b.tuning);
+  // The guns' tick (the step's gun phase, shared with the pilot's client, which fires its own shells on the same tick
+  // with the same shot ids: common sim/guns.ts gunsTick). Its fire events name each shell by its shot id
+  GUN_EVENTS.length = 0;
+  const { shots, beams, pulses, tells } = gunsTick(ship, eid, pose, { firing, aimWorld, aimDist, energy }, tick, b.tuning, GUN_EVENTS);
   // Where the guns aim this tick and whether the trigger is held: a guided shell steers to it (features/weaponry guided; Weapons.guide)
   noteGuide(b, eid, tick, firing, pose, aimWorld, aimDist);
   // A walking salvo's later shells, on their ticks (features/weaponry walk)
@@ -242,7 +246,8 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, damageScale,
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: mods,
         reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model, gun: straight ? w.part + 256 * ammo + (aug ? 65536 : 0) : undefined });
-    if (ids?.length && straight) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo } : {}), ...(aug ? { aug: 1 as const } : {}) });
+    // (each shell's shot id: the step's fire events name the volley's barrels so; an ammunition's extra shells by their place too)
+    if (ids?.length && straight) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, shots: volleyShotIds(eid, tick, w.part, ids.length), ...(round?.item ? { ammo } : {}), ...(aug ? { aug: 1 as const } : {}) });
     // A rippling salvo: the rest of its shells, `gap` ticks apart, on the same lock
     if (d.salvo && d.salvo.count > 1) {
       let list = b.salvos.get(eid);
@@ -263,6 +268,17 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   if (beamHit >= 0) b.weaponBeams.set(eid, beamHit);
   else b.weaponBeams.delete(eid);
   if (shots.length || beams.length || pulses.length || tells.length) b.lastFired.set(eid, tick);
+}
+
+/** The gun phase's events this call (scratch: read before the next) */
+const GUN_EVENTS: SimEvent[] = [];
+
+/** A volley's shot ids by place (events.ts shotId); none past the id's barrel field (a volley that big goes unnamed) */
+function volleyShotIds(owner: number, tick: number, part: number, n: number): number[] | undefined {
+  if (n > SHOT_ID_BARRELS || part >= SHOT_ID_SLOTS || owner >= SHOT_ID_OWNERS) return undefined;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(shotId(owner, tick, part, i));
+  return out;
 }
 
 /** Note where a ship's guns aim this tick (the cursor point) and whether the trigger is held (allocation-free after its first) */
