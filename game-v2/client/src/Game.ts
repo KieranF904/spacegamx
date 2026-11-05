@@ -27,6 +27,7 @@ import { GameState } from './state/GameState';
 
 
 import { RegionUI } from './ui/RegionUI';
+import { MusicPlaceTracker } from './audio/musicPlace';
 import { TimeScaleBadge } from './ui/TimeScaleBadge';
 
 import { PilotState, createClientEconomy } from './econ/clientEcon';
@@ -140,6 +141,8 @@ export class Game {
   readonly pilot: PilotState;
   /** The danger band you're in (a banner as you cross), and the card for a gate you're near */
   private regionUI = new RegionUI();
+  /** Where you are, for the music (its areas, with edge margins) */
+  private musicPlace = new MusicPlaceTracker();
   /** Raids and wrecks in this system (marked on screen) */
   private worldEvents = new Map<number, { name: string; x: number; y: number; system: string }>();
   /** Kills (and assists) this session, for the tutorial */
@@ -646,7 +649,11 @@ this.xpFillEl = document.getElementById('xpFill');
       this.lastAlarm = now;
       this.audio.playUI('warning', 0.6);
     }
-    this.audio.setMusicSystem(this.state.systemId || 'sol');
+    // The music follows the system, the area you're in, docking, a boss's arena or fight (audio/musicPlace.ts)
+    this.audio.setMusicPlace(this.musicPlace.update({
+      systemId: this.state.systemId || 'sol', sys: this.currentSystem(), x: me?.renderX, y: me?.renderY,
+      tick: this.state.getRawServerTick(), docked: this.stationOpen, boss: this.w.bossUI.bossId,
+    }), now);
     // Nearing a boss's lair (a surface's or pocket's dread point), the music turns ominous
     const dread = this.currentSystem()?.surface?.dread ?? this.currentSystem()?.pocket?.dread;
     const d = dread && me ? Math.hypot(me.renderX - dread.x, me.renderY - dread.y) : Infinity;

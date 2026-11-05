@@ -648,6 +648,7 @@
       "color": "#7dd3fc",
       "glow": "#a5f3fc",
       "decor": "laser",
+      "sfxLoop": "frost_loop",
       "pieces": [
         "rect2",
         "block2"
@@ -783,8 +784,8 @@
       "fabOrder": 6.2,
       "color": "#d0703a",
       "decor": "cannon",
-      "sfx": "shot",
-      "sfxTurret": "turret_shot",
+      "sfx": "autocannon_shot",
+      "sfxTurret": "autocannon_shot",
       "guide": {
         "name": "Autocannon",
         "blurb": "Many small shells, fast",
@@ -813,7 +814,7 @@
       "color": "#e0408a",
       "glow": "#ff6ab0",
       "decor": "laser",
-      "sfx": "shot",
+      "sfx": "pulse_shot",
       "guide": {
         "name": "Pulse laser",
         "blurb": "Bursts that strip shields",
@@ -843,7 +844,7 @@
       "color": "#4aa8e0",
       "glow": "#9ad8ff",
       "decor": "emp",
-      "sfx": "emp_shot",
+      "sfx": "arc_shot",
       "guide": {
         "name": "Arc projector",
         "blurb": "Chains between nearby ships",
@@ -871,7 +872,7 @@
       "fabOrder": 6.7,
       "color": "#8a7a5a",
       "decor": "missile",
-      "sfx": "missile_launch",
+      "sfx": "torpedo_launch",
       "guide": {
         "name": "Torpedo",
         "blurb": "Slow and huge, through shields",
@@ -899,7 +900,7 @@
       "fabOrder": 6.8,
       "color": "#7a8a5a",
       "decor": "flak",
-      "sfx": "flak_shot",
+      "sfx": "mortar_shot",
       "guide": {
         "name": "Mortar",
         "blurb": "Lands where you aim",
@@ -927,7 +928,7 @@
       "fabOrder": 4.5,
       "color": "#c8a040",
       "decor": "missile",
-      "sfx": "missile_launch",
+      "sfx": "charge_launch",
       "guide": {
         "name": "Mining charge",
         "blurb": "Cracks rock wide open",

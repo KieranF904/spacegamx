@@ -66,3 +66,4 @@ game-v2/docs/ux/polish-*/
 
 # Dev-update before/after images stay local (the index is tracked)
 game-v2/docs/panels/**/*.png
+game-v2/docs/panels/**/*.wav

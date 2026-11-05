@@ -12,30 +12,23 @@
  */
 
 import { renderSfx, reverbImpulse, variantKey, LoopId, SFX_REVERB, SFX_VARIANTS } from './sfx';
-import { MusicEngine } from './MusicEngine';
-import { WEAPON_KIND_TYPE } from '@space-game/common';
-import { SHIP_FUNCTIONS } from '../ships/shipFunctionData';
+import { MusicEngine, MUSIC } from './MusicEngine';
+import { MusicDirector, type MusicPlace } from './musicProfiles';
+import { BEAM_LOOP, shotSoundForType } from './weaponSounds';
 
-/** Each part function's sounds (data/ships/functions.json `sfx`, `sfxTurret`, `sfxLoop`), by its weapon kind */
-const FN_SOUNDS = SHIP_FUNCTIONS;
-/** Projectile type (WEAPON_KIND_TYPE, the wire's data[0]) → its shot sound, plain and from a turret */
-const SHOT_SFX = new Map<number, { sfx: string; turret?: string }>();
-for (const f of FN_SOUNDS) {
-  const type = f.weapon !== undefined ? WEAPON_KIND_TYPE[f.weapon] : undefined;
-  if (type !== undefined && f.sfx !== undefined) SHOT_SFX.set(type, { sfx: f.sfx, turret: f.sfxTurret });
-}
-// A prism's shards aren't a part's own shot: they're silent
-SHOT_SFX.set(WEAPON_KIND_TYPE.prism_shard, { sfx: '' });
-/** Beam weapon kind → the loop that plays while it fires */
-const BEAM_LOOP = new Map<string, LoopId>(FN_SOUNDS.filter((f) => f.weapon && f.sfxLoop).map((f) => [f.weapon!, f.sfxLoop as LoopId]));
+/** Every held beam's loop (weaponSounds: its part's sfxLoop) */
 const BEAM_LOOPS = [...new Set(BEAM_LOOP.values())];
+/** Each loop's level at full */
+const LOOP_LEVEL: Record<string, number> = { engine: 0.35, boost: 0.25, mining: 0.4, laser_loop: 0.45, lance_loop: 0.5, arc_loop: 0.4, frost_loop: 0.45, repair_loop: 0.35 };
 
 /** World units at which a sound fades out entirely, and the panning width */
 const AUDIO_MAX_DISTANCE = 6000;
 const AUDIO_REF_DISTANCE = 1200;
 
 /** At most this many copies of one effect at once (turret batteries fire a lot) */
-const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_shot: 8, railgun_shot: 4, hit: 8, explosion_small: 6, part_break: 6, disintegrate: 3, bump: 4, hive_launch: 3, prism_shot: 4, boss_roar: 1, laser_pulse: 5, mining_pulse: 4, boss_charge: 2, magma_charge: 4, magma_shot: 4, magma_burst: 5, boss_beam: 1, gun_charge: 3, gun_clack: 6, gun_vent: 4, gun_spin: 2 };
+const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_shot: 8, railgun_shot: 4, hit: 8, explosion_small: 6, part_break: 6, disintegrate: 3, bump: 4, hive_launch: 3, prism_shot: 4, boss_roar: 1, laser_pulse: 5, mining_pulse: 4, boss_charge: 2, magma_charge: 4, magma_shot: 4, magma_burst: 5, boss_beam: 1, gun_charge: 3, gun_clack: 6, gun_vent: 4, gun_spin: 2,
+  autocannon_shot: 10, pulse_shot: 8, arc_shot: 6, mortar_shot: 5, torpedo_launch: 3, charge_launch: 4, pd_shot: 6,
+  rivet_shot: 8, scrap_chunk_shot: 4, seeker_launch: 4, heart_spark: 8, heart_seeker: 4 };
 /** Effects that, at their cap, cut the oldest copy short rather than stay silent (a ship's lasers fire in turn: each pulse must be heard) */
 const STEAL = new Set(['laser_pulse', 'mining_pulse']);
 
@@ -43,7 +36,7 @@ const STEAL = new Set(['laser_pulse', 'mining_pulse']);
  * Level of each generated effect after loudness matching, so the mix sits
  * right: weapons and blasts up front, interface sounds well back.
  */
-const FILE_GAIN: Record<string, number> = {
+export const FILE_GAIN: Record<string, number> = {
   shot: 0.85, turret_shot: 0.6, hit: 0.5, hurt: 0.8, explosion_small: 0.8, explosion_large: 1,
   part_break: 0.55, armor_break: 0.6, generator_blast: 0.8, thruster_blast: 0.75, weapon_cookoff: 0.65, conduit_spark: 0.45,
   disintegrate: 0.45, bump: 0.32, repair_part: 0.5,
@@ -54,14 +47,18 @@ const FILE_GAIN: Record<string, number> = {
   engine: 0.9, boost: 0.9, mining: 0.7, scan_ping: 0.6, craft_done: 0.6, sell: 0.5,
   railgun_shot: 0.9, flak_shot: 0.6, missile_launch: 0.7, emp_shot: 0.7, laser_loop: 0.6, lance_loop: 0.7, shield_hit: 0.5,
   boss_roar: 0.9, hive_launch: 0.6, cinder_shot: 0.75, prism_shot: 0.6, phase_shot: 0.8, singularity_fire: 0.85,
+  autocannon_shot: 0.55, pulse_shot: 0.6, arc_shot: 0.65, mortar_shot: 0.75, torpedo_launch: 0.85, charge_launch: 0.6, pd_shot: 0.4,
+  arc_loop: 0.6, frost_loop: 0.6, repair_loop: 0.55,
+  rivet_shot: 0.6, scrap_chunk_shot: 0.75, seeker_launch: 0.6, heart_spark: 0.6, heart_seeker: 0.65,
 };
 /** Playback rate for generated effects that came out too bright (below 1 = deeper and slower) */
-const FILE_PITCH: Record<string, number> = { bump: 0.85 };
+export const FILE_PITCH: Record<string, number> = { bump: 0.85, scrap_chunk_shot: 0.85 };
 /** Low-pass cutoff (Hz) for generated effects that must stay soft: no harsh highs */
-const FILE_LOWPASS: Record<string, number> = {
+export const FILE_LOWPASS: Record<string, number> = {
   bump: 700, hit: 2500, railgun_shot: 4000, emp_shot: 3000, shield_hit: 2500, part_break: 1800, armor_break: 1800, weapon_cookoff: 1800, conduit_spark: 1800, disintegrate: 1200,
   generator_blast: 2500, explosion_small: 3000, thruster_blast: 3000, repair_part: 2500,
   boss_roar: 2200, hive_launch: 3000, cinder_shot: 2800, prism_shot: 3200, phase_shot: 2600, singularity_fire: 2200,
+  autocannon_shot: 3000, arc_shot: 3000, arc_loop: 2600, rivet_shot: 2600, scrap_chunk_shot: 1600, seeker_launch: 2600, pd_shot: 2600, heart_spark: 2800,
 };
 /** Reverb send for generated effects (they already carry some room of their own) */
 const FILE_REVERB: Record<string, number> = { explosion_large: 0.35, explosion_small: 0.25, generator_blast: 0.25, thruster_blast: 0.25, shot: 0.15, turret_shot: 0.15, hit: 0.15, bump: 0.15 };
@@ -84,7 +81,9 @@ export class AudioManager {
   private stealable = new Map<string, (() => void)[]>();
   private loops = new Map<LoopId, { src: AudioBufferSourceNode; gain: GainNode }>();
   private music: MusicEngine | null = null;
-  private pendingSystem = 'sol';
+  /** Decides when the music follows you somewhere new (musicProfiles.ts) */
+  private director = new MusicDirector(MUSIC);
+  private pendingPlace: MusicPlace = { system: 'sol' };
 
   private listenerX = 0;
   private listenerY = 0;
@@ -137,7 +136,7 @@ export class AudioManager {
       this.buffers = await renderSfx(ctx);
       await this.loadFiles(ctx);
       this.music = new MusicEngine(ctx, this.musicGain);
-      this.music.setSystem(this.pendingSystem);
+      this.music.setPlace(this.director.place ?? this.pendingPlace);
       this.music.start();
       this.initialized = true;
     } catch (e) {
@@ -258,15 +257,13 @@ export class AudioManager {
       this.loops.set(id, loop);
     }
     const t = this.context.currentTime;
-    loop.gain.gain.setTargetAtTime(this.enabled ? level * ({ engine: 0.35, boost: 0.25, mining: 0.4, laser_loop: 0.45, lance_loop: 0.5 } as Record<string, number>)[id] : 0, t, 0.08);
+    loop.gain.gain.setTargetAtTime(this.enabled ? level * (LOOP_LEVEL[id] ?? 0.45) : 0, t, 0.08);
     loop.src.playbackRate.setTargetAtTime(pitch, t, 0.15);
   }
 
   /** The sound of a shot of projectile type `type` (data[0] on the wire), fired from a turret or not ('' for none) */
   shotSound(type: number, turret: boolean): string {
-    const s = SHOT_SFX.get(type);
-    if (!s) return turret ? 'turret_shot' : 'shot';
-    return turret && s.turret ? s.turret : s.sfx;
+    return shotSoundForType(type, turret);
   }
 
   /** The beam loop of the beam weapon (tuning kind) you're firing, null for none */
@@ -275,10 +272,14 @@ export class AudioManager {
     for (const id of BEAM_LOOPS) this.setLoop(id, on === id ? 1 : 0, 1);
   }
 
-  /** Music mood follows the system you're in. */
-  setMusicSystem(systemId: string): void {
-    this.pendingSystem = systemId;
-    this.music?.setSystem(systemId);
+  /**
+   * Where you are and what's happening (system, area, docked, a boss's arena or fight), every frame: the music
+   * follows once a change has held a moment (MusicDirector), at its next bar.
+   */
+  setMusicPlace(place: MusicPlace, nowMs: number = performance.now()): void {
+    this.pendingPlace = place;
+    const change = this.director.update(place, nowMs);
+    if (change) this.music?.setPlace(change);
   }
 
   /** How near a dread point the music is (0 none .. 1 full): its ominous layer creeps in */
@@ -331,7 +332,7 @@ export class AudioManager {
  * audible part sits at a common loudness (then by `gain`), and for loops trim
  * both ends and crossfade the tail into the head so the seam is seamless.
  */
-function prepare(ctx: BaseAudioContext, src: AudioBuffer, loop: boolean, gain: number, lowpassHz?: number): AudioBuffer {
+export function prepare(ctx: BaseAudioContext, src: AudioBuffer, loop: boolean, gain: number, lowpassHz?: number): AudioBuffer {
   const n = src.length;
   const mono = new Float32Array(n);
   for (let c = 0; c < src.numberOfChannels; c++) {

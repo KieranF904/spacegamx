@@ -16,6 +16,8 @@ const BOSSES = (bossData as unknown as { rules: { barRange: number }; bosses: Re
 const BY_NAME = new Map(Object.values(BOSSES.bosses).map((b) => [b.name, b]));
 /** id → name (this week's hunted boss is picked by id) */
 const BOSS_IDS = Object.fromEntries(Object.entries(BOSSES.bosses).map(([id, b]) => [id, b.name]));
+/** name → id */
+const ID_OF = new Map(Object.entries(BOSSES.bosses).map(([id, b]) => [b.name, id]));
 
 let styled = false;
 function inject(): void {
@@ -75,6 +77,8 @@ export class BossUI {
   /** The open window (bossWindow), by its boss */
   private win: ServerBossWindowMessage | null = null;
   hidden = false;
+  /** The boss in range (bosses.json id; 'boss' for one not listed), for the music; null for none */
+  bossId: string | null = null;
 
   /** Is the boss bar up (other panels make room) */
   get visible(): boolean {
@@ -103,14 +107,17 @@ export class BossUI {
   update(): void {
     const me = this.state.entities.get(this.state.playerId);
     let best: { id: number; d: number } | null = null;
-    if (me && !this.hidden) {
+    if (me) {
       for (const e of this.state.entities.values()) {
         if (e.type !== EntityType.ShipBody || e.data?.[4] !== 2) continue;
         const d = Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY);
         if (d < BOSSES.rules.barRange && (!best || d < best.d)) best = { id: e.id, d };
       }
     }
-    if (!best) {
+    // (The music's boss fight: the boss in range, bar shown or not)
+    const near = best ? this.state.entities.get(best.id) : undefined;
+    this.bossId = near ? (near.name && ID_OF.get(near.name)) || 'boss' : null;
+    if (!best || this.hidden) {
       setStyle(this.bar, 'display', 'none');
       this.current = -1;
       return;
