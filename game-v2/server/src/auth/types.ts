@@ -74,4 +74,6 @@ export interface AccountAdmin {
   /** Ban until `until` (epoch ms; null: for good) */
   ban(username: string, until: number | null, reason: string, by: string, actor?: string): Promise<AccountInfo>;
   unban(username: string, actor?: string): Promise<AccountInfo>;
+  /** A message to a player's inbox (`to` null: everyone), from `actor` (the lobby checks they're an admin). Missing: an older lobby client */
+  mail?(to: string | null, subject: string, body: string, actor: string): Promise<{ sent: number; to: string }>;
 }

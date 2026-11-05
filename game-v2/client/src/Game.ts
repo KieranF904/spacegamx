@@ -12,6 +12,7 @@ import { handleKey, type KeyHost } from './app/keys';
 import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
 import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './app/inputSend';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
+import { lobbyInbox } from './network/inbox';
 import { setText, setStyle } from './ui/domWrite';
 import { Application, Text } from 'pixi.js';
 import { NetworkManager } from './network/NetworkManager';
@@ -493,7 +494,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.pendingAuth = null;
     this.loginUI.setLoading(false);
     this.loginUI.hide();
-    this.serverBrowserUI.show();
+    this.serverBrowserUI.show({ token: r.token, username: r.username ?? '', isAdmin: !!r.isAdmin });
     this.prefetchScreens();
   }
 
@@ -545,6 +546,7 @@ this.xpFillEl = document.getElementById('xpFill');
   private handleLogout(): void {
     this.stopAdmin();
     this.serverBrowserUI.hide();
+    this.serverBrowserUI.inbox.setAccount(null);
     this.state.playerName = '';
     if (this.authToken) void lobbyAuth('logout', { token: this.authToken });
     this.authToken = null;
@@ -1492,6 +1494,18 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.w.inventoryWindow.close();
   }
 
+  /** Unread mail, said once a page when the pilot is in (the inbox is on the join screen) */
+  private mailToasted = false;
+  private mailToast(): void {
+    const token = this.authToken;
+    if (this.mailToasted || !token || this.proto) return;
+    this.mailToasted = true;
+    void lobbyInbox.list(token).then((r) => {
+      if (!r.success || !r.unread) return;
+      this.w.toasts?.show(`You have ${r.unread} unread message${r.unread === 1 ? '' : 's'} (your inbox is on the join screen)`, r.unreadImportant ? 'warn' : 'info');
+    });
+  }
+
   private handleAuthResult(msg: { success: boolean; username?: string; token?: string; isAdmin?: boolean; isOwner?: boolean; isContributor?: boolean; error?: string }): void {
     if (msg.success) {
       console.log(`Authenticated as ${msg.username}${msg.isOwner ? ' (owner)' : msg.isAdmin ? ' (admin)' : ''}`);
@@ -1508,6 +1522,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
       
       if (this.isAdmin) this.startAdmin();
       else this.stopAdmin();
+      this.mailToast();
       if (msg.isContributor || this.isAdmin) this.startContrib();
       else this.stopContrib();
     } else {

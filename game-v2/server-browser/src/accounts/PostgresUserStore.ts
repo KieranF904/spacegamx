@@ -80,6 +80,11 @@ export class PostgresUserStore implements UserStore {
     console.log('[UserStore] PostgreSQL pool created');
   }
 
+  /** The pool, for the lobby's other tables (the inbox's messages: server-browser/src/inbox) */
+  get sharedPool(): PgPool {
+    return this.pool;
+  }
+
   /**
    * Create a store backed by a node-postgres pool.
    * Requires 'pg' to be installed: npm install pg
