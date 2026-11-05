@@ -2,7 +2,8 @@
  * What's in and on a den's rock that isn't rock (TerrainFile `dressing`; the Scrap Mother's Nest Rock,
  * scripts/terrain/scrap_nest.mjs). Look only, drawn over the rock:
  *
- *   plates   scrap plates welded over the rock face round a way in: dull steel, a darker seam, rivets
+ *   rust     rust bleeding down the rock from its edges
+ *   plates   scrap plates welded over the rock face round a way in (and hung across a barrier): dull steel, a seam, rivets
  *   cables   slung across a chamber: a dark line with a faint sheen along it
  *   belts    conveyors over a chamber's floor: a dark bed, its rails, cross-slats running the way it goes
  *   veins    greyseam in the rock's cracks: a faint green glow, slowly breathing
@@ -49,6 +50,14 @@ export class DenDressing {
 
   private drawStill(): void {
     const g = this.still, d = this.d;
+    for (const r of d.rust ?? []) {
+      g.moveTo(r[0][0], r[0][1]);
+      for (const [x, y] of r.slice(1)) g.lineTo(x, y);
+      g.stroke({ color: 0x7a3e22, width: 150, alpha: 0.16, cap: 'round', join: 'round' });
+      g.moveTo(r[0][0], r[0][1]);
+      for (const [x, y] of r.slice(1)) g.lineTo(x, y);
+      g.stroke({ color: 0x9a5028, width: 50, alpha: 0.18, cap: 'round', join: 'round' });
+    }
     for (const p of d.plates ?? []) {
       g.poly(p.flat()).fill({ color: 0x4a4d52 }).stroke({ color: 0x24262a, width: 18 });
       // (a seam across it, and rivets in its corners)
@@ -78,15 +87,15 @@ export class DenDressing {
     for (const c of d.cables ?? []) {
       g.moveTo(c[0][0], c[0][1]);
       for (const [x, y] of c.slice(1)) g.lineTo(x, y);
-      g.stroke({ color: 0x0c0c0d, width: 26, alpha: 0.9 });
+      g.stroke({ color: 0x0c0c0d, width: 44, alpha: 0.9 });
       g.moveTo(c[0][0], c[0][1] - 6);
       for (const [x, y] of c.slice(1)) g.lineTo(x, y - 6);
-      g.stroke({ color: 0x5a5a5e, width: 5, alpha: 0.5 });
+      g.stroke({ color: 0x6a6a6e, width: 9, alpha: 0.5 });
     }
     // Lamps: a housing on the wall, and its hot face
     for (const [x, y] of d.lamps ?? []) {
-      g.circle(x, y, 34).fill({ color: 0x1e1d1c });
-      g.circle(x, y, 18).fill({ color: 0xffe2b0 });
+      g.circle(x, y, 30).fill({ color: 0x1e1d1c });
+      g.circle(x, y, 14).fill({ color: 0xffe2b0 });
     }
   }
 
@@ -106,8 +115,8 @@ export class DenDressing {
     (d.lamps ?? []).forEach(([x, y], i) => {
       // (now and then one stutters)
       const f = hash(i + Math.floor(this.t * 3)) < 0.03 ? 0.35 : 1;
-      g.circle(x, y, 260).fill({ color: AMBER, alpha: 0.08 * f });
-      g.circle(x, y, 90).fill({ color: AMBER, alpha: 0.28 * f });
+      g.circle(x, y, 180).fill({ color: AMBER, alpha: 0.06 * f });
+      g.circle(x, y, 70).fill({ color: AMBER, alpha: 0.26 * f });
     });
   }
 

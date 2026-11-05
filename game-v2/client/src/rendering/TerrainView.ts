@@ -127,6 +127,8 @@ export class TerrainView {
       this.streams = new LavaStreams(f.streams, lighting);
       this.container.addChild(this.streams.mesh);
     }
+    // (a hollowed rock's floor: plain rock, under everything; its lava, barrier and dressing go over it)
+    for (const pts of f.floor ?? []) { g.flat(pts.flat(), f.palette?.floor ? hex(f.palette.floor) : this.pal.far); tag(0, 0, 0, BOULDER_KIND); }
     for (const pts of f.fill ?? []) { g.flat(pts.flat(), cave ? 0x000000 : this.pal.far); tag(0, 0, 1e5, CLIFF); }
     // A cave's mouth: black, a faint glow far down, its rim falling away into it
     for (const hole of f.holes ?? []) {
@@ -163,7 +165,8 @@ export class TerrainView {
     });
     this.container.addChild(this.lit.mesh);
     lighting.add(this.lit);
-    // (over the rock: lamps on its walls, veins in it, plates on it)
+    // (over a floor: its lava and its barrier; over the rock: lamps on its walls, veins in it, plates on it)
+    if (f.floor?.length) for (const c of [this.streams?.mesh, this.barrier?.gfx]) if (c) this.container.addChild(c);
     if (this.dressing) this.container.addChild(this.dressing.container);
   }
 

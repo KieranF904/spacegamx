@@ -228,8 +228,9 @@ const SM = CHAMBERS.smelter.c;
 const streams = [
   // The chute's run, out of the east wall and down into the pool
   stream([[SM[0] + 3500, SM[1] - 900], [SM[0] + 2600, SM[1] - 500], [SM[0] + 1500, SM[1] - 150], [SM[0] + 600, SM[1] + 150]], 150),
-  // The pool: a wide loop round the rich rocks' feet
-  stream([[SM[0] + 900, SM[1] + 300], [SM[0] + 200, SM[1] + 1300], [SM[0] - 1200, SM[1] + 1100], [SM[0] - 1500, SM[1] - 200], [SM[0] - 600, SM[1] - 1200], [SM[0] + 700, SM[1] - 900]], 340, 0),
+  // The pool: two wide arcs round the rich rocks' feet, closing on each other
+  stream([[SM[0] + 700, SM[1] - 300], [SM[0] + 1100, SM[1] + 900], [SM[0] - 200, SM[1] + 1700], [SM[0] - 1500, SM[1] + 1000], [SM[0] - 1700, SM[1] - 100]], 460, 0),
+  stream([[SM[0] - 1800, SM[1] + 300], [SM[0] - 1300, SM[1] - 1100], [SM[0] - 100, SM[1] - 1500], [SM[0] + 900, SM[1] - 800], [SM[0] + 800, SM[1] + 200]], 420, 0),
 ];
 
 // ---- The scrap heap she lies buried in (the Heart's bowl): low ridges round its middle (look only) ----
@@ -250,7 +251,7 @@ const lamps = [];
 for (const t of TUNNELS) {
   for (let i = 0; i < t.pts.length - 1; i++) {
     const a = t.pts[i], b = t.pts[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / l, uy = (b[1] - a[1]) / l;
-    for (let s = 450; s < l; s += 950) for (const side of [-1, 1]) {
+    for (let s = 500; s < l; s += 1400) for (const side of [-1, 1]) {
       // (on the wall: out across the tunnel until the rock, a little back from it)
       let d = t.half - 400;
       const x0 = a[0] + ux * s, y0 = a[1] + uy * s;
@@ -323,12 +324,41 @@ for (const c of cliffs) {
   }
 }
 
+/** The chambers' and tunnels' floor (look only): the rock's own floor under the open ground inside it */
+const floor = [];
+const disc = (c, r, n = 28) => Array.from({ length: n }, (_, k) => [round(c[0] + Math.cos((k / n) * Math.PI * 2) * r), round(c[1] + Math.sin((k / n) * Math.PI * 2) * r)]);
+for (const ch of Object.values(CHAMBERS)) floor.push(disc(ch.c, ch.r + 700));
+for (const t of TUNNELS) {
+  for (let i = 0; i < t.pts.length - 1; i++) {
+    let a = t.pts[i], b = t.pts[i + 1];
+    // (the Mouth's floor stops where it leaves the rock)
+    if (t.name === 'mouth') { if (a[1] > 21000) continue; if (b[1] > 21000) b = [b[0], 21000]; }
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / l, ny = (b[0] - a[0]) / l, w = t.half + 700;
+    floor.push([[a[0] + nx * w, a[1] + ny * w], [b[0] + nx * w, b[1] + ny * w], [b[0] - nx * w, b[1] - ny * w], [a[0] - nx * w, a[1] - ny * w]].map((p) => p.map(round)));
+  }
+}
+/** Rust bleeding down the rock from its edges (look only: wide faint streaks) */
+const rust = [];
+for (const c of cliffs) {
+  for (let i = 5; i < c.pts.length; i += 7) {
+    if (rnd() < 0.5 || c.depth[i] < 600) continue;
+    const [x, y] = c.pts[i], [nx, ny] = c.in[i], len = 300 + rnd() * Math.min(1400, c.depth[i] * 1.2), wob = (rnd() - 0.5) * 0.5;
+    rust.push([[x + nx * 60, y + ny * 60], [x + (nx + -ny * wob) * len * 0.5, y + (ny + nx * wob) * len * 0.5], [x + nx * len, y + ny * len]].map((p) => p.map(round)));
+  }
+}
+/** The barrier: a curtain of scrap welded across the Throat (plates hung along it, the shimmer between) */
+for (let x = -1500; x < 1500; x += 330) {
+  const w = 200 + rnd() * 90, h = 120 + rnd() * 90, y = BARRIER_Y + (rnd() - 0.5) * 40;
+  plates.push([[x, y - h / 2], [x + w, y - h / 2 + (rnd() - 0.5) * 40], [x + w, y + h / 2], [x, y + h / 2 + (rnd() - 0.5) * 40]].map((p) => p.map(round)));
+}
+
 mkdirSync(join(root, 'data/terrain'), { recursive: true });
 writeFileSync(join(root, 'data/terrain/sol_scrap_nest.json'), JSON.stringify({
   _comment: 'The Scrap Mother\'s Nest Rock (common/src/terrain.ts). Written by scripts/terrain/scrap_nest.mjs: edit that, not this.',
   rocks, mass, cliffs, streams, ridges,
-  palette: { foot: '#221f1e', face: '#3d3634', top: '#2f2a28', far: '#1b1817' },
-  dressing: { lamps, cables, veins, belts, plates },
+  palette: { foot: '#2a211d', face: '#4b3d36', top: '#3a302b', far: '#1d1816', floor: '#3a312b' },
+  floor,
+  dressing: { lamps, cables, veins, belts, plates, rust },
 }) + '\n');
 console.log(`${cliffs.length} outlines (${cliffs.map((c) => c.pts.length).join(', ')} points), ${mass.length} mass triangles, ${rocks.length} boulders, ${streams.length} streams, ${ridges.length} ridges; ${lamps.length} lamps, ${cables.length} cables, ${veins.length} veins, ${belts.length} belts, ${plates.length} plates`);
 

@@ -40,7 +40,9 @@ export interface TerrainFile {
    */
   cliffs?: { pts: Vec2[]; in: Vec2[]; depth?: number[] }[];
   /** The rock's colours (look only: CSS hex), instead of the cavern's: its foot, its face, its top, rock further off */
-  palette?: { foot: string; face: string; top: string; far: string };
+  palette?: { foot: string; face: string; top: string; far: string; floor?: string };
+  /** The floor under open ground inside the rock (look only: a hollowed asteroid's chambers), drawn under everything */
+  floor?: Vec2[][];
   /** Things in and on the rock that aren't rock (look only: client rendering/DenDressing.ts) */
   dressing?: {
     /** Work lamps on the walls */
@@ -53,6 +55,8 @@ export interface TerrainFile {
     belts?: { pts: Vec2[]; w: number }[];
     /** Plates welded over the rock */
     plates?: Vec2[][];
+    /** Rust bleeding down the rock (wide faint streaks) */
+    rust?: Vec2[][];
   };
 }
 
