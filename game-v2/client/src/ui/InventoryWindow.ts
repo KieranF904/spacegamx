@@ -140,7 +140,6 @@ export class InventoryWindow {
   private hint(id: string, where: 'cargo' | 'storage'): string | undefined {
     const d = this.pilot.econ.items.get(id);
     const menu = this.pilot.atStation ? 'Shift-right-click' : 'Right-click';
-    if (d?.category === 'plan') return this.pilot.knowsPlan(d.plan!) ? 'You already know this plan' : `${menu} → Learn plan`;
     if (d?.category === 'consumable') return `${menu} → Use or put on the quick bar · drag onto the bar`;
     const cls = where === 'cargo' ? holdClassOf(this.pilot, id) : null;
     const keep = cls === 'loadout' ? "Your ship's ammunition loadout: the storage controls leave it aboard, and its guns open it first. "
@@ -153,7 +152,6 @@ export class InventoryWindow {
   private useItems(id: string): { label: string; run: () => void }[] {
     const d = this.pilot.econ.items.get(id);
     const out: { label: string; run: () => void }[] = [];
-    if (d?.category === 'plan' && d.plan && !this.pilot.knowsPlan(d.plan)) out.push({ label: 'Learn plan', run: () => this.send({ type: 'itemUse', id }) });
     if (d?.category === 'consumable' && (d.repair || id === 'boost_cell' || id === 'scanner_charge')) out.push({ label: 'Use', run: () => this.send({ type: 'itemUse', id }) });
     // Modules break down to salvage: most of their ore back, their components in full
     if (d?.category === 'part' && this.pilot.atStation) {

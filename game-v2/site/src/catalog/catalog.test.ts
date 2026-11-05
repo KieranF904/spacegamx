@@ -86,7 +86,6 @@ describe('catalog snapshot', () => {
       for (const l of b.loot) expect(catalog.item.has(l.item), `${b.id} loot ${l.item}`).toBe(true);
     }
     for (const s of file.stations) expect(catalog.system.has(s.system), `${s.id} system`).toBe(true);
-    for (const s of file.ships) for (const x of s.soldAt) expect(catalog.station.has(x), `${s.id} soldAt ${x}`).toBe(true);
     for (const p of file.parts) for (const id of Object.keys(p.craft?.inputs ?? {})) expect(catalog.item.has(id), `${p.id} craft ${id}`).toBe(true);
   });
 

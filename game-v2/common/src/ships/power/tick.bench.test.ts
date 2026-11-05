@@ -13,7 +13,7 @@ import { createEnergyState } from './state.js';
 import { beamStep, energyTick, gunReady, spendShot } from './tick.js';
 import { type PartSpec, blueprintInput, genFn, layoutInput, storeFn } from './testData.js';
 
-const SHIPS = ['enemy/maw_heart_titan.json', 'hammerhead.json', 'bastion-dreadnought.json', 'sparrow-t.json', 'dense'];
+const SHIPS = ['enemy/maw_heart_titan.json', 'hammerhead.json', 'bastion.json', 'sparrow-t.json', 'dense'];
 
 /** A worst case: 15 x 15 single cells, every one touching four (generators, Batteries, Pips, Ion Drives, shields) */
 function dense(): PartSpec[] {

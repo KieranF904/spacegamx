@@ -240,17 +240,6 @@ function draw(g: CanvasRenderingContext2D, d: ItemDef, econ: Economy): void {
       for (let i = -1; i <= 1; i++) { roundRect(g, i * 10 - 3, -1, 6, 12, 3); g.fill(); }
       break;
     }
-    case 'plan': {
-      // A blueprint sheet with the ship's outline
-      g.fillStyle = '#1d4f91'; g.fillRect(-22, -18, 44, 36);
-      g.strokeStyle = 'rgba(160,200,255,0.35)'; g.lineWidth = 1;
-      for (let i = -22; i <= 22; i += 6) { g.beginPath(); g.moveTo(i, -18); g.lineTo(i, 18); g.stroke(); }
-      for (let i = -18; i <= 18; i += 6) { g.beginPath(); g.moveTo(-22, i); g.lineTo(22, i); g.stroke(); }
-      const bp = d.plan ? econ.plans[d.plan] : undefined;
-      if (bp) drawShipOutline(g, econ, bp.parts, 30);
-      g.strokeStyle = '#ffd166'; g.lineWidth = 2; g.strokeRect(-22, -18, 44, 36);
-      break;
-    }
     case 'part': {
       const p = d.part!;
       const v = econ.ships.variants.get(p.piece)?.[0];

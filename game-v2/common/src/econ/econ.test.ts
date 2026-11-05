@@ -17,7 +17,7 @@ for (const f of readdirSync(join(data, 'ships/blueprints')).filter((n) => n.ends
 const econ = new Economy(json('items.json'), json('recipes.json'), ships, plans);
 
 describe('item catalogue', () => {
-  it('has every listed item, a part for every allowed combination, and a plan per blueprint', () => {
+  it('has every listed item and a part for every allowed combination (ship plans are not items)', () => {
     expect(econ.items.get('iron_ore')?.category).toBe('mineral');
     expect(econ.items.get('part:alloy:hull:sq')?.category).toBe('part');
     expect(econ.items.get('part:steel:armor:block2')?.part).toEqual({ material: 'steel', fn: 'armor', piece: 'block2' });
@@ -32,7 +32,7 @@ describe('item catalogue', () => {
     expect(econ.items.has('part:steel:conduit:sq')).toBe(false);
     // Hull can't be a bespoke boss piece, so there's no such part
     expect([...econ.ships.pieces.values()].some((pc) => pc.bespoke && econ.items.has(`part:alloy:hull:${pc.id}`))).toBe(false);
-    expect(econ.items.get('plan:lancer')?.category).toBe('plan');
+    expect(econ.items.has('plan:lancer')).toBe(false);
   });
 
   it('every item referenced by recipes, drops and quests exists', () => {

@@ -34,7 +34,7 @@ export function galleryPage(ctx: PageCtx, d: { catalog: Catalog | null; shared: 
   ${sectionHead('Game', 'Plans in the game', html`<a class="link-quiet" href="/database/ships">Database</a>`)}
   ${d.catalog?.ships.length ? html`<div class="ship-grid">${d.catalog.ships.map((s) => shipCard(d.catalog!, s))}</div>` : html`<p class="dim">No plans to show.</p>`}
 </section>`;
-  return layout(ctx, { title: 'Ships', body, description: 'Ships pilots have shared, and the ship plans in the game.' });
+  return layout(ctx, { title: 'Ships', body, description: 'Ships pilots have shared, and the ships in the game.' });
 }
 
 export function sharedShipPage(ctx: PageCtx, d: { catalog: Catalog | null; ship: SharedShip }): SafeHtml {

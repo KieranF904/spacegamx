@@ -164,7 +164,6 @@ const stations: CatalogStation[] = stationsFile.map((s) => {
     repairCostPerHp: s.repairCostPerHp ?? 0, refuelCostPerUnit: s.refuelCostPerUnit ?? 0,
     sells: {
       items: sells.filter((x) => itemName.has(x)),
-      plans: sells.filter((x) => x.startsWith('plan:')).map((x) => x.slice(5)),
       parts: sells.filter((x) => x.startsWith('part:')).map((x) => {
         const [, material, fn] = x.split(':');
         return { part: fn, material, label: `${material[0].toUpperCase()}${material.slice(1)} ${partName.get(fn) ?? fn}` };
@@ -222,7 +221,6 @@ for (const f of libFiles) {
     power: bp.power === 'ports' ? 'ports' : 'pool',
     // (Moved so the top left corner is the origin: a drawing needs no offset)
     plan: plan.map((p) => ({ ...p, x: p.x - ox, y: p.y - oy })),
-    soldAt: stationsFile.filter((s) => (s.market?.sells ?? []).includes(`plan:${id}`)).map((s) => s.id),
   });
 }
 ships.sort((a, b) => a.stats.cells - b.stats.cells || a.name.localeCompare(b.name));

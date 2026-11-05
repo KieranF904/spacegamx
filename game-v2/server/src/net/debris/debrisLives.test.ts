@@ -113,7 +113,8 @@ function world() {
 
 function fight(ticks: number) {
   const w = world(), { ships, sys, x0, y0, server } = w;
-  const bp = ships.library.get('hauler')!;
+  // (The old unarmed, unshielded Hauler: a fixed target, whatever the world's freighters become)
+  const bp = ships.devDesigns['target-freighter'];
   const haulers = [0, 1, 2].map((i) => ships.spawnDummy(bp, x0 + 700 + 260 * i, y0 - 150 + 170 * i, 0.4 * i, sys));
   // Parts shot away, a few at a time, seeded
   let r = 7;

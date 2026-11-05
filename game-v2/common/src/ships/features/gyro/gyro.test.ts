@@ -61,7 +61,7 @@ describe('gyro: torque', () => {
       return last;
     };
     const dread = (at: [number, number][]) => {
-      const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/bastion-dreadnought.json'), 'utf-8'));
+      const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/bastion.json'), 'utf-8'));
       at.forEach(([x, y], k) => bp.parts.push(HEAVY(x, y, 240 + k) as never));
       const d = createShipState(catalog, tuning, 1, bp, 0).derived;
       expect(d.fx?.gyro?.parts.length ?? 0).toBe(at.length);

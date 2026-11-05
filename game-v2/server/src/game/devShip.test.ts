@@ -73,7 +73,7 @@ describe('dev ship swap', () => {
     const own = p.ship.blueprint.name, slots = p.hangar.length;
     const storage = JSON.stringify(p.storage);
     server.step(5);
-    t.send({ type: 'devShip', ship: 'bastion-dreadnought' } as any);
+    t.send({ type: 'devShip', ship: 'bastion' } as any);
     server.step(2);
     expect(server.getShips().get(pid)!.blueprint.name).not.toBe(own);
     server.pilots.onDestroyed(conn, 0, 0, 0, 0, 0);

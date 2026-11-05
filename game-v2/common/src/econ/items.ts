@@ -1,11 +1,11 @@
 /**
  * The item catalogue: everything a player can hold.
  *
- * Most items are listed in data/items.json. Two kinds are generated:
- *   - ship parts, `part:<material>:<fn>:<piece>`: a model's one per piece it
- *     comes in (in its own material), structure and the core one per material
- *     and piece (cost and value come from the recipes); legacy functions none
- *   - ship plans, `plan:<blueprint file>`, one per pre-made blueprint
+ * Most items are listed in data/items.json. Ship parts are generated,
+ * `part:<material>:<fn>:<piece>`: a model's one per piece it comes in (in its
+ * own material), structure and the core one per material and piece (cost and
+ * value come from the recipes); legacy functions none. Ship plans are not
+ * items: the designs a pilot knows are on their profile (`plans`).
  */
 
 import type { Catalog } from '../ships/catalog.js';
@@ -15,7 +15,7 @@ import { sizeName } from '../ships/partStats.js';
 import { dpow } from '../math/detTrig.js';
 
 /** quest: a job's own items (worth nothing, taken back if you abandon it) */
-export type ItemCategory = 'mineral' | 'gem' | 'volatile' | 'refined' | 'component' | 'artefact' | 'consumable' | 'ammo' | 'jewel' | 'part' | 'plan' | 'quest';
+export type ItemCategory = 'mineral' | 'gem' | 'volatile' | 'refined' | 'component' | 'artefact' | 'consumable' | 'ammo' | 'jewel' | 'part' | 'quest';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 export const RARITIES: ItemRarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
@@ -24,7 +24,7 @@ export const RARITY_COLOR: Record<ItemRarity, string> = {
 };
 export const CATEGORY_LABEL: Record<ItemCategory, string> = {
   mineral: 'Mineral', gem: 'Gem', volatile: 'Volatile', refined: 'Refined material', component: 'Component',
-  artefact: 'Artefact', consumable: 'Consumable', ammo: 'Ammunition', jewel: 'Cut gem', part: 'Ship part', plan: 'Ship plan', quest: 'Job item',
+  artefact: 'Artefact', consumable: 'Consumable', ammo: 'Ammunition', jewel: 'Cut gem', part: 'Ship part', quest: 'Job item',
 };
 
 export interface ItemDef {
@@ -42,8 +42,6 @@ export interface ItemDef {
   mass?: number;
   /** Parts: what to build */
   part?: { material: string; fn: string; piece: string };
-  /** Plans: the blueprint file it unlocks */
-  plan?: string;
   /** Job items: the job it belongs to (taken back if you abandon it) */
   quest?: string;
   /** Repair kits: credits of repairs, HP healed per second (fraction of each part's max), seconds per missing part rebuilt */
@@ -65,13 +63,13 @@ export interface ItemDef {
 
 /**
  * Mass per unit of cargo space, by category (ships/load.ts: a full hold
- * flies heavy). Ore and metal heavy, gems and plans light, ammunition between.
+ * flies heavy). Ore and metal heavy, gems light, ammunition between.
  * An item's own `mass` (items.json) overrides it. A ship's own mass is about
  * its cell count, so a starter's 30-space hold of ore is about a fifth of it.
  */
 export const CATEGORY_MASS: Record<ItemCategory, number> = {
   mineral: 0.1, refined: 0.09, part: 0.08, ammo: 0.06, artefact: 0.05, component: 0.04, quest: 0.04,
-  consumable: 0.03, volatile: 0.03, gem: 0.01, jewel: 0.01, plan: 0,
+  consumable: 0.03, volatile: 0.03, gem: 0.01, jewel: 0.01,
 };
 
 /** The five families of minerals (what kind of rock carries them) */
@@ -100,19 +98,14 @@ export function parsePartItemId(id: string): { material: string; fn: string; pie
   return m ? { material: m[1], fn: m[2], piece: m[3] } : null;
 }
 
-export function planItemId(file: string): string {
-  return `plan:${file}`;
-}
-
 export class ItemCatalog {
   private defs = new Map<string, ItemDef>();
   private order = new Map<string, number>();
 
   /**
    * @param ships the ship catalogue (parts are generated from it)
-   * @param plans pre-made blueprints by file name, with display names
    */
-  constructor(file: ItemsFile, ships?: Catalog, plans?: Record<string, { name: string; parts: number }>) {
+  constructor(file: ItemsFile, ships?: Catalog) {
     for (const d of file.items) this.addDef(d);
     if (ships) {
       for (const [fnId, fn] of ships.functions) FN_NAMES[fnId] = fn.name ?? cap(fnId);
@@ -153,12 +146,6 @@ export class ItemCatalog {
           }
         }
       }
-    }
-    for (const [file, bp] of Object.entries(plans ?? {})) {
-      this.addDef({
-        id: planItemId(file), name: `${bp.name} Plan`, category: 'plan', rarity: bp.parts > 60 ? 'epic' : bp.parts > 25 ? 'rare' : 'uncommon',
-        value: 50 * bp.parts, color: '#ffd166', description: `Ship plan: the ${bp.name} (${bp.parts} parts). Learn it to build it in the hangar.`, plan: file,
-      });
     }
   }
 

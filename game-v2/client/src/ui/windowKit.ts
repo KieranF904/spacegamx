@@ -333,11 +333,11 @@ export function matchesFilter(d: ItemDef | undefined, f: ItemFilter): boolean {
     case 'materials': return d.category === 'refined';
     case 'components': return d.category === 'component' || d.category === 'artefact' || d.category === 'jewel';
     case 'parts': return d.category === 'part';
-    case 'other': return d.category === 'consumable' || d.category === 'ammo' || d.category === 'plan' || d.category === 'quest';
+    case 'other': return d.category === 'consumable' || d.category === 'ammo' || d.category === 'quest';
   }
 }
 
-const CATEGORY_ORDER = ['quest', 'mineral', 'gem', 'volatile', 'refined', 'jewel', 'component', 'artefact', 'consumable', 'ammo', 'plan', 'part'];
+const CATEGORY_ORDER = ['quest', 'mineral', 'gem', 'volatile', 'refined', 'jewel', 'component', 'artefact', 'consumable', 'ammo', 'part'];
 
 export function sortStacks(econ: Economy, list: Stack[]): Stack[] {
   return [...list].sort((a, b) => {
@@ -412,7 +412,7 @@ export class ItemGrid {
       n.className = 'n';
       n.textContent = s.n > 9999 ? `${Math.floor(s.n / 1000)}k` : String(s.n);
       cell.append(img, n);
-      const tag = this.o.tag?.(s.id) ?? (d?.category === 'plan' ? { text: 'PLAN', cls: '' } : undefined);
+      const tag = this.o.tag?.(s.id);
       if (tag) { const t = document.createElement('span'); t.className = `tag ${tag.cls}`; t.textContent = tag.text; cell.appendChild(t); }
       cell.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, hint: this.o.hint?.(s.id) }), e.clientX, e.clientY));
       cell.addEventListener('mouseleave', hideTip);
