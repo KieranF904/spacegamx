@@ -120,4 +120,10 @@ class LobbyAccountAdmin implements AccountAdmin {
   async unban(username: string, actor?: string): Promise<AccountInfo> {
     return (await this.post('unban', { username, actor })).user;
   }
+
+  /** The lobby's inbox (server-browser/src/inbox/routes.ts /admin/mail) */
+  async mail(to: string | null, subject: string, body: string, actor: string): Promise<{ sent: number; to: string }> {
+    const r = await this.post('mail', to === null ? { everyone: true, subject, body, actor } : { to, subject, body, actor });
+    return { sent: r.sent, to: r.to };
+  }
 }

@@ -120,6 +120,7 @@ const HELP = [
   '/credits n [name] · /xp n [name] · /give item [n] [name] · /skillpoints n [name] · /codex [name] id|all|clear (records)',
   '/spawn [faction] [ship ...] [xN] (near you) · /boss id · /clear [radius] (destroy hostiles) · /clearpods · /event raid|salvage|siege',
   '/announce text · /who · F2: admin panel · F3: teleport to the cursor',
+  '/mail name|everyone [subject |] text (to their inbox on the join screen: a banner until read)',
   '/contributor name on|off (the contributor rank: map notes, F6) · /contributors (who has it)',
   '/freebuild [on|off] (dev servers: place any part in the hangar, nothing taken)',
   '/hits [on|off] [name] (confirmed hits: the network test switch; no on/off: the counters)',
@@ -435,6 +436,7 @@ export class AdminTools {
       case 'rank': return this.setRank(me, str(a.player), str(a.rank).toLowerCase());
       case 'ban': return this.ban(me, str(a.player), str(a.duration), str(a.reason).slice(0, 200));
       case 'unban': return this.unban(me, str(a.player));
+      case 'mail': return this.mail(me, str(a.to), str(a.text));
 
       case 'codex': {
         const t = target();
@@ -576,6 +578,20 @@ export class AdminTools {
     return { ok: true, text: `Unbanned ${t.name}` };
   }
 
+  /** A message to a player's inbox (or everyone's), kept by the lobby: "subject | text", or just the text */
+  private async mail(me: AdminConn, to: string, text: string): Promise<Result> {
+    const accounts = this.host.accounts;
+    if (!accounts?.mail) return { ok: false, text: NO_LOBBY.replace("admin rank and bans can't be changed here", "mail can't be sent from here") };
+    if (me.userId == null) return { ok: false, text: 'Sign in to an admin account to send mail' };
+    if (!to || !text) return { ok: false, text: 'Usage: /mail name|everyone [subject |] text' };
+    const bar = text.indexOf('|');
+    const subject = bar > 0 ? text.slice(0, bar).trim() : '';
+    const body = bar > 0 ? text.slice(bar + 1).trim() : text;
+    const everyone = /^(\*|everyone|all)$/i.test(to);
+    const r = await accounts.mail(everyone ? null : to, subject, body, me.username);
+    return { ok: true, text: r.to === '*' ? `Mailed everyone (${r.sent} accounts)` : `Mailed ${r.to}` };
+  }
+
   /** Has the owner rank (by their account, or their connection) */
   private isOwner(t: { online: AdminConn | null; info: AccountInfo | null }): boolean {
     return !!(t.info?.isOwner ?? t.online?.isOwner);
@@ -664,6 +680,7 @@ export class AdminTools {
       case 'rank': return { cmd, args: { player: a[0], rank: a[1] } };
       case 'ban': return { cmd, args: { player: a[0], duration: a[1], reason: a.slice(2).join(' ') } };
       case 'unban': return { cmd, args: { player: a[0] } };
+      case 'mail': return { cmd, args: { to: a[0], text: rest.trim().slice((a[0] ?? '').length).trim() } };
     }
     void me;
     return null;
