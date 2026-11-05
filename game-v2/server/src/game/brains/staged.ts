@@ -2,7 +2,8 @@
  * A staged boss's brain (docs/boss-design.md): what every one shares, so a new boss only writes its moves.
  *
  *   its loop     each stage a fixed loop of moves (`loop`), gone through in order, a move it can't do skipped; a
- *                move is a generator setting `want` each tick (`make` builds it by name)
+ *                move is its moves' (common bodies/moves: the same on every client running its body), a generator
+ *                setting `want` each tick, started by a MOVE decision (its seed for its rolls)
  *   flying       between moves it circles its target at its stage's range (`range`, `circle`), held to its ground;
  *                lighter stages drive harder (`drive`); it turns as its hull lets it, braking onto its heading (bosses.json `turn`)
  *   its stages   its pieces' `stage` (stages.ts): when the one it's fighting with has nothing deciding left standing,
@@ -11,18 +12,24 @@
  *   its rules    signature moves open weak-point windows, pilots present draw personal attacks (fightRules.ts)
  *   phases       a boss with `exposure` (rework 2026-11 section 15) chains its stage's loop into one attack phase: each
  *                move straight into the next (`chain` ticks apart), then one window. Between its signature moves and
- *                in its window (after the rest beat) it keeps up a light threat of its own (`harass`, `harassShot`)
+ *                in its window (after the rest beat) it keeps up a light threat of its own (`harass`: its moves' harassShot)
  *   dev          `forceShed` steps through its stages' looks: shot off, wrecked, blown away; the boss tools
  *                (game/dev/bossDev.ts) hold it, play a move next, open a window, force a personal attack
+ *
+ * Its moves on the wire (decision-inputs stage 4, CAPS.MOVES): what the brain picks goes as decisions (MOVE, HARASS,
+ * PERSONAL, WINDOW, HOLD, CAP: common bodies/decisions.ts), and a client running its body runs the same moves from them
+ * (common bodies/moves/track.ts), drawing their tells and straight shells itself. What only the server knows (who is
+ * near for the density cap, damage, pulls, homing shells, mobs) is the moves' `work`, here.
  */
 
 import {
-  Position, Velocity, Rotation, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin,
-  CTL, DECISION, WANT, BODY_KINDS, applyDecision, sameWant, stagedFlight, syncArgs, wantAim, wantDrive, wantFly, wantHold, dequantizeCursorAngle,
-  hashString, restBeat, staggered, type BodyState, type StagedFlightTables, type WantRec, type WindowSpec,
+  Position, Velocity, Rotation, ShipState, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin,
+  CTL, DECISION, WANT, BODY_KINDS, MOVES_HOLD, NO_ORIGIN, STAGED_MOVES, applyDecision, sameWant, stagedFlight, syncArgs, wantFly, wantHold, dequantizeCursorAngle,
+  hashString, restBeat, staggered, capMask, moveShotSeed, partState, StagedMoves,
+  type BodyState, type StagedFlightTables, type WantRec, type WindowSpec, type MoveHost, type MovePose,
 } from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
-import { BossBrain, BossView, BrainHost, lead, partMount, pose, strike, wrap } from './kit.js';
+import { BossBrain, BossView, BrainHost, partMount, pose, strike } from './kit.js';
 import { FightRules, DEV_WINDOW, type FightTables } from './fightRules.js';
 
 export type Move = Generator<void, void, void>;
@@ -60,12 +67,20 @@ const DEATH_SHUDDER = 75, DEATH_FLING = 13, DEATH_CRUMBLE = 300;
 /** Enraged (its last phase): rests and warnings × this */
 const RAGE = 0.8;
 
+/** A staged boss with no moves of its own yet (the Brood Mother) */
+class NoMoves extends StagedMoves {
+  readonly names: readonly string[] = [];
+  make(): null { return null; }
+}
+
 export abstract class StagedBrain implements BossBrain {
   protected view!: BossView;
   protected ship!: ShipState;
   protected target = -1;
   protected want: Want = wantFly();
   protected move: Move | null = null;
+  /** The tick the move under way started (its MOVE) */
+  private moveAt = -Infinity;
   /** Its place in its stage's loop */
   protected step = 0;
   protected restUntil = 0;
@@ -92,38 +107,52 @@ export abstract class StagedBrain implements BossBrain {
   /** (dev) held still, no moves; the move it plays next */
   devHold = false;
   private devNext: string | null = null;
+  /** Its moves (common bodies/moves), made at its first tick (when it knows its ship) */
+  private moves: StagedMoves | null = null;
+  /** Its moves' HOLD as last decided (MOVES_HOLD), its shells this tick (their seeds), its density caps this tick */
+  private hold = MOVES_HOLD.RUN as number;
+  private shots = { tick: -1, n: 0 };
+  private caps = { tick: -1, k: 0 };
+  /** Its parts' states as its moves last read them (PART_STATE) */
+  private parts: Uint8Array | null = null;
 
-  constructor(protected host: BrainHost, protected tables: StagedTables, brain: string) {
+  constructor(protected host: BrainHost, protected tables: StagedTables, private readonly brain: string) {
     const kind = Math.max(0, BODY_KINDS.findIndex((k) => k.brain === brain));
     this.flight = BODY_KINDS[kind].flight!;
     this.body = { kind, homeX: 0, homeY: 0, stage: 1, side: 1, target: -1, want: wantFly(), wantAt: 0, on: false };
     this.fight = new FightRules(host, tables, hashString(brain));
+    this.fight.opened = (w) => this.decide(DECISION.WINDOW, [w.ticks, w.cap]);
   }
 
-  /** A personal attack by name on a pilot (its tables' `personal` pool), or null if it can't now. Every boss has 'mark' */
-  protected personalMove(name: string, target: number, seed: number): Move | null {
-    return name === 'mark' ? this.mark(target, seed) : null;
+  /** Its moves (common bodies/moves: by its brain) */
+  protected get mv(): StagedMoves {
+    if (!this.moves) {
+      const h = this.moveHost(), k = STAGED_MOVES[this.brain];
+      this.moves = k ? k.make(h, this.view.eid, this.flight) : new NoMoves(h, this.view.eid, this.flight, [1, 1, 1]);
+    }
+    return this.moves;
   }
 
-  /** The plain personal attack: a faint ring under a pilot, then a strike there (move off it) */
-  protected *mark(target: number, seed: number): Move {
-    const warn = 84, radius = 260 + (seed % 40);
-    const x = Position.x[target] + Velocity.x[target] * 20, y = Position.y[target] + Velocity.y[target] * 20;
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'impact', x: Math.round(x), y: Math.round(y), radius, ticks: warn });
-    for (let i = 0; i < warn; i++) yield;
-    this.land([{ x, y, at: this.host.tick() }], radius, 60);
+  /** Its personal attacks' names (a PERSONAL's name index) */
+  private get personalNames(): readonly string[] {
+    return STAGED_MOVES[this.brain]?.personalNames ?? ['mark'];
   }
 
   /** A move by name, or null if it can't do it now (its part is gone) */
-  protected abstract make(id: string): Move | null;
-  /** Every tick it's fighting (between moves too): its passive attacks */
+  protected make(id: string): Move | null {
+    return this.mv.make(id);
+  }
+
+  /** Every tick it's fighting (between moves too): its own passive work besides its moves' (a boss's heat, its window's look) */
   protected passives(_now: number): void {}
   /** A move that cuts in ahead of its loop (a punish), or null */
   protected interrupt(_now: number): Move | null { return null; }
-  /** Wrapped round each move of a stage (stage three's darts) */
-  protected around(m: Move): Move { return m; }
-  /** Its stages beaten: hooks to stop what its moves leave running */
+  /** Its stages beaten: hooks to stop what its brain leaves running */
   protected onStop(): void {}
+  /** Of a volley's shots (out of (x, y) along `angles`), those its density cap keeps (none: all) */
+  protected capped(_x: number, _y: number, angles: number[]): number[] {
+    return angles;
+  }
 
   orders(base: PilotOrders | null, ship: ShipState, view: BossView): PilotOrders | null {
     this.view = view;
@@ -132,7 +161,11 @@ export abstract class StagedBrain implements BossBrain {
     const t = base?.target ?? -1;
     this.target = t;
     this.want = wantFly();
+    const mv = this.mv;
+    mv.target = t; mv.want = wantFly(); mv.homeX = this.body.homeX; mv.homeY = this.body.homeY;
+    this.partsNow();
     this.shedding(now);
+    mv.stage = this.stage;
     // (blown apart: nothing left to fly)
     if (!this.host.ships.get(view.eid)) return null;
     if (this.blows.length && base) {
@@ -145,7 +178,8 @@ export abstract class StagedBrain implements BossBrain {
     if (t < 0) { this.move = null; this.moveName = ''; this.bodyOff(); return base; }
     this.fight.tickWindow(view.eid, view.systemNum, now);
     // (A window running (open, or a crack's stagger), or held by the dev tools: no move starts; staggered, it holds still)
-    if (this.fight.staggered(now) || this.devHold) { this.move = null; this.moveName = ''; this.want = wantHold(); return this.fly(base!, t); }
+    if (this.fight.staggered(now) || this.devHold) { this.move = null; this.moveName = ''; this.holdMoves(MOVES_HOLD.PAUSE); this.want = wantHold(); return this.fly(base!, t); }
+    this.holdMoves(MOVES_HOLD.RUN);
     if (!this.move && now >= this.restUntil && !this.fight.holding(now)) {
       this.move = this.pick(now);
       if (!this.move && this.tables.exposure) {
@@ -154,33 +188,121 @@ export abstract class StagedBrain implements BossBrain {
         if (++this.empty >= 2) { this.empty = 0; this.expose(now); }
       }
     }
+    mv.side = this.side > 0 ? 1 : -1;
+    mv.present = view.present;
+    mv.passives(now);
     this.passives(now);
     this.harassing(now);
     this.fight.cause = this.moveName;
-    if (this.move && this.move.next().done) {
-      const done = this.moveName;
-      this.move = null;
-      this.moveName = '';
-      if (this.tables.exposure) {
-        // (Attack phases: the next move of its loop straight on; its loop done, its one window, then its rest)
-        this.empty = 0;
-        if (this.phaseOver()) this.expose(now);
-        else this.restUntil = now + (this.tables.chain?.[this.stage - 1] ?? 0);
-      } else {
-        // (A windowed boss's rest comes after its window, and is never scaled by how many fight it: rework 2.3)
-        this.fight.finished(done, view.eid, view.systemNum, now);
-        const w = this.fight.windowed ? this.fight.window : null;
-        this.restUntil = (w && w.at === now ? w.at + w.ticks : now)
-          + Math.round(this.tables.rest[this.stage - 1] * this.rage() / (this.fight.windowed ? 1 : 1 + 0.15 * (view.fighters - 1)));
+    if (this.move) {
+      mv.h.origin = { t: this.moveAt, who: -1 };
+      const done = this.move.next().done;
+      mv.h.origin = NO_ORIGIN;
+      if (done) {
+        const name = this.moveName;
+        this.move = null;
+        this.moveName = '';
+        if (this.tables.exposure) {
+          // (Attack phases: the next move of its loop straight on; its loop done, its one window, then its rest)
+          this.empty = 0;
+          if (this.phaseOver()) this.expose(now);
+          else this.restUntil = now + (this.tables.chain?.[this.stage - 1] ?? 0);
+        } else {
+          // (A windowed boss's rest comes after its window, and is never scaled by how many fight it: rework 2.3)
+          this.fight.finished(name, view.eid, view.systemNum, now);
+          const w = this.fight.windowed ? this.fight.window : null;
+          this.restUntil = (w && w.at === now ? w.at + w.ticks : now)
+            + Math.round(this.tables.rest[this.stage - 1] * this.rage() / (this.fight.windowed ? 1 : 1 + 0.15 * (view.fighters - 1)));
+        }
       }
     }
-    this.fight.personal(view.eid, this.stage, now, view.present ?? this.pilots(), this.fight.isSignature(this.moveName),
-      (name, tg, seed) => this.personalMove(name, tg, seed), (op, args) => this.host.decide?.(view.eid, op, args, this.body));
+    this.side = mv.side;
+    this.want = mv.want;
+    this.fight.personal(view.eid, this.stage, now, view.present ?? this.pilots(), this.fight.isSignature(this.moveName), mv, this.personalNames,
+      (op, args) => this.host.decide?.(view.eid, op, args, this.body));
     return this.fly(base!, t);
   }
 
   idle(): boolean {
     return !this.move && !this.blows.length && !this.dying;
+  }
+
+  /**
+   * Its parts as its moves read them (PART_STATE: on, gone, a wreck): a change is a PART
+   * decision, so the clients running its moves read each part as it was on the tick (part damage is the server's)
+   */
+  private partsNow(): void {
+    const ship = this.ship, cat = this.host.ships.catalog, n = ship.blueprint.parts.length;
+    if (!this.parts || this.parts.length !== n) { this.parts = Uint8Array.from({ length: n }, (_, i) => partState(cat, ship, i)); return; }
+    for (let i = 0; i < n; i++) {
+      const s = partState(cat, ship, i);
+      if (s === this.parts[i]) continue;
+      this.parts[i] = s;
+      this.decide(DECISION.PART, [i, s]);
+    }
+  }
+
+  /** Its moves' HOLD: the clients running them stop or go on with them as it does */
+  private holdMoves(mode: number): void {
+    if (this.hold === mode) return;
+    this.hold = mode;
+    this.decide(DECISION.HOLD, [mode]);
+  }
+
+  // ---- Its moves' host (common bodies/moves/host.ts): the server's side ----
+
+  private moveHost(): MoveHost {
+    const b = this, host = this.host;
+    const poseOf = (e: number): MovePose => ({ x: Position.x[e], y: Position.y[e], angle: Rotation.angle[e], vx: Velocity.x[e], vy: Velocity.y[e] });
+    const h: MoveHost = {
+      tick: () => host.tick(),
+      me: () => poseOf(b.view.eid),
+      pose: (id) => (host.ships.get(id) ? poseOf(id) : null),
+      ship: () => b.ship,
+      catalog: host.ships.catalog,
+      geometry: (s) => host.ships.geometry(s),
+      cellSize: host.ships.tuning.cellSize,
+      terrain: () => host.terrain?.(b.view.systemNum),
+      fx: (msg) => {
+        if (host.moveFx) host.moveFx(b.view.systemNum, b.view.eid, h.origin, msg);
+        else host.send(b.view.systemNum, msg);
+      },
+      shoot: (s) => {
+        const now = host.tick();
+        if (b.shots.tick !== now) b.shots = { tick: now, n: 0 };
+        const seed = moveShotSeed(b.view.eid, now, b.shots.n++);
+        if (host.moveShot) host.moveShot(b.view.eid, s.kind, s.x, s.y, s.angle, s.scale, s.speed, seed, h.origin);
+        else host.fire(b.view.eid, s.kind, s.x, s.y, s.angle, s.scale, { speed: s.speed, seed });
+      },
+      cap: (x, y, angles) => {
+        const now = host.tick();
+        if (b.caps.tick !== now) b.caps = { tick: now, k: 0 };
+        const k = b.caps.k++, kept = b.capped(x, y, angles);
+        if (kept.length < angles.length) b.decide(DECISION.CAP, [k, capMask(angles, kept)]);
+        return kept;
+      },
+      get mobs() { return !!host.mobs; },
+      work: {
+        players: () => host.players(b.view.systemNum),
+        segmentHit: (id, x0, y0, x1, y1, half) => {
+          const sh = host.ships.get(id), r = sh && host.ships.segmentHit(id, sh, x0, y0, x1, y1, half);
+          return r ? r.part : -1;
+        },
+        damage: (id, part, amount, how) => host.ships.damagePartBy(id, part, amount, b.view.eid, how),
+        splash: (x, y, r, amount) => strike(host, b.view.systemNum, x, y, r, amount, b.view.eid),
+        push: (id, dx, dy) => host.ships.push(id, dx, dy),
+        homing: (kind, x, y, a, scale, target) => host.fire(b.view.eid, kind, x, y, a, scale, { target }),
+        mob: (kind, x, y, a, speed, scale, target) => {
+          const d = host.mobs?.spawn(kind, b.view.systemNum, x, y, a, speed, b.view.eid, scale, target) ?? -1;
+          if (d >= 0) b.drones.add(d);
+          return d;
+        },
+        say: (msg) => host.send(b.view.systemNum, msg),
+        get damageScale() { return b.view.damage; },
+      },
+      origin: NO_ORIGIN,
+    };
+    return h;
   }
 
   // ---- Attack phases (tables' `exposure`) ----
@@ -208,7 +330,8 @@ export abstract class StagedBrain implements BossBrain {
 
   /**
    * Its light threat between signature moves and in its window (after the rest beat; never in a stagger): a harassing
-   * shot every `harass` ticks at its pilots in turn (`harassShot`, the boss's own)
+   * shot every `harass` ticks at its pilots in turn (its moves' `harassShot`; a HARASS decision, its pilot's client
+   * works it out)
    */
   private harassing(now: number): void {
     const every = this.tables.harass?.[this.stage - 1] ?? 0;
@@ -218,14 +341,12 @@ export abstract class StagedBrain implements BossBrain {
     if (w && (restBeat(w, now) || staggered(w, now))) return;
     const who = this.view.present?.length ? this.view.present : this.pilots();
     if (!who.length) return;
-    const t = who[this.harassN % who.length];
-    if (this.harassShot(t, this.harassN)) { this.harassN++; this.harassAt = now + every; }
+    const t = who[this.harassN % who.length], mv = this.mv;
+    mv.h.origin = { t: now, who: t };
+    const shot = mv.harassShot(t);
+    mv.h.origin = NO_ORIGIN;
+    if (shot) { this.harassN++; this.harassAt = now + every; this.decide(DECISION.HARASS, [t + 1]); }
     else this.harassAt = now + 20;
-  }
-
-  /** One harassing shot at a pilot (the `n`th): false if it can't now */
-  protected harassShot(_target: number, _n: number): boolean {
-    return false;
   }
 
   dispose(): void {
@@ -250,6 +371,8 @@ export abstract class StagedBrain implements BossBrain {
       b.homeX = Math.round(this.view.home.x); b.homeY = Math.round(this.view.home.y);
       b.target = t; b.stage = this.stage; b.side = this.side > 0 ? 1 : -1; b.want = this.want; b.wantAt = now;
       this.host.decide?.(eid, DECISION.SYNC, syncArgs(b), b);
+      // (its moves held: a SYNC says nothing of that, so it goes again)
+      if (this.hold !== MOVES_HOLD.RUN) this.decide(DECISION.HOLD, [this.hold]);
     }
     if (b.target !== t) this.decide(DECISION.TARGET, [t + 1]);
     if (b.stage !== this.stage) this.decide(DECISION.STAGE, [this.stage]);
@@ -269,7 +392,7 @@ export abstract class StagedBrain implements BossBrain {
   }
 
   /** A decision: folded into its body's state now, and sent to the clients that run it (BrainHost.decide) */
-  private decide(op: number, args: readonly number[]): void {
+  protected decide(op: number, args: readonly number[]): void {
     applyDecision(this.body, op, args, this.host.tick());
     this.host.decide?.(this.view.eid, op, args, this.body);
   }
@@ -284,46 +407,17 @@ export abstract class StagedBrain implements BossBrain {
     return d <= R ? [x, y] : [h.x + (dx / d) * R, h.y + (dy / d) * R];
   }
 
-  protected fromHome(x: number, y: number): number {
-    return dhypot(x - this.view.home.x, y - this.view.home.y);
-  }
-
-  /** A unit way to go, bent back in if `reach` along it would take it off its ground */
-  protected homeward(vx: number, vy: number, reach: number): [number, number] {
-    const me = pose(this.view.eid);
-    if (this.fromHome(me.x + vx * reach, me.y + vy * reach) <= this.flight.homeR) return [vx, vy];
-    const hx = this.view.home.x - me.x, hy = this.view.home.y - me.y, hl = dhypot(hx, hy) || 1;
-    const bx = vx * 0.3 + (hx / hl) * 0.9, by = vy * 0.3 + (hy / hl) * 0.9, bl = dhypot(bx, by) || 1;
-    return [bx / bl, by / bl];
-  }
-
-  /** Hold still, turning to face its target, for `ticks` */
-  protected *hold(ticks: number): Move {
-    for (let i = 0; i < ticks; i++) {
-      this.want = this.target >= 0 ? wantAim() : wantHold();
-      yield;
-    }
-  }
-
-  /** A short, quick burst to a new angle on its target, warned by a streak */
-  protected *dart(reach = 1000, speed = 20, warnTicks = 24): Move {
-    const t = this.target, me = pose(this.view.eid);
-    if (t < 0) return;
-    const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = dhypot(dx, dy) || 1;
-    const ux = dx / d, uy = dy / d, side = this.host.rng() < 0.5 ? 1 : -1;
-    const range = this.flight.range[this.stage - 1], radial = Math.max(-0.7, Math.min(0.7, (d - range) / range));
-    const l0 = dhypot(-uy * side + ux * radial, ux * side + uy * radial) || 1;
-    const [vx, vy] = this.homeward((-uy * side + ux * radial) / l0, (ux * side + uy * radial) / l0, reach);
-    const wind = this.haste(warnTicks);
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(datan2(vy, vx) - me.angle), length: reach, width: 140, ticks: wind });
-    for (let i = 0; i < wind; i++) { this.want = wantHold(); yield; }
-    const dir = datan2(vy, vx);
-    this.want = wantDrive(dir, undefined, speed);
-    yield;
-    for (let i = 0; i < 14; i++) { this.want = wantDrive(dir); yield; }
-  }
-
   // ---- Choosing ----
+
+  /** A move picked: its rolls from a seed of its own (its MOVE decision: every client running its moves starts it too) */
+  private started(name: string, m: Move, now: number): Move {
+    const mv = this.mv, idx = mv.names.indexOf(name), seed = Math.floor(this.host.rng() * 256), rage = this.rage() < 1 ? 1 : 0;
+    mv.rage = rage === 1;
+    mv.begin(seed, now);
+    this.moveAt = now;
+    if (idx >= 0) this.decide(DECISION.MOVE, [idx, seed, rage]);
+    return mv.around(m, name);
+  }
 
   private pick(now: number): Move | null {
     if (this.devNext) {
@@ -334,7 +428,7 @@ export abstract class StagedBrain implements BossBrain {
         const loop = this.tables.loop[this.stage - 1], at = loop.indexOf(name);
         if (at >= 0) this.step = at + 1;
         this.moveName = name;
-        return this.around(m);
+        return this.started(name, m, now);
       }
     }
     const cut = this.interrupt(now);
@@ -342,7 +436,7 @@ export abstract class StagedBrain implements BossBrain {
     const loop = this.tables.loop[this.stage - 1];
     for (let k = 0; k < loop.length; k++) {
       const name = loop[this.step++ % loop.length], m = this.make(name);
-      if (m) { this.moveName = name; return this.around(m); }
+      if (m) { this.moveName = name; return this.started(name, m, now); }
     }
     return null;
   }
@@ -385,10 +479,12 @@ export abstract class StagedBrain implements BossBrain {
     this.fight.open(spec, this.view.eid, this.view.systemNum, this.host.tick());
   }
 
-  /** A personal attack on this pilot now */
+  /** A personal attack on this pilot now (a PERSONAL decision, as a drawn one) */
   devPersonalOn(name: string, target: number): boolean {
-    const now = this.host.tick();
-    return this.fight.start(name, target, { slot: -1, attack: 0, seed: now & 0xffff, at: now, until: now + (this.tables.personal?.ticks ?? 300) }, (n, tg, seed) => this.personalMove(n, tg, seed));
+    const now = this.host.tick(), seed = now & 0xffff;
+    if (!this.fight.start(name, target, seed, now, this.mv)) return false;
+    this.decide(DECISION.PERSONAL, [-1, 0, seed, target + 1, this.personalNames.indexOf(name)]);
+    return true;
   }
 
   /** The stage it's fighting in */
@@ -419,10 +515,6 @@ export abstract class StagedBrain implements BossBrain {
     return this.view.phase >= 4 ? RAGE : 1;
   }
 
-  protected haste(ticks: number): number {
-    return Math.round(ticks * this.tables.haste[this.stage - 1] * this.rage());
-  }
-
   // ---- Its parts ----
 
   /** Parts of this function still on and working (a wreck does nothing) */
@@ -431,22 +523,9 @@ export abstract class StagedBrain implements BossBrain {
     return ship.blueprint.parts.flatMap((p, i) => (p.fn === fn && ship.derived.alive[i] && !isRuined(this.host.ships.catalog, ship, i) ? [i] : []));
   }
 
-  /** A part by its piece's name (bespoke id), if it's still on and working, else -1 */
-  protected named(piece: string): number {
-    const i = this.ship.blueprint.parts.findIndex((p) => p.piece === piece);
-    return i >= 0 && this.ship.derived.alive[i] && !isRuined(this.host.ships.catalog, this.ship, i) ? i : -1;
-  }
-
   /** Where a part's mount (or middle) is in the world, and the way it points */
   protected mount(i: number): { x: number; y: number; dir: number } {
     return partMount(this.host, this.view.eid, this.ship, i);
-  }
-
-  /** Parts in clockwise order round its middle (as seen: y down), from its nose */
-  protected clockwise(parts: number[]): number[] {
-    const geo = this.host.ships.geometry(this.ship), c = this.ship.derived.com;
-    const turn = (i: number) => { const [x, y] = geo[i].centroid; return (datan2(y - c[1], x - c[0]) + Math.PI / 2 + 4 * Math.PI) % (2 * Math.PI); };
-    return [...parts].sort((a, b) => turn(a) - turn(b));
   }
 
   /** Pilots near it (within `r`), its target first */
@@ -454,67 +533,6 @@ export abstract class StagedBrain implements BossBrain {
     const eid = this.view.eid, t = this.target;
     const near = this.host.players(this.view.systemNum).filter((q) => q !== t && dhypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) < r);
     return t >= 0 ? [t, ...near] : near;
-  }
-
-  // ---- Hurting ----
-
-  /** Shells (or strikes) due now come down: `kind` the detonation clients see ('': none, a lingering hurt) */
-  protected land(due: { x: number; y: number; at: number }[], radius: number, damage: number, kind = 'eruption'): void {
-    const n = this.host.tick();
-    for (let i = due.length - 1; i >= 0; i--) {
-      if (n < due[i].at) continue;
-      const { x, y } = due[i];
-      due.splice(i, 1);
-      strike(this.host, this.view.systemNum, x, y, radius, damage * this.view.damage, this.view.eid);
-      if (kind) this.host.send(this.view.systemNum, { type: 'detonation', kind, x: Math.round(x), y: Math.round(y), radius });
-    }
-  }
-
-  /** A beam's burn this tick from a point on the body (its own frame) at an angle off its heading; it stops at rock */
-  protected beam(at: { x: number; y: number }, rel: number, length: number, width: number, damage: number): void {
-    const me = pose(this.view.eid), a = me.angle + rel;
-    const c = dcos(me.angle), s = dsin(me.angle);
-    const x0 = me.x + at.x * c - at.y * s, y0 = me.y + at.x * s + at.y * c;
-    const reach = length * rayTerrain(this.host.terrain?.(this.view.systemNum), x0, y0, x0 + dcos(a) * length, y0 + dsin(a) * length);
-    const x1 = x0 + dcos(a) * reach, y1 = y0 + dsin(a) * reach, ships = this.host.ships;
-    for (const p of this.host.players(this.view.systemNum)) {
-      const sh = ships.get(p);
-      if (!sh) continue;
-      const h = ships.segmentHit(p, sh, x0, y0, x1, y1, width / 2);
-      if (h) ships.damagePartBy(p, h.part, damage * this.view.damage, this.view.eid, { type: 'thermal', pen: 1.5 });
-    }
-  }
-
-  /** Every pilot within `reach` of a point catches fire */
-  protected scorch(x: number, y: number, reach: number, dps: number): void {
-    for (const q of this.host.players(this.view.systemNum)) {
-      if (dhypot(Position.x[q] - x, Position.y[q] - y) > reach || this.walled(x, y, q)) continue;
-      const part = this.host.ships.ignite(q, x, y, dps * this.view.damage, 150, 1.2, this.view.eid);
-      if (part >= 0) this.host.send(this.view.systemNum, { type: 'ignite', bodyId: q, part, ticks: 150 });
-    }
-  }
-
-  /** Pull every pilot within `r` of a point towards it (`k` world units a tick at its middle, none at the edge) */
-  protected pull(x: number, y: number, r: number, k: number): void {
-    for (const q of this.host.players(this.view.systemNum)) {
-      const dx = x - Position.x[q], dy = y - Position.y[q], d = dhypot(dx, dy);
-      if (d > r || d < 1 || this.walled(x, y, q)) continue;
-      const f = k * (1 - d / r);
-      // (Through the bridge: a pilot's client is told the push, TEMPORARY until boss decisions are inputs: ShipBridge.push)
-      this.host.ships.push(q, (dx / d) * f, (dy / d) * f);
-    }
-  }
-
-  /** Rock (or an arena's barrier) between a point and a pilot: pulls and burns don't reach through it */
-  protected walled(x: number, y: number, q: number): boolean {
-    const t = this.host.terrain?.(this.view.systemNum);
-    return !!t && rayTerrain(t, x, y, Position.x[q], Position.y[q]) < 1;
-  }
-
-  /** Aimed at where a pilot will be when a shot `speed` fast gets there */
-  protected aimAt(t: number, x: number, y: number, speed: number): number {
-    const at = lead(t, dhypot(Position.x[t] - x, Position.y[t] - y) / speed);
-    return datan2(at.y - y, at.x - x);
   }
 
   // ---- Its stages ----
@@ -557,7 +575,7 @@ export abstract class StagedBrain implements BossBrain {
     else if (this.stage === last && st !== last && !this.dying) this.die(now);
   }
 
-  /** A stage beaten: whatever it was doing stops */
+  /** A stage beaten: whatever it was doing stops (its moves too, on every client running them: HOLD STOP) */
   protected stop(): void {
     this.move = null;
     this.moveName = '';
@@ -566,6 +584,9 @@ export abstract class StagedBrain implements BossBrain {
     this.empty = 0;
     this.host.mobs?.clear(this.view.systemNum, this.view.eid);
     this.drones.clear();
+    this.mv.stop();
+    this.hold = MOVES_HOLD.STOP;
+    this.decide(DECISION.HOLD, [MOVES_HOLD.STOP]);
     this.onStop();
   }
 

@@ -57,7 +57,7 @@ export function fight(o: Opts = {}) {
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
     // (mobs on the tick layer too, a volley as one row: a client asking for them, CAPS.WAYPOINTS and LAUNCHES)
-    netCaps: ALL | CAPS.WAYPOINTS | CAPS.LAUNCHES,
+    netCaps: ALL | CAPS.WAYPOINTS | CAPS.LAUNCHES | CAPS.MOVES,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
@@ -174,5 +174,5 @@ export function fight(o: Opts = {}) {
     o.each?.(t, server, foeIds());
     step(t);
   }
-  return { server, got, A, boss, mobs, stats: server.bodies.stats, rep: server.replication.bodyStats };
+  return { server, got, A, B, boss, mobs, stats: server.bodies.stats, rep: server.replication.bodyStats };
 }

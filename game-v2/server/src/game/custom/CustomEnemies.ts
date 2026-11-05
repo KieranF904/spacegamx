@@ -7,19 +7,19 @@
  *   order   its engage order as a custom one (common bodies/custom/order.ts): its design, the pieces it has lost (one
  *           byte) and the move under way, a move picked here when it may start (the commander's; its seed rolled from
  *           this server's own stream). Its body flies it, on every client running it too
- *   act     what the move under way does to the world this tick (custom/moves.ts), and its guns between moves
+ *   act     what the move under way does to the world this tick (common bodies/moves/custom.ts: the same steps every client
+ *           running its body runs from its order, CAPS.MOVES), and its guns between moves
  *
  * Grades scale its hp and damage (custom.grades), not its materials: its look is its design's at every grade.
  */
 import {
   AI_ORDER, InSystem, Position, Rotation, Velocity, customIndex, customOrder, customGroups, groupsGone, localToWorldDir, mulberry32, shipPointToWorld, datan2, dcos, dhypot, dsin,
-  CUSTOM_DESIGNS, type ShipState, type WantRec,
+  CUSTOM_DESIGNS, CUSTOM_TRAIL, DECISION, NO_ORIGIN, aheadOf, customMoves, moveShotSeed, type ShipState, type WantRec, type CustomAct, type DesignMoves, type MoveOrigin, type MovePose,
 } from '@space-game/common';
-import { MOVES } from './moves.js';
-import type { Act, CustomHost, CustomLive, CustomStats, CustomTable } from './types.js';
+import type { CustomHost, CustomLive, CustomStats, CustomTable } from './types.js';
 
-/** Ticks of a target's velocity kept, to see how it's turning; the most it's taken to turn a tick (radians) */
-const TRAIL = 10, TURN_MAX = 0.05;
+/** Ticks of a target's velocity kept, to see how it's turning (common bodies/moves/custom.ts aheadOf: CUSTOM_TRAIL) */
+const TRAIL = CUSTOM_TRAIL;
 
 export class CustomEnemies {
   /** Moves started, by design and move ("censer.lance"), and pieces lost */
@@ -28,8 +28,16 @@ export class CustomEnemies {
   /** Each target's velocity over its last TRAIL ticks (newest last), and the tick it was last noted */
   private readonly trail = new Map<number, { at: number; v: number[] }>();
   private readonly rng = mulberry32(0xc0ffee);
+  /** Every design's moves (common), each move's start held to its ship's `next` */
+  private readonly moves: Record<string, DesignMoves>;
+  /** The decision what its moves do now comes of (its move's start; between moves, nothing a client works out) */
+  private origin: MoveOrigin = NO_ORIGIN;
+  /** Its shells this tick (their seeds: moveShotSeed) */
+  private shots = { tick: -1, eid: -1, n: 0 };
 
-  constructor(private readonly host: CustomHost, private readonly table: CustomTable | undefined) {}
+  constructor(private readonly host: CustomHost, private readonly table: CustomTable | undefined) {
+    this.moves = customMoves((a) => this.live.get(a.eid)?.next ?? Infinity);
+  }
 
   /** The custom design a ship type spawns as (undefined: a grid design, its own) */
   designOf(type: string): string | undefined {
@@ -60,7 +68,7 @@ export class CustomEnemies {
     if (!design || !ship) return;
     const stats = this.table!.designs[design];
     this.host.ships.setMaxHp(eid, pieceHp(ship, design, stats, this.scale('hp', grade) * eliteHp));
-    this.live.set(eid, { design, index: customIndex(design), stats, dmg: this.scale('damage', grade), move: null, next: this.host.tick() + 60, gone: 0, guns: {} });
+    this.live.set(eid, { design, index: customIndex(design), stats, dmg: this.scale('damage', grade), move: null, next: this.host.tick() + 60, gone: 0 });
   }
 
   forget(eid: number): void {
@@ -76,7 +84,7 @@ export class CustomEnemies {
     const under = L.move && now - L.move.start < (spec.moves[L.move.move]?.ticks ?? 0);
     if (!under && target >= 0) {
       const a = this.act(eid, ship, L, target, now);
-      const pick = MOVES[L.design]?.pick(a);
+      const pick = this.moves[L.design]?.pick(a);
       if (pick) {
         L.move = { move: pick.move, arg: pick.arg, seed: Math.floor(this.rng() * 256), start: now };
         L.next = now + (L.stats.moves[spec.moves[pick.move].name]?.every ?? 240);
@@ -92,16 +100,32 @@ export class CustomEnemies {
     const L = this.live.get(eid), ship = this.host.ships.get(eid);
     if (!L || !ship) return;
     const now = this.host.tick(), gone = groupsGone(ship.blueprint, ship.hp, ship.detached);
-    const a = this.act(eid, ship, L, target, now), moves = MOVES[L.design];
-    if (gone !== L.gone) { const newly = gone & ~L.gone; L.gone = gone; if (newly) { this.stats.lost++; moves?.lost?.(a, newly); } }
+    const a = this.act(eid, ship, L, target, now), moves = this.moves[L.design];
+    if (gone !== L.gone) {
+      const newly = gone & ~L.gone;
+      L.gone = gone;
+      // (its clients' moves read its pieces as they are on the tick, CAPS.MOVES: part damage is the server's)
+      this.host.decide?.(eid, DECISION.GONE, [gone]);
+      if (newly) { this.stats.lost++; moves?.lost?.(a, newly); }
+    }
     if (!fighting || target < 0) return;
     this.note(target, now);
     const spec = CUSTOM_DESIGNS[L.index];
     if (L.move) {
       const k = now - L.move.start;
+      // (its move's steps: every client running its body runs them from its order, CAPS.MOVES)
+      this.origin = { t: L.move.start, who: -1 };
       if (k >= 0 && k < (spec.moves[L.move.move]?.ticks ?? 0)) moves?.step?.(a, L.move, k);
     }
+    // (its guns, on their grid: worked out where its body runs too)
+    this.origin = { t: now, who: -1 };
     moves?.always?.(a);
+    this.origin = NO_ORIGIN;
+  }
+
+  /** Its target's velocity over the last few ticks it was fought (oldest first: x, y pairs), for `ahead` */
+  trailOf(target: number): readonly number[] | undefined {
+    return this.trail.get(target)?.v;
   }
 
   /** A target's velocity this tick, once a tick however many fight it (its trail: `ahead`) */
@@ -116,33 +140,19 @@ export class CustomEnemies {
     if (now % 600 === 0) for (const [id, t] of this.trail) if (now - t.at > 60) this.trail.delete(id);
   }
 
-  /** Where a target will be `ticks` on: its speed held, its heading turning as it turned over its trail (at most TURN_MAX a tick) */
-  private ahead(target: number, ticks: number): { x: number; y: number } {
-    let x = Position.x[target], y = Position.y[target];
-    const vx = Velocity.x[target], vy = Velocity.y[target], s = dhypot(vx, vy), tr = this.trail.get(target)?.v;
-    let w = 0;
-    if (tr && tr.length >= 4 && s > 2) {
-      const n = tr.length / 2 - 1, ox = tr[0], oy = tr[1];
-      if (dhypot(ox, oy) > 2) w = Math.max(-TURN_MAX, Math.min(TURN_MAX, datan2(ox * vy - oy * vx, ox * vx + oy * vy) / n));
-    }
-    if (!w) return { x: x + vx * ticks, y: y + vy * ticks };
-    let a = datan2(vy, vx);
-    for (let k = 0; k < ticks; k++) { a += w; x += dcos(a) * s; y += dsin(a) * s; }
-    return { x, y };
-  }
-
   private scale(what: 'hp' | 'damage', grade: number): number {
     const g = this.table?.grades[what];
     return g?.[Math.max(0, Math.min(g.length - 1, grade - 1))] ?? 1;
   }
 
-  /** What its moves see this tick */
-  private act(eid: number, ship: ShipState, live: CustomLive, target: number, now: number): Act {
-    const groups = customGroups(live.design), host = this.host, rng = this.rng;
+  /** What its moves see this tick, and the work only the server does for them (damage, pulls, EMP, mines) */
+  private act(eid: number, ship: ShipState, live: CustomLive, target: number, now: number): CustomAct {
+    const groups = customGroups(live.design), host = this.host, rng = this.rng, num = InSystem.systemId[eid], self = this;
     const gone = () => groupsGone(ship.blueprint, ship.hp, ship.detached);
     const bit = (g: string) => { const i = groups.indexOf(g); return i < 0 ? 0 : 1 << i; };
+    const poseOf = (id: number): MovePose => ({ x: Position.x[id], y: Position.y[id], angle: Rotation.angle[id], vx: Velocity.x[id], vy: Velocity.y[id] });
     return {
-      eid, num: InSystem.systemId[eid], now, target, live, host,
+      eid, now, target, design: live.design, stats: live.stats, dmg: live.dmg, st: live,
       d: target >= 0 ? dhypot(Position.x[target] - Position.x[eid], Position.y[target] - Position.y[eid]) : Infinity,
       has: (g) => { const b = bit(g); return b !== 0 && !(gone() & b); },
       at: (g, evenGone) => {
@@ -150,8 +160,36 @@ export class CustomEnemies {
         if (!b || (!evenGone && gone() & b)) return null;
         return groupAt(host, eid, ship, groups.indexOf(g));
       },
+      me: () => poseOf(eid),
+      tpose: () => poseOf(target),
+      ahead: (ticks) => (target >= 0 ? aheadOf(poseOf(target), this.trail.get(target)?.v, Math.max(0, Math.round(ticks))) : { x: 0, y: 0 }),
+      fx: (msg) => {
+        if (host.moveFx) host.moveFx(num, eid, self.origin, msg);
+        else host.send?.(num, msg);
+      },
+      shoot: (s) => {
+        if (self.shots.tick !== now || self.shots.eid !== eid) self.shots = { tick: now, eid, n: 0 };
+        const seed = moveShotSeed(eid, now, self.shots.n++);
+        if (host.moveShot) host.moveShot(eid, s.kind, s.x, s.y, s.angle, s.scale, s.speed, seed, self.origin);
+        else host.fire?.(eid, s.kind, s.x, s.y, s.angle, s.scale, { speed: s.speed, seed });
+      },
       rng: () => rng(),
-      ahead: (ticks) => (target >= 0 ? this.ahead(target, Math.max(0, Math.round(ticks))) : { x: 0, y: 0 }),
+      get mobs() { return !!host.mobs; },
+      work: {
+        victims: () => {
+          const all = host.players(num).slice().sort((p, q) => p - q);
+          return all.includes(target) ? [target, ...all.filter((p) => p !== target)] : all;
+        },
+        segmentHit: (id, x0, y0, x1, y1, half) => { const sh = host.ships.get(id), h = sh && host.ships.segmentHit(id, sh, x0, y0, x1, y1, half); return h ? { part: h.part, t: h.t } : null; },
+        damage: (id, part, amount, how) => host.ships.damagePartBy(id, part, amount, eid, how),
+        splash: (x, y, r, amount, source) => host.ships.splashAt(num, x, y, r, amount, source),
+        push: (id, dx, dy) => host.ships.push(id, dx, dy),
+        emp: (x, y, r, ticks) => { host.ships.empAt(num, x, y, r, ticks, eid); },
+        launch: (kind, p, scale) => { host.mobs?.launch(kind, num, p, eid, scale); },
+        has: (id) => host.ships.has(id),
+        pose: (id) => (host.ships.has(id) ? poseOf(id) : null),
+        say: (msg) => host.send?.(num, msg),
+      },
     };
   }
 }

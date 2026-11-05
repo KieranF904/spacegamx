@@ -19,6 +19,23 @@
  *   STATUS  [emp, slowed]: from this tick its drive is EMP'd for `emp` ticks and slowed (a Frostbite's beam) for
  *           `slowed` (0: not): its flight crippled as the server's is (bodyStatusBits), told when what the body had
  *           stops being what the ship has (struck, or struck again before it wore off). A SYNC clears it
+ *
+ * Its moves (decision-inputs stage 4, CAPS.MOVES: bodies/moves/). None of these changes its flight (its moves' wants
+ * still go as WANTs); a client running the body runs the moves from them (MoveTrack) and draws what they give:
+ *
+ *   MOVE    [move, seed, rage]: its move (an index into its moves' table, StagedMoves.names) starts this tick; its rolls
+ *           from `seed`; rage 1: enraged (warnings × 0.8)
+ *   HARASS  [target + 1]: a harassing shot at that pilot this tick (its pilot's client works it out)
+ *   CAP     [k, mask]: the k-th volley the density cap read this tick dropped the shots in `mask` (bit i: the i-th); a
+ *           volley without one kept every shot
+ *   WINDOW  [ticks, cap]: its window opened this tick (bossWindow: its meter's fills go from the server, they're damage)
+ *   HOLD    [mode]: 0 its moves run again; 1 they're held (a stagger, the dev tools: the move under way is dropped, what
+ *           its moves left waits); 2 everything stops (a stage beaten, dying: what its moves left and personal attacks go)
+ *   PART    [part, state]: from this tick a staged boss's part is gone or a wreck (moves/host.ts PART_STATE), or back:
+ *           part damage is the server's, and a move reads it at the tick (shot off on tick k, nothing from it from k)
+ *   GONE    [gone]: from this tick a custom enemy's pieces gone (a bit each, bodies/custom/roster.json order), as its
+ *           moves read them
+ * PERSONAL carries [slot, attack, seed, target + 1, name] with moves on: the attack by its name's index (StagedTrack)
  */
 
 import { quantizeCursorAngle } from '../network/cursorState.js';
@@ -26,9 +43,13 @@ import { ownSimCaps } from '../network/ownTick.js';
 import { CAPS } from '../network/hits.js';
 import { CTL } from '../ships/replica.js';
 
-export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6, STATUS: 7 } as const;
+export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6, STATUS: 7, MOVE: 8, HARASS: 9, CAP: 10, WINDOW: 11, HOLD: 12, PART: 13, GONE: 14 } as const;
 /** Ops there are (a row whose op is past this is dropped) */
-export const DECISION_OPS = 8;
+export const DECISION_OPS = 15;
+/** The ops only a client running bodies' moves takes (CAPS.MOVES: the others aren't sent them) */
+export const MOVE_OPS: ReadonlySet<number> = new Set([DECISION.MOVE, DECISION.HARASS, DECISION.CAP, DECISION.WINDOW, DECISION.HOLD, DECISION.PART, DECISION.GONE]);
+/** HOLD's modes */
+export const MOVES_HOLD = { RUN: 0, PAUSE: 1, STOP: 2 } as const;
 
 /**
  * A want: [kind, ...args], angles in the 13-bit aim quantisation (q13)
@@ -82,6 +103,10 @@ export interface BodyState {
   /** The ticks its drive is EMP'd until, and slowed until (STATUS; absent: neither) */
   empUntil?: number;
   slowUntil?: number;
+  /** Its moves held or stopped (HOLD: MOVES_HOLD; absent: they run) */
+  hold?: number;
+  /** (a custom enemy) its pieces gone as its moves read them (GONE; absent: as its order says) */
+  gone?: number;
 }
 
 /** Its flight's status bits on tick t (STATUS): CTL.emp while EMP'd, CTL.slowed while slowed, as the server's ship flies */
@@ -105,7 +130,7 @@ export function bodyStateOfSync(args: readonly number[], tick: number): BodyStat
     kind: args[0] ?? 0, homeX: args[1] ?? 0, homeY: args[2] ?? 0, stage: Math.max(1, args[3] ?? 1), side: args[4] ? 1 : -1,
     target: (args[5] ?? 0) - 1, want: args.length > 6 ? args.slice(6) : [WANT.FLY], wantAt: tick, on: true,
     // (a SYNC clears a STATUS: one still under way follows it)
-    empUntil: undefined, slowUntil: undefined,
+    empUntil: undefined, slowUntil: undefined, hold: undefined, gone: undefined,
   };
 }
 
@@ -124,6 +149,8 @@ export function applyDecision(s: BodyState, op: number, args: readonly number[],
     case DECISION.STAGE: s.stage = Math.max(1, args[0] ?? 1); break;
     case DECISION.WANT: s.want = args.length ? args.slice() : [WANT.FLY]; s.wantAt = tick; break;
     case DECISION.STATUS: s.empUntil = (args[0] ?? 0) > 0 ? tick + args[0] : undefined; s.slowUntil = (args[1] ?? 0) > 0 ? tick + args[1] : undefined; break;
+    case DECISION.HOLD: s.hold = (args[0] ?? 0) || undefined; break;
+    case DECISION.GONE: s.gone = args[0] ?? 0; break;
   }
 }
 
@@ -137,6 +164,14 @@ export function decisionRowOk(row: unknown): row is number[] {
 /** Do these caps have the client run bosses' bodies (CAPS.BODIES, with OWN_SIM: a body reads its own ship there)? */
 export function bodiesFor(caps: number | undefined): boolean {
   return ((caps ?? 0) & CAPS.BODIES) !== 0 && ownSimCaps(caps);
+}
+
+/**
+ * Do these caps have the client run its bodies' moves too (CAPS.MOVES, with BODIES): their tells, beams, strikes' looks
+ * and straight shells worked out from MOVE, HARASS, PERSONAL and custom orders, not sent (decision-inputs stage 4)
+ */
+export function movesFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.MOVES) !== 0 && bodiesFor(caps);
 }
 
 /**

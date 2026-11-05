@@ -589,3 +589,42 @@ replica after) and her removal mid-fight; BodyNet.test.ts the forgotten boss (it
 Left, in order: stage 4 (her moves: telegraphs, beams, strikes, LAUNCH ids, pulls, taken/invulnerable), stage 3
 (NOVA/BLINK/PHASE: now the AI-flown bosses' flight is a body, these are the next bytes there), 5, 6, 8 (mob LAUNCH:
 mobs already fly by the waypoint law), and stage 7's second half (siege turrets and roles, station defence, traffic).
+
+## 13. Built: stage 4, the moves on both sides (2026-11-05, `CAPS.MOVES` 1048576, no wire change)
+
+- **common/src/bodies/moves/**: `host.ts` (`MoveHost`: what a move reads and does; `work` is the server's alone:
+  damage, pulls, homing shells, mobs, a hit's own messages), `staged.ts` (`StagedMoves`: a staged boss's moves'
+  pieces and personal attacks, its parts read at the tick), `scrapMother.ts`, `pyreclast.ts` (their moves, harassing
+  shots, personal attacks and what outlives a move, ported from the brains unchanged but for their rolls), `custom.ts`
+  (the custom roster's picks, steps, guns and losses, from server game/custom/moves.ts and kit.ts, now gone),
+  `track.ts` (`StagedTrack`, `CustomTrack`: a client's tick of them, in the server's order), `index.ts` (`STAGED_MOVES`
+  by brain). The brains keep what is theirs: the loop and its picks, windows, personal rolls, the stages' blow-aways
+  and deaths, the Mother's density cap over the pilots near, the Pyreclast's vents' heat.
+- **Seeds, not the server's RNG** (rule 2, now kept): a move's rolls (a dart's side, a spiral's start and spin,
+  shrapnel's turn, a dash's flips, a lance's swing, a ring's turn, a swarm's start) come from `moveRng(seed, start)`,
+  the seed rolled by the brain and sent in its MOVE. A move's straight shell is seeded `m<owner>:<tick>:<n>`
+  (Weapons.spawn `seed`), so its spread is the same on both sides. Custom guns between moves fire on a grid of their own
+  (`gunDue`: `(tick + id × 7) % every`) instead of a timer, so they're worked out too.
+- **Decisions** (only to a client with the cap: `MOVE_OPS`): MOVE [move, seed, rage]; HARASS [target + 1]; CAP [k, mask]
+  (the k-th volley of the tick dropped these shots: who is near is the server's); WINDOW [ticks, cap]; HOLD [mode] (0
+  run; 1 held: a stagger or the dev tools, the move under way dropped; 2 stopped: a stage beaten or dying); PART [part,
+  state] (a staged boss's part gone or wrecked from this tick: part damage is the server's, so a move reads its parts as
+  they were on the tick, rule 6); GONE [bits] (a custom enemy's pieces, the same). PERSONAL carries its target and its
+  name's index. HOLD and GONE go with a SYNC when they aren't the defaults. A custom enemy's move rides its order.
+- **The client** (client ships/bodies/MoveRunner.ts; the fake client in the tests and the probe too): each snapshot,
+  after the bodies were stepped again, every tick of the window once, forward only. Its own pose before its step is its
+  replica at t - 1; a pilot's is `preAt(t)`, as the flight reads it. What it draws goes to the frame's handlers as if it
+  had been sent; its shells are projectile rows with ids of its own (from 2^30), flown straight, gone at their life's
+  end or the rock they meet, or with a told hit at their point (`struck`). A personal attack or harassing shot is worked
+  out only by the client it's at. A move under way when it began running the body is sat out (the server sends it).
+- **The server** (GameServer.moveFx, moveShot; BodyNet.derives, shellDerived): a move's look goes to every client but
+  those working it out (running the body's moves since before the decision it came of, and its own pilot for a
+  personal attack or a harassing shot); a move shell's row (and so its removal) the same, decided once per client.
+- **Measured**: docs/audits/boss-moves-shared-2026-11-05.md. **Tests**: server/src/net/decisions/moves.test.ts.
+
+What stays the server's (named exceptions): the hits of these shells (told the old way: `projectileHit`, `damage`; the
+shells carry no gun to derive them from), homing seekers (their guides: WAYPOINTS), mobs (their LAUNCH and guides),
+damage of every kind (strikes, beams, burns, pulls), the window's meter (its fills and crack: damage) and its close, a
+crane's or a harpoon's strike flash (the hit's), the stage blow-aways' and death's booms and `bossBlow`, the Pyreclast's
+stage-two vent glow (its own timer), a personal attack or harassing shot at another pilot, and a move begun before the
+client ran the body.

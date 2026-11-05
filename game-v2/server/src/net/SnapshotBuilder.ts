@@ -41,7 +41,7 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, launchesFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
+import { bodiesFor, pilotsFor, movesFor, focusFor, causesFor, waypointsFor, launchesFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import { AwayNet } from './cells/AwayNet.js';
 import type { CrowdControl } from './crowd/CrowdControl.js';
@@ -728,7 +728,7 @@ export class SnapshotBuilder {
       // (Other ships' causes on its tick layer, CAPS.CAUSES: keyframes only where they don't explain a ship's path)
       const causes = causesFor(conn.caps);
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
-        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes), pilotsFor(conn.caps));
+        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes), pilotsFor(conn.caps), movesFor(conn.caps));
       // Homing shells and mobs on its tick layer (CAPS.WAYPOINTS): their SYNCs and records, and from here no rows of them
       const guidesOn = this.guides && waypointsFor(conn.caps) ? this.guides : null;
       if (!guidesOn) this.guides?.drop(conn);
@@ -768,6 +768,8 @@ export class SnapshotBuilder {
         if (conn.debrisHeld.has(r.id)) continue;
         if (conn.debrisRowOk.size && conn.debrisRowOk.delete(r.id) && r.key === DEBRIS_ROW_KEY) { newStates.set(r.id, r.key); continue; }
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
+        // (a body's move's straight shell it makes itself, CAPS.MOVES: no row, nor a removal)
+        if (r.kind === 'projectile' && bodies?.shellDerived(conn, conn.playerId, r.id, prevStates.has(r.id))) continue;
         // (a homing shell it runs, its row once sent: it flies it itself)
         if (r.kind === 'projectile' && guidesOn?.runs(conn, r.id) && prevStates.has(r.id)) { newStates.set(r.id, r.key); continue; }
         // (a mob it runs: its row again only when its HP changes)
@@ -901,10 +903,14 @@ export class SnapshotBuilder {
     if (crowd) { crowd.charge(this.chargeTo, performance.now() - t0); this.chargeTo = -1; }
     // Clear pending removed entities after sending to all clients
     // Also remove from knownEntities so they can be re-sent if respawned
+    const goneNow: number[] = [];
     for (const [eid] of this.pendingRemovedEntities) {
       if (due && !due(eid)) continue;
       for (const conn of this.clients.values()) conn.knownEntities.delete(eid);
+      goneNow.push(eid);
     }
+    // (Move shells gone: forgotten, CAPS.MOVES)
+    this.bodies?.shellsGone(goneNow, this.clients.values());
     // (Encode-once blocks: the removed give their wire ids back, flushRound; ones no block has named for a while too)
     this.flushRound(due, true);
     this.replication.endSnapshot(due);

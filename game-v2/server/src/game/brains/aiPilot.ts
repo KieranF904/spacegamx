@@ -82,6 +82,12 @@ export class AiPilots {
     return { controls, firing, aim: out.aim, aimDist: out.aimDist, target, body: on ? { bits: out.bits, q: out.q, ix: 0, iy: 0 } : undefined };
   }
 
+  /** A decision of its moves' (a custom enemy's pieces gone, GONE: CAPS.MOVES), into its body's state and to its clients */
+  note(eid: number, op: number, args: readonly number[]): void {
+    const f = this.flown.get(eid);
+    if (f) this.decide(eid, f.body, op, args);
+  }
+
   /** A ship gone (its pilot forgotten): its body stops on every client running it */
   forget(eid: number): void {
     const f = this.flown.get(eid);

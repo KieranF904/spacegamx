@@ -67,6 +67,16 @@ export class BodyRunner {
     return this.runs.keys();
   }
 
+  /**
+   * A body it runs, as its moves read it (CAPS.MOVES: MoveRunner): the tick it was synced at, its decisions at a tick
+   * ([op, ...args] in the order they were taken), its state at a tick. Null: it runs none of this id
+   */
+  view(id: number): { syncTick: number; at(t: number): readonly (readonly number[])[]; state(t: number): BodyState | null } | null {
+    const run = this.runs.get(id);
+    if (!run) return null;
+    return { syncTick: run.syncTick, at: (t) => run.log.get(t) ?? [], state: (t) => this.stateAt(run, t) };
+  }
+
   /** Those whose hits are told (a boss's: its hit rules are still its brain's, BodyKind.toldHits) */
   *told(): IterableIterator<number> {
     for (const [id, run] of this.runs) if (BODY_KINDS[run.states.get(run.syncTick)?.kind ?? -1]?.toldHits) yield id;
@@ -87,6 +97,8 @@ export class BodyRunner {
         continue;
       }
       const run = this.runs.get(id);
+      // (its moves held, or a custom enemy's pieces gone, as it was synced, CAPS.MOVES: part of its state at the SYNC)
+      if (run && (op === DECISION.HOLD || op === DECISION.GONE) && t === run.syncTick) { const s0 = run.states.get(t); if (s0) applyDecision(s0, op, args, t); continue; }
       if (!run || t <= run.syncTick) continue;
       // (Its OFF for this client: the rows fly it from here)
       if (op === DECISION.OFF && dt === 0 && t === tick) { this.stop(id); this.stats.offs++; continue; }
