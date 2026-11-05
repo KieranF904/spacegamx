@@ -243,6 +243,21 @@ When a ship's rebuild point splits it (rebuildNow: what it shed whole this tick 
 
 Debris then drifts and knocks into other debris only (ships ignore it), push only, all pieces of a system stepped together in id order (`stepDebrisWorld`) on the server and in `ShipReplicaSet` (`stepDebrisTo`, through the client's `DebrisWorld`: each piece's shape from the structure it flew that tick). A piece in its grace (`DEBRIS_GRACE_TICKS`, 90 ticks from its spawn tick, `debrisYoung`; a sent piece's sync says `born` and `aloof`) takes force only from its break-up: it neither knocks nor is knocked (shots still hit it). Every part's crumble tick is fixed at its spawn (common ships/debrisLife.ts `debrisDecay`, a parent's for its parts, a shed's own). `CAPS.DEBRIS` (131072, protocol 44): a split marked `l` is the client's to run (client ships/debris/DebrisLives.ts): it works out each crumble's rebuild at its tick (`crumbleRebuild`: structure by tick, what's left recentred in place, the crumble effect shown, what broke off from its pre-recentre body when the server's split names it), so nothing of the piece is sent but its removal (`ClientConnection.debrisLive`: no sync, HP, crumble `partDestroyed` or keyframe) until something else touches it (a shot, fire, a tow: `DebrisNet.told`, and a sync, after which it is told). A client keeping structures by tick (`CAPS.STRUCTS`) recentres a sent piece from its syncs (`DebrisSplits.after`, `rebuildAt`); Replication's `dver` is their keyframe version (not bumped by debris rebuilds); a legacy client gets a keyframe of a recentred piece and of what's near it or knocked it (`DebrisNet.offLegacy`). A piece moved by anything else (a tow), and whatever knocked into it or is within reach before the snapshot, is keyframed (`DebrisNet.touched`, Replication `Drift:moved`); so is a piece knocked by one a client doesn't step (out of view, or not had yet). Damage and removal stay server-told. Measured in docs/audits/debris-2026-11-05.md.
 
+### Boss bytes round (protocol 49, 2026-11-05; docs/audits/boss-bytes-2026-11-05.md)
+- **Own row with OWN_SIM**: the client's own row goes by its own keyframe version (`Replication.ownVersionOf`), so a
+  contact or pull its tick layer worked out is no correction; with no row, its drawn prediction follows the tick layer
+  at the snapshot's tick (`ShipClient.ownTickPose`, `GameState.followOwnTick`: pose put there, inputs since replayed).
+- **Own contacts with a run boss** go without the boss's state when its bodied shadow is what the client has
+  (`shadowCauses` `bodyPreStep`, `Replication.ownFor`).
+- **Hits on its own ship** are found by an OWN_SIM client like any other (`SelfHits.ownExact`; `HitLedger` 'self' only
+  without OWN_SIM).
+- **`shipSync.dmg`**: a ship's shells' damage multiplier (a boss's `damage` and rage), on a new ship's sync when it
+  isn't 1 and on any sync after it changed; client `ShipState.dmg`, `gunShell` scales the strength by it; the server
+  derives with the one it sent (`shipSynced.dmg`), a stale one goes as the record's damage.
+- **`DECISION.STATUS` [emp, slowed]** (op 7): an AI ship EMP'd or slowed, told to its body when what it had stops
+  being what the ship has (`AiPilots.fly`); the body flies `CTL.emp`/`CTL.slowed` from it (`bodyStatusBits`). A SYNC
+  clears it (BodyNet sends a STATUS after a SYNC while one is under way).
+
 ## Invariants
 - Any change to the wire tables needs `PROTOCOL_VERSION` + `PROTOCOL_WIRE_HASH` updated (protocol.test.ts fails otherwise, on purpose). JSON-only messages not in `COMPACT` do not change the hash.
 - The dictionary is append-only (indices are the wire format).
