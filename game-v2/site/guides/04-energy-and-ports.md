@@ -6,7 +6,7 @@ summary: Generators, batteries and banks, what draws power first, and what is ch
 checked: 2026-11-04
 sources: data/ships/functions.json, data/ships/models.json, data/ships/tuning.json (energy), common/src/ships/energy.ts, circuits.ts, rebuild.ts, wires.ts, power/ports.ts, docs/areas/energy.md, docs/design/energy-ports-2026-11.md
 ---
-<!-- TODO: power is mid-change. Checked on 2026-11-04: every stock ship, every library design and any ship built in the hangar runs on the pool-and-banks system (common/src/ships/circuits.ts, energy.ts). Only designs marked `power: 'ports'` (the dev test ships under data/ships/blueprints/dev/ports-*.json) run the ports system. The wire tool was retired on 1 November; a design with no wires is auto-wired (wires.ts autoWire). Recheck this whole page when ports reach the hangar. -->
+<!-- TODO: out of date since 2026-11-05: every library ship, enemy design and hangar design now runs on the ports core (power/ports.ts; the server sets power: ports on every design), and the pool-and-banks system below is unused by the game. Rewrite this page for ports (generators give out of their front, stores take at the back and give at the front, guns and engines take at their back, the core takes at its sides and gives fore and aft). -->
 
 Every ship runs on energy, measured in **E**. Generators make it per second, batteries hold it, and engines, guns, shields and tools spend it. The **ENERGY** gauge on the right of the screen shows your pool. This page describes how the game runs today; the last section covers what is changing.
 

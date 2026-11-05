@@ -96,6 +96,27 @@ describe('hangar refits in the live game', () => {
     }
   });
 
+  it('the server decides the power system: a design sent without the ports flag (or with another) is built as a ports ship', () => {
+    const { server, t, got, pid } = liveServer();
+    (server as any).shipEditAnywhere = true;
+    grantParts(server, pid, arrow);
+    const { power: _drop, ...sent } = arrow;
+    t.send({ type: 'shipEdit', blueprint: { ...sent, power: 'pool' } as any });
+    expect(lastEdit(got).ok).toBe(true);
+    const ship = server.getShips().get(pid)!;
+    expect(ship.blueprint.power).toBe('ports');
+    expect(ship.derived.ports).toBeDefined();
+    expect(ship.derived.power).toBeUndefined();
+  });
+
+  it('a new pilot starts in the ports Sparrow T', () => {
+    const { server, pid } = liveServer();
+    const ship = server.getShips().get(pid)!;
+    expect(ship.blueprint.name).toBe('Sparrow T');
+    expect(ship.blueprint.power).toBe('ports');
+    expect(ship.derived.ports).toBeDefined();
+  });
+
   it('reject an invalid blueprint even when docked', () => {
     const { server, t, got, pid } = liveServer();
     (server as any).shipEditAnywhere = true;

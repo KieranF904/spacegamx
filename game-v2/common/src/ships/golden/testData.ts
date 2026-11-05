@@ -51,7 +51,7 @@ export interface Scenario {
 const UP = -Math.PI / 2;
 
 const blueprint = (file: string): Blueprint => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints', file), 'utf-8'));
-const sparrow = () => blueprint('sparrow-t.json');
+const sparrow = () => blueprint('fixtures/sparrow-t.json');
 const withParts = (bp: Blueprint, parts: object[]): Blueprint => ({ ...bp, parts: [...bp.parts, ...(parts as PlacedPart[])] });
 
 /** A strafer on the right flank (dodges the ship left), one on the left (dodges it right), a Tow Beam under the nose */
@@ -186,7 +186,7 @@ export const SCENARIOS: Scenario[] = [
 ];
 
 /** The Corsair (towed as a wreck) */
-export const corsair = () => blueprint('corsair.json');
+export const corsair = () => blueprint('fixtures/corsair.json');
 
 export const UPDATE_GOLDEN = process.env.UPDATE_GOLDEN === '1';
 
@@ -198,7 +198,9 @@ export function bodyRow(b: FlightBody): number[] {
 export const BODY_FIELDS = ['x', 'y', 'vx', 'vy', 'angle', 'angVel', 'jump', 'jumpScale', 'cargo', 'dodge', 'dodgeDir'] as const;
 
 export function chargeRow(c: Charge): number[] {
-  return [c.g, ...c.b];
+  // (A ports ship: its parts' stores and buffers, summed, after the pool numbers, which it doesn't use)
+  const e = c.e as { held: Int32Array } | undefined;
+  return e ? [c.g, ...c.b, e.held.reduce((a, b) => a + b, 0)] : [c.g, ...c.b];
 }
 
 /** sha256 of the rows (numbers written exactly), first 16 hex digits */

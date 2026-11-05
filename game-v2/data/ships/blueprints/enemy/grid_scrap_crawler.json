@@ -1,6 +1,7 @@
 {
  "name": "Scrap Crawler",
  "catalogVersion": 1,
+ "power": "ports",
  "parts": [
   {
    "uid": 0,

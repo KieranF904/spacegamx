@@ -520,6 +520,8 @@ Three dev ships (F9, `data/ships/blueprints/dev/ports-*.json`; `common/src/ships
 line round two corners); **Ports Slurry Raider** (the Slurry Cannon's Accelerant crossing its power line through a
 Passthrough, two Reaction Thrusters on one Reaction Mass tank).
 
+**2026-11-05: the switch.** Every ship in the game now runs the ports core: the library (reworked, with four new ships), the enemy designs (touch-routed legacy functions) and every hangar design (the server sets the flag). See docs/areas/energy.md "The switch" and docs/panels/2026-11-05/ports-library.
+
 Not in this cut: the hangar draws no port glyphs and its load test skips ports ships; tanks refill only on a rebuild
 (a respawn or swap); mining lasers and part features (Tow, Strafer, Flash) are unaccounted on a ports ship; shields
 draw their buffer but their `sat` isn't wired to the shield; a hazard's battery cap is ignored.

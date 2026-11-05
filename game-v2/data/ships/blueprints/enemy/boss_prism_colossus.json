@@ -1,6 +1,7 @@
 {
  "name": "Prism Colossus",
  "catalogVersion": 1,
+ "power": "ports",
  "parts": [
   {
    "uid": 0,

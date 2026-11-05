@@ -56,6 +56,7 @@
     },
     {
       "id": "generator",
+      "touch": "gen",
       "legacy": true,
       "name": "Generator",
       "rarity": "uncommon",
@@ -85,6 +86,7 @@
     },
     {
       "id": "conduit",
+      "touch": "relay",
       "legacy": true,
       "name": "Conduit",
       "rarity": "common",
@@ -99,6 +101,7 @@
     },
     {
       "id": "thruster",
+      "touch": "in",
       "legacy": true,
       "name": "Ion Thruster",
       "rarity": "uncommon",
@@ -130,6 +133,7 @@
     },
     {
       "id": "afterburner",
+      "touch": "in",
       "legacy": true,
       "name": "Afterburner",
       "rarity": "rare",
@@ -159,6 +163,7 @@
     },
     {
       "id": "plasma_drive",
+      "touch": "in",
       "legacy": true,
       "name": "Plasma Drive",
       "rarity": "rare",
@@ -189,6 +194,7 @@
     },
     {
       "id": "miner",
+      "touch": "in",
       "legacy": true,
       "name": "Mining Laser",
       "rarity": "uncommon",
@@ -214,6 +220,7 @@
     },
     {
       "id": "battery",
+      "touch": "relay",
       "legacy": true,
       "name": "Battery",
       "rarity": "uncommon",
@@ -244,6 +251,7 @@
     },
     {
       "id": "drive_battery",
+      "touch": "relay",
       "legacy": true,
       "name": "Drive Battery",
       "rarity": "uncommon",
@@ -275,6 +283,7 @@
     },
     {
       "id": "weapon_battery",
+      "touch": "relay",
       "legacy": true,
       "name": "Weapon Battery",
       "rarity": "uncommon",
@@ -306,6 +315,7 @@
     },
     {
       "id": "scanner",
+      "touch": "in",
       "legacy": true,
       "name": "Scanner",
       "rarity": "uncommon",
@@ -332,6 +342,7 @@
     },
     {
       "id": "constructor",
+      "touch": "in",
       "legacy": true,
       "name": "Constructor",
       "rarity": "uncommon",
@@ -379,6 +390,7 @@
     },
     {
       "id": "weapon",
+      "touch": "in",
       "legacy": true,
       "name": "Cannon",
       "rarity": "uncommon",
@@ -411,6 +423,7 @@
     },
     {
       "id": "railgun",
+      "touch": "in",
       "legacy": true,
       "name": "Railgun",
       "rarity": "rare",
@@ -441,6 +454,7 @@
     },
     {
       "id": "laser",
+      "touch": "in",
       "legacy": true,
       "name": "Beam Laser",
       "rarity": "rare",
@@ -471,6 +485,7 @@
     },
     {
       "id": "flak",
+      "touch": "in",
       "legacy": true,
       "name": "Flak Cannon",
       "rarity": "uncommon",
@@ -500,6 +515,7 @@
     },
     {
       "id": "missile",
+      "touch": "in",
       "legacy": true,
       "name": "Missile Launcher",
       "rarity": "rare",
@@ -529,6 +545,7 @@
     },
     {
       "id": "lance",
+      "touch": "in",
       "legacy": true,
       "name": "Plasma Lance",
       "rarity": "epic",
@@ -558,6 +575,7 @@
     },
     {
       "id": "emp",
+      "touch": "in",
       "legacy": true,
       "name": "EMP Projector",
       "rarity": "rare",
@@ -587,6 +605,7 @@
     },
     {
       "id": "shield",
+      "touch": "in",
       "legacy": true,
       "name": "Shield Generator",
       "rarity": "rare",
@@ -615,6 +634,7 @@
     },
     {
       "id": "hive",
+      "touch": "in",
       "legacy": true,
       "name": "Rustjaw's Hive",
       "rarity": "legendary",
@@ -639,6 +659,7 @@
     },
     {
       "id": "frostbite",
+      "touch": "in",
       "legacy": true,
       "name": "Frostbite Lance",
       "rarity": "legendary",
@@ -661,6 +682,7 @@
     },
     {
       "id": "cinder_bloom",
+      "touch": "in",
       "legacy": true,
       "name": "Cinder Bloom",
       "rarity": "legendary",
@@ -684,6 +706,7 @@
     },
     {
       "id": "prism",
+      "touch": "in",
       "legacy": true,
       "name": "Prism Splitter",
       "rarity": "legendary",
@@ -708,6 +731,7 @@
     },
     {
       "id": "phase",
+      "touch": "in",
       "legacy": true,
       "name": "Phase Cannon",
       "rarity": "legendary",
@@ -731,6 +755,7 @@
     },
     {
       "id": "singularity",
+      "touch": "in",
       "legacy": true,
       "name": "Singularity Launcher",
       "rarity": "legendary",
@@ -755,6 +780,7 @@
     },
     {
       "id": "jumpcoil",
+      "touch": "in",
       "legacy": true,
       "name": "Jump Coil",
       "rarity": "rare",
@@ -776,6 +802,7 @@
     },
     {
       "id": "autocannon",
+      "touch": "in",
       "legacy": true,
       "name": "Autocannon",
       "rarity": "uncommon",
@@ -805,6 +832,7 @@
     },
     {
       "id": "pulse",
+      "touch": "in",
       "legacy": true,
       "name": "Pulse Laser",
       "rarity": "rare",
@@ -835,6 +863,7 @@
     },
     {
       "id": "arc",
+      "touch": "in",
       "legacy": true,
       "name": "Arc Projector",
       "rarity": "rare",
@@ -864,6 +893,7 @@
     },
     {
       "id": "torpedo",
+      "touch": "in",
       "legacy": true,
       "name": "Torpedo Tube",
       "rarity": "rare",
@@ -892,6 +922,7 @@
     },
     {
       "id": "mortar",
+      "touch": "in",
       "legacy": true,
       "name": "Mortar",
       "rarity": "uncommon",
@@ -920,6 +951,7 @@
     },
     {
       "id": "charge_launcher",
+      "touch": "in",
       "legacy": true,
       "name": "Mining Charge Launcher",
       "rarity": "uncommon",
@@ -947,6 +979,7 @@
     },
     {
       "id": "siphon",
+      "touch": "in",
       "legacy": true,
       "name": "Gas Siphon",
       "rarity": "uncommon",
@@ -1021,6 +1054,7 @@
     },
     {
       "id": "magma_cannon",
+      "touch": "in",
       "name": "Magma Cannon",
       "exclusive": "boss",
       "description": "A boss's turret: heaves out great balls of magma, one gun after another, that burst and burn where they land.",

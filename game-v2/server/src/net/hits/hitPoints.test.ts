@@ -88,7 +88,7 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
       const c = server.pilots.connOf(A.pid)!;
       c.isAdmin = true;
       server.admin.run(c, 'god', { on: 'on' });
-      ships.respawnInPlace(A.pid, ships.library.get('corsair')!);
+      ships.respawnInPlace(A.pid, ships.library.get('wisp')!);
       const num = InSystem.systemId[A.pid];
       const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
       Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;

@@ -29,7 +29,7 @@ const MODELS = ['engine_ion_drive', 'engine_vernier', 'engine_afterburner', 'eng
 
 describe('thruster cost', () => {
   it('a busy scene: 48 big ships, every engine burning', () => {
-    const designs = [cfg.library.bastion, cfg.library.hammerhead, cfg.library.galleon, cfg.enemies.pyreclast, cfg.library.hauler, cfg.library.lancer];
+    const designs = [cfg.library.sunspear, cfg.library['ark-tender'], cfg.library.halberd, cfg.enemies.pyreclast, cfg.library.hauler, cfg.library.quarry];
     const ships: { ship: ShipState; e: InterpolatedEntity; c: Container }[] = [];
     for (let k = 0; k < 48; k++) {
       const bp = designs[k % designs.length], fn = MODELS[k % MODELS.length];

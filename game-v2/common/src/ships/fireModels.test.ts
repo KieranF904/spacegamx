@@ -16,7 +16,7 @@ import type { ShipTuning } from './tuning.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
+const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
 const UP = -Math.PI / 2;
 const pose = { x: 0, y: 0, angle: UP };
 

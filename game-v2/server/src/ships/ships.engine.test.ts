@@ -307,7 +307,7 @@ describe('destroyed parts, decay and station repair', () => {
 });
 
 describe('turrets and helm in the engine', () => {
-  const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/corsair.json'), 'utf-8'));
+  const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/corsair.json'), 'utf-8'));
 
   function broadside(targetAngle: number) {
     const { server, bridge, pid, input, run } = setup();

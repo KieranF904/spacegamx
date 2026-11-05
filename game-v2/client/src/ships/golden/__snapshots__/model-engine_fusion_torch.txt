@@ -4,14 +4,14 @@ Mk IV · Large · Block · 4 cells
 Hull · mass445 hp · 4.8
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Thrust14.4 · boost ×1.7, drain ×1
+Thrust14.4 · boost ×1.7, drain ×0.4
 Power draw112/s
 Rated speed5,100 m/s (its push fades out near it)
 
 == partStats (stats rows) ==
 GradeMk IV · Large
 Power draw112
-Thrust14.4 · boost ×1.7, drain ×1
+Thrust14.4 · boost ×1.7, drain ×0.4
 Hull · mass445 hp · 4.8
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
@@ -45,4 +45,4 @@ thrust 14.4 · top 5,100 m/s · draws 112
 {"open":true,"badge":"Lv 30","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":445.4,"mass":4.8,"firepower":0,"toughness":445.4,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"draw":112,"thrust":14.4,"boost":1.7,"boostDrain":1}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":445.4,"mass":4.8,"firepower":0,"toughness":445.4,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"draw":112,"thrust":14.4,"boost":1.7,"boostDrain":0.4}

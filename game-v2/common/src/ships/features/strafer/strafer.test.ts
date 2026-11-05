@@ -20,7 +20,7 @@ import { encodeInputBinary, decodeInputBinary } from '../../../network/protocol.
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 
-const sparrowBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
+const sparrowBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
 const ship = (extra: object[] = []) => {
   const bp = sparrowBp();
   bp.parts.push(...(extra as never[]));

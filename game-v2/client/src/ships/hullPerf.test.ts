@@ -7,7 +7,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
 import { Container } from 'pixi.js';
-import { blueprintGeometry, createShipState, loadCatalog, rebuildShip, type Blueprint, type ShipState } from '@space-game/common';
+import { readFileSync } from 'fs';
+import { blueprintGeometry, createShipState, loadCatalog, parseBlueprint, rebuildShip, type Blueprint, type ShipState } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { buildHull } from './hullBuild';
 import { fromWire, runHullJob, type DesignCache } from './hullWire';
@@ -19,6 +20,8 @@ import { turretHead } from './gunDecor';
 vi.mock('pixi.js', async (orig) => ({ ...(await orig<typeof import('pixi.js')>()), GlProgram: class { destroy(): void {} } }));
 
 const cfg = loadShipConfigFromDisk(join(__dirname, '../../../data')) as ReturnType<typeof loadShipConfigFromDisk> & { library: Record<string, Blueprint>; enemies: Record<string, Blueprint> };
+// (The Bastion Dreadnought left the library with the pool core; its hull is still the big-hull case here: the pool-era fixture)
+cfg.library.bastion = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/fixtures/bastion.json'), 'utf-8'));
 const catalog = loadCatalog(cfg.catalog as never, { overlapShrink: cfg.tuning.overlapShrink });
 const tuning = cfg.tuning, cs = tuning.cellSize;
 

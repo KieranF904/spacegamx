@@ -14,7 +14,7 @@ import { FRICTION, BOOST_FACTOR, WORLD_SIZE } from '../constants.js';
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const inventory: InventoryStub = readShipJson('inventory.json');
-const corsair = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/corsair.json'), 'utf-8'));
+const corsair = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/corsair.json'), 'utf-8'));
 const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 const DEG = Math.PI / 180;
 

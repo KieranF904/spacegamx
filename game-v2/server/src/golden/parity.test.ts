@@ -31,6 +31,14 @@ import { replicaAngle, quantizeReplicaAngle } from '../../../common/src/network/
 import { readShipJson, testCatalog } from '../../../common/src/ships/testData.js';
 import { SCENARIOS, corsair, type Scenario, type ScriptTick } from '../../../common/src/ships/golden/testData.js';
 import { parseBlueprint } from '../../../common/src/ships/blueprint.js';
+import type { PortsState } from '../../../common/src/ships/power/ports.js';
+
+/** A copy of the charge as it is now (a ports ship's state is changed in place by every later tick) */
+function snapCharge(c: Charge): Charge {
+  const e = c.e as PortsState | undefined;
+  if (!e) return c;
+  return { ...c, e: { ...e, held: e.held.slice(), flags: e.flags.slice(), amt: e.amt.slice(), mat: e.mat.slice(), closed: e.closed.slice(), aug: e.aug.slice(), sat: e.sat.slice() } };
+}
 import { bodyRow, chargeRow, hashRows, goldenFile, ranges, BODY_FIELDS } from '../../../common/src/ships/golden/testData.js';
 import { ShipClient } from '../../../client/src/ships/ShipClient.js';
 import { GameServer } from '../GameServer.js';
@@ -123,7 +131,7 @@ function runServer(sc: Scenario) {
       x: Position.x[pid], y: Position.y[pid], vx: Velocity.x[pid], vy: Velocity.y[pid], angle: Rotation.angle[pid], angVel: ship.angVel,
       jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir,
     },
-    charge: ships.chargeOf(pid), jumpPrime: ship.jumpPrime ?? 0, tow: ship.tow, guns: gunRow(ship), wire: wireRow(ship),
+    charge: snapCharge(ships.chargeOf(pid)), jumpPrime: ship.jumpPrime ?? 0, tow: ship.tow, guns: gunRow(ship), wire: wireRow(ship),
   });
   const start = read();
   const ticks: Tick[] = [];
@@ -309,8 +317,8 @@ describe('prediction parity: server, client prediction and replicas fly the same
 // keep the server's clips, reloads, charges, spin and cooldowns, and draw the same energy, tick by tick.
 
 /** A Sparrow with its two Pips swapped for these models (their own cells and mounts: the shape is the Sparrow's) */
-const armedSparrow = (left: string, right: string) => () => {
-  const bp = readShipJson('blueprints/sparrow-t.json') as unknown;
+const armedSparrow = (left: string, right: string, file = 'blueprints/sparrow-t.json') => () => {
+  const bp = readShipJson(file) as unknown;
   const b = parseBlueprint(JSON.stringify(bp));
   const pips = b.parts.filter((q) => q.fn === 'cannon_pip');
   pips[0].fn = left;
@@ -354,6 +362,10 @@ const FIRE_SCENARIOS: Scenario[] = [
     script: fireScript([300, { forward: true }, true, (i) => UP + Math.sin(i / 60) * 0.15], [40, {}, false, UP], [300, { forward: true, boost: true }, true, UP]),
   },
 ];
+/** The first four on the pool-era Sparrow (a fixture): the pool core's clip reload eighths and feed shares, which the GunSync
+ * and sputter checks below are written for (the ports core's guns are checked tick by tick above) */
+const POOL_PAIRS: [string, string][] = [['railgun_rail_driver', 'cannon_longbarrel'], ['autocannon_chainsaw', 'lance_lance'], ['legendary_hive', 'autocannon_stinger'], ['flak_cloudmaker', 'emp_blackout']];
+const POOL_FIRE: Scenario[] = POOL_PAIRS.map(([l, r], k) => ({ ...FIRE_SCENARIOS[k], ship: armedSparrow(l, r, 'blueprints/fixtures/sparrow-t.json') }));
 
 describe('prediction parity: the firing models (the pilot\'s guns keep the server\'s state)', () => {
   for (const sc of FIRE_SCENARIOS) {
@@ -378,7 +390,7 @@ describe('prediction parity: the firing models (the pilot\'s guns keep the serve
   }
 
   it('under latency and a missed shot: the real GunSync pulls the pilot clip and charge back to the server within 30 ticks plus the snapshot gap', () => {
-    const sc = FIRE_SCENARIOS[0];
+    const sc = POOL_FIRE[0];
     const r = runServer(sc);
     const gap = Math.round(TICK_RATE / SNAPSHOT_RATE);
     // The pilot's guns agree with the server's: a clip by rounds and reloading, a charge to within a few ticks
@@ -435,21 +447,21 @@ describe('prediction parity: the firing models (the pilot\'s guns keep the serve
   });
 
   it('the scenarios exercise each model: a reload, a charge that fired and one let go, spin, a windup and a sputter, regrowth', () => {
-    const cc = runServer(FIRE_SCENARIOS[0]);
+    const cc = runServer(POOL_FIRE[0]);
     const [rd, lb] = cc.derived.weapons;
     expect([rd.fire.model, lb.fire.model]).toEqual(['clip', 'charge']);
     // (gunRow: cooldown, rounds, reload, charge, spin per gun)
     const g = (t: Tick, w: number, k: number) => t.guns[w * 5 + k];
     expect(cc.ticks.some((t) => g(t, 0, 2) > 0)).toBe(true);
     expect(cc.ticks.some((t) => g(t, 1, 3) < 0)).toBe(true);
-    const sb = runServer(FIRE_SCENARIOS[1]);
+    const sb = runServer(POOL_FIRE[1]);
     expect(sb.ticks.some((t) => g(t, 0, 4) === 1)).toBe(true);
     expect(sb.ticks.some((t) => (t.charge.gun ?? []).some((v) => v < 0.995))).toBe(true);
-    const rg = runServer(FIRE_SCENARIOS[2]);
+    const rg = runServer(POOL_FIRE[2]);
     const hive = rg.ticks.map((t) => g(t, 0, 1));
     expect(hive.some((v, i) => i > 0 && v === hive[i - 1] + 1)).toBe(true);
     // (Aim bursts: the Cloudmaker's clip emptied and reloaded, the Blackout charged and fired)
-    const ab = runServer(FIRE_SCENARIOS[3]);
+    const ab = runServer(POOL_FIRE[3]);
     expect(ab.derived.weapons.map((w) => w.fire.model)).toEqual(['clip', 'charge']);
     expect(ab.ticks.some((t) => g(t, 0, 2) > 0)).toBe(true);
     expect(ab.ticks.some((t) => g(t, 1, 3) > 0)).toBe(true);

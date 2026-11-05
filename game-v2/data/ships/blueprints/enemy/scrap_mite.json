@@ -1,6 +1,7 @@
 {
  "name": "Scrap Mite",
  "catalogVersion": 1,
+ "power": "ports",
  "parts": [
   {
    "uid": 0,

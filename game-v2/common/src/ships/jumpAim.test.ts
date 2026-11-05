@@ -84,8 +84,8 @@ describe('the jump overlay is where the jump lands', () => {
     ['a star\'s ring, 80k', { aim: 0, dist: 80000, boost: 1.6 }],
     ['a gravity hazard', { x: 30000, y: 8000, vx: -6, aim: 2.5, dist: 40000, hazard: { control: 0.7, driftAccel: 0.007, jump: 0.55, cap: 1 } }],
     ['a black hole\'s well', { x: 20000, y: -15000, aim: 1, dist: 30000, gravity: { strength: 2e6, minRadius: 3000 } }],
-    ['a big, slow-turning ship', { ship: 'bastion.json', aim: 2.8, dist: 30000, vx: 10 }],
-    ['a galleon, turning while moving', { ship: 'galleon.json', aim: -2, dist: 45000, vy: 15 }],
+    ['a big, slow-turning ship', { ship: 'fixtures/bastion.json', aim: 2.8, dist: 30000, vx: 10 }],
+    ['a galleon, turning while moving', { ship: 'fixtures/galleon.json', aim: -2, dist: 45000, vy: 15 }],
     ['helm: along the nose', { helm: true, angle: 0.7, aim: 2, dist: 30000, vx: 20 }],
     ['thrust held from the burn on', { aim: 0.4, dist: 30000, holdW: true }],
   ];
@@ -105,7 +105,7 @@ describe('the jump overlay is where the jump lands', () => {
   });
 
   it('a charge waits on its last tick for a slow ship to come round, and never burns off the aim', () => {
-    const r = jump({ ship: 'bastion.json', aim: 3.1, dist: 30000 });
+    const r = jump({ ship: 'fixtures/bastion.json', aim: 3.1, dist: 30000 });
     expect(r.held).toBeGreaterThan(1);
     expect(Math.abs(wrapAngle(r.angle - 3.1))).toBeLessThan(JUMP_ALIGN);
   });

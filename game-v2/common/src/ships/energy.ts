@@ -500,6 +500,19 @@ export function feedShare(d: ShipDerived, c: Charge | undefined, part: number, u
 }
 
 /**
+ * How much harder the ship pushes forward boosting (the autopilot's and the HUD's estimate). A pool ship's is its
+ * `boostFactor`; a ports ship folds each engine's boost into its thrust share (boostFactor 1), so it is the forward
+ * engines' boost multipliers, weighted by their push
+ */
+export function boostOf(d: ShipDerived): number {
+  const L = d.ports;
+  if (!L) return d.boostFactor ?? 2.2;
+  let f = 0, b = 0;
+  for (const t of d.thrusters) { const v = Math.max(0, -t.force[1]); f += v; b += v * L.boostMul[t.part]; }
+  return f > 0 ? b / f : 1;
+}
+
+/**
  * The share of their push the engines pushing along `dir` (ship-local) get,
  * each on its own feed group's share (the core's maneuvering is its own, never
  * short): what flight scales the thrust by

@@ -1,6 +1,7 @@
 {
  "name": "Pyreclast",
  "catalogVersion": 1,
+ "power": "ports",
  "paint": "#2a201c",
  "rigid": true,
  "parts": [

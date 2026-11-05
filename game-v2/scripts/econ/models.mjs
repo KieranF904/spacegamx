@@ -214,7 +214,7 @@ const E = [
   ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 30, 40, 'alloy', 'Brutal thrust at full power all the time, and a brutal drain. It has no boost: nothing is held back to give.'],
   ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 25, 60, 'steel', 'The balanced main engine.'],
   ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 3, 6, 'titanium', 'Near-free cruising, never in a hurry.'],
-  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 1.0, 32.5, 100, 'cobalt', 'The long-haul racer: fast, and faster still.'],
+  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 0.4, 32.5, 100, 'cobalt', 'The long-haul racer: fast, and faster still.'],
 ];
 
 const BLAST = TUNING.partBlast;
@@ -286,8 +286,8 @@ const OTHER = [
   ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, intake: 40, hpScale: 0.6 }, 'Touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screen it touches before the ship does; it does not feed engines.', 'power'],
   ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, intake: 80, hpScale: 0.6 }, 'Touching Drive Cells form a bank that feeds the engines and Burst Strafers it touches before the ship does; it does not feed guns.', 'power'],
   ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 450, discharge: 150, intake: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
-  ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, minePulse: 0.9, hpScale: 0.7 }, 'A pulsed cutter that takes ore from rock, and a poor weapon.', 'utility'],
-  ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, minePulse: 1.2, hpScale: 0.8 }, 'A heavy cutter that breaks harder rock than a mining laser.', 'utility'],
+  ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 30, priority: 2, facing: true, mining: true, minePulse: 0.9, hpScale: 0.7 }, 'A pulsed cutter that takes ore from rock, and a poor weapon.', 'utility'],
+  ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 20, priority: 2, facing: true, mining: true, minePulse: 1.2, hpScale: 0.8 }, 'A heavy cutter that breaks harder rock than a mining laser.', 'utility'],
   ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges (30 a crate, one every 2 seconds) that stick to rock, blink for a second, then blow it open. Harmless to ships.', 'utility'],
   ['utility_siphon', 'Siphon', 'siphon', ['sq'], 12, 'steel', { demand: 10, priority: 2, facing: true, siphon: true, hpScale: 0.7 }, 'Drinks gas from gas pockets and sends it back to the ship.', 'utility'],
   ['utility_scanner', 'Scanner', 'scanner', ['sq'], 5, 'alloy', { demand: 4, priority: 3, range: 2400, hpScale: 0.6 }, 'A quick short sweep that reads rocks and finds seams.', 'utility'],
@@ -675,7 +675,10 @@ for (const m of models) m.carriesFlow = true;
     else if (m.weapon || m.thrust || m.shield || m.gyro || m.jumpCapacity || m.mining || m.siphon || m.range || m.strafe || m.tow) {
       // (Consumers: In at the back, a little over the draw, split over the back cells; an engine's its own intake)
       const side = m.mounting?.angle === 'right', cells = side ? [0] : backCells(m.pieces[0]), area = PIECE_AREA[m.pieces[0]];
-      const draw = m.thrust ? (m.intake ?? m.demand) * area : (m.demand ?? 0) * area * 1.5;
+      // (An engine's in ports carry its boosted burn (power/ports.ts: a thruster takes all its lines bring), so a store or a
+      // strong line in front of it keeps a boost going; its intake if that's more)
+      const boosted = (m.boost ?? 1) > 1 ? (m.demand ?? 0) * (1 + 2.2 * (m.boostDrain ?? 0)) : 0;
+      const draw = m.thrust ? Math.max((m.intake ?? m.demand) ?? 0, m.demand ?? 0, boosted) * area : (m.demand ?? 0) * area * 1.5;
       // (A side mount (mounting angle 'right': it fires at right angles to the edge it bolts on, the W in its own frame) takes there)
       if (draw > 0) m.ports = ports('in', side ? 'W' : 'S', cells, Math.max(4, Math.ceil(draw / cells.length)));
     }

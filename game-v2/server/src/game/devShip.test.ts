@@ -36,9 +36,9 @@ describe('dev ship swap', () => {
     expect(saved.hangar[saved.activeSlot].blueprint.name).toBe(own);
 
     // Another one, then back
-    t.send({ type: 'devShip', ship: 'corsair' } as any);
+    t.send({ type: 'devShip', ship: 'wisp' } as any);
     server.step(2);
-    expect(bridge.get(pid)!.blueprint.name).toBe('Corsair');
+    expect(bridge.get(pid)!.blueprint.name).toBe('Wisp');
     expect((server.pilots as any).persistable(conn, server.pilots.get(conn)!).ship.blueprint.name).toBe(own);
     t.send({ type: 'devShip' } as any);
     server.step(2);
@@ -73,7 +73,7 @@ describe('dev ship swap', () => {
     const own = p.ship.blueprint.name, slots = p.hangar.length;
     const storage = JSON.stringify(p.storage);
     server.step(5);
-    t.send({ type: 'devShip', ship: 'bastion' } as any);
+    t.send({ type: 'devShip', ship: 'sunspear' } as any);
     server.step(2);
     expect(server.getShips().get(pid)!.blueprint.name).not.toBe(own);
     server.pilots.onDestroyed(conn, 0, 0, 0, 0, 0);
@@ -97,7 +97,7 @@ describe('dev ship swap', () => {
     const pid = t.getPlayerId();
     const own = server.getShips().get(pid)!.blueprint.name;
     server.step(5);
-    t.send({ type: 'devShip', ship: 'hammerhead' } as any);
+    t.send({ type: 'devShip', ship: 'sunspear' } as any);
     server.step(2);
     expect(server.getShips().get(pid)!.blueprint.name).toBe(own);
   });

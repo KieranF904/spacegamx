@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
-import { autoWire, createShipState, placeGeometry, wireCells, cellKey, type Blueprint } from '@space-game/common';
+import { readFileSync } from 'fs';
+import { autoWire, parseBlueprint, createShipState, placeGeometry, wireCells, cellKey, type Blueprint } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { DEAD_NET, NET_COLORS, powerReport, pruneWires, whereOnShip } from './wireEdit';
@@ -92,9 +93,9 @@ describe('the power overlay', () => {
     expect(whereOnShip([0.5, 0.5], [0, 0], [6, 6])).toBe('amidships');
   });
 
-  it('the starter plans power everything they carry, auto-wired', () => {
+  it('the pool-era starter plans (kept as fixtures) power everything they carry, auto-wired', () => {
     for (const name of ['sparrow-t', 'corsair']) {
-      const bp = clone(bridge.library.get(name)!);
+      const bp = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/fixtures', `${name}.json`), 'utf-8'));
       expect(report(bp).warnings, name).toEqual([]);
     }
   });

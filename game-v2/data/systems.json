@@ -269,7 +269,7 @@
         {
           "id": "wreck_drift_picket",
           "name": "Picket Ship Ninefold",
-          "blueprint": "corsair",
+          "blueprint": "wisp",
           "position": {
             "x": 63817,
             "y": 87135
@@ -280,7 +280,7 @@
         {
           "id": "wreck_morrow",
           "name": "Wreck of the Morrow",
-          "blueprint": "galleon",
+          "blueprint": "hauler",
           "position": {
             "x": 30824,
             "y": -19815
@@ -291,7 +291,7 @@
         {
           "id": "wreck_kestrel",
           "name": "Kestrel (abandoned)",
-          "blueprint": "lancer",
+          "blueprint": "halberd",
           "position": {
             "x": -18805,
             "y": -33432
@@ -302,7 +302,7 @@
         {
           "id": "wreck_perseverance",
           "name": "Colony Ship Perseverance",
-          "blueprint": "hammerhead",
+          "blueprint": "hauler",
           "position": {
             "x": -45617,
             "y": -36494
@@ -316,7 +316,7 @@
         {
           "id": "wreck_vesta_1",
           "name": "Graveyard: Rook",
-          "blueprint": "corsair",
+          "blueprint": "wisp",
           "position": {
             "x": 29060,
             "y": 10256
@@ -327,7 +327,7 @@
         {
           "id": "wreck_vesta_2",
           "name": "Graveyard: Halberd",
-          "blueprint": "lancer",
+          "blueprint": "halberd",
           "position": {
             "x": 29693,
             "y": 11770
@@ -338,7 +338,7 @@
         {
           "id": "wreck_vesta_3",
           "name": "Graveyard: Wren",
-          "blueprint": "corsair",
+          "blueprint": "wisp",
           "position": {
             "x": 27426,
             "y": 13569
@@ -349,7 +349,7 @@
         {
           "id": "wreck_vesta_4",
           "name": "Graveyard: Pike",
-          "blueprint": "lancer",
+          "blueprint": "halberd",
           "position": {
             "x": 28421,
             "y": 14479
@@ -360,7 +360,7 @@
         {
           "id": "wreck_tenth_vigil",
           "name": "Dreadnought Vigil",
-          "blueprint": "hammerhead",
+          "blueprint": "sunspear",
           "position": {
             "x": -104000,
             "y": -30000
@@ -374,7 +374,7 @@
         {
           "id": "wreck_tenth_lantern",
           "name": "Frigate Lantern",
-          "blueprint": "lancer",
+          "blueprint": "halberd",
           "position": {
             "x": -101400,
             "y": -31400
@@ -385,7 +385,7 @@
         {
           "id": "wreck_tenth_oath",
           "name": "Frigate Oath",
-          "blueprint": "lancer",
+          "blueprint": "halberd",
           "position": {
             "x": -106400,
             "y": -28100
@@ -396,7 +396,7 @@
         {
           "id": "wreck_tenth_cinder",
           "name": "Gunboat Cinder",
-          "blueprint": "corsair",
+          "blueprint": "wisp",
           "position": {
             "x": -102800,
             "y": -26900
@@ -1016,7 +1016,7 @@
         {
           "id": "wreck_ash_corsair",
           "name": "Raided: Wick",
-          "blueprint": "corsair",
+          "blueprint": "wisp",
           "position": {
             "x": -35135,
             "y": 27150
@@ -1238,7 +1238,7 @@
         {
           "id": "wreck_icebound",
           "name": "Icebound Bastion",
-          "blueprint": "bastion",
+          "blueprint": "sunspear",
           "position": {
             "x": 28983,
             "y": 19322
@@ -1498,8 +1498,8 @@
       "derelicts": [
         {
           "id": "wreck_drifter",
-          "name": "Drifting Hammerhead",
-          "blueprint": "hammerhead",
+          "name": "Drifting Quarry",
+          "blueprint": "quarry",
           "position": {
             "x": -42923,
             "y": 27315
@@ -1690,7 +1690,7 @@
         {
           "id": "wreck_last_light",
           "name": "Last Light",
-          "blueprint": "bastion",
+          "blueprint": "sunspear",
           "position": {
             "x": -15009,
             "y": 9649
@@ -1700,8 +1700,8 @@
         },
         {
           "id": "wreck_void_lancer",
-          "name": "Silent Lancer",
-          "blueprint": "lancer",
+          "name": "Silent Halberd",
+          "blueprint": "halberd",
           "position": {
             "x": 6330,
             "y": 22154
@@ -1942,8 +1942,8 @@
       "derelicts": [
         {
           "id": "wreck_slag",
-          "name": "Slag Corsair",
-          "blueprint": "corsair",
+          "name": "Slag Wisp",
+          "blueprint": "wisp",
           "position": {
             "x": -25788,
             "y": 48353
@@ -1953,8 +1953,8 @@
         },
         {
           "id": "wreck_cinder_galleon",
-          "name": "Burnt Galleon",
-          "blueprint": "galleon",
+          "name": "Burnt Hauler",
+          "blueprint": "hauler",
           "position": {
             "x": 53809,
             "y": -26905
@@ -2148,8 +2148,8 @@
       "derelicts": [
         {
           "id": "wreck_maw_hammer",
-          "name": "Hammerhead at the Brink",
-          "blueprint": "hammerhead",
+          "name": "Quarry at the Brink",
+          "blueprint": "quarry",
           "position": {
             "x": 26419,
             "y": -15411
@@ -2159,8 +2159,8 @@
         },
         {
           "id": "wreck_maw_galleon",
-          "name": "Galleon of the Lost",
-          "blueprint": "galleon",
+          "name": "Hauler of the Lost",
+          "blueprint": "hauler",
           "position": {
             "x": -28728,
             "y": 6630
@@ -2337,8 +2337,8 @@
       "derelicts": [
         {
           "id": "wreck_glass_lancer",
-          "name": "Frozen Lancer",
-          "blueprint": "lancer",
+          "name": "Frozen Halberd",
+          "blueprint": "halberd",
           "position": {
             "x": 10000,
             "y": 18000
@@ -2349,7 +2349,7 @@
         {
           "id": "wreck_glass_galleon",
           "name": "The Shattered Bell",
-          "blueprint": "galleon",
+          "blueprint": "hauler",
           "position": {
             "x": -24000,
             "y": -14000
@@ -3436,8 +3436,8 @@
       "derelicts": [
         {
           "id": "wreck_nest_gullet_a",
-          "name": "Gutted Corsair",
-          "blueprint": "corsair",
+          "name": "Gutted Wisp",
+          "blueprint": "wisp",
           "position": {
             "x": -2300,
             "y": 11200
@@ -3447,8 +3447,8 @@
         },
         {
           "id": "wreck_nest_gullet_b",
-          "name": "Stripped Lancer",
-          "blueprint": "lancer",
+          "name": "Stripped Halberd",
+          "blueprint": "halberd",
           "position": {
             "x": 2500,
             "y": 13600
@@ -3513,8 +3513,8 @@
         },
         {
           "id": "wreck_nest_hulk_ne",
-          "name": "Drifting Corsair",
-          "blueprint": "corsair",
+          "name": "Drifting Wisp",
+          "blueprint": "wisp",
           "position": {
             "x": 17000,
             "y": -17500
@@ -3524,8 +3524,8 @@
         },
         {
           "id": "wreck_nest_hulk_nw",
-          "name": "Drifting Lancer",
-          "blueprint": "lancer",
+          "name": "Drifting Halberd",
+          "blueprint": "halberd",
           "position": {
             "x": -15500,
             "y": -19500

@@ -105,7 +105,7 @@ function fixtures(): { specs: PilotSpec[]; corsair: Blueprint; shipCfg: ReturnTy
   for (const id of ['test-strafer', 'test-tow-hauler', 'test-surge-striker']) if (!dev[id]) throw new Error(`dev ship ${id} missing`);
   return {
     shipCfg,
-    corsair: bp('corsair.json'),
+    corsair: bp('fixtures/corsair.json'),
     specs: [
       { name: 'strafer', bp: dev['test-strafer'], dx: 0, dy: 0 },
       { name: 'tug', bp: dev['test-tow-hauler'], dx: 500, dy: 0 },

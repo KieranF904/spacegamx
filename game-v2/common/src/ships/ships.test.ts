@@ -23,9 +23,9 @@ import { FRICTION, BOOST_FACTOR, WORLD_SIZE } from '../constants.js';
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const inventory: InventoryStub = readShipJson('inventory.json');
-const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
+const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
 const sparrow = () => parseBlueprint(sparrowText);
-const prospectorBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/prospector.json'), 'utf-8'));
+const prospectorBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/prospector.json'), 'utf-8'));
 const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 
 function p(uid: number, piece: string, fn: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart {
@@ -543,7 +543,7 @@ describe('flow network and solver (M4)', () => {
   });
 
   it('auto-wiring (a design with no wires) reaches every part that makes, stores or draws power', () => {
-    for (const name of ['sparrow-t', 'prospector', 'corsair', 'bastion', 'hauler', 'lancer']) {
+    for (const name of ['fixtures/sparrow-t', 'fixtures/prospector', 'fixtures/corsair', 'fixtures/bastion', 'fixtures/hauler', 'fixtures/lancer']) {
       const b = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, `blueprints/${name}.json`), 'utf-8'));
       expect(b.wires, name).toBeUndefined();
       const d = derive(b);
@@ -612,8 +612,8 @@ describe('health curve and dirty bands', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('pre-made ships', () => {
-  const PREMADE = ['corsair', 'lancer', 'galleon', 'bastion', 'hammerhead'];
+describe('pre-made ships (the pool-era library, kept as fixtures)', () => {
+  const PREMADE = ['fixtures/corsair', 'fixtures/lancer', 'fixtures/galleon', 'fixtures/bastion', 'fixtures/hammerhead'];
 
   it.each(PREMADE)('%s is valid with the inventory, fully powered, and can fly', (file) => {
     const b = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, `blueprints/${file}.json`), 'utf-8'));
@@ -630,8 +630,8 @@ describe('pre-made ships', () => {
       const d = derive(parseBlueprint(readFileSync(join(SHIP_DATA_DIR, `blueprints/${f}.json`), 'utf-8')));
       return d.maxThrust.forward / d.mass;
     };
-    expect(accel('lancer')).toBeGreaterThan(accel('galleon'));
-    expect(accel('galleon')).toBeGreaterThan(accel('bastion'));
+    expect(accel('fixtures/lancer')).toBeGreaterThan(accel('fixtures/galleon'));
+    expect(accel('fixtures/galleon')).toBeGreaterThan(accel('fixtures/bastion'));
   });
 });
 
@@ -729,7 +729,7 @@ describe('jump drive', () => {
   };
 
   it('beats flying on long legs; flying keeps up on short hops', () => {
-    const lancer = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/lancer.json'), 'utf-8'));
+    const lancer = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/lancer.json'), 'utf-8'));
     for (const b of [sparrow(), withCoils(lancer, 12)]) {
       // A long trip: chaining jumps (flying while the drive recharges) is at least twice as quick
       for (const dist of [50000, 100000, 150000]) expect(travel(b, dist, true), `${b.name} ${dist}`).toBeLessThan(travel(b, dist, false) / 2);
@@ -841,7 +841,7 @@ describe('jump drive', () => {
     expect(at(0).range).toBeGreaterThanOrEqual(29000);
     expect(at(0).cooldown / 60).toBeLessThanOrEqual(25.01);
     // A big hull: coils bring it up to the sweet spot
-    const lancer = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/lancer.json'), 'utf-8'));
+    const lancer = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/lancer.json'), 'utf-8'));
     const bare = derive(lancer()), coiled = derive(withCoils(lancer(), 12));
     expect(bare.jumpRatio).toBeLessThan(0.6);
     expect(coiled.jumpRatio).toBeGreaterThan(1);
@@ -855,7 +855,7 @@ describe('jump drive', () => {
     expect(mk5.range).toBeLessThan(mk1.range * 1.3);
     expect(mk5.cooldown).toBeLessThan(mk1.cooldown);
     expect(mk5.cooldown).toBeGreaterThan(mk1.cooldown * 0.7);
-    const lancer = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/lancer.json'), 'utf-8'));
+    const lancer = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/lancer.json'), 'utf-8'));
     const plain = derive(withCoils(lancer(), 6)), fine = derive(withCoils(lancer(), 6, 'titanium'));
     expect(fine.jumpRatio).toBeGreaterThan(plain.jumpRatio);
     expect(fine.jumpRange).toBeGreaterThan(plain.jumpRange);

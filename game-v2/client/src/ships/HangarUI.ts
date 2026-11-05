@@ -46,6 +46,7 @@ import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
 import { powerReport, pruneWires, DEAD_NET, type PowerReport } from './wireEdit';
+import { portsReport, portsWarnings } from './portsReport';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -335,7 +336,7 @@ export class HangarUI {
       this.bp = clone(this.deps.getBlueprint());
       this.plan = undefined;
     } else {
-      this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, parts: [
+      this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, power: 'ports', parts: [
         { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
       ] };
       this.plan = undefined;
@@ -534,7 +535,7 @@ export class HangarUI {
   }
 
   private newBlueprint(): void {
-    this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, parts: [
+    this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, power: 'ports', parts: [
       { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
     ] };
     this.plan = undefined;
@@ -781,6 +782,8 @@ export class HangarUI {
   /** The design's derived state (as built whole), and its power report */
   private rederive(): void {
     const { catalog, tuning, econ } = this.deps;
+    // (Every design runs on the ports core: an older pool design opened here is shown and saved as one; the server decides too)
+    this.bp.power = 'ports';
     try {
       this.derived = createShipState(catalog, tuning, 0, this.bp, 0).derived;
     } catch {
@@ -1306,6 +1309,7 @@ export class HangarUI {
    */
   private powerHtml(): string {
     const rep = this.power, d = this.derived;
+    if (d?.ports) return this.portsHtml(d.ports);
     if (!rep || !d) return '';
     let html = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>`;
     const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.generators.length || n.batteries.length || n.demand > 0);
@@ -1353,6 +1357,18 @@ export class HangarUI {
       html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
         + `${rep.warnings.length > 6 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 6} more</div>` : ''}</div>`;
     } else if (nets.length) html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Everything that uses power has it.</div>';
+    return html + '<div style="margin-bottom:12px"></div>';
+  }
+
+  /** Power on a ports design: what the generators make and the stores hold, and what the routing leaves out (portsReport.ts). No port glyphs or link overlay on the grid yet */
+  private portsHtml(L: NonNullable<ShipDerived['ports']>): string {
+    const r = portsReport(L), n0 = (v: number) => Math.round(v).toLocaleString();
+    const name = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
+    const warn = portsWarnings(r, name);
+    let html = '<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>';
+    html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="Power moves only out of an out port into an in port across a shared edge: generators give at their front, stores take at the back and give at the front, guns and engines take at their back, the core takes at its sides">Generation ${n0(r.supply)}/s · stores hold ${n0(r.store)} · ${r.links} link${r.links === 1 ? '' : 's'}</div>`;
+    if (warn.length) html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${warn.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w)}</div>`).join('')}${warn.length > 6 ? `<div style="color:#6b7a93">and ${warn.length - 6} more</div>` : ''}</div>`;
+    else html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Every gun, engine and tool is fed.</div>';
     return html + '<div style="margin-bottom:12px"></div>';
   }
 

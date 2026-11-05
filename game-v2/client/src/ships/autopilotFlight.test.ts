@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
-  EntityType, loadCatalog, createShipState, parseBlueprint, stepShipPhysics, accelAlong, chargeTotal, FULL_CHARGE,
+  EntityType, loadCatalog, createShipState, parseBlueprint, stepShipPhysics, accelAlong, chargeTotal, boostOf, FULL_CHARGE,
   jumpTuning, jumpPhase, jumpRange, pilotJumpStep, type StarSystemData, type ShipTuning, type FlightBody, type Charge, type ShipDerived,
 } from '@space-game/common';
 import tuningJson from '../../../data/ships/tuning.json';
@@ -59,7 +59,7 @@ function fly(d: ShipDerived, x: number, y: number, opts: Opts = {}) {
   let charge: Charge = { ...FULL_CHARGE };
   let arrived = false;
   const ap = new Autopilot({
-    state, tuning, accel: () => accelAlong(d, [0, -1]), boostFactor: () => d.boostFactor ?? 2.2, energy: () => chargeTotal(d, charge),
+    state, tuning, accel: () => accelAlong(d, [0, -1]), boostFactor: () => boostOf(d), energy: () => chargeTotal(d, charge),
     jumpPhase: () => (opts.jumps ? jumpPhase(body.jump ?? 0, jt).phase : 'cooldown'), jumpReach: () => jumpRange(d, jt),
     objective: () => null, interact: () => {}, arrived: () => { arrived = true; }, message: () => {}, lead: () => opts.delay ?? 0,
     drive: () => {
@@ -107,7 +107,7 @@ function fly(d: ShipDerived, x: number, y: number, opts: Opts = {}) {
 const sparrow = ship('sparrow-t');
 /** The starter on the legacy thrusters it flew before (no rated speed): what the old timings were measured on */
 const sparrowUnrated = (() => {
-  const bp = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
   for (const q of bp.parts) if (q.fn === 'engine_ion_drive') q.fn = 'thruster';
   return createShipState(catalog, tuning, 1, bp, 0).derived;
 })();
@@ -185,7 +185,7 @@ describe('autopilot flight', () => {
   it('a ship that has to brake turns round once, cleanly, and stays turned round', () => {
     // Coming in fast with the input delay (the sparrow), and ships with next to no reverse thrust
     const runs = [fly(sparrow, 2500, 0, { v0: { x: 60, y: 0 }, angle: 0, delay: 6 })];
-    for (const name of ['hauler', 'galleon', 'bastion']) {
+    for (const name of ['hauler', 'ark-tender', 'sunspear']) {
       const d = ship(name);
       runs.push(fly(d, 3000, 1200), fly(d, 20000, 0, { delay: 6 }), fly(d, 9000, 0, { jumps: true }));
     }

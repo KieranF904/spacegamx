@@ -17,7 +17,7 @@ import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { buildFlightInputs, newFlightControls, payMining, gunLoadTick, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
+import { boostOf, buildFlightInputs, newFlightControls, payMining, gunLoadTick, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -982,7 +982,7 @@ export class ShipClient {
   /** How much harder the local ship's engines push boosting (×) */
   localBoostFactor(): number {
     const ship = this.store.get(this.opts.state.playerId);
-    return ship && ship.kind === 'ship' ? ship.derived.boostFactor ?? 2.2 : 1;
+    return ship && ship.kind === 'ship' ? boostOf(ship.derived) : 1;
   }
 
   /**
