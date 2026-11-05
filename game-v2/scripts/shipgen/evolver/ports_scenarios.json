@@ -1,0 +1,321 @@
+{
+ "_comment": "Scenarios for the ports evolver (ports_app.py, ports_evolve.py): the lab's parts and rules (docs/design/energy-ports-2026-11.md). silhouette: a file in samples/. level: parts up to that level. allow: part ids it may use (empty: all). budget: credits (the lab's first-guess costs). points: build points (1 a cell below level 10, 1.6 below 24, 2.5 above; the core is free). start_parts: [type, x, y, rot, flip] placed on the start (the right half and centre line). power_s: seconds of the power phase. fire: {on, off} seconds (no off: held). enemy_armour: against each gun's pen (the penetration table). incoming: the hits (damage, pen, dps, from, spread, flank, max_s). seeds: one hit run each. weights: each measure against the scenario's scales (what counts as 1). Measures: damage_before_down (damage dealt, after the enemy's armour, until the core goes), sustained_dps (power phase), systems_kept, alive_s, half_s, wiring (for each unfed port, the share of its shortest path to power built with conduits pointing the right way, a conduit counting fully once power reaches it; at most 1 a port), live_conduits (still carrying power at the end of the power phase), engine_zone, thrust_to_mass. Penalties: unpowered (guns, engines and shields getting under a quarter of what they want over the power phase), blocked (guns with the ship in front, engines with it behind), no_engines, shape_off, clashes (two outs or two ins facing). effects: what each consumable effect is worth: burn, splash and mark as a share of the hit's own damage; slow and disrupt build a suppression that stretches the time between incoming hits (at most 60% fewer). Measures for the feed layer: feed_wiring (for each Combiner or feed gun with no feed, the share of its shortest path to a tank built with pipes), fx_share (the share of damage dealt by shots carrying an effect), feed_used. idle: parts doing nothing (a store or line nothing passes through, a generator wasting every line, pipes and tanks on a feed network without both a tank and a user). scales: what counts as 1 for each weighted measure (fixed, so penalties weigh the same whatever the start). detached: parts not joined to the core through touching parts (the game refuses them).",
+ "scenarios": [
+  {
+   "name": "Gunship: head-on fight",
+   "about": "Most hits at the nose; scored on damage dealt before going down. Starter-to-mid parts.",
+   "silhouette": "gunship.json",
+   "level": 20,
+   "allow": [],
+   "budget": 4000,
+   "points": 220,
+   "start_parts": [],
+   "power_s": 30,
+   "fire": {
+    "on": 3,
+    "off": 5
+   },
+   "enemy_armour": 2,
+   "incoming": {
+    "damage": 40,
+    "pen": 2,
+    "dps": 200,
+    "from": "front",
+    "spread": 50,
+    "flank": 0.35,
+    "max_s": 120
+   },
+   "seeds": [
+    1,
+    2
+   ],
+   "weights": {
+    "damage_before_down": 1.0,
+    "sustained_dps": 0.3,
+    "systems_kept": 0.3,
+    "engine_zone": 0.1,
+    "wiring": 0.15,
+    "live_conduits": 0,
+    "feed_wiring": 0.1
+   },
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.12,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "penalties": {
+    "unpowered": 0.1,
+    "blocked": 0.3,
+    "no_engines": 1.0,
+    "shape_off": 0.02,
+    "clashes": 0.02,
+    "idle": 0.02,
+    "detached": 0.3
+   },
+   "shape": {
+    "margin": 2
+   },
+   "effects": {
+    "burn": 0.5,
+    "splash": 0.4,
+    "mark": 0.2,
+    "slow": 0.6,
+    "disrupt": 0.6
+   },
+   "scales": {
+    "damage_before_down": 2000,
+    "sustained_dps": 100,
+    "systems_kept": 60,
+    "engine_zone": 1,
+    "wiring": 1,
+    "live_conduits": 10,
+    "feed_wiring": 1,
+    "alive_s": 60,
+    "half_s": 30
+   }
+  },
+  {
+   "name": "Capital: Sunbreaker",
+   "about": "A capital ship built around a Sunbreaker at the nose: six lines of 60 to fill, heavy armour to beat (4), hard hits from the front.",
+   "silhouette": "capital.json",
+   "level": 36,
+   "allow": [],
+   "budget": 20000,
+   "points": 520,
+   "start_parts": [
+    [
+     "sunbreaker",
+     11,
+     3,
+     0,
+     false
+    ]
+   ],
+   "power_s": 30,
+   "fire": {
+    "on": 3,
+    "off": 5
+   },
+   "enemy_armour": 4,
+   "incoming": {
+    "damage": 60,
+    "pen": 3,
+    "dps": 300,
+    "from": "front",
+    "spread": 60,
+    "flank": 0.4,
+    "max_s": 150
+   },
+   "seeds": [
+    1,
+    2
+   ],
+   "weights": {
+    "damage_before_down": 1.0,
+    "sustained_dps": 0.3,
+    "systems_kept": 0.3,
+    "engine_zone": 0.1,
+    "wiring": 0.15,
+    "live_conduits": 0,
+    "feed_wiring": 0.1
+   },
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.06,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "penalties": {
+    "unpowered": 0.1,
+    "blocked": 0.3,
+    "no_engines": 1.0,
+    "shape_off": 0.02,
+    "clashes": 0.02,
+    "idle": 0.02,
+    "detached": 0.3
+   },
+   "shape": {
+    "margin": 2
+   },
+   "effects": {
+    "burn": 0.5,
+    "splash": 0.4,
+    "mark": 0.2,
+    "slow": 0.6,
+    "disrupt": 0.6
+   },
+   "scales": {
+    "damage_before_down": 8000,
+    "sustained_dps": 300,
+    "systems_kept": 60,
+    "engine_zone": 1,
+    "wiring": 1,
+    "live_conduits": 10,
+    "feed_wiring": 1,
+    "alive_s": 60,
+    "half_s": 30
+   }
+  },
+  {
+   "name": "Raider: burn them down",
+   "about": "Against lightly armoured ships that burn well: fire is worth as much as the hit itself. Level 20, so feed parts are open to it.",
+   "silhouette": "gunship.json",
+   "level": 20,
+   "allow": [],
+   "budget": 4000,
+   "points": 220,
+   "start_parts": [],
+   "power_s": 30,
+   "fire": {
+    "on": 3,
+    "off": 5
+   },
+   "enemy_armour": 1,
+   "incoming": {
+    "damage": 40,
+    "pen": 2,
+    "dps": 200,
+    "from": "front",
+    "spread": 50,
+    "flank": 0.35,
+    "max_s": 120
+   },
+   "seeds": [
+    1,
+    2
+   ],
+   "weights": {
+    "damage_before_down": 1.0,
+    "sustained_dps": 0.3,
+    "systems_kept": 0.3,
+    "engine_zone": 0.1,
+    "wiring": 0.15,
+    "live_conduits": 0,
+    "feed_wiring": 0.1
+   },
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.12,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "penalties": {
+    "unpowered": 0.1,
+    "blocked": 0.3,
+    "no_engines": 1.0,
+    "shape_off": 0.02,
+    "clashes": 0.02,
+    "idle": 0.02,
+    "detached": 0.3
+   },
+   "shape": {
+    "margin": 2
+   },
+   "effects": {
+    "burn": 1.0,
+    "splash": 0.5,
+    "mark": 0.2,
+    "slow": 0.5,
+    "disrupt": 0.5
+   },
+   "scales": {
+    "damage_before_down": 2000,
+    "sustained_dps": 100,
+    "systems_kept": 60,
+    "engine_zone": 1,
+    "wiring": 1,
+    "live_conduits": 10,
+    "feed_wiring": 1,
+    "alive_s": 60,
+    "half_s": 30
+   }
+  },
+  {
+   "name": "Siege: crack the armour",
+   "about": "Against heavy armour (4): penetration is everything. It starts with a pair of Longbarrels (pen 3) at the nose to build round; tungsten feeds and joined lines should earn their place.",
+   "silhouette": "gunship.json",
+   "level": 28,
+   "allow": [],
+   "budget": 8000,
+   "points": 320,
+   "start_parts": [
+    [
+     "longbarrel",
+     11,
+     6,
+     0,
+     false
+    ]
+   ],
+   "power_s": 30,
+   "fire": {
+    "on": 3,
+    "off": 5
+   },
+   "enemy_armour": 4,
+   "incoming": {
+    "damage": 40,
+    "pen": 2,
+    "dps": 200,
+    "from": "front",
+    "spread": 50,
+    "flank": 0.35,
+    "max_s": 120
+   },
+   "seeds": [
+    1,
+    2
+   ],
+   "weights": {
+    "damage_before_down": 1.0,
+    "sustained_dps": 0.3,
+    "systems_kept": 0.3,
+    "engine_zone": 0.1,
+    "wiring": 0.15,
+    "live_conduits": 0,
+    "feed_wiring": 0.1
+   },
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.12,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "penalties": {
+    "unpowered": 0.1,
+    "blocked": 0.3,
+    "no_engines": 1.0,
+    "shape_off": 0.02,
+    "clashes": 0.02,
+    "idle": 0.02,
+    "detached": 0.3
+   },
+   "shape": {
+    "margin": 2
+   },
+   "effects": {
+    "burn": 0.2,
+    "splash": 0.2,
+    "mark": 0.2,
+    "slow": 0.4,
+    "disrupt": 0.4
+   },
+   "scales": {
+    "damage_before_down": 2000,
+    "sustained_dps": 100,
+    "systems_kept": 60,
+    "engine_zone": 1,
+    "wiring": 1,
+    "live_conduits": 10,
+    "feed_wiring": 1,
+    "alive_s": 60,
+    "half_s": 30
+   }
+  }
+ ]
+}

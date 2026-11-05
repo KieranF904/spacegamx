@@ -1,0 +1,1681 @@
+{
+  "_comment": "People (econ/dialogue.ts): who you can talk to, where, and what they say. Stations: talk while docked (station window, People). Space and surfaces: fly close and press X. Jobs name their person; a job's talk steps carry their own lines.",
+  "people": [
+    {
+      "id": "vance",
+      "name": "Commander Vance",
+      "title": "Commander, Sol Central Station",
+      "color": "#fbbf24",
+      "at": {
+        "station": "sol_station_central"
+      },
+      "greeting": [
+        "Pilot. What do you need?",
+        "Good to see you in one piece.",
+        "Make it quick, pilot: the buoys won't fix themselves."
+      ],
+      "topics": [
+        {
+          "id": "buoys",
+          "label": "What happened to the relay buoys?",
+          "lines": [
+            {
+              "say": "Three relay buoys in the outer belt went dark in one night, and the ships I sent after them didn't come back."
+            },
+            {
+              "say": "Before the last one died it recorded a pulse. No words, no source. Just a pattern, repeating."
+            },
+            {
+              "if": {
+                "done": "main_03"
+              },
+              "then": [
+                {
+                  "say": "The pirates know something about it. Maya at Borealis thinks she knows more."
+                }
+              ],
+              "else": [
+                {
+                  "say": "Get yourself a real ship first. Then we'll talk about where it's coming from."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "work",
+          "label": "Who else around here has work?",
+          "lines": [
+            {
+              "say": "Old Brannoch at the Mining Outpost always wants ore. Merchant Joe at the Trade Hub pays for hauling. Lieutenant Achebe at Sentinel Watch wants the Drift cleared."
+            },
+            {
+              "say": "The Directorate's hiring too, out at the Helios Array, for whichever of its big projects is falling over this month. Third this year. Their engineers swear they built it right."
+            },
+            {
+              "say": "And once you're flying something better than a Sparrow, Ilse Marrow at the Lagrange yard will teach you to build."
+            }
+          ]
+        },
+        {
+          "id": "ark",
+          "label": "Who are the Ark?",
+          "lines": [
+            {
+              "say": "An old order, older than this station. About one in ten people you'll meet keep some of their rules: a bag packed by the door, mostly, and leaving when one of their heralds says so."
+            },
+            {
+              "say": "Their hall's in the inner system: the plain grey keep nobody puts on a postcard. Keeper Vey runs its books, and he's always got some errand that wants a pilot."
+            },
+            {
+              "if": {
+                "not": {
+                  "known": "ark_01"
+                }
+              },
+              "then": [
+                {
+                  "reveal": "ark_01"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "okafor",
+      "name": "Harbourmaster Okafor",
+      "title": "Traffic control, Sol Central",
+      "color": "#7dd3fc",
+      "at": {
+        "station": "sol_station_central"
+      },
+      "greeting": [
+        "Traffic control. Go ahead.",
+        "Okafor. Lanes are quiet today, for once.",
+        "You again. Keeping out of my shipping lanes, I hope?"
+      ],
+      "topics": [
+        {
+          "id": "lanes",
+          "label": "What's beyond Sol?",
+          "lines": [
+            {
+              "say": "Glasswater through the Cyan Rift, east of here: crystal fields, scavengers, nothing too nasty. Borealis, Nebula Prime and Cinder Reach through the gates, each worse than the last."
+            },
+            {
+              "if": {
+                "done": "clearance"
+              },
+              "then": [
+                {
+                  "say": "You're cleared for all of them. The Maw is another matter: Horizon Watch keeps that sealed."
+                }
+              ],
+              "else": [
+                {
+                  "say": "Nobody goes out there without lane clearance from me. Get your ship sorted with Commander Vance first, and I'll see what you're made of."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "stillstones",
+          "label": "What are the stillstones?",
+          "lines": [
+            {
+              "say": "Big grey stones, fifty kilometres across and up. A few to a system: more in Sol, fewer in the bad places. Jump drives run better near them and nobody can tell me why, so half my traffic plans route round them."
+            },
+            {
+              "say": "Fly close and you'll see the faces are too flat, and the veins glow on the night side. The geologists say a mineral formation. The settlers say somebody put them there. I say they're on my charts, and that's all I need."
+            },
+            {
+              "say": "People build on them, too. Now and then a section goes dark and the field weakens, and everyone on it moves house. Very rarely you lose the lot. They build anyway."
+            },
+            {
+              "say": "And a new one turns up maybe once in a lifetime. Borealis charted one a few years back, the Aurora Knot: small and rough. The survey office was insufferable for months."
+            }
+          ]
+        },
+        {
+          "id": "dark",
+          "label": "Which stillstones go dark?",
+          "lines": [
+            {
+              "say": "The old ones, nearly always. The long-worked faces. That yard in the Drift had been bolted to its stone since before my grandmother flew, and a third of the stone went."
+            },
+            {
+              "say": "The Guild says old faces are tired faces. And people settle the good stones first and stay, so of course it's the old sites that go. Stands to reason."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "brannoch",
+      "name": "Old Brannoch",
+      "title": "Foreman, Miners' Guild",
+      "color": "#a3e635",
+      "at": {
+        "station": "sol_station_mining"
+      },
+      "greeting": [
+        "Mind the dust. What d'you want?",
+        "Brannoch. Speak up, the drills are loud.",
+        "Another rock-cracker. Good. We need 'em."
+      ],
+      "topics": [
+        {
+          "id": "ore",
+          "label": "Where's the good ore?",
+          "lines": [
+            {
+              "say": "Iron and nickel in any metal rock. Copper too, if you look: it's the orange flecks."
+            },
+            {
+              "say": "Crystal grows in the hard rocks out in Glasswater. Titanium's in the big ones, further out. You'll want a mining laser for both; guns just bounce off."
+            },
+            {
+              "say": "And mind your tier. A laser that's a grade behind the rock barely scratches it."
+            }
+          ]
+        },
+        {
+          "id": "greyseam",
+          "label": "What's greyseam?",
+          "lines": [
+            {
+              "say": "The dull grey veins in near any rock you crack. Assay calls it a metal-silicate glass. The refinery pulls it out with everything else."
+            },
+            {
+              "say": "It goes in everything: plate, shields, wire, sensor crystal, drive lattices. As long as there's been a Guild, nobody's had a bad word to say about it. It just works."
+            },
+            {
+              "say": "Mind, some batches run better than others, and nobody can tell you why. Luck, the yard says. I've never argued with the yard."
+            }
+          ]
+        },
+        {
+          "id": "seam",
+          "label": "Where's the richest greyseam in Sol?",
+          "lines": [
+            {
+              "say": "Out past the shoal, short of Thule. The Quiet Seam, we call it. Biggest field of grey in Sol, and the cleanest I've ever had assayed."
+            },
+            {
+              "say": "Not a nest on it. Not one heap. Scrapborn build round grey everywhere else you go, and they've never touched that field. Too cold and too far out for 'em, the Guild says."
+            },
+            {
+              "say": "Instruments read flat as a table out there. No odd readings, nothing. The best kind of rock: boring. Mind the Redtooth round Thule."
+            },
+            {
+              "codex": "quiet_seam"
+            }
+          ]
+        },
+        {
+          "id": "traces",
+          "label": "Are trace finds drying up?",
+          "lines": [
+            {
+              "say": "Other way round. More aurum, more voidglass, every year, and most of it where the pilots are thickest."
+            },
+            {
+              "say": "Same rock, mind. The Guild assays the belt every ten years and it hasn't changed. Busy pilots crack the good rock first, they say. Only it's up per rock cracked as well. I've stopped arguing with the ledger."
+            },
+            {
+              "say": "Old Fenn says the ore's alive and follows us about. Fenn says a lot after a double shift."
+            },
+            {
+              "codex": "trace_ledger"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "marrow",
+      "name": "Ilse Marrow",
+      "title": "Shipwright, Lagrange Shipyard",
+      "color": "#93c5fd",
+      "at": {
+        "station": "sol_station_lagrange"
+      },
+      "greeting": [
+        "Mind the welders. What can I build you?",
+        "Marrow. Talk while I work.",
+        "Back again? Show me what you're flying."
+      ],
+      "topics": [
+        {
+          "id": "metals",
+          "label": "Can you build in anything better than alloy?",
+          "if": {
+            "not": {
+              "known": "osei_01"
+            }
+          },
+          "lines": [
+            {
+              "say": "Steel? Not without the licence, and nobody's issued one in years. The old foundry methods were lost when Halcyon closed."
+            },
+            {
+              "say": "There's a metallurgist down on Terra Nova, Dr. Osei, at the Meridian Institute in New Meridian. She's been asking every shipwright in Sol for a pilot. Fly down and see her."
+            },
+            {
+              "reveal": "osei_01"
+            }
+          ]
+        },
+        {
+          "id": "cores",
+          "label": "What goes wrong with a ship?",
+          "lines": [
+            {
+              "say": "Not the greyseam. Plate, shields, drive lattice: it never lets you down. If something goes wrong it's the core, where we drive current through the stuff and read what comes back."
+            },
+            {
+              "say": "Crack a core open under a microscope and as often as not you'll find whiskering: threads through the material, finer than hair. Usually harmless. Usually."
+            },
+            {
+              "say": "The engineers will argue all night about why cores fail: the architecture, the firmware, whoever built the thing. Some batches just run better than others. Luck, I call it."
+            },
+            {
+              "say": "And now and then an old pilot tells me his ship is waking up, when a core starts handling better than it ought to. It's settling in, that's all. Bearings wear smooth; so do cores."
+            }
+          ]
+        },
+        {
+          "id": "ark",
+          "label": "What do you make of Ark ships?",
+          "if": {
+            "known": "ark_01"
+          },
+          "lines": [
+            {
+              "say": "Ark-heavy, we call it, and it isn't a compliment. Leestone in the plate, near twice the weight of titanium, and they fly like it."
+            },
+            {
+              "say": "I've run the numbers on that stone more often than I'd like. Dense, tough enough, no better than titanium, dearer to patch. I can't find a thing it does that's worth the mass."
+            },
+            {
+              "say": "And the core regimen! Strip it, clean it, reseat it, log it, every few weeks, and new parts in long before the old ones fail. Polishing the grey, the yard calls it. Their ships fly no better for it. Discipline, they say. I say it's a lot of spanner time."
+            }
+          ]
+        },
+        {
+          "id": "thule",
+          "label": "Does every core whisker?",
+          "lines": [
+            {
+              "say": "Near enough. Every maker I've had under the scope, sooner or later. Except Thule Works."
+            },
+            {
+              "say": "Small outfit out on the rim. I've cracked a dozen of their cores and never found a thread in one. Their supplier's seam is boring, they say: the cleanest grey in Sol."
+            },
+            {
+              "say": "Or they run them cool and only sell to careful buyers. Pricey, and you'll wait a year for one. Good cores, though. Dull as ditchwater."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "joe",
+      "name": "Merchant Joe",
+      "title": "Trader, Sol Trade Hub",
+      "color": "#f0abfc",
+      "at": {
+        "station": "sol_station_trade"
+      },
+      "greeting": [
+        "Buying or selling?",
+        "Joe's the name, margins are the game.",
+        "Ah, my favourite customer. Probably."
+      ],
+      "topics": [
+        {
+          "id": "rumour",
+          "label": "Heard any rumours?",
+          "if": {
+            "not": {
+              "known": "kerr_01"
+            }
+          },
+          "lines": [
+            {
+              "say": "Rumours are free; it's the truth that costs. All right, here's one."
+            },
+            {
+              "say": "There's a woman living in an old hab module way out past the Lagrange yard, past Jovan's orbit. Buys copper wire by the kilo and never says what for. Calls herself Kerr."
+            },
+            {
+              "say": "Pilots who've gone looking say she pays well, if she likes you."
+            },
+            {
+              "say": "Funny thing: the Prism Relay told me the same one last month, word for word. The rumour boards all share a feed, I suppose."
+            },
+            {
+              "reveal": "kerr_01"
+            }
+          ]
+        },
+        {
+          "id": "prices",
+          "label": "Any tips for trading?",
+          "lines": [
+            {
+              "say": "Every station wants different things, and the wants change every few hours. Green tags on the market mean they're paying over the odds."
+            },
+            {
+              "say": "And don't dump a thousand of one ore in one place. The price sags; give it time and it comes back."
+            }
+          ]
+        },
+        {
+          "id": "convoy",
+          "label": "Ever lost a cargo?",
+          "lines": [
+            {
+              "say": "Once. Biggest deal I ever struck: a whole convoy of plate for the Lagrange yard. It never came in. Not a wreck, not a beacon, nothing."
+            },
+            {
+              "say": "The old traders said I'd got proud and the Gardener pruned me. Something tends the cluster, see, and it doesn't like anyone growing too tall."
+            },
+            {
+              "say": "Pirates, I say. Pirates and cheap insurance. But I've never bet that big again."
+            }
+          ]
+        },
+        {
+          "id": "ark",
+          "label": "What do you make of the Ark?",
+          "lines": [
+            {
+              "say": "Ever notice their heralds always turn up right before the disaster? Never after. Never a week early with a cup of tea."
+            },
+            {
+              "say": "I'm a trader, so I'm a suspicious man, and here's what I suspect: whoever knows when the roof's coming in might be the one holding it up. Plenty on the docks say the same."
+            },
+            {
+              "say": "Achebe says they've just got better listening posts than the Directorate and won't share. That's the Ark all over, she says. Which is worse, I ask you?"
+            },
+            {
+              "codex": "ark_cynics"
+            }
+          ]
+        },
+        {
+          "id": "kessick",
+          "label": "Does the Gardener prune anyone but traders?",
+          "lines": [
+            {
+              "say": "The Kessick relay. Consortium job out on the Jovan lanes, built cheap: stone, copper and glass. Not a gram of greyseam in it, because grey costs money and Kessick didn't have any."
+            },
+            {
+              "say": "Burned in its first month. The old traders said the Gardener pruned it for pride. Pride! It was a relay."
+            },
+            {
+              "say": "Wiring, I say. Cheap wiring in a cheap relay. But you'll never get a believer to tell you what the Gardener's got against copper."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "achebe",
+      "name": "Lieutenant Achebe",
+      "title": "Sol Patrol, Sentinel Watch",
+      "color": "#93c5fd",
+      "at": {
+        "station": "sol_station_sentinel"
+      },
+      "greeting": [
+        "Achebe. Report.",
+        "Sentinel Watch. Keep it brief, pilot.",
+        "Still flying? Good."
+      ],
+      "topics": [
+        {
+          "id": "advice",
+          "label": "Any advice for a new pilot?",
+          "lines": [
+            {
+              "say": "Keep moving. Everything out there hits harder than it looks, and nothing hits a moving target well."
+            },
+            {
+              "say": "If it goes wrong, run for a station: nothing follows you inside. And keep repair kits on your quick bar."
+            }
+          ]
+        },
+        {
+          "id": "scrapborn",
+          "label": "What are the Scrapborn?",
+          "lines": [
+            {
+              "say": "Machines gone feral: drones, tugs, anything with a core in it. It happens to some cores, rarely, and nobody can tell you why. Then they go off and heap greyseam into nests."
+            },
+            {
+              "say": "Every pilot on this station has a theory, and the yard has folklore. I have a quota."
+            },
+            {
+              "say": "The old hands won't fit a part salvaged off one. Cursed, they say. Me, I say second-hand parts are second-hand: you don't know where they've been. That's curse enough."
+            }
+          ]
+        },
+        {
+          "id": "herald",
+          "label": "The herald's word at Tamsin's Claim?",
+          "if": {
+            "done": "ark_04"
+          },
+          "lines": [
+            {
+              "say": "We logged a Redtooth warband through that claim an hour after you pulled the Tamsins out. The Patrol had no sign of it. The Ark did, or says it did."
+            },
+            {
+              "say": "They've never been wrong. Not once I can find, and I've looked. I hate it."
+            },
+            {
+              "say": "They'll have listening posts we don't, out in the Reaches. If they'd share them I'd hate it less."
+            }
+          ]
+        },
+        {
+          "id": "greyhour",
+          "label": "The Ark tender in the Drift nest?",
+          "lines": [
+            {
+              "say": "The Grey Hour. Ark tender, leestone-lined, regimen kept to the letter: her log's the tidiest thing I've ever read. Drive fault, crew off to a Guild tug, core sealed in its cradle."
+            },
+            {
+              "say": "And now there's a Scrapborn nest heaped round her. Polishing the grey every few weeks for years, and her core woke anyway. So much for the regimen."
+            },
+            {
+              "say": "The Keeper will tell you different. He always does."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "osei",
+      "name": "Dr. Imani Osei",
+      "title": "Metallurgist, Meridian Institute",
+      "color": "#fb923c",
+      "at": {
+        "system": "terra_nova_surface",
+        "x": 1500,
+        "y": -1400,
+        "label": "the Meridian Institute in New Meridian, on Terra Nova (descend with X in orbit)"
+      },
+      "craft": {
+        "ship": "sparrow-t",
+        "angle": -1.2,
+        "name": "Institute shuttle"
+      },
+      "moves": [
+        {
+          "if": {
+            "any": [
+              {
+                "step": [
+                  "osei_03",
+                  1
+                ]
+              },
+              {
+                "step": [
+                  "osei_03",
+                  2
+                ]
+              }
+            ]
+          },
+          "at": {
+            "station": "glasswater_station_depot"
+          }
+        }
+      ],
+      "greeting": [
+        "Careful with the samples. What is it?",
+        "Pilot! Come in, come in.",
+        "Osei. You've caught me between experiments, which is the best time."
+      ],
+      "topics": [
+        {
+          "id": "steel",
+          "label": "What makes steel better than alloy?",
+          "lines": [
+            {
+              "say": "Grains. Every metal is made of tiny crystals. Alloy's are coarse, so a crack runs straight through them."
+            },
+            {
+              "say": "Iron with enough nickel, worked hot enough, grows fine grains that turn a crack aside. It's heavier, but it takes twice the punishment."
+            },
+            {
+              "say": "And every grade beyond steel is the same idea, harder: titanium, cobalt, neutronium. Each one needs more ore and more heat than the last."
+            }
+          ]
+        },
+        {
+          "id": "terra_nova",
+          "label": "Why does Terra Nova suit us so well?",
+          "lines": [
+            {
+              "say": "Luck, mostly. The oceans had exactly the salts the colonists needed, the right mix to the decimal. Luck, the first survey team wrote, and nobody has found a better word since."
+            },
+            {
+              "say": "There's a mountain on the far continent that never quite matches its last survey, either. Survey error, the Institute says. Every time."
+            }
+          ]
+        },
+        {
+          "id": "meridian",
+          "label": "Where does New Meridian get its name?",
+          "lines": [
+            {
+              "say": "Nobody knows. It's on the oldest charts the Institute holds, older than the Institute. Every historian has a theory, and the Museum Guild has three."
+            },
+            {
+              "say": "A person, a place left behind, a line on a map. My favourite is that it was a slip on a survey sheet nobody ever bothered to correct. That would be very like us."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kerr",
+      "name": "Sabine Kerr",
+      "title": "Hermit, signal collector",
+      "color": "#c4b5fd",
+      "at": {
+        "system": "sol",
+        "x": -68148,
+        "y": -49800,
+        "label": "an old hab module far out past the Lagrange Shipyard"
+      },
+      "craft": {
+        "ship": "drum",
+        "angle": 0.6,
+        "name": "Kerr's hab"
+      },
+      "greeting": [
+        "You found me. Not many do.",
+        "Shh. I'm listening. ...All right, what?",
+        "Visitors. Twice in one year."
+      ],
+      "topics": [
+        {
+          "id": "listening",
+          "label": "What are you listening for?",
+          "lines": [
+            {
+              "say": "Everything. The stars hiss, the planets hum, and under all of it there's something else. A pulse."
+            },
+            {
+              "say": "I've been out here forty years writing it down. Nobody listens to me, so I listen to it."
+            }
+          ]
+        },
+        {
+          "id": "pulse",
+          "label": "What is the pulse?",
+          "if": {
+            "done": "kerr_02"
+          },
+          "lines": [
+            {
+              "say": "I don't know. I may be the only one in the cluster who'll say so."
+            },
+            {
+              "say": "What I do know: it drifts. Forty years of my notebooks, and every older record I can beg, and its period has moved by a hair. And it has stopped before, for a moment, and started again."
+            },
+            {
+              "say": "And greyseam hums. A grain of it on my bench, faint as anything, and the same shape as the heartbeat. I think they're related. Everyone else has an answer for that. I have notebooks."
+            }
+          ]
+        },
+        {
+          "id": "gap",
+          "label": "Dr. Quinn says your records have a gap.",
+          "if": {
+            "done": "kerr_02"
+          },
+          "lines": [
+            {
+              "say": "Of course Quinn says that. Quinn says it at every chance."
+            },
+            {
+              "say": "Six years, near enough. One winter the hab lost power and the cold got into the drives, and when I had them running again there was nothing on them. Six years of nothing."
+            },
+            {
+              "say": "Quinn says a record with a hole in it isn't a record, so my drift is noise, and my grain only hums because my own gear hears the heartbeat. Maybe. I'm not sure what any of it means. I never said I was."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "orrin",
+      "name": "Depot Chief Orrin",
+      "title": "Shardfall Depot, Glasswater",
+      "color": "#67e8f9",
+      "at": {
+        "station": "glasswater_station_depot"
+      },
+      "greeting": [
+        "Mind the crystal dust; it gets everywhere.",
+        "Orrin. What can the depot do for you?",
+        "Another pilot through the rift. Welcome to Glasswater."
+      ],
+      "topics": [
+        {
+          "id": "glass",
+          "label": "Tell me about Glasswater.",
+          "lines": [
+            {
+              "say": "Crystal fields as far as you can see, and every one of them rings if you hit it right. The scavengers strip anything that stops moving."
+            },
+            {
+              "say": "There's a planet, Halcyon, out on the edge. There was a foundry in its crust once. Sealed now."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pell",
+      "name": "Old Pell",
+      "title": "Retired foundry hand, Prism Relay",
+      "color": "#d6d3d1",
+      "at": {
+        "station": "glasswater_station_relay"
+      },
+      "greeting": [
+        "What.",
+        "Pell. I'm busy doing nothing. What do you want?",
+        "Hm. A pilot."
+      ],
+      "topics": [
+        {
+          "id": "foundry",
+          "label": "What was the Halcyon foundry like?",
+          "if": {
+            "done": "osei_02"
+          },
+          "lines": [
+            {
+              "say": "Hot. Loud. The best years of my life. We poured steel there that'd turn a railgun slug."
+            },
+            {
+              "say": "We ran the same stock through her for years, ore off one seam, thicker with greyseam than anything else in the cluster, and the yield got better every month. The process settling in, the chemists said."
+            },
+            {
+              "say": "Then the furnace got... strange. Kept burning after we cut the fuel. The Institute sealed it and sent us home."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wren",
+      "name": "Tobias Wren",
+      "title": "Stranded hauler",
+      "color": "#fcd34d",
+      "at": {
+        "system": "glasswater",
+        "x": 41000,
+        "y": 15000,
+        "label": "a dead hauler drifting just past the east edge of the crystal field"
+      },
+      "craft": {
+        "ship": "hauler",
+        "angle": 2.2,
+        "name": "Hauler Lucky Penny (adrift)"
+      },
+      "greeting": [
+        "Oh, thank the stars, a ship!",
+        "Still here. Still drifting.",
+        "Wren. You came back!"
+      ],
+      "topics": []
+    },
+    {
+      "id": "maya",
+      "name": "Researcher Maya",
+      "title": "Borealis Research Outpost",
+      "color": "#a5f3fc",
+      "at": {
+        "station": "borealis_station_outpost"
+      },
+      "greeting": [
+        "Careful, the instruments are calibrated.",
+        "Maya. Have you heard it too?",
+        "Welcome to the best ears in the inner systems."
+      ],
+      "topics": [
+        {
+          "id": "brood",
+          "label": "What do the Brood make of the signal?",
+          "lines": [
+            {
+              "say": "They hate it. When it peaks, every nest in Borealis scatters at once. Nothing else in the cluster does that."
+            },
+            {
+              "say": "They nest where the aurora's thickest, too, and in there my receivers hear nothing but hiss."
+            },
+            {
+              "say": "Animal behaviour, my colleagues say. They're probably right. I still write down every peak."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "quinn",
+      "name": "Dr. Quinn",
+      "title": "Observatory, Nebula Prime",
+      "color": "#c084fc",
+      "at": {
+        "station": "nebula_research_station"
+      },
+      "greeting": [
+        "Quinn. I'm in the middle of a theory.",
+        "Ah, the pilot. Sit, sit.",
+        "You're letting the cold in."
+      ],
+      "topics": [
+        {
+          "id": "theory",
+          "label": "What's your theory?",
+          "lines": [
+            {
+              "say": "The signal comes through cleaner here than anywhere in the cluster. That's why Rustjaw hides his receivers in the cloud."
+            },
+            {
+              "say": "And my theory is that the heartbeat is a natural effect, nothing more. The Maw, most likely, or the Glasswater pulsar setting something ringing. Most physicists agree with me."
+            },
+            {
+              "say": "Boring, isn't it? Most good theories are."
+            },
+            {
+              "codex": "quinn_theory"
+            }
+          ]
+        },
+        {
+          "id": "catalogue",
+          "label": "What's in the observatory's catalogue?",
+          "lines": [
+            {
+              "say": "Most of the heartbeat is hum: featureless, the same everywhere, as far back as there are records. But a handful of signatures stand out of it, and we catalogue those by number."
+            },
+            {
+              "say": "7-K is the famous one, strongest near Terra Nova. Some read it as aimed at the planet. It's just the closest world to it, and people like to feel looked at."
+            },
+            {
+              "say": "And Sabine Kerr? Her humming grain of greyseam is her own gear picking up the heartbeat, and her drift is noise in a broken record. Ask her about the years missing from her notebooks, while you're there."
+            }
+          ]
+        },
+        {
+          "id": "spike",
+          "label": "Has a signature ever spiked?",
+          "if": {
+            "done": "main_08"
+          },
+          "lines": [
+            {
+              "say": "Once, that I've filed. Years back, a Rustjaw relay in the cloud put a spike on one of the catalogued signatures, strong enough to burn out receivers across Nebula Prime for a night."
+            },
+            {
+              "say": "Afterwards? Nothing. Nothing weakened, nothing moved, the whole catalogue the same the next week and the next year. A pirate relay, overdriven. I filed it under equipment."
+            },
+            {
+              "codex": "rustjaw_spike"
+            }
+          ]
+        },
+        {
+          "id": "recording",
+          "label": "Sabine Kerr's recording of the Helios Array?",
+          "if": {
+            "done": "bw_03"
+          },
+          "lines": [
+            {
+              "say": "Instrument drift. Her recorder warms up as it runs, its response shifts, and anything faint at the start looks like it's creeping in."
+            },
+            {
+              "say": "I've told her that about everything she's ever sent me. She keeps sending them, and I keep reading them, which I suppose says something about one of us."
+            }
+          ]
+        },
+        {
+          "id": "filaments",
+          "label": "Sabine Kerr's threads?",
+          "if": {
+            "done": "kerr_03"
+          },
+          "lines": [
+            {
+              "say": "Current through a metal-silicate glass, in a damp hab, off a boost cell? Electrochemistry. You grow dendrites: threads. Every first-year lab grows them, usually by accident."
+            },
+            {
+              "say": "And nothing the second time because the first run used up whatever was on the surface. The shape in the hum is her own gear hearing its own cell. I'm sorry. I'd like it to be more interesting too."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hale",
+      "name": "Forgemaster Hale",
+      "title": "The Ember Forge, Cinder Reach",
+      "color": "#f87171",
+      "at": {
+        "station": "cinder_station_forge"
+      },
+      "greeting": [
+        "Speak up, the forge is loud.",
+        "Hale. What d'you need forged?",
+        "Still alive out here? You're tougher than you look."
+      ],
+      "topics": [
+        {
+          "id": "giant",
+          "label": "Why is the red giant swelling?",
+          "lines": [
+            {
+              "say": "Ask the Cult and they'll tell you it's the end of everything. Ask me and I'll show you the forge's records."
+            },
+            {
+              "say": "The swelling starts the same year as the first logged heartbeat. Same year, near enough the same month."
+            },
+            {
+              "say": "Coincidence. Has to be. Stars don't listen to radio."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kask",
+      "name": "Warden Teodora Kask",
+      "title": "Horizon Watch, the Maw",
+      "color": "#f472b6",
+      "at": {
+        "station": "maw_station_watch"
+      },
+      "greeting": [
+        "Warden Kask. You're a long way from home.",
+        "The Watch stands. What do you need?",
+        "Pilot."
+      ],
+      "topics": [
+        {
+          "id": "shards",
+          "label": "What's in the shard ring?",
+          "lines": [
+            {
+              "say": "Half a world, and what's left of the people who lived on it. Salvagers bring us scraps of their writing: etched plates, cracked and scorched. Nothing else they built still works."
+            },
+            {
+              "say": "Our translators swear half their words for ore match our own trade terms. Convergent language, they call it. Miners name things the same way everywhere."
+            },
+            {
+              "say": "The plates don't agree on how they ended, and the translations agree even less. A sickness in their machines, says one. A war. A failing star. A god arriving."
+            },
+            {
+              "say": "Me, I think they lived next to a black hole. That usually settles it."
+            }
+          ]
+        },
+        {
+          "id": "ark",
+          "label": "The Ark's camp at the edge of the ring?",
+          "if": {
+            "known": "ark_07"
+          },
+          "lines": [
+            {
+              "say": "Kol's people. They come out every season to dig leestone at the edge of the ring, and every season we fly fewer of them home."
+            },
+            {
+              "say": "Dense, dark and good for nothing. We buy it because nobody else will, at a price that says so. Dying over a rock. My crews call them the stone-eaters."
+            },
+            {
+              "say": "And the grain in the stone, that they make so much of? The Maw's pressures. Put enough weight on any rock and it'll look like somebody meant it."
+            }
+          ]
+        },
+        {
+          "id": "age",
+          "label": "How old is the shard ring?",
+          "lines": [
+            {
+              "say": "Older than anyone's counting would like. The plates have calendar marks, and our translators read them as well as they read anything, which is badly."
+            },
+            {
+              "say": "By the Watch's count the ring broke about eleven thousand years ago, and nothing in it is older than the breaking. Give or take whatever the Maw people meant by a year."
+            },
+            {
+              "codex": "maw_breaking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sander",
+      "name": "Foreman Ide Sander",
+      "title": "Ice crews, Thawline",
+      "color": "#7ff0d0",
+      "at": {
+        "station": "borealis_station_thawline"
+      },
+      "greeting": [
+        "Shut the hatch, you're letting the warm out.",
+        "Sander. If it's ice, I'll buy it. If it's trouble, try Maya.",
+        "Back from the Shoal? Count your fingers."
+      ],
+      "topics": [
+        {
+          "id": "rime",
+          "label": "What's aurora rime?",
+          "lines": [
+            {
+              "say": "Ice that grew in the aurora's light, out in the Shoal. It's shot through with greyseam, same as any rock, but quiet. Scan a floe and it barely hums."
+            },
+            {
+              "say": "Press it into panes and a receiver behind one hears nothing but hiss. Maya's people buy all we make. So does Rustjaw, I hear, which I don't like."
+            }
+          ]
+        },
+        {
+          "id": "peaks",
+          "label": "What happens when the signal peaks?",
+          "lines": [
+            {
+              "say": "The Brood go mad. Every one of them bursts out of the Curtain at once and scatters, and they drop rime all over the place doing it."
+            },
+            {
+              "say": "My crews go out and sweep it up. Free rime is free rime. We keep the camp's lights low until they've settled, mind."
+            }
+          ]
+        },
+        {
+          "id": "road",
+          "label": "What's the ice road?",
+          "lines": [
+            {
+              "say": "The old run from the Sol gate out to Glacia. The first crews' landers flew it back in the early centuries, before the gates were properly mapped. Rimeholt's bastion watched over it."
+            },
+            {
+              "say": "Watched over it before we came, too. The first crews found it standing, lights and all. Nobody built it that anyone remembers."
+            }
+          ]
+        },
+        {
+          "id": "gardener",
+          "label": "Do the ice crews have superstitions?",
+          "lines": [
+            {
+              "say": "Plenty. The old ones say something tends the cluster. The Gardener, they call it. Keep your camp small and careful and it brings you luck; get proud and it cuts you down."
+            },
+            {
+              "say": "Every crew's got a story. The convoy that never came in, the refinery that burned the week it opened. Some say it lives in Sol's light, some behind the gate that closed. My lot say the Maw."
+            },
+            {
+              "say": "Me, I say a refinery burns when somebody skimps on the seals. But I don't build big out here, and I don't brag."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aske",
+      "name": "Brother Aske",
+      "title": "New Halden pilgrim, Glacia",
+      "color": "#a9cfd8",
+      "at": {
+        "system": "glacia_surface",
+        "x": 5800,
+        "y": -7000,
+        "label": "the Halden site on Glacia's ice (descend with X in orbit)"
+      },
+      "craft": {
+        "ship": "sparrow-t",
+        "angle": 0.8,
+        "name": "Pilgrim's skiff"
+      },
+      "greeting": [
+        "Peace on you, pilot. Mind the ice; it remembers.",
+        "You came down. Most only fly over.",
+        "Aske. Sit with me a while. The stone is patient; so am I."
+      ],
+      "topics": [
+        {
+          "id": "faith",
+          "label": "What do the New Halden believe?",
+          "lines": [
+            {
+              "say": "That there is a sleeper in the stone round Sol, and it is kind. The Halden were its priests. They sealed its gifts away for us, here and on Ashfall, in little cases of slate."
+            },
+            {
+              "say": "We are their heirs. When we have gathered enough of the gifts, it will wake, and the cluster will be warm again."
+            },
+            {
+              "say": "You look doubtful. Everyone does, at first."
+            }
+          ]
+        },
+        {
+          "id": "caches",
+          "label": "Why are the caches so small?",
+          "if": {
+            "done": "ice_04"
+          },
+          "lines": [
+            {
+              "say": "Every Halden site has one, and every one is small. The Guild says they simply ran out of whatever they were sealing."
+            },
+            {
+              "say": "I say they were rationing it. For us. A priest doesn't hand a child the whole fire."
+            }
+          ]
+        },
+        {
+          "id": "ark",
+          "label": "What do the New Halden think of the Ark?",
+          "lines": [
+            {
+              "say": "The Ark keeps our god in a grey box and calls it inventory. Why else does nobody see inside their halls? Why else do their heralds know when the ground will shake, unless they keep the thing that shakes it?"
+            },
+            {
+              "say": "Their Keeper says they keep stone and ledgers and nothing else. A man who only keeps ledgers doesn't need walls that thick."
+            }
+          ]
+        },
+        {
+          "id": "age",
+          "label": "How old are the Halden?",
+          "lines": [
+            {
+              "say": "Older than the Guild will credit, and the Guild credits a great deal. Their slate-daters put the Glacia site deep in the past, and one of the little cases that came out of the Maw's debris at nearly fourteen thousand years."
+            },
+            {
+              "say": "The priests kept the stone for longer than anyone remembers. The Guild says slate dates badly, and the Maw dates worse. The Guild says a great many things."
+            },
+            {
+              "codex": "halden_dating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "holt",
+      "name": "Warden Imre Holt",
+      "title": "Warden of Farwatch",
+      "color": "#fca5a5",
+      "at": {
+        "station": "sol_station_farwatch"
+      },
+      "greeting": [
+        "Farwatch. You came a long way out.",
+        "Still in one piece? Out here that counts for something.",
+        "Holt. What've you seen out there?"
+      ],
+      "topics": [
+        {
+          "id": "reaches",
+          "label": "What are the Reaches?",
+          "lines": [
+            {
+              "say": "Everything past this fort. The patrol doesn't go out there, so nobody else's law does either."
+            },
+            {
+              "say": "The pirates have a fortress on the rim, the Hollow Crown. Their veterans fly better plate than anything you'll meet inside Jovan's orbit."
+            },
+            {
+              "say": "Lose a ship out there and you lose what was in its hold. Your wreck keeps a while, if you can get back to it."
+            }
+          ]
+        },
+        {
+          "id": "safe",
+          "label": "Where is it safe?",
+          "lines": [
+            {
+              "say": "Inside Jovan's orbit the patrol keeps the peace: nothing hostile follows you in there, and the yards rebuild what you lose."
+            },
+            {
+              "say": "Between there and here it's contested. The Lanes, the Drift, the Graveyard. Bring a ship you built yourself."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ark_herald",
+      "name": "A herald in grey",
+      "title": "Herald",
+      "color": "#9ca3af",
+      "at": {
+        "station": "sol_station_ark"
+      },
+      "greeting": [
+        "You must leave."
+      ],
+      "topics": [
+        {
+          "id": "when",
+          "label": "When?",
+          "lines": [
+            {
+              "say": "Nine hours."
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "label": "Why?",
+          "lines": [
+            {
+              "say": "I carry the word."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ark_keeper",
+      "name": "Keeper Anselm Vey",
+      "title": "Keeper, the Ark Hall",
+      "color": "#cbd5e1",
+      "at": {
+        "station": "sol_station_ark"
+      },
+      "greeting": [
+        "Keeper Vey. Sign the ledger; then we can talk.",
+        "Pilot. The Hall keeps early hours and long books. What do you need?",
+        "You're back. Good. I have you down as reliable."
+      ],
+      "topics": [
+        {
+          "id": "order",
+          "label": "What is the Ark?",
+          "lines": [
+            {
+              "say": "An order of duty. It started in Sol so long ago that nobody has the founding on file, and I have looked: I keep the files."
+            },
+            {
+              "say": "About one in ten of the people you'll meet belong, one way or another. Some keep a bag by the door and nothing else. Some come here and keep everything."
+            },
+            {
+              "say": "And we're not a church, whatever you've heard. No gods, no miracles. Service and discipline. It's a great deal less exciting than people want it to be."
+            }
+          ]
+        },
+        {
+          "id": "practices",
+          "label": "Why does the Ark do things the way it does?",
+          "lines": [
+            {
+              "say": "Everyone keeps a bag by the door and leaves when a herald says so. That one isn't a practice; that's just sense."
+            },
+            {
+              "say": "Short tenures, on the stillstones and everywhere else: complacency kills, and a crew that stays too long loses its edge. Homesteads spread well apart, because small towns evacuate faster. Homes built light, because they're easier to leave."
+            },
+            {
+              "say": "The core regimen is discipline, and pride in one's equipment. We retire old machinery early and scatter it, for accountability and inventory control. And we don't cycle a machine that needn't be cycled; that's energy discipline."
+            },
+            {
+              "say": "And we build in leestone where we can afford it. Tradition, and durability. The shipwrights laugh at that one. Shipwrights laugh at most things that aren't theirs."
+            }
+          ]
+        },
+        {
+          "id": "heralds",
+          "label": "How do the heralds know?",
+          "lines": [
+            {
+              "say": "The word comes down. I keep the books."
+            },
+            {
+              "say": "Each word goes in the ledger: the date, the place, the time given. Then a second line for the day it came true. I've never had to leave the second line blank."
+            },
+            {
+              "say": "The Directorate's auditors say we only write down the ones that land. They're welcome to come and count. They never stay long enough."
+            }
+          ]
+        },
+        {
+          "id": "rivals",
+          "label": "What about the Directorate, and the New Halden?",
+          "lines": [
+            {
+              "say": "The Directorate runs the lights. We were here before the lights. They would like our heralds to file notice with their emergency office in triplicate, ahead of time. I've explained to them that ahead of time is exactly what a herald is."
+            },
+            {
+              "say": "The New Halden say we've got their god put away somewhere. I've done the inventory. If it's here, it isn't on the books, and everything here is on the books."
+            }
+          ]
+        },
+        {
+          "id": "relic",
+          "label": "People say the Ark guards something from the first ship.",
+          "lines": [
+            {
+              "say": "Because of the name. Everyone asks, sooner or later."
+            },
+            {
+              "say": "The Ark has never said it keeps anything but stone and ledgers, and I keep the ledgers. You may draw your own conclusions. Most people do, and then tell me what they are."
+            }
+          ]
+        },
+        {
+          "id": "greyhour",
+          "label": "The Grey Hour, in the Drift?",
+          "lines": [
+            {
+              "say": "The Grey Hour was a good tender with a good crew, and her log is in order to the last line. I have the countersigned copy."
+            },
+            {
+              "say": "A drive fault, a crew that followed the book, and a hull left in the Drift. The Scrapborn heap round any hull with grey in its plate; they always have. Her core is sealed in its cradle, where the log says it is."
+            },
+            {
+              "say": "Lieutenant Achebe says it woke. Lieutenant Achebe hasn't been inside to look. Neither, I grant you, have I."
+            }
+          ]
+        },
+        {
+          "id": "minute",
+          "label": "Did the Ark oppose Bellwether?",
+          "if": {
+            "done": "bw_01"
+          },
+          "lines": [
+            {
+              "say": "The Hall's minutes are the Hall's. If you've read one that came out of a crate, Marek has been packing with the wrong paper again. I'll speak to him."
+            },
+            {
+              "say": "The Directorate asked us for reasons. We keep books, pilot, not reasons."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ark_quartermaster",
+      "name": "Quartermaster Rhee",
+      "title": "Quartermaster, the Ark Hall",
+      "color": "#a8a29e",
+      "at": {
+        "station": "sol_station_ark"
+      },
+      "greeting": [
+        "Stores. Sign for it, then take it.",
+        "Rhee. If it isn't on the shelf, we don't have it.",
+        "Rank first, then stock. What do you need?"
+      ],
+      "topics": [
+        {
+          "id": "stock",
+          "label": "What do you sell?",
+          "lines": [
+            {
+              "say": "Kits, bonds, plain plate, to anyone. Leestone plate to those the Hall knows."
+            },
+            {
+              "say": "Prices are fair and they don't move. We buy leestone ore, too, better than anyone. Not hard. Nobody else buys it at all."
+            }
+          ]
+        },
+        {
+          "id": "old",
+          "label": "Why is everything here so old?",
+          "lines": [
+            {
+              "say": "It isn't old. It's logged. Nothing goes on that shelf till it's been checked, and nothing stays on it long enough to wear."
+            },
+            {
+              "say": "Outsiders see grey and think dusty. Run a finger along it. Go on."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ark_expedition",
+      "name": "Expedition Master Idunn Kol",
+      "title": "Ark expedition, the Maw's edge",
+      "color": "#78716c",
+      "at": {
+        "system": "the_maw",
+        "x": 28500,
+        "y": 7600,
+        "label": "the Ark's leestone camp at the edge of the shard ring"
+      },
+      "craft": {
+        "ship": "ark-tender",
+        "angle": 2.6,
+        "name": "Ark Tender Patience"
+      },
+      "greeting": [
+        "You came out. Mind the Cult: they watch the Cinder gate, and they don't like anyone heading this way.",
+        "Kol. Speak while I work; the shift is short.",
+        "Another pilot at the edge. Sit down before the disk gets in your eyes."
+      ],
+      "topics": [
+        {
+          "id": "why",
+          "label": "Why mine here?",
+          "lines": [
+            {
+              "say": "Because it's richest here. The halls need leestone, and the Maw has more of it than anywhere."
+            },
+            {
+              "say": "A useless rock, they say. Too heavy, too dear, does nothing steel can't. We mine it anyway. The halls are built of it, and the halls stand."
+            }
+          ]
+        },
+        {
+          "id": "back",
+          "label": "How many of your people don't come back?",
+          "lines": [
+            {
+              "say": "Many. The disk, the Cult, the spawn out of the shards. A rig gets caught in the pull and that's that."
+            },
+            {
+              "say": "Many don't come back. That's the duty. We knew it when we signed. The ones who think it's foolish are welcome to stay home."
+            }
+          ]
+        },
+        {
+          "id": "watch",
+          "label": "What does Horizon Watch make of you?",
+          "lines": [
+            {
+              "say": "Warden Kask's crews call us the stone-eaters. They buy our ore when we're short of hold space, at a price I'd be ashamed to name, and then they ask why we bother."
+            },
+            {
+              "say": "They say the grain in it is the Maw's pressures. Could be. I don't mine it for the grain."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ark_depot",
+      "name": "Marek",
+      "title": "Depot hand, the Ark Depot",
+      "color": "#94a3b8",
+      "at": {
+        "system": "sol",
+        "x": 62000,
+        "y": 108000,
+        "label": "the Ark Depot, a plain stone store moored out past the Drift"
+      },
+      "craft": {
+        "ship": "hauler",
+        "angle": 1.1,
+        "name": "The Ark Depot"
+      },
+      "greeting": [
+        "Depot. Mind the stacks.",
+        "Marek. If you're here for the stock, the Keeper'll have told you. If not, you're lost.",
+        "Visitors. We get two a year, and one's the Keeper's auditor."
+      ],
+      "topics": [
+        {
+          "id": "stock",
+          "label": "What do you keep here?",
+          "lines": [
+            {
+              "say": "Old stock. Core cradles, pumps, coil packs, every one taken out of service years before it wore out. It comes here, it gets logged, and then it goes out again a few crates at a time, somewhere else."
+            },
+            {
+              "say": "Accountability and inventory control, the Keeper calls it. I call it moving boxes."
+            }
+          ]
+        },
+        {
+          "id": "stone",
+          "label": "Why isn't the depot built of leestone?",
+          "lines": [
+            {
+              "say": "Cheap stone, old stock. Leestone's for halls and homes, not sheds."
+            },
+            {
+              "say": "It's burned twice, mind. Ordinary stone, ordinary wiring: ordinary fires, the inspectors said, both times."
+            },
+            {
+              "say": "The sceptics on Sol Central love that. If the Ark knows everything, they say, why does its own depot burn? Fair question. I tell them nobody was hurt either time, and the stock was mostly out. Then they ask why, and I tell them I move boxes."
+            }
+          ]
+        },
+        {
+          "id": "paper",
+          "label": "Anything turn up in the crates?",
+          "if": {
+            "done": "bw_01"
+          },
+          "lines": [
+            {
+              "say": "Paper. The Hall packs old stock in old paper. Inventories, mostly, which is the Ark all over: even the packing's got a ledger."
+            },
+            {
+              "say": "This one isn't inventory. A page of Hall minutes, years old, about the Helios Array. Here, have it. I move boxes."
+            },
+            {
+              "codex": "ark_minute"
+            },
+            {
+              "say": "It says the Hall opposed it, and gave no reason. They never give a reason for anything; try asking a herald. The Directorate went ahead anyway, so what good did it do?"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tamsin",
+      "name": "Bren Tamsin",
+      "title": "Settler, Tamsin's Claim",
+      "color": "#d6b98c",
+      "at": {
+        "system": "sol",
+        "x": 160000,
+        "y": -92000,
+        "label": "Tamsin's Claim, a homestead out in the Reaches past Farwatch"
+      },
+      "craft": {
+        "ship": "quarry",
+        "angle": 0.4,
+        "name": "Tamsin homestead"
+      },
+      "moves": [
+        {
+          "if": {
+            "any": [
+              {
+                "done": "ark_04"
+              },
+              {
+                "step": [
+                  "ark_04",
+                  2
+                ]
+              },
+              {
+                "step": [
+                  "ark_04",
+                  3
+                ]
+              }
+            ]
+          },
+          "at": {
+            "station": "sol_station_farwatch"
+          }
+        }
+      ],
+      "greeting": [
+        "This is a claim, not a port. State your business.",
+        "Tamsin. If you're selling something, we've got it already."
+      ],
+      "topics": [
+        {
+          "id": "claim",
+          "label": "How is the claim?",
+          "lines": [
+            {
+              "say": "Hard rock, harder neighbours, and ours. My grandmother staked it. Nobody's taking it off us."
+            }
+          ]
+        },
+        {
+          "id": "after",
+          "label": "Are you all right?",
+          "if": {
+            "done": "ark_04"
+          },
+          "lines": [
+            {
+              "say": "Alive, which I'm told I should be grateful for. Farwatch says a warband went through the claim an hour after we left."
+            },
+            {
+              "say": "A herald, and a pilot, and not one word of why. If I'd known I'd have... well. I'd have left. That's the worst of it."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helios_director",
+      "name": "Director Nadia Mbeki",
+      "title": "Director, the Helios Directorate",
+      "color": "#f1f5f9",
+      "at": {
+        "station": "sol_station_helios"
+      },
+      "greeting": [
+        "Mbeki. You have five minutes; I've budgeted six.",
+        "Pilot. Good. The schedule likes you.",
+        "The Seat runs on time. Sit down, and so will you."
+      ],
+      "topics": [
+        {
+          "id": "directorate",
+          "label": "What does the Directorate do?",
+          "lines": [
+            {
+              "say": "Everything you don't notice. The lights on Sol Central, the lane beacons, the water on Terra Nova, power to half the stations in the cluster. When we do it well, nobody knows our name."
+            },
+            {
+              "say": "The Array feeds most of it. We've run the cluster's works from this ring for longer than anyone has run anything, except the Ark, and the Ark doesn't run anything."
+            }
+          ]
+        },
+        {
+          "id": "projects",
+          "label": "What keeps wrecking your projects?",
+          "lines": [
+            {
+              "say": "Fourteen major works in eleven years, every one lost at the worst possible moment: commissioning, or the week after. A refinery, two relays, a lane-lighting programme. Every inquiry says bad luck, a bad batch, bad weather."
+            },
+            {
+              "say": "I don't need to know what. I need it to stop."
+            },
+            {
+              "say": "Bellwether stops it. That's what you're helping build."
+            }
+          ]
+        },
+        {
+          "id": "shield",
+          "label": "What is the shield against?",
+          "lines": [
+            {
+              "say": "Against loss. I know to the credit what a failed project costs this Directorate, and Bellwether is built to take that number to zero."
+            },
+            {
+              "say": "What it stops is an engineering question, and my engineers tell me a shield doesn't need a name for a thing to stop it. The numbers agree with them. I go by the numbers."
+            }
+          ]
+        },
+        {
+          "id": "ark",
+          "label": "Does the Ark have a view on Bellwether?",
+          "lines": [
+            {
+              "say": "The Ark has a view on everything and a reason for nothing. Trust us, they say. Show us, we say. They never do."
+            },
+            {
+              "say": "People say the Hall objected. People say a great deal about the Hall. Bellwether went to review like any work its size, and the review found for us."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helios_engineer",
+      "name": "Engineer Tove Rask",
+      "title": "Performance engineer, the Helios Seat",
+      "color": "#fcd34d",
+      "at": {
+        "station": "sol_station_helios"
+      },
+      "greeting": [
+        "Rask. Have you seen this week's chart? You should see this week's chart.",
+        "Mind the cables: live, and beautiful.",
+        "Pilot! Efficiencies compounding. Sit, sit."
+      ],
+      "topics": [
+        {
+          "id": "chart",
+          "label": "What do your charts show?",
+          "lines": [
+            {
+              "say": "Output per tonne of greyseam on the rail, week on week. It ought to be flat: a tonne of greyseam in, a tonne's worth of output out."
+            },
+            {
+              "say": "It isn't flat. It climbs, and the climb gets steeper. Efficiencies compounding. The array's bedding in, the way a good engine does."
+            },
+            {
+              "say": "The Director likes one number, and that's the losses. I like this one. They'll both come right with Bellwether on."
+            }
+          ]
+        },
+        {
+          "id": "drones",
+          "label": "Who schedules the Helios drones?",
+          "lines": [
+            {
+              "say": "Nobody here. The drones keep the old schedule, older than the Directorate's survey, and it's never been worth the cost of rewriting. They do the work; I chart it."
+            },
+            {
+              "say": "Their logs number some segments past a hundred and twenty. Legacy numbering. Every new engineer finds it and gets excited, and then gets used to it."
+            }
+          ]
+        },
+        {
+          "id": "whisker",
+          "label": "Do the Seat's cores whisker?",
+          "lines": [
+            {
+              "say": "Some. We scope every core on the rail once a month. A few threads, usually harmless."
+            },
+            {
+              "say": "The ones running above spec show it a little more often, as it happens. Heat, the yard says: work a core hard and it shows. We work ours very hard."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Fusion Plant
+Mk II · Large · Block · 4 cells
+Hull · mass338 hp · 11.2
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power out+192/s
+
+== partStats (stats rows) ==
+GradeMk II · Large
+Power out+192
+Hull · mass338 hp · 11.2
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 338
+
+== familyLabel ==
+Generators
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+plenty of power, heavy, big blast
+
+== keyStats ==
++192 power
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 18","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Large","area":4,"hp":338.40000000000003,"mass":11.2,"firepower":0,"toughness":338.40000000000003,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"supply":192}

@@ -5,11 +5,11 @@ export {
   NetworkModuleRegistry, 
   moduleRegistry, 
   createModule 
-} from './NetworkModule';
+} from './NetworkModule.js';
 
-export { InputModule, InputData, createEmptyInput, inputsEqual } from './InputModule';
-export { TransformModule, TransformData, createDefaultTransform } from './TransformModule';
-export { VelocityModule, VelocityData, createZeroVelocity } from './VelocityModule';
-export { OrbitModule, createNoOrbit } from './OrbitModule';
-export { HealthModule, HealthData, createHealth, isAlive, healthPercent } from './HealthModule';
-export { AIModule, AIData, NetAIState, NetAIStateValue, createIdleAI, getAIStateName } from './AIModule';
+export { InputModule, InputData, createEmptyInput, inputsEqual } from './InputModule.js';
+export { TransformModule, TransformData, createDefaultTransform } from './TransformModule.js';
+export { VelocityModule, VelocityData, createZeroVelocity } from './VelocityModule.js';
+export { OrbitModule, createNoOrbit } from './OrbitModule.js';
+export { HealthModule, HealthData, createHealth, isAlive, healthPercent } from './HealthModule.js';
+export { AIModule, AIData, NetAIState, NetAIStateValue, createIdleAI, getAIStateName } from './AIModule.js';

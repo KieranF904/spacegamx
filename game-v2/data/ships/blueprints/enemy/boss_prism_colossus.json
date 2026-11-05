@@ -1,0 +1,517 @@
+{
+ "name": "Prism Colossus",
+ "catalogVersion": 1,
+ "power": "ports",
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "composite",
+   "x": -2,
+   "y": -3,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 1,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "composite",
+   "x": 2,
+   "y": -3,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": -3,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -2,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "composite",
+   "x": -1,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "composite",
+   "x": 1,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 2,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": 3,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": -4,
+   "y": -1,
+   "rot": 3,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": 4,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "composite",
+   "x": -4,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "facing": "W"
+  },
+  {
+   "uid": 18,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -3,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "sq",
+   "fn": "core",
+   "material": "composite",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 3,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "composite",
+   "x": 4,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "facing": "E"
+  },
+  {
+   "uid": 26,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -5,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -4,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": -2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 30,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 31,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 0,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 32,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 33,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": 2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 34,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 4,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 36,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 5,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 37,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -4,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 38,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -3,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 39,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -2,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 40,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -1,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 0,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 42,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 1,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 43,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 2,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 3,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 4,
+   "y": 2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": -3,
+   "y": 3,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 47,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": -1,
+   "y": 3,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 48,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": 1,
+   "y": 3,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 49,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": 3,
+   "y": 3,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ]
+}

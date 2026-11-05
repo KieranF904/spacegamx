@@ -1,0 +1,48 @@
+== partTip (tooltip) ==
+Drift Sail
+Mk III · Small · Round · 0.8 cells
+Hull · mass62 hp · 0.8
+Armour · build3 · 2 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Thrust0.7 · boost ×1.3, drain ×0.5
+Power draw2/s
+Rated speed1,560 m/s (its push fades out near it)
+
+== partStats (stats rows) ==
+GradeMk III · Small
+Power draw2
+Thrust0.7 · boost ×1.3, drain ×0.5
+Hull · mass62 hp · 0.8
+Armour · build3 · 2 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 62
+
+== familyLabel ==
+Ion drives
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Round
+
+== tradeOff ==
+near-free cruising, slow
+
+== keyStats ==
+thrust 0.7 · top 1,560 m/s · draws 2
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 22","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":0,"toughness":61.57521601035994,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":2.356194490192345,"thrust":0.7068583470577035,"boost":1.3,"boostDrain":0.5}

@@ -1,0 +1,369 @@
+/**
+ * Accounts, kept by the lobby so one account works on every game server.
+ *
+ * Public (the client, through nginx at /lobby/auth/...):
+ *   POST /auth/register  { username, email, password } -> { success, username, token, isAdmin, isOwner }
+ *   POST /auth/login     { username, password }        -> { success, username, token, isAdmin, isOwner }
+ *   POST /auth/validate  { token }                     -> { success, id, username, isAdmin, isOwner }
+ *
+ * Ranks: owner > admin > pilot. An owner is an admin everywhere: every answer's isAdmin is true for one.
+ *   POST /auth/logout    { token }                     -> { success }
+ *
+ * Account management (the website's account page; each needs the session token,
+ * and those that change the account need the password again; limited per address
+ * like sign-in):
+ *   POST /auth/account         { token }                          -> { success, id, username, email, isAdmin, isOwner, createdAt }
+ *   POST /auth/change-password { token, password, newPassword }   -> { success }   (the account's other sessions end)
+ *   POST /auth/change-email    { token, password, email }         -> { success, email }
+ *   POST /auth/logout-all      { token }                          -> { success, ended }  (every session, this one too)
+ *   POST /auth/delete-account  { token, password }                -> { success, id }     (for good; its sessions go too)
+ *
+ * Deleting an account also deletes the pilot's profile: the lobby keeps the ids of lately deleted accounts
+ * (DeletedAccounts) and answers each game server's heartbeat (POST /register, index.ts) with them as
+ * `deletedAccounts`, and the server deletes those profiles (GameServer.forgetAccounts).
+ *
+ * Game servers call /auth/validate when a pilot joins with a token, and get
+ * the account's id (their profiles are kept by it) and admin flag.
+ *
+ * Sign-in and registration are limited per address (a few a minute), so the
+ * one place every password is checked can't be used to guess them. Wrong
+ * passwords are limited per account and address (FAIL_LIMIT: a stranger who
+ * knows a pilot's name can lock only their own address out, not the pilot),
+ * and per account from anywhere under a far higher ceiling (NAME_FAIL_LIMIT, so
+ * many addresses still can't share out the guessing). A banned
+ * account can't sign in, and its sessions stop validating (the answer says why
+ * and until when).
+ *
+ * Game servers only (the admin tools' players, ranks and bans; nginx doesn't
+ * pass /admin/ through, and each call needs `Authorization: Bearer
+ * <LOBBY_ADMIN_SECRET>`, the secret the game servers are given too):
+ *   POST /admin/users     { search?, offset?, limit? }        -> { success, users: AdminUser[], total }
+ *   POST /admin/user      { username }                        -> { success, user: AdminUser }
+ *   POST /admin/set-admin { username, isAdmin, actor? }       -> { success, user }
+ *   POST /admin/ban       { username, until, reason, by, actor? } -> { success, user }   (until: epoch ms, null for good)
+ *   POST /admin/unban     { username, actor? }                -> { success, user }
+ *   POST /admin/delete    { username, actor? }                -> { success, id, username }   (for good, as delete-account)
+ *   POST /admin/set-owner { username, isOwner }               -> { success, user }   (the server side only: never with an actor)
+ * AdminUser is { id, username, isAdmin, isOwner, createdAt, ban: { until, reason, by } | null } (until null: for good);
+ * never an email or credentials. Without a secret (production with none set)
+ * these are off.
+ *
+ * `actor`: the call is on a signed-in user's behalf (the website's and the game's admin tools send their username),
+ * and the ranks' rules apply (rankRefusal): granting or revoking admin, and deleting accounts, are the owner's;
+ * an admin can't act on an admin or the owner (ban, unban, demote, delete); nobody bans, demotes or deletes an owner
+ * through these. Without an actor the secret alone is enough (the server side), except that an owner still can't
+ * be banned, demoted or deleted here: the owner rank changes only by set-owner, or OWNER_USERNAMES (comma-separated
+ * usernames made owners at every lobby start; taking a name out doesn't take the rank away: set-owner does).
+ */
+
+import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createUserStore } from './index.js';
+import { DeletedAccounts } from './DeletedAccounts.js';
+import type { UserRecord, UserStore, UserSummary } from './types.js';
+import { BAN_FOREVER, banMessage, isAdminRank, rankOf, safeEqual, validatePassword } from './utils.js';
+import { RateLimiter } from './RateLimiter.js';
+import { notifier } from './pushover.js';
+
+type Json = (res: http.ServerResponse, status: number, body: unknown) => void;
+type Body = (req: http.IncomingMessage) => Promise<any>;
+
+/** Attempts allowed per address per window */
+const LIMIT = 10;
+const WINDOW_MS = 60_000;
+/**
+ * Wrong passwords allowed per window: signing in, for a name from one address (FAIL_LIMIT) and for a name from
+ * anywhere (NAME_FAIL_LIMIT, far higher: guessing spread over many addresses); changing an account, for the account
+ * (FAIL_LIMIT: that needs its session already)
+ */
+const FAIL_LIMIT = 10;
+const NAME_FAIL_LIMIT = 100;
+const FAIL_WINDOW_MS = 15 * 60_000;
+const SLOW_DOWN = 'Too many attempts. Wait a minute and try again.';
+/** (Why sign-in is refused after many wrong passwords for one account) */
+const lockedOut = (seconds: number) => `Too many wrong passwords for this account. Try again in ${Math.ceil(seconds / 60)} minute${seconds > 60 ? 's' : ''}.`;
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+/** Accounts live beside the game's data (kept across deploys): ../../data/lobby from dist/accounts or src/accounts */
+export const DATA_DIR = process.env.ACCOUNTS_DIR || path.resolve(here, '../../../data/lobby');
+/** Shared with the game servers for /admin/* (dev servers share a fixed one, so it works out of the box) */
+const ADMIN_SECRET = process.env.LOBBY_ADMIN_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-lobby-admin-secret');
+/** Account management actions (handleAccount) */
+const ACCOUNT_ACTIONS = ['account', 'change-password', 'change-email', 'logout-all', 'delete-account'];
+/** Most users in one page of /admin/users */
+const PAGE_MAX = 100;
+
+/** What to answer a body that couldn't be read (413 too large, else 400) */
+function bodyStatus(err: unknown): number {
+  return (err as { status?: unknown })?.status === 413 ? 413 : 400;
+}
+
+/** The rank flags every answer carries (an owner is an admin too) */
+function ranks(u: { is_admin: boolean; is_owner: boolean }) {
+  return { isAdmin: isAdminRank(u), isOwner: u.is_owner };
+}
+
+/** The admin actions on one account (by username) */
+const ACCOUNT_ADMIN_ACTIONS = ['user', 'set-admin', 'set-owner', 'ban', 'unban', 'delete'];
+
+/** Why `actor` (null: the server side, the secret alone) can't do `action` to `target` (null: they can). See the top. */
+export function rankRefusal(action: string, actor: UserRecord | null, target: UserRecord, body: { isAdmin?: unknown }): string | null {
+  const name = target.username;
+  const ownerOnly = actor !== null && rankOf(actor) !== 'owner';
+  const targetRank = rankOf(target);
+  switch (action) {
+    case 'set-owner':
+      return actor ? 'The owner rank is set on the server only (LOBBY_ADMIN_SECRET set-owner, or OWNER_USERNAMES)' : null;
+    case 'set-admin':
+      if (targetRank === 'owner') return `${name} is the owner: the owner rank is set on the server only`;
+      if (ownerOnly) return 'Only the owner can grant or revoke admin';
+      if (actor && actor.id === target.id && body.isAdmin !== true) return "You can't demote yourself";
+      return null;
+    case 'ban':
+      if (targetRank === 'owner') return `${name} is the owner: owners can't be banned`;
+      if (actor && actor.id === target.id) return "You can't ban yourself";
+      if (ownerOnly && targetRank === 'admin') return `${name} is an admin: only the owner can ban an admin`;
+      return null;
+    case 'unban':
+      if (ownerOnly && targetRank !== 'pilot') return `${name} is ${targetRank === 'owner' ? 'the owner' : 'an admin'}: only the owner can change that`;
+      return null;
+    case 'delete':
+      if (targetRank === 'owner') return `${name} is the owner: owners can't be deleted here`;
+      if (ownerOnly) return 'Only the owner can delete accounts';
+      if (actor && actor.id === target.id) return 'Delete your own account from the account page';
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** OWNER_USERNAMES: each named account is made the owner (at every start; a name with no account is logged and skipped) */
+export async function applyOwners(store: UserStore, names: string): Promise<string[]> {
+  const made: string[] = [];
+  for (const name of names.split(',').map((n) => n.trim()).filter(Boolean)) {
+    const user = await store.getUserByUsername(name);
+    if (!user) { console.log(`[Accounts] OWNER_USERNAMES: no account "${name}" (yet): skipped`); continue; }
+    if (!user.is_owner) {
+      await store.setOwner(user.id, true);
+      console.log(`[Accounts] OWNER_USERNAMES: ${user.username} is the owner`);
+    }
+    made.push(user.username);
+  }
+  return made;
+}
+
+/** A user as the game servers' admin tools see them */
+function adminUser(u: UserSummary, now = Date.now()) {
+  const banned = u.banned_until !== null && u.banned_until > now;
+  return {
+    id: u.id, username: u.username, ...ranks(u), createdAt: u.created_at,
+    ban: banned ? { until: u.banned_until! >= BAN_FOREVER ? null : u.banned_until, reason: u.ban_reason ?? '', by: u.banned_by ?? '' } : null,
+  };
+}
+
+export class AccountRoutes {
+  /** Every sign-in, registration and account change, by address */
+  private attempts = new RateLimiter(LIMIT, WINDOW_MS);
+  /** Wrong passwords, by "name:<what was typed>@<address>" or "id:<account>" */
+  private failures = new RateLimiter(FAIL_LIMIT, FAIL_WINDOW_MS);
+  /** Wrong passwords by "name:<what was typed>" from any address (a spread-out guesser has many) */
+  private nameFailures = new RateLimiter(NAME_FAIL_LIMIT, FAIL_WINDOW_MS);
+
+  /** An account was deleted (by its pilot or an admin): the lobby's other stores forget it (the inbox) */
+  onAccountDeleted: ((userId: number) => void) | null = null;
+
+  private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string, private deleted: DeletedAccounts) {}
+
+  /** The accounts, for the lobby's other routes (the inbox) */
+  get users(): UserStore {
+    return this.store;
+  }
+
+  /** The game servers' shared secret ('' when off), for the lobby's other /admin/ routes */
+  get secret(): string {
+    return this.adminSecret;
+  }
+
+  /** (Tests pass their own store and secret) */
+  /** (`ownerUsernames`: OWNER_USERNAMES, comma-separated, by default) */
+  static async create(sendJson: Json, parseJson: Body, ipOf: (req: http.IncomingMessage) => string, opts: { store?: UserStore; adminSecret?: string; deleted?: DeletedAccounts; ownerUsernames?: string } = {}): Promise<AccountRoutes> {
+    const store = opts.store ?? await createUserStore(DATA_DIR);
+    await applyOwners(store, opts.ownerUsernames ?? process.env.OWNER_USERNAMES ?? '');
+    if (!opts.store) setInterval(() => void store.cleanupExpiredSessions(), 60 * 60 * 1000);
+    const secret = opts.adminSecret ?? ADMIN_SECRET;
+    if (!secret) console.log("[Accounts] LOBBY_ADMIN_SECRET isn't set: the game servers' admin tools can't manage accounts");
+    const deleted = opts.deleted ?? new DeletedAccounts(opts.store ? null : path.join(DATA_DIR, 'deleted-accounts.json'));
+    return new AccountRoutes(store, sendJson, parseJson, ipOf, secret, deleted);
+  }
+
+  /** Handles /auth/* and /admin/* (true when it did) */
+  async handle(req: http.IncomingMessage, res: http.ServerResponse, url: string): Promise<boolean> {
+    if (url.startsWith('/admin/') && req.method === 'POST') { await this.handleAdmin(req, res, url.slice('/admin/'.length)); return true; }
+    if (!url.startsWith('/auth/') || req.method !== 'POST') return false;
+    const action = url.slice('/auth/'.length);
+    let body: any;
+    try { body = await this.parseJson(req); } catch (err) { this.sendJson(res, bodyStatus(err), { success: false, error: 'Invalid request' }); return true; }
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
+
+    if (action === 'login' || action === 'register') {
+      const ip = this.ipOf(req);
+      if (!this.allow(ip)) {
+        this.sendJson(res, 429, { success: false, error: SLOW_DOWN });
+        return true;
+      }
+      const name = `name:${str(body.username).trim().toLowerCase()}`, here = `${name}@${ip}`;
+      if (action === 'login' && (this.failures.blocked(here) || this.nameFailures.blocked(name))) {
+        this.sendJson(res, 429, { success: false, error: lockedOut(Math.max(this.failures.retryAfter(here), this.nameFailures.retryAfter(name))) });
+        return true;
+      }
+      const result = action === 'login'
+        ? await this.store.login(str(body.username), str(body.password))
+        : await this.store.register(str(body.username), str(body.email), str(body.password));
+      if (action === 'login') {
+        // (A right password clears this address's count; the ceiling across addresses stays, as a spread-out guesser's)
+        if (result.success) this.failures.reset(here);
+        else if (result.error === 'Invalid username or password') { this.failures.record(here); this.nameFailures.record(name); }
+      }
+      if (!result.success) { this.sendJson(res, action === 'login' ? 401 : 400, { success: false, error: result.error }); return true; }
+      if (action === 'register') notifier.registered(result.user.username);
+      this.sendJson(res, 200, { success: true, username: result.user.username, token: result.token, ...ranks(result.user) });
+      return true;
+    }
+    if (action === 'validate') {
+      const user = str(body.token) ? await this.store.validateSession(str(body.token)) : null;
+      if (!user) { this.sendJson(res, 401, { success: false, error: 'Invalid or expired session' }); return true; }
+      const banned = banMessage(user);
+      if (banned) { this.sendJson(res, 403, { success: false, error: banned, banned: true }); return true; }
+      this.sendJson(res, 200, { success: true, id: user.id, username: user.username, ...ranks(user) });
+      return true;
+    }
+    if (ACCOUNT_ACTIONS.includes(action)) { await this.handleAccount(req, res, action, body); return true; }
+    if (action === 'logout') {
+      if (str(body.token)) await this.store.logout(str(body.token));
+      this.sendJson(res, 200, { success: true });
+      return true;
+    }
+    this.sendJson(res, 404, { success: false, error: 'Not found' });
+    return true;
+  }
+
+  /** The website's account management (see the top) */
+  private async handleAccount(req: http.IncomingMessage, res: http.ServerResponse, action: string, body: any): Promise<void> {
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
+    const token = str(body.token);
+    const user = token ? await this.store.validateSession(token) : null;
+    if (!user) { this.sendJson(res, 401, { success: false, error: 'Invalid or expired session' }); return; }
+    const banned = banMessage(user);
+    if (banned) { this.sendJson(res, 403, { success: false, error: banned, banned: true }); return; }
+
+    if (action === 'account') {
+      this.sendJson(res, 200, { success: true, id: user.id, username: user.username, email: user.email, ...ranks(user), createdAt: user.created_at });
+      return;
+    }
+    if (action === 'logout-all') {
+      const ended = await this.store.endSessions(user.id);
+      console.log(`[Accounts] ${user.username} signed out everywhere (${ended})`);
+      this.sendJson(res, 200, { success: true, ended });
+      return;
+    }
+    // The rest change the account: the password again, limited like sign-in
+    if (!this.allow(this.ipOf(req))) { this.sendJson(res, 429, { success: false, error: SLOW_DOWN }); return; }
+    const who = `id:${user.id}`;
+    if (this.failures.blocked(who)) { this.sendJson(res, 429, { success: false, error: lockedOut(this.failures.retryAfter(who)) }); return; }
+    if (!(await this.store.checkPassword(user.id, str(body.password)))) {
+      this.failures.record(who);
+      this.sendJson(res, 401, { success: false, error: 'That password is wrong' });
+      return;
+    }
+
+    if (action === 'change-password') {
+      const next = str(body.newPassword);
+      const invalid = validatePassword(next);
+      if (invalid) { this.sendJson(res, 400, { success: false, error: invalid }); return; }
+      await this.store.setPassword(user.id, next);
+      await this.store.endSessions(user.id, token);
+      console.log(`[Accounts] ${user.username} changed their password`);
+      this.sendJson(res, 200, { success: true });
+      return;
+    }
+    if (action === 'change-email') {
+      const error = await this.store.setEmail(user.id, str(body.email));
+      if (error) { this.sendJson(res, 400, { success: false, error }); return; }
+      this.sendJson(res, 200, { success: true, email: (await this.store.getUserById(user.id))?.email ?? '' });
+      return;
+    }
+    // delete-account
+    await this.store.deleteUser(user.id);
+    this.deleted.add(user.id);
+    this.onAccountDeleted?.(user.id);
+    console.log(`[Accounts] ${user.username} (id ${user.id}) deleted their account`);
+    this.sendJson(res, 200, { success: true, id: user.id });
+  }
+
+  /** The game servers' account admin (see the top) */
+  private async handleAdmin(req: http.IncomingMessage, res: http.ServerResponse, action: string): Promise<void> {
+    const given = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    if (!this.adminSecret || !safeEqual(given, this.adminSecret)) {
+      this.sendJson(res, 403, { success: false, error: 'Forbidden' });
+      return;
+    }
+    let body: any;
+    try { body = await this.parseJson(req); } catch (err) { this.sendJson(res, bodyStatus(err), { success: false, error: 'Invalid request' }); return; }
+    const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+
+    if (action === 'users') {
+      const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+      const limit = Math.min(PAGE_MAX, Math.max(1, Math.floor(Number(body.limit) || 50)));
+      const { users, total } = await this.store.listUsers(str(body.search), offset, limit);
+      this.sendJson(res, 200, { success: true, users: users.map((u) => adminUser(u)), total });
+      return;
+    }
+    if (!ACCOUNT_ADMIN_ACTIONS.includes(action)) { this.sendJson(res, 404, { success: false, error: 'Not found' }); return; }
+    // On a signed-in user's behalf: they must be an admin (or the owner) and not banned, and the ranks' rules apply
+    let actor: UserRecord | null = null;
+    if (str(body.actor)) {
+      actor = await this.store.getUserByUsername(str(body.actor));
+      if (!actor || !isAdminRank(actor) || banMessage(actor)) { this.sendJson(res, 403, { success: false, error: 'Only an admin can do that' }); return; }
+    }
+    const found = str(body.username) ? await this.store.getUserByUsername(str(body.username)) : null;
+    if (!found) { this.sendJson(res, 404, { success: false, error: `No account "${str(body.username)}"` }); return; }
+    const refused = rankRefusal(action, actor, found, body);
+    if (refused) { this.sendJson(res, 403, { success: false, error: refused }); return; }
+    if (action === 'delete') {
+      await this.store.deleteUser(found.id);
+      this.deleted.add(found.id);
+      this.onAccountDeleted?.(found.id);
+      console.log(`[Accounts] ${found.username} (id ${found.id}) deleted${actor ? ` by ${actor.username}` : ' (server side)'}`);
+      this.sendJson(res, 200, { success: true, id: found.id, username: found.username });
+      return;
+    }
+    if (action === 'set-admin') await this.store.setAdmin(found.id, body.isAdmin === true);
+    if (action === 'set-owner') await this.store.setOwner(found.id, body.isOwner === true);
+    if (action === 'ban') {
+      const until = body.until === null ? BAN_FOREVER : Number(body.until);
+      if (!Number.isFinite(until) || until <= Date.now()) { this.sendJson(res, 400, { success: false, error: 'A ban needs an end in the future (or null for good)' }); return; }
+      await this.store.setBan(found.id, Math.min(until, BAN_FOREVER), str(body.reason).slice(0, 200), str(body.by).slice(0, 40));
+    }
+    if (action === 'unban') await this.store.setBan(found.id, null, '', '');
+    const user = (await this.store.getUserById(found.id))!;
+    if (action !== 'user') {
+      const what = action === 'ban' ? ` by ${str(body.by)}` : action === 'set-admin' ? `: ${user.is_admin}` : action === 'set-owner' ? `: ${user.is_owner}` : '';
+      console.log(`[Accounts] ${action} ${user.username}${what}${actor ? ` (${actor.username})` : ''}`);
+    }
+    this.sendJson(res, 200, { success: true, user: adminUser(user) });
+  }
+
+  /** The ids of accounts deleted lately, for the game servers to delete their profiles */
+  deletedAccounts(): number[] {
+    return this.deleted.recent();
+  }
+
+  async close(): Promise<void> {
+    await this.store.close();
+  }
+
+  private allow(ip: string): boolean {
+    return this.attempts.hit(ip);
+  }
+}

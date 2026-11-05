@@ -1,0 +1,35 @@
+{
+ "id": "slag_ray",
+ "name": "Slag Ray",
+ "faction": "cinder",
+ "sky": "ashfall_cavern",
+ "role": "skirmisher / area denial",
+ "level": "26-32",
+ "threat": "medium",
+ "parts": 7,
+ "groups": {
+  "tail": [
+   "tail"
+  ],
+  "wing_l": [
+   "wing_l"
+  ],
+  "wing_r": [
+   "wing_r"
+  ],
+  "horns": [
+   "horn_l",
+   "horn_r"
+  ],
+  "core": [
+   "body",
+   "heart"
+  ]
+ },
+ "damaged": [
+  "wing_r",
+  "tail"
+ ],
+ "radiusCells": 4.477,
+ "radius": 107
+}

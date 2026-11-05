@@ -1,0 +1,278 @@
+{
+ "name": "Heart of the Maw (redesign), stage 2: the chambers",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "mawheart_s3_ring",
+   "fn": "conduit",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "mawheart_s3_valve0",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "mawheart_s3_valve1",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "mawheart_s3_valve2",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "mawheart_s3_valve3",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "mawheart_s3_stub_apex",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "mawheart_s3_stub_flank_l",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "mawheart_s3_stub_flank_r",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "mawheart_s3_stub_base",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "mawheart_s3_core",
+   "fn": "core",
+   "material": "maw_coreglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "mawheart_ch_apex_walla",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "mawheart_ch_apex_wallb",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "mawheart_ch_apex_valve",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "mawheart_ch_flank_walla_l",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "mawheart_ch_flank_walla_r",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "mawheart_ch_flank_wallb_l",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "mawheart_ch_flank_wallb_r",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "mawheart_ch_flank_valve_l",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "mawheart_ch_flank_valve_r",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "mawheart_ch_base_walla",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "mawheart_ch_base_wallb",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "mawheart_ch_base_valve",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "mawheart_septum",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "mawheart_artery0_l",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "mawheart_artery0_r",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "mawheart_artery1_l",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "mawheart_artery1_r",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

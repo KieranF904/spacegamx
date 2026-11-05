@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Cell Reactor
+Mk I · Small · Square · 1 cell
+Hull · mass60 hp · 1.0
+Armour · build1 · 1 pts
+Power out+35/s
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Power out+35
+Hull · mass60 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 60
+
+== familyLabel ==
+Generators
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+the starter; explodes when destroyed
+
+== keyStats ==
++35 power
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 0","why":"Learned at level 0 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 0","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":0,"toughness":60,"armour":1,"supply":35}

@@ -1,0 +1,622 @@
+{
+ "name": "Hushwing",
+ "catalogVersion": 1,
+ "power": "ports",
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": -7,
+   "y": 0,
+   "rot": 3,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": -6,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -5,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -4,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -3,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": -2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": 2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 3,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 4,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 5,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": 6,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": 7,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "composite",
+   "x": -6,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -5,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -4,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 0,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 4,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 5,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "composite",
+   "x": 6,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": -5,
+   "y": 2,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": -4,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 30,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": -2,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 31,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": 0,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 32,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": 2,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 33,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "composite",
+   "x": 4,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 34,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": 5,
+   "y": 2,
+   "rot": 1,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "sq",
+   "fn": "emp",
+   "material": "composite",
+   "x": -2,
+   "y": -3,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 36,
+   "piece": "sq",
+   "fn": "flak",
+   "material": "composite",
+   "x": 0,
+   "y": -3,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "mount": "turret"
+  },
+  {
+   "uid": 37,
+   "piece": "sq",
+   "fn": "emp",
+   "material": "composite",
+   "x": 2,
+   "y": -3,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 38,
+   "piece": "sq",
+   "fn": "flak",
+   "material": "composite",
+   "x": -4,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "mount": "turret"
+  },
+  {
+   "uid": 39,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": -3,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 40,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -2,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -1,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 42,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 0,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 43,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 1,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 2,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "composite",
+   "x": 3,
+   "y": -2,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "sq",
+   "fn": "flak",
+   "material": "composite",
+   "x": 4,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "mount": "turret"
+  },
+  {
+   "uid": 47,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": -6,
+   "y": -1,
+   "rot": 3,
+   "flip": false
+  },
+  {
+   "uid": 48,
+   "piece": "sq",
+   "fn": "emp",
+   "material": "composite",
+   "x": -5,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 49,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": -4,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 50,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 51,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": -2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 52,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": -1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 53,
+   "piece": "sq",
+   "fn": "core",
+   "material": "composite",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 54,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 55,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "composite",
+   "x": 2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 56,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "composite",
+   "x": 3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 57,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "composite",
+   "x": 4,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 58,
+   "piece": "sq",
+   "fn": "emp",
+   "material": "composite",
+   "x": 5,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 59,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "composite",
+   "x": 6,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

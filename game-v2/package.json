@@ -3,16 +3,37 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
+    "monitor": "node scripts/vpsmon/server.mjs",
+    "shipgen": "pythonw scripts/shipgen/app/shipgen.pyw",
+    "silhouette": "pythonw scripts/shipgen/app/silhouette.py",
+    "evolver": "pythonw scripts/shipgen/evolver/app.py",
+    "evolver:ports": "pythonw scripts/shipgen/evolver/ports_app.py",
     "build:common": "cd common && npm run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
     "build": "npm run build:common && npm run build:server && npm run build:client",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
+    "dev:browser": "cd server-browser && npm run dev",
+    "dev": "npm run dev:browser & npm run dev:server & npm run dev:client",
     "start": "cd server && npm start",
-    "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install"
+    "proto": "cd client && npx vite --open \"/?proto\"",
+    "test": "vitest run",
+    "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install",
+    "gen:sfx": "node --env-file=.env scripts/gen-sfx.mjs",
+    "panels:index": "node scripts/panels-index.mjs",
+    "render-daemon": "node scripts/render/daemon.mjs",
+    "render": "node scripts/render/render.mjs",
+    "wire:sync": "node scripts/wire/sync.mjs",
+    "wire:bump": "node scripts/wire/bump.mjs",
+    "features:gen": "node scripts/features/gen.mjs",
+    "features:check": "node scripts/features/gen.mjs --check",
+    "slideshow": "node scripts/slideshow/build.mjs",
+    "det:engines": "node scripts/det/engines.mjs",
+    "net:inputs": "node scripts/net/inputs.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
   }
 }

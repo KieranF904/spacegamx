@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Slideshow</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  /* (the boxes below set display: flex, which would otherwise beat the hidden attribute) */
+  [hidden] { display: none !important; }
+  body.idle { cursor: none; }
+  img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .25s; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; }
+  img.on { opacity: 1; }
+  body.zoomed { cursor: grab; }
+  body.dragging { cursor: grabbing; }
+  .box { position: fixed; font: 14px system-ui, sans-serif; color: #ccd; background: #000b; padding: 4px 8px; border-radius: 4px; }
+  #cap { left: 16px; bottom: 14px; }
+  #help { right: 16px; bottom: 14px; font-size: 13px; color: #889; padding: 6px 10px; line-height: 1.5; max-width: 46em; }
+  #mode { left: 16px; top: 14px; display: flex; gap: 8px; align-items: center; }
+  #mode b { color: #fff; }
+  .chip { padding: 1px 7px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .chip.hide { background: #7a2b2b; color: #fdd; }
+  .chip.review { background: #7a5a12; color: #ffe9b0; }
+  #note { right: 16px; top: 14px; max-width: 40em; color: #ffe9b0; }
+  #status { left: 50%; top: 14px; transform: translateX(-50%); }
+  #noteBox { left: 50%; bottom: 60px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; }
+  #stamp { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
+  #stamp div { font: 700 34px system-ui, sans-serif; letter-spacing: .06em; padding: 18px 30px; border-radius: 14px; border: 4px solid; background: #000a; text-align: center; opacity: .85; }
+  #stamp .hide { color: #ffb3b3; border-color: #d04848; }
+  #stamp .review { color: #ffe08a; border-color: #e0a520; }
+  #stamp .hide::before { content: '\2715  '; }
+  #stamp .review::before { content: '\2691  '; }
+  #stamp.pop div { animation: pop .35s ease-out; }
+  @keyframes pop { from { transform: scale(1.35); opacity: 1; } to { transform: scale(1); opacity: .85; } }
+  @media (prefers-reduced-motion: reduce) { #stamp.pop div { animation: none; } }
+  #noteBox input { width: 36em; max-width: 70vw; font: 14px system-ui, sans-serif; padding: 4px 6px; background: #111; color: #eee; border: 1px solid #556; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="cap" class="box" hidden></div>
+<div id="mode" class="box" hidden></div>
+<div id="note" class="box" hidden></div>
+<div id="status" class="box" hidden></div>
+<div id="noteBox" class="box" hidden><label for="noteIn">Note for Claude</label><input id="noteIn" placeholder="what to look at (Enter saves, Esc cancels)"></div>
+<div id="stamp" hidden></div>
+<div id="help" class="box">Space / → next · ← back · Home start · wheel zoom · drag pan · 0 or double-click reset · F full screen · C caption · H hide this<br>M mode<span id="hideKeys" hidden> · X hide from the slideshow</span><span id="flagKeys" hidden> · R flag for Claude · N note for Claude (flags it too)</span></div>
+<script>
+const SLIDES = [
+];
+const SAVED_FLAGS = {};
+const DECK = '';
+const stage = document.getElementById('stage'), cap = document.getElementById('cap'), help = document.getElementById('help');
+const modeEl = document.getElementById('mode'), noteEl = document.getElementById('note'), statusEl = document.getElementById('status');
+const noteBox = document.getElementById('noteBox'), noteIn = document.getElementById('noteIn');
+const imgs = SLIDES.map((src) => { const im = new Image(); im.src = src; im.alt = src; stage.appendChild(im); return im; }); // all preloaded
+
+// Flags per file: { hide, review, note }. Kept in this browser, and in the folder's flags.json when served (--serve)
+const KEY = 'slideshow-flags:' + DECK, served = location.protocol.startsWith('http');
+let flags = SAVED_FLAGS;
+try { const local = JSON.parse(localStorage.getItem(KEY) || 'null'); if (local && !served) flags = local; } catch {}
+const f = (s) => flags[s] || {};
+let statusTimer = 0;
+function say(text, ok = true) {
+  statusEl.textContent = text; statusEl.style.color = ok ? '#9c9' : '#f99'; statusEl.hidden = false;
+  clearTimeout(statusTimer); statusTimer = setTimeout(() => { statusEl.hidden = true; }, 2500);
+}
+function save() {
+  for (const k of Object.keys(flags)) { const v = flags[k]; if (!v.hide && !v.review && !v.note) delete flags[k]; }
+  try { localStorage.setItem(KEY, JSON.stringify(flags)); } catch {}
+  if (!served) { say('Saved in this browser only (open it with --serve to save flags.json)', false); return; }
+  fetch('flags.json', { method: 'PUT', body: JSON.stringify(flags) })
+    .then((r) => say(r.ok ? 'Saved to flags.json' : 'Could not save flags.json', r.ok))
+    .catch(() => say('Could not save flags.json (is the server still running?)', false));
+}
+function setFlag(name, patch) {
+  flags[name] = { ...f(name), ...patch }; save(); refresh();
+  stampEl.classList.remove('pop'); void stampEl.offsetWidth; stampEl.classList.add('pop'); // replay the pop
+}
+const stampEl = document.getElementById('stamp'), hideKeys = document.getElementById('hideKeys'), flagKeys = document.getElementById('flagKeys');
+
+// Present skips hidden slides. Hiding mode shows every slide and only the hide marks; Flagging mode only the flags and notes for Claude
+const MODES = ['present', 'hide', 'flag'];
+let mode = 'present', i = 0;
+const visible = (k) => mode === 'hide' || !f(SLIDES[k]).hide;
+// Zoom and pan of the current slide: scale z about the top-left, then shift by (x, y) screen pixels
+let z = 1, x = 0, y = 0;
+function apply() {
+  imgs[i].style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+  document.body.classList.toggle('zoomed', z > 1.001);
+}
+function resetView() { z = 1; x = 0; y = 0; imgs.forEach((im) => { im.style.transform = ''; }); apply(); }
+function zoomAt(px, py, factor) {
+  const nz = Math.max(1, Math.min(16, z * factor));
+  // Keep the point under the cursor where it is
+  x = px - ((px - x) / z) * nz; y = py - ((py - y) / z) * nz; z = nz;
+  if (z === 1) { x = 0; y = 0; }
+  apply();
+}
+function refresh() {
+  const shown = SLIDES.map((_, k) => k).filter(visible), at = shown.indexOf(i), fl = f(SLIDES[i]);
+  const vals = Object.values(flags);
+  cap.textContent = `${at + 1} / ${shown.length} · ${SLIDES[i]}`;
+  modeEl.hidden = mode === 'present';
+  modeEl.innerHTML = mode === 'hide'
+    ? '<b>Hiding</b>' + (fl.hide ? '<span class="chip hide">hidden from slideshow</span>' : '')
+      + `<span style="color:#889">${vals.filter((v) => v.hide).length} hidden</span>`
+    : '<b>Flagging</b>' + (fl.review ? '<span class="chip review">flagged for Claude</span>' : '')
+      + `<span style="color:#889">${vals.filter((v) => v.review).length} flagged</span>`;
+  // The middle of the slide says what it's marked with, for the current mode only
+  stampEl.innerHTML = mode === 'hide' ? (fl.hide ? '<div class="hide">HIDDEN FROM SLIDESHOW</div>' : '')
+    : mode === 'flag' ? (fl.review ? '<div class="review">FLAGGED FOR CLAUDE</div>' : '') : '';
+  stampEl.hidden = !stampEl.innerHTML;
+  hideKeys.hidden = mode !== 'hide';
+  flagKeys.hidden = mode !== 'flag';
+  if (mode !== 'flag') noteBox.hidden = true;
+  noteEl.hidden = mode !== 'flag' || !fl.note;
+  noteEl.textContent = fl.note ? 'Note: ' + fl.note : '';
+}
+function show(n) {
+  i = Math.max(0, Math.min(SLIDES.length - 1, n));
+  imgs.forEach((im, k) => im.classList.toggle('on', k === i));
+  refresh();
+  resetView();
+}
+// Move to the next (d 1) or previous (d -1) slide the current mode shows; false if there is none
+function step(d) {
+  for (let k = i + d; k >= 0 && k < SLIDES.length; k += d) if (visible(k)) { show(k); return true; }
+  return false;
+}
+function edge(d) { const ks = SLIDES.map((_, k) => k).filter(visible); if (ks.length) show(d < 0 ? ks[0] : ks[ks.length - 1]); }
+function openNote() { noteIn.value = f(SLIDES[i]).note || ''; noteBox.hidden = false; noteIn.focus(); }
+noteIn.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { const note = noteIn.value.trim(); noteBox.hidden = true; setFlag(SLIDES[i], note ? { note, review: true } : { note: undefined }); }
+  else if (e.key === 'Escape') noteBox.hidden = true;
+});
+addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+let drag = null, moved = false;
+addEventListener('mousedown', (e) => { if (e.button !== 0 || !noteBox.hidden) return; drag = { sx: e.clientX, sy: e.clientY, x, y }; moved = false; });
+addEventListener('mousemove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+  if (moved && z > 1.001) { x = drag.x + dx; y = drag.y + dy; document.body.classList.add('dragging'); apply(); }
+});
+addEventListener('mouseup', () => { drag = null; document.body.classList.remove('dragging'); });
+addEventListener('dblclick', resetView);
+addEventListener('keydown', (e) => {
+  if (!noteBox.hidden) return;
+  const k = e.key.toLowerCase();
+  if (e.code === 'Space' || e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); step(1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp') { e.preventDefault(); step(-1); }
+  else if (e.key === 'Home') edge(-1);
+  else if (e.key === 'End') edge(1);
+  else if (k === 'f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  else if (k === 'c') cap.hidden = !cap.hidden;
+  else if (k === 'h') help.hidden = !help.hidden;
+  else if (k === 'm') {
+    mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+    if (!visible(i) && !step(1)) step(-1);
+    refresh();
+    say({ present: 'Slideshow: hidden slides skipped', hide: 'Hiding mode: every slide · X hides or shows it in the slideshow', flag: 'Flagging mode: R flag for Claude · N note' }[mode]);
+  }
+  else if (mode === 'hide' && k === 'x') setFlag(SLIDES[i], { hide: !f(SLIDES[i]).hide });
+  else if (mode === 'flag' && k === 'r') setFlag(SLIDES[i], { review: !f(SLIDES[i]).review });
+  else if (mode === 'flag' && k === 'n') { e.preventDefault(); openNote(); }
+  else if (e.key === '0') resetView();
+  else if (e.key === '+' || e.key === '=') zoomAt(innerWidth / 2, innerHeight / 2, 1.25);
+  else if (e.key === '-') zoomAt(innerWidth / 2, innerHeight / 2, 0.8);
+});
+// A plain click (no drag, not zoomed in) still moves on
+let clickTimer = 0;
+addEventListener('click', (e) => {
+  if (moved || z > 1.001 || !noteBox.hidden) return;
+  clearTimeout(clickTimer);
+  if (e.detail === 1) clickTimer = setTimeout(() => step(1), 260); // a double-click cancels it (and resets the view)
+  else clearTimeout(clickTimer);
+});
+let idle; addEventListener('mousemove', () => { document.body.classList.remove('idle'); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add('idle'), 1200); });
+setTimeout(() => { help.hidden = true; }, 6000);
+// Served: the folder's flags.json is the truth (it may have changed since the build)
+if (served) fetch('flags.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { flags = j; edge(-1); } }).catch(() => {});
+edge(-1);
+</script>
+</body>
+</html>

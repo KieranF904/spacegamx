@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Constructor
+Mk III · Square · 1 cell
+Hull · mass67 hp · 1.0
+Armour · build3 · 2.5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw4/s
+
+== partStats (stats rows) ==
+GradeMk III
+Power draw4
+Hull · mass67 hp · 1.0
+Armour · build3 · 2.5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 67
+
+== familyLabel ==
+Constructors
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+builds structures
+
+== keyStats ==
+draws 4
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 2","why":"Learned at level 2 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 2","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":1,"hp":67.2,"mass":1,"firepower":0,"toughness":67.2,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":4}

@@ -1,12 +1,12 @@
-import { BitBuffer } from '../BitBuffer';
-import { createModule, NetworkModule } from './NetworkModule';
+import { BitBuffer } from '../BitBuffer.js';
+import { createModule, NetworkModule } from './NetworkModule.js';
 import {
   POSITION_BITS, POSITION_MIN, POSITION_MAX,
   ANGLE_BITS,
   POSITION_CORRECTION_THRESHOLD,
   ANGLE_CORRECTION_THRESHOLD,
   normalizeAngle,
-} from '../Precision';
+} from '../Precision.js';
 
 /**
  * Transform data - position and rotation

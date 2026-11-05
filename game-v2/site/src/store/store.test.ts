@@ -1,0 +1,243 @@
+import { describe, it, expect } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { JsonSiteStore } from './JsonSiteStore.js';
+import { PostgresSiteStore } from './PostgresSiteStore.js';
+import type { SiteStore } from './types.js';
+
+const post = (slug: string, status: 'draft' | 'published' = 'published') =>
+  ({ slug, title: `Post ${slug}`, summary: '', body: 'Hello', tags: ['news', 'ships'], cover: null, status, authorId: 1, authorName: 'boss' });
+
+/**
+ * What both stores do the same. The Postgres one runs it too when SITE_TEST_DATABASE_URL names a scratch database
+ * (it makes its own schema there from site/schema.sql, and drops it after):
+ *   SITE_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5432/spacetest npx vitest run site/src/store
+ * (and `npm install --no-save pg` in site/, or anywhere above it)
+ */
+function contract(name: string, make: () => Promise<{ store: SiteStore; done: () => Promise<void> | void }>) {
+  describe(`${name} site store`, () => {
+    it('posts: create, slug clash, publish keeps its first date, list, tags, delete', async () => {
+      const { store, done } = await make();
+      const a = await store.createPost(post('alpha', 'draft'));
+      expect(a).toMatchObject({ slug: 'alpha', status: 'draft', publishedAt: null, tags: ['news', 'ships'] });
+      expect(await store.createPost(post('alpha'))).toBeNull();
+      const b = await store.createPost(post('beta'));
+      expect(b?.publishedAt).not.toBeNull();
+      expect((await store.listPosts({})).posts.map((p) => p.slug)).toEqual(['beta']);
+      expect((await store.listPosts({ status: 'all' })).total).toBe(2);
+      expect((await store.listPosts({ tag: 'ships' })).total).toBe(1);
+      expect((await store.listPosts({ tag: 'nope' })).total).toBe(0);
+      const pub = await store.updatePost(a!.id, { status: 'published', title: 'Alpha!' });
+      expect(pub).toMatchObject({ title: 'Alpha!', status: 'published' });
+      expect(pub?.publishedAt).not.toBeNull();
+      const first = pub!.publishedAt;
+      await store.updatePost(a!.id, { status: 'draft' });
+      expect((await store.updatePost(a!.id, { status: 'published' }))?.publishedAt).toBe(first);
+      expect(await store.updatePost(a!.id, { slug: 'beta' })).toBeNull();
+      expect(await store.updatePost(999999, { title: 'x' })).toBeNull();
+      expect((await store.getPostBySlug('beta'))?.id).toBe(b!.id);
+      expect(await store.allTags()).toEqual([{ tag: 'news', count: 2 }, { tag: 'ships', count: 2 }]);
+      await store.deletePost(a!.id);
+      expect(await store.getPost(a!.id)).toBeNull();
+      await done();
+    });
+
+    it('comments: add, count, hide, and they go with their post', async () => {
+      const { store, done } = await make();
+      const p = (await store.createPost(post('talk')))!;
+      const c1 = await store.addComment({ postId: p.id, authorId: 2, authorName: 'ace', body: 'First' });
+      await store.addComment({ postId: p.id, authorId: 3, authorName: 'bob', body: 'Second' });
+      expect((await store.commentCounts([p.id])).get(p.id)).toBe(2);
+      await store.setCommentHidden(c1.id, true);
+      expect((await store.listComments(p.id)).map((c) => c.body)).toEqual(['Second']);
+      expect(await store.listComments(p.id, true)).toHaveLength(2);
+      expect((await store.recentComments(5))[0].body).toBe('Second');
+      await store.deletePost(p.id);
+      expect(await store.listComments(p.id, true)).toEqual([]);
+      await done();
+    });
+
+    it('comments on an image: kept with the comment, listed, counted, hidden ones not shown, gone with the post', async () => {
+      const { store, done } = await make();
+      const p = (await store.createPost(post('pictures')))!;
+      const img = '/uploads/aaaa.jpg?size=big&x=1';
+      const plain = await store.addComment({ postId: p.id, authorId: 2, authorName: 'ace', body: 'On the post' });
+      const a = await store.addComment({ postId: p.id, authorId: 3, authorName: 'bob', body: 'Nice sun', image: img });
+      const b = await store.addComment({ postId: p.id, authorId: 4, authorName: 'cy', body: 'Too bright', image: img });
+      expect(plain.image).toBeNull();
+      expect(a.image).toBe(img);
+      expect((await store.listComments(p.id)).map((c) => [c.body, c.image])).toEqual([['On the post', null], ['Nice sun', img], ['Too bright', img]]);
+      expect((await store.recentComments(5)).find((c) => c.id === b.id)?.image).toBe(img);
+      await store.setCommentHidden(a.id, true);
+      expect((await store.listComments(p.id)).filter((c) => c.image === img).map((c) => c.body)).toEqual(['Too bright']);
+      expect((await store.listComments(p.id, true)).filter((c) => c.image === img)).toHaveLength(2);
+      expect((await store.commentCounts([p.id])).get(p.id)).toBe(2);
+      await store.forgetUser(4);
+      expect((await store.listComments(p.id)).find((c) => c.id === b.id)).toMatchObject({ authorId: null, image: img });
+      await store.deletePost(p.id);
+      expect(await store.listComments(p.id, true)).toEqual([]);
+      await done();
+    });
+
+    it('suggestions: votes are one per account, statuses and replies, counts', async () => {
+      const { store, done } = await make();
+      const s = await store.addSuggestion({ title: 'More ships', body: 'Please', authorId: 2, authorName: 'ace' });
+      const t = await store.addSuggestion({ title: 'Less ships', body: '', authorId: 3, authorName: 'bob' });
+      expect(await store.setVote(s.id, 5, true)).toBe(1);
+      expect(await store.setVote(s.id, 5, true)).toBe(1);
+      expect(await store.setVote(s.id, 6, true)).toBe(2);
+      expect(await store.setVote(999999, 6, true)).toBeNull();
+      expect([...(await store.votedBy(5, [s.id, t.id]))]).toEqual([s.id]);
+      expect((await store.listSuggestions({ sort: 'top' })).map((x) => x.title)).toEqual(['More ships', 'Less ships']);
+      await store.setSuggestionStatus(t.id, 'planned', ' Soon ', 'boss');
+      expect(await store.getSuggestion(t.id)).toMatchObject({ status: 'planned', reply: 'Soon', replyBy: 'boss' });
+      await store.setSuggestionStatus(t.id, 'done', null, 'boss');
+      expect(await store.getSuggestion(t.id)).toMatchObject({ status: 'done', reply: null, replyBy: null, repliedAt: null });
+      await store.setSuggestionHidden(t.id, true);
+      expect((await store.listSuggestions({ sort: 'new' })).map((x) => x.id)).toEqual([s.id]);
+      expect((await store.suggestionCounts()).open).toBe(1);
+      expect(await store.setVote(s.id, 6, false)).toBe(1);
+      await store.deleteSuggestion(s.id);
+      expect(await store.getSuggestion(s.id)).toBeNull();
+      await done();
+    });
+
+    it('shouts keep only the latest', async () => {
+      const { store, done } = await make();
+      for (let i = 1; i <= 5; i++) await store.addShout({ authorId: 2, authorName: 'ace', isAdmin: false, text: `s${i}` }, 3);
+      expect((await store.recentShouts(10)).map((x) => x.text)).toEqual(['s3', 's4', 's5']);
+      const last = (await store.recentShouts(1))[0];
+      expect(await store.deleteShout(last.id)).toBe(true);
+      expect(await store.deleteShout(last.id)).toBe(false);
+      await done();
+    });
+
+    it('API tokens: only the hash is kept; find, touch, revoke', async () => {
+      const { store, done } = await make();
+      const t = await store.createToken({ name: 'cli', hash: 'abc123', prefix: 'sgs_ab', createdBy: 1, createdByName: 'boss' });
+      expect(await store.findToken('abc123')).toMatchObject({ id: t.id, name: 'cli', lastUsedAt: null });
+      expect(await store.findToken('nope')).toBeNull();
+      await store.touchToken(t.id);
+      expect((await store.findToken('abc123'))?.lastUsedAt).not.toBeNull();
+      expect(await store.listTokens()).toHaveLength(1);
+      await store.revokeToken(t.id);
+      expect(await store.findToken('abc123')).toBeNull();
+      await done();
+    });
+
+    it('shared ships: one per name per pilot, a cap, hide, delete, and they go with the account', async () => {
+      const { store, done } = await make();
+      const ship = (ownerId: number, name: string) => ({ ownerId, ownerName: 'ace', name, plan: [{ fn: 'hull', piece: 'sq', x: 0, y: 0, rot: 0 }], stats: { parts: 1, cells: 1, mass: 1, hp: 75, gen: 0, draw: 0, thrust: 0, shield: 0, cargo: 0, guns: { fixed: 0, turret: 0 } }, power: 'pool' as const });
+      const a = await store.saveShip(ship(5, 'Dart'), 2);
+      expect(a).toMatchObject({ created: true, ship: { name: 'Dart', hidden: false } });
+      const again = await store.saveShip({ ...ship(5, 'dart'), name: 'DART' }, 2);
+      expect(again).toMatchObject({ created: false, ship: { name: 'DART' } });
+      expect((again as { ship: { id: number } }).ship.id).toBe((a as { ship: { id: number } }).ship.id);
+      expect(await store.saveShip(ship(5, 'Brick'), 2)).toMatchObject({ created: true });
+      expect(await store.saveShip(ship(5, 'Third'), 2)).toBe('cap');
+      expect(await store.saveShip(ship(5, 'brick'), 2)).toMatchObject({ created: false }); // (replacing is not adding)
+      expect(await store.saveShip(ship(6, 'Dart'), 2)).toMatchObject({ created: true }); // (another pilot's own Dart)
+      expect(await store.listShips({ ownerId: 5 })).toHaveLength(2);
+      const id = (a as { ship: { id: number } }).ship.id;
+      await store.setShipHidden(id, true);
+      expect((await store.listShips({ ownerId: 5 })).map((x) => x.name)).toEqual(['brick']);
+      expect(await store.listShips({ ownerId: 5, includeHidden: true })).toHaveLength(2);
+      expect((await store.getShip(id))?.hidden).toBe(true);
+      expect(await store.deleteShip(id)).toBe(true);
+      expect(await store.deleteShip(id)).toBe(false);
+      await store.forgetUser(5);
+      expect(await store.listShips({ ownerId: 5, includeHidden: true })).toEqual([]);
+      expect(await store.listShips({ ownerId: 6 })).toHaveLength(1);
+      await done();
+    });
+
+    it('a deleted account: its shouts and votes go, its comments and suggestions stay unsigned', async () => {
+      const { store, done } = await make();
+      const p = (await store.createPost(post('gone')))!;
+      await store.addComment({ postId: p.id, authorId: 7, authorName: 'leaver', body: 'Bye' });
+      const s = await store.addSuggestion({ title: 'Idea', body: '', authorId: 7, authorName: 'leaver' });
+      await store.setVote(s.id, 7, true);
+      await store.addShout({ authorId: 7, authorName: 'leaver', isAdmin: false, text: 'Hi' }, 50);
+      await store.forgetUser(7);
+      expect(await store.recentShouts(10)).toEqual([]);
+      expect((await store.getSuggestion(s.id))).toMatchObject({ authorId: null, authorName: 'a former pilot', votes: 0 });
+      expect((await store.listComments(p.id))[0]).toMatchObject({ authorId: null, authorName: 'a former pilot', body: 'Bye' });
+      await done();
+    });
+  });
+}
+
+it('JSON store: comments saved before images were commentable load with no image', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'site-store-'));
+  const file = join(dir, 'site.json');
+  writeFileSync(file, JSON.stringify({ version: 1, nextId: {}, posts: [], comments: [{ id: 1, postId: 1, authorId: 2, authorName: 'ace', body: 'Old', createdAt: '2026-01-01T00:00:00Z', hidden: false }] }));
+  const store = new JsonSiteStore(file);
+  expect((await store.recentComments(5))[0]).toMatchObject({ body: 'Old', image: null });
+  await store.close();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+describe('Postgres store: upgrading a database from before comments could be on an image (a fake pool, no database)', () => {
+  const fake = (state: { comments: boolean; image: boolean }, alterFails = false) => {
+    const sql: string[] = [];
+    const pool = {
+      async query(text: string) {
+        sql.push(text);
+        if (/^\s*SELECT/i.test(text)) return { rows: [state] };
+        if (alterFails) throw new Error('must be owner of table site_comments');
+        return { rows: [] };
+      },
+      async end() {},
+    };
+    return { store: new PostgresSiteStore(pool), alters: () => sql.filter((s) => /ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT/.test(s)).length };
+  };
+
+  it('adds the column when the table has none', async () => {
+    const f = fake({ comments: true, image: false });
+    await f.store.upgrade();
+    expect(f.alters()).toBe(1);
+  });
+  it('does nothing when it is there, or when schema.sql was never applied', async () => {
+    const has = fake({ comments: true, image: true });
+    await has.store.upgrade();
+    const fresh = fake({ comments: false, image: false });
+    await fresh.store.upgrade();
+    expect(has.alters() + fresh.alters()).toBe(0);
+  });
+  it('says what to do when this database user may not alter the table', async () => {
+    await expect(fake({ comments: true, image: false }, true).store.upgrade()).rejects.toThrow(/run site\/schema\.sql as the table's owner/);
+  });
+  it('schema.sql has the column in the table and as an idempotent ALTER', () => {
+    const sql = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../schema.sql'), 'utf-8');
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS site_comments \([^;]*\bimage\s+TEXT/);
+    expect(sql).toContain('ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT;');
+  });
+});
+
+contract('JSON', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'site-store-'));
+  const store = new JsonSiteStore(join(dir, 'site.json'));
+  return { store, done: async () => { await store.close(); rmSync(dir, { recursive: true, force: true }); } };
+});
+
+const databaseUrl = process.env.SITE_TEST_DATABASE_URL;
+if (databaseUrl) {
+  contract('postgres', async () => {
+    const moduleName = 'pg';
+    const pg: any = await import(moduleName);
+    const schema = `site_test_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const admin = new pg.Pool({ connectionString: databaseUrl });
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    const client = await admin.connect();
+    await client.query(`SET search_path TO ${schema}`);
+    await client.query(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../schema.sql'), 'utf-8'));
+    client.release();
+    const url = new URL(databaseUrl);
+    url.searchParams.set('options', `-c search_path=${schema}`);
+    const { PostgresSiteStore } = await import('./PostgresSiteStore.js');
+    const store = await PostgresSiteStore.create(url.toString());
+    return { store, done: async () => { await store.close(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); } };
+  });
+}

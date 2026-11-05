@@ -40,15 +40,6 @@ export const Health = defineComponent({
   lastDamageTick: Types.ui32, // Last tick damage was taken
 });
 
-/** Shield component - absorbs damage before health */
-export const Shield = defineComponent({
-  current: Types.f32,
-  max: Types.f32,
-  regenRate: Types.f32,
-  regenDelay: Types.ui16,     // Ticks until regen starts after damage
-  lastDamageTick: Types.ui32, // Last tick damage was taken
-});
-
 /** Lifetime in ticks - entity destroyed when reaches 0 */
 export const Lifetime = defineComponent({
   remaining: Types.ui32,
@@ -78,6 +69,16 @@ export const Input = defineComponent({
   // Combat
   fireLeft: Types.ui8,
   fireRight: Types.ui8,
+  // Modular ships: ship-relative strafe and helm (turn-with-keys) mode
+  strafeLeft: Types.ui8,
+  strafeRight: Types.ui8,
+  helm: Types.ui8,
+  /** Jump drive control held (or latched by the client) */
+  jump: Types.ui8,
+  /** Burst Strafer: dodge held (its way comes from the movement keys: ships/features/strafer, whose held input reads this field by name) */
+  dodge: Types.ui8,
+  /** Ship-to-cursor distance (world units) */
+  cursorDist: Types.f32,
   // Target angle for aiming
   targetAngle: Types.f64,
   // Sequence number for networking
@@ -97,26 +98,6 @@ export const Boost = defineComponent({
 // ============================================
 // INVENTORY & EQUIPMENT
 // ============================================
-
-/** Equipment slots - stores item data IDs */
-export const Equipment = defineComponent({
-  leftWeapon: Types.ui16,     // Item ID for left weapon
-  rightWeapon: Types.ui16,    // Item ID for right weapon
-  booster: Types.ui16,        // Item ID for booster
-  cockpit: Types.ui16,        // Item ID for cockpit
-});
-
-/** Cached equipment stat bonuses for efficient access */
-export const EquipmentStats = defineComponent({
-  // Booster bonuses (multipliers, 1.0 = 100% = no bonus)
-  thrustMultiplier: Types.f32,   // 1.0 = normal
-  fuelCapacity: Types.f32,       // 1.0 = normal
-  fuelRegenRate: Types.f32,      // 1.0 = normal
-  // Cockpit bonuses (additive)
-  accelBonus: Types.f32,         // Added to base accel
-  turnBonus: Types.f32,          // Added to base turn speed
-  hpBonus: Types.f32,            // Added to max HP
-});
 
 /** Inventory storage - array of item IDs */
 export const Inventory = defineComponent({
@@ -148,30 +129,6 @@ export const Inventory = defineComponent({
 // WEAPON COMPONENTS
 // ============================================
 
-/** Weapon state (attached to player) */
-export const WeaponState = defineComponent({
-  // Left weapon
-  leftCooldown: Types.ui16,
-  leftCharge: Types.ui16,      // For charge weapons (missile, pulse)
-  leftCharging: Types.ui8,
-  // Right weapon
-  rightCooldown: Types.ui16,
-  rightCharge: Types.ui16,
-  rightCharging: Types.ui8,
-  // Mine count for mine weapons
-  leftMineCount: Types.ui8,
-  rightMineCount: Types.ui8,
-  // Laser state (continuous fire)
-  leftLaserActive: Types.ui8,
-  leftLaserEndX: Types.f64,
-  leftLaserEndY: Types.f64,
-  leftLaserHitId: Types.eid,
-  rightLaserActive: Types.ui8,
-  rightLaserEndX: Types.f64,
-  rightLaserEndY: Types.f64,
-  rightLaserHitId: Types.eid,
-});
-
 /** Generic projectile marker */
 export const Projectile = defineComponent({
   ownerId: Types.eid,         // Entity that fired this
@@ -182,6 +139,12 @@ export const Projectile = defineComponent({
   spawnTick: Types.ui32,      // Tick when spawned
   spawnX: Types.f64,          // Initial spawn position
   spawnY: Types.f64,
+  sizeScale: Types.f32,       // Shell size relative to the base shot (0 = 1)
+  turret: Types.ui8,          // Fired by a turret (1) or a fixed gun / anything else (0)
+  miningYield: Types.f32,     // Ore per damage on asteroids (relative to the mining table's damagePerUnit)
+  miningHardness: Types.ui8,  // Hardest rock it can crack
+  endTick: Types.ui32,        // A shell that ends at a chosen point (a mortar's, an aim burst's): the tick it ends, in spawn + velocity × (tick - spawnTick) terms (0: none). Projectile row data[9]
+  gun: Types.i32,             // The gun that fired it, packed as a fire event's part (part + 256 × ammo + 65536 augmented; -1: none, Weapons.spawn always sets it). Projectile row data[10] (confirmed hits)
 });
 
 /** Bullet-specific data (cannon, scatter) */
@@ -198,29 +161,12 @@ export const Laser = defineComponent({
   hitEntityId: Types.eid,
 });
 
-/** Missile homing data */
-export const Missile = defineComponent({
-  targetId: Types.eid,
-  turnRate: Types.f32,
-  fuel: Types.ui16,
-  armed: Types.ui8,
-});
-
 /** Pulse projectile data */
 export const Pulse = defineComponent({
   chargeLevel: Types.f32,     // 0-1 charge multiplier
   splashRadius: Types.f32,
   growing: Types.ui8,         // Still growing
   growTimer: Types.f32,
-});
-
-/** Mine data */
-export const Mine = defineComponent({
-  ownerId: Types.eid,
-  armTimer: Types.ui16,       // Ticks until armed
-  armed: Types.ui8,
-  splashRadius: Types.f32,
-  damage: Types.f32,
 });
 
 /** Mining shot data - sticks to asteroids and deals DoT */
@@ -230,27 +176,6 @@ export const MiningShot = defineComponent({
   dotInterval: Types.ui16,    // Ticks between damage ticks
   dotTimer: Types.ui16,       // Current timer until next tick
   dotDamage: Types.f32,       // Damage per tick
-});
-
-/** Warp beacon data */
-export const WarpBeacon = defineComponent({
-  ownerId: Types.eid,
-  activationTimer: Types.ui16, // Ticks until can teleport
-  active: Types.ui8,
-});
-
-/** Warp projectile - teleports owner to destination on hit */
-export const WarpProjectile = defineComponent({
-  ownerId: Types.eid,
-  activationTimer: Types.ui16, // Ticks until warp activates
-  warpSpeed: Types.f32,       // Speed to launch caught entities
-});
-
-/** Mining beam state */
-export const MiningBeam = defineComponent({
-  targetId: Types.eid,        // Asteroid being mined
-  progress: Types.f32,        // Mining progress 0-1
-  dotTimer: Types.ui16,       // DoT tick timer
 });
 
 // ============================================
@@ -314,6 +239,8 @@ export const Station = defineComponent({
   argPeriapsis: Types.f32,
   meanAnomaly0: Types.f32,
   epochTick: Types.ui32,
+  /** Orbit clock rate (1 = Keplerian). Stations orbit slower so ships can match them. */
+  orbitTimeScale: Types.f32,
 });
 
 /** Portal/warp gate */
@@ -321,6 +248,10 @@ export const Portal = defineComponent({
   targetSystem: Types.ui8,
   targetX: Types.f64,
   targetY: Types.f64,
+  /** 0 = jump gate (interact to travel to its system), 1 = rift (fly in: fast travel to targetX/targetY) */
+  kind: Types.ui8,
+  /** Rift colour hue (0-360) */
+  hue: Types.f32,
 });
 
 /** Dropped item in world */
@@ -350,17 +281,6 @@ export const Trail = defineComponent({
   fadeRate: Types.f32,
 });
 
-/** Particle emitter */
-export const ParticleEmitter = defineComponent({
-  type: Types.ui8,            // Emitter type enum
-  rate: Types.f32,            // Particles per tick
-  color: Types.ui32,
-  lifetime: Types.f32,
-  spread: Types.f32,
-  speed: Types.f32,
-  active: Types.ui8,
-});
-
 /** Glow effect */
 export const Glow = defineComponent({
   color: Types.ui32,
@@ -378,42 +298,9 @@ export const NetworkSync = defineComponent({
   lastSyncTick: Types.ui32,
 });
 
-/** Interpolation data for smooth rendering */
-export const Interpolated = defineComponent({
-  prevX: Types.f64,
-  prevY: Types.f64,
-  prevAngle: Types.f64,
-  targetX: Types.f64,
-  targetY: Types.f64,
-  targetAngle: Types.f64,
-  t: Types.f32,               // Interpolation factor 0-1
-});
-
 // ============================================
 // QUEST/PROGRESSION COMPONENTS
 // ============================================
-
-/** Quest progress (attached to player) */
-export const QuestProgress = defineComponent({
-  // Active quest IDs (up to 5 active quests)
-  quest0: Types.ui16,
-  quest1: Types.ui16,
-  quest2: Types.ui16,
-  quest3: Types.ui16,
-  quest4: Types.ui16,
-  // Current stage for each quest
-  stage0: Types.ui8,
-  stage1: Types.ui8,
-  stage2: Types.ui8,
-  stage3: Types.ui8,
-  stage4: Types.ui8,
-  // Progress counter for current objective
-  progress0: Types.ui16,
-  progress1: Types.ui16,
-  progress2: Types.ui16,
-  progress3: Types.ui16,
-  progress4: Types.ui16,
-});
 
 // ============================================
 // UTILITY TAGS
@@ -446,7 +333,35 @@ export enum WeaponType {
   Mine = 6,
   Mining = 7,
   Warp = 8,
+  Railgun = 9,
+  Flak = 10,
+  Emp = 11,
+  Hive = 12,
+  CinderBloom = 13,
+  Prism = 14,
+  PrismShard = 15,
+  Phase = 16,
+  Singularity = 17,
+  Autocannon = 18,
+  Arc = 19,
+  Torpedo = 20,
+  Mortar = 21,
+  Charge = 22,
+  Magma = 23,
+  HeartSpark = 24,
+  HeartSeeker = 25,
+  Rivet = 26,
+  ScrapChunk = 27,
+  SeamSeeker = 28,
 }
+
+/** Projectile weapon kinds (tuning.weapons keys) to their snapshot WeaponType */
+export const WEAPON_KIND_TYPE: Record<string, number> = {
+  cannon: 1, missile: 4, railgun: 9, flak: 10, emp: 11,
+  hive: 12, cinder_bloom: 13, prism: 14, prism_shard: 15, phase: 16, singularity: 17,
+  pulse: 5, autocannon: 18, arc: 19, torpedo: 20, mortar: 21, charge: 22, magma: 23,
+  heart_spark: 24, heart_seeker: 25, rivet: 26, scrap_chunk: 27, seam_seeker: 28,
+};
 
 export enum AIBehavior {
   Idle = 0,

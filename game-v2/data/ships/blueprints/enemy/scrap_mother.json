@@ -1,0 +1,1147 @@
+{
+ "name": "Scrap Mother",
+ "catalogVersion": 1,
+ "power": "ports",
+ "paint": "#3a3c40",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "scrapmother_s3_petal0",
+   "fn": "generator",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "scrapmother_s3_petal1",
+   "fn": "generator",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "scrapmother_s3_petal2",
+   "fn": "generator",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "scrapmother_s3_petal3",
+   "fn": "generator",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "scrapmother_s3_petal4",
+   "fn": "generator",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "scrapmother_s3_petal5",
+   "fn": "generator",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "scrapmother_s3_servo0",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "scrapmother_s3_servo1",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "scrapmother_s3_servo2",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "scrapmother_s3_servo3",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "scrapmother_s3_servo4",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "scrapmother_s3_servo5",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "scrapmother_s3_servo6",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "scrapmother_s3_servo7",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "scrapmother_s3_servo8",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "scrapmother_s3_servo9",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "scrapmother_s3_servo10",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "scrapmother_s3_servo11",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "scrapmother_s3_spike1",
+   "fn": "generator",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "scrapmother_s3_spike2",
+   "fn": "generator",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "scrapmother_s3_spike4",
+   "fn": "generator",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "scrapmother_s3_spike5",
+   "fn": "generator",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "scrapmother_s3_welder_l",
+   "fn": "arc",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "scrapmother_s3_welder_r",
+   "fn": "arc",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "scrapmother_s3_drive_l",
+   "fn": "plasma_drive",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "scrapmother_s3_drive_r",
+   "fn": "plasma_drive",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "scrapmother_s3_core",
+   "fn": "core",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "scrapmother_throat",
+   "fn": "conduit",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "scrapmother_spine",
+   "fn": "generator",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "scrapmother_works",
+   "fn": "conduit",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 30,
+   "piece": "scrapmother_stacks",
+   "fn": "heat_vent",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 31,
+   "piece": "scrapmother_flank0_l",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 32,
+   "piece": "scrapmother_flank0_r",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 33,
+   "piece": "scrapmother_flank1_l",
+   "fn": "generator",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 34,
+   "piece": "scrapmother_flank1_r",
+   "fn": "generator",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "scrapmother_flank2_l",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 36,
+   "piece": "scrapmother_flank2_r",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 37,
+   "piece": "scrapmother_flank3_l",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 38,
+   "piece": "scrapmother_flank3_r",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 39,
+   "piece": "scrapmother_vat_l",
+   "fn": "generator",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 40,
+   "piece": "scrapmother_vat_r",
+   "fn": "generator",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "scrapmother_flak_l",
+   "fn": "flak",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 42,
+   "piece": "scrapmother_flak_r",
+   "fn": "flak",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 43,
+   "piece": "scrapmother_rotor_l",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "scrapmother_rotor_r",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "scrapmother_spindle",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "scrapmother_jaw_l",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 47,
+   "piece": "scrapmother_jaw_r",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 48,
+   "piece": "scrapmother_drive_c",
+   "fn": "plasma_drive",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 49,
+   "piece": "scrapmother_drive_l",
+   "fn": "plasma_drive",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 50,
+   "piece": "scrapmother_drive_r",
+   "fn": "plasma_drive",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 51,
+   "piece": "scrapmother_slab0_l",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 52,
+   "piece": "scrapmother_slab0_r",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 53,
+   "piece": "scrapmother_slab1_l",
+   "fn": "conduit",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 54,
+   "piece": "scrapmother_slab1_r",
+   "fn": "conduit",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 55,
+   "piece": "scrapmother_slab2_l",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 56,
+   "piece": "scrapmother_slab2_r",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 57,
+   "piece": "scrapmother_slab3_l",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 58,
+   "piece": "scrapmother_slab3_r",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 59,
+   "piece": "scrapmother_slab4_l",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 60,
+   "piece": "scrapmother_slab4_r",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 61,
+   "piece": "scrapmother_slab5_l",
+   "fn": "conduit",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 62,
+   "piece": "scrapmother_slab5_r",
+   "fn": "conduit",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 63,
+   "piece": "scrapmother_slab6_l",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 64,
+   "piece": "scrapmother_slab6_r",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 65,
+   "piece": "scrapmother_slab7_l",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 66,
+   "piece": "scrapmother_slab7_r",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 67,
+   "piece": "scrapmother_slab8_l",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 68,
+   "piece": "scrapmother_slab8_r",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 69,
+   "piece": "scrapmother_slab9_l",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 70,
+   "piece": "scrapmother_slab9_r",
+   "fn": "armor",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 71,
+   "piece": "scrapmother_slab10_l",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 72,
+   "piece": "scrapmother_slab10_r",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 73,
+   "piece": "scrapmother_slab11_l",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 74,
+   "piece": "scrapmother_slab11_r",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 75,
+   "piece": "scrapmother_patch0_l",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 76,
+   "piece": "scrapmother_patch0_r",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 77,
+   "piece": "scrapmother_patch1_l",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 78,
+   "piece": "scrapmother_patch1_r",
+   "fn": "armor",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 79,
+   "piece": "scrapmother_rack0_l",
+   "fn": "brood_bay",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 80,
+   "piece": "scrapmother_rack0_r",
+   "fn": "brood_bay",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 81,
+   "piece": "scrapmother_rack1_l",
+   "fn": "brood_bay",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 82,
+   "piece": "scrapmother_rack1_r",
+   "fn": "brood_bay",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 83,
+   "piece": "scrapmother_gun0_l",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 84,
+   "piece": "scrapmother_gun0_r",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 85,
+   "piece": "scrapmother_gun1_l",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 86,
+   "piece": "scrapmother_gun1_r",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 87,
+   "piece": "scrapmother_gun2_l",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 88,
+   "piece": "scrapmother_gun2_r",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 89,
+   "piece": "scrapmother_shoulder_l",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 90,
+   "piece": "scrapmother_shoulder_r",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 91,
+   "piece": "scrapmother_boom_l",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 92,
+   "piece": "scrapmother_boom_r",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 93,
+   "piece": "scrapmother_elbow_l",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 94,
+   "piece": "scrapmother_elbow_r",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 95,
+   "piece": "scrapmother_forearm_l",
+   "fn": "hull",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 96,
+   "piece": "scrapmother_forearm_r",
+   "fn": "hull",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 97,
+   "piece": "scrapmother_wrist_l",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 98,
+   "piece": "scrapmother_wrist_r",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 99,
+   "piece": "scrapmother_claw0_l",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 100,
+   "piece": "scrapmother_claw0_r",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 101,
+   "piece": "scrapmother_claw1_l",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 102,
+   "piece": "scrapmother_claw1_r",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 103,
+   "piece": "scrapmother_claw2_l",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 104,
+   "piece": "scrapmother_claw2_r",
+   "fn": "armor",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 105,
+   "piece": "scrapmother_hinge_l",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 106,
+   "piece": "scrapmother_hinge_r",
+   "fn": "hull",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 107,
+   "piece": "scrapmother_tow_l",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 108,
+   "piece": "scrapmother_tow_r",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 109,
+   "piece": "scrapmother_magnet_l",
+   "fn": "conduit",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 110,
+   "piece": "scrapmother_magnet_r",
+   "fn": "conduit",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 111,
+   "piece": "scrapmother_scaffold_l",
+   "fn": "bone_frame",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 112,
+   "piece": "scrapmother_scaffold_r",
+   "fn": "bone_frame",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

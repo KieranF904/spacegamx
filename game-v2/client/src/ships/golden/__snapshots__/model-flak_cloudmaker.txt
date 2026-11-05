@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Cloudmaker
+Mk II · Medium · Panel · 2 cells
+Hull · mass150 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage25/s · reach 1,700
+Hits withExplosive · penetration 1
+Clip4 rounds at 2.0/s · reloads in 2.5s from energy (30 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
+MountTurret, 240°
+FittingSide mount (flippable) · Bolts on at its side only
+Power draw12/s
+
+== partStats (stats rows) ==
+GradeMk II · Medium
+Hits withExplosive · penetration 2
+Power draw12
+Hull · mass150 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 150
+
+== familyLabel ==
+Flak
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+placed clouds at your aim distance, slow reload
+
+== keyStats ==
+25 dmg/s · reach 1,700 · clip 4 · 2.5s reload · draws 12
+
+== mountBadge ==
+TURRET 240°SIDE
+
+== mountingText ==
+Turret, 240°
+Side mount (flippable)
+Bolts on at its side only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 16","why":"Learned at level 16 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 16","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":24.842311111111112,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":24.842311111111112,"range":1700,"damageType":"explosive","pen":1,"draw":12.14}

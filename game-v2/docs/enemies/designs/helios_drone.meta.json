@@ -1,0 +1,42 @@
+{
+ "id": "helios_drone",
+ "name": "Helios Drone",
+ "faction": "helios",
+ "sky": "sol",
+ "replaces": "grid_helios_drone",
+ "role": "passive / welder",
+ "level": "1-3",
+ "threat": "low",
+ "parts": 11,
+ "groups": {
+  "core": [
+   "chassis",
+   "cell"
+  ],
+  "eye": [
+   "eye"
+  ],
+  "torch": [
+   "shoulder",
+   "upper",
+   "elbow",
+   "fore",
+   "torch"
+  ],
+  "panel_l": [
+   "panel_l"
+  ],
+  "panel_r": [
+   "panel_r"
+  ],
+  "drive": [
+   "drive"
+  ]
+ },
+ "damaged": [
+  "torch",
+  "panel_r"
+ ],
+ "radiusCells": 2.667,
+ "radius": 64
+}

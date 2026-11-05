@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Selector
+Mk II · Square · 1 cell
+Hull · mass56 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+
+== partStats (stats rows) ==
+GradeMk II
+Hull · mass56 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 56
+
+== familyLabel ==
+Feed
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Two feeds in (left and right), one out (front)
+
+== keyStats ==
+56 hp · armour 2
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 16","why":"Learned at level 16 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 16","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":56.4,"mass":1.4,"firepower":0,"toughness":56.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

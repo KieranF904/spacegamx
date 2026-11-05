@@ -2,53 +2,130 @@
  * Data Loader - Loads and indexes game data from JSON files
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { buildTerrain, withArenaGates, type Terrain, type TerrainFile } from '@space-game/common';
 import {
-  ItemData,
+  ItemDef,
+  RecipesFile,
+  MiningTable,
   StarSystemData,
-  EnemyTypeData,
-  NPCData,
   StationData,
-  QuestData,
   ItemsFile,
   SystemsFile,
-  EnemiesFile,
-  NPCsFile,
   StationsFile,
   QuestsFile,
+  PeopleFile,
+  CodexFile,
+  UnlockTable,
+  setUnlockTable,
+  HazardRules,
+  registerRockTypes,
+  registerAmmo,
+  GemsFile,
+  StationFile,
+  setStationTable,
 } from '@space-game/common';
+import { checkGameData } from './validateGameData.js';
+import type { RulesFile, StringsFile } from './rules.js';
+
+/** Parsed contents of the data JSON files. Node loads them from disk; proto mode bundles them. */
+export interface GameDataFiles {
+  items: ItemsFile;
+  recipes: RecipesFile;
+  mining: MiningTable;
+  factions: unknown;
+  bosses?: unknown;
+  /** Single-body enemies (data/mobs.json) */
+  mobs?: unknown;
+  /** Surfaces' rock, by surface id (data/terrain/<id>.json) */
+  terrain?: Record<string, TerrainFile>;
+  systems: SystemsFile;
+  stations: StationsFile;
+  quests: QuestsFile;
+  /** Who you can talk to (data/people.json) */
+  people?: PeopleFile;
+  /** Records: lore found as documents and testimony (data/codex.json) */
+  codex?: CodexFile;
+  /** Ribbons (data/achievements.json) */
+  achievements?: unknown;
+  /** Tuning for sieges, surfaces, events and operations (data/rules.json) */
+  rules?: RulesFile;
+  /** Player-facing text (data/strings.json) */
+  strings?: StringsFile;
+  /** What each level opens up (data/unlocks.json) */
+  unlocks?: Partial<UnlockTable>;
+  /** Hazard rules: where ratings rise, what builds tolerate (data/hazards.json) */
+  hazards?: HazardRules;
+  /** Cut gems and sockets (data/gems.json) */
+  gems?: GemsFile;
+  /** Your station: charter, sites, tracks (data/station.json) */
+  station?: StationFile;
+}
 
 export class GameData {
   // Indexed by ID for O(1) lookup
-  private items: Map<string, ItemData> = new Map();
+  private items: Map<string, ItemDef> = new Map();
+  /** The raw item and recipe files (the economy is built from these plus the ship catalogue) */
+  readonly itemsFile: ItemsFile;
+  readonly recipesFile: RecipesFile;
+  readonly miningTable: MiningTable;
+  readonly factionsFile: unknown;
+  readonly bossesFile: unknown;
+  readonly mobsFile: unknown;
+  private terrainFiles: Record<string, TerrainFile>;
+  private terrains = new Map<string, Terrain>();
   private systems: Map<string, StarSystemData> = new Map();
-  private enemies: Map<string, EnemyTypeData> = new Map();
-  private npcs: Map<string, NPCData> = new Map();
   private stations: Map<string, StationData> = new Map();
-  private quests: Map<string, QuestData> = new Map();
+  /** Quest definitions (the Quests module indexes them) */
+  readonly questsFile: QuestsFile;
+  readonly peopleFile: PeopleFile;
+  readonly codexFile: CodexFile;
+  readonly achievementsFile: unknown;
+  /** data/rules.json: each module merges its section over its own defaults */
+  readonly rulesFile: RulesFile;
+  readonly hazardRules: HazardRules;
+  readonly gemsFile: GemsFile;
+  readonly stationFile: StationFile | undefined;
+  /** data/strings.json: each module's text over its own defaults */
+  readonly stringsFile: StringsFile;
 
   // Numeric ID mappings for ECS
   private itemIdToNum: Map<string, number> = new Map();
   private numToItemId: Map<number, string> = new Map();
   private systemIdToNum: Map<string, number> = new Map();
   private numToSystemId: Map<number, string> = new Map();
-  private enemyIdToNum: Map<string, number> = new Map();
-  private numToEnemyId: Map<number, string> = new Map();
   private stationIdToNum: Map<string, number> = new Map();
+  private instances: Map<string, number[]> = new Map();
   private numToStationId: Map<number, string> = new Map();
 
-  constructor(dataPath: string) {
-    this.loadItems(join(dataPath, 'items.json'));
-    this.loadSystems(join(dataPath, 'systems.json'));
-    this.loadEnemies(join(dataPath, 'enemies.json'));
-    this.loadNPCs(join(dataPath, 'npcs.json'));
-    this.loadStations(join(dataPath, 'stations.json'));
-    this.loadQuests(join(dataPath, 'quests.json'));
+  constructor(files: GameDataFiles) {
+    // Shape and cross-reference checks (throws in dev/test, logs in production)
+    checkGameData(files);
+    this.itemsFile = files.items;
+    this.recipesFile = files.recipes;
+    this.miningTable = files.mining;
+    this.factionsFile = files.factions;
+    this.bossesFile = files.bosses ?? { rules: { creditRange: 5000, creditWindowTicks: 3600, barRange: 7000 }, bosses: {} };
+    this.mobsFile = files.mobs ?? { mobs: {} };
+    this.terrainFiles = files.terrain ?? {};
+    this.loadItems(files.items);
+    this.loadSystems(files.systems);
+    this.loadStations(files.stations);
+    this.questsFile = { quests: files.quests.quests ?? [], reputations: files.quests.reputations ?? {}, restricted: files.quests.restricted ?? {} };
+    this.peopleFile = { people: files.people?.people ?? [] };
+    this.codexFile = { entries: files.codex?.entries ?? [] };
+    this.achievementsFile = files.achievements ?? { ribbons: [] };
+    this.rulesFile = files.rules ?? {};
+    this.stringsFile = files.strings ?? {};
+    setUnlockTable(files.unlocks);
+    registerRockTypes(files.mining);
+    registerAmmo(files.items.items);
+    this.hazardRules = files.hazards ?? {};
+    this.stationFile = files.station;
+    setStationTable(files.station);
+    this.gemsFile = files.gems ?? { sockets: { byGrade: [], levelByGrade: [], largeArea: 2, legendary: [0, 0] }, cuts: {}, types: {} };
   }
 
-  private loadItems(path: string): void {
-    const data: ItemsFile = JSON.parse(readFileSync(path, 'utf-8'));
+  private loadItems(data: ItemsFile): void {
     let numId = 1;
     for (const item of data.items) {
       this.items.set(item.id, item);
@@ -59,40 +136,33 @@ export class GameData {
     console.log(`Loaded ${this.items.size} items`);
   }
 
-  private loadSystems(path: string): void {
-    const data: SystemsFile = JSON.parse(readFileSync(path, 'utf-8'));
+  private loadSystems(data: SystemsFile): void {
     let numId = 0;
     for (const system of data.systems) {
       this.systems.set(system.id, system);
       this.systemIdToNum.set(system.id, numId);
       this.numToSystemId.set(numId, system.id);
+      this.instances.set(system.id, [numId]);
       numId++;
+    }
+    // Instanced systems (a party's own copy of a moon): more numbers for the same system.
+    // Clients are only ever told the system's id, so a copy looks just like the original.
+    for (const system of data.systems) {
+      for (let k = 1; k < (system.instance?.slots ?? 1); k++) {
+        this.numToSystemId.set(numId, system.id);
+        this.instances.get(system.id)!.push(numId);
+        numId++;
+      }
     }
     console.log(`Loaded ${this.systems.size} star systems`);
   }
 
-  private loadEnemies(path: string): void {
-    const data: EnemiesFile = JSON.parse(readFileSync(path, 'utf-8'));
-    let numId = 1;
-    for (const enemy of data.enemies) {
-      this.enemies.set(enemy.id, enemy);
-      this.enemyIdToNum.set(enemy.id, numId);
-      this.numToEnemyId.set(numId, enemy.id);
-      numId++;
-    }
-    console.log(`Loaded ${this.enemies.size} enemy types`);
+  /** Every copy of a system (its own number first; more for instanced systems) */
+  getSystemInstances(id: string): number[] {
+    return this.instances.get(id) ?? [];
   }
 
-  private loadNPCs(path: string): void {
-    const data: NPCsFile = JSON.parse(readFileSync(path, 'utf-8'));
-    for (const npc of data.npcs) {
-      this.npcs.set(npc.id, npc);
-    }
-    console.log(`Loaded ${this.npcs.size} NPCs`);
-  }
-
-  private loadStations(path: string): void {
-    const data: StationsFile = JSON.parse(readFileSync(path, 'utf-8'));
+  private loadStations(data: StationsFile): void {
     let numId = 1;
     for (const station of data.stations) {
       this.stations.set(station.id, station);
@@ -103,23 +173,16 @@ export class GameData {
     console.log(`Loaded ${this.stations.size} stations`);
   }
 
-  private loadQuests(path: string): void {
-    const data: QuestsFile = JSON.parse(readFileSync(path, 'utf-8'));
-    for (const quest of data.quests) {
-      this.quests.set(quest.id, quest);
-    }
-    console.log(`Loaded ${this.quests.size} quests`);
-  }
 
   // ============================================
   // GETTERS
   // ============================================
 
-  getItem(id: string): ItemData | undefined {
+  getItem(id: string): ItemDef | undefined {
     return this.items.get(id);
   }
 
-  getItemByNum(num: number): ItemData | undefined {
+  getItemByNum(num: number): ItemDef | undefined {
     const id = this.numToItemId.get(num);
     return id ? this.items.get(id) : undefined;
   }
@@ -128,8 +191,18 @@ export class GameData {
     return this.itemIdToNum.get(id) ?? 0;
   }
 
-  getAllItems(): ItemData[] {
+  getAllItems(): ItemDef[] {
     return Array.from(this.items.values());
+  }
+
+  /** A surface's rock (built once), or undefined where there's none */
+  terrain(systemId: string): Terrain | undefined {
+    let t = this.terrains.get(systemId);
+    if (t) return t;
+    // (A boss arena's barrier is part of its rock: world/gates.ts)
+    const file = withArenaGates(this.terrainFiles[systemId], this.systems.get(systemId)?.arena);
+    if (file) this.terrains.set(systemId, (t = buildTerrain(file)));
+    return t;
   }
 
   getSystem(id: string): StarSystemData | undefined {
@@ -149,31 +222,6 @@ export class GameData {
     return Array.from(this.systems.values());
   }
 
-  getEnemy(id: string): EnemyTypeData | undefined {
-    return this.enemies.get(id);
-  }
-
-  getEnemyByNum(num: number): EnemyTypeData | undefined {
-    const id = this.numToEnemyId.get(num);
-    return id ? this.enemies.get(id) : undefined;
-  }
-
-  getEnemyNum(id: string): number {
-    return this.enemyIdToNum.get(id) ?? 0;
-  }
-
-  getAllEnemies(): EnemyTypeData[] {
-    return Array.from(this.enemies.values());
-  }
-
-  getNPC(id: string): NPCData | undefined {
-    return this.npcs.get(id);
-  }
-
-  getAllNPCs(): NPCData[] {
-    return Array.from(this.npcs.values());
-  }
-
   getStation(id: string): StationData | undefined {
     return this.stations.get(id);
   }
@@ -191,13 +239,6 @@ export class GameData {
     return Array.from(this.stations.values());
   }
 
-  getQuest(id: string): QuestData | undefined {
-    return this.quests.get(id);
-  }
-
-  getAllQuests(): QuestData[] {
-    return Array.from(this.quests.values());
-  }
 
   // ============================================
   // QUERIES
@@ -207,25 +248,4 @@ export class GameData {
     return this.getAllStations().filter(s => s.system === systemId);
   }
 
-  getSystemNPCs(systemId: string): NPCData[] {
-    return this.getAllNPCs().filter(n => n.system === systemId);
-  }
-
-  getSystemEnemies(systemId: string): EnemyTypeData[] {
-    return this.getAllEnemies().filter(e => e.spawnInfo.systems.includes(systemId));
-  }
-
-  getNPCQuests(npcId: string): QuestData[] {
-    const npc = this.npcs.get(npcId);
-    if (!npc) return [];
-    return npc.quests.map(qid => this.quests.get(qid)).filter((q): q is QuestData => q !== undefined);
-  }
-
-  getItemsByType(type: string): ItemData[] {
-    return this.getAllItems().filter(i => i.type === type);
-  }
-
-  getWeaponsByType(weaponType: string): ItemData[] {
-    return this.getAllItems().filter(i => i.weaponType === weaponType);
-  }
 }

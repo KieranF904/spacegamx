@@ -1,0 +1,678 @@
+{
+  "cellSize": 24,
+  "overlapShrink": 0.01,
+  "arcSegmentsPerQuarter": 8,
+  "maxParts": 255,
+  "hpBandSize": 0.25,
+  "health": {
+    "floor": 0.25,
+    "slope": 0.75
+  },
+  "flow": {
+    "minWeaponSatisfaction": 0.1
+  },
+  "flight": {
+    "_comment": "Mouse-steer (common/src/ships/flight.ts steerSpin): the ship spins towards the aim no faster than maxAngularSpeed, than it can still stop from in time (its torque/inertia cap the braking way, under hazards and cargo, x turnBrakeMargin), or than turnGain x the angle left (the last little way eased in: at most 1, or it overshoots and twitches). Bosses (Blueprint turn) spin at most bossMaxAngularSpeed and ease in at bossTurnGain.",
+    "coreManeuverForce": 3,
+    "gyroTorque": 216,
+    "thrusterTorqueGain": 9,
+    "turnGain": 0.5,
+    "turnBrakeMargin": 0.9,
+    "maxAngularSpeed": 0.1,
+    "bossMaxAngularSpeed": 0.04,
+    "bossTurnGain": 0.15,
+    "helmTurnGain": 0.25
+  },
+  "jump": {
+    "_comment": "The drive's reach and cooldown come from coil capacity (the core's own coreCapacity cells of hull, plus jump coils' functions.json jumpCapacity per cell) over the hull's cells: at ratio 1, baseRange and cooldownTicks; over, diminishing returns; under, less range and a longer cooldown (common/src/ships/flight.ts jumpDriveStats).",
+    "chargeTicks": 90,
+    "_short": "A short jump charges longer (flight.ts jumpChargeNeed): up to shortRange the charge adds the ticks to fly it at shortCruise (units a tick, about a starter at cruise), so it is never quicker than flying; that extra tapers off to none by shortTaper.",
+    "shortCruise": 20,
+    "shortRange": 12000,
+    "shortTaper": 25000,
+    "burnTicks": 90,
+    "cooldownTicks": 900,
+    "speed": 340,
+    "exitSpeed": 0,
+    "rampTicks": 5,
+    "slowTicks": 16,
+    "chargeDamping": 0.96,
+    "baseRange": 50000,
+    "minRange": 5000,
+    "coreCapacity": 40,
+    "gradeCapacity": 0.1,
+    "gradeRange": 0.05,
+    "gradeCooldown": 0.0625,
+    "overRange": 0.15,
+    "overRangeMax": 0.35,
+    "overCooldown": 0.2,
+    "cooldownFloor": 0.7,
+    "minCooldownTicks": 600,
+    "underRange": 0.6,
+    "underRangeFloor": 0.6,
+    "underCooldown": 0.7,
+    "underCooldownCap": 1.6667,
+    "solarRing": 9000,
+    "solarRangeBoost": 1.25,
+    "solarCharge": 1,
+    "lodestoneName": "Stillstone",
+    "lodestoneShort": "Stillstone",
+    "lodestoneSize": 900,
+    "lodestoneField": 1250,
+    "lodestoneCharge": 1,
+    "lodestoneRangeBoost": 1.2,
+    "lodestonePrimeTicks": 3600,
+    "lodestoneScarredCharge": 0.5,
+    "lodestoneScarredBoost": 0.5
+  },
+  "fixedGun": {
+    "gimbalDeg": 2,
+    "beamGimbalDeg": 9,
+    "fireToleranceDeg": 0.5,
+    "intervalScale": 1.5,
+    "speedScale": 0.7,
+    "sizeScale": 1.5
+  },
+  "_weapons": "Per weapon kind. projectile: speed (u/tick), damage, life (ticks), size (shell scale), spread (deg). Extras: pierce (bodies it passes through), homing (turn rate), accel/maxSpeed, fuse (proximity radius), splash {radius, damage}, emp {radius, ticks}. beam: range, dps (no heat: it burns as long as the power lasts, rework 2026-11); or a pulse laser: damage a pulse, pulse {ticks, peakAt} (common/src/ships/pulse.ts: fades in, peaks for an instant, trails off; charges for its part's fireInterval; no heat); width (at a pulse's peak); falloff {start, floor}: full strength out to start x range (its effective range), then down steeply to floor at its full range, fading as it goes (a hull this near its line is hit), npcScale (hostiles' beams × this), armorBonus. stagger: a ship's guns of the kind (and interval) fire in turn, evenly over their interval (guns.ts). heal (beam): mends instead of hurting, HP a second (the Repair Beam: common/src/ships/support.ts). intercept: point defence can shoot a shot of this kind down, in this many hits (a boss nova never). pointDefence {range, slew}: fires on its own at interceptable shots, never at ships. gimbalDeg (a fixed gun of the kind): how far it swivels either side (degrees), in place of fixedGun gimbalDeg / beamGimbalDeg (the Lance: half as far again as other fixed beams). bySize: how a bigger gun differs beyond hitting harder, each number x (size / base size)^this (rate: fire rate).",
+  "weapons": {
+    "cannon": {
+      "type": "projectile",
+      "speed": 48,
+      "damage": 14,
+      "life": 150,
+      "size": 1,
+      "spread": 1.8,
+      "pen": 0
+    },
+    "railgun": {
+      "type": "projectile",
+      "speed": 150,
+      "damage": 62,
+      "life": 60,
+      "size": 0.8,
+      "spread": 0.15,
+      "pierce": 2,
+      "stagger": true,
+      "ammo": {
+        "item": "railgun_slugs",
+        "rounds": 200
+      },
+      "pen": 1.5
+    },
+    "flak": {
+      "type": "projectile",
+      "speed": 34,
+      "damage": 5,
+      "life": 50,
+      "size": 1.3,
+      "spread": 5,
+      "fuse": 120,
+      "splash": {
+        "radius": 170,
+        "damage": 16
+      },
+      "ammo": {
+        "item": "flak_canisters",
+        "rounds": 120
+      },
+      "pen": -1,
+      "bySize": {
+        "rate": -0.1,
+        "splashRadius": 0.3,
+        "splashDamage": -0.1,
+        "fuse": 0.3,
+        "size": 0.25
+      }
+    },
+    "missile": {
+      "type": "projectile",
+      "intercept": 1,
+      "speed": 14,
+      "accel": 0.9,
+      "maxSpeed": 44,
+      "damage": 30,
+      "life": 260,
+      "size": 1.5,
+      "spread": 4,
+      "homing": 0.07,
+      "stagger": true,
+      "splash": {
+        "radius": 120,
+        "damage": 34
+      },
+      "ammo": {
+        "item": "missile_crate",
+        "rounds": 24
+      },
+      "pen": -0.5
+    },
+    "emp": {
+      "type": "projectile",
+      "speed": 30,
+      "damage": 3,
+      "life": 110,
+      "size": 1.8,
+      "spread": 1,
+      "fuse": 90,
+      "emp": {
+        "radius": 200,
+        "ticks": 120
+      },
+      "pen": 0
+    },
+    "laser": {
+      "type": "beam",
+      "range": 5100,
+      "falloff": {
+        "start": 0.6667,
+        "floor": 0.12
+      },
+      "damage": 96,
+      "pulse": {
+        "ticks": 84,
+        "peakAt": 0.42
+      },
+      "width": 30,
+      "npcScale": 0.7,
+      "stagger": true,
+      "color": "red",
+      "pen": 0
+    },
+    "autocannon": {
+      "type": "projectile",
+      "speed": 54,
+      "damage": 5,
+      "life": 100,
+      "size": 0.6,
+      "spread": 4,
+      "pen": -0.5
+    },
+    "pulse": {
+      "type": "projectile",
+      "speed": 72,
+      "damage": 9,
+      "life": 70,
+      "size": 0.7,
+      "spread": 2.5,
+      "burst": 3,
+      "vsShield": 1.6,
+      "vsHull": 0.6,
+      "color": "pink",
+      "pen": -0.5
+    },
+    "arc": {
+      "type": "projectile",
+      "speed": 110,
+      "damage": 34,
+      "life": 6,
+      "size": 1.1,
+      "spread": 1,
+      "chain": {
+        "count": 3,
+        "radius": 300,
+        "falloff": 0.5
+      },
+      "pen": 0
+    },
+    "torpedo": {
+      "type": "projectile",
+      "intercept": 3,
+      "speed": 6,
+      "accel": 0.12,
+      "maxSpeed": 15,
+      "damage": 420,
+      "life": 520,
+      "size": 2,
+      "spread": 0.5,
+      "vsShield": 0,
+      "splash": {
+        "radius": 90,
+        "damage": 80
+      },
+      "ammo": {
+        "item": "torpedo_crate",
+        "rounds": 6
+      },
+      "pen": 1
+    },
+    "mortar": {
+      "type": "projectile",
+      "intercept": 1,
+      "speed": 22,
+      "damage": 0,
+      "life": 120,
+      "size": 1.6,
+      "spread": 2,
+      "lob": true,
+      "splash": {
+        "radius": 220,
+        "damage": 70
+      },
+      "ammo": {
+        "item": "mortar_shells",
+        "rounds": 40
+      },
+      "pen": -0.5
+    },
+    "magma": {"type": "projectile", "speed": 16, "damage": 30, "life": 230, "size": 5.2, "spread": 1.2, "splash": {"radius": 240, "damage": 34}, "ignite": {"dps": 12, "ticks": 180, "radius": 1}, "stagger": true, "pen": -0.5},
+    "charge": {
+      "type": "projectile",
+      "speed": 20,
+      "damage": 900,
+      "life": 120,
+      "size": 1.4,
+      "spread": 1,
+      "vsShield": 0,
+      "vsHull": 0,
+      "stick": {"ticks": 60},
+      "ammo": {
+        "item": "mining_charges",
+        "rounds": 30
+      },
+      "pen": 0
+    },
+    "lance": {
+      "type": "beam",
+      "range": 500,
+      "gimbalDeg": 13.5,
+      "dps": 210,
+      "width": 22,
+      "npcScale": 0.92,
+      "armorBonus": 1.2,
+      "color": "violet",
+      "pen": 1.5
+    },
+    "hive": {
+      "type": "projectile",
+      "intercept": 1,
+      "speed": 12,
+      "accel": 0.8,
+      "maxSpeed": 38,
+      "damage": 10,
+      "life": 240,
+      "size": 0.9,
+      "spread": 20,
+      "homing": 0.11,
+      "salvo": { "count": 4, "gap": 6 },
+      "volleyTargets": 4,
+      "splash": {
+        "radius": 70,
+        "damage": 12
+      },
+      "pen": -1
+    },
+    "frostbite": {
+      "type": "beam",
+      "range": 760,
+      "dps": 95,
+      "width": 14,
+      "slow": {
+        "ticks": 42
+      },
+      "color": "ice",
+      "pen": 0.5
+    },
+    "repair": {"type": "beam", "heal": 42, "dps": 0, "range": 520, "width": 34, "color": "teal", "pen": 0},
+    "point_defence": {"type": "projectile", "pointDefence": {"range": 560, "slew": 3}, "damage": 0, "speed": 0, "life": 1, "pen": 0},
+    "rivet": {"type": "projectile", "speed": 34, "damage": 16, "life": 110, "size": 1.7, "spread": 1.5, "pen": 0},
+    "scrap_chunk": {"type": "projectile", "speed": 15, "damage": 50, "life": 700, "size": 11, "spread": 0, "pen": 0},
+    "seam_seeker": {"type": "projectile", "intercept": 2, "speed": 6, "accel": 0.35, "maxSpeed": 22, "damage": 34, "life": 320, "size": 1.7, "spread": 0, "homing": 0.045, "splash": {"radius": 90, "damage": 14}, "pen": -1},
+    "heart_spark": {"type": "projectile", "speed": 20, "damage": 70, "life": 700, "size": 13, "spread": 0, "pen": -0.5},
+    "heart_seeker": {"type": "projectile", "intercept": 2, "speed": 7, "accel": 0.35, "maxSpeed": 24, "damage": 45, "life": 300, "size": 1.6, "spread": 0, "homing": 0.045, "splash": {"radius": 90, "damage": 16}, "pen": -1},
+    "cinder_bloom": {
+      "type": "projectile",
+      "speed": 36,
+      "damage": 16,
+      "life": 90,
+      "size": 1.4,
+      "spread": 3,
+      "ignite": {
+        "dps": 22,
+        "ticks": 300,
+        "radius": 1.2
+      },
+      "pen": -0.5
+    },
+    "prism": {
+      "type": "projectile",
+      "speed": 40,
+      "damage": 22,
+      "life": 70,
+      "size": 1.3,
+      "spread": 1,
+      "split": {
+        "count": 5,
+        "arc": 40,
+        "kind": "prism_shard"
+      },
+      "pen": 0
+    },
+    "prism_shard": {
+      "type": "projectile",
+      "speed": 44,
+      "damage": 11,
+      "life": 26,
+      "size": 0.7,
+      "spread": 0,
+      "pen": -0.5
+    },
+    "phase": {
+      "type": "projectile",
+      "speed": 30,
+      "damage": 70,
+      "life": 110,
+      "size": 1.6,
+      "spread": 0.4,
+      "pierce": 2,
+      "pierceKeep": 1,
+      "vsShield": 0,
+      "ghost": true,
+      "pen": 1
+    },
+    "singularity": {
+      "type": "projectile",
+      "speed": 9,
+      "damage": 0,
+      "life": 228,
+      "hold": 228,
+      "size": 2.4,
+      "spread": 0,
+      "pull": {
+        "radius": 900,
+        "strength": 0.32
+      },
+      "splash": {
+        "radius": 300,
+        "damage": 140
+      },
+      "pen": 0.5
+    }
+  },
+  "_weaponGrades": "Per weapon kind, Mk I to Mk V: what each grade's gun does differently, on top of its material's output (damage x1/1.3/1.65/2.1/2.6). A gem's kind of change (mul: x(1 + v); add; set; rate: fire rate; splashDamage/splashRadius: its burst's). Each is a little better overall than the one before but not just bigger: cannon Mk II heavy shells, III fast high-velocity slugs, IV a rapid autoloader, V siege slugs that punch through. Clients draw each mark's shells their own way (client/src/rendering/weapons/weaponStyles.ts).",
+  "weaponGrades": {
+    "cannon": [
+      null,
+      { "mul": { "damage": 0.18, "rate": -0.12, "speed": -0.08, "life": 0.08, "size": 0.15, "spread": -0.1 } },
+      { "mul": { "speed": 0.35, "life": -0.15, "spread": -0.4, "size": -0.1, "damage": 0.05 }, "add": { "pen": 0.3 } },
+      { "mul": { "rate": 0.3, "damage": -0.15, "speed": 0.1, "life": -0.05, "spread": 0.15 } },
+      { "mul": { "damage": 0.24, "rate": -0.1, "speed": 0.2, "life": -0.1, "size": 0.25, "spread": -0.3 }, "add": { "pierce": 1, "pen": 0.3 } }
+    ],
+    "laser": [
+      null,
+      { "mul": { "range": 0.12, "damage": 0.05, "width": -0.15 } },
+      { "mul": { "rate": 0.15, "damage": -0.05 } },
+      { "mul": { "width": 0.5, "damage": 0.1 } },
+      { "mul": { "range": 0.25, "damage": 0.12 }, "add": { "pen": 0.4 } }
+    ],
+    "flak": [
+      null,
+      { "mul": { "splashRadius": 0.12, "splashDamage": 0.1, "damage": 0.05, "rate": -0.05 } },
+      { "mul": { "speed": 0.2, "fuse": 0.2, "splashDamage": 0.16 } },
+      { "mul": { "rate": 0.15, "splashDamage": -0.05, "spread": -0.3 } },
+      { "mul": { "splashRadius": 0.2, "splashDamage": 0.3, "damage": 0.2, "rate": -0.1 }, "add": { "pen": 0.5 } }
+    ],
+    "railgun": [
+      null,
+      { "mul": { "damage": 0.1, "rate": -0.06 } },
+      { "add": { "pierce": 1 } },
+      { "mul": { "speed": 0.2, "life": -0.1, "rate": 0.1 } },
+      { "mul": { "damage": 0.15 }, "add": { "pen": 0.5 } }
+    ],
+    "missile": [
+      null,
+      { "mul": { "splashDamage": 0.1, "maxSpeed": -0.05 } },
+      { "mul": { "homing": 0.4, "accel": 0.2 } },
+      { "mul": { "rate": 0.15, "damage": -0.05 } },
+      { "mul": { "splashRadius": 0.2, "damage": 0.1, "maxSpeed": 0.1 } }
+    ]
+  },
+  "shield": {
+    "regenDelayTicks": 180,
+    "regenPerSecond": 0.14,
+    "maxPerArea": 40
+  },
+  "energy": {
+    "_comment": "Battery: the core holds coreCapacity (energy units: power x seconds); battery parts add store x area x grade output. Boosting multiplies what the engines draw by 1 + boostDraw x their boostDrain (common/src/ships/energy.ts).",
+    "coreCapacity": 240,
+    "boostDraw": 2.2,
+    "_pool": "One ship pool and the banks (common/src/ships/circuits.ts, energy.ts; docs/design/rework-2026-11.md 2.2-2.3): the pool is the core's store plus the batteries on powered networks; it gives at most coreDischarge a second plus each battery's discharge per cell (models.json discharge; legacy batteries: discharge.general). Output = spare generation + that while the pool holds charge; past it the ship browns out. Capacitor and Drive Cell banks give at most their discharge (absent: discharge.bank, discharge.drive) to what they touch.",
+    "coreDischarge": 720,
+    "discharge": { "general": 600, "drive": 1400, "bank": 2000 },
+    "_routing": "Energy routing (docs/design/energy-routing-impl.md 5.2; read from P1, common/src/ships/power): the core Takes at most coreIntake E a second; a beam relights once its buffer is back to relight of full (a weapon fire.relight overrides).",
+    "coreIntake": 120,
+    "relight": 0.5
+  },
+
+  "_feeds": "The feed layer (common/src/ships/power/ports.ts; docs/design/energy-ports-2026-11.md section 10): materials a tank holds and a pipe carries, each a sidegrade of what takes it (models.json takes). shot: E a shot; damage; cycle: ticks between shots; discharge/rest: s the ports shut; burn: a beam's or engine's E a second; steady: the floor, E/s a gun's lines must deliver while it fills or what it gathered collapses; thrust; boost: x the boost; boostDrain: x the boosted burn.",
+  "feeds": {
+    "overcharge": {
+      "name": "Overcharge",
+      "short": "OC",
+      "on": "weapon",
+      "color": "#f97316",
+      "mod": {
+        "damage": 1.3,
+        "discharge": 0.5,
+        "shot": 1.4,
+        "burn": 1.4
+      },
+      "say": "Harder hits, half the discharge, 40% more power a shot"
+    },
+    "coolant": {
+      "name": "Coolant",
+      "short": "CL",
+      "on": "weapon",
+      "color": "#38bdf8",
+      "mod": {
+        "discharge": 0.5,
+        "rest": 0.5,
+        "damage": 0.85
+      },
+      "say": "Half the discharge and rest, 15% softer"
+    },
+    "damping": {
+      "name": "Damping gel",
+      "short": "DG",
+      "on": "weapon",
+      "color": "#a78bfa",
+      "mod": {
+        "steady": 0.5,
+        "steady": 0.5,
+        "cycle": 1.25
+      },
+      "say": "Half the floor a heavy gun needs, a quarter slower"
+    },
+    "flux": {
+      "name": "Flux salts",
+      "short": "FX",
+      "on": "weapon",
+      "color": "#facc15",
+      "mod": {
+        "shot": 0.7,
+        "burn": 0.7,
+        "damage": 0.85
+      },
+      "say": "30% less power a shot, 15% softer"
+    },
+    "accelerant": {
+      "name": "Accelerant",
+      "short": "AC",
+      "on": "weapon",
+      "color": "#f43f5e",
+      "mod": {
+        "cycle": 0.7,
+        "shot": 1.25,
+        "steady": 1.5
+      },
+      "say": "30% faster, a quarter more power a shot, a higher floor"
+    },
+    "lens": {
+      "name": "Lens fluid",
+      "short": "LF",
+      "on": "weapon",
+      "color": "#2dd4bf",
+      "mod": {
+        "burn": 0.75,
+        "damage": 0.9,
+        "rest": 1.5
+      },
+      "say": "A beam burns a quarter less, hits a tenth softer, rests half again as long"
+    },
+    "catalyst": {
+      "name": "Catalyst",
+      "short": "CT",
+      "on": "engine",
+      "color": "#84cc16",
+      "mod": {
+        "burn": 0.6,
+        "thrust": 0.85
+      },
+      "say": "An engine burns 40% less for 15% less thrust"
+    },
+    "reaction": {
+      "name": "Reaction mass",
+      "short": "RM",
+      "on": "engine",
+      "color": "#e879f9",
+      "mod": {
+        "thrust": 1.4
+      },
+      "say": "40% more thrust for the same burn"
+    },
+    "burstgel": {
+      "name": "Burst gel",
+      "short": "BG",
+      "on": "engine",
+      "color": "#fb7185",
+      "mod": {
+        "boost": 1.5,
+        "boostDrain": 0.5,
+        "thrust": 0.9
+      },
+      "say": "Boost half again as hard for half the extra burn; a tenth less thrust cruising"
+    }
+  },
+  "miner": {
+    "range": 700,
+    "dps": 42,
+    "shipDps": 7,
+    "gimbalDeg": 14
+  },
+  "turret": {
+    "halfArcDeg": 90,
+    "sampleDeg": 2,
+    "slewRate": 0.09,
+    "fireToleranceDeg": 4,
+    "barrelMargin": 0.15
+  },
+  "debris": {
+    "lifetimeTicks": 3600,
+    "pushSpeed": 0.6,
+    "pushSpin": 0.02,
+    "decayTicks": 1200
+  },
+  "partBlast": {
+    "core": {
+      "radius": 2.5,
+      "damage": 45,
+      "delayTicks": [
+        0,
+        0
+      ]
+    },
+    "generator": {
+      "radius": 2,
+      "damage": 45,
+      "delayTicks": [
+        4,
+        16
+      ]
+    },
+    "thruster": {
+      "radius": 1.5,
+      "damage": 25,
+      "delayTicks": [
+        2,
+        10
+      ]
+    },
+    "afterburner": {
+      "radius": 1.6,
+      "damage": 32,
+      "delayTicks": [
+        2,
+        8
+      ]
+    },
+    "plasma_drive": {
+      "radius": 2.2,
+      "damage": 40,
+      "delayTicks": [
+        3,
+        12
+      ]
+    },
+    "weapon": {
+      "radius": 1.3,
+      "damage": 18,
+      "delayTicks": [
+        6,
+        24
+      ]
+    }
+  },
+  "repair": {
+    "range": 1500,
+    "healPerSecond": 0.06,
+    "restoreTicks": 120,
+    "restoreHp": 0.25,
+    "intervalTicks": 15,
+    "combatPauseTicks": 300
+  },
+  "collision": {
+    "restitution": 0.3,
+    "minDamageSpeed": 1.5,
+    "damagePerSpeed": 6,
+    "fxMinSpeed": 0.6,
+    "fxCooldownTicks": 8
+  },
+  "debug": {
+    "damageFraction": 0.25,
+    "replayTicks": 600,
+    "replayRuns": 10
+  },
+  "fixtures": {
+    "flowExample": {
+      "supply": 98,
+      "demands": [
+        30,
+        25,
+        25,
+        30
+      ],
+      "priorities": [
+        1,
+        2,
+        2,
+        3
+      ],
+      "expected": [
+        30,
+        25,
+        25,
+        18
+      ]
+    }
+  },
+  "damage": {
+    "_comment": "damage.ts: a hit does damage x penetration[(weapon pen) - (block armour)] (interpolated) x the block material's resist for its damage type. pen = the gun's grade + its weapon's pen; armour = the block material's grade + its function's armour (armour plate +1).",
+    "penetration": {
+      "-4": 0.05,
+      "-3": 0.1,
+      "-2": 0.25,
+      "-1": 0.55,
+      "0": 1,
+      "1": 1.15
+    }
+  }
+}

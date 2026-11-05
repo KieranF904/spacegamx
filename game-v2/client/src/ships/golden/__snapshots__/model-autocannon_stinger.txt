@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Stinger
+Mk III · Small · Square · 1 cell
+Hull · mass84 hp · 1.0
+Armour · build3 · 2.5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage36/s · reach 5,400
+Hits withKinetic · penetration 2.5
+Clip12 rounds at 8.0/s · reloads in 1.2s from energy (20 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
+MountTurret, 200°
+FittingBolts on any side
+Power draw14/s
+
+== partStats (stats rows) ==
+GradeMk III · Small
+Hits withKinetic · penetration 3
+Power draw14
+Hull · mass84 hp · 1.0
+Armour · build3 · 2.5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 84
+
+== familyLabel ==
+Autocannons
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+accurate, a little slower
+
+== keyStats ==
+36 dmg/s · reach 5,400 · clip 12 · 1.2s reload · draws 14
+
+== mountBadge ==
+TURRET 200°
+
+== mountingText ==
+Turret, 200°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 24","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Small","area":1,"hp":84,"mass":1,"firepower":35.55555555555556,"toughness":84,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":35.55555555555556,"range":5400,"damageType":"kinetic","pen":2.5,"draw":14.4}

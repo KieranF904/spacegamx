@@ -1,0 +1,45 @@
+{
+ "id": "clinker",
+ "name": "Clinker",
+ "faction": "cinder",
+ "sky": "ashfall_cavern",
+ "role": "tank / artillery",
+ "level": "26-32",
+ "threat": "high",
+ "parts": 13,
+ "groups": {
+  "core": [
+   "magma",
+   "vent"
+  ],
+  "plate_front": [
+   "plate_front",
+   "rim_front",
+   "beak"
+  ],
+  "plate_right": [
+   "plate_right",
+   "rim_right"
+  ],
+  "plate_back": [
+   "plate_back",
+   "rim_back"
+  ],
+  "plate_left": [
+   "plate_left",
+   "rim_left"
+  ],
+  "chimney_l": [
+   "chimney_l"
+  ],
+  "chimney_r": [
+   "chimney_r"
+  ]
+ },
+ "damaged": [
+  "plate_left",
+  "chimney_r"
+ ],
+ "radiusCells": 4.018,
+ "radius": 96
+}

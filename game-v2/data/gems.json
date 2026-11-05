@@ -1,0 +1,338 @@
+{
+  "_comment": "Cut gems (common/src/econ/gems.ts): a gem socketed into a weapon part changes how that gun fires (its levels' mods: the WeaponMods of ships/types.ts, mul +0.25 = 25% more). Gems are cut at a station (cuts: what a level takes besides the gem's own material, how long, and the chance it fails, which returns half). Sockets: how many a weapon part has by its material's grade (small piece, large piece = area >= largeArea), from which pilot level; drop-only (legendary) guns have their own. Socketing is free; taking a gem out destroys it; a gem is lost with its part.",
+  "sockets": {
+    "byGrade": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    "levelByGrade": [
+      0,
+      0,
+      19,
+      32,
+      0,
+      0
+    ],
+    "largeArea": 2,
+    "legendary": [
+      1,
+      2
+    ]
+  },
+  "cuts": {
+    "1": {
+      "inputs": {
+        "crystal": 3,
+        "coolant": 1
+      },
+      "seconds": 300,
+      "fail": 0
+    },
+    "2": {
+      "inputs": {
+        "crystal": 2,
+        "coolant": 2
+      },
+      "seconds": 900,
+      "fail": 0.2
+    }
+  },
+  "types": {
+    "frost": {
+      "name": "Frost",
+      "color": "#7dd3fc",
+      "material": "voidglass_pane",
+      "levels": {
+        "1": {
+          "summary": "Hits chill (0.3 a hit): a chilled-through ship seizes up for a moment. −15% damage",
+          "mods": {
+            "set": {
+              "frost": {
+                "perHit": 0.3,
+                "ticks": 40
+              }
+            },
+            "mul": {
+              "damage": -0.15
+            }
+          }
+        },
+        "2": {
+          "summary": "Hits chill (0.6 a hit). −15% damage",
+          "mods": {
+            "set": {
+              "frost": {
+                "perHit": 0.6,
+                "ticks": 50
+              }
+            },
+            "mul": {
+              "damage": -0.15
+            }
+          }
+        }
+      }
+    },
+    "ember": {
+      "name": "Ember",
+      "color": "#fb923c",
+      "material": "aurum_ingot",
+      "levels": {
+        "1": {
+          "summary": "Hits set the part burning. −20% rate of fire",
+          "mods": {
+            "set": {
+              "ignite": {
+                "dps": 4,
+                "ticks": 180,
+                "radius": 0
+              }
+            },
+            "mul": {
+              "rate": -0.2
+            }
+          }
+        },
+        "2": {
+          "summary": "Hits set the part (and its neighbours) burning. −20% rate of fire",
+          "mods": {
+            "set": {
+              "ignite": {
+                "dps": 8,
+                "ticks": 180,
+                "radius": 1
+              }
+            },
+            "mul": {
+              "rate": -0.2
+            }
+          }
+        }
+      }
+    },
+    "splitter": {
+      "name": "Splitter",
+      "color": "#a5f3fc",
+      "material": "voidglass_pane",
+      "levels": {
+        "1": {
+          "summary": "Shots shatter into 2 shards on a hit. −30% range",
+          "mods": {
+            "set": {
+              "split": {
+                "count": 2,
+                "arc": 30,
+                "kind": "prism_shard"
+              }
+            },
+            "mul": {
+              "life": -0.3
+            }
+          }
+        },
+        "2": {
+          "summary": "Shots shatter into 3 shards on a hit. −30% range",
+          "mods": {
+            "set": {
+              "split": {
+                "count": 3,
+                "arc": 40,
+                "kind": "prism_shard"
+              }
+            },
+            "mul": {
+              "life": -0.3
+            }
+          }
+        }
+      }
+    },
+    "lance_core": {
+      "name": "Lance Core",
+      "color": "#e2e8f0",
+      "material": "iridium_ingot",
+      "levels": {
+        "1": {
+          "summary": "+25% range",
+          "mods": {
+            "mul": {
+              "life": 0.25,
+              "range": 0.25
+            }
+          }
+        },
+        "2": {
+          "summary": "+40% range, and shots pierce one more",
+          "mods": {
+            "mul": {
+              "life": 0.4,
+              "range": 0.4
+            },
+            "add": {
+              "pierce": 1
+            }
+          }
+        }
+      }
+    },
+    "grapple": {
+      "name": "Grapple",
+      "color": "#facc15",
+      "material": "aurum_ingot",
+      "levels": {
+        "1": {
+          "summary": "Shots drag ships near them in. −25% shot speed",
+          "mods": {
+            "set": {
+              "pull": {
+                "radius": 300,
+                "strength": 0.4
+              }
+            },
+            "mul": {
+              "speed": -0.25
+            }
+          }
+        },
+        "2": {
+          "summary": "Shots drag ships in hard. −25% shot speed",
+          "mods": {
+            "set": {
+              "pull": {
+                "radius": 360,
+                "strength": 0.8
+              }
+            },
+            "mul": {
+              "speed": -0.25
+            }
+          }
+        }
+      }
+    },
+    "scatter": {
+      "name": "Scatter",
+      "color": "#fde047",
+      "material": "aurum_ingot",
+      "levels": {
+        "1": {
+          "summary": "+1 shot a volley. Wider spread",
+          "mods": {
+            "add": {
+              "burst": 1
+            },
+            "mul": {
+              "spread": 0.5
+            }
+          }
+        },
+        "2": {
+          "summary": "+2 shots a volley. Wider spread",
+          "mods": {
+            "add": {
+              "burst": 2
+            },
+            "mul": {
+              "spread": 0.5
+            }
+          }
+        }
+      }
+    },
+    "keel": {
+      "name": "Keel",
+      "color": "#a1887f",
+      "material": "ferrite_plate",
+      "levels": {
+        "1": {
+          "summary": "+15% part HP. −10% damage",
+          "mods": {
+            "mul": {
+              "hp": 0.15,
+              "damage": -0.1
+            }
+          }
+        },
+        "2": {
+          "summary": "+25% part HP. −10% damage",
+          "mods": {
+            "mul": {
+              "hp": 0.25,
+              "damage": -0.1
+            }
+          }
+        }
+      }
+    },
+    "sight": {
+      "name": "Sight",
+      "color": "#67e8f9",
+      "material": "crystal_lens",
+      "levels": {
+        "1": {
+          "summary": "−10% spread. −10% rate of fire",
+          "mods": {
+            "mul": {
+              "spread": -0.1,
+              "rate": -0.1
+            }
+          }
+        },
+        "2": {
+          "summary": "−20% spread. −10% rate of fire",
+          "mods": {
+            "mul": {
+              "spread": -0.2,
+              "rate": -0.1
+            }
+          }
+        }
+      }
+    },
+    "overdrive": {
+      "name": "Overdrive",
+      "color": "#f87171",
+      "material": "aurum_ingot",
+      "levels": {
+        "1": {
+          "summary": "+15% rate of fire",
+          "mods": {
+            "mul": {
+              "rate": 0.15
+            }
+          }
+        },
+        "2": {
+          "summary": "+25% rate of fire",
+          "mods": {
+            "mul": {
+              "rate": 0.25
+            }
+          }
+        }
+      }
+    }
+  }
+}

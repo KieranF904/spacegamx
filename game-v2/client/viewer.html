@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!-- Asset viewer: dev server only (not a build input in vite.config.ts). See DEVELOPMENT.md "Asset viewer and renders". -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Game - Asset viewer</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #07090d; color: #c9d3e0; font: 12px 'Segoe UI', system-ui, sans-serif; }
+    #app { display: grid; grid-template-columns: 260px 1fr 250px; grid-template-rows: 1fr 26px; height: 100%; }
+    aside { overflow-y: auto; background: #0d1118; border-right: 1px solid #1d2532; padding: 8px; }
+    aside.right { border-right: 0; border-left: 1px solid #1d2532; }
+    #stage { position: relative; overflow: hidden; background: #000; cursor: grab; }
+    #stage canvas { display: block; }
+    #status { grid-column: 1 / 4; background: #0a0d13; border-top: 1px solid #1d2532; padding: 5px 10px; color: #7f8ca0; white-space: nowrap; overflow: hidden; }
+    input, select, button { background: #151b26; color: #d6deea; border: 1px solid #263044; border-radius: 3px; font: inherit; padding: 2px 4px; }
+    button { cursor: pointer; padding: 3px 8px; }
+    button:hover { background: #1d2635; }
+    #search, #asset { width: 100%; margin-bottom: 6px; }
+    .group { color: #8ea2bd; font-weight: 600; margin: 8px 0 2px; cursor: pointer; user-select: none; }
+    .item { padding: 2px 6px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item:hover { background: #172030; }
+    .item.on { background: #1f3350; color: #fff; }
+    .item small { color: #5d6b80; font-size: 10px; }
+    h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6f86a6; margin: 12px 0 4px; }
+    .row { display: grid; grid-template-columns: 78px 1fr auto auto; gap: 4px; align-items: center; margin: 3px 0; }
+    .row input[type=range] { width: 100%; }
+    .row input[type=number], .row input[type=text], .row select { width: 100%; }
+    .row input[type=checkbox] { justify-self: start; }
+    .row em { font-style: normal; color: #7f8ca0; min-width: 34px; text-align: right; }
+    .row button { padding: 0 5px; }
+    .export { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+    .keys { color: #64748a; margin-top: 14px; line-height: 1.5; }
+    /* ui=0: the canvas alone (the render daemon) */
+    body.bare #app { display: block; }
+    body.bare aside, body.bare #status { display: none; }
+    body.bare #stage { width: 100vw; height: 100vh; background: transparent; }
+    body.bare, body.bare html { background: transparent; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <input id="search" placeholder="Search (/): sparrow, model laser, material, boss…" autocomplete="off">
+      <input id="asset" title="Asset id: ship:… model:…@E material:… piece:… sheet:… or several, comma separated">
+      <div id="list"></div>
+    </aside>
+    <div id="stage"></div>
+    <aside class="right">
+      <div class="export">
+        <button id="fit">Fit (F)</button>
+        <select id="scale" title="Export scale"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+        <label><input type="checkbox" id="transparent"> transparent</label>
+        <button id="export">Export PNG</button>
+        <button id="copy" title="Copy this view's link">Copy link</button>
+      </div>
+      <div id="controls"></div>
+      <div class="keys">Drag: pan · right/shift-drag: turn · wheel: zoom<br>F fit · G grid · R turn 45° · / search<br>Every setting is in the URL.</div>
+    </aside>
+    <div id="status"><span id="info"></span></div>
+  </div>
+  <script type="module" src="/src/viewer/main.ts"></script>
+</body>
+</html>

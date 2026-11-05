@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Swarm
+Mk III · Medium · Panel · 2 cells
+Hull · mass179 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage36/s · reach 11,440
+Hits withExplosive · penetration 2.5
+Fire rate1.3/s · shells · Missiles (no energy)
+Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
+MountFixed: aims with the ship
+FittingSide mount (flippable) · Bolts on at its side only · Needs 1 clear cell ahead
+
+== partStats (stats rows) ==
+GradeMk III · Medium
+Hits withExplosive · penetration 3
+Hull · mass179 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 179
+
+== familyLabel ==
+Missiles
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+six small rockets a salvo, floods point defence · ammo
+
+== keyStats ==
+36 dmg/s · reach 11,440 · ammo
+
+== mountBadge ==
+FIXEDSIDE
+
+== mountingText ==
+Fixed: aims with the ship
+Side mount (flippable)
+Bolts on at its side only
+Needs 1 clear cell ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 21","why":"Learned at level 21 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 21","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":179.20000000000002,"mass":2,"firepower":36.266666666666666,"toughness":179.20000000000002,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":36.266666666666666,"range":11440,"damageType":"explosive","pen":2.5}

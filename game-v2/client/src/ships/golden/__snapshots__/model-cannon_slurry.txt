@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Slurry Cannon
+Mk III · Medium · Panel · 2 cells
+Hull · mass197 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage69/s · reach 5,700
+Hits withKinetic · penetration 4
+Fire rate1.4/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 2 clear cells ahead
+Power draw36/s
+
+== partStats (stats rows) ==
+GradeMk III · Medium
+Hits withKinetic · penetration 3
+Power draw36
+Hull · mass197 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 197
+
+== familyLabel ==
+Cannons
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+The two-input gun
+
+== keyStats ==
+69 dmg/s · reach 5,700 · cycle · draws 36
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 2 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 18","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":197.12,"mass":2,"firepower":68.57142858,"toughness":197.12,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":68.57142858,"range":5700.0000024,"damageType":"kinetic","pen":4,"draw":36}

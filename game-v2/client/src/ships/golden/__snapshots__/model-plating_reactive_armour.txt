@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Reactive Armour · Square
+Mk II · 1 cell
+Hull · mass188 hp · 2.2
+Armour · build4 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+
+== partStats (stats rows) ==
+GradeMk II
+Hull · mass188 hp · 2.2
+Armour · build4 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 188
+
+== familyLabel ==
+Plating
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square / Medium · Panel
+
+== tradeOff ==
+blunts small fast hits
+
+== keyStats ==
+188 hp · armour 4
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":188,"mass":2.2399999999999998,"firepower":0,"toughness":188,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

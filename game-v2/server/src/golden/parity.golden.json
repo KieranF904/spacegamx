@@ -1,0 +1,47 @@
+{
+  "drive-bank-boost/replica": {
+    "keyframes": "",
+    "server": "406655335cf0e743"
+  },
+  "drive-bank-boost/unrounded-aim": null,
+  "heavy-cargo/replica": {
+    "keyframes": "",
+    "server": "b6cea3ff1ef8a516"
+  },
+  "heavy-cargo/unrounded-aim": null,
+  "jump-burn/replica": {
+    "keyframes": "109",
+    "server": "a1db15933ec3336b"
+  },
+  "jump-burn/unrounded-aim": null,
+  "plain-thrust-turn/replica": {
+    "keyframes": "",
+    "server": "aaa9e3766355431e"
+  },
+  "plain-thrust-turn/unrounded-aim": null,
+  "strafer-energy-short/replica": {
+    "keyframes": "",
+    "server": "6649b07865c0c010"
+  },
+  "strafer-energy-short/unrounded-aim": null,
+  "strafer-every-way/replica": {
+    "keyframes": "",
+    "server": "958db6bc64800cb4"
+  },
+  "strafer-every-way/unrounded-aim": null,
+  "strafer-heavy/replica": {
+    "keyframes": "",
+    "server": "062f22b1abe9ae34"
+  },
+  "strafer-heavy/unrounded-aim": null,
+  "strafer-replay/replica": {
+    "keyframes": "",
+    "server": "855196dbcb68fef6"
+  },
+  "strafer-replay/unrounded-aim": null,
+  "tow/replica": {
+    "keyframes": "2",
+    "server": "08468ef7f71d940b"
+  },
+  "tow/unrounded-aim": null
+}

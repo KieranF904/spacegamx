@@ -1,3 +1,4 @@
+import { dsin } from './math/detTrig.js';
 // Shared star generation utilities for starfield
 // Uses an inline simplex-noise implementation to avoid external dependency
 
@@ -7,9 +8,9 @@ const SIMPLEX_G2 = (3 - Math.sqrt(3)) / 6;
 const SIMPLEX_GRAD: [number, number][] = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
 
 export function seededRandom(seed: number): () => number {
-    let x = Math.sin(seed) * 10000;
+    let x = dsin(seed) * 10000;
     return () => {
-        x = Math.sin(x) * 10000;
+        x = dsin(x) * 10000;
         return x - Math.floor(x);
     };
 }

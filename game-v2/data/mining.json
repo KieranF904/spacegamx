@@ -1,0 +1,711 @@
+{
+  "_comment": "Mining. Every asteroid type has an ore mix and a hardness; the system's danger tier boosts rarer ores and makes gem seams more common. A shot or beam extracts ore in proportion to damage × the tool's yield, provided the tool is hard enough. Asteroids respawn after respawnSeconds.",
+  "respawnSeconds": 300,
+  "unitsPerSize": 0.15,
+  "damagePerUnit": 96,
+  "chunkUnits": [
+    5,
+    10
+  ],
+  "breakFraction": 0.3,
+  "xpPerUnit": 0.35,
+  "types": {
+    "asteroid_metal": {
+      "hardness": 1,
+      "ores": {
+        "iron_ore": 60,
+        "nickel_ore": 25,
+        "silicate": 15,
+        "copper_ore": 10,
+        "leestone_ore": 1
+      },
+      "name": "Chondrite"
+    },
+    "asteroid_ice": {
+      "hardness": 1,
+      "ores": {
+        "ice": 65,
+        "silicate": 15,
+        "hydrazine_slush": 20
+      },
+      "name": "Ice Body"
+    },
+    "asteroid_fuel": {
+      "hardness": 1,
+      "ores": {
+        "iron_ore": 35,
+        "ice": 40,
+        "silicate": 20,
+        "helium3": 5
+      },
+      "name": "Carbonaceous Rock"
+    },
+    "asteroid_crystal": {
+      "hardness": 2,
+      "ores": {
+        "silicate": 45,
+        "crystal": 30,
+        "copper_ore": 20
+      },
+      "name": "Crystal Geode"
+    },
+    "asteroid_mega": {
+      "hardness": 2,
+      "ores": {
+        "iron_ore": 35,
+        "titanium_ore": 35,
+        "nickel_ore": 20,
+        "cobalt_ore": 6,
+        "neutronium_ore": 2,
+        "ferrite_ore": 8,
+        "leestone_ore": 2
+      },
+      "traceMul": 3,
+      "name": "Neutron Slug"
+    },
+    "comet": {
+      "hardness": 1,
+      "ores": {
+        "ice": 80,
+        "helium3": 15
+      },
+      "name": "Comet",
+      "traceBoost": {
+        "pale_iridium": 1
+      }
+    },
+    "rock_cuprite": {
+      "name": "Cuprite",
+      "hardness": 2,
+      "ores": {
+        "copper_ore": 70,
+        "iron_ore": 20,
+        "nickel_ore": 10
+      },
+      "size": [
+        30,
+        80
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_rutile": {
+      "name": "Rutile",
+      "hardness": 2,
+      "ores": {
+        "titanium_ore": 60,
+        "iron_ore": 40
+      },
+      "size": [
+        30,
+        80
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_slag": {
+      "name": "Slag Ball",
+      "hardness": 2,
+      "ores": {
+        "iron_ore": 40,
+        "nickel_ore": 20,
+        "ferrite_ore": 40
+      },
+      "size": [
+        60,
+        120
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_gem_seam": {
+      "name": "Gem Seam",
+      "hardness": 3,
+      "ores": {
+        "crystal": 60,
+        "silicate": 40
+      },
+      "size": [
+        20,
+        45
+      ],
+      "like": "asteroid_crystal",
+      "traceBoost": {
+        "voidglass": 3
+      }
+    },
+    "rock_polymer_tar": {
+      "name": "Polymer Tar",
+      "hardness": 2,
+      "ores": {
+        "polymer_precursor": 70,
+        "copper_ore": 30
+      },
+      "size": [
+        30,
+        80
+      ],
+      "like": "asteroid_ice"
+    },
+    "rock_chromite": {
+      "name": "Chromite Nodule",
+      "hardness": 3,
+      "ores": {
+        "chromite": 50,
+        "iron_ore": 50
+      },
+      "size": [
+        20,
+        45
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_cobaltite": {
+      "name": "Cobaltite",
+      "hardness": 3,
+      "ores": {
+        "cobalt_ore": 70,
+        "iron_ore": 30
+      },
+      "size": [
+        30,
+        80
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_platinoid": {
+      "name": "Platinoid Shard",
+      "hardness": 3,
+      "ores": {
+        "platinoid_ore": 80,
+        "crystal": 20
+      },
+      "size": [
+        15,
+        35
+      ],
+      "like": "asteroid_crystal"
+    },
+    "rock_opal_husk": {
+      "name": "Opal Husk",
+      "hardness": 3,
+      "ores": {
+        "crystal": 70,
+        "void_opal": 10,
+        "titanium_ore": 20
+      },
+      "size": [
+        30,
+        80
+      ],
+      "like": "asteroid_crystal"
+    },
+    "gas_pocket": {
+      "name": "Gas Pocket",
+      "hardness": 1,
+      "gas": true,
+      "ores": {
+        "cryo_gas": 65,
+        "hydrazine_slush": 35
+      },
+      "size": [
+        50,
+        110
+      ],
+      "like": "asteroid_ice"
+    },
+    "rock_ashback": {
+      "hardness": 1,
+      "ores": {
+        "iron_ore": 55,
+        "nickel_ore": 25,
+        "silicate": 20
+      },
+      "name": "Ashback Boulder",
+      "size": [
+        120,
+        200
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_aurora_floe": {
+      "hardness": 1,
+      "ores": {
+        "ice": 45,
+        "aurora_rime": 35,
+        "silicate": 20
+      },
+      "name": "Aurora Floe",
+      "size": [
+        40,
+        100
+      ],
+      "like": "asteroid_ice"
+    },
+    "rock_leestone": {
+      "name": "Leestone Shard",
+      "hardness": 2,
+      "ores": {
+        "leestone_ore": 45,
+        "iron_ore": 35,
+        "ferrite_ore": 20
+      },
+      "size": [
+        30,
+        80
+      ],
+      "like": "asteroid_metal"
+    },
+    "scrap_seam_rich": {
+      "_comment": "The Scrap Mother's Nest Rock (systems.json sol_scrap_nest): a few lodes set down in her Smelter and on the rock's east face, each one big (about twice a belt rock's ore): worth a starter's while, take-or-leave later",
+      "name": "Greyseam Lode",
+      "hardness": 2,
+      "ores": {
+        "iron_ore": 38,
+        "copper_ore": 32,
+        "nickel_ore": 15,
+        "crystal": 15
+      },
+      "size": [
+        100,
+        140
+      ],
+      "like": "asteroid_metal"
+    }
+  },
+  "oreHardness": {
+    "titanium_ore": 2,
+    "crystal": 2,
+    "cobalt_ore": 3,
+    "neutronium_ore": 3,
+    "ferrite_ore": 2,
+    "chromite": 3,
+    "platinoid_ore": 3,
+    "void_opal": 3,
+    "leestone_ore": 2
+  },
+  "danger": {
+    "1": {
+      "seamChance": 0.05,
+      "boost": {
+        "neutronium_ore": 0
+      }
+    },
+    "2": {
+      "seamChance": 0.08,
+      "boost": {
+        "crystal": 1.5,
+        "copper_ore": 1.3,
+        "neutronium_ore": 0
+      }
+    },
+    "3": {
+      "seamChance": 0.1,
+      "boost": {
+        "titanium_ore": 1.4,
+        "crystal": 1.3,
+        "neutronium_ore": 0
+      }
+    },
+    "4": {
+      "seamChance": 0.12,
+      "boost": {
+        "titanium_ore": 1.7,
+        "cobalt_ore": 1.6,
+        "neutronium_ore": 0.3
+      }
+    },
+    "5": {
+      "seamChance": 0.15,
+      "boost": {
+        "titanium_ore": 2.2,
+        "cobalt_ore": 2.5,
+        "neutronium_ore": 0.6
+      }
+    },
+    "6": {
+      "seamChance": 0.18,
+      "boost": {
+        "cobalt_ore": 3.5,
+        "crystal": 2.2,
+        "neutronium_ore": 2.5
+      }
+    },
+    "7": {
+      "seamChance": 0.24,
+      "boost": {
+        "cobalt_ore": 5,
+        "crystal": 3,
+        "neutronium_ore": 4
+      }
+    }
+  },
+  "seams": [
+    {
+      "gem": "ruby",
+      "hardness": 2,
+      "minTier": 1,
+      "weight": 10
+    },
+    {
+      "gem": "sapphire",
+      "hardness": 2,
+      "minTier": 1,
+      "weight": 10
+    },
+    {
+      "gem": "emerald",
+      "hardness": 2,
+      "minTier": 3,
+      "weight": 6
+    },
+    {
+      "gem": "void_opal",
+      "hardness": 3,
+      "minTier": 5,
+      "weight": 4
+    }
+  ],
+  "seamGemChance": 0.3,
+  "_laserGapComment": "A mining laser by its gap: its grade minus the rock's tier (the system's Mk), clamped to +2. `work` scales how fast it works the rock (so how often chunks come: one every chunkUnits worked), `keep` the share of what it works that it keeps. A grade behind is a little slower and loses a fifth; two behind, slower again and loses two fifths; further behind it can't mine the rock. Each laser mines on its own (no crowding): what limits a ship's lasers is the power to run them (a Mining Laser draws most of a Cell Reactor: models.json).",
+  "laserGap": {
+    "2": {
+      "work": 1.3,
+      "keep": 1
+    },
+    "1": {
+      "work": 1.2,
+      "keep": 1
+    },
+    "0": {
+      "work": 1,
+      "keep": 1
+    },
+    "-1": {
+      "work": 0.85,
+      "keep": 0.8
+    },
+    "-2": {
+      "work": 0.7,
+      "keep": 0.6
+    }
+  },
+  "_gunsComment": "Guns (every tool but a mining tool: tools[k].mining, or a mining laser) mine soft rock only (hardness 1). They work it at about a Mk I mining laser's pace: damage x tools[kind].yield / damagePerUnit, and past refDps damage a second on the rock the pace grows only with its square root (a starter's two Pips, 112 a second, about 0.7 rock units a second like the laser; a gunship twice that, about 1.4x). They keep `keep` of the common ores, keepOther times that of anything else (gems too), and keepByTier times that again by the rock's tier: a Mk I laser gets about three times the ore off Mk I rock, from chunks as often.",
+  "guns": {
+    "refDps": 112,
+    "keep": 0.32,
+    "common": [
+      "iron_ore",
+      "nickel_ore",
+      "silicate",
+      "ice"
+    ],
+    "keepOther": 0.5,
+    "keepByTier": {
+      "1": 1,
+      "2": 0.4,
+      "3": 0.15,
+      "4": 0.08,
+      "5": 0.05
+    }
+  },
+  "_outliersComment": "Outliers: about one belt rock in 130 is 3.5-4.5x its size. Mining it (or blasting it) breaks it down through `stages` (its size as a fraction of the first), each a fresh smaller rock carrying the ore that's left, until the last breaks up. `common` of them are a lump of common ore: each ore's weight x its boost (unlisted ores x rare).",
+  "outliers": {
+    "chance": 0.0075,
+    "scale": [
+      3.5,
+      4.5
+    ],
+    "stages": [
+      1,
+      0.75,
+      0.55,
+      0.38
+    ],
+    "exclude": [
+      "comet",
+      "gas_pocket"
+    ],
+    "common": 0.8,
+    "boost": {
+      "iron_ore": 2.5,
+      "nickel_ore": 2,
+      "silicate": 2,
+      "ice": 2.5,
+      "copper_ore": 1.5,
+      "hydrazine_slush": 1
+    },
+    "rare": 0.35,
+    "systems": {
+      "ashfall": 4
+    }
+  },
+  "_tracesComment": "Rare traces: never mined as such, they come out of their carrier ores at the refinery. per100 = units per 100 units of carrier ore, by the tier (Mk) of the rock it was mined from (index 0..5). Mega rocks (traceMul) carry them at that multiple; seamMul is for rocks with a gem seam; megaOnly traces come from mega rocks alone.",
+  "traces": {
+    "aurum": {
+      "from": [
+        "copper_ore",
+        "platinoid_ore"
+      ],
+      "per100": [
+        0,
+        0,
+        0.2,
+        0.6,
+        1.2,
+        2
+      ]
+    },
+    "voidglass": {
+      "from": [
+        "crystal"
+      ],
+      "per100": [
+        0,
+        0,
+        0.1,
+        0.4,
+        0.9,
+        1.5
+      ],
+      "seamMul": 3
+    },
+    "pale_iridium": {
+      "from": [
+        "ice",
+        "hydrazine_slush",
+        "polymer_precursor",
+        "helium3"
+      ],
+      "per100": [
+        0,
+        0,
+        0,
+        0.05,
+        0.5,
+        1.2
+      ]
+    },
+    "singularity_dust": {
+      "from": [
+        "neutronium_ore",
+        "cobalt_ore",
+        "titanium_ore"
+      ],
+      "per100": [
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        0.5
+      ],
+      "megaOnly": true
+    }
+  },
+  "tools": {
+    "_comment": "yield: rock units worked per damage (relative to damagePerUnit); hardness: the hardest ore or gem seam it cracks. Guns (all but `mining` tools and the mining lasers, `miner`) share one normalised yield and mine hardness-1 rock only (guns above); their hardness only decides which harder ores and gem seams inside soft rock they take. The EMP does no damage to rock.",
+    "fixed": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "turret": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "miner": {
+      "yield": 1.6,
+      "hardness": 2
+    },
+    "laser": {
+      "yield": 0.6,
+      "hardness": 2
+    },
+    "lance": {
+      "yield": 0.6,
+      "hardness": 3
+    },
+    "railgun": {
+      "yield": 0.6,
+      "hardness": 3
+    },
+    "flak": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "missile": {
+      "yield": 0.6,
+      "hardness": 2
+    },
+    "hive": {
+      "yield": 0.6,
+      "hardness": 2
+    },
+    "frostbite": {
+      "yield": 0.6,
+      "hardness": 3
+    },
+    "cinder_bloom": {
+      "yield": 0.6,
+      "hardness": 2
+    },
+    "prism": {
+      "yield": 0.6,
+      "hardness": 3
+    },
+    "prism_shard": {
+      "yield": 0.6,
+      "hardness": 2
+    },
+    "phase": {
+      "yield": 0.6,
+      "hardness": 3
+    },
+    "singularity": {
+      "yield": 0.6,
+      "hardness": 3
+    },
+    "emp": {
+      "yield": 0,
+      "hardness": 1
+    },
+    "minerByMaterial": {
+      "neutronium": 3,
+      "cobalt": 3,
+      "titanium": 3,
+      "steel": 2,
+      "composite": 2,
+      "alloy": 2
+    },
+    "charge": {
+      "yield": 2.5,
+      "hardness": 3,
+      "mining": true
+    },
+    "autocannon": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "pulse": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "arc": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "torpedo": {
+      "yield": 0.6,
+      "hardness": 2
+    },
+    "mortar": {
+      "yield": 0.6,
+      "hardness": 1
+    },
+    "siphon": {
+      "yield": 1.4,
+      "hardness": 1,
+      "mining": true
+    }
+  },
+  "_fieldsComment": "Each belt's mix of rock types by weight (econ/rocks.ts): a type with a name and a size band is a rock type of its own; the rest are built in (AsteroidDefinition).",
+  "fields": {
+    "scrap_nest_junk": {
+      "asteroid_metal": 50,
+      "rock_slag": 40,
+      "asteroid_fuel": 10
+    },
+    "scrap_seam": {
+      "scrap_seam_rich": 1
+    },
+    "sol_belt": {
+      "asteroid_metal": 35,
+      "asteroid_ice": 30,
+      "asteroid_fuel": 25,
+      "asteroid_crystal": 10,
+      "comet": 4
+    },
+    "borealis_belt": {
+      "asteroid_ice": 55,
+      "asteroid_fuel": 20,
+      "comet": 15,
+      "asteroid_crystal": 10,
+      "gas_pocket": 10
+    },
+    "glasswater_field": {
+      "asteroid_crystal": 35,
+      "asteroid_ice": 30,
+      "rock_cuprite": 15,
+      "comet": 10,
+      "rock_gem_seam": 5,
+      "asteroid_fuel": 5
+    },
+    "nebula_belt": {
+      "rock_cuprite": 20,
+      "asteroid_metal": 20,
+      "rock_rutile": 15,
+      "rock_polymer_tar": 15,
+      "asteroid_crystal": 15,
+      "rock_gem_seam": 5,
+      "asteroid_fuel": 10,
+      "gas_pocket": 10
+    },
+    "cinder_belt": {
+      "asteroid_metal": 25,
+      "rock_rutile": 20,
+      "rock_slag": 20,
+      "rock_chromite": 10,
+      "rock_cobaltite": 15,
+      "asteroid_fuel": 10
+    },
+    "maw_shards": {
+      "rock_slag": 30,
+      "asteroid_mega": 25,
+      "asteroid_metal": 15,
+      "rock_opal_husk": 15,
+      "asteroid_crystal": 10,
+      "comet": 5,
+      "rock_leestone": 12
+    },
+    "void_belt": {
+      "asteroid_mega": 25,
+      "rock_cobaltite": 15,
+      "rock_platinoid": 15,
+      "rock_opal_husk": 15,
+      "rock_chromite": 10,
+      "rock_gem_seam": 10,
+      "asteroid_crystal": 10
+    },
+    "ashfall_drift": {
+      "asteroid_metal": 35,
+      "asteroid_ice": 20,
+      "asteroid_fuel": 15,
+      "rock_ashback": 14,
+      "rock_cuprite": 10,
+      "rock_slag": 6
+    },
+    "sol_shoal": {
+      "asteroid_metal": 25,
+      "asteroid_mega": 18,
+      "rock_cuprite": 15,
+      "asteroid_ice": 14,
+      "rock_rutile": 10,
+      "comet": 8,
+      "asteroid_crystal": 6,
+      "rock_gem_seam": 4
+    },
+    "borealis_shoal": {
+      "rock_aurora_floe": 45,
+      "asteroid_ice": 30,
+      "gas_pocket": 15,
+      "comet": 10
+    }
+  },
+  "_cometComment": "The comet passes Sol and Borealis for cometHours every cometDays (server/src/GameServer.ts): while it does, comet rocks there carry their traces at comet.traceTier (iridium at the tier 4 rate).",
+  "comet": {
+    "days": 3,
+    "hours": 2,
+    "systems": [
+      "sol",
+      "borealis"
+    ],
+    "traceTier": 4
+  }
+}

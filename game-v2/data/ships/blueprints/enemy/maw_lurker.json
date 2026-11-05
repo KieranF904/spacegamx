@@ -1,0 +1,86 @@
+{
+ "name": "Maw Lurker",
+ "catalogVersion": 1,
+ "power": "ports",
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "maw_lurker_root_l",
+   "fn": "armor",
+   "material": "maw_slate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 3
+  },
+  {
+   "uid": 1,
+   "piece": "maw_lurker_root_r",
+   "fn": "armor",
+   "material": "maw_slate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 4
+  },
+  {
+   "uid": 2,
+   "piece": "maw_lurker_tail",
+   "fn": "armor",
+   "material": "maw_slate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 5
+  },
+  {
+   "uid": 3,
+   "piece": "maw_lurker_rail",
+   "fn": "railgun",
+   "material": "maw_slate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 2
+  },
+  {
+   "uid": 4,
+   "piece": "maw_lurker_body",
+   "fn": "hull",
+   "material": "maw_slate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 0
+  },
+  {
+   "uid": 5,
+   "piece": "maw_lurker_node",
+   "fn": "core",
+   "material": "maw_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 0
+  },
+  {
+   "uid": 6,
+   "piece": "maw_lurker_eye",
+   "fn": "scanner",
+   "material": "maw_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 1
+  }
+ ]
+}

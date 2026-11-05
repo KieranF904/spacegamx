@@ -1,0 +1,52 @@
+== partTip (tooltip) ==
+Needle
+Mk II · Medium · Panel · 2 cells
+Hull · mass150 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage50/s · reach 9,000
+Hits withKinetic · penetration 3.5
+Fire rate0.8/s · shells · Railgun Slugs (no energy)
+Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 2 clear cells ahead
+
+== partStats (stats rows) ==
+GradeMk II · Medium
+Hits withKinetic · penetration 2
+Hull · mass150 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 150
+
+== familyLabel ==
+Railguns
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+fast slugs through two ships · ammo
+
+== keyStats ==
+50 dmg/s · reach 9,000 · ammo
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 2 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 13","why":"Learned at level 13 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 13","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":49.6,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":49.6,"range":9000,"damageType":"kinetic","pen":3.5}

@@ -9,6 +9,8 @@
  * - Combo multipliers
  */
 
+import { onOverlayFrame } from '../rendering/overlayFrame';
+
 interface FloatingText {
   id: number;
   text: string;
@@ -23,6 +25,9 @@ interface FloatingText {
   type: 'xp' | 'credits' | 'item' | 'damage' | 'heal' | 'combo' | 'achievement';
   scale: number;
   targetScale: number;
+  /** Set the first time it's drawn: its font string and its colour as an rgba() prefix */
+  font?: string;
+  rgb?: string;
 }
 
 export class FloatingRewardsUI {
@@ -31,13 +36,17 @@ export class FloatingRewardsUI {
   private ctx: CanvasRenderingContext2D;
   private texts: FloatingText[] = [];
   private nextId = 0;
-  private animationFrame: number = 0;
+  private stop: () => void;
   private visible = true;
+  /** The canvas has something on it (cleared only when there's something to clear) */
+  private drawn = false;
   
   // Camera offset for world-space texts
   private cameraX = 0;
   private cameraY = 0;
   private zoom = 1;
+  /** The view's roll (the texts float up the screen however it's turned) */
+  private angle = 0;
   
   constructor(container: HTMLElement) {
     this.container = container;
@@ -60,7 +69,12 @@ export class FloatingRewardsUI {
     this.handleResize();
     window.addEventListener('resize', this.handleResize);
     
-    this.startAnimation();
+    // Stepped from the renderer's frame, with its real delta (see overlayFrame)
+    this.stop = onOverlayFrame((dt) => {
+      if (!this.visible || (!this.texts.length && !this.drawn)) return;
+      this.update(Math.min(0.1, dt));
+      this.draw();
+    });
   }
   
   private handleResize = (): void => {
@@ -68,24 +82,14 @@ export class FloatingRewardsUI {
     this.canvas.height = window.innerHeight;
   };
   
-  private startAnimation(): void {
-    const animate = () => {
-      if (this.visible) {
-        this.update();
-        this.draw();
-      }
-      this.animationFrame = requestAnimationFrame(animate);
-    };
-    this.animationFrame = requestAnimationFrame(animate);
-  }
-  
   /**
    * Update camera position for world-space to screen-space conversion
    */
-  setCamera(x: number, y: number, zoom: number): void {
+  setCamera(x: number, y: number, zoom: number, angle = 0): void {
     this.cameraX = x;
     this.cameraY = y;
     this.zoom = zoom;
+    this.angle = angle;
   }
   
   /**
@@ -280,14 +284,11 @@ export class FloatingRewardsUI {
   }
   
   private worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
-    const screenX = (worldX - this.cameraX) * this.zoom + this.canvas.width / 2;
-    const screenY = (worldY - this.cameraY) * this.zoom + this.canvas.height / 2;
-    return { x: screenX, y: screenY };
+    const c = Math.cos(this.angle), s = Math.sin(this.angle), dx = worldX - this.cameraX, dy = worldY - this.cameraY;
+    return { x: (c * dx + s * dy) * this.zoom + this.canvas.width / 2, y: (c * dy - s * dx) * this.zoom + this.canvas.height / 2 };
   }
   
-  private update(): void {
-    const dt = 1 / 60;
-    
+  private update(dt: number): void {
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const text = this.texts[i];
       
@@ -295,13 +296,13 @@ export class FloatingRewardsUI {
       text.x += text.vx * dt;
       text.y += text.vy * dt;
       text.vy += 50 * dt; // Gravity (slows upward movement)
-      text.vx *= 0.98; // Air resistance
+      text.vx *= Math.pow(0.98, dt * 60); // Air resistance
       
       // Update life
       text.life -= dt / text.maxLife;
       
       // Animate scale
-      text.scale += (text.targetScale - text.scale) * 0.1;
+      text.scale += (text.targetScale - text.scale) * (1 - Math.pow(0.9, dt * 60));
       
       // Remove dead texts
       if (text.life <= 0) {
@@ -313,48 +314,55 @@ export class FloatingRewardsUI {
   private draw(): void {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
+    this.drawn = this.texts.length > 0;
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
+
+    // Each text placed by setting the transform outright (no save/restore per text); the glow's shadow is turned off
+    // again straight after the one fill it's for. Its font string and colour are made once, the first time it's drawn.
     for (const text of this.texts) {
+      if (text.font === undefined) {
+        text.font = `bold ${text.size}px 'Rajdhani', Arial, sans-serif`;
+        text.rgb = this.hexToRgbPrefix(text.color);
+      }
       const alpha = this.easeOutQuad(text.life);
       const scale = text.scale;
-      
-      ctx.save();
-      ctx.translate(text.x, text.y);
-      ctx.scale(scale, scale);
-      
+      ctx.setTransform(scale, 0, 0, scale, text.x, text.y);
+
       // Draw shadow
-      ctx.font = `bold ${text.size}px 'Rajdhani', Arial, sans-serif`;
+      ctx.font = text.font;
       ctx.fillStyle = `rgba(0, 0, 0, ${alpha * 0.5})`;
       ctx.fillText(text.text, 2, 2);
-      
+
       // Draw outline
       ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.8})`;
       ctx.lineWidth = 3;
       ctx.strokeText(text.text, 0, 0);
-      
+
       // Draw text with glow
-      if (text.type === 'achievement' || text.type === 'combo') {
+      const glow = text.type === 'achievement' || text.type === 'combo';
+      if (glow) {
         ctx.shadowColor = text.color;
         ctx.shadowBlur = 15;
       }
-      
-      ctx.fillStyle = this.hexToRgba(text.color, alpha);
+
+      ctx.fillStyle = `${text.rgb}${alpha})`;
       ctx.fillText(text.text, 0, 0);
-      
-      ctx.restore();
+
+      if (glow) {
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+      }
     }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
-  
-  private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+  /** '#rrggbb' as 'rgba(r, g, b, ' (the alpha and ')' added per frame) */
+  private hexToRgbPrefix(hex: string): string {
+    return `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, `;
   }
-  
+
   private easeOutQuad(t: number): number {
     return t * (2 - t);
   }
@@ -380,9 +388,7 @@ export class FloatingRewardsUI {
   }
   
   destroy(): void {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
+    this.stop();
     window.removeEventListener('resize', this.handleResize);
     this.canvas.remove();
   }

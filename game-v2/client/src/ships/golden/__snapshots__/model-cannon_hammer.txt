@@ -1,0 +1,52 @@
+== partTip (tooltip) ==
+Hammer
+Mk I · Medium · Panel · 2 cells
+Hull · mass120 hp · 2.0
+Armour · build1 · 2 pts
+Damage69/s · reach 5,700
+Hits withKinetic · penetration 2
+Fire rate1.4/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 1 clear cell ahead
+Power draw10/s
+
+== partStats (stats rows) ==
+GradeMk I · Medium
+Hits withKinetic · penetration 1
+Power draw10
+Hull · mass120 hp · 2.0
+Armour · build1 · 2 pts
+Rating scoretoughness 120
+
+== familyLabel ==
+Cannons
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+slow heavy shell, punches plate
+
+== keyStats ==
+69 dmg/s · reach 5,700 · cycle · draws 10
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 1 clear cell ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 6","why":"Learned at level 6 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 6","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":120,"mass":2,"firepower":68.57142858,"toughness":120,"armour":1,"dps":68.57142858,"range":5700.0000024,"damageType":"kinetic","pen":2,"draw":10}

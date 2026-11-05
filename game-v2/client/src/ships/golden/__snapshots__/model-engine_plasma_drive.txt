@@ -1,0 +1,48 @@
+== partTip (tooltip) ==
+Plasma Drive
+Mk II · Medium · Panel · 2 cells
+Hull · mass160 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Thrust6.2 · boost ×1.8, drain ×0.8
+Power draw40/s
+Rated speed3,300 m/s (its push fades out near it)
+
+== partStats (stats rows) ==
+GradeMk II · Medium
+Power draw40
+Thrust6.2 · boost ×1.8, drain ×0.8
+Hull · mass160 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 160
+
+== familyLabel ==
+Plasma drives
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+the balanced main engine
+
+== keyStats ==
+thrust 6.2 · top 3,300 m/s · draws 40
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 16","why":"Learned at level 16 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 16","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":159.79999999999998,"mass":2.8,"firepower":0,"toughness":159.79999999999998,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":40,"thrust":6.2,"boost":1.8,"boostDrain":0.8}

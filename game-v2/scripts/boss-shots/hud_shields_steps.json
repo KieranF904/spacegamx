@@ -1,0 +1,90 @@
+[
+ {
+  "eval": "(async () => { localStorage.setItem('sg.tutorialDone','1'); document.querySelector('.guest-button').click(); await new Promise(r => setTimeout(r, 2500)); const j = [...document.querySelectorAll('button')].find(b => /join/i.test(b.innerText)); if (j) j.click(); await new Promise(r => setTimeout(r, 9000)); const g = window.__game, sleep = (ms) => new Promise(r => setTimeout(r, ms)); g.network.send({ type: 'admin', cmd: 'god', args: { on: true } }); await sleep(400); g.network.send({ type: 'admin', cmd: 'clear', args: { radius: 6000, quiet: true } }); await sleep(400); g.network.send({ type: 'respawn' }); await sleep(3000); g.network.send({ type: 'devShip', ship: 'review-heron' }); await sleep(4000); const s = g.shipClient.myShip(); return { ship: s?.blueprint?.name, zoom: g.renderer.getZoom(), charge: g.state.charge }; })()"
+ },
+ {
+  "move": [
+   900,
+   250
+  ]
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": 1
+ },
+ {
+  "cdp": {
+   "method": "Input.dispatchMouseEvent",
+   "params": {
+    "type": "mousePressed",
+    "x": 900,
+    "y": 250,
+    "button": "left",
+    "buttons": 1,
+    "clickCount": 1
+   }
+  }
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "shot": 1
+ },
+ {
+  "cdp": {
+   "method": "Input.dispatchMouseEvent",
+   "params": {
+    "type": "mouseReleased",
+    "x": 900,
+    "y": 250,
+    "button": "left",
+    "clickCount": 1
+   }
+  }
+ },
+ {
+  "eval": "(async () => { const g = window.__game, sleep = (ms) => new Promise(r => setTimeout(r, ms)); const me = g.state.entities.get(g.state.playerId); g.network.send({ type: 'admin', cmd: 'spawn', args: { x: me.x + 450, y: me.y - 250, count: 3 } }); await sleep(2500); return { me: [Math.round(me.x), Math.round(me.y)], shield: me.data?.[4] }; })()"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": 1
+ },
+ {
+  "wait": 700
+ },
+ {
+  "shot": 1
+ },
+ {
+  "wait": 700
+ },
+ {
+  "shot": 1
+ },
+ {
+  "wait": 700
+ },
+ {
+  "shot": 1
+ },
+ {
+  "wait": 700
+ },
+ {
+  "shot": 1
+ },
+ {
+  "eval": "(() => { const g = window.__game, me = g.state.entities.get(g.state.playerId); return { shield: me.data?.[4], hp: g.shipClient.myShip()?.hp?.[0] }; })()"
+ },
+ {
+  "eval": "(() => { window.__game.network.send({ type: 'admin', cmd: 'clear', args: { radius: 6000, quiet: true } }); return 'cleared'; })()"
+ },
+ {
+  "wait": 800
+ }
+]

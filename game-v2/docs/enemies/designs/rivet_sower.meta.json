@@ -1,0 +1,39 @@
+{
+ "id": "rivet_sower",
+ "name": "Rivet Sower",
+ "faction": "scrapborn",
+ "sky": "sol_scrap_nest",
+ "role": "mine layer",
+ "level": "4-7",
+ "threat": "medium",
+ "parts": 9,
+ "groups": {
+  "sensors": [
+   "whisker_l",
+   "whisker_r"
+  ],
+  "core": [
+   "body",
+   "lamp"
+  ],
+  "pannier_l": [
+   "pannier_l"
+  ],
+  "pannier_r": [
+   "pannier_r"
+  ],
+  "drive": [
+   "drive_l",
+   "drive_r"
+  ],
+  "drum": [
+   "drum"
+  ]
+ },
+ "damaged": [
+  "pannier_r",
+  "sensors"
+ ],
+ "radiusCells": 4.182,
+ "radius": 100
+}

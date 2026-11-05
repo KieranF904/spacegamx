@@ -1,0 +1,96 @@
+import { describe, it, expect } from 'vitest';
+import { join } from 'path';
+import * as bitecs from 'bitecs';
+import { Asteroid, InSystem, mulberry32, calcOrbitStateRaw } from '@space-game/common';
+import { GameServer } from '../GameServer.js';
+import { GameData } from '../data/GameData.js';
+import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
+import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { createShipBridge } from '../proto/createProtoServer.js';
+import { MemoryProfileStore } from '../profile/ProfileStore.js';
+
+const dataDir = join(__dirname, '../../../data');
+const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
+const files = readGameDataFiles(dataDir);
+
+function world() {
+  resetGlobals();
+  const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)), clock: () => 0 });
+  const w = server.getWorld();
+  const ids = [...Array(8000).keys()].filter((e) => bitecs.entityExists(w, e) && bitecs.hasComponent(w, Asteroid, e));
+  return { server, ids, orbits: (server as any).asteroidOrbits };
+}
+
+const where = (e: number, tick: number) => {
+  const o = calcOrbitStateRaw(Asteroid.orbitType[e], Asteroid.semiMajorAxis[e], Asteroid.eccentricity[e], Asteroid.argPeriapsis[e], Asteroid.meanAnomaly0[e], Asteroid.epochTick[e], tick);
+  return [o.x, o.y];
+};
+
+describe('asteroid orbit timetable', () => {
+  it('finds every asteroid that could be in a box, at any tick', () => {
+    const { ids, orbits } = world();
+    const rnd = mulberry32(99);
+    let found = 0;
+    for (let round = 0; round < 60; round++) {
+      // Up to about five weeks of uptime
+      const tick = Math.floor(rnd() * 2e8);
+      for (let q = 0; q < 40; q++) {
+        const e = ids[Math.floor(rnd() * ids.length)];
+        const sys = InSystem.systemId[e];
+        const [ax, ay] = where(e, tick);
+        const x = ax + (rnd() - 0.5) * 3000, y = ay + (rnd() - 0.5) * 3000;
+        const ang = rnd() * Math.PI * 2, len = rnd() < 0.5 ? 40 : 1500, pad = 120;
+        const x1 = x + Math.cos(ang) * len, y1 = y + Math.sin(ang) * len;
+        const got = new Set<number>(orbits.query(sys, x, y, x1, y1, pad, tick));
+        // Everything whose rock reaches the padded box must come back
+        for (const a of ids) {
+          if (InSystem.systemId[a] !== sys) continue;
+          const [px, py] = where(a, tick), r = Asteroid.size[a];
+          if (px + r < Math.min(x, x1) - pad || px - r > Math.max(x, x1) + pad || py + r < Math.min(y, y1) - pad || py - r > Math.max(y, y1) + pad) continue;
+          expect(got.has(a), `asteroid ${a} at tick ${tick}`).toBe(true);
+          found++;
+        }
+      }
+    }
+    expect(found).toBeGreaterThan(100);
+  });
+
+  it('stays exact through heavy churn: cells emptied and reused, the pools compacted', () => {
+    const { ids, orbits } = world();
+    const shapes = new Map<number, { system: number; shape: unknown }>(ids.map((e) => [e, orbits.orbits.get(e)]));
+    const entries0 = orbits.entries;
+    const rnd = mulberry32(7);
+    for (let round = 0; round < 4; round++) {
+      const half = ids.filter(() => rnd() < 0.5);
+      for (const e of half) orbits.remove(e);
+      for (const e of half) orbits.add(e, shapes.get(e)!.system, shapes.get(e)!.shape);
+    }
+    expect(orbits.entries).toBe(entries0);
+    for (let q = 0; q < 300; q++) {
+      const tick = Math.floor(rnd() * 2e8);
+      const e = ids[Math.floor(rnd() * ids.length)];
+      const sys = InSystem.systemId[e];
+      const [x, y] = where(e, tick);
+      const got = new Set<number>(orbits.query(sys, x - 400, y - 400, x + 400, y + 400, 120, tick));
+      for (const a of ids) {
+        if (InSystem.systemId[a] !== sys) continue;
+        const [px, py] = where(a, tick), r = Asteroid.size[a];
+        if (px + r < x - 520 || px - r > x + 520 || py + r < y - 520 || py - r > y + 520) continue;
+        expect(got.has(a), `asteroid ${a} at tick ${tick}`).toBe(true);
+      }
+    }
+  });
+
+  it('a broken asteroid leaves the timetable', () => {
+    const { server, ids, orbits } = world();
+    const e = ids[0];
+    const tick = (server as any).currentTick;
+    const [x, y] = where(e, tick);
+    expect(orbits.query(InSystem.systemId[e], x, y, x, y, 10, tick)).toContain(e);
+    Asteroid.hp[e] = 0;
+    server.step();
+    const [x2, y2] = where(e, tick + 1);
+    expect(orbits.query(InSystem.systemId[e], x2, y2, x2, y2, 10, tick + 1)).not.toContain(e);
+  });
+});

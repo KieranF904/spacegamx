@@ -1,0 +1,520 @@
+{
+ "when": "2026-11-04",
+ "mode": "quick",
+ "bulk": "blocks",
+ "results": [
+  {
+   "layout": "ball",
+   "n": 300,
+   "secs": 40,
+   "bulk": "blocks",
+   "probes": 4,
+   "caps": 32767,
+   "lat": 3,
+   "scene": {
+    "alive": 300,
+    "hostiles": 30,
+    "boss": false,
+    "ships": 381
+   },
+   "timing": {
+    "tickMeanMs": 16.259,
+    "tickP95Ms": 67.773,
+    "tickMaxMs": 267.961,
+    "budgetPct": 97.556,
+    "snapshotsMsPerTick": 4.836,
+    "replicationMsPerTick": 0.541,
+    "encodeSendMsPerTick": 3.202,
+    "rebuildMsPerTick": 0.241,
+    "rebuildsPerSec": 63.25,
+    "rebuildRepeats": 0,
+    "deflateMsPerTickEst": 0.035
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "blocks",
+     "clients": 296,
+     "rawBpsMean": 27646,
+     "rawBpsP95": 27873,
+     "rawBpsMax": 28033,
+     "wireBpsMean": 28507,
+     "wireSampled": 4,
+     "msgsPerSecMean": 13.209,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 30777,
+     "rawBpsP95": 30957,
+     "rawBpsMax": 30957,
+     "wireBpsMean": 31671,
+     "wireSampled": 4,
+     "msgsPerSecMean": 13.537
+    },
+    "capableUp": {
+     "msgsPerSec": 14.506,
+     "bps": 182
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 24.756
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 495,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 148005,
+      "off": 8,
+      "offNoKf": 8
+     },
+     "ai": {
+      "checked": 2253,
+      "off": 8,
+      "offNoKf": 8
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "other": {
+      "checked": 15883,
+      "off": 418,
+      "offNoKf": 418
+     }
+    },
+    "disagreeNoKeyframe": 16,
+    "checked": 150753,
+    "otherDisagree": 418,
+    "otherChecked": 15883,
+    "keyframeCorrectionsPerSecPerProbe": 36.906,
+    "keyframeEntriesPerSecPerProbe": 4.8,
+    "server": {
+     "hits": {
+      "hits": 4003,
+      "records": 2973,
+      "legacy": 12947,
+      "d": 190,
+      "s": 40,
+      "i": 0,
+      "checks": 30,
+      "why": {
+       "rebuilt": 12672,
+       "view": 66,
+       "gun": 60,
+       "shell": 77,
+       "owner": 72
+      },
+      "own": 120,
+      "told": 2853,
+      "reports": 337,
+      "fixes": 2,
+      "fixHits": 23,
+      "toldWhy": {
+       "keyframed": 9907,
+       "synced": 519,
+       "debris": 3994,
+       "curve": 22,
+       "oldWay": 406,
+       "strict": 892
+      }
+     },
+     "reasons": {
+      "Player:caused": 147,
+      "Player:pos": 0,
+      "Player:caused:pos": 0,
+      "rebuild": 40,
+      "Player:caused:cargo": 33,
+      "Player:cargo": 53,
+      "Pilotless:pos": 83,
+      "Drift:moved": 9
+     },
+     "bodies": {
+      "net": {
+       "decisions": 1056,
+       "rows": 3572,
+       "syncs": 419,
+       "offs": 0,
+       "targetKeyed": 545,
+       "checks": 108,
+       "agreed": 105,
+       "off": 3,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 11427,
+       "keyframes": 1356,
+       "why": {
+        "pos": 83
+       }
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 337.253,
+    "server": {
+     "rounds": 122,
+     "drops": 1,
+     "dropShips": 4,
+     "entries": 8,
+     "offers": 2,
+     "logs": 2,
+     "logShips": 8,
+     "logBytes": 40,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 0,
+     "refusedNone": 0,
+     "savedBytes": 280
+    },
+    "probes": {
+     "drops": 1,
+     "keptShips": 4,
+     "offers": 2,
+     "answered": 2,
+     "logs": 2,
+     "restored": 8,
+     "replayTicks": 2496,
+     "forgotten": 1,
+     "missing": 0
+    },
+    "dropsPerSec": 0.025,
+    "entriesPerSec": 0.2,
+    "offersPerSec": 0.05,
+    "logsPerSec": 0.05,
+    "logShipsPerSec": 0.2,
+    "refused": 0
+   },
+   "probeClientMsPerTick": 4.876,
+   "crowd": {
+    "bySecond": [
+     {
+      "lv": 4,
+      "cost": 40.797,
+      "tickMs": 53.507,
+      "steps": 60
+     },
+     {
+      "lv": 4,
+      "cost": 23.164,
+      "tickMs": 26.464,
+      "steps": 60
+     },
+     {
+      "lv": 5,
+      "cost": 22.339,
+      "tickMs": 28.478,
+      "steps": 60
+     },
+     {
+      "lv": 6,
+      "cost": 25.302,
+      "tickMs": 25.122,
+      "steps": 60
+     },
+     {
+      "lv": 6,
+      "cost": 22.891,
+      "tickMs": 21.928,
+      "steps": 48
+     },
+     {
+      "lv": 7,
+      "cost": 23.002,
+      "tickMs": 25.3,
+      "steps": 44
+     },
+     {
+      "lv": 8,
+      "cost": 20.472,
+      "tickMs": 18.076,
+      "steps": 30
+     },
+     {
+      "lv": 8,
+      "cost": 17.477,
+      "tickMs": 16.67,
+      "steps": 28
+     },
+     {
+      "lv": 8,
+      "cost": 14.471,
+      "tickMs": 13.076,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 13.388,
+      "tickMs": 13.508,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 9.893,
+      "tickMs": 10.096,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 14.942,
+      "tickMs": 12.614,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 15.508,
+      "tickMs": 14.08,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 15.117,
+      "tickMs": 15.634,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 13.463,
+      "tickMs": 15.092,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 17.202,
+      "tickMs": 14.312,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 13.988,
+      "tickMs": 10.893,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 13.164,
+      "tickMs": 11.37,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 12.809,
+      "tickMs": 13.316,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 11.563,
+      "tickMs": 13.984,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 17.662,
+      "tickMs": 16.566,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 14.225,
+      "tickMs": 12.736,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 12.787,
+      "tickMs": 12.019,
+      "steps": 20
+     },
+     {
+      "lv": 8,
+      "cost": 13.469,
+      "tickMs": 13.503,
+      "steps": 20
+     },
+     {
+      "lv": 9,
+      "cost": 22.848,
+      "tickMs": 20.624,
+      "steps": 20
+     },
+     {
+      "lv": 9,
+      "cost": 23.592,
+      "tickMs": 19.632,
+      "steps": 20
+     },
+     {
+      "lv": 9,
+      "cost": 11.508,
+      "tickMs": 11.878,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 12.26,
+      "tickMs": 14.514,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 14.2,
+      "tickMs": 12.309,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 8.865,
+      "tickMs": 8.538,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 10.746,
+      "tickMs": 11.032,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 15.68,
+      "tickMs": 14.617,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 11.539,
+      "tickMs": 13.051,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 15.112,
+      "tickMs": 18.742,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 17.757,
+      "tickMs": 16.559,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 11.844,
+      "tickMs": 12.632,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 12.423,
+      "tickMs": 13.959,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 13.617,
+      "tickMs": 11.825,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 8.486,
+      "tickMs": 8.233,
+      "steps": 15
+     },
+     {
+      "lv": 9,
+      "cost": 11.088,
+      "tickMs": 13.883,
+      "steps": 15
+     }
+    ],
+    "log": [
+     {
+      "tick": 35,
+      "system": 0,
+      "from": 0,
+      "to": 1,
+      "cost": 30.98,
+      "forced": false
+     },
+     {
+      "tick": 125,
+      "system": 0,
+      "from": 1,
+      "to": 2,
+      "cost": 57.55,
+      "forced": false
+     },
+     {
+      "tick": 215,
+      "system": 0,
+      "from": 2,
+      "to": 3,
+      "cost": 53.08,
+      "forced": false
+     },
+     {
+      "tick": 305,
+      "system": 0,
+      "from": 3,
+      "to": 4,
+      "cost": 43.09,
+      "forced": false
+     },
+     {
+      "tick": 395,
+      "system": 0,
+      "from": 4,
+      "to": 5,
+      "cost": 20.51,
+      "forced": false
+     },
+     {
+      "tick": 485,
+      "system": 0,
+      "from": 5,
+      "to": 6,
+      "cost": 19.62,
+      "forced": false
+     },
+     {
+      "tick": 575,
+      "system": 0,
+      "from": 6,
+      "to": 7,
+      "cost": 28.5,
+      "forced": false
+     },
+     {
+      "tick": 665,
+      "system": 0,
+      "from": 7,
+      "to": 8,
+      "cost": 20.03,
+      "forced": false
+     },
+     {
+      "tick": 1735,
+      "system": 0,
+      "from": 8,
+      "to": 9,
+      "cost": 20.66,
+      "forced": false
+     }
+    ],
+    "settledTickMs": 13.069,
+    "settledLevel": 9
+   },
+   "wallSeconds": 123.892,
+   "ticks": 2400
+  }
+ ]
+}

@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Heavy Coil
+Mk IV · Block · 4 cells
+Hull · mass419 hp · 4.8
+Armour · build4 · 15.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Power draw32/s
+Jump cooldown−20%
+Jump coilserves 83 cells of hull
+
+== partStats (stats rows) ==
+GradeMk IV
+Power draw32
+Hull · mass419 hp · 4.8
+Armour · build4 · 15.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 419
+
+== familyLabel ==
+Jump coils
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+more jump per cell, and 20% faster to cool
+
+== keyStats ==
+jump cooldown −20% · jump 83 cells · draws 32
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 30","why":"Learned at level 30 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 30","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"","area":4,"hp":419.20000000000005,"mass":4.8,"firepower":0,"toughness":419.20000000000005,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"draw":32}

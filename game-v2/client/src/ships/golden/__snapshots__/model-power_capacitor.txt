@@ -1,0 +1,46 @@
+== partTip (tooltip) ==
+Capacitor
+Mk I · Square · 1 cell
+Hull · mass30 hp · 0.7
+Armour · build1 · 1 pts
+TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
+Holds (guns it touches)160 energy
+Givesup to 2,000/s first to the guns, beams, mining lasers and Flash Screens its bank touches; touching Capacitors are one bank
+Takesup to 40/s while not full, from the ship's Output; short of power, it shares by what it asks, so more raises its parts' share
+
+== partStats (stats rows) ==
+GradeMk I
+Hull · mass30 hp · 0.7
+Armour · build1 · 1 pts
+TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
+Rating scoretoughness 30
+
+== familyLabel ==
+Capacitors
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines
+
+== keyStats ==
+holds 160 (guns) · gives 2,000/s by touch
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 7","why":"Learned at level 7 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 7","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":30,"mass":0.7,"firepower":0,"toughness":30,"armour":1,"resist":{"kinetic":1.2,"explosive":1.1,"thermal":1.1,"energy":0.8}}

@@ -1,0 +1,35 @@
+[Unit]
+Description=Space Game v2 server browser (lobby)
+After=network.target
+
+[Service]
+Type=simple
+User=spacegame
+Group=spacegame
+WorkingDirectory=/opt/spacegame/server-browser
+ExecStart=/usr/bin/node dist/index.js
+Environment=NODE_ENV=production
+Environment=BROWSER_PORT=8790
+# This machine only: nginx, the game server and the site all reach it at 127.0.0.1:8790
+Environment=BROWSER_HOST=127.0.0.1
+# LOBBY_ADMIN_SECRET (shared with the game server; remote-install.sh makes it)
+# OWNER_USERNAMES (optional, comma-separated: made the owner, the rank above admin, at every start; put it in
+# secrets.env by hand, e.g. OWNER_USERNAMES=brotherk3d; nothing sets it for you)
+EnvironmentFile=-/etc/spacegame/secrets.env
+Restart=always
+RestartSec=3
+# A small service on a shared 2 vCPU / 4 GB box
+CPUWeight=100
+MemoryHigh=256M
+MemoryMax=384M
+# Files it makes (accounts): not readable by other users
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+# Accounts (one for every game server) are kept here
+ReadWritePaths=/opt/spacegame/data/lobby
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

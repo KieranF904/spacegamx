@@ -1,0 +1,3536 @@
+{
+ "when": "2026-11-04",
+ "mode": "full",
+ "bulk": "focus",
+ "results": [
+  {
+   "layout": "spread",
+   "n": 20,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 19,
+    "hostiles": 31,
+    "boss": false,
+    "ships": 102
+   },
+   "timing": {
+    "tickMeanMs": 1.015,
+    "tickP95Ms": 2.305,
+    "tickMaxMs": 4.312,
+    "budgetPct": 6.092,
+    "snapshotsMsPerTick": 0.318,
+    "replicationMsPerTick": 0.04,
+    "encodeSendMsPerTick": 0.042,
+    "rebuildMsPerTick": 0.05,
+    "rebuildsPerSec": 10.067,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.007,
+    "debrisMean": 4.878,
+    "debrisMax": 6,
+    "deflateMsPerTickEst": 0.003
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 16,
+     "rawBpsMean": 2026,
+     "rawBpsP95": 2352,
+     "rawBpsMax": 2352,
+     "wireBpsMean": 2671,
+     "wireSampled": 4,
+     "msgsPerSecMean": 10.625,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 1218,
+     "rawBpsP95": 1503,
+     "rawBpsMax": 1503,
+     "wireBpsMean": 1774,
+     "wireSampled": 4,
+     "msgsPerSecMean": 8.433,
+     "subTypesBps": {
+      "snapshot": 2366,
+      "projectileHit": 491,
+      "damage": 481,
+      "shipSync": 277,
+      "shipHps": 185,
+      "mapDots": 169,
+      "hangar": 114,
+      "partDestroyed": 97,
+      "items": 66,
+      "effect": 29
+     },
+     "debrisBps": {
+      "debrisSplit": 5,
+      "shipSync+re": 4,
+      "partDestroyed": 3,
+      "snapshot": 0
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 18.983,
+     "bps": 226
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 18.972
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 963,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 8105,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 8241,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 461,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "other": {
+      "checked": 2473,
+      "off": 0,
+      "offNoKf": 0
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 17309,
+    "otherDisagree": 0,
+    "otherChecked": 2934,
+    "debrisOffAt": [],
+    "debrisDisagree": 0,
+    "debrisOff": 0,
+    "debrisChecked": 461,
+    "keyframeCorrectionsPerSecPerProbe": 0.3,
+    "correctionsByClass": {
+     "ai": {
+      "n": 15,
+      "same": 9
+     },
+     "player": {
+      "n": 3,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 0.017,
+    "server": {
+     "ownChecks": {
+      "checks": 395,
+      "agreed": 395,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 342,
+      "failed": {},
+      "rows": 419,
+      "stateless": 660,
+      "unworkable": 0
+     },
+     "own": {
+      "causes": 7,
+      "pull": 0,
+      "contact": 0,
+      "contactState": 0,
+      "rebuild": 7,
+      "cargo": 0,
+      "keyframes": 8,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 4
+      }
+     },
+     "hits": {
+      "hits": 377,
+      "records": 62,
+      "legacy": 1185,
+      "d": 3,
+      "s": 0,
+      "i": 0,
+      "checks": 21,
+      "why": {
+       "view": 168,
+       "shell": 538,
+       "rebuilt": 479
+      },
+      "own": 40,
+      "told": 22,
+      "reports": 43,
+      "fixes": 0,
+      "fixHits": 0,
+      "toldWhy": {
+       "synced": 277,
+       "keyframed": 76,
+       "self": 41,
+       "curve": 5,
+       "oldWay": 2,
+       "debris": 16
+      }
+     },
+     "reasons": {
+      "Player:pos": 0,
+      "rebuild": 3,
+      "Player:caused": 5
+     },
+     "bodies": {
+      "net": {
+       "decisions": 177,
+       "rows": 235,
+       "syncs": 1,
+       "offs": 2,
+       "targetKeyed": 15,
+       "checks": 60,
+       "agreed": 60,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 25882,
+       "keyframes": 16,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 19.417,
+    "server": {
+     "rounds": 300,
+     "drops": 2,
+     "dropShips": 8,
+     "entries": 14,
+     "offers": 3,
+     "logs": 1,
+     "logShips": 1,
+     "logBytes": 8,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 2,
+     "refusedNone": 0,
+     "savedBytes": 32
+    },
+    "probes": {
+     "drops": 0,
+     "keptShips": 0,
+     "offers": 1,
+     "answered": 1,
+     "logs": 1,
+     "restored": 1,
+     "replayTicks": 483,
+     "forgotten": 0,
+     "missing": 0
+    },
+    "dropsPerSec": 0.133,
+    "entriesPerSec": 0.933,
+    "offersPerSec": 0.2,
+    "logsPerSec": 0.067,
+    "logShipsPerSec": 0.067,
+    "refused": 2
+   },
+   "probeClientMsPerTick": 0.195,
+   "probeDebrisMsPerTick": 0.001,
+   "wallSeconds": 3.793,
+   "ticks": 900
+  },
+  {
+   "layout": "spread",
+   "n": 50,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 48,
+    "hostiles": 49,
+    "boss": false,
+    "ships": 165
+   },
+   "timing": {
+    "tickMeanMs": 2.498,
+    "tickP95Ms": 6.461,
+    "tickMaxMs": 14.073,
+    "budgetPct": 14.991,
+    "snapshotsMsPerTick": 0.932,
+    "replicationMsPerTick": 0.121,
+    "encodeSendMsPerTick": 0.154,
+    "rebuildMsPerTick": 0.152,
+    "rebuildsPerSec": 41.133,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.018,
+    "debrisMean": 21.262,
+    "debrisMax": 26,
+    "deflateMsPerTickEst": 0.01
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 46,
+     "rawBpsMean": 3464,
+     "rawBpsP95": 4853,
+     "rawBpsMax": 5580,
+     "wireBpsMean": 4953,
+     "wireSampled": 4,
+     "msgsPerSecMean": 11.883,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 2873,
+     "rawBpsP95": 3674,
+     "rawBpsMax": 3674,
+     "wireBpsMean": 3582,
+     "wireSampled": 4,
+     "msgsPerSecMean": 10.75,
+     "subTypesBps": {
+      "snapshot": 3436,
+      "projectileHit": 1627,
+      "damage": 1231,
+      "shipSync": 606,
+      "effect": 601,
+      "partDestroyed": 548,
+      "mapDots": 334,
+      "detonation": 312,
+      "shipHps": 256,
+      "ignite": 127
+     },
+     "debrisBps": {
+      "shipSync+re": 38,
+      "debrisSplit": 24,
+      "shipSync+bp": 13,
+      "partDestroyed": 11,
+      "snapshot": 8,
+      "hpCheck": 1
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 20.117,
+     "bps": 248
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 25.681
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 1109,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 15909,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 6751,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 5304,
+      "off": 1,
+      "offNoKf": 1
+     },
+     "other": {
+      "checked": 2513,
+      "off": 0,
+      "offNoKf": 0
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 23769,
+    "otherDisagree": 1,
+    "otherChecked": 7817,
+    "debrisOffAt": [
+     {
+      "id": 5855,
+      "tick": 342,
+      "d": [
+       9.37,
+       -7.37,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 336,
+      "aloof": false
+     }
+    ],
+    "debrisDisagree": 1,
+    "debrisOff": 1,
+    "debrisChecked": 5304,
+    "keyframeCorrectionsPerSecPerProbe": 0.817,
+    "correctionsByClass": {
+     "ai": {
+      "n": 43,
+      "same": 20
+     },
+     "player": {
+      "n": 5,
+      "same": 0
+     },
+     "other": {
+      "n": 1,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 0.4,
+    "server": {
+     "ownChecks": {
+      "checks": 471,
+      "agreed": 471,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 928,
+      "failed": {},
+      "rows": 615,
+      "stateless": 876,
+      "unworkable": 14
+     },
+     "own": {
+      "causes": 20,
+      "pull": 0,
+      "contact": 12,
+      "contactState": 0,
+      "rebuild": 8,
+      "cargo": 0,
+      "keyframes": 8,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 4
+      }
+     },
+     "hits": {
+      "hits": 1250,
+      "records": 158,
+      "legacy": 4766,
+      "d": 4,
+      "s": 0,
+      "i": 0,
+      "checks": 33,
+      "why": {
+       "rebuilt": 2417,
+       "view": 1881,
+       "shell": 455,
+       "gun": 12,
+       "owner": 1
+      },
+      "own": 43,
+      "told": 115,
+      "reports": 101,
+      "fixes": 1,
+      "fixHits": 2,
+      "toldWhy": {
+       "synced": 187,
+       "keyframed": 149,
+       "curve": 72,
+       "debris": 83,
+       "oldWay": 1652,
+       "strict": 1236,
+       "self": 68
+      }
+     },
+     "reasons": {
+      "Player:caused": 8,
+      "Player:pos": 0,
+      "rebuild": 6
+     },
+     "bodies": {
+      "net": {
+       "decisions": 323,
+       "rows": 237,
+       "syncs": 17,
+       "offs": 21,
+       "targetKeyed": 39,
+       "checks": 77,
+       "agreed": 77,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 43289,
+       "keyframes": 48,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 27.45,
+    "server": {
+     "rounds": 300,
+     "drops": 23,
+     "dropShips": 32,
+     "entries": 40,
+     "offers": 5,
+     "logs": 0,
+     "logShips": 0,
+     "logBytes": 0,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 5,
+     "refusedNone": 0,
+     "savedBytes": 0
+    },
+    "probes": {
+     "drops": 1,
+     "keptShips": 1,
+     "offers": 0,
+     "answered": 0,
+     "logs": 0,
+     "restored": 0,
+     "replayTicks": 0,
+     "forgotten": 0,
+     "missing": 0
+    },
+    "dropsPerSec": 1.533,
+    "entriesPerSec": 2.667,
+    "offersPerSec": 0.333,
+    "logsPerSec": 0,
+    "logShipsPerSec": 0,
+    "refused": 5
+   },
+   "probeClientMsPerTick": 0.231,
+   "probeDebrisMsPerTick": 0.007,
+   "wallSeconds": 5.945,
+   "ticks": 900
+  },
+  {
+   "layout": "spread",
+   "n": 100,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 97,
+    "hostiles": 80,
+    "boss": false,
+    "ships": 260
+   },
+   "timing": {
+    "tickMeanMs": 4.855,
+    "tickP95Ms": 11.993,
+    "tickMaxMs": 24.506,
+    "budgetPct": 29.128,
+    "snapshotsMsPerTick": 2.023,
+    "replicationMsPerTick": 0.343,
+    "encodeSendMsPerTick": 0.345,
+    "rebuildMsPerTick": 0.356,
+    "rebuildsPerSec": 71.133,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.025,
+    "debrisMean": 28.463,
+    "debrisMax": 37,
+    "deflateMsPerTickEst": 0.033
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 96,
+     "rawBpsMean": 4066,
+     "rawBpsP95": 6057,
+     "rawBpsMax": 6646,
+     "wireBpsMean": 4884,
+     "wireSampled": 4,
+     "msgsPerSecMean": 11.277,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 3317,
+     "rawBpsP95": 4407,
+     "rawBpsMax": 4407,
+     "wireBpsMean": 4053,
+     "wireSampled": 4,
+     "msgsPerSecMean": 11.15,
+     "subTypesBps": {
+      "snapshot": 5202,
+      "projectileHit": 1778,
+      "damage": 1510,
+      "partDestroyed": 561,
+      "shipSync": 559,
+      "mapDots": 406,
+      "effect": 367,
+      "shipHps": 184,
+      "detonation": 159,
+      "hits": 74
+     },
+     "debrisBps": {
+      "shipSync+re": 35,
+      "partDestroyed": 26,
+      "debrisSplit": 23,
+      "hpCheck": 1,
+      "snapshot": 0
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 32.6,
+     "bps": 390
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 24.611
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 1192,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 14364,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 9338,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 3902,
+      "off": 3,
+      "offNoKf": 3
+     },
+     "other": {
+      "checked": 2213,
+      "off": 0,
+      "offNoKf": 0
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 24894,
+    "otherDisagree": 3,
+    "otherChecked": 6115,
+    "debrisOffAt": [
+     {
+      "id": 5394,
+      "tick": 363,
+      "d": [
+       -2.78,
+       1.95,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 356,
+      "aloof": false
+     },
+     {
+      "id": 6040,
+      "tick": 675,
+      "d": [
+       4.48,
+       -5.51,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 670,
+      "aloof": false
+     },
+     {
+      "id": 5978,
+      "tick": 681,
+      "d": [
+       -6.09,
+       -6.71,
+       0,
+       0
+      ],
+      "runs": false,
+      "live": false,
+      "told": true,
+      "born": 677,
+      "aloof": false
+     }
+    ],
+    "debrisDisagree": 3,
+    "debrisOff": 3,
+    "debrisChecked": 3902,
+    "keyframeCorrectionsPerSecPerProbe": 0.583,
+    "correctionsByClass": {
+     "ai": {
+      "n": 30,
+      "same": 14
+     },
+     "player": {
+      "n": 4,
+      "same": 0
+     },
+     "other": {
+      "n": 1,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 0.217,
+    "server": {
+     "ownChecks": {
+      "checks": 512,
+      "agreed": 512,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 2673,
+      "failed": {},
+      "rows": 2579,
+      "stateless": 4627,
+      "unworkable": 53
+     },
+     "own": {
+      "causes": 165,
+      "pull": 0,
+      "contact": 154,
+      "contactState": 129,
+      "rebuild": 11,
+      "cargo": 0,
+      "keyframes": 8,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 4
+      }
+     },
+     "hits": {
+      "hits": 2198,
+      "records": 269,
+      "legacy": 8479,
+      "d": 7,
+      "s": 6,
+      "i": 0,
+      "checks": 45,
+      "why": {
+       "rebuilt": 4224,
+       "view": 4092,
+       "shell": 152,
+       "gun": 11
+      },
+      "own": 32,
+      "told": 237,
+      "reports": 127,
+      "fixes": 2,
+      "fixHits": 21,
+      "toldWhy": {
+       "synced": 88,
+       "keyframed": 173,
+       "curve": 62,
+       "self": 69,
+       "debris": 106,
+       "oldWay": 4889,
+       "strict": 987
+      }
+     },
+     "reasons": {
+      "Player:caused": 59,
+      "Player:pos": 0,
+      "rebuild": 13
+     },
+     "bodies": {
+      "net": {
+       "decisions": 693,
+       "rows": 294,
+       "syncs": 11,
+       "offs": 10,
+       "targetKeyed": 24,
+       "checks": 98,
+       "agreed": 98,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 74337,
+       "keyframes": 33,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 25.917,
+    "server": {
+     "rounds": 300,
+     "drops": 71,
+     "dropShips": 117,
+     "entries": 120,
+     "offers": 14,
+     "logs": 0,
+     "logShips": 0,
+     "logBytes": 0,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 13,
+     "refusedNone": 0,
+     "savedBytes": 0
+    },
+    "probes": {
+     "drops": 7,
+     "keptShips": 7,
+     "offers": 0,
+     "answered": 0,
+     "logs": 0,
+     "restored": 0,
+     "replayTicks": 0,
+     "forgotten": 25,
+     "missing": 0
+    },
+    "dropsPerSec": 4.733,
+    "entriesPerSec": 8,
+    "offersPerSec": 0.933,
+    "logsPerSec": 0,
+    "logShipsPerSec": 0,
+    "refused": 13
+   },
+   "probeClientMsPerTick": 0.248,
+   "probeDebrisMsPerTick": 0.006,
+   "wallSeconds": 9.095,
+   "ticks": 900
+  },
+  {
+   "layout": "spread",
+   "n": 300,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 298,
+    "hostiles": 96,
+    "boss": false,
+    "ships": 516
+   },
+   "timing": {
+    "tickMeanMs": 15.461,
+    "tickP95Ms": 40.165,
+    "tickMaxMs": 60.386,
+    "budgetPct": 92.764,
+    "snapshotsMsPerTick": 8.135,
+    "replicationMsPerTick": 1.658,
+    "encodeSendMsPerTick": 0.945,
+    "rebuildMsPerTick": 1.115,
+    "rebuildsPerSec": 166.333,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.048,
+    "debrisMean": 51.678,
+    "debrisMax": 78,
+    "deflateMsPerTickEst": 0.071
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 296,
+     "rawBpsMean": 3413,
+     "rawBpsP95": 4932,
+     "rawBpsMax": 6446,
+     "wireBpsMean": 3883,
+     "wireSampled": 4,
+     "msgsPerSecMean": 11.693,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 2215,
+     "rawBpsP95": 2826,
+     "rawBpsMax": 2826,
+     "wireBpsMean": 2966,
+     "wireSampled": 4,
+     "msgsPerSecMean": 11.383,
+     "subTypesBps": {
+      "snapshot": 2054,
+      "projectileHit": 1645,
+      "damage": 1426,
+      "effect": 486,
+      "partDestroyed": 483,
+      "shipSync": 315,
+      "mapDots": 272,
+      "shipHps": 174,
+      "detonation": 101,
+      "hits": 61
+     },
+     "debrisBps": {
+      "partDestroyed": 15,
+      "shipSync+re": 11,
+      "debrisSplit": 11,
+      "snapshot": 0
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 59.217,
+     "bps": 684
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 26.958
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 984,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 13501,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 4764,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 1343,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "other": {
+      "checked": 1885,
+      "off": 0,
+      "offNoKf": 0
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 19249,
+    "otherDisagree": 0,
+    "otherChecked": 3228,
+    "debrisOffAt": [],
+    "debrisDisagree": 0,
+    "debrisOff": 0,
+    "debrisChecked": 1343,
+    "keyframeCorrectionsPerSecPerProbe": 0.15,
+    "correctionsByClass": {
+     "ai": {
+      "n": 9,
+      "same": 4
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 0.067,
+    "server": {
+     "ownChecks": {
+      "checks": 593,
+      "agreed": 593,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 7402,
+      "failed": {},
+      "rows": 14066,
+      "stateless": 27888,
+      "unworkable": 111
+     },
+     "own": {
+      "causes": 127,
+      "pull": 0,
+      "contact": 91,
+      "contactState": 36,
+      "rebuild": 36,
+      "cargo": 0,
+      "keyframes": 8,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 4
+      }
+     },
+     "hits": {
+      "hits": 6226,
+      "records": 189,
+      "legacy": 24767,
+      "d": 12,
+      "s": 0,
+      "i": 0,
+      "checks": 43,
+      "why": {
+       "rebuilt": 11644,
+       "view": 12793,
+       "shell": 328,
+       "gun": 2
+      },
+      "own": 1,
+      "told": 188,
+      "reports": 119,
+      "fixes": 4,
+      "fixHits": 9,
+      "toldWhy": {
+       "synced": 34,
+       "self": 103,
+       "debris": 105,
+       "curve": 46,
+       "keyframed": 85,
+       "oldWay": 13477,
+       "strict": 8793
+      }
+     },
+     "reasons": {
+      "Player:caused": 29,
+      "Player:pos": 0,
+      "rebuild": 10,
+      "Pilotless:pos": 11
+     },
+     "bodies": {
+      "net": {
+       "decisions": 877,
+       "rows": 128,
+       "syncs": 0,
+       "offs": 0,
+       "targetKeyed": 12,
+       "checks": 118,
+       "agreed": 118,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 98268,
+       "keyframes": 9,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 23.175,
+    "server": {
+     "rounds": 300,
+     "drops": 93,
+     "dropShips": 122,
+     "entries": 127,
+     "offers": 24,
+     "logs": 2,
+     "logShips": 2,
+     "logBytes": 16,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 19,
+     "refusedNone": 0,
+     "savedBytes": 64
+    },
+    "probes": {
+     "drops": 5,
+     "keptShips": 5,
+     "offers": 2,
+     "answered": 2,
+     "logs": 2,
+     "restored": 2,
+     "replayTicks": 717,
+     "forgotten": 23,
+     "missing": 0
+    },
+    "dropsPerSec": 6.2,
+    "entriesPerSec": 8.467,
+    "offersPerSec": 1.6,
+    "logsPerSec": 0.133,
+    "logShipsPerSec": 0.133,
+    "refused": 19
+   },
+   "probeClientMsPerTick": 0.222,
+   "probeDebrisMsPerTick": 0.003,
+   "wallSeconds": 25.267,
+   "ticks": 900
+  },
+  {
+   "layout": "ball",
+   "n": 20,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 20,
+    "hostiles": 10,
+    "boss": false,
+    "ships": 85
+   },
+   "timing": {
+    "tickMeanMs": 1.331,
+    "tickP95Ms": 3.047,
+    "tickMaxMs": 7.241,
+    "budgetPct": 7.987,
+    "snapshotsMsPerTick": 0.471,
+    "replicationMsPerTick": 0.048,
+    "encodeSendMsPerTick": 0.086,
+    "rebuildMsPerTick": 0.047,
+    "rebuildsPerSec": 17.067,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.01,
+    "debrisMean": 11.089,
+    "debrisMax": 14,
+    "deflateMsPerTickEst": 0.003
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 16,
+     "rawBpsMean": 6590,
+     "rawBpsP95": 7975,
+     "rawBpsMax": 7975,
+     "wireBpsMean": 7187,
+     "wireSampled": 4,
+     "msgsPerSecMean": 12.696,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 5678,
+     "rawBpsP95": 6108,
+     "rawBpsMax": 6108,
+     "wireBpsMean": 6488,
+     "wireSampled": 4,
+     "msgsPerSecMean": 12.267,
+     "subTypesBps": {
+      "snapshot": 15053,
+      "shipSync": 897,
+      "projectileHit": 830,
+      "damage": 678,
+      "shipHps": 665,
+      "partDestroyed": 310,
+      "effect": 289,
+      "contact": 212,
+      "profile": 165,
+      "hits": 132
+     },
+     "debrisBps": {
+      "shipSync+re": 103,
+      "debrisSplit": 38,
+      "partDestroyed": 10,
+      "hpCheck": 2,
+      "snapshot": 0
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 42.283,
+     "bps": 502
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 24.972
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 1201,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 22819,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 7851,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 8569,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "other": {
+      "checked": 8011,
+      "off": 0,
+      "offNoKf": 0
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 31871,
+    "otherDisagree": 0,
+    "otherChecked": 16580,
+    "debrisOffAt": [],
+    "debrisDisagree": 0,
+    "debrisOff": 0,
+    "debrisChecked": 8569,
+    "keyframeCorrectionsPerSecPerProbe": 0.133,
+    "correctionsByClass": {
+     "player": {
+      "n": 8,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 0.133,
+    "server": {
+     "ownChecks": {
+      "checks": 547,
+      "agreed": 547,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 2468,
+      "failed": {},
+      "rows": 5934,
+      "stateless": 10010,
+      "unworkable": 0
+     },
+     "own": {
+      "causes": 560,
+      "pull": 0,
+      "contact": 558,
+      "contactState": 139,
+      "rebuild": 2,
+      "cargo": 0,
+      "keyframes": 8,
+      "exc": 86,
+      "why": {
+       "start": 4,
+       "unexplained": 3,
+       "unexplained, with causes": 1
+      }
+     },
+     "hits": {
+      "hits": 486,
+      "records": 916,
+      "legacy": 1032,
+      "d": 76,
+      "s": 0,
+      "i": 0,
+      "checks": 36,
+      "why": {
+       "rebuilt": 1012,
+       "gun": 4,
+       "view": 16
+      },
+      "own": 476,
+      "told": 440,
+      "reports": 186,
+      "fixes": 0,
+      "fixHits": 0,
+      "toldWhy": {
+       "synced": 504,
+       "keyframed": 396,
+       "curve": 4,
+       "oldWay": 20,
+       "debris": 536
+      }
+     },
+     "reasons": {
+      "Player:pos": 0,
+      "Player:caused": 153,
+      "Player:caused:pos": 0,
+      "rebuild": 2
+     },
+     "bodies": {
+      "net": {
+       "decisions": 55,
+       "rows": 171,
+       "syncs": 6,
+       "offs": 6,
+       "targetKeyed": 0,
+       "checks": 107,
+       "agreed": 107,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 10113,
+       "keyframes": 6,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 40.492,
+    "server": {
+     "rounds": 300,
+     "drops": 12,
+     "dropShips": 52,
+     "entries": 58,
+     "offers": 5,
+     "logs": 1,
+     "logShips": 1,
+     "logBytes": 18,
+     "logEvents": 2,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 3,
+     "refusedNone": 1,
+     "savedBytes": 22
+    },
+    "probes": {
+     "drops": 2,
+     "keptShips": 2,
+     "offers": 2,
+     "answered": 2,
+     "logs": 1,
+     "restored": 1,
+     "replayTicks": 195,
+     "forgotten": 1,
+     "missing": 0
+    },
+    "dropsPerSec": 0.8,
+    "entriesPerSec": 3.867,
+    "offersPerSec": 0.333,
+    "logsPerSec": 0.067,
+    "logShipsPerSec": 0.067,
+    "refused": 4
+   },
+   "probeClientMsPerTick": 0.551,
+   "probeDebrisMsPerTick": 0.012,
+   "wallSeconds": 5.889,
+   "ticks": 900
+  },
+  {
+   "layout": "ball",
+   "n": 50,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 50,
+    "hostiles": 20,
+    "boss": false,
+    "ships": 143
+   },
+   "timing": {
+    "tickMeanMs": 4.201,
+    "tickP95Ms": 10.441,
+    "tickMaxMs": 25.472,
+    "budgetPct": 25.206,
+    "snapshotsMsPerTick": 1.837,
+    "replicationMsPerTick": 0.159,
+    "encodeSendMsPerTick": 0.537,
+    "rebuildMsPerTick": 0.211,
+    "rebuildsPerSec": 81.4,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.022,
+    "debrisMean": 22.137,
+    "debrisMax": 33,
+    "deflateMsPerTickEst": 0.011
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 46,
+     "rawBpsMean": 20294,
+     "rawBpsP95": 21080,
+     "rawBpsMax": 21458,
+     "wireBpsMean": 21087,
+     "wireSampled": 4,
+     "msgsPerSecMean": 13.091,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 17603,
+     "rawBpsP95": 17908,
+     "rawBpsMax": 17908,
+     "wireBpsMean": 18447,
+     "wireSampled": 4,
+     "msgsPerSecMean": 12.783,
+     "subTypesBps": {
+      "snapshot": 40896,
+      "shipSync": 4517,
+      "projectileHit": 3437,
+      "damage": 3093,
+      "partDestroyed": 1705,
+      "shipHps": 1439,
+      "hits": 825,
+      "detonation": 591,
+      "contact": 542,
+      "profile": 369
+     },
+     "debrisBps": {
+      "shipSync+re": 347,
+      "debrisSplit": 189,
+      "partDestroyed": 83,
+      "snapshot": 29,
+      "shipSync+bp": 13,
+      "hpCheck": 2
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 54.067,
+     "bps": 671
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 25.667
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 1203,
+      "off": 7,
+      "offNoKf": 7
+     },
+     "player": {
+      "checked": 58947,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 19137,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 21460,
+      "off": 27,
+      "offNoKf": 27
+     },
+     "other": {
+      "checked": 8255,
+      "off": 0,
+      "offNoKf": 0
+     }
+    },
+    "disagreeNoKeyframe": 7,
+    "checked": 79287,
+    "otherDisagree": 27,
+    "otherChecked": 29715,
+    "debrisOffAt": [
+     {
+      "id": 5661,
+      "tick": 450,
+      "d": [
+       -20.15,
+       1.01,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 445,
+      "aloof": false
+     },
+     {
+      "id": 5324,
+      "tick": 492,
+      "d": [
+       1.83,
+       5.69,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 489,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 819,
+      "d": [
+       5.16,
+       -5.85,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 822,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 825,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1143,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1146,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     },
+     {
+      "id": 4672,
+      "tick": 318,
+      "d": [
+       7.4,
+       9.44,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 312,
+      "aloof": false
+     },
+     {
+      "id": 5661,
+      "tick": 450,
+      "d": [
+       -20.15,
+       1.01,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 445,
+      "aloof": false
+     },
+     {
+      "id": 5324,
+      "tick": 492,
+      "d": [
+       1.83,
+       5.69,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 489,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 819,
+      "d": [
+       5.16,
+       -5.85,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 822,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1143,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1146,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     },
+     {
+      "id": 5661,
+      "tick": 450,
+      "d": [
+       -20.15,
+       1.01,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 445,
+      "aloof": false
+     },
+     {
+      "id": 5324,
+      "tick": 492,
+      "d": [
+       1.83,
+       5.69,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 489,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 819,
+      "d": [
+       5.16,
+       -5.85,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 822,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 825,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1143,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1146,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     },
+     {
+      "id": 5661,
+      "tick": 450,
+      "d": [
+       -20.15,
+       1.01,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 445,
+      "aloof": false
+     },
+     {
+      "id": 5324,
+      "tick": 492,
+      "d": [
+       1.83,
+       5.69,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 489,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 819,
+      "d": [
+       5.16,
+       -5.85,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 822,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4640,
+      "tick": 825,
+      "d": [
+       2.57,
+       -9.1,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 817,
+      "aloof": false
+     },
+     {
+      "id": 4345,
+      "tick": 1143,
+      "d": [
+       -11.36,
+       3.88,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1139,
+      "aloof": false
+     }
+    ],
+    "debrisDisagree": 27,
+    "debrisOff": 27,
+    "debrisChecked": 21460,
+    "keyframeCorrectionsPerSecPerProbe": 4.483,
+    "correctionsByClass": {
+     "ai": {
+      "n": 146,
+      "same": 75
+     },
+     "player": {
+      "n": 84,
+      "same": 1
+     },
+     "other": {
+      "n": 14,
+      "same": 6
+     },
+     "self": {
+      "n": 1,
+      "same": 1
+     },
+     "debris": {
+      "n": 24,
+      "same": 24
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 2.067,
+    "server": {
+     "ownChecks": {
+      "checks": 616,
+      "agreed": 615,
+      "bodyOff": 1,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 6426,
+      "failed": {},
+      "rows": 14375,
+      "stateless": 23448,
+      "unworkable": 12
+     },
+     "own": {
+      "causes": 568,
+      "pull": 0,
+      "contact": 559,
+      "contactState": 16,
+      "rebuild": 5,
+      "cargo": 4,
+      "keyframes": 9,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 3,
+       "unexplained, with causes": 1,
+       "contact: other not had": 1
+      }
+     },
+     "hits": {
+      "hits": 2230,
+      "records": 3381,
+      "legacy": 5527,
+      "d": 170,
+      "s": 32,
+      "i": 0,
+      "checks": 94,
+      "why": {
+       "rebuilt": 5276,
+       "owner": 52,
+       "gun": 92,
+       "view": 78,
+       "shell": 29
+      },
+      "own": 505,
+      "told": 2876,
+      "reports": 592,
+      "fixes": 2,
+      "fixHits": 26,
+      "toldWhy": {
+       "synced": 740,
+       "keyframed": 2138,
+       "self": 3,
+       "oldWay": 25,
+       "debris": 331,
+       "curve": 19,
+       "strict": 5109
+      }
+     },
+     "reasons": {
+      "Player:caused": 188,
+      "Player:pos": 0,
+      "Player:caused:pos": 0,
+      "rebuild": 9
+     },
+     "bodies": {
+      "net": {
+       "decisions": 1034,
+       "rows": 4020,
+       "syncs": 120,
+       "offs": 0,
+       "targetKeyed": 173,
+       "checks": 120,
+       "agreed": 120,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 17498,
+       "keyframes": 266,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 90.9,
+    "server": {
+     "rounds": 300,
+     "drops": 19,
+     "dropShips": 59,
+     "entries": 95,
+     "offers": 3,
+     "logs": 0,
+     "logShips": 0,
+     "logBytes": 0,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 3,
+     "refusedNone": 0,
+     "savedBytes": 0
+    },
+    "probes": {
+     "drops": 0,
+     "keptShips": 0,
+     "offers": 0,
+     "answered": 0,
+     "logs": 0,
+     "restored": 0,
+     "replayTicks": 0,
+     "forgotten": 0,
+     "missing": 0
+    },
+    "dropsPerSec": 1.267,
+    "entriesPerSec": 6.333,
+    "offersPerSec": 0.2,
+    "logsPerSec": 0,
+    "logShipsPerSec": 0,
+    "refused": 3
+   },
+   "probeClientMsPerTick": 0.915,
+   "probeDebrisMsPerTick": 0.027,
+   "wallSeconds": 11.586,
+   "ticks": 900
+  },
+  {
+   "layout": "ball",
+   "n": 100,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 100,
+    "hostiles": 14,
+    "boss": false,
+    "ships": 180
+   },
+   "timing": {
+    "tickMeanMs": 9.258,
+    "tickP95Ms": 24.518,
+    "tickMaxMs": 47.191,
+    "budgetPct": 55.546,
+    "snapshotsMsPerTick": 4.358,
+    "replicationMsPerTick": 0.439,
+    "encodeSendMsPerTick": 1.475,
+    "rebuildMsPerTick": 0.21,
+    "rebuildsPerSec": 89.667,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.035,
+    "debrisMean": 37.191,
+    "debrisMax": 57,
+    "deflateMsPerTickEst": 0.024
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 96,
+     "rawBpsMean": 32729,
+     "rawBpsP95": 33420,
+     "rawBpsMax": 34542,
+     "wireBpsMean": 33685,
+     "wireSampled": 4,
+     "msgsPerSecMean": 14.438,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 26296,
+     "rawBpsP95": 26915,
+     "rawBpsMax": 26915,
+     "wireBpsMean": 27214,
+     "wireSampled": 4,
+     "msgsPerSecMean": 13.9,
+     "subTypesBps": {
+      "snapshot": 69585,
+      "shipSync": 4812,
+      "projectileHit": 3741,
+      "damage": 3670,
+      "partDestroyed": 2229,
+      "contact": 2052,
+      "shipHps": 1591,
+      "detonation": 1037,
+      "hits": 754,
+      "profile": 551
+     },
+     "debrisBps": {
+      "shipSync+re": 505,
+      "debrisSplit": 283,
+      "partDestroyed": 52,
+      "shipSync+bp": 14,
+      "snapshot": 11,
+      "hpCheck": 0
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 45.917,
+     "bps": 584
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 29.167
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 1200,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 118800,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 16771,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 39384,
+      "off": 21,
+      "offNoKf": 21
+     },
+     "other": {
+      "checked": 8282,
+      "off": 9,
+      "offNoKf": 9
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 136771,
+    "otherDisagree": 30,
+    "otherChecked": 47666,
+    "debrisOffAt": [
+     {
+      "id": 5774,
+      "tick": 348,
+      "d": [
+       0.57,
+       -3.35,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 344,
+      "aloof": false
+     },
+     {
+      "id": 5524,
+      "tick": 354,
+      "d": [
+       -10.03,
+       -6.59,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 346,
+      "aloof": false
+     },
+     {
+      "id": 5691,
+      "tick": 684,
+      "d": [
+       -3.15,
+       -6.09,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 681,
+      "aloof": false
+     },
+     {
+      "id": 4757,
+      "tick": 816,
+      "d": [
+       7.7,
+       9.21,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 811,
+      "aloof": false
+     },
+     {
+      "id": 4360,
+      "tick": 918,
+      "d": [
+       -3.93,
+       -11.15,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 913,
+      "aloof": false
+     },
+     {
+      "id": 5774,
+      "tick": 348,
+      "d": [
+       0.57,
+       -3.35,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 344,
+      "aloof": false
+     },
+     {
+      "id": 5774,
+      "tick": 351,
+      "d": [
+       0.57,
+       -3.35,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 344,
+      "aloof": false
+     },
+     {
+      "id": 5852,
+      "tick": 417,
+      "d": [
+       -2.19,
+       -2.6,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 411,
+      "aloof": false
+     },
+     {
+      "id": 5691,
+      "tick": 684,
+      "d": [
+       -3.15,
+       -6.09,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 681,
+      "aloof": false
+     },
+     {
+      "id": 4757,
+      "tick": 816,
+      "d": [
+       7.7,
+       9.21,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 811,
+      "aloof": false
+     },
+     {
+      "id": 4360,
+      "tick": 918,
+      "d": [
+       -3.93,
+       -11.15,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 913,
+      "aloof": false
+     },
+     {
+      "id": 5774,
+      "tick": 348,
+      "d": [
+       0.57,
+       -3.35,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 344,
+      "aloof": false
+     },
+     {
+      "id": 5852,
+      "tick": 417,
+      "d": [
+       -2.19,
+       -2.6,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 411,
+      "aloof": false
+     },
+     {
+      "id": 5691,
+      "tick": 684,
+      "d": [
+       -3.15,
+       -6.09,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 681,
+      "aloof": false
+     },
+     {
+      "id": 4757,
+      "tick": 816,
+      "d": [
+       7.7,
+       9.21,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 811,
+      "aloof": false
+     },
+     {
+      "id": 4360,
+      "tick": 918,
+      "d": [
+       -3.93,
+       -11.15,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 913,
+      "aloof": false
+     },
+     {
+      "id": 5774,
+      "tick": 348,
+      "d": [
+       0.57,
+       -3.35,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 344,
+      "aloof": false
+     },
+     {
+      "id": 5852,
+      "tick": 417,
+      "d": [
+       -2.19,
+       -2.6,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 411,
+      "aloof": false
+     },
+     {
+      "id": 5691,
+      "tick": 684,
+      "d": [
+       -3.15,
+       -6.09,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 681,
+      "aloof": false
+     },
+     {
+      "id": 4757,
+      "tick": 816,
+      "d": [
+       7.7,
+       9.21,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 811,
+      "aloof": false
+     },
+     {
+      "id": 4360,
+      "tick": 918,
+      "d": [
+       -3.93,
+       -11.15,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 913,
+      "aloof": false
+     }
+    ],
+    "debrisDisagree": 21,
+    "debrisOff": 21,
+    "debrisChecked": 39384,
+    "keyframeCorrectionsPerSecPerProbe": 3.45,
+    "correctionsByClass": {
+     "player": {
+      "n": 45,
+      "same": 11
+     },
+     "ai": {
+      "n": 153,
+      "same": 38
+     },
+     "other": {
+      "n": 5,
+      "same": 0
+     },
+     "debris": {
+      "n": 4,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 2.217,
+    "server": {
+     "ownChecks": {
+      "checks": 629,
+      "agreed": 629,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 22879,
+      "failed": {},
+      "rows": 56167,
+      "stateless": 103773,
+      "unworkable": 12
+     },
+     "own": {
+      "causes": 787,
+      "pull": 0,
+      "contact": 780,
+      "contactState": 116,
+      "rebuild": 0,
+      "cargo": 7,
+      "keyframes": 9,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 3,
+       "unexplained, with causes": 1,
+       "contact: other not had": 1
+      }
+     },
+     "hits": {
+      "hits": 2385,
+      "records": 3050,
+      "legacy": 6514,
+      "d": 218,
+      "s": 0,
+      "i": 0,
+      "checks": 84,
+      "why": {
+       "rebuilt": 6308,
+       "gun": 76,
+       "view": 92,
+       "owner": 36,
+       "shell": 2
+      },
+      "own": 413,
+      "told": 2637,
+      "reports": 553,
+      "fixes": 4,
+      "fixHits": 50,
+      "toldWhy": {
+       "synced": 808,
+       "keyframed": 3389,
+       "debris": 866,
+       "self": 3,
+       "oldWay": 82,
+       "curve": 28,
+       "strict": 3916
+      }
+     },
+     "reasons": {
+      "Player:caused": 261,
+      "Player:pos": 0,
+      "Player:caused:pos": 0,
+      "rebuild": 8
+     },
+     "bodies": {
+      "net": {
+       "decisions": 859,
+       "rows": 3328,
+       "syncs": 132,
+       "offs": 0,
+       "targetKeyed": 208,
+       "checks": 120,
+       "agreed": 120,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 13523,
+       "keyframes": 284,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 154.883,
+    "server": {
+     "rounds": 300,
+     "drops": 50,
+     "dropShips": 110,
+     "entries": 244,
+     "offers": 20,
+     "logs": 0,
+     "logShips": 0,
+     "logBytes": 0,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 17,
+     "refusedNone": 0,
+     "savedBytes": 0
+    },
+    "probes": {
+     "drops": 0,
+     "keptShips": 0,
+     "offers": 0,
+     "answered": 0,
+     "logs": 0,
+     "restored": 0,
+     "replayTicks": 0,
+     "forgotten": 0,
+     "missing": 0
+    },
+    "dropsPerSec": 3.333,
+    "entriesPerSec": 16.267,
+    "offersPerSec": 1.333,
+    "logsPerSec": 0,
+    "logShipsPerSec": 0,
+    "refused": 17
+   },
+   "probeClientMsPerTick": 1.901,
+   "probeDebrisMsPerTick": 0.048,
+   "wallSeconds": 24.647,
+   "ticks": 900
+  },
+  {
+   "layout": "ball",
+   "n": 300,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 299,
+    "hostiles": 12,
+    "boss": false,
+    "ships": 377
+   },
+   "timing": {
+    "tickMeanMs": 50.479,
+    "tickP95Ms": 130.217,
+    "tickMaxMs": 167.134,
+    "budgetPct": 302.875,
+    "snapshotsMsPerTick": 22.08,
+    "replicationMsPerTick": 2.88,
+    "encodeSendMsPerTick": 7.944,
+    "rebuildMsPerTick": 0.262,
+    "rebuildsPerSec": 80.267,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.044,
+    "debrisMean": 32.251,
+    "debrisMax": 49,
+    "deflateMsPerTickEst": 0.082
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 296,
+     "rawBpsMean": 91229,
+     "rawBpsP95": 92822,
+     "rawBpsMax": 93778,
+     "wireBpsMean": 92688,
+     "wireSampled": 4,
+     "msgsPerSecMean": 16.153,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 66822,
+     "rawBpsP95": 68668,
+     "rawBpsMax": 68668,
+     "wireBpsMean": 67846,
+     "wireSampled": 4,
+     "msgsPerSecMean": 15.517,
+     "subTypesBps": {
+      "snapshot": 233215,
+      "contact": 15604,
+      "shipSync": 5116,
+      "damage": 4175,
+      "projectileHit": 3570,
+      "shipHps": 2901,
+      "partDestroyed": 1851,
+      "detonation": 1025,
+      "hits": 721,
+      "effect": 605
+     },
+     "debrisBps": {
+      "shipSync+re": 394,
+      "debrisSplit": 177,
+      "partDestroyed": 41,
+      "shipSync+bp": 38,
+      "snapshot": 16,
+      "shipSync+new": 9,
+      "hpCheck": 1
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 35.583,
+     "bps": 470
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 31.389
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 1201,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 357898,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 8205,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 0,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 33681,
+      "off": 17,
+      "offNoKf": 17
+     },
+     "other": {
+      "checked": 8762,
+      "off": 6,
+      "offNoKf": 6
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 367304,
+    "otherDisagree": 23,
+    "otherChecked": 42443,
+    "debrisOffAt": [
+     {
+      "id": 4579,
+      "tick": 324,
+      "d": [
+       0.35,
+       0.84,
+       0.067,
+       0.162
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 321,
+      "aloof": false
+     },
+     {
+      "id": 4579,
+      "tick": 327,
+      "d": [
+       0.55,
+       1.31,
+       0.064,
+       0.155
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 321,
+      "aloof": false
+     },
+     {
+      "id": 5352,
+      "tick": 849,
+      "d": [
+       -18.41,
+       -6.55,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 843,
+      "aloof": false
+     },
+     {
+      "id": 7438,
+      "tick": 1035,
+      "d": [
+       -10.6,
+       1.62,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1030,
+      "aloof": false
+     },
+     {
+      "id": 5566,
+      "tick": 1038,
+      "d": [
+       -1.49,
+       3.06,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1034,
+      "aloof": false
+     },
+     {
+      "id": 4579,
+      "tick": 324,
+      "d": [
+       0.35,
+       0.84,
+       0.067,
+       0.162
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 321,
+      "aloof": false
+     },
+     {
+      "id": 4579,
+      "tick": 327,
+      "d": [
+       0.55,
+       1.31,
+       0.064,
+       0.155
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 321,
+      "aloof": false
+     },
+     {
+      "id": 6323,
+      "tick": 852,
+      "d": [
+       -18.28,
+       -6.89,
+       0.023,
+       -0.066
+      ],
+      "runs": false,
+      "live": false,
+      "told": true,
+      "born": 847,
+      "aloof": false
+     },
+     {
+      "id": 7438,
+      "tick": 1035,
+      "d": [
+       -10.6,
+       1.62,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1030,
+      "aloof": false
+     },
+     {
+      "id": 4579,
+      "tick": 324,
+      "d": [
+       0.35,
+       0.84,
+       0.067,
+       0.162
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 321,
+      "aloof": false
+     },
+     {
+      "id": 5352,
+      "tick": 849,
+      "d": [
+       -18.41,
+       -6.55,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 843,
+      "aloof": false
+     },
+     {
+      "id": 7438,
+      "tick": 1035,
+      "d": [
+       -10.6,
+       1.62,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1030,
+      "aloof": false
+     },
+     {
+      "id": 5566,
+      "tick": 1038,
+      "d": [
+       -1.49,
+       3.06,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1034,
+      "aloof": false
+     },
+     {
+      "id": 4579,
+      "tick": 324,
+      "d": [
+       0.35,
+       0.84,
+       0.067,
+       0.162
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 321,
+      "aloof": false
+     },
+     {
+      "id": 6323,
+      "tick": 852,
+      "d": [
+       -18.28,
+       -6.89,
+       0.023,
+       -0.066
+      ],
+      "runs": false,
+      "live": false,
+      "told": true,
+      "born": 847,
+      "aloof": false
+     },
+     {
+      "id": 7438,
+      "tick": 1035,
+      "d": [
+       -10.6,
+       1.62,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1030,
+      "aloof": false
+     },
+     {
+      "id": 5566,
+      "tick": 1038,
+      "d": [
+       -1.49,
+       3.06,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 1034,
+      "aloof": false
+     }
+    ],
+    "debrisDisagree": 17,
+    "debrisOff": 17,
+    "debrisChecked": 33681,
+    "keyframeCorrectionsPerSecPerProbe": 2.967,
+    "correctionsByClass": {
+     "other": {
+      "n": 12,
+      "same": 4
+     },
+     "ai": {
+      "n": 97,
+      "same": 24
+     },
+     "debris": {
+      "n": 4,
+      "same": 0
+     },
+     "player": {
+      "n": 64,
+      "same": 4
+     },
+     "self": {
+      "n": 1,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 2.833,
+    "server": {
+     "ownChecks": {
+      "checks": 854,
+      "agreed": 842,
+      "bodyOff": 4,
+      "hpOff": 0,
+      "stale": 8,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 152337,
+      "failed": {},
+      "rows": 500560,
+      "stateless": 980263,
+      "unworkable": 48
+     },
+     "own": {
+      "causes": 3390,
+      "pull": 0,
+      "contact": 3390,
+      "contactState": 1618,
+      "rebuild": 0,
+      "cargo": 0,
+      "keyframes": 13,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained, with causes": 4,
+       "contact: other not had": 5
+      }
+     },
+     "hits": {
+      "hits": 2265,
+      "records": 2752,
+      "legacy": 6332,
+      "d": 162,
+      "s": 32,
+      "i": 0,
+      "checks": 86,
+      "why": {
+       "rebuilt": 6136,
+       "view": 134,
+       "gun": 28,
+       "shell": 2,
+       "owner": 32
+      },
+      "own": 169,
+      "told": 2583,
+      "reports": 523,
+      "fixes": 4,
+      "fixHits": 57,
+      "toldWhy": {
+       "keyframed": 4276,
+       "synced": 304,
+       "debris": 300,
+       "curve": 6,
+       "oldWay": 17,
+       "strict": 4005
+      }
+     },
+     "reasons": {
+      "Player:caused": 536,
+      "Player:pos": 0,
+      "Player:caused:pos": 0,
+      "rebuild": 11
+     },
+     "bodies": {
+      "net": {
+       "decisions": 493,
+       "rows": 1899,
+       "syncs": 158,
+       "offs": 18,
+       "targetKeyed": 136,
+       "checks": 116,
+       "agreed": 116,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 9227,
+       "keyframes": 266,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 341.975,
+    "server": {
+     "rounds": 300,
+     "drops": 126,
+     "dropShips": 411,
+     "entries": 976,
+     "offers": 122,
+     "logs": 2,
+     "logShips": 2,
+     "logBytes": 36,
+     "logEvents": 4,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 72,
+     "refusedNone": 0,
+     "savedBytes": 44
+    },
+    "probes": {
+     "drops": 2,
+     "keptShips": 2,
+     "offers": 2,
+     "answered": 2,
+     "logs": 2,
+     "restored": 2,
+     "replayTicks": 210,
+     "forgotten": 0,
+     "missing": 0
+    },
+    "dropsPerSec": 8.4,
+    "entriesPerSec": 65.067,
+    "offersPerSec": 8.133,
+    "logsPerSec": 0.133,
+    "logShipsPerSec": 0.133,
+    "refused": 72
+   },
+   "probeClientMsPerTick": 15.143,
+   "probeDebrisMsPerTick": 0.047,
+   "wallSeconds": 135.194,
+   "ticks": 900
+  },
+  {
+   "layout": "boss",
+   "n": 20,
+   "secs": 15,
+   "bulk": "focus",
+   "probes": 4,
+   "caps": 245759,
+   "lat": 3,
+   "scene": {
+    "alive": 14,
+    "hostiles": 10,
+    "boss": true,
+    "ships": 93
+   },
+   "timing": {
+    "tickMeanMs": 2.165,
+    "tickP95Ms": 6.774,
+    "tickMaxMs": 19.45,
+    "budgetPct": 12.992,
+    "snapshotsMsPerTick": 0.43,
+    "replicationMsPerTick": 0.063,
+    "encodeSendMsPerTick": 0.16,
+    "rebuildMsPerTick": 0.448,
+    "rebuildsPerSec": 25.467,
+    "rebuildRepeats": 0,
+    "debrisStepMsPerTick": 0.02,
+    "debrisMean": 14.082,
+    "debrisMax": 23,
+    "deflateMsPerTickEst": 0.004
+   },
+   "bytes": {
+    "legacyOrBulk": {
+     "kind": "focus",
+     "clients": 16,
+     "rawBpsMean": 13433,
+     "rawBpsP95": 15976,
+     "rawBpsMax": 15976,
+     "wireBpsMean": 13310,
+     "wireSampled": 4,
+     "msgsPerSecMean": 14.529,
+     "subTypesBps": {}
+    },
+    "capable": {
+     "clients": 4,
+     "rawBpsMean": 7452,
+     "rawBpsP95": 11087,
+     "rawBpsMax": 11087,
+     "wireBpsMean": 8135,
+     "wireSampled": 4,
+     "msgsPerSecMean": 10.35,
+     "subTypesBps": {
+      "snapshot": 19390,
+      "damage": 1930,
+      "shipHps": 1754,
+      "shipSync": 1644,
+      "projectileHit": 1565,
+      "detonation": 749,
+      "hits": 676,
+      "partDestroyed": 645,
+      "contact": 619,
+      "ignite": 389
+     },
+     "debrisBps": {
+      "shipSync+re": 155,
+      "debrisSplit": 92,
+      "partDestroyed": 83,
+      "shipSync+bp": 24,
+      "snapshot": 13,
+      "hpCheck": 1
+     }
+    },
+    "capableUp": {
+     "msgsPerSec": 57.033,
+     "bps": 665
+    }
+   },
+   "messages": {
+    "capableFramesPerSec": 17.347
+   },
+   "agreement": {
+    "byKind": {
+     "self": {
+      "checked": 757,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "player": {
+      "checked": 12127,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "ai": {
+      "checked": 3725,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "boss": {
+      "checked": 757,
+      "off": 0,
+      "offNoKf": 0
+     },
+     "debris": {
+      "checked": 6359,
+      "off": 8,
+      "offNoKf": 8
+     },
+     "other": {
+      "checked": 4967,
+      "off": 2,
+      "offNoKf": 2
+     }
+    },
+    "disagreeNoKeyframe": 0,
+    "checked": 17366,
+    "otherDisagree": 10,
+    "otherChecked": 11326,
+    "debrisOffAt": [
+     {
+      "id": 4912,
+      "tick": 657,
+      "d": [
+       -6.83,
+       -4.17,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 649,
+      "aloof": false
+     },
+     {
+      "id": 4933,
+      "tick": 669,
+      "d": [
+       1.71,
+       30.95,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 664,
+      "aloof": false
+     },
+     {
+      "id": 4955,
+      "tick": 669,
+      "d": [
+       16.03,
+       -14.62,
+       0.29,
+       0.284
+      ],
+      "runs": false,
+      "live": false,
+      "told": true,
+      "born": 666,
+      "aloof": false
+     },
+     {
+      "id": 4933,
+      "tick": 669,
+      "d": [
+       1.71,
+       30.95,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 664,
+      "aloof": false
+     },
+     {
+      "id": 4955,
+      "tick": 669,
+      "d": [
+       16.03,
+       -14.62,
+       0.29,
+       0.284
+      ],
+      "runs": false,
+      "live": false,
+      "told": true,
+      "born": 666,
+      "aloof": false
+     },
+     {
+      "id": 4933,
+      "tick": 672,
+      "d": [
+       -7.28,
+       43.99,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 664,
+      "aloof": false
+     },
+     {
+      "id": 4955,
+      "tick": 672,
+      "d": [
+       16.88,
+       -13.79,
+       0.277,
+       0.271
+      ],
+      "runs": false,
+      "live": false,
+      "told": true,
+      "born": 666,
+      "aloof": false
+     },
+     {
+      "id": 5010,
+      "tick": 708,
+      "d": [
+       -9.6,
+       1.39,
+       0,
+       0
+      ],
+      "runs": true,
+      "live": false,
+      "told": true,
+      "born": 702,
+      "aloof": false
+     }
+    ],
+    "debrisDisagree": 8,
+    "debrisOff": 8,
+    "debrisChecked": 6359,
+    "keyframeCorrectionsPerSecPerProbe": 0.967,
+    "correctionsByClass": {
+     "player": {
+      "n": 18,
+      "same": 0
+     },
+     "other": {
+      "n": 10,
+      "same": 2
+     },
+     "boss": {
+      "n": 28,
+      "same": 0
+     },
+     "debris": {
+      "n": 2,
+      "same": 0
+     }
+    },
+    "keyframeEntriesPerSecPerProbe": 0.05,
+    "server": {
+     "ownChecks": {
+      "checks": 537,
+      "agreed": 537,
+      "bodyOff": 0,
+      "hpOff": 0,
+      "stale": 0,
+      "unknown": 0
+     },
+     "causes": {
+      "worked": 6930,
+      "failed": {},
+      "rows": 17120,
+      "stateless": 20114,
+      "unworkable": 0
+     },
+     "own": {
+      "causes": 1653,
+      "pull": 249,
+      "contact": 1393,
+      "contactState": 832,
+      "rebuild": 11,
+      "cargo": 0,
+      "keyframes": 8,
+      "exc": 16,
+      "why": {
+       "start": 4,
+       "unexplained": 4
+      }
+     },
+     "hits": {
+      "hits": 1487,
+      "records": 3397,
+      "legacy": 640,
+      "d": 457,
+      "s": 0,
+      "i": 0,
+      "checks": 25,
+      "why": {
+       "rebuilt": 561,
+       "shell": 53,
+       "view": 6,
+       "gun": 20
+      },
+      "own": 284,
+      "told": 3113,
+      "reports": 206,
+      "fixes": 0,
+      "fixHits": 0,
+      "toldWhy": {
+       "body": 408,
+       "keyframed": 3149,
+       "oldWay": 75,
+       "self": 4,
+       "debris": 42,
+       "synced": 46
+      }
+     },
+     "reasons": {
+      "Player:pos": 0,
+      "Player:caused:pos": 0,
+      "Pilotless:caused:pos": 67,
+      "Pilotless:pos": 17,
+      "rebuild": 12,
+      "Player:caused": 392
+     },
+     "bodies": {
+      "net": {
+       "decisions": 32,
+       "rows": 86,
+       "syncs": 11,
+       "offs": 19,
+       "targetKeyed": 3,
+       "checks": 76,
+       "agreed": 76,
+       "off": 0,
+       "stale": 0,
+       "unknown": 0
+      },
+      "rep": {
+       "stepped": 5656,
+       "keyframes": 14,
+       "why": {}
+      }
+     }
+    }
+   },
+   "focus": {
+    "heldMean": 36.158,
+    "server": {
+     "rounds": 300,
+     "drops": 15,
+     "dropShips": 23,
+     "entries": 67,
+     "offers": 10,
+     "logs": 3,
+     "logShips": 3,
+     "logBytes": 24,
+     "logEvents": 0,
+     "refusedHash": 0,
+     "refusedSize": 0,
+     "refusedLate": 7,
+     "refusedNone": 0,
+     "savedBytes": 96
+    },
+    "probes": {
+     "drops": 5,
+     "keptShips": 5,
+     "offers": 3,
+     "answered": 3,
+     "logs": 3,
+     "restored": 3,
+     "replayTicks": 123,
+     "forgotten": 0,
+     "missing": 0
+    },
+    "dropsPerSec": 1,
+    "entriesPerSec": 4.467,
+    "offersPerSec": 0.667,
+    "logsPerSec": 0.2,
+    "logShipsPerSec": 0.2,
+    "refused": 7
+   },
+   "probeClientMsPerTick": 0.766,
+   "probeDebrisMsPerTick": 0.01,
+   "wallSeconds": 7.528,
+   "ticks": 900
+  }
+ ]
+}

@@ -1,5 +1,5 @@
-// @ts-ignore - import assertion syntax varies across TS versions
-import sunShaderDefsJson from './sun-shader-defs.json';
+// @ts-ignore - import attribute syntax varies across TS versions
+import sunShaderDefsJson from './sun-shader-defs.json' with { type: 'json' };
 
 export interface ShaderParamDef {
   key: string;

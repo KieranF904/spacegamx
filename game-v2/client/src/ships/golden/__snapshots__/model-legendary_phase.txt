@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Phase Cannon
+Mk IV · Medium · Panel · 2 cells
+Hull · mass236 hp · 2.4
+Armour · build4 · 7.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage32/s · reach 3,300
+Hits withExotic · penetration 5
+Fire rate0.5/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 3 clear cells ahead
+Power draw14/s
+
+== partStats (stats rows) ==
+GradeMk IV · Medium
+Hits withExotic · penetration 4
+Power draw14
+Hull · mass236 hp · 2.4
+Armour · build4 · 7.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 236
+
+== familyLabel ==
+Legendary
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+The ghost round
+
+== keyStats ==
+32 dmg/s · reach 3,300 · cycle · draws 14
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 3 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 26","why":"Learned at level 26 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 26","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":31.818181818181817,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":31.818181818181817,"range":3300,"damageType":"exotic","pen":5,"draw":13.64}

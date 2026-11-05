@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Cinder Bloom
+Mk IV · Small · Square · 1 cell
+Hull · mass118 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage13/s · reach 3,240
+Hits withThermal · penetration 3.5
+Fire rate0.8/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+MountTurret, 360°
+FittingBolts on any side
+Power draw12/s
+
+== partStats (stats rows) ==
+GradeMk IV · Small
+Hits withThermal · penetration 4
+Power draw12
+Hull · mass118 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 118
+
+== familyLabel ==
+Legendary
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+The arsonist
+
+== keyStats ==
+13 dmg/s · reach 3,240 · cycle · draws 12
+
+== mountBadge ==
+TURRET 360°
+
+== mountingText ==
+Turret, 360°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 22","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":117.9,"mass":1.2,"firepower":13.333333333333334,"toughness":117.9,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":13.333333333333334,"range":3240,"damageType":"thermal","pen":3.5,"draw":11.67}

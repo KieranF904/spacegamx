@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Lance
+Mk IV · Medium · Panel · 2 cells
+Hull · mass210 hp · 2.4
+Armour · build4 · 7.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage210/s · reach 500
+Hits withThermal · penetration 5.5
+Beamheld while you fire · draws its power while it's on · winds up over 0.3s
+Modelbeam: Burns energy every second you hold it.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 4 clear cells ahead
+Power draw90/s
+
+== partStats (stats rows) ==
+GradeMk IV · Medium
+Hits withThermal · penetration 4
+Power draw90
+Hull · mass210 hp · 2.4
+Armour · build4 · 7.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 210
+
+== familyLabel ==
+Lances
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+the heaviest held beam at point blank; sputters short of power
+
+== keyStats ==
+210 dmg/s · reach 500 · held beam · winds up · draws 90
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 4 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 32","why":"Learned at level 32 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 32","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":209.60000000000002,"mass":2.4,"firepower":210,"toughness":209.60000000000002,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":210,"range":500,"damageType":"thermal","pen":5.5,"draw":90}

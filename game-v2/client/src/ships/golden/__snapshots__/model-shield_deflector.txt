@@ -1,0 +1,48 @@
+== partTip (tooltip) ==
+Deflector
+Mk I · Square · 1 cell
+Hull · mass56 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw16/s
+Shield40
+Refills8/s after 3 s unhit
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw16
+Shield40
+Hull · mass56 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 56
+
+== familyLabel ==
+Shields
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+soaks hits before the hull
+
+== keyStats ==
+shield 40 · refills 8/s after 3 s · draws 16
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 11","why":"Learned at level 11 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 11","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":56.4,"mass":1.4,"firepower":0,"toughness":56.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":16,"shield":40}

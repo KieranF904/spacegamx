@@ -1,6 +1,18 @@
 /**
- * Server Browser UI - Shows available servers after login
+ * Join screen - shown after sign-in. There is one main server, so it's a Join button for it, a short
+ * description of the game with a few photos, and the development news feed (join/news.json).
+ * The server is the one this page belongs to: the dev server on the dev client, the live server on the VPS.
+ * Signed-in pilots also get their inbox (join/InboxPanel.ts): a banner above everything for an unread admin
+ * message, a badge on the Join button, and the inbox below it.
  */
+
+import { LOBBY_URL } from '../network/lobby';
+import { lobbyInbox, type InboxApi } from '../network/inbox';
+import { InboxPanel, type InboxAccount } from './join/InboxPanel';
+import NEWS from './join/news.json';
+import sunRun from './join/sun-run.jpg';
+import planet from './join/planet.jpg';
+import boss from './join/boss.jpg';
 
 export interface ServerInfo {
   host: string;
@@ -13,32 +25,43 @@ export interface ServerInfo {
   ping?: number;
 }
 
+/** One development news item (newest first in news.json) */
+interface NewsItem { date: string; title: string; body: string }
+
+const PHOTOS = [
+  { src: sunRun, alt: 'A ship skimming a star' },
+  { src: planet, alt: 'A planet from orbit' },
+  { src: boss, alt: 'A boss fight' },
+];
+
 export class ServerBrowserUI {
   private container: HTMLElement;
   private panel: HTMLElement;
   private visible = false;
   private servers: ServerInfo[] = [];
   private loading = false;
-  private error = '';
-  private sortBy: 'ping' | 'name' = 'ping';
-  
-  // Server browser URL
-  private browserUrl = 'https://spacegame-v2.fly.dev';
-  
+
+  // Server browser URL (override with VITE_BROWSER_URL at build/dev time)
+  private browserUrl = LOBBY_URL;
+
+  /** The inbox (kept across renders: placed into its slots after each) */
+  readonly inbox: InboxPanel;
+
   // Callbacks
   public onServerSelect: ((server: ServerInfo) => void) | null = null;
   public onLogout: (() => void) | null = null;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, inboxApi: InboxApi = lobbyInbox) {
     this.container = container;
-    
-    // Create panel
+    this.inbox = new InboxPanel(inboxApi);
+    this.inbox.onCounts = () => this.showMailBadge();
+
     this.panel = document.createElement('div');
     this.panel.id = 'server-browser-panel';
     this.panel.className = 'ui-element';
     this.panel.style.display = 'none';
     container.appendChild(this.panel);
-    
+
     this.setupStyles();
     this.render();
   }
@@ -47,542 +70,193 @@ export class ServerBrowserUI {
     const style = document.createElement('style');
     style.textContent = `
       #server-browser-panel {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
         background: radial-gradient(ellipse at center, #001133 0%, #000011 100%);
-        z-index: 1900;
+        z-index: 1900; overflow-y: auto; padding: 24px 16px; box-sizing: border-box;
       }
-      
-      .browser-container {
-        width: 700px;
-        max-width: 95vw;
-        background: rgba(0, 20, 50, 0.95);
-        border: 2px solid #2266aa;
-        border-radius: 12px;
-        padding: 30px;
-        box-shadow: 0 0 50px rgba(0, 100, 200, 0.3);
+      .join-wrap { width: 780px; max-width: 100%; margin: auto; display: flex; flex-direction: column; gap: 14px; }
+      .join-box {
+        background: rgba(0, 20, 50, 0.95); border: 1px solid #2266aa; border-radius: 12px;
+        padding: 22px 24px; box-shadow: 0 0 40px rgba(0, 100, 200, 0.2); box-sizing: border-box;
       }
-      
-      .browser-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
+      .join-title { font-size: 30px; color: #88ccff; font-weight: bold; letter-spacing: 3px;
+        text-shadow: 0 0 20px rgba(100, 180, 255, 0.45); margin: 0 0 8px; }
+      .join-blurb { color: #9fb4cc; font-size: 14px; line-height: 1.55; margin: 0 0 16px; max-width: 60ch; }
+      .join-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+      .join-photos img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 6px;
+        border: 1px solid #234; display: block; }
+      .join-h { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #6f8fb5; margin: 20px 0 10px; }
+      .news { display: flex; flex-direction: column; gap: 12px; max-height: 260px; overflow-y: auto; padding-right: 4px; }
+      .news-item { border-left: 2px solid #2a5a8a; padding-left: 12px; }
+      .news-date { font-size: 11px; color: #6f8fb5; font-variant-numeric: tabular-nums; }
+      .news-title { color: #dde8f5; font-size: 15px; margin: 2px 0 4px; }
+      .news-body { color: #9fb4cc; font-size: 13px; line-height: 1.5; }
+      .news-empty { color: #6a7d96; font-size: 13px; }
+      .join-main-btn {
+        width: 100%; padding: 14px 16px 12px;
+        background: linear-gradient(180deg, #2a9a3a 0%, #17702a 100%);
+        border: 1px solid #4c4; border-radius: 8px; color: #fff; cursor: pointer;
+        font-size: 30px; font-weight: bold; letter-spacing: 3px; transition: background 0.2s, box-shadow 0.2s;
       }
-      
-      .browser-title {
-        font-size: 28px;
-        color: #88ccff;
-        text-shadow: 0 0 20px rgba(100, 180, 255, 0.5);
-        font-weight: bold;
-        letter-spacing: 2px;
-      }
-      
-      .browser-controls {
-        display: flex;
-        gap: 10px;
-      }
-      
-      .browser-btn {
-        padding: 8px 16px;
-        background: rgba(30, 60, 100, 0.8);
-        border: 1px solid #446;
-        border-radius: 6px;
-        color: #88aacc;
-        font-size: 13px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      
-      .browser-btn:hover {
-        background: rgba(40, 80, 130, 0.9);
-        border-color: #66aaff;
-        color: #aaccff;
-      }
-      
-      .browser-btn.active {
-        background: rgba(50, 100, 180, 0.8);
-        border-color: #88ccff;
-        color: #fff;
-      }
-      
-      .sort-controls {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 15px;
-      }
-      
-      .sort-btn {
-        padding: 6px 12px;
-        background: transparent;
-        border: 1px solid #335;
-        border-radius: 4px;
-        color: #668;
-        font-size: 12px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      
-      .sort-btn:hover {
-        border-color: #558;
-        color: #88aacc;
-      }
-      
-      .sort-btn.active {
-        border-color: #88ccff;
-        color: #88ccff;
-        background: rgba(50, 100, 180, 0.2);
-      }
-      
-      .server-list {
-        max-height: 400px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-      
-      .server-list::-webkit-scrollbar {
-        width: 8px;
-      }
-      
-      .server-list::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 4px;
-      }
-      
-      .server-list::-webkit-scrollbar-thumb {
-        background: #446;
-        border-radius: 4px;
-      }
-      
-      .server-card {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 20px;
-        background: rgba(20, 40, 70, 0.8);
-        border: 1px solid #335;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      
-      .server-card:hover {
-        background: rgba(30, 60, 100, 0.9);
-        border-color: #558;
-        transform: translateX(5px);
-      }
-      
-      .server-info {
-        flex: 1;
-      }
-      
-      .server-name {
-        font-size: 18px;
-        color: #fff;
-        margin-bottom: 4px;
-      }
-      
-      .server-meta {
-        display: flex;
-        gap: 12px;
-        font-size: 13px;
-        color: #668;
-      }
-      
-      .region-tag {
-        background: rgba(100, 150, 255, 0.2);
-        color: #88aacc;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        text-transform: uppercase;
-      }
-      
-      .server-stats {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-      }
-      
-      .server-players {
-        font-size: 16px;
-        color: #88ff88;
-      }
-      
-      .server-ping {
-        font-size: 14px;
-        padding: 4px 10px;
-        border-radius: 4px;
-        min-width: 60px;
-        text-align: center;
-      }
-      
-      .ping-good { background: rgba(80, 200, 80, 0.2); color: #88ff88; }
-      .ping-medium { background: rgba(200, 180, 80, 0.2); color: #ffdd88; }
-      .ping-bad { background: rgba(200, 80, 80, 0.2); color: #ff8888; }
-      
-      .join-btn {
-        padding: 10px 20px;
-        background: linear-gradient(180deg, #228822 0%, #116611 100%);
-        border: none;
-        border-radius: 6px;
-        color: #fff;
-        font-size: 14px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.2s;
-        margin-left: 15px;
-      }
-      
-      .join-btn:hover {
-        background: linear-gradient(180deg, #33aa33 0%, #228822 100%);
-        box-shadow: 0 0 15px rgba(80, 200, 80, 0.3);
-      }
-      
-      .browser-status {
-        text-align: center;
-        padding: 40px;
-        color: #668;
-        font-size: 14px;
-      }
-      
-      .browser-error {
-        text-align: center;
-        padding: 20px;
-        background: rgba(200, 50, 50, 0.2);
-        border: 1px solid #a44;
-        border-radius: 8px;
-        color: #ff6666;
-        font-size: 14px;
-        margin-bottom: 15px;
-      }
-      
-      .browser-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-top: 15px;
-        border-top: 1px solid #335;
-      }
-      
-      .logout-btn {
-        padding: 10px 20px;
-        background: transparent;
-        border: 1px solid #664444;
-        border-radius: 6px;
-        color: #aa6666;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      
-      .logout-btn:hover {
-        background: rgba(150, 50, 50, 0.2);
-        border-color: #aa6666;
-        color: #ff8888;
-      }
-      
-      .direct-connect {
-        display: flex;
-        gap: 10px;
-      }
-      
-      .direct-input {
-        padding: 10px 15px;
-        background: rgba(0, 30, 60, 0.8);
-        border: 1px solid #335;
-        border-radius: 6px;
-        color: #fff;
-        font-size: 14px;
-        width: 200px;
-      }
-      
-      .direct-input:focus {
-        border-color: #66aaff;
-        outline: none;
-      }
-      
-      .direct-btn {
-        padding: 10px 15px;
-        background: rgba(30, 60, 100, 0.8);
-        border: 1px solid #446;
-        border-radius: 6px;
-        color: #88aacc;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      
-      .direct-btn:hover {
-        background: rgba(40, 80, 130, 0.9);
-        border-color: #66aaff;
-      }
+      .join-main-btn:hover { background: linear-gradient(180deg, #36b347 0%, #208a33 100%); box-shadow: 0 0 18px rgba(80, 200, 80, 0.35); }
+      .join-main-btn:focus-visible { outline: 2px solid #aef; outline-offset: 2px; }
+      .join-main-btn:disabled { background: #233; border-color: #345; color: #678; cursor: default; box-shadow: none; }
+      .join-main-btn small { display: block; font-size: 13px; font-weight: normal; letter-spacing: 1px; opacity: 0.85; margin-top: 2px; }
+      .join-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .join-stats { display: flex; gap: 16px; font-size: 13px; color: #9fb4cc; }
+      .join-stats b { color: #88ff88; font-weight: normal; }
+      .ping-good { color: #88ff88; } .ping-medium { color: #ffdd88; } .ping-bad { color: #ff8888; }
+      .logout-btn { padding: 8px 16px; background: transparent; border: 1px solid #664444;
+        border-radius: 6px; color: #aa6666; font-size: 13px; cursor: pointer; }
+      .logout-btn:hover { background: rgba(150, 50, 50, 0.2); color: #ff8888; }
     `;
     document.head.appendChild(style);
   }
 
+  /** The server the Join button connects to: the one on this page's own host (dev client: the dev server; the VPS: the
+   *  live one), else the lobby's first */
+  private mainServer(): ServerInfo | undefined {
+    const here = window.location.hostname;
+    return this.servers.find((s) => s.host === here) ?? this.getSortedServers()[0];
+  }
+
   private render(): void {
-    const sortedServers = this.getSortedServers();
-    
+    const main = this.mainServer();
+    const news = (NEWS as NewsItem[]);
+
     this.panel.innerHTML = `
-      <div class="browser-container">
-        <div class="browser-header">
-          <div class="browser-title">SELECT SERVER</div>
-          <div class="browser-controls">
-            <button class="browser-btn refresh-btn">⟳ Refresh</button>
+      <div class="join-wrap">
+        <div class="inbox-slot-banner"></div>
+        <div class="join-box">
+          <h1 class="join-title">SPACE GAME</h1>
+          <p class="join-blurb">Fly, fight, mine and trade alongside other pilots in one shared galaxy.
+            Build your ship from parts, take on bosses together and defend stations through the night.
+            The game is in early development, so expect changes and the odd bug.</p>
+          <div class="join-photos">
+            ${PHOTOS.map((p) => `<img src="${p.src}" alt="${p.alt}" loading="lazy">`).join('')}
+          </div>
+          <div class="join-h">Development news</div>
+          <div class="news">
+            ${news.length === 0
+              ? '<div class="news-empty">No news yet. Updates from development will show up here.</div>'
+              : news.map((n) => `
+                <div class="news-item">
+                  <div class="news-date">${this.escapeHtml(n.date)}</div>
+                  <div class="news-title">${this.escapeHtml(n.title)}</div>
+                  <div class="news-body">${this.escapeHtml(n.body)}</div>
+                </div>`).join('')}
           </div>
         </div>
-        
-        <div class="sort-controls">
-          <span style="color:#668;font-size:12px;margin-right:10px;">Sort by:</span>
-          <button class="sort-btn ${this.sortBy === 'ping' ? 'active' : ''}" data-sort="ping">Ping</button>
-          <button class="sort-btn ${this.sortBy === 'name' ? 'active' : ''}" data-sort="name">Name</button>
-        </div>
-        
-        ${this.error ? `<div class="browser-error">${this.error}</div>` : ''}
-        
-        <div class="server-list">
-          ${this.loading ? `
-            <div class="browser-status">Loading servers...</div>
-          ` : sortedServers.length === 0 ? `
-            <div class="browser-status">No servers available</div>
-          ` : sortedServers.map(server => this.renderServerCard(server)).join('')}
-        </div>
-        
-        <div class="browser-footer">
-          <button class="logout-btn">← Logout</button>
-          <div class="direct-connect">
-            <input type="text" class="direct-input" placeholder="ws://host:port" />
-            <button class="direct-btn">Direct Connect</button>
+
+        <button class="join-main-btn" ${main && !this.loading ? '' : 'disabled'}>
+          ${main || this.loading ? 'Join' : 'Server offline'}
+          <span class="join-mail-badge" hidden></span>
+          <small class="join-server">${this.loading ? 'Finding the server…' : main ? this.escapeHtml(main.name) : 'Try again in a minute'}</small>
+        </button>
+
+        <div class="inbox-slot"></div>
+
+        <div class="join-foot">
+          <div class="join-stats">
+            ${main && !this.loading ? `<span><b>${main.players}</b> / ${main.maxPlayers} pilots online</span>${this.renderPing(main)}` : ''}
           </div>
+          <button class="logout-btn">← Log out</button>
         </div>
       </div>
     `;
-    
+
+    this.panel.querySelector('.inbox-slot-banner')?.replaceWith(this.inbox.banner);
+    this.panel.querySelector('.inbox-slot')?.replaceWith(this.inbox.box);
+    this.showMailBadge();
     this.setupEventListeners();
   }
 
-  private renderServerCard(server: ServerInfo): string {
-    const pingClass = server.ping !== undefined
-      ? server.ping < 100 ? 'ping-good'
-        : server.ping < 200 ? 'ping-medium'
-        : 'ping-bad'
-      : '';
-    
-    const pingText = server.ping !== undefined
-      ? server.ping < 999 ? `${server.ping}ms` : 'N/A'
-      : '...';
-    
-    const region = this.getRegionName(server);
-    
-    return `
-      <div class="server-card" data-host="${server.host}" data-port="${server.port}" data-secure="${server.secure}">
-        <div class="server-info">
-          <div class="server-name">${this.escapeHtml(server.name || region)}</div>
-          <div class="server-meta">
-            <span class="region-tag">${region}</span>
-            <span>${server.players}/${server.maxPlayers} players</span>
-          </div>
-        </div>
-        <div class="server-stats">
-          <div class="server-ping ${pingClass}">${pingText}</div>
-          <button class="join-btn">Join</button>
-        </div>
-      </div>
-    `;
+  /** The Join button's badge: unread mail */
+  private showMailBadge(): void {
+    const badge = this.panel.querySelector<HTMLElement>('.join-mail-badge');
+    if (!badge) return;
+    const { unread } = this.inbox.counts();
+    badge.hidden = unread === 0;
+    badge.textContent = `✉ ${unread} new`;
   }
 
-  private getRegionName(server: ServerInfo): string {
-    if (server.region) {
-      const regionMap: Record<string, string> = {
-        'iad': 'US East',
-        'lax': 'US West',
-        'syd': 'Australia',
-        'lhr': 'Europe',
-        'nrt': 'Japan',
-        'sin': 'Singapore',
-        'local': 'Local',
-      };
-      return regionMap[server.region] || server.region.toUpperCase();
-    }
-    
-    // Try to detect from hostname
-    const host = server.host.toLowerCase();
-    if (host.includes('syd')) return 'Australia';
-    if (host.includes('iad')) return 'US East';
-    if (host.includes('lax')) return 'US West';
-    if (host.includes('lhr')) return 'Europe';
-    if (host.includes('localhost') || host.includes('127.0.0.1')) return 'Local';
-    
-    return 'Unknown';
+  private renderPing(server: ServerInfo): string {
+    if (server.ping === undefined) return '<span>…</span>';
+    if (server.ping >= 999) return '<span class="ping-bad">no reply</span>';
+    const cls = server.ping < 100 ? 'ping-good' : server.ping < 200 ? 'ping-medium' : 'ping-bad';
+    return `<span class="${cls}">${server.ping} ms</span>`;
   }
 
   private getSortedServers(): ServerInfo[] {
-    return [...this.servers].sort((a, b) => {
-      if (this.sortBy === 'ping') {
-        const pingA = a.ping ?? 9999;
-        const pingB = b.ping ?? 9999;
-        return pingA - pingB;
-      } else {
-        return (a.name || '').localeCompare(b.name || '');
-      }
-    });
+    return [...this.servers].sort((a, b) => (a.ping ?? 9999) - (b.ping ?? 9999));
   }
 
   private setupEventListeners(): void {
-    // Refresh button
-    const refreshBtn = this.panel.querySelector('.refresh-btn');
-    refreshBtn?.addEventListener('click', () => this.refresh());
-    
-    // Sort buttons
-    const sortBtns = this.panel.querySelectorAll('.sort-btn');
-    sortBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.sortBy = (btn as HTMLElement).dataset.sort as 'ping' | 'name';
-        this.render();
-      });
+    const q = <T extends Element>(sel: string) => this.panel.querySelector<T>(sel);
+    q('.join-main-btn')?.addEventListener('click', () => {
+      const main = this.mainServer();
+      if (main && !this.loading) this.onServerSelect?.(main);
     });
-    
-    // Server cards
-    const serverCards = this.panel.querySelectorAll('.server-card');
-    serverCards.forEach(card => {
-      const joinBtn = card.querySelector('.join-btn');
-      joinBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const host = (card as HTMLElement).dataset.host!;
-        const port = parseInt((card as HTMLElement).dataset.port!, 10);
-        const secure = (card as HTMLElement).dataset.secure === 'true';
-        const server = this.servers.find(s => s.host === host && s.port === port);
-        if (server) {
-          this.onServerSelect?.(server);
-        }
-      });
-      
-      // Also allow clicking the whole card
-      card.addEventListener('click', () => {
-        const host = (card as HTMLElement).dataset.host!;
-        const port = parseInt((card as HTMLElement).dataset.port!, 10);
-        const server = this.servers.find(s => s.host === host && s.port === port);
-        if (server) {
-          this.onServerSelect?.(server);
-        }
-      });
-    });
-    
-    // Logout button
-    const logoutBtn = this.panel.querySelector('.logout-btn');
-    logoutBtn?.addEventListener('click', () => this.onLogout?.());
-    
-    // Direct connect
-    const directInput = this.panel.querySelector('.direct-input') as HTMLInputElement;
-    const directBtn = this.panel.querySelector('.direct-btn');
-    directBtn?.addEventListener('click', () => {
-      const url = directInput?.value.trim();
-      if (url) {
-        // Parse the URL and create a fake server entry
-        const match = url.match(/^(wss?):\/\/([^:\/]+)(?::(\d+))?/);
-        if (match) {
-          const server: ServerInfo = {
-            host: match[2],
-            port: parseInt(match[3] || (match[1] === 'wss' ? '443' : '80'), 10),
-            name: 'Direct Connect',
-            maxPlayers: 32,
-            players: 0,
-            secure: match[1] === 'wss',
-          };
-          this.onServerSelect?.(server);
-        }
-      }
-    });
-    
-    // Enter key on direct input
-    directInput?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        directBtn?.dispatchEvent(new Event('click'));
-      }
-    });
+    q('.logout-btn')?.addEventListener('click', () => this.onLogout?.());
   }
 
   async refresh(): Promise<void> {
     this.loading = true;
-    this.error = '';
     this.render();
-    
-    // Fallback servers in case API is unavailable
-    const fallbackServers: ServerInfo[] = [
-      {
-        host: 'spacegame-v2-server.fly.dev',
-        port: 443,
-        name: 'Sydney (Primary)',
-        region: 'Sydney',
-        maxPlayers: 32,
-        players: 0,
-        secure: true,
-      }
-    ];
-    
+
+    // Fallback in case the lobby is unavailable: the dev server (port 3000) in dev builds; in production the game on
+    // this page's own address (nginx takes its socket at the root, on the page's own scheme and port)
+    const dev = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
+    const secure = window.location.protocol === 'https:';
+    const fallbackServers: ServerInfo[] = [dev ? {
+      host: window.location.hostname || 'localhost',
+      port: 3000,
+      name: 'Local dev',
+      region: 'local',
+      maxPlayers: 32,
+      players: 0,
+      secure: false,
+    } : {
+      host: window.location.hostname,
+      port: Number(window.location.port) || (secure ? 443 : 80),
+      name: 'Space Game',
+      region: '',
+      maxPlayers: 32,
+      players: 0,
+      secure,
+    }];
+
     try {
       const response = await fetch(`${this.browserUrl}/list`);
-      if (!response.ok) {
-        throw new Error(`Server browser error (${response.status})`);
-      }
-      
+      if (!response.ok) throw new Error(`Server browser error (${response.status})`);
       const data = await response.json();
-      this.servers = Array.isArray(data.servers) && data.servers.length > 0 
-        ? data.servers 
-        : fallbackServers;
-      
-      // Measure ping for each server
-      await this.measurePings();
-      
-    } catch (err) {
-      // Use fallback servers if API fails
+      this.servers = Array.isArray(data.servers) && data.servers.length > 0 ? data.servers : fallbackServers;
+    } catch {
       this.servers = fallbackServers;
-      await this.measurePings();
     }
-    
+    // Show the server as soon as it's known; the ping fills in after
     this.loading = false;
     this.render();
+    await this.measurePings();
+    if (this.visible) this.render();
   }
 
   private async measurePings(): Promise<void> {
-    const pingPromises = this.servers.map(async (server) => {
-      server.ping = await this.measurePing(server);
-    });
-    
-    await Promise.all(pingPromises);
+    await Promise.all(this.servers.map(async (server) => { server.ping = await this.measurePing(server); }));
   }
 
   private async measurePing(server: ServerInfo): Promise<number> {
-    // Use HTTP fetch to /health to measure round-trip time
-    // This avoids WebSocket errors when machines are waking up on fly.io
+    // HTTP round trip to /health (no WebSocket errors while a server wakes up)
     try {
       const protocol = server.secure ? 'https' : 'http';
-      const isFlyHost = /\.fly\.dev$/i.test(server.host);
-      const shouldOmitPort = isFlyHost || (server.secure && (server.port === 443 || server.port === 80));
-      
-      const url = shouldOmitPort
+      const omitPort = server.secure && (server.port === 443 || server.port === 80);
+      const url = omitPort
         ? `${protocol}://${server.host}/health`
         : `${protocol}://${server.host}:${server.port}/health`;
-      
       const start = performance.now();
-      const response = await fetch(url, { 
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
-      });
-      
-      if (response.ok) {
-        return Math.round(performance.now() - start);
-      }
-      return 999;
+      const response = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) });
+      return response.ok ? Math.round(performance.now() - start) : 999;
     } catch {
       return 999;
     }
@@ -594,9 +268,12 @@ export class ServerBrowserUI {
     return div.innerHTML;
   }
 
-  show(): void {
+  /** `account`: the signed-in pilot (their inbox shows); none for a guest */
+  show(account: InboxAccount | null = null): void {
     this.visible = true;
     this.panel.style.display = 'flex';
+    this.inbox.setAccount(account);
+    void this.inbox.refresh();
     this.refresh();
   }
 

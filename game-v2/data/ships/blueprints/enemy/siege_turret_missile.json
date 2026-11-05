@@ -1,0 +1,91 @@
+{
+ "name": "Missile Turret",
+ "catalogVersion": 1,
+ "power": "ports",
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "missile",
+   "material": "steel",
+   "x": -1,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "mount": "turret"
+  },
+  {
+   "uid": 1,
+   "piece": "sq",
+   "fn": "missile",
+   "material": "steel",
+   "x": 1,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N",
+   "mount": "turret"
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": -1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "core",
+   "material": "steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

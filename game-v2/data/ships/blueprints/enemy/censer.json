@@ -1,0 +1,108 @@
+{
+ "name": "Censer",
+ "catalogVersion": 1,
+ "power": "ports",
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "censer_vane_l",
+   "fn": "armor",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 3
+  },
+  {
+   "uid": 1,
+   "piece": "censer_vane_r",
+   "fn": "armor",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 4
+  },
+  {
+   "uid": 2,
+   "piece": "censer_hull",
+   "fn": "hull",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 0
+  },
+  {
+   "uid": 3,
+   "piece": "censer_reliquary",
+   "fn": "core",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 0
+  },
+  {
+   "uid": 4,
+   "piece": "censer_blade",
+   "fn": "pyre_lance",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 1
+  },
+  {
+   "uid": 5,
+   "piece": "censer_tine_l",
+   "fn": "armor",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 1
+  },
+  {
+   "uid": 6,
+   "piece": "censer_tine_r",
+   "fn": "armor",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 1
+  },
+  {
+   "uid": 7,
+   "piece": "censer_brazier",
+   "fn": "conduit",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 2
+  },
+  {
+   "uid": 8,
+   "piece": "censer_drive",
+   "fn": "plasma_drive",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 5
+  }
+ ]
+}

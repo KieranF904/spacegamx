@@ -1,0 +1,146 @@
+{
+ "_comment": "Each scenario: level (which parts and materials are unlocked, and the build points: unlocks.json), budget (credits for the whole ship), allow (catalogue categories it may use; default all), the hits it takes (incoming: damage a hit, its pen and type, damage per second, where from: front, rear, sides, left, right or all, the spread in degrees, and flank: the share of hits that come from any side instead), and how it is scored. weights: each measure against the starting ship's (1 = as good as the start). targets: a measure worth its weight once it reaches the target and no more (thrust_to_mass: shipgen's roles use 0.06 for haulers and capitals up to 0.2 for a starter). penalties: per count. Measures: damage_before_down, systems_kept (firepower, thrust and power still working, over the seconds it lasts), alive_s, half_s, sustained_dps, burst_dps, thrust_to_mass, engine_zone (engines in the last rows, zones of 3), cargo. Penalties: unpowered (guns, engines, shields under a quarter of their power), idle (relays and reactors nothing goes through), blocked (guns with outline in front, engines with outline behind), no_engines (1 when no engine works), parts. shape: {margin}: how many cells beyond the outline it may build (0: the outline exactly). More penalties: shape_off (cells where the ship and the outline differ). A target with gate: true scales the whole score by 0.3 + 0.7 \u00d7 how far it is met instead of adding to it (its weight is unused). invalid: per validator error (the ship may pass through invalid states on the way to valid ones).",
+ "scenarios": [
+  {
+   "name": "Gunship: head-on fight",
+   "about": "Fights facing the enemy: most hits come at the nose. Scored on damage dealt before going down.",
+   "budget": 5000,
+   "allow": [
+    "structure",
+    "power",
+    "shields",
+    "weapons",
+    "engines"
+   ],
+   "incoming": {
+    "damage": 40,
+    "pen": 2,
+    "type": "kinetic",
+    "dps": 120,
+    "from": "front",
+    "spread": 50,
+    "max_hits": 3000,
+    "flank": 0.35
+   },
+   "weights": {
+    "damage_before_down": 1.0,
+    "burst_dps": 0.2,
+    "engine_zone": 0.1,
+    "systems_kept": 0.6
+   },
+   "penalties": {
+    "unpowered": 0.3,
+    "idle": 0.05,
+    "blocked": 1.0,
+    "no_engines": 3.0,
+    "shape_off": 0.03,
+    "invalid": 0.5
+   },
+   "level": 20,
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.12,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "shape": {
+    "margin": 2
+   }
+  },
+  {
+   "name": "Brawler: surrounded",
+   "about": "Hit from every side. Survival matters as much as damage.",
+   "budget": 5000,
+   "allow": [
+    "structure",
+    "power",
+    "shields",
+    "weapons",
+    "engines"
+   ],
+   "incoming": {
+    "damage": 40,
+    "pen": 2,
+    "type": "explosive",
+    "dps": 160,
+    "from": "all",
+    "spread": 180,
+    "max_hits": 3000,
+    "flank": 0.0
+   },
+   "weights": {
+    "damage_before_down": 1.0,
+    "alive_s": 0.5,
+    "engine_zone": 0.1,
+    "systems_kept": 0.6
+   },
+   "penalties": {
+    "unpowered": 0.3,
+    "idle": 0.05,
+    "blocked": 1.0,
+    "no_engines": 3.0,
+    "shape_off": 0.03,
+    "invalid": 0.5
+   },
+   "level": 20,
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.08,
+     "weight": 0.4,
+     "gate": true
+    }
+   },
+   "shape": {
+    "margin": 2
+   }
+  },
+  {
+   "name": "Hauler: get the cargo home",
+   "about": "Carries as much as it can, fast, and survives being chased (hits from behind).",
+   "budget": 4000,
+   "allow": [
+    "structure",
+    "power",
+    "shields",
+    "weapons",
+    "engines"
+   ],
+   "incoming": {
+    "damage": 30,
+    "pen": 1,
+    "type": "kinetic",
+    "dps": 60,
+    "from": "rear",
+    "spread": 40,
+    "max_hits": 3000,
+    "flank": 0.3
+   },
+   "weights": {
+    "cargo": 1.0,
+    "alive_s": 0.4,
+    "engine_zone": 0.1,
+    "systems_kept": 0.6
+   },
+   "penalties": {
+    "unpowered": 0.3,
+    "idle": 0.05,
+    "blocked": 1.0,
+    "no_engines": 3.0,
+    "shape_off": 0.03,
+    "invalid": 0.5
+   },
+   "level": 20,
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.06,
+     "weight": 0.8,
+     "gate": true
+    }
+   },
+   "shape": {
+    "margin": 2
+   }
+  }
+ ]
+}

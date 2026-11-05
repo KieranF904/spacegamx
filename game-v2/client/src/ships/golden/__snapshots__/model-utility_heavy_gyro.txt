@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Heavy Gyro
+Mk III · Block · 4 cells
+Hull · mass403 hp · 8.0
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw48/s
+Turning forceadds 28,000 turning force anywhere on the hull; draws power only while turning · no push of its own; heavier than plain hull
+
+== partStats (stats rows) ==
+GradeMk III
+Power draw48
+Turning force+28,000 turning force
+Hull · mass403 hp · 8.0
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 403
+
+== familyLabel ==
+Gyros
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+A big reaction wheel for big ships
+
+== keyStats ==
++28,000 turning · draws 48 turning
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Learned at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":4,"hp":403.2,"mass":8,"firepower":0,"toughness":403.2,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":48}

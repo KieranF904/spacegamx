@@ -1,0 +1,51 @@
+== partTip (tooltip) ==
+Glint
+Mk I · Small · Square · 1 cell
+Hull · mass53 hp · 1.0
+Armour · build1 · 1 pts
+Damage53/s · reach 3,400, fading out to 5,100
+Hits withThermal · penetration 1
+Pulse96 a pulse · charges in 1.8s
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+MountTurret, 240°
+FittingBolts on any side
+Power draw15/s
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Hits withThermal · penetration 1
+Power draw15
+Hull · mass53 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 53
+
+== familyLabel ==
+Lasers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+a long pulse you time, reaches far
+
+== keyStats ==
+96 a pulse · reach 5,100 · cycle · draws 15
+
+== mountBadge ==
+TURRET 240°
+
+== mountingText ==
+Turret, 240°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 9","why":"Learned at level 9 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 9","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":52.5,"mass":1,"firepower":53.333333333333336,"toughness":52.5,"armour":1,"dps":53.333333333333336,"pulse":{"damage":96,"seconds":1.8},"range":5100,"effectiveRange":3400.1699999999996,"damageType":"thermal","pen":1,"draw":15}

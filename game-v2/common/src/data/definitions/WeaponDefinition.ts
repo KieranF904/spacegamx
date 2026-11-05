@@ -2,7 +2,7 @@
  * Weapon Definition - Complete data-driven weapon configuration
  */
 
-import { WeaponTypeString } from '../schemas';
+import { WeaponTypeString } from '../schemas.js';
 
 export interface WeaponDefinition {
   id: string;

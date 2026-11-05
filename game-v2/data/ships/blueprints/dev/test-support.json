@@ -1,0 +1,22 @@
+{
+  "name": "Test Support",
+  "catalogVersion": 1,
+  "parts": [
+    {"uid":0,"piece":"rect2","fn":"utility_repair_beam","material":"steel","x":-1,"y":-1,"rot":0,"flip":false,"facing":"N"},
+    {"uid":1,"piece":"sq","fn":"autocannon_rattler","material":"alloy","x":-2,"y":0,"rot":0,"flip":false,"facing":"N"},
+    {"uid":2,"piece":"rect2","fn":"core","material":"alloy","x":-1,"y":0,"rot":0,"flip":false},
+    {"uid":3,"piece":"sq","fn":"autocannon_rattler","material":"alloy","x":1,"y":0,"rot":0,"flip":false,"facing":"N"},
+    {"uid":4,"piece":"sq","fn":"point_defence_turret","material":"steel","x":-3,"y":1,"rot":0,"flip":false,"facing":"N"},
+    {"uid":5,"piece":"block2","fn":"power_fusion_plant","material":"steel","x":-2,"y":1,"rot":0,"flip":false},
+    {"uid":6,"piece":"block2","fn":"power_fusion_plant","material":"steel","x":0,"y":1,"rot":0,"flip":false},
+    {"uid":7,"piece":"sq","fn":"point_defence_turret","material":"steel","x":2,"y":1,"rot":0,"flip":false,"facing":"N"},
+    {"uid":8,"piece":"sq","fn":"hull","material":"alloy","x":-3,"y":2,"rot":0,"flip":false},
+    {"uid":9,"piece":"sq","fn":"hull","material":"alloy","x":2,"y":2,"rot":0,"flip":false},
+    {"uid":10,"piece":"sq","fn":"power_battery","material":"alloy","x":-2,"y":3,"rot":0,"flip":false},
+    {"uid":11,"piece":"sq","fn":"power_battery","material":"alloy","x":-1,"y":3,"rot":0,"flip":false},
+    {"uid":12,"piece":"sq","fn":"power_battery","material":"alloy","x":0,"y":3,"rot":0,"flip":false},
+    {"uid":13,"piece":"sq","fn":"power_battery","material":"alloy","x":1,"y":3,"rot":0,"flip":false},
+    {"uid":14,"piece":"rect2","fn":"engine_plasma_drive","material":"steel","x":-2,"y":4,"rot":0,"flip":false,"facing":"S"},
+    {"uid":15,"piece":"rect2","fn":"engine_plasma_drive","material":"steel","x":0,"y":4,"rot":0,"flip":false,"facing":"S"}
+  ]
+}

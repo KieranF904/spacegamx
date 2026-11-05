@@ -2,14 +2,14 @@
  * Item Definition - Data-driven item configuration
  */
 
-export type ItemCategory = 'weapon' | 'module' | 'consumable' | 'resource' | 'quest' | 'ship';
-export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type LegacyItemCategory = 'weapon' | 'module' | 'consumable' | 'resource' | 'quest' | 'ship';
+export type LegacyItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 export interface ItemDefinition {
   id: string;
   name: string;
-  category: ItemCategory;
-  rarity: ItemRarity;
+  category: LegacyItemCategory;
+  rarity: LegacyItemRarity;
   tier: number;
   description: string;
   

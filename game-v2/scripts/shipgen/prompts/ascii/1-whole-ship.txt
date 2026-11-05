@@ -1,0 +1,70 @@
+You are drawing a top-down spaceship on a grid of square cells.
+Only the RIGHT half is drawn. It will be mirrored to make the left half.
+Column 0 is the centre line. The nose points UP (row 0).
+
+SHIP
+Role: heavy gunship
+Shape: a long central hull, swept-back wings in the middle, two small fins at the tail.
+
+HOW TO DRAW
+- '.' is an empty cell.
+- Use one capital letter per part: A for the first part, B for the second, and so on.
+- Put T on 1 or 2 filled cells for turrets.
+- Write a key line for each letter, like: A = Hull
+
+EXAMPLE (format only, a tiny 5 x 7 grid)
+     0  1  2  3  4
+ 0   .  .  .  .  .
+ 1   A  .  .  .  .
+ 2   A  A  .  .  .
+ 3   A  A  B  B  .
+ 4   A  A  B  B  B
+ 5   A  A  .  .  .
+ 6   A  .  .  .  .
+A = Hull
+B = Wing
+
+RULES
+- Part A must include cells in column 0 and run down column 0 without gaps.
+- Every part must touch another part (left, right, above or below; diagonal does not count).
+- Each T must be the top filled cell of its column: only '.' above it.
+- Length 10 to 20 rows. Width up to 8 columns (so 15 cells across once mirrored).
+- Avoid a solid blob: include at least one notch, gap or part that sticks out.
+
+YOUR GRID (11 columns, 32 rows; fill it in)
+     0  1  2  3  4  5  6  7  8  9 10
+ 0   .  .  .  .  .  .  .  .  .  .  .
+ 1   .  .  .  .  .  .  .  .  .  .  .
+ 2   .  .  .  .  .  .  .  .  .  .  .
+ 3   .  .  .  .  .  .  .  .  .  .  .
+ 4   .  .  .  .  .  .  .  .  .  .  .
+ 5   .  .  .  .  .  .  .  .  .  .  .
+ 6   .  .  .  .  .  .  .  .  .  .  .
+ 7   .  .  .  .  .  .  .  .  .  .  .
+ 8   .  .  .  .  .  .  .  .  .  .  .
+ 9   .  .  .  .  .  .  .  .  .  .  .
+10   .  .  .  .  .  .  .  .  .  .  .
+11   .  .  .  .  .  .  .  .  .  .  .
+12   .  .  .  .  .  .  .  .  .  .  .
+13   .  .  .  .  .  .  .  .  .  .  .
+14   .  .  .  .  .  .  .  .  .  .  .
+15   .  .  .  .  .  .  .  .  .  .  .
+16   .  .  .  .  .  .  .  .  .  .  .
+17   .  .  .  .  .  .  .  .  .  .  .
+18   .  .  .  .  .  .  .  .  .  .  .
+19   .  .  .  .  .  .  .  .  .  .  .
+20   .  .  .  .  .  .  .  .  .  .  .
+21   .  .  .  .  .  .  .  .  .  .  .
+22   .  .  .  .  .  .  .  .  .  .  .
+23   .  .  .  .  .  .  .  .  .  .  .
+24   .  .  .  .  .  .  .  .  .  .  .
+25   .  .  .  .  .  .  .  .  .  .  .
+26   .  .  .  .  .  .  .  .  .  .  .
+27   .  .  .  .  .  .  .  .  .  .  .
+28   .  .  .  .  .  .  .  .  .  .  .
+29   .  .  .  .  .  .  .  .  .  .  .
+30   .  .  .  .  .  .  .  .  .  .  .
+31   .  .  .  .  .  .  .  .  .  .  .
+
+OUTPUT
+The full grid in the same format (row numbers, a space between cells), then the key lines. No other text.

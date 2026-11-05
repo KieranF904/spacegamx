@@ -1,0 +1,4 @@
+{
+  "pieces": {"sq": 120, "rect2": 120, "tri": 40, "slope2": 12, "cap": 6, "round": 12, "fillet": 12, "block2": 60, "block3": 24, "round2": 6, "fillet2": 6},
+  "materials": ["alloy", "composite", "steel", "titanium", "cobalt", "neutronium"]
+}

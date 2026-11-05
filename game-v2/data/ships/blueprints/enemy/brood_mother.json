@@ -1,0 +1,1179 @@
+{
+ "name": "Brood Mother",
+ "catalogVersion": 1,
+ "power": "ports",
+ "paint": "#3d4763",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "broodmother_s3_egg0_l",
+   "fn": "brood_bay",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "broodmother_s3_egg0_r",
+   "fn": "brood_bay",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "broodmother_s3_egg1_l",
+   "fn": "brood_bay",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "broodmother_s3_egg1_r",
+   "fn": "brood_bay",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "broodmother_s3_egg2_l",
+   "fn": "brood_bay",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "broodmother_s3_egg2_r",
+   "fn": "brood_bay",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "broodmother_s3_antler_l",
+   "fn": "generator",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "broodmother_s3_antler_r",
+   "fn": "generator",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "broodmother_s3_siphon_l",
+   "fn": "plasma_drive",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "broodmother_s3_siphon_r",
+   "fn": "plasma_drive",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "broodmother_s3_core",
+   "fn": "core",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "broodmother_seg0_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "broodmother_seg0_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "broodmother_seg1_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "broodmother_seg1_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "broodmother_seg2_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "broodmother_seg2_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "broodmother_seg3_l",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "broodmother_seg3_r",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "broodmother_seg4_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "broodmother_seg4_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "broodmother_seg5_l",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "broodmother_seg5_r",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "broodmother_seg6_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "broodmother_seg6_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "broodmother_seg7_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "broodmother_seg7_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "broodmother_keel0",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "broodmother_keel1",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "broodmother_keel2",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 30,
+   "piece": "broodmother_beak",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 31,
+   "piece": "broodmother_palp_l",
+   "fn": "hull",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 32,
+   "piece": "broodmother_palp_r",
+   "fn": "hull",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 33,
+   "piece": "broodmother_gland0_l",
+   "fn": "generator",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 34,
+   "piece": "broodmother_gland0_r",
+   "fn": "generator",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "broodmother_gland1_l",
+   "fn": "generator",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 36,
+   "piece": "broodmother_gland1_r",
+   "fn": "generator",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 37,
+   "piece": "broodmother_spine0_l",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 38,
+   "piece": "broodmother_spine0_r",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 39,
+   "piece": "broodmother_spine1_l",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 40,
+   "piece": "broodmother_spine1_r",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "broodmother_spine2_l",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 42,
+   "piece": "broodmother_spine2_r",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 43,
+   "piece": "broodmother_siphon_l",
+   "fn": "plasma_drive",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "broodmother_siphon_r",
+   "fn": "plasma_drive",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "broodmother_scale0_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "broodmother_scale0_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 47,
+   "piece": "broodmother_scale1_l",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 48,
+   "piece": "broodmother_scale1_r",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 49,
+   "piece": "broodmother_scale2_l",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 50,
+   "piece": "broodmother_scale2_r",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 51,
+   "piece": "broodmother_scale3_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 52,
+   "piece": "broodmother_scale3_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 53,
+   "piece": "broodmother_scale4_l",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 54,
+   "piece": "broodmother_scale4_r",
+   "fn": "armor",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 55,
+   "piece": "broodmother_scale5_l",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 56,
+   "piece": "broodmother_scale5_r",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 57,
+   "piece": "broodmother_scale6_l",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 58,
+   "piece": "broodmother_scale6_r",
+   "fn": "conduit",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 59,
+   "piece": "broodmother_scale7_l",
+   "fn": "armor",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 60,
+   "piece": "broodmother_scale7_r",
+   "fn": "armor",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 61,
+   "piece": "broodmother_scale8_l",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 62,
+   "piece": "broodmother_scale8_r",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 63,
+   "piece": "broodmother_scale9_l",
+   "fn": "conduit",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 64,
+   "piece": "broodmother_scale9_r",
+   "fn": "conduit",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 65,
+   "piece": "broodmother_scale10_l",
+   "fn": "conduit",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 66,
+   "piece": "broodmother_scale10_r",
+   "fn": "conduit",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 67,
+   "piece": "broodmother_scale11_l",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 68,
+   "piece": "broodmother_scale11_r",
+   "fn": "armor",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 69,
+   "piece": "broodmother_horn_l",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 70,
+   "piece": "broodmother_horn_r",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 71,
+   "piece": "broodmother_tooth0_l",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 72,
+   "piece": "broodmother_tooth0_r",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 73,
+   "piece": "broodmother_tooth1_l",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 74,
+   "piece": "broodmother_tooth1_r",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 75,
+   "piece": "broodmother_frill0_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 76,
+   "piece": "broodmother_frill0_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 77,
+   "piece": "broodmother_frill1_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 78,
+   "piece": "broodmother_frill1_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 79,
+   "piece": "broodmother_frill2_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 80,
+   "piece": "broodmother_frill2_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 81,
+   "piece": "broodmother_frill3_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 82,
+   "piece": "broodmother_frill3_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 83,
+   "piece": "broodmother_frill4_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 84,
+   "piece": "broodmother_frill4_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 85,
+   "piece": "broodmother_frill5_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 86,
+   "piece": "broodmother_frill5_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 87,
+   "piece": "broodmother_frill6_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 88,
+   "piece": "broodmother_frill6_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 89,
+   "piece": "broodmother_frill7_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 90,
+   "piece": "broodmother_frill7_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 91,
+   "piece": "broodmother_frill8_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 92,
+   "piece": "broodmother_frill8_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 93,
+   "piece": "broodmother_arm0a_l",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 94,
+   "piece": "broodmother_arm0a_r",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 95,
+   "piece": "broodmother_arm0b_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 96,
+   "piece": "broodmother_arm0b_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 97,
+   "piece": "broodmother_arm0c_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 98,
+   "piece": "broodmother_arm0c_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 99,
+   "piece": "broodmother_sac0_l",
+   "fn": "brood_bay",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 100,
+   "piece": "broodmother_sac0_r",
+   "fn": "brood_bay",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 101,
+   "piece": "broodmother_arm1a_l",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 102,
+   "piece": "broodmother_arm1a_r",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 103,
+   "piece": "broodmother_arm1b_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 104,
+   "piece": "broodmother_arm1b_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 105,
+   "piece": "broodmother_arm1c_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 106,
+   "piece": "broodmother_arm1c_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 107,
+   "piece": "broodmother_sac1_l",
+   "fn": "brood_bay",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 108,
+   "piece": "broodmother_sac1_r",
+   "fn": "brood_bay",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 109,
+   "piece": "broodmother_arm2a_l",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 110,
+   "piece": "broodmother_arm2a_r",
+   "fn": "conduit",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 111,
+   "piece": "broodmother_arm2b_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 112,
+   "piece": "broodmother_arm2b_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 113,
+   "piece": "broodmother_arm2c_l",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 114,
+   "piece": "broodmother_arm2c_r",
+   "fn": "hull",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 115,
+   "piece": "broodmother_rays_l",
+   "fn": "bone_frame",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 116,
+   "piece": "broodmother_rays_r",
+   "fn": "bone_frame",
+   "material": "brood_shell",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+[Unit]
+Description=Space Game netcode lab (prototype server, prototypes/netcode-lab)
+After=network.target
+
+[Service]
+Type=simple
+User=spacegame
+Group=spacegame
+WorkingDirectory=/opt/spacegame-netlab/server
+ExecStart=/usr/bin/node server.js
+Environment=NODE_ENV=production
+# Only reachable through nginx (https://space.brotherk3d.com/netlab/)
+Environment=PORT=3120
+Environment=HOST=127.0.0.1
+Restart=always
+RestartSec=3
+# A guest on a shared box: kept to its own folder, and to a slice of the machine
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=300M
+CPUQuota=60%
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

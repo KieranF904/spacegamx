@@ -1,0 +1,48 @@
+== partTip (tooltip) ==
+Burst Strafer
+Mk I · Small · Square · 1 cell
+Hull · mass56 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw700/s
+Dodge14.0 push for 0.20 s away from its nozzle · again after 0.40 s · no push for cruising
+A burst costs140 energy straight out (less at an angle) (from a Drive Cell bank it touches first, then the ship: dodging often needs Drive Cells, batteries and generation behind it)
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Power draw700
+Dodge14.0 push · every 0.4 s · 140 energy a burst
+Hull · mass56 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 56
+
+== familyLabel ==
+Strafers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+a hard dodge away from its nozzle, short cooldown; no cruising push, big draw
+
+== keyStats ==
+dodge 14.0 push · every 0.4 s · 140 energy a burst · draws 700 bursting
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 10","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":56.4,"mass":1.4,"firepower":0,"toughness":56.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":700,"dodge":{"force":14,"secs":0.2,"cooldown":0.4,"energy":140}}

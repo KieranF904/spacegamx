@@ -1,0 +1,1795 @@
+{
+ "name": "Pyreclast",
+ "catalogVersion": 1,
+ "power": "ports",
+ "paint": "#2a201c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "pyreclast_s3_inner0",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "pyreclast_s3_inner1",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "pyreclast_s3_inner2",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "pyreclast_s3_inner3",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "pyreclast_s3_inner4",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "pyreclast_s3_inner5",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "pyreclast_s3_inner6",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "pyreclast_s3_inner7",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "pyreclast_s3_outer0",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "pyreclast_s3_outer1",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "pyreclast_s3_outer2",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "pyreclast_s3_outer3",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "pyreclast_s3_outer4",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "pyreclast_s3_outer5",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "pyreclast_s3_outer6",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "pyreclast_s3_outer7",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "pyreclast_s3_outer8",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "pyreclast_s3_outer9",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "pyreclast_s3_outer10",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "pyreclast_s3_outer11",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "pyreclast_s3_outer12",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "pyreclast_s3_outer13",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "pyreclast_s3_outer14",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "pyreclast_s3_outer15",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "pyreclast_s3_vent_housing_l",
+   "fn": "heat_vent",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "pyreclast_s3_vent_housing_r",
+   "fn": "heat_vent",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "pyreclast_s3_aft_vent",
+   "fn": "heat_vent",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "pyreclast_s3_frame_l",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "pyreclast_s3_frame_r",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "pyreclast_s3_frame_base",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 30,
+   "piece": "pyreclast_s3_mineral",
+   "fn": "generator",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 31,
+   "piece": "pyreclast_s3_clamp_top",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 32,
+   "piece": "pyreclast_s3_clamp_l",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 33,
+   "piece": "pyreclast_s3_clamp_r",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 34,
+   "piece": "pyreclast_s3_lamps",
+   "fn": "generator",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "pyreclast_s3_stub_l",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 36,
+   "piece": "pyreclast_s3_stub_r",
+   "fn": "armor",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 37,
+   "piece": "pyreclast_s3_drive_l",
+   "fn": "plasma_drive",
+   "material": "pyre_chrome",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 38,
+   "piece": "pyreclast_s3_drive_c",
+   "fn": "plasma_drive",
+   "material": "pyre_chrome",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 39,
+   "piece": "pyreclast_s3_drive_r",
+   "fn": "plasma_drive",
+   "material": "pyre_chrome",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 40,
+   "piece": "pyreclast_s3_strut_out_l",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "pyreclast_s3_strut_out_r",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 42,
+   "piece": "pyreclast_s3_strut_in_l",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 43,
+   "piece": "pyreclast_s3_strut_in_r",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "pyreclast_s3_strut_c",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "pyreclast_s3_strut_c_side_l",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "pyreclast_s3_strut_c_side_r",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 47,
+   "piece": "pyreclast_s3_hose_out_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 48,
+   "piece": "pyreclast_s3_hose_out_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 49,
+   "piece": "pyreclast_s3_hose_in_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 50,
+   "piece": "pyreclast_s3_hose_in_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 51,
+   "piece": "pyreclast_s3_hose_c_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 52,
+   "piece": "pyreclast_s3_hose_c_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 53,
+   "piece": "pyreclast_s3_core",
+   "fn": "core",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 54,
+   "piece": "pyreclast_heart_0",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 55,
+   "piece": "pyreclast_heart_1",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 56,
+   "piece": "pyreclast_heart_2",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 57,
+   "piece": "pyreclast_heart_3",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 58,
+   "piece": "pyreclast_heart_4",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 59,
+   "piece": "pyreclast_heart_5",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 60,
+   "piece": "pyreclast_carapace_front_in_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 61,
+   "piece": "pyreclast_carapace_front_in_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 62,
+   "piece": "pyreclast_carapace_front_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 63,
+   "piece": "pyreclast_carapace_front_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 64,
+   "piece": "pyreclast_carapace_fore_in_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 65,
+   "piece": "pyreclast_carapace_fore_in_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 66,
+   "piece": "pyreclast_carapace_fore_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 67,
+   "piece": "pyreclast_carapace_fore_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 68,
+   "piece": "pyreclast_carapace_side_in_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 69,
+   "piece": "pyreclast_carapace_side_in_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 70,
+   "piece": "pyreclast_carapace_side_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 71,
+   "piece": "pyreclast_carapace_side_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 72,
+   "piece": "pyreclast_carapace_aft_in_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 73,
+   "piece": "pyreclast_carapace_aft_in_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 74,
+   "piece": "pyreclast_carapace_aft_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 75,
+   "piece": "pyreclast_carapace_aft_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 76,
+   "piece": "pyreclast_mortar_bed_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 77,
+   "piece": "pyreclast_mortar_bed_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 78,
+   "piece": "pyreclast_mortar_l",
+   "fn": "magma_mortar",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 79,
+   "piece": "pyreclast_mortar_r",
+   "fn": "magma_mortar",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 80,
+   "piece": "pyreclast_vent_bed_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 81,
+   "piece": "pyreclast_vent_bed_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 82,
+   "piece": "pyreclast_vent_l",
+   "fn": "heat_vent",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 83,
+   "piece": "pyreclast_vent_r",
+   "fn": "heat_vent",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 84,
+   "piece": "pyreclast_spine",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 85,
+   "piece": "pyreclast_lance",
+   "fn": "pyre_lance",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 86,
+   "piece": "pyreclast_spine_rib_0",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 87,
+   "piece": "pyreclast_spine_rib_1",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 88,
+   "piece": "pyreclast_spine_rib_2",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 89,
+   "piece": "pyreclast_spine_rib_3",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 90,
+   "piece": "pyreclast_prow_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 91,
+   "piece": "pyreclast_prow_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 92,
+   "piece": "pyreclast_prow_fore_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 93,
+   "piece": "pyreclast_prow_fore_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 94,
+   "piece": "pyreclast_horn_base_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 95,
+   "piece": "pyreclast_horn_base_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 96,
+   "piece": "pyreclast_horn_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 97,
+   "piece": "pyreclast_horn_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 98,
+   "piece": "pyreclast_horn_tip_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 99,
+   "piece": "pyreclast_horn_tip_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 100,
+   "piece": "pyreclast_horn_tooth0_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 101,
+   "piece": "pyreclast_horn_tooth0_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 102,
+   "piece": "pyreclast_horn_tooth1_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 103,
+   "piece": "pyreclast_horn_tooth1_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 104,
+   "piece": "pyreclast_horn_tip_tooth0_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 105,
+   "piece": "pyreclast_horn_tip_tooth0_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 106,
+   "piece": "pyreclast_horn_tip_tooth1_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 107,
+   "piece": "pyreclast_horn_tip_tooth1_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 108,
+   "piece": "pyreclast_horn_gun_l",
+   "fn": "magma_cannon",
+   "material": "conductive_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 109,
+   "piece": "pyreclast_horn_gun_r",
+   "fn": "magma_cannon",
+   "material": "conductive_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 110,
+   "piece": "pyreclast_coil_l",
+   "fn": "dash_coil",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 111,
+   "piece": "pyreclast_coil_r",
+   "fn": "dash_coil",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 112,
+   "piece": "pyreclast_wing_vein_l",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 113,
+   "piece": "pyreclast_wing_vein_r",
+   "fn": "conduit",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 114,
+   "piece": "pyreclast_wing_lead_in_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 115,
+   "piece": "pyreclast_wing_lead_in_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 116,
+   "piece": "pyreclast_wing_lead_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 117,
+   "piece": "pyreclast_wing_lead_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 118,
+   "piece": "pyreclast_bay_in_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 119,
+   "piece": "pyreclast_bay_in_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 120,
+   "piece": "pyreclast_bay_l",
+   "fn": "brood_bay",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 121,
+   "piece": "pyreclast_bay_r",
+   "fn": "brood_bay",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 122,
+   "piece": "pyreclast_scythe_root_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 123,
+   "piece": "pyreclast_scythe_root_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 124,
+   "piece": "pyreclast_scythe_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 125,
+   "piece": "pyreclast_scythe_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 126,
+   "piece": "pyreclast_scythe_tip_l",
+   "fn": "molten_plate",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 127,
+   "piece": "pyreclast_scythe_tip_r",
+   "fn": "molten_plate",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 128,
+   "piece": "pyreclast_scythe_tooth0_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 129,
+   "piece": "pyreclast_scythe_tooth0_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 130,
+   "piece": "pyreclast_scythe_tooth1_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 131,
+   "piece": "pyreclast_scythe_tooth1_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 132,
+   "piece": "pyreclast_scythe_tooth2_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 133,
+   "piece": "pyreclast_scythe_tooth2_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 134,
+   "piece": "pyreclast_scythe_tip_tooth0_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 135,
+   "piece": "pyreclast_scythe_tip_tooth0_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 136,
+   "piece": "pyreclast_scythe_tip_tooth1_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 137,
+   "piece": "pyreclast_scythe_tip_tooth1_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 138,
+   "piece": "pyreclast_scythe_tip_tooth2_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 139,
+   "piece": "pyreclast_scythe_tip_tooth2_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 140,
+   "piece": "pyreclast_scythe_heel_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 141,
+   "piece": "pyreclast_scythe_heel_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 142,
+   "piece": "pyreclast_heel_tooth0_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 143,
+   "piece": "pyreclast_heel_tooth0_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 144,
+   "piece": "pyreclast_heel_tooth1_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 145,
+   "piece": "pyreclast_heel_tooth1_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 146,
+   "piece": "pyreclast_heel_tooth2_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 147,
+   "piece": "pyreclast_heel_tooth2_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 148,
+   "piece": "pyreclast_scythe_plate_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 149,
+   "piece": "pyreclast_scythe_plate_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 150,
+   "piece": "pyreclast_wing_plate_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 151,
+   "piece": "pyreclast_wing_plate_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 152,
+   "piece": "pyreclast_horn_plate_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 153,
+   "piece": "pyreclast_horn_plate_r",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 154,
+   "piece": "pyreclast_rib_horn_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 155,
+   "piece": "pyreclast_rib_horn_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 156,
+   "piece": "pyreclast_rib_scythe_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 157,
+   "piece": "pyreclast_rib_scythe_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 158,
+   "piece": "pyreclast_rib_aft_l",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 159,
+   "piece": "pyreclast_rib_aft_r",
+   "fn": "molten_plate",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 160,
+   "piece": "pyreclast_wing_flak_l",
+   "fn": "magma_cannon",
+   "material": "conductive_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 161,
+   "piece": "pyreclast_wing_flak_r",
+   "fn": "magma_cannon",
+   "material": "conductive_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 162,
+   "piece": "pyreclast_scythe_gun_l",
+   "fn": "magma_cannon",
+   "material": "conductive_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 163,
+   "piece": "pyreclast_scythe_gun_r",
+   "fn": "magma_cannon",
+   "material": "conductive_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 164,
+   "piece": "pyreclast_drive_l",
+   "fn": "plasma_drive",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 165,
+   "piece": "pyreclast_drive_r",
+   "fn": "plasma_drive",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 166,
+   "piece": "pyreclast_drive_fin0_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 167,
+   "piece": "pyreclast_drive_fin0_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 168,
+   "piece": "pyreclast_drive_fin1_l",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 169,
+   "piece": "pyreclast_drive_fin1_r",
+   "fn": "armor",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 170,
+   "piece": "pyreclast_drive_c",
+   "fn": "plasma_drive",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 171,
+   "piece": "pyreclast_aux_drive_l",
+   "fn": "thruster",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 172,
+   "piece": "pyreclast_aux_drive_r",
+   "fn": "thruster",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 173,
+   "piece": "pyreclast_aux_drive2_l",
+   "fn": "thruster",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 174,
+   "piece": "pyreclast_aux_drive2_r",
+   "fn": "thruster",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 175,
+   "piece": "pyreclast_core",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 176,
+   "piece": "pyreclast_skeleton_l",
+   "fn": "bone_frame",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 177,
+   "piece": "pyreclast_skeleton_r",
+   "fn": "bone_frame",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

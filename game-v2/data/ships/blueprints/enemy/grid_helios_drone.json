@@ -1,0 +1,71 @@
+{
+ "name": "Helios Drone",
+ "catalogVersion": 1,
+ "power": "ports",
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "alloy",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 1,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -1,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "core",
+   "material": "alloy",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "alloy",
+   "x": 0,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "alloy",
+   "x": 0,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ],
+ "drive": 0.22,
+ "paint": "#d9c27a"
+}

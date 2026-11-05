@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Cutter
+Mk II · Medium · Panel · 2 cells
+Hull · mass132 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage60 rising to 150/s · reach 900
+Hits withThermal · penetration 2
+Beamheld while you fire · draws its power while it's on · burns deeper over 1.5s on one part, starting over if it slips off
+Modelbeam: Burns energy every second you hold it.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 1 clear cell ahead
+Power draw32/s
+
+== partStats (stats rows) ==
+GradeMk II · Medium
+Hits withThermal · penetration 2
+Power draw32
+Hull · mass132 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 132
+
+== familyLabel ==
+Lasers
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+burns deeper the longer it stays on one part, short reach
+
+== keyStats ==
+150 dmg/s · reach 900 · held beam · ramps up · draws 32
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 1 clear cell ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 18","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":131.6,"mass":2.8,"firepower":150,"toughness":131.6,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":150,"range":900,"damageType":"thermal","pen":2,"draw":32}

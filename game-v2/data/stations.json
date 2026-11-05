@@ -3,129 +3,723 @@
     {
       "id": "sol_station_central",
       "name": "Sol Central Station",
-      "description": "The main hub of the Sol system. All services available.",
+      "description": "The colony's capital station: a hub ringed with habitat and docking arms. All services.",
       "system": "sol",
-      "position": { "x": 4500, "y": 0 },
+      "position": {
+        "x": 35000,
+        "y": 0
+      },
       "orbit": {
         "orbitType": 0,
-        "semiMajorAxis": 4500,
+        "semiMajorAxis": 35000,
         "eccentricity": 0,
         "argPeriapsis": 0,
         "meanAnomaly0": 0,
         "epochTick": 0
       },
-      "radius": 300,
+      "radius": 1200,
       "sprite": "station_large",
-      "dockingRadius": 800,
-      "services": ["repair", "refuel", "shop", "bank", "quests"],
-      "shop": {
-        "buyMultiplier": 1.0,
-        "sellMultiplier": 0.6,
-        "inventory": [
-          { "itemId": "blaster_mk1", "stock": -1, "price": 100 },
-          { "itemId": "blaster_mk2", "stock": 5, "price": 500 },
-          { "itemId": "laser_mk1", "stock": -1, "price": 150 },
-          { "itemId": "scatter_mk1", "stock": -1, "price": 200 },
-          { "itemId": "missile_mk1", "stock": 3, "price": 400 },
-          { "itemId": "mining_laser_mk1", "stock": -1, "price": 100 },
-          { "itemId": "booster_mk1", "stock": -1, "price": 200 },
-          { "itemId": "booster_mk2", "stock": 3, "price": 800 },
-          { "itemId": "cockpit_mk1", "stock": -1, "price": 200 }
-        ]
-      },
-      "repairCostPerHp": 2,
-      "refuelCostPerUnit": 1
+      "design": "citadel",
+      "dockingRadius": 1600,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.8,
+      "refuelCostPerUnit": 1,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "alloy_plate",
+          "copper_wire",
+          "composite_sheet",
+          "insurance_bond"
+        ],
+        "demand": {},
+        "note": "Hub prices: fair on everything."
+      }
     },
     {
       "id": "sol_station_mining",
       "name": "Sol Mining Outpost",
-      "description": "A small outpost near the asteroid belt. Specializes in mining equipment.",
+      "description": "A Miners' Guild outpost near the asteroid belt, with mining supplies and an assay office.",
       "system": "sol",
-      "position": { "x": 25000, "y": 15000 },
+      "position": {
+        "x": 42150,
+        "y": 25290
+      },
       "radius": 150,
       "sprite": "station_small",
+      "design": "outpost",
       "dockingRadius": 500,
-      "services": ["repair", "refuel", "shop"],
-      "shop": {
-        "buyMultiplier": 0.9,
-        "sellMultiplier": 0.7,
-        "inventory": [
-          { "itemId": "mining_laser_mk1", "stock": -1, "price": 90 },
-          { "itemId": "mining_laser_mk2", "stock": 5, "price": 400 },
-          { "itemId": "mining_laser_mk3", "stock": 1, "price": 1500 }
-        ]
-      },
-      "repairCostPerHp": 1,
-      "refuelCostPerUnit": 0.5
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.4,
+      "refuelCostPerUnit": 0.5,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "alloy_plate",
+          "copper_wire",
+          "part:alloy:utility_mining_laser:sq"
+        ],
+        "demand": {
+          "iron_ore": 0.9,
+          "nickel_ore": 0.9,
+          "titanium_ore": 1.2,
+          "crystal": 1.15
+        },
+        "note": "Miners' outpost: buys hard ores well, sells mining gear."
+      }
     },
     {
       "id": "sol_station_trade",
       "name": "Sol Trade Hub",
-      "description": "The best place to buy and sell goods in Sol.",
+      "description": "Sol's main trading station.",
       "system": "sol",
-      "position": { "x": -20000, "y": 10000 },
+      "position": {
+        "x": -37889,
+        "y": 18944
+      },
       "radius": 200,
       "sprite": "station_medium",
+      "design": "ring",
       "dockingRadius": 600,
-      "services": ["shop", "bank"],
-      "shop": {
-        "buyMultiplier": 1.1,
-        "sellMultiplier": 0.8,
-        "inventory": [
-          { "itemId": "ore_iron", "stock": -1, "price": 8 },
-          { "itemId": "ore_crystal", "stock": -1, "price": 20 },
-          { "itemId": "ore_plasma", "stock": -1, "price": 80 }
-        ]
-      },
-      "repairCostPerHp": 3,
-      "refuelCostPerUnit": 2
+      "services": [
+        "storage",
+        "market"
+      ],
+      "repairCostPerHp": 1.2,
+      "refuelCostPerUnit": 2,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "alloy_plate",
+          "copper_wire",
+          "composite_sheet",
+          "steel_plate",
+          "titanium_plate",
+          "crystal_lens",
+          "servo_motor",
+          "power_coupling",
+          "insurance_bond"
+        ],
+        "demand": {
+          "ruby": 1.25,
+          "sapphire": 1.25,
+          "emerald": 1.25,
+          "void_opal": 1.3,
+          "helium3": 1.2,
+          "ancient_relic": 1.3
+        },
+        "note": "Trade hub: the best prices for gems and luxuries."
+      }
     },
     {
       "id": "borealis_station_outpost",
       "name": "Borealis Research Station",
-      "description": "A cold, isolated station dedicated to studying the Ice Sprites.",
+      "description": "A research station studying the ice sprites and the Frost Brood.",
       "system": "borealis",
-      "position": { "x": -5000, "y": 0 },
+      "position": {
+        "x": -18200,
+        "y": 0
+      },
       "radius": 180,
       "sprite": "station_medium",
+      "design": "observatory",
       "dockingRadius": 600,
-      "services": ["repair", "refuel", "shop", "quests"],
-      "shop": {
-        "buyMultiplier": 1.2,
-        "sellMultiplier": 0.5,
-        "inventory": [
-          { "itemId": "laser_mk1", "stock": -1, "price": 180 },
-          { "itemId": "laser_mk2", "stock": 3, "price": 900 },
-          { "itemId": "cockpit_mk2", "stock": 2, "price": 1200 },
-          { "itemId": "ice_sprite_drop", "stock": -1, "price": 12 }
-        ]
-      },
-      "repairCostPerHp": 3,
-      "refuelCostPerUnit": 2
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 1.2,
+      "refuelCostPerUnit": 2,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "composite_sheet",
+          "part:alloy:utility_scanner:sq"
+        ],
+        "demand": {
+          "frost_gland": 1.4,
+          "ice": 0.7,
+          "sapphire": 1.2,
+          "hush_pane": 1.4
+        },
+        "note": "Research station: pays well for Frost Brood samples."
+      }
     },
     {
       "id": "nebula_research_station",
       "name": "Nebula Prime Observatory",
-      "description": "An observatory studying the nebula's unique radiation patterns.",
+      "description": "An observatory studying the nebula's radiation and the signal. Defended by laser turrets.",
       "system": "nebula_prime",
-      "position": { "x": 0, "y": 8000 },
+      "position": {
+        "x": 0,
+        "y": 32800
+      },
       "radius": 250,
       "sprite": "station_large",
-      "dockingRadius": 700,
-      "services": ["repair", "refuel", "shop", "quests"],
-      "shop": {
-        "buyMultiplier": 1.1,
-        "sellMultiplier": 0.6,
-        "inventory": [
-          { "itemId": "blaster_mk2", "stock": 5, "price": 550 },
-          { "itemId": "blaster_mk3", "stock": 2, "price": 2500 },
-          { "itemId": "pulse_mk1", "stock": 3, "price": 600 },
-          { "itemId": "pulse_mk2", "stock": 1, "price": 2000 },
-          { "itemId": "booster_mk3", "stock": 1, "price": 3000 }
-        ]
+      "design": "observatory",
+      "defence": {
+        "weapon": "laser",
+        "turrets": 2
       },
-      "repairCostPerHp": 2,
-      "refuelCostPerUnit": 1
+      "dockingRadius": 700,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.8,
+      "refuelCostPerUnit": 1,
+      "dockingFee": 40,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "crystal_lens",
+          "targeting_chip"
+        ],
+        "demand": {
+          "crystal": 1.3,
+          "targeting_chip": 1.2,
+          "scrap_electronics": 1.25
+        },
+        "note": "Observatory: buys crystal and electronics."
+      }
+    },
+    {
+      "id": "cinder_station_forge",
+      "name": "Ember Forge",
+      "description": "A refinery and shipyard at the edge of the red giant's heat. Defended by flak turrets.",
+      "system": "cinder_reach",
+      "position": {
+        "x": 17677,
+        "y": 57110
+      },
+      "radius": 170,
+      "sprite": "station_medium",
+      "design": "refinery",
+      "defence": {
+        "weapon": "flak",
+        "turrets": 3
+      },
+      "dockingRadius": 500,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.48,
+      "refuelCostPerUnit": 0.6,
+      "dockingFee": 100,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "steel_plate",
+          "titanium_plate",
+          "cobalt_alloy"
+        ],
+        "demand": {
+          "cobalt_ore": 1.3,
+          "titanium_ore": 1.25,
+          "cinder_ash": 1.4
+        },
+        "note": "Forge: the place to turn hard ore into heavy plate."
+      }
+    },
+    {
+      "id": "glasswater_station_relay",
+      "name": "Prism Relay",
+      "description": "A listening post in the Expanse, with repairs, storage and a market.",
+      "system": "glasswater",
+      "position": {
+        "x": -14000,
+        "y": 4000
+      },
+      "radius": 150,
+      "sprite": "station_small",
+      "design": "outpost",
+      "dockingRadius": 500,
+      "services": [
+        "repair",
+        "storage",
+        "market"
+      ],
+      "repairCostPerHp": 0.4,
+      "refuelCostPerUnit": 0.7,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "crystal_lens"
+        ],
+        "demand": {
+          "emerald": 1.2,
+          "prism_shard": 1.1
+        },
+        "note": "Relay: a little of everything."
+      }
+    },
+    {
+      "id": "maw_station_watch",
+      "name": "Horizon Watch",
+      "description": "Horizon Watch's fortified observatory at the Maw. It controls Maw transit licences and buys inscribed fragments from the shard ring. Defended by lance turrets.",
+      "system": "the_maw",
+      "position": {
+        "x": -10441,
+        "y": 17401
+      },
+      "radius": 220,
+      "sprite": "station_medium",
+      "design": "bastion",
+      "defence": {
+        "weapon": "lance",
+        "turrets": 4
+      },
+      "dockingRadius": 600,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.8,
+      "refuelCostPerUnit": 1,
+      "dockingFee": 250,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "cobalt_alloy",
+          "quantum_core"
+        ],
+        "demand": {
+          "maw_fragment": 1.2,
+          "void_ichor": 1.3,
+          "cobalt_ore": 1.2,
+          "leestone_ore": 0.5
+        },
+        "note": "Salvagers' watch: buys anything pulled from the dark."
+      }
+    },
+    {
+      "id": "void_station_lantern",
+      "name": "Black Lantern",
+      "description": "An independent outpost in the Void Sector, with repairs, storage and a market. Defended by flak turrets.",
+      "system": "void_sector",
+      "position": {
+        "x": 8960,
+        "y": -6720
+      },
+      "radius": 170,
+      "sprite": "station_small",
+      "design": "outpost",
+      "defence": {
+        "weapon": "flak",
+        "turrets": 2
+      },
+      "dockingRadius": 500,
+      "services": [
+        "repair",
+        "storage",
+        "market"
+      ],
+      "repairCostPerHp": 1,
+      "refuelCostPerUnit": 1.2,
+      "dockingFee": 400,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "insurance_bond",
+          "shield_emitter"
+        ],
+        "demand": {
+          "void_ichor": 1.5,
+          "void_opal": 1.4,
+          "ancient_relic": 1.2
+        },
+        "note": "Black market: steep prices."
+      }
+    },
+    {
+      "id": "glasswater_station_depot",
+      "name": "Shardfall Depot",
+      "description": "A depot for crystal haulers, with a hangar large enough for capital ships.",
+      "system": "glasswater",
+      "position": {
+        "x": 21000,
+        "y": -12000
+      },
+      "radius": 200,
+      "sprite": "station_medium",
+      "design": "outpost",
+      "dockingRadius": 600,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.6,
+      "refuelCostPerUnit": 0.8,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "alloy_plate",
+          "copper_wire",
+          "composite_sheet",
+          "crystal_lens"
+        ],
+        "demand": {
+          "crystal": 1.2,
+          "silicate": 1.1
+        },
+        "note": "Crystal haulers' depot."
+      }
+    },
+    {
+      "id": "sol_station_lagrange",
+      "name": "Lagrange Shipyard",
+      "description": "Sol's main shipyard, at a Lagrange point between worlds. Capital hulls are built here.",
+      "system": "sol",
+      "position": {
+        "x": -25173,
+        "y": -48772
+      },
+      "radius": 320,
+      "sprite": "station_large",
+      "design": "shipyard",
+      "dockingRadius": 800,
+      "services": [
+        "repair",
+        "storage",
+        "fabricator",
+        "market",
+        "shipyard"
+      ],
+      "repairCostPerHp": 0.6,
+      "refuelCostPerUnit": 0.8,
+      "market": {
+        "sells": [
+          "steel_plate",
+          "titanium_plate",
+          "power_coupling",
+          "servo_motor"
+        ],
+        "demand": {
+          "steel_plate": 1.15,
+          "titanium_plate": 1.2
+        },
+        "note": "Shipyard: sells big ship plans and the plate to build them."
+      }
+    },
+    {
+      "id": "sol_station_sentinel",
+      "name": "Sentinel Watch",
+      "description": "A fortified Sol Patrol picket on the route to Cinder Reach. Defended by laser turrets.",
+      "system": "sol",
+      "position": {
+        "x": -57236,
+        "y": 37451
+      },
+      "radius": 200,
+      "sprite": "station_medium",
+      "design": "bastion",
+      "defence": {
+        "weapon": "laser",
+        "turrets": 4
+      },
+      "dockingRadius": 600,
+      "services": [
+        "repair",
+        "storage",
+        "market"
+      ],
+      "repairCostPerHp": 0.72,
+      "refuelCostPerUnit": 1,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "insurance_bond",
+          "steel_plate"
+        ],
+        "demand": {
+          "targeting_chip": 1.2,
+          "scrap_electronics": 1.1
+        },
+        "note": "Patrol picket: buys salvage from the pirate lanes."
+      }
+    },
+    {
+      "id": "homestead_dock",
+      "name": "Your Station",
+      "description": "Your private station. Its services run on the tracks you've unlocked.",
+      "system": "homestead",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "radius": 320,
+      "sprite": "station_large",
+      "design": "ring",
+      "dockingRadius": 900,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.4,
+      "refuelCostPerUnit": 1,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge"
+        ],
+        "demand": {},
+        "note": "Your own: the market link track widens it."
+      }
+    },
+    {
+      "id": "ashfall_station_claim",
+      "name": "Tinder Claim",
+      "description": "A prospectors' station on the inner edge of the belt. It buys common ore in bulk.",
+      "system": "ashfall",
+      "position": {
+        "x": 28386,
+        "y": -20817
+      },
+      "radius": 150,
+      "sprite": "station_small",
+      "design": "outpost",
+      "dockingRadius": 500,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.4,
+      "refuelCostPerUnit": 0.5,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "alloy_plate",
+          "ceramic_plate",
+          "part:alloy:utility_mining_laser:sq"
+        ],
+        "demand": {
+          "iron_ore": 1.1,
+          "nickel_ore": 1.1,
+          "silicate": 1.05,
+          "ice": 1.05
+        },
+        "note": "Prospectors: pay above market for common ore."
+      }
+    },
+    {
+      "id": "borealis_station_thawline",
+      "name": "Thawline",
+      "description": "A Miners' Guild ice camp on the edge of the Rime Shoal, with a refinery for aurora rime.",
+      "system": "borealis",
+      "position": {
+        "x": -52000,
+        "y": -55400
+      },
+      "radius": 150,
+      "sprite": "station_small",
+      "design": "outpost",
+      "dockingRadius": 500,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 1,
+      "refuelCostPerUnit": 1.5,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "coolant",
+          "part:alloy:utility_mining_laser:sq"
+        ],
+        "demand": {
+          "aurora_rime": 1.3,
+          "ice": 1.1,
+          "hydrazine_slush": 1.2,
+          "cryo_gas": 1.15
+        },
+        "note": "Ice camp: pays well for rime and volatiles."
+      }
+    },
+    {
+      "id": "sol_station_farwatch",
+      "name": "Farwatch",
+      "system": "sol",
+      "description": "A patrol fort on the edge of Middle Sol, the last station before the Reaches. Defended by lance turrets.",
+      "position": {
+        "x": 97539,
+        "y": -100430
+      },
+      "radius": 260,
+      "sprite": "station_medium",
+      "design": "bastion",
+      "defence": {
+        "weapon": "lance",
+        "turrets": 3
+      },
+      "dockingRadius": 700,
+      "services": [
+        "repair",
+        "storage",
+        "refinery",
+        "fabricator",
+        "market"
+      ],
+      "repairCostPerHp": 0.6,
+      "refuelCostPerUnit": 1,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "scanner_charge",
+          "insurance_bond",
+          "steel_plate"
+        ],
+        "demand": {
+          "targeting_chip": 1.25,
+          "servo_motor": 1.2,
+          "titanium_ore": 1.15
+        },
+        "note": "Frontier prices: it pays well for what comes back from the Reaches."
+      }
+    },
+    {
+      "id": "sol_station_ark",
+      "name": "The Ark Hall",
+      "system": "sol",
+      "description": "The Ark's hall in Sol, built of leestone. Repairs, storage and the quartermaster's stores. It has no fabricator or refinery.",
+      "position": {
+        "x": -7700,
+        "y": 43800
+      },
+      "radius": 300,
+      "sprite": "station_medium",
+      "design": "bastion",
+      "dockingRadius": 750,
+      "services": [
+        "repair",
+        "storage",
+        "market"
+      ],
+      "repairCostPerHp": 0.7,
+      "refuelCostPerUnit": 1,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "field_repair_kit",
+          "boost_cell",
+          "insurance_bond",
+          "steel_plate",
+          "copper_wire"
+        ],
+        "demand": {
+          "leestone_ore": 1.3,
+          "leestone": 1.25,
+          "copper_wire": 1.1
+        },
+        "note": "Plain stores at plain prices. Pays well for leestone."
+      }
+    },
+    {
+      "id": "sol_station_helios",
+      "name": "Helios Seat",
+      "system": "sol",
+      "description": "The Helios Directorate's station on the Array's rail. Repairs, storage and Directorate procurement.",
+      "position": {
+        "x": -4900,
+        "y": -27200
+      },
+      "radius": 500,
+      "sprite": "station_medium",
+      "design": "ring",
+      "dockingRadius": 900,
+      "services": [
+        "repair",
+        "storage",
+        "market"
+      ],
+      "repairCostPerHp": 0.75,
+      "refuelCostPerUnit": 1,
+      "market": {
+        "sells": [
+          "repair_kit",
+          "boost_cell",
+          "power_coupling",
+          "copper_wire",
+          "composite_sheet",
+          "scanner_charge"
+        ],
+        "demand": {
+          "scrap_electronics": 1.25,
+          "power_coupling": 1.15,
+          "crystal_lens": 1.1
+        },
+        "note": "Directorate procurement: fair prices."
+      }
     }
   ]
 }

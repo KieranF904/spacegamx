@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Prism Splitter
+Mk IV · Small · Square · 1 cell
+Hull · mass105 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage14/s · reach 2,800
+Hits withEnergy · penetration 4
+Fire rate0.6/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+MountTurret, 270°
+FittingBolts on any side
+Power draw10/s
+
+== partStats (stats rows) ==
+GradeMk IV · Small
+Hits withEnergy · penetration 4
+Power draw10
+Hull · mass105 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 105
+
+== familyLabel ==
+Legendary
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+The splitter
+
+== keyStats ==
+14 dmg/s · reach 2,800 · cycle · draws 10
+
+== mountBadge ==
+TURRET 270°
+
+== mountingText ==
+Turret, 270°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 10","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":104.80000000000001,"mass":1.2,"firepower":13.75,"toughness":104.80000000000001,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":13.75,"range":2800,"damageType":"energy","pen":4,"draw":10}

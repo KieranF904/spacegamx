@@ -1,0 +1,49 @@
+== partTip (tooltip) ==
+Flash Screen
+Mk II · Square · 1 cell
+Hull · mass56 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw16/s
+Shield36
+Returns wholeno slow refill: it returns whole 4 s after it breaks, or at once for 4 E a point from a Capacitor bank touching it
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw16
+Shield36
+Returns wholereturns whole 4 s after it breaks
+Hull · mass56 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 56
+
+== familyLabel ==
+Shields
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+no slow refill, back whole after a break
+
+== keyStats ==
+shield 36 · back in 4 s · draws 16
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 13","why":"Learned at level 13 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 13","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":56.4,"mass":1.4,"firepower":0,"toughness":56.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":16,"shield":36}

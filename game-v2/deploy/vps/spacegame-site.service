@@ -1,0 +1,42 @@
+[Unit]
+Description=Space Game v2 website
+After=network.target spacegame-browser.service
+
+[Service]
+Type=simple
+User=spacegame
+Group=spacegame
+WorkingDirectory=/opt/spacegame/site
+# (tsx runs the TypeScript directly; there is no build step)
+ExecStart=/usr/bin/node node_modules/tsx/dist/cli.mjs src/server.ts
+Environment=NODE_ENV=production
+# Only reachable through nginx (ufw blocks everything but 22/80/443)
+Environment=SITE_HOST=127.0.0.1
+Environment=SITE_PORT=8791
+Environment=SITE_ORIGIN=https://space.brotherk3d.com
+Environment=SITE_TRUST_PROXY=1
+Environment=LOBBY_URL=http://127.0.0.1:8790
+Environment=GAME_MODE=static
+Environment=GAME_INDEX_FILE=/opt/spacegame/client/dist/index.html
+Environment=SITE_DATA_DIR=/opt/spacegame/data/site
+Environment=SITE_PROFILES_DIR=/opt/spacegame/data/profiles
+Environment=SITE_STATUS_FILE=/opt/spacegame/data/status/live.json
+# SITE_SECRET and LOBBY_ADMIN_SECRET (the lobby's own); remote-install.sh makes them. The site refuses to start without them.
+EnvironmentFile=/etc/spacegame/secrets.env
+Restart=always
+RestartSec=3
+# Below the game server on a shared 2 vCPU / 4 GB box
+CPUWeight=80
+MemoryHigh=384M
+MemoryMax=512M
+# Files it makes (posts, uploads): not readable by other users (nginx never serves data/site directly)
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+# Posts, comments, suggestions, uploads (the pilot profiles and the live status are only read)
+ReadWritePaths=/opt/spacegame/data/site
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

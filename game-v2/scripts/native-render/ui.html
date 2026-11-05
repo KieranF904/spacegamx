@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<!-- The native renderer's viewer page (service.ts serves it at /). It draws nothing itself: every change asks /render for a
+     fresh PNG and shows it, so it costs the browser nothing. Plain HTML, CSS and JS. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Native asset viewer</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #07090d; color: #c9d3e0; font: 12px 'Segoe UI', system-ui, sans-serif; }
+    #app { display: grid; grid-template-columns: 260px 1fr 250px; grid-template-rows: 1fr 26px; height: 100%; }
+    aside { overflow-y: auto; background: #0d1118; border-right: 1px solid #1d2532; padding: 8px; }
+    aside.right { border-right: 0; border-left: 1px solid #1d2532; }
+    #stage { position: relative; overflow: hidden; background: #05070b; cursor: grab; user-select: none; }
+    #stage.dragging { cursor: grabbing; }
+    #stage.checker { background: repeating-conic-gradient(#11151c 0% 25%, #171c25 0% 50%) 0 0 / 24px 24px; }
+    #view { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+    #busy { position: absolute; top: 8px; right: 10px; color: #6f86a6; font-size: 11px; opacity: 0; transition: opacity .15s; }
+    #busy.on { opacity: 1; }
+    #err { position: absolute; left: 12px; bottom: 10px; right: 12px; color: #ff9c8a; white-space: pre-wrap; font: 11px Consolas, monospace; }
+    #status { grid-column: 1 / 4; background: #0a0d13; border-top: 1px solid #1d2532; padding: 5px 10px; color: #7f8ca0; white-space: nowrap; overflow: hidden; }
+    input, select, button { background: #151b26; color: #d6deea; border: 1px solid #263044; border-radius: 3px; font: inherit; padding: 2px 4px; }
+    button { cursor: pointer; padding: 3px 8px; }
+    button:hover { background: #1d2635; }
+    #search, #asset { width: 100%; margin-bottom: 6px; }
+    .group { color: #8ea2bd; font-weight: 600; margin: 8px 0 2px; }
+    .item { padding: 2px 6px; border-radius: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item:hover { background: #172030; }
+    .item.on { background: #1f3350; color: #fff; }
+    .item small { color: #5d6b80; font-size: 10px; }
+    h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6f86a6; margin: 12px 0 4px; }
+    .row { display: grid; grid-template-columns: 70px 1fr 40px; gap: 4px; align-items: center; margin: 3px 0; }
+    .row input[type=range] { width: 100%; }
+    .row select, .row input[type=text] { width: 100%; grid-column: 2 / 4; }
+    .row em { font-style: normal; color: #7f8ca0; text-align: right; }
+    .row label { grid-column: 2 / 4; }
+    .export { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+    .keys { color: #64748a; margin-top: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <input id="search" placeholder="Search (/): sparrow, model laser, material, boss…" autocomplete="off">
+      <input id="asset" title="Asset id: ship:… boss:… model:…@E material:… piece:… sheet:… or several, comma separated">
+      <div id="list"></div>
+    </aside>
+    <div id="stage"><img id="view" alt=""><div id="busy">rendering…</div><div id="err"></div></div>
+    <aside class="right">
+      <div class="export">
+        <button id="fit" title="Fit (F)">Fit</button>
+        <select id="scale" title="Saved PNG scale"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select>
+        <button id="save">Save PNG</button>
+        <button id="copy" title="Copy this view's link">Copy link</button>
+      </div>
+      <h3>View</h3>
+      <div class="row"><span>Zoom</span><input type="range" id="zoom" min="-5" max="3" step="0.01"><em id="zoomV">fit</em></div>
+      <div class="row"><span>Angle</span><input type="range" id="angle" min="0" max="359" step="1"><em id="angleV">0°</em></div>
+      <div class="row"><span>Background</span><select id="bg"><option value="starfield">starfield</option><option value="dark">dark</option><option value="transparent">transparent</option></select></div>
+      <div class="row"><span>Sky</span><input type="text" id="sky" placeholder="sol, or band cluster emission ember void abyss remnant"></div>
+      <h3>Light</h3>
+      <div class="row"><span>Preset</span><select id="light"><option>sun</option><option>hangar</option><option>nebula</option><option>dark</option><option>flat</option></select></div>
+      <div class="row"><span>Direction</span><input type="range" id="lightDir" min="0" max="359" step="1"><em id="lightDirV">auto</em></div>
+      <div class="row"><span>Power</span><input type="range" id="lightPower" min="0" max="3" step="0.05"><em id="lightPowerV">auto</em></div>
+      <div class="row"><span>Ambient</span><input type="range" id="ambient" min="0" max="1.5" step="0.01"><em id="ambientV">auto</em></div>
+      <div class="row"><span>Elevation</span><input type="range" id="elevation" min="0.05" max="1.57" step="0.01"><em id="elevationV">auto</em></div>
+      <div class="row"><span>Sun colour</span><input type="color" id="lightColor" value="#f2e0bd"><em id="lightColorV">preset</em></div>
+      <div class="row"><span>Ambient tint</span><input type="color" id="ambientColor" value="#404045"><em id="ambientColorV">preset</em></div>
+      <div class="export"><button id="lightReset">Preset's light</button></div>
+      <h3>Engines and glow</h3>
+      <div class="row"><span>Flames</span><input type="range" id="flames" min="0" max="1" step="0.01"><em id="flamesV">0</em></div>
+      <div class="row"><span>Boost</span><label><input type="checkbox" id="boost"> longer, violet</label></div>
+      <div class="row"><span>Exhaust</span><label><input type="checkbox" id="exhaust" checked> particles</label></div>
+      <div class="row"><span>Bloom</span><label><input type="checkbox" id="bloom" checked> glow halo</label></div>
+      <div class="row"><span>Frame heat</span><input type="range" id="heat" min="0" max="1" step="0.01"><em id="heatV">0</em></div>
+      <h3>Ship</h3>
+      <div class="row"><span>Turret aim</span><input type="range" id="aim" min="0" max="359" step="1"><em id="aimV">rest</em></div>
+      <div class="row"><span>Damage</span><input type="range" id="damage" min="0" max="1" step="0.01"><em id="damageV">0</em></div>
+      <div class="row"><span>Seed</span><input type="range" id="seed" min="1" max="50" step="1"><em id="seedV">1</em></div>
+      <div class="row"><span>Tint</span><input type="text" id="tint" placeholder="#rrggbb or faction:pirates"></div>
+      <div class="row"><span>Facing</span><select id="facing"><option value="auto">auto</option><option>N</option><option>E</option><option>S</option><option>W</option></select></div>
+      <div class="row"><span>Stub</span><label><input type="checkbox" id="stub" checked> models on a hull stub</label></div>
+      <div class="row"><span>Labels</span><label><input type="checkbox" id="labels" checked> under each (sheets)</label></div>
+      <div class="keys">
+        Drag: pan · wheel: zoom · double-click: fit<br>
+        / search · ↑↓ pick · Enter show<br>
+        ←→ turn 15° · F fit · R reset view<br>
+        [ ] zoom · L next light · B background<br>
+        Settings live in the link.
+      </div>
+    </aside>
+    <div id="status"><span id="info">…</span></div>
+  </div>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const DEF = { asset: 'ship:sparrow-t', zoom: 'fit', x: 0, y: 0, angle: 0, bg: 'starfield', sky: 'sol', flames: 0, boost: false, exhaust: true, bloom: true, heat: 0, light: 'sun', lightDir: null, lightPower: null, ambient: null, elevation: null, lightColor: null, ambientColor: null,
+  aim: null, damage: 0, seed: 1, tint: '', facing: 'auto', stub: true, labels: true };
+let P = { ...DEF };
+let lastZoom = 1;   // the zoom the last render used (fit's, when fitting)
+let assets = [], shown = [], cursor = -1;
+
+// ---- state in the hash
+
+function readHash() {
+  const sp = new URLSearchParams(location.hash.slice(1));
+  for (const k of Object.keys(DEF)) {
+    if (!sp.has(k)) continue;
+    const v = sp.get(k), d = DEF[k];
+    P[k] = typeof d === 'boolean' ? v !== '0' : v === 'auto' || v === '' ? (d === null ? null : v) : (typeof d === 'number' || d === null) && !isNaN(+v) ? +v : v;
+  }
+}
+function query(extra = {}) {
+  const q = new URLSearchParams();
+  const all = { ...P, ...extra };
+  for (const [k, v] of Object.entries(all)) {
+    if (v === null || v === '' || v === DEF[k]) continue;
+    q.set(k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
+  }
+  return q;
+}
+function writeHash() { history.replaceState(null, '', '#' + query().toString()); }
+
+// ---- the list
+
+async function loadAssets() {
+  assets = await (await fetch('/assets')).json();
+  // (sheets first, as in the game's viewer)
+  const sheets = ['models', 'materials', 'pieces', 'ships', 'enemy', 'bosses'].map((s) => ({ id: `sheet:${s}`, label: `Sheet: ${s}`, group: 'Sheets', kind: 'sheet' }));
+  assets = [...sheets, ...assets];
+  filter();
+}
+function filter() {
+  const words = $('search').value.toLowerCase().split(/\s+/).filter(Boolean);
+  shown = assets.filter((e) => words.every((w) => `${e.id} ${e.label} ${e.group}`.toLowerCase().includes(w)));
+  cursor = shown.findIndex((e) => e.id === P.asset);
+  const list = $('list'), frag = document.createDocumentFragment();
+  let group = '';
+  shown.slice(0, 600).forEach((e, i) => {
+    if (e.group !== group) { group = e.group; const g = document.createElement('div'); g.className = 'group'; g.textContent = group; frag.appendChild(g); }
+    const d = document.createElement('div');
+    d.className = 'item' + (e.id === P.asset ? ' on' : '');
+    d.dataset.i = i;
+    d.innerHTML = `${esc(e.label)} <small>${esc(e.id)}</small>`;
+    d.onclick = () => pick(i);
+    frag.appendChild(d);
+  });
+  list.replaceChildren(frag);
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function mark() {
+  for (const el of document.querySelectorAll('.item')) {
+    const on = +el.dataset.i === cursor;
+    el.classList.toggle('on', on);
+    if (on) el.scrollIntoView({ block: 'nearest' });
+  }
+}
+function pick(i) {
+  if (!shown[i]) return;
+  cursor = i;
+  P.asset = shown[i].id;
+  P.zoom = 'fit'; P.x = 0; P.y = 0;
+  mark();
+  sync(); request();
+}
+
+// ---- controls
+
+const NULLABLE = ['lightDir', 'lightPower', 'ambient', 'elevation', 'aim'];
+function sync() {
+  $('asset').value = P.asset;
+  $('zoom').value = P.zoom === 'fit' ? Math.log2(lastZoom) : Math.log2(P.zoom);
+  $('zoomV').textContent = P.zoom === 'fit' ? `fit` : `${(+P.zoom).toFixed(2)}`;
+  $('angle').value = P.angle; $('angleV').textContent = `${P.angle}°`;
+  for (const k of ['bg', 'light', 'facing']) $(k).value = P[k];
+  for (const k of NULLABLE) {
+    if (P[k] !== null) $(k).value = P[k];
+    $(k + 'V').textContent = P[k] === null ? (k === 'aim' ? 'rest' : 'auto') : k === 'lightDir' || k === 'aim' ? `${P[k]}°` : (+P[k]).toFixed(2);
+  }
+  for (const k of ['lightColor', 'ambientColor']) { if (P[k]) $(k).value = P[k]; $(k + 'V').textContent = P[k] ?? 'preset'; $(k + 'V').title = 'click: back to the preset'; }
+  $('flames').value = P.flames; $('flamesV').textContent = (+P.flames).toFixed(2);
+  $('heat').value = P.heat; $('heatV').textContent = (+P.heat).toFixed(2);
+  $('boost').checked = P.boost; $('exhaust').checked = P.exhaust; $('bloom').checked = P.bloom;
+  $('sky').value = P.sky === 'sol' ? '' : P.sky;
+  $('damage').value = P.damage; $('damageV').textContent = (+P.damage).toFixed(2);
+  $('seed').value = P.seed; $('seedV').textContent = P.seed;
+  $('tint').value = P.tint ?? '';
+  $('stub').checked = P.stub; $('labels').checked = P.labels;
+  $('stage').classList.toggle('checker', P.bg === 'transparent');
+}
+function bind() {
+  $('zoom').oninput = (e) => { P.zoom = +(2 ** +e.target.value).toFixed(4); sync(); request(); };
+  $('angle').oninput = (e) => { P.angle = +e.target.value; sync(); request(); };
+  for (const k of ['bg', 'light', 'facing']) $(k).onchange = (e) => { P[k] = e.target.value; sync(); request(); };
+  for (const k of NULLABLE) $(k).oninput = (e) => { P[k] = +e.target.value; sync(); request(); };
+  for (const k of ['flames', 'heat']) $(k).oninput = (e) => { P[k] = +e.target.value; sync(); request(); };
+  for (const k of ['boost', 'exhaust', 'bloom']) $(k).onchange = (e) => { P[k] = e.target.checked; request(); };
+  $('sky').onchange = (e) => { P.sky = e.target.value.trim() || 'sol'; request(); };
+  for (const k of ['damage', 'seed']) $(k).oninput = (e) => { P[k] = +e.target.value; sync(); request(); };
+  $('aimV').onclick = () => { P.aim = null; sync(); request(); };
+  for (const k of ['lightColor', 'ambientColor']) {
+    $(k).oninput = (e) => { P[k] = e.target.value; sync(); request(); };
+    $(k + 'V').onclick = () => { P[k] = null; sync(); request(); };
+  }
+  $('aimV').title = 'click: rest';
+  $('tint').onchange = (e) => { P.tint = e.target.value.trim(); request(); };
+  $('stub').onchange = (e) => { P.stub = e.target.checked; request(); };
+  $('labels').onchange = (e) => { P.labels = e.target.checked; request(); };
+  $('lightReset').onclick = () => { for (const k of ['lightDir', 'lightPower', 'ambient', 'elevation', 'lightColor', 'ambientColor']) P[k] = null; sync(); request(); };
+  $('asset').onchange = (e) => { P.asset = e.target.value.trim(); P.zoom = 'fit'; P.x = 0; P.y = 0; filter(); sync(); request(); };
+  $('fit').onclick = fit;
+  $('save').onclick = save;
+  $('copy').onclick = () => navigator.clipboard?.writeText(location.href);
+  $('search').oninput = () => { filter(); cursor = shown.length ? 0 : -1; mark(); };
+  // Pan by dragging, zoom with the wheel (about the pointer), fit on double-click
+  const stage = $('stage');
+  let drag = null;
+  stage.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, px: P.x, py: P.y }; stage.setPointerCapture(e.pointerId); stage.classList.add('dragging'); };
+  stage.onpointermove = (e) => {
+    if (!drag) return;
+    const z = (P.zoom === 'fit' ? lastZoom : P.zoom);
+    P.x = Math.round(drag.px - (e.clientX - drag.x) / z); P.y = Math.round(drag.py - (e.clientY - drag.y) / z);
+    if (P.zoom === 'fit') P.zoom = +lastZoom.toFixed(4);
+    request();
+  };
+  stage.onpointerup = () => { drag = null; stage.classList.remove('dragging'); sync(); };
+  stage.ondblclick = fit;
+  stage.onwheel = (e) => {
+    e.preventDefault();
+    const z0 = P.zoom === 'fit' ? lastZoom : P.zoom, z1 = Math.max(0.01, Math.min(64, z0 * Math.exp(-e.deltaY * 0.0015)));
+    const r = stage.getBoundingClientRect(), mx = e.clientX - r.left - r.width / 2, my = e.clientY - r.top - r.height / 2;
+    // (the point under the pointer stays put)
+    P.x = Math.round(P.x + mx / z0 - mx / z1); P.y = Math.round(P.y + my / z0 - my / z1);
+    P.zoom = +z1.toFixed(4);
+    sync(); request();
+  };
+  new ResizeObserver(() => request()).observe(stage);
+  addEventListener('keydown', onKey);
+}
+function fit() { P.zoom = 'fit'; P.x = 0; P.y = 0; sync(); request(); }
+function onKey(e) {
+  const typing = e.target.tagName === 'INPUT' && e.target.type === 'text';
+  if (e.key === '/' && !typing) { e.preventDefault(); $('search').focus(); $('search').select(); return; }
+  if (e.target === $('search')) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); cursor = Math.max(0, Math.min(shown.length - 1, cursor + (e.key === 'ArrowDown' ? 1 : -1))); mark(); pick(cursor); }
+    else if (e.key === 'Enter') { pick(Math.max(0, cursor)); }
+    else if (e.key === 'Escape') { $('search').blur(); }
+    return;
+  }
+  if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (k === 'ArrowDown' || k === 'ArrowUp') { e.preventDefault(); pick(Math.max(0, Math.min(shown.length - 1, cursor + (k === 'ArrowDown' ? 1 : -1)))); }
+  else if (k === 'ArrowLeft' || k === 'ArrowRight') { e.preventDefault(); P.angle = ((P.angle + (k === 'ArrowRight' ? 15 : -15)) % 360 + 360) % 360; sync(); request(); }
+  else if (k === 'f' || k === 'F') fit();
+  else if (k === 'r' || k === 'R') { P.angle = 0; fit(); }
+  else if (k === '[' || k === ']') { const z0 = P.zoom === 'fit' ? lastZoom : P.zoom; P.zoom = +(z0 * (k === ']' ? 1.25 : 0.8)).toFixed(4); sync(); request(); }
+  else if (k === 'l' || k === 'L') { const L = ['sun', 'hangar', 'nebula', 'dark', 'flat']; P.light = L[(L.indexOf(P.light) + 1) % L.length]; sync(); request(); }
+  else if (k === 'b' || k === 'B') { const B = ['starfield', 'dark', 'transparent']; P.bg = B[(B.indexOf(P.bg) + 1) % B.length]; sync(); request(); }
+}
+
+// ---- rendering: one request at a time, the newest wins, the stale ones cancelled
+
+let timer = 0, inflight = null, shownUrl = '';
+function request() {
+  writeHash();
+  clearTimeout(timer);
+  timer = setTimeout(go, 40);
+}
+async function go() {
+  const stage = $('stage'), r = stage.getBoundingClientRect();
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const q = query({ w: Math.max(64, Math.round(r.width)), h: Math.max(64, Math.round(r.height)), scale: dpr, compress: 0 });
+  inflight?.abort();
+  const ctl = new AbortController();
+  inflight = ctl;
+  $('busy').classList.add('on');
+  const t0 = performance.now();
+  try {
+    const res = await fetch('/render?' + q, { signal: ctl.signal });
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    if (ctl.signal.aborted) return;
+    const url = URL.createObjectURL(blob);
+    $('view').src = url;
+    if (shownUrl) URL.revokeObjectURL(shownUrl);
+    shownUrl = url;
+    $('err').textContent = '';
+    lastZoom = +(res.headers.get('X-Render-Zoom') ?? 1) / dpr;
+    const info = JSON.parse(res.headers.get('X-Render-Info') ?? '{}');
+    const what = info.items ? `${info.items} assets, ${info.vertices.toLocaleString()} vertices` : `${info.name} · ${info.parts} parts · ${info.vertices?.toLocaleString()} vertices${info.rigid ? ' · rigid' : ''}`;
+    const miss = info.missing?.length ? ` · not found: ${info.missing.slice(0, 3).join(', ')}` : '';
+    $('info').textContent = `${what}${miss} · zoom ${lastZoom.toFixed(3)} · service ${res.headers.get('X-Render-Total-Ms')} ms (build ${res.headers.get('X-Render-Build-Ms')}, gpu ${res.headers.get('X-Render-Gpu-Ms')}, png ${res.headers.get('X-Render-Png-Ms')}) · round trip ${Math.round(performance.now() - t0)} ms`;
+    if (P.zoom === 'fit') $('zoom').value = Math.log2(lastZoom);
+  } catch (e) {
+    if (e.name !== 'AbortError') $('err').textContent = String(e.message ?? e);
+  } finally {
+    if (inflight === ctl) { inflight = null; $('busy').classList.remove('on'); }
+  }
+}
+
+async function save() {
+  const stage = $('stage'), r = stage.getBoundingClientRect(), scale = +$('scale').value;
+  const q = query({ w: Math.round(r.width), h: Math.round(r.height), scale, compress: 6 });
+  const res = await fetch('/render?' + q);
+  if (!res.ok) { $('err').textContent = await res.text(); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(await res.blob());
+  a.download = `${P.asset.replace(/[^A-Za-z0-9_-]+/g, '_')}${scale > 1 ? `@${scale}x` : ''}.png`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+readHash();
+bind();
+sync();
+loadAssets().then(() => request());
+addEventListener('hashchange', () => { readHash(); sync(); request(); });
+</script>
+</body>
+</html>

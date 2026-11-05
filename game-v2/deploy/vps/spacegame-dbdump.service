@@ -1,0 +1,25 @@
+[Unit]
+Description=Space Game v2: nightly dump of its Postgres database (accounts and profiles)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=spacegame
+Group=spacegame
+# DATABASE_URL (the spacegame database only): the script hands it to pg_dump as PG* settings and a password file in
+# this unit's private /tmp, never on the command line
+EnvironmentFile=/etc/spacegame/secrets.env
+# Keep the last 14 nights: data/backups/db/spacegame-YYYY-MM-DD.sql.gz (deploy/vps/spacegame-dbdump.sh)
+ExecStart=/opt/spacegame/bin/spacegame-dbdump
+UMask=0077
+# A background job on a shared box: last in line for CPU and disk
+Nice=15
+IOSchedulingClass=idle
+CPUWeight=20
+MemoryHigh=256M
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/spacegame/data/backups
+PrivateTmp=true

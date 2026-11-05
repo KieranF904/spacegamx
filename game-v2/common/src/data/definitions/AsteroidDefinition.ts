@@ -405,6 +405,60 @@ export const DEFAULT_ASTEROID_FIELDS: AsteroidFieldConfig[] = [
     ],
   },
   
+  // Cinder Reach - slag and iron around a red giant
+  {
+    id: 'cinder_belt',
+    name: 'Slag Belt',
+    center: { x: 0, y: 0 },
+    radius: 34000,
+    density: 0.65,
+    asteroidTypes: [
+      { id: 'asteroid_metal', weight: 50 },
+      { id: 'asteroid_mega', weight: 15 },
+      { id: 'asteroid_fuel', weight: 25 },
+      { id: 'asteroid_crystal', weight: 10 },
+    ],
+    hazards: [
+      { type: 'radiation', intensity: 0.25 },
+    ],
+  },
+
+  // The Maw - shattered remains spiralling into the black hole
+  {
+    id: 'maw_shards',
+    name: 'The Shard Ring',
+    center: { x: 0, y: 0 },
+    radius: 24000,
+    density: 0.55,
+    asteroidTypes: [
+      { id: 'asteroid_crystal', weight: 35 },
+      { id: 'asteroid_mega', weight: 30 },
+      { id: 'asteroid_metal', weight: 30 },
+      { id: 'comet', weight: 5 },
+    ],
+    hazards: [
+      { type: 'gravity_well', intensity: 0.6, radius: 9000, center: { x: 0, y: 0 } },
+    ],
+  },
+
+  // Glasswater Expanse - ice and crystal lit by the pulsar
+  {
+    id: 'glasswater_field',
+    name: 'Glasswater Field',
+    center: { x: 0, y: 0 },
+    radius: 36000,
+    density: 0.5,
+    asteroidTypes: [
+      { id: 'asteroid_ice', weight: 45 },
+      { id: 'asteroid_crystal', weight: 35 },
+      { id: 'comet', weight: 15 },
+      { id: 'asteroid_fuel', weight: 5 },
+    ],
+    hazards: [
+      { type: 'debris_storm', intensity: 0.25 },
+    ],
+  },
+
   // === Generic reusable fields ===
   
   {

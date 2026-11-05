@@ -1,0 +1,152 @@
+{
+  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core; or engine: a part with thrust, which the gyros and the burst strafer are not), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. shapes: silhouettes a design is asked for, one per trial (so a model has a target that is not the example). weights: check() score weights. targets: measures of the ship the role should reach (weaponShare, cargoShare, armourShare: share of the cells; thrustToMass; generationPerCell), the fit score. The lean score (check.ts) keeps a design from padding itself with batteries: the review ships run about two fifths power plant, and a design past that scores lower.",
+  "roles": [
+    {
+      "id": "starter",
+      "name": "Starter fighter",
+      "summary": "a small, cheap first ship: a couple of guns, a reactor and a battery, two engines",
+      "size": { "cells": [14, 40], "maxWidth": 10, "maxHeight": 8 },
+      "band": { "maxLevel": 5 },
+      "require": [
+        { "role": "generator", "min": 1 },
+        { "role": "weapon", "min": 2 },
+        { "role": "engine", "min": 2 }
+      ],
+      "encourage": [{ "role": "store", "min": 1, "why": "a battery between the reactor and the guns keeps them firing" }],
+      "style": [
+        "Keep it small and tidy: a short nose, the core in the middle, two guns at the front corners facing ^, two engines at the back facing v.",
+        "Mirror it left to right.",
+        "A wedge or two of hull (shaped pieces) at the wing tips looks good but is optional."
+      ],
+      "example": "dev/review-wren",
+      "targets": { "weaponShare": 0.08, "thrustToMass": 0.2 },
+      "shapes": [
+        "a dart: narrow (5 columns) and long (7 rows), with a pointed nose",
+        "a flying wing: wide (9 columns) and short (4 rows), the guns at the wing roots",
+        "an arrowhead: wings swept back from a short nose, 7 columns wide and 6 rows long",
+        "a stubby brick: compact, 6 columns wide and 5 rows long, the engines in a block at the back"
+      ]
+    },
+    {
+      "id": "gunship",
+      "name": "Gunship",
+      "summary": "a brawler: as many guns as it can keep firing, armour at the front and sides",
+      "size": { "cells": [35, 90], "maxWidth": 14, "maxHeight": 12 },
+      "band": { "maxLevel": 24 },
+      "require": [
+        { "role": "generator", "min": 1 },
+        { "role": "store", "min": 2 },
+        { "role": "weapon", "min": 4 },
+        { "role": "engine", "min": 3 }
+      ],
+      "encourage": [
+        { "fn": "armor", "min": 4, "why": "armour on the nose and flanks" },
+        { "family": "shield", "min": 1, "why": "a shield keeps it in the fight" }
+      ],
+      "style": [
+        "Guns in a forward battery facing ^, turrets out at the flanks.",
+        "Armour across the nose and down the sides; the core, generators and stores deep inside.",
+        "Each group of guns gets its own store beside a generator."
+      ],
+      "example": "dev/review-kestrel",
+      "shapes": [
+        "a hammerhead: a wide armoured nose (12 columns) over a narrower body, 10 rows long",
+        "a long brawler: narrow (8 columns) and long (12 rows), the guns down the front half",
+        "a diamond: 11 columns wide at the middle, tapering to the nose and the tail, 10 rows long",
+        "a twin-boom: two gun pods on short arms either side of the core, 12 columns wide and 8 rows long"
+      ],
+      "weights": { "gunsOut": 0.2, "armourOutside": 0.2 },
+      "targets": { "weaponShare": 0.12, "armourShare": 0.15 }
+    },
+    {
+      "id": "beam_frigate",
+      "name": "Beam frigate",
+      "summary": "a mid-size ship built around beams and pulse lasers, with the generation to keep them lit",
+      "size": { "cells": [50, 120], "maxWidth": 14, "maxHeight": 14 },
+      "band": { "maxLevel": 32 },
+      "require": [
+        { "family": ["laser", "pulse"], "min": 2 },
+        { "role": "generator", "min": 2 },
+        { "role": "store", "min": 2 },
+        { "role": "engine", "min": 4 }
+      ],
+      "encourage": [{ "family": "shield", "min": 2, "why": "shields" }],
+      "style": [
+        "Lasers are hungry: put generators and stores right behind them.",
+        "A long, narrow hull with the beams forward and the engines in a row at the back.",
+        "Use Diodes to keep an engine or shield reserve that the beams can't drain."
+      ],
+      "example": "dev/review-heron",
+      "targets": { "weaponShare": 0.08, "generationPerCell": 2.5 }
+    },
+    {
+      "id": "missile_boat",
+      "name": "Missile boat",
+      "summary": "a stand-off ship: missiles and torpedoes, light armour, fast engines",
+      "size": { "cells": [40, 100], "maxWidth": 14, "maxHeight": 12 },
+      "band": { "maxLevel": 33 },
+      "require": [
+        { "family": ["missile", "torpedo"], "min": 3 },
+        { "role": "generator", "min": 2 },
+        { "role": "engine", "min": 4 }
+      ],
+      "encourage": [{ "fn": "point_defence_turret", "min": 1, "why": "point defence against return fire" }],
+      "style": [
+        "Missile and torpedo launchers face forward (^) and need the cells ahead of them clear.",
+        "Keep it light and quick: good thrust for its mass.",
+        "Launchers along the flanks, mirrored."
+      ],
+      "example": "dev/review-mako",
+      "weights": { "enginesAft": 0.2 },
+      "targets": { "weaponShare": 0.12, "thrustToMass": 0.12 }
+    },
+    {
+      "id": "hauler",
+      "name": "Hauler",
+      "summary": "a cargo ship: big holds, a tow beam or mining gear, a little self-defence",
+      "size": { "cells": [40, 130], "maxWidth": 14, "maxHeight": 16 },
+      "band": { "maxLevel": 20 },
+      "require": [
+        { "fn": "cargo", "min": 6 },
+        { "role": "generator", "min": 1 },
+        { "role": "engine", "min": 3 }
+      ],
+      "encourage": [
+        { "family": ["tow", "mining"], "min": 1, "why": "something to fill the holds with" },
+        { "role": "weapon", "min": 1, "why": "a turret or two to see off scavengers" }
+      ],
+      "style": [
+        "Cargo holds in a big block in the middle, hull around them.",
+        "Engines strong enough for the loaded mass.",
+        "Guns are an afterthought: a turret or two at the corners."
+      ],
+      "weights": { "gunsOut": 0.05, "compactness": 0.2 },
+      "targets": { "cargoShare": 0.25, "thrustToMass": 0.06 }
+    },
+    {
+      "id": "capital",
+      "name": "Capital ship",
+      "summary": "a big warship in separate power grids: weapons, shields and engines each with their own generators",
+      "size": { "cells": [150, 260], "maxWidth": 20, "maxHeight": 24 },
+      "band": { "maxLevel": 40 },
+      "require": [
+        { "role": "generator", "min": 4 },
+        { "role": "store", "min": 6 },
+        { "role": "weapon", "min": 6 },
+        { "role": "engine", "min": 4 },
+        { "family": "shield", "min": 2 }
+      ],
+      "encourage": [
+        { "role": "diode", "min": 2, "why": "Diodes between the grids keep the engines' reserve from the guns" },
+        { "fn": "armor", "min": 10, "why": "an armoured shell" }
+      ],
+      "style": [
+        "Build it as three grids in a row: weapons forward, shields in the middle, engines aft, joined by Diodes and Conduits.",
+        "Armour all round the outside; nothing vital on the edge.",
+        "Big guns forward facing ^, turrets out at the flanks, a wall of engines at the back facing v."
+      ],
+      "example": "dev/review-monarch",
+      "targets": { "weaponShare": 0.08, "armourShare": 0.2, "thrustToMass": 0.06 }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+== partTip (tooltip) ==
+Jump Coil
+Mk II · Square · 1 cell
+Hull · mass75 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw8/s
+Jump coilserves 13 cells of hull
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw8
+Hull · mass75 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 75
+
+== familyLabel ==
+Jump coils
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+more jump for a bigger hull
+
+== keyStats ==
+jump 13 cells · draws 8
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 14","why":"Learned at level 14 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 14","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":75.2,"mass":1.4,"firepower":0,"toughness":75.2,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":8}

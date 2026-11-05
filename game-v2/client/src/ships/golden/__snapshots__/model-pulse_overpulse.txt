@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Overpulse
+Mk III · Medium · Panel · 2 cells
+Hull · mass157 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage40/s · reach 5,040
+Hits withEnergy · penetration 2.5
+Clip12 rounds at 10/s · reloads in 1.5s from energy (36 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
+MountTurret, 120°
+FittingBolts on from behind only
+Power draw13/s
+
+== partStats (stats rows) ==
+GradeMk III · Medium
+Hits withEnergy · penetration 3
+Power draw13
+Hull · mass157 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 157
+
+== familyLabel ==
+Pulse guns
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+dumps a clip of bolts into shields, barely scratches hull
+
+== keyStats ==
+40 dmg/s · reach 5,040 · clip 12 · 1.5s reload · draws 13
+
+== mountBadge ==
+TURRET 120°
+
+== mountingText ==
+Turret, 120°
+Bolts on from behind only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 25","why":"Learned at level 25 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 25","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":156.79999999999998,"mass":2,"firepower":40,"toughness":156.79999999999998,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":40,"range":5040,"damageType":"energy","pen":2.5,"draw":13.34}

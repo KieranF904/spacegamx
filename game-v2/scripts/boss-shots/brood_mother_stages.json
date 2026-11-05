@@ -1,0 +1,96 @@
+[
+ {
+  "resize": [
+   1500,
+   1400
+  ],
+  "eval": "(async () => { localStorage.setItem('sg.tutorialDone','1'); document.querySelector('.guest-button').click(); await new Promise(r => setTimeout(r, 2500)); [...document.querySelectorAll('button')].find(b => /join/i.test(b.innerText)).click(); await new Promise(r => setTimeout(r, 9000));\n const g = window.__game, sleep = (ms) => new Promise(r => setTimeout(r, ms));\n g.network.send({ type: 'admin', cmd: 'god', args: { on: true } }); await sleep(400);\n g.network.send({ type: 'devTeleport', systemId: 'borealis', x: 56000, y: 51660 }); await sleep(7000);\n g.network.send({ type: 'devBoss', reset: true }); await sleep(6000);\n const PIN = { x: 56000, y: 54000 };\n const sc = g.shipClient, orig = sc.placeReplica.bind(sc); window.__pin = false;\n sc.placeReplica = (e, t) => { if (window.__pin && window.__boss && e.id === window.__boss.id) { const s = sc.store.get(e.id), com = s ? s.derived.com : [0, 0], CS = sc.store.tuning.cellSize; e.renderX = e.x = PIN.x + com[0] * CS; e.renderY = e.y = PIN.y + com[1] * CS; e.renderAngle = -Math.PI / 2; return true; } return orig(e, t); };\n g.renderer.setCameraTarget(() => PIN);\n sc.renderer.hidden = (id) => window.__pin && (!window.__boss || id !== window.__boss.id);\n g.input.zoom = g.input.targetZoom = 0.36; g.renderer.setCameraTarget(() => ({ x: PIN.x, y: PIN.y + 280 }));\n g.renderer.surface.ground.visible = false;\n g.renderer.app.renderer.background.color = 0x8a8590; g.renderer.app.renderer.background.alpha = 1;\n const main = g.renderer.app.canvas;\n for (const el of document.body.querySelectorAll('*')) { if (el === main || el.contains(main)) continue; el.style.visibility = 'hidden'; }\n const hideText = (o) => { if (typeof o.text === 'string') { o.renderable = false; o.alpha = 0; } for (const c of o.children ?? []) hideText(c); };\n g.renderer.app.ticker.add(() => { hideText(g.renderer.app.stage); g.renderer.surface.ground.visible = false; });\n window.__stage = async (n) => { window.__pin = false; g.network.send({ type: 'devBoss', shed: n }); await sleep(2500); window.__boss = [...g.state.entities.values()].find(e => e.type === 10 && e.data?.[4] === 2 && g.shipClient.store.get(e.id)?.blueprint.name === 'Brood Mother'); window.__pin = true; await sleep(2500); return window.__boss ? 'ok' : 'none'; };\n return await window.__stage(0); })()"
+ },
+ {
+  "eval": "window.__at = async (n, wait) => { const g = window.__game, sleep = (ms) => new Promise(r => setTimeout(r, ms)); window.__pin = false; g.network.send({ type: 'devBoss', shed: n }); await sleep(1200); window.__boss = [...g.state.entities.values()].find(e => e.type === 10 && e.data?.[4] === 2 && g.shipClient.store.get(e.id)?.blueprint.name === 'Brood Mother'); window.__pin = true; await sleep(wait); return window.__boss ? 'ok' : 'none'; }; 'ok'"
+ },
+ {
+  "eval": "window.__at(0,2500)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ },
+ {
+  "eval": "window.__at(18,2200)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ },
+ {
+  "eval": "window.__at(35,1000)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ },
+ {
+  "eval": "window.__at(36,6000)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ },
+ {
+  "eval": "window.__at(54,2200)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ },
+ {
+  "eval": "window.__at(56,2600)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ },
+ {
+  "eval": "window.__at(59,2200)"
+ },
+ {
+  "shot": 1,
+  "clip": {
+   "x": 150,
+   "y": 100,
+   "width": 1200,
+   "height": 1200
+  }
+ }
+]

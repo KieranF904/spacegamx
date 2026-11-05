@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Bastion
+Mk IV · Large · Block · 4 cells
+Hull · mass545 hp · 7.7
+Armour · build4 · 15.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage100/s · reach 4,800
+Hits withKinetic · penetration 5
+Clip2 rounds at 3.3/s · reloads in 3.0s from energy (60 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 2 clear cells ahead
+Power draw17/s
+
+== partStats (stats rows) ==
+GradeMk IV · Large
+Hits withKinetic · penetration 4
+Power draw17
+Hull · mass545 hp · 7.7
+Armour · build4 · 15.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 545
+
+== familyLabel ==
+Cannons
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+two huge dodgeable shells, then a long reload
+
+== keyStats ==
+100 dmg/s · reach 4,800 · clip 2 · 3.0s reload · draws 17
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 2 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 30","why":"Learned at level 30 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 30","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":544.96,"mass":7.68,"firepower":99.99999999888888,"toughness":544.96,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":99.99999999888888,"range":4800.0000024,"damageType":"kinetic","pen":5,"draw":16.68}

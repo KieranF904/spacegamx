@@ -3,88 +3,3537 @@
     {
       "id": "sol",
       "name": "Sol System",
-      "description": "The home system of humanity. A warm yellow star with several stations.",
+      "description": "Home system of the colony. The inner system is patrolled and safe; the middle belts are contested; the Reaches at the rim are lawless.",
       "starColor": "#FFDD44",
-      "starRadius": 1000,
-      "position": { "x": -60000, "y": 0 },
+      "starRadius": 21000,
+      "position": {
+        "x": -60000,
+        "y": 0
+      },
+      "sector": "core",
+      "centralBody": {
+        "type": "sun",
+        "plasma": {"limbDarkening": 0.55, "limbPower": 0.6, "limbContrast": 0.45, "limbTint": "#a82800", "limbTintStrength": 0.5, "bump": 0.6, "rim": 0.7, "rimColor": "#ffb37a", "rimWidth": 0.008, "halo": 0.35, "spicules": 0.035, "evolve": 0.012, "warpEvolve": 0.006, "warpWander": 0.15, "threads": 2.4, "threadFlow": 0.3, "granulation": 0.35, "fineContrast": 1.25},
+        "radius": 21000,
+        "hue": 40,
+        "detailStar": true,
+        "detailParams": {
+          "radius": 21000,
+          "hue": 40,
+          "octaves": 5,
+          "lacunarity": 2,
+          "gain": 0.5,
+          "noiseScale": 4,
+          "animSpeed": 0.15,
+          "fbmContrast": 1,
+          "warpAmount": 0.4,
+          "warpScale": 0.5,
+          "turbulenceMix": 0.3,
+          "plasmaIntensity": 0.3,
+          "plasmaScale": 3,
+          "plasmaSpeed": 1,
+          "centerDarken": 0.3,
+          "centerHighlight": 0.7,
+          "centerMidpoint": 0.5,
+          "centerFalloff": 1.5,
+          "innerDarkening": 0,
+          "whiteBalance": 0,
+          "saturation": 1.1,
+          "edgeBrightness": 1.3,
+          "edgeThickness": 0.03,
+          "edgeSharpness": 0.5,
+          "limbDarkening": 0.3,
+          "glowIntensity": 0.8,
+          "glowSize": 0.1,
+          "glowRadius": 45800
+        },
+        "detailColors": {
+          "darkColor": "#5a1a00",
+          "midColor": "#cc4400",
+          "brightColor": "#ffaa22",
+          "edgeColor": "#ffdd66",
+          "plasmaColor": "#ffbb44",
+          "centerColor": "#fff2cc"
+        }
+      },
+      "visuals": {
+        "starHueShift": 0
+      },
       "hazards": [],
-      "asteroidDensity": 1.0,
+      "asteroidDensity": 1,
       "asteroidBelt": {
-        "innerRadius": 15000,
-        "outerRadius": 45000,
-        "count": 400
+        "innerRadius": 35000,
+        "outerRadius": 65000,
+        "count": 400,
+        "extra": [
+          {
+            "innerRadius": 150000,
+            "outerRadius": 182000,
+            "count": 160,
+            "field": "sol_shoal"
+          }
+        ]
       },
       "asteroidField": "sol_belt",
-      "stations": ["sol_station_central", "sol_station_mining", "sol_station_trade"],
-      "npcs": ["dr_vance", "merchant_joe"],
-      "enemies": [],
+      "stations": [
+        "sol_station_central",
+        "sol_station_mining",
+        "sol_station_trade",
+        "sol_station_lagrange",
+        "sol_station_sentinel",
+        "sol_station_farwatch",
+        "sol_station_ark",
+        "sol_station_helios"
+      ],
+      "planets": [
+        {
+          "id": "vesta",
+          "name": "Vesta",
+          "kind": "rocky",
+          "radius": 900,
+          "orbit": {
+            "radius": 31000,
+            "phase": 2.4,
+            "period": 240
+          },
+          "description": "A small cratered rocky planet close to the sun."
+        },
+        {
+          "id": "terra_nova",
+          "name": "Terra Nova",
+          "kind": "ocean",
+          "radius": 1900,
+          "surface": "terra_nova_surface",
+          "look": { "emitColor": [1.0, 0.68, 0.32] },
+          "orbit": {
+            "radius": 50000,
+            "phase": 0.9,
+            "period": 420
+          },
+          "moons": [
+            {
+              "name": "Selene",
+              "surface": "selene_siege",
+              "radius": 260,
+              "distance": 3400,
+              "period": 12,
+              "phase": 0
+            }
+          ],
+          "description": "An ocean world with a breathable atmosphere. Descend with X in orbit."
+        },
+        {
+          "id": "jovan",
+          "name": "Jovan",
+          "kind": "gas",
+          "look": { "storm": [0.9, -0.36, 0.13], "stormColor": [0.745, 0.27, 0.175], "storm2": [0.5, 6, 0.035] },
+          "hue": 32,
+          "radius": 4300,
+          "orbit": {
+            "radius": 74000,
+            "phase": 4.1,
+            "period": 720
+          },
+          "rings": {
+            "inner": 1.35,
+            "outer": 2.1,
+            "hue": 38
+          },
+          "moons": [
+            {
+              "radius": 380,
+              "distance": 7200,
+              "period": 18,
+              "phase": 1
+            },
+            {
+              "radius": 220,
+              "distance": 9800,
+              "period": 30,
+              "phase": 3
+            }
+          ],
+          "description": "A banded gas giant with a wide ring system."
+        },
+        {
+          "id": "ares",
+          "name": "Ares",
+          "kind": "desert",
+          "hue": 12,
+          "radius": 1150,
+          "orbit": {
+            "radius": 39000,
+            "phase": 3.9,
+            "period": 330
+          },
+          "moons": [
+            {
+              "radius": 160,
+              "distance": 2100,
+              "period": 7,
+              "phase": 0.4
+            },
+            {
+              "radius": 110,
+              "distance": 2900,
+              "period": 11,
+              "phase": 2.6
+            }
+          ],
+          "description": "A red desert planet with two moons and long-lasting dust storms."
+        },
+        {
+          "id": "nereid",
+          "name": "Nereid",
+          "kind": "ice",
+          "hue": 212,
+          "radius": 2700,
+          "orbit": {
+            "radius": 90000,
+            "phase": 0.6,
+            "period": 900
+          },
+          "rings": {
+            "inner": 1.45,
+            "outer": 2,
+            "hue": 205
+          },
+          "moons": [
+            {
+              "radius": 300,
+              "distance": 5600,
+              "period": 22,
+              "phase": 5
+            }
+          ],
+          "description": "A blue ice giant with a thin ring, on the outer edge of Sol."
+        },
+        {
+          "id": "thule",
+          "name": "Thule",
+          "kind": "ice",
+          "hue": 200,
+          "radius": 1400,
+          "orbit": {
+            "radius": 205000,
+            "phase": 3.6,
+            "period": 1800
+          },
+          "moons": [
+            {
+              "radius": 180,
+              "distance": 3200,
+              "period": 16,
+              "phase": 1.2
+            }
+          ],
+          "description": "A frozen dwarf planet at the outer edge of Sol."
+        },
+        {
+          "id": "greyback",
+          "name": "Greyback",
+          "kind": "rocky",
+          "hue": 215,
+          "radius": 520,
+          "orbit": {
+            "radius": 61000,
+            "phase": 5.2,
+            "period": 560
+          },
+          "description": "A dark planetoid with a long greyseam vein. The Miners' Guild works the seam."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_drift_tug",
+          "name": "Tug Halcyon's Wake",
+          "blueprint": "hauler",
+          "position": {
+            "x": 103799,
+            "y": -14828
+          },
+          "angle": 2.1,
+          "salvage": 175
+        },
+        {
+          "id": "wreck_drift_barge",
+          "name": "Ore Barge Tallow",
+          "blueprint": "hauler",
+          "position": {
+            "x": -36587,
+            "y": 104884
+          },
+          "angle": 4,
+          "salvage": 225
+        },
+        {
+          "id": "wreck_drift_picket",
+          "name": "Picket Ship Ninefold",
+          "blueprint": "wisp",
+          "position": {
+            "x": 63817,
+            "y": 87135
+          },
+          "angle": 0.7,
+          "salvage": 275
+        },
+        {
+          "id": "wreck_morrow",
+          "name": "Wreck of the Morrow",
+          "blueprint": "hauler",
+          "position": {
+            "x": 30824,
+            "y": -19815
+          },
+          "angle": 2.3,
+          "salvage": 150
+        },
+        {
+          "id": "wreck_kestrel",
+          "name": "Kestrel (abandoned)",
+          "blueprint": "halberd",
+          "position": {
+            "x": -18805,
+            "y": -33432
+          },
+          "angle": -0.7,
+          "salvage": 75
+        },
+        {
+          "id": "wreck_perseverance",
+          "name": "Colony Ship Perseverance",
+          "blueprint": "hauler",
+          "position": {
+            "x": -45617,
+            "y": -36494
+          },
+          "angle": 0.8,
+          "salvage": 450,
+          "log": {
+            "codex": "perseverance_log"
+          }
+        },
+        {
+          "id": "wreck_vesta_1",
+          "name": "Graveyard: Rook",
+          "blueprint": "wisp",
+          "position": {
+            "x": 29060,
+            "y": 10256
+          },
+          "angle": 1.9,
+          "salvage": 55
+        },
+        {
+          "id": "wreck_vesta_2",
+          "name": "Graveyard: Halberd",
+          "blueprint": "halberd",
+          "position": {
+            "x": 29693,
+            "y": 11770
+          },
+          "angle": -2.4,
+          "salvage": 80
+        },
+        {
+          "id": "wreck_vesta_3",
+          "name": "Graveyard: Wren",
+          "blueprint": "wisp",
+          "position": {
+            "x": 27426,
+            "y": 13569
+          },
+          "angle": 0.3,
+          "salvage": 55
+        },
+        {
+          "id": "wreck_vesta_4",
+          "name": "Graveyard: Pike",
+          "blueprint": "halberd",
+          "position": {
+            "x": 28421,
+            "y": 14479
+          },
+          "angle": 2.8,
+          "salvage": 80
+        },
+        {
+          "id": "wreck_tenth_vigil",
+          "name": "Dreadnought Vigil",
+          "blueprint": "sunspear",
+          "position": {
+            "x": -104000,
+            "y": -30000
+          },
+          "angle": 0.4,
+          "salvage": 650,
+          "log": {
+            "codex": "vigil_log"
+          }
+        },
+        {
+          "id": "wreck_tenth_lantern",
+          "name": "Frigate Lantern",
+          "blueprint": "halberd",
+          "position": {
+            "x": -101400,
+            "y": -31400
+          },
+          "angle": 2.2,
+          "salvage": 260
+        },
+        {
+          "id": "wreck_tenth_oath",
+          "name": "Frigate Oath",
+          "blueprint": "halberd",
+          "position": {
+            "x": -106400,
+            "y": -28100
+          },
+          "angle": -1.1,
+          "salvage": 260
+        },
+        {
+          "id": "wreck_tenth_cinder",
+          "name": "Gunboat Cinder",
+          "blueprint": "wisp",
+          "position": {
+            "x": -102800,
+            "y": -26900
+          },
+          "angle": 1.4,
+          "salvage": 180
+        },
+        {
+          "id": "wreck_tenth_rook",
+          "name": "Tender Rook",
+          "blueprint": "hauler",
+          "position": {
+            "x": -107300,
+            "y": -32600
+          },
+          "angle": 0.9,
+          "salvage": 220
+        },
+        {
+          "id": "wreck_grey_hour",
+          "name": "Ark Tender Grey Hour",
+          "blueprint": "ark-tender",
+          "position": {
+            "x": 52000,
+            "y": -92000
+          },
+          "angle": 1.9,
+          "salvage": 300,
+          "log": {
+            "codex": "grey_hour_log"
+          }
+        }
+      ],
+      "comets": [
+        {
+          "id": "halvorsen",
+          "name": "Comet Halvorsen",
+          "nucleus": 140,
+          "hue": 195,
+          "orbit": {
+            "a": 52000,
+            "e": 0.517,
+            "argP": 2.2,
+            "period": 45,
+            "phase": 2.6
+          },
+          "description": "A comet on a long elliptical orbit, passing the sun every 45 minutes."
+        }
+      ],
+      "structures": [
+        {
+          "id": "helios_array",
+          "name": "Helios Array",
+          "kind": "solar_ring",
+          "radius": 26000,
+          "segments": 120,
+          "oldArc": {
+            "from": 41,
+            "count": 9
+          },
+          "description": "A ring of solar collectors around the sun, serviced by automated drones. The seat of the Helios Directorate."
+        }
+      ],
+      "nests": [
+        {
+          "id": "sol_nest_nereid",
+          "name": "Nereid Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "around": "nereid",
+          "orbit": {
+            "radius": 7500,
+            "phase": 0.6,
+            "period": 14
+          },
+          "description": "A Scrapborn nest built around a greyseam deposit in Nereid's orbit. Mites, and occasionally hulks."
+        },
+        {
+          "id": "sol_dock_helios_east",
+          "name": "Helios Service Dock",
+          "faction": "helios",
+          "kind": "dock",
+          "orbit": {
+            "radius": 29000,
+            "phase": 0.8,
+            "period": 600
+          },
+          "description": "A maintenance cradle on the Helios Array's outer rail. Its drones are non-hostile."
+        },
+        {
+          "id": "sol_dock_helios_west",
+          "name": "Helios Spares Dock",
+          "faction": "helios",
+          "kind": "dock",
+          "orbit": {
+            "radius": 29000,
+            "phase": 3.94,
+            "period": 600
+          },
+          "description": "A second maintenance cradle on the Helios Array, stocked with spare collector blades. Its drones are non-hostile."
+        },
+        {
+          "id": "sol_dock_helios_survey",
+          "name": "Helios Survey Dock",
+          "faction": "helios",
+          "kind": "dock",
+          "orbit": {
+            "radius": 29000,
+            "phase": 2.2,
+            "period": 0
+          },
+          "description": "The Helios Array's survey cradle, where the service docks file their performance logs. Its drones are non-hostile."
+        },
+        {
+          "id": "sol_den_greyback",
+          "name": "Greyback Den",
+          "faction": "pirates",
+          "kind": "den",
+          "around": "greyback",
+          "orbit": {
+            "radius": 2500,
+            "phase": 1.4,
+            "period": 7
+          },
+          "description": "A smugglers' den skimming greyseam from the Greyback seam. They won't attack unless provoked."
+        },
+        {
+          "id": "sol_nest_drift_east",
+          "name": "Drift Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 106000,
+            "phase": 0.2,
+            "period": 4000
+          },
+          "description": "A Scrapborn nest built around a greyseam deposit in the Drift. Mites and crawlers."
+        },
+        {
+          "id": "sol_nest_grey_hour",
+          "name": "Grey Hour Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 105679,
+            "phase": -1.05635,
+            "period": 0
+          },
+          "description": "A Scrapborn nest built around the wreck of the Ark tender Grey Hour. Mites and crawlers."
+        },
+        {
+          "id": "sol_nest_drift_west",
+          "name": "Far Drift Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 114000,
+            "phase": 3.6,
+            "period": 4400
+          },
+          "description": "A Scrapborn nest on the far side of the Drift. Mites and crawlers."
+        },
+        {
+          "id": "sol_den_lanes",
+          "name": "Smugglers' Den",
+          "faction": "pirates",
+          "kind": "den",
+          "orbit": {
+            "radius": 84000,
+            "phase": 1.1,
+            "period": 3000
+          },
+          "description": "A pirate base in a hollowed asteroid on the lanes beyond Jovan. Skiffs."
+        },
+        {
+          "id": "sol_camp_lanes",
+          "name": "Redtooth Camp",
+          "faction": "redtooth",
+          "kind": "den",
+          "orbit": {
+            "radius": 91000,
+            "phase": 4.3,
+            "period": 3200
+          },
+          "description": "A Redtooth camp on the lanes. Cutters, led by a brawler."
+        },
+        {
+          "id": "sol_nest_graveyard",
+          "name": "Graveyard Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 112222,
+            "phase": -2.89402,
+            "period": 0
+          },
+          "description": "A Scrapborn nest among the Tenth Fleet's wrecks. Hulks."
+        },
+        {
+          "id": "sol_den_reaches",
+          "name": "Reaches Den",
+          "faction": "pirates",
+          "kind": "den",
+          "orbit": {
+            "radius": 170000,
+            "phase": 2.3,
+            "period": 6000
+          },
+          "description": "A pirate fortress asteroid in the outer belt. Veteran raiders and gunships."
+        },
+        {
+          "id": "sol_camp_thule",
+          "name": "Thule Warcamp",
+          "faction": "redtooth",
+          "kind": "den",
+          "around": "thule",
+          "orbit": {
+            "radius": 6000,
+            "phase": 0.5,
+            "period": 12
+          },
+          "description": "A Redtooth warband camp in Thule's orbit. Heavily plated."
+        },
+        {
+          "id": "sol_nest_shoal",
+          "name": "Shoal Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 158000,
+            "phase": 5.4,
+            "period": 5600
+          },
+          "description": "A Scrapborn nest in the outer shoal. Hulks."
+        },
+        {
+          "id": "sol_camp_wardens",
+          "name": "Wardens' Camp",
+          "faction": "redtooth",
+          "kind": "den",
+          "orbit": {
+            "radius": 201716,
+            "phase": -2.24167,
+            "period": 0
+          },
+          "description": "A Redtooth camp on the Wardens' Stillstone."
+        },
+        {
+          "id": "sol_den_wardens",
+          "name": "Wardens' Den",
+          "faction": "pirates",
+          "kind": "den",
+          "orbit": {
+            "radius": 204989,
+            "phase": -2.26154,
+            "period": 0
+          },
+          "description": "A pirate camp on the Wardens' Stillstone."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "sol_lodestone_5",
+          "position": {
+            "x": 11548,
+            "y": 65490
+          },
+          "size": 1400,
+          "description": "The largest stillstone in Sol, beside the inner lanes. Jump drives charge faster within its field."
+        },
+        {
+          "id": "sol_lodestone_4",
+          "position": {
+            "x": 56382,
+            "y": -20521
+          },
+          "size": 1000,
+          "description": "A stillstone sunward of the shipping lanes, used as a charging stop by haulers. Jump drives charge faster within its field."
+        },
+        {
+          "id": "sol_lodestone_7",
+          "orbit": {
+            "radius": 108000,
+            "phase": 0.9,
+            "period": 4200
+          },
+          "size": 1000,
+          "state": "scarred",
+          "scar": {
+            "from": 200,
+            "to": 300
+          },
+          "description": "A scarred stillstone in the Drift. About a third of it is inactive, and its field is weaker than normal. A salvage yard operates on the active side."
+        },
+        {
+          "id": "sol_lodestone_8",
+          "orbit": {
+            "radius": 131000,
+            "phase": 2.8,
+            "period": 5000
+          },
+          "size": 1200,
+          "description": "A stillstone on a slow orbit along the route to the Reaches. Jump drives charge faster within its field."
+        },
+        {
+          "id": "sol_lodestone_wardens",
+          "name": "Wardens' Stillstone",
+          "position": {
+            "x": -128000,
+            "y": -158000
+          },
+          "size": 1100,
+          "zone": "lodestone_wardens",
+          "description": "A stillstone in the Reaches. Jump drives charge faster within its field. Redtooth and pirate camps are based on it."
+        }
+      ],
+      "traffic": [
+        {
+          "id": "freighter_ceres_dawn",
+          "name": "Freighter Ceres Dawn",
+          "blueprint": "hauler",
+          "route": [
+            "sol_station_central",
+            "sol_station_trade",
+            "sol_station_lagrange"
+          ]
+        },
+        {
+          "id": "freighter_long_haul",
+          "name": "Freighter Long Haul",
+          "blueprint": "hauler",
+          "route": [
+            "sol_station_mining",
+            "sol_station_central"
+          ]
+        },
+        {
+          "id": "freighter_marigold",
+          "name": "Freighter Marigold",
+          "blueprint": "hauler",
+          "route": [
+            "sol_station_sentinel",
+            "sol_station_trade",
+            "sol_station_mining"
+          ]
+        },
+        {
+          "id": "ark_tender_steadfast",
+          "name": "Ark Tender Steadfast",
+          "blueprint": "ark-tender",
+          "route": [
+            "sol_station_ark",
+            "sol_station_central"
+          ]
+        }
+      ],
       "portals": [
-        { "id": "portal_sol_to_borealis", "targetSystem": "borealis", "position": { "x": 60000, "y": 0 } }
+        {
+          "id": "portal_sol_to_borealis",
+          "targetSystem": "borealis",
+          "position": {
+            "x": 150000,
+            "y": 0
+          }
+        },
+        {
+          "id": "portal_sol_to_cinder",
+          "targetSystem": "cinder_reach",
+          "position": {
+            "x": -170570,
+            "y": 113714
+          }
+        },
+        {
+          "id": "portal_sol_to_nebula",
+          "targetSystem": "nebula_prime",
+          "position": {
+            "x": 0,
+            "y": 180000
+          }
+        },
+        {
+          "id": "jp_sol_station",
+          "targetSystem": "homestead",
+          "position": {
+            "x": 44650,
+            "y": 26790
+          }
+        },
+        {
+          "id": "portal_sol_to_ashfall",
+          "targetSystem": "ashfall",
+          "position": {
+            "x": -49755,
+            "y": -52519
+          }
+        }
+      ],
+      "rifts": [
+        {
+          "id": "rift_sol_to_glasswater",
+          "label": "Cyan Rift to Glasswater",
+          "hue": 186,
+          "position": {
+            "x": 112326,
+            "y": -24656
+          },
+          "destination": {
+            "system": "glasswater",
+            "x": -12500,
+            "y": 5600
+          }
+        }
+      ],
+      "danger": 1,
+      "zones": [
+        {
+          "id": "drift",
+          "name": "The Drift",
+          "inner": 96000,
+          "outer": 120000,
+          "color": "#c9a46a",
+          "description": "A band of junk and wreckage beyond Nereid, with Scrapborn nests throughout. Low threat."
+        },
+        {
+          "id": "helios_swarm",
+          "name": "Helios Swarm",
+          "inner": 24000,
+          "outer": 40000,
+          "color": "#e8c86a",
+          "description": "Stray maintenance drones from the Helios Array. Non-hostile."
+        },
+        {
+          "id": "lanes",
+          "name": "Smugglers' Lanes",
+          "inner": 78000,
+          "outer": 95000,
+          "color": "#e05a4a",
+          "description": "The shipping lanes beyond Jovan, raided by pirates and Redtooth cutters."
+        },
+        {
+          "id": "graveyard",
+          "name": "Graveyard of the Tenth",
+          "inner": 0,
+          "outer": 9000,
+          "x": -104000,
+          "y": -30000,
+          "color": "#9aa7b4",
+          "description": "The wrecks of the Tenth Fleet, now occupied by Scrapborn hulks."
+        },
+        {
+          "id": "reaches",
+          "name": "The Reaches",
+          "inner": 140000,
+          "outer": 215000,
+          "color": "#ff5a5a",
+          "description": "The outer rim of Sol. Veteran pirates and Redtooth warbands. High threat."
+        },
+        {
+          "id": "lodestone_wardens",
+          "name": "Wardens' Stillstone",
+          "inner": 0,
+          "outer": 6000,
+          "x": -128000,
+          "y": -158000,
+          "color": "#c4b5fd",
+          "description": "The Wardens' Stillstone and the raider camps on it."
+        },
+        {
+          "id": "quiet_seam",
+          "name": "The Quiet Seam",
+          "inner": 170000,
+          "outer": 182000,
+          "color": "#8a96a3",
+          "description": "A large greyseam field on the outer edge of the shoal, short of Thule. No hostile nests."
+        }
+      ],
+      "regions": [
+        {
+          "id": "inner",
+          "name": "Inner Sol",
+          "outer": 76000,
+          "danger": "safe",
+          "description": "Patrolled space. Hostiles keep out, and ships lost here are rebuilt whole."
+        },
+        {
+          "id": "middle",
+          "name": "Middle Sol",
+          "outer": 140000,
+          "danger": "contested",
+          "description": "Contested space: smugglers, the Drift and the Redtooth Picket."
+        },
+        {
+          "id": "reaches",
+          "name": "The Reaches",
+          "outer": 230000,
+          "danger": "hostile",
+          "description": "Lawless space at the rim: pirate fortresses and warbands. Ships lost here lose their cargo."
+        }
       ]
+    },
+    {
+      "id": "ashfall",
+      "name": "Ashfall Drift",
+      "description": "A brown dwarf with a dense, dusty asteroid belt and Halden ruins. Prospectors work the belt; Redtooth raiders hold an outpost in the outer system.",
+      "starColor": "#C2552E",
+      "starRadius": 18000,
+      "position": {
+        "x": -100000,
+        "y": -55000
+      },
+      "sector": "core",
+      "centralBody": {
+        "type": "brown_dwarf",
+        "radius": 18000,
+        "hue": 14
+      },
+      "visuals": {
+        "starHueShift": -25,
+        "hasNebula": true,
+        "nebulaHue": 18,
+        "ambient": 0.2
+      },
+      "hazards": [],
+      "asteroidDensity": 1.4,
+      "asteroidBelt": {
+        "innerRadius": 22600,
+        "outerRadius": 56600,
+        "count": 560
+      },
+      "asteroidField": "ashfall_drift",
+      "stations": [
+        "ashfall_station_claim"
+      ],
+      "planets": [
+        {
+          "id": "kindle",
+          "name": "Kindle",
+          "kind": "lava",
+          "hue": 18,
+          "radius": 1000,
+          "orbit": {
+            "radius": 25600,
+            "phase": 1.1,
+            "period": 200
+          },
+          "description": "A molten planet close to the brown dwarf."
+        },
+        {
+          "id": "cinderjack",
+          "name": "Cinderjack",
+          "kind": "gas",
+          "look": { "bands": [9, 1.35, 0.004], "stormColor": [0.352, 0.132, 0.088], "atmo": [1.8, 0.03, 0.32] },
+          "hue": 28,
+          "radius": 16000,
+          "orbit": {
+            "radius": 88600,
+            "phase": 3.9,
+            "period": 900
+          },
+          "rings": {
+            "inner": 1.32,
+            "outer": 2.05,
+            "hue": 24
+          },
+          "moons": [
+            {
+              "name": "Halden",
+              "radius": 900,
+              "distance": 36000,
+              "period": 40,
+              "phase": 0.8
+            },
+            {
+              "radius": 520,
+              "distance": 44000,
+              "period": 64,
+              "phase": 3.1
+            }
+          ],
+          "description": "A banded gas giant nearly as large as its star. The Redtooth dig on its moon Halden."
+        }
+      ],
+      "structures": [
+        {
+          "id": "halden_ring",
+          "name": "Halden Ring",
+          "kind": "ruin_ring",
+          "radius": 31000,
+          "segments": 30,
+          "description": "A ruined Halden ring around the brown dwarf, broken into arcs."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_ash_prospector",
+          "name": "Prospector Ember Jill",
+          "blueprint": "prospector",
+          "position": {
+            "x": 36961,
+            "y": 10560
+          },
+          "angle": 1.2,
+          "salvage": 70
+        },
+        {
+          "id": "wreck_ash_hauler",
+          "name": "Ore Hauler Long Sooty",
+          "blueprint": "hauler",
+          "position": {
+            "x": -18956,
+            "y": -41072
+          },
+          "angle": 2.6,
+          "salvage": 120
+        },
+        {
+          "id": "wreck_ash_corsair",
+          "name": "Raided: Wick",
+          "blueprint": "wisp",
+          "position": {
+            "x": -35135,
+            "y": 27150
+          },
+          "angle": -0.6,
+          "salvage": 90
+        }
+      ],
+      "nests": [
+        {
+          "id": "ashfall_dig_cinderjack",
+          "name": "Cinderjack Dig",
+          "faction": "redtooth",
+          "kind": "dig",
+          "around": "cinderjack",
+          "moon": 1,
+          "orbit": {
+            "radius": 2400,
+            "phase": 0,
+            "period": 6
+          },
+          "description": "A Redtooth mining rig over a Halden cache on Cinderjack's outer moon. Cutters, and a Sledge hauler."
+        },
+        {
+          "id": "ashfall_dig_belt",
+          "name": "Ashback Dig",
+          "faction": "redtooth",
+          "kind": "dig",
+          "orbit": {
+            "radius": 47000,
+            "phase": 2,
+            "period": 1800
+          },
+          "description": "A Redtooth dig into a sealed Halden cache inside a belt asteroid."
+        },
+        {
+          "id": "ashfall_nest_scrap",
+          "name": "Scrapborn Nest",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 56000,
+            "phase": 4.4,
+            "period": 2400
+          },
+          "description": "A Scrapborn nest built around a greyseam vein. Non-hostile unless attacked."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "ashfall_lodestone_1",
+          "position": {
+            "x": -31610,
+            "y": 18250
+          },
+          "size": 1000,
+          "description": "A stillstone just outside the Halden Ring. Jump drives charge faster within its field. A small settler camp is based on it."
+        },
+        {
+          "id": "ashfall_lodestone_3",
+          "position": {
+            "x": -11808,
+            "y": -66967
+          },
+          "size": 900,
+          "description": "A stillstone between the belt and Cinderjack. Jump drives charge faster within its field."
+        },
+        {
+          "id": "ashfall_lodestone_2",
+          "orbit": {
+            "radius": 112000,
+            "phase": 5.3,
+            "period": 4400
+          },
+          "size": 1200,
+          "description": "An uninhabited stillstone on a long orbit beyond Cinderjack. Jump drives charge faster within its field."
+        }
+      ],
+      "portals": [
+        {
+          "id": "portal_ashfall_to_sol",
+          "targetSystem": "sol",
+          "position": {
+            "x": 51029,
+            "y": 40286
+          }
+        }
+      ],
+      "danger": 1
     },
     {
       "id": "borealis",
       "name": "Borealis System",
-      "description": "A frozen system dominated by ice and strange creatures.",
+      "description": "A cold blue-white star with a permanent aurora. Home of the ice sprites and the Frost Brood.",
       "starColor": "#88CCFF",
-      "starRadius": 800,
-      "position": { "x": 60000, "y": 0 },
-      "hazards": ["cold"],
+      "starRadius": 14000,
+      "position": {
+        "x": 60000,
+        "y": 0
+      },
+      "sector": "core",
+      "centralBody": {
+        "type": "sun",
+        "plasma": {"limbDarkening": 0.35, "limbPower": 0.5, "limbContrast": 0.55, "limbTint": "#2a5cff", "limbTintStrength": 0.4, "bump": 0.45, "rim": 0.65, "rimColor": "#c8f0ff", "rimWidth": 0.007, "halo": 0.5, "spicules": 0.03, "evolve": 0.018, "warpEvolve": 0.009, "warpWander": 0.18},
+        "radius": 14000,
+        "hue": 200,
+        "sunStyle": "granular",
+        "coronaStyle": "softGlow"
+      },
+      "visuals": {
+        "starHueShift": 20,
+        "specialStarChance": 0.05,
+        "specialStarHue": 240
+      },
+      "hazards": [
+        "cold"
+      ],
+      "hazardRatings": {
+        "cryo": 3
+      },
       "asteroidDensity": 0.6,
       "asteroidBelt": {
-        "innerRadius": 12000,
-        "outerRadius": 50000,
-        "count": 250
+        "innerRadius": 25200,
+        "outerRadius": 63200,
+        "count": 250,
+        "extra": [
+          {
+            "innerRadius": 86000,
+            "outerRadius": 98000,
+            "count": 110,
+            "field": "borealis_shoal"
+          }
+        ]
       },
       "asteroidField": "borealis_belt",
-      "stations": ["borealis_station_outpost"],
-      "npcs": ["researcher_maya"],
-      "enemies": ["ice_sprite"],
+      "stations": [
+        "borealis_station_outpost",
+        "borealis_station_thawline"
+      ],
+      "planets": [
+        {
+          "id": "rime",
+          "name": "Rime",
+          "kind": "ice",
+          "radius": 700,
+          "orbit": {
+            "radius": 22200,
+            "phase": 1.2,
+            "period": 200
+          }
+        },
+        {
+          "id": "glacia",
+          "name": "Glacia",
+          "kind": "ice",
+          "hue": 195,
+          "radius": 1700,
+          "orbit": {
+            "radius": 37200,
+            "phase": 3.6,
+            "period": 380
+          },
+          "moons": [
+            {
+              "name": "Rimeholt",
+              "surface": "rimeholt_siege",
+              "radius": 240,
+              "distance": 3000,
+              "period": 10,
+              "phase": 2
+            }
+          ],
+          "surface": "glacia_surface",
+          "description": "An ice world with a Halden site beneath its glaciers. Descend with X in orbit."
+        },
+        {
+          "id": "pelagia",
+          "name": "Pelagia",
+          "kind": "ocean",
+          "hue": 224,
+          "radius": 2200,
+          "look": { "sea": [0.42, 1.8, 0.1], "atmoColor": [0.3, 0.52, 0.95], "pal": [[0.07, 0.5, 0.68], [0.014, 0.065, 0.27], [0.1, 0.3, 0.5]] },
+          "orbit": {
+            "radius": 47500,
+            "phase": 2.2,
+            "period": 500
+          },
+          "moons": [
+            {
+              "radius": 300,
+              "distance": 3500,
+              "period": 14,
+              "phase": 3
+            }
+          ],
+          "description": "A water world: open sea almost to the poles, a few island chains and small polar ice caps. One moon. Between Glacia and Boreas Major. No landing."
+        },
+        {
+          "id": "boreas_major",
+          "name": "Boreas Major",
+          "kind": "gas",
+          "look": { "bands": [5, 0.7, 0.003], "stormColor": [0.1, 0.19, 0.4], "storm2": [0, 0, 0], "storm": [2, -0.25, 0.1] },
+          "hue": 205,
+          "radius": 3500,
+          "orbit": {
+            "radius": 57200,
+            "phase": 5.5,
+            "period": 640
+          },
+          "rings": {
+            "inner": 1.4,
+            "outer": 1.9,
+            "hue": 200
+          },
+          "description": "A pale gas giant inside the aurora. Signal reception near it is poor."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_icebound",
+          "name": "Icebound Bastion",
+          "blueprint": "sunspear",
+          "position": {
+            "x": 28983,
+            "y": 19322
+          },
+          "angle": 0.4,
+          "salvage": 300
+        },
+        {
+          "id": "wreck_halvard",
+          "name": "Lighter Halvard (lander)",
+          "blueprint": "hauler",
+          "position": {
+            "x": -46000,
+            "y": 21000
+          },
+          "angle": 2.4,
+          "salvage": 220,
+          "log": {
+            "codex": "halvard_log"
+          }
+        }
+      ],
+      "zones": [
+        {
+          "id": "curtain",
+          "name": "The Curtain",
+          "inner": 0,
+          "outer": 9000,
+          "x": 30000,
+          "y": 42000,
+          "color": "#7ff0d0",
+          "description": "The densest part of the aurora, where receivers pick up only static. Frost Brood nesting ground."
+        },
+        {
+          "id": "rime_shoal",
+          "name": "The Rime Shoal",
+          "inner": 86000,
+          "outer": 98000,
+          "color": "#a7f3d0",
+          "description": "An outer belt of aurora floes, ice veined with greyseam. The only source of aurora rime."
+        }
+      ],
+      "nests": [
+        {
+          "id": "borealis_roost_glacia",
+          "name": "Glacia Roost",
+          "faction": "frost",
+          "kind": "roost",
+          "around": "glacia",
+          "orbit": {
+            "radius": 4500,
+            "phase": 1.2,
+            "period": 9
+          },
+          "description": "A Frost Brood roost in the ice over Glacia. Shards and Elders."
+        },
+        {
+          "id": "borealis_roost_boreas",
+          "name": "Boreas Roost",
+          "faction": "frost",
+          "kind": "roost",
+          "around": "boreas_major",
+          "orbit": {
+            "radius": 6500,
+            "phase": 4,
+            "period": 12
+          },
+          "description": "An old Frost Brood roost near Boreas Major. Fewer, larger Brood."
+        },
+        {
+          "id": "borealis_sift",
+          "name": "Borealis Sift",
+          "faction": "scavengers",
+          "kind": "sift",
+          "orbit": {
+            "radius": 30000,
+            "phase": 2.6,
+            "period": 1500
+          },
+          "description": "Scavenger drones stripping the inner belt, stacking their haul on a drifting frame."
+        },
+        {
+          "id": "borealis_roost_shoal",
+          "name": "Shoal Roost",
+          "faction": "frost",
+          "kind": "roost",
+          "orbit": {
+            "radius": 92000,
+            "phase": 0.9,
+            "period": 2400
+          },
+          "description": "A young Frost Brood roost among the aurora floes."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "borealis_lodestone_1",
+          "orbit": {
+            "radius": 44000,
+            "phase": 0.7,
+            "period": 1600
+          },
+          "size": 900,
+          "description": "A stillstone orbiting through the inner belt. Jump drives charge faster within its field."
+        },
+        {
+          "id": "borealis_lodestone_2",
+          "orbit": {
+            "radius": 108000,
+            "phase": 3.9,
+            "period": 4200
+          },
+          "size": 1200,
+          "description": "A stillstone beyond the Rime Shoal. Jump drives charge faster within its field."
+        },
+        {
+          "id": "borealis_aurora_knot",
+          "name": "Aurora Knot",
+          "position": {
+            "x": 33000,
+            "y": 47000
+          },
+          "size": 350,
+          "rough": true,
+          "description": "A small stillstone in the Curtain. Jump drives charge faster within its field. A Frost Brood roost surrounds it."
+        }
+      ],
+      "traffic": [
+        {
+          "id": "tender_coldwater",
+          "name": "Ice Tender Coldwater",
+          "blueprint": "hauler",
+          "route": [
+            "borealis_station_thawline",
+            "borealis_station_outpost"
+          ]
+        }
+      ],
       "portals": [
-        { "id": "portal_borealis_to_sol", "targetSystem": "sol", "position": { "x": -60000, "y": 0 } }
-      ]
+        {
+          "id": "portal_borealis_to_sol",
+          "targetSystem": "sol",
+          "position": {
+            "x": -73200,
+            "y": 0
+          }
+        },
+        {
+          "id": "portal_borealis_to_glasswater",
+          "targetSystem": "glasswater",
+          "position": {
+            "x": 0,
+            "y": 71200
+          }
+        }
+      ],
+      "rifts": [
+        {
+          "id": "rift_borealis_to_nebula",
+          "label": "Aurora Rift to Nebula Prime",
+          "hue": 160,
+          "position": {
+            "x": -24000,
+            "y": -31500
+          },
+          "destination": {
+            "system": "nebula_prime",
+            "x": -26915,
+            "y": -37681
+          }
+        }
+      ],
+      "danger": 3
     },
     {
       "id": "nebula_prime",
       "name": "Nebula Prime",
-      "description": "A colorful nebula filled with valuable resources but reduced visibility.",
+      "description": "A young star inside its birth cloud. Rich asteroids and poor visibility. Nebula Prime Observatory is here.",
       "starColor": "#FF66AA",
-      "starRadius": 1200,
-      "position": { "x": 0, "y": 80000 },
-      "hazards": ["radiation", "low_visibility"],
+      "starRadius": 26000,
+      "position": {
+        "x": 0,
+        "y": 80000
+      },
+      "sector": "outer_rim",
+      "centralBody": {
+        "type": "sun",
+        "plasma": {"limbDarkening": 0.45, "limbPower": 0.55, "limbContrast": 0.5, "limbTint": "#6e0a5e", "limbTintStrength": 0.5, "bump": 0.5, "rim": 0.7, "rimColor": "#ffc4ee", "rimWidth": 0.008, "halo": 0.45, "spicules": 0.035, "evolve": 0.014, "warpEvolve": 0.008, "warpWander": 0.22},
+        "radius": 26000,
+        "hue": 330,
+        "sunStyle": "flow",
+        "coronaStyle": "plasmaStreams"
+      },
+      "visuals": {
+        "starHueShift": -30,
+        "hasNebula": true,
+        "nebulaHue": 300
+      },
+      "hazards": [
+        "radiation",
+        "low_visibility"
+      ],
+      "hazardRatings": {
+        "radiation": 2,
+        "corrosive": 4
+      },
       "asteroidDensity": 1.5,
       "asteroidBelt": {
-        "innerRadius": 20000,
-        "outerRadius": 60000,
+        "innerRadius": 44800,
+        "outerRadius": 84800,
         "count": 500
       },
       "asteroidField": "nebula_belt",
-      "stations": ["nebula_research_station"],
-      "npcs": ["scientist_quinn"],
-      "enemies": [],
+      "stations": [
+        "nebula_research_station"
+      ],
+      "planets": [
+        {
+          "id": "verdance",
+          "name": "Verdance",
+          "kind": "toxic",
+          "radius": 1500,
+          "orbit": {
+            "radius": 41800,
+            "phase": 0.3,
+            "period": 300
+          },
+          "description": "A planet under thick green cloud, with a hot surface."
+        },
+        {
+          "id": "opaline",
+          "name": "Opaline",
+          "kind": "gas",
+          "look": { "storm2": [-0.55, 8, 0.03] },
+          "hue": 305,
+          "radius": 3900,
+          "orbit": {
+            "radius": 65800,
+            "phase": 2.8,
+            "period": 600
+          },
+          "rings": {
+            "inner": 1.3,
+            "outer": 2.3,
+            "hue": 320
+          },
+          "moons": [
+            {
+              "radius": 300,
+              "distance": 6800,
+              "period": 16,
+              "phase": 0.5
+            }
+          ]
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_drifter",
+          "name": "Drifting Quarry",
+          "blueprint": "quarry",
+          "position": {
+            "x": -42923,
+            "y": 27315
+          },
+          "angle": -2.2,
+          "salvage": 250
+        }
+      ],
+      "nests": [
+        {
+          "id": "nebula_den_opaline",
+          "name": "Opaline Den",
+          "faction": "pirates",
+          "kind": "den",
+          "around": "opaline",
+          "orbit": {
+            "radius": 9500,
+            "phase": 0.4,
+            "period": 10
+          },
+          "description": "Rustjaw's raiding base, in a hollowed asteroid in Opaline's orbit. Gunships."
+        },
+        {
+          "id": "nebula_den_cloud",
+          "name": "Cloud Den",
+          "faction": "pirates",
+          "kind": "den",
+          "orbit": {
+            "radius": 56000,
+            "phase": 5.1,
+            "period": 2000
+          },
+          "description": "A pirate hideout inside the birth cloud."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "nebula_lodestone_1",
+          "orbit": {
+            "radius": 92000,
+            "phase": 4.6,
+            "period": 3200
+          },
+          "size": 1200,
+          "description": "A stillstone at the edge of the birth cloud. Jump drives charge faster within its field."
+        },
+        {
+          "id": "nebula_lodestone_2",
+          "position": {
+            "x": -54502,
+            "y": 19837
+          },
+          "size": 900,
+          "description": "A stillstone in the haze beyond Opaline. Jump drives charge faster within its field."
+        }
+      ],
       "portals": [
-        { "id": "portal_nebula_to_sol", "targetSystem": "sol", "position": { "x": 0, "y": -60000 } }
-      ]
+        {
+          "id": "portal_nebula_to_sol",
+          "targetSystem": "sol",
+          "position": {
+            "x": 0,
+            "y": -84800
+          }
+        },
+        {
+          "id": "jp_nebula_station",
+          "targetSystem": "homestead",
+          "position": {
+            "x": 8811,
+            "y": 33483
+          }
+        }
+      ],
+      "rifts": [
+        {
+          "id": "rift_nebula_to_borealis",
+          "label": "Aurora Rift to Borealis",
+          "hue": 160,
+          "position": {
+            "x": -28119,
+            "y": -38533
+          },
+          "destination": {
+            "system": "borealis",
+            "x": -20728,
+            "y": -28701
+          }
+        },
+        {
+          "id": "rift_nebula_to_void",
+          "label": "Umbral Rift to Void Sector",
+          "hue": 300,
+          "position": {
+            "x": 32734,
+            "y": -35803
+          },
+          "destination": {
+            "system": "void_sector",
+            "x": 23641,
+            "y": -24056
+          }
+        }
+      ],
+      "danger": 4
     },
     {
       "id": "void_sector",
       "name": "Void Sector",
-      "description": "A dark region of space. Few return from its depths.",
+      "description": "A smaller black hole surrounded by debris fields. Void Wraiths are found here. Extreme threat.",
       "starColor": "#440066",
-      "starRadius": 600,
-      "position": { "x": 0, "y": -80000 },
-      "hazards": ["darkness", "gravitational_anomalies"],
+      "starRadius": 1800,
+      "position": {
+        "x": 0,
+        "y": -80000
+      },
+      "sector": "outer_rim",
+      "centralBody": {
+        "type": "black_hole",
+        "radius": 1800,
+        "diskHue": 260,
+        "gravity": {
+          "strength": 525000,
+          "minRadius": 1170,
+          "horizon": 1800
+        }
+      },
+      "visuals": {
+        "starHueShift": -60
+      },
+      "hazards": [
+        "darkness",
+        "gravitational_anomalies"
+      ],
+      "hazardRatings": {
+        "radiation": 5,
+        "gravitational": 2
+      },
       "asteroidDensity": 0.3,
       "asteroidBelt": {
-        "innerRadius": 10000,
-        "outerRadius": 30000,
+        "innerRadius": 11200,
+        "outerRadius": 31200,
         "count": 100
       },
       "asteroidField": "void_belt",
+      "stations": [
+        "void_station_lantern"
+      ],
+      "planets": [
+        {
+          "id": "umbra",
+          "name": "Umbra",
+          "kind": "rocky",
+          "hue": 265,
+          "radius": 1200,
+          "orbit": {
+            "radius": 19200,
+            "phase": 4.4,
+            "period": 260
+          },
+          "moons": [
+            {
+              "name": "Gloam",
+              "surface": "gloam_siege",
+              "radius": 260,
+              "distance": 3300,
+              "period": 13,
+              "phase": 2.6
+            }
+          ],
+          "description": "A dead rocky world, lit only by the accretion disk."
+        },
+        {
+          "id": "nyx",
+          "name": "Nyx",
+          "kind": "ice",
+          "hue": 250,
+          "radius": 850,
+          "orbit": {
+            "radius": 28200,
+            "phase": 1.6,
+            "period": 360
+          },
+          "description": "An ice world heavily cratered by debris."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_last_light",
+          "name": "Last Light",
+          "blueprint": "sunspear",
+          "position": {
+            "x": -15009,
+            "y": 9649
+          },
+          "angle": 2.9,
+          "salvage": 350
+        },
+        {
+          "id": "wreck_void_lancer",
+          "name": "Silent Halberd",
+          "blueprint": "halberd",
+          "position": {
+            "x": 6330,
+            "y": 22154
+          },
+          "angle": 1.1,
+          "salvage": 90
+        }
+      ],
+      "nests": [
+        {
+          "id": "void_knot_nyx",
+          "name": "Nyx Knot",
+          "faction": "wraiths",
+          "kind": "knot",
+          "around": "nyx",
+          "orbit": {
+            "radius": 3500,
+            "phase": 2.2,
+            "period": 8
+          },
+          "description": "A dense debris cloud around Nyx. Wraiths emerge from it."
+        },
+        {
+          "id": "void_knot_outer",
+          "name": "Outer Knot",
+          "faction": "wraiths",
+          "kind": "knot",
+          "orbit": {
+            "radius": 46000,
+            "phase": 0.8,
+            "period": 2400
+          },
+          "description": "A debris cloud near the scarred stillstone. Reavers emerge from it."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "void_lodestone_1",
+          "orbit": {
+            "radius": 39500,
+            "phase": 2.2,
+            "period": 1800
+          },
+          "size": 900,
+          "state": "scarred",
+          "scar": {
+            "from": 30,
+            "to": 150
+          },
+          "description": "A scarred stillstone orbiting the black hole. Part of it is inactive, and its field is weaker than normal."
+        },
+        {
+          "id": "void_lodestone_2",
+          "position": {
+            "x": -56382,
+            "y": -20521
+          },
+          "size": 1300,
+          "state": "shattered",
+          "description": "The fragments of a shattered stillstone. It has no field."
+        }
+      ],
+      "rifts": [
+        {
+          "id": "rift_void_to_maw",
+          "label": "Rift to The Maw",
+          "hue": 278,
+          "position": {
+            "x": -26987,
+            "y": 18683
+          },
+          "destination": {
+            "system": "the_maw",
+            "x": 8206,
+            "y": -3224
+          }
+        },
+        {
+          "id": "rift_void_to_nebula",
+          "label": "Umbral Rift to Nebula Prime",
+          "hue": 300,
+          "position": {
+            "x": 22811,
+            "y": -24885
+          },
+          "destination": {
+            "system": "nebula_prime",
+            "x": 31893,
+            "y": -35041
+          }
+        }
+      ],
+      "portals": [
+        {
+          "id": "portal_void_to_maw",
+          "targetSystem": "the_maw",
+          "position": {
+            "x": 0,
+            "y": 35200
+          }
+        }
+      ],
+      "danger": 7,
+      "pvp": {
+        "mode": "all"
+      }
+    },
+    {
+      "id": "cinder_reach",
+      "name": "Cinder Reach",
+      "description": "A red giant. Ember dust fills the inner system; the belt is slag and iron.",
+      "starColor": "#FF4A1A",
+      "starRadius": 40000,
+      "position": {
+        "x": -130000,
+        "y": 60000
+      },
+      "sector": "ember_frontier",
+      "centralBody": {
+        "type": "sun",
+        "plasma": {"limbDarkening": 0.72, "limbPower": 0.8, "limbContrast": 0.35, "limbTint": "#3a0400", "limbTintStrength": 0.6, "bump": 0.75, "rim": 0.5, "rimColor": "#ff5a2a", "rimWidth": 0.014, "halo": 0.45, "spicules": 0.045, "evolve": 0.007, "warpEvolve": 0.004, "warpWander": 0.12},
+        "radius": 40000,
+        "hue": 10,
+        "detailStar": true,
+        "detailParams": {
+          "radius": 40000,
+          "hue": 10,
+          "octaves": 5,
+          "lacunarity": 2.1,
+          "gain": 0.55,
+          "noiseScale": 2.4,
+          "animSpeed": 0.07,
+          "fbmContrast": 1.25,
+          "warpAmount": 0.6,
+          "warpScale": 0.4,
+          "turbulenceMix": 0.45,
+          "plasmaIntensity": 0.45,
+          "plasmaScale": 2.2,
+          "plasmaSpeed": 0.6,
+          "centerDarken": 0.45,
+          "centerHighlight": 0.5,
+          "centerMidpoint": 0.55,
+          "centerFalloff": 1.2,
+          "innerDarkening": 0.15,
+          "whiteBalance": -0.1,
+          "saturation": 1.25,
+          "edgeBrightness": 1.1,
+          "edgeThickness": 0.05,
+          "edgeSharpness": 0.35,
+          "limbDarkening": 0.55,
+          "glowIntensity": 0.9,
+          "glowSize": 0.14,
+          "glowRadius": 80000
+        },
+        "detailColors": {
+          "darkColor": "#2a0400",
+          "midColor": "#8a1800",
+          "brightColor": "#ff4a12",
+          "edgeColor": "#ff8a50",
+          "plasmaColor": "#ff5a20",
+          "centerColor": "#ffb080"
+        }
+      },
+      "visuals": {
+        "starHueShift": 25,
+        "hasNebula": true,
+        "nebulaHue": 12,
+        "specialStarChance": 0.04,
+        "specialStarHue": 20
+      },
+      "hazards": [
+        "radiation",
+        "low_visibility"
+      ],
+      "hazardRatings": {
+        "thermal": 4
+      },
+      "asteroidDensity": 1.3,
+      "asteroidBelt": {
+        "innerRadius": 51800,
+        "outerRadius": 71800,
+        "count": 360
+      },
+      "asteroidField": "cinder_belt",
+      "stations": [
+        "cinder_station_forge"
+      ],
+      "planets": [
+        {
+          "id": "ashfall",
+          "name": "Ashfall",
+          "kind": "lava",
+          "radius": 1300,
+          "orbit": {
+            "radius": 47300,
+            "phase": 3.3,
+            "period": 180
+          },
+          "description": "A molten planet, its crust cracking under the red giant's heat.",
+          "surface": "ashfall_surface"
+        },
+        {
+          "id": "kiln",
+          "name": "Kiln",
+          "kind": "desert",
+          "radius": 1700,
+          "orbit": {
+            "radius": 63800,
+            "phase": 0.6,
+            "period": 400
+          },
+          "description": "A scorched desert world with rich greyseam deposits. The Cinder Cult prevents mining."
+        },
+        {
+          "id": "ember_giant",
+          "name": "Ember Giant",
+          "kind": "gas",
+          "look": { "stormColor": [0.88, 0.7, 0.52], "bands": [8, 1.2, 0.0035], "pal": [[0.82, 0.496, 0.28], [0.56, 0.176, 0.08], [0.262, 0.052, 0.038]], "atmoColor": [0.82, 0.442, 0.28] },
+          "hue": 16,
+          "radius": 3700,
+          "orbit": {
+            "radius": 83800,
+            "phase": 2.1,
+            "period": 620
+          },
+          "moons": [
+            {
+              "name": "Cinderhold",
+              "surface": "cinderhold_siege",
+              "radius": 320,
+              "distance": 6400,
+              "period": 14,
+              "phase": 4
+            }
+          ]
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_slag",
+          "name": "Slag Wisp",
+          "blueprint": "wisp",
+          "position": {
+            "x": -25788,
+            "y": 48353
+          },
+          "angle": 0.9,
+          "salvage": 50
+        },
+        {
+          "id": "wreck_cinder_galleon",
+          "name": "Burnt Hauler",
+          "blueprint": "hauler",
+          "position": {
+            "x": 53809,
+            "y": -26905
+          },
+          "angle": -1.8,
+          "salvage": 175
+        }
+      ],
+      "nests": [
+        {
+          "id": "cinder_shrine_ember",
+          "name": "Ember Shrine",
+          "faction": "cinder",
+          "kind": "shrine",
+          "around": "ember_giant",
+          "orbit": {
+            "radius": 9000,
+            "phase": 3,
+            "period": 12
+          },
+          "description": "A Cinder Cult shrine: an old hull converted into a furnace."
+        },
+        {
+          "id": "cinder_shrine_furnace",
+          "name": "Furnace Shrine",
+          "faction": "cinder",
+          "kind": "shrine",
+          "orbit": {
+            "radius": 72000,
+            "phase": 4.6,
+            "period": 2400
+          },
+          "description": "The Cinder Cult's furnace in the outer belt, where Brands are fitted out."
+        },
+        {
+          "id": "cinder_den",
+          "name": "Reach Den",
+          "faction": "pirates",
+          "kind": "den",
+          "orbit": {
+            "radius": 104000,
+            "phase": 1.5,
+            "period": 3600
+          },
+          "description": "A pirate base near the scarred stillstone. They trade with the Cult."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "cinder_lodestone_1",
+          "orbit": {
+            "radius": 75000,
+            "phase": 4,
+            "period": 2400
+          },
+          "size": 900,
+          "description": "A stillstone orbiting through the belt. Jump drives charge faster within its field. Cinder Cult shrines are nearby."
+        },
+        {
+          "id": "cinder_lodestone_2",
+          "orbit": {
+            "radius": 100000,
+            "phase": 1,
+            "period": 3600
+          },
+          "size": 1200,
+          "state": "scarred",
+          "scar": {
+            "from": 100,
+            "to": 210
+          },
+          "description": "A scarred stillstone beyond the Ember Giant. Part of it is inactive, and its field is weaker than normal. Its ore-cutting camp is abandoned."
+        },
+        {
+          "id": "cinder_lodestone_3",
+          "position": {
+            "x": -62500,
+            "y": 108253
+          },
+          "size": 1100,
+          "state": "dead",
+          "description": "A dead stillstone with an abandoned refuelling camp. It has no field."
+        }
+      ],
+      "portals": [
+        {
+          "id": "portal_cinder_to_sol",
+          "targetSystem": "sol",
+          "position": {
+            "x": 73452,
+            "y": -48968
+          }
+        },
+        {
+          "id": "portal_cinder_to_maw",
+          "targetSystem": "the_maw",
+          "position": {
+            "x": -88500,
+            "y": 23827
+          }
+        }
+      ],
+      "danger": 5,
+      "pvp": {
+        "mode": "outer",
+        "safeRadius": 9000
+      }
+    },
+    {
+      "id": "the_maw",
+      "name": "The Maw",
+      "description": "A supermassive black hole with a bright accretion disk, circled by a ring of shards. Horizon Watch recovers inscribed fragments from the debris.",
+      "starColor": "#FFB040",
+      "starRadius": 4200,
+      "position": {
+        "x": -170000,
+        "y": -40000
+      },
+      "sector": "ember_frontier",
+      "centralBody": {
+        "type": "black_hole",
+        "radius": 4200,
+        "diskHue": 32,
+        "gravity": {
+          "strength": 2257600,
+          "minRadius": 2730,
+          "horizon": 4200
+        }
+      },
+      "visuals": {
+        "starHueShift": -15,
+        "specialStarChance": 0.02,
+        "specialStarHue": 35
+      },
+      "hazards": [
+        "gravitational_anomalies",
+        "darkness"
+      ],
+      "hazardRatings": {
+        "gravitational": 5,
+        "corrosive": 1
+      },
+      "asteroidDensity": 0.9,
+      "asteroidBelt": {
+        "innerRadius": 14800,
+        "outerRadius": 26800,
+        "count": 260
+      },
+      "asteroidField": "maw_shards",
+      "stations": [
+        "maw_station_watch"
+      ],
+      "planets": [
+        {
+          "id": "shard",
+          "name": "Shard",
+          "kind": "rocky",
+          "hue": 30,
+          "radius": 900,
+          "orbit": {
+            "radius": 33800,
+            "phase": 5,
+            "period": 300
+          },
+          "description": "Half a planet, beside the shard ring."
+        },
+        {
+          "id": "pyre",
+          "name": "Pyre",
+          "kind": "lava",
+          "hue": 25,
+          "radius": 1500,
+          "orbit": {
+            "radius": 44800,
+            "phase": 1.9,
+            "period": 480
+          },
+          "moons": [
+            {
+              "name": "Last Light",
+              "surface": "lastlight_siege",
+              "radius": 300,
+              "distance": 3800,
+              "period": 15,
+              "phase": 0.8
+            }
+          ],
+          "description": "A burning planet near the disk. Its moon, Last Light, has a bastion."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_maw_hammer",
+          "name": "Quarry at the Brink",
+          "blueprint": "quarry",
+          "position": {
+            "x": 26419,
+            "y": -15411
+          },
+          "angle": 2.6,
+          "salvage": 325
+        },
+        {
+          "id": "wreck_maw_galleon",
+          "name": "Hauler of the Lost",
+          "blueprint": "hauler",
+          "position": {
+            "x": -28728,
+            "y": 6630
+          },
+          "angle": -0.4,
+          "salvage": 225
+        }
+      ],
+      "nests": [
+        {
+          "id": "maw_knot_pyre",
+          "name": "Pyre Knot",
+          "faction": "maw",
+          "kind": "knot",
+          "around": "pyre",
+          "orbit": {
+            "radius": 5500,
+            "phase": 1,
+            "period": 10
+          },
+          "description": "A dense debris cloud around Pyre. Maw spawn emerge from it."
+        },
+        {
+          "id": "maw_knot_shard",
+          "name": "Shard Knot",
+          "faction": "wraiths",
+          "kind": "knot",
+          "around": "shard",
+          "orbit": {
+            "radius": 3000,
+            "phase": 5.2,
+            "period": 8
+          },
+          "description": "Debris trailing Shard, where wraiths gather."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "maw_lodestone_1",
+          "orbit": {
+            "radius": 50000,
+            "phase": 3,
+            "period": 2200
+          },
+          "size": 1200,
+          "state": "shattered",
+          "description": "The fragments of a shattered stillstone. It has no field."
+        },
+        {
+          "id": "maw_lodestone_2",
+          "position": {
+            "x": -13892,
+            "y": 78785
+          },
+          "size": 1000,
+          "state": "dead",
+          "description": "A dead stillstone with an abandoned mining camp. It has no field."
+        }
+      ],
+      "portals": [
+        {
+          "id": "portal_maw_to_cinder",
+          "targetSystem": "cinder_reach",
+          "position": {
+            "x": 60785,
+            "y": 6288
+          }
+        },
+        {
+          "id": "portal_maw_to_void",
+          "targetSystem": "void_sector",
+          "position": {
+            "x": -31484,
+            "y": -50374
+          }
+        }
+      ],
+      "danger": 6,
+      "pvp": {
+        "mode": "all"
+      },
+      "zones": [
+        {
+          "id": "ark_camp",
+          "name": "The Leestone Camp",
+          "inner": 0,
+          "outer": 6000,
+          "x": 28500,
+          "y": 7600,
+          "color": "#9ca3af",
+          "description": "The Ark's leestone mining camp at the edge of the shard ring. Frequently attacked by the Cinder Cult."
+        }
+      ]
+    },
+    {
+      "id": "glasswater",
+      "name": "Glasswater Expanse",
+      "description": "A pulsar system with a frozen field of crystal and ice.",
+      "starColor": "#9FF4FF",
+      "starRadius": 900,
+      "position": {
+        "x": 130000,
+        "y": 70000
+      },
+      "sector": "frost_reach",
+      "centralBody": {
+        "type": "pulsar",
+        "radius": 900,
+        "beamHue": 186
+      },
+      "visuals": {
+        "starHueShift": 60,
+        "hasNebula": true,
+        "nebulaHue": 170,
+        "specialStarChance": 0.08,
+        "specialStarHue": 190
+      },
+      "hazards": [
+        "cold",
+        "radiation"
+      ],
+      "asteroidDensity": 1.1,
+      "asteroidBelt": {
+        "innerRadius": 9000,
+        "outerRadius": 36000,
+        "count": 320
+      },
+      "asteroidField": "glasswater_field",
+      "stations": [
+        "glasswater_station_relay",
+        "glasswater_station_depot"
+      ],
+      "planets": [
+        {
+          "id": "prism",
+          "name": "Prism",
+          "kind": "ice",
+          "hue": 186,
+          "radius": 1300,
+          "orbit": {
+            "radius": 15000,
+            "phase": 2.2,
+            "period": 260
+          },
+          "rings": {
+            "inner": 1.5,
+            "outer": 2.4,
+            "hue": 180
+          },
+          "description": "A ringed ice world with crystal plains."
+        },
+        {
+          "id": "halcyon",
+          "name": "Halcyon",
+          "kind": "ocean",
+          "hue": 175,
+          "radius": 2100,
+          "orbit": {
+            "radius": 42000,
+            "phase": 4.8,
+            "period": 560
+          },
+          "moons": [
+            {
+              "radius": 280,
+              "distance": 3800,
+              "period": 11,
+              "phase": 1.5
+            }
+          ],
+          "description": "A grey-green ocean world at the edge of the field, with the sealed Halcyon foundry in its crust."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_glass_lancer",
+          "name": "Frozen Halberd",
+          "blueprint": "halberd",
+          "position": {
+            "x": 10000,
+            "y": 18000
+          },
+          "angle": 0.2,
+          "salvage": 90
+        },
+        {
+          "id": "wreck_glass_galleon",
+          "name": "The Shattered Bell",
+          "blueprint": "hauler",
+          "position": {
+            "x": -24000,
+            "y": -14000
+          },
+          "angle": 1.4,
+          "salvage": 175,
+          "log": {
+            "codex": "shattered_bell_log"
+          }
+        }
+      ],
+      "nests": [
+        {
+          "id": "glasswater_sift_halcyon",
+          "name": "Halcyon Sift",
+          "faction": "scavengers",
+          "kind": "sift",
+          "around": "halcyon",
+          "orbit": {
+            "radius": 5000,
+            "phase": 0.5,
+            "period": 10
+          },
+          "description": "Scavenger drones stripping crystal in Halcyon's orbit. A Dredge collects their haul."
+        },
+        {
+          "id": "glasswater_den",
+          "name": "Glasswater Den",
+          "faction": "pirates",
+          "kind": "den",
+          "orbit": {
+            "radius": 47000,
+            "phase": 3,
+            "period": 2200
+          },
+          "description": "A pirate base in a hollowed asteroid beyond the crystal fields. Skiffs, raiders and occasional gunships."
+        }
+      ],
+      "lodestones": [
+        {
+          "id": "glasswater_lodestone_1",
+          "position": {
+            "x": -15500,
+            "y": 26847
+          },
+          "size": 800,
+          "description": "A stillstone close to the pulsar. Jump drives charge faster within its field."
+        },
+        {
+          "id": "glasswater_lodestone_2",
+          "orbit": {
+            "radius": 62000,
+            "phase": 3.3,
+            "period": 2700
+          },
+          "size": 1000,
+          "description": "A stillstone on a long orbit around the pulsar, used by Shardfall Depot's supply runs. Jump drives charge faster within its field."
+        },
+        {
+          "id": "glasswater_lodestone_3",
+          "orbit": {
+            "radius": 85000,
+            "phase": 1.4,
+            "period": 3400
+          },
+          "size": 1300,
+          "description": "The largest stillstone in the Expanse, in the outer field. Jump drives charge faster within its field."
+        }
+      ],
+      "portals": [
+        {
+          "id": "portal_glasswater_to_borealis",
+          "targetSystem": "borealis",
+          "position": {
+            "x": 0,
+            "y": -56000
+          }
+        },
+        {
+          "id": "jp_glasswater_station",
+          "targetSystem": "homestead",
+          "position": {
+            "x": 23500,
+            "y": -13500
+          }
+        }
+      ],
+      "danger": 2
+    },
+    {
+      "id": "terra_nova_surface",
+      "name": "Terra Nova",
+      "description": "The surface of Terra Nova: temperate coasts and the city of New Meridian.",
+      "danger": 2,
+      "starColor": "#FFDD44",
+      "starRadius": 0,
+      "position": {
+        "x": -60000,
+        "y": 0
+      },
+      "sector": "core",
+      "surface": {
+        "of": "sol",
+        "planet": "terra_nova",
+        "kind": "terran",
+        "radius": 24000,
+        "seed": 11,
+        "city": {
+          "name": "New Meridian",
+          "x": 0,
+          "y": 0,
+          "radius": 5200,
+          "pylons": []
+        }
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "ambient": 0.62
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
       "stations": [],
-      "npcs": [],
-      "enemies": ["void_wraith"],
       "portals": []
+    },
+    {
+      "id": "selene_siege",
+      "name": "Selene",
+      "description": "Terra Nova's moon. A bastion stands in its central crater and is attacked every night.",
+      "danger": 3,
+      "starColor": "#FFDD44",
+      "starRadius": 0,
+      "position": {
+        "x": -60000,
+        "y": 0
+      },
+      "sector": "core",
+      "surface": {
+        "of": "sol",
+        "planet": "terra_nova",
+        "moon": 0,
+        "kind": "rocky",
+        "radius": 14000,
+        "seed": 23,
+        "bastion": {
+          "grade": 1,
+          "offset": 0,
+          "x": 0,
+          "y": 0,
+          "slots": [
+            {
+              "x": 485,
+              "y": 280
+            },
+            {
+              "x": 0,
+              "y": 560
+            },
+            {
+              "x": -485,
+              "y": 280
+            },
+            {
+              "x": -485,
+              "y": -280
+            },
+            {
+              "x": 0,
+              "y": -560
+            },
+            {
+              "x": 485,
+              "y": -280
+            },
+            {
+              "x": 0,
+              "y": -1150
+            },
+            {
+              "x": 996,
+              "y": 575
+            },
+            {
+              "x": -996,
+              "y": 575
+            }
+          ],
+          "profile": "selene",
+          "platform": {
+            "sides": 8,
+            "radius": 820
+          }
+        }
+      },
+      "instance": {
+        "slots": 6
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "glacia_surface",
+      "name": "Glacia",
+      "description": "The surface of Glacia: glaciers under the aurora, a Halden site, and New Halden pilgrims.",
+      "danger": 3,
+      "starColor": "#88CCFF",
+      "starRadius": 0,
+      "position": {
+        "x": -59997,
+        "y": 3
+      },
+      "sector": "core",
+      "surface": {
+        "of": "borealis",
+        "planet": "glacia",
+        "kind": "ice",
+        "radius": 18000,
+        "seed": 63
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "ambient": 0.5
+      },
+      "hazards": [
+        "cold"
+      ],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "rimeholt_siege",
+      "name": "Rimeholt",
+      "description": "Glacia's moon. A bastion stands on it and is attacked every night, harder than at Selene.",
+      "danger": 4,
+      "starColor": "#88CCFF",
+      "starRadius": 0,
+      "position": {
+        "x": -59999,
+        "y": 1
+      },
+      "sector": "core",
+      "surface": {
+        "of": "borealis",
+        "planet": "glacia",
+        "moon": 0,
+        "kind": "ice",
+        "radius": 14000,
+        "seed": 41,
+        "bastion": {
+          "grade": 2,
+          "offset": 0,
+          "x": 0,
+          "y": 0,
+          "slots": [
+            {
+              "x": -779,
+              "y": -450
+            },
+            {
+              "x": -450,
+              "y": -779
+            },
+            {
+              "x": 0,
+              "y": -900
+            },
+            {
+              "x": 450,
+              "y": -779
+            },
+            {
+              "x": 779,
+              "y": -450
+            },
+            {
+              "x": -240,
+              "y": -416
+            },
+            {
+              "x": 240,
+              "y": -416
+            },
+            {
+              "x": 0,
+              "y": 500
+            }
+          ],
+          "profile": "rimeholt",
+          "platform": {
+            "sides": 6,
+            "radius": 760
+          },
+          "walls": [
+            {
+              "from": -165,
+              "to": -15,
+              "radius": 1350
+            }
+          ]
+        }
+      },
+      "instance": {
+        "slots": 6
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "cinderhold_siege",
+      "name": "Cinderhold",
+      "description": "A moon of cooling lava orbiting the Ember Giant. Its bastion is attacked every night by the Cinder Cult and pirates in Mk III hulls.",
+      "danger": 5,
+      "starColor": "#FF4A1A",
+      "starRadius": 0,
+      "position": {
+        "x": -59998,
+        "y": 2
+      },
+      "sector": "ember_frontier",
+      "surface": {
+        "of": "cinder_reach",
+        "planet": "ember_giant",
+        "moon": 0,
+        "kind": "lava",
+        "radius": 14000,
+        "seed": 57,
+        "bastion": {
+          "grade": 3,
+          "offset": 0,
+          "x": 0,
+          "y": 0,
+          "slots": [
+            {
+              "x": 304,
+              "y": 304
+            },
+            {
+              "x": -304,
+              "y": 304
+            },
+            {
+              "x": -304,
+              "y": -304
+            },
+            {
+              "x": 304,
+              "y": -304
+            },
+            {
+              "x": 980,
+              "y": 0
+            },
+            {
+              "x": 490,
+              "y": 849
+            },
+            {
+              "x": -490,
+              "y": 849
+            },
+            {
+              "x": -980,
+              "y": 0
+            },
+            {
+              "x": -490,
+              "y": -849
+            },
+            {
+              "x": 490,
+              "y": -849
+            }
+          ],
+          "profile": "cinderhold",
+          "platform": {
+            "sides": 10,
+            "radius": 860
+          },
+          "walls": [
+            {
+              "from": 0,
+              "to": 40,
+              "radius": 1350
+            },
+            {
+              "from": 60,
+              "to": 100,
+              "radius": 1350
+            },
+            {
+              "from": 120,
+              "to": 160,
+              "radius": 1350
+            },
+            {
+              "from": 180,
+              "to": 220,
+              "radius": 1350
+            },
+            {
+              "from": 240,
+              "to": 280,
+              "radius": 1350
+            },
+            {
+              "from": 300,
+              "to": 340,
+              "radius": 1350
+            }
+          ]
+        }
+      },
+      "instance": {
+        "slots": 6
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "ashfall_surface",
+      "name": "Ashfall",
+      "description": "The surface of Ashfall: cracked crust over molten rock. A cave opens in the rock to the north.",
+      "danger": 8,
+      "starColor": "#FF4A1A",
+      "starRadius": 0,
+      "position": {
+        "x": -59995,
+        "y": 5
+      },
+      "sector": "ember_frontier",
+      "surface": {
+        "of": "cinder_reach",
+        "planet": "ashfall",
+        "kind": "lava",
+        "radius": 13000,
+        "seed": 211
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "ambient": 0.42
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "ashfall_cavern",
+      "name": "The Pyreclast's Cavern",
+      "description": "A cavern under Ashfall's crust: a long canyon running to the vault where the Pyreclast waits.",
+      "danger": 8,
+      "starColor": "#FF4A1A",
+      "starRadius": 0,
+      "position": {
+        "x": -59994,
+        "y": 6
+      },
+      "sector": "ember_frontier",
+      "surface": {
+        "fixedWalls": true,
+        "of": "cinder_reach",
+        "planet": "ashfall",
+        "kind": "cavern",
+        "radius": 31500,
+        "seed": 212,
+        "landing": {
+          "x": 0,
+          "y": 26500
+        },
+        "under": {
+          "surface": "ashfall_surface",
+          "x": 0,
+          "y": -5200,
+          "radius": 900,
+          "name": "the Pyreclast's cavern"
+        },
+        "dread": {
+          "x": 0,
+          "y": -14000,
+          "from": 17000,
+          "full": 7000
+        }
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "ambient": 0.1
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": [],
+      "nests": [
+        { "id": "cavern_canyon_south", "name": "Canyon floor", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 2358, "phase": 1.012197, "period": 0 } },
+        { "id": "cavern_canyon_bend", "name": "West bend", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 7289, "phase": 1.957672, "period": 0 } },
+        { "id": "cavern_canyon_mid", "name": "Canyon floor", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 13933, "phase": 1.408597, "period": 0 } },
+        { "id": "cavern_canyon_north", "name": "Canyon floor", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 17183, "phase": 1.424784, "period": 0 } },
+        { "id": "cavern_kiln_floor", "name": "The Kiln", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 15241, "phase": 2.509902, "period": 0 } },
+        { "id": "cavern_kiln_tunnel", "name": "The Kiln's tunnel", "faction": "cinder", "kind": "shrine", "hidden": true, "orbit": { "radius": 11336, "phase": 2.293776, "period": 0 } }
+      ],
+      "den": [
+        {
+          "kind": "vents",
+          "id": "kiln_vents",
+          "at": [[-9721, 9450], [-10500, 9900], [-11279, 9450], [-11279, 8550], [-10500, 8100], [-9721, 8550]],
+          "order": [0, 3, 1, 4, 2, 5],
+          "every": 120,
+          "tell": 90,
+          "burn": 180,
+          "radius": 600,
+          "dps": 14,
+          "pen": 3
+        },
+        {
+          "kind": "cache",
+          "id": "kiln_cache",
+          "name": "Slag Crust",
+          "x": -10500,
+          "y": 9000,
+          "cells": 11,
+          "material": "pyre_steel",
+          "paint": "#3b2b27",
+          "hp": 3600,
+          "everyMinutes": 20,
+          "regrowSeconds": 120,
+          "loot": [
+            { "item": "ceramic_plate", "chance": 1, "min": 2, "max": 4 },
+            { "item": "coolant", "chance": 1, "min": 2, "max": 4 },
+            { "item": "titanium_plate", "chance": 0.8, "min": 1, "max": 3 },
+            { "item": "cinder_ash", "chance": 0.15, "min": 1, "max": 1 }
+          ]
+        }
+      ],
+      "arena": {
+        "boss": "boss_pyreclast",
+        "centre": { "x": 0, "y": -14000 },
+        "radius": 9000,
+        "barrier": [[-1400, -5000], [2000, -5000]],
+        "outside": { "x": 400, "y": -4300 }
+      }
+    },
+    {
+      "id": "gloam_siege",
+      "name": "Gloam",
+      "description": "Umbra's moon, at the edge of the disk. Its bastion is attacked every night by neutronium-built hostiles: the hardest siege.",
+      "danger": 7,
+      "starColor": "#440066",
+      "starRadius": 0,
+      "position": {
+        "x": -59997,
+        "y": 3
+      },
+      "sector": "outer_rim",
+      "surface": {
+        "of": "void_sector",
+        "planet": "umbra",
+        "moon": 0,
+        "kind": "rocky",
+        "radius": 14000,
+        "seed": 73,
+        "bastion": {
+          "grade": 5,
+          "offset": 0,
+          "x": 0,
+          "y": 0,
+          "slots": [
+            {
+              "x": 0,
+              "y": -420
+            },
+            {
+              "x": 399,
+              "y": -130
+            },
+            {
+              "x": 247,
+              "y": 340
+            },
+            {
+              "x": -247,
+              "y": 340
+            },
+            {
+              "x": -399,
+              "y": -130
+            },
+            {
+              "x": 760,
+              "y": 0
+            },
+            {
+              "x": -380,
+              "y": 658
+            },
+            {
+              "x": -380,
+              "y": -658
+            }
+          ],
+          "profile": "gloam",
+          "platform": {
+            "sides": 12,
+            "radius": 700
+          },
+          "walls": [
+            {
+              "from": 10,
+              "to": 90,
+              "radius": 1100
+            },
+            {
+              "from": 100,
+              "to": 180,
+              "radius": 1100
+            },
+            {
+              "from": 190,
+              "to": 270,
+              "radius": 1100
+            },
+            {
+              "from": 280,
+              "to": 360,
+              "radius": 1100
+            }
+          ]
+        }
+      },
+      "instance": {
+        "slots": 6
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "lastlight_siege",
+      "name": "Last Light",
+      "description": "Pyre's moon, the last before the disk. Its bastion is attacked every night by cobalt-built hostiles from the Maw.",
+      "danger": 6,
+      "starColor": "#FFB040",
+      "starRadius": 0,
+      "position": {
+        "x": -59996,
+        "y": 4
+      },
+      "sector": "ember_frontier",
+      "surface": {
+        "of": "the_maw",
+        "planet": "pyre",
+        "moon": 0,
+        "kind": "lava",
+        "radius": 14000,
+        "seed": 89,
+        "bastion": {
+          "grade": 4,
+          "offset": 0,
+          "x": 0,
+          "y": 0,
+          "slots": [
+            {
+              "x": 600,
+              "y": 0
+            },
+            {
+              "x": 1100,
+              "y": 0
+            },
+            {
+              "x": -600,
+              "y": 0
+            },
+            {
+              "x": -1100,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 520
+            },
+            {
+              "x": 0,
+              "y": -520
+            },
+            {
+              "x": 779,
+              "y": 450
+            },
+            {
+              "x": -779,
+              "y": 450
+            }
+          ],
+          "profile": "lastlight",
+          "platform": {
+            "sides": 4,
+            "radius": 900
+          },
+          "walls": [
+            {
+              "from": -35,
+              "to": 35,
+              "radius": 1450
+            },
+            {
+              "from": 145,
+              "to": 215,
+              "radius": 1450
+            }
+          ]
+        }
+      },
+      "instance": {
+        "slots": 6
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "halcyon_foundry",
+      "name": "The Deep Foundry",
+      "description": "The sealed Halcyon foundry beneath Halcyon's crust.",
+      "danger": 2,
+      "starColor": "#FF7A2A",
+      "starRadius": 0,
+      "position": {
+        "x": 130000,
+        "y": 70000
+      },
+      "sector": "frost_reach",
+      "surface": {
+        "of": "glasswater",
+        "planet": "halcyon",
+        "kind": "lava",
+        "radius": 9000,
+        "seed": 31,
+        "arena": {
+          "boss": {
+            "x": 0,
+            "y": -1200
+          },
+          "entry": {
+            "x": 0,
+            "y": 6200
+          }
+        }
+      },
+      "instance": {
+        "slots": 8
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "homestead",
+      "name": "Your Station",
+      "description": "Your private station, reached through the jump point at the site you chartered.",
+      "danger": 1,
+      "starColor": "#9fd8ff",
+      "starRadius": 0,
+      "position": {
+        "x": -200000,
+        "y": -200000
+      },
+      "sector": "private",
+      "private": true,
+      "instance": {
+        "slots": 32
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "hasNebula": true,
+        "nebulaHue": 200
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": []
+    },
+    {
+      "id": "sol_scrap_nest",
+      "name": "The Scrap Mother's Nest",
+      "description": "The Scrap Mother's nest in the Drift: a hollowed asteroid, its chambers worked by scrapborn, her own at its heart behind a barrier. Junk drifts round it, and scrapborn patrol its face.",
+      "danger": 2,
+      "starColor": "#FFDD44",
+      "starRadius": 0,
+      "position": {
+        "x": -60008,
+        "y": 4
+      },
+      "sector": "core",
+      "pocket": {
+        "entrance": {
+          "system": "sol",
+          "x": -84100,
+          "y": 82740,
+          "radius": 1100,
+          "name": "the Scrap Mother's nest",
+          "look": {
+            "kind": "scrap",
+            "faction": "scrapborn",
+            "scale": 2.4
+          }
+        },
+        "landing": {
+          "x": 0,
+          "y": 26500
+        },
+        "radius": 29000,
+        "dread": {
+          "x": 0,
+          "y": 0,
+          "from": 16000,
+          "full": 6000
+        }
+      },
+      "arena": {
+        "boss": "boss_scrap_mother",
+        "centre": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 6400,
+        "barrier": [
+          [
+            -1900,
+            6250
+          ],
+          [
+            1900,
+            6250
+          ]
+        ],
+        "outside": {
+          "x": 0,
+          "y": 7700
+        }
+      },
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "ambient": 0.55,
+        "greyseam": 0.75
+      },
+      "hazards": [],
+      "asteroidDensity": 1,
+      "asteroidBelt": {
+        "innerRadius": 22800,
+        "outerRadius": 28200,
+        "count": 220,
+        "stationary": true,
+        "lane": {
+          "angle": 1.5708,
+          "width": 4200
+        },
+        "extra": [
+          {
+            "innerRadius": 0,
+            "outerRadius": 30000,
+            "count": 3,
+            "stationary": true,
+            "field": "scrap_seam",
+            "at": [
+              [
+                13700,
+                3300
+              ],
+              [
+                12500,
+                5500
+              ],
+              [
+                14900,
+                5600
+              ]
+            ]
+          },
+          {
+            "innerRadius": 0,
+            "outerRadius": 30000,
+            "count": 3,
+            "stationary": true,
+            "field": "scrap_seam",
+            "at": [
+              [
+                23300,
+                -3400
+              ],
+              [
+                23900,
+                600
+              ],
+              [
+                23000,
+                4300
+              ]
+            ]
+          }
+        ]
+      },
+      "asteroidField": "scrap_nest_junk",
+      "stations": [],
+      "portals": [],
+      "nests": [
+        {
+          "id": "nest_gullet",
+          "name": "Gullet Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 11573,
+            "phase": 1.3531,
+            "period": 0
+          },
+          "description": "A heap of scrap in the Gullet's east alcove. Crawlers sit in it."
+        },
+        {
+          "id": "nest_sorting",
+          "name": "Sorting Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 17109,
+            "phase": 2.8328,
+            "period": 0
+          },
+          "description": "Scrap piled against the Sorting Floor's west wall, where the belts end. Sowers and darters come out of it."
+        },
+        {
+          "id": "nest_smelter",
+          "name": "Smelter Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 15642,
+            "phase": 0.5295,
+            "period": 0
+          },
+          "description": "Scrap heaped by the Smelter's pool. Crawlers keep pilots off the lodes."
+        },
+        {
+          "id": "nest_gallery",
+          "name": "Gallery Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 16700,
+            "phase": -1.5708,
+            "period": 0
+          },
+          "description": "The heap the Wreck Gallery's hauler is guarded from."
+        },
+        {
+          "id": "nest_rim_w",
+          "name": "West Face Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25179,
+            "phase": 3.0222,
+            "period": 0
+          },
+          "description": "Junk welded to drifting rock off the Nest Rock's west face."
+        },
+        {
+          "id": "nest_rim_n",
+          "name": "North Face Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25318,
+            "phase": -1.4121,
+            "period": 0
+          },
+          "description": "Junk welded to drifting rock off the Nest Rock's north face."
+        },
+        {
+          "id": "nest_seam",
+          "name": "Seam Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25828,
+            "phase": 0.0465,
+            "period": 0
+          },
+          "description": "A heap by the lodes on the Nest Rock's east face. Sowers patrol it."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_nest_gullet_a",
+          "name": "Gutted Wisp",
+          "blueprint": "wisp",
+          "position": {
+            "x": -2300,
+            "y": 11200
+          },
+          "angle": 0.9,
+          "salvage": 70
+        },
+        {
+          "id": "wreck_nest_gullet_b",
+          "name": "Stripped Halberd",
+          "blueprint": "halberd",
+          "position": {
+            "x": 2500,
+            "y": 13600
+          },
+          "angle": 2.6,
+          "salvage": 85
+        },
+        {
+          "id": "wreck_nest_gallery",
+          "name": "The Hoarded Hauler",
+          "blueprint": "hauler",
+          "position": {
+            "x": 0,
+            "y": -14300
+          },
+          "angle": 1.4,
+          "salvage": 200
+        },
+        {
+          "id": "wreck_nest_floor_a",
+          "name": "Stripped Drum",
+          "blueprint": "drum",
+          "position": {
+            "x": -12000,
+            "y": 4200
+          },
+          "angle": 0.2,
+          "salvage": 45
+        },
+        {
+          "id": "wreck_nest_floor_b",
+          "name": "Stripped Drum",
+          "blueprint": "drum",
+          "position": {
+            "x": -14600,
+            "y": 5500
+          },
+          "angle": 2.4,
+          "salvage": 45
+        },
+        {
+          "id": "wreck_nest_floor_c",
+          "name": "Stripped Drum",
+          "blueprint": "drum",
+          "position": {
+            "x": -13000,
+            "y": 6800
+          },
+          "angle": 4.0,
+          "salvage": 45
+        },
+        {
+          "id": "wreck_nest_hulk_w",
+          "name": "Drifting Hauler",
+          "blueprint": "hauler",
+          "position": {
+            "x": -24000,
+            "y": 9500
+          },
+          "angle": 3.6,
+          "salvage": 110
+        },
+        {
+          "id": "wreck_nest_hulk_ne",
+          "name": "Drifting Wisp",
+          "blueprint": "wisp",
+          "position": {
+            "x": 17000,
+            "y": -17500
+          },
+          "angle": 2.4,
+          "salvage": 80
+        },
+        {
+          "id": "wreck_nest_hulk_nw",
+          "name": "Drifting Halberd",
+          "blueprint": "halberd",
+          "position": {
+            "x": -15500,
+            "y": -19500
+          },
+          "angle": 0.6,
+          "salvage": 65
+        }
+      ]
     }
   ]
 }

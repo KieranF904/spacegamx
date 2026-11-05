@@ -1,0 +1,1018 @@
+{
+ "name": "Heart of the Maw (redesign), at rest in its bed",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "mawheart_s3_ring",
+   "fn": "conduit",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "mawheart_s3_valve0",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "mawheart_s3_valve1",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "mawheart_s3_valve2",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "mawheart_s3_valve3",
+   "fn": "generator",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "mawheart_s3_stub_apex",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "mawheart_s3_stub_flank_l",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "mawheart_s3_stub_flank_r",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "mawheart_s3_stub_base",
+   "fn": "conduit",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "mawheart_s3_core",
+   "fn": "core",
+   "material": "maw_coreglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "mawheart_ch_apex_walla",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "mawheart_ch_apex_wallb",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "mawheart_ch_apex_valve",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "mawheart_ch_flank_walla_l",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "mawheart_ch_flank_walla_r",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "mawheart_ch_flank_wallb_l",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "mawheart_ch_flank_wallb_r",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "mawheart_ch_flank_valve_l",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "mawheart_ch_flank_valve_r",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "mawheart_ch_base_walla",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "mawheart_ch_base_wallb",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "mawheart_ch_base_valve",
+   "fn": "generator",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "mawheart_septum",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "mawheart_artery0_l",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "mawheart_artery0_r",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "mawheart_artery1_l",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "mawheart_artery1_r",
+   "fn": "conduit",
+   "material": "maw_bone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 27,
+   "piece": "mawheart_crust_diag0_in_l_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 28,
+   "piece": "mawheart_crust_diag0_in_r_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 29,
+   "piece": "mawheart_crust_diag0_out_l_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 30,
+   "piece": "mawheart_crust_diag0_out_r_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 31,
+   "piece": "mawheart_crust_diag1_in_l_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 32,
+   "piece": "mawheart_crust_diag1_in_r_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 33,
+   "piece": "mawheart_crust_diag1_out_l_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 34,
+   "piece": "mawheart_crust_diag1_out_r_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 35,
+   "piece": "mawheart_cap_apex_dim",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 36,
+   "piece": "mawheart_cap_flank_l_dim",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 37,
+   "piece": "mawheart_cap_flank_r_dim",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 38,
+   "piece": "mawheart_cap_base_dim",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 39,
+   "piece": "mawheart_crust_growth_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 40,
+   "piece": "mawheart_crust_key_dim",
+   "fn": "armor",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 41,
+   "piece": "mawheart_crown_mid_dim",
+   "fn": "armor",
+   "material": "maw_shardglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 42,
+   "piece": "mawheart_crown_side_l_dim",
+   "fn": "armor",
+   "material": "maw_shardglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 43,
+   "piece": "mawheart_crown_side_r_dim",
+   "fn": "armor",
+   "material": "maw_shardglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 44,
+   "piece": "mawheart_root0a_l_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 45,
+   "piece": "mawheart_root0a_r_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 46,
+   "piece": "mawheart_root0b_l_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 47,
+   "piece": "mawheart_root0b_r_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 48,
+   "piece": "mawheart_root0c_l_dim",
+   "fn": "hull",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 49,
+   "piece": "mawheart_root0c_r_dim",
+   "fn": "hull",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 50,
+   "piece": "mawheart_root0_knot_l_dim",
+   "fn": "conduit",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 51,
+   "piece": "mawheart_root0_knot_r_dim",
+   "fn": "conduit",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 52,
+   "piece": "mawheart_root1a_l_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 53,
+   "piece": "mawheart_root1a_r_dim",
+   "fn": "armor",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 54,
+   "piece": "mawheart_root1b_l_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 55,
+   "piece": "mawheart_root1b_r_dim",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 56,
+   "piece": "mawheart_root1c_l_dim",
+   "fn": "hull",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 57,
+   "piece": "mawheart_root1c_r_dim",
+   "fn": "hull",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 58,
+   "piece": "mawheart_root1_knot_l_dim",
+   "fn": "conduit",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 59,
+   "piece": "mawheart_root1_knot_r_dim",
+   "fn": "conduit",
+   "material": "maw_seamglass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 60,
+   "piece": "mawheart_lattice_l_dim",
+   "fn": "bone_frame",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 61,
+   "piece": "mawheart_lattice_r_dim",
+   "fn": "bone_frame",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 62,
+   "piece": "mawheart_rim0_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 63,
+   "piece": "mawheart_rim0_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 64,
+   "piece": "mawheart_rim1_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 65,
+   "piece": "mawheart_rim1_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 66,
+   "piece": "mawheart_rim2_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 67,
+   "piece": "mawheart_rim2_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 68,
+   "piece": "mawheart_rim3_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 69,
+   "piece": "mawheart_rim3_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 70,
+   "piece": "mawheart_rim4_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 71,
+   "piece": "mawheart_rim4_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 72,
+   "piece": "mawheart_rim5_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 73,
+   "piece": "mawheart_rim5_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 74,
+   "piece": "mawheart_rim6_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 75,
+   "piece": "mawheart_rim6_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 76,
+   "piece": "mawheart_rim7_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 77,
+   "piece": "mawheart_rim7_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 78,
+   "piece": "mawheart_rim8_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 79,
+   "piece": "mawheart_rim8_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 80,
+   "piece": "mawheart_rim9_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 81,
+   "piece": "mawheart_rim9_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 82,
+   "piece": "mawheart_rim10_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 83,
+   "piece": "mawheart_rim10_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 84,
+   "piece": "mawheart_rim11_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 85,
+   "piece": "mawheart_rim11_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 86,
+   "piece": "mawheart_rim12_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 87,
+   "piece": "mawheart_rim12_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 88,
+   "piece": "mawheart_rim_aft",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 89,
+   "piece": "mawheart_drift0_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 90,
+   "piece": "mawheart_drift0_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 91,
+   "piece": "mawheart_drift1_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 92,
+   "piece": "mawheart_drift1_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 93,
+   "piece": "mawheart_drift2_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 94,
+   "piece": "mawheart_drift2_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 95,
+   "piece": "mawheart_drift3_l",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 96,
+   "piece": "mawheart_drift3_r",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 97,
+   "piece": "mawheart_drift4_l",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 98,
+   "piece": "mawheart_drift4_r",
+   "fn": "hull",
+   "material": "maw_heartstone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 99,
+   "piece": "mawheart_drift_mid",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 100,
+   "piece": "mawheart_drift_low",
+   "fn": "hull",
+   "material": "maw_crust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

@@ -1,0 +1,58 @@
+{
+ "name": "Hookboat (damaged)",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "hookboat_core",
+   "fn": "core",
+   "material": "pirate_plate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "hookboat_hull",
+   "fn": "hull",
+   "material": "pirate_plate",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "hookboat_wheelhouse",
+   "fn": "hull",
+   "material": "pirate_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "hookboat_drive_l",
+   "fn": "plasma_drive",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "hookboat_drive_r",
+   "fn": "thruster",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

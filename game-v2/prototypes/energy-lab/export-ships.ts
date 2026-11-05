@@ -1,0 +1,75 @@
+// Exports the game's blueprints into ships.js for the Energy Lab (cells exact, via the game's own geometry).
+// Run from game-v2: npx tsx prototypes/energy-lab/export-ships.ts
+import { readdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { parseBlueprint, loadCatalog } from '../../common/src/index';
+import { placeGeometry } from '../../common/src/ships/grid';
+import { loadShipConfigFromDisk } from '../../server/src/ships/loadShipConfig';
+
+const root = join(__dirname, '../..');
+const raw = loadShipConfigFromDisk(join(root, 'data'));
+const catalog = loadCatalog(raw.catalog, { overlapShrink: raw.tuning.overlapShrink });
+
+const MAP: Record<string, string> = {
+  core: 'core', armor: 'armor', hull: 'hull', cargo: 'cargo', conduit: 'conduit', power_conduit: 'conduit', power_diode: 'diode',
+  power_cell_reactor: 'cell_reactor', power_isotope_pile: 'isotope', power_fusion_plant: 'fusion', power_overclock_reactor: 'overclock',
+  power_battery: 'battery', power_heavy_bank: 'heavy_bank', power_capacitor: 'capacitor', power_drive_cell: 'drive_cell', power_pulse_dynamo: 'dynamo',
+  engine_ion_drive: 'ion', engine_vernier: 'vernier', engine_afterburner: 'afterburner', engine_torch: 'torch', engine_plasma_drive: 'plasma',
+  engine_drift_sail: 'drift_sail', engine_fusion_torch: 'fusion_torch', engine_burst_strafer: 'strafer',
+  utility_mining_laser: 'mining', utility_bore: 'bore', utility_siphon: 'siphon', utility_scanner: 'scanner', utility_long_range_array: 'scanner',
+  utility_tow_beam: 'tow', utility_jump_coil: 'jump_coil', utility_heavy_coil: 'jump_coil', utility_constructor: 'scanner', utility_demolition_launcher: 'lobber',
+  shield_deflector: 'deflector', shield_flicker_screen: 'flicker', shield_bulwark_projector: 'bulwark',
+  cannon_pip: 'pip', cannon_hammer: 'hammer', cannon_twinlink: 'twinlink', cannon_longbarrel: 'longbarrel', cannon_bastion: 'bastion',
+  autocannon_rattler: 'rattler', autocannon_chainsaw: 'chainsaw', autocannon_stinger: 'stinger', flak_burst: 'burst', flak_cloudmaker: 'cloudmaker',
+  mortar_lobber: 'lobber', mortar_quake: 'quake', laser_glint: 'glint', laser_cutter: 'cutter', laser_searchlight: 'searchlight',
+  pulse_strobe: 'strobe', pulse_overpulse: 'overpulse', missile_dart: 'dart', missile_swarm: 'swarm', missile_hammerhead: 'hammerhead',
+  railgun_needle: 'needle', railgun_coilgun: 'coilgun', railgun_spear: 'spear', railgun_rail_driver: 'rail_driver', emp_hush: 'hush', emp_blackout: 'blackout',
+  arc_spark: 'spark', arc_tesla: 'tesla', torpedo_eel: 'eel', torpedo_leviathan: 'leviathan', lance_lance: 'lance',
+  legendary_hive: 'hive', legendary_frostbite: 'frostbite', legendary_cinder_bloom: 'cinder', legendary_prism: 'prism', legendary_phase: 'phase',
+  legendary_singularity: 'singularity', point_defence_turret: 'pd',
+};
+// Older, non-model parts (mostly enemies): map by family
+const FAMILY: [RegExp, string][] = [[/reactor|generator|power_core/, 'cell_reactor'], [/heavy_bank/, 'heavy_bank'], [/capacitor/, 'capacitor'], [/battery/, 'battery'],
+  [/fusion_torch/, 'fusion_torch'], [/plasma/, 'plasma'], [/afterburner/, 'afterburner'], [/torch/, 'torch'], [/thruster|engine|ion/, 'ion'],
+  [/lance/, 'lance'], [/autocannon/, 'rattler'], [/cannon/, 'pip'], [/laser|beam/, 'glint'], [/pulse/, 'strobe'], [/missile|rocket/, 'dart'], [/torpedo/, 'eel'],
+  [/rail/, 'needle'], [/^weapon$/, 'pip'], [/flak/, 'burst'], [/mortar/, 'lobber'], [/arc|tesla/, 'spark'], [/emp/, 'hush'], [/shield/, 'deflector'], [/mining|miner/, 'mining'],
+  [/armou?r|plate/, 'armor'], [/cargo|hold/, 'cargo']];
+const unknown = new Map<string, number>();
+function typeOf(fn: string): string {
+  if (MAP[fn]) return MAP[fn];
+  for (const [re, t] of FAMILY) if (re.test(fn)) return t;
+  unknown.set(fn, (unknown.get(fn) ?? 0) + 1);
+  return 'hull';
+}
+
+const ships: unknown[] = [];
+// The hand-built review ships (dev/review-*.json) come first; the rest of the dev folder (test ships) goes last
+const GROUPS: [string, string, (f: string) => boolean][] = [
+  ['Review ships', 'data/ships/blueprints/dev', (f) => f.startsWith('review-')],
+  ['Player ships', 'data/ships/blueprints', () => true],
+  ['Enemy ships', 'data/ships/blueprints/enemy', () => true],
+  ['Dev test ships', 'data/ships/blueprints/dev', (f) => !f.startsWith('review-')],
+];
+for (const [group, dir, keep] of GROUPS) {
+  const d = join(root, dir);
+  if (!existsSync(d)) continue;
+  for (const f of readdirSync(d).filter((x) => x.endsWith('.json') && keep(x)).sort()) {
+    let bp;
+    try { bp = parseBlueprint(readFileSync(join(d, f), 'utf8')); } catch { continue; }
+    // [type, cells] or, for a Diode, [type, cells, out side]: the game's PlacedPart.facing (N = -y, the lab's up)
+    const parts: [string, number[][], string?][] = [];
+    for (const p of bp.parts) {
+      let cells: number[][];
+      try { cells = placeGeometry(catalog, p).cells.map((c) => [Math.round(c[0]), Math.round(c[1])]); } catch { continue; }
+      const type = typeOf(p.fn);
+      if (cells.length) parts.push(type === 'diode' ? [type, cells, p.facing ?? 'N'] : [type, cells]);
+    }
+    const xs = parts.flatMap(([, c]) => c.map((v) => v[0])), ys = parts.flatMap(([, c]) => c.map((v) => v[1]));
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    for (const pt of parts) pt[1] = pt[1].map(([x, y]) => [x - x0, y - y0]);
+    ships.push({ name: bp.name || f.replace('.json', ''), file: f, group, parts });
+  }
+}
+writeFileSync(join(__dirname, 'ships.js'), '// Generated by export-ships.ts from data/ships/blueprints. Do not edit.\nwindow.SHIPS = ' + JSON.stringify(ships) + ';\n');
+console.log(`${ships.length} ships written`);
+if (unknown.size) console.log('Shown as hull (no match):', [...unknown].map(([k, v]) => `${k}×${v}`).join(', '));

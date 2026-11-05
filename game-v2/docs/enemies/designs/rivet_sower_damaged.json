@@ -1,0 +1,68 @@
+{
+ "name": "Rivet Sower (damaged)",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "rivet_sower_body",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "rivet_sower_lamp",
+   "fn": "core",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "rivet_sower_pannier_l",
+   "fn": "cargo",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "rivet_sower_drive_l",
+   "fn": "thruster",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "rivet_sower_drive_r",
+   "fn": "thruster",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "rivet_sower_drum",
+   "fn": "conduit",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

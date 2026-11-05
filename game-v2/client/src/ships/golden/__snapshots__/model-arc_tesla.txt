@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Tesla
+Mk IV · Small · Round · 0.8 cells
+Hull · mass62 hp · 0.8
+Armour · build4 · 3 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage70/s · reach 660
+Hits withEnergy · penetration 4
+Beamheld while you fire · draws its power while it's on
+Modelbeam: Burns energy every second you hold it.
+MountTurret, 300°
+FittingSide mount (flippable) · Bolts on at its side only
+Power draw30/s
+
+== partStats (stats rows) ==
+GradeMk IV · Small
+Hits withEnergy · penetration 4
+Power draw30
+Hull · mass62 hp · 0.8
+Armour · build4 · 3 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 62
+
+== familyLabel ==
+Arc projectors
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Round
+
+== tradeOff ==
+held storm: 5 zaps a second, chains to 5
+
+== keyStats ==
+70 dmg/s · reach 660 · held beam · draws 30
+
+== mountBadge ==
+TURRET 300°SIDE
+
+== mountingText ==
+Turret, 300°
+Side mount (flippable)
+Bolts on at its side only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 29","why":"Learned at level 29 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 29","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":70,"toughness":61.57521601035994,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":70,"range":660,"damageType":"energy","pen":4,"draw":30.002209841782527}

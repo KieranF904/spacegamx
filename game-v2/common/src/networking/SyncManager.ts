@@ -1,11 +1,11 @@
-import { BitBuffer } from './BitBuffer';
-import { getEntitySchemaRequired, EntitySchema } from './EntitySchema';
-import { NetworkModule } from './modules/NetworkModule';
+import { BitBuffer } from './BitBuffer.js';
+import { getEntitySchemaRequired, EntitySchema } from './EntitySchema.js';
+import { NetworkModule } from './modules/NetworkModule.js';
 import { 
   PacketType, 
   StateCorrectionPacket, 
   writeStateCorrection 
-} from './packets/Packets';
+} from './packets/Packets.js';
 
 /**
  * Tracks entity state for correction detection

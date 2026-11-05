@@ -2,95 +2,65 @@
  * Login UI - Cinematic Login/Registration screen
  * 
  * Features:
- * - Huge animated sun using WebGL shader (same as in-game)
+ * - A huge body of Sol under the form, a different one each visit (ui/loginBody.ts): the sun (rendering/sun/SunRenderer.ts)
+ *   or a planet or moon as the game draws them, by the game's own renderer
  * - Stylized glowing title
  * - Animated starfield background
  * - Particle effects
  * - Sleek modern login form
  */
 
-import { Application, Container, Graphics } from 'pixi.js';
-import { SunRenderer } from '../rendering/SunRenderer';
-import { GlowRenderer } from '../rendering/GlowRenderer';
-import { sunShaderDefs } from '@space-game/common';
+import { Application, Container, Graphics, type GlProgram } from 'pixi.js';
+import { SunRenderer } from '../rendering/sun/SunRenderer';
+import { batchProgram, shaderReady } from '../rendering/shaderWarmup';
+import type { StarSystemData } from '@space-game/common';
+import systemsData from '../../../data/systems.json';
+import { LoginBody, loginBodyForVisit } from './loginBody';
+import { SkyRenderer, skyPrograms } from '../rendering/sky/SkyRenderer';
+import { skyBiome, type BiomeHints } from '../rendering/sky/skyBiome';
+import { attachVolumeUploads } from '../rendering/planet-proto/planetTextures';
 
 export class LoginUI {
   private container: HTMLElement;
   private panel: HTMLElement;
   private visible = true;
-  private debugPanelVisible = false;
   private startTime = Date.now();
   
-  // PixiJS WebGL rendering
-  private app: Application | null = null;
+  // The backdrop: drawn by the game's renderer in the world's place while the screen is up (one WebGL context, so its
+  // shaders compile once, and ahead: see shaderWarmup), on the game's canvas, borrowed into the panel
+  private app: Application;
   private worldContainer: Container | null = null;
+  /** The star (it shows itself once its noise and program are ready) */
   private sunRenderer: SunRenderer | null = null;
-  private glowRenderer: GlowRenderer | null = null;
+  /** Sol's sky behind it all */
+  private sky: SkyRenderer | null = null;
+  private skyW = 0;
+  private skyH = 0;
+  /** Or this visit's planet or moon of Sol (loginBody.ts), in the sun's place */
+  private body: LoginBody | null = null;
   private starsGraphics: Graphics | null = null;
-  private pixiInitialized = false;
+  /** The backdrop's parts and the programs each waits for: shown once they're compiled (a first visit's first frames aren't held up) */
+  private parts: [Container, GlProgram[]][] = [];
+  /** Where the game's canvas goes back to when the screen is hidden */
+  private canvasHome: { parent: Node; next: Node | null } | null = null;
   
   // Star field
   private stars: Array<{ x: number; y: number; z: number; size: number; phase: number }> = [];
-  
-  // Debug sliders values - fBM + Plasma shader params
-  private debugParams = {
-    // === fBM CORE ===
-    octaves: 5.0,           // Number of noise octaves (1-8)
-    lacunarity: 2.0,        // Frequency multiplier per octave
-    gain: 0.5,              // Amplitude multiplier per octave
-    noiseScale: 4.0,        // Overall noise scale
-    animSpeed: 0.15,        // Animation speed
-    contrast: 1.0,          // Output contrast
-    // === DOMAIN WARPING ===
-    warpAmount: 0.4,        // Warp strength
-    warpScale: 0.5,         // Warp noise scale
-    turbulenceMix: 0.3,     // Smooth vs turbulent fBM
-    // === PLASMA OVERLAY ===
-    plasmaIntensity: 0.3,   // Plasma effect strength
-    plasmaScale: 3.0,       // Plasma pattern scale
-    plasmaSpeed: 1.0,       // Plasma animation speed
-    // === CENTER CONTRAST ===
-    centerDarken: 0.5,      // Darken dark areas toward center
-    centerHighlight: 0.5,   // Highlight bright areas toward center
-    centerFalloff: 1.5,     // Center effect falloff curve
-    // === INSIDE ADJUST ===
-    innerDarkening: 0.0,    // Darken the center (opposite of limb)
-    whiteBalance: 0.0,      // Warm (+) / Cool (-) shift
-    saturation: 1.0,        // Color saturation
-    // === EDGE STYLING ===
-    edgeBrightness: 1.0,    // Edge brightness multiplier
-    edgeThickness: 0.03,    // Edge thickness
-    edgeSharpness: 0.5,     // Edge sharpness/falloff
-    limbDarkening: 0.5,     // Darken towards edges
-    glowIntensity: 0.4,     // Edge glow strength
-    glowSize: 0.1,          // How far glow extends
-    // === CORONA ===
-    coronaSize: 2.0,
-    coronaIntensity: 0.8,
-    atmosphereInnerRadius: 0.7,
-    atmosphereOuterRadius: 2.2,
-    coronaInnerRadius: 0.6,
-    coronaOuterRadius: 1.5,
-    // === COLORS (hex strings) ===
-    darkColor: '#1a0500',   // Darkest
-    midColor: '#661100',    // Mid-tone
-    brightColor: '#ff6600', // Brightest
-    edgeColor: '#ffaa33',   // Highlight/edge color
-    plasmaColor: '#ff9933', // Plasma overlay color
-    centerColor: '#ffe6cc', // Center light color
-  };
   
   // Callbacks
   public onLogin: ((username: string, password: string) => void) | null = null;
   public onRegister: ((username: string, password: string, email: string) => void) | null = null;
   public onPlayAsGuest: (() => void) | null = null;
+  /** After it's shown or hidden (the game renders at the screen's density while it's up) */
+  public onVisibility: (() => void) | null = null;
   
   private mode: 'login' | 'register' = 'login';
   private errorMessage = '';
   private loading = false;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, app: Application) {
     this.container = container;
+    this.app = app;
     
     // Create login panel
     this.panel = document.createElement('div');
@@ -101,139 +71,115 @@ export class LoginUI {
     this.setupStyles();
     this.initStars();
     this.render();
-    this.initPixi();
+    this.attachBackdrop();
   }
   
-  private async initPixi(): Promise<void> {
-    // Create PixiJS application
-    this.app = new Application();
-    await this.app.init({
-      width: window.innerWidth,
-      height: window.innerHeight,
-      backgroundColor: 0x000005,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
-      antialias: true,
-    });
-    
-    // Insert canvas into the login panel before other content
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    canvas.id = 'login-canvas';
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.zIndex = '0';
-    this.panel.insertBefore(canvas, this.panel.firstChild);
-    
+  /** The sign-in screen's scene while it's up (the game draws it instead of the world), else null */
+  backdrop(): Container | null {
+    return this.visible ? this.worldContainer : null;
+  }
+
+  private buildBackdrop(): void {
+    if (this.worldContainer) return;
     // Create container hierarchy
     this.worldContainer = new Container();
-    this.app.stage.addChild(this.worldContainer);
     
     // Stars layer
     this.starsGraphics = new Graphics();
     this.worldContainer.addChild(this.starsGraphics);
     
-    // Initialize GPU renderers
-    this.glowRenderer = new GlowRenderer();
-    this.glowRenderer.initialize();
-    this.worldContainer.addChild(this.glowRenderer.getContainer());
-    
-    this.sunRenderer = new SunRenderer();
-    this.sunRenderer.initialize();
-    this.worldContainer.addChild(this.sunRenderer.getContainer());
-    
-    // Set up the brownian sun style
-    this.setupBrownianSunStyle();
-    
-    // Position sun at bottom center
-    this.updateSunPosition();
-    
-    // Handle resize
-    window.addEventListener('resize', this.handleResize);
-    
-    // Start animation loop
-    this.app.ticker.add(() => this.updateAnimation());
-    
-    this.pixiInitialized = true;
+    const batch = batchProgram(this.app.renderer);
+    this.parts = [[this.starsGraphics, batch ? [batch] : []]];
+
+    // Sol's sky as the game draws it (its nebula, haze and stars), once its programs are compiled; the dots above till then
+    const sol = (systemsData as { systems: StarSystemData[] }).systems.find((s) => s.id === 'sol');
+    const v = (sol?.visuals ?? {}) as BiomeHints;
+    this.sky = new SkyRenderer(this.app);
+    this.sky.setBiome(skyBiome('sol', {
+      biome: v.biome, sector: sol?.sector, position: sol?.position, central: sol?.centralBody?.type,
+      hasNebula: v.hasNebula, nebulaHue: v.nebulaHue, starHueShift: v.starHueShift, specialStarChance: v.specialStarChance, specialStarHue: v.specialStarHue,
+    }));
+    this.worldContainer.addChild(this.sky.container);
+    this.parts.push([this.sky.container, skyPrograms()]);
+
+    // One of Sol's bodies, a different one each visit (loginBody.ts): the sun as the game draws it, or a planet or moon
+    // lit by the sun drawn small at a top corner (the sun and one small body orbit it, slowly)
+    const id = loginBodyForVisit(sol);
+    this.sunRenderer = new SunRenderer(this.app);
+    this.sunRenderer.setStar('sol');
+    // The star goes in first, under the planets: it is the farthest thing in the scene, so the central body (its disc, haze
+    // and rings) and the small one cover it wherever it passes behind them. It is one container (the star's own pass drawn
+    // to a target and stretched over the screen: disc, plasma, corona, glow, flares), so one place in the order does it.
+    this.worldContainer.addChild(this.sunRenderer.container);
+    if (id !== 'sun') {
+      attachVolumeUploads(this.app.renderer);
+      this.body = new LoginBody(id, sol);
+      this.worldContainer.addChild(this.body.container);
+    }
+  }
+
+  /** Show the backdrop: the game's canvas into the panel, under the form, and animated */
+  private attachBackdrop(): void {
+    this.buildBackdrop();
+    const canvas = this.app.canvas as HTMLCanvasElement;
+    if (canvas.parentNode && canvas.parentNode !== this.panel) {
+      this.canvasHome = { parent: canvas.parentNode, next: canvas.nextSibling };
+      this.panel.insertBefore(canvas, this.panel.firstChild);
+    }
+    this.app.ticker.remove(this.updateAnimation);
+    this.app.ticker.add(this.updateAnimation);
+  }
+
+  /** The game's canvas back where it was; nothing more to animate */
+  private detachBackdrop(): void {
+    this.app.ticker.remove(this.updateAnimation);
+    const canvas = this.app.canvas as HTMLCanvasElement, home = this.canvasHome;
+    if (home && canvas.parentNode === this.panel) home.parent.insertBefore(canvas, home.next?.parentNode === home.parent ? home.next : null);
+    this.canvasHome = null;
   }
   
-  private setupBrownianSunStyle(): void {
-    if (!this.sunRenderer) return;
-    
-    // Find the brownian style index
-    const brownianIndex = sunShaderDefs.sunStyles.findIndex(s => s.id === 'brownian');
-    
-    // Set up corona style (plasma streams looks nice)
-    const coronaIndex = sunShaderDefs.coronaStyles.findIndex(s => s.id === 'plasmaStreams');
-    const coronaStyle = sunShaderDefs.coronaStyles[coronaIndex] || sunShaderDefs.coronaStyles[0];
-    const coronaParams = coronaStyle.params.map(p => p.default);
-    this.sunRenderer.setCoronaStyle(coronaIndex >= 0 ? coronaIndex : 0, coronaParams);
-    
-    // Set sun visual parameters
-    this.sunRenderer.setRadius(0.4);
-    this.sunRenderer.setLOD(1.0); // Full detail
-    
-    // Apply debug params (this sets the sun style and corona)
-    this.applyDebugParams();
-  }
-  
-  private updateSunPosition(): void {
-    if (!this.sunRenderer || !this.glowRenderer || !this.app) return;
-    
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-    
-    // Position sun so the visible top 25% arc spans exactly the view width
-    // (touching both bottom corners).
-    const sunX = w / 2;
-    const visibleFraction = 0.25;
-    const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
-    const sunY = h + (1 - 2 * visibleFraction) * renderedRadius;
-    
-    this.sunRenderer.setPosition(sunX, sunY);
-    this.glowRenderer.setPosition(sunX, sunY);
-  }
-  
-  private updateAnimation(): void {
-    if (!this.visible || !this.app || !this.sunRenderer || !this.glowRenderer) return;
+  private updateAnimation = (): void => {
+    if (!this.visible || !this.sunRenderer) return;
+    for (const [part, programs] of this.parts) part.visible = programs.every(shaderReady);
     
     const time = (Date.now() - this.startTime) / 1000;
     const delta = this.app.ticker.deltaMS / 1000;
     const w = this.app.screen.width;
     const h = this.app.screen.height;
+    // (the sky's haze texture is screen-sized: follow the window when it's resized under the sign-in screen)
+    if (this.sky && (w !== this.skyW || h !== this.skyH)) { this.skyW = w; this.skyH = h; this.sky.resize(); }
     
-    // Update sun + glow shaders.
-    // For top 25% visibility to span view width: chord = 4R*sqrt(f*(1-f)), f=0.25.
-    // SunRenderer effective pixel radius is 2 * worldRadius
-    // (quadSize=2, meshScale=worldRadius*2.5, uRadius=0.4).
+    // The sun: its visible top quarter's arc spans exactly the view's width (touching both bottom corners): for a cap of
+    // height f·2R, the chord is 4R·sqrt(f(1 − f))
     const visibleFraction = 0.25;
     const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
-    const sunWorldRadius = renderedRadius / 2;
+    const cy = h + (1 - 2 * visibleFraction) * renderedRadius;
+    // (a slow drift through the sky: its near stars slide past the far ones; not drawn, its haze not even into its
+    // texture, till its programs are compiled ahead: a compile here would hold up the sign-in screen's first frames)
+    if (this.sky?.container.visible) this.sky.update(delta * 1000, time * 40, time * 12, 0.35);
+    if (this.body) {
+      // (the star and the small body orbit the big one, slowly: the body says where the star is)
+      const sun = this.body.update(delta, w / 2, cy, renderedRadius, w, h);
+      this.sunRenderer.drawAt(delta, sun.x, sun.y, sun.r);
+    } else this.sunRenderer.drawAt(delta, w / 2, cy, renderedRadius);
 
-    // Keep ambient glow fade in sync with the atmosphere radius sliders.
-    const atmosphereInner = Math.max(0.0, this.debugParams.atmosphereInnerRadius);
-    const atmosphereOuter = Math.max(atmosphereInner + 0.001, this.debugParams.atmosphereOuterRadius);
-    const glowInnerRadius = renderedRadius * atmosphereInner;
-    const glowOuterRadius = renderedRadius * atmosphereOuter;
-    const hue = 30;
-    
-    this.sunRenderer.update(delta, hue, sunWorldRadius, { width: w, height: h });
-    this.glowRenderer.update(delta, hue, glowInnerRadius, glowOuterRadius, 0, 0);
-    
     // Draw stars
     this.drawStars(time);
-  }
+  };
   
   private drawStars(time: number): void {
-    if (!this.starsGraphics || !this.app) return;
+    if (!this.starsGraphics) return;
     
     const g = this.starsGraphics;
     const w = this.app.screen.width;
     const h = this.app.screen.height;
     
     g.clear();
+    // The backdrop's own black (the game's renderer clears to its own)
+    g.rect(0, 0, w, h);
+    g.fill({ color: 0x000005 });
+    // (only till Sol's own sky shows)
+    if (this.sky?.container.visible) return;
     
     for (const star of this.stars) {
       const parallax = 0.5 + star.z * 0.5;
@@ -281,7 +227,7 @@ export class LoginUI {
         align-items: center;
         justify-content: center;
         background: #000;
-        z-index: 2000;
+        z-index: 5000; /* over anything a connection left on screen */
         overflow: hidden;
       }
       
@@ -562,436 +508,45 @@ export class LoginUI {
       }
       
       /* Debug Panel Styles */
-      .debug-panel {
-        position: fixed;
-        top: 44px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.85);
-        border: 1px solid rgba(255, 150, 50, 0.4);
-        border-radius: 8px;
-        padding: 10px;
-        z-index: 9999;
-        font-family: monospace;
-        font-size: 11px;
-        color: #ffaa66;
-        min-width: 220px;
-        max-height: 90vh;
-        overflow-y: auto;
-      }
 
-      .debug-panel.hidden {
-        display: none;
-      }
 
-      .debug-toggle-btn {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 10000;
-        height: 28px;
-        padding: 0 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 150, 50, 0.5);
-        background: rgba(0, 0, 0, 0.8);
-        color: #ffaa66;
-        font-family: monospace;
-        font-size: 11px;
-        cursor: pointer;
-      }
 
-      .debug-toggle-btn:hover {
-        background: rgba(255, 120, 30, 0.2);
-        border-color: rgba(255, 170, 80, 0.8);
-      }
       
-      .debug-panel-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        cursor: pointer;
-        padding-bottom: 8px;
-        border-bottom: 1px solid rgba(255, 150, 50, 0.3);
-        margin-bottom: 8px;
-      }
       
-      .debug-panel-title {
-        font-weight: bold;
-        font-size: 12px;
-      }
       
-      .debug-panel-content {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
       
-      .debug-panel.collapsed .debug-panel-content {
-        display: none;
-      }
       
-      .debug-slider-group {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
       
-      .debug-slider-label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 10px;
-      }
       
-      .debug-slider-label span:last-child {
-        color: #ffcc88;
-      }
       
-      .debug-slider {
-        width: 100%;
-        height: 4px;
-        -webkit-appearance: none;
-        background: rgba(255, 150, 50, 0.2);
-        border-radius: 2px;
-        outline: none;
-      }
       
-      .debug-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 12px;
-        height: 12px;
-        background: #ff8833;
-        border-radius: 50%;
-        cursor: pointer;
-      }
       
-      .debug-slider::-moz-range-thumb {
-        width: 12px;
-        height: 12px;
-        background: #ff8833;
-        border-radius: 50%;
-        cursor: pointer;
-        border: none;
-      }
       
-      .debug-color-section {
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid rgba(255, 150, 50, 0.3);
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
       
-      .debug-color-group {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2px;
-      }
       
-      .debug-color-group label {
-        font-size: 9px;
-      }
       
-      .debug-color-group input[type="color"] {
-        width: 32px;
-        height: 20px;
-        border: 1px solid rgba(255, 150, 50, 0.4);
-        border-radius: 4px;
-        background: transparent;
-        cursor: pointer;
-        padding: 0;
-      }
       
-      .debug-group {
-        margin-bottom: 6px;
-        padding-bottom: 6px;
-        border-bottom: 1px solid rgba(255, 150, 50, 0.15);
-      }
       
-      .debug-group:last-of-type {
-        border-bottom: none;
-      }
       
-      .debug-group-title {
-        font-weight: bold;
-        font-size: 10px;
-        color: #ff9944;
-        margin-bottom: 4px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
       
       /* Import Google Font */
       @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500;600&display=swap');
     `;
     document.head.appendChild(style);
-    
-    // Create debug panel
-    this.createDebugPanel();
-  }
-  
-  private createDebugPanel(): void {
-    const existingPanel = document.getElementById('sun-debug-panel');
-    if (existingPanel) existingPanel.remove();
-    const existingToggle = document.getElementById('sun-debug-toggle');
-    if (existingToggle) existingToggle.remove();
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.id = 'sun-debug-toggle';
-    toggleBtn.className = 'debug-toggle-btn';
-    toggleBtn.type = 'button';
-    toggleBtn.textContent = this.debugPanelVisible ? 'Hide Sun Settings' : 'Show Sun Settings';
-    
-    const panel = document.createElement('div');
-    panel.id = 'sun-debug-panel';
-    panel.className = 'debug-panel';
-    if (!this.debugPanelVisible) panel.classList.add('hidden');
-    
-    const sliders = [
-      // fBM Core
-      { key: 'octaves', label: 'Octaves', min: 1, max: 8, step: 1, group: 'fBM' },
-      { key: 'lacunarity', label: 'Lacunarity', min: 1.5, max: 3.0, step: 0.1, group: 'fBM' },
-      { key: 'gain', label: 'Gain', min: 0.1, max: 0.9, step: 0.05, group: 'fBM' },
-      { key: 'noiseScale', label: 'Noise Scale', min: 1, max: 10, step: 0.5, group: 'fBM' },
-      { key: 'animSpeed', label: 'Anim Speed', min: 0.01, max: 0.5, step: 0.01, group: 'fBM' },
-      { key: 'contrast', label: 'Contrast', min: 0.5, max: 2.0, step: 0.1, group: 'fBM' },
-      // Domain Warping
-      { key: 'warpAmount', label: 'Warp Amount', min: 0, max: 1.5, step: 0.05, group: 'Warp' },
-      { key: 'warpScale', label: 'Warp Scale', min: 0.1, max: 2.0, step: 0.1, group: 'Warp' },
-      { key: 'turbulenceMix', label: 'Turbulence', min: 0, max: 1, step: 0.05, group: 'Warp' },
-      // Plasma
-      { key: 'plasmaIntensity', label: 'Intensity', min: 0, max: 1, step: 0.05, group: 'Plasma' },
-      { key: 'plasmaScale', label: 'Scale', min: 0.5, max: 8, step: 0.5, group: 'Plasma' },
-      { key: 'plasmaSpeed', label: 'Speed', min: 0.1, max: 3, step: 0.1, group: 'Plasma' },
-      // Center Contrast
-      { key: 'centerDarken', label: 'Darken Darks', min: 0, max: 2, step: 0.1, group: 'Center' },
-      { key: 'centerHighlight', label: 'Highlight Brights', min: 0, max: 2, step: 0.1, group: 'Center' },
-      { key: 'centerFalloff', label: 'Falloff', min: 0.5, max: 5, step: 0.25, group: 'Center' },
-      // Inside Adjust
-      { key: 'innerDarkening', label: 'Inner Dark', min: 0, max: 1, step: 0.05, group: 'Inside' },
-      { key: 'whiteBalance', label: 'Warm/Cool', min: -1, max: 1, step: 0.1, group: 'Inside' },
-      { key: 'saturation', label: 'Saturation', min: 0, max: 2, step: 0.1, group: 'Inside' },
-      // Edge Styling
-      { key: 'edgeBrightness', label: 'Brightness', min: 0.2, max: 2, step: 0.1, group: 'Edge' },
-      { key: 'edgeThickness', label: 'Thickness', min: 0.01, max: 0.15, step: 0.01, group: 'Edge' },
-      { key: 'edgeSharpness', label: 'Sharpness', min: 0.1, max: 1, step: 0.05, group: 'Edge' },
-      { key: 'limbDarkening', label: 'Limb Dark', min: 0, max: 1, step: 0.05, group: 'Edge' },
-      { key: 'glowIntensity', label: 'Glow', min: 0, max: 1, step: 0.05, group: 'Edge' },
-      { key: 'glowSize', label: 'Glow Size', min: 0.01, max: 0.3, step: 0.01, group: 'Edge' },
-      // Corona
-      { key: 'coronaSize', label: 'Size', min: 0.5, max: 4, step: 0.1, group: 'Corona' },
-      { key: 'coronaIntensity', label: 'Intensity', min: 0, max: 2, step: 0.1, group: 'Corona' },
-      { key: 'atmosphereInnerRadius', label: 'Atmo Inner', min: 0.2, max: 2.5, step: 0.05, group: 'Corona' },
-      { key: 'atmosphereOuterRadius', label: 'Atmo Outer', min: 0.3, max: 4.0, step: 0.05, group: 'Corona' },
-      { key: 'coronaInnerRadius', label: 'Corona Inner', min: 0.2, max: 2.5, step: 0.05, group: 'Corona' },
-      { key: 'coronaOuterRadius', label: 'Corona Outer', min: 0.3, max: 4.0, step: 0.05, group: 'Corona' },
-    ];
-    
-    const colors = [
-      { key: 'darkColor', label: 'Dark' },
-      { key: 'midColor', label: 'Mid' },
-      { key: 'brightColor', label: 'Bright' },
-      { key: 'edgeColor', label: 'Edge' },
-      { key: 'plasmaColor', label: 'Plasma' },
-      { key: 'centerColor', label: 'Center' },
-    ];
-    
-    // Group sliders by category
-    const groups = ['fBM', 'Warp', 'Plasma', 'Center', 'Inside', 'Edge', 'Corona'];
-    
-    panel.innerHTML = `
-      <div class="debug-panel-header">
-        <span class="debug-panel-title">☀️ Sun Debug</span>
-        <span>▼</span>
-      </div>
-      <div class="debug-panel-content">
-        ${groups.map(group => `
-          <div class="debug-group">
-            <div class="debug-group-title">${group}</div>
-            ${sliders.filter(s => s.group === group).map(s => `
-              <div class="debug-slider-group">
-                <div class="debug-slider-label">
-                  <span>${s.label}</span>
-                  <span id="val-${s.key}">${(this.debugParams as any)[s.key].toFixed(2)}</span>
-                </div>
-                <input type="range" class="debug-slider" 
-                  id="slider-${s.key}" 
-                  min="${s.min}" max="${s.max}" step="${s.step}" 
-                  value="${(this.debugParams as any)[s.key]}">
-              </div>
-            `).join('')}
-          </div>
-        `).join('')}
-        <div class="debug-color-section">
-          ${colors.map(c => `
-            <div class="debug-color-group">
-              <label>${c.label}</label>
-              <input type="color" id="color-${c.key}" value="${(this.debugParams as any)[c.key]}">
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(toggleBtn);
-    document.body.appendChild(panel);
-
-    toggleBtn.addEventListener('click', () => {
-      this.debugPanelVisible = !this.debugPanelVisible;
-      panel.classList.toggle('hidden', !this.debugPanelVisible);
-      toggleBtn.textContent = this.debugPanelVisible ? 'Hide Sun Settings' : 'Show Sun Settings';
-    });
-    
-    // Toggle collapse
-    const header = panel.querySelector('.debug-panel-header');
-    header?.addEventListener('click', () => {
-      panel.classList.toggle('collapsed');
-      const arrow = header.querySelector('span:last-child');
-      if (arrow) arrow.textContent = panel.classList.contains('collapsed') ? '▶' : '▼';
-    });
-    
-    // Bind sliders
-    sliders.forEach(s => {
-      const slider = document.getElementById(`slider-${s.key}`) as HTMLInputElement;
-      const valDisplay = document.getElementById(`val-${s.key}`);
-      
-      slider?.addEventListener('input', () => {
-        const val = parseFloat(slider.value);
-        (this.debugParams as any)[s.key] = val;
-        if (valDisplay) valDisplay.textContent = val.toFixed(2);
-        this.applyDebugParams();
-      });
-    });
-    
-    // Bind color pickers
-    colors.forEach(c => {
-      const picker = document.getElementById(`color-${c.key}`) as HTMLInputElement;
-      picker?.addEventListener('input', () => {
-        (this.debugParams as any)[c.key] = picker.value;
-        this.applyDebugParams();
-      });
-    });
   }
   
   // Helper to convert hex color to RGB array
-  private hexToRgb(hex: string): [number, number, number] {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (result) {
-      return [
-        parseInt(result[1], 16) / 255,
-        parseInt(result[2], 16) / 255,
-        parseInt(result[3], 16) / 255
-      ];
-    }
-    return [0, 0, 0];
-  }
-  
-  private applyDebugParams(): void {
-    if (!this.sunRenderer) return;
-    
-    // Apply corona settings
-    this.sunRenderer.setCoronaSize(this.debugParams.coronaSize);
-    this.sunRenderer.setCoronaIntensity(this.debugParams.coronaIntensity);
-    this.sunRenderer.setAtmosphereRadii(
-      this.debugParams.atmosphereInnerRadius,
-      this.debugParams.atmosphereOuterRadius
-    );
-    this.sunRenderer.setCoronaRadii(
-      this.debugParams.coronaInnerRadius,
-      this.debugParams.coronaOuterRadius
-    );
-    
-    // Apply custom colors (4 colors: dark, mid, bright, edge)
-    const darkRgb = this.hexToRgb(this.debugParams.darkColor);
-    const midRgb = this.hexToRgb(this.debugParams.midColor);
-    const brightRgb = this.hexToRgb(this.debugParams.brightColor);
-    const edgeRgb = this.hexToRgb(this.debugParams.edgeColor);
-    this.sunRenderer.setCustomColors(darkRgb, midRgb, brightRgb, edgeRgb);
-    
-    // Apply warp params: warpScale, unused, turbulenceMix
-    this.sunRenderer.setWarpParams(
-      this.debugParams.warpScale,
-      0.0, // unused
-      this.debugParams.turbulenceMix
-    );
-    
-    // Apply fBM params: noiseScale, animSpeed, contrast
-    this.sunRenderer.setFbmParams(
-      this.debugParams.noiseScale,
-      this.debugParams.animSpeed,
-      this.debugParams.contrast
-    );
-    
-    // Apply plasma params: intensity, scale, speed
-    this.sunRenderer.setPlasmaParams(
-      this.debugParams.plasmaIntensity,
-      this.debugParams.plasmaScale,
-      this.debugParams.plasmaSpeed
-    );
-    
-    // Apply plasma color
-    const plasmaRgb = this.hexToRgb(this.debugParams.plasmaColor);
-    this.sunRenderer.setPlasmaColor(plasmaRgb);
-    
-    // Apply center contrast: darken, highlight, falloff
-    this.sunRenderer.setCenterLight(
-      this.debugParams.centerDarken,
-      this.debugParams.centerHighlight,
-      this.debugParams.centerFalloff
-    );
-    
-    // Apply center color
-    const centerRgb = this.hexToRgb(this.debugParams.centerColor);
-    this.sunRenderer.setCenterColor(centerRgb);
-    
-    // Apply inside adjustments: innerDarkening, whiteBalance, saturation
-    this.sunRenderer.setInsideAdjust(
-      this.debugParams.innerDarkening,
-      this.debugParams.whiteBalance,
-      this.debugParams.saturation
-    );
-    
-    // Apply edge style: brightness, thickness, sharpness
-    this.sunRenderer.setEdgeStyle(
-      this.debugParams.edgeBrightness,
-      this.debugParams.edgeThickness,
-      this.debugParams.edgeSharpness
-    );
-    
-    // Apply edge glow: limbDarkening, glowIntensity, glowSize
-    this.sunRenderer.setEdgeGlow(
-      this.debugParams.limbDarkening,
-      this.debugParams.glowIntensity,
-      this.debugParams.glowSize
-    );
-    
-    // Get brownian style index (should be 2)
-    const brownianIndex = sunShaderDefs.sunStyles.findIndex(s => s.id === 'brownian');
-    const styleIndex = brownianIndex >= 0 ? brownianIndex : 2;
-    
-    // Apply sun style params (fBM core): [coreRadius, octaves, lacunarity, gain, unused, warpAmount]
-    const sunParams = [
-      0.5,                              // coreRadius
-      this.debugParams.octaves,         // octaves (1-8)
-      this.debugParams.lacunarity,      // lacunarity (freq multiplier)
-      this.debugParams.gain,            // gain (amplitude multiplier)
-      0.9,                              // unused
-      this.debugParams.warpAmount,      // warpAmount for domain warping
-    ];
-    this.sunRenderer.setSunStyle(styleIndex, sunParams);
-  }
-
   private render(): void {
     const isLogin = this.mode === 'login';
     
-    // Keep existing canvas if PixiJS already initialized
-    const existingCanvas = this.panel.querySelector('#login-canvas');
+    // Keep the backdrop's canvas (the game's, borrowed)
+    const existingCanvas = this.canvasHome ? (this.app.canvas as HTMLCanvasElement) : null;
     
     this.panel.innerHTML = `
       <div class="login-content">
         <div class="login-title-container">
           <div class="login-title">SPACE GAME</div>
-          <div class="login-subtitle">Journey to the Stars</div>
+          <div class="login-subtitle">Working Title</div>
         </div>
         
         <div class="login-container">
@@ -1049,13 +604,6 @@ export class LoginUI {
     this.setupEventListeners();
   }
   
-  private handleResize = (): void => {
-    if (this.app) {
-      this.app.renderer.resize(window.innerWidth, window.innerHeight);
-      this.updateSunPosition();
-    }
-  };
-
   private setupEventListeners(): void {
     // Tab switching
     const tabs = this.panel.querySelectorAll('.login-tab');
@@ -1117,20 +665,23 @@ export class LoginUI {
   show(): void {
     this.visible = true;
     this.panel.style.display = 'flex';
-    const debugToggle = document.getElementById('sun-debug-toggle') as HTMLElement | null;
-    const debugPanel = document.getElementById('sun-debug-panel') as HTMLElement | null;
-    if (debugToggle) debugToggle.style.display = '';
-    if (debugPanel) debugPanel.style.display = '';
+    // The backdrop: running again, or rebuilt if it was released
+    this.attachBackdrop();
+    this.onVisibility?.();
   }
 
   hide(): void {
     this.visible = false;
     this.panel.style.display = 'none';
-    const debugToggle = document.getElementById('sun-debug-toggle') as HTMLElement | null;
-    const debugPanel = document.getElementById('sun-debug-panel') as HTMLElement | null;
-    if (debugToggle) debugToggle.style.display = 'none';
-    if (debugPanel) debugPanel.style.display = 'none';
-    window.removeEventListener('resize', this.handleResize);
+    // The world is drawn again, on its canvas back in the game's container
+    this.detachBackdrop();
+    this.onVisibility?.();
+  }
+
+  /** Free the backdrop (the game is up); show() builds it again */
+  releaseBackdrop(): void {
+    if (this.visible) return;
+    this.disposePixi();
   }
 
   isVisible(): boolean {
@@ -1138,24 +689,21 @@ export class LoginUI {
   }
   
   destroy(): void {
-    window.removeEventListener('resize', this.handleResize);
-    const debugPanel = document.getElementById('sun-debug-panel');
-    if (debugPanel) debugPanel.remove();
-    const debugToggle = document.getElementById('sun-debug-toggle');
-    if (debugToggle) debugToggle.remove();
-    
-    // Clean up PixiJS
+    this.detachBackdrop();
+    this.disposePixi();
+  }
+
+  private disposePixi(): void {
+    // Clean up PixiJS (the meshes; the renderer is the game's)
     if (this.sunRenderer) {
       this.sunRenderer.destroy();
       this.sunRenderer = null;
     }
-    if (this.glowRenderer) {
-      this.glowRenderer.destroy();
-      this.glowRenderer = null;
-    }
-    if (this.app) {
-      this.app.destroy(true);
-      this.app = null;
-    }
+    this.body = null;
+    this.sky = null;
+    this.worldContainer?.destroy({ children: true });
+    this.worldContainer = null;
+    this.starsGraphics = null;
+    this.parts = [];
   }
 }

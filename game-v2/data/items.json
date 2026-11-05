@@ -1,451 +1,1616 @@
 {
+  "_comment": "Item catalogue. Ship parts (part:<material>:<fn>:<piece>) are generated from the ship catalogue, not listed here (ship plans are not items). value = base credits; volume = cargo space per unit (default 1).",
   "items": [
     {
-      "id": "blaster_mk1",
-      "name": "Blaster Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "cannon",
-      "damage": 1.0,
-      "speed": 1.0,
-      "fireRate": 1.0,
-      "spread": 0,
-      "projectileCount": 1,
-      "rarity": "common",
-      "description": "Standard issue plasma blaster. Reliable but basic."
-    },
-    {
-      "id": "blaster_mk2",
-      "name": "Blaster Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "cannon",
-      "damage": 1.3,
-      "speed": 1.1,
-      "fireRate": 1.2,
-      "spread": 0,
-      "projectileCount": 1,
-      "rarity": "uncommon",
-      "description": "Enhanced plasma blaster with improved damage output."
-    },
-    {
-      "id": "blaster_mk3",
-      "name": "Blaster Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "cannon",
-      "damage": 1.6,
-      "speed": 1.2,
-      "fireRate": 1.4,
-      "spread": 0,
-      "projectileCount": 1,
-      "rarity": "rare",
-      "description": "Military-grade plasma blaster. Devastating firepower."
-    },
-    {
-      "id": "laser_mk1",
-      "name": "Laser Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "laser",
-      "damage": 1.0,
-      "range": 1.0,
-      "fireRate": 1.0,
-      "rarity": "common",
-      "description": "Focused light beam. Instant hit, damage falls off with distance."
-    },
-    {
-      "id": "laser_mk2",
-      "name": "Laser Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "laser",
-      "damage": 1.4,
-      "range": 1.2,
-      "fireRate": 1.2,
-      "rarity": "uncommon",
-      "description": "High-powered laser with extended range."
-    },
-    {
-      "id": "laser_mk3",
-      "name": "Laser Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "laser",
-      "damage": 1.8,
-      "range": 1.5,
-      "fireRate": 1.4,
-      "rarity": "rare",
-      "description": "Cutting-edge laser technology. Melts through armor."
-    },
-    {
-      "id": "scatter_mk1",
-      "name": "Scatter Gun Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "scatter",
-      "damage": 0.8,
-      "speed": 0.8,
-      "fireRate": 0.7,
-      "spread": 0.5,
-      "projectileCount": 5,
-      "rarity": "common",
-      "description": "Fires a spread of projectiles. Deadly at close range."
-    },
-    {
-      "id": "scatter_mk2",
-      "name": "Scatter Gun Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "scatter",
-      "damage": 1.0,
-      "speed": 0.9,
-      "fireRate": 0.8,
-      "spread": 0.45,
-      "projectileCount": 7,
-      "rarity": "uncommon",
-      "description": "Improved scatter gun with tighter spread."
-    },
-    {
-      "id": "scatter_mk3",
-      "name": "Scatter Gun Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "scatter",
-      "damage": 1.2,
-      "speed": 1.0,
-      "fireRate": 0.9,
-      "spread": 0.4,
-      "projectileCount": 9,
-      "rarity": "rare",
-      "description": "Elite scatter gun. Devastating burst damage."
-    },
-    {
-      "id": "missile_mk1",
-      "name": "Missile Launcher Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "missile",
-      "damage": 2.5,
-      "speed": 1.0,
-      "fireRate": 0.5,
-      "maxCharge": 3,
-      "homing": 1.0,
-      "rarity": "common",
-      "description": "Launches homing missiles. Hold to charge multiple missiles."
-    },
-    {
-      "id": "missile_mk2",
-      "name": "Missile Launcher Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "missile",
-      "damage": 3.0,
-      "speed": 1.1,
-      "fireRate": 0.6,
-      "maxCharge": 3,
-      "homing": 1.2,
-      "rarity": "uncommon",
-      "description": "Advanced missiles with improved tracking."
-    },
-    {
-      "id": "missile_mk3",
-      "name": "Missile Launcher Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "missile",
-      "damage": 3.5,
-      "speed": 1.2,
-      "fireRate": 0.7,
-      "maxCharge": 8,
-      "homing": 1.4,
-      "rarity": "rare",
-      "description": "Military-grade launcher. Can charge up to 8 missiles."
-    },
-    {
-      "id": "pulse_mk1",
-      "name": "Pulse Cannon Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "pulse",
-      "damage": 2.0,
-      "speed": 1.0,
-      "fireRate": 0.4,
-      "splashRadius": 1.0,
-      "rarity": "common",
-      "description": "Charged energy ball with splash damage. Hold to charge."
-    },
-    {
-      "id": "pulse_mk2",
-      "name": "Pulse Cannon Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "pulse",
-      "damage": 2.5,
-      "speed": 1.1,
-      "fireRate": 0.5,
-      "splashRadius": 1.2,
-      "rarity": "uncommon",
-      "description": "Enhanced pulse with larger blast radius."
-    },
-    {
-      "id": "pulse_mk3",
-      "name": "Pulse Cannon Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "pulse",
-      "damage": 3.0,
-      "speed": 1.2,
-      "fireRate": 0.6,
-      "splashRadius": 1.5,
-      "rarity": "rare",
-      "description": "Devastating pulse weapon. Maximum charge is catastrophic."
-    },
-    {
-      "id": "mine_mk1",
-      "name": "Mine Layer Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "mine",
-      "damage": 3.0,
-      "fireRate": 0.5,
-      "maxMines": 3,
-      "splashRadius": 1.0,
-      "rarity": "common",
-      "description": "Deploys proximity mines. Max 3 active at a time."
-    },
-    {
-      "id": "mine_mk2",
-      "name": "Mine Layer Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "mine",
-      "damage": 3.5,
-      "fireRate": 0.6,
-      "maxMines": 3,
-      "splashRadius": 1.2,
-      "rarity": "uncommon",
-      "description": "Advanced mines with larger detection radius."
-    },
-    {
-      "id": "mine_mk3",
-      "name": "Mine Layer Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "mine",
-      "damage": 4.0,
-      "fireRate": 0.7,
-      "maxMines": 3,
-      "splashRadius": 1.5,
-      "rarity": "rare",
-      "description": "Military mines. Massive explosion radius."
-    },
-    {
-      "id": "mining_laser_mk1",
-      "name": "Mining Laser Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "mining",
-      "damage": 0.5,
-      "range": 1.0,
-      "miningSpeed": 1.0,
-      "rarity": "common",
-      "description": "Extracts ore from asteroids. Low combat effectiveness."
-    },
-    {
-      "id": "mining_laser_mk2",
-      "name": "Mining Laser Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "mining",
-      "damage": 0.7,
-      "range": 1.2,
-      "miningSpeed": 1.5,
-      "rarity": "uncommon",
-      "description": "Enhanced mining laser. Faster ore extraction."
-    },
-    {
-      "id": "mining_laser_mk3",
-      "name": "Mining Laser Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "mining",
-      "damage": 1.0,
-      "range": 1.5,
-      "miningSpeed": 2.0,
-      "rarity": "rare",
-      "description": "Industrial-grade mining laser. Also effective in combat."
-    },
-    {
-      "id": "warp_mk1",
-      "name": "Warp Gun Mk1",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 1,
-      "weaponType": "warp",
-      "damage": 1.0,
-      "speed": 1.0,
-      "rarity": "common",
-      "description": "Fires a warp beacon. Teleport to it after a delay."
-    },
-    {
-      "id": "warp_mk2",
-      "name": "Warp Gun Mk2",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 2,
-      "weaponType": "warp",
-      "damage": 1.3,
-      "speed": 1.2,
-      "rarity": "uncommon",
-      "description": "Improved warp beacon with faster activation."
-    },
-    {
-      "id": "warp_mk3",
-      "name": "Warp Gun Mk3",
-      "type": "weapon",
-      "slot": "leftWeapon",
-      "tier": 3,
-      "weaponType": "warp",
-      "damage": 1.6,
-      "speed": 1.4,
-      "rarity": "rare",
-      "description": "Advanced warp technology. Nearly instant teleportation."
-    },
-    {
-      "id": "booster_mk1",
-      "name": "Booster Mk1",
-      "type": "equipment",
-      "slot": "booster",
-      "tier": 1,
-      "thrustMultiplier": 1.0,
-      "fuelCapacity": 1.0,
-      "regenRate": 1.0,
-      "rarity": "common",
-      "description": "Standard booster module."
-    },
-    {
-      "id": "booster_mk2",
-      "name": "Booster Mk2",
-      "type": "equipment",
-      "slot": "booster",
-      "tier": 2,
-      "thrustMultiplier": 1.2,
-      "fuelCapacity": 1.3,
-      "regenRate": 1.2,
-      "rarity": "uncommon",
-      "description": "Enhanced booster with improved fuel efficiency."
-    },
-    {
-      "id": "booster_mk3",
-      "name": "Booster Mk3",
-      "type": "equipment",
-      "slot": "booster",
-      "tier": 3,
-      "thrustMultiplier": 1.5,
-      "fuelCapacity": 1.5,
-      "regenRate": 1.4,
-      "rarity": "rare",
-      "description": "Military-grade boosters. Maximum thrust."
-    },
-    {
-      "id": "cockpit_mk1",
-      "name": "Cockpit Mk1",
-      "type": "equipment",
-      "slot": "cockpit",
-      "tier": 1,
-      "hpBonus": 0,
-      "shieldBonus": 0,
-      "radarRange": 1.0,
-      "accelBonus": 0,
-      "turnBonus": 0,
-      "rarity": "common",
-      "description": "Standard cockpit module."
-    },
-    {
-      "id": "cockpit_mk2",
-      "name": "Cockpit Mk2",
-      "type": "equipment",
-      "slot": "cockpit",
-      "tier": 2,
-      "hpBonus": 20,
-      "shieldBonus": 10,
-      "radarRange": 1.2,
-      "accelBonus": 0.05,
-      "turnBonus": 0.02,
-      "rarity": "uncommon",
-      "description": "Reinforced cockpit with extended radar."
-    },
-    {
-      "id": "cockpit_mk3",
-      "name": "Cockpit Mk3",
-      "type": "equipment",
-      "slot": "cockpit",
-      "tier": 3,
-      "hpBonus": 50,
-      "shieldBonus": 25,
-      "radarRange": 1.5,
-      "accelBonus": 0.1,
-      "turnBonus": 0.04,
-      "rarity": "rare",
-      "description": "Elite cockpit. Maximum survivability."
-    },
-    {
-      "id": "ore_iron",
+      "id": "iron_ore",
       "name": "Iron Ore",
-      "type": "resource",
-      "stackSize": 100,
-      "value": 10,
+      "category": "mineral",
       "rarity": "common",
-      "description": "Basic iron ore. Used in basic crafting."
+      "value": 2,
+      "color": "#a1887f",
+      "description": "Common ore found in almost every belt. Alloyed into plate.",
+      "family": "ferrous",
+      "tier": 1,
+      "short": "Iron"
     },
     {
-      "id": "ore_crystal",
-      "name": "Crystal Shard",
-      "type": "resource",
-      "stackSize": 50,
-      "value": 25,
+      "id": "nickel_ore",
+      "name": "Nickel Ore",
+      "category": "mineral",
+      "rarity": "common",
+      "value": 3,
+      "color": "#b0bec5",
+      "description": "Common ore. Alloyed with iron into hull plating.",
+      "family": "ferrous",
+      "tier": 1,
+      "short": "Nickel"
+    },
+    {
+      "id": "silicate",
+      "name": "Silicate",
+      "category": "mineral",
+      "rarity": "common",
+      "value": 2,
+      "color": "#d7ccc8",
+      "description": "Rocky silica. Pressed into composites and lenses.",
+      "family": "crystalline",
+      "tier": 1,
+      "short": "Silicate",
+      "mass": 0.08
+    },
+    {
+      "id": "ice",
+      "name": "Water Ice",
+      "category": "mineral",
+      "rarity": "common",
+      "value": 2,
+      "color": "#b3e5fc",
+      "description": "Frozen volatiles. Used in composites, coolant and boost cells.",
+      "family": "volatile",
+      "tier": 1,
+      "short": "Ice",
+      "mass": 0.06
+    },
+    {
+      "id": "copper_ore",
+      "name": "Copper Ore",
+      "category": "mineral",
       "rarity": "uncommon",
-      "description": "Crystalline ore. Used in advanced components."
+      "value": 6,
+      "color": "#e0864a",
+      "description": "Drawn into wiring for generators, thrusters and guns.",
+      "family": "noble",
+      "tier": 2,
+      "short": "Copper"
     },
     {
-      "id": "ore_plasma",
-      "name": "Plasma Core",
-      "type": "resource",
-      "stackSize": 25,
-      "value": 100,
+      "id": "titanium_ore",
+      "name": "Titanium Ore",
+      "category": "mineral",
+      "rarity": "uncommon",
+      "value": 10,
+      "color": "#90a4ae",
+      "description": "Hard ore: it needs a strong mining laser. Refined into light, tough plate.",
+      "family": "exotic",
+      "tier": 3,
+      "short": "Titanium"
+    },
+    {
+      "id": "cobalt_ore",
+      "name": "Cobalt Ore",
+      "category": "mineral",
       "rarity": "rare",
-      "description": "Volatile plasma container. Extremely valuable."
+      "value": 18,
+      "color": "#5c6bc0",
+      "description": "Ore from dangerous belts. Refined into cobalt superalloy.",
+      "family": "exotic",
+      "tier": 4,
+      "short": "Cobalt"
     },
     {
-      "id": "ice_sprite_drop",
-      "name": "Frozen Essence",
-      "type": "resource",
-      "stackSize": 100,
-      "value": 15,
+      "id": "neutronium_ore",
+      "name": "Neutronium Ore",
+      "category": "mineral",
+      "rarity": "epic",
+      "value": 34,
+      "color": "#9b6bd6",
+      "description": "Ore from the Void and the Maw. Refined into Mk V plating.",
+      "family": "exotic",
+      "tier": 5,
+      "short": "Neutronium",
+      "mass": 0.2
+    },
+    {
+      "id": "crystal",
+      "name": "Resonant Crystal",
+      "category": "mineral",
+      "rarity": "rare",
+      "value": 25,
+      "color": "#80deea",
+      "description": "Crystal ore from Glasswater. Focuses beams and stores charge.",
+      "family": "crystalline",
+      "tier": 2,
+      "short": "Crystal",
+      "mass": 0.05
+    },
+    {
+      "id": "ruby",
+      "name": "Ruby",
+      "category": "gem",
+      "rarity": "rare",
+      "value": 60,
+      "color": "#e53950",
+      "description": "A red gem from glowing seams. Valuable to traders."
+    },
+    {
+      "id": "sapphire",
+      "name": "Sapphire",
+      "category": "gem",
+      "rarity": "rare",
+      "value": 70,
+      "color": "#3d7bff",
+      "description": "A blue gem from seams in cold belts. Valuable to traders."
+    },
+    {
+      "id": "emerald",
+      "name": "Emerald",
+      "category": "gem",
+      "rarity": "epic",
+      "value": 120,
+      "color": "#2ee59d",
+      "description": "A rare green gem. Valuable to traders."
+    },
+    {
+      "id": "void_opal",
+      "name": "Void Opal",
+      "category": "gem",
+      "rarity": "epic",
+      "value": 220,
+      "color": "#b388ff",
+      "description": "A gem. Only the hardest mining tools crack it free. Very valuable.",
+      "family": "crystalline",
+      "tier": 4,
+      "short": "Void opal"
+    },
+    {
+      "id": "helium3",
+      "name": "Helium-3",
+      "category": "volatile",
+      "rarity": "rare",
+      "value": 40,
+      "color": "#fff59d",
+      "description": "Fusion fuel skimmed from comet tails and gas giants.",
+      "family": "volatile",
+      "tier": 3,
+      "short": "He-3"
+    },
+    {
+      "id": "ferrite_ore",
+      "name": "Ferrite Ore",
+      "category": "mineral",
       "rarity": "common",
-      "description": "Essence dropped by Ice Sprites. Used in cold-resistant gear."
+      "value": 8,
+      "color": "#7a6450",
+      "description": "Dense iron ore, thickest in the Maw. Refined into ferrite plate.",
+      "family": "ferrous",
+      "tier": 3,
+      "short": "Ferrite"
+    },
+    {
+      "id": "chromite",
+      "name": "Chromite",
+      "category": "mineral",
+      "rarity": "uncommon",
+      "value": 16,
+      "color": "#5a5f6b",
+      "description": "Chromium ore. Hardens steel for railgun barrels and armour-piercing slugs.",
+      "family": "ferrous",
+      "tier": 4,
+      "short": "Chromite"
+    },
+    {
+      "id": "aurum",
+      "name": "Aurum",
+      "category": "mineral",
+      "rarity": "rare",
+      "value": 60,
+      "color": "#ffd54f",
+      "description": "A trace metal found by refining copper ore. A very good conductor.",
+      "family": "noble",
+      "tier": 2,
+      "short": "Aurum",
+      "trace": true,
+      "mass": 0.13
+    },
+    {
+      "id": "pale_iridium",
+      "name": "Pale Iridium",
+      "category": "mineral",
+      "rarity": "rare",
+      "value": 90,
+      "color": "#e3ecf4",
+      "description": "A trace metal found by refining ice and volatile ore. Very dense; stops radiation.",
+      "family": "noble",
+      "tier": 3,
+      "short": "Iridium",
+      "trace": true,
+      "mass": 0.14
+    },
+    {
+      "id": "platinoid_ore",
+      "name": "Platinoid Ore",
+      "category": "mineral",
+      "rarity": "uncommon",
+      "value": 30,
+      "color": "#c9cbd8",
+      "description": "Platinum-group ore from the Void. Refined into catalyst, for seeker missiles and torpedoes.",
+      "family": "noble",
+      "tier": 4,
+      "short": "Platinoid"
+    },
+    {
+      "id": "voidglass",
+      "name": "Voidglass",
+      "category": "mineral",
+      "rarity": "rare",
+      "value": 70,
+      "color": "#7fe0ff",
+      "description": "A trace glass found by refining crystal ore, richest in gem seams.",
+      "family": "crystalline",
+      "tier": 3,
+      "short": "Voidglass",
+      "trace": true,
+      "mass": 0.06
+    },
+    {
+      "id": "hydrazine_slush",
+      "name": "Hydrazine Slush",
+      "category": "mineral",
+      "rarity": "common",
+      "value": 4,
+      "color": "#c5e1a5",
+      "description": "Frozen fuel from ice bodies, thickest in Borealis. Refined into propellant.",
+      "family": "volatile",
+      "tier": 2,
+      "short": "Hydrazine",
+      "mass": 0.05
+    },
+    {
+      "id": "aurora_rime",
+      "name": "Aurora Rime",
+      "category": "mineral",
+      "rarity": "uncommon",
+      "value": 14,
+      "color": "#7ff0d0",
+      "description": "Ice from the aurora floes of the Rime Shoal. Refined into hush panes.",
+      "family": "volatile",
+      "tier": 2,
+      "short": "Rime",
+      "mass": 0.05
+    },
+    {
+      "id": "polymer_precursor",
+      "name": "Polymer Precursor",
+      "category": "mineral",
+      "rarity": "uncommon",
+      "value": 9,
+      "color": "#8d6e63",
+      "description": "Tarry hydrocarbons from the nebula bands. Cured into insulated polymer.",
+      "family": "volatile",
+      "tier": 3,
+      "short": "Polymer",
+      "mass": 0.05
+    },
+    {
+      "id": "cryo_gas",
+      "name": "Cryo Gas",
+      "category": "volatile",
+      "rarity": "uncommon",
+      "value": 14,
+      "color": "#b2ebf2",
+      "description": "Siphoned from drifting gas pockets, not mined. Refined into cryogen, for chaff canisters and cryo missiles.",
+      "family": "volatile",
+      "tier": 3,
+      "short": "Cryo gas"
+    },
+    {
+      "id": "singularity_dust",
+      "name": "Singularity Dust",
+      "category": "mineral",
+      "rarity": "epic",
+      "value": 400,
+      "color": "#5e35b1",
+      "description": "A trace material found by refining the mega rocks of the Maw and the Void.",
+      "family": "exotic",
+      "tier": 5,
+      "short": "Singularity",
+      "trace": true,
+      "mass": 0.15
+    },
+    {
+      "id": "gem_frost_1",
+      "name": "Frost Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#7dd3fc",
+      "description": "For a weapon's socket: Hits chill (0.3 a hit): a chilled-through ship seizes up for a moment. −15% damage.",
+      "socket": {
+        "type": "frost",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_frost_2",
+      "name": "Frost Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#7dd3fc",
+      "description": "For a weapon's socket: Hits chill (0.6 a hit). −15% damage.",
+      "socket": {
+        "type": "frost",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_ember_1",
+      "name": "Ember Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#fb923c",
+      "description": "For a weapon's socket: Hits set the part burning. −20% rate of fire.",
+      "socket": {
+        "type": "ember",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_ember_2",
+      "name": "Ember Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#fb923c",
+      "description": "For a weapon's socket: Hits set the part (and its neighbours) burning. −20% rate of fire.",
+      "socket": {
+        "type": "ember",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_splitter_1",
+      "name": "Splitter Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#a5f3fc",
+      "description": "For a weapon's socket: Shots shatter into 2 shards on a hit. −30% range.",
+      "socket": {
+        "type": "splitter",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_splitter_2",
+      "name": "Splitter Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#a5f3fc",
+      "description": "For a weapon's socket: Shots shatter into 3 shards on a hit. −30% range.",
+      "socket": {
+        "type": "splitter",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_lance_core_1",
+      "name": "Lance Core Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#e2e8f0",
+      "description": "For a weapon's socket: +25% range. Beams run 50% hotter.",
+      "socket": {
+        "type": "lance_core",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_lance_core_2",
+      "name": "Lance Core Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#e2e8f0",
+      "description": "For a weapon's socket: +40% range, and shots pierce one more. Beams run 50% hotter.",
+      "socket": {
+        "type": "lance_core",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_grapple_1",
+      "name": "Grapple Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#facc15",
+      "description": "For a weapon's socket: Shots drag ships near them in. −25% shot speed.",
+      "socket": {
+        "type": "grapple",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_grapple_2",
+      "name": "Grapple Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#facc15",
+      "description": "For a weapon's socket: Shots drag ships in hard. −25% shot speed.",
+      "socket": {
+        "type": "grapple",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_scatter_1",
+      "name": "Scatter Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#fde047",
+      "description": "For a weapon's socket: +1 shot a volley. Wider spread.",
+      "socket": {
+        "type": "scatter",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_scatter_2",
+      "name": "Scatter Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#fde047",
+      "description": "For a weapon's socket: +2 shots a volley. Wider spread.",
+      "socket": {
+        "type": "scatter",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_keel_1",
+      "name": "Keel Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#a1887f",
+      "description": "For a weapon's socket: +15% part HP. −10% damage.",
+      "socket": {
+        "type": "keel",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_keel_2",
+      "name": "Keel Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#a1887f",
+      "description": "For a weapon's socket: +25% part HP. −10% damage.",
+      "socket": {
+        "type": "keel",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_sight_1",
+      "name": "Sight Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#67e8f9",
+      "description": "For a weapon's socket: −10% spread. −10% rate of fire.",
+      "socket": {
+        "type": "sight",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_sight_2",
+      "name": "Sight Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#67e8f9",
+      "description": "For a weapon's socket: −20% spread. −10% rate of fire.",
+      "socket": {
+        "type": "sight",
+        "level": 2
+      }
+    },
+    {
+      "id": "gem_overdrive_1",
+      "name": "Overdrive Gem I",
+      "category": "jewel",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#f87171",
+      "description": "For a weapon's socket: +15% rate of fire. Beams run 40% hotter.",
+      "socket": {
+        "type": "overdrive",
+        "level": 1
+      }
+    },
+    {
+      "id": "gem_overdrive_2",
+      "name": "Overdrive Gem II",
+      "category": "jewel",
+      "rarity": "rare",
+      "value": 450,
+      "color": "#f87171",
+      "description": "For a weapon's socket: +25% rate of fire. Beams run 40% hotter.",
+      "socket": {
+        "type": "overdrive",
+        "level": 2
+      }
+    },
+    {
+      "id": "alloy_plate",
+      "name": "Alloy Plate",
+      "category": "refined",
+      "rarity": "common",
+      "value": 9,
+      "color": "#8fa3bf",
+      "description": "Standard hull plating. Iron and nickel."
+    },
+    {
+      "id": "steel_plate",
+      "name": "Steel Plate",
+      "category": "refined",
+      "rarity": "common",
+      "value": 12,
+      "color": "#9aa0a6",
+      "description": "Mk II plating stock."
+    },
+    {
+      "id": "composite_sheet",
+      "name": "Composite Sheet",
+      "category": "refined",
+      "rarity": "common",
+      "value": 8,
+      "color": "#b9c7a5",
+      "description": "Light pressed silicate and resin.",
+      "mass": 0.05
+    },
+    {
+      "id": "titanium_plate",
+      "name": "Titanium Plate",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 24,
+      "color": "#cfd8dc",
+      "description": "Mk III plating stock: light and very tough."
+    },
+    {
+      "id": "copper_wire",
+      "name": "Copper Wiring",
+      "category": "refined",
+      "rarity": "common",
+      "value": 4,
+      "color": "#ff9e5e",
+      "description": "Power runs. Every working part needs some."
+    },
+    {
+      "id": "crystal_lens",
+      "name": "Crystal Lens",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 40,
+      "color": "#a7ffeb",
+      "description": "Focuses beam weapons and scanners."
+    },
+    {
+      "id": "cobalt_alloy",
+      "name": "Cobalt Superalloy",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 50,
+      "color": "#7986cb",
+      "description": "Mk IV plating stock, and reactors and heavy cores."
+    },
+    {
+      "id": "neutronium_plate",
+      "name": "Neutronium Plate",
+      "category": "refined",
+      "rarity": "epic",
+      "value": 95,
+      "color": "#b48cf2",
+      "description": "Mk V plating stock: the toughest there is.",
+      "mass": 0.18
+    },
+    {
+      "id": "coolant",
+      "name": "Coolant",
+      "category": "refined",
+      "rarity": "common",
+      "value": 5,
+      "color": "#81d4fa",
+      "description": "Chilled ice. Used in flak canisters, ceramic laminate and gem cutting.",
+      "mass": 0.04
+    },
+    {
+      "id": "ferrite_plate",
+      "name": "Dense Ferrite Plate",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 26,
+      "color": "#8d7b6a",
+      "description": "Mass-anchor plating: the slowest hull there is, and nothing tosses it."
+    },
+    {
+      "id": "hardened_steel",
+      "name": "Hardened Steel",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 44,
+      "color": "#78838f",
+      "description": "Steel hardened with chromium. Used in tungsten railgun slugs."
+    },
+    {
+      "id": "aurum_ingot",
+      "name": "Aurum Ingot",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 75,
+      "color": "#ffca28",
+      "description": "Refined aurum. Used in conductive steel and aurum-tipped slugs, and to cut Ember, Grapple, Scatter and Overdrive gems.",
+      "mass": 0.12
+    },
+    {
+      "id": "iridium_ingot",
+      "name": "Iridium Ingot",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 110,
+      "color": "#eceff1",
+      "description": "Refined pale iridium. Used in leaded iridium plating and to cut Lance Core gems.",
+      "mass": 0.15
+    },
+    {
+      "id": "catalyst",
+      "name": "Catalyst",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 100,
+      "color": "#d1d5e8",
+      "description": "Refined from platinoid ore. Used in seeker missiles and torpedoes."
+    },
+    {
+      "id": "voidglass_pane",
+      "name": "Voidglass Pane",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 90,
+      "color": "#a5f0ff",
+      "description": "A rigid laminate. Used in ceramic and sealed composite plating, and to cut Frost and Splitter gems."
+    },
+    {
+      "id": "hush_pane",
+      "name": "Hush Pane",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 45,
+      "color": "#b2f5ea",
+      "description": "Aurora rime pressed into a pane. Borealis Research buys them."
+    },
+    {
+      "id": "propellant",
+      "name": "Propellant",
+      "category": "refined",
+      "rarity": "common",
+      "value": 9,
+      "color": "#dce775",
+      "description": "Fuel for missiles, torpedoes, mortar shells, mining charges and incendiary flak.",
+      "mass": 0.04
+    },
+    {
+      "id": "insulated_polymer",
+      "name": "Insulated Polymer",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 35,
+      "color": "#a1887f",
+      "description": "Insulating hull plating: a hull of it builds up cold slower. Turns energy fire, but heat goes through it.",
+      "mass": 0.05
+    },
+    {
+      "id": "cryogen",
+      "name": "Cryogen",
+      "category": "refined",
+      "rarity": "uncommon",
+      "value": 16,
+      "color": "#e0f7fa",
+      "description": "Refined cryo gas. Used in chaff canisters and cryo missiles.",
+      "mass": 0.04
+    },
+    {
+      "id": "singularity_grain",
+      "name": "Singularity Grain",
+      "category": "refined",
+      "rarity": "epic",
+      "value": 450,
+      "color": "#7e57c2",
+      "description": "Refined singularity dust. Rare and valuable.",
+      "mass": 0.15
+    },
+    {
+      "id": "conductive_steel_plate",
+      "name": "Conductive Steel Plate",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 60,
+      "color": "#c9a86a",
+      "description": "Steel alloyed with aurum: guns mounted in it recharge 15% faster."
+    },
+    {
+      "id": "leaded_iridium_plate",
+      "name": "Leaded Iridium Plate",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 140,
+      "color": "#dfe6ec",
+      "description": "Radiation plating: slow, heavy, and nearly proof against the Void.",
+      "mass": 0.15
+    },
+    {
+      "id": "ceramic_plate",
+      "name": "Ceramic Laminate",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 110,
+      "color": "#efe3cf",
+      "description": "Heat plating for Cinder and near-star work. Brittle: collisions hurt it double."
+    },
+    {
+      "id": "sealed_composite_plate",
+      "name": "Sealed Composite Plate",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 120,
+      "color": "#7fb3a0",
+      "description": "Corrosion plating for the nebula bands. Costly to repair."
+    },
+    {
+      "id": "scrap_electronics",
+      "name": "Scrap Electronics",
+      "category": "component",
+      "rarity": "common",
+      "value": 8,
+      "color": "#9ccc65",
+      "description": "Salvaged boards and cracked cores. Every wreck has some."
+    },
+    {
+      "id": "servo_motor",
+      "name": "Servo Motor",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 30,
+      "color": "#ffca28",
+      "description": "Drives turret rings and tractor arms."
+    },
+    {
+      "id": "targeting_chip",
+      "name": "Targeting Chip",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 35,
+      "color": "#ef5350",
+      "description": "Fire control for advanced weapons."
+    },
+    {
+      "id": "power_coupling",
+      "name": "Power Coupling",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 32,
+      "color": "#ffee58",
+      "description": "Carries heavy current. Cores and shield generators."
+    },
+    {
+      "id": "shield_emitter",
+      "name": "Shield Emitter",
+      "category": "component",
+      "rarity": "rare",
+      "value": 90,
+      "color": "#4fc3f7",
+      "description": "Projects a deflector field."
+    },
+    {
+      "id": "nav_computer",
+      "name": "Navigation Computer",
+      "category": "component",
+      "rarity": "rare",
+      "value": 80,
+      "color": "#26c6da",
+      "description": "Plots jumps and drives scanners."
+    },
+    {
+      "id": "quantum_core",
+      "name": "Quantum Core",
+      "category": "component",
+      "rarity": "epic",
+      "value": 260,
+      "color": "#e040fb",
+      "description": "The heart of capital-class cores."
+    },
+    {
+      "id": "void_ichor",
+      "name": "Void Ichor",
+      "category": "component",
+      "rarity": "rare",
+      "value": 110,
+      "color": "#7c4dff",
+      "description": "Dropped by wraiths."
+    },
+    {
+      "id": "frost_gland",
+      "name": "Frost Gland",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 40,
+      "color": "#81d4fa",
+      "description": "Cryo organ from the Frost Brood."
+    },
+    {
+      "id": "cinder_ash",
+      "name": "Cinder Ash",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 38,
+      "color": "#ff7043",
+      "description": "Ash from the Cinder Cult's altars. Used to make the Cinder Bloom."
+    },
+    {
+      "id": "barrel_assembly",
+      "name": "Barrel Assembly",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 60,
+      "color": "#a8a29e",
+      "description": "A rifled barrel on a servo mount: cannons, autocannons, flak and mortars."
+    },
+    {
+      "id": "coil_winding",
+      "name": "Coil Winding",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 48,
+      "color": "#d97706",
+      "description": "Copper wound on a ferrite core: railguns, arc and EMP projectors, jump coils."
+    },
+    {
+      "id": "capacitor_cell",
+      "name": "Capacitor Cell",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 40,
+      "color": "#38bdf8",
+      "description": "A fast-discharge cell: batteries, capacitors, pulse guns and lasers."
+    },
+    {
+      "id": "thrust_nozzle",
+      "name": "Thrust Nozzle",
+      "category": "component",
+      "rarity": "rare",
+      "value": 85,
+      "color": "#f97316",
+      "description": "A ceramic-lined titanium bell: torches, plasma and fusion drives."
+    },
+    {
+      "id": "fuel_injector",
+      "name": "Fuel Injector",
+      "category": "component",
+      "rarity": "uncommon",
+      "value": 55,
+      "color": "#fb923c",
+      "description": "Meters propellant into a burn: afterburners and torches."
+    },
+    {
+      "id": "reactor_core",
+      "name": "Reactor Core",
+      "category": "component",
+      "rarity": "rare",
+      "value": 130,
+      "color": "#facc15",
+      "description": "The heart of a generator past the cell reactor."
+    },
+    {
+      "id": "wire_spool",
+      "name": "Wire Spool",
+      "category": "component",
+      "rarity": "common",
+      "value": 14,
+      "color": "#c2773a",
+      "description": "Insulated power wire: one spool lays four segments of wiring."
+    },
+    {
+      "id": "rustjaw_cog",
+      "name": "Rustjaw's Cog",
+      "category": "artefact",
+      "rarity": "legendary",
+      "value": 1500,
+      "color": "#ff8f00",
+      "description": "A drive cog from Rustjaw. A rare drop; Rustjaw's Hive can't be made without it."
+    },
+    {
+      "id": "frost_heart",
+      "name": "Heart of Hoarfrost",
+      "category": "artefact",
+      "rarity": "legendary",
+      "value": 1800,
+      "color": "#b3e5fc",
+      "description": "A core from the Hoarfrost Matriarch's wreck. A rare drop; the Frostbite Lance can't be made without it."
+    },
+    {
+      "id": "cinder_ember",
+      "name": "Warden's Ember",
+      "category": "artefact",
+      "rarity": "legendary",
+      "value": 2000,
+      "color": "#ff5722",
+      "description": "A coal from the Warden or the Pyreclast. A rare drop; the Cinder Bloom can't be made without it."
+    },
+    {
+      "id": "prism_shard",
+      "name": "Prism Shard",
+      "category": "artefact",
+      "rarity": "legendary",
+      "value": 2200,
+      "color": "#e1f5fe",
+      "description": "A shard from the Prism Colossus. A rare drop; the Prism Splitter can't be made without it."
+    },
+    {
+      "id": "void_pearl",
+      "name": "Void Pearl",
+      "category": "artefact",
+      "rarity": "legendary",
+      "value": 2600,
+      "color": "#9575cd",
+      "description": "A pearl from the Void Leviathan's wreck. A rare drop; the Phase Cannon can't be made without it."
+    },
+    {
+      "id": "maw_fragment",
+      "name": "Fragment of the Maw",
+      "category": "artefact",
+      "rarity": "legendary",
+      "value": 4000,
+      "color": "#212121",
+      "description": "A fragment of the Heart of the Maw. A rare drop; the Singularity Launcher can't be made without it."
+    },
+    {
+      "id": "ancient_relic",
+      "name": "Ancient Relic",
+      "category": "artefact",
+      "rarity": "epic",
+      "value": 400,
+      "color": "#ffd54f",
+      "description": "A small sealed case. Sells to collectors and fabricators."
+    },
+    {
+      "id": "repair_kit",
+      "name": "Basic Repair Kit",
+      "category": "consumable",
+      "rarity": "common",
+      "value": 30,
+      "color": "#66bb6a",
+      "description": "Slowly patches your ship: damaged parts first, then missing ones, up to 150 cr of repairs. Hold still: moving or taking a hit wastes what's left.",
+      "repair": {
+        "budget": 150,
+        "hpPerSec": 0.03,
+        "restoreSec": 6
+      }
+    },
+    {
+      "id": "field_repair_kit",
+      "name": "Field Repair Kit",
+      "category": "consumable",
+      "rarity": "uncommon",
+      "value": 110,
+      "color": "#26a69a",
+      "description": "A crate of plate and servo arms: repairs damaged parts, then rebuilds missing ones, up to 500 cr of repairs. Hold still: moving or taking a hit wastes what's left.",
+      "repair": {
+        "budget": 500,
+        "hpPerSec": 0.05,
+        "restoreSec": 4
+      }
+    },
+    {
+      "id": "nanite_repair_kit",
+      "name": "Nanite Repair Kit",
+      "category": "consumable",
+      "rarity": "rare",
+      "value": 380,
+      "color": "#80deea",
+      "description": "A swarm of repair nanites: heals and regrows your ship fast, up to 1,600 cr of repairs. Hold still: moving or taking a hit wastes what's left.",
+      "repair": {
+        "budget": 1600,
+        "hpPerSec": 0.08,
+        "restoreSec": 2.5
+      }
+    },
+    {
+      "id": "boost_cell",
+      "name": "Boost Cell",
+      "category": "consumable",
+      "rarity": "common",
+      "value": 15,
+      "color": "#42a5f5",
+      "description": "Refills your boost tank."
+    },
+    {
+      "id": "insurance_bond",
+      "name": "Insurance Bond",
+      "category": "consumable",
+      "rarity": "uncommon",
+      "value": 150,
+      "color": "#26a69a",
+      "description": "Pays the rebuild bill once after your ship is destroyed."
+    },
+    {
+      "id": "scanner_charge",
+      "name": "Scanner Charge",
+      "category": "consumable",
+      "rarity": "common",
+      "value": 10,
+      "color": "#80cbc4",
+      "description": "One long-range scan pulse, even without a scanner part."
+    },
+    {
+      "id": "railgun_slugs",
+      "name": "Railgun Slugs",
+      "category": "ammo",
+      "rarity": "common",
+      "value": 30,
+      "color": "#b0bec5",
+      "description": "A crate of 200 slugs for a railgun (a volley a slug). Made at any fabricator.",
+      "ammoFor": {
+        "weapon": "railgun",
+        "rounds": 200
+      }
+    },
+    {
+      "id": "flak_canisters",
+      "name": "Flak Canisters",
+      "category": "ammo",
+      "rarity": "common",
+      "value": 25,
+      "color": "#ffb74d",
+      "description": "A crate of 120 canisters for a flak gun. Made at any fabricator.",
+      "ammoFor": {
+        "weapon": "flak",
+        "rounds": 120
+      }
+    },
+    {
+      "id": "missile_crate",
+      "name": "Missiles",
+      "category": "ammo",
+      "rarity": "common",
+      "value": 50,
+      "color": "#ef5350",
+      "description": "A crate of 24 missiles for a missile rack. Made at any fabricator.",
+      "ammoFor": {
+        "weapon": "missile",
+        "rounds": 24
+      }
+    },
+    {
+      "id": "railgun_sabot",
+      "name": "Sabot Slugs",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 45,
+      "color": "#90a4ae",
+      "description": "Railgun slugs that punch through one more part, for 25% less damage. 200 a crate.",
+      "ammoFor": {
+        "weapon": "railgun",
+        "rounds": 200,
+        "mods": {
+          "add": {
+            "pierce": 1
+          },
+          "mul": {
+            "damage": -0.25
+          }
+        }
+      }
+    },
+    {
+      "id": "railgun_tungsten",
+      "name": "Tungsten Slugs",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 60,
+      "color": "#78909c",
+      "description": "Heavy railgun slugs: 40% more damage, but only 100 a crate.",
+      "ammoFor": {
+        "weapon": "railgun",
+        "rounds": 100,
+        "mods": {
+          "mul": {
+            "damage": 0.4
+          }
+        }
+      }
+    },
+    {
+      "id": "railgun_aurum",
+      "name": "Aurum-tipped Slugs",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 120,
+      "color": "#ffca28",
+      "description": "Railgun slugs tipped in aurum: 25% more damage. Costly. 200 a crate.",
+      "ammoFor": {
+        "weapon": "railgun",
+        "rounds": 200,
+        "mods": {
+          "mul": {
+            "damage": 0.25
+          }
+        }
+      }
+    },
+    {
+      "id": "railgun_quench",
+      "name": "Quench Slugs",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 55,
+      "color": "#4fc3f7",
+      "description": "Railgun slugs with a cryogen core: 30% less damage, but 2.5 times that against Cinder Cult ships (not their great ones). 200 a crate. Pressed only by your own station's armoury.",
+      "ammoFor": {
+        "weapon": "railgun",
+        "rounds": 200,
+        "mods": {
+          "mul": {
+            "damage": -0.3
+          },
+          "set": {
+            "bane": {
+              "faction": "cinder",
+              "damage": 2.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "flak_incendiary",
+      "name": "Incendiary Canisters",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 40,
+      "color": "#ff7043",
+      "description": "Flak that sets what it hits burning, for 30% less damage. 120 a crate.",
+      "ammoFor": {
+        "weapon": "flak",
+        "rounds": 120,
+        "mods": {
+          "set": {
+            "ignite": {
+              "dps": 3,
+              "ticks": 120,
+              "radius": 0
+            }
+          },
+          "mul": {
+            "damage": -0.3
+          }
+        }
+      }
+    },
+    {
+      "id": "flak_chaff",
+      "name": "Chaff Canisters",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 45,
+      "color": "#b2ebf2",
+      "description": "Flak that bursts in a short EMP: no damage at all, but it seizes up what it catches. 120 a crate.",
+      "ammoFor": {
+        "weapon": "flak",
+        "rounds": 120,
+        "mods": {
+          "set": {
+            "emp": {
+              "radius": 140,
+              "ticks": 30
+            },
+            "splash": {
+              "radius": 170,
+              "damage": 0
+            }
+          },
+          "mul": {
+            "damage": -1
+          }
+        }
+      }
+    },
+    {
+      "id": "flak_frag",
+      "name": "Frag Canisters",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 35,
+      "color": "#ffab40",
+      "description": "Flak with a wider blast. 120 a crate.",
+      "ammoFor": {
+        "weapon": "flak",
+        "rounds": 120,
+        "mods": {
+          "set": {
+            "splash": {
+              "radius": 230,
+              "damage": 18
+            }
+          },
+          "mul": {
+            "damage": -0.2
+          }
+        }
+      }
+    },
+    {
+      "id": "missile_shaped",
+      "name": "Shaped-charge Missiles",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 80,
+      "color": "#e57373",
+      "description": "Missiles that punch rather than blast: 30% more damage on what they hit, a tighter blast. 24 a crate.",
+      "ammoFor": {
+        "weapon": "missile",
+        "rounds": 24,
+        "mods": {
+          "mul": {
+            "damage": 0.3
+          },
+          "set": {
+            "splash": {
+              "radius": 70,
+              "damage": 30
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "missile_seeker",
+      "name": "Seeker Missiles",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 90,
+      "color": "#ef9a9a",
+      "description": "Missiles that turn twice as hard to follow their target, for 30% less damage. 24 a crate.",
+      "ammoFor": {
+        "weapon": "missile",
+        "rounds": 24,
+        "mods": {
+          "mul": {
+            "homing": 1,
+            "damage": -0.3
+          }
+        }
+      }
+    },
+    {
+      "id": "missile_cryo",
+      "name": "Cryo Missiles",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 75,
+      "color": "#80deea",
+      "description": "Missiles that chill what they hit (two seize it up), for half the damage. 24 a crate.",
+      "ammoFor": {
+        "weapon": "missile",
+        "rounds": 24,
+        "mods": {
+          "set": {
+            "frost": {
+              "perHit": 0.5,
+              "ticks": 60
+            }
+          },
+          "mul": {
+            "damage": -0.5
+          }
+        }
+      }
+    },
+    {
+      "id": "torpedo_crate",
+      "name": "Torpedoes",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 160,
+      "color": "#a1887f",
+      "description": "A crate of 6 torpedoes for a torpedo tube.",
+      "ammoFor": {
+        "weapon": "torpedo",
+        "rounds": 6
+      }
+    },
+    {
+      "id": "mortar_shells",
+      "name": "Mortar Shells",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 45,
+      "color": "#9e9d24",
+      "description": "A crate of 40 shells for a mortar.",
+      "ammoFor": {
+        "weapon": "mortar",
+        "rounds": 40
+      }
+    },
+    {
+      "id": "mining_charges",
+      "name": "Mining Charges",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 30,
+      "color": "#ffb300",
+      "description": "A crate of 30 charges for a mining charge launcher.",
+      "ammoFor": {
+        "weapon": "charge",
+        "rounds": 30
+      }
+    },
+    {
+      "id": "cannon_hv",
+      "name": "High-velocity Shells",
+      "category": "ammo",
+      "rarity": "common",
+      "value": 14,
+      "color": "#ffe082",
+      "description": "Cannon shells that fly 50% faster. 150 a crate. A cannon fires its own plain shells without them.",
+      "ammoFor": {
+        "weapon": "cannon",
+        "rounds": 150,
+        "mods": {
+          "mul": {
+            "speed": 0.5,
+            "life": -0.3333
+          }
+        }
+      }
+    },
+    {
+      "id": "fractured_plating",
+      "name": "Fractured Plating",
+      "category": "quest",
+      "quest": "osei_01",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#a8a29e",
+      "description": "A slab of the Kestrel's hull. Dr. Osei wants it."
+    },
+    {
+      "id": "foundry_log",
+      "name": "Foundry Log",
+      "category": "quest",
+      "quest": "osei_02",
+      "codex": "shattered_bell_log",
+      "rarity": "rare",
+      "value": 0,
+      "color": "#fdba74",
+      "description": "The Shattered Bell's cargo manifest and a foreman's notes, from the old Halcyon foundry."
+    },
+    {
+      "id": "crucible_pattern",
+      "name": "Crucible Pattern",
+      "category": "quest",
+      "quest": "osei_02",
+      "rarity": "rare",
+      "value": 0,
+      "color": "#fb923c",
+      "description": "Pell's drawings for a field crucible."
+    },
+    {
+      "id": "field_crucible",
+      "name": "Field Crucible",
+      "category": "quest",
+      "quest": "osei_02",
+      "rarity": "epic",
+      "value": 0,
+      "color": "#f97316",
+      "description": "A portable crucible for making steel. Dr. Osei's experiment."
+    },
+    {
+      "id": "probe_core",
+      "name": "Probe Core",
+      "category": "quest",
+      "quest": "kerr_01",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#c4b5fd",
+      "description": "The memory core of one of Sabine Kerr's listening probes."
+    },
+    {
+      "id": "drone_core",
+      "name": "Relay Drone Core",
+      "category": "quest",
+      "quest": "drift_01",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#c9a46a",
+      "description": "The core of a Scrapborn relay drone. The Sentinel Watch yard wants it."
+    },
+    {
+      "id": "smuggler_cache",
+      "name": "Smuggler's Cache",
+      "category": "quest",
+      "quest": "patrol_01",
+      "rarity": "rare",
+      "value": 0,
+      "color": "#e05a4a",
+      "description": "A sealed cargo cache from the Lanes. The Patrol will want to inspect it."
+    },
+    {
+      "id": "vigil_log",
+      "name": "Vigil's Log",
+      "category": "quest",
+      "quest": "far_02",
+      "codex": "vigil_log",
+      "rarity": "rare",
+      "value": 0,
+      "color": "#9aa7b4",
+      "description": "The Dreadnought Vigil's bridge log, pulled from the wreck."
+    },
+    {
+      "id": "meridian_beacon",
+      "name": "Drowned Beacon",
+      "category": "quest",
+      "quest": "tn_beacon",
+      "rarity": "rare",
+      "value": 0,
+      "color": "#38bdf8",
+      "description": "A landing beacon dug out of the Pale Reef on Terra Nova."
+    },
+    {
+      "id": "buoy_frame",
+      "name": "Buoy Frame",
+      "category": "quest",
+      "quest": "clearance",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#94a3b8",
+      "description": "A nav buoy's base ring and keel."
+    },
+    {
+      "id": "buoy_mast",
+      "name": "Buoy Mast",
+      "category": "quest",
+      "quest": "clearance",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#cbd5e1",
+      "description": "A nav buoy's mast."
+    },
+    {
+      "id": "buoy_cell",
+      "name": "Buoy Power Cell",
+      "category": "quest",
+      "quest": "clearance",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#fbbf24",
+      "description": "A pair of power cells for a nav buoy."
+    },
+    {
+      "id": "buoy_dish",
+      "name": "Buoy Transponder Dish",
+      "category": "quest",
+      "quest": "clearance",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#7dd3fc",
+      "description": "A nav buoy's dish and transponder."
+    },
+    {
+      "id": "halvard_log",
+      "name": "Halvard's Log",
+      "category": "quest",
+      "quest": "ice_03",
+      "codex": "halvard_log",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#fde68a",
+      "description": "The flight log of the Lighter Halvard, an early colony lander lost on the ice road."
+    },
+    {
+      "id": "halden_cache",
+      "name": "Halden Cache",
+      "category": "quest",
+      "quest": "ice_04",
+      "codex": "halden_caches",
+      "rarity": "rare",
+      "value": 0,
+      "color": "#a9cfd8",
+      "description": "A small sealed case of slate, cut out of the ice under Glacia."
+    },
+    {
+      "id": "leestone_ore",
+      "name": "Leestone Ore",
+      "category": "mineral",
+      "rarity": "rare",
+      "value": 22,
+      "color": "#3f424a",
+      "description": "A dark, dense stone. Found in traces in rock across the cluster, thickest in the Maw's shard ring. Refined into leestone.",
+      "family": "exotic",
+      "tier": 4,
+      "short": "Leestone",
+      "mass": 0.12
+    },
+    {
+      "id": "leestone",
+      "name": "Leestone",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 70,
+      "color": "#4a4d55",
+      "description": "Refined leestone. Made into leestone plate.",
+      "mass": 0.12
+    },
+    {
+      "id": "leestone_plate",
+      "name": "Leestone Plate",
+      "category": "refined",
+      "rarity": "rare",
+      "value": 130,
+      "color": "#565a63",
+      "description": "Hull plating: leestone faced on a steel backing. Heavy.",
+      "mass": 0.12
+    },
+    {
+      "id": "ark_old_stock",
+      "name": "Ark Old Stock",
+      "category": "quest",
+      "quest": "ark_05",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#9ca3af",
+      "description": "A crate of retired machinery from the Ark Depot: pump housings, coil packs, a core cradle."
+    },
+    {
+      "id": "helios_cell",
+      "name": "Directorate Power Cell",
+      "category": "quest",
+      "quest": "bw_01",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#fde68a",
+      "description": "A pallet of Helios Directorate power cells, for the Seat."
+    },
+    {
+      "id": "helios_perf_logs",
+      "name": "Dock Performance Logs",
+      "category": "quest",
+      "quest": "bw_02",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#fcd34d",
+      "description": "A Helios service dock's weekly performance logs. Engineer Rask wants them."
+    },
+    {
+      "id": "helios_drone_logs",
+      "name": "Drone Service Log",
+      "category": "quest",
+      "quest": "bw_02",
+      "codex": "helios_drone_logs",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#e8c86a",
+      "description": "A month of one Helios drone's service log."
+    },
+    {
+      "id": "kerr_recorder",
+      "name": "Kerr's Recorder",
+      "category": "quest",
+      "quest": "bw_03",
+      "rarity": "uncommon",
+      "value": 0,
+      "color": "#c4b5fd",
+      "description": "One of Sabine Kerr's listening recorders. She wants it back with half a minute of the Helios Array recorded on it."
     }
   ]
 }

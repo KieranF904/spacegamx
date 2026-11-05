@@ -1,0 +1,464 @@
+{
+  "_comment": "Materials are grades (Mk I-V): a part's material sets its toughness (hit points per cell), its density (mass per cell) and its output (weapon damage, generator power, shield strength; graded parts draw that much more power too). Mk I has two: alloy, and lighter, frailer composite. traits: what a material is (light, heavy, brittle, conductive, mass_anchor, costly_repair: ships/hazards.ts); hazards: the tolerance (0-5) a hull made wholly of it has to each system hazard; a ship has its cells' share of it. insulation: the share of cold (0..1) a hull made wholly of it keeps out, so cold builds up that much slower (warmth.ts; again by share of cells): it only buys time.",
+  "materials": [
+    {
+      "id": "alloy",
+      "name": "Alloy",
+      "grade": 1,
+      "output": 1.0,
+      "color": "#8fa3bf",
+      "density": 1.0,
+      "toughness": 75
+    },
+    {
+      "id": "composite",
+      "name": "Composite",
+      "grade": 1,
+      "output": 1.0,
+      "color": "#b9c7a5",
+      "density": 0.7,
+      "toughness": 50,
+      "traits": [
+        "light"
+      ],
+      "hazards": {
+        "corrosive": 1
+      },
+      "resist": {
+        "kinetic": 1.2,
+        "explosive": 1.1,
+        "thermal": 1.1,
+        "energy": 0.8
+      }
+    },
+    {
+      "id": "steel",
+      "name": "Steel",
+      "grade": 2,
+      "output": 1.3,
+      "color": "#9aa0a6",
+      "density": 1.4,
+      "toughness": 94,
+      "traits": [
+        "heavy"
+      ],
+      "resist": {
+        "kinetic": 0.85,
+        "explosive": 0.9,
+        "energy": 1.2,
+        "cryo": 1.1
+      }
+    },
+    {
+      "id": "titanium",
+      "name": "Titanium",
+      "grade": 3,
+      "output": 1.65,
+      "color": "#d5e3ee",
+      "density": 1.0,
+      "toughness": 112,
+      "resist": {
+        "kinetic": 0.95,
+        "thermal": 0.85,
+        "cryo": 0.9
+      }
+    },
+    {
+      "id": "cobalt",
+      "name": "Cobalt",
+      "grade": 4,
+      "output": 2.1,
+      "color": "#5b8fd9",
+      "density": 1.2,
+      "toughness": 131,
+      "resist": {
+        "kinetic": 0.85,
+        "explosive": 0.9,
+        "energy": 1.15,
+        "exotic": 0.9
+      }
+    },
+    {
+      "id": "neutronium",
+      "name": "Neutronium",
+      "grade": 5,
+      "output": 2.6,
+      "color": "#b48cf2",
+      "density": 1.35,
+      "toughness": 150,
+      "traits": [
+        "heavy"
+      ],
+      "resist": {
+        "kinetic": 0.75,
+        "explosive": 0.8,
+        "cryo": 1.3,
+        "exotic": 1.2
+      }
+    },
+    {
+      "id": "insulated_polymer",
+      "name": "Insulated Polymer",
+      "grade": 2,
+      "output": 1.1,
+      "color": "#a1887f",
+      "density": 0.7,
+      "toughness": 52,
+      "traits": [
+        "conductive"
+      ],
+      "insulation": 0.3,
+      "resist": {
+        "energy": 0.45,
+        "cryo": 0.7,
+        "thermal": 1.4,
+        "kinetic": 1.1
+      }
+    },
+    {
+      "id": "conductive_steel",
+      "name": "Conductive Steel",
+      "grade": 3,
+      "output": 1.3,
+      "color": "#c9a86a",
+      "density": 1.4,
+      "toughness": 84,
+      "traits": [
+        "heavy",
+        "conductive"
+      ],
+      "resist": {
+        "energy": 1.6,
+        "kinetic": 0.8,
+        "explosive": 0.9
+      }
+    },
+    {
+      "id": "leaded_iridium",
+      "name": "Leaded Iridium",
+      "grade": 3,
+      "output": 1.3,
+      "color": "#dfe6ec",
+      "density": 1.9,
+      "toughness": 90,
+      "traits": [
+        "heavy"
+      ],
+      "hazards": {
+        "radiation": 5
+      },
+      "resist": {
+        "energy": 0.75,
+        "exotic": 0.7,
+        "kinetic": 0.9,
+        "thermal": 1.1
+      }
+    },
+    {
+      "id": "ceramic_laminate",
+      "name": "Ceramic Laminate",
+      "grade": 3,
+      "output": 1.3,
+      "color": "#efe3cf",
+      "density": 0.9,
+      "toughness": 68,
+      "traits": [
+        "brittle"
+      ],
+      "insulation": 0.15,
+      "hazards": {
+        "thermal": 4
+      },
+      "resist": {
+        "thermal": 0.45,
+        "energy": 0.85,
+        "kinetic": 1.35,
+        "explosive": 1.3
+      }
+    },
+    {
+      "id": "sealed_composite",
+      "name": "Sealed Composite",
+      "grade": 3,
+      "output": 1.3,
+      "color": "#7fb3a0",
+      "density": 1.1,
+      "toughness": 84,
+      "traits": [
+        "costly_repair"
+      ],
+      "insulation": 0.1,
+      "hazards": {
+        "corrosive": 4
+      },
+      "resist": {
+        "cryo": 0.6,
+        "thermal": 0.9,
+        "kinetic": 1.1,
+        "explosive": 1.15
+      }
+    },
+    {
+      "id": "dense_ferrite",
+      "name": "Dense Ferrite",
+      "grade": 3,
+      "output": 1.0,
+      "color": "#6d5a4a",
+      "density": 2.2,
+      "toughness": 101,
+      "traits": [
+        "heavy",
+        "mass_anchor"
+      ],
+      "resist": {
+        "kinetic": 0.7,
+        "explosive": 0.75,
+        "energy": 1.35,
+        "exotic": 1.25
+      }
+    },
+    {
+      "id": "leestone",
+      "name": "Leestone",
+      "grade": 3,
+      "output": 1.3,
+      "color": "#4a4d55",
+      "density": 1.8,
+      "toughness": 96,
+      "traits": [
+        "heavy",
+        "costly_repair"
+      ],
+      "hazards": {
+        "radiation": 3
+      },
+      "resist": {
+        "exotic": 0.8,
+        "energy": 0.95,
+        "kinetic": 1.05,
+        "thermal": 1.1
+      }
+    },
+    {
+      "id": "pyre_glass",
+      "name": "Pyreclast Glass",
+      "exclusive": "boss",
+      "grade": 4,
+      "output": 1.6,
+      "color": "#2a2234",
+      "density": 1.9,
+      "toughness": 104,
+      "resist": {
+        "thermal": 0.6,
+        "kinetic": 1.1
+      }
+    },
+    {
+      "id": "pyre_crystal",
+      "name": "Pyreclast Crystal",
+      "exclusive": "boss",
+      "grade": 4,
+      "output": 1.6,
+      "color": "#9a8fd0",
+      "density": 1.4,
+      "toughness": 88,
+      "resist": {
+        "energy": 0.7,
+        "kinetic": 1.2
+      }
+    },
+    {
+      "id": "pyre_chrome",
+      "name": "Pyreclast Chrome",
+      "exclusive": "boss",
+      "grade": 4,
+      "output": 1.6,
+      "color": "#e6ebf4",
+      "density": 2.1,
+      "toughness": 120,
+      "resist": {
+        "thermal": 0.7,
+        "kinetic": 0.9
+      }
+    },
+    {
+      "id": "pyre_steel",
+      "name": "Pyreclast Steel",
+      "exclusive": "boss",
+      "grade": 4,
+      "output": 1.6,
+      "color": "#d6dce8",
+      "density": 2.1,
+      "toughness": 120,
+      "resist": {
+        "thermal": 0.7,
+        "kinetic": 0.9
+      }
+    },
+    {
+      "id": "scrap_iron",
+      "name": "Scrapborn Iron",
+      "exclusive": "boss",
+      "grade": 1,
+      "output": 1.4,
+      "color": "#44484e",
+      "density": 0.8,
+      "toughness": 96,
+      "resist": {"kinetic": 0.9, "thermal": 1.1}
+    },
+    {
+      "id": "scrap_rust",
+      "name": "Scrapborn Rust",
+      "exclusive": "boss",
+      "grade": 1,
+      "output": 1.4,
+      "color": "#6f4632",
+      "density": 0.75,
+      "toughness": 88,
+      "resist": {"kinetic": 1.0, "thermal": 1.15}
+    },
+    {
+      "id": "scrap_paint",
+      "name": "Scrapborn Plate",
+      "exclusive": "boss",
+      "grade": 1,
+      "output": 1.4,
+      "color": "#56684b",
+      "density": 0.8,
+      "toughness": 90,
+      "resist": {"kinetic": 0.95, "energy": 1.05}
+    },
+    {
+      "id": "scrap_steel",
+      "name": "Scrapborn Steel",
+      "exclusive": "boss",
+      "grade": 1,
+      "output": 1.4,
+      "color": "#868a90",
+      "density": 0.9,
+      "toughness": 110,
+      "resist": {"kinetic": 0.85, "thermal": 0.95}
+    },
+    {
+      "id": "scrap_seam",
+      "name": "Greyseam",
+      "exclusive": "boss",
+      "grade": 1,
+      "output": 1.4,
+      "color": "#6fe0c4",
+      "density": 0.7,
+      "toughness": 84,
+      "resist": {"energy": 0.7, "kinetic": 1.2}
+    },
+    {
+      "id": "brood_shell",
+      "name": "Brood Carapace",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#3d4763",
+      "density": 0.75,
+      "toughness": 96,
+      "resist": {"kinetic": 0.9, "thermal": 1.15}
+    },
+    {
+      "id": "brood_rime",
+      "name": "Brood Rime",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#5f7d99",
+      "density": 0.7,
+      "toughness": 90,
+      "resist": {"kinetic": 0.95, "thermal": 1.25}
+    },
+    {
+      "id": "brood_membrane",
+      "name": "Brood Membrane",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#4b3a63",
+      "density": 0.6,
+      "toughness": 80,
+      "resist": {"kinetic": 1.05, "energy": 1.05}
+    },
+    {
+      "id": "brood_ice",
+      "name": "Brood Ice",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#6a879f",
+      "density": 0.65,
+      "toughness": 84,
+      "resist": {"energy": 0.8, "kinetic": 1.15, "thermal": 1.3}
+    },
+    {
+      "id": "brood_gland",
+      "name": "Frost Gland",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#7a52a8",
+      "density": 0.6,
+      "toughness": 84,
+      "resist": {"energy": 0.7, "kinetic": 1.1}
+    },
+    {
+      "id": "dev_singularity",
+      "name": "Dev Singularity",
+      "exclusive": "dev",
+      "grade": 5,
+      "output": 60,
+      "color": "#ff3ad8",
+      "density": 0.5,
+      "toughness": 5000,
+      "resist": {}
+    },
+    {
+      "id": "maw_slate",
+      "name": "Maw Slate",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#46474d",
+      "density": 0.9,
+      "toughness": 100,
+      "resist": {"thermal": 0.95, "energy": 1.05}
+    },
+    {
+      "id": "maw_glass",
+      "name": "Maw Glass",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#5a4a3c",
+      "density": 0.7,
+      "toughness": 86,
+      "resist": {"energy": 0.85, "kinetic": 1.15}
+    },
+    {
+      "id": "pirate_plate",
+      "name": "Pirate Plate",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#6b6f76",
+      "density": 0.85,
+      "toughness": 96,
+      "resist": {"kinetic": 0.92}
+    },
+    {
+      "id": "pirate_paint",
+      "name": "Pirate Paint",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#8e2a22",
+      "density": 0.8,
+      "toughness": 90,
+      "resist": {"thermal": 1.05}
+    }
+  ]
+}

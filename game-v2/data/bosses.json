@@ -1,0 +1,1786 @@
+{
+  "_comment": "Bosses. Each lairs at a fixed point in its system and appears while players are there (respawnSeconds after it dies; its system left empty is remembered as it is, a living boss mending slowly: rules.json memory). hp scales every part; damage scales its guns; speed is its engine output (up to 2.5, above any player design: how fast it flies and turns). Phases trigger as its hull integrity falls below `at`: say (announced to the system), escorts (ships that join it), enrage (damage multiplier from then on), heal (fraction of every part restored), blink (teleports next to its target every N ticks), nova (a telegraphed ring of shots every N ticks: kind, count, warnTicks). Everyone who damaged it (or was close when it died) gets XP, credits and their own loot roll, straight into storage.",
+  "rules": {
+    "creditRange": 5000,
+    "creditWindowTicks": 3600,
+    "barRange": 7000,
+    "repeatCredits": 0.25,
+    "_stageCover": "Staged bosses: a hit on a later stage's part (under the plates) passes to the nearest current-stage plate at this share. A boss's own stageCover overrides it.",
+    "stageCover": 0.4
+  },
+  "bosses": {
+    "boss_scrap_mother": {
+      "name": "Scrap Mother",
+      "title": "Nest of the Drift",
+      "faction": "scrapborn",
+      "system": "sol_scrap_nest",
+      "lair": {
+        "x": 0,
+        "y": 0
+      },
+      "level": 8,
+      "hp": 0.14,
+      "stageHp": [3300, 4300, 2700],
+      "_exposed": "Where her window shows (client BossFx draws it from the bossWindow message alone): by stage, the pieces laid open",
+      "exposed": [["scrapmother_magnet_l", "scrapmother_magnet_r", "scrapmother_gun1_l", "scrapmother_gun1_r"], ["scrapmother_throat", "scrapmother_stacks", "scrapmother_vat_l", "scrapmother_vat_r"], ["scrapmother_s3_core"]],
+      "damage": 1,
+      "xp": 2400,
+      "credits": 2400,
+      "respawnSeconds": 600,
+      "speed": 2.5,
+      "turn": 7,
+      "design": "scrap_mother",
+      "asDesigned": true,
+      "brain": "scrap_mother",
+      "behaviour": {
+        "strafe": 0.3,
+        "flee": 0,
+        "aggro": 3600,
+        "range": 1800,
+        "leash": 8000,
+        "accuracy": 0.85
+      },
+      "intro": "Something huge and patched together heaves up out of the scrap heap at the heart of the rock, grey veins glinting in the walls around it. The Scrap Mother wakes, and the nest hums with drones.",
+      "phases": [
+        {
+          "at": 0.667,
+          "say": "The Scrap Mother's nest tears away from her."
+        },
+        {
+          "at": 0.334,
+          "say": "The Scrap Mother's mill falls away. Something green burns inside."
+        },
+        {
+          "at": 0.15,
+          "say": "The Scrap Mother is coming apart."
+        }
+      ],
+      "loot": [
+        {
+          "item": "servo_motor",
+          "chance": 1,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "scrap_electronics",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "alloy_plate",
+          "chance": 1,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "repair_kit",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_rustjaw": {
+      "name": "Rustjaw",
+      "title": "Pirate King of Nebula Prime",
+      "faction": "pirates",
+      "system": "nebula_prime",
+      "lair": {
+        "x": -50093,
+        "y": 46962
+      },
+      "level": 9,
+      "hp": 3.5,
+      "damage": 0.27,
+      "xp": 2600,
+      "credits": 3500,
+      "respawnSeconds": 600,
+      "speed": 1.75,
+      "behaviour": {
+        "strafe": 0.25,
+        "flee": 0,
+        "aggro": 3400,
+        "range": 800,
+        "leash": 9000,
+        "accuracy": 0.91
+      },
+      "intro": "Rustjaw's scrapyard flagship powers up. \"Another hero. Bring her apart, boys!\"",
+      "phases": [
+        {
+          "at": 0.75,
+          "say": "Rustjaw: \"Raiders! To me!\"",
+          "escorts": [
+            "pirate_raider",
+            "pirate_raider"
+          ]
+        },
+        {
+          "at": 0.5,
+          "say": "Rustjaw opens up every gun he has.",
+          "enrage": 1.35,
+          "nova": {
+            "every": 420,
+            "kind": "cannon",
+            "count": 20,
+            "warnTicks": 60
+          }
+        },
+        {
+          "at": 0.25,
+          "say": "Rustjaw: \"Gunship! Cover me while I patch up!\"",
+          "escorts": [
+            "pirate_gunship"
+          ],
+          "heal": 0.12
+        }
+      ],
+      "loot": [
+        {
+          "item": "rustjaw_cog",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "targeting_chip",
+          "chance": 0.8,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_hoarfrost": {
+      "name": "Hoarfrost Matriarch",
+      "title": "Queen of the Frost Brood",
+      "faction": "frost",
+      "system": "borealis",
+      "lair": {
+        "x": 37007,
+        "y": -39650
+      },
+      "level": 7,
+      "hp": 10,
+      "damage": 1,
+      "xp": 2200,
+      "credits": 2400,
+      "respawnSeconds": 600,
+      "behaviour": {
+        "strafe": 0.25,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 900,
+        "leash": 8000,
+        "accuracy": 0.93
+      },
+      "intro": "The ice cracks. The Hoarfrost Matriarch uncoils from her nest.",
+      "phases": [
+        {
+          "at": 0.7,
+          "say": "The Matriarch shrieks. Shards break off the ice and come for you.",
+          "escorts": [
+            "frost_shard",
+            "frost_shard",
+            "frost_shard"
+          ]
+        },
+        {
+          "at": 0.45,
+          "say": "Frost crawls over every hull nearby.",
+          "nova": {
+            "every": 480,
+            "kind": "emp",
+            "count": 8,
+            "warnTicks": 75
+          }
+        },
+        {
+          "at": 0.2,
+          "say": "The Matriarch draws the cold into herself and knits back together.",
+          "heal": 0.15,
+          "escorts": [
+            "frost_warden"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "frost_heart",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "frost_gland",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "sapphire",
+          "chance": 0.5,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "shield_emitter",
+          "chance": 0.4,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "boss_hushwing": {
+      "name": "Hushwing",
+      "title": "Eldest of the Brood",
+      "faction": "frost",
+      "system": "borealis",
+      "lair": {
+        "x": 16000,
+        "y": 58000
+      },
+      "level": 9,
+      "hp": 7.5,
+      "damage": 0.875,
+      "xp": 2600,
+      "credits": 2600,
+      "respawnSeconds": 900,
+      "speed": 2.2,
+      "behaviour": {
+        "strafe": 0.35,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 1000,
+        "leash": 8000,
+        "accuracy": 0.91
+      },
+      "intro": "The aurora folds back like a curtain. Something old and pale spreads its wings in the light: the Hushwing, eldest of the Brood, and it doesn't care to be found.",
+      "phases": [
+        {
+          "at": 0.75,
+          "say": "The Hushwing screams. Brood pour out of the aurora round it.",
+          "escorts": [
+            "frost_shard",
+            "frost_shard",
+            "frost_shard",
+            "frost_shard"
+          ]
+        },
+        {
+          "at": 0.5,
+          "say": "The Hushwing slips into the aurora and out again, somewhere else.",
+          "blink": 360
+        },
+        {
+          "at": 0.25,
+          "say": "Cold light gathers on its wings: it sheds it in a storm of frost!",
+          "nova": {
+            "every": 480,
+            "kind": "emp",
+            "count": 10,
+            "warnTicks": 75
+          },
+          "escorts": [
+            "frost_warden"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "hush_pane",
+          "chance": 1,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "aurora_rime",
+          "chance": 1,
+          "min": 8,
+          "max": 16
+        },
+        {
+          "item": "frost_gland",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "sapphire",
+          "chance": 0.5,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "ancient_relic",
+          "chance": 0.08,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "boss_prism_colossus": {
+      "name": "Prism Colossus",
+      "title": "The crystal that eats ships",
+      "faction": "scavengers",
+      "system": "glasswater",
+      "lair": {
+        "x": 24000,
+        "y": 20000
+      },
+      "level": 5,
+      "hp": 7.5,
+      "damage": 0.45,
+      "xp": 1800,
+      "credits": 1800,
+      "respawnSeconds": 540,
+      "speed": 1.1,
+      "behaviour": {
+        "strafe": 0.25,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 950,
+        "leash": 8000,
+        "accuracy": 0.89
+      },
+      "intro": "Light bends around a lattice of crystal and stolen plate. The Prism Colossus turns towards you.",
+      "phases": [
+        {
+          "at": 0.7,
+          "say": "The Colossus calls its drones home.",
+          "escorts": [
+            "scav_drone",
+            "scav_drone",
+            "scav_harvester"
+          ]
+        },
+        {
+          "at": 0.4,
+          "say": "The Colossus flares: a storm of crystal shards!",
+          "nova": {
+            "every": 360,
+            "kind": "prism_shard",
+            "count": 24,
+            "warnTicks": 60
+          },
+          "enrage": 1.2
+        }
+      ],
+      "loot": [
+        {
+          "item": "prism_shard",
+          "chance": 0.06,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "crystal",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "emerald",
+          "chance": 0.4,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "crystal_lens",
+          "chance": 0.7,
+          "min": 1,
+          "max": 3
+        }
+      ]
+    },
+    "boss_cinder_warden": {
+      "name": "Cinder Warden",
+      "title": "Idol of the Cinder Cult",
+      "faction": "cinder",
+      "system": "cinder_reach",
+      "lair": {
+        "x": -75337,
+        "y": 11895
+      },
+      "level": 18,
+      "hp": 8.75,
+      "damage": 0.81,
+      "xp": 4200,
+      "credits": 5000,
+      "respawnSeconds": 720,
+      "speed": 1.75,
+      "behaviour": {
+        "strafe": 0.25,
+        "flee": 0,
+        "aggro": 3200,
+        "range": 420,
+        "leash": 9000,
+        "accuracy": 0.93
+      },
+      "intro": "The Cinder Warden ignites. The cultists' hymn rises on every channel.",
+      "phases": [
+        {
+          "at": 0.75,
+          "say": "Zealots throw themselves into the fight.",
+          "escorts": [
+            "cinder_zealot",
+            "cinder_zealot"
+          ]
+        },
+        {
+          "at": 0.5,
+          "say": "The Warden's furnace roars: flak bursts in every direction!",
+          "enrage": 1.3,
+          "nova": {
+            "every": 360,
+            "kind": "flak",
+            "count": 14,
+            "warnTicks": 60
+          }
+        },
+        {
+          "at": 0.25,
+          "say": "The Brand arrives to defend its idol.",
+          "escorts": [
+            "cinder_brand"
+          ],
+          "heal": 0.1
+        }
+      ],
+      "loot": [
+        {
+          "item": "cinder_ember",
+          "chance": 0.04,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "ruby",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "titanium_plate",
+          "chance": 0.8,
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "boss_void_leviathan": {
+      "name": "Void Leviathan",
+      "title": "Where the heartbeat echoes",
+      "faction": "wraiths",
+      "system": "void_sector",
+      "lair": {
+        "x": -18947,
+        "y": -14737
+      },
+      "level": 23,
+      "hp": 12.5,
+      "damage": 0.81,
+      "xp": 6000,
+      "credits": 7000,
+      "respawnSeconds": 780,
+      "speed": 1.15,
+      "behaviour": {
+        "strafe": 0.25,
+        "flee": 0,
+        "aggro": 3600,
+        "range": 900,
+        "leash": 10000,
+        "accuracy": 0.95
+      },
+      "intro": "Space folds. The Void Leviathan slides out of nowhere.",
+      "phases": [
+        {
+          "at": 0.8,
+          "say": "The Leviathan blinks through space.",
+          "blink": 300
+        },
+        {
+          "at": 0.55,
+          "say": "Phantoms pour from the fold.",
+          "escorts": [
+            "void_phantom",
+            "void_phantom",
+            "void_phantom"
+          ]
+        },
+        {
+          "at": 0.3,
+          "say": "The Leviathan screams: an EMP storm!",
+          "nova": {
+            "every": 420,
+            "kind": "emp",
+            "count": 10,
+            "warnTicks": 70
+          },
+          "enrage": 1.3,
+          "blink": 220
+        }
+      ],
+      "loot": [
+        {
+          "item": "void_pearl",
+          "chance": 0.04,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "void_ichor",
+          "chance": 1,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "void_opal",
+          "chance": 0.5,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "nav_computer",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "boss_maw_heart": {
+      "name": "Heart of the Maw",
+      "title": "Where the heartbeat is loudest",
+      "faction": "maw",
+      "system": "the_maw",
+      "lair": {
+        "x": 15302,
+        "y": -10594
+      },
+      "level": 26,
+      "hp": 1,
+      "damage": 0.5,
+      "xp": 10000,
+      "credits": 12000,
+      "respawnSeconds": 900,
+      "behaviour": {
+        "strafe": 0,
+        "flee": 0,
+        "aggro": 6500,
+        "range": 2600,
+        "leash": 3500,
+        "accuracy": 0.8
+      },
+      "intro": "Every receiver aboard fills with the heartbeat, as loud as it gets. Then the Heart of the Maw beats, and every hull in the system shudders. It looks grown, not built, out of the shard ring's dark rock; only its vents are open.",
+      "phases": [
+        {
+          "at": 0.97,
+          "say": "The Heart beats. Its vents glow where the plating parts: four channels in, along its axes.",
+          "nova": {
+            "every": 1500,
+            "kind": "cannon",
+            "count": 24,
+            "warnTicks": 150
+          }
+        },
+        {
+          "at": 0.75,
+          "say": "Lurkers pour from the Heart’s bays.",
+          "escorts": [
+            "maw_lurker",
+            "maw_lurker"
+          ]
+        },
+        {
+          "at": 0.55,
+          "say": "The Heart bends space: singularities bloom around it!",
+          "nova": {
+            "every": 900,
+            "kind": "singularity",
+            "count": 5,
+            "warnTicks": 120
+          }
+        },
+        {
+          "at": 0.35,
+          "say": "A Colossus answers the Heart’s call.",
+          "escorts": [
+            "maw_colossus",
+            "maw_lurker"
+          ],
+          "heal": 0.04
+        },
+        {
+          "at": 0.15,
+          "say": "The Heart is failing. It beats faster, and everything burns!",
+          "enrage": 1.3,
+          "nova": {
+            "every": 600,
+            "kind": "missile",
+            "count": 14,
+            "warnTicks": 90
+          }
+        }
+      ],
+      "loot": [
+        {
+          "item": "maw_fragment",
+          "chance": 0.03,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "quantum_core",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "ancient_relic",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "void_opal",
+          "chance": 0.5,
+          "min": 1,
+          "max": 3
+        }
+      ],
+      "design": "maw_heart_titan",
+      "asDesigned": true
+    },
+    "boss_foundry_warden": {
+      "name": "Foundry Warden",
+      "title": "Keeper of the Deep Foundry",
+      "faction": "scavengers",
+      "system": "halcyon_foundry",
+      "design": "boss_cinder_warden",
+      "arena": true,
+      "lair": {
+        "x": 0,
+        "y": -1200
+      },
+      "level": 5,
+      "hp": 1.25,
+      "damage": 0.324,
+      "xp": 900,
+      "credits": 250,
+      "respawnSeconds": 0,
+      "speed": 1.75,
+      "behaviour": {
+        "strafe": 0.25,
+        "flee": 0,
+        "aggro": 4000,
+        "range": 520,
+        "leash": 12000,
+        "accuracy": 0.85
+      },
+      "intro": "The crucible's heat reaches the old furnace, and the furnace wakes. The Foundry Warden pulls itself out of the slag.",
+      "phases": [
+        {
+          "at": 0.6,
+          "say": "Scavenger drones pour out of the vents to defend the Warden.",
+          "escorts": [
+            "scav_drone",
+            "scav_drone"
+          ]
+        },
+        {
+          "at": 0.3,
+          "say": "The Warden's furnace roars: flak in every direction!",
+          "enrage": 1.25,
+          "nova": {
+            "every": 420,
+            "kind": "flak",
+            "count": 10,
+            "warnTicks": 70
+          }
+        }
+      ],
+      "loot": [
+        {
+          "item": "steel_plate",
+          "chance": 1,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "crystal",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "boss_redtooth_hold": {
+      "name": "Redtooth Hold",
+      "title": "Raider Outpost",
+      "faction": "redtooth",
+      "system": "ashfall",
+      "lair": {
+        "x": -38914,
+        "y": 31430
+      },
+      "level": 2,
+      "hp": 1.125,
+      "damage": 0.63,
+      "xp": 420,
+      "credits": 380,
+      "respawnSeconds": 480,
+      "fixed": true,
+      "behaviour": {
+        "strafe": 0,
+        "flee": 0,
+        "aggro": 2600,
+        "range": 1500,
+        "leash": 1000,
+        "accuracy": 0.55
+      },
+      "intro": "Lamps come on along a fort of welded junk, its holds stacked with small sealed crates dug out from under Halden's crust. The Redtooth's outpost has seen you, and its launch bays open.",
+      "phases": [
+        {
+          "at": 0.75,
+          "say": "Redtooth Hold launches its cutters.",
+          "escorts": [
+            "redtooth_cutter",
+            "redtooth_cutter",
+            "redtooth_cutter"
+          ]
+        },
+        {
+          "at": 0.45,
+          "say": "Redtooth Hold scrambles its brawlers.",
+          "escorts": [
+            "redtooth_brawler",
+            "redtooth_cutter",
+            "redtooth_cutter"
+          ]
+        },
+        {
+          "at": 0.2,
+          "say": "The Redtooth patch the Hold under fire.",
+          "heal": 0.08
+        }
+      ],
+      "loot": [
+        {
+          "item": "scrap_electronics",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "alloy_plate",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "copper_wire",
+          "chance": 1,
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.6,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "targeting_chip",
+          "chance": 0.4,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "repair_kit",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_redtooth_picket": {
+      "name": "Redtooth Picket",
+      "title": "Forward Camp of the Redtooth",
+      "faction": "redtooth",
+      "system": "sol",
+      "lair": {
+        "x": 60000,
+        "y": -64000
+      },
+      "design": "boss_redtooth_hold",
+      "level": 3,
+      "hp": 0.875,
+      "damage": 0.63,
+      "xp": 450,
+      "credits": 420,
+      "respawnSeconds": 480,
+      "fixed": true,
+      "behaviour": {
+        "strafe": 0,
+        "flee": 0,
+        "aggro": 2600,
+        "range": 1500,
+        "leash": 1000,
+        "accuracy": 0.55
+      },
+      "intro": "Welded plate and stolen lamps: the Redtooth have pushed a camp into Sol itself. Its bays open as you come in range.",
+      "phases": [
+        {
+          "at": 0.7,
+          "say": "The Picket launches its cutters.",
+          "escorts": [
+            "redtooth_cutter",
+            "redtooth_cutter"
+          ]
+        },
+        {
+          "at": 0.4,
+          "say": "The Picket scrambles a brawler.",
+          "escorts": [
+            "redtooth_brawler",
+            "redtooth_cutter"
+          ]
+        },
+        {
+          "at": 0.2,
+          "say": "The Redtooth patch the Picket under fire.",
+          "heal": 0.06
+        }
+      ],
+      "loot": [
+        {
+          "item": "scrap_electronics",
+          "chance": 1,
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "alloy_plate",
+          "chance": 1,
+          "min": 3,
+          "max": 5
+        },
+        {
+          "item": "copper_wire",
+          "chance": 1,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "repair_kit",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_tallyman": {
+      "name": "The Tallyman",
+      "title": "Bounty Collector of the Reaches",
+      "faction": "pirates",
+      "system": "sol",
+      "lair": {
+        "x": 140000,
+        "y": 95000
+      },
+      "design": "pirate_gunship",
+      "level": 5,
+      "hp": 4,
+      "damage": 0.9,
+      "xp": 900,
+      "credits": 700,
+      "respawnSeconds": 540,
+      "plating": 1,
+      "roam": {
+        "radius": 35000,
+        "everySeconds": 90
+      },
+      "behaviour": {
+        "strafe": 0.4,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 900,
+        "leash": 9000,
+        "accuracy": 0.9
+      },
+      "intro": "A gunship in black paint, tally marks scratched down its flank. \"You're on my list, pilot. Everyone is.\"",
+      "phases": [
+        {
+          "at": 0.7,
+          "say": "The Tallyman: \"Collectors! Bring them in!\"",
+          "escorts": [
+            "pirate_raider",
+            "pirate_raider"
+          ]
+        },
+        {
+          "at": 0.35,
+          "say": "The Tallyman stops counting and opens up.",
+          "enrage": 1.3
+        }
+      ],
+      "loot": [
+        {
+          "item": "targeting_chip",
+          "chance": 1,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.6,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "titanium_plate",
+          "chance": 0.3,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "boss_hollow_crown": {
+      "name": "Hollow Crown",
+      "title": "Pirate Fortress of the Reaches",
+      "faction": "pirates",
+      "system": "sol",
+      "lair": {
+        "x": -30000,
+        "y": 168000
+      },
+      "level": 6,
+      "hp": 1.75,
+      "damage": 0.81,
+      "xp": 1100,
+      "credits": 900,
+      "respawnSeconds": 600,
+      "fixed": true,
+      "plating": 1,
+      "behaviour": {
+        "strafe": 0,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 1600,
+        "leash": 1000,
+        "accuracy": 0.6
+      },
+      "intro": "A ring of guns round a hollow of stolen cargo bays: the Hollow Crown, where every pirate on the rim sells what they take.",
+      "phases": [
+        {
+          "at": 0.75,
+          "say": "The Hollow Crown launches its raiders.",
+          "escorts": [
+            "pirate_raider",
+            "pirate_raider",
+            "pirate_skiff"
+          ]
+        },
+        {
+          "at": 0.5,
+          "say": "The Crown's guns turn as one.",
+          "nova": {
+            "every": 600,
+            "kind": "cannon",
+            "count": 16,
+            "warnTicks": 75
+          }
+        },
+        {
+          "at": 0.3,
+          "say": "The Hollow Crown calls in a gunship.",
+          "escorts": [
+            "pirate_gunship"
+          ]
+        },
+        {
+          "at": 0.15,
+          "say": "The pirates patch the Crown under fire.",
+          "heal": 0.08
+        }
+      ],
+      "loot": [
+        {
+          "item": "targeting_chip",
+          "chance": 1,
+          "min": 2,
+          "max": 3
+        },
+        {
+          "item": "servo_motor",
+          "chance": 1,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "titanium_plate",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "shield_emitter",
+          "chance": 0.15,
+          "min": 1,
+          "max": 1
+        }
+      ]
+    },
+    "boss_giant_midden": {
+      "name": "The Midden",
+      "title": "Wandering Scrap Heap",
+      "faction": "scrapborn",
+      "system": "sol",
+      "lair": {
+        "x": -105000,
+        "y": -70000
+      },
+      "level": 4,
+      "hp": 0.375,
+      "damage": 0.099,
+      "xp": 900,
+      "credits": 800,
+      "respawnSeconds": 900,
+      "speed": 2.5,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 2800,
+        "range": 1000,
+        "leash": 9000,
+        "accuracy": 0.6
+      },
+      "intro": "A heap of salvage the size of a station, welded together and driven by Scrapborn cores. It drifts through middle Sol. Heavily built, lightly armed.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "The Midden launches its drones.",
+          "escorts": [
+            "scrap_mite",
+            "scrap_mite",
+            "scrap_spitter"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "alloy_plate",
+          "chance": 1,
+          "min": 10,
+          "max": 20
+        },
+        {
+          "item": "scrap_electronics",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "steel_plate",
+          "chance": 0.8,
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.7,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.7,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "repair_kit",
+          "chance": 0.6,
+          "min": 1,
+          "max": 3
+        }
+      ],
+      "design": "giant_midden",
+      "roam": {
+        "radius": 25000,
+        "everySeconds": 120
+      }
+    },
+    "boss_giant_mammoth": {
+      "name": "Redtooth Mammoth",
+      "title": "Redtooth Warcamp Hauler",
+      "faction": "redtooth",
+      "system": "ashfall",
+      "lair": {
+        "x": -20000,
+        "y": -60000
+      },
+      "level": 4,
+      "hp": 0.5,
+      "damage": 0.09,
+      "xp": 1000,
+      "credits": 900,
+      "respawnSeconds": 900,
+      "speed": 2.15,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 1000,
+        "leash": 10000,
+        "accuracy": 0.7
+      },
+      "intro": "An ore hauler the Redtooth have plated over and armed. It carries a warcamp's worth of raiders between Ashfall's claims.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "Redtooth cutters launch from the Mammoth's bays.",
+          "escorts": [
+            "redtooth_cutter",
+            "redtooth_cutter",
+            "redtooth_brawler"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "alloy_plate",
+          "chance": 1,
+          "min": 10,
+          "max": 20
+        },
+        {
+          "item": "steel_plate",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "scrap_electronics",
+          "chance": 1,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "targeting_chip",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "field_repair_kit",
+          "chance": 0.4,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "design": "giant_mammoth",
+      "roam": {
+        "radius": 25000,
+        "everySeconds": 120
+      }
+    },
+    "boss_giant_dredge": {
+      "name": "The Great Dredge",
+      "title": "Scavenger Strip-miner",
+      "faction": "scavengers",
+      "system": "glasswater",
+      "lair": {
+        "x": -35000,
+        "y": -35000
+      },
+      "level": 5,
+      "hp": 0.75,
+      "damage": 0.153,
+      "xp": 1400,
+      "credits": 1300,
+      "respawnSeconds": 900,
+      "speed": 1.6,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 1000,
+        "leash": 9000,
+        "accuracy": 0.8
+      },
+      "intro": "A scavenger strip-miner built from a dozen salvaged hulls. It works its way through the Glasswater crystal field.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "The Great Dredge releases its drones.",
+          "escorts": [
+            "scav_drone",
+            "scav_drone",
+            "scav_harvester"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "crystal",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "crystal_lens",
+          "chance": 0.8,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "composite_sheet",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "scrap_electronics",
+          "chance": 1,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.7,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "scanner_charge",
+          "chance": 0.6,
+          "min": 2,
+          "max": 4
+        }
+      ],
+      "design": "giant_dredge",
+      "roam": {
+        "radius": 18000,
+        "everySeconds": 120
+      }
+    },
+    "boss_giant_rimeback": {
+      "name": "Rimeback",
+      "title": "Frost Brood Colony",
+      "faction": "frost",
+      "system": "borealis",
+      "lair": {
+        "x": 55000,
+        "y": 15000
+      },
+      "level": 8,
+      "hp": 0.688,
+      "damage": 0.432,
+      "xp": 2400,
+      "credits": 2200,
+      "respawnSeconds": 900,
+      "speed": 2.5,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 3000,
+        "range": 1000,
+        "leash": 9000,
+        "accuracy": 0.85
+      },
+      "intro": "A Frost Brood colony grown into a single mass of ice and shell. It drifts slowly through outer Borealis.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "Frost Brood break away from Rimeback.",
+          "escorts": [
+            "frost_shard",
+            "frost_shard",
+            "frost_warden"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "frost_gland",
+          "chance": 1,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "aurora_rime",
+          "chance": 1,
+          "min": 8,
+          "max": 16
+        },
+        {
+          "item": "hydrazine_slush",
+          "chance": 0.8,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "coolant",
+          "chance": 0.8,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "shield_emitter",
+          "chance": 0.4,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "field_repair_kit",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "design": "giant_rimeback",
+      "roam": {
+        "radius": 20000,
+        "everySeconds": 120
+      }
+    },
+    "boss_giant_ironmonger": {
+      "name": "The Ironmonger",
+      "title": "Pirate Supply Barge",
+      "faction": "pirates",
+      "system": "nebula_prime",
+      "lair": {
+        "x": 45000,
+        "y": -20000
+      },
+      "level": 10,
+      "hp": 1.063,
+      "damage": 0.18,
+      "xp": 3000,
+      "credits": 3200,
+      "respawnSeconds": 900,
+      "speed": 1.8,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 3200,
+        "range": 1100,
+        "leash": 10000,
+        "accuracy": 0.85
+      },
+      "intro": "A pirate supply barge, built up over years into a floating yard. It resupplies Rustjaw's raiders across Nebula Prime.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "Raiders launch from the Ironmonger's bays.",
+          "escorts": [
+            "pirate_raider",
+            "pirate_raider",
+            "pirate_gunship"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "steel_plate",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "polymer_precursor",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "targeting_chip",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "railgun_slugs",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "insurance_bond",
+          "chance": 0.3,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "design": "giant_ironmonger",
+      "roam": {
+        "radius": 25000,
+        "everySeconds": 120
+      }
+    },
+    "boss_giant_pilgrim": {
+      "name": "The Ash Pilgrim",
+      "title": "Cinder Cult Barge",
+      "faction": "cinder",
+      "system": "cinder_reach",
+      "lair": {
+        "x": -20000,
+        "y": -50000
+      },
+      "level": 17,
+      "hp": 1.375,
+      "damage": 0.18,
+      "xp": 5000,
+      "credits": 5500,
+      "respawnSeconds": 900,
+      "speed": 2.15,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 3200,
+        "range": 900,
+        "leash": 10000,
+        "accuracy": 0.87
+      },
+      "intro": "A Cinder Cult barge that circles the red giant on a fixed route. It carries the Cult's zealots between their shrines.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "Zealots pour out of the Ash Pilgrim.",
+          "escorts": [
+            "cinder_zealot",
+            "cinder_zealot",
+            "cinder_brand"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "titanium_plate",
+          "chance": 1,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "cinder_ash",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "ceramic_plate",
+          "chance": 0.8,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "chromite",
+          "chance": 0.8,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.8,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "field_repair_kit",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "design": "giant_pilgrim",
+      "roam": {
+        "radius": 25000,
+        "everySeconds": 120
+      }
+    },
+    "boss_giant_shroud": {
+      "name": "The Shroudhulk",
+      "title": "Wraith-crewed Wreck",
+      "faction": "wraiths",
+      "system": "void_sector",
+      "lair": {
+        "x": 25000,
+        "y": 20000
+      },
+      "level": 22,
+      "hp": 1.375,
+      "damage": 0.234,
+      "xp": 7000,
+      "credits": 8000,
+      "respawnSeconds": 900,
+      "speed": 2.5,
+      "behaviour": {
+        "strafe": 0.1,
+        "flee": 0,
+        "aggro": 3600,
+        "range": 1100,
+        "leash": 10000,
+        "accuracy": 0.9
+      },
+      "intro": "A wreck of unknown origin, crewed by wraiths. It drifts through the Void Sector under its own power.",
+      "phases": [
+        {
+          "at": 0.5,
+          "say": "Wraiths gather around the Shroudhulk.",
+          "escorts": [
+            "void_phantom",
+            "void_phantom",
+            "void_reaver"
+          ]
+        }
+      ],
+      "loot": [
+        {
+          "item": "neutronium_plate",
+          "chance": 0.8,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "void_ichor",
+          "chance": 1,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "platinoid_ore",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "singularity_dust",
+          "chance": 0.6,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "nav_computer",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "nanite_repair_kit",
+          "chance": 0.4,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "design": "giant_shroud",
+      "roam": {
+        "radius": 12000,
+        "everySeconds": 120
+      }
+    },
+    "boss_pyreclast": {
+      "name": "The Pyreclast",
+      "title": "Molten Engine of Ashfall",
+      "faction": "cinder",
+      "system": "ashfall_cavern",
+      "lair": {
+        "x": 0,
+        "y": -14000
+      },
+      "level": 30,
+      "hp": 0.335,
+      "damage": 0.7,
+      "xp": 12000,
+      "credits": 15000,
+      "respawnSeconds": 900,
+      "design": "pyreclast",
+      "asDesigned": true,
+      "speed": 2.5,
+      "turn": 1,
+      "brain": "pyreclast",
+      "stageHp": [17500, 23500, 18000],
+      "_exposed": "Where its window shows (client BossFx): by stage, the pieces laid open",
+      "exposed": [["pyreclast_wing_vein_l", "pyreclast_wing_vein_r", "pyreclast_scythe_gun_l", "pyreclast_scythe_gun_r"], ["pyreclast_vent_l", "pyreclast_vent_r", "pyreclast_lance"], ["pyreclast_s3_core", "pyreclast_s3_mineral"]],
+      "limbs": {
+        "scythe_gun": 900, "wing_flak": 900, "bay": 800, "scythe_root": 950,
+        "horn_gun": 800, "mortar": 950, "coil": 950, "lance": 1500, "vent": 900, "spine": 1100,
+        "s3_mineral": 2200, "s3_vent_housing": 1400, "s3_aft_vent": 1400
+      },
+      "codex": ["pyreclast_scan", "pyreclast_tactics"],
+      "hints": {
+        "glancing": "Glancing hit: this plating needs more penetration",
+        "burning": "Burning: heat plating would help"
+      },
+      "behaviour": {
+        "strafe": 0.6,
+        "flee": 0,
+        "aggro": 4500,
+        "range": 2100,
+        "leash": 9000,
+        "accuracy": 0.93
+      },
+      "intro": "A shape the size of a station heaves itself up out of the lava.",
+      "phases": [
+        {
+          "at": 0.667,
+          "say": "Its wings tear away."
+        },
+        {
+          "at": 0.334,
+          "say": "Its body falls away from its heart."
+        },
+        {
+          "at": 0.15,
+          "say": "It's coming apart."
+        }
+      ],
+      "loot": [
+        {
+          "item": "ruby",
+          "chance": 1,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "cinder_ember",
+          "chance": 0.06,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "titanium_plate",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_brood_mother": {
+      "_placeholder": "Look prototype: her fight is not built yet. \"Brood Mother\" is only what pilots call it (Kieran: an old, unexplained thing; lore later), so the text attributes the name and says nothing of what it is. No legendary drop for now (undecided: docs/bosses/brood-mother.md section 9)",
+      "name": "Brood Mother",
+      "title": "Pale Giant of the Aurora",
+      "faction": "frost",
+      "system": "borealis",
+      "lair": {
+        "x": 56000,
+        "y": 54000
+      },
+      "level": 8,
+      "hp": 0.14,
+      "damage": 1,
+      "xp": 2400,
+      "credits": 2400,
+      "respawnSeconds": 600,
+      "speed": 2.5,
+      "turn": 7,
+      "design": "brood_mother",
+      "asDesigned": true,
+      "brain": "brood_mother",
+      "behaviour": {
+        "strafe": 0.3,
+        "flee": 0,
+        "aggro": 3600,
+        "range": 1800,
+        "leash": 8000,
+        "accuracy": 0.85
+      },
+      "intro": "Something vast and pale unfolds out of the aurora, past the belt: broad fins, arms trailing behind, a violet light glowing in them. Pilots call it the Brood Mother.",
+      "phases": [
+        {
+          "at": 0.667,
+          "say": "Its fins tear away."
+        },
+        {
+          "at": 0.334,
+          "say": "Its shell falls away. A long violet light burns inside."
+        },
+        {
+          "at": 0.15,
+          "say": "It is coming apart, and faster for it.",
+          "enrage": 1.3
+        }
+      ],
+      "loot": [
+        {
+          "item": "frost_gland",
+          "chance": 1,
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "aurora_rime",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "ice",
+          "chance": 1,
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "sapphire",
+          "chance": 0.4,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    }
+  }
+}

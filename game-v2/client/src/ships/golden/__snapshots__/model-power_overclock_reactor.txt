@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Overclock Reactor
+Mk III · Medium · Panel · 2 cells
+Hull · mass90 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power out+124/s
+
+== partStats (stats rows) ==
+GradeMk III · Medium
+Power out+124
+Hull · mass90 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 90
+
+== familyLabel ==
+Generators
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+most power, fragile, biggest blast
+
+== keyStats ==
++124 power
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 24","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":89.60000000000001,"mass":2,"firepower":0,"toughness":89.60000000000001,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"supply":124}

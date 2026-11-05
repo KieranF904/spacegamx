@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Blackout
+Mk IV · Large · Block · 4 cells
+Hull · mass367 hp · 4.8
+Armour · build4 · 15.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage1/s · reach 3,300
+Hits withEnergy · penetration 4
+Chargehold 1.5s: it fires itself, then 4.0s to cool · let go early and nothing fires · 90 energy a charge
+Modelcharge: Hold to charge; it fires itself at full charge, then cools down. Let go early and nothing fires.
+MountTurret, 120°
+FittingBolts on from behind only
+Power draw15/s
+
+== partStats (stats rows) ==
+GradeMk IV · Large
+Hits withEnergy · penetration 4
+Power draw15
+Hull · mass367 hp · 4.8
+Armour · build4 · 15.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 367
+
+== familyLabel ==
+EMP
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+charged area blackout, 2.8 s
+
+== keyStats ==
+1 dmg/s · reach 3,300 · charge 1.5s · draws 15
+
+== mountBadge ==
+TURRET 120°
+
+== mountingText ==
+Turret, 120°
+Bolts on from behind only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 35","why":"Learned at level 35 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 35","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":366.79999999999995,"mass":4.8,"firepower":0.5454545454545454,"toughness":366.79999999999995,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":0.5454545454545454,"range":3300,"damageType":"energy","pen":4,"draw":14.92}

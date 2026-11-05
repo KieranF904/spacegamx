@@ -1,0 +1,46 @@
+== partTip (tooltip) ==
+Vernier
+Mk I · Small · Wedge · 0.5 cells
+Hull · mass26 hp · 0.5
+Armour · build1 · 0.5 pts
+Thrust0.6 · no boost
+Power draw2/s
+Rated speed2,400 m/s (its push fades out near it)
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Power draw2
+Thrust0.6 · boost ×1, drain ×0
+Hull · mass26 hp · 0.5
+Armour · build1 · 0.5 pts
+Rating scoretoughness 26
+
+== familyLabel ==
+Ion drives
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Wedge
+
+== tradeOff ==
+cheap corner push, no boost
+
+== keyStats ==
+thrust 0.6 · top 2,400 m/s · draws 2
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 2","why":"Learned at level 2 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 2","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":0.5,"hp":26.25,"mass":0.5,"firepower":0,"toughness":26.25,"armour":1,"draw":2,"thrust":0.6,"boost":1,"boostDrain":0}

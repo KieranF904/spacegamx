@@ -1,0 +1,40 @@
+{
+ "id": "hookboat",
+ "name": "Hookboat",
+ "faction": "pirates",
+ "sky": "nebula_prime",
+ "replaces": "pirate_raider",
+ "role": "puller",
+ "level": "8-12",
+ "threat": "medium",
+ "parts": 11,
+ "groups": {
+  "core": [
+   "core",
+   "hull",
+   "wheelhouse"
+  ],
+  "outrigger": [
+   "strut_f",
+   "strut_a",
+   "pontoon",
+   "gun"
+  ],
+  "harpoon": [
+   "winch",
+   "harpoon"
+  ],
+  "drive_l": [
+   "drive_l"
+  ],
+  "drive_r": [
+   "drive_r"
+  ]
+ },
+ "damaged": [
+  "harpoon",
+  "outrigger"
+ ],
+ "radiusCells": 5.76,
+ "radius": 138
+}

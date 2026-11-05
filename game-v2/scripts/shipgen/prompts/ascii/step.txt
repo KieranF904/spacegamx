@@ -1,0 +1,27 @@
+You are working on a top-down spaceship silhouette drawn on a grid of square cells.
+Only the RIGHT half is shown; it is mirrored to make the left half. Column 0 is the centre line. The nose points UP (row 0).
+
+KEY
+. = empty
+{{key}}
+
+CURRENT GRID
+{{grid}}
+
+TASK
+{{instruction}}
+
+WHAT YOU MAY DO IN THIS STEP
+{{may}}
+
+WHAT YOU MAY NOT DO IN THIS STEP
+{{may_not}}
+
+RULES
+- Every part must touch another part (left, right, above or below; diagonal does not count).
+- Something must be in column 0 (the centre line), so the two halves join.
+- Stay on the grid: columns 0 to {{last_col}}, rows 0 to {{last_row}}.
+
+OUTPUT
+The full grid in the same format (every row, row numbers, a space between cells), then one key line per letter you used, like: A = Hull
+No other text.

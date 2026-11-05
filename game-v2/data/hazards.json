@@ -1,0 +1,73 @@
+{
+  "_comment": "System hazards (common/src/ships/hazards.ts). Each system rates its hazards 0-5 (systems.json hazardRatings); places within a system can add to them (nearStar, nearBlackHole: within `radii` × the central body's radius, a rating is at least this). A ship's tolerance comes from what it's built of: its materials' hazard ratings by share of its cells (materials.json hazards), plus the bulk rules below. Rating minus tolerance (floored at 0) is the deficit; effects are per point of deficit. Cold (cryo) is the exception: it has no tolerance, it builds up on a ship over time instead (warmth, below; common/src/ships/warmth.ts).",
+  "nearStar": {
+    "margin": 1500,
+    "ratings": {
+      "thermal": 3
+    }
+  },
+  "nearBlackHole": {
+    "margin": 2500,
+    "ratings": {
+      "gravitational": 3
+    }
+  },
+  "tolerance": {
+    "gravitational": {
+      "massFloor": 20,
+      "massPerPoint": 25,
+      "_comment": "a point per massPerPoint of mass over massFloor; mass in mass-anchor material counts double"
+    },
+    "thermal": {
+      "massOver": 100,
+      "points": 1,
+      "_comment": "bulk soaks heat: a point for mass over massOver"
+    },
+    "electromagnetic": {
+      "conductiveConduits": 3,
+      "_comment": "grounded: the share of conduits in a conductive material × this"
+    }
+  },
+  "effects": {
+    "radiation": {
+      "summary": "Hull cells lose 0.4% HP a minute and battery capacity drops 8%, per point",
+      "hullWearPerMin": 0.004,
+      "batteryCap": -0.08
+    },
+    "thermal": {
+      "summary": "Shield regen drops 15%, per point",
+      "shieldRegen": -0.15
+    },
+    "cryo": {
+      "summary": "Cold builds up on your ship away from heat. Below half warmth your guns recycle slower, below a quarter thrust and steering drop too, and frozen through the ship seizes up. Stars, stations and fires warm you back up; insulating materials only slow the cold"
+    },
+    "corrosive": {
+      "summary": "Armour cells lose 0.3% HP a minute and station repairs cost 25% more, per point",
+      "armourWearPerMin": 0.003,
+      "repairCost": 0.25
+    },
+    "gravitational": {
+      "summary": "Light ships are pulled towards the well and lose 10% of their steering and thrust per point; jump range −15% a point",
+      "control": -0.1,
+      "jumpRange": -0.15,
+      "driftAccel": 0.0035
+    },
+    "electromagnetic": {
+      "summary": "A 2-second EMP every 40 s while short",
+      "empEverySeconds": 40,
+      "empSeconds": 2
+    }
+  },
+  "warmth": {
+    "_comment": "Cold builds up on a ship in a cold place (common/src/ships/warmth.ts; server/src/game/Warmth.ts). Warmth runs 1 (warm) to 0 (frozen through). coldPerPoint: lost a second per point of cryo rating (rating 3: about 5 minutes from warm to frozen), × (1 - the hull's insulation, materials.json). ambient: regained a second where it isn't cold. Heat sources: regained a second near one (the best counts, and it beats the cold). seizeTicks: frozen through, how long the ship seizes up (it comes out with a little warmth back). What each stage costs is in warmth.ts WARMTH_STAGES.",
+    "coldPerPoint": 0.0011,
+    "ambient": 0.05,
+    "seizeTicks": 120,
+    "sources": {
+      "star": { "margin": 9000, "rate": 0.02 },
+      "station": { "margin": 1500, "rate": 0.04, "docked": 0.1 },
+      "burning": { "radius": 700, "rate": 0.025 },
+      "planet": { "kinds": ["lava"], "margin": 2500, "rate": 0.03 }
+    }
+  }
+}

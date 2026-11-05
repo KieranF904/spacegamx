@@ -1,0 +1,10 @@
+[Unit]
+Description=Space Game v2: nightly Postgres dump
+
+[Timer]
+OnCalendar=*-*-* 04:20:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

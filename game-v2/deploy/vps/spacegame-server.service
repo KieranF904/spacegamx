@@ -1,0 +1,39 @@
+[Unit]
+Description=Space Game v2 game server
+After=network.target spacegame-browser.service
+
+[Service]
+Type=simple
+User=spacegame
+Group=spacegame
+WorkingDirectory=/opt/spacegame/server
+ExecStart=/usr/bin/node dist/index.js
+Environment=NODE_ENV=production
+# Only reachable through nginx: it listens on this machine alone (and ufw blocks everything but 22/80/443)
+Environment=HOST=127.0.0.1
+Environment=PORT=3100
+Environment=ADMIN_PORT=3105
+Environment=BROWSER_URL=http://127.0.0.1:8790
+# LOBBY_ADMIN_SECRET (shared with the lobby: admin ranks and bans) and ADMIN_SERVER_PASSWORD (the admin dashboard's); remote-install.sh makes them
+EnvironmentFile=-/etc/spacegame/secrets.env
+Environment=PUBLIC_HOST=space.brotherk3d.com
+Environment="SERVER_NAME=AUS Main"
+Environment=SERVER_REGION=au
+Restart=always
+RestartSec=3
+# Its share of a 2 vCPU / 4 GB box it shares with other sites: the most of anything here (it runs the world's tick),
+# throttled past MemoryHigh and stopped (then restarted) only past MemoryMax
+CPUWeight=200
+MemoryHigh=1536M
+MemoryMax=2G
+# Files it makes: not readable by other users (data/status gets an ACL for the monitor: remote-install.sh)
+UMask=0027
+# Keep it to its own folder
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/spacegame/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

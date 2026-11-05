@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Twinlink
+Mk II · Medium · Panel · 2 cells
+Hull · mass150 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage62/s · reach 7,200
+Hits withKinetic · penetration 2
+Clip16 rounds at 10/s · reloads in 1.5s from energy (24 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
+MountTurret, 180°
+FittingBolts on any side
+Power draw8/s
+
+== partStats (stats rows) ==
+GradeMk II · Medium
+Hits withKinetic · penetration 2
+Power draw8
+Hull · mass150 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 150
+
+== familyLabel ==
+Cannons
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+the only cannon turret: 16 rounds, then a short reload
+
+== keyStats ==
+62 dmg/s · reach 7,200 · clip 16 · 1.5s reload · draws 8
+
+== mountBadge ==
+TURRET 180°
+
+== mountingText ==
+Turret, 180°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":61.935483860645164,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":61.935483860645164,"range":7200,"damageType":"kinetic","pen":2,"draw":7.74}

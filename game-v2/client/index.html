@@ -1,4 +1,4 @@
-push this <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -81,6 +81,16 @@ push this <!DOCTYPE html>
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
     }
 
+    /* XP coming in: the bar glows; a new level: it flares gold and the level number pops */
+    #xpBar.gain { animation: xpGain 0.6s ease-out; }
+    #xpBar.lvl { animation: xpLvl 1.4s ease-out; }
+    #xpLevel.lvl { animation: lvlPop 0.9s cubic-bezier(0.2, 1.6, 0.4, 1); color: #ffd166; }
+    @keyframes xpGain { 0% { box-shadow: 0 0 18px rgba(120, 200, 255, 0.95); border-color: #d8f0ff; } }
+    @keyframes xpLvl { 0%, 30% { box-shadow: 0 0 30px rgba(255, 209, 102, 1); border-color: #ffd166; } }
+    @keyframes lvlPop { 0% { transform: scale(1); } 30% { transform: scale(1.45); } 100% { transform: scale(1); } }
+    #xpLevel { display: inline-block; transition: color 1s; }
+    @media (prefers-reduced-motion: reduce) { #xpBar.gain, #xpBar.lvl, #xpLevel.lvl { animation: none; } }
+
     #xpFill {
       position: absolute;
       left: 0;
@@ -112,92 +122,6 @@ push this <!DOCTYPE html>
       color: rgba(255, 255, 255, 0.8);
       margin-left: 8px;
       min-width: 50px;
-    }
-
-    /* ============================================
-       HP HUD - Above XP Bar
-       ============================================ */
-    #hpHud {
-      position: absolute;
-      left: 50%;
-      bottom: 58px;
-      transform: translateX(-50%);
-      display: none;
-      align-items: center;
-      gap: 10px;
-      z-index: 25;
-      pointer-events: none;
-    }
-
-    #hpLabel {
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255, 80, 80, 0.95);
-    }
-
-    #hpBar {
-      position: relative;
-      width: 200px;
-      height: 10px;
-      border-radius: 999px;
-      border: 2px solid rgba(255, 100, 100, 0.9);
-      background: rgba(255, 100, 100, 0.1);
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(255, 80, 80, 0.25);
-    }
-
-    #hpFill {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 100%;
-      background: rgba(255, 80, 80, 0.9);
-      transition: width 0.15s ease-out;
-    }
-
-    #hpNumber {
-      font-size: 11px;
-      color: rgba(255, 150, 150, 0.9);
-      min-width: 45px;
-    }
-
-    /* ============================================
-       Weapon HUD - Between HP and XP
-       ============================================ */
-    #weaponHud {
-      position: absolute;
-      left: 50%;
-      bottom: 42px;
-      transform: translateX(-50%);
-      display: none;
-      align-items: center;
-      gap: 8px;
-      z-index: 26;
-      pointer-events: none;
-      width: 260px;
-    }
-
-    .weapon-bar {
-      position: relative;
-      flex: 1;
-      height: 10px;
-      border-radius: 999px;
-      border: 2px solid rgba(255, 255, 255, 0.85);
-      background: rgba(255, 255, 255, 0.08);
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-    }
-
-    .weapon-fill {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 0%;
-      background: rgba(120, 200, 255, 0.9);
-      transition: width 0.08s ease-out;
     }
 
     /* Inventory/Equipment panels are styled by InventoryUI.ts */
@@ -276,21 +200,6 @@ push this <!DOCTYPE html>
     /* ============================================
        Minimap - Bottom Right
        ============================================ */
-    #minimapContainer {
-      position: absolute;
-      bottom: 140px;
-      right: 16px;
-      z-index: 20;
-    }
-
-    #minimap-canvas {
-      width: 160px;
-      height: 160px;
-      border-radius: 10px;
-      border: 1px solid rgba(120, 160, 220, 0.3);
-      background: rgba(6, 10, 24, 0.7);
-    }
-
     /* ============================================
        Loading & Debug
        ============================================ */
@@ -304,49 +213,7 @@ push this <!DOCTYPE html>
       text-shadow: 0 0 20px rgba(100, 150, 255, 0.6);
     }
 
-    #debug {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      font-size: 11px;
-      color: rgba(150, 170, 200, 0.7);
-      text-shadow: 1px 1px 2px #000;
-      text-align: right;
-      display: none;
-    }
-
-    /* ============================================
-       Ping Display - Top Center
-       ============================================ */
-    #pingDisplay {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      display: none;
-      flex-direction: column;
-      align-items: flex-end;
-      z-index: 30;
-      pointer-events: none;
-    }
-
-    #pingText {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      color: rgba(200, 220, 255, 0.92);
-      text-shadow: 0 0 8px rgba(100, 150, 255, 0.4);
-      margin-bottom: 6px;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    #pingGraphCanvas {
-      width: 360px;
-      height: 120px;
-      border-radius: 8px;
-      border: 1px solid rgba(120, 160, 220, 0.25);
-      background: rgba(6, 10, 24, 0.7);
-    }
+    /* The performance monitor builds its own panel (ui/PerfMonitor.ts) */
 
     /* ============================================
        Quest Tracker - Top Right
@@ -385,13 +252,69 @@ push this <!DOCTYPE html>
       pointer-events: auto;
     }
 
+    #chatTabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 6px;
+    }
+
+    #chatTabs button {
+      padding: 3px 10px;
+      background: rgba(6, 10, 24, 0.55);
+      border: 1px solid rgba(120, 160, 220, 0.25);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      color: rgba(220, 230, 255, 0.6);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    #chatTabs button:hover {
+      color: rgba(220, 230, 255, 0.9);
+    }
+
+    #chatTabs #chatHideBtn {
+      margin-left: auto;
+    }
+
+    /* Hidden chat: only this stays, and it's invisible until the mouse is over it (so videos don't show it) */
+    #chatShowBtn {
+      position: absolute;
+      left: 6px;
+      bottom: 0;
+      padding: 3px 10px;
+      background: rgba(6, 10, 24, 0.7);
+      border: 1px solid rgba(120, 160, 220, 0.25);
+      border-radius: 6px;
+      color: rgba(220, 230, 255, 0.8);
+      font-size: 11px;
+      cursor: pointer;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    #chatBox.chat-hidden #chatShowBtn {
+      visibility: visible;
+    }
+
+    #chatBox.chat-hidden #chatShowBtn:hover,
+    #chatBox.chat-hidden #chatShowBtn:focus-visible {
+      opacity: 1;
+    }
+
+    #chatTabs button.active {
+      background: rgba(6, 10, 24, 0.7);
+      color: rgba(120, 200, 255, 0.95);
+    }
+
     #chatMessages {
       max-height: 180px;
       overflow-y: auto;
       padding: 10px;
       background: rgba(6, 10, 24, 0.7);
       border: 1px solid rgba(120, 160, 220, 0.25);
-      border-radius: 10px 10px 0 0;
+      border-radius: 6px 10px 0 0;
       font-size: 12px;
       line-height: 1.5;
       scrollbar-width: thin;
@@ -482,25 +405,6 @@ push this <!DOCTYPE html>
         <div id="creditsDisplay">💰 <span id="credits">0</span></div>
       </div>
 
-      <!-- HP Bar -->
-      <div id="hpHud">
-        <span id="hpLabel">HP</span>
-        <div id="hpBar">
-          <div id="hpFill"></div>
-        </div>
-        <span id="hpNumber">100/100</span>
-      </div>
-
-      <!-- Weapon Cooldown Bars -->
-      <div id="weaponHud">
-        <div class="weapon-bar">
-          <div class="weapon-fill" id="weaponLeftFill"></div>
-        </div>
-        <div class="weapon-bar">
-          <div class="weapon-fill" id="weaponRightFill"></div>
-        </div>
-      </div>
-
       <!-- XP Bar -->
       <div id="xpHud">
         <span id="xpLevel">LVL <span id="level">1</span></span>
@@ -528,25 +432,7 @@ push this <!DOCTYPE html>
         <div id="boostBar">
           <div id="boostFill"></div>
         </div>
-        <span id="boostLabel">BOOST</span>
-      </div>
-
-      <!-- Minimap -->
-      <div id="minimapContainer">
-        <canvas id="minimap-canvas" width="160" height="160"></canvas>
-      </div>
-
-      <!-- Debug Info -->
-      <div id="debug">
-        FPS: <span id="fps">0</span><br>
-        Ping: <span id="ping">0</span>ms<br>
-        Entities: <span id="entity-count">0</span>
-      </div>
-
-      <!-- Ping Display - Top Center -->
-      <div id="pingDisplay">
-        <div id="pingText">PING: 0ms | JITTER: 0ms</div>
-        <canvas id="pingGraphCanvas" width="720" height="240"></canvas>
+        <span id="boostLabel">ENERGY</span>
       </div>
 
       <!-- Quest Tracker -->
@@ -557,6 +443,13 @@ push this <!DOCTYPE html>
 
       <!-- Chat Box -->
       <div id="chatBox" class="ui-element">
+        <div id="chatTabs">
+          <button type="button" data-tab="all" class="active">All</button>
+          <button type="button" data-tab="chat">Chat</button>
+          <button type="button" data-tab="game">Game</button>
+          <button type="button" id="chatHideBtn" title="Hide the chat (Settings > Chat box; Enter brings it back)">Hide</button>
+        </div>
+        <button type="button" id="chatShowBtn" title="Show the chat">Show chat</button>
         <div id="chatMessages"></div>
         <div id="chatInputContainer">
           <input type="text" id="chatInput" placeholder="Press Enter to chat..." maxlength="200" autocomplete="off">
