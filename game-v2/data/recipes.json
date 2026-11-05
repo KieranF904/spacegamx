@@ -200,12 +200,12 @@
       "id": "ceramic_plate",
       "inputs": {
         "silicate": 3,
-        "voidglass_pane": 1,
+        "titanium_plate": 1,
         "coolant": 1
       },
       "out": 2,
       "time": 15,
-      "level": 45
+      "level": 24
     },
     {
       "id": "sealed_composite_plate",

@@ -558,6 +558,7 @@
           "boost_cell",
           "scanner_charge",
           "alloy_plate",
+          "ceramic_plate",
           "part:alloy:utility_mining_laser:sq"
         ],
         "demand": {
