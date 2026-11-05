@@ -3,8 +3,9 @@
  * one) shows up as an unfed part or a wasted line.
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { join } from 'path';
-import { createShipState, portsLoadTest, portsView, PORTS_SCENARIOS, PS_LINKED, PS_WASTE, type Blueprint } from '@space-game/common';
+import { createShipState, parseBlueprint, portsLoadTest, portsView, PORTS_SCENARIOS, PS_LINKED, PS_WASTE, type Blueprint } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { loadRow, portTipHtml, portsReport, portsWarnings } from './portsReport';
@@ -45,7 +46,8 @@ describe('portsReport', () => {
 describe('the ports overlay and load test, in words', () => {
   const derive = (bp: Blueprint) => createShipState(catalog, tuning, 0, bp, 0).derived;
   const uidAt = (bp: Blueprint, uid: number) => bp.parts.findIndex((p) => p.uid === uid);
-  const starter = () => clone(cfg.library!['sparrow-t']);
+  // (The first ports starter, kept as a fixture: a reactor under each Pip. The library's starter now feeds its Pips from the core hub)
+  const starter = () => parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/fixtures/sparrow-t-reactors.json'), 'utf8'));
 
   it('two reactors giving into each other: a clash warning naming both', () => {
     const bp = starter();
