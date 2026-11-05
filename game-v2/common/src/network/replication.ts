@@ -252,6 +252,15 @@ export interface ReplicaCauses {
 }
 
 /**
+ * A client finding contact pairs on its tick layer itself (CAPS.CONTACTS: client ships/causes/ContactWorld.ts): what
+ * it worked out on a tick reads every ship of the pair there, so a ship stepped again from tick t (a rewind, a
+ * keyframe, a late control row, gone) may change what it found from t on
+ */
+export interface ReplicaRewinds {
+  rewound(id: number, t: number): void;
+}
+
+/**
  * Every replicated ship a client knows: keyframes and control changes from
  * snapshots go in, states at any tick come out (stepped with the shared
  * replicaStep, exactly as the server's shadow does). A control change that
@@ -361,12 +370,40 @@ export class ShipReplicaSet {
   /** Other ships' causes (CAPS.CAUSES), and each such ship's state after a tick's step and before that tick's causes */
   private causes: ReplicaCauses | null = null;
   private pres = new Map<number, Map<number, FlightBody>>();
-  /** The ship whose causes are being worked out now, and on which tick (its pre-cause state is the one to read) */
-  private busy = new Map<number, number>();
+  /**
+   * A tick's step worked out ahead of the ship being stepped to it (preAt: what the contact pass and bodies read of it
+   * there, before that tick's causes): the step then takes it as it is
+   */
+  private pend = new Map<number, Map<number, Step>>();
   setCauses(src: ReplicaCauses | null): void {
     this.causes = src;
     this.pres.clear();
     for (const id of this.reps.keys()) if (this.own?.id !== id) this.rewind(id, -Infinity);
+  }
+
+  /** Told whenever a ship is stepped again from a tick (CAPS.CONTACTS: ContactWorld) */
+  private hook: ReplicaRewinds | null = null;
+  setRewinds(h: ReplicaRewinds | null): void {
+    this.hook = h;
+  }
+
+  /** A ship's stepped states from tick t on are gone: what was worked out ahead of them goes too */
+  private dropped(id: number, t: number): void {
+    const pm = this.pend.get(id);
+    if (pm) for (const k of pm.keys()) if (k >= t) pm.delete(k);
+    const pr = this.pres.get(id);
+    if (pr) for (const k of pr.keys()) if (k >= t) pr.delete(k);
+    this.hook?.rewound(id, t);
+  }
+
+  /** Its latest keyframe's tick (its path before it is the one it was drawn on; undefined: not held) */
+  kfOf(id: number): number | undefined {
+    return this.reps.get(id)?.kf;
+  }
+
+  /** The last tick it has been stepped to (undefined: not held) */
+  lastOf(id: number): number | undefined {
+    return this.reps.get(id)?.last;
   }
 
   /**
@@ -375,23 +412,47 @@ export class ShipReplicaSet {
    * other ship's is its state at t
    */
   preAt(id: number, t: number): FlightBody | null {
-    if (this.own?.id !== id) {
-      // (Other ships' causes, CAPS.CAUSES: its state before them; read while they're being worked out, the one kept then)
-      if (this.busy.get(id) === t) return this.pres.get(id)?.get(t) ?? null;
-      const st = this.at(id, t);
-      return (this.causes?.has(id, t) ? this.pres.get(id)?.get(t) : undefined) ?? st?.body ?? null;
-    }
     const r = this.reps.get(id);
     if (!r) return null;
-    if (r.last >= t) return this.ownPre.get(t) ?? this.at(id, t)?.body ?? null;
-    // (Not stepped to t yet, or being stepped to it now: t's step again, without its causes)
-    const prev = r.last === t - 1 ? r.hist.get(t - 1) : this.at(id, t - 1);
+    if (r.last >= t) {
+      // (Its own ship: kept as it was stepped. Any other: kept when it had causes then, else its state is it)
+      if (this.own?.id === id) return this.ownPre.get(t) ?? this.at(id, t)?.body ?? null;
+      return this.pres.get(id)?.get(t) ?? this.at(id, t)?.body ?? null;
+    }
+    // (Not stepped to t yet, or being stepped to it now: t's step, without its causes, worked out once: stepPre)
     const d = this.derived(id);
-    if (!prev || !d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift) return prev?.body ?? null;
-    const src = this.own.src, ev = src.ctl(t);
+    if (!d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift || t <= r.kf) return this.at(id, t)?.body ?? null;
+    const prev = r.last === t - 1 ? r.hist.get(t - 1) : this.at(id, t - 1);
+    if (!prev || r.last !== t - 1) return prev?.body ?? null;
+    return this.stepPre(id, r, t, prev, d).body;
+  }
+
+  /**
+   * Tick t's step of a ship from its state at t - 1, before that tick's causes: its controls (its own inputs, its
+   * body's, or its rows), the hold's mass it flies with, its structure then. Worked out once (pend) whoever asks first:
+   * the step itself (at) or something reading it there before (preAt: a body reading its target, the contact pass)
+   */
+  private stepPre(id: number, r: Rep, t: number, prev: Step, d: ShipDerived): Step {
+    let pm = this.pend.get(id);
+    const have = pm?.get(t);
+    if (have) return have;
+    const own = this.own?.id === id ? this.own.src : null;
+    const ev = own ? own.ctl(t) : r.events.get(t);
+    // (Flown by its body: its controls and push from that, CAPS.BODIES)
+    const by = this.drivers.get(id)?.step(t, prev.body, prev.q, prev.bits);
+    const bits = by ? by.bits : ev ? ev[0] : prev.bits, q = by ? by.q : ev ? ev[1] : prev.q;
     const body = cloneBody(prev.body);
-    replicaStep(r.mode, body, { bits: ev ? ev[0] : prev.bits, targetAngle: replicaAngle(r.mode, ev ? ev[1] : prev.q) }, src.derived(t) || d, this.tuning, this.env(), t);
-    return body;
+    if (by) { body.vx += by.ix; body.vy += by.iy; }
+    const cs = own ? null : this.causes;
+    // (The hold's mass it flies this step with, if that changed: a CARGO cause, CAPS.CARGO)
+    if (own) own.preStep?.(t, body);
+    else cs?.preStep?.(id, t, body);
+    replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own ? own.derived(t) : cs?.derived(id, t)) || d, this.tuning, this.env(), t);
+    const st: Step = { body, bits, q };
+    if (!pm) this.pend.set(id, (pm = new Map()));
+    pm.set(t, st);
+    if (pm.size > 64) for (const k of pm.keys()) if (k < t - HISTORY) pm.delete(k);
+    return st;
   }
 
   /**
@@ -403,12 +464,15 @@ export class ShipReplicaSet {
    */
   rewind(id: number, t: number): void {
     const r = this.reps.get(id);
-    if (!r || t > r.last) return;
+    if (!r) return;
+    // (Not stepped there yet: only what was worked out ahead of it, preAt, goes)
+    if (t > r.last) { this.dropped(id, t); return; }
     // (Debris steps as a world, from where it was rewound to: stepDebrisTo does its own)
     const from = r.mode === ReplicaMode.Drift ? t : Math.max(t, r.kf + 1);
     for (const h of [...r.hist.keys()]) if (h >= from && h !== r.kf) r.hist.delete(h);
     r.last = Math.max(...r.hist.keys(), -Infinity);
     rewrote(r, from);
+    this.dropped(id, from);
     // (Debris steps as a world (stepDebrisTo): left as it is, the world, already past t, never stepped it again: frozen)
     if (r.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, t - 1);
   }
@@ -433,13 +497,15 @@ export class ShipReplicaSet {
   }
 
   remove(id: number): void {
-    this.reps.delete(id);
+    if (this.reps.delete(id)) this.dropped(id, -Infinity);
     this.pres.delete(id);
+    this.pend.delete(id);
   }
 
   clear(): void {
-    this.reps.clear();
+    for (const id of [...this.reps.keys()]) this.remove(id);
     this.pres.clear();
+    this.pend.clear();
   }
 
   ids(): IterableIterator<number> {
@@ -448,6 +514,8 @@ export class ShipReplicaSet {
 
   /** A snapshot's keyframes and control changes */
   apply(tick: number, ships?: KeyframeRow[], ctl?: ControlRow[]): void {
+    // (Steps worked out ahead, preAt, read what came before this snapshot and its frame's structures: worked out afresh)
+    this.pend.clear();
     for (const row of ships ?? []) {
       const k = unpackKeyframe(row);
       let r = this.reps.get(k.id);
@@ -458,6 +526,7 @@ export class ShipReplicaSet {
       r.dock = k.dock;
       // The new path starts here; what came before stays (we may still be drawing it)
       for (const t of [...r.hist.keys()]) if (t >= tick) r.hist.delete(t);
+      this.dropped(k.id, tick);
       for (const t of [...r.events.keys()]) if (t <= tick) r.events.delete(t);
       r.hist.set(tick, { body: k.body, bits: k.ctl.bits, q: k.q });
       r.last = tick;
@@ -485,6 +554,8 @@ export class ShipReplicaSet {
           r.last = Math.max(...r.hist.keys(), -Infinity);
           rewrote(r, t);
         }
+        // (a step worked out ahead for it, preAt, read the old controls)
+        this.dropped(id, t);
       }
       if (!r.hist.size) this.reps.delete(id); // nothing to replay from: wait for a keyframe
     }
@@ -535,22 +606,13 @@ export class ShipReplicaSet {
       return { body, bits: cur.bits, q: cur.q };
     }
     if (!d || r.mode === ReplicaMode.Drift) return cur;
-    const env = this.env();
     // Don't run away: a ship we haven't heard about for a long time simply waits
     const to = Math.min(tick, r.last + 600);
     while (r.last < to) {
       const t = r.last + 1;
-      const ev = own ? own.ctl(t) : r.events.get(t);
-      // (Flown by its body: its controls and push from that, CAPS.BODIES)
-      const by = driver?.step(t, cur.body, cur.q, cur.bits);
-      const bits = by ? by.bits : ev ? ev[0] : cur.bits, q = by ? by.q : ev ? ev[1] : cur.q;
-      const body = cloneBody(cur.body);
-      if (by) { body.vx += by.ix; body.vy += by.iy; }
+      const pre = this.stepPre(id, r, t, cur, d);
+      const body = cloneBody(pre.body);
       const cs = own ? null : this.causes;
-      // (The hold's mass it flies this step with, if that changed: a CARGO cause, CAPS.CARGO)
-      if (own) own.preStep?.(t, body);
-      else if (cs?.has(id, t)) cs.preStep?.(id, t, body);
-      replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own ? own.derived(t) : cs?.derived(id, t)) || d, this.tuning, env, t);
       if (own) {
         this.ownPre.set(t, cloneBody(body));
         this.ownPre.delete(t - 64);
@@ -559,13 +621,14 @@ export class ShipReplicaSet {
         // (Its causes on this tick, CAPS.CAUSES: what it was before them is kept, for a contact another ship works out)
         let p = this.pres.get(id);
         if (!p) this.pres.set(id, (p = new Map()));
-        p.set(t, cloneBody(body));
+        p.set(t, pre.body);
         if (p.size > 64) for (const k of p.keys()) if (k < t - HISTORY) p.delete(k);
-        this.busy.set(id, t);
-        try { cs.after(id, t, body); } finally { this.busy.delete(id); }
-      }
+        cs.after(id, t, body);
+      } else this.pres.get(id)?.delete(t);
+      // (Asked of it ahead while its causes were worked out: done with now)
+      this.pend.get(id)?.delete(t);
       driver?.after?.(t, body);
-      cur = { body, bits, q };
+      cur = { body, bits: pre.bits, q: pre.q };
       r.hist.set(t, cur);
       r.last = t;
     }

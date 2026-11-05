@@ -82,7 +82,7 @@ export interface ShipHost {
   /** A part was destroyed (shot, rammed, blown up or crumbled away), for effects */
   notifyPartDestroyed?(e: PartDestroyedEvent): void;
   /** Two bodies hit each other hard enough to see and hear */
-  notifyContact?(e: { systemId: number; x: number; y: number; nx: number; ny: number; speed: number }): void;
+  notifyContact?(e: { systemId: number; x: number; y: number; nx: number; ny: number; speed: number; a: number; b: number; tick: number }): void;
   /** Whether a ship is close enough to a station to be repaired */
   nearRepairSite?(eid: number): boolean;
   /** Station repair is about to regrow a lost part: charge for it. False = can't pay (try again later). */
@@ -205,12 +205,10 @@ export { centroidOf, type ContactPiece } from '@space-game/common';
 export const EMP_IMMUNE_TICKS = 240;
 
 /**
- * Contact pairs are looked for this much beyond touching bounding circles:
- * more than all the pushes earlier pairs can give a body in one pass (each is
- * at most a piece's overlap, a few cells), so nothing that comes into contact
- * mid-pass is missed
+ * Contact pairs are looked for this much beyond touching bounding circles (common ships/contactPass.ts): more than
+ * all the pushes earlier pairs can give a body in one pass, so nothing that comes into contact mid-pass is missed
  */
-export const CONTACT_MARGIN = 256;
+export { CONTACT_MARGIN } from '@space-game/common';
 
 /** How far past a beam's width its broadphase looks: more than any ship moves in a tick (it's filed where it began the tick) */
 export const BEAM_PAD = 120;
@@ -229,7 +227,7 @@ export interface BridgeInternals {
   lastHitBy: ShipBridge['lastHitBy']; anchored: ShipBridge['anchored']; pinned: ShipBridge['pinned'];
   charge: ShipBridge['charge']; autopilot: ShipBridge['autopilot']; blasts: ShipBridge['blasts'];
   decayAt: ShipBridge['decayAt']; intangible: ShipBridge['intangible']; crumbled: ShipBridge['crumbled'];
-  lastDamaged: ShipBridge['lastDamaged']; restoreProgress: ShipBridge['restoreProgress']; contactFx: ShipBridge['contactFx'];
+  lastDamaged: ShipBridge['lastDamaged']; restoreProgress: ShipBridge['restoreProgress']; contactFx: ShipBridge['contactFx']; contactLog: ShipBridge['contactLog'];
   joinCache: ShipBridge['joinCache']; empUntil: ShipBridge['empUntil']; warmth: ShipBridge['warmth'];
   burns: ShipBridge['burns']; weaponBeams: ShipBridge['weaponBeams']; pulsing: ShipBridge['pulsing'];
   pulseHit: ShipBridge['pulseHit']; apHeading: ShipBridge['apHeading']; controllers: ShipBridge['controllers'];

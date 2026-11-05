@@ -33,7 +33,7 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: 4095 | CAPS.STRUCTS,
+    netCaps: 4095 | CAPS.STRUCTS | CAPS.CONTACTS,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
@@ -119,7 +119,8 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
     const chk = A.own?.takeCheck(true, server.getTick());
     if (chk) checks.check(server.pilots.connOf(A.pid), chk);
   }
-  return { a, b, checks: { ...checks.stats }, stats: (server.replication as unknown as { causeStats: { worked: number; rows: number; stateless: number; unworkable: number; failed: Record<string, number> } }).causeStats, client: A.causes?.stats };
+  const rep = server.replication as unknown as { causeStats: { worked: number; rows: number; stateless: number; unworkable: number; failed: Record<string, number> }; contactStats: Record<string, number> };
+  return { a, b, checks: { ...checks.stats }, stats: rep.causeStats, contacts: rep.contactStats, client: A.causes?.stats, own: A.own?.stats, world: A.contacts?.stats, fx: A.contactFx.length, fxMsgs: A.contactMsgs };
 }
 
 describe('other ships\' causes (CAPS.CAUSES)', () => {
@@ -171,6 +172,24 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(kept.stats.unworkable).toBe(0);
     expect(plain.stats.unworkable).toBeGreaterThan(5);
     expect(kept.a.keyframes).toBeLessThan(plain.a.keyframes);
+  }, 240_000);
+
+  it('finding contact pairs itself (CAPS.CONTACTS): the same ships exactly, with the pairs between ships it holds as no record', () => {
+    const told = fight(BASE, CAPS.CAUSES | CAPS.STRUCTS);
+    const found = fight(BASE, CAPS.CAUSES | CAPS.STRUCTS | CAPS.CONTACTS);
+    if (process.env.CONTACTS_DEBUG) console.log('CONTACTS', JSON.stringify({ told: { a: told.a, stats: told.stats }, found: { a: found.a, stats: found.stats, contacts: found.contacts, world: found.world, client: found.client, own: found.own, fx: found.fx, fxMsgs: found.fxMsgs } }));
+    expect(found.client?.failed).toBe(0);
+    expect(found.own?.failed ?? 0).toBe(0);
+    expect(found.checks.bodyOff).toBe(0);
+    expect(found.checks.agreed).toBeGreaterThan(10);
+    expect(found.a.checked).toBeGreaterThan(5000);
+    expect(found.a.offTicks).toBe(0);
+    // (the pairs it found: most of the fight's, none told, their sparks its own)
+    expect(found.contacts.found).toBeGreaterThan(50);
+    expect(found.world?.reentry).toBe(0);
+    expect(found.fx).toBeGreaterThan(0);
+    expect(found.a.records * 2).toBeLessThan(told.a.records);
+    expect(found.a.keyframes).toBeLessThanOrEqual(told.a.keyframes);
   }, 240_000);
 
   it('without the cap, the same client is keyframed as before', () => {

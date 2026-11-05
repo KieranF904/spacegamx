@@ -13,10 +13,10 @@ import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
   stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, ReplicaMode, CTL,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  buildFlightInputs, newFlightControls, chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG,
+  buildFlightInputs, newFlightControls, chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactCandidates, contactFxDue,
   type ShipState, type GravityWell, type FlightConstants, type FlightInputSource,
 } from '@space-game/common';
-import { K, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
+import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
 import { dhypot } from '@space-game/common';
 import { SimPass } from '../../sim/SystemClocks.js';
@@ -36,6 +36,9 @@ function heldInputs(): { name: string; field: ArrayLike<number> }[] {
   });
 }
 const MOVE_CTL = newFlightControls();
+/** resolveContacts' scratch: a system's candidate pairs */
+const CAND: number[] = [];
+const NONE: readonly number[] = [];
 
 /** Read a player's held keys from the Input component into `src` */
 function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource {
@@ -391,46 +394,42 @@ export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: {
  * is high enough (scaled by the other body's share of the mass).
  *
  * Pairs are found by system, swept along x (bounding circles, padded by
- * CONTACT_MARGIN for the pushes earlier pairs make this pass), then taken in
- * the same order as testing every pair would. Pieces are only tested against
+ * CONTACT_MARGIN for the pushes earlier pairs make this pass: common ships/contactPass.ts), then taken in order of
+ * their ships' ids, lower first, as a client finding them takes them. Pieces are only tested against
  * pieces whose bounding boxes they meet: the rest can't overlap.
  */
 export function resolveContacts(ctx: BridgeCtx): void {
   const ct = ctx.tuning.collision;
-  // Who can touch anything at all (none of it changes while this runs)
+  // Who can touch anything at all (none of it changes while this runs), by id: a pair's first body is its lower id,
+  // and pairs go in that order, as a client finding them itself takes them (CAPS.CONTACTS, common ships/contactPass.ts)
   const list: [number, ShipState][] = [];
   for (const e of ctx.bodies) {
     if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && SimPass.on(InSystem.systemId[e[0]]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
   }
-  const n = list.length;
-  const pairs: number[] = [];
+  list.sort((p, q) => p[0] - q[0]);
   const bySys = new Map<number, number[]>();
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < list.length; i++) {
     const sys = InSystem.systemId[list[i][0]];
     let ids = bySys.get(sys);
     if (!ids) bySys.set(sys, (ids = []));
     ids.push(i);
   }
-  // (Each one's left edge worked out once, not on every comparison of the sort)
-  const lefts = list.map(([eid, ship]) => Position.x[eid] - ship.derived.radius);
-  const left = (i: number) => lefts[i];
-  for (const ids of bySys.values()) {
-    if (ids.length < 2) continue;
-    ids.sort((p, q) => left(p) - left(q));
-    for (let a = 0; a < ids.length; a++) {
-      const i = ids[a], ei = list[i][0];
-      const ri = list[i][1].derived.radius + CONTACT_MARGIN;
-      const right = Position.x[ei] + ri, yi = Position.y[ei];
-      for (let b = a + 1; b < ids.length; b++) {
-        const j = ids[b];
-        // Sorted by left edge: everything after this starts further right still
-        if (left(j) > right) break;
-        if (Math.abs(Position.y[list[j][0]] - yi) > ri + list[j][1].derived.radius) continue;
-        pairs.push(i < j ? i * n + j : j * n + i);
-      }
+  const tick = ctx.host.getTick(), log = ctx.contactLog, seq0 = ctx.ownCauses.peek();
+  // Each system's candidate pairs (indices into `list`), systems one after another
+  const pairs: number[] = [];
+  for (const [sys, ids] of bySys) {
+    if (ids.length < 2 && !log.wanted) continue;
+    const entries = ids.map((i) => ({ id: list[i][0], x: Position.x[list[i][0]], y: Position.y[list[i][0]], r: list[i][1].derived.radius }));
+    const found = ids.length < 2 ? NONE : contactCandidates(entries, CAND);
+    for (let k = 0; k < found.length; k++) pairs.push(ids[found[k]]);
+    // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)
+    if (log.wanted) {
+      const pinned: number[] = [], ap: number[] = [];
+      for (const e of entries) if (ctx.pinned.has(e.id)) pinned.push(e.id);
+      for (let k = 0; k < found.length; k++) ap.push(entries[found[k]].id);
+      log.note(tick, sys, { ids: entries.map((e) => e.id), rebuilds: ids.map((i) => list[i][1].rebuilds), pinned, pairs: ap, seq: seq0 });
     }
   }
-  pairs.sort((p, q) => p - q);
 
   const pieces = new Map<number, ContactPiece[]>();
   // A small body's pieces are kept for the pass (until it's pushed); a big one's (a boss's) are only those near the other body
@@ -440,8 +439,8 @@ export function resolveContacts(ctx: BridgeCtx): void {
     if (!p) { p = ctx.worldPieces(eid, ship); pieces.set(eid, p); }
     return p;
   };
-  for (const key of pairs) {
-    const i = Math.floor(key / n), j = key - i * n;
+  for (let k = 0; k < pairs.length; k += 2) {
+    const i = pairs[k], j = pairs[k + 1];
     const [ea, A] = list[i];
     const [eb, B] = list[j];
     const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
@@ -471,13 +470,12 @@ export function resolveContacts(ctx: BridgeCtx): void {
     const { nx, ny, at, partsA, partsB } = res;
     if (res.closing <= 0) continue; // already separating
     const closing = res.closing;
-    // Sparks and a thud, at most once per pair per cooldown
-    if (closing > (ct.fxMinSpeed ?? 0.6)) {
+    // Sparks and a thud, at most once per pair per cooldown (a client deriving the pair draws its own: ContactWorld)
+    {
       const fk = ea < eb ? `${ea}:${eb}` : `${eb}:${ea}`;
-      const tick = ctx.host.getTick();
-      if (tick - (ctx.contactFx.get(fk) ?? -1e9) >= (ct.fxCooldownTicks ?? 8)) {
+      if (contactFxDue(closing, ctx.contactFx.get(fk), tick, ctx.tuning)) {
         ctx.contactFx.set(fk, tick);
-        ctx.host.notifyContact?.({ systemId: InSystem.systemId[ea], x: at[0], y: at[1], nx, ny, speed: closing });
+        ctx.host.notifyContact?.({ systemId: InSystem.systemId[ea], x: at[0], y: at[1], nx, ny, speed: closing, a: ea, b: eb, tick });
       }
     }
     if (closing <= ct.minDamageSpeed) continue;

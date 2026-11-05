@@ -236,6 +236,11 @@ export class SelfHits {
     if (rows) for (const r of rows) { this.synced.add(r[2]); if (r[1] === OWN_CAUSE.CONTACT) this.synced.add(r[3]); }
   }
 
+  /** Ships a contact pair it found itself touched this window (CAPS.CONTACTS: ContactWorld.endSnapshot): as onCaused */
+  onTouched(ids: Iterable<number> | undefined): void {
+    if (ids) for (const id of ids) this.synced.add(id);
+  }
+
   /** The snapshot's removed list (before it's applied): those shells sit this window out, and go */
   onRemoved(ids: readonly number[]): void {
     for (const id of ids) this.removed.add(id);

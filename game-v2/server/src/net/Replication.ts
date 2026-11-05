@@ -27,6 +27,8 @@ import {
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { OwnCause } from '../ships/bridge/ownCauses.js';
 import { workCauses, recordCauses, settleContacts, causeRow, causeRecords, type CauseEvent, type WorkedCauses } from './causes/shadowCauses.js';
+import { contactWindow, type ContactWindow } from './causes/contactsFor.js';
+import type { ServerContactMessage } from '@space-game/common';
 import { SimPass } from '../sim/SystemClocks.js';
 
 export interface ReplicationHost {
@@ -151,6 +153,34 @@ export class Replication {
   readonly ownStats = { causes: 0, pull: 0, contact: 0, contactState: 0, rebuild: 0, cargo: 0, keyframes: 0, exc: 0, why: {} as Record<string, number> };
   /** Other ships' causes (CAPS.CAUSES): ticks a ship's were worked out, rows sent, contacts sent without state, keyframes for ones a client couldn't work out */
   readonly causeStats = { worked: 0, failed: {} as Record<string, number>, rows: 0, stateless: 0, unworkable: 0 };
+  /** Contacts its clients found themselves (CAPS.CONTACTS): rows not sent (own rows, records' sides), ships left out */
+  readonly contactStats = { found: 0, ownRows: 0, records: 0, leftOut: 0, windows: 0, fxSent: 0, fxFound: 0 };
+  /** Contacts' sparks lately (CAPS.CONTACTS clients get those of pairs they don't find at their snapshot: contactFxFor) */
+  private readonly fxPending: { tick: number; sys: number; a: number; b: number; msg: ServerContactMessage }[] = [];
+  /** ...and the tick each such client was handed them up to */
+  private readonly fxTo = new WeakMap<object, number>();
+
+  /** A contact's sparks (GameServer notifyContact): every other client got them at once */
+  noteContactFx(tick: number, sys: number, a: number, b: number, msg: ServerContactMessage): void {
+    this.fxPending.push({ tick, sys, a, b, msg });
+    let n = 0;
+    while (n < this.fxPending.length && this.fxPending[n].tick < tick - 128) n++;
+    if (n) this.fxPending.splice(0, n);
+  }
+
+  /** A CONTACTS client's sparks since it was last handed them: those of pairs it doesn't find itself (`found`: its window's) */
+  contactFxFor(conn: object, sys: number, found: ContactWindow | null, now: number): ServerContactMessage[] {
+    const from = this.fxTo.get(conn) ?? now - 1;
+    this.fxTo.set(conn, now);
+    const out: ServerContactMessage[] = [];
+    for (const f of this.fxPending) {
+      if (f.tick <= from || f.tick > now || f.sys !== sys) continue;
+      if (found?.pair(f.a, f.b, f.tick)) { this.contactStats.fxFound++; continue; }
+      out.push(f.msg);
+      this.contactStats.fxSent++;
+    }
+    return out;
+  }
 
   constructor(private host: ReplicationHost, private ships: ShipBridge) {}
 
@@ -511,10 +541,13 @@ export class Replication {
    * it, so it has its ship as the server's shadow has it, tick by tick, beside its
    * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, cargo = false, live?: ReadonlySet<number>): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, cargo = false, live?: ReadonlySet<number>, contacts?: { since: number }): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
-    const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[] } = {};
+    const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[]; found?: ContactWindow } = {};
+    // (CAPS.CONTACTS: the ships it held before this snapshot: the ones it may take in its own contact pass)
+    const before = contacts && causes ? new Set(known.keys()) : null;
+    if (before) this.ships.contactLog.wanted = true;
     // (Which version of a ship this client goes by: CAPS.CAUSES clients' moves only when causes don't explain it; a piece
     // of debris it runs, CAPS.DEBRIS, only when it left what it works out)
     const ver = (s: Shadow, eid: number) => (s.mode === ReplicaMode.Drift && (kept || live?.has(eid)) ? s.dver : causes ? s.cver : s.version);
@@ -585,6 +618,21 @@ export class Replication {
         if (i >= 0) caused.splice(i, 1);
       }
     }
+    // (CAPS.CONTACTS: the window's contacts it finds itself, between ships it held before and holds in step: neither
+    // as own rows nor as records, net/causes/contactsFor.ts)
+    const found = before ? this.found(systemId, self, before, known, ships, snapshotTick, contacts!.since, mine, view, held, synced, kept) : null;
+    if (found) {
+      out.found = found;
+      if (out.own && out.ownEvents) {
+        const keep = out.own.map((_, i) => !found.found(self, out.ownEvents![i]));
+        if (keep.includes(false)) {
+          this.contactStats.ownRows += keep.filter((k) => !k).length;
+          out.own = out.own.filter((_, i) => keep[i]);
+          out.ownEvents = out.ownEvents.filter((_, i) => keep[i]);
+          if (!out.own.length) out.own = undefined;
+        }
+      }
+    }
     // (Its own ship's contacts with a ship keyframed now after all (new to it, or one it couldn't work out): the other's
     // state goes, its replica of the other before the keyframe isn't the pass's)
     if (out.own && out.ownEvents) {
@@ -596,7 +644,7 @@ export class Replication {
     out.ownEvents = undefined;
     // Their causes (CAPS.CAUSES), a contact without the other's state where its replica of the other is the pass's: in
     // step (no keyframe of it since the contact, none now) and not flown by its body here
-    if (caused.length) {
+    if (caused.length || found?.leftOut.length) {
       // (Its own ship keyframed now: ownFor's, first in the list)
       const ownKeyed = ships.some((k) => k[0] === self);
       const inStep = (c: NonNullable<CauseEvent['contact']>) => {
@@ -608,17 +656,58 @@ export class Replication {
         if (os.bodied && bodies?.(o)) return !!c.bodyStep && os.bodied.cver === c.bcver && known.get(o) === os.bodied.cver;
         return c.inStep && os.cver === c.cver && known.get(o) === os.cver;
       };
-      const { rows, stateless } = causeRecords(caused.map(([eid, s]) => [eid, s.causes] as const), snapshotTick,
+      // (Contacts it finds itself go as no record, CAPS.CONTACTS)
+      const lists = caused.map(([eid, s]) => {
+        if (!found) return [eid, s.causes] as const;
+        const l = s.causes.filter((e) => !found.found(eid, e));
+        this.contactStats.records += s.causes.length - l.length;
+        return [eid, l] as const;
+      });
+      const { rows, stateless } = causeRecords(lists, snapshotTick,
         (e) => !!e.contact && inStep(e.contact), (e) => !!e.contact && this.before(e.contact, synced));
       this.causeStats.rows += rows.length;
       this.causeStats.stateless += stateless;
-      out.causes = rows;
-      // (Every ship a record names: its client leaves hits on them this window to the records, SelfHits.onCaused)
-      const ids = new Set<number>();
+      // (Ships it leaves out of its own contact pass this window: one record naming each twice, last)
+      if (found) for (const id of found.leftOut) rows.push([0, OWN_CAUSE.CONTACT, id, id, 0]);
+      if (rows.length) out.causes = rows;
+      // (Every ship a record names: its client leaves hits on them this window to the records, SelfHits.onCaused; and
+      // every ship a pair it finds touched, ContactWorld)
+      const ids = new Set<number>(found?.touched);
       for (const r of rows) { ids.add(r[2]); if (r[1] === OWN_CAUSE.CONTACT) ids.add(r[3]); }
       out.caused = [...ids];
+    } else if (found?.touched.size) {
+      out.caused = [...found.touched];
     }
     return { ships, ctl, ...out };
+  }
+
+  /**
+   * The window's contacts a CONTACTS client finds itself (net/causes/contactsFor.ts): the ships it takes are the ones it
+   * held before this snapshot and holds in step through it (no keyframe now, still in view, in this system, ships; its
+   * own when it steps it, CAPS.OWN_SIM)
+   */
+  private found(systemId: number, self: number, before: ReadonlySet<number>, known: ReadonlyMap<number, number>, ships: KeyframeRow[], snapshotTick: number, since: number, mine: Shadow | undefined, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, kept?: Kept): ContactWindow {
+    const keyed = new Set(ships.map((k) => k[0]));
+    const take = new Set<number>();
+    for (const id of before) {
+      if (!known.has(id) || keyed.has(id) || held?.has(id) || InSystem.systemId[id] !== systemId || this.ships.get(id)?.kind !== 'ship') continue;
+      if (id === self ? !mine?.own : !this.shadows.has(id) || (view && !view.has(id))) continue;
+      take.add(id);
+    }
+    const w = contactWindow({
+      log: this.ships.contactLog, systemId, from: since, to: snapshotTick, held: take,
+      docked: (id) => this.shadows.get(id)?.mode === ReplicaMode.Docked,
+      events: (id) => this.shadows.get(id)?.causes,
+      structOk: (id, rb) => {
+        if (kept?.(id)?.includes(rb)) return true;
+        const now = this.ships.get(id)?.rebuilds;
+        return now === rb && (synced?.(id) === now || id === self || !!view?.has(id));
+      },
+    });
+    this.contactStats.windows++;
+    this.contactStats.leftOut += w.leftOut.length;
+    this.contactStats.found += w.count;
+    return w;
   }
 
   /** A contact's other, rebuilt since while its client still has it as it was: it keeps that structure (OTHER_BEFORE) */
