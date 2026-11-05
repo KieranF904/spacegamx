@@ -16,7 +16,7 @@ Environment=BROWSER_URL=http://127.0.0.1:8790
 # LOBBY_ADMIN_SECRET (shared with the lobby: admin ranks and bans) and ADMIN_SERVER_PASSWORD (the admin dashboard's); remote-install.sh makes them
 EnvironmentFile=-/etc/spacegame/secrets.env
 Environment=PUBLIC_HOST=space.brotherk3d.com
-Environment="SERVER_NAME=Space Game v2"
+Environment="SERVER_NAME=AUS Main"
 Environment=SERVER_REGION=au
 Restart=always
 RestartSec=3
