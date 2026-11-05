@@ -66,11 +66,7 @@ export class ServerBrowserUI {
         background: radial-gradient(ellipse at center, #001133 0%, #000011 100%);
         z-index: 1900; overflow-y: auto; padding: 24px 16px; box-sizing: border-box;
       }
-      .join-wrap {
-        width: 980px; max-width: 100%; margin: auto;
-        display: grid; grid-template-columns: 1fr 320px; gap: 20px;
-      }
-      @media (max-width: 820px) { .join-wrap { grid-template-columns: 1fr; } }
+      .join-wrap { width: 780px; max-width: 100%; margin: auto; display: flex; flex-direction: column; gap: 14px; }
       .join-box {
         background: rgba(0, 20, 50, 0.95); border: 1px solid #2266aa; border-radius: 12px;
         padding: 22px 24px; box-shadow: 0 0 40px rgba(0, 100, 200, 0.2); box-sizing: border-box;
@@ -88,22 +84,21 @@ export class ServerBrowserUI {
       .news-title { color: #dde8f5; font-size: 15px; margin: 2px 0 4px; }
       .news-body { color: #9fb4cc; font-size: 13px; line-height: 1.5; }
       .news-empty { color: #6a7d96; font-size: 13px; }
-      .join-side { display: flex; flex-direction: column; gap: 14px; }
-      .join-server-label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #6f8fb5; }
       .join-main-btn {
-        width: 100%; padding: 18px 16px; margin-top: 10px;
+        width: 100%; padding: 14px 16px 12px;
         background: linear-gradient(180deg, #2a9a3a 0%, #17702a 100%);
         border: 1px solid #4c4; border-radius: 8px; color: #fff; cursor: pointer;
-        font-size: 22px; font-weight: bold; letter-spacing: 1px; transition: background 0.2s, box-shadow 0.2s;
+        font-size: 30px; font-weight: bold; letter-spacing: 3px; transition: background 0.2s, box-shadow 0.2s;
       }
       .join-main-btn:hover { background: linear-gradient(180deg, #36b347 0%, #208a33 100%); box-shadow: 0 0 18px rgba(80, 200, 80, 0.35); }
       .join-main-btn:focus-visible { outline: 2px solid #aef; outline-offset: 2px; }
       .join-main-btn:disabled { background: #233; border-color: #345; color: #678; cursor: default; box-shadow: none; }
-      .join-main-btn small { display: block; font-size: 12px; font-weight: normal; letter-spacing: 0; opacity: 0.85; margin-top: 2px; }
-      .join-stats { display: flex; justify-content: space-between; margin-top: 12px; font-size: 13px; color: #9fb4cc; }
+      .join-main-btn small { display: block; font-size: 13px; font-weight: normal; letter-spacing: 1px; opacity: 0.85; margin-top: 2px; }
+      .join-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .join-stats { display: flex; gap: 16px; font-size: 13px; color: #9fb4cc; }
       .join-stats b { color: #88ff88; font-weight: normal; }
       .ping-good { color: #88ff88; } .ping-medium { color: #ffdd88; } .ping-bad { color: #ff8888; }
-      .logout-btn { align-self: flex-start; padding: 8px 16px; background: transparent; border: 1px solid #664444;
+      .logout-btn { padding: 8px 16px; background: transparent; border: 1px solid #664444;
         border-radius: 6px; color: #aa6666; font-size: 13px; cursor: pointer; }
       .logout-btn:hover { background: rgba(150, 50, 50, 0.2); color: #ff8888; }
     `;
@@ -144,21 +139,15 @@ export class ServerBrowserUI {
           </div>
         </div>
 
-        <div class="join-side">
-          <div class="join-box">
-            <div class="join-server-label">Server</div>
-            <button class="join-main-btn" ${main ? '' : 'disabled'}>
-              ${this.loading ? 'Finding the server…' : main ? `Join ${this.escapeHtml(main.name)}` : 'Server offline'}
-              ${main && !this.loading ? `<small>${this.regionName(main)}</small>` : ''}
-            </button>
-            ${main && !this.loading ? `
-              <div class="join-stats">
-                <span><b>${main.players}</b> / ${main.maxPlayers} pilots online</span>
-                ${this.renderPing(main)}
-              </div>` : ''}
+        <button class="join-main-btn" ${main && !this.loading ? '' : 'disabled'}>
+          ${main || this.loading ? 'Join' : 'Server offline'}
+          <small class="join-server">${this.loading ? 'Finding the server…' : main ? this.escapeHtml(main.name) : 'Try again in a minute'}</small>
+        </button>
+
+        <div class="join-foot">
+          <div class="join-stats">
+            ${main && !this.loading ? `<span><b>${main.players}</b> / ${main.maxPlayers} pilots online</span>${this.renderPing(main)}` : ''}
           </div>
-
-
           <button class="logout-btn">← Log out</button>
         </div>
       </div>
@@ -172,17 +161,6 @@ export class ServerBrowserUI {
     if (server.ping >= 999) return '<span class="ping-bad">no reply</span>';
     const cls = server.ping < 100 ? 'ping-good' : server.ping < 200 ? 'ping-medium' : 'ping-bad';
     return `<span class="${cls}">${server.ping} ms</span>`;
-  }
-
-  private regionName(server: ServerInfo): string {
-    const regionMap: Record<string, string> = {
-      'au': 'Australia', 'syd': 'Australia', 'iad': 'US East', 'lax': 'US West',
-      'lhr': 'Europe', 'nrt': 'Japan', 'sin': 'Singapore', 'local': 'This computer',
-    };
-    if (server.region) return regionMap[server.region] || server.region.toUpperCase();
-    const host = server.host.toLowerCase();
-    if (host.includes('localhost') || host.includes('127.0.0.1')) return 'This computer';
-    return '';
   }
 
   private getSortedServers(): ServerInfo[] {
@@ -206,7 +184,7 @@ export class ServerBrowserUI {
     const fallbackServers: ServerInfo[] = [{
       host: window.location.hostname || 'localhost',
       port: 3000,
-      name: 'Local Dev Server',
+      name: 'Local dev',
       region: 'local',
       maxPlayers: 32,
       players: 0,

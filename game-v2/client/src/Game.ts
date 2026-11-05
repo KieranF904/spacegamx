@@ -770,7 +770,10 @@ this.xpFillEl = document.getElementById('xpFill');
       this.perfMonitor?.setVisible(s.ui.netStats);
     }
     const chat = document.getElementById('chatBox');
-    if (chat) chat.style.visibility = s.ui.chat ? 'visible' : 'hidden';
+    if (chat) {
+      chat.style.visibility = s.ui.chat ? 'visible' : 'hidden';
+      chat.classList.toggle('chat-hidden', !s.ui.chat);
+    }
     this.input.invertZoom = s.gameplay.invertZoom;
     this.input.zoomSpeedScale = s.gameplay.zoomSpeed;
     this.input.setBindings(ACTIONS.filter((a) => a.rebindable !== false).map((a) => ({ defaultCode: a.key, code: s.bindings[a.id] ?? a.key })));
@@ -1263,7 +1266,10 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   private setupChat(): void {
-    document.querySelectorAll<HTMLElement>('#chatTabs button').forEach((b) => b.addEventListener('click', () => this.setChatTab(parseTab(b.dataset.tab))));
+    document.querySelectorAll<HTMLElement>('#chatTabs button[data-tab]').forEach((b) => b.addEventListener('click', () => this.setChatTab(parseTab(b.dataset.tab))));
+    // Hide / show the chat in place (the same setting as Settings > Chat box), e.g. for recording videos
+    document.getElementById('chatHideBtn')?.addEventListener('click', () => settings.update((d) => { d.ui.chat = false; }));
+    document.getElementById('chatShowBtn')?.addEventListener('click', () => settings.update((d) => { d.ui.chat = true; }));
     let saved: string | null = null;
     try { saved = localStorage.getItem(CHAT_TAB_KEY); } catch { /* no storage */ }
     this.setChatTab(parseTab(saved));
@@ -1297,6 +1303,8 @@ this.xpFillEl = document.getElementById('xpFill');
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !this.chatFocused && !this.menu.isOpen && this.network.isConnected()) {
         e.preventDefault();
+        // A hidden chat comes back to type in
+        if (!settings.data.ui.chat) settings.update((d) => { d.ui.chat = true; });
         this.chatInputEl?.focus();
       }
     });
@@ -1340,7 +1348,7 @@ this.xpFillEl = document.getElementById('xpFill');
   private setChatTab(tab: ChatTab): void {
     this.chatTab = tab;
     try { localStorage.setItem(CHAT_TAB_KEY, tab); } catch { /* storage blocked: the tab just isn't remembered */ }
-    document.querySelectorAll<HTMLElement>('#chatTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll<HTMLElement>('#chatTabs button[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     this.renderChat();
   }
 

@@ -273,6 +273,36 @@
       color: rgba(220, 230, 255, 0.9);
     }
 
+    #chatTabs #chatHideBtn {
+      margin-left: auto;
+    }
+
+    /* Hidden chat: only this stays, and it's invisible until the mouse is over it (so videos don't show it) */
+    #chatShowBtn {
+      position: absolute;
+      left: 6px;
+      bottom: 0;
+      padding: 3px 10px;
+      background: rgba(6, 10, 24, 0.7);
+      border: 1px solid rgba(120, 160, 220, 0.25);
+      border-radius: 6px;
+      color: rgba(220, 230, 255, 0.8);
+      font-size: 11px;
+      cursor: pointer;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    #chatBox.chat-hidden #chatShowBtn {
+      visibility: visible;
+    }
+
+    #chatBox.chat-hidden #chatShowBtn:hover,
+    #chatBox.chat-hidden #chatShowBtn:focus-visible {
+      opacity: 1;
+    }
+
     #chatTabs button.active {
       background: rgba(6, 10, 24, 0.7);
       color: rgba(120, 200, 255, 0.95);
@@ -417,7 +447,9 @@
           <button type="button" data-tab="all" class="active">All</button>
           <button type="button" data-tab="chat">Chat</button>
           <button type="button" data-tab="game">Game</button>
+          <button type="button" id="chatHideBtn" title="Hide the chat (Settings > Chat box; Enter brings it back)">Hide</button>
         </div>
+        <button type="button" id="chatShowBtn" title="Show the chat">Show chat</button>
         <div id="chatMessages"></div>
         <div id="chatInputContainer">
           <input type="text" id="chatInput" placeholder="Press Enter to chat..." maxlength="200" autocomplete="off">

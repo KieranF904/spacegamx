@@ -26,7 +26,7 @@ const dataPath = join(__dirname, '../../data');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ADMIN_PORT = parseInt(process.env.ADMIN_PORT || '3005', 10);
 const DEV_MODE = process.env.NODE_ENV !== 'production';
-const SERVER_NAME = process.env.SERVER_NAME || 'Local Dev Server';
+const SERVER_NAME = process.env.SERVER_NAME || 'Local dev';
 const SERVER_REGION = process.env.SERVER_REGION || 'local';
 const BROWSER_URL = process.env.BROWSER_URL || 'http://localhost:8787';
 /** Shared with the lobby: lets the admin tools manage accounts (ranks, bans). Dev lobbies share a fixed one */
