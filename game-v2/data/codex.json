@@ -304,6 +304,20 @@
       "unlock": {
         "done": "drift_02"
       }
+    },
+    {
+      "id": "pyreclast_scan",
+      "tab": "records",
+      "title": "Scan: the Pyreclast",
+      "source": "Your ship's scanner",
+      "body": "Limbs (its turrets, scythes, bays, mortars, dash coils, lance, vents and crystal): very heavy plating. Low-penetration guns barely mark them. Each limb works one of its attacks: break it and that attack is gone.\n\nVents: very hot. Anything close burns. Heat-resistant plating cuts it.\n\nIts attacks keep you moving; its openings are short. Ships whose guns and engines share one power supply struggle to do both."
+    },
+    {
+      "id": "pyreclast_tactics",
+      "tab": "records",
+      "title": "Combat log: the Pyreclast",
+      "source": "Your ship's combat recorder",
+      "body": "Each attack has a sign, and one way out:\n\nBarrage (its wing turrets glow one by one): keep moving sideways.\nBroadside (it rolls side-on, lanes drawn from one wing): get off that side, over its nose or tail.\nScythe (a scythe's root glows): get in close.\nMortar wall (its mortar beds thump twice): reverse out the way you came.\nDash chain (orange streaks): never sit on a streak.\nLance (its prow hums red): get behind it.\nCrystal beams (white lines): never sit on a white line.\nRing pulse (its core flares twice): get on its nose-to-tail line.\nSwarm (a hiss, its seams glowing): turn hard across the seekers.\nVents (it goes still and blazes): stay out of the heat, or wear heat plating.\n\nAfter each attack it recovers for a few seconds: hit it hard then. The meter under its bar shows how much more it can take before it cracks."
     }
   ]
 }

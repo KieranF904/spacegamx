@@ -582,7 +582,7 @@ export class PyreclastBrain extends StagedBrain {
     for (const q of this.host.players(this.view.systemNum)) {
       if (dhypot(Position.x[q] - m.x, Position.y[q] - m.y) > HEAT_REACH || this.walled(m.x, m.y, q)) continue;
       const part = this.host.ships.ignite(q, m.x, m.y, dps * this.view.damage, 45, 1.2, this.view.eid, { type: 'thermal', pen: 3 });
-      if (part >= 0) this.host.send(this.view.systemNum, { type: 'ignite', bodyId: q, part, ticks: 45 });
+      if (part >= 0) { this.host.send(this.view.systemNum, { type: 'ignite', bodyId: q, part, ticks: 45 }); this.host.hint?.(q, 'burning'); }
     }
   }
 

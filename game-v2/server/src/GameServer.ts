@@ -1724,6 +1724,10 @@ this.devTeleport = opts.devTeleport ?? false;
         const who = names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0] ?? 'someone';
         this.achievements.post(`${def.name} has fallen to ${who}${this.hunted()?.id === boss ? ' (the hunted boss!)' : ''}`, 'boss');
       },
+      encountered: (def: { codex?: string[] }, players: number[]) => {
+        for (const p of players) { const c = this.pilots.connOf(p); if (c && def.codex) this.codex.unlock(c, def.codex); }
+      },
+      toast: (player: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad') => { const c = this.pilots.connOf(player); if (c) this.pilots.toast(c, text, kind); },
     };
   }
 
@@ -2487,7 +2491,7 @@ this.devTeleport = opts.devTeleport ?? false;
         this.combat.note(targetEid, sourceEid, this.currentTick);
         this.bossDev?.onDamage(targetEid, amount, sourceEid);
         this.recovery?.hurt(targetEid, sourceEid);
-        this.bosses?.onDamage(targetEid, amount, sourceEid);
+        this.bosses?.onDamage(targetEid, amount, sourceEid, !!glancing);
         this.dens?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)

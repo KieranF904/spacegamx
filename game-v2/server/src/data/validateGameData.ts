@@ -370,7 +370,7 @@ const SHAPES: Record<string, Spec> = {
         'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number', 'intercept?': 'boolean' }),
       })),
       loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
-      'stageHp?': 'number[]', 'limbs?': rec('number'), 'scanNotes?': 'string[]',
+      'stageHp?': 'number[]', 'limbs?': rec('number'), 'codex?': 'string[]', 'hints?': rec('string'),
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
     })),
   }),
@@ -1152,6 +1152,8 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
 
   // codex.json: what each record waits for
   list(f.codex?.entries).forEach((e, i) => cond('codex.json', `entries[${i}].unlock`, e?.unlock));
+  // (a boss's records, found on meeting it)
+  for (const [id, b] of bosses) list((b as { codex?: unknown } | undefined)?.codex).forEach((r, i) => record('bosses.json', `bosses.${id}.codex[${i}]`, r));
 
   // achievements.json
   list(f.achievements?.ribbons).forEach((r, i) => {

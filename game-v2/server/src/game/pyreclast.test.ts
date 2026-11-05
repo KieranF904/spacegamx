@@ -470,6 +470,31 @@ describe('the Pyreclast', () => {
     expect([...kinds.keys()]).toEqual(['lob']);
   });
 
+  it('its hints: meeting it files its scan and the dodge rules of its attacks as records; a glancing hit and catching fire at its vents each get a plain toast, once', () => {
+    const { server, got, pid, step, num, bridge } = world();
+    const eid = server.bosses.spawn('boss_pyreclast');
+    noPersonal(server, eid);
+    place(pid, num, Position.x[eid] + 2600, Position.y[eid]);
+    step(3);
+    // (the fight starts when it's hurt: a hit that barely gets through its plating)
+    server.bosses.onDamage(eid, 5, pid, true);
+    server.bosses.onDamage(eid, 5, pid, true);
+    step(2);
+    const found = server.pilots.get(server.pilots.connOf(pid)!)!.codex.found;
+    expect(found).toEqual(expect.arrayContaining(['pyreclast_scan', 'pyreclast_tactics']));
+    const toasts = () => got.filter((m) => m.type === 'toast').map((m) => (m as any).text as string);
+    expect(toasts().filter((t) => /^Glancing hit/.test(t)).length).toBe(1);
+    // Burning at its vents (its heart's, open)
+    advance(server, eid, 3, step);
+    brainOf(server, eid).devPlay('vent');
+    const vent = bridge.get(eid)!.blueprint.parts.findIndex((p) => p.piece === 'pyreclast_s3_aft_vent');
+    for (let i = 0; i < 160; i++) { step(); mend(server, pid); const m = (brainOf(server, eid) as any).mount(vent); place(pid, num, m.x + 300, m.y); }
+    expect(toasts().filter((t) => /^Burning: heat plating/.test(t)).length).toBe(1);
+    // (its records say nothing of what it is: a scan and a combat log, mechanics only)
+    const codex = (files.codex as any).entries.filter((e: any) => e.id.startsWith('pyreclast_'));
+    expect(codex.map((e: any) => e.source)).toEqual(["Your ship's scanner", "Your ship's combat recorder"]);
+  });
+
   it('stage one: each plate shot off bares the skeleton under it, shots pass through bones; every plate gone, it stops, can\'t be hurt, and blows its wings away piece by piece', () => {
     const { server, got, pid, step, num, bridge, god } = world();
     god();

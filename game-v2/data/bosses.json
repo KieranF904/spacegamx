@@ -1661,11 +1661,11 @@
         "horn_gun": 1100, "mortar": 1300, "coil": 1300, "lance": 2000, "vent": 1200, "spine": 1500,
         "s3_mineral": 2200, "s3_vent_housing": 1300, "s3_aft_vent": 1300
       },
-      "scanNotes": [
-        "Limbs (its turrets, scythes, bays, mortars, coils, lance, vents and crystal): very heavy plating. Low-penetration guns barely mark them. Each limb works one of its attacks: break it and that attack is gone.",
-        "Vents: very hot. Anything close burns. Heat-resistant plating cuts it.",
-        "Its attacks keep you moving; its openings are short. Ships whose guns and engines share one power supply struggle to do both."
-      ],
+      "codex": ["pyreclast_scan", "pyreclast_tactics"],
+      "hints": {
+        "glancing": "Glancing hit: this plating needs more penetration",
+        "burning": "Burning: heat plating would help"
+      },
       "behaviour": {
         "strafe": 0.6,
         "flee": 0,
