@@ -9,6 +9,9 @@
  *                it stops everything (`stop`), can't be hurt, holds still, and blows that stage away piece by piece
  *                (`blowStage`); its last stage beaten, it shudders and every piece blows apart at once (`die`)
  *   its rules    signature moves open weak-point windows, pilots present draw personal attacks (fightRules.ts)
+ *   phases       a boss with `exposure` (rework 2026-11 section 15) chains its stage's loop into one attack phase: each
+ *                move straight into the next (`chain` ticks apart), then one window. Between its signature moves and
+ *                in its window (after the rest beat) it keeps up a light threat of its own (`harass`, `harassShot`)
  *   dev          `forceShed` steps through its stages' looks: shot off, wrecked, blown away; the boss tools
  *                (game/dev/bossDev.ts) hold it, play a move next, open a window, force a personal attack
  */
@@ -16,7 +19,7 @@
 import {
   Position, Velocity, Rotation, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin,
   CTL, DECISION, WANT, BODY_KINDS, applyDecision, sameWant, stagedFlight, syncArgs, wantAim, wantDrive, wantFly, wantHold, dequantizeCursorAngle,
-  hashString, type BodyState, type StagedFlightTables, type WantRec, type WindowSpec,
+  hashString, restBeat, staggered, type BodyState, type StagedFlightTables, type WantRec, type WindowSpec,
 } from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
 import { BossBrain, BossView, BrainHost, lead, partMount, pose, strike, wrap } from './kit.js';
@@ -39,7 +42,14 @@ export interface StagedTables extends FightTables {
   rest: number[];
   /** Warnings × this */
   haste: number[];
+  /** (attack phases: `exposure`) ticks between one chained move's end and the next's start, by stage */
+  chain?: number[];
+  /** Ticks between its harassing shots (outside its signature moves, rest beats and staggers), by stage (0: none) */
+  harass?: number[];
 }
+
+/** (attack phases) Nothing in its loop it can do now: it flies (harassing) this long, and after two of these shows its window as ever */
+const EMPTY_SLOT = 180;
 
 /** Between stages: ticks it holds still before (and after) blowing a stage away, and between each blast */
 const BLOW_PAUSE = 45, BLOW_GAP = 6;
@@ -67,6 +77,10 @@ export abstract class StagedBrain implements BossBrain {
   /** Its drones (mobs it launched) */
   protected drones = new Set<number>();
   private forced = 0;
+  /** (attack phases) empty slots flown since its last window; its next harassing shot, and how many so far */
+  private empty = 0;
+  private harassAt = 0;
+  private harassN = 0;
   /** Its flight (its body's: range, circle, drive and ground by stage) */
   protected readonly flight: StagedFlightTables;
   /** Its body's state as its decisions have left it (the clients that run its body fold the same decisions in) */
@@ -132,18 +146,33 @@ export abstract class StagedBrain implements BossBrain {
     this.fight.tickWindow(view.eid, view.systemNum, now);
     // (A window running (open, or a crack's stagger), or held by the dev tools: no move starts; staggered, it holds still)
     if (this.fight.staggered(now) || this.devHold) { this.move = null; this.moveName = ''; this.want = wantHold(); return this.fly(base!, t); }
-    if (!this.move && now >= this.restUntil && !this.fight.holding(now)) this.move = this.pick(now);
+    if (!this.move && now >= this.restUntil && !this.fight.holding(now)) {
+      this.move = this.pick(now);
+      if (!this.move && this.tables.exposure) {
+        // (Its whole loop broken off: it flies, harassing, and shows its window as ever: safer, not slower)
+        this.restUntil = now + EMPTY_SLOT;
+        if (++this.empty >= 2) { this.empty = 0; this.expose(now); }
+      }
+    }
     this.passives(now);
+    this.harassing(now);
     this.fight.cause = this.moveName;
     if (this.move && this.move.next().done) {
       const done = this.moveName;
       this.move = null;
       this.moveName = '';
-      // (A windowed boss's rest comes after its window, and is never scaled by how many fight it: rework 2.3)
-      this.fight.finished(done, view.eid, view.systemNum, now);
-      const w = this.fight.windowed ? this.fight.window : null;
-      this.restUntil = (w && w.at === now ? w.at + w.ticks : now)
-        + Math.round(this.tables.rest[this.stage - 1] * this.rage() / (this.fight.windowed ? 1 : 1 + 0.15 * (view.fighters - 1)));
+      if (this.tables.exposure) {
+        // (Attack phases: the next move of its loop straight on; its loop done, its one window, then its rest)
+        this.empty = 0;
+        if (this.phaseOver()) this.expose(now);
+        else this.restUntil = now + (this.tables.chain?.[this.stage - 1] ?? 0);
+      } else {
+        // (A windowed boss's rest comes after its window, and is never scaled by how many fight it: rework 2.3)
+        this.fight.finished(done, view.eid, view.systemNum, now);
+        const w = this.fight.windowed ? this.fight.window : null;
+        this.restUntil = (w && w.at === now ? w.at + w.ticks : now)
+          + Math.round(this.tables.rest[this.stage - 1] * this.rage() / (this.fight.windowed ? 1 : 1 + 0.15 * (view.fighters - 1)));
+      }
     }
     this.fight.personal(view.eid, this.stage, now, view.present ?? this.pilots(), this.fight.isSignature(this.moveName),
       (name, tg, seed) => this.personalMove(name, tg, seed), (op, args) => this.host.decide?.(view.eid, op, args, this.body));
@@ -152,6 +181,51 @@ export abstract class StagedBrain implements BossBrain {
 
   idle(): boolean {
     return !this.move && !this.blows.length && !this.dying;
+  }
+
+  // ---- Attack phases (tables' `exposure`) ----
+
+  /** Is its attack phase over: its loop gone round, or nothing left in it it can do */
+  private phaseOver(): boolean {
+    const loop = this.tables.loop[this.stage - 1], at = this.step % loop.length;
+    if (at === 0) return true;
+    for (let k = at; k < loop.length; k++) if (this.make(loop[k])) return false;
+    return true;
+  }
+
+  /** Its attack phase done: its one window opens (its stage's), its rest after it; the next phase from the top of its loop */
+  protected expose(now: number): void {
+    const spec = this.tables.exposure?.[this.stage - 1];
+    this.step = 0;
+    if (!spec) { this.restUntil = now + this.tables.rest[this.stage - 1]; return; }
+    this.fight.open(spec, this.view.eid, this.view.systemNum, now);
+    this.onExpose(now, spec);
+    this.restUntil = now + spec.ticks + this.tables.rest[this.stage - 1];
+  }
+
+  /** Its window opened (a boss's own look or state for it; clients draw the exposure from the window itself) */
+  protected onExpose(_now: number, _spec: WindowSpec): void {}
+
+  /**
+   * Its light threat between signature moves and in its window (after the rest beat; never in a stagger): a harassing
+   * shot every `harass` ticks at its pilots in turn (`harassShot`, the boss's own)
+   */
+  private harassing(now: number): void {
+    const every = this.tables.harass?.[this.stage - 1] ?? 0;
+    if (!every || now < this.harassAt || this.blows.length || this.dying) return;
+    if (this.move && this.fight.isSignature(this.moveName)) return;
+    const w = this.fight.window;
+    if (w && (restBeat(w, now) || staggered(w, now))) return;
+    const who = this.view.present?.length ? this.view.present : this.pilots();
+    if (!who.length) return;
+    const t = who[this.harassN % who.length];
+    if (this.harassShot(t, this.harassN)) { this.harassN++; this.harassAt = now + every; }
+    else this.harassAt = now + 20;
+  }
+
+  /** One harassing shot at a pilot (the `n`th): false if it can't now */
+  protected harassShot(_target: number, _n: number): boolean {
+    return false;
   }
 
   dispose(): void {
@@ -301,9 +375,11 @@ export abstract class StagedBrain implements BossBrain {
     this.forceShed(steps);
   }
 
-  /** A window now: its signature's if it has one by this name, else the dev default */
+  /** A window now: its stage's attack-phase window, or its signature's if it has one by this name, else the dev default */
   devWindow(name?: string): void {
     if (!this.view) return;
+    const phase = this.tables.exposure?.[this.stage - 1];
+    if (phase) { this.move = null; this.moveName = ''; this.expose(this.host.tick()); return; }
     const own = name ? this.tables.signature?.[name] : undefined;
     const spec: WindowSpec = own ?? Object.values(this.tables.signature ?? {})[0] ?? DEV_WINDOW;
     this.fight.open(spec, this.view.eid, this.view.systemNum, this.host.tick());
@@ -487,6 +563,7 @@ export abstract class StagedBrain implements BossBrain {
     this.moveName = '';
     this.fight.clear();
     this.step = 0;
+    this.empty = 0;
     this.host.mobs?.clear(this.view.systemNum, this.view.eid);
     this.drones.clear();
     this.onStop();

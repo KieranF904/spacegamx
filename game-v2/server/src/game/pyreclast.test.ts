@@ -12,7 +12,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { BossesFile } from './Bosses.js';
-import type { PyreclastBrain } from './brains/pyreclast.js';
+import { PYRECLAST_EXPOSURE, PYRECLAST_LOOP, type PyreclastBrain } from './brains/pyreclast.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -184,7 +184,7 @@ describe('the Pyreclast', () => {
     expect(hi / lo).toBeGreaterThan(2.5);
   });
 
-  it('stage one, the fortress: barrage, broadside, scythe in that order, each followed by its window (7 s, capped 5,200), no move started in one, and no fire between moves', () => {
+  it('stage one, the fortress: one attack phase, barrage, broadside and scythe chained, then one short window, no move started in it; between moves and in it, only its single harassing sparks', () => {
     const w = world();
     const { server, god } = w;
     god();
@@ -193,16 +193,23 @@ describe('the Pyreclast', () => {
     const brain = brainOf(server, eid);
     const weapons = server['weapons'], spawn = weapons.spawn.bind(weapons);
     const strays: string[] = [];
-    weapons.spawn = (owner: number, kind: string, ...rest: any[]) => { if (owner === eid && !['barrage', 'broadside'].includes(brain.moveName)) strays.push(`${kind}@${brain.moveName}`); return (spawn as any)(owner, kind, ...rest); };
-    const r = loop(w, eid, 40, 2600);
+    let harass = 0;
+    weapons.spawn = (owner: number, kind: string, ...rest: any[]) => {
+      if (owner === eid && !['barrage', 'broadside'].includes(brain.moveName)) { if (kind === 'heart_spark') harass++; else strays.push(`${kind}@${brain.moveName}`); }
+      return (spawn as any)(owner, kind, ...rest);
+    };
+    const r = loop(w, eid, 45, 2600);
     expect(r.moves.slice(0, 4)).toEqual(['barrage', 'broadside', 'scythe', 'barrage']);
-    expect(r.windows.slice(0, 3).map((x) => x.after)).toEqual(['barrage', 'broadside', 'scythe']);
-    expect(r.windows.every((x) => x.ticks === 420 && x.cap === 5200)).toBe(true);
+    expect(r.windows[0].after).toBe('scythe');
+    expect(r.windows.every((x) => x.ticks === PYRECLAST_EXPOSURE[0].ticks && x.cap === PYRECLAST_EXPOSURE[0].cap)).toBe(true);
+    expect(PYRECLAST_EXPOSURE[0].ticks).toBeLessThanOrEqual(300);
     expect(r.startedInWindow).toBe(0);
     expect(strays).toEqual([]);
+    // (it keeps up a light threat: a glint and a single spark now and then between its moves and in its window)
+    expect(harass).toBeGreaterThan(2);
   });
 
-  it('barrage: each wing turret glows in turn (clockwise) and throws a fan of three slow balls at where you are, never ahead: moving sideways, they miss', () => {
+  it('barrage: its wing turrets glow two at a time (clockwise, opposite sides) and throw fans of three slow balls at where you are, never ahead: moving sideways, they miss', () => {
     const w = world();
     const { server, pid, step, num, god } = w;
     god();
@@ -212,7 +219,7 @@ describe('the Pyreclast', () => {
     const balls: { speed: number; off: number }[] = [];
     weapons.spawn = (owner: number, kind: string, x: number, y: number, a: number, ...rest: any[]) => {
       const id = (spawn as any)(owner, kind, x, y, a, ...rest);
-      if (owner === eid && kind === 'magma') {
+      if (owner === eid && kind === 'magma' && brainOf(server, eid).moveName === 'barrage') {
         const now = Math.atan2(Position.y[pid] - y, Position.x[pid] - x);
         balls.push({ speed: Math.hypot(Velocity.x[id], Velocity.y[id]), off: Math.abs(Math.atan2(Math.sin(a - now), Math.cos(a - now))) });
       }
@@ -220,7 +227,8 @@ describe('the Pyreclast', () => {
     };
     // Sideways at 20 a tick, across its line
     place(pid, num, Position.x[eid] + 2600, Position.y[eid] - 1500);
-    for (let i = 0; i < 200; i++) { Velocity.x[pid] = 0; Velocity.y[pid] = 20; step(); if (Position.y[pid] > Position.y[eid] + 1500) place(pid, num, Position.x[eid] + 2600, Position.y[eid] - 1500); }
+    for (let i = 0; i < 250; i++) { Velocity.x[pid] = 0; Velocity.y[pid] = 20; step(); if (Position.y[pid] > Position.y[eid] + 1500) place(pid, num, Position.x[eid] + 2600, Position.y[eid] - 1500); }
+    // (its four turrets, two by two)
     expect(balls.length).toBe(12);
     // Slow (a level 30 ship outruns them), the middle of each fan straight at where you were
     expect(Math.max(...balls.map((b) => b.speed))).toBeLessThan(16.5);
@@ -228,7 +236,7 @@ describe('the Pyreclast', () => {
     expect(Math.max(...middles.map((b) => b.off))).toBeLessThan(0.03);
   });
 
-  it('broadside: it rolls side-on and draws parallel lanes straight out of one wing; its fast shells fly only down them', () => {
+  it('broadside: it rolls side-on and draws parallel lanes straight out of one wing; its fast shells fly only down them; then it follows you round a little and fires again', () => {
     const w = world();
     const { server, got, pid, step, num, god } = w;
     god();
@@ -239,8 +247,8 @@ describe('the Pyreclast', () => {
     place(pid, num, Position.x[eid] + 2600, Position.y[eid]);
     const lanes: any[] = [], shots: number[] = [], abeam: number[] = [];
     const weapons = server['weapons'], spawn = weapons.spawn.bind(weapons);
-    weapons.spawn = (owner: number, kind: string, x: number, y: number, a: number, ...rest: any[]) => { if (owner === eid && kind === 'magma') shots.push(a); return (spawn as any)(owner, kind, x, y, a, ...rest); };
-    for (let i = 0; i < 300; i++) {
+    weapons.spawn = (owner: number, kind: string, x: number, y: number, a: number, ...rest: any[]) => { if (owner === eid && kind === 'magma' && brain.moveName === 'broadside') shots.push(a); return (spawn as any)(owner, kind, x, y, a, ...rest); };
+    for (let i = 0; i < 420; i++) {
       got.length = 0;
       step();
       for (const m of got) if (m.type === 'bossTelegraph' && m.kind === 'lane') {
@@ -249,14 +257,16 @@ describe('the Pyreclast', () => {
         abeam.push(Math.abs(Math.atan2(Math.sin(toT - Rotation.angle[eid]), Math.cos(toT - Rotation.angle[eid]))));
       }
     }
-    expect(lanes.length).toBe(4);
+    // Two salvos of four lanes
+    expect(lanes.length).toBe(8);
     // One wing, all the same way (straight out of its side)
     expect(new Set(lanes.map((l) => Math.sign(l.y))).size).toBe(1);
     expect(new Set(lanes.map((l) => l.angle)).size).toBe(1);
     expect(Math.abs(Math.abs(lanes[0].angle) - Math.PI / 2)).toBeLessThan(1e-6);
-    // Fired down them: every shell the one way
-    expect(shots.length).toBe(12);
-    expect(Math.max(...shots) - Math.min(...shots)).toBeLessThan(1e-6);
+    // Fired down them: every shell of a salvo the one way
+    // (three down each lane, then two)
+    expect(shots.length).toBe(20);
+    for (const salvo of [shots.slice(0, 12), shots.slice(12)]) expect(Math.max(...salvo) - Math.min(...salvo)).toBeLessThan(1e-6);
     // Its target abeam that wing as the lanes are drawn (over its nose or its tail is out of every lane)
     expect(Math.abs(abeam[0] - Math.PI / 2)).toBeLessThan(0.15);
   });
@@ -272,10 +282,11 @@ describe('the Pyreclast', () => {
       let n = 0;
       const dpb = bridge.damagePartBy.bind(bridge);
       (bridge as any).damagePartBy = (target: number, part: number, amount: number, source: number, hit?: any) => { if (target === pid && source === eid && hit?.type === 'kinetic') n++; return dpb(target, part, amount, source, hit); };
-      for (let i = 0; i < 160; i++) { mend(server, pid); place(pid, num, Position.x[eid] + r + dist, Position.y[eid]); step(); }
+      for (let i = 0; i < 400; i++) { mend(server, pid); place(pid, num, Position.x[eid] + r + dist, Position.y[eid]); step(); }
       return n;
     };
-    expect(hits(2000)).toBe(1);
+    // (nose to tail and back: cut on each pass)
+    expect(hits(2000)).toBe(2);
     expect(hits(500)).toBe(0);
   });
 
@@ -299,7 +310,7 @@ describe('the Pyreclast', () => {
     expect(brain.moveName).toBe('');
   });
 
-  it('stage two, the hunter: mortar wall, dash chain, lance in that order, each with its window; its body\'s vents burn a pilot close to them, always', () => {
+  it('stage two, the hunter: mortar wall, dash chain, lance, mortar wall chained, then its window; its body\'s vents burn a pilot close to them, always', () => {
     const w = world();
     const { server, step, god, bridge, pid, num } = w;
     god();
@@ -312,8 +323,11 @@ describe('the Pyreclast', () => {
     let burnt = 0;
     (bridge as any).ignite = (q: number, ...rest: any[]) => { if (q === pid && rest[5] === eid) burnt++; return (ign as any)(q, ...rest); };
     const r = loop(w, eid, 40, 1700);
-    expect(r.moves.slice(0, 3)).toEqual(['mortar', 'dash', 'lance']);
-    expect(r.windows.slice(0, 3).map((x) => x.after)).toEqual(['mortar', 'dash', 'lance']);
+    expect(PYRECLAST_LOOP[1]).toEqual(['mortar', 'dash', 'lance', 'mortar']);
+    // (a phase's last mortar and the next one's first run together across the window)
+    expect(r.moves.slice(0, 5)).toEqual(['mortar', 'dash', 'lance', 'mortar', 'dash']);
+    expect(r.windows[0].after).toBe('mortar');
+    expect(r.windows[0].cap).toBe(PYRECLAST_EXPOSURE[1].cap);
     expect(r.startedInWindow).toBe(0);
     // Close to a vent, between its moves or in them: it burns
     const vent = bridge.get(eid)!.blueprint.parts.findIndex((p) => p.piece === 'pyreclast_vent_l');
@@ -341,11 +355,11 @@ describe('the Pyreclast', () => {
       expect(streaks.every((t) => t >= 54)).toBe(true);
       return streaks.length;
     };
-    expect(count(2)).toBe(4);
-    expect(count(1)).toBe(3);
+    expect(count(2)).toBe(5);
+    expect(count(1)).toBe(4);
   });
 
-  it('stage three, the heart: it darts once, then its crystal\'s five beams in a set order; rings with their gaps always at its nose and tail; eight seekers however many pilots; then its vents open: the big window', () => {
+  it('stage three, the heart: it darts once, then its crystal\'s seven beams in a set order; rings with their gaps always at its nose and tail; eight seekers however many pilots; then its vents open: its window', () => {
     const w = world();
     const { server, got, pid, step, num, god, join, bridge } = w;
     god();
@@ -372,25 +386,34 @@ describe('the Pyreclast', () => {
         if (m.type === 'bossTelegraph' && m.kind === 'dash') darts++;
         if (m.type === 'bossTelegraph' && m.kind === 'crystal') warned.push(m.angle!);
         if (m.type === 'bossBeam' && m.kind === 'crystal') beams.push(m.a0);
-        if (m.type === 'bossWindow' && m.ticks === 600 && !vent) vent = m;
+        if (m.type === 'bossWindow' && m.ticks > 0 && !vent) vent = m;
       }
     });
     expect(r.moves.slice(0, 4)).toEqual(['crystal', 'ring', 'swarm', 'vent']);
-    expect(darts).toBe(1);
+    // (one dart a phase, before its crystal: the first may have gone before the watch began)
+    const crystals = r.moves.filter((m) => m === 'crystal').length;
+    expect(darts).toBeGreaterThanOrEqual(crystals - 1);
+    expect(darts).toBeLessThanOrEqual(crystals);
     const rd = (a: number) => Math.round(a * 10) / 10 + 0;
-    expect(warned.slice(0, 5).map(rd)).toEqual([0, -0.3, 0.3, -0.6, 0.6]);
-    expect(beams.slice(0, 5).map(rd)).toEqual([0, -0.3, 0.3, -0.6, 0.6]);
+    expect(warned.slice(0, 7).map(rd)).toEqual([0, -0.3, 0.3, -0.6, 0.6, -0.9, 0.9]);
+    expect(beams.slice(0, 7).map(rd)).toEqual([0, -0.3, 0.3, -0.6, 0.6, -0.9, 0.9]);
     // Every ring's gaps at its nose and its tail: no spark within 15 degrees of either
     expect(rings.length).toBeGreaterThan(80);
     for (const s of rings) {
       const off = Math.abs(Math.atan2(Math.sin(s.a - s.heading), Math.cos(s.a - s.heading)));
       expect(off > 0.26 && off < Math.PI - 0.26).toBe(true);
     }
-    // Eight, shared among the three of them (never more for more pilots)
-    expect(seekers.length).toBe(8);
+    // Eight a swarm, shared among the three of them (never more for more pilots)
+    // (two waves of four: the watch may end between a swarm's waves)
+    const swarms = r.moves.filter((m) => m === 'swarm').length;
+    expect(seekers.length % 4).toBe(0);
+    expect(seekers.length).toBeGreaterThan(8 * (swarms - 1));
+    expect(seekers.length).toBeLessThanOrEqual(8 * swarms);
     expect(new Set(seekers).size).toBe(3);
-    // The vent: the big window, 10 s capped 8,320
-    expect(vent?.cap).toBe(8320);
+    // The vent: its window, after the phase
+    expect(r.windows[0].after).toBe('vent');
+    expect(vent?.cap).toBe(PYRECLAST_EXPOSURE[2].cap);
+    expect(vent?.ticks).toBe(PYRECLAST_EXPOSURE[2].ticks);
     void pid; void bridge;
   });
 
@@ -440,27 +463,28 @@ describe('the Pyreclast', () => {
     expect(r.moves).toEqual([]);
   });
 
-  it('personal attacks: each pilot present draws its own from its stage\'s pool, never in a signature move or a window\'s rest beat; a broken limb takes its attack out', () => {
+  it('personal attacks: each pilot present draws its own from its stage\'s pool, in its moves too but never in a window\'s rest beat; a broken limb takes its attack out', () => {
     const w = world();
     const { server, got, step, bridge, god } = w;
     god();
     const eid = server.bosses.spawn('boss_pyreclast');
     const brain = brainOf(server, eid);
     const kinds = new Map<string, number>();
-    let bad = 0;
+    let bad = 0, inMoves = 0;
     loop(w, eid, 90, 2600, () => {
       const now = server.getTick(), win = brain.fight.window;
       for (const m of got) {
         if (m.type !== 'bossTelegraph' || !['lob', 'flak', 'synapse', 'spark'].includes(m.kind)) continue;
         // (a flak burst's five marks are one attack)
         kinds.set(m.kind, (kinds.get(m.kind) ?? 0) + (m.kind === 'flak' ? 0.2 : 1));
-        // (each starts the tick it's drawn: never in a signature move, nor a window's first 2 s)
-        if (m.kind !== 'flak' || m.ticks === 60) if (brain.fight.isSignature(brain.moveName) || (win && now - win.at < WINDOW.rest && now < win.at + win.ticks)) bad++;
+        // (each starts the tick it's drawn: in its moves too, but never in a window's first 1 s)
+        if (m.kind !== 'flak' || m.ticks === 60) { if (win && now - win.at < WINDOW.rest && now < win.at + win.ticks) bad++; if (brain.fight.isSignature(brain.moveName)) inMoves++; }
       }
     });
     expect([...kinds.keys()].every((k) => ['lob', 'flak'].includes(k))).toBe(true);
     expect([...kinds.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(3);
     expect(bad).toBe(0);
+    expect(inMoves).toBeGreaterThan(0);
     // Its bays and flak off: only lobs (and its turrets' lobs need its turrets)
     const s = bridge.get(eid)!;
     s.blueprint.parts.forEach((p, i) => { if (/_(bay|wing_flak)_[lr]$/.test(p.piece)) bridge.hurt(eid, bridge.get(eid)!, i, 1e9); });

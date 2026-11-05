@@ -167,8 +167,9 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
     expect(r.got.A.off).toBe(0);
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.got.A.decisions).toBeGreaterThan(5);
-    // (keyframes of her: the first, and only what her body doesn't model: the stage sheds)
-    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes / 4);
+    // (keyframes of her: the first, and only what her body doesn't model: the stage sheds, and contacts: her phases ram
+    // twice in stage two, and these pilots sit in her way)
+    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes / 2.5);
     expect(r.stats.checks).toBeGreaterThan(10);
     expect(r.stats.off).toBe(0);
     expect(r.stats.agreed).toBe(r.stats.checks - r.stats.stale - r.stats.unknown);

@@ -16,8 +16,8 @@ export const WINDOW = {
   outside: 0.35,
   /** The crack's bonus, as a share of the cap */
   crack: 0.1,
-  /** Ticks at a window's start with no personal attack starting */
-  rest: 120,
+  /** Ticks at a window's start with no personal attack (nor a boss's harassing shot) starting: a short beat (1 s, 2026-11-05 playtest: 2 s left it idle) */
+  rest: 60,
   /** The meter's steps on the wire (fill in 1/steps) */
   steps: 32,
 } as const;

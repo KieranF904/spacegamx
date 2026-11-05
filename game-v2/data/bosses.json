@@ -20,7 +20,9 @@
       },
       "level": 8,
       "hp": 0.14,
-      "stageHp": [3600, 5200, 4300],
+      "stageHp": [3300, 4300, 2700],
+      "_exposed": "Where her window shows (client BossFx draws it from the bossWindow message alone): by stage, the pieces laid open",
+      "exposed": [["scrapmother_magnet_l", "scrapmother_magnet_r", "scrapmother_gun1_l", "scrapmother_gun1_r"], ["scrapmother_throat", "scrapmother_stacks", "scrapmother_vat_l", "scrapmother_vat_r"], ["scrapmother_s3_core"]],
       "damage": 1,
       "xp": 2400,
       "credits": 2400,
@@ -1651,11 +1653,13 @@
       "speed": 2.5,
       "turn": 1,
       "brain": "pyreclast",
-      "stageHp": [33000, 44000, 33000],
+      "stageHp": [17500, 23500, 18000],
+      "_exposed": "Where its window shows (client BossFx): by stage, the pieces laid open",
+      "exposed": [["pyreclast_wing_vein_l", "pyreclast_wing_vein_r", "pyreclast_scythe_gun_l", "pyreclast_scythe_gun_r"], ["pyreclast_vent_l", "pyreclast_vent_r", "pyreclast_lance"], ["pyreclast_s3_core", "pyreclast_s3_mineral"]],
       "limbs": {
-        "scythe_gun": 1700, "wing_flak": 1700, "bay": 1500, "scythe_root": 1800,
-        "horn_gun": 1500, "mortar": 1800, "coil": 1800, "lance": 2800, "vent": 1700, "spine": 2100,
-        "s3_mineral": 4000, "s3_vent_housing": 2600, "s3_aft_vent": 2600
+        "scythe_gun": 900, "wing_flak": 900, "bay": 800, "scythe_root": 950,
+        "horn_gun": 800, "mortar": 950, "coil": 950, "lance": 1500, "vent": 900, "spine": 1100,
+        "s3_mineral": 2200, "s3_vent_housing": 1400, "s3_aft_vent": 1400
       },
       "codex": ["pyreclast_scan", "pyreclast_tactics"],
       "hints": {

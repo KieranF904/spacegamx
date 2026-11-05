@@ -1,39 +1,42 @@
 /**
  * The Pyreclast (its cavern under Ashfall): a hulk the size of a station, the meta boss (docs/bosses/rework-2026-11.md
- * sections 5 and 6). Three stages (staged.ts), each a loop of signature moves, one at a time and never scaled by how
- * many pilots there are. Every move has a light tell (always the same one), one dodge rule that always works, and is
- * followed by its window (fightRules.ts: x2 up to a cap, a crack if the cap fills early), whose first 2 s are a rest.
- * Between them pilots draw personal attacks of their own (`personal`). No filler fire: only its vents burn.
+ * sections 5, 6 and 15). Three stages (staged.ts), each an attack phase: its signature moves chained back to back (a
+ * short beat between them), then one short window (fightRules.ts: x2 up to a cap, a crack if the cap fills early; its
+ * first 1 s a rest), then the phase again; nothing scaled by how many pilots there are. Every move has a light tell
+ * (always the same one) and one dodge rule that always works. Between moves and in its window it keeps up a light
+ * threat (`harassShot`: a glint and one fast spark at where you were), and pilots draw personal attacks of their own.
  *
  * Its limbs (PieceDef `limb`: armour 5 against its body's 3, never what a stage is beaten by) each work an attack:
  * break one and that attack weakens or goes (a turret one fewer fan, both scythes no sweep...).
  *
- * Stage one, the fortress (carapace and wings): slow, holding off.
- *   barrage      its wing turrets glow one at a time, clockwise: each throws a fan of three slow magma balls at where
- *                you ARE, once round. Rule: keep moving sideways. Window: its barrels cooling
+ * Stage one, the fortress (carapace and wings): slow, holding off. Phase: barrage, broadside, scythe.
+ *   barrage      its wing turrets glow two at a time from opposite sides, clockwise: each throws a fan of three slow
+ *                magma balls at where you ARE, the fans crossing on you. Rule: keep moving sideways
  *   broadside    it rolls side-on, that wing's turrets swing together and red lanes are drawn; fast shells only down
- *                the lanes. Rule: get off that side, over its nose or tail. Window: the recoil shoves it back
- *   scythe       a scythe's root glows and the blade draws back: it sweeps that side from 900 to 3,400 off its hull.
- *                Rule: get in close. Window: the blade bites into the floor and sticks
- * Stage two, the hunter (its body): lighter, closer, its vents burning anything near them (always).
+ *                the lanes; then it follows you round a little and fires a second salvo. Rule: get off that side, over
+ *                its nose or tail
+ *   scythe       a scythe's root glows and the blade draws back: it sweeps that side from 900 to 3,400 off its hull,
+ *                nose to tail and back. Rule: get in close
+ * Stage two, the hunter (its body): lighter, closer, its vents burning anything near them (always). Phase: mortar,
+ * dash, lance, mortar.
  *   mortar       its mortar beds thump twice: a lane of shells along your line of flight, walls either side and a cap
- *                ahead. Rule: reverse out the way you came. Window: the beds venting
- *   dash         its coils crackle; four dashes round you, each streaked 0.9 s before; the last overshoots. Rule: never
- *                sit on a streak. Window: slow to come about, coils dark
- *   lance        the prow lance hums and draws a line, burns down it, then sweeps across its front towards the side
- *                it first glowed on. Rule: get behind it. Window: the lance overheated
- * Stage three, the heart: small and quick.
- *   crystal      (it darts once first) five beams in a set order, each a white line 0.9 s before. Rule: never sit on a
- *                white line. Window: the crystal dims
- *   ring         side-on to you, its core flares twice: four rings of slow sparks, the two gaps always at its nose and
- *                tail. Rule: get on its nose-to-tail line. Window: the core spent
- *   swarm        a hiss, its seams glow: eight seekers in all, shared among pilots. Rule: turn hard across them.
- *                Window: the seams cooling
- *   vent         it goes still and its vents blaze: no attack, but anything within 700 of a vent burns. Rule: stay out
- *                of the heat, or wear heat plating. Its window is the big one; its vents can't be broken while open
+ *                ahead. Rule: reverse out the way you came
+ *   dash         its coils crackle; five dashes round you, each streaked 0.9 s before; the last overshoots. Rule: never
+ *                sit on a streak
+ *   lance        the prow lance hums and draws a line, burns down it, sweeps across its front towards the side it
+ *                first glowed on, and straight back. Rule: get behind it
+ * Stage three, the heart: small and quick. Phase: crystal, ring, swarm, then its vent (its window).
+ *   crystal      (it darts once first) seven beams in a set order, each a white line 0.9 s before. Rule: never sit on a
+ *                white line
+ *   ring         side-on to you, its core flares twice: five rings of fast sparks out to the vault's walls, the two
+ *                gaps always at its nose and tail as it turns. Rule: stay on its nose-to-tail line
+ *   swarm        a hiss, its seams glow: eight seekers in two waves, shared among pilots. Rule: turn hard across them
+ *   vent         it goes still and its vents blaze: its window, and anything within 700 of a vent burns. Rule: stay
+ *                out of the heat, or wear heat plating. Its vents can't be broken while open
  *
- * Personal attacks (one pilot each, pure luck a beat): magma lob, ember drone, flak burst (stage one), lob and synapse
- * mark (two), spark fan and lob (three); each from a limb, so a broken limb takes it out of the pool.
+ * Its window is drawn by clients from the window alone (BossFx: bosses.json `exposed`). Personal attacks (one pilot
+ * each, pure luck a beat; held only in a window's rest beat and a stagger): magma lob, ember drone, flak burst (stage
+ * one), lob and synapse mark (two), spark fan and lob (three); each from a limb, so a broken limb takes it out of the pool.
  */
 
 import {
@@ -46,15 +49,26 @@ import { StagedBrain, type Move } from './staged.js';
 
 const P = (name: string) => `pyreclast_${name}`;
 
-/** Windows (docs 3.2): stages one and two 7 s capped 5,200; stage three's moves 5 s capped 3,640, its vent 10 s capped 8,320 */
-const W12: WindowSpec = { ticks: 420, cap: 5200 }, W3: WindowSpec = { ticks: 300, cap: 3640 }, VENT_W: WindowSpec = { ticks: 600, cap: 8320 };
+/**
+ * Its attack phases' windows (docs section 15), by stage: one a phase, 5 s for its fortress and its hunter, and 6 s
+ * for its heart, whose window is its vents blazing (VENT_W)
+ */
+export const PYRECLAST_EXPOSURE: WindowSpec[] = [{ ticks: 300, cap: 4200 }, { ticks: 300, cap: 4200 }, { ticks: 360, cap: 5400 }];
+const VENT_W = PYRECLAST_EXPOSURE[2];
+/** Its signature moves (what counts as one: fightRules.ts), each with its stage's window */
 export const PYRECLAST_SIGNATURE: Record<string, WindowSpec> = {
-  barrage: W12, broadside: W12, scythe: W12, mortar: W12, dash: W12, lance: W12, crystal: W3, ring: W3, swarm: W3, vent: VENT_W,
+  barrage: PYRECLAST_EXPOSURE[0], broadside: PYRECLAST_EXPOSURE[0], scythe: PYRECLAST_EXPOSURE[0],
+  mortar: PYRECLAST_EXPOSURE[1], dash: PYRECLAST_EXPOSURE[1], lance: PYRECLAST_EXPOSURE[1],
+  crystal: VENT_W, ring: VENT_W, swarm: VENT_W, vent: VENT_W,
 };
+/** Its phases: the moves chained in order (the heart's ends in its vent: its window), by stage */
+export const PYRECLAST_LOOP = [['barrage', 'broadside', 'scythe'], ['mortar', 'dash', 'lance', 'mortar'], ['crystal', 'ring', 'swarm', 'vent']];
 /** Personal attacks by stage (docs 5.4): a quarter chance a beat each */
 export const PYRECLAST_PERSONAL: PersonalRules = { beat: 120, chance: 0.25, ticks: 240, pool: [['lob', 'ember', 'flak'], ['lob', 'synapse'], ['spark', 'lob']] };
-/** After a move's window (staged.ts: a windowed boss rests from its window's close), 2 s to move before the next tell */
-const REST = [120, 120, 120];
+/** The beat between two chained moves, and its rest after a window (ticks), by stage: shorter each stage */
+const CHAIN = [30, 24, 18], REST = [30, 24, 18];
+/** Its light threat between moves and in its windows: a harassing shot every this many ticks, by stage */
+const HARASS = [90, 80, 70];
 
 /** Shots you dodge by moving across them fly at most this fast (world units a tick: level 30 ships make 25-30) */
 const SLOW = 16;
@@ -67,16 +81,24 @@ const BITE = {
 const HEAT_S2 = 28, HEAT_OPEN = 57, HEAT_REACH = 700;
 /** The scythe's reach off its hull: inside the first it can't reach you */
 const SCYTHE_NEAR = 900, SCYTHE_FAR = 3400;
+/** Between its scythe's pass and its pass back (ticks) */
+const SCYTHE_BEAT = 20;
+/** Its heart's harassing spark: the glint's warning (ticks) */
+const GLINT = 40;
 /** Turning side-on (a broadside, a scythe, a ring pulse) takes at most this long (ticks) */
-const ROLL = 150;
+const ROLL = 150, ROLL_EVERY = 8;
 /** The crystal's beams in order (x BEAM_STEP radians off its heading) */
-const BEAMS = [0, -1, 1, -2, 2], BEAM_STEP = 0.3;
+const BEAMS = [0, -1, 1, -2, 2, -3, 3], BEAM_STEP = 0.3;
+/** Its ring pulse: how many rings, how far apart (ticks), how far it turns between (its sparks: tuning.json heart_spark, 20 a tick out to the walls) */
+const RINGS = 5, RING_EVERY = 32, RING_TURN = 0.12;
 
 type Due = { x: number; y: number; at: number };
 
 export class PyreclastBrain extends StagedBrain {
   /** Turrets' magma swelling, then hurled (at where the target is then: never ahead) */
   private swelling: { part: number; at: number; fan: number; bite: number; aim: number }[] = [];
+  /** Its harassing sparks due (from the part that glinted, at where its pilot was then) */
+  private glints: { part: number; x: number; y: number; at: number }[] = [];
   /** Ground left burning by magma lobs */
   private pools: { x: number; y: number; next: number; until: number }[] = [];
   /** Its heart's vents, held whole while they're open (they can't be broken venting), and when the next heat pulse is */
@@ -90,8 +112,8 @@ export class PyreclastBrain extends StagedBrain {
 
   constructor(host: BrainHost) {
     super(host, {
-      loop: [['barrage', 'broadside', 'scythe'], ['mortar', 'dash', 'lance'], ['crystal', 'ring', 'swarm', 'vent']],
-      rest: REST, haste: [1, 1, 1], signature: PYRECLAST_SIGNATURE, personal: PYRECLAST_PERSONAL,
+      loop: PYRECLAST_LOOP, rest: REST, haste: [1, 1, 1], chain: CHAIN, harass: HARASS,
+      signature: PYRECLAST_SIGNATURE, exposure: PYRECLAST_EXPOSURE, personal: PYRECLAST_PERSONAL,
     }, 'pyreclast');
   }
 
@@ -134,6 +156,7 @@ export class PyreclastBrain extends StagedBrain {
 
   protected onStop(): void {
     this.swelling = [];
+    this.glints = [];
     this.pools = [];
     this.ventHp.clear();
     this.lastMove = '';
@@ -188,12 +211,13 @@ export class PyreclastBrain extends StagedBrain {
    * It turns side-on to its target, `side` (+1: its target off its left as it counts, -1 its right) towards it, following
    * the target as it turns (at most ROLL ticks); returns the heading it settled on, held from there
    */
-  private *roll(side: number): Generator<void, number, void> {
+  private *roll(side: number, most = ROLL): Generator<void, number, void> {
     const eid = this.view.eid, t = this.target;
     let heading = pose(eid).angle;
-    for (let i = 0; i < ROLL && t >= 0; i++) {
+    for (let i = 0; i < most && t >= 0; i++) {
       const me = pose(eid);
-      heading = datan2(Position.y[t] - me.y, Position.x[t] - me.x) - side * Math.PI / 2;
+      // (re-aimed every ROLL_EVERY ticks, not every tick: each new heading is a want, a decision on the wire)
+      if (i % ROLL_EVERY === 0) heading = datan2(Position.y[t] - me.y, Position.x[t] - me.x) - side * Math.PI / 2;
       if (i >= 12 && Math.abs(wrap(me.angle - heading)) < 0.08) break;
       this.want = wantFace(heading);
       yield;
@@ -226,11 +250,14 @@ export class PyreclastBrain extends StagedBrain {
     }
   }
 
-  /** Its wing turrets one after another, clockwise, each a fan of three slow balls at where you are; once round */
+  /**
+   * Its wing turrets clockwise, two at once from opposite sides (their fans cross on you), each a fan of three slow
+   * balls at where you are; then the other two, a beat later
+   */
   private *barrage(): Move {
-    const order = this.clockwise(this.wingGuns()), grow = 72, gap = 30, t = this.target;
-    for (const part of order) {
-      if (this.ship.derived.alive[part]) this.swell(part, grow, 3, BITE.barrage, t);
+    const order = this.clockwise(this.wingGuns()), grow = 66, gap = 24, t = this.target, half = Math.ceil(order.length / 2);
+    for (let k = 0; k < half; k++) {
+      for (const part of [order[k], order[k + half]]) if (part !== undefined && this.ship.derived.alive[part]) this.swell(part, grow, 3, BITE.barrage, t);
       for (let i = 0; i < gap; i++) { this.want = wantAim(); yield; }
     }
     // (held still while it throws: its balls don't take its speed with them)
@@ -250,23 +277,27 @@ export class PyreclastBrain extends StagedBrain {
     const tSide = Math.sign(wrap(toT - me0.angle)) || 1;
     let side = tSide;
     if (!guns.some((g) => Math.sign(local(g).y) === side)) side = -side;
-    // It rolls side-on: that wing towards the target (its heading a quarter turn off the way to it)
-    const heading = yield* this.roll(side);
-    const wing = this.wingGuns().filter((g) => Math.sign(local(g).y) === side);
-    if (!wing.length) return;
-    // The lanes: straight out from that side, from each turret and beside it
-    const lanes = wing.flatMap((g) => { const at = local(g); return [-220, 220].map((dx) => ({ part: g, x: Math.round(at.x + dx), y: Math.round(at.y) })); });
-    const warn = 66, rel = side * Math.PI / 2;
-    for (const l of lanes) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'lane', bodyId: eid, x: l.x, y: l.y, angle: rel, length: 3600, width: 200, ticks: warn });
-    for (let i = 0; i < warn; i++) { this.want = wantFace(heading); yield; }
-    const me = pose(eid), c = dcos(me.angle), s = dsin(me.angle), a = me.angle + rel;
-    for (let shot = 0; shot < 3; shot++) {
-      for (const l of lanes) {
-        if (!this.ship.derived.alive[l.part]) continue;
-        const x = me.x + l.x * c - l.y * s, y = me.y + l.x * s + l.y * c;
-        this.host.fire(eid, 'magma', x + dcos(a) * 60, y + dsin(a) * 60, a, this.view.damage * BITE.broadside);
+    // Two salvos: it rolls side-on (that wing towards the target, its heading a quarter turn off the way to it), and
+    // for the second follows the target round again, briefly, and draws its lanes afresh where they've gone
+    let heading = yield* this.roll(side);
+    for (let salvo = 0; salvo < 2; salvo++) {
+      if (salvo) heading = yield* this.roll(side, 50);
+      const wing = this.wingGuns().filter((g) => Math.sign(local(g).y) === side);
+      if (!wing.length) return;
+      // The lanes: straight out from that side, from each turret and beside it
+      const lanes = wing.flatMap((g) => { const at = local(g); return [-220, 220].map((dx) => ({ part: g, x: Math.round(at.x + dx), y: Math.round(at.y) })); });
+      const warn = salvo ? 54 : 66, rel = side * Math.PI / 2;
+      for (const l of lanes) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'lane', bodyId: eid, x: l.x, y: l.y, angle: rel, length: 3600, width: 200, ticks: warn });
+      for (let i = 0; i < warn; i++) { this.want = wantFace(heading); yield; }
+      const me = pose(eid), c = dcos(me.angle), s = dsin(me.angle), a = me.angle + rel;
+      for (let shot = 0; shot < (salvo ? 2 : 3); shot++) {
+        for (const l of lanes) {
+          if (!this.ship.derived.alive[l.part]) continue;
+          const x = me.x + l.x * c - l.y * s, y = me.y + l.x * s + l.y * c;
+          this.host.fire(eid, 'magma', x + dcos(a) * 60, y + dsin(a) * 60, a, this.view.damage * BITE.broadside);
+        }
+        for (let i = 0; i < 6; i++) { this.want = wantFace(heading); yield; }
       }
-      for (let i = 0; i < 6; i++) { this.want = wantFace(heading); yield; }
     }
     // The recoil: shoved back, away from that side
     const away = toT + Math.PI;
@@ -288,38 +319,39 @@ export class PyreclastBrain extends StagedBrain {
     if (!roots.some((r) => Math.sign(local(r).y) === side)) side = -side;
     const root = roots.find((r) => Math.sign(local(r).y) === side)!;
     // Side-on, the scythe's side to its target; then it draws back
-    const heading = yield* this.roll(side), warn = 84, at = local(root), r = this.ship.derived.radius;
+    const heading = yield* this.roll(side), warn = 72, at = local(root), r = this.ship.derived.radius;
     this.host.launchFx(this.view.systemNum, this.mount(root).x, this.mount(root).y);
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'scythe', bodyId: eid, x: Math.round(at.x), y: Math.round(at.y), radius: 160, ticks: warn });
     // (Where it starts: off its nose on that side; faint, its reach can't be read off the hull)
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'scythe', bodyId: eid, x: 0, y: 0, angle: side * 0.25, length: Math.round(r + SCYTHE_FAR), width: 120, ticks: warn });
     for (let i = 0; i < warn; i++) { this.want = wantFace(heading); yield; }
-    if (this.named(this.ship.blueprint.parts[root].piece) < 0) return;
-    const sweep = 48, hit = new Set<number>();
-    // (the blade, drawn over its reach only: client BossFx 'scythe')
-    this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'scythe', bodyId: eid, x: 0, y: 0, a0: side * 0.25, a1: side * (Math.PI - 0.25), ticks: sweep, length: Math.round(r + SCYTHE_FAR), width: 220 });
-    for (let i = 0; i <= sweep; i++) {
-      // (from just off its nose round that side to just off its tail)
-      const me = pose(eid), a = me.angle + side * (0.25 + (Math.PI - 0.5) * (i / sweep));
-      const ux = dcos(a), uy = dsin(a);
+    // Nose to tail, a beat, and back tail to nose (each pass cuts a pilot once)
+    for (let pass = 0; pass < 2; pass++) {
+      if (this.named(this.ship.blueprint.parts[root].piece) < 0) return;
+      if (pass) for (let i = 0; i < SCYTHE_BEAT; i++) { this.want = wantFace(heading); yield; }
+      const sweep = 44, hit = new Set<number>(), from = pass ? Math.PI - 0.25 : 0.25, to = pass ? 0.25 : Math.PI - 0.25;
+      // (the blade, drawn over its reach only: client BossFx 'scythe')
+      this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'scythe', bodyId: eid, x: 0, y: 0, a0: side * from, a1: side * to, ticks: sweep, length: Math.round(r + SCYTHE_FAR), width: 220 });
+      for (let i = 0; i <= sweep; i++) {
+        // (from just off its nose round that side to just off its tail, and back)
+        const me = pose(eid), a = me.angle + side * (from + (to - from) * (i / sweep));
+        const ux = dcos(a), uy = dsin(a);
 
-      for (const q of this.host.players(this.view.systemNum)) {
-        if (hit.has(q)) continue;
-        const dx = Position.x[q] - me.x, dy = Position.y[q] - me.y, along = dx * ux + dy * uy, across = Math.abs(dx * uy - dy * ux);
-        if (along < r + SCYTHE_NEAR || along > r + SCYTHE_FAR || across > 180) continue;
-        const ship = this.host.ships.get(q);
-        if (!ship || this.walled(me.x, me.y, q)) continue;
-        const h = this.host.ships.segmentHit(q, ship, me.x + ux * (r + SCYTHE_NEAR), me.y + uy * (r + SCYTHE_NEAR), me.x + ux * (r + SCYTHE_FAR), me.y + uy * (r + SCYTHE_FAR), 180);
-        if (!h) continue;
-        hit.add(q);
-        this.host.ships.damagePartBy(q, h.part, BITE.scythe * this.view.damage, eid, { type: 'kinetic', pen: 3 });
+        for (const q of this.host.players(this.view.systemNum)) {
+          if (hit.has(q)) continue;
+          const dx = Position.x[q] - me.x, dy = Position.y[q] - me.y, along = dx * ux + dy * uy, across = Math.abs(dx * uy - dy * ux);
+          if (along < r + SCYTHE_NEAR || along > r + SCYTHE_FAR || across > 180) continue;
+          const ship = this.host.ships.get(q);
+          if (!ship || this.walled(me.x, me.y, q)) continue;
+          const h = this.host.ships.segmentHit(q, ship, me.x + ux * (r + SCYTHE_NEAR), me.y + uy * (r + SCYTHE_NEAR), me.x + ux * (r + SCYTHE_FAR), me.y + uy * (r + SCYTHE_FAR), 180);
+          if (!h) continue;
+          hit.add(q);
+          this.host.ships.damagePartBy(q, h.part, BITE.scythe * this.view.damage, eid, { type: 'kinetic', pen: 3 });
+        }
+        this.want = wantFace(heading);
+        yield;
       }
-      this.want = wantFace(heading);
-      yield;
     }
-    // (it bites into the floor at the end of its sweep)
-    const me = pose(eid), a = me.angle + side * (Math.PI - 0.25);
-    this.host.send(this.view.systemNum, { type: 'detonation', kind: 'eruption', x: Math.round(me.x + dcos(a) * (r + 1600)), y: Math.round(me.y + dsin(a) * (r + 1600)), radius: 260 });
   }
 
   // ---- Stage two: the hunter ----
@@ -340,7 +372,7 @@ export class PyreclastBrain extends StagedBrain {
     const tx = Position.x[t], ty = Position.y[t], d = dhypot(tx - me.x, ty - me.y) || 1;
     const tv = dhypot(Velocity.x[t], Velocity.y[t]);
     const [ux, uy] = tv > 4 ? [Velocity.x[t] / tv, Velocity.y[t] / tv] : [(tx - me.x) / d, (ty - me.y) / d];
-    const nx = -uy, ny = ux, lane = 420, radius = 200, warn = 84;
+    const nx = -uy, ny = ux, lane = 420, radius = 200, warn = 72;
     const reach = Math.max(1100, tv * warn);
     const spots: [number, number][] = [];
     for (const side of [-1, 1]) for (let along = -600; along <= reach; along += 360) spots.push([tx + ux * along + nx * side * lane, ty + uy * along + ny * side * lane]);
@@ -357,7 +389,7 @@ export class PyreclastBrain extends StagedBrain {
 
   /** Dashes round its target, each streaked first (fewer coils, fewer dashes); the last overshoots */
   private *dashChain(): Move {
-    const coils0 = this.working('dash_coil').length, dashes = 2 + coils0;
+    const coils0 = this.working('dash_coil').length, dashes = 3 + coils0;
     for (let k = 0; k < dashes; k++) {
       const t = this.target, coils = this.working('dash_coil').length;
       if (t < 0 || !coils) return;
@@ -381,21 +413,25 @@ export class PyreclastBrain extends StagedBrain {
     }
   }
 
-  /** The prow lance: a red line, then a burning sweep across its front, always towards the side it first glowed on */
+  /**
+   * The prow lance: a red line, then a burning sweep across its front, always towards the side it first glowed on, and
+   * straight back again (its front half only, both ways: behind it, nothing reaches)
+   */
   private *lanceSweep(): Move {
     const lance = this.named(P('lance')), eid = this.view.eid;
     if (lance < 0) return;
-    yield* this.hold(20);
+    yield* this.hold(12);
     const swing = this.host.rng() < 0.5 ? 1 : -1, a0 = -0.75 * swing, a1 = 0.75 * swing;
-    const at = bodyFrame(this.host, eid, this.ship, lance), length = 14000, width = 90, warn = 80;
+    const at = bodyFrame(this.host, eid, this.ship, lance), length = 14000, width = 90, warn = 72;
     const heading = pose(eid).angle;
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'lance', bodyId: eid, x: Math.round(at.x), y: Math.round(at.y), angle: a0, length, width, ticks: warn });
     for (let i = 0; i < warn; i++) { this.want = wantFace(heading); yield; }
-    const ticks = 100;
-    this.host.send(this.view.systemNum, { type: 'bossBeam', bodyId: eid, x: Math.round(at.x), y: Math.round(at.y), a0, a1, ticks, length, width });
-    for (let i = 0; i < ticks; i++) {
+    const ticks = 80;
+    for (let i = 0; i < ticks * 2; i++) {
       if (this.named(P('lance')) < 0) return;
-      this.beam(at, a0 + (a1 - a0) * (i / ticks), length, width, BITE.lance);
+      if (i === 0 || i === ticks) this.host.send(this.view.systemNum, { type: 'bossBeam', bodyId: eid, x: Math.round(at.x), y: Math.round(at.y), a0: i ? a1 : a0, a1: i ? a0 : a1, ticks, length, width });
+      const k = i < ticks ? i / ticks : 1 - (i - ticks) / ticks;
+      this.beam(at, a0 + (a1 - a0) * k, length, width, BITE.lance);
       this.want = wantFace(heading);
       yield;
     }
@@ -415,16 +451,16 @@ export class PyreclastBrain extends StagedBrain {
     for (let i = 0; i < ticks; i++) { this.want = want; yield; }
   }
 
-  /** One spark out of its core (tuning.json heart_spark: slower than SLOW) */
-  private spark(c: { x: number; y: number }, a: number, bite: number): void {
-    this.host.fire(this.view.eid, 'heart_spark', c.x + dcos(a) * 140, c.y + dsin(a) * 140, a, this.view.damage * bite);
+  /** One spark out of its core (tuning.json heart_spark: 20 a tick, out to the vault's walls) */
+  private spark(c: { x: number; y: number }, a: number, bite: number, off = 140): void {
+    this.host.fire(this.view.eid, 'heart_spark', c.x + dcos(a) * off, c.y + dsin(a) * off, a, this.view.damage * bite);
   }
 
-  /** Five beams from its crystal in a set order across its front, each a white line 0.9 s first */
+  /** Seven beams from its crystal in a set order across its front, each a white line 0.9 s first */
   private *crystalBeams(): Move {
     const eid = this.view.eid;
-    yield* this.hold(18);
-    const heading = pose(eid).angle, warn = 54, gap = 20, burn = 22, length = 9000, width = 60;
+    yield* this.hold(12);
+    const heading = pose(eid).angle, warn = 54, gap = 15, burn = 22, length = 9000, width = 60;
     const end = (BEAMS.length - 1) * gap + warn + burn;
     for (let i = 0; i < end; i++) {
       const crystal = this.named(P('s3_mineral'));
@@ -441,15 +477,20 @@ export class PyreclastBrain extends StagedBrain {
     }
   }
 
-  /** Side-on to its target, its core flares twice: four rings of slow sparks, the gaps always at its nose and tail */
+  /**
+   * Side-on to its target, its core flares twice: five rings of fast sparks out to the vault's walls, the gaps always at
+   * its nose and tail as it faces when each is thrown; it turns a little between rings (one way a volley), so the gaps
+   * swing with it
+   */
   private *ringPulse(): Move {
     const t = this.target, eid = this.view.eid;
     if (t < 0) return;
-    const heading = yield* this.roll(this.host.rng() < 0.5 ? 1 : -1);
+    let heading = yield* this.roll(this.host.rng() < 0.5 ? 1 : -1);
+    const turn = this.host.rng() < 0.5 ? RING_TURN : -RING_TURN;
     yield* this.flare(36, wantFace(heading));
     yield* this.flare(36, wantFace(heading));
     const n = 28, gapW = 3;
-    for (let r = 0; r < 4; r++) {
+    for (let r = 0; r < RINGS; r++) {
       if (this.core() < 0) return;
       const c = this.coreAt(), a0 = pose(eid).angle;
       // (spark j's middle at a0 + j/n of a turn: the gaps centred on its nose (j = 0) and its tail (j = n/2))
@@ -457,21 +498,26 @@ export class PyreclastBrain extends StagedBrain {
         const off = j <= gapW / 2 || n - j <= gapW / 2 || Math.abs(j - n / 2) <= gapW / 2;
         if (!off) this.spark(c, a0 + (j / n) * Math.PI * 2, BITE.ring);
       }
-      for (let i = 0; i < 40; i++) { this.want = wantFace(heading); yield; }
+      heading = a0 + turn;
+      for (let i = 0; i < RING_EVERY; i++) { this.want = wantFace(heading); yield; }
     }
   }
 
-  /** A hiss, its seams glowing: eight seekers out all round it, then hunting, shared among the pilots */
+  /** A hiss, its seams glowing: eight seekers in two waves of four, out all round it, then hunting, shared among the pilots */
   private *swarm(): Move {
     const eid = this.view.eid, who = this.view.present?.length ? this.view.present : this.pilots(6000);
     if (!who.length) return;
     yield* this.flare(72, wantHold(), 'seams');
-    const c = this.coreAt(), a0 = this.host.rng() * Math.PI * 2;
-    for (let j = 0; j < 8; j++) {
-      const a = a0 + (j / 8) * Math.PI * 2;
-      this.host.fire(eid, 'heart_seeker', c.x + dcos(a) * 90, c.y + dsin(a) * 90, a, this.view.damage * BITE.swarm, { target: who[j % who.length] });
+    const a0 = this.host.rng() * Math.PI * 2;
+    for (let wave = 0; wave < 2; wave++) {
+      if (this.core() < 0) return;
+      const c = this.coreAt();
+      for (let k = 0; k < 4; k++) {
+        const j = wave * 4 + k, a = a0 + (k / 4) * Math.PI * 2 + wave * Math.PI / 4;
+        this.host.fire(eid, 'heart_seeker', c.x + dcos(a) * 90, c.y + dsin(a) * 90, a, this.view.damage * BITE.swarm, { target: who[j % who.length] });
+      }
+      for (let i = 0; i < 36; i++) { this.want = wantFly(); yield; }
     }
-    for (let i = 0; i < 60; i++) { this.want = wantFly(); yield; }
   }
 
   /** Spent: it goes still and its vents blaze (the heat reaches HEAT_REACH round each); its window is the big one */
@@ -549,8 +595,36 @@ export class PyreclastBrain extends StagedBrain {
 
   // ---- Always on ----
 
+  // ---- Its light threat (staged.ts harass): between moves and in its window ----
+
+  /**
+   * One harassing shot at a pilot: the turret (stage one), horn gun (two) or core (three) on their side glints (the
+   * glint: an aimed shot, as the Mother's), and spits one fast spark at where they were (no splash, no shove). Sidestep
+   */
+  protected harassShot(t: number): boolean {
+    const from = this.stage === 3 ? this.core() : this.sideOf(this.stage === 1 ? this.wingGuns() : this.working('magma_cannon').filter((i) => this.ofStageOf(i) === 2), t);
+    if (from < 0) return false;
+    const at = bodyFrame(this.host, this.view.eid, this.ship, from);
+    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'glint', bodyId: this.view.eid, x: Math.round(at.x), y: Math.round(at.y), radius: 90, ticks: GLINT });
+    this.glints.push({ part: from, x: Position.x[t], y: Position.y[t], at: this.host.tick() + GLINT });
+    return true;
+  }
+
+  /** Its harassing sparks due: one from the part that glinted, at where the pilot was then */
+  private throwGlints(now: number): void {
+    for (let k = this.glints.length - 1; k >= 0; k--) {
+      const g = this.glints[k];
+      if (now < g.at) continue;
+      this.glints.splice(k, 1);
+      if (!this.ship.derived.alive[g.part]) continue;
+      const c = this.mount(g.part);
+      this.spark(c, datan2(g.y - c.y, g.x - c.x), BITE.spark, 60);
+    }
+  }
+
   protected passives(now: number): void {
     this.hurl(now);
+    this.throwGlints(now);
     this.burnPools(now);
     this.lockVents(now);
     const w = this.fight.window;
@@ -619,6 +693,6 @@ export class PyreclastBrain extends StagedBrain {
   }
 
   idle(): boolean {
-    return super.idle() && !this.swelling.length && !this.pools.length;
+    return super.idle() && !this.swelling.length && !this.pools.length && !this.glints.length;
   }
 }

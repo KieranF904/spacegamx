@@ -2,11 +2,14 @@
  * The rules every staged boss fights by (docs/bosses/rework-2026-11.md 2.1-2.2; the shared maths: common bosses/):
  *
  *   windows    a signature move (its tables' `signature`) is followed by its window: x2 up to the cap, a crack and a
- *              stagger when the cap fills early, x0.35 outside windows. The boss starts no move in a window. Clients
- *              are told (bossWindow) at its opening, as it fills, on a crack and as it closes
+ *              stagger when the cap fills early, x0.35 outside windows. A boss with `exposure` (rework 2026-11 section
+ *              15) chains its stage's signature moves into one attack phase and opens one window after the phase, not
+ *              one a move (staged.ts). The boss starts no move in a window. Clients are told (bossWindow) at its
+ *              opening, as it fills, on a crack and as it closes; their exposure effect is drawn from that alone
  *   personal   each beat every pilot present rolls for a personal attack (its tables' `personal`); a draw is a decision
  *              on the boss's body ({slot, attack, seed}) and runs as a move of its own beside the boss's, aimed at that
- *              pilot. None starts in a signature move or a window's rest beat
+ *              pilot. None starts in a window's rest beat or a stagger; a boss without `exposure` also holds them
+ *              through its signature moves
  *   causes     what it's doing now (`cause`): the move, or whose personal attack, for the dev damage log
  *
  * A brain without `signature` takes hits as before (x1), except in a window the dev tools opened (x2).
@@ -25,6 +28,11 @@ export interface FightTables {
   signature?: Record<string, WindowSpec>;
   /** Its personal attacks: the pool by stage, the beat and the chance */
   personal?: PersonalRules;
+  /**
+   * Its attack phases' windows, by stage: its stage's signature moves chained, then this one window (and none after
+   * each move). Personal attacks then come during its moves too, held only in the window's rest beat and a stagger
+   */
+  exposure?: WindowSpec[];
 }
 
 /** A personal attack running: what was drawn, on whom, and its move */
@@ -74,8 +82,9 @@ export class FightRules {
     return staggered(this.window, now);
   }
 
-  /** A move finished: a signature move opens its window */
+  /** A move finished: a signature move opens its window (a boss with attack phases opens its own: staged.ts) */
   finished(name: string, eid: number, num: number, now: number): void {
+    if (this.tables.exposure) return;
     const spec = this.tables.signature?.[name];
     if (spec) this.open(spec, eid, num, now);
   }
@@ -121,7 +130,7 @@ export class FightRules {
     const running = pruneDraws(draws, now);
     this.runs = this.runs.filter((r) => draws.includes(r.draw));
     if (rules) {
-      const held = inSignature || restBeat(this.window, now) || staggered(this.window, now);
+      const held = (inSignature && !this.tables.exposure) || restBeat(this.window, now) || staggered(this.window, now);
       const pool = rules.pool[Math.max(0, Math.min(rules.pool.length - 1, stage - 1))] ?? [];
       for (const d of rollPersonal(rules, stage, this.seed ^ eid, now, present.length, running, held)) {
         const target = present[d.slot];

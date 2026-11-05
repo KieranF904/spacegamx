@@ -20,10 +20,11 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
-import { rayTerrain, type ServerBossBeamMessage, type ServerBossTelegraphMessage } from '@space-game/common';
+import { rayTerrain, type ServerBossBeamMessage, type ServerBossTelegraphMessage, type ServerBossWindowMessage } from '@space-game/common';
 import { terrainFor } from '../rendering/terrainData';
 import type { GameState } from '../state/GameState';
 import { CRANE_BEAM, CRANE_BITE, drawCraneLash, drawTell, isTell, tellSound } from './bossTells';
+import { BossExposure } from './bossExposure';
 
 const COLOR: Record<string, number> = { charge: 0xff2a1a, lance: 0xff2a1a, dash: 0xff9a2a, impact: 0xff6a1a, crystal: 0xffc040, synapse: 0xffd060, ring: 0xffe0a0, vent: 0xffb040,
   // (the Scrap Mother's: hazard yellow for her guns, greyseam green for what pulls, pools and burns)
@@ -79,6 +80,15 @@ export class BossFx {
   private root = new Container();
   /** The beams and warnings (for the bloom) */
   get glowLayer(): Container { return this.root; }
+  /** Where a boss's exposed pieces are drawn (ShipRenderer.exposedAt: set by ShipClient) */
+  partsAt: (bodyId: number, byStage: readonly (readonly string[])[]) => { x: number; y: number }[] = () => [];
+  /** Its window's look on its exposed pieces (bossExposure.ts: from the window message alone) */
+  private exposure = new BossExposure({
+    nameOf: (id) => this.state.entities.get(id)?.name ?? null,
+    partsAt: (id, byStage) => this.partsAt(id, byStage),
+    centre: (id) => { const e = this.state.entities.get(id); return e ? { x: e.renderX, y: e.renderY } : null; },
+    tick: () => this.state.renderTickNow,
+  });
 
   constructor(layer: Container, private state: GameState, private sound: (id: string, at?: { x: number; y: number }, volume?: number, pitch?: number) => (() => void) | null) {
     this.g.blendMode = 'add';
@@ -96,6 +106,11 @@ export class BossFx {
     if (m.kind === 'lance') this.sound('boss_charge', at, 1, Math.max(0.85, Math.min(2, CHARGE_SOUND / (m.ticks * TICK))));
     else if (m.kind === 'magma') this.sound('magma_charge', at, 0.8, Math.max(0.8, Math.min(1.6, MAGMA_SOUND / (m.ticks * TICK))));
     else this.sound(m.kind === 'impact' ? 'warning' : m.kind === 'dash' ? 'thruster_blast' : 'jump_charge', at, m.kind === 'impact' ? 0.35 : 0.7, m.kind === 'charge' ? 0.7 : 1);
+  }
+
+  /** A weak-point window opened, filled, cracked or closed: its exposed pieces blaze while it runs */
+  onWindow(m: ServerBossWindowMessage): void {
+    this.exposure.onWindow(m);
   }
 
   onBeam(m: ServerBossBeamMessage): void {
@@ -138,6 +153,7 @@ export class BossFx {
     }
     this.beams.length = w;
     this.drawAfter(g, dt);
+    this.exposure.draw(g, dt);
   }
 
   private drawWarn(g: Graphics, x: Warn, at: { x: number; y: number; angle: number }): void {

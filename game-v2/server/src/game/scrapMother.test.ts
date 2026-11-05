@@ -3,7 +3,7 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, ServerMessage, isRuined, currentStage, createShipState, stepFlight, deciding, stageOf, type FlightBody } from '@space-game/common';
 import { devHooks } from './brains/kit.js';
-import { MOTHER_SIGNATURE } from './brains/scrapMother.js';
+import { MOTHER_SIGNATURE, MOTHER_EXPOSURE, MOTHER_LOOP } from './brains/scrapMother.js';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -54,27 +54,28 @@ const advance = (server: GameServer, eid: number, stage: number, step: (n?: numb
   for (let i = 0; i < 60 * 15 && brain.invulnerable!(); i++) step();
 };
 /**
- * Her fight watched from a pilot held `d` from her (mended, never dying): the signature moves in the order she starts
- * them (until `n` of them and `n` windows), the windows told, her tells' kinds in order, sweeping beams and darts
+ * Her fight watched from a pilot held `d` from her (mended, never dying), until `w` windows have opened: the signature
+ * moves in the order she starts them, the windows told (their caps), the order of both (`order`: a move's name, or
+ * 'window'), her tells' kinds in order (with the tick each came), sweeping beams and darts
  */
-function watch(server: GameServer, got: ServerMessage[], eid: number, pid: number, num: number, d: number, ticks: number, n: number) {
+function watch(server: GameServer, got: ServerMessage[], eid: number, pid: number, num: number, d: number, ticks: number, w: number) {
   const hooks = devHooks(server.bosses.brainOf(eid))!;
-  const moves: string[] = [], windows: { cap: number }[] = [], tells: string[] = [];
+  const moves: string[] = [], windows: { cap: number; at: number }[] = [], tells: string[] = [], told: { kind: string; at: number; ticks: number }[] = [], order: string[] = [];
   let beams = 0, darts = 0, last = '';
-  for (let i = 0; i < ticks && !(moves.length >= n && windows.length >= n); i++) {
+  for (let i = 0; i < ticks && windows.length < w; i++) {
     got.length = 0;
     server.step();
     if (i % 30 === 0) { mend(server, pid); place(pid, num, Position.x[eid] + d, Position.y[eid]); }
     const name = hooks.moveName;
-    if (name && name !== last && MOTHER_SIGNATURE[name]) moves.push(name);
+    if (name && name !== last && MOTHER_SIGNATURE[name]) { moves.push(name); order.push(name); }
     last = name;
     for (const m of got as any[]) {
-      if (m.type === 'bossWindow' && m.bodyId === eid && m.ticks > 0 && m.fill === 0) windows.push({ cap: m.cap });
-      if (m.type === 'bossTelegraph') { tells.push(m.kind); if (m.kind === 'dash') darts++; }
+      if (m.type === 'bossWindow' && m.bodyId === eid && m.ticks > 0 && m.fill === 0 && !m.crack) { windows.push({ cap: m.cap, at: server.getTick() }); order.push('window'); }
+      if (m.type === 'bossTelegraph') { tells.push(m.kind); told.push({ kind: m.kind, at: server.getTick(), ticks: m.ticks }); if (m.kind === 'dash') darts++; }
       if (m.type === 'bossBeam' && m.kind === 'weld') beams++;
     }
   }
-  return { moves, windows, tells, beams, darts };
+  return { moves, windows, tells, told, order, beams, darts };
 }
 
 describe('the Scrap Mother', () => {
@@ -91,24 +92,51 @@ describe('the Scrap Mother', () => {
     expect(quest.level).toBe(def.level);
   });
 
-  it('stage one, the hoard: barrage, haul, crane in that order, each told first on her hull, each followed by its window; no filler fire', () => {
+  it('stage one, the hoard: one attack phase, barrage, crane and haul chained, each told first on her hull, then one short window; her guns keep firing in it', () => {
     const { server, got, pid, num, god } = world();
     god();
     const eid = server.bosses.spawn('boss_scrap_mother');
     place(pid, num, Position.x[eid] + 2400, Position.y[eid]);
-    const { moves, windows, tells } = watch(server, got, eid, pid, num, 2400, 60 * 50, 3);
-    expect(moves.slice(0, 3)).toEqual(['barrage', 'haul', 'crane']);
-    // (a window opens as each ends, with its cap; her next move waits for it and her rest after it)
-    expect(windows.length).toBeGreaterThanOrEqual(3);
-    for (const w of windows.slice(0, 3)) expect(w.cap).toBe(MOTHER_SIGNATURE.barrage.cap);
-    // (the tells: a gun's faint line, her magnets' green glow, the crane's amber lamp: each before its move's first hurt)
+    const { order, windows, tells, told } = watch(server, got, eid, pid, num, 2400, 60 * 50, 2);
+    // (her three moves back to back, then her one window, then the phase again)
+    expect(order.slice(0, 5)).toEqual(['barrage', 'crane', 'haul', 'window', 'barrage']);
+    expect(windows[0].cap).toBe(MOTHER_EXPOSURE[0].cap);
+    expect(MOTHER_EXPOSURE[0].ticks).toBeLessThanOrEqual(300);
+    // (the phase is quick: barrage to window in under 15 s)
+    expect(windows[1].at - windows[0].at).toBeLessThan(60 * 20);
+    // (the tells: a gun's faint line, the crane's amber lamp, her magnets' green glow: each before its move's first hurt)
     expect(tells.indexOf('rivet')).toBeGreaterThanOrEqual(0);
-    expect(tells.indexOf('glow_green')).toBeGreaterThan(tells.indexOf('rivet'));
-    expect(tells.indexOf('glow_amber')).toBeGreaterThan(tells.indexOf('glow_green'));
-    // (between moves she only flies: rivet lines are her barrage's six and no more, unless a personal attack drew one)
-    expect(tells.filter((k) => k === 'rivet').length).toBeGreaterThanOrEqual(6);
-    expect(tells.filter((k) => k === 'rivet').length).toBeLessThanOrEqual(8);
+    expect(tells.indexOf('glow_amber')).toBeGreaterThan(tells.indexOf('rivet'));
+    expect(tells.indexOf('glow_green')).toBeGreaterThan(tells.indexOf('glow_amber'));
+    // (in her window, after its 1 s rest beat, a gun still draws a line at you: never just sitting there)
+    const w0 = windows[0].at, inWindow = told.filter((t) => t.kind === 'rivet' && t.at > w0 && t.at < w0 + MOTHER_EXPOSURE[0].ticks);
+    expect(inWindow.length).toBeGreaterThanOrEqual(2);
+    expect(inWindow.every((t) => t.at >= w0 + 60)).toBe(true);
   });
+
+  it('she keeps up the pressure: from her first tell on, never more than 2 s without a tell live or a move under way, outside a stagger', () => {
+    for (const stage of [1, 2, 3]) {
+      const { server, got, pid, step, num, god } = world();
+      god();
+      const eid = server.bosses.spawn('boss_scrap_mother');
+      place(pid, num, Position.x[eid] + 2000, Position.y[eid]);
+      step(5);
+      if (stage > 1) advance(server, eid, stage, step);
+      const hooks = devHooks(server.bosses.brainOf(eid))!;
+      let live = -1, quiet = 0, longest = 0, started = false;
+      for (let i = 0; i < 60 * 40; i++) {
+        got.length = 0;
+        step();
+        if (i % 30 === 0) { mend(server, pid); place(pid, num, Position.x[eid] + 2000, Position.y[eid]); }
+        for (const m of got as any[]) if (m.type === 'bossTelegraph' || m.type === 'bossBeam') { live = Math.max(live, server.getTick() + m.ticks); started = true; }
+        if (!started) continue;
+        const busy = live > server.getTick() || (!!hooks.moveName && MOTHER_SIGNATURE[hooks.moveName] !== undefined) || hooks.fight.staggered(server.getTick());
+        quiet = busy ? 0 : quiet + 1;
+        longest = Math.max(longest, quiet);
+      }
+      expect(longest, `stage ${stage}`).toBeLessThanOrEqual(120);
+    }
+  }, 60_000);
 
   it('her haul pulls only what is in front of her, and her crane misses what is close in', () => {
     const pulled = (side: number) => {
@@ -173,7 +201,7 @@ describe('the Scrap Mother', () => {
     expect(bridge.get(eid)!.hp[body]).toBeLessThan(w);
   });
 
-  it('stage two, the mill: intake, shrapnel, charge, each followed by its window; her rings always open at her flanks; her body wrecks', () => {
+  it('stage two, the mill: shrapnel, charge, intake, charge chained, then her window; her rings always open at her flanks; her body wrecks', () => {
     const { server, got, pid, step, num, bridge, god } = world();
     god();
     const eid = server.bosses.spawn('boss_scrap_mother');
@@ -184,10 +212,11 @@ describe('the Scrap Mother', () => {
     const weapons = server['weapons'], spawn = weapons.spawn.bind(weapons);
     const chunks: number[] = [];
     weapons.spawn = (owner: number, kind: string, x: number, y: number, a: number, ...rest: any[]) => { if (owner === eid && kind === 'scrap_chunk') chunks.push(a - (bridge as any).pose(eid).angle); return (spawn as any)(owner, kind, x, y, a, ...rest); };
-    const { moves, windows } = watch(server, got, eid, pid, num, 1600, 60 * 50, 3);
-    expect(moves.slice(0, 3)).toEqual(['intake', 'shrapnel', 'charge']);
-    expect(windows.length).toBeGreaterThanOrEqual(3);
-    expect(chunks.length).toBeGreaterThanOrEqual(30);
+    const { order, windows } = watch(server, got, eid, pid, num, 1600, 60 * 50, 1);
+    expect(order.slice(0, 5)).toEqual([...MOTHER_LOOP[1], 'window']);
+    expect(MOTHER_LOOP[1]).toEqual(['shrapnel', 'charge', 'intake', 'charge']);
+    expect(windows[0].cap).toBe(MOTHER_EXPOSURE[1].cap);
+    expect(chunks.length).toBeGreaterThanOrEqual(60);
     // (no chunk flies out of her flanks: the gap is there every ring)
     for (const a of chunks) {
       const off = Math.abs(Math.atan2(Math.sin(a), Math.cos(a)));
@@ -202,7 +231,7 @@ describe('the Scrap Mother', () => {
     expect(isRuined(catalog, bridge.get(eid)!, vat)).toBe(true);
   });
 
-  it('a move whose part is shot off: she only flies in its slot, then its window opens as ever', () => {
+  it('a move whose part is shot off goes out of her phase: she goes straight on to the next, and her window opens as ever', () => {
     const { server, got, pid, step, num, bridge, god } = world();
     god();
     const eid = server.bosses.spawn('boss_scrap_mother');
@@ -211,23 +240,13 @@ describe('the Scrap Mother', () => {
     const s = bridge.get(eid)!;
     for (const name of ['magnet_l', 'magnet_r']) bridge.hurt(eid, bridge.get(eid)!, s.blueprint.parts.findIndex((p) => p.piece === `scrapmother_${name}`), 1e9);
     step(2);
-    const hooks = devHooks(server.bosses.brainOf(eid))!;
-    hooks.devPlay('haul');
     got.length = 0;
-    const names = new Set<string>();
-    let opened = -1;
-    for (let i = 0; i < 500 && opened < 0; i++) {
-      step();
-      if (i % 30 === 0) { mend(server, pid); place(pid, num, Position.x[eid] + 2400, Position.y[eid]); }
-      names.add(hooks.moveName);
-      if (got.some((m) => m.type === 'bossWindow' && (m as any).ticks > 0)) opened = i;
-    }
-    expect(names.has('rest')).toBe(true);
+    const { order } = watch(server, got, eid, pid, num, 2400, 60 * 40, 2);
+    expect(order.slice(0, 6)).toEqual(['barrage', 'crane', 'window', 'barrage', 'crane', 'window']);
     expect(got.some((m) => m.type === 'bossTelegraph' && (m as any).kind === 'glow_green')).toBe(false);
-    expect(opened).toBeGreaterThan(300);
   });
 
-  it('stage three, the seed: scissor, spiral, seekers; she repositions once (in the spiral\'s tell), looses eight seekers in all', () => {
+  it('stage three, the seed: spiral, scissor, seekers, scissor chained, then her window; she repositions once (in the spiral\'s tell), looses eight seekers in all', () => {
     const { server, got, pid, step, num, god } = world();
     god();
     const eid = server.bosses.spawn('boss_scrap_mother');
@@ -238,30 +257,40 @@ describe('the Scrap Mother', () => {
     const weapons = server['weapons'], spawn = weapons.spawn.bind(weapons);
     const shots: { kind: string; target?: number }[] = [];
     weapons.spawn = (owner: number, kind: string, x: number, y: number, a: number, k: number, shape: any, ...rest: any[]) => { if (owner === eid) shots.push({ kind, target: shape?.target }); return (spawn as any)(owner, kind, x, y, a, k, shape, ...rest); };
-    const { moves, windows, tells, beams, darts } = watch(server, got, eid, pid, num, 1300, 60 * 60, 3);
-    expect(moves.slice(0, 3)).toEqual(['scissor', 'spiral', 'seekers']);
-    expect(windows.length).toBeGreaterThanOrEqual(3);
-    expect(beams).toBe(2);
-    expect(darts).toBe(1);
-    expect(tells).toContain('iris');
+    const { order, windows, beams, told } = watch(server, got, eid, pid, num, 1300, 60 * 60, 2);
+    expect(order.slice(0, 5)).toEqual(['spiral', 'scissor', 'seekers', 'scissor', 'window']);
+    expect(windows[0].cap).toBe(MOTHER_EXPOSURE[2].cap);
+    // (each scissor: both welders in, then back out; two phases watched)
+    expect(beams).toBe(16);
+    // (one dart a phase: in the spiral's tell)
+    expect(told.filter((t) => t.kind === 'dash' && t.at > windows[0].at && t.at <= windows[1].at).length).toBe(1);
+    // (eight a phase: two phases, and the odd lone seeker a pilot drew)
     const seekers = shots.filter((s) => s.kind === 'seam_seeker');
-    expect(seekers.length).toBeGreaterThanOrEqual(8);
-    expect(seekers.length).toBeLessThanOrEqual(9);
+    expect(seekers.length).toBeGreaterThanOrEqual(16);
+    expect(seekers.length).toBeLessThanOrEqual(19);
     expect(seekers.every((s) => s.target === pid)).toBe(true);
     expect(shots.filter((s) => s.kind === 'scrap_chunk').length).toBeGreaterThan(30);
   });
 
-  it('her windows: x2 up to the cap; filled early, it cracks once; outside them she takes x0.3', () => {
+  it('her radial chunks are fast and reach the nest\'s walls: there is no safe distance to sit at', () => {
+    const chunk = (world().bridge.tuning as any).weapons.scrap_chunk;
+    const arena = (files.systems as any).systems.find((s: any) => s.id === def.system).arena;
+    expect(chunk.speed).toBeGreaterThanOrEqual(15);
+    // (from anywhere she flies (her home's reach) to the far wall)
+    expect(chunk.speed * chunk.life).toBeGreaterThanOrEqual(arena.radius + 3500);
+  });
+
+  it('her windows: x2 up to the cap; filled early, it cracks once; outside them she takes x0.25', () => {
     const { server, pid, step, num, bridge, god } = world();
     god();
     const eid = server.bosses.spawn('boss_scrap_mother');
     place(pid, num, Position.x[eid] + 2400, Position.y[eid]);
     step(5);
     const brain = server.bosses.brainOf(eid)!, hooks = devHooks(brain)!;
-    expect(server.bosses.taken(eid)).toBeCloseTo(0.3);
+    expect(server.bosses.taken(eid)).toBeCloseTo(0.25);
     hooks.devWindow('barrage');
     expect(server.bosses.taken(eid)).toBe(2);
-    expect(hooks.fight.window!.cap).toBe(MOTHER_SIGNATURE.barrage.cap);
+    expect(hooks.fight.window!.cap).toBe(MOTHER_EXPOSURE[0].cap);
     const s = bridge.get(eid)!;
     for (let i = 0; i < s.hp.length && hooks.fight.window!.crackAt < 0; i++) if (s.derived.alive[i] && s.hp[i] > 30) bridge.damagePartBy(eid, i, 200, pid);
     expect(hooks.fight.stats.cracks).toBe(1);
@@ -355,8 +384,8 @@ describe('the Scrap Mother', () => {
       if (d > Math.PI / 4) away++;
     }
     expect(between).toBeGreaterThan(200);
-    // (her windows and rests are flying too; her moves now hold a heading)
-    expect(away / between).toBeGreaterThan(0.35);
+    // (her windows and the beats between her chained moves are flying too; her moves hold a heading)
+    expect(away / between).toBeGreaterThan(0.2);
   });
 
   it('she flies as built throughout', () => {
