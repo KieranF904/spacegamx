@@ -9,12 +9,16 @@
  *
  * A real GameServer and the fake client (fakeHitsClient.testkit.ts) taking confirmed hits for everything (CAPS.HITS);
  * each impact it was shown is compared with the server's projectileHit for that shell.
+ *
+ * What this client isn't told can move a ship after a shell struck it: a contact or a pull on its own ship (the Hookboat's
+ * harpoon reels it in, into the boat's hull, since its lines are led: 2026-11-05), or whatever had a ship keyframed. Such
+ * a hit is drawn from the pose at the tick's end, a unit or two off; it's held to "a few units" only.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Input, InSystem, CAPS, ReplicaMode, replicaAngle, quantizeReplicaAngle, type ReplicaEnv,
+  Position, Velocity, Input, InSystem, CAPS, ReplicaMode, replicaAngle, quantizeReplicaAngle, type ReplicaEnv, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
@@ -47,13 +51,37 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
       const ships = server.getShips();
       const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
       const A = new FakeHitsClient(server, { name: 'hit_points', caps: CAPS.HITS, env });
-      // The server's point for each shell's hits on ships
-      const truth = new Map<number, { x: number; y: number; target: number }[]>();
+      // The server's point for each shell's hits on ships, and the tick
+      const truth = new Map<number, { x: number; y: number; target: number; tick: number }[]>();
       const ledger = server.hits as unknown as { shellHit(p: number, x: number, y: number, h?: { target: number }): void };
       const shellHit = ledger.shellHit.bind(ledger);
       ledger.shellHit = (p, x, y, h) => {
-        if (h) { const l = truth.get(p) ?? []; l.push({ x, y, target: h.target }); truth.set(p, l); }
+        if (h) { const l = truth.get(p) ?? []; l.push({ x, y, target: h.target, tick: server.getTick() }); truth.set(p, l); }
         shellHit(p, x, y, h);
+      };
+      // The ticks its own ship was pushed by what it isn't told (a contact, a pull: the causes a CAPS.OWN_SIM client gets)
+      const pushed = new Set<number>();
+      {
+        const oc = ships.ownCauses as unknown as { add(eid: number, c: { kind: number }): void };
+        const add = oc.add.bind(oc);
+        oc.add = (eid, c) => { if (eid === A.pid && (c.kind === 0 || c.kind === 1)) pushed.add(server.getTick()); add(eid, c); };
+      }
+      // The snapshots it was sent, and the ships each keyframed (their paths up to it the client's guess)
+      const snaps: number[] = [], keyed = new Map<number, Set<number>>();
+      {
+        const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void };
+        const o = fa.snapshot.bind(A);
+        fa.snapshot = (s) => {
+          snaps.push(s.tick);
+          if (s.ships?.length) keyed.set(s.tick, new Set(s.ships.map((k) => k[0])));
+          o(s);
+        };
+      }
+      /** Was the ship struck on `tick` moved by what the client isn't told: pushed then (its own), or keyframed in the snapshot after */
+      const untold = (target: number, tick: number) => {
+        if (target === A.pid && pushed.has(tick)) return true;
+        const at = snaps.find((t) => t >= tick);
+        return at !== undefined && !!keyed.get(at)?.has(target);
       };
       const step = () => { server.step(); clock.t += 1000 / 60; A.flushUp(); };
       for (let i = 0; i < 20; i++) step();
@@ -86,24 +114,27 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
         step();
       }
       // Each impact the client was shown against the server's point for that shell (the nearest, for a pierce)
-      let onSelf = 0, onOthers = 0, close = 0;
+      let onSelf = 0, onOthers = 0, close = 0, moved = 0;
       const off: string[] = [];
       for (const m of A.impacts) {
         const l = truth.get(m.id);
         if (!l) continue;
-        let e = Infinity, tgt = -1;
-        for (const s of l) { const d = Math.hypot(s.x - m.x, s.y - m.y); if (d < e) { e = d; tgt = s.target; } }
+        let e = Infinity, tgt = -1, tick = -1;
+        for (const s of l) { const d = Math.hypot(s.x - m.x, s.y - m.y); if (d < e) { e = d; tgt = s.target; tick = s.tick; } }
         if (tgt === A.pid) onSelf++; else if (hostiles.has(tgt)) onOthers++;
-        if (e <= 0.5) close++;
+        if (untold(tgt, tick)) moved++;
+        else if (e <= 0.5) close++;
         if (e > 5) off.push(`shell ${m.id} on ${tgt === A.pid ? 'self' : tgt}: ${e.toFixed(1)} off`);
       }
-      if (process.env.HITS_DEBUG) console.log('HP', { onSelf, onOthers, close, impacts: A.impacts.length }, off.slice(0, 5));
+      if (process.env.HITS_DEBUG) console.log('HP', { onSelf, onOthers, close, moved, impacts: A.impacts.length }, off.slice(0, 5));
       expect(onSelf, "hits on the client's own ship").toBeGreaterThan(10);
       expect(onOthers, 'hits on pirates').toBeGreaterThan(3);
       // Every one where the server's struck, to the tenth it's sent at; a hit on a ship keyframed in its snapshot may be a
-      // little off (its path before the keyframe is the client's guess), never more than a few units
+      // little off (its path before the keyframe is the client's guess), and so may one on its own ship that a contact or
+      // a pull moved after the shell struck: never more than a few units
       expect(off).toEqual([]);
-      expect(close / (onSelf + onOthers)).toBeGreaterThan(0.95);
+      expect(close / (onSelf + onOthers - moved)).toBeGreaterThan(0.95);
+      expect(moved).toBeLessThan((onSelf + onOthers) / 2);
     } finally {
       Math.random = random;
     }
