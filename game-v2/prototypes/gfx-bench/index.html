@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>gfx-bench</title>
+<style>
+body{margin:0;background:#000011;color:#cde;font:13px/1.4 monospace}
+#bar{position:fixed;top:0;left:0;right:0;background:#000c;padding:6px 10px;z-index:5;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#stats{white-space:pre}
+canvas{display:block}
+table{border-collapse:collapse;margin:8px 10px}td,th{border:1px solid #345;padding:2px 8px;text-align:right}
+select,input,button{background:#123;color:#cde;border:1px solid #456;font:inherit}
+</style></head><body>
+<div id="bar">
+ <label>mode <select id="mode">
+  <option value="pixi-webgl">Pixi WebGL (as game: Graphics bullets, Container hulls)</option>
+  <option value="pixi-webgpu">Pixi WebGPU preference</option>
+  <option value="direct">Direct WebGL2 instanced</option></select></label>
+ <label>particles <input id="p" type="number" value="10000" step="1000" style="width:70px"></label>
+ <label>bullets <input id="b" type="number" value="1000" step="100" style="width:60px"></label>
+ <label>hulls <input id="k" type="number" value="100" step="10" style="width:50px"></label>
+ <button id="go">restart</button><button id="table">run scaling table (this mode)</button>
+ <span id="stats"></span>
+</div>
+<div id="stage"></div><div id="out"></div>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.16.0/dist/pixi.min.js"></script>
+<script src="bench.js"></script>
+</body></html>
