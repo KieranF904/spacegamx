@@ -64,6 +64,15 @@
  */
 export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072, LAUNCHES: 262144, NOSE: 524288 } as const;
 
+/**
+ * The caps that are on by default, everywhere (dev and production alike): the server allows these unless NET_CAPS
+ * says otherwise, and a client offers each of them unless its `?flag=0` (client network/netCaps.ts) switches it off.
+ * One mask, so the dev stage and the live game run the same netcode. A new cap is off until it is added here.
+ */
+export const DEFAULT_CAPS: number = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM
+  | CAPS.INPUTS | CAPS.BODIES | CAPS.BLOCKS | CAPS.FOCUS | CAPS.CAUSES | CAPS.WAYPOINTS | CAPS.PILOTS | CAPS.CROWD | CAPS.STRUCTS
+  | CAPS.CARGO | CAPS.DEBRIS | CAPS.LAUNCHES | CAPS.NOSE;
+
 /** Does this client run the debris it works out from then on (CAPS.DEBRIS)? */
 export function debrisFor(caps: number | undefined): boolean {
   return ((caps ?? 0) & CAPS.DEBRIS) !== 0;

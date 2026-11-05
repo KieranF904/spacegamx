@@ -18,12 +18,14 @@ import { createShipBridge } from './proto/createProtoServer.js';
 import { createProfileStore } from './profile/index.js';
 import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';
-import { CAPS } from '@space-game/common';
+import { DEFAULT_CAPS } from '@space-game/common';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
+/** The address it listens on: every interface unless HOST says (the VPS unit: 127.0.0.1, behind nginx) */
+const HOST = process.env.HOST || undefined;
 const ADMIN_PORT = parseInt(process.env.ADMIN_PORT || '3005', 10);
 const DEV_MODE = process.env.NODE_ENV !== 'production';
 const SERVER_NAME = process.env.SERVER_NAME || 'Local dev';
@@ -80,11 +82,10 @@ const gameServer = new GameServer({
   devRange: DEV_MODE ? loadRangeConfig(dataPath) : undefined,
   // Everyone (guests and signed-in pilots) is an admin on the dev server (never in production: GameServer refuses it there too)
   guestAdmin: DEV_MODE,
-  // Confirmed hits, client-detected hits, bit-packed frames and coalescing for clients that offer them
-  // (docs/design/confirmed-hits.md parts C, D, E; docs/design/packed-frames.md): the dev server; NET_CAPS (a bit mask: 1
-  // confirmed, 2 client-detected, 4 packed, 8 coalesced, 16 own shots as fire events, 32 adaptive validation, 64 its own ship
-  // stepped by itself, 128 compact inputs; 255 all) elsewhere
-  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEV_MODE ? CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.BLOCKS | CAPS.FOCUS | CAPS.CAUSES | CAPS.WAYPOINTS | CAPS.PILOTS | CAPS.CROWD | CAPS.STRUCTS | CAPS.CARGO | CAPS.DEBRIS | CAPS.LAUNCHES | CAPS.NOSE : 0,
+  // The netcode caps this server allows a client that offers them (common network/hits.ts CAPS): DEFAULT_CAPS, the same in
+  // dev and production; NET_CAPS (a bit mask: 1 confirmed hits, 2 client-detected, 4 packed, 8 coalesced, 16 own shots as
+  // fire events, 32 adaptive validation, 64 its own ship stepped by itself, 128 compact inputs, ... 0 none) overrides it
+  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEFAULT_CAPS,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
   // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)
@@ -98,7 +99,7 @@ const gameServer = new GameServer({
   // What's alive, dead and due back in every system, so a restart picks the world up where it was (data/world/, kept between deploys)
   worldStore: worldFileStore(join(dataPath, 'world', 'memory.json')),
 });
-const transport = new SocketTransport(gameServer, PORT);
+const transport = new SocketTransport(gameServer, PORT, HOST);
 
 // How it's running, every 2 s, for the box's resource monitor (deploy/vps/monitor): written whole, then swapped in
 const statusDir = join(dataPath, 'status');
@@ -160,7 +161,7 @@ process.on('uncaughtException', (e) => {
 
 // Register with server browser
 async function registerWithBrowser() {
-  // In production, Fly.io routes HTTPS through port 443
+  // In production nginx takes the game's socket on 443 (TLS) and passes it to PORT on 127.0.0.1
   const publicPort = DEV_MODE ? PORT : 443;
   
   try {

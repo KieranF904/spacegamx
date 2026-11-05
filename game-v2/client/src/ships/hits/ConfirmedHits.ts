@@ -20,7 +20,7 @@
  * own hit is dropped), then `flush` at the frame's end hands out the messages.
  */
 import {
-  CAPS, unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
+  CAPS, DEFAULT_CAPS, unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
   type ClientMessage, type ServerMessage, type ServerHitsMessage, type ServerHpCheckMessage, type ShipState, type HitCtx, type PlacedGeom,
   hpWire, type ShellHitRecord, type HitEndFx,
 } from '@space-game/common';
@@ -401,7 +401,8 @@ export function clientCaps(): number {
     } catch { /* no storage: the default */ }
     return null;
   };
-  const on = flag('hits', 'sg.hits') ?? !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
+  // (on by default in dev and production builds alike: common DEFAULT_CAPS; ?hits=0 / ?selfhits=0 switch them off)
+  const on = flag('hits', 'sg.hits') ?? (DEFAULT_CAPS & CAPS.HITS) !== 0;
   if (!on) return 0;
-  return CAPS.HITS | (flag('selfhits', 'sg.selfhits') ?? true ? CAPS.SELF_HITS : 0);
+  return CAPS.HITS | (flag('selfhits', 'sg.selfhits') ?? (DEFAULT_CAPS & CAPS.SELF_HITS) !== 0 ? CAPS.SELF_HITS : 0);
 }
