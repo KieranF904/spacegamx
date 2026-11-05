@@ -532,6 +532,8 @@ const LINGER_TICKS = 60 * 20;
 // setImmediate is Node-only; fall back to setTimeout when running in a browser (proto mode).
 const scheduleImmediate: (fn: () => void) => unknown =
   typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
+/** The game loop's last stretch before a tick is due: too short to sleep (timers fire on whole ms), so it doesn't */
+const LOOP_SPIN_MS = 0.25;
 
 /** No asteroids: what a ghost round's rock query is (it flies through them) */
 const NO_ROCKS: number[] = [];
@@ -3417,69 +3419,70 @@ this.devTeleport = opts.devTeleport ?? false;
   // ============================================
 
   /**
-   * Pure setImmediate game loop — never sleeps.
+   * Real-time loop: sleeps until the next tick is due, runs the ticks the
+   * accumulator owes (catch-up capped), then the snapshot round and one flush
+   * of everyone's outbox.
    *
-   * Every iteration yields to the Node event loop via setImmediate, so
-   * WebSocket messages (inputs, pongs, chat) are received and dispatched
-   * with ~0ms server-side delay instead of waiting for a setTimeout to
-   * expire.  Inputs are queued on arrival and batch-applied right before
-   * each tick for deterministic simulation.
-   *
-   * CPU usage is slightly higher than a sleeping loop, but on a dedicated
-   * game server that's the correct trade-off — latency matters more than
-   * idle power savings.
+   * WebSocket messages (inputs, pongs, chat) are handled as they arrive,
+   * between wakeups: inputs are queued and batch-applied right before each
+   * tick for deterministic simulation, and replies to a request are flushed
+   * straight after it (pongs go at once), so a wakeup that runs no tick has
+   * no snapshot due and nothing waiting to flush.
    */
   private gameLoop(): void {
     const now = performance.now();
     const deltaMs = now - this.lastTickTime;
     this.lastTickTime = now;
-    
+
     this.tickAccumulator += deltaMs;
     if (this.paused) this.tickAccumulator = 0;
 
     // Fixed timestep updates— cap catch-up to avoid spiral of death
     let ticksThisFrame = 0;
     const maxTicksPerFrame = 4;
-    this.net.batching++;
-    try {
-      while (this.tickAccumulator >= TICK_MS && ticksThisFrame < maxTicksPerFrame) {
-        // Drain queued inputs right before each tick so they take effect
-        // on the earliest possible tick boundary.
-        this.guard('inputs', () => this.drainInputQueue());
-      
-        this.tick();
-        this.ownPasses();
-        this.crowd?.endTick();
-        this.tickAccumulator -= TICK_MS;
-        ticksThisFrame++;
-      }
-    
-      // If we're still behind, drop accumulated time to avoid spiral
-      if (this.tickAccumulator > TICK_MS * maxTicksPerFrame) {
+    // (Woken a little early, or paused: no tick, so nothing to do but sleep again)
+    if (this.tickAccumulator >= TICK_MS) {
+      this.net.batching++;
+      try {
+        while (this.tickAccumulator >= TICK_MS && ticksThisFrame < maxTicksPerFrame) {
+          // Drain queued inputs right before each tick so they take effect
+          // on the earliest possible tick boundary.
+          this.guard('inputs', () => this.drainInputQueue());
+
+          this.tick();
+          this.ownPasses();
+          this.crowd?.endTick();
+          this.tickAccumulator -= TICK_MS;
+          ticksThisFrame++;
+        }
+
+        // If we're still behind, drop accumulated time to avoid spiral
+        if (this.tickAccumulator > TICK_MS * maxTicksPerFrame) {
+          this.tickAccumulator = 0;
+        }
+
+        // Send snapshots at snapshot rate (each system at its own window: crowd fallbacks)
+        this.guard('snapshots', () => this.snapshotRound());
+      } catch (e) {
+        // (Whatever got past the guards: logged, and the loop goes on: it's scheduled below either way)
         this.tickAccumulator = 0;
+        this.fault('gameLoop', e);
+      } finally {
+        this.net.batching--;
+        this.guard('flushOutbox', () => this.flushOutbox());
       }
-    
-      // Send snapshots at snapshot rate (each system at its own window: crowd fallbacks)
-      this.guard('snapshots', () => this.snapshotRound());
-    } catch (e) {
-      // (Whatever got past the guards: logged, and the loop goes on: it's scheduled below either way)
-      this.tickAccumulator = 0;
-      this.fault('gameLoop', e);
-    } finally {
-      this.net.batching--;
-      this.guard('flushOutbox', () => this.flushOutbox());
     }
-    
-    // Schedule the next iteration with a precise delay instead of busy-spinning.
-    // setImmediate loops consume a full CPU core, which starves co-located
-    // processes and invites scheduler preemption mid-tick (observed as
-    // 100-500ms tick spikes on loaded dev machines). Sleeping between ticks
-    // drops CPU usage to near zero while keeping tick timing accurate —
-    // the accumulator absorbs any timer jitter via catch-up.
+
+    // Sleep until the next tick is due. Busy-waiting (setImmediate) burns CPU
+    // between ticks (the last 1-1.5 ms of every tick was spun through: thousands
+    // of wakeups a second for 60 ticks), which starves co-located processes and
+    // invites scheduler preemption mid-tick. Timers fire on whole milliseconds,
+    // so a sleep lands up to ~1 ms either side of the deadline: early, the
+    // wakeup just sleeps the rest; late, the accumulator absorbs it (the next
+    // sleep is that much shorter). Only the last LOOP_SPIN_MS isn't slept.
     const msUntilNextTick = TICK_MS - this.tickAccumulator;
-    if (msUntilNextTick > 1.5) {
-      // Sleep until just before the next tick is due (1ms scheduling margin)
-      this.gameLoopTimer = setTimeout(() => this.gameLoop(), msUntilNextTick - 1);
+    if (msUntilNextTick > LOOP_SPIN_MS) {
+      this.gameLoopTimer = setTimeout(() => this.gameLoop(), Math.max(1, Math.floor(msUntilNextTick)));
     } else {
       // Tick due now (or behind) — run on the next event loop pass
       this.gameLoopTimer = scheduleImmediate(() => this.gameLoop());
