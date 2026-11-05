@@ -37,6 +37,6 @@
   "torch",
   "panel_r"
  ],
- "radiusCells": 3.045,
- "radius": 73
+ "radiusCells": 2.667,
+ "radius": 64
 }

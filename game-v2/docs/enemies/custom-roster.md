@@ -123,11 +123,13 @@ changes what the enemy does, so there's a reason to aim.
 | 6 | Maw Lurker | Maw Spawn | `maw_lurker` | sniper | 165 | 7 / 6 | 24-30 | high |
 | 7 | Hookboat | Pirates | `pirate_raider` | puller | 138 | 11 / 5 | 8-12 | medium |
 | 8 | Rime Bell | Frost Brood | `frost_shard` | swarmer / support | 125 | 6 / 5 | 6-9 | low |
-| 9 | Helios Drone | Helios Drones | `helios_drone` | passive / welder | 73 | 11 / 6 | 1-3 | low |
+| 9 | Helios Drone | Helios Drones | `helios_drone` | passive / welder | 64 | 11 / 6 | 1-3 | low |
 
 Radius is in world units (24 to a cell). The grid enemies they replace are about 60-100 across their radius. The
 custom ones are a little bigger so their pieces read at game zoom; each design's `scale` in `write()` is a single
-number to change. A **group** is one destroyable piece. It may be drawn as several polygons (a claw is an arm, a palm
+number to change. The kit writes that scale onto each piece as `fine`, so its seams and bevels are drawn at its size
+(a share of a cell otherwise: heavy, inked outlines on a hull drawn small) and its detail is outlined in shadow, not
+black; painted detail is toned a quarter of the way to grey (restyle, 2026-11-05). A **group** is one destroyable piece. It may be drawn as several polygons (a claw is an arm, a palm
 and a finger), but it breaks as one. With eight groups or fewer, which pieces are gone fits in one byte.
 
 ### 1. Scrap Crawler (Scrapborn; replaces `scrap_crawler`)
@@ -251,10 +253,10 @@ membrane frill around its back edge, three crystal tendrils trailing.
 
 One of the Array's maintenance drones that strayed, as `docs/lore-canon.md` has them. It is drawn as Directorate
 engineering:
-- a clean titanium service chassis with gold trim and stencilled hatches
+- a slim titanium service chassis with a little brass trim (about the grid drone's bulk)
 - a sensor dome lit on one half and cracked dark on the other (half-blind)
-- a jointed welding arm ending in a torch
-- two folding solar panels and one small drive
+- a light jointed welding arm ending in a torch
+- two solar panels on thin booms, in the stations' own solar cells (`surface: 'solar'`), and one small drive
 
 It is a starter's first kill, a little smaller than the starter ship.
 

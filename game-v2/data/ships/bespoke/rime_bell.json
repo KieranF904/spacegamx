@@ -128,7 +128,8 @@
      "w": 0.149,
      "color": "#e6f2ff"
     }
-   ]
+   ],
+   "fine": 0.62
   },
   {
    "id": "rime_bell_tendril_c",
@@ -257,7 +258,8 @@
      "w": 0.149,
      "color": "#e6f2ff"
     }
-   ]
+   ],
+   "fine": 0.62
   },
   {
    "id": "rime_bell_tendril_r",
@@ -386,7 +388,8 @@
      "w": 0.149,
      "color": "#e6f2ff"
     }
-   ]
+   ],
+   "fine": 0.62
   },
   {
    "id": "rime_bell_frill",
@@ -605,7 +608,8 @@
      "w": 0.043,
      "color": "#c48cff"
     }
-   ]
+   ],
+   "fine": 0.62
   },
   {
    "id": "rime_bell_bell",
@@ -713,7 +717,7 @@
        -1.013
       ]
      ],
-     "color": "#7d9cb6"
+     "color": "#839aae"
     },
     {
      "kind": "raise",
@@ -735,7 +739,7 @@
        -0.457
       ]
      ],
-     "color": "#7d9cb6"
+     "color": "#839aae"
     },
     {
      "kind": "raise",
@@ -757,7 +761,7 @@
        0.045
       ]
      ],
-     "color": "#7d9cb6"
+     "color": "#839aae"
     },
     {
      "kind": "raise",
@@ -779,7 +783,7 @@
        -0.2
       ]
      ],
-     "color": "#7d9cb6"
+     "color": "#839aae"
     },
     {
      "kind": "raise",
@@ -801,7 +805,7 @@
        -0.855
       ]
      ],
-     "color": "#7d9cb6"
+     "color": "#839aae"
     },
     {
      "kind": "channel",
@@ -988,7 +992,8 @@
      "w": 0.161,
      "color": "#e6f2ff"
     }
-   ]
+   ],
+   "fine": 0.62
   },
   {
    "id": "rime_bell_gland",
@@ -1064,7 +1069,7 @@
        -0.643
       ]
      ],
-     "color": "#1b1830"
+     "color": "#1b192b"
     },
     {
      "kind": "glow",
@@ -1084,7 +1089,8 @@
      "r": 0.136,
      "color": "#e6f2ff"
     }
-   ]
+   ],
+   "fine": 0.62
   }
  ]
 }

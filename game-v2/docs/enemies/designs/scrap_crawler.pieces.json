@@ -55,11 +55,11 @@
      ],
      "r": 0.21,
      "w": 0.08,
-     "color": "#c9a23a"
+     "color": "#bfa254"
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        -2.198,
@@ -81,7 +81,7 @@
     },
     {
      "kind": "raise",
-     "color": "#202226",
+     "color": "#202225",
      "poly": [
       [
        -2.348,
@@ -103,7 +103,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        -2.498,
@@ -123,7 +123,8 @@
       ]
      ]
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_leg_r",
@@ -179,11 +180,11 @@
      ],
      "r": 0.21,
      "w": 0.08,
-     "color": "#c9a23a"
+     "color": "#bfa254"
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        2.454,
@@ -205,7 +206,7 @@
     },
     {
      "kind": "raise",
-     "color": "#202226",
+     "color": "#202225",
      "poly": [
       [
        2.604,
@@ -227,7 +228,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        2.754,
@@ -247,7 +248,8 @@
       ]
      ]
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_spine",
@@ -290,7 +292,7 @@
        -1.15
       ]
      ],
-     "color": "#2a2620"
+     "color": "#292622"
     },
     {
      "kind": "glow",
@@ -330,7 +332,7 @@
        1.175
       ]
      ],
-     "color": "#55585e"
+     "color": "#56585c"
     },
     {
      "kind": "raise",
@@ -352,7 +354,7 @@
        1.45
       ]
      ],
-     "color": "#55585e"
+     "color": "#56585c"
     },
     {
      "kind": "raise",
@@ -374,7 +376,7 @@
        1.725
       ]
      ],
-     "color": "#55585e"
+     "color": "#56585c"
     },
     {
      "kind": "ring",
@@ -385,7 +387,7 @@
      "r": 0.055,
      "w": 0.041,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -396,7 +398,7 @@
      "r": 0.055,
      "w": 0.041,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -407,7 +409,7 @@
      "r": 0.055,
      "w": 0.041,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -418,7 +420,7 @@
      "r": 0.055,
      "w": 0.041,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -429,7 +431,7 @@
      "r": 0.055,
      "w": 0.041,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -440,9 +442,10 @@
      "r": 0.055,
      "w": 0.041,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_shell_l",
@@ -510,7 +513,7 @@
        1.236
       ]
      ],
-     "color": "#5a3a2a"
+     "color": "#543c30"
     },
     {
      "kind": "ring",
@@ -521,7 +524,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -532,7 +535,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -543,7 +546,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -554,7 +557,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "recess",
@@ -584,7 +587,7 @@
        0.621
       ]
      ],
-     "color": "#3d2318"
+     "color": "#38251c"
     },
     {
      "kind": "raise",
@@ -606,7 +609,7 @@
        -0.232
       ]
      ],
-     "color": "#2e2a26"
+     "color": "#2d2a27"
     },
     {
      "kind": "glow",
@@ -645,9 +648,10 @@
        -0.532
       ]
      ],
-     "color": "#2a2620"
+     "color": "#292622"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_shell_r",
@@ -715,7 +719,7 @@
        -0.888
       ]
      ],
-     "color": "#4d5a44"
+     "color": "#4f5848"
     },
     {
      "kind": "ring",
@@ -726,7 +730,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -737,7 +741,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -748,7 +752,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -759,7 +763,7 @@
      "r": 0.07,
      "w": 0.053,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "recess",
@@ -810,7 +814,7 @@
        -0.168
       ]
      ],
-     "color": "#2e2a26"
+     "color": "#2d2a27"
     },
     {
      "kind": "glow",
@@ -849,9 +853,10 @@
        -0.678
       ]
      ],
-     "color": "#2a2620"
+     "color": "#292622"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_lamp",
@@ -891,7 +896,7 @@
      ],
      "r": 0.425,
      "w": 0.11,
-     "color": "#9a9ea4",
+     "color": "#9b9ea2",
      "sides": 6
     },
     {
@@ -922,7 +927,7 @@
        0.295
       ]
      ],
-     "color": "#2a2620"
+     "color": "#292622"
     },
     {
      "kind": "glow",
@@ -934,7 +939,8 @@
      "color": "#7affd2",
      "sides": 6
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_arm_l",
@@ -998,7 +1004,7 @@
      ],
      "r": 0.2,
      "w": 0.07,
-     "color": "#c9a23a"
+     "color": "#bfa254"
     },
     {
      "kind": "glow",
@@ -1011,7 +1017,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        -1.796,
@@ -1033,7 +1039,7 @@
     },
     {
      "kind": "raise",
-     "color": "#202226",
+     "color": "#202225",
      "poly": [
       [
        -1.846,
@@ -1055,7 +1061,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        -1.896,
@@ -1075,7 +1081,8 @@
       ]
      ]
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_arm_r",
@@ -1139,7 +1146,7 @@
      ],
      "r": 0.2,
      "w": 0.07,
-     "color": "#c9a23a"
+     "color": "#bfa254"
     },
     {
      "kind": "glow",
@@ -1152,7 +1159,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        1.522,
@@ -1174,7 +1181,7 @@
     },
     {
      "kind": "raise",
-     "color": "#202226",
+     "color": "#202225",
      "poly": [
       [
        1.572,
@@ -1196,7 +1203,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        1.622,
@@ -1216,7 +1223,8 @@
       ]
      ]
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_pincer_l",
@@ -1273,7 +1281,7 @@
      "r": 0.09,
      "w": 0.068,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -1284,7 +1292,7 @@
      "r": 0.075,
      "w": 0.056,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "raise",
@@ -1306,7 +1314,7 @@
        -2.673
       ]
      ],
-     "color": "#a6a9ae"
+     "color": "#a7a9ad"
     },
     {
      "kind": "recess",
@@ -1336,9 +1344,10 @@
        -2.204
       ]
      ],
-     "color": "#3d2318"
+     "color": "#38251c"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_pincer_r",
@@ -1395,7 +1404,7 @@
      "r": 0.09,
      "w": 0.068,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "ring",
@@ -1406,7 +1415,7 @@
      "r": 0.075,
      "w": 0.056,
      "sides": 8,
-     "color": "#8a8d92"
+     "color": "#8b8d91"
     },
     {
      "kind": "raise",
@@ -1428,7 +1437,7 @@
        -2.727
       ]
      ],
-     "color": "#a6a9ae"
+     "color": "#a7a9ad"
     },
     {
      "kind": "recess",
@@ -1458,9 +1467,10 @@
        -2.205
       ]
      ],
-     "color": "#3d2318"
+     "color": "#38251c"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_finger_l",
@@ -1524,9 +1534,10 @@
      ],
      "r": 0.16,
      "w": 0.06,
-     "color": "#c9a23a"
+     "color": "#bfa254"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_finger_r",
@@ -1590,9 +1601,10 @@
      ],
      "r": 0.16,
      "w": 0.06,
-     "color": "#c9a23a"
+     "color": "#bfa254"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_magnet",
@@ -1664,7 +1676,7 @@
      ],
      "r": 0.5,
      "w": 0.12,
-     "color": "#6e7277"
+     "color": "#6f7276"
     },
     {
      "kind": "ring",
@@ -1674,7 +1686,7 @@
      ],
      "r": 0.35,
      "w": 0.1,
-     "color": "#b0702a"
+     "color": "#a3733e"
     },
     {
      "kind": "recess",
@@ -1730,7 +1742,8 @@
      "r": 0.11,
      "color": "#3f9a78"
     }
-   ]
+   ],
+   "fine": 0.5
   },
   {
    "id": "scrap_crawler_drive",
@@ -1780,7 +1793,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        -0.425,
@@ -1802,7 +1815,7 @@
     },
     {
      "kind": "raise",
-     "color": "#202226",
+     "color": "#202225",
      "poly": [
       [
        -0.212,
@@ -1824,7 +1837,7 @@
     },
     {
      "kind": "raise",
-     "color": "#c9a23a",
+     "color": "#bfa254",
      "poly": [
       [
        0,
@@ -1846,7 +1859,7 @@
     },
     {
      "kind": "raise",
-     "color": "#202226",
+     "color": "#202225",
      "poly": [
       [
        0.213,
@@ -1866,7 +1879,8 @@
       ]
      ]
     }
-   ]
+   ],
+   "fine": 0.5
   }
  ]
 }
