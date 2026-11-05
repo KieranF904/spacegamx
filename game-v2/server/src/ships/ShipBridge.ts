@@ -13,7 +13,7 @@ import {
   Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
   GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, standing,
-  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, dhypot,
+  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot,
 } from '@space-game/common';
 import {
   STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type PendingSalvoShell,
@@ -242,6 +242,9 @@ export class ShipBridge {
 
   /** Player movement. Returns false for non-ship entities so the legacy path runs. */
   stepMovement(eid: number): boolean { return flt.stepMovement(this.ctx, eid); }
+
+  /** A pilot's stores, guns, hazards and priming as tick `tick` ended, as its own client steps them (a copy; null: no ship) */
+  ownExtras(eid: number, tick: number): OwnExtras | null { return flt.ownExtras(this.ctx, eid, tick); }
 
   addToSpatialGrid(add: (eid: number, x: number, y: number, r: number) => void): void { return flt.addToSpatialGrid(this.ctx, add); }
 

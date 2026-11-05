@@ -58,6 +58,7 @@
   "needsRepair",
   "onPlayerCreated",
   "ownCauses",
+  "ownExtras",
   "partAt",
   "partFacing",
   "pin",

@@ -11,16 +11,24 @@
  *   causes     after each tick's step, that tick's (a pull's push, a contact worked out with the shared contact maths,
  *              a rebuild's recentring), then rounded as every body is
  *
- * The drawn ship is its prediction, untouched. Its check (takeCheck): a hash of its state at the last snapshot's tick
+ * Its step is the whole one (Stage 3b: step): the one stepper (common sim/ownStep.ts stepOwnShip) on its full state,
+ * stores, guns, hazards and priming kept here by tick, its guns' fire events kept by tick for the drawing side to take
+ * (takeEvents, once per tick as the prediction reaches it). It is stepped up to the prediction's tick and drawn from
+ * there (ShipClient.ownStepTo / ownPose): its ship is stepped once a tick, not once here and once by a prediction.
+ *
+ * Its check (takeCheck): a hash of its full state (common sim/headHash.ts ownStateHash) at the last snapshot's tick
  * on an input that goes anyway, as often as its record calls for: NORMAL to start, ROUGH after a clean stretch, STRICT
  * after the server had to fix it (a keyframe of its own ship after the first), stepping back down after each clean one.
+ * A snapshot's head hash it disagrees with sends it at once. Put right: its keyframe (the pose) and an ownSync (the
+ * rest, exact: onOwnSync).
  */
 import {
   applyOwnCauses, applyCauseRows, cargoBefore, buildFlightInputs, controlBits, quantizeReplicaAngle, unpackControlRow, controlRowId, ownBodyHash, ownHpHash,
   ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG, placeRows, pairPlace, type CauseRow,
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
-  headAgrees, headHashOfWord, ownHeadHash, type HeadHash,
+  headAgrees, headHashOfWord, ownStateHash, pilotAimQ, stepOwnShip, ownStructure, seedOwnExtras, unpackOwnSync, remapCharge, NO_OWN_INPUT, type HeadHash,
+  type OwnExtras, type OwnInputExtras, type ServerOwnSyncMessage, type SimShipState, type SimEvent, type SimEnv, type FieldEnv, type ReplicaEnv,
 } from '@space-game/common';
 import type { StructSource } from '../ShipStore.js';
 import type { ContactWorld } from '../causes/ContactWorld.js';
@@ -43,6 +51,17 @@ export interface OwnTickHost {
 
 /** Ticks of inputs kept (a snapshot window is never this far behind the inputs it needs) */
 const KEEP_TICKS = 600;
+/** Ticks of full states and their events kept (the replica set keeps 240 of its own) */
+const KEEP_STATES = 300;
+/** Ticks of fire events handed out at most at once (a long stall's are not drawn: they are long gone) */
+const PRESENT_TICKS = 8;
+
+/** The own step's env (stepOwnShip's: guns in the step), filled from the replica set's world each tick */
+const OWN_FIELDS: FieldEnv = { central: null };
+const OWN_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: OWN_FIELDS, terrain: null };
+
+/** What takeEvents hands out: a tick's events and its full state after its step */
+export interface OwnTickEvents { tick: number; events: SimEvent[]; state: Readonly<SimShipState> }
 /** Clean ticks for its check to step down a level (as part E's) */
 const CLEAN_TICKS = 600;
 
@@ -71,10 +90,27 @@ export class OwnTick implements OwnTimeline {
   level: number = CONFIRM.NORMAL;
   private levelSince = 0;
   private last = { tick: -Infinity, snap: -Infinity, body: -1, hp: -1 };
-  readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0, heads: 0, headMisses: 0 };
+  readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0, heads: 0, headMisses: 0, syncs: 0 };
   /** The newest snapshot's head hash, to judge at its next check (sim/headHash.ts), and a miss not yet sent */
   private head: { tick: number; h: HeadHash } | null = null;
   private missed = false;
+  /** Its inputs' fire, jump and aim distance from their target ticks (held between): parallel, by tick */
+  private readonly inTicks: number[] = [];
+  private readonly inVals: OwnInputExtras[] = [];
+  /** Its full state after each tick's step, before that tick's causes (where its guns fired, what they did) */
+  private readonly stepped = new Map<number, SimShipState>();
+  /** Its stores, guns, hazards and priming as each tick ended (after its causes: a rebuild's stores remapped) */
+  private readonly full = new Map<number, OwnExtras>();
+  /** Each tick's fire and fx events, as last stepped, and the newest tick they were handed out through */
+  private readonly evs = new Map<number, SimEvent[]>();
+  private presented = -Infinity;
+  /** ...and the newest tick a snapshot confirmed them through (takeConfirmed), and the tick of the newest ownSync */
+  private confirmedTo = -Infinity;
+  syncedAt = -Infinity;
+  /** The server's extras by the tick they ended (ownSync): a step of that tick ends with these, whatever it worked out */
+  private readonly synced = new Map<number, OwnExtras>();
+  /** What it starts from with nothing earlier (its record's gun state, full stores) */
+  private seed: OwnExtras | null = null;
 
   constructor(private readonly host: OwnTickHost) {}
 
@@ -87,6 +123,12 @@ export class OwnTick implements OwnTimeline {
     this.causes.clear();
     this.until = null;
     this.keyed = false;
+    this.stepped.clear(); this.full.clear(); this.evs.clear();
+    this.presented = -Infinity;
+    this.confirmedTo = -Infinity;
+    this.syncedAt = -Infinity;
+    this.synced.clear();
+    this.seed = null;
     this.host.reps.setOwn(id, this);
   }
 
@@ -94,10 +136,129 @@ export class OwnTick implements OwnTimeline {
   noteInput(msg: ClientInputMessage): void {
     const t = msg.targetTick;
     if (t === undefined) return;
-    this.ctls.set(t, [controlBits(buildFlightInputs(msg, false)), quantizeReplicaAngle(Number(msg.targetAngle) || 0)]);
+    // (The aim as the server's step flies it (pilotAimQ): what its control rows say and its head hash hashes)
+    this.ctls.set(t, [controlBits(buildFlightInputs(msg, false)), pilotAimQ(Number(msg.targetAngle) || 0)]);
+    const dist = Number(msg.cursorDist) || 0;
+    this.noteExtras(t, { fire: !!msg.fireLeft, fireAlt: !!msg.fireRight, jumpDist: dist, aimDist: dist });
     this.stats.inputs++;
     if (this.ctls.size > KEEP_TICKS) for (const k of [...this.ctls.keys()]) if (k < t - KEEP_TICKS) this.ctls.delete(k);
     if (this.on) this.host.reps.rewind(this.host.self(), t);
+  }
+
+  private noteExtras(t: number, v: OwnInputExtras): void {
+    const ts = this.inTicks;
+    let i = ts.length;
+    while (i > 0 && ts[i - 1] > t) i--;
+    if (i > 0 && ts[i - 1] === t) this.inVals[i - 1] = v;
+    else { ts.splice(i, 0, t); this.inVals.splice(i, 0, v); }
+    if (ts.length > 256) { const cut = ts.findIndex((k) => k >= t - KEEP_TICKS); if (cut > 0) { ts.splice(0, cut); this.inVals.splice(0, cut); } }
+  }
+
+  /** Its input's fire, jump and aim distance on tick t (the newest with a target tick at or before it) */
+  inputAt(t: number): Readonly<OwnInputExtras> {
+    const ts = this.inTicks;
+    let lo = 0, hi = ts.length - 1, at = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (ts[m] <= t) { at = m; lo = m + 1; } else hi = m - 1; }
+    return at >= 0 ? this.inVals[at] : NO_OWN_INPUT;
+  }
+
+  /** Its stores, guns, hazards and priming as tick t ended (undefined: not stepped there) */
+  extrasAt(t: number): Readonly<OwnExtras> | undefined {
+    return this.full.get(t);
+  }
+
+  /** Its full state after tick t's step, before its causes (undefined: not stepped there) */
+  steppedAt(t: number): Readonly<SimShipState> | undefined {
+    return this.stepped.get(t);
+  }
+
+  /** What it ended the newest tick before t with (a keyframe's tick has none of its own: its path's before it) */
+  private extrasBefore(t: number): OwnExtras | undefined {
+    const x = this.full.get(t - 1);
+    if (x) return x;
+    let best = -Infinity;
+    for (const k of this.full.keys()) if (k < t && k > best) best = k;
+    return best > -Infinity ? this.full.get(best) : undefined;
+  }
+
+  /**
+   * Tick t's whole step (OwnTimeline.step: the replica set asks, for every tick it steps its own ship flown): the one
+   * stepper on its full state from what tick t - 1 ended with, its guns' events kept for the drawing side (takeEvents)
+   */
+  step(t: number, body: FlightBody, bits: number, q: number, derived: ShipDerived, env: ReplicaEnv): number | null {
+    const self = this.host.self(), ship = this.host.store.get(self);
+    if (!this.on || !ship || ship.kind !== 'ship') return null;
+    const prev = this.extrasBefore(t) ?? (this.seed ??= seedOwnExtras(ship));
+    OWN_ENV.tick = t; OWN_ENV.tuning = this.host.tuning; OWN_ENV.gravity = env.gravity; OWN_ENV.terrain = env.terrain ?? null; OWN_ENV.hazard = env.hazard;
+    OWN_FIELDS.central = env.central; OWN_FIELDS.lodestones = env.lodestones;
+    const events: SimEvent[] = [];
+    const s = stepOwnShip(self, prev, body, bits, q, this.inputAt(t), ownStructure(derived, ship), OWN_ENV, events);
+    this.stepped.set(t, s);
+    this.evs.set(t, events);
+    if (this.stepped.size > KEEP_STATES + 64) for (const mp of [this.stepped, this.full, this.evs] as Map<number, unknown>[]) for (const k of [...mp.keys()]) if (k < t - KEEP_STATES) mp.delete(k);
+    return s.ctl.bits;
+  }
+
+  /** Tick t's step done and its causes worked out: what it ended the tick with (a rebuild's stores remapped) */
+  private finish(t: number, rows: CauseRow[] | undefined): void {
+    const s = this.stepped.get(t);
+    if (!s) return;
+    // (The server said how this tick ended: that, exact (its snapshot steps this tick again after the ownSync came))
+    const told = this.synced.get(t);
+    if (told) { this.full.set(t, told); return; }
+    const x: OwnExtras = { charge: s.charge, guns: s.guns, hazard: s.hazard, jumpPrime: s.jumpPrime };
+    // (A rebuild at the tick's end moves the stores to the new structure, as the server's rebuild does)
+    if (rows?.some((r) => r.row[0] === OWN_CAUSE.REBUILD)) {
+      const was = this.derived(t), now = this.derived(t + 1);
+      if (was && now && was !== now) x.charge = remapCharge(was, now, x.charge);
+    }
+    this.full.set(t, x);
+  }
+
+  /**
+   * The fire and fx events of the ticks after the last handed out, through tick `through` (the prediction's newest),
+   * as each was last stepped; at most the newest `cap` (a stall's are not drawn)
+   */
+  takeEvents(through: number, out: OwnTickEvents[] = [], cap = PRESENT_TICKS): OwnTickEvents[] {
+    this.eventsFrom(Math.max(this.presented + 1, through - cap + 1), through, out);
+    if (through > this.presented) this.presented = through;
+    return out;
+  }
+
+  /**
+   * The fire and fx events of the ticks a snapshot at `through` confirms (those after the last it confirmed), as its
+   * layer has them now, the snapshot's keyframe, causes and ownSync in: what its own shells are built from (OwnShells)
+   */
+  takeConfirmed(through: number, out: OwnTickEvents[] = []): OwnTickEvents[] {
+    this.eventsFrom(Math.max(this.confirmedTo + 1, through - KEEP_STATES + 1), through, out);
+    if (through > this.confirmedTo) this.confirmedTo = through;
+    return out;
+  }
+
+  private eventsFrom(from: number, through: number, out: OwnTickEvents[]): void {
+    out.length = 0;
+    if (!Number.isFinite(from)) { from = through + 1; for (const k of this.evs.keys()) if (k < from) from = k; }
+    for (let t = from; t <= through; t++) {
+      const events = this.evs.get(t), state = this.stepped.get(t);
+      if (events && state) out.push({ tick: t, events, state });
+    }
+  }
+
+  /**
+   * The server's word on its stores, guns, hazards and priming as tick m.t ended (exact; it comes just before that
+   * tick's snapshot): taken as that tick's, and its ship stepped again from the next (its pose comes by its keyframe).
+   * That window's own shells are the server's to tell, as a keyframed window's are (syncedAt: ShipClient.preSnapshot)
+   */
+  onOwnSync(m: ServerOwnSyncMessage): void {
+    if (!this.on) return;
+    const x = unpackOwnSync(m), ship = this.host.store.get(this.host.self());
+    if (ship) x.charge = seedOwnExtras({ derived: ship.derived }, x.charge).charge;
+    this.full.set(m.t, x);
+    this.synced.set(m.t, x);
+    if (this.synced.size > 8) this.synced.delete(this.synced.keys().next().value!);
+    this.syncedAt = m.t;
+    this.stats.syncs++;
+    this.host.reps.rewind(this.host.self(), m.t + 1);
   }
 
   /** Its own ship's structure is about to change (shipSync): the one it flew until now */
@@ -189,7 +350,9 @@ export class OwnTick implements OwnTimeline {
    * each by its place in the pass
    */
   rowsAt(t: number): CauseRow[] | undefined {
-    const told = this.causes.get(t), w = this.finds();
+    // (Past the newest snapshot (its ship stepped ahead, the prediction): no pairs found there. What it would touch
+    // isn't known yet, and the other ships aren't stepped ahead for it; the snapshot's window finds them once, final)
+    const told = this.causes.get(t), w = t <= this.snapTick ? this.finds() : null;
     if (!w) return told?.map((row, i) => ({ seq: i, row }));
     const self = this.host.self(), found = w.rowsFor(self, t);
     const pl = told ? placeRows(self, told) : [];
@@ -205,11 +368,12 @@ export class OwnTick implements OwnTimeline {
 
   after(t: number, body: FlightBody): void {
     const rows = this.rowsAt(t);
+    this.finish(t, rows);
     if (!rows) return;
     this.fired.set(t, { ...body });
     if (this.fired.size > 64) for (const k of [...this.fired.keys()]) if (k < t - KEEP_TICKS) this.fired.delete(k);
     // (Finding pairs itself: through its cursor, the states others read of it kept, MidCursors)
-    if (this.finds()) { if (!this.cursors.after(this.host.self(), t, body, () => ({ pre: body, rows, env: this.env(t) }))) this.stats.failed++; return; }
+    if (this.finds() && t <= this.snapTick) { if (!this.cursors.after(this.host.self(), t, body, () => ({ pre: body, rows, env: this.env(t) }))) this.stats.failed++; return; }
     if (!applyOwnCauses(body, rows.map((r) => r.row), this.env(t))) this.stats.failed++;
   }
 
@@ -289,9 +453,9 @@ export class OwnTick implements OwnTimeline {
     this.head = null;
     const self = this.host.self();
     if (this.host.reps.docked(self)) return;
-    const st = this.host.reps.at(self, hd.tick);
+    const st = this.host.reps.at(self, hd.tick), x = this.full.get(hd.tick);
     this.stats.heads++;
-    if (headAgrees(hd.h, st ? ownHeadHash(self, st.body, st.bits, st.q) : undefined)) return;
+    if (headAgrees(hd.h, st && x ? ownStateHash(self, st.body, st.bits, st.q, x, hd.tick) : undefined)) return;
     this.stats.headMisses++;
     this.missed = true;
   }
@@ -317,9 +481,12 @@ export class OwnTick implements OwnTimeline {
     const rules = ownCheckRules(this.level), since = tick - this.last.tick;
     if (!force && (since < rules.ride || (!riding && since < rules.alone))) return undefined;
     // (Docked: as its keyframe had it, the server's too: Replication.ownHeld)
-    const self = this.host.self(), st = this.host.reps.docked(self) ?? this.host.reps.at(self, this.snapTick), ship = this.host.store.get(self);
+    const self = this.host.self(), docked = this.host.reps.docked(self), st = docked ?? this.host.reps.at(self, this.snapTick), ship = this.host.store.get(self);
     if (!st || !ship) return undefined;
-    const body = (ownBodyHash(st.body, st.bits, st.q) + (this.host.extraHash?.(this.snapTick) ?? 0)) & 0xff, hp = ownHpHash(ship.hp);
+    // (Its full state, as the head hash has it; docked, its keyframe's pose, as the server holds it)
+    const x = docked ? undefined : this.full.get(this.snapTick);
+    const own = x ? ownStateHash(self, st.body, st.bits, st.q, x, this.snapTick) : ownBodyHash(st.body, st.bits, st.q);
+    const body = (own + (this.host.extraHash?.(this.snapTick) ?? 0)) & 0xff, hp = ownHpHash(ship.hp);
     if (!force && !riding && body === this.last.body && hp === this.last.hp) return undefined;
     this.missed = false;
     this.last = { tick, snap: this.snapTick, body, hp };

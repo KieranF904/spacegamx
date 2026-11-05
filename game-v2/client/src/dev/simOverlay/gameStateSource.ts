@@ -34,18 +34,17 @@ export class GameStateSource implements SimOverlaySource {
 
   constructor(private readonly d: GameStateSourceDeps) {}
 
-  /** Start timing prediction (wraps the state's two prediction hooks) */
+  /** Start timing prediction (wraps the state's own-ship step hook: its tick layer's whole step, and any re-steps) */
   attach(): void {
     if (this.unwrap) return;
     const s = this.d.state;
-    const phys = s.shipPhysics, guns = s.shipGuns;
+    const step = s.ownStep;
     const timed = <A extends unknown[], R>(f: (...a: A) => R) => (...a: A): R => { const t = performance.now(); try { return f(...a); } finally { this.frameCpu += performance.now() - t; } };
-    const wphys = phys ? timed(phys) : null, wguns = guns ? timed(guns) : null;
-    s.shipPhysics = wphys; s.shipGuns = wguns;
+    const wstep = step ? timed(step) : null;
+    s.ownStep = wstep;
     this.unwrap = () => {
-      // (Only put back what is still ours: someone may have replaced a hook since)
-      if (s.shipPhysics === wphys) s.shipPhysics = phys;
-      if (s.shipGuns === wguns) s.shipGuns = guns;
+      // (Only put back what is still ours: someone may have replaced the hook since)
+      if (s.ownStep === wstep) s.ownStep = step;
     };
   }
 

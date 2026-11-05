@@ -19,7 +19,7 @@ How a ship moves: `stepFlight` turns inputs plus `ShipDerived` (thrust, mass, in
 | server/src/ships/bridge/flight.ts | 503 | server flight step `stepMovement`, `tick()` (per-tick ship loop: shields, contacts, event horizons, part deaths, station repair, rebuilds, rounding), `resolveContacts`/`worldPieces`, `addToSpatialGrid`, `sleep`/`wake`/`moveDistant` (SimLod), `teleport`, `pin` |
 | server/src/ships/bridge/pilotless.ts | 95 | ships nobody pilots: `setController` (AI pilots' `PilotOrders`), `setAutopilot`/`autopilotControls`, and `stepPilotless` (tick's pilotless step) |
 | server/src/ships/bridge/core.ts, sync.ts, damage.ts, rebuild.ts, weapons.ts | 243 / 144 / 461 / 431 / 522 | shared bridge types (`ShipHost`, `ShipBridgeConfig`, `BridgeCtx`) and constants (core.ts); body, health, jump-field and tow readers and writers (`readBody`, `writeBody`, `syncHealth`, `jumpFieldState`, `towable`) (sync.ts); hits, EMP, fire and part deaths (damage.ts); geometry, spawning, removal, rebuild, repair kits (rebuild.ts); firing, beams and `hitProjectile` (weapons.ts) |
-| client/src/ships/ShipClient.ts | 1126 | `predict()` pilot prediction, `predictGuns` |
+| client/src/ships/ShipClient.ts | 1126 | `ownStepTo()` / `ownPose()`: the own ship from its tick layer (own/OwnTick.ts `step`, common sim/ownStep.ts `stepOwnShip`), `presentOwn` (what its guns did, drawn once a tick) |
 | server/src/net/Replication.ts | - | the `replicaStep` shadow in `Replication` that decides when a keyframe is needed |
 | data/ships/tuning.json `flight`, `jump`, `tow` | - | gains and constants; read via `jumpTuning`, `towTuning` (the strafer's numbers are per model: `strafe` in models.mjs) |
 
@@ -62,7 +62,7 @@ Add a velocity source (gravity, hazard): through `FlightConstants`, not in the b
 - Both sides build their `FlightControls` with `buildFlightInputs` (common/src/ships/flightInputs.ts). The `FlightBody` (cargo, dodge, jump counters) is still copied by hand on each side: `ShipBridge.stepMovement` and `ShipClient.predict` (`body = {...}`). A new body field missing on the client side is a silent desync: add it to both copies together.
 - `replicaStep` (shadow on the server, Replication.ts) uses `FULL_CHARGE`, `drainRate 0`, and the control bits only: anything not in `CTL`/keyframe (jump distance, cargo, cursor) is not replicated, and a mismatch forces a keyframe. `replica.ts` header says clients replay too; at this time no client code calls `replicaStep`.
 - Jump landing distance isn't replicated: the burn start triggers a keyframe.
-- Berthed pilots skip prediction (`ShipClient.predict` early return).
+- Berthed pilots: the own replica is Docked (it rides its station, keyframed as it docks and leaves); its step isn't run.
 - The Tow Beam's towed object is moved by the server only (server/src/ships/features/tow/Towing.ts) and never predicted; only its load (cargo mass) is.
 - Never import collide.ts hit tests for gameplay damage outside the weapons code path; use the same functions server and client.
 

@@ -5,11 +5,12 @@
  *
  * The client steps its own ship itself (its inputs, and the causes the snapshots tell it), and Replication runs the
  * same steps on its shadow, so a mismatch means something neither side foresaw (a bug, a lost message, a client
- * that isn't ours). Then: its own ship gets a keyframe with the next snapshot (state hash off), or its part HP again
+ * that isn't ours). Then: its own ship gets a keyframe and an ownSync with the next snapshot (state hash off: its pose,
+ * and its stores, guns, hazards and priming exact), or its part HP again
  * (HP hash off). Checks for snapshots before the fix went out are not judged again. The client chooses how often it
  * checks (OWN_CHECK_RULES by its own record); a lying client only gets its own view wrong.
  */
-import { unwrapTick12, ownBodyHash, ownHpHash, type OwnCheck, type FlightBody } from '@space-game/common';
+import { unwrapTick12, ownHpHash, type OwnCheck } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 
 /** Snapshots remembered per client (2 s at 20 a second: a check rides its client's next input or goes in 4 s at most) */
@@ -17,7 +18,7 @@ const KEEP = 80;
 
 export interface OwnChecksHost {
   tick(): number;
-  /** The fix for a state hash off: its own ship's keyframe with the next snapshot */
+  /** The fix for a state hash off: its own ship's keyframe and an ownSync with the next snapshot */
   rekey(conn: ClientConnection): void;
   /** ...for an HP hash off: its own part HP again */
   resyncHp(conn: ClientConnection): void;
@@ -31,12 +32,15 @@ export class OwnChecks {
 
   constructor(private readonly host: OwnChecksHost) {}
 
-  /** A snapshot went to it: its own ship then (real: what its own layer has, keyframed or stepped), its controls and HP copy */
-  note(conn: ClientConnection, tick: number, body: FlightBody, bits: number, q: number, hp: readonly number[] | undefined, extra = 0): void {
+  /**
+   * A snapshot went to it: its own ship's hash then (`own`: its full state, common sim/headHash.ts ownStateHash; docked,
+   * its keyframe's pose, ownBodyHash), its HP copy
+   */
+  note(conn: ClientConnection, tick: number, own: number, hp: readonly number[] | undefined, extra = 0): void {
     let e = this.by.get(conn);
     if (!e) this.by.set(conn, (e = { ticks: [], at: new Map(), fixedAt: -Infinity }));
     // (`extra`: every other ship it holds then, Replication.heldByte, and the homing shells it runs)
-    e.at.set(tick, ((ownBodyHash(body, bits, q) + extra) & 0xff) | ((hp ? ownHpHash(hp) : 0) << 8));
+    e.at.set(tick, ((own + extra) & 0xff) | ((hp ? ownHpHash(hp) : 0) << 8));
     e.ticks.push(tick);
     while (e.ticks.length > KEEP) e.at.delete(e.ticks.shift()!);
   }

@@ -101,6 +101,10 @@ export interface ClientConnection {
    */
   ownCtl?: { bits: number; q: number };
   ownLate?: boolean;
+  /** Its check found its own ship's state off (OwnChecks): an ownSync goes with the next snapshot (SnapshotBuilder) */
+  ownSyncDue?: boolean;
+  /** Its own shells (CAPS.SHOT_IDS) since the last snapshot it was sent: told, all of them, if that window's own ship was put right */
+  ownWindow?: number[];
   /** ...as does anything that moves the ship besides its inputs (a new keyframe version), or a status change */
   selfVersion: number;
   selfKey: string;

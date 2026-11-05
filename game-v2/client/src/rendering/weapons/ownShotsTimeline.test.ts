@@ -43,13 +43,18 @@ function rig() {
   (fx as unknown as { draw: () => void }).draw = () => {};
   const shots = () => [...(fx as unknown as { shots: Map<number, ShotView> }).shots.values()];
 
-  // The ship flies along x at SHIP_V; on tick `fireAt` its gun fires from its centre, straight across (-y), as
-  // ShipClient.predictGuns does (spawnTick: the tick before, its shells move on the tick they're fired)
+  // The ship flies along x at SHIP_V on its tick layer (each tick stepped once); on tick `fireAt` its gun fires from its
+  // centre, straight across (-y), drawn as the prediction reaches that tick, as ShipClient.ownStepTo does (spawnTick:
+  // the tick before, its shells move on the tick they're fired)
   let fireAt = -1;
-  s.shipPhysics = (p) => { p.x += SHIP_V; return null; };
-  s.shipGuns = (p, _input, tick) => {
-    if (tick === fireAt) fx.predict({ owner: ME, type: WeaponType.Cannon, pose: { x: p.x, y: p.y, angle: p.angle }, spawnX: p.x, spawnY: p.y, spawnTick: tick - 1, vx: p.vx, vy: -SHELL_V, size: 1 });
-    return null;
+  const xs = new Map<number, number>();
+  s.ownStep = (tick) => {
+    let x = xs.get(tick);
+    if (x === undefined) {
+      xs.set(tick, (x = (xs.get(tick - 1) ?? player.x) + SHIP_V));
+      if (tick === fireAt) fx.predict({ owner: ME, type: WeaponType.Cannon, pose: { x, y: 0, angle: 0 }, spawnX: x, spawnY: 0, spawnTick: tick - 1, vx: SHIP_V, vy: -SHELL_V, size: 1 });
+    }
+    return { body: { x, y: 0, vx: SHIP_V, vy: 0, angle: 0, angVel: 0 }, jumpPrime: 0 };
   };
   let seq = 0;
   /** One frame, in Game.update's order: the prediction's steps due, the world interpolated, then the shells */

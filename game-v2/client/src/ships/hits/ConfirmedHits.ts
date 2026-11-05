@@ -22,7 +22,7 @@
 import {
   unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
   type ClientMessage, type ServerMessage, type ServerHitsMessage, type ServerHpCheckMessage, type ShipState, type HitCtx, type PlacedGeom,
-  hpWire, type ShellHitRecord, type HitEndFx,
+  hpWire, isOwnShotWire, OWN_SHOT_WIRE0, SHOT_ID_BARRELS, SHOT_ID_SLOTS, type ShellHitRecord, type HitEndFx,
 } from '@space-game/common';
 
 /** A line that misses the struck part is cast again this thick (world units) before falling back to its middle */
@@ -44,6 +44,8 @@ export interface ConfirmedHitsHost {
   /** Is it flown by a pilot (the local ship too)? A pilot moves before the server's collision step, the rest after */
   pilot(id: number): boolean;
   send(msg: ClientMessage): void;
+  /** Its own ship's id (a told hit by an own shell it never built is worked out at the ship it struck: unbuiltOwn) */
+  self?(): number;
 }
 
 /** What a hits message comes to */
@@ -98,10 +100,15 @@ export class ConfirmedHits {
   private pending: HitDone[] = [];
   /** ...and spent shells whose records couldn't be worked out */
   private lostGone: number[] = [];
+  /**
+   * Records of hits by shells it doesn't have (its own fired on a tick its layer was put right at, before it knew: the
+   * server tells their hits): nothing to draw, but they count in the hit chain as the server's do (flushPending)
+   */
+  private uncounted: HitDone[] = [];
   /** Shells worked out lately (shellOf) */
   private recent = new Map<number, HitShell>();
   /** Counters (tests, the console) */
-  readonly stats = { records: 0, missed: 0, checks: 0, mismatches: 0, resyncs: 0, own: 0, overridden: 0, oldWay: 0 };
+  readonly stats = { records: 0, missed: 0, checks: 0, mismatches: 0, resyncs: 0, own: 0, overridden: 0, oldWay: 0, unbuilt: 0 };
 
   constructor(private host: ConfirmedHitsHost) {}
 
@@ -116,6 +123,20 @@ export class ConfirmedHits {
       if (this.recent.size > 512) this.recent.delete(this.recent.keys().next().value!);
     }
     return s;
+  }
+
+  /**
+   * An own shell named by its shot id that it never built (fired on a tick its own layer couldn't know of: the one its
+   * ship was keyframed at, a new ship's first): its gun from its name, struck where the ship it hit was (no line)
+   */
+  private unbuiltOwn(id: number, target: number, tick: number): HitShell | null {
+    const self = this.host.self?.();
+    if (self === undefined || !isOwnShotWire(id)) return null;
+    const pose = this.host.pose(target, this.host.pilot(target) ? tick : tick - 1);
+    if (!pose) return null;
+    const slot = Math.floor((id - OWN_SHOT_WIRE0) / SHOT_ID_BARRELS) % SHOT_ID_SLOTS;
+    this.stats.unbuilt++;
+    return { owner: self, gun: slot, spawnTick: tick, x: pose.x, y: pose.y, vx: 0, vy: 0 };
   }
 
   /** A shell's ship passes so far (its pierce count, as the server counts it for this client) */
@@ -170,7 +191,10 @@ export class ConfirmedHits {
       if (!mine) {
         const d = this.record(r, snapTick - r.ago, true);
         if (d) this.pending.push(d);
-        else if (r.gone) this.lostGone.push(r.shell);
+        else {
+          if (r.gone) this.lostGone.push(r.shell);
+          this.uncounted.push({ shell: r.shell, target: r.target, part: r.part, tick: snapTick - r.ago, owner: -1, glancing: r.glancing, gone: r.gone, dealt: 0, ignite: 0, igniteTicks: 0, fx: null, at: [0, 0], own: false, undo: null, prev: 0 });
+        }
         continue;
       }
       this.stats.overridden++;
@@ -211,7 +235,7 @@ export class ConfirmedHits {
    * snapshot's records, so they're still handed out)
    */
   get hasPending(): boolean {
-    return this.pending.length > 0 || this.lostGone.length > 0;
+    return this.pending.length > 0 || this.lostGone.length > 0 || this.uncounted.length > 0;
   }
 
   /** The frame's end: this frame's hits (found and told) as their messages, and the hits themselves (for the chain) */
@@ -220,6 +244,8 @@ export class ConfirmedHits {
     this.pending = [];
     const out = this.messages(done);
     out.gone.push(...this.lostGone.splice(0));
+    // (counted in the chain, nothing drawn)
+    if (this.uncounted.length) done.push(...this.uncounted.splice(0));
     this.flush();
     return { out, done };
   }
@@ -275,6 +301,7 @@ export class ConfirmedHits {
     this.resync.clear();
     this.pending = [];
     this.lostGone = [];
+    this.uncounted = [];
     this.recent.clear();
   }
 
@@ -287,7 +314,7 @@ export class ConfirmedHits {
     this.stats.records++;
     const passes = this.passes.get(r.shell) ?? 0;
     if (r.gone) this.passes.delete(r.shell); else this.passes.set(r.shell, passes + 1);
-    const s = this.shellOf(r.shell), ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
+    const s = this.shellOf(r.shell) ?? this.unbuiltOwn(r.shell, r.target, tick), ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
     const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
     if (!s || !ship || !sh) { this.stats.missed++; if (hp) this.resync.add(r.target); return null; }
     const at = this.hitPoint(s, ship, r.target, r.part, tick);

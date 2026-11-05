@@ -59,7 +59,10 @@ describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides
   }, 240_000);
 
   it('a decision lost: its check catches it, SYNCs put it right', () => {
-    const r = fight({ ticks: 800, dropAt: 400 });
+    // (Lost where a check of its will see it off: dropped from 400, the one snapshot it put off was keyframed right again
+    // (its target keyed) before a check came round, once the late-input quirk of the fake clients' reports stopped
+    // sending a snapshot after every report: Stage 3b)
+    const r = fight({ ticks: 800, dropAt: 450 });
     expect(r.stats.off).toBeGreaterThan(0);
     expect(r.got.A.off).toBeLessThan(60);
   }, 240_000);

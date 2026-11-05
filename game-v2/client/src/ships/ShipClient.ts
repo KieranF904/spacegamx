@@ -2,7 +2,7 @@
  * Everything the client does for modular ships, in live play and proto alike:
  * mirrors ship state from the server (ShipStore), draws ships (ShipRenderer),
  * the HUD schematic (ShipHud), the hangar (HangarUI, docked only), helm vs
- * mouse-steer controls, client-side prediction with the shared ship physics,
+ * mouse-steer controls, your own ship on its tick layer (the one stepper, own/OwnTick.ts), drawn ahead,
  * and turret visuals.
  *
  *   H  dock at a station in range and open the hangar (closing it undocks)
@@ -12,13 +12,12 @@
 
 import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '@space-game/common';
 import { bossRise, clearBossLives } from './bossLife';
-import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { stepShip, SimShipView, pilotInput, ReplicaMode, type SimInput, type SimEnv, type FieldEnv } from '@space-game/common';
-import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
+import { cloneCharge, type SimShipState, type ServerOwnSyncMessage } from '@space-game/common';
+import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -30,7 +29,7 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding, jumpGo, jumpChargeNeed,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
-  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, gunsTick, gunControls, miningTick, GUN_FX, simAim, simAimQ, ammoCodeOfMods, fireVolley, type SimEvent, firesStraight, partWeaponDef,
+  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, gunControls, GUN_FX, ammoCodeOfMods, fireVolley, type SimEvent, firesStraight, partWeaponDef,
   type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, SIDE, ghostWeight, FOCUS_RANGE, EffectType, gunShell,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
@@ -58,7 +57,8 @@ import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
 import { OwnShells } from './hits/OwnShells';
-import { OwnTick } from './own/OwnTick';
+import { OwnTick, type OwnTickEvents } from './own/OwnTick';
+import type { OwnStepped } from '../state/GameState';
 import { ShipCauses } from './causes/ShipCauses';
 import { ContactWorld } from './causes/ContactWorld';
 import { DebrisSplits } from './debris/DebrisSplits';
@@ -118,15 +118,9 @@ export interface ShipClientOptions {
   onHangarClose?(): void;
 }
 
-/** predict's controls scratch (reused every call; the step never keeps it) */
-/** predict's scratch: the view it steps, its input and env (reused every call; the step keeps none of them) */
-const PREDICT_VIEW = new SimShipView();
-const PREDICT_IN: SimInput = { bits: 0, q: 0, jumpDist: 0, fire: false, fireAlt: false, aimDist: 0 };
-const PREDICT_FIELDS: FieldEnv = { central: null };
-const PREDICT_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PREDICT_FIELDS, terrain: null, gunsByHost: true };
-
-/** The gun step's events on a predicted tick (ShipClient.predictGuns' scratch) */
-const GUN_EVENTS: SimEvent[] = [];
+/** The own layer's events handed out per tick (ShipClient.ownStepTo's scratch) */
+const OWN_EVENTS: OwnTickEvents[] = [];
+const CONFIRMED: OwnTickEvents[] = [];
 
 export class ShipClient {
   readonly store: ShipStore;
@@ -293,6 +287,7 @@ export class ShipClient {
       },
       pilot: (id) => id === opts.state.playerId || opts.state.entities.get(id)?.type === EntityType.Player,
       send: (m) => opts.send(m),
+      self: () => opts.state.playerId,
     });
     this.drawnWorld = new DrawnWorld(this.store, opts.state, (id) => this.sideOf(id));
     this.selfHits = new SelfHits({
@@ -554,6 +549,11 @@ export class ShipClient {
     return this.bodies.takeCheck(riding, this.opts.state.serverTick);
   }
 
+  /** Its own ship's stores, guns, hazards and priming as the server has them at a snapshot's tick (OwnTick.onOwnSync) */
+  onOwnSync(m: ServerOwnSyncMessage): void {
+    this.own.onOwnSync(m);
+  }
+
   /** An input it sent: its own ship's controls on the tick-aligned layer from its target tick (OwnTick) */
   noteInput(msg: ClientInputMessage): void {
     this.own.noteInput(msg);
@@ -638,7 +638,6 @@ export class ShipClient {
     this.replicas.apply(m.tick, m.ships, m.ctl);
     // (its own ship's causes and controls: before its own fire events are built from it)
     this.own.onSnapshot(m);
-    if (m.own?.length) this.ownCausedAt = m.tick;
     // (other ships' causes: before their fire events are built from them)
     this.causes.onSnapshot(m);
     // (bosses' decisions: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
@@ -657,7 +656,11 @@ export class ShipClient {
     out.push(...this.guides.draw(m.tick, m.entities, (id) => this.opts.state.entities.get(id)?.data));
     // (your own straight shells: built here from your own gun step's volleys, at your confirmed ship, named by
     // shot id; those whose life has ended removed here, the server sending no removal for them: hits/OwnShells.ts)
-    const keyed = !!m.ships?.some((k) => k[0] === this.opts.state.playerId), ended: number[] = [];
+    // (Which volleys: its own layer's fire events through this snapshot's tick, as the layer has them now that the
+    // snapshot's keyframe, causes and ownSync are in. A window its ship was keyframed in, or put right by an ownSync, has
+    // its shells' hits told: the server's rowShell)
+    this.confirmOwnFires(m.tick);
+    const keyed = !!m.ships?.some((k) => k[0] === this.opts.state.playerId) || this.own.syncedAt === m.tick, ended: number[] = [];
     out.push(...this.ownShells.snapshot(m.tick, ended, keyed));
     if (ended.length) { m.removed.push(...ended); this.selfHits.onRemoved(ended); }
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
@@ -764,23 +767,33 @@ export class ShipClient {
     const found = this.contacts.endSnapshot(m.tick);
     this.touched = found.touched;
     for (const fx of found.fx) this.damageFx?.onContact({ type: 'contact', ...fx });
-    if (found.own) this.ownCausedAt = m.tick;
     for (const id of m.removed) this.guides.remove(id, m.tick);
     // (the shells it runs now, for its check: CAPS.WAYPOINTS)
     this.guides.noteHeld(m.tick);
   }
 
   /**
-   * Its own ship on the tick layer at the last snapshot's tick, if that snapshot's causes moved it (CAPS.OWN_SIM: a
-   * contact, a pull, a rebuild): the drawn prediction follows it (GameState.followOwnTick), as it would an own row
+   * Your own ship stepped to `tick` on its tick layer (GameState, once per prediction tick: OwnTick's whole step, each
+   * tick once), what it fired on the ticks it got to drawn now (presentOwn), and its state there. Null: not on the
+   * layer yet (no keyframe of it), or not flying one
    */
-  ownTickPose(tick: number): FlightBody | null {
-    if (!this.own.on || this.ownCausedAt !== tick) return null;
-    return this.replicas.at(this.opts.state.playerId, tick)?.body ?? null;
+  ownStepTo(tick: number): OwnStepped | null {
+    const self = this.opts.state.playerId;
+    if (!this.own.on) return null;
+    const st = this.replicas.at(self, tick);
+    if (!st) return null;
+    const ship = this.store.get(self);
+    if (ship && ship.kind === 'ship') for (const e of this.own.takeEvents(tick, OWN_EVENTS)) this.presentOwn(ship, e);
+    const x = this.own.extrasAt(tick);
+    return { body: st.body, charge: x ? cloneCharge(x.charge) : undefined, jumpPrime: x?.jumpPrime ?? st.body.jumpPrime ?? 0 };
   }
-  private ownCausedAt = -1;
 
-  /** Place a replicated ship for this frame (false: not one, or not ready yet) */
+  /** Where your own ship is drawn at a fractional tick on its layer (a keyframe's or a re-step's change eased in) */
+  ownPose(t: number): { x: number; y: number; angle: number } | null {
+    return this.own.on ? this.replicas.pose(this.opts.state.playerId, t) : null;
+  }
+
+  /** Place a replicated ship for this frame (false: not one, or not ready yet) */  /** Place a replicated ship for this frame (false: not one, or not ready yet) */
   placeReplica(e: InterpolatedEntity, renderTick: number): boolean {
     const p = this.replicas.pose(e.id, renderTick);
     if (!p) return false;
@@ -970,67 +983,75 @@ export class ShipClient {
     return lodestonePosition(l, this.opts.state.getRawServerTick());
   }
 
-  /** The local ship's forward acceleration (world units / tick²), for the autopilot */
-  /**
-   * Your guns, one predicted tick (GameState.applyPhysics, after the ship's
-   * step; never on a replay): the same gun step as the server's (guns.ts), so
-   * shells leave your barrels on the tick the server fires them, with the same
-   * spread. They're drawn at once; the server's copies take them over.
-   */
-  /** Your held beams on this predicted tick (by part), so your own beam shows the moment it fires, as your shells do */
+  /** Your held beams on the newest tick drawn (by part), so your own beam shows the moment it fires, as your shells do */
   private ownBeams = new Set<number>();
 
-  predictGuns(player: InterpolatedEntity, input: ClientInputMessage, tick: number, charge: Charge): Charge | null {
-    const ship = this.store.get(player.id);
-    this.ownBeams?.clear();
-    if (!ship || ship.kind !== 'ship' || this.docked || !this.scene) return null;
-    // (No firing mid-jump, nor knocked out by an EMP: ShipBridge.stepWeapons; the trigger as the step reads it, common sim/guns.ts)
-    const burning = jumpPhase(player.jump ?? 0, this.jump).phase === 'burn' || tick < (player.empUntil ?? 0);
-    const c = gunControls(ship, !!input.fireLeft, !!input.fireRight, burning);
-    this.fireHeld = c.firing;
-    const pose = { x: player.x, y: player.y, angle: player.angle };
-    // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
-    ensurePortsCharge(ship.derived, charge);
-    const energy = { charge };
-    // The step's gun phase (common sim/guns.ts gunsTick: the server's fireWeapons runs the same), aimed on the one aim
-    // rule, simAim(q): what the server's pilot fires at (its Input.targetAngle is fround(dequantize(q)) off the wire).
-    // It returns events; they're drawn here, after the step. (Never on a replay: each predicted tick once, no dedupe needed.
-    // Guns never read warmth: rework 2026-11)
-    const events = GUN_EVENTS;
-    events.length = 0;
-    gunsTick(ship, player.id, pose, { firing: c.firing, aimWorld: simAim(simAimQ(input.targetAngle)), aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning, events);
-    // (What the guns hold now, for the server's gun-state correction: gunSync.ts)
-    this.gunSync.record(ship, tick);
+  /**
+   * What your guns did on one tick of your own ship's step (OwnTick's whole step: the same gun core as the server's
+   * fireWeapons, common sim/guns.ts), drawn as the prediction reaches that tick, once: its shells from its fire events
+   * (built on the ship as it fired), pulses and beams, the guns' sounds and HUD from the gun state it ended with
+   */
+  private presentOwn(ship: ShipState, e: OwnTickEvents): void {
+    const { tick, events, state } = e;
+    if (this.docked || !this.scene) return;
+    this.ownBeams.clear();
+    // (Your gun state as of the newest tick drawn: the HUD's ring, turrets, the gun sounds read it off your ship's record)
+    mirrorGuns(ship, state);
+    // (No firing mid-jump, nor knocked out by an EMP: the trigger as the step read it, common sim/guns.ts)
+    const input = this.own.inputAt(tick);
+    const burning = jumpPhase(state.body.jump ?? 0, this.jump).phase === 'burn' || tick < state.hazard.empUntil;
+    this.fireHeld = gunControls(ship, input.fire, input.fireAlt, burning).firing;
     this.gunFeel.own(ship, tick);
-    miningTick(ship, player.id, pose, c, tick, energy, events);
-    for (const e of events) {
-      if (e.k === 'fx') {
-        if (e.fx === GUN_FX.beam) this.ownBeams?.add(e.part);
-        else if (e.fx === GUN_FX.pulse) this.beamFx?.startPulse(player.id, e.part, tick);
+    const pose = { x: state.body.x, y: state.body.y, angle: state.body.angle };
+    for (const ev of events) {
+      if (ev.k === 'fx') {
+        if (ev.fx === GUN_FX.beam) this.ownBeams.add(ev.part);
+        else if (ev.fx === GUN_FX.pulse) this.beamFx?.startPulse(ship.id, ev.part, tick);
         continue;
       }
       // (a volley: its first barrel's event builds it)
-      if (e.k !== 'fire' || e.barrel !== 0) continue;
-      const w = ship.derived.weapons.find((x) => x.part === e.slot);
+      if (ev.k !== 'fire' || ev.barrel !== 0) continue;
+      const w = ship.derived.weapons.find((x) => x.part === ev.slot);
       if (!w) continue;
       // (Homing missiles change course: those the server sends as they fly)
       const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w);
       if (!firesStraight(pdef)) continue;
-      const aug = (e as { aug?: 1 }).aug, ammo = ammoCodeOfMods(this.ownAmmo?.(w.kind));
-      const fire = { owner: player.id, tick, part: w.part, aimQ: e.aimQ, ammo, aug };
-      // (your own shells on the tick layer: this volley's, built when a snapshot covers its tick)
-      if (this.ownShells?.derivable(ship, w.part + 256 * ammo + (aug ? 65536 : 0))) this.ownShells.fired({ tick, part: w.part, aimQ: e.aimQ, ammo, aug });
+      const aug = (ev as { aug?: 1 }).aug, ammo = ammoCodeOfMods(this.ownAmmo?.(w.kind));
+      const fire = { owner: ship.id, tick, part: w.part, aimQ: ev.aimQ, ammo, aug };
+      // (the ammunition it fired, for your own shells on the tick layer, built when a snapshot confirms the tick: confirmOwnFires)
+      this.ownAmmoAt.set(tick * 256 + w.part, ammo);
+      while (this.ownAmmoAt.size > 256) this.ownAmmoAt.delete(this.ownAmmoAt.keys().next().value!);
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
-      const v = fireVolley(fire, ship, { ...pose, vx: player.vx, vy: player.vy }, this.opts.tuning);
+      const v = fireVolley(fire, ship, { ...pose, vx: state.body.vx, vy: state.body.vy }, this.opts.tuning);
       if (!v) continue;
-      for (const s of v.shells) {
-        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, s.life), arm: pdef.arm, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
+      for (const sh of v.shells) {
+        this.scene.predictShot({ owner: ship.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, spawnX: sh.x, spawnY: sh.y, spawnTick: tick - 1, vx: sh.vx, vy: sh.vy, size: sh.size, pose });
       }
     }
-    return energy.charge;
   }
 
-  /** The ship you fly (null between ships) */
+  /** The ammunition each own volley was drawn with (by tick * 256 + part), for the shells built on the tick layer */
+  private readonly ownAmmoAt = new Map<number, number>();
+
+  /**
+   * Your own straight shells on the tick layer (OwnShells): the volleys your own layer fired through a snapshot's tick,
+   * as it has them once that snapshot is in (its keyframe, causes and ownSync)
+   */
+  private confirmOwnFires(tick: number): void {
+    const self = this.opts.state.playerId, ship = this.store.get(self);
+    if (!this.own.on || !ship || ship.kind !== 'ship' || !this.replicas.at(self, tick)) return;
+    for (const { tick: t, events } of this.own.takeConfirmed(tick, CONFIRMED)) {
+      for (const ev of events) {
+        if (ev.k !== 'fire' || ev.barrel !== 0) continue;
+        const aug = (ev as { aug?: 1 }).aug, w = ship.derived.weapons.find((x) => x.part === ev.slot);
+        if (!w) continue;
+        const ammo = this.ownAmmoAt.get(t * 256 + w.part) ?? ammoCodeOfMods(this.ownAmmo?.(w.kind));
+        if (this.ownShells.derivable(ship, w.part + 256 * ammo + (aug ? 65536 : 0))) this.ownShells.fired({ tick: t, part: w.part, aimQ: ev.aimQ, ammo, aug });
+      }
+    }
+  }
+
+  /** The ship you fly (null between ships) */  /** The ship you fly (null between ships) */
   myShip(): ShipState | null {
     const ship = this.store.get(this.opts.state.playerId);
     return ship && ship.kind === 'ship' ? ship : null;
@@ -1428,15 +1449,6 @@ export class ShipClient {
     },
   };
 
-  /** The gun-state correction for your own guns (gunSync.ts) */
-  private readonly gunSync = new GunSync();
-
-  /** A pilot row from the server for your ship at a tick: its gun state against your prediction (GameState, on reconciling) */
-  syncGuns(data: number[] | undefined, tick: number): void {
-    const ship = this.store.get(this.opts.state.playerId);
-    if (data && ship && ship.kind === 'ship') this.gunSync.onRow(ship, data, tick);
-  }
-
   /**
    * Your pulse lasers' charge, for the HUD: how far the least-charged one is
    * to its next pulse (0..1; its reload, as your client steps it: guns.ts),
@@ -1536,49 +1548,6 @@ export class ShipClient {
   /** Berthed at a station (the server took the dock: it holds our controls neutral, so no inputs go: app/inputSend.ts) */
   berthed(): boolean {
     return this.docked;
-  }
-
-  /**
-   * Client prediction for the local ship: the same shared physics the server
-   * runs. Returns the new boost fuel, or null if there's no ship to predict.
-   */
-  predict(player: InterpolatedEntity, input: ClientInputMessage, charge: Charge, tick: number): Charge | null {
-    const ship = this.store.get(player.id);
-    if (!ship || ship.kind !== 'ship') return null;
-    // Berthed: held at the station's centre, going nowhere
-    const st = this.docked && this.berth ? this.opts.state.entities.get(this.berth.station) : undefined;
-    if (st) {
-      player.x = st.x; player.y = st.y; player.vx = 0; player.vy = 0; player.angVel = 0;
-      return charge;
-    }
-    // (The hold's mass and the Burst Strafer's counter and way, as the server flies them: load.ts, strafer.ts)
-    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, cargo: player.cargoMass ?? 0, dodge: player.dodge ?? 0, dodgeDir: player.dodgeDir ?? 0 };
-    // (A ports ship's charge is its parts' state: made once, and read from the row the server sent: energy.ts)
-    ensurePortsCharge(ship.derived, charge);
-    // One tick of the one stepper (common sim/step.ts stepShip), exactly as the server steps it (bridge/flight.ts
-    // stepMovement), in place on a view of the ship: the hazard chain (the env hazard, numb with cold from the warmth the
-    // server tells, slowed from the slowed ticks it tells, an EMP's crippled drive and no jump starting), the charging
-    // fields round the flight, the aim on the replicated grid, the controls built as the server builds them
-    const s = PREDICT_VIEW.load(player.id, ReplicaMode.Player, body, ship.derived, ship, charge, true, player.jumpPrime ?? 0);
-    s.hazard.empUntil = player.empUntil ?? 0;
-    s.hazard.slowUntil = player.slowUntil ?? 0;
-    s.hazard.numb = warmthStage(player.warmth ?? 100).control;
-    const env = PREDICT_ENV;
-    env.tick = tick; env.tuning = this.opts.tuning; env.gravity = this.gravity; env.terrain = this.terrain; env.hazard = this.hazardFor;
-    PREDICT_FIELDS.central = this.central; PREDICT_FIELDS.lodestones = this.lodestones;
-    stepShip(s, pilotInput(input, PREDICT_IN), env, s);
-    player.jumpPrime = s.jumpPrime;
-    player.jumpScale = body.jumpScale;
-    player.x = body.x;
-    player.y = body.y;
-    player.vx = body.vx;
-    player.vy = body.vy;
-    player.angle = body.angle;
-    player.angVel = body.angVel;
-    player.jump = body.jump;
-    player.dodge = body.dodge ?? 0;
-    player.dodgeDir = body.dodgeDir ?? 0;
-    return s.charge;
   }
 
   /** All your ship's stored energy as one percentage (the HUD's gauge) */
@@ -1776,4 +1745,18 @@ export class ShipClient {
  */
 function straightLife(def: { stick?: unknown } & Parameters<typeof endsAtAim>[0], life: number | undefined): number | undefined {
   return life && !endsAtAim(def) && !def.stick ? life : undefined;
+}
+
+/** A step's gun state onto your ship's record (what the HUD, turrets and gun sounds read), its arrays kept */
+function mirrorGuns(ship: ShipState, st: Readonly<SimShipState>): void {
+  const g = st.guns;
+  copyInto(ship.cooldown, g.cooldown); copyInto(ship.rounds, g.rounds); copyInto(ship.reload, g.reload);
+  copyInto(ship.charge, g.charge); copyInto(ship.spin, g.spin); copyInto(ship.aim, g.aim);
+  ship.triggerHeld = g.triggerHeld; ship.clickAt = g.clickAt;
+  ship.minePaid = g.minePaid; ship.mineUntil = g.mineUntil; ship.mineShare = g.mineShare; ship.tow = g.tow;
+}
+
+function copyInto(to: number[], from: readonly number[]): void {
+  to.length = from.length;
+  for (let i = 0; i < from.length; i++) to[i] = from[i];
 }

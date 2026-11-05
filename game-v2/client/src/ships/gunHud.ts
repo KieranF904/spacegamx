@@ -1,7 +1,7 @@
 /**
  * The weapon ring's data (docs/design/rework-2026-11.md §3.4): your guns grouped by model, each group's clip, charge,
- * spin and ammo read from the gun state your own client steps (guns.ts stepGuns; the server's correction keeps it
- * honest: gunSync.ts). Pure: no DOM; WeaponRing.ts draws it.
+ * spin and ammo read from the gun state your own client steps (its own ship's whole step on its tick layer, own/OwnTick.ts;
+ * the server's ownSync keeps it exact). Pure: no DOM; WeaponRing.ts draws it.
  *
  * The groups and their records are built when the ship's structure changes; `update` then rewrites the same records
  * every frame, so a frame allocates nothing.

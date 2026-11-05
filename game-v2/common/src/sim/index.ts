@@ -24,3 +24,5 @@ export * from './d-sources.js';
 export * from './c-replicaState.js';
 export * from './c-contactCache.js';
 export * from './c-pulls.js';
+// The own ship's whole step on its client (Stage 3b) and its exact correction (ownSync)
+export * from './ownStep.js';
