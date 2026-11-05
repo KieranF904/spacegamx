@@ -139,8 +139,11 @@ export abstract class StagedBrain implements BossBrain {
       const done = this.moveName;
       this.move = null;
       this.moveName = '';
-      this.restUntil = now + Math.round(this.tables.rest[this.stage - 1] * this.rage() / (1 + 0.15 * (view.fighters - 1)));
+      // (A windowed boss's rest comes after its window, and is never scaled by how many fight it: rework 2.3)
       this.fight.finished(done, view.eid, view.systemNum, now);
+      const w = this.fight.windowed ? this.fight.window : null;
+      this.restUntil = (w && w.at === now ? w.at + w.ticks : now)
+        + Math.round(this.tables.rest[this.stage - 1] * this.rage() / (this.fight.windowed ? 1 : 1 + 0.15 * (view.fighters - 1)));
     }
     this.fight.personal(view.eid, this.stage, now, view.present ?? this.pilots(), this.fight.isSignature(this.moveName),
       (name, tg, seed) => this.personalMove(name, tg, seed), (op, args) => this.host.decide?.(view.eid, op, args, this.body));
