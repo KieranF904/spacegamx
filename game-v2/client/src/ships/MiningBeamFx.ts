@@ -71,6 +71,11 @@ export class MiningBeamFx {
   private t = 0;
   /** Your held beams on, by part, as your client predicts them (ShipClient.predictGuns): your own beam doesn't wait for the snapshot */
   ownBeams: (() => ReadonlySet<number>) | null = null;
+  /**
+   * A mining laser's pulse landing on rock: about as often as it works a unit (each a roll for ore on the server,
+   * Mining.extract), so its mining strike (rendering/weapons/MiningStrikeFx.ts): where, out of the face, the rock's material
+   */
+  onMiningStrike: ((x: number, y: number, dx: number, dy: number, material: string) => void) | null = null;
   /** Is your own beam on (for the loop sound) */
   localActive = false;
   /** Every ship's held beams lit this frame, as drawn (their loops and ignitions: Game.updateSounds) */
@@ -147,11 +152,13 @@ export class MiningBeamFx {
           const ph = pz.phase[mi];
           if (ph >= 0 && (!last || Math.abs(now - ph - last.start) > 3 || now - last.start >= pz.ticks[mi])) {
             runs.push(newRun(id, mi, now - ph));
+            if (t < 0.999) this.onMiningStrike?.(hx, hy, -Math.cos(a), -Math.sin(a), rockMaterial(this.rockHit));
             if (!miningSounded.has(id)) { miningSounded.add(id); this.onMiningPulse?.(x, y, id === this.state.playerId); }
           } else if (ph < 0 && (!last || now - last.start >= pz.ticks[mi])) continue;
         } else if (!last || now - last.start >= MINING_EVERY) {
           if (!on) continue;
           runs.push(newRun(id, mi, last && now - last.start < MINING_EVERY * 2 ? last.start + MINING_EVERY : now));
+          if (t < 0.999) this.onMiningStrike?.(hx, hy, -Math.cos(a), -Math.sin(a), rockMaterial(this.rockHit));
           if (!miningSounded.has(id)) { miningSounded.add(id); this.onMiningPulse?.(x, y, id === this.state.playerId); }
         }
         while (runs.length && now - runs[0].start >= (pz ? pz.ticks[mi] : prof.ticks)) runs.shift();

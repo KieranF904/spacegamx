@@ -29,6 +29,7 @@ import {
 } from 'pixi.js';
 import { GameState } from '../state/GameState';
 import { WeaponFx, type PredictedShell } from './weapons/WeaponFx';
+import { MiningStrikeFx } from './weapons/MiningStrikeFx';
 import { LootPodView } from './LootPodView';
 import { TerrainView } from './TerrainView';
 import { terrainFor } from './terrainData';
@@ -191,6 +192,8 @@ export class Renderer {
   
   /** Projectile tracers, muzzle flashes and impacts */
   private weaponFx: WeaponFx;
+  /** Mining strikes on rock (a hit that rolls for ore), and a chunk's richer puff where it appears (weapons/MiningStrikeFx.ts) */
+  private miningStrikes = new MiningStrikeFx({ spark: (...a) => this.spark(...a), flash: (...a) => this.flash(...a) }, () => performance.now() / 1000);
   /** Black hole / pulsar central bodies */
   private centralShaders = new CentralBodyShaders();
   /** The current system's planets and moons */
@@ -1015,6 +1018,9 @@ export class Renderer {
         // data: [rarity index, kinds of item, item count]
         const pod = new LootPodView(data?.[0] ?? 0, data?.[2] ?? 1);
         this.lootPods.set(id, pod);
+        // (A chunk thrown out of a rock just struck: the strike kept ore, and it shows richer where it appears)
+        const at = this.state.entities.get(id);
+        if (at) this.miningStrikes.pod(at.x, at.y);
         container.addChild(pod.container);
         break;
       }
@@ -1274,6 +1280,11 @@ export class Renderer {
     const view = this.stations.get(station), s = this.state.entities.get(station), t = this.state.entities.get(target);
     if (!view || !s || !t) return null;
     return view.fire(turret, target, s.renderX, s.renderY, t.renderX, t.renderY);
+  }
+
+  /** A hit on rock that rolls for ore: rock dust and grit off the face; (dx, dy) out of it (weapons/MiningStrikeFx.ts) */
+  miningStrike(x: number, y: number, dx: number, dy: number, material: string | null | undefined, scale = 1): void {
+    this.miningStrikes.strike(x, y, dx, dy, material, scale);
   }
 
   /** Something took damage: asteroids flash and jolt (ships do their own, ShipRenderer.hit) */

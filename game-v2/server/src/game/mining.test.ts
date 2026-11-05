@@ -104,11 +104,15 @@ describe('mining: work and keep', () => {
     expect(mk1.ore).toBeLessThan(0.75 * 60);
   });
 
-  it('guns keep less past Mk I, and much less again further out; chunks still come as often', () => {
-    const one = rate('asteroid_metal', 1, pips()), two = rate('asteroid_metal', 2, pips()), three = rate('asteroid_metal', 3, pips());
+  it('guns keep less past Mk I, and much less again further out; the drops that roll nothing are skipped', () => {
+    // (Every unit is a dice roll: long runs, so the averages show through)
+    const one = rate('asteroid_metal', 1, pips(), 3000), two = rate('asteroid_metal', 2, pips(), 3000), three = rate('asteroid_metal', 3, pips(), 3000);
     expect(two.ore).toBeLessThan(one.ore * 0.5);
     expect(three.ore).toBeLessThan(two.ore * 0.5);
-    expect(two.chunks).toBeGreaterThan(one.chunks * 0.8);
+    // Chunks come as often, but a drop whose rolls all failed is skipped: the less kept, the more skipped
+    expect(two.chunks).toBeLessThan(one.chunks * 0.85);
+    expect(two.chunks).toBeGreaterThan(one.chunks * 0.45);
+    expect(three.chunks).toBeLessThan(two.chunks);
     // A Mk I laser a grade or two behind still beats them
     expect(rate('asteroid_metal', 2, [{ tool: laser(), dps: LASER_DPS }]).ore).toBeGreaterThan(two.ore * 3);
     expect(rate('asteroid_metal', 3, [{ tool: laser(), dps: LASER_DPS }]).ore).toBeGreaterThan(three.ore * 3);
@@ -169,9 +173,10 @@ describe('chunks follow the rock', () => {
     const before = m.remaining(1);
     for (t = 0; t < 60 * 120; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
     const worked = before - m.remaining(1);
-    expect(sizes.length).toBeGreaterThan(worked / 10 - 1);
+    // (A drop whose rolls all failed is skipped: at a third kept, one in ten or so)
+    expect(sizes.length).toBeGreaterThan((worked / 10) * 0.7);
     expect(sizes.length).toBeLessThanOrEqual(worked / 5 + 1);
-    for (const n of sizes) { expect(n).toBeGreaterThanOrEqual(1); expect(n).toBeLessThanOrEqual(4); }
+    for (const n of sizes) { expect(n).toBeGreaterThanOrEqual(1); expect(n).toBeLessThanOrEqual(10); }
   });
 
   it('a laser keeps it all: 5 to 10 units a chunk (what is left still drops when the rock is mined out)', () => {
@@ -191,7 +196,7 @@ describe('chunks follow the rock', () => {
     expect(sizes.at(-1)!).toBeLessThanOrEqual(10);
   });
 
-  it('a drop with nothing kept is skipped, and what was owed carries into the next', () => {
+  it('a drop whose rolls all failed is skipped; over many rolls the keep averages out', () => {
     const sizes: number[] = [];
     let t = 0;
     const h: MiningHost = { spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { sizes.push(Object.values(items).reduce((a, b) => a + b, 0)); }, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 4 };
@@ -199,12 +204,62 @@ describe('chunks follow the rock', () => {
     m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 4);
     const before = m.remaining(1);
     // (Mk IV rock: guns keep a fortieth or so)
-    for (t = 0; t < 60 * 600; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
+    for (t = 0; t < 60 * 6000; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
     const worked = before - m.remaining(1);
     expect(sizes.every((n) => n >= 1)).toBe(true);
     expect(sizes.length).toBeLessThan(worked / 10);
-    const kept = sizes.reduce((a, b) => a + b, 0);
-    expect(kept / worked).toBeCloseTo(table.guns!.keep * table.guns!.keepByTier['4'] * 0.95, 2);
+    const kept = sizes.reduce((a, b) => a + b, 0), want = table.guns!.keep * table.guns!.keepByTier['4'] * 0.95;
+    expect(kept / worked).toBeGreaterThan(want * 0.8);
+    expect(kept / worked).toBeLessThan(want * 1.2);
+  });
+
+  it('every keep is a dice roll: chunk sizes vary, and a run of bad rolls still takes the rock down', () => {
+    // A Mk I laser a grade behind (80% kept), on one rock: chunk sizes spread around the average, not steady
+    const sizes: number[] = [];
+    let t = 0;
+    const h: MiningHost = {
+      spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { sizes.push(Object.values(items).reduce((a, b) => a + b, 0)); },
+      awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 2,
+    };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 2);
+    const before = m.remaining(1);
+    for (t = 0; t < 60 * 600; t++) m.extract(1, 99, LASER_DPS / 60, laser(1, 3), 0, 0, 1, 0);
+    const worked = before - m.remaining(1), kept = sizes.reduce((a, b) => a + b, 0);
+    expect(kept / worked).toBeGreaterThan(0.75);
+    expect(kept / worked).toBeLessThan(0.85);
+    // Mining XP is per unit kept (what's owed and not yet paid out in whole points)
+    expect((m as unknown as { xpOwed: Map<number, number> }).xpOwed.get(99)).toBeCloseTo(kept * table.xpPerUnit, 6);
+    // Variance: for one chunk length the kept count differs chunk to chunk (a running total would give the same each time)
+    expect(new Set(sizes).size).toBeGreaterThan(4);
+    expect(Math.min(...sizes)).toBeLessThan(5);
+  });
+
+  it("the rolls are the rock's own seeded dice: the same hits replay the same drops", () => {
+    const run = () => {
+      const sizes: number[] = [];
+      const h: MiningHost = { spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { sizes.push(Object.values(items).reduce((a, b) => a + b, 0)); }, awardXp: () => {}, notify: () => {}, tick: () => 0, respawn: () => {}, crumble: () => {}, rockTier: () => 3 };
+      const m = new Mining(h, table);
+      m.register(5, 0, 0, 'asteroid_metal', 'k', 1e6, 3);
+      for (let k = 0; k < 20000; k++) m.extract(5, 99, 1, laser(1, 3), 0, 0, 1, 0);
+      return sizes;
+    };
+    const a = run();
+    expect(a.length).toBeGreaterThan(10);
+    expect(run()).toEqual(a);
+  });
+
+  it('a chunk whose rolls all failed is skipped: at a third kept, some drops never come', () => {
+    let chunks = 0, t = 0;
+    const h: MiningHost = { spawnChunk: () => { chunks++; }, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {} };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
+    const before = m.remaining(1);
+    for (t = 0; t < 60 * 3000; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
+    // 5 to 10 units a drop (7.5 on average); a few in a hundred roll nothing at all
+    const drops = (before - m.remaining(1)) / 7.5;
+    expect(chunks).toBeLessThan(drops * 0.99);
+    expect(chunks).toBeGreaterThan(drops * 0.85);
   });
 
   it('rocks hold 1.5x the ore they did (0.1 a unit of size before)', () => {
@@ -217,7 +272,7 @@ describe('mining lasers against the rock', () => {
     expect(table.laserGap!['0']).toEqual({ work: 1, keep: 1 });
     expect(table.laserGap!['-1']).toEqual({ work: 0.85, keep: 0.8 });
     expect(table.laserGap!['-2']).toEqual({ work: 0.7, keep: 0.6 });
-    const at = (tier: number, grade = 1) => rate('asteroid_metal', tier, [{ tool: laser(grade, 3), dps: LASER_DPS }], 300);
+    const at = (tier: number, grade = 1) => rate('asteroid_metal', tier, [{ tool: laser(grade, 3), dps: LASER_DPS }], 1800);
     const own = at(1), one = at(2), two = at(3), three = at(4);
     expect(one.chunks / own.chunks).toBeCloseTo(0.85, 1);
     expect(one.ore / own.ore).toBeCloseTo(0.85 * 0.8, 1);
@@ -265,17 +320,19 @@ describe('mining lasers against the rock', () => {
 
 describe('the numbers (docs/areas/economy-quests.md)', () => {
   it('ore and chunks a minute', () => {
+    // (Every keep is a dice roll: 3000 s so the averages show through)
+    const S = 3000;
     const L = (grade: number) => ({ tool: laser(grade, 3), dps: LASER_DPS });
     const rows: [string, { ore: number; chunks: number }][] = [
-      ['Starter Pips, Mk I soft rock', rate('asteroid_metal', 1, pips())],
-      ['Starter Pips, Mk II soft rock', rate('asteroid_metal', 2, pips())],
-      ['Starter Pips, Mk III soft rock', rate('asteroid_metal', 3, pips())],
-      ['Gale (2 Chainsaws, 2 Sparks), Mk I soft rock', rate('asteroid_metal', 1, [{ tool: tools.autocannon, dps: 160, hit: 5 }, { tool: tools.arc, dps: 77, hit: 8 }])],
-      ['Mk I laser, Mk I rock (gap 0)', rate('asteroid_metal', 1, [L(1)])],
-      ['Mk I laser, Mk II hard rock (gap -1)', rate('asteroid_mega', 2, [L(1)])],
-      ['Mk I laser, Mk III hard rock (gap -2)', rate('asteroid_mega', 3, [L(1)])],
-      ['Mk III laser, Mk III hard rock', rate('rock_cobaltite', 3, [L(3)])],
-      ['3 Mk III lasers (3 ships), Mk III hard rock', rate('rock_cobaltite', 3, [0, 1, 2].map((ship) => ({ ...L(3), ship })))],
+      ['Starter Pips, Mk I soft rock', rate('asteroid_metal', 1, pips(), S)],
+      ['Starter Pips, Mk II soft rock', rate('asteroid_metal', 2, pips(), S)],
+      ['Starter Pips, Mk III soft rock', rate('asteroid_metal', 3, pips(), S)],
+      ['Gale (2 Chainsaws, 2 Sparks), Mk I soft rock', rate('asteroid_metal', 1, [{ tool: tools.autocannon, dps: 160, hit: 5 }, { tool: tools.arc, dps: 77, hit: 8 }], S)],
+      ['Mk I laser, Mk I rock (gap 0)', rate('asteroid_metal', 1, [L(1)], S)],
+      ['Mk I laser, Mk II hard rock (gap -1)', rate('asteroid_mega', 2, [L(1)], S)],
+      ['Mk I laser, Mk III hard rock (gap -2)', rate('asteroid_mega', 3, [L(1)], S)],
+      ['Mk III laser, Mk III hard rock', rate('rock_cobaltite', 3, [L(3)], S)],
+      ['3 Mk III lasers (3 ships), Mk III hard rock', rate('rock_cobaltite', 3, [0, 1, 2].map((ship) => ({ ...L(3), ship })), S)],
     ];
     console.log(rows.map(([k, v]) => `${k}: ${v.ore.toFixed(1)} ore/min, ${v.chunks.toFixed(1)} chunks/min`).join('\n'));
     // main_01: 10 ore with a starter's guns well inside 90 seconds of mining

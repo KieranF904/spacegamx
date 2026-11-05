@@ -50,6 +50,8 @@ import { ScannerFx } from './ScannerFx';
 import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import { AUG } from '../rendering/weapons/weaponStyles';
+import { strikeRolls } from '../rendering/weapons/MiningStrikeFx';
+import { rockMaterial } from '../rendering/rocks/RockMaterials';
 import { hitSurface } from './hitSurface';
 import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
@@ -350,7 +352,7 @@ export class ShipClient {
   /**
    * A shell's hit, where it's seen to strike (WeaponFx.onStruck), or where the server says for one not drawn here: a
    * raised shield's ripple and plating's sparks there, and the hit look a shell with no detonation of its own has; on
-   * a rock (`target`, as drawn here), its sparks, which the server no longer sends, and (finding its own hits, so told
+   * a rock (`target`, as drawn here), its mining strike or sparks, which the server no longer sends, and (finding its own hits, so told
    * no projectileHit for it) its sound: GameServer.hurtAsteroid
    */
   private struckFx(id: number, x: number, y: number, type: number, target = -1): void {
@@ -358,8 +360,12 @@ export class ShipClient {
     // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
     const kind = KIND_OF_TYPE.get(type);
     if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, x, y, 40);
-    if (target >= 0 && this.opts.state.entities.get(target)?.type === EntityType.Asteroid) {
-      this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
+    const rockAt = target >= 0 ? this.opts.state.entities.get(target) : undefined;
+    if (rockAt?.type === EntityType.Asteroid) {
+      // A hit that mines rolls for ore on the server (Mining.extract): a mining strike, rock dust and grit off the face
+      // (nothing's sent for it, so it plays whatever the roll); one that can't mine there, a shell's plain sparks
+      if (strikeRolls(kind, rockAt.composition?.hardness)) this.scene?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
+      else this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
       if (this.selfHits.on) this.opts.sound?.('hit', { x, y }, 0.7, 0.85 + Math.random() * 0.3);
     }
   }
@@ -806,6 +812,8 @@ export class ShipClient {
     this.beamFx.onPulse = (x, y, grade, own) => { this.opts.sound?.('laser_pulse', own ? undefined : { x, y }, own ? 0.42 : 0.7, PULSE_GRADE_PITCH[Math.max(0, Math.min(4, grade - 1))]); };
     // A mining laser's pulse: a deep, soft throb, one a ship however many miners it has
     this.beamFx.onMiningPulse = (x, y, own) => { this.opts.sound?.('mining_pulse', own ? undefined : { x, y }, own ? 0.5 : 0.6); };
+    // ...and where it lands on rock, a mining strike (a roll for ore: nothing's sent for it)
+    this.beamFx.onMiningStrike = (x, y, dx, dy, material) => this.scene?.miningStrike(x, y, dx, dy, material, 1.4);
     this.chargeFx = new ChargeFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, this.chargeTells);
     renderer.addBloomSource(this.chargeFx.glowLayer);
     this.scannerFx = new ScannerFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.pilot.econ);
