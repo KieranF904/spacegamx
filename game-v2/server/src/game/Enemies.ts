@@ -385,7 +385,10 @@ export class Enemies {
   mobs: Mobs | undefined;
 
   constructor(private host: EnemyHost, private ships: ShipBridge, private data: FactionsFile, private designs: Record<string, Blueprint>) {
-    this.pilots = new AiPilots(host);
+    this.pilots = new AiPilots({
+      tick: () => host.tick(), decide: host.decide ? (e, op, args, st) => host.decide!(e, op, args, st) : undefined,
+      status: (e) => [ships.empTicksLeft(e), ships.slowedTicksLeft(e)],
+    });
     const self = this;
     this.custom = new CustomEnemies({
       tick: () => host.tick(), ships, players: (num) => host.players(num), get mobs() { return self.mobs; },

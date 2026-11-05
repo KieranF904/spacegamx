@@ -43,6 +43,8 @@ export interface Opts {
   /** Its hull brought down to this share at this tick (its phases: escorts, novas, blinks) */
   hurtAt?: number;
   hurt?: number;
+  /** Before each tick (between ticks, as a message is): `foes` the hostiles now */
+  each?: (t: number, server: GameServer, foes: number[]) => void;
 }
 
 export function fight(o: Opts = {}) {
@@ -169,6 +171,7 @@ export function fight(o: Opts = {}) {
       ships.setPartHp(boss, () => o.hurt ?? 0.5);
     }
     if (o.loseAt === t && o.lose) for (const id of foeIds()) { const sh = ships.get(id)!; ships.setPartHp(id, (uid) => (o.lose!(sh, uid) ? 0 : 1)); }
+    o.each?.(t, server, foeIds());
     step(t);
   }
   return { server, got, A, boss, mobs, stats: server.bodies.stats, rep: server.replication.bodyStats };

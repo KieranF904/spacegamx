@@ -7,7 +7,7 @@
 
 import { stagedFlight, type StagedFlightTables, type BodyOut, type BodyPose } from './stagedFlight.js';
 import { aiPilot, aiReads, orderPack, packCentroid } from './aiPilot.js';
-import type { BodyState } from './decisions.js';
+import { bodyStatusBits, type BodyState } from './decisions.js';
 
 /** What a body reads of other ships, on the side it runs on */
 export interface BodyReads {
@@ -64,7 +64,10 @@ const AI_PILOT: BodyKind = {
     const pack = orderPack(id, s.want);
     const c = pack ? packCentroid(pack, read.before) : null;
     if (pack && !c) return null;
-    return aiPilot(s, me, tg, c, t, id, prevQ);
+    const out = aiPilot(s, me, tg, c, t, id, prevQ);
+    // (EMP'd or slowed: its drive crippled as the server's ship's is, STATUS)
+    out.bits |= bodyStatusBits(s, t);
+    return out;
   },
 };
 

@@ -10,7 +10,7 @@
  */
 
 import {
-  CTL, DECISION, applyDecision, sameWant, syncArgs, aiPilot, bodyKindOf, dequantizeCursorAngle, quantizeCursorAngle,
+  CTL, DECISION, applyDecision, bodyStatusBits, statusArgs, sameWant, syncArgs, aiPilot, bodyKindOf, dequantizeCursorAngle, quantizeCursorAngle,
   type AiPilotOut, type BodyPose, type BodyState, type WantRec,
 } from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
@@ -21,6 +21,8 @@ export interface AiPilotHost {
   tick(): number;
   /** A decision for the clients that run its body (net/decisions/BodyNet.ts) */
   decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
+  /** Ticks left EMP'd and slowed (its flight this tick, bridge/pilotless.ts): told to its body as a STATUS */
+  status?(eid: number): readonly [number, number];
 }
 
 interface Flown {
@@ -45,7 +47,7 @@ export class AiPilots {
     const b = f.body, sd = side > 0 ? 1 : -1;
     if (bodied && !b.on) {
       // (Its body takes over (again): the whole state; the clients running it start from it here)
-      b.on = true; b.target = target; b.side = sd; b.want = want; b.wantAt = now;
+      b.on = true; b.target = target; b.side = sd; b.want = want; b.wantAt = now; b.empUntil = b.slowUntil = undefined;
       this.host.decide?.(eid, DECISION.SYNC, syncArgs(b), b);
     } else if (bodied) {
       if (b.target !== target) this.decide(eid, b, DECISION.TARGET, [target + 1]);
@@ -56,7 +58,13 @@ export class AiPilots {
       b.target = target; b.side = sd;
       if (!sameWant(b.want, want)) { b.want = want; b.wantAt = now; }
     }
+    // (EMP'd or slowed as it flies this tick: its body is told when that stops being what it had, and flies it so)
+    if (bodied && this.host.status) {
+      const [emp, slowed] = this.host.status(eid), st = statusArgs(b, now, emp, slowed);
+      if (st) this.decide(eid, b, DECISION.STATUS, st);
+    }
     const out = aiPilot(b, me, tgt, centroid, now, eid, f.q ?? quantizeCursorAngle(me.angle));
+    if (bodied) out.bits |= bodyStatusBits(b, now);
     f.q = out.q;
     return out;
   }

@@ -74,7 +74,7 @@ function fly(o: Opts = {}) {
     };
   }
   // What A was sent of its own ship, and its own layer against the server's ship at each snapshot's tick
-  const got = { keyframes: 0, ctlRows: 0, causes: 0, snapshots: 0, off: 0, checked: 0 };
+  const got = { keyframes: 0, ctlRows: 0, causes: 0, snapshots: 0, off: 0, checked: 0, ownRows: 0, causedRows: 0 };
   const truth = new Map<number, number[]>();
   const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void };
   const oSnap = fa.snapshot.bind(A);
@@ -85,6 +85,8 @@ function fly(o: Opts = {}) {
     if (s.ships?.some((k) => k[0] === A.pid)) got.keyframes++;
     if (s.ctl?.some((r) => controlRowId(r) === A.pid)) got.ctlRows++;
     got.causes += s.own?.length ?? 0;
+    // (Its own row: a correction of its drawn prediction; the causes' moves it works out itself, so none rides with them)
+    if (s.entities.some((e) => e.id === A.pid)) { got.ownRows++; if (s.own?.length) got.causedRows++; }
     const st = A.reps.at(A.pid, s.tick)?.body, r = truth.get(s.tick);
     if (A.own?.on && st && r) { got.checked++; if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) got.off++; }
   };
@@ -210,6 +212,8 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.own.pull).toBeGreaterThan(50);
     expect(r.own.contact).toBeGreaterThan(0);
     expect(r.got.causes).toBeGreaterThan(50);
+    // (no own row for what its causes moved: only now and then, SELF_SAFETY_TICKS)
+    expect(r.got.causedRows).toBeLessThan(r.got.causes / 10);
     expect(r.got.off).toBe(0);
     expect(r.got.ctlRows).toBe(0);
     expect(r.checks.bodyOff).toBe(0);

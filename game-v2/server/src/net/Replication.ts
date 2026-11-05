@@ -435,6 +435,15 @@ export class Replication {
     return this.shadows.get(eid)?.version ?? 0;
   }
 
+  /**
+   * A pilot's own ship as its own client goes by (CAPS.OWN_SIM): its own keyframe version, moved only when something
+   * its client can't work out moved it (stepOwn, ownFor); undefined while its client doesn't step it. A contact or a
+   * pull moves `version` (everyone else's keyframe), not this: its client worked that out on its tick layer
+   */
+  ownVersionOf(eid: number): number | undefined {
+    return this.shadows.get(eid)?.own?.version;
+  }
+
   /** Before building snapshots: ships that left their predicted path get a new keyframe */
   beginSnapshot(due?: (eid: number) => boolean): void {
     for (const [eid, s] of this.shadows) {
@@ -513,7 +522,7 @@ export class Replication {
     // Its own ship, stepped by itself (CAPS.OWN_SIM): this window's causes, the real controls only where its inputs
     // don't say them, and a keyframe only when it can't have its ship otherwise (first, before the others' versions move on)
     const mine = own && this.host.ownSim?.(self) ? this.shadows.get(self) : undefined;
-    if (mine?.own && InSystem.systemId[self] === systemId && (!view || view.has(self))) this.ownFor(self, mine, mine.own, known, snapshotTick, ships, ctl, out, synced, causes, kept, cargo);
+    if (mine?.own && InSystem.systemId[self] === systemId && (!view || view.has(self))) this.ownFor(self, mine, mine.own, known, snapshotTick, ships, ctl, out, synced, causes, kept, cargo, bodies);
     for (const id of known.keys()) if (!this.shadows.has(id)) known.delete(id);
     // (Not sent its own: what it has of it goes stale, so it starts again from a keyframe when it is)
     if (!own) known.delete(self);
@@ -662,7 +671,7 @@ export class Replication {
   }
 
   /** One pilot's own ship (CAPS.OWN_SIM): see forClient */
-  private ownFor(eid: number, s: Shadow, o: OwnShadow, known: Map<number, number>, snapshotTick: number, ships: KeyframeRow[], ctl: ControlRow[], out: { own?: number[][]; ownRebuild?: number; ownEvents?: CauseEvent[] }, synced?: (id: number) => number | undefined, causes = false, kept?: Kept, cargo = false): void {
+  private ownFor(eid: number, s: Shadow, o: OwnShadow, known: Map<number, number>, snapshotTick: number, ships: KeyframeRow[], ctl: ControlRow[], out: { own?: number[][]; ownRebuild?: number; ownEvents?: CauseEvent[] }, synced?: (id: number) => number | undefined, causes = false, kept?: Kept, cargo = false, bodied?: (id: number) => boolean): void {
     // (The hold's mass changing: a CARGO cause only for a client taking them, CAPS.CARGO)
     if (!cargo && o.events.some((e) => e.row[0] === OWN_CAUSE.CARGO)) { o.version--; this.ownWhy('cargo'); }
     // (A contact whose other it can't have as the pass had it: rebuilt since, or a ship this client doesn't have)
@@ -698,7 +707,12 @@ export class Replication {
       // the new structure from its last keyframe on. Its versions: the ones this client goes by)
       const os = c && this.shadows.get(c.other), v = c && (causes ? c.cver : c.version);
       const rekeyed = !!c && (causes ? os?.cver : os?.version) !== v;
-      const r = causeRow(e, snapshotTick, !!c && !!c.preStep && !rekeyed && known.get(c.other) === v);
+      // (One flown by its body on this client (CAPS.BODIES): its bodied shadow is what the client has of it, its own
+      // versions counting down; in step then and not keyframed since, the state stays out too)
+      const ran = causes && !!c && !!os?.bodied && (bodied?.(c.other) ?? false) && (known.get(c.other) ?? 0) < 0;
+      const stateless = !!c && (ran ? !!c.bodyPreStep && os!.bodied!.cver === c.bcver && known.get(c.other) === c.bcver
+        : !!c.preStep && !rekeyed && known.get(c.other) === v);
+      const r = causeRow(e, snapshotTick, stateless);
       rows.push(r);
       this.ownStats.causes++;
       if (r[1] === OWN_CAUSE.PULL) this.ownStats.pull++;

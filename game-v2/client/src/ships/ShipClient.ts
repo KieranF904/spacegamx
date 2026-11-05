@@ -17,7 +17,7 @@ import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { buildFlightInputs, newFlightControls, payMining, gunLoadTick, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { buildFlightInputs, newFlightControls, payMining, gunLoadTick, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -287,6 +287,7 @@ export class ShipClient {
       at: (id, tick) => this.replicas.at(id, tick)?.body ?? null,
       side: (id) => this.sideOf(id),
       passes: (shell) => this.hits.passesOf(shell),
+      ownExact: () => this.own.on,
     });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t) });
     this.bodies = new BodyRunner({ reps: this.replicas });
@@ -575,6 +576,7 @@ export class ShipClient {
     this.replicas.apply(m.tick, m.ships, m.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM: before its own fire events are built from it)
     this.own.onSnapshot(m);
+    if (m.own?.length) this.ownCausedAt = m.tick;
     // (other ships' causes, CAPS.CAUSES: before their fire events are built from them)
     this.causes.onSnapshot(m);
     // (bosses' decisions, CAPS.BODIES: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
@@ -690,6 +692,16 @@ export class ShipClient {
     // (the shells it runs now, for its check: CAPS.WAYPOINTS)
     this.guides.noteHeld(m.tick);
   }
+
+  /**
+   * Its own ship on the tick layer at the last snapshot's tick, if that snapshot's causes moved it (CAPS.OWN_SIM: a
+   * contact, a pull, a rebuild): the drawn prediction follows it (GameState.followOwnTick), as it would an own row
+   */
+  ownTickPose(tick: number): FlightBody | null {
+    if (!this.own.on || this.ownCausedAt !== tick) return null;
+    return this.replicas.at(this.opts.state.playerId, tick)?.body ?? null;
+  }
+  private ownCausedAt = -1;
 
   /** Place a replicated ship for this frame (false: not one, or not ready yet) */
   placeReplica(e: InterpolatedEntity, renderTick: number): boolean {

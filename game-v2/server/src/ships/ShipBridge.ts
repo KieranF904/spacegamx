@@ -316,6 +316,8 @@ export class ShipBridge {
   wingBonus(eid: number): number { return wpn.wingBonus(this.ctx, eid); }
 
   private damageMul(eid: number): number { return wpn.damageMul(this.ctx, eid); }
+  /** Its shells' damage multiplier (a boss's damage and rage: setDamageScale), as its syncs tell clients (`dmg`) */
+  damageMulOf(eid: number): number { return wpn.damageMul(this.ctx, eid); }
 
   setTarget(eid: number, target: number): void { return wpn.setTarget(this.ctx, eid, target); }
 

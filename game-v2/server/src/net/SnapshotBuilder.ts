@@ -369,7 +369,9 @@ export class SnapshotBuilder {
           kept = next.kept;
           at = next.at;
         }
-        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept };
+        // (Its shells' damage multiplier: on a new ship's sync when it isn't 1, then whenever it changed)
+        const dmg = this.ships.damageMulOf(id), hadDmg = fresh ? 1 : (synced?.dmg ?? 1);
+        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg };
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;
@@ -397,6 +399,7 @@ export class SnapshotBuilder {
           // (A piece of debris new to it: its grace, and whether it knocks at all, as its debris world steps it)
           born: fresh && ship.kind === 'debris' ? ship.spawnTick : undefined,
           aloof: fresh && ship.kind === 'debris' && this.ships.debrisNet.intangible.has(id) ? 1 : undefined,
+          dmg: dmg !== hadDmg ? dmg : undefined,
         });
       }
       if (!hps_ || !synced) continue;
@@ -613,7 +616,9 @@ export class SnapshotBuilder {
     const d = r.state.data ?? [];
     const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
     const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
-    const version = this.replication.versionOf(r.id);
+    // (A client stepping its own ship (CAPS.OWN_SIM) goes by its own keyframe version: what its tick layer worked out
+    // itself (a contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
+    const version = (ownSimFor(conn.caps) ? this.replication.ownVersionOf(r.id) : undefined) ?? this.replication.versionOf(r.id);
     const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
     const need = fix || key !== conn.selfKey || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS;
     return { need, fix, key, flight, version };

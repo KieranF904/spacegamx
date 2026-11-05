@@ -40,6 +40,7 @@ import { damageMessage, projectileHitMessage, type Outbox } from '../snapshot/Ou
 import { COALESCE_TICKS } from '../snapshot/constants.js';
 import { SelfHitJournal, type JournalHit } from './SelfHitJournal.js';
 import { ConfirmLevel } from './ConfirmLevel.js';
+import { ownSimFor } from '../snapshot/ownShots.js';
 
 /** What the ledger needs of the server (GameServer itself) */
 export interface HitLedgerHost {
@@ -241,7 +242,7 @@ export class HitLedger {
   }
 
   /**
-   * Can a client finding its own hits find this one exactly (part D)? Not on its own ship, debris, or a ship synced to
+   * Can a client finding its own hits find this one exactly (part D)? Not on its own ship (unless it steps it itself, CAPS.OWN_SIM), debris, or a ship synced to
    * it this snapshot (a rebuild changed its shape mid-window) or keyframed (its path changed: where it was before the
    * keyframe's tick is the client's guess); not by a shell the snapshot will remove (its end tick
    * isn't known), a great orb, one that doesn't fly straight or arms late; not between two pilots
@@ -256,7 +257,8 @@ export class HitLedger {
     const world = this.host.world;
     // (STRICT: a client that needed correcting is told every hit for a while: part E)
     if (this.levels.get(conn)?.rules.strict) return 'strict';
-    if (h.target === conn.playerId) return 'self';
+    // (Its own ship: exact on its tick layer only when it steps it itself, CAPS.OWN_SIM; client SelfHits.ownExact)
+    if (h.target === conn.playerId && !ownSimFor(conn.caps)) return 'self';
     // (A boss its body flies here: how much of a hit it takes (braced, laid open, between stages) is still its brain's,
     // until its body has its hit rules too: decision inputs build stage 4)
     if (this.host.bodies?.toldHits(conn, h.target)) return 'body';
@@ -350,8 +352,10 @@ export class HitLedger {
     if (!owner || !os || os.ship !== owner || os.rebuilds !== owner.rebuilds) return 'owner';
     // (as near as its damage number would go)
     if (!this.host.net.nearClient(conn, h.sys, Position.x[h.target], Position.y[h.target], h.owner)) return 'far';
-    const sh = gunShell(ships.tuning, owner, h.gun);
-    if (!sh) return 'gun';
+    const g = gunShell(ships.tuning, owner, h.gun);
+    if (!g) return 'gun';
+    // (its damage multiplier as this client was told it: a stale one is put right by the record's damage)
+    const sh = { ...g, strength: g.strength * (os.dmg ?? 1) };
     // What it draws at the shell's end must be what the server told (a dry round, out of ammunition, has no effects)
     const fx = hitEndFx(sh.kind, sh.def, h.gone);
     if (fx ? !h.end || h.end.kind !== fx.kind || h.end.radius !== fx.radius : !!h.end) return 'fx';

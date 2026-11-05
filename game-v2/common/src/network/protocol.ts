@@ -35,9 +35,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 49;
+export const PROTOCOL_VERSION = 50;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '6ce1576f';
+export const PROTOCOL_WIRE_HASH = 'd403f503';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -1358,6 +1358,11 @@ export interface ServerShipSyncMessage {
   born?: number;
   /** ...and only to be seen: it knocks nothing (1) */
   aloof?: number;
+  /**
+   * Its shells' damage multiplier (a boss's `damage` and rage), on a new ship's sync when it isn't 1 and on any sync
+   * after it changed: hits by its guns are worked out with it (ShipState.dmg, hitRules.ts gunShell)
+   */
+  dmg?: number;
 }
 
 /** Part HP changes between rebuilds (visual only: the client doesn't rebuild on these) */
@@ -1685,7 +1690,7 @@ const COMPACT: [string, string[]][] = [
   ['contact', ['x', 'y', 'nx', 'ny', 'speed']],
   ['shipHps', ['ships']],
   ['debrisSplit', ['id', 'tick', 'e', 'p', 'l', 'g', 's', 'c', 'h']],
-  ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts', 'at', 'born', 'aloof']],
+  ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts', 'at', 'born', 'aloof', 'dmg']],
   ['effect', ['effectType', 'x', 'y', 'targetX', 'targetY', 'entityId', 'data']],
   ['death', ['entityId', 'entityType', 'killerId']],
   ['stationFire', ['station', 'target', 'turret']],

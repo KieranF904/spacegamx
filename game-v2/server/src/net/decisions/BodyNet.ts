@@ -120,6 +120,8 @@ export class BodyNet {
       if (can && runs && (gone.length || b.dropped.some(([t, r]) => t > c.through && (!this.host.has(r) || !holds(r))))) { rekey(known, eid); this.stats.targetKeyed++; }
       if (can && !runs) {
         rows.push([eid, 0, DECISION.SYNC, ...syncArgs(s)]);
+        // (its drive EMP'd or slowed now: a SYNC clears that, so it goes after)
+        if ((s.empUntil ?? 0) > tick || (s.slowUntil ?? 0) > tick) rows.push([eid, 0, DECISION.STATUS, Math.max(0, (s.empUntil ?? 0) - tick), Math.max(0, (s.slowUntil ?? 0) - tick)]);
         rekey(known, eid);
         c.runs.add(eid);
         this.stats.syncs++;
