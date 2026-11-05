@@ -21,6 +21,15 @@
   #note { right: 16px; top: 14px; max-width: 40em; color: #ffe9b0; }
   #status { left: 50%; top: 14px; transform: translateX(-50%); }
   #noteBox { left: 50%; bottom: 60px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; }
+  #stamp { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
+  #stamp div { font: 700 34px system-ui, sans-serif; letter-spacing: .06em; padding: 18px 30px; border-radius: 14px; border: 4px solid; background: #000a; text-align: center; opacity: .85; }
+  #stamp .hide { color: #ffb3b3; border-color: #d04848; }
+  #stamp .review { color: #ffe08a; border-color: #e0a520; }
+  #stamp .hide::before { content: '\2715  '; }
+  #stamp .review::before { content: '\2691  '; }
+  #stamp.pop div { animation: pop .35s ease-out; }
+  @keyframes pop { from { transform: scale(1.35); opacity: 1; } to { transform: scale(1); opacity: .85; } }
+  @media (prefers-reduced-motion: reduce) { #stamp.pop div { animation: none; } }
   #noteBox input { width: 36em; max-width: 70vw; font: 14px system-ui, sans-serif; padding: 4px 6px; background: #111; color: #eee; border: 1px solid #556; border-radius: 3px; }
 </style>
 </head>
@@ -31,7 +40,8 @@
 <div id="note" class="box" hidden></div>
 <div id="status" class="box" hidden></div>
 <div id="noteBox" class="box" hidden><label for="noteIn">Note for Claude</label><input id="noteIn" placeholder="what to look at (Enter saves, Esc cancels)"></div>
-<div id="help" class="box">Space / → next · ← back · Home start · wheel zoom · drag pan · 0 or double-click reset · F full screen · C caption · H hide this<br>M review mode · in review: X hide from the slideshow · R flag for Claude · N note (flags it too)</div>
+<div id="stamp" hidden></div>
+<div id="help" class="box">Space / → next · ← back · Home start · wheel zoom · drag pan · 0 or double-click reset · F full screen · C caption · H hide this<br>M review mode<span id="reviewKeys" hidden> · X hide from the slideshow · R flag for Claude · N note for Claude (flags it too)</span></div>
 <script>
 const SLIDES = [
 ];
@@ -60,7 +70,11 @@ function save() {
     .then((r) => say(r.ok ? 'Saved to flags.json' : 'Could not save flags.json', r.ok))
     .catch(() => say('Could not save flags.json (is the server still running?)', false));
 }
-function setFlag(name, patch) { flags[name] = { ...f(name), ...patch }; save(); refresh(); }
+function setFlag(name, patch) {
+  flags[name] = { ...f(name), ...patch }; save(); refresh();
+  stampEl.classList.remove('pop'); void stampEl.offsetWidth; stampEl.classList.add('pop'); // replay the pop
+}
+const stampEl = document.getElementById('stamp'), reviewKeys = document.getElementById('reviewKeys');
 
 // Present skips hidden slides; Review shows every slide with its flags
 let review = false, i = 0;
@@ -88,6 +102,11 @@ function refresh() {
     + (fl.hide ? '<span class="chip hide">hidden from slideshow</span>' : '')
     + (fl.review ? '<span class="chip review">flagged for Claude</span>' : '')
     + `<span style="color:#889">${vals.filter((v) => v.hide).length} hidden · ${vals.filter((v) => v.review).length} flagged</span>`;
+  // The middle of the slide says what it's marked with, in review mode only
+  stampEl.innerHTML = (fl.hide ? '<div class="hide">HIDDEN FROM SLIDESHOW</div>' : '') + (fl.review ? '<div class="review">FLAGGED FOR CLAUDE</div>' : '');
+  stampEl.hidden = !review || !stampEl.innerHTML;
+  reviewKeys.hidden = !review;
+  if (!review) noteBox.hidden = true;
   noteEl.hidden = !review || !fl.note;
   noteEl.textContent = fl.note ? 'Note: ' + fl.note : '';
 }
