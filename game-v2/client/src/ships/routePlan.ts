@@ -22,7 +22,7 @@
 
 import {
   planetPosition, moonOffset, nestPosition, nestReach, lodestonePosition, lodestoneLive, lodestoneChargeOf, lodestoneFieldRadius,
-  inSolarRing, fieldRangeBoost, type StarSystemData, type JumpTuning, type LodestoneData,
+  inSolarRing, fieldRangeBoost, jumpChargeNeed, type StarSystemData, type JumpTuning, type LodestoneData,
 } from '@space-game/common';
 import bossData from '../../../data/bosses.json';
 
@@ -160,15 +160,15 @@ export function insideAny(p: XY, obstacles: readonly Obstacle[], pad = 0): Obsta
   return null;
 }
 
-/** Ticks a jump of the drive takes, start to on your way */
-export function jumpTicks(jt: JumpTuning): number {
-  return jt.chargeTicks + jt.burnTicks + JUMP_SETTLE;
+/** Ticks a jump of the drive takes, start to on your way; `go`: how far it goes (a short jump charges longer: flight.ts jumpChargeNeed) */
+export function jumpTicks(jt: JumpTuning, go = Infinity): number {
+  return jumpChargeNeed(Math.max(jt.minRange, go), jt) + jt.burnTicks + JUMP_SETTLE;
 }
 
 /** Is it worth jumping `left` along a leg now (the drive ready), rather than flying it? */
 export function jumpPays(left: number, ship: PlanShip): boolean {
   const d = ship.drive;
-  return !!d && left >= d.jt.minRange && jumpTicks(d.jt) < left / Math.max(1, ship.vFly);
+  return !!d && left >= d.jt.minRange && jumpTicks(d.jt, Math.min(left, d.range)) < left / Math.max(1, ship.vFly);
 }
 
 /**
@@ -199,7 +199,7 @@ export function routeTime(
         const reach = d.range * fieldRangeBoost(inSolarRing(here.x, here.y, sys?.centralBody, d.jt), primed, d.jt);
         const k = Math.min(reach, left);
         push(here, pos(s + k), 'jump');
-        t += jumpTicks(d.jt); s += k; primed = 0;
+        t += jumpTicks(d.jt, k); s += k; primed = 0;
         cool = d.cooldown - JUMP_SETTLE;
         continue;
       }

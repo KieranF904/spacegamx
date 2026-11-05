@@ -3,7 +3,7 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, InSystem, ServerMessage, ReplicaMode, replicaAngle, quantizeReplicaAngle,
-  jumpTuning, jumpRange, jumpScaleFor, jumpPhase, FRICTION, jumpFieldAt, lodestonePosition, pilotJumpStep, stepShipPhysics, solarRingRadius,
+  jumpTuning, jumpBurnAt, jumpRange, jumpScaleFor, jumpPhase, FRICTION, jumpFieldAt, lodestonePosition, pilotJumpStep, stepShipPhysics, solarRingRadius,
   lodestoneFieldRadius, lodestoneSize, lodestoneLive, primeBoost, PILOT_ROW, type LodestoneData, type Charge,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
@@ -73,7 +73,7 @@ describe('stillstones', () => {
     const lode = innerLode(sys);
     const cool = ship().derived.jumpCooldown || jt.cooldownTicks;
     const cooled = (at: () => { x: number; y: number }) => {
-      ship().jump = jt.chargeTicks + jt.burnTicks;
+      ship().jump = jumpBurnAt(jt) + jt.burnTicks;
       let n = 0;
       while (ship().jump !== 0 && n < cool * 2) { idle(); const p = at(); park(p.x, p.y); server.step(); n++; }
       return n;
@@ -122,7 +122,7 @@ describe('stillstones', () => {
     const inRing: LodestoneData = { id: 'test_ring_lode', position: { x: ring - 3000, y: 0 } };
     sys.lodestones = [...sys.lodestones!, inRing];
     (server as any).replicaEnvs.clear();
-    ship().jump = jt.chargeTicks + jt.burnTicks;
+    ship().jump = jumpBurnAt(jt) + jt.burnTicks;
     let n = 0;
     while (ship().jump !== 0 && n < cool) { idle(); park(ring - 3000, 0); server.step(); n++; }
     expect(jumpFieldAt(ring - 3000, 0, { central: sys.centralBody, lodestones: sys.lodestones }, tick(), jt)).toEqual({ ring: true, lodestone: inRing });
@@ -138,7 +138,7 @@ describe('stillstones', () => {
     Position.x[pid] = at.x - Math.cos(dir) * (F + 500); Position.y[pid] = at.y - Math.sin(dir) * (F + 500);
     Velocity.x[pid] = 0; Velocity.y[pid] = 0;
     Rotation.angle[pid] = dir;
-    ship().jump = jt.chargeTicks + jt.burnTicks; // cooling down
+    ship().jump = jumpBurnAt(jt) + jt.burnTicks; // cooling down
     ship().angVel = 0;
     const s = ship();
     // The client's copy: from the server's state, stepped as ShipClient.predict does
@@ -193,7 +193,7 @@ describe('stillstones', () => {
     const at = lodestonePosition(lode, tick() + 1);
     Position.x[pid] = at.x; Position.y[pid] = at.y; Velocity.x[pid] = 0; Velocity.y[pid] = 0;
     Position.x[t2.getPlayerId()] = at.x + 3000; Position.y[t2.getPlayerId()] = at.y;
-    ship().jump = jt.chargeTicks + jt.burnTicks;
+    ship().jump = jumpBurnAt(jt) + jt.burnTicks;
     Input.jump[pid] = 0; // (the input arrays outlive a test's server: nobody's asking for a jump here)
     const reasons = (server as any).replication.reasons as Record<string, number>;
     for (let i = 0; i < 30; i++) server.step();
@@ -207,7 +207,7 @@ describe('stillstones', () => {
     const { server, got, pid, jt, sys, tick, park, idle, ship } = world();
     const scar = sys.lodestones!.find((l) => l.state === 'scarred')!;
     const cool = ship().derived.jumpCooldown || jt.cooldownTicks;
-    ship().jump = jt.chargeTicks + jt.burnTicks;
+    ship().jump = jumpBurnAt(jt) + jt.burnTicks;
     let n = 0;
     while (ship().jump !== 0 && n < cool * 2) { idle(); const p = lodestonePosition(scar, tick() + 1); park(p.x, p.y); server.step(); n++; }
     expect(Math.abs(n - cool / (1 + jt.lodestoneCharge * jt.lodestoneScarredCharge))).toBeLessThanOrEqual(2);

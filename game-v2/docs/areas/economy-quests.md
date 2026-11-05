@@ -77,7 +77,8 @@ server-core (hosts, stores, message switch), networking (econProtocol, pilot row
 Mining has two separate sides (Kieran, 2026-11-05):
 
 - **Work** sets how often chunks come. A hit works `damage × tool.yield × work ÷ damagePerUnit` rock units (96). The rock loses every unit worked, kept or not. A chunk is thrown every 5 to 10 units worked (`chunkUnits`, rolled per chunk).
-- **Keep** sets how much ore is in each chunk. Each unit worked adds its keep to a per-miner running total, and a unit is kept each time that makes a whole one. The share is exact and steady, and kept ores come out in proportion to their keep. Lost ore is gone. A drop where nothing was kept is skipped, and the running total carries on into the next one, so no chunk is empty. When the rock is spent, whatever was kept is thrown with it.
+- **Keep** sets how much ore is in each chunk. Every unit worked is a dice roll against its keep (Kieran, 2026-11-05: "make every possible mine chance be a dice roll"), on the rock's own seeded RNG so a run replays the same. A failed roll is lost: the rock loses the unit all the same. A full keep (a laser at its grade) needs no roll. The averages are the keep, as before; only the variance is new. A drop whose rolls all failed is skipped, so no chunk is empty; the less a tool keeps, the more drops are skipped (guns on Mk II rock skip about a third). When the rock is spent, whatever was kept is thrown with it. Mining XP is per unit kept.
+- **The strike effect.** Every hit on a rock that rolls shows a mining strike on the client: a burst of rock dust and grit, distinct from a shell's plain spark (`client/src/rendering/weapons/MiningStrikeFx.ts`). No bytes are sent for it: the client draws it from the shell or beam it already sees strike the rock (the rock-bytes audit removed the per-hit spark and `projectileHit`), so it plays on every mining hit whatever the roll. The richer look on a success comes from data the client already has: a chunk of ore thrown out of the rock gets a brighter dust puff where it appears.
 
 **Mining lasers** (they have a grade) use `laserGap`, indexed by the laser's grade minus the rock's tier (the system's Mk), clamped to +2:
 
@@ -95,20 +96,20 @@ Every laser mines independently. The crowd mechanic (`crowd`, `kByGap`, `crowdFa
 
 Why the numbers: guns keep about 30% of a Mk I Chondrite, so a Mk I laser gets about 3.3× the ore from a chunk cadence that is the same. A Mk I laser one or two grades behind still beats guns by 6× or more. Rocks hold `size × 0.15` units and `size × 30..120` HP. Guns work a rock out after about `size × 24` damage, so they mine a rock out before they break it.
 
-### The numbers (mining.test.ts "the numbers"; 600 s on a big rock, steady fire)
+### The numbers (mining.test.ts "the numbers"; 3000 s on a big rock, steady fire; averages of dice rolls)
 
 | Rig | Rock | Ore/min | Chunks/min |
 |---|---|---|---|
-| Starter's 2 Pips (112 dps) | Mk I soft (Chondrite) | 12.7 | 5.5 |
-| Starter's 2 Pips | Mk II soft | 5.0 | 4.7 |
-| Starter's 2 Pips | Mk III soft | 1.9 | 1.9 |
-| Dev Gale (2 Chainsaws 160 dps, 2 Sparks 77 dps) | Mk I soft | 18.6 | 8.1 |
+| Starter's 2 Pips (112 dps) | Mk I soft (Chondrite) | 12.9 | 5.1 |
+| Starter's 2 Pips | Mk II soft | 5.1 | 3.5 |
+| Starter's 2 Pips | Mk III soft | 2.3 | 1.8 |
+| Dev Gale (2 Chainsaws 160 dps, 2 Sparks 77 dps) | Mk I soft | 18.5 | 7.4 |
 | Mk I Mining Laser (Prospector, 42 dps), gap 0 | Mk I | 41.9 | 5.5 |
-| Mk I Mining Laser, gap −1 | Mk II hard (Neutron Slug) | 28.5 | 4.8 |
-| Mk I Mining Laser, gap −2 | Mk III hard (Neutron Slug) | 17.1 | 3.9 |
+| Mk I Mining Laser, gap −1 | Mk II hard (Neutron Slug) | 28.8 | 4.8 |
+| Mk I Mining Laser, gap −2 | Mk III hard (Neutron Slug) | 17.7 | 3.9 |
 | Mk I Mining Laser, gap −3 | Mk IV | 0 (can't) | 0 |
 | Mk III laser, gap 0, alone | Mk III hard (Cobaltite) | 41.9 | 5.5 |
-| 3 Mk III lasers (3 ships) | Mk III hard (Cobaltite) | 125.2 | 17.0 |
+| 3 Mk III lasers (3 ships) | Mk III hard (Cobaltite) | 125.9 | 16.9 |
 
 main_01 (10 ore with the starter's guns) takes about 47 s of steady fire. Flight School's "mine a rock" step finishes on the first chunk, after about 10 s.
 

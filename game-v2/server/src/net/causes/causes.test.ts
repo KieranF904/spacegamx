@@ -52,6 +52,15 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
     dummies.push(d);
   }
   const hauler = ships.spawnDummy(bp('hauler'), x0 - 1200, y0, 0.3, sys);
+  // Only this fight's ships in the system: the world's are taken away as they come. (A Helios Drone at the docks the
+  // clients started by, the client's target there and so in its view however far, grinding on a packmate out of view:
+  // a contact it can't work out, so a keyframe, whatever structures it keeps. Sol's docks have had more of them since
+  // the custom enemies' rework, 2026-11-05)
+  const ours = new Set([A.pid, B.pid, ...dummies, hauler]);
+  const clearAbout = () => {
+    for (const [eid, s] of ships.bodies) if (!ours.has(eid) && s.kind === 'ship' && InSystem.systemId[eid] === sys) ships.removeShip(eid);
+  };
+  clearAbout();
   // The server's ships every tick (what each held replica must be)
   const truth = new Map<number, Map<number, number[]>>();
   const record = () => {
@@ -103,6 +112,7 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
       const parts = sp.blueprint.parts.map((_, k) => k).filter((k) => sp.derived.alive[k] && sp.blueprint.parts[k].fn !== 'core');
       if (parts.length > 3) ships.damagePartFraction(hauler, parts[(t / hurtEvery) % parts.length], hurtEvery < 45 ? 0.2 : 1);
     }
+    clearAbout();
     server.step();
     clock.t += 1000 / 60;
     record();

@@ -4,7 +4,7 @@ import { parseBlueprint, partFacingRule, partNeedsFacing, serializeBlueprint, va
 import { allocateFlow, rebuild, type ShipDerived } from './rebuild.js';
 import { createShipState, damagePart } from './state.js';
 import { healthFactor, ShipTuning } from './tuning.js';
-import { stepFlight, FlightBody, jumpTuning, jumpPhase, jumpDistance, jumpCoast, jumpScaleFor, jumpDriveStats } from './flight.js';
+import { stepFlight, FlightBody, jumpTuning, jumpPhase, jumpDistance, jumpCoast, jumpScaleFor, jumpDriveStats, jumpChargeNeed, jumpBurnAt, jumpExtraCharge } from './flight.js';
 import { pilotJumpStep, NO_FIELDS } from './jumpFields.js';
 import { stepShipPhysics } from './physics.js';
 import { powerTick, payMining, gunLoad, poolHeld, energyTuning, MINE_CYCLE, FULL_CHARGE, type Charge } from './energy.js';
@@ -681,7 +681,12 @@ describe('jump drive', () => {
 
   it('jumps as far as you aim (the cursor distance), within the shortest and longest the drive allows', () => {
     // (Where the ship comes to rest: after the burn, the coast)
-    const go = (dist: number, boost = 1) => { const b = fly(jt.chargeTicks + jt.burnTicks + 600, (t) => t < jt.chargeTicks, 0.6, dist, boost).body; return Math.hypot(b.x, b.y); };
+    // (Held for as long as the jump charges: a short one longer, jumpChargeNeed)
+    const go = (dist: number, boost = 1) => {
+      const need = jumpChargeNeed(Math.max(jt.minRange, Math.min(R * boost, dist)), jt);
+      const b = fly(need + jt.burnTicks + 600, (t) => t < need, 0.6, dist, boost).body;
+      return Math.hypot(b.x, b.y);
+    };
     expect(go(8000)).toBeGreaterThan(7950);
     expect(go(8000)).toBeLessThan(8050);
     expect(go(500)).toBeGreaterThan(jt.minRange * 0.95); // too short: the minimum
@@ -728,13 +733,57 @@ describe('jump drive', () => {
     for (const b of [sparrow(), withCoils(lancer, 12)]) {
       // A long trip: chaining jumps (flying while the drive recharges) is at least twice as quick
       for (const dist of [50000, 100000, 150000]) expect(travel(b, dist, true), `${b.name} ${dist}`).toBeLessThan(travel(b, dist, false) / 2);
-      expect(travel(b, 20000, true), b.name).toBeLessThan(travel(b, 20000, false) / 2);
+      // A middling one (a short jump's extra charge tapering off): still well ahead
+      expect(travel(b, 20000, true), b.name).toBeLessThan(travel(b, 20000, false) * 0.75);
     }
     // A big hull on the core's coil alone: a poor drive, but still quicker than flying
     for (const dist of [50000, 150000]) expect(travel(lancer, dist, true), `${dist}`).toBeLessThan(travel(lancer, dist, false) * 0.8);
-    // A short hop: the starter ship under its own power is not far behind a jump's spool and burn (the jump stops dead on
-    // the mark, exitSpeed 0, with no coast: it used to be the slower of the two here)
-    expect(travel(sparrow(), 6000, false)).toBeLessThan(travel(sparrow(), 6000, true) * 1.5);
+    // A short hop: a jump charges the longer for it, and is never quicker than the starter flying it (boosting)
+    for (const dist of [5000, 6000, 8000, 10000, 12000]) expect(travel(sparrow(), dist, true), `${dist}`).toBeGreaterThanOrEqual(travel(sparrow(), dist, false));
+  });
+
+  it('a short jump charges longer: at least the time to fly it at a cruise, on top of the charge, tapering to the plain charge for long jumps', () => {
+    // (Kieran, 2026-11-05: "Short jumps are allowed, just add more charge time")
+    expect(jt.shortCruise).toBeGreaterThan(0);
+    expect(jt.shortRange).toBeGreaterThanOrEqual(jt.minRange);
+    expect(jt.shortTaper).toBeGreaterThan(jt.shortRange);
+    // Up to shortRange: the spool and burn together take at least the flight at shortCruise (whole ticks)
+    for (let d = jt.minRange; d <= jt.shortRange; d += 250) {
+      expect(jumpChargeNeed(d, jt) + jt.burnTicks, `${d}`).toBeGreaterThanOrEqual(d / jt.shortCruise);
+      expect(jumpChargeNeed(d, jt)).toBe(jt.chargeTicks + Math.ceil(d / jt.shortCruise));
+    }
+    // A 6,000-unit jump: no quicker than flying it at the reference cruise
+    expect((jumpChargeNeed(6000, jt) + jt.burnTicks) / 60).toBeGreaterThanOrEqual(6000 / jt.shortCruise / 60);
+    // Then the extra tapers off, never rising, and long jumps charge as they always did
+    let last = Infinity;
+    for (let d = jt.shortRange; d <= jt.shortTaper + 1000; d += 500) {
+      const x = jumpExtraCharge(d, jt);
+      expect(x).toBeLessThanOrEqual(last);
+      last = x;
+    }
+    expect(jumpChargeNeed(jt.shortTaper, jt)).toBe(jt.chargeTicks);
+    expect(jumpChargeNeed(R, jt)).toBe(jt.chargeTicks);
+    // The burn starts past the longest charge (the counter counts the ticks charged)
+    expect(jumpBurnAt(jt)).toBe(jt.chargeTicks + Math.ceil(jt.shortRange / jt.shortCruise));
+    // Not known (a replica's): it never starts the burn itself
+    expect(jumpChargeNeed(-1, jt)).toBe(Infinity);
+  });
+
+  it('flies a short jump only once it has charged for it, and a long one as soon as before', () => {
+    const need = jumpChargeNeed(6000, jt);
+    const short = fly(need + jt.burnTicks + 10, () => true, 0.6, 6000);
+    // trace[i] is the counter after i + 1 ticks: charging until it has charged `need`, then the burn
+    expect(jumpPhase(short.trace[need - 2], jt).phase).toBe('charging');
+    expect(jumpPhase(short.trace[need - 1], jt).phase).toBe('burn');
+    expect(Math.hypot(short.body.x, short.body.y)).toBeCloseTo(6000, -2);
+    // (Progress through the charge is against what this jump needs)
+    expect(jumpPhase(short.trace[(need >> 1) - 1], jt, need).progress).toBeCloseTo(0.5, 1);
+    // Let go part way: the charge collapses, no jump
+    const gone = fly(need + 50, (t) => t < need - 20, 0.6, 6000);
+    expect(Math.hypot(gone.body.x, gone.body.y)).toBeLessThan(1);
+    // A long jump burns at the plain charge, as it always did
+    const long = fly(jt.chargeTicks + 5, () => true, 0.6, 40000);
+    expect(jumpPhase(long.trace[jt.chargeTicks - 1], jt).phase).toBe('burn');
   });
 
   /** A blueprint with its first `n` hull parts made jump coils (Mk I) */

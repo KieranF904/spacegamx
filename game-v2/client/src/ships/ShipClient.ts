@@ -26,7 +26,7 @@ import type { Application } from 'pixi.js';
 import {
   Blueprint, Catalog, ClientInputMessage, ClientMessage, EntityType, InventoryStub, ServerMessage, ShipTuning,
   stationInteractRadius, stepShipPhysics, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
-  JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding,
+  JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding, jumpGo, jumpChargeNeed,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
@@ -50,6 +50,8 @@ import { ScannerFx } from './ScannerFx';
 import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import { AUG } from '../rendering/weapons/weaponStyles';
+import { strikeRolls } from '../rendering/weapons/MiningStrikeFx';
+import { rockMaterial } from '../rendering/rocks/RockMaterials';
 import { hitSurface } from './hitSurface';
 import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
@@ -350,7 +352,7 @@ export class ShipClient {
   /**
    * A shell's hit, where it's seen to strike (WeaponFx.onStruck), or where the server says for one not drawn here: a
    * raised shield's ripple and plating's sparks there, and the hit look a shell with no detonation of its own has; on
-   * a rock (`target`, as drawn here), its sparks, which the server no longer sends, and (finding its own hits, so told
+   * a rock (`target`, as drawn here), its mining strike or sparks, which the server no longer sends, and (finding its own hits, so told
    * no projectileHit for it) its sound: GameServer.hurtAsteroid
    */
   private struckFx(id: number, x: number, y: number, type: number, target = -1): void {
@@ -358,8 +360,12 @@ export class ShipClient {
     // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
     const kind = KIND_OF_TYPE.get(type);
     if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, x, y, 40);
-    if (target >= 0 && this.opts.state.entities.get(target)?.type === EntityType.Asteroid) {
-      this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
+    const rockAt = target >= 0 ? this.opts.state.entities.get(target) : undefined;
+    if (rockAt?.type === EntityType.Asteroid) {
+      // A hit that mines rolls for ore on the server (Mining.extract): a mining strike, rock dust and grit off the face
+      // (nothing's sent for it, so it plays whatever the roll); one that can't mine there, a shell's plain sparks
+      if (strikeRolls(kind, rockAt.composition?.hardness)) this.scene?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
+      else this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
       if (this.selfHits.on) this.opts.sound?.('hit', { x, y }, 0.7, 0.85 + Math.random() * 0.3);
     }
   }
@@ -806,6 +812,8 @@ export class ShipClient {
     this.beamFx.onPulse = (x, y, grade, own) => { this.opts.sound?.('laser_pulse', own ? undefined : { x, y }, own ? 0.42 : 0.7, PULSE_GRADE_PITCH[Math.max(0, Math.min(4, grade - 1))]); };
     // A mining laser's pulse: a deep, soft throb, one a ship however many miners it has
     this.beamFx.onMiningPulse = (x, y, own) => { this.opts.sound?.('mining_pulse', own ? undefined : { x, y }, own ? 0.5 : 0.6); };
+    // ...and where it lands on rock, a mining strike (a roll for ore: nothing's sent for it)
+    this.beamFx.onMiningStrike = (x, y, dx, dy, material) => this.scene?.miningStrike(x, y, dx, dy, material, 1.4);
     this.chargeFx = new ChargeFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, this.chargeTells);
     renderer.addBloomSource(this.chargeFx.glowLayer);
     this.scannerFx = new ScannerFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.pilot.econ);
@@ -840,7 +848,13 @@ export class ShipClient {
   localJump(): ReturnType<typeof jumpPhase> {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const ship = me && this.store.get(me.id);
-    return jumpPhase(me ? JumpFx.counter(me, true) : 0, ship?.derived.jumpCooldown ? { ...this.jump, cooldownTicks: ship.derived.jumpCooldown } : this.jump);
+    return jumpPhase(me ? JumpFx.counter(me, true) : 0, ship?.derived.jumpCooldown ? { ...this.jump, cooldownTicks: ship.derived.jumpCooldown } : this.jump, this.jumpNeed());
+  }
+
+  /** Ticks the local ship's jump, aimed as the input says, charges for (a short one longer: flight.ts jumpChargeNeed) */
+  jumpNeed(): number {
+    const reach = this.jumpReach();
+    return reach ? jumpChargeNeed(jumpGo(this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, reach, this.jump), this.jump) : this.jump.chargeTicks;
   }
 
   /** Jump range multiplier at a point (a star's charging ring), for a drive with `primed` ticks of a stillstone's priming (jumpFields.ts stepPrime) */
@@ -1553,7 +1567,7 @@ export class ShipClient {
     this.jumpFx?.update(dt, {
       hidden: this.hangarOpen || !this.store.get(state.playerId), latched: this.jumpLatched,
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
-      reach: this.jumpReach(), landing: this.jumpAiming() ? this.jumpLanding() : null, field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
+      reach: this.jumpReach(), need: this.jumpNeed(), landing: this.jumpAiming() ? this.jumpLanding() : null, field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
     // (Part features' chips: the Burst Strafer's, ready or cooling and whether the ship can pay; the Tow Beam's while it tows)
     this.features.updateIndicators();

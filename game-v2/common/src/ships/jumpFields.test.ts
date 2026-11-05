@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_JUMP, solarRingRadius } from './flight.js';
+import { DEFAULT_JUMP, solarRingRadius, jumpBurnAt } from './flight.js';
 import {
   lodestonePosition, lodestoneAt, jumpFieldAt, fieldCharge, fieldRangeBoost, fieldCooldown, stepPrime, pilotJumpStep, NO_FIELD,
   lodestoneFieldRadius, lodestoneBoostOf, lodestoneLabel, lodestoneStop, primeBoost, wholeTicks, type FieldEnv,
@@ -13,7 +13,7 @@ const fixed: LodestoneData = { id: 'still', position: { x: 60000, y: 0 } };
 const moving: LodestoneData = { id: 'moving', orbit: { radius: 80000, phase: 1, period: 2400 } };
 const env: FieldEnv = { central: { type: 'sun', radius: 21000 }, lodestones: [fixed, moving] };
 const cool = t.cooldownTicks;
-const start = t.chargeTicks + t.burnTicks; // the cooldown's first tick
+const burnAt = jumpBurnAt(t), start = burnAt + t.burnTicks; // the burn's first tick, the cooldown's first tick
 
 /** Ticks for a drive to cool down from the start of its cooldown, stepping the counter as a pilot's ship does */
 const coolTicks = (f: (typeof NO_FIELD)) => {
@@ -59,7 +59,7 @@ describe('stillstones', () => {
     expect(lode).toBe(Math.ceil(cool / (1 + t.lodestoneCharge)));
     expect(ring).toBe(lode);
     // Only while cooling: a drive that's ready, spooling or mid-burn isn't touched
-    for (const j of [0, 10, t.chargeTicks + 5]) expect(fieldCooldown(j, cool, { ring: false, lodestone: fixed }, t)).toBe(j);
+    for (const j of [0, 10, burnAt + 5]) expect(fieldCooldown(j, cool, { ring: false, lodestone: fixed }, t)).toBe(j);
   });
 
   it("don't stack above the star ring's own boost", () => {
@@ -82,10 +82,10 @@ describe('stillstones', () => {
     expect(p).toBe(1);
     expect(stepPrime(p, 0, NO_FIELD, t)).toBe(0);
     // A jump (its burn) spends it, and the field can't top it up while the burn carries you out
-    expect(stepPrime(500, t.chargeTicks, NO_FIELD, t)).toBe(0);
-    expect(stepPrime(500, t.chargeTicks + 3, inField, t)).toBe(0);
+    expect(stepPrime(500, burnAt, NO_FIELD, t)).toBe(0);
+    expect(stepPrime(500, burnAt + 3, inField, t)).toBe(0);
     // Spooling doesn't spend it (the burn's first tick does)
-    expect(stepPrime(500, t.chargeTicks - 1, NO_FIELD, t)).toBe(499);
+    expect(stepPrime(500, burnAt - 1, NO_FIELD, t)).toBe(499);
   });
 
   it("a pilot's step: the boost from where it starts, the charge from where it ends", () => {
@@ -122,7 +122,7 @@ describe('stillstones', () => {
     p = stepPrime(p, 0, NO_FIELD, t);
     expect(p).toBe(-t.lodestonePrimeTicks + 1);
     expect(stepPrime(-1, 0, NO_FIELD, t)).toBe(0);
-    expect(stepPrime(-500, t.chargeTicks, NO_FIELD, t)).toBe(0);
+    expect(stepPrime(-500, burnAt, NO_FIELD, t)).toBe(0);
     const weak = 1 + (t.lodestoneRangeBoost - 1) * t.lodestoneScarredBoost;
     expect(primeBoost(-10, t)).toBeCloseTo(weak);
     expect(lodestoneBoostOf(scarred, t)).toBeCloseTo(weak);

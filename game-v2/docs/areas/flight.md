@@ -29,6 +29,7 @@ How a ship moves: `stepFlight` turns inputs plus `ShipDerived` (thrust, mass, in
 - Counters on the body (jump, dodge, dodgeDir) are the whole feature state and ride keyframes/snapshots.
 - Wire side of the input bundle: protocol.ts input message + binary flags2 (`encodeInputBinary`: strafeLeft/Right, helm, jump, targetTick, dodge; 0x20 and 0x80 free); `CTL` bits in replica.ts; server `Input.*` ECS arrays (GameServer `applyInputToEntity` and `releaseControls`).
 - Jump: `jumpDriveStats`, `pilotJumpStep` (jumpFields.ts) wrap a step with field boosts; both ShipBridge and ShipClient use it.
+- Jump charge (2026-11-05, "short jumps are allowed, just add more charge time"): `jumpChargeNeed(go)` = `chargeTicks` + the ticks to fly `go` at `shortCruise` (20 u/tick) up to `shortRange` (12k), tapering to none by `shortTaper` (25k). The counter counts ticks charged; the burn starts at `jumpBurnAt(jt)` (`chargeTicks + shortRange / shortCruise`), never at `chargeTicks`: use `jumpBurnAt` / `jumpBurning`, not raw `chargeTicks`, for the burn. `go` comes from `jumpDist` each charging tick (`jumpGoFor`); a replica's `jumpDist` is -1 (not known), so its charge waits and the burn's start keyframes it, as it always did. The HUD shows a short jump's charge seconds (JumpFx, `ShipClient.jumpNeed`), and the route planner prices it (`routePlan.jumpTicks`).
 
 ## Invariants
 - Deterministic: no Date.now, Math.random, I/O, imports from client/server. Same inputs -> same body, bit for bit.

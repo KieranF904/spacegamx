@@ -18,7 +18,7 @@
 import type { LodestoneData } from '../data/schemas.js';
 import { planetAngle } from '../world/planets.js';
 import { dcos, dsin } from '../math/detTrig.js';
-import { inSolarRing, type JumpTuning } from './flight.js';
+import { inSolarRing, jumpBurnAt, jumpBurning, type JumpTuning } from './flight.js';
 
 /** Where a system's fields are */
 export interface FieldEnv {
@@ -137,8 +137,9 @@ export function fieldRangeBoost(ring: boolean, primed: number, t: JumpTuning): n
  */
 export function fieldCooldown(jump: number, cool: number, f: JumpField, t: JumpTuning, tick = 0): number {
   const extra = wholeTicks(fieldCharge(f, t), tick);
-  if (!extra || jump < t.chargeTicks + t.burnTicks) return jump;
-  return jump + extra >= t.chargeTicks + t.burnTicks + cool ? 0 : jump + extra;
+  const at = jumpBurnAt(t);
+  if (!extra || jump < at + t.burnTicks) return jump;
+  return jump + extra >= at + t.burnTicks + cool ? 0 : jump + extra;
 }
 
 /**
@@ -148,7 +149,7 @@ export function fieldCooldown(jump: number, cool: number, f: JumpField, t: JumpT
  * negative ticks, running up to 0 (it reaches less far: primeBoost).
  */
 export function stepPrime(primed: number, jump: number, f: JumpField, t: JumpTuning): number {
-  if (jump >= t.chargeTicks && jump < t.chargeTicks + t.burnTicks) return 0;
+  if (jumpBurning(jump, t)) return 0;
   if (f.lodestone) return f.lodestone.state === 'scarred' ? -t.lodestonePrimeTicks : t.lodestonePrimeTicks;
   return primed > 0 ? primed - 1 : primed < 0 ? primed + 1 : 0;
 }

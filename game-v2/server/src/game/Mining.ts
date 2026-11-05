@@ -8,8 +8,10 @@
  *   tool's yield x its work rate / damagePerUnit). The rock loses every unit
  *   worked, kept or not, and a chunk is thrown every 5 to 10 units worked, so
  *   the work sets how often chunks come.
- * - The keep: the share of what's worked that ends up in the chunk; the rest
- *   is lost. A chunk holds what was kept (a gun's are small but steady).
+ * - The keep: the chance each unit worked ends up in the chunk; every unit is
+ *   a dice roll (the rock's seeded RNG), and a failed roll is lost from the
+ *   rock all the same. A chunk holds what was kept; a chunk whose rolls all
+ *   failed is skipped. The averages are the keep; the drops vary.
  *
  * Mining lasers keep all they work on rock of their grade or below (a grade or
  * two ahead works it a little faster). A grade or two behind the rock's tier
@@ -40,9 +42,8 @@ export interface MiningTool {
 
 /** A miner's work on one rock */
 interface Work {
-  /** Rock units owed (the fraction of the next), and the keep owed (a unit is kept each time it reaches 1) */
+  /** Rock units owed (the fraction of the next) */
   owed: number;
-  keep: number;
   /** Rock units worked since the last chunk, and how many the next chunk wants (chunkUnits) */
   worked: number;
   want: number;
@@ -192,10 +193,10 @@ export class Mining {
         id = pickOre(r, this.rand(r));
         if ((this.table.oreHardness[id] ?? 1) > tool.hardness) id = this.softest(r, tool);
       }
-      // Kept or lost, a steady share: each unit adds its keep, and one is kept each time that makes a whole one
-      w.keep += gun && !gun.common.includes(id) ? keep * gun.keepOther : keep;
-      if (w.keep >= 1) {
-        w.keep -= 1;
+      // Kept or lost, a dice roll: each unit worked rolls against the keep (the rock's own seeded dice, so it
+      // replays the same); a failed roll still takes the unit out of the rock. (A full keep needs no roll.)
+      const p = gun && !gun.common.includes(id) ? keep * gun.keepOther : keep;
+      if (p >= 1 || this.rand(r) < p) {
         units++;
         let n = 1;
         // Mining skill (and a wing): the chance of an extra unit
@@ -204,7 +205,7 @@ export class Mining {
         w.bag[id] = (w.bag[id] ?? 0) + n;
         got[id] = (got[id] ?? 0) + n;
       }
-      // Worked enough for a chunk: throw what was kept (nothing kept: no chunk, and the keep owed carries on to the next)
+      // Worked enough for a chunk: throw what was kept (every roll failed: no chunk, that drop is skipped)
       if (w.worked >= w.want) {
         if (Object.keys(w.bag).length) this.throwChunk(r, miner, w, x, y, nx, ny);
         w.worked = 0;
@@ -221,7 +222,7 @@ export class Mining {
 
   private workOf(r: Rock, miner: number): Work {
     let w = r.work.get(miner);
-    if (!w) r.work.set(miner, (w = { owed: 0, keep: 0, worked: 0, want: this.chunkWant(r), bag: {}, dps: 0, t: this.host.tick() }));
+    if (!w) r.work.set(miner, (w = { owed: 0, worked: 0, want: this.chunkWant(r), bag: {}, dps: 0, t: this.host.tick() }));
     return w;
   }
 
