@@ -17,7 +17,8 @@ const MAX_PER_HOUR = 30;
 
 interface Keys { token: string; user: string }
 
-function keys(env = process.env): Keys | null {
+// (No `process` in the browser: proto mode bundles the server, and there it's off)
+function keys(env: NodeJS.ProcessEnv = typeof process === 'undefined' ? {} : process.env): Keys | null {
   const want = env.NOTIFY_EVENTS ?? (env.NODE_ENV === 'production' ? '1' : '0');
   if (want !== '1') return null;
   let token = env.PUSHOVER_TOKEN, user = env.PUSHOVER_USER;
