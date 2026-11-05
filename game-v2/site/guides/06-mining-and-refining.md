@@ -6,7 +6,7 @@ summary: Rock types, mining tools and how hard a rock is, what each ore is worth
 checked: 2026-11-04
 sources: data/mining.json, data/recipes.json (refining), data/items.json, server/src/game/Mining.ts, common/src/econ/mining.ts, traces.ts, rocks.ts, items.ts, common/src/econ/quests.ts (SKILLS), server/src/game/Party.ts, data/unlocks.json
 ---
-<!-- TODO: the "about 5.6 ore units a second" for a Mining Laser is 42 damage a second (tuning miner.dps) times yield 1.6 divided by 12 (damagePerUnit). Not measured in the game: a material's output may scale the beam's damage. -->
+<!-- TODO: the "about 0.7 ore units a second" for a Mining Laser is 42 damage a second (tuning miner.dps) times yield 1.6 divided by 96 (damagePerUnit). Not measured in the game: a material's output may scale the beam's damage. -->
 <!-- TODO: the Bore (steel, level 10) shares the Mining Laser's yield and hardness in data; what it does better is not confirmed beyond being a grade II tool. Described here only as a grade II miner. -->
 
 ## How mining works
@@ -34,7 +34,7 @@ The amount of ore a hit frees is:
 | Lance, Phase, Prism | 0.06 to 0.1 | 3 |
 | Siphon (gas only) | 1.4 | 1 |
 
-A Mining Laser does 42 damage a second to rock, which is about 5.6 ore units a second at full efficiency.
+A Mining Laser does 42 damage a second to rock, which is about 0.7 ore units a second at full efficiency.
 
 If a rock is too hard for your tool the game tells you, and the ore it cannot crack stays in the rock.
 
