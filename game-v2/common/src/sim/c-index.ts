@@ -5,3 +5,4 @@
 export * from './c-replicaState.js';
 export * from './c-contactCache.js';
 export * from './c-pulls.js';
+export * from './c-headHash.js';

@@ -15,7 +15,10 @@ const isArr = Array.isArray;
 
 /** Can the snapshot's row go packed (ids where ids go, rows the shapes the packing expects)? */
 export function snapshotOk(w: unknown[]): boolean {
-  if (w.length > 14) return false;
+  if (w.length > 15) return false;
+  // (The head hash: 24 bits, sim/headHash.ts)
+  const hh = w[14];
+  if (hh != null && !(Number.isInteger(hh) && (hh as number) >= 0 && (hh as number) < 1 << 24)) return false;
   const [, , , e, p, r, k, c, o, f, n, d, x, g] = w as unknown[][];
   // (Homing shells' guide records: rows of whole numbers as the decisions', decisionsIO packs them)
   if (g != null && !(isArr(g) && g.every((row) => guideRowOk(row) && isId(row[0]) && row[1] > -4096 && row.every((v, i) => i < 3 || (v >= -(2 ** 30) && v < 2 ** 30))))) return false;
