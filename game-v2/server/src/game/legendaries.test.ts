@@ -6,7 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Input, InSystem, Position, Velocity, Projectile, OwnedBy, isWeaponFn, replicaAngle, quantizeReplicaAngle, ReplicaMode, WEAPON_KIND_TYPE } from '@space-game/common';
+import { Input, InSystem, Position, Velocity, Projectile, OwnedBy, isWeaponFn, replicaAngle, quantizeReplicaAngle, ReplicaMode, WEAPON_KIND_TYPE, parseBlueprint } from '@space-game/common';
+import { readFileSync } from 'fs';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -21,8 +22,9 @@ const files = readGameDataFiles(dataDir);
 const X = 25000, Y = 20000;
 const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
 
-/** A pilot whose first gun is this weapon model, held at (X, Y) */
-function pilotWith(model: string) {
+/** A pilot whose first gun is this weapon model, held at (X, Y). `pool`: on the pool-era starter (a fixture), whose clip
+ * regrows a round at a time (on the ports core a clip is the gun's buffer, filling at its feed: guns.ts) */
+function pilotWith(model: string, pool = false) {
   resetGlobals();
   const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
@@ -32,7 +34,7 @@ function pilotWith(model: string) {
   t.send({ type: 'join', username: 'pilot' } as any);
   const pid = t.getPlayerId();
   const ships = server.getShips()!;
-  const bp = ships.get(pid)!.blueprint;
+  const bp = pool ? parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8')) : ships.get(pid)!.blueprint;
   let n = 0;
   ships.respawnInPlace(pid, { ...bp, parts: bp.parts.map((q) => ((q.fn === 'cannon_pip' || isWeaponFn(q.fn)) && n++ < 1 ? { ...q, fn: model } : q)) });
   const hold = () => { Position.x[pid] = X; Position.y[pid] = Y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
@@ -46,7 +48,7 @@ const shellsOf = (w: ReturnType<typeof pilotWith>, kind: keyof typeof WEAPON_KIN
 
 describe('Hive: a clip of eight that regrows', () => {
   it('a salvo of four takes four rounds; then one round grows back every 45 ticks', () => {
-    const w = pilotWith('legendary_hive');
+    const w = pilotWith('legendary_hive', true);
     const part = w.gun().part;
     expect(w.ships.get(w.pid)!.rounds[part]).toBe(8);
     for (let i = 0; i < 4; i++) { w.hold(); Input.fireLeft[w.pid] = i < 2 ? 1 : 0; Input.cursorDist[w.pid] = 900; Input.targetAngle[w.pid] = aimEast(); w.server.step(); }

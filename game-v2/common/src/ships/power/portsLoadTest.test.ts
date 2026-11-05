@@ -19,9 +19,10 @@ import { PORTS_SCENARIOS, portsLoadTest } from './portsLoadTest.js';
 const load = (path: string) => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints', path), 'utf8'));
 const derive = (bp: Blueprint) => createShipState(catalog, tuning, 1, bp, 0).derived;
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
-const starter = () => load('sparrow-t.json');
+// (The first ports starter, kept as a fixture: the library's now feeds its Pips from a core hub)
+const starter = () => load('fixtures/sparrow-t-reactors.json');
 const idx = (bp: Blueprint, uid: number) => bp.parts.findIndex((p) => p.uid === uid);
-// (The starter: Pips at (-1,0) and (2,0), each fed from below by a reactor giving N (uids 7, 8); reactors 4 and 13 give S into the engines)
+// (That starter: Pips at (-1,0) and (2,0), each fed from below by a reactor giving N (uids 7, 8); reactors 4 and 13 give S into the engines)
 const PIP = 2, PIP_REACTOR = 7, ENGINE_REACTOR = 4, ENGINE_REACTOR_2 = 13;
 
 describe('portsView', () => {

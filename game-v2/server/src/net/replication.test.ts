@@ -4,7 +4,7 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, InSystem, ServerMessage, ShipReplicaSet, ReplicaMode, replicaAngle, quantizeReplicaAngle,
   rebuildVolley, Player, Projectile, createShipState, stepGuns, volleyShells, firesStraight, weaponDef, isWeaponFn,
-  parseBlueprint, TELL_CHARGE_START, TELL_CHARGE_CANCEL, type Blueprint,
+  parseBlueprint, stackMods, TELL_CHARGE_START, TELL_CHARGE_CANCEL, type Blueprint, type Charge, type PortsState,
 } from '@space-game/common';
 import { readFileSync } from 'fs';
 import { hasComponent } from 'bitecs';
@@ -18,6 +18,13 @@ import { createShipBridge } from '../proto/createProtoServer.js';
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
+
+/** A copy of a charge as it is now (a ports ship's state is changed in place: golden/parity.test.ts snapCharge) */
+function snapCharge(c: Charge): Charge {
+  const e = c.e as PortsState | undefined;
+  if (!e) return { ...c };
+  return { ...c, e: { ...e, held: e.held.slice(), flags: e.flags.slice(), amt: e.amt.slice(), mat: e.mat.slice(), closed: e.closed.slice(), aug: e.aug.slice(), sat: e.sat.slice() } };
+}
 
 function world() {
   resetGlobals();
@@ -205,6 +212,16 @@ describe('fire events', () => {
     Position.x[p] = 25000; Position.y[p] = 20000;
     // The client's own copy of the ship: guns stepped by guns.ts with the inputs it sent and the pose it predicted
     const mine = createShipState(ships.catalog, ships.tuning, p, ships.get(p)!.blueprint, 0);
+    // (A ports ship's guns fire from their buffers, which its client keeps in its charge, stepped in the flight step as the
+    // server's is: golden/parity.test.ts checks that chain tick by tick. Here the client's guns are given the charge the
+    // server's guns had this tick, so they are judged on their own state with the same buffers, as the client's are)
+    let theirCharge: Charge | undefined;
+    const fire0 = (ships as any).fireWeapons as (eid: number, ...rest: any[]) => void;
+    (ships as any).fireWeapons = function (this: unknown, eid: number, ...rest: any[]) {
+      const energy = rest[5] as { charge: Charge } | undefined;
+      if (eid === p && energy) theirCharge = snapCharge(energy.charge);
+      return fire0.call(this, eid, ...rest);
+    };
     let predicted = 0, matched = 0, worst = 0;
     for (let i = 0; i < 60 * 6; i++) {
       Input.forward[p] = (i % 120) < 60 ? 1 : 0;
@@ -214,7 +231,9 @@ describe('fire events', () => {
       server.step();
       const tick = (server as any).currentTick as number;
       const pose = { x: Position.x[p], y: Position.y[p], angle: Rotation.angle[p] };
-      const { shots } = stepGuns(mine, pose, { firing: Input.fireLeft[p] === 1, aimWorld: Input.targetAngle[p], aimDist: Input.cursorDist[p] }, tick, ships.tuning);
+      const energy = theirCharge && { charge: theirCharge };
+      theirCharge = undefined;
+      const { shots } = stepGuns(mine, pose, { firing: Input.fireLeft[p] === 1, aimWorld: Input.targetAngle[p], aimDist: Input.cursorDist[p], energy }, tick, ships.tuning);
       for (const m of b.got.splice(0)) for (const [owner, , partAmmo, , ...ids] of (m.type === 'snapshot' ? m.fire : undefined) ?? []) {
         if (owner !== p) continue;
         const code = Math.floor(partAmmo / 256);
@@ -224,7 +243,8 @@ describe('fire events', () => {
       // The server's shells fired this tick (they've moved once since)
       const theirs = [...Array(20000).keys()].filter((e) => hasComponent(server['world'], Projectile, e) && Projectile.ownerId[e] === p && Projectile.spawnTick[e] === tick);
       const ours = shots.filter((s) => firesStraight(weaponDef(ships.tuning, s.w.kind)))
-        .flatMap(({ w, shot }) => volleyShells(p, mine, w, shot, { ...pose, vx: Velocity.x[p], vy: Velocity.y[p] }, tick, ships.tuning));
+        // (A ports shot made augmented by its material carries its augment's mods, as the client's predictGuns gives them)
+        .flatMap(({ w, shot, aug }) => volleyShells(p, mine, w, shot, { ...pose, vx: Velocity.x[p], vy: Velocity.y[p] }, tick, ships.tuning, stackMods(undefined, aug)));
       predicted += ours.length;
       expect(ours.length, `tick ${tick}`).toBe(theirs.length);
       for (const s of ours) {
@@ -235,7 +255,9 @@ describe('fire events', () => {
       }
     }
     // (Slow guns: a 4-shell clip with a long reload and a charged orb fire less in the six seconds)
-    expect(predicted).toBeGreaterThan(guns ? 5 : 10);
+    // (On the ports Sparrow each gun has one Cell Reactor behind it: the Cloudmaker fires one clip of four in the six seconds, and the
+    // Blackout's 90-tick charge never fills in a 70-tick hold, so only its tells go)
+    expect(predicted).toBeGreaterThan(guns ? 3 : 10);
     expect(matched).toBe(predicted);
     expect(worst).toBeLessThan(1e-3);
     // (A charge gun's every charge is told, and the ones let go too: fire is let go 20 ticks in every 90)
