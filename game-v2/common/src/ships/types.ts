@@ -42,6 +42,13 @@ export interface PieceDef {
   relief?: PieceRelief;
   turret?: number;
   detail?: PieceDetail[];
+  /**
+   * Look only: a small hull's finish, its seams and bevels this share of the usual (a cell's 0.13) and its detail
+   * outlined in shadow, not black (a design drawn small, scripts/bespoke/enemies kit.mjs: its scale)
+   */
+  fine?: number;
+  /** Look only: its surface, in place of its material's: 'solar', the stations' solar cells (client rendering/solarCells.ts) */
+  surface?: 'solar';
   /** Look only (a bespoke hull's core): the metal frame under the whole hull, seen where parts are gone */
   frame?: PieceFrame;
   /**
@@ -139,7 +146,7 @@ export type SkeletonPart =
   | { kind: 'fins'; poly: Vec2[]; n: number };
 
 export interface BespokeFile {
-  pieces: { id: string; polygon: Vec2[]; mount?: PieceMount; contact?: number; relief?: PieceRelief; turret?: number; detail?: PieceDetail[]; frame?: PieceFrame; skeleton?: PieceSkeleton; under?: boolean; stage?: number; ruin?: boolean }[];
+  pieces: { id: string; polygon: Vec2[]; mount?: PieceMount; contact?: number; relief?: PieceRelief; turret?: number; detail?: PieceDetail[]; fine?: number; surface?: 'solar'; frame?: PieceFrame; skeleton?: PieceSkeleton; under?: boolean; stage?: number; ruin?: boolean }[];
 }
 
 export type FunctionId = string;

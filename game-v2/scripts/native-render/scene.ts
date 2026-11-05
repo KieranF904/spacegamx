@@ -22,6 +22,7 @@ import { buildFrame } from '../../client/src/ships/frameBuild';
 import { turretHead } from '../../client/src/ships/gunDecor';
 import { buildHullAtlas, HULL_ROWS, HULL_TILE } from '../../client/src/ships/hullTextures';
 import { GLOW_COOL, GLOW_WARM, HULL_WEAR, KIND_GLOW, KIND_LOOK } from '../../client/src/ships/hullLook';
+import { SOLAR } from '../../client/src/rendering/solarCells';
 import { MAX_LIGHTS, fades } from '../../client/src/rendering/lighting/litShader';
 import { SHIP_MAX_PARTS } from '../../client/src/rendering/lighting/ShipBatch';
 import { LitGeometry } from '../../client/src/rendering/lighting/LitGeometry';
@@ -54,7 +55,7 @@ const toDesktop = (s: string) => s.replace(/^#version 300 es/, '#version 330 cor
 /** Slots compiled in: the renderer draws one object at a time (two: as LitMesh, never a one-slot array) */
 const SLOTS = 2;
 export const SHADERS = (() => {
-  const vars = { slots: SLOTS, MAX_LIGHTS, fades, HULL_ROWS };
+  const vars = { slots: SLOTS, MAX_LIGHTS, fades, HULL_ROWS, SOLAR };
   return {
     hullVertex: toDesktop(template('rendering/lighting/ShipBatch.ts', 'const vertex = (slots: number) =>', vars)),
     hullFragment: toDesktop(template('rendering/lighting/ShipBatch.ts', 'const fragment = `', vars)),

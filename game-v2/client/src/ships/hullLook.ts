@@ -79,8 +79,8 @@ export const HULL_MAT: Record<string, { tile: number; tint: number; metal: numbe
   dev_singularity: { tile: 15, tint: 0.9, metal: 0.9, glow: 1.6, boost: 1.2, any: true, emit: [1.0, 0.2, 0.9], hot: 2 },
 };
 
-/** The game's own ships' tiles (16-23): × what colour where worn through, and whether their own light's mask is that (w: 1) */
-export const HULL_WEAR = new Float32Array(32).map((_, k) => (k % 4 === 3 ? 0 : 1));
+/** The game's own ships' tiles (16 on: one a tile): × what colour where worn through, and whether their own light's mask is that (w: 1) */
+export const HULL_WEAR = new Float32Array((HULL_ROWS * 4 - 16) * 4).map((_, k) => (k % 4 === 3 ? 0 : 1));
 for (const m of Object.values(HULL_MAT)) if (m.wear && m.tile >= 16) HULL_WEAR.set([...m.wear, 1], (m.tile - 16) * 4);
 
 export function gradeOfMaterial(catalog: Catalog, material: string): number {

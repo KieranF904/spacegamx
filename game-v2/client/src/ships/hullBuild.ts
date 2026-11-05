@@ -12,6 +12,7 @@ import { ENGINE_FNS, HULL_MAT, bakeHull, gradeOfMaterial, hullKind } from './hul
 import { decorOf } from './partDecor';
 import { functionColor, mix } from './shipColors';
 import { carve, drawDetail } from './bespokeRelief';
+import { SOLAR_CELL_HEX, SOLAR_FRAME_HEX, SOLAR_HULL_TILE } from '../rendering/solarCells';
 
 /**
  * A fixed gun's barrel as built (pixels, about its base): its first outline, all of its outline (cracks), its shaded
@@ -59,6 +60,9 @@ export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState
     // Faction colours or paint
     // (a boss's own material is its own colour: no faction's)
     if (tint !== undefined && !own && (shell || part.fn === 'core')) color = mix(color, tint, part.fn === 'core' ? 0.3 : 0.45);
+    // (a solar panel: the stations' cells, whatever it's made of; what's laid over it the stations' frame grey)
+    const solar = !!geom.bespoke && catalog.pieces.get(part.piece)?.surface === 'solar';
+    if (solar) color = SOLAR_CELL_HEX;
     if (debris) color = mix(color, 0x333333, 0.45);
     let edge = mix(color, debris ? 0x555c66 : 0xc8d6ea, shell ? 0.22 : 0.3);
     if (!shell && !debris) edge = mix(edge, matColor, 0.15 + 0.6 * gk);
@@ -72,15 +76,21 @@ export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState
     const toPx = (q: number[]) => q.map((v, k) => (v - (k % 2 ? cy : cx)) * cs);
     // A weapon's mounting base, in its colour (toned), is its body: the rest of the part open
     const basePanels = () => { for (const b of decor.base!) g.panel(toPx(b.pts), mix(color, b.tone > 0 ? 0xffffff : 0, Math.abs(b.tone)), { bevel: b.bevel * cs, edge }); };
+    const details = (pc: NonNullable<typeof piece>, body: number, ed: number, crystal: number, glowCol: number, pb: number) =>
+      pc.detail?.flatMap(trim).forEach((d, k) => drawDetail(g, d, (x, y) => [(x - cx) * cs, (y - cy) * cs], cs, { body, edge: ed, crystal, glow: glowCol }, i * 31 + k, pb, !!pc.fine));
     if (piece) {
       const glowCol = own?.emit ? (Math.round(own.emit[0] * 255) << 16) | (Math.round(own.emit[1] * 255) << 8) | Math.round(own.emit[2] * 255) : 0xff8a3a;
-      carve(g, geom.convex.map((c) => c.flatMap(([x, y]) => [(x - cx) * cs, (y - cy) * cs])), color, edge, bevel, i + 1, piece.relief, glowCol);
+      // (a small hull's finer finish: its seams and bevels narrower, its detail outlined in shadow, not black)
+      const pb = bevel * (piece.fine ?? 1);
+      carve(g, geom.convex.map((c) => c.flatMap(([x, y]) => [(x - cx) * cs, (y - cy) * cs])), color, edge, pb, i + 1, piece.relief, glowCol, !!piece.fine);
       // Its detail (look only): housings, vents, channels, shards, rings, glows, nozzles
       const crystal = mix(parseInt((catalog.materials.get('pyre_crystal')?.color ?? '#9a8fd0').slice(1), 16), color, 0.15);
-      piece.detail?.flatMap(trim).forEach((d, k) => drawDetail(g, d, (x, y) => [(x - cx) * cs, (y - cy) * cs], cs, { body: color, edge, crystal, glow: glowCol }, i * 31 + k, bevel));
+      if (!solar) details(piece, color, edge, crystal, glowCol, pb);
     } else if (decor.base) basePanels();
     else g.panel(pts, color, { bevel, edge });
     const decorFrom = g.vertexCount;
+    // (a solar panel's detail is plain hardware, as the hull's decor is: not cells)
+    if (piece && solar) { const fc = debris ? mix(SOLAR_FRAME_HEX, 0x333333, 0.45) : SOLAR_FRAME_HEX; details(piece, fc, mix(fc, 0xc8d6ea, 0.22), fc, 0xff8a3a, bevel * (piece.fine ?? 1)); }
     // (on a boss's carved weapon, its base goes over the carving, as hardware)
     if (piece && decor.base) basePanels();
 
@@ -108,7 +118,7 @@ export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState
     const look = {
       // (the game's own ships' parts look as their material does, whatever they are: no kind's own glow)
       kind: own ? (part.fn === 'core' ? 3 : 0) : hullKind(part.fn), tone,
-      hull: hm && !debris ? [hm.tile, hm.metal, emit ? -emit : hm.glow, hm.boost] : [-1, debris ? 0.2 : 0.4 + 0.5 * gk, 0, debris ? 0 : gk * 0.9],
+      hull: solar && !debris ? [SOLAR_HULL_TILE, 0, 0, 0] : hm && !debris ? [hm.tile, hm.metal, emit ? -emit : hm.glow, hm.boost] : [-1, debris ? 0.2 : 0.4 + 0.5 * gk, 0, debris ? 0 : gk * 0.9],
       decor: [-1, debris ? 0.2 : 0.4 + 0.5 * gk, 0, debris ? 0 : gk * 0.9],
       // (the glows' palette: the game's own ships' materials take Mk III's gold, whatever their grade)
       grade: [debris ? 1 : own ? 3 : grade, ...(emit ? own!.emit! : [((matColor >> 16) & 255) / 255, ((matColor >> 8) & 255) / 255, (matColor & 255) / 255])],

@@ -243,6 +243,8 @@ export function bespokePiece(b: BespokeFile['pieces'][number]): PieceDef {
     ...(b.relief ? { relief: b.relief } : {}),
     ...(b.turret ? { turret: b.turret } : {}),
     ...(b.detail?.length ? { detail: b.detail } : {}),
+    ...(b.fine ? { fine: b.fine } : {}),
+    ...(b.surface ? { surface: b.surface } : {}),
     ...(b.frame ? { frame: b.frame } : {}),
     ...(b.skeleton ? { skeleton: b.skeleton } : {}),
     ...(b.under ? { under: true } : {}),

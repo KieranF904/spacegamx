@@ -8,19 +8,28 @@
  * A fifth row holds the game's own ships' materials (bossTile): Pyreclast
  * glass (faceted volcanic glass, fissures glowing) and crystal (gabled prisms
  * lit from within); then, into a sixth, the Scrap Mother's salvage (scrapTile)
- * and the Brood Mother's carapace (broodTile).
+ * and the Brood Mother's carapace (broodTile); a seventh row's first, solar
+ * cells (the stations' own: solarCells.ts) for a ship's solar panels.
  * Each texel: slope (r, g), cavity (b), own light (a; on the salvage but its
  * crystal, where it's worn through instead: HULL_WEAR). Pure: built in a
  * worker (hullAtlasWorker.ts).
  */
 
+import { SOLAR_HULL_TILE, solarCellTexel } from '../rendering/solarCells';
+
 /** A tile's side (texels); the atlas is 4 tiles across and HULL_ROWS down */
 export const HULL_TILE = 256;
 /** What it makes, by version (assetCache.ts): bump it whenever the output changes */
-export const HULL_ATLAS_VERSION = 1;
-export const HULL_ROWS = 6;
+export const HULL_ATLAS_VERSION = 2;
+export const HULL_ROWS = 7;
 
 const N = HULL_TILE;
+
+/** Solar cells, as the stations' arrays have them (the rest of the seventh row: blank) */
+function solarTile(kind: number, h: Float32Array, e: Float32Array): Tile {
+  if (kind === SOLAR_HULL_TILE) for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const c = solarCellTexel(i, j); h[j * N + i] = c.v; e[j * N + i] = c.e; }
+  return { h, e };
+}
 /** Height, own light (or wear), and a tone of its own (stains, fading: into the cavity channel, whatever the height) */
 type Tile = { h: Float32Array; e: Float32Array; k?: Float32Array };
 const wrap = (v: number) => ((v % N) + N) % N;
@@ -68,6 +77,7 @@ function tile(kind: number): Tile {
     // (a faint grain; not on the hull materials' tiles, whose shine would turn it to sparkle)
     h[j * N + i] += v + (kind < 4 ? (rnd() - 0.5) * 0.12 : 0);
   }
+  if (kind >= SOLAR_HULL_TILE) return solarTile(kind, h, e);
   if (kind === 23) return broodTile(h, e, groove);
   if (kind >= 18) return scrapTile(kind, h, e, bump, groove);
   if (kind >= 16) bossTile(kind, h, e, groove);

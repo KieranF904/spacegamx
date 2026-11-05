@@ -10,6 +10,8 @@
  * Grid units (a cell is 24 world units), y down, nose towards -y. Angles in degrees clockwise from straight ahead.
  * Helpers copied from scripts/bespoke/scrap_mother.mjs and maw_heart.mjs (docs/boss-design.md section 3), plus a
  * `group` on every part: the destroyable piece it belongs to (a few parts drawn as one piece break as one).
+ * Look: every piece is written with `fine` (its scale: its seams and bevels drawn at its size, its detail outlined in
+ * shadow, not ink), and a part may take `surface: 'solar'` (the stations' solar cells, whatever its material).
  */
 import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -96,11 +98,18 @@ export function stripes(a, b, w, n, c1 = '#c9a23a', c2 = '#24262b') {
 /** A dent or patch (a recess) roughly round `at` */
 export const dent = (at, r, seed, color) => recess(Array.from({ length: 6 }, (_, k) => { const a = (k / 6) * Math.PI * 2 + seed, rr = r * (0.7 + 0.5 * hash(seed * 9 + k)); return [round(at[0] + Math.cos(a) * rr), round(at[1] + Math.sin(a) * rr)]; }), color);
 
+/** Detail that's painted, not lit: toned (write) */
+const TONED = new Set(['raise', 'recess', 'ring', 'cable', 'vent']);
+/** A colour a quarter of the way to its own grey */
+export function tone(c, k = 0.25) {
+  const v = parseInt(c.slice(1), 16), r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255, l = 0.299 * r + 0.587 * g + 0.114 * b;
+  return '#' + [r, g, b].map((q) => Math.round(q + (l - q) * k).toString(16).padStart(2, '0')).join('');
+}
 export const mirrorDetail = (d) => ({ ...d, ...(d.poly ? { poly: d.kind === 'vein' || d.kind === 'cable' ? d.poly.map(flipX) : mirror(d.poly) } : {}), ...(d.at ? { at: flipX(d.at) } : {}), ...(d.dir ? { dir: flipX(d.dir) } : {}) });
 
 /**
  * A design under construction. `part(name, fn, material, polygon, opts)`; opts: group (the destroyable piece it is
- * part of; default its own name), relief, mount {at, dir, width}, turret (size in cells: a turret mount), detail.
+ * part of; default its own name), relief, mount {at, dir, width}, turret (size in cells: a turret mount), surface, detail.
  * `pair(...)` builds name_l as given and name_r mirrored (groups get _l/_r too unless `shared`; `matR`: the right's material).
  */
 export function design(id, card) {
@@ -113,7 +122,7 @@ export function design(id, card) {
         id: pid, polygon: polygon.map((q) => q.map(round)),
         ...(opts.mount ? { mount: { ...opts.mount, at: opts.mount.at.map(round), dir: norm(opts.mount.dir) } } : {}),
         ...(opts.relief ? { relief: opts.relief } : {}), ...(opts.turret ? { turret: opts.turret } : {}),
-        ...(opts.under ? { under: true } : {}), ...(opts.detail?.length ? { detail: opts.detail } : {}),
+        ...(opts.under ? { under: true } : {}), ...(opts.surface ? { surface: opts.surface } : {}), ...(opts.detail?.length ? { detail: opts.detail } : {}),
       });
       parts.push({ uid: parts.length, piece: pid, fn, material, x: 0, y: 0, rot: 0, flip: false, ...(opts.turret ? { mount: 'turret' } : {}), _group: opts.group ?? name });
       return d;
@@ -128,6 +137,9 @@ export function design(id, card) {
     /** Write the files; `damaged`: the groups shot off in the damaged still */
     write({ damaged = [], paint = '#34363c', scale = 1 } = {}) {
       mkdirSync(OUT, { recursive: true });
+      // (painted detail toned to the game's palette: its plates, trim, rings and cables a quarter of the way to their
+      // own grey, so a brass strip reads as worn metal beside the grid ships, not a flat saturated fill; lights keep theirs)
+      for (const p of pieces) if (p.detail) p.detail = p.detail.map((x) => (x.color && TONED.has(x.kind) ? { ...x, color: tone(x.color) } : x));
       // (drawn at `scale` on the way out: authored roomy, written at its size; turrets keep their size in cells)
       if (scale !== 1) {
         const sc = (q) => [round(q[0] * scale), round(q[1] * scale)];
@@ -136,6 +148,9 @@ export function design(id, card) {
           p.polygon = p.polygon.map(sc);
           if (p.mount) p.mount = { ...p.mount, at: sc(p.mount.at), ...(p.mount.width ? { width: round(p.mount.width * scale) } : {}) };
           if (p.detail) p.detail = p.detail.map(sd);
+          // (and its finish drawn at that size too: seams and bevels are a share of a cell, so a hull drawn small would
+          // otherwise wear its authored size's outlines, heavy and inked; PieceDef `fine`)
+          p.fine = round(scale);
         }
       }
       const coreGroup = parts.find((q) => q.fn === 'core')?._group;

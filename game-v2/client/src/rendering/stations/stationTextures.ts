@@ -9,6 +9,8 @@
  * (procedural.ts asks; StationMaterials.ts makes the texture).
  */
 
+import { solarCellTexel } from '../solarCells';
+
 export const STATION_TILE = 256;
 /** What it makes, by version (assetCache.ts): bump it whenever the output changes */
 export const STATION_ATLAS_VERSION = 1;
@@ -73,16 +75,9 @@ function tile(kind: number): { h: Float32Array; e: Float32Array } {
       const li = i % 32, lj = j % 32, d = Math.min(li, 32 - li, lj, 32 - lj);
       v = groove(d, 2) * 2.5 + Math.min(1, d / 6) * 0.4 + groove(Math.min(i % 128, 128 - (i % 128), j % 128, 128 - (j % 128)), 3) * 2;
     } else if (kind === TILE.SOLAR2) {
-      // photovoltaic cells: 32 px (8×8 to a tile) with a hairline gap, two thin silver bus lines across each and a fine
-      // finger line along, a heavier frame every 4×4 cells; a crystalline speckle (blocks of 3 px) in the relief
-      const li = i % 32, lj = j % 32, d = Math.min(li, 32 - li, lj, 32 - lj), fd = Math.min(i % 128, 128 - (i % 128), j % 128, 128 - (j % 128));
-      let q = ((Math.floor(i / 3) * 73856093) ^ (Math.floor(j / 3) * 19349663)) >>> 0; q = Math.imul(q ^ (q >>> 13), 1274126177) >>> 0;
-      v = groove(d, 1.5) * 1.6 + groove(fd, 3) * 2.5 + ((q / 4294967296) - 0.5) * 0.5;
-      const bus = Math.max(1 - sm(0.4, 1.2, Math.abs(li - 10.5)), 1 - sm(0.4, 1.2, Math.abs(li - 21.5))) * (d > 1.5 ? 1 : 0);
-      const finger = (1 - sm(0.2, 0.7, Math.abs(lj - 16))) * 0.45 * (d > 1.5 ? 1 : 0);
-      const frame = 1 - sm(1.5, 2.6, fd);
-      e[j * N + i] = Math.min(1, Math.max(bus * 0.75, finger, frame));
-      v += frame * 0.8 + bus * 0.3;
+      // photovoltaic cells (solarCells.ts: the ships' solar panels share them)
+      const c = solarCellTexel(i, j);
+      v = c.v; e[j * N + i] = c.e;
     } else if (kind === TILE.HEX) {
       // power core: raised hex tiles, energy along the joints (in the alpha)
       const x = i / 32, y = (j / N) * 8, r = Math.round(y), xo = x - (r % 2) * 0.5, c = Math.round(xo);

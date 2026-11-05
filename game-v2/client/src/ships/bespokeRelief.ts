@@ -286,15 +286,18 @@ function ridged(g: ShipGeometry, pts: number[], color: number, h: number): void 
 }
 
 /** A bespoke part's body: a seam round each of its convex pieces, then the piece in its relief */
-export function carve(g: ShipGeometry, pieces: number[][], color: number, edge: number, bevel: number, seed: number, relief: PieceRelief = 'raise', light = 0xff8a3a): void {
+export function carve(g: ShipGeometry, pieces: number[][], color: number, edge: number, bevel: number, seed: number, relief: PieceRelief = 'raise', light = 0xff8a3a, soft = false): void {
+  // (the seam's lip: near-black on a boss; on a small hull (`soft`), a narrower shadow of the part's own colour, as the
+  // grid ships' panels meet, not an inked outline round its silhouette)
+  const lipOut = soft ? mix(color, SEAM, 0.62) : SEAM, lipIn = soft ? mix(color, SEAM, 0.4) : mix(SEAM, color, 0.25), lipW = soft ? 0.5 : 0.7;
   // The plate's tilt: one way for the whole part, a few degrees
   const ta = seeded(seed, 0, 1) * Math.PI * 2, tk = 0.05 + 0.08 * seeded(seed, 0, 2);
   // (a rounded part is one cylinder, however it's cut up: its axis and its width taken from the whole of it)
-  if (relief === 'round') { cylinder(g, pieces.filter((p) => p.length >= 6), color, bevel); return; }
+  if (relief === 'round') { cylinder(g, pieces.filter((p) => p.length >= 6), color, bevel, lipOut, lipIn, lipW); return; }
   for (const pts of pieces) {
     if (pts.length < 6) continue;
     // The seam: a dark lip out past the outline (what's drawn later lies over it, as armour overlaps)
-    band(g, inset(pts, -bevel * 0.7), pts, 0, SEAM, mix(SEAM, color, 0.25));
+    band(g, inset(pts, -bevel * lipW), pts, 0, lipOut, lipIn);
     if (relief === 'plate') {
       // Laid over what's under it: its shadow on that, its side wall, then the plate itself (see overlays)
       const outline = chamfer(pts, bevel * 1.6), sx = bevel * 1.2, sy = bevel * 1.5;
@@ -314,7 +317,7 @@ export function carve(g: ShipGeometry, pieces: number[][], color: number, edge: 
  * A rounded part (a polished drive's casing) as a cylinder along its length: its axis the way it's longest, its
  * normals rolling across it from one side to the other, so a light runs down it in a streak and its sides fall away
  */
-function cylinder(g: ShipGeometry, pieces: number[][], color: number, bevel: number): void {
+function cylinder(g: ShipGeometry, pieces: number[][], color: number, bevel: number, lipOut = SEAM, lipIn = mix(SEAM, color, 0.25), lipW = 0.7): void {
   const all = pieces.flat(), m = all.length / 2;
   let cx = 0, cy = 0;
   for (let i = 0; i < m; i++) { cx += all[i * 2] / m; cy += all[i * 2 + 1] / m; }
@@ -336,7 +339,7 @@ function cylinder(g: ShipGeometry, pieces: number[][], color: number, bevel: num
   };
   const MAX = 1.25, ACROSS = 8, ALONG = 10;
   // The seam round it first (as every carved part has), then each piece as strips across the whole part's width
-  for (const p of pieces) band(g, inset(p, -bevel * 0.7), p, 0, SEAM, mix(SEAM, color, 0.25));
+  for (const p of pieces) band(g, inset(p, -bevel * lipW), p, 0, lipOut, lipIn);
   for (const p of pieces) {
     const ss = Array.from({ length: p.length / 2 }, (_, i) => S(p[i * 2], p[i * 2 + 1]));
     const s0 = Math.min(...ss), s1 = Math.max(...ss), rows: number[][] = [];
@@ -402,16 +405,24 @@ function ringOf(g: ShipGeometry, x: number, y: number, r: number, w: number, sid
 export interface DetailColours { body: number; edge: number; crystal: number; glow: number }
 
 /** One detail, `px` mapping its grid points to the hull's (pixels about the centre of mass), `cs` pixels a cell */
-export function drawDetail(g: ShipGeometry, d: PieceDetail, px: (x: number, y: number) => [number, number], cs: number, col: DetailColours, seed: number, bevel: number): void {
+export function drawDetail(g: ShipGeometry, d: PieceDetail, px: (x: number, y: number) => [number, number], cs: number, col: DetailColours, seed: number, bevel: number, soft = false): void {
   const own = d.color ? hex(d.color) : undefined;
+  // The dark lip round a detail standing proud: black on a boss, where it's a hairline; on a small hull (`soft`) a
+  // narrower shadow of what it's on, as the grid ships' panels have it, so stacked trim doesn't read as an inked outline
+  const lip = (pts: number[], w: number) => (soft
+    ? band(g, inset(pts, -bevel * w * 0.6), pts, 0, mix(col.body, SEAM, 0.5), mix(col.body, SEAM, 0.3))
+    : band(g, inset(pts, -bevel * w), pts, 0, SEAM, SEAM));
+  // (and its bevel's rim the detail's own colour lifted, not the hull's pale edge: a gold strip stays gold to its edge)
+  const rimOf = (c: number) => (soft ? mix(c, 0xffffff, 0.12) : col.edge);
   const poly = d.poly?.flatMap(([x, y]) => px(x, y));
   const at = d.at ? px(d.at[0], d.at[1]) : undefined;
   const r = (d.r ?? 1) * cs, w = (d.w ?? 0.3) * cs;
   switch (d.kind) {
     case 'raise':
       if (poly) {
-        band(g, inset(poly, -bevel * 0.6), poly, 0, SEAM, SEAM);
-        raised(g, poly, d.crystal ? col.crystal : own ?? mix(col.body, 0xffffff, 0.05), col.edge, bevel * 0.8, seeded(seed, 3) * 6.28, 0.08);
+        lip(poly, 0.6);
+        const c = d.crystal ? col.crystal : own ?? mix(col.body, 0xffffff, 0.05);
+        raised(g, poly, c, rimOf(c), bevel * 0.8, seeded(seed, 3) * 6.28, 0.08);
       }
       break;
     case 'recess':
@@ -422,7 +433,7 @@ export function drawDetail(g: ShipGeometry, d: PieceDetail, px: (x: number, y: n
         const fins = d.fins ?? 5, n = poly.length / 2;
         // The frame: a raised lip round it (leaning out, then in)
         const outer = inset(poly, -bevel * 1.1);
-        band(g, inset(outer, -bevel * 0.5), outer, 0, SEAM, SEAM);
+        lip(outer, 0.5);
         band(g, outer, poly, 0.6, mix(col.body, 0xffffff, 0.1), mix(col.body, 0xffffff, 0.04));
         // The recess: walls falling steeply in, dark all the way down
         const floor = inset(poly, bevel * 1.2);
@@ -461,7 +472,7 @@ export function drawDetail(g: ShipGeometry, d: PieceDetail, px: (x: number, y: n
         const tip = [at[0] + ux * r, at[1] + uy * r], back = [at[0] - ux * w * 0.6, at[1] - uy * w * 0.6];
         const l = [at[0] + vx * w * 0.5 + ux * r * 0.15, at[1] + vy * w * 0.5 + uy * r * 0.15], rr = [at[0] - vx * w * 0.5 + ux * r * 0.15, at[1] - vy * w * 0.5 + uy * r * 0.15];
         const pts = [...back, ...l, ...tip, ...rr];
-        band(g, inset(pts, -bevel * 0.5), pts, 0, SEAM, SEAM);
+        lip(pts, 0.5);
         ridged(g, pts, own ?? col.crystal, w * 0.9);
       }
       break;
@@ -530,8 +541,8 @@ export function drawDetail(g: ShipGeometry, d: PieceDetail, px: (x: number, y: n
         const ux = d.dir[0], uy = d.dir[1], vx = -uy, vy = ux, len = w;
         const q = (s: number, h: number): [number, number] => [at[0] - ux * s + vx * h, at[1] - uy * s + vy * h];
         const shell = [...q(len, -r * 0.62), ...q(0, -r), ...q(0, r), ...q(len, r * 0.62)];
-        band(g, inset(shell, -bevel * 0.6), shell, 0, SEAM, SEAM);
-        raised(g, shell, mix(col.body, 0xffffff, 0.06), col.edge, bevel * 0.7, Math.atan2(uy, ux), 0.12);
+        lip(shell, 0.6);
+        raised(g, shell, mix(col.body, 0xffffff, 0.06), rimOf(mix(col.body, 0xffffff, 0.06)), bevel * 0.7, Math.atan2(uy, ux), 0.12);
         for (const s of [0.3, 0.62]) {
           const h = r * (1 - 0.38 * s) * 0.92, a = q(len * s, -h), b = q(len * s, h);
           groove(g, a[0], a[1], b[0], b[1], bevel * 0.6, col.body);

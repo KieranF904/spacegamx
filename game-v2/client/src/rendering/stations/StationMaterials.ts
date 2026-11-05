@@ -25,6 +25,7 @@ import { BufferImageSource, GlProgram, Texture, type UniformData } from 'pixi.js
 import { MAX_LIGHTS, SHIP_SHADE, fades } from '../lighting/litShader';
 import { stationAtlasData } from '../procedural';
 import { K, NK, T } from './stationBake';
+import { SOLAR } from '../solarCells';
 import { STATION_ATLAS_H, STATION_ATLAS_W } from './stationTextures';
 
 /** Per kind, A: highlight strength, shininess, window glow (negative: paint in the alpha, darkening), relief; B: tile, windowed, rim, glow pulse */
@@ -131,7 +132,7 @@ void main() {
   vec2 bw = vec2(cs.x * aBend.x - cs.y * aBend.y, cs.y * aBend.x + cs.x * aBend.y);
   n = normalize(n + vec3(bw * 2.2, 0.0));
   float m = MC.x;
-  vec3 col = solar ? mix(vec3(0.13, 0.15, 0.42), vec3(0.36, 0.14, 0.04), aMat.z) : aColor.rgb;
+  vec3 col = solar ? mix(${SOLAR.cell}, vec3(0.36, 0.14, 0.04), aMat.z) : aColor.rgb;
   vec3 body = col * mix(1.0, 0.55, m);
   float ao = aBend.z;
   vec3 L = uAmbient * (0.7 + 0.3 * clamp(aExpo.x * 1.4, 0.0, 1.0)) * ao;
@@ -187,10 +188,10 @@ void main() {
   float kx = MA.w * detail;
   vec3 Hv = normalize(Ld + vec3(0.0, 0.0, 1.0));
   vec2 Ht = vec2(dot(Hv, Tv), dot(Hv, Bv));
-  float shin = (solar ? 7.0 : MA.y) * (1.0 + m), nh = clamp(dot(n, Hv), 0.0, 1.0), sp = pow(nh, shin), dsp = min(shin * sp / max(nh, 0.05), 4.0) * kx;
+  float shin = (solar ? ${SOLAR.shin} : MA.y) * (1.0 + m), nh = clamp(dot(n, Hv), 0.0, 1.0), sp = pow(nh, shin), dsp = min(shin * sp / max(nh, 0.05), 4.0) * kx;
   // solar: a broad anti-reflective sheen, blue-white with a thin-film shift
   vec3 irid = 0.5 + 0.5 * cos(6.2831 * (nh * 1.7 + rim + vec3(0.0, 0.33, 0.67)));
-  vec3 tint = solar ? mix(mix(vec3(0.42, 0.6, 1.0), irid, 0.3), mix(vec3(1.0, 0.8, 0.5), irid, 0.22), aMat.z) : mix(vec3(1.0), col * 1.5, mix(0.5, 0.85, m));
+  vec3 tint = solar ? mix(mix(${SOLAR.sheen}, irid, 0.3), mix(vec3(1.0, 0.8, 0.5), irid, 0.22), aMat.z) : mix(vec3(1.0), col * 1.5, mix(0.5, 0.85, m));
   vec3 S = tint * cl * (solar ? 0.9 : MA.x * mix(1.0, 1.5, m)) * lit * fade;
   vColor += S * sp;
   vCx = D * (0.7 * kx * Lt.x) + S * (dsp * Ht.x);
@@ -198,7 +199,7 @@ void main() {
   vCav = 0.9 * kx;
   vEmis = MA.z > 0.0 ? (win ? mix(vec3(1.0, 0.84, 0.56), vec3(0.8, 0.92, 1.0), aMat.z) * MA.z * fade : vec3(0.0)) : vColor * MA.z;
   // solar: silver bus lines and frame, lit as the array is (and a navy floor: an array facing away still reads as cells)
-  if (solar) { vEmis = mix(vec3(0.36, 0.39, 0.45), vec3(0.46, 0.39, 0.28), aMat.z) * (dot(Lc, vec3(0.33)) * 0.8 + 0.08) * mix(0.35, 1.0, detail) * fade + S * sp * 0.5; vColor += mix(vec3(0.025, 0.035, 0.1), vec3(0.07, 0.03, 0.01), aMat.z) * fade; }
+  if (solar) { vEmis = mix(${SOLAR.bus}, vec3(0.46, 0.39, 0.28), aMat.z) * (dot(Lc, vec3(0.33)) * 0.8 + 0.08) * mix(0.35, 1.0, detail) * fade + S * sp * 0.5; vColor += mix(${SOLAR.floor}, vec3(0.07, 0.03, 0.01), aMat.z) * fade; }
   // glows of their own, lighting nothing: a slow pulse running across the station
   float pulse = 0.7 + 0.3 * sin(uParams.x * 1.7 - dot(aPosition, vec2(1.0, 0.6)) * 2.5 * uParams.z);
   if (MC.z > 0.5 && MC.z < 1.5) vEmis = vec3(1.0, 0.5, 0.18) * 0.9 * pulse * small * fade;

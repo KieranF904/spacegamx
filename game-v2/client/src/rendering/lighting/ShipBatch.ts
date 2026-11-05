@@ -39,6 +39,7 @@ import { Lighting, LitMesh } from './Lighting';
 import { MAX_LIGHTS, fades } from './litShader';
 import { GLOW_COOL, GLOW_WARM, HULL_WEAR, KIND_GLOW, KIND_LOOK, hullAtlas } from '../../ships/hullLook';
 import { HULL_ROWS } from '../../ships/hullTextures';
+import { SOLAR } from '../solarCells';
 
 const PER_CHUNK = 32;
 /** Parts a ship can have (data/ships/tuning.json maxParts), the damage texture's width */
@@ -145,7 +146,7 @@ out vec2 vLocal; out float vHurt; out float vSeed; out float vLit; flat out vec4
 uniform mat3 uProjectionMatrix; uniform mat3 uWorldTransformMatrix; uniform mat3 uTransformMatrix;
 uniform vec4 uXform[${slots}]; uniform vec4 uFade[${fades(slots)}]; uniform float uPlace;
 uniform vec4 uFlash[${fades(slots)}]; uniform highp float uTime; uniform float uCell;
-uniform vec4 uKindLook[7]; uniform vec4 uKindGlow[7]; uniform vec3 uGlowCool[5]; uniform vec3 uGlowWarm[5]; uniform vec4 uWear[8];
+uniform vec4 uKindLook[7]; uniform vec4 uKindGlow[7]; uniform vec3 uGlowCool[5]; uniform vec3 uGlowWarm[5]; uniform vec4 uWear[${HULL_ROWS * 4 - 16}];
 uniform sampler2D uDamage;
 uniform vec3 uAmbient; uniform vec4 uSun; uniform vec3 uSunColor; uniform vec2 uSunElev; uniform float uCount; uniform vec3 uGround;
 uniform vec4 uLightPos[${MAX_LIGHTS}]; uniform vec4 uLightCol[${MAX_LIGHTS}]; uniform vec4 uLightCone[${MAX_LIGHTS}];
@@ -175,7 +176,11 @@ void main() {
   vec3 n = vec3(cs.x * aNormal.x - cs.y * aNormal.y, cs.y * aNormal.x + cs.x * aNormal.y, aNormal.z);
   // volume: the normal leans towards the open space its part faces (the hull reads rounded)
   vec2 bw = vec2(cs.x * aBend.x - cs.y * aBend.y, cs.y * aBend.x + cs.x * aBend.y);
-  n = normalize(n + vec3(bw * LEAN, 0.0));
+  // (solar panels: the stations' cells, solarCells.ts; their sheen, shine and silver as StationMaterials has them, lit
+  // as a station's array is: the sun unwrapped)
+  bool solar = abs(aHull.x - ${SOLAR.tile}.0) < 0.5;
+  // (an array tilts outward, as the stations' do: 0.18 × their 2.2 lean, out from the hull)
+  n = normalize(n + vec3(solar ? (dot(bw, bw) > 1e-8 ? normalize(bw) * 0.396 : vec2(0.0)) : bw * LEAN, 0.0));
   // the part's health: hurt plating darkens towards ember (its own lights stay as they are)
   float f = texelFetch(uDamage, ivec2(int(aPart + 0.5), slot), 0).r;
   float m = aHull.y, boost = aHull.w;
@@ -188,7 +193,7 @@ void main() {
   vec3 sl = vec3(ds / max(dist, 1.0) * uSunElev.x, uSunElev.y);
   float sunK = uSun.w / (1.0 + dist * dist / (uSun.z * uSun.z)) * expo(sl);
   // wrapped a little round the far side, so the shading stays gentle
-  L += uSunColor * sunK * max(dot(n, sl) * 0.75 + 0.25, 0.0);
+  L += uSunColor * sunK * (solar ? max(dot(n, sl), 0.0) : max(dot(n, sl) * 0.75 + 0.25, 0.0));
   // light up off the ground (a lava world's glow): mostly on faces turned away from straight up (bevels, sides), a little on tops
   L += uGround * (0.3 + 0.9 * (1.0 - clamp(n.z, 0.0, 1.0))) * (0.6 + 0.4 * clamp(aExpo.x * 1.4, 0.0, 1.0));
   vec3 dsum = sl * sunK, csum = uSunColor * sunK;
@@ -222,7 +227,7 @@ void main() {
   // (space's cool rim; on a surface, the ground's colour)
   float gm = max(max(uGround.r, uGround.g), uGround.b);
   vec3 rimTint = gm > 0.001 ? mix(vec3(0.55, 0.65, 0.85), uGround / gm, 0.8) : vec3(0.55, 0.65, 0.85);
-  vColor += col * rimTint * rim * rim * 1.0 * (1.0 + 0.4 * m) * clamp(aExpo.x * 1.5, 0.0, 1.0) * fade;
+  vColor += col * rimTint * rim * rim * (solar ? 0.7 : 1.0) * (1.0 + 0.4 * m) * clamp(aExpo.x * 1.5, 0.0, 1.0) * fade;
   // the panels' frame: the ship's own axes, and the light's direction in it
   vec3 T = vec3(cs, 0.0), B = vec3(-cs.y, cs.x, 0.0);
   float dl = length(dsum);
@@ -230,12 +235,13 @@ void main() {
   vec2 Lt = vec2(dot(Ld, T), dot(Ld, B));
   vec3 D = body * cl * (1.0 - aColor.a) * fade;
   // the panel detail fades out as cells get small on screen (no shimmer on a far ship)
-  float kx = MA.w * clamp((s * uCell - 7.0) / 10.0, 0.0, 1.0);
+  float detail = clamp((s * uCell - 7.0) / 10.0, 0.0, 1.0), kx = MA.w * (solar ? 0.7 : 1.0) * detail;
   // the highlight, with how fast it grows as the panels tilt the surface (metal: tighter, stronger, tinted)
   vec3 Hv = normalize(Ld + vec3(0.0, 0.0, 1.0));
   vec2 Ht = vec2(dot(Hv, T), dot(Hv, B));
-  float shin = MA.y * (1.0 + m) * (1.0 + boost), nh = clamp(dot(n, Hv), 0.0, 1.0), sp = pow(nh, shin), dsp = min(shin * sp / max(nh, 0.05), 4.0) * kx;
-  vec3 S = mix(vec3(1.0), col * 1.5, mix(0.5, 0.85, m)) * cl * MA.x * mix(1.0, 2.2, m) * (1.0 + boost) * (1.0 - aColor.a) * fade;
+  float shin = solar ? ${SOLAR.shin} * (1.0 + m) : MA.y * (1.0 + m) * (1.0 + boost), nh = clamp(dot(n, Hv), 0.0, 1.0), sp = pow(nh, shin), dsp = min(shin * sp / max(nh, 0.05), 4.0) * kx;
+  vec3 irid = 0.5 + 0.5 * cos(6.2831 * (nh * 1.7 + rim + vec3(0.0, 0.33, 0.67)));
+  vec3 S = (solar ? mix(${SOLAR.sheen}, irid, 0.3) * 0.9 : mix(vec3(1.0), col * 1.5, mix(0.5, 0.85, m)) * MA.x * mix(1.0, 2.2, m) * (1.0 + boost)) * cl * (1.0 - aColor.a) * fade;
   vColor += S * sp;
   vCx = D * (0.7 * kx * Lt.x) + S * (dsp * Ht.x);
   vCy = D * (0.7 * kx * Lt.y) + S * (dsp * Ht.y);
@@ -255,6 +261,8 @@ void main() {
   vec3 ec = aHull.z < 0.0 ? aGrade.yzw : col / max(max(col.r, col.g), max(col.b, 0.05));
   vEmis += ec * abs(aHull.z) * (0.75 + 0.25 * sin(uTime * 1.7 - dot(aPosition, vec2(0.03, 0.05)))) * small * fade;
   if (mk == 3) vColor += E.rgb * 0.1 * pulse * fade;
+  // solar: silver bus lines and frame, lit as the panel is, and a navy floor (one turned away still reads as cells)
+  if (solar) { vEmis = ${SOLAR.bus} * (dot(Lc, vec3(0.33)) * 0.8 + 0.08) * mix(0.35, 1.0, detail) * fade + S * sp * 0.5; vColor += ${SOLAR.floor} * fade; }
   // engine discs take their grade's glow, flickering; glowing hardware brighter the higher the grade
   float flick = 0.82 + 0.18 * sin(uTime * 9.0 + aPosition.x * 0.3) * sin(uTime * 5.3 + aPosition.y * 0.2);
   vColor = mix(vColor, uGlowCool[gi] * min(gl, 1.35) * 1.05 * flick * fade, aGlow);
@@ -265,7 +273,7 @@ void main() {
   int tl = aHull.x > -0.5 ? int(aHull.x + 0.5) : (mk >= 5 ? 2 : min(mk, 3));
   vTile = vec2(float(tl % 4), float(tl / 4));
   // (the game's own ships' materials are huge hulls: their surface is drawn six times larger)
-  if (tl >= 16) vUV *= 0.16;
+  if (tl >= 16 && !solar) vUV *= 0.16;
   float seed = fract(sin(aPart * 12.9898 + float(slot) * 78.233) * 43758.5453);
   // (the Scrap Mother's salvage: each part its own patch of its surface, turned its own way, as salvage is; the panel
   // detail's slopes turned back with it. Its tile's own light is where it's worn through: towards uWear's colour)
@@ -275,7 +283,7 @@ void main() {
   // (as bright to the eye as the molten orange: a green seam would otherwise outshine it)
   vSeam = aHull.z < 0.0 ? aGrade.yzw * (0.52 / max(dot(aGrade.yzw, vec3(0.299, 0.587, 0.114)), 0.05)) : vec3(1.0, 0.36, 0.08);
   vWear.w *= (1.0 - aColor.a) * (1.0 - aGlow);
-  if (tl >= 18) {
+  if (tl >= 18 && !solar) {
     float ra = floor(seed * 4.0) * 1.5708 + (fract(seed * 13.7) - 0.5) * 0.5, rc = cos(ra), rs = sin(ra);
     vUV = vec2(rc * vUV.x - rs * vUV.y, rs * vUV.x + rc * vUV.y) + vec2(fract(seed * 3.1), fract(seed * 5.7));
     vec3 cx = vCx;
@@ -472,7 +480,7 @@ export class ShipBatch {
       uFlash: { value: flash, type: 'vec4<f32>', size: fades(PER_CHUNK) }, uTime: { value: 0, type: 'f32' }, uCell: { value: this.cellSize, type: 'f32' },
       uKindLook: { value: KIND_LOOK, type: 'vec4<f32>', size: 7 }, uKindGlow: { value: KIND_GLOW, type: 'vec4<f32>', size: 7 },
       uGlowCool: { value: GLOW_COOL, type: 'vec3<f32>', size: 5 }, uGlowWarm: { value: GLOW_WARM, type: 'vec3<f32>', size: 5 },
-      uWear: { value: HULL_WEAR, type: 'vec4<f32>', size: 8 },
+      uWear: { value: HULL_WEAR, type: 'vec4<f32>', size: HULL_ROWS * 4 - 16 },
     });
     const detail = hullAtlas();
     lit.mesh.shader = new Shader({
