@@ -50,6 +50,9 @@ import { rockMaterial } from '../rendering/rocks/RockMaterials';
 /** (`heal`: a Repair Beam's sparkle, soft green, drifting: support.ts) */
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; heal?: boolean }
 
+/** A held beam lit this frame (for its sound: Game.updateSounds): whose, which gun, and where its ship is */
+export interface LitBeam { owner: number; part: number; kind: string; model: string | undefined; x: number; y: number; own: boolean }
+
 /** A mining laser's pulse (ticks): fades in, flares, trails off to nothing; the next one starts the moment it's gone (no cooldown) */
 const MINING_EVERY = 54;
 /** A station laser turret's pulse (its shot every 48 ticks: factions.json rules.stationDefence.laser) */
@@ -70,6 +73,8 @@ export class MiningBeamFx {
   ownBeams: (() => ReadonlySet<number>) | null = null;
   /** Is your own beam on (for the loop sound) */
   localActive = false;
+  /** Every ship's held beams lit this frame, as drawn (their loops and ignitions: Game.updateSounds) */
+  readonly litBeams: LitBeam[] = [];
 
   constructor(layer: Container, private source: ShipSource, private state: GameState, private tuning: ShipTuning,
     private local: () => { firing: boolean; aim: number; dist: number }) {
@@ -208,6 +213,7 @@ export class MiningBeamFx {
   private weaponBeams(g: Graphics): void {
     this.frameNo++;
     this.lanceFx.begin(this.dt);
+    this.litBeams.length = 0;
     const defs = this.tuning.weapons ?? {};
     for (const [id, ship] of this.source.bodies) {
       if (ship.kind !== 'ship') continue;
@@ -231,6 +237,8 @@ export class MiningBeamFx {
         const pl = phase >= -1 ? pieceLook(L!, w.part, phase) : null;
         if (pl && (phase >= 0 || own)) lit = phase >= 0;
         const pw = pl && lit && phase >= 0 ? pl.width : 1, pg = pl && lit && phase >= 0 ? pl.gain : 1;
+        // (Heard as it's seen: each lit beam's loop, every ship's, Game.updateSounds)
+        if (lit) this.litBeams.push({ owner: id, part: w.part, kind: w.kind, model: ship.blueprint.parts[w.part]?.fn, x: pose.x, y: pose.y, own: id === this.state.playerId });
         // Its own tuning: its grade's reach and width too (launch.ts gunDef)
         const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
         if (w.kind === 'lance') { this.lance(g, id, ship, w, pose, def, lit, own !== null, pw, pg); continue; }

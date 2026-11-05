@@ -33,7 +33,8 @@ import { TimeScaleBadge } from './ui/TimeScaleBadge';
 import { PilotState, createClientEconomy } from './econ/clientEcon';
 import { LoginUI } from './ui/LoginUI';
 import { ServerBrowserUI, ServerInfo } from './ui/ServerBrowserUI';
-import { AudioManager } from './audio/AudioManager';
+import { AudioManager, type BeamSource } from './audio/AudioManager';
+import { beamLightSound, beamLoopFor, hasOwnShotSound } from './audio/weaponSounds';
 
 import { PerfMonitor } from './ui/PerfMonitor';
 
@@ -617,19 +618,27 @@ this.xpFillEl = document.getElementById('xpFill');
     const settled = now - this.systemArrivedAt > 1500; // don't play everything already there on arrival
     let shots = 0;
     const alive = this.shotsAlive;
+    // (One sound a gun's volley: a fan of shells from one ship in one frame is heard once, so a pack can't machine-gun a sample)
+    const volleys = this.volleysHeard;
+    volleys.clear();
     alive.clear();
     for (const e of this.state.entities.ofType(EntityType.Projectile)) {
       alive.add(e.id);
       if (this.heard.has(e.id)) continue;
       this.heard.add(e.id);
       if (settled && shots < 4) {
-        shots++;
         const own = e.data?.[6] === this.state.playerId;
-        // data[0]: weapon type; data[8]: fired by a turret (cannons)
+        // Its gun's model, known from its fire event (no wire bytes: ShipClient.shellInfo), has its own sound; else the
+        // kind's, by data[0] (the weapon type) and data[8] (fired by a turret)
         const wt = e.data?.[0] ?? 1;
-        const id = this.audio.shotSound(wt, e.data?.[8] === 1);
-        // data[1]: the gun's grade: a cannon's heavier marks boom deeper, its fast slugs crack higher
-        const pitch = wt === 1 ? CANNON_GRADE_PITCH[Math.max(0, Math.min(4, (e.data?.[1] ?? 1) - 1))] : 1;
+        const model = this.shipClient.shellInfo(e)?.model;
+        const id = this.audio.shotSound(model, wt, e.data?.[8] === 1);
+        const volley = `${e.data?.[6] ?? -1}:${id}`;
+        if (volleys.has(volley)) continue;
+        volleys.add(volley);
+        shots++;
+        // (A cannon heard by its kind's sound: data[1], its grade, nudges the pitch, heavier marks deeper)
+        const pitch = wt === 1 && !hasOwnShotSound(model) ? CANNON_GRADE_PITCH[Math.max(0, Math.min(4, (e.data?.[1] ?? 1) - 1))] : 1;
         if (id) this.audio.play(id, e.spawnX ?? e.x, e.spawnY ?? e.y, { volume: own ? 0.6 : 0.8, pitch: pitch * (0.94 + Math.random() * 0.12) });
       }
     }
@@ -642,8 +651,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.audio.setLoop('engine', flying ? (thrusting ? 1 : 0.25) : 0, 0.8 + Math.min(0.5, speed / 30));
     this.audio.setLoop('boost', boosting ? 1 : 0, 1 + Math.min(0.3, speed / 60));
     // (Mining lasers pulse, each pulse its own sound: ShipClient's beamFx.onMiningPulse)
-    const beam = flying ? this.shipClient.weaponBeamKind() : null;
-    this.audio.setBeam(beam);
+    this.beamSounds(flying);
 
     if (this.shipClient.horizonDanger() > 0.35 && now - this.lastAlarm > 900) {
       this.lastAlarm = now;
@@ -662,6 +670,37 @@ this.xpFillEl = document.getElementById('xpFill');
     this.objectives.update(this.state.systemId);
     const wayIn = flying ? this.pocketWayIn() : null;
     this.shipClient.setPlanetHint(wayIn ?? (flying ? this.planetBelow() : null), wayIn ? 'Enter' : undefined);
+  }
+
+  /** This frame's shot sounds, by owner and sound (updateSounds) */
+  private readonly volleysHeard = new Set<string>();
+  /** Held beams lit last frame (ship * 256 + part), so a beam lighting is heard once */
+  private beamsLit = new Set<number>();
+  private beamsNow = new Set<number>();
+  private readonly beamSources: BeamSource[] = [];
+
+  /**
+   * Held beams, every ship's, heard as they're drawn (MiningBeamFx.litBeams): each its model's loop (weaponSounds
+   * beamLoopFor), and as one lights its model's ignition, if it has one (the Lance's)
+   */
+  private beamSounds(flying: boolean): void {
+    const src = this.beamSources, now = this.beamsNow;
+    src.length = 0;
+    now.clear();
+    if (flying) {
+      for (const b of this.shipClient.litBeams()) {
+        const key = b.owner * 256 + b.part;
+        now.add(key);
+        const loop = beamLoopFor(b.model, b.kind);
+        if (loop) src.push({ loop, x: b.x, y: b.y, own: b.own });
+        if (this.beamsLit.has(key)) continue;
+        const light = beamLightSound(b.model);
+        if (light) { if (b.own) this.audio.playUI(light, 0.6); else this.audio.play(light, b.x, b.y, { volume: 0.8 }); }
+      }
+    }
+    this.audio.setBeams(src);
+    this.beamsNow = this.beamsLit;
+    this.beamsLit = now;
   }
 
   /** A pocket's way in (a boss's nest), close enough to go in (X enters) */

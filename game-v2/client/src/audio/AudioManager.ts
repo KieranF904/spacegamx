@@ -14,12 +14,12 @@
 import { renderSfx, reverbImpulse, variantKey, LoopId, SFX_REVERB, SFX_VARIANTS } from './sfx';
 import { MusicEngine, MUSIC } from './MusicEngine';
 import { MusicDirector, type MusicPlace } from './musicProfiles';
-import { BEAM_LOOP, shotSoundForType } from './weaponSounds';
+import { ALL_BEAM_LOOPS, shotSoundFor } from './weaponSounds';
 
-/** Every held beam's loop (weaponSounds: its part's sfxLoop) */
-const BEAM_LOOPS = [...new Set(BEAM_LOOP.values())];
+/** A held beam lit now, for its loop: where it is, and whether it's yours (heard full and centred) */
+export interface BeamSource { loop: string; x: number; y: number; own: boolean }
 /** Each loop's level at full */
-const LOOP_LEVEL: Record<string, number> = { engine: 0.35, boost: 0.25, mining: 0.4, laser_loop: 0.45, lance_loop: 0.5, arc_loop: 0.4, frost_loop: 0.45, repair_loop: 0.35 };
+const LOOP_LEVEL: Record<string, number> = { engine: 0.35, boost: 0.25, mining: 0.4, laser_loop: 0.45, lance_loop: 0.55, arc_loop: 0.4, frost_loop: 0.45, repair_loop: 0.35, searchlight_loop: 0.45 };
 
 /** World units at which a sound fades out entirely, and the panning width */
 const AUDIO_MAX_DISTANCE = 6000;
@@ -28,7 +28,13 @@ const AUDIO_REF_DISTANCE = 1200;
 /** At most this many copies of one effect at once (turret batteries fire a lot) */
 const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_shot: 8, railgun_shot: 4, hit: 8, explosion_small: 6, part_break: 6, disintegrate: 3, bump: 4, hive_launch: 3, prism_shot: 4, boss_roar: 1, laser_pulse: 5, mining_pulse: 4, boss_charge: 2, magma_charge: 4, magma_shot: 4, magma_burst: 5, boss_beam: 1, gun_charge: 3, gun_clack: 6, gun_vent: 4, gun_spin: 2,
   autocannon_shot: 10, pulse_shot: 8, arc_shot: 6, mortar_shot: 5, torpedo_launch: 3, charge_launch: 4, pd_shot: 6,
-  rivet_shot: 8, scrap_chunk_shot: 4, seeker_launch: 4, heart_spark: 8, heart_seeker: 4 };
+  rivet_shot: 8, scrap_chunk_shot: 4, seeker_launch: 4, heart_spark: 8, heart_seeker: 4,
+  // (Each model's own: the quick ones need the voices)
+  pip_shot: 10, hammer_shot: 6, twinlink_shot: 10, longbarrel_shot: 3, bastion_shot: 3, slurry_shot: 6, chainsaw_shot: 12, stinger_shot: 8,
+  cloudmaker_shot: 6, quake_shot: 3, overpulse_shot: 8, swarm_launch: 6, hammerhead_launch: 3, coilgun_shot: 4, spear_shot: 3, rail_driver_shot: 6,
+  blackout_shot: 2, leviathan_launch: 2, lance_fire: 3,
+  // (Warnings: soft, and never a stack: BossFx also spaces them)
+  target_tone: 2, suck_whoosh: 2 };
 /** Effects that, at their cap, cut the oldest copy short rather than stay silent (a ship's lasers fire in turn: each pulse must be heard) */
 const STEAL = new Set(['laser_pulse', 'mining_pulse']);
 
@@ -50,6 +56,12 @@ export const FILE_GAIN: Record<string, number> = {
   autocannon_shot: 0.55, pulse_shot: 0.6, arc_shot: 0.65, mortar_shot: 0.75, torpedo_launch: 0.85, charge_launch: 0.6, pd_shot: 0.4,
   arc_loop: 0.6, frost_loop: 0.6, repair_loop: 0.55,
   rivet_shot: 0.6, scrap_chunk_shot: 0.75, seeker_launch: 0.6, heart_spark: 0.6, heart_seeker: 0.65,
+  // (Each weapon model's own shot: the heavy marks louder than the quick ones)
+  pip_shot: 0.7, hammer_shot: 0.9, twinlink_shot: 0.6, longbarrel_shot: 0.95, bastion_shot: 1, slurry_shot: 0.75, chainsaw_shot: 0.45, stinger_shot: 0.6,
+  cloudmaker_shot: 0.7, quake_shot: 0.85, overpulse_shot: 0.55, swarm_launch: 0.55, hammerhead_launch: 0.85, coilgun_shot: 0.8, spear_shot: 0.95, rail_driver_shot: 0.75,
+  blackout_shot: 0.85, leviathan_launch: 0.95, lance_fire: 0.85, searchlight_loop: 0.65,
+  // (Warnings sit under the shots)
+  target_tone: 0.4, suck_whoosh: 0.5,
 };
 /** Playback rate for generated effects that came out too bright (below 1 = deeper and slower) */
 export const FILE_PITCH: Record<string, number> = { bump: 0.85, scrap_chunk_shot: 0.85 };
@@ -59,6 +71,8 @@ export const FILE_LOWPASS: Record<string, number> = {
   generator_blast: 2500, explosion_small: 3000, thruster_blast: 3000, repair_part: 2500,
   boss_roar: 2200, hive_launch: 3000, cinder_shot: 2800, prism_shot: 3200, phase_shot: 2600, singularity_fire: 2200,
   autocannon_shot: 3000, arc_shot: 3000, arc_loop: 2600, rivet_shot: 2600, scrap_chunk_shot: 1600, seeker_launch: 2600, pd_shot: 2600, heart_spark: 2800,
+  chainsaw_shot: 3000, stinger_shot: 3500, overpulse_shot: 3200, spear_shot: 4000, rail_driver_shot: 4000, coilgun_shot: 4000, blackout_shot: 3000, lance_fire: 4000, lance_loop: 4500,
+  target_tone: 2000, suck_whoosh: 1800,
 };
 /** Reverb send for generated effects (they already carry some room of their own) */
 const FILE_REVERB: Record<string, number> = { explosion_large: 0.35, explosion_small: 0.25, generator_blast: 0.25, thruster_blast: 0.25, shot: 0.15, turret_shot: 0.15, hit: 0.15, bump: 0.15 };
@@ -79,7 +93,7 @@ export class AudioManager {
   private voices = new Map<string, number>();
   /** Copies of the STEAL effects playing, oldest first: how to fade each out */
   private stealable = new Map<string, (() => void)[]>();
-  private loops = new Map<LoopId, { src: AudioBufferSourceNode; gain: GainNode }>();
+  private loops = new Map<LoopId, { src: AudioBufferSourceNode; gain: GainNode; panner: StereoPannerNode }>();
   private music: MusicEngine | null = null;
   /** Decides when the music follows you somewhere new (musicProfiles.ts) */
   private director = new MusicDirector(MUSIC);
@@ -239,7 +253,7 @@ export class AudioManager {
   }
 
   /** Continuous sound (engine, boost): set its level 0..1 each frame; 0 is silent. */
-  setLoop(id: LoopId, level: number, pitch = 1): void {
+  setLoop(id: LoopId, level: number, pitch = 1, pan = 0): void {
     if (!this.initialized || !this.context || !this.sfxGain) return;
     let loop = this.loops.get(id);
     if (!loop) {
@@ -251,25 +265,41 @@ export class AudioManager {
       src.loop = true;
       const gain = this.context.createGain();
       gain.gain.value = 0;
-      src.connect(gain).connect(this.sfxGain);
+      const panner = this.context.createStereoPanner();
+      src.connect(gain).connect(panner).connect(this.sfxGain);
       src.start();
-      loop = { src, gain };
+      loop = { src, gain, panner };
       this.loops.set(id, loop);
     }
     const t = this.context.currentTime;
     loop.gain.gain.setTargetAtTime(this.enabled ? level * (LOOP_LEVEL[id] ?? 0.45) : 0, t, 0.08);
     loop.src.playbackRate.setTargetAtTime(pitch, t, 0.15);
+    loop.panner.pan.setTargetAtTime(pan, t, 0.1);
   }
 
-  /** The sound of a shot of projectile type `type` (data[0] on the wire), fired from a turret or not ('' for none) */
-  shotSound(type: number, turret: boolean): string {
-    return shotSoundForType(type, turret);
+  /**
+   * The sound of a shot from gun model `model` (its own; undefined when the client can't tell), else of its projectile
+   * type `type` (data[0] on the wire), fired from a turret or not ('' for none)
+   */
+  shotSound(model: string | undefined, type: number, turret: boolean): string {
+    return shotSoundFor(model, type, turret);
   }
 
-  /** The beam loop of the beam weapon (tuning kind) you're firing, null for none */
-  setBeam(kind: string | null): void {
-    const on = kind ? BEAM_LOOP.get(kind) : undefined;
-    for (const id of BEAM_LOOPS) this.setLoop(id, on === id ? 1 : 0, 1);
+  /**
+   * The held beams lit now, every ship's: each loop plays once, as loud and panned as its nearest beam (yours: full,
+   * centred; another's falls off with distance as a shot does). Every frame; none silences them all.
+   */
+  setBeams(beams: readonly BeamSource[]): void {
+    for (const id of ALL_BEAM_LOOPS) {
+      let level = 0, pan = 0;
+      for (const b of beams) {
+        if (b.loop !== id) continue;
+        if (b.own) { level = 1; pan = 0; break; }
+        const dx = b.x - this.listenerX, a = Math.max(0, 1 - Math.hypot(dx, b.y - this.listenerY) / AUDIO_MAX_DISTANCE);
+        if (a * a * 0.8 > level) { level = a * a * 0.8; pan = Math.max(-1, Math.min(1, dx / AUDIO_REF_DISTANCE)); }
+      }
+      this.setLoop(id, level, 1, pan);
+    }
   }
 
   /**

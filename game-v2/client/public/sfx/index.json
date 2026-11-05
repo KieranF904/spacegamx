@@ -250,5 +250,93 @@
   "heart_seeker": {
     "variants": 1,
     "loop": false
+  },
+  "pip_shot": {
+    "variants": 3,
+    "loop": false
+  },
+  "hammer_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "twinlink_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "longbarrel_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "bastion_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "slurry_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "chainsaw_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "stinger_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "cloudmaker_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "quake_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "overpulse_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "swarm_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "hammerhead_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "coilgun_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "spear_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "rail_driver_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "blackout_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "leviathan_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "searchlight_loop": {
+    "variants": 1,
+    "loop": true
+  },
+  "lance_fire": {
+    "variants": 1,
+    "loop": false
+  },
+  "target_tone": {
+    "variants": 1,
+    "loop": false
+  },
+  "suck_whoosh": {
+    "variants": 1,
+    "loop": false
   }
 }
