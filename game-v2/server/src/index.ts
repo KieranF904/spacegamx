@@ -18,6 +18,7 @@ import { createShipBridge } from './proto/createProtoServer.js';
 import { createProfileStore } from './profile/index.js';
 import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';
+import { BotManager } from './bots/index.js';
 import { DEFAULT_CAPS } from '@space-game/common';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -99,6 +100,15 @@ const gameServer = new GameServer({
   // What's alive, dead and due back in every system, so a restart picks the world up where it was (data/world/, kept between deploys)
   worldStore: worldFileStore(join(dataPath, 'world', 'memory.json')),
 });
+// Dev-only player bots (docs/areas/bots.md): `/bot spawn mine-and-deposit 1 npc` in chat as an admin, or BOTS=mine-and-deposit:1:client
+// (task:count:driver, comma separated) at start. Never in production: BotManager refuses to exist there.
+if (DEV_MODE) {
+  const bots = new BotManager(gameServer, { statsDir: join(__dirname, '..', 'stats', 'bots') });
+  for (const spec of (process.env.BOTS ?? '').split(',').filter(Boolean)) {
+    const [task, n, kind] = spec.split(':');
+    for (let i = 0; i < Math.max(1, Number(n) || 1); i++) bots.spawn(task, kind === 'npc' ? 'npc' : 'client');
+  }
+}
 const transport = new SocketTransport(gameServer, PORT, HOST);
 
 // How it's running, every 2 s, for the box's resource monitor (deploy/vps/monitor): written whole, then swapped in

@@ -73,6 +73,7 @@ render-ships guides.
 | UI, HUD & input | [docs/areas/ui-hud-input.md](docs/areas/ui-hud-input.md) | menus, settings, keybindings, map, audio, admin panel |
 | Website, lobby & accounts | [docs/areas/web-accounts.md](docs/areas/web-accounts.md) | `site/`, `server-browser/`, post-update CLI, Play handoff |
 | Ops, deploy & tools | [docs/areas/ops-tools.md](docs/areas/ops-tools.md) | VPS deploy, backups, monitor, benches, sound generation, panels |
+| Player bots | [docs/areas/bots.md](docs/areas/bots.md) | dev-only simulated-player and NPC bots, tasks, stats, the playerBot bench |
 
 Each folder with a `CONTEXT.md` (`common/src/{ships,network,econ}`, `server/src/game`, `client/src/{rendering,ships,ui}`,
 `deploy`, `server-browser`) points at its guide.

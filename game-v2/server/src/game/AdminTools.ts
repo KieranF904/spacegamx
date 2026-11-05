@@ -187,11 +187,22 @@ export class AdminTools {
     });
   }
 
+  /**
+   * Commands other modules add (the dev bots: server/src/bots): chat words in, a result out. Looked at before the built-in
+   * ones; an extension that doesn't want the line returns null.
+   */
+  readonly extensions = new Map<string, (c: AdminConn, words: string[]) => Result | null>();
+
   /** A chat line starting with / from an admin: true if it was an admin command */
   chat(c: AdminConn, text: string): boolean {
     const m = /^\/(\w+)\s*(.*)$/.exec(text);
     if (!m || !c.isAdmin) return false;
     const [, name, rest] = m;
+    const ext = this.extensions.get(name.toLowerCase());
+    if (ext) {
+      const r = ext(c, rest.split(/\s+/).filter(Boolean));
+      if (r) { this.host.reply(c, { type: 'adminResult', ok: r.ok, text: r.text }); return true; }
+    }
     const a = rest.split(/\s+/).filter(Boolean);
     const cmd = name.toLowerCase();
     const parsed = this.parseChat(c, cmd, a, rest);

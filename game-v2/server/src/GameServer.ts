@@ -617,10 +617,15 @@ export class GameServer implements ServerCtx {
   readonly econ: Economy;
   /** Each player's progress: profile, cargo, storage, saving */
   readonly pilots: Pilots;
-  private pods: LootPods;
+  readonly pods: LootPods;
+  /**
+   * Run once at the end of every main tick, after the tick table (guarded): the dev-only bots (server/src/bots) think and
+   * send their inputs here, as a client does between ticks. Empty on every server that has no bots.
+   */
+  readonly afterTick: Array<() => void> = [];
   /** Part features' world side (ships/features/host.ts): built once, ticked in the 'towing' entry's place */
   features!: ServerFeatures;
-  private mining: Mining;
+  readonly mining: Mining;
   services: StationServices;
   ammo!: Ammo;
   /** The dev weapons range (game/WeaponsRange.ts): null unless this is a dev server */
@@ -3687,6 +3692,7 @@ this.devTeleport = opts.devTeleport ?? false;
     }
     
     if (own) return;
+    if (this.afterTick.length) for (const h of this.afterTick) this.guard('afterTick', h);
     // Report to admin server and update performance metrics
     const tickTime = performance.now() - tickStart;
     // (Crowd fallbacks: the tick's time charged to the systems by their ships)
