@@ -180,8 +180,11 @@ export class ServerBrowserUI {
     this.loading = true;
     this.render();
 
-    // Fallback in case the lobby is unavailable
-    const fallbackServers: ServerInfo[] = [{
+    // Fallback in case the lobby is unavailable: the dev server (port 3000) in dev builds; in production the game on
+    // this page's own address (nginx takes its socket at the root, on the page's own scheme and port)
+    const dev = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
+    const secure = window.location.protocol === 'https:';
+    const fallbackServers: ServerInfo[] = [dev ? {
       host: window.location.hostname || 'localhost',
       port: 3000,
       name: 'Local dev',
@@ -189,6 +192,14 @@ export class ServerBrowserUI {
       maxPlayers: 32,
       players: 0,
       secure: false,
+    } : {
+      host: window.location.hostname,
+      port: Number(window.location.port) || (secure ? 443 : 80),
+      name: 'Space Game',
+      region: '',
+      maxPlayers: 32,
+      players: 0,
+      secure,
     }];
 
     try {

@@ -57,3 +57,22 @@ export function parseHeartbeat(body: Record<string, any>, fromIp: string): Omit<
     adminPort,
   };
 }
+
+/**
+ * What GET /list shows of a server. Never its admin port in production: the admin dashboard listens on the server's
+ * own 127.0.0.1 only, so the port is no use to anyone outside and only says what runs there. The dev lobby still
+ * lists it for the sandbox's Admin button.
+ */
+export function listing(s: ServerEntry, production: boolean): Omit<ServerEntry, 'lastSeen'> {
+  return {
+    host: s.host,
+    port: s.port,
+    name: s.name,
+    region: s.region,
+    maxPlayers: s.maxPlayers,
+    players: s.players,
+    secure: s.secure,
+    version: s.version,
+    ...(production || s.adminPort === undefined ? {} : { adminPort: s.adminPort }),
+  };
+}

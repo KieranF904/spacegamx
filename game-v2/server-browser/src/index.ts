@@ -14,7 +14,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'crypto';
 import { AccountRoutes } from './accounts/routes.js';
 import { BodyError, clientIp, readJson } from './accounts/request.js';
-import { MAX_SERVERS, parseHeartbeat, type ServerEntry } from './servers.js';
+import { MAX_SERVERS, listing, parseHeartbeat, type ServerEntry } from './servers.js';
 
 // ============================================
 // CONFIGURATION
@@ -215,17 +215,7 @@ async function handleRegister(req: http.IncomingMessage, res: http.ServerRespons
 
 function handleList(res: http.ServerResponse): void {
   cleanup();
-  const list = Array.from(servers.values()).map((s) => ({
-    host: s.host,
-    port: s.port,
-    name: s.name,
-    region: s.region,
-    maxPlayers: s.maxPlayers,
-    players: s.players,
-    secure: s.secure,
-    version: s.version,
-    adminPort: s.adminPort
-  }));
+  const list = Array.from(servers.values()).map((s) => listing(s, process.env.NODE_ENV === 'production'));
   sendJson(res, 200, { servers: list });
 }
 
