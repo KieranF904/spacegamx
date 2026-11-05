@@ -88,6 +88,8 @@ interface Plan {
   gone: Set<number>;
   /** Damage the records cover, by sum */
   covered: Map<string, number>;
+  /** The same sums as the client works them out from the records: a record's tenths where it carries them, else its own hit's */
+  shown: Map<string, number>;
   /** Client-detected hits: each record the client finds itself (not sent), and each record's hit */
   own: boolean[];
   hits: Hit[];
@@ -200,7 +202,7 @@ export class HitLedger {
    */
   plan(conn: ClientConnection, known: (id: number) => boolean, keyframed?: ReadonlySet<number>): ReadonlySet<number> | null {
     if (!this.wants(conn)) return null;
-    const plan: Plan = { recs: [], keys: [], legacy: [], gone: new Set(), covered: new Map(), own: [], hits: [] };
+    const plan: Plan = { recs: [], keys: [], legacy: [], gone: new Set(), covered: new Map(), shown: new Map(), own: [], hits: [] };
     this.plans.set(conn, plan);
     if (!this.hits.length) return plan.gone;
     let passes = this.passes.get(conn);
@@ -388,6 +390,7 @@ export class HitLedger {
     plan.recs.push(rec);
     plan.keys.push(key);
     plan.covered.set(key, (plan.covered.get(key) ?? 0) + h.dealt);
+    plan.shown.set(key, (plan.shown.get(key) ?? 0) + (rec.d10 !== undefined ? rec.d10 / 10 : h.dealt));
     this.stats.records++;
     return null;
   }
@@ -406,10 +409,12 @@ export class HitLedger {
     for (const e of net.heldDamage) {
       if (!net.nearClient(conn, e.sys, Position.x[e.target], Position.y[e.target], e.source)) continue;
       const key = keyOf(e.target, e.source, e.glancing), cov = plan.covered.get(key) ?? 0;
-      // (The records say it all: it sums them itself. Something else too, a blast: the sum goes as ever, the records show no number)
-      if (cov > 0 && e.amount - cov <= 0.05) continue;
-      if (cov > 0) (quiet ??= new Set()).add(key);
       const amount = Math.round(e.amount * 10) / 10;
+      // (The records say it all: it sums them itself. Something else too, a blast: the sum goes as ever, the records show no number.
+      // So too where its sum of the records would round otherwise than the server's (a shield's records carry their tenths,
+      // rounded one by one): the number it shows is the legacy clients')
+      if (cov > 0 && e.amount - cov <= 0.05 && Math.round((plan.shown.get(key) ?? 0) * 10) / 10 === amount) continue;
+      if (cov > 0) (quiet ??= new Set()).add(key);
       if (amount > 0) net.send(conn.ws, damageMessage(e, amount));
     }
     if (plan.recs.length) {
