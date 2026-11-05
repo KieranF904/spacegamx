@@ -37,7 +37,8 @@ import {
   MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
   nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
   orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec,
-  spawnersOf, seedGroups, pickGroup, ghostCentre, ghostShip, slotStyle, packPopSlot, LIFE_ASLEEP_RESET, type Spawner } from '@space-game/common';
+  spawnersOf, seedGroups, pickGroup, ghostCentre, ghostShip, slotStyle, packPopSlot, lureSector, packLure, LIFE_ASLEEP_RESET, FOCUS_RANGE, GHOST_STEP,
+  type Spawner, type Lure } from '@space-game/common';
 import { AiPilots } from './brains/aiPilot.js';
 import { CustomEnemies } from './custom/CustomEnemies.js';
 import type { CustomTable } from './custom/types.js';
@@ -310,10 +311,17 @@ interface Enemy {
 interface PopSlot { group: number; alive: number; elite: number; hp: (number[] | undefined)[]; pack?: number; leftAt?: number }
 
 /** A nest's or zone's packs, ship by ship, there whether anyone's near or not (`next`: its next ship back, 0: it's full) */
-interface Population { num: number; sysId: string; sp: Spawner; sys?: StarSystemData; nest?: SpawnNest; zone?: SpawnZone; key: string; slots: PopSlot[]; next: number; changed: boolean }
+interface Population {
+  num: number; sysId: string; sp: Spawner; sys?: StarSystemData; nest?: SpawnNest; zone?: SpawnZone; key: string; slots: PopSlot[]; next: number; changed: boolean;
+  /** Its nomads' ghosts drift towards where pilots were last seen in its band (common Lure; none: it has no nomads, or nobody's been) */
+  lure?: Lure;
+}
+
+/** A system's populations on the wire (pops: `p` slots, `n` lures) */
+export interface PopRows { p: number[]; n: number[] }
 
 /** A population as remembered (SystemMemory.ts: the file's `populations`), times as world ticks */
-export interface PopulationMemory { next?: number; slots: { group: number; alive: number; elite?: number; hp?: (number[] | null)[]; leftAt?: number }[] }
+export interface PopulationMemory { next?: number; slots: { group: number; alive: number; elite?: number; hp?: (number[] | null)[]; leftAt?: number }[]; lure?: { l1: number; s1: number; l2: number; s2: number } }
 
 interface Pack {
   id: number;
@@ -844,9 +852,22 @@ export class Enemies {
     return out;
   }
 
-  /** Between one ship coming back and the next (ticks): its spawner's respawnSeconds */
+  /**
+   * Between one ship coming back and the next (ticks): its spawner's respawnSeconds shared out over the ships of the
+   * pack the next one goes to (a pack refills in about respawnSeconds, as one pack a respawnSeconds always did, but a
+   * ship at a time)
+   */
   private interval(pop: Population): number {
-    return Math.max(60, ((pop.nest?.respawnSeconds ?? pop.zone?.respawnSeconds) ?? this.data.rules.respawnSeconds) * 60);
+    const every = ((pop.nest?.respawnSeconds ?? pop.zone?.respawnSeconds) ?? this.data.rules.respawnSeconds) * 60;
+    const i = this.nextSlot(pop), g = i >= 0 ? pop.sp.def.groups[pop.slots[i].group] : undefined;
+    const size = g?.ships.length ?? Math.max(1, Math.round(pop.sp.def.groups.reduce((n, q) => n + q.ships.length, 0) / Math.max(1, pop.sp.def.groups.length)));
+    return Math.max(60, Math.round(every / Math.max(1, size)));
+  }
+
+  /** The slot the next ship back goes to: a hurt pack's first, then a wiped-out one (-1: it's full) */
+  private nextSlot(pop: Population): number {
+    const i = pop.slots.findIndex((s) => s.group >= 0 && s.alive && s.alive !== this.full(pop, s));
+    return i >= 0 ? i : pop.slots.findIndex((s) => !s.alive);
   }
 
   private full(pop: Population, s: PopSlot): number {
@@ -865,18 +886,16 @@ export class Enemies {
    */
   private regrow(pop: Population, now: number): void {
     if (!this.short(pop)) { pop.next = 0; return; }
-    const every = this.interval(pop);
-    if (!pop.next) pop.next = now + every;
+    if (!pop.next) pop.next = now + this.interval(pop);
     for (let guard = 0; pop.next <= now && guard < 1000 && this.short(pop); guard++) {
       this.regrowOne(pop, pop.next, now);
-      pop.next += every;
+      pop.next += this.interval(pop);
     }
     if (!this.short(pop)) pop.next = 0;
   }
 
   private regrowOne(pop: Population, at: number, now: number): void {
-    let i = pop.slots.findIndex((s) => s.group >= 0 && s.alive && s.alive !== this.full(pop, s));
-    if (i < 0) i = pop.slots.findIndex((s) => !s.alive);
+    const i = this.nextSlot(pop);
     if (i < 0) return;
     const slot = pop.slots[i], empty = !slot.alive;
     if (empty) {
@@ -923,7 +942,7 @@ export class Enemies {
   /** A ship back while its pack's loaded: out of the nest's hull, seen launching (a zone's: where its pack's ghost would be) */
   private launchInto(pop: Population, i: number, pack: Pack, k: number, now: number): void {
     const n = pop.nest, a = this.rng() * Math.PI * 2, c = dcos(a), s = dsin(a);
-    const at = n?.place ? nestPosition(n.place, n.planets, now) : ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, pop.slots[i].group), now);
+    const at = n?.place ? nestPosition(n.place, n.planets, now) : ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, pop.slots[i].group), now, pop.lure);
     const from = n?.place ? NEST_RADIUS : 0, x = at.x + c * from, y = at.y + s * from;
     if (n?.place && !n.place.hidden) this.host.effect?.(pop.num, x, y, 'launch');
     const eid = this.spawnPopShip(pop, i, pack, k, x, y, a);
@@ -939,12 +958,12 @@ export class Enemies {
    * (mended for the time since it was put back), on patrol; `launch`: a wiped-out pack's first ship back, seen
    * coming out of the nest's hull instead
    */
-  private loadSlot(pop: Population, i: number, now: number, launch = false): void {
+  private loadSlot(pop: Population, i: number, now: number, launch = false, seen = false): void {
     const slot = pop.slots[i], g = pop.sp.def.groups[slot.group] as SpawnGroup | undefined;
     if (!g || !slot.alive) return;
     const style = slotStyle(pop.sp, slot.group), n = pop.nest, roam = pop.sp.def.roam ?? 2400;
     const nestAt = n?.place ? nestPosition(n.place, n.planets, now) : undefined;
-    const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, style, now);
+    const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, style, now, pop.lure);
     const pack: Pack = {
       id: this.nextPack++, systemNum: pop.num, home: nestAt && style !== 'nomad' ? { ...nestAt } : { ...c }, members: new Set(), lastSeen: now,
       passive: g.passive, origin: n ? 'nest' : 'zone', pop: { p: pop, slot: i }, roam, pace: 0.4 + this.rng() * 0.45,
@@ -966,6 +985,8 @@ export class Enemies {
       Velocity.x[eid] = dcos(h) * v; Velocity.y[eid] = dsin(h) * v;
       const hp = slot.hp[k];
       if (hp) restoreHp(this.ships, eid, hp, heal);
+      // (Loaded within a pilot's sight, an arrival as anyone's: it comes in as a warp-in looks)
+      if (seen && !out) this.host.effect?.(pop.num, at.x, at.y, 'warpIn');
       this.enemies.get(eid)!.waypoint = { ...c };
     }
     slot.hp = []; slot.leftAt = undefined;
@@ -1018,10 +1039,33 @@ export class Enemies {
           return;
         }
         if (!slot.alive || !players.length) return;
-        const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, slot.group), now);
-        if (near(c.x, c.y, R)) this.loadSlot(pop, i, now);
+        const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, slot.group), now, pop.lure);
+        if (near(c.x, c.y, R)) this.loadSlot(pop, i, now, false, near(c.x, c.y, FOCUS_RANGE));
       });
+      this.tendLure(pop, players, now);
     }
+  }
+
+  /**
+   * A spawner with nomads: its lure follows its band's pilots, by sector (common Lure): the sector of the pilot in its
+   * band nearest its first nomad's ghost. A new sector starts a new lure from now (the clients are told: pops `n`);
+   * nobody in the band leaves it as it is. Pilots' places aren't the clients' to know past their view: a sector a
+   * sixteenth of the way round changes seldom, and is all they're told.
+   */
+  private tendLure(pop: Population, players: number[], now: number): void {
+    const band = pop.sp.band;
+    const slot = pop.slots.findIndex((s) => s.group >= 0 && slotStyle(pop.sp, s.group) === 'nomad');
+    if (!band || slot < 0) return;
+    const inBand = players.filter((p) => { const r = dhypot(Position.x[p], Position.y[p]); return r > band.min - 4000 && r < band.max + 4000; });
+    if (!inBand.length) return;
+    const c = ghostCentre(pop.sys, pop.sysId, pop.sp, slot, 'nomad', now, pop.lure);
+    let best = inBand[0], bd = Infinity;
+    for (const p of inBand) { const d = dhypot(Position.x[p] - c.x, Position.y[p] - c.y); if (d < bd) { bd = d; best = p; } }
+    const sector = lureSector(Position.x[best], Position.y[best]);
+    const l = pop.lure ?? { l1: -1, s1: 0, l2: -1, s2: 0 };
+    if (sector === l.l2) return;
+    pop.lure = { l1: l.l2, s1: l.s2, l2: sector, s2: Math.floor(now / GHOST_STEP) };
+    pop.changed = true;
   }
 
   /** A population's ship is gone (shot down, or gone some other way): its slot remembers, and the spawner starts on its replacement */
@@ -1040,26 +1084,30 @@ export class Enemies {
     if (!slot.alive && g?.respawnSeconds) this.nestLock.set(`${pop.key}:${slot.group}`, now + g.respawnSeconds * 60);
   }
 
-  /** A system's populations as the wire has them (common packPopSlot): [spawner index, slots, ...a code a slot] for each */
-  popRows(num: number): number[] {
-    const out: number[] = [];
+  /**
+   * A system's populations as the wire has them: `p` [spawner index, slots, ...a code a slot] for each (common
+   * packPopSlot), `n` its nomads' lures (common packLure)
+   */
+  popRows(num: number): PopRows {
+    const out: PopRows = { p: [], n: [] };
     for (const pop of this.populations().get(num) ?? []) this.popRow(pop, out);
     return out;
   }
 
-  private popRow(pop: Population, out: number[]): void {
-    out.push(pop.sp.index, pop.slots.length, ...pop.slots.map((s) => packPopSlot(s.group, s.pack !== undefined, s.alive)));
+  private popRow(pop: Population, out: PopRows): void {
+    out.p.push(pop.sp.index, pop.slots.length, ...pop.slots.map((s) => packPopSlot(s.group, s.pack !== undefined, s.alive)));
+    if (pop.lure) packLure(out.n, pop.sp.index, pop.lure);
   }
 
-  /** What's changed in each system's populations since last asked (a death, a ship back, a pack loaded or put back): its rows */
-  popChanges(): Map<number, number[]> {
-    const out = new Map<number, number[]>();
+  /** What's changed in each system's populations since last asked (a death, a ship back, a pack loaded or put back, a lure moved): its rows */
+  popChanges(): Map<number, PopRows> {
+    const out = new Map<number, PopRows>();
     for (const [num, list] of this.populations()) {
       for (const pop of list) {
         if (!pop.changed) continue;
         pop.changed = false;
         let rows = out.get(num);
-        if (!rows) out.set(num, (rows = []));
+        if (!rows) out.set(num, (rows = { p: [], n: [] }));
         this.popRow(pop, rows);
       }
     }
@@ -1077,7 +1125,7 @@ export class Enemies {
   ghostAt(systemNum: number, id: string, slot: number, tick = this.host.tick()): XY | null {
     const pop = this.populations().get(systemNum)?.find((p) => p.sp.def.id === id), s = pop?.slots[slot];
     if (!pop || !s || s.group < 0) return null;
-    return ghostCentre(pop.sys, pop.sysId, pop.sp, slot, slotStyle(pop.sp, s.group), tick);
+    return ghostCentre(pop.sys, pop.sysId, pop.sp, slot, slotStyle(pop.sp, s.group), tick, pop.lure);
   }
 
   /** Every population as remembered (the memory file): times as world ticks; a loaded pack's ships as hurt as they are now */
@@ -1088,6 +1136,7 @@ export class Enemies {
         const pack = (s: PopSlot) => (s.pack !== undefined ? this.packs.get(s.pack) : undefined);
         (out[pop.sysId] ??= {})[pop.sp.def.id] = {
           ...(pop.next ? { next: pop.next + offset } : {}),
+          ...(pop.lure ? { lure: { ...pop.lure, s1: pop.lure.s1 * GHOST_STEP + offset, s2: pop.lure.s2 * GHOST_STEP + offset } } : {}),
           slots: pop.slots.map((s) => {
             const hp = [...s.hp];
             for (const m of pack(s)?.members ?? []) { const e = this.enemies.get(m), ship = this.ships.get(m); if (e?.pop && ship) hp[e.pop.k] = hpShares(ship); }
@@ -1118,6 +1167,8 @@ export class Enemies {
           slot.pack = undefined;
         });
         pop.next = typeof m.next === 'number' ? m.next - offset : 0;
+        const l = m.lure;
+        if (l && [l.l1, l.s1, l.l2, l.s2].every((v) => typeof v === 'number')) pop.lure = { l1: l.l1, s1: Math.floor((l.s1 - offset) / GHOST_STEP), l2: l.l2, s2: Math.floor((l.s2 - offset) / GHOST_STEP) };
         pop.changed = true;
       }
     }
