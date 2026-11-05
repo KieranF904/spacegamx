@@ -114,7 +114,7 @@ describe('v5 ship wipe', () => {
   it('designs, the wreck, loadouts and ship-bound jobs go; jobs keep running for storage; the hold moves to storage', () => {
     const ship = rec('prospector', { ammo: { load: { slug_crate: 2 } } });
     const raw = v4([ship], {
-      designs: [clone(plans.arrow), null, clone(plans.lancer)],
+      designs: [clone(plans.arrow), null, clone(plans.halberd)],
       wreck: { system: 'sol', x: 1, y: 2, until: Date.now() + 60_000 },
       cargo: [{ id: 'iron_ore', n: 5 }, { id: 'crystal', n: 2 }],
       jobs: [
