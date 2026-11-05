@@ -1,6 +1,6 @@
 /**
  * Shared pieces of the input sources (sim foundation, Stage 1 section D): the plumbing the server's and the client's
- * adapters (server/src/ships/inputs.ts, client/src/ships/inputs.ts) and the bots (server/src/bots) build on. Since
+ * adapters (server/src/ships/bridge/inputs.ts, client/src/ships/inputs.ts) and the bots (server/src/bots) build on. Since
  * Stage 3 the client's replica set (network/replication.ts stepPreNow) picks each ship's input through
  * CtlChangeInputs (own timeline: known; control rows: assumed) and DriverInputs (a body's driver: decided).
  */

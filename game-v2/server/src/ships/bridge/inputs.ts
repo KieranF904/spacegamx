@@ -7,14 +7,14 @@
  *  - `ControllerInputSource` (decided): an AI ship's order this tick, as pilotless.ts stepPilotless works it out: its
  *    controller's PilotOrders, else its autopilot, else holding still; pinned ships only turn; the impulse rides along.
  *
- * Flown since Stage 3: bridge/flight.ts stepMovement steps a pilot on `readPilotInput`, bridge/pilotless.ts
+ * Flown since Stage 3 (and in bridge/ since, as it reads BridgeCtx): flight.ts stepMovement steps a pilot on `readPilotInput`, pilotless.ts
  * stepPilotless an AI ship on `controllerInput` (the sources' cores; the step skips the guns' fields, which
  * fireWeapons reads itself: SimEnv.gunsByHost).
  */
 
 import { Input, CTL, controlBits, getPlan, quantizeCursorDist, simAimQ, buildFlightInputs, newFlightControls, InputSlots } from '@space-game/common';
 import type { FlightInputSource, InputSource, SimInput } from '@space-game/common';
-import type { BridgeCtx, PilotOrders } from './bridge/core.js';
+import type { BridgeCtx, PilotOrders } from './core.js';
 
 let HELD: { name: string; field: ArrayLike<number> }[] | undefined;
 function heldInputs(): { name: string; field: ArrayLike<number> }[] {

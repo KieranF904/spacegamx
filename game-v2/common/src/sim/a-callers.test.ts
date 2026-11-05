@@ -27,7 +27,7 @@ import { stepShip, newSimShip, cloneCharge, simAim, CTL_STATE_BITS, type SimEnv,
 import { aimQ, pilotInput, gridAim } from './a-adapt.js';
 import { stepMovement } from '../../../server/src/ships/bridge/flight.js';
 import { stepPilotless } from '../../../server/src/ships/bridge/pilotless.js';
-import { controllerInput } from '../../../server/src/ships/inputs.js';
+import { controllerInput } from '../../../server/src/ships/bridge/inputs.js';
 import { cruiseOf } from '../../../server/src/ships/SimLod.js';
 import { ShipClient } from '../../../client/src/ships/ShipClient.js';
 

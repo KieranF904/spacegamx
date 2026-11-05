@@ -152,8 +152,10 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(client?.failed).toBe(0);
     expect(a.checked).toBeGreaterThan(5000);
     expect(a.offTicks).toBe(0);
-    // (Only what it couldn't work out: a ship that touched one rebuilt twice in a window, the structure between not had)
-    expect(a.keyframes * 50).toBeLessThan(b.keyframes);
+    // (Only what it couldn't work out: a ship that touched one rebuilt twice in a window, the structure between not had.
+    // Stage 3: 50x -> 40x: the fight itself moved with the Stage 1 merge (A's aim rule for AI ships); 17 vs 777 and
+    // every tick still exact)
+    expect(a.keyframes * 40).toBeLessThan(b.keyframes);
     // The legacy observer: keyframes for what the causes moved, and none of the records
     expect(b.records).toBe(0);
     expect(b.keyframes).toBeGreaterThan(20);
@@ -165,7 +167,7 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(client?.failed).toBe(0);
     expect(a.checked).toBeGreaterThan(5000);
     expect(a.offTicks).toBe(0);
-    expect(a.keyframes * 50).toBeLessThan(b.keyframes);
+    expect(a.keyframes * 40).toBeLessThan(b.keyframes);
   }, 120_000);
 
   it('a client that misses some causes is caught by its check and put right: every ship it holds again', () => {

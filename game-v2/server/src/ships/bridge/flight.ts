@@ -19,7 +19,7 @@ import {
 } from '@space-game/common';
 import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
-import { readPilotInput } from '../inputs.js';
+import { readPilotInput } from './inputs.js';
 import { dhypot } from '@space-game/common';
 import { SimPass } from '../../sim/SystemClocks.js';
 
@@ -177,7 +177,7 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
   // (Numb: its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb)
   s.hazard.numb = b.coldStage(eid).control;
-  // (Its inputs from its source: ships/inputs.ts, the pilot's held keys off the Input component)
+  // (Its inputs from its source: bridge/inputs.ts, the pilot's held keys off the Input component)
   const { isBoosting } = stepShip(s, readPilotInput(eid, MOVE_IN), moveEnv(b, eid, tick), s, MOVE_EVENTS);
   ship.jumpPrime = s.jumpPrime;
   b.setCharge(eid, s.charge);

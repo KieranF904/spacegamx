@@ -4,7 +4,7 @@ import {
   InputSlots, ScriptedInputs, NO_INPUT, type FlightInputSource,
 } from '@space-game/common';
 import { PilotInputSource, ControllerInputSource, readPilotInput } from './inputs.js';
-import type { BridgeCtx } from './bridge/core.js';
+import type { BridgeCtx } from './core.js';
 
 const EID = 7;
 const BODY = { x: 0, y: 0, angle: 0.4 };

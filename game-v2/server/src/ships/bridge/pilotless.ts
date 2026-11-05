@@ -11,7 +11,7 @@ import {
   powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
-import { controllerInput } from '../inputs.js';
+import { controllerInput } from './inputs.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 /** Reused each tick (powerTick reads it and keeps nothing) */
@@ -82,7 +82,7 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   s.hazard.empUntil = b.empUntil.get(eid) ?? 0;
   s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
   s.hazard.numb = b.coldStage(eid).control;
-  // (Its input from its source, ships/inputs.ts: the orders asked once above, as their aim, target and body are read here too)
+  // (Its input from its source, bridge/inputs.ts: the orders asked once above, as their aim, target and body are read here too)
   stepShip(s, controllerInput(b, eid, orders, target, PILOTLESS_IN), pilotlessEnv(b, eid, k, tick), s, PILOTLESS_EVENTS);
   PILOTLESS_EVENTS.length = 0;
   if (s.jumpPrime || ship.jumpPrime !== undefined) ship.jumpPrime = s.jumpPrime;
