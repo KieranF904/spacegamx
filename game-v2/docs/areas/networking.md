@@ -45,6 +45,8 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | server/src/net/decisions/BodyNet.ts | ~155 | decision inputs, the server side: each boss's decision log, which bosses each client runs (SYNC, the decisions since its last snapshot, OFF), its body checks; `bodies.test.ts` the parity test |
 | client/src/ships/bodies/BodyRunner.ts | ~165 | decision inputs, the client side: decisions folded in at their ticks, the boss's replica driven by its body (ShipReplicaSet `setDriver`), the body check |
 | server/src/ships/bridge/debrisNet.ts | 206 | the server's debris bookkeeping: splits clients may derive (`noteSplit`, a ship's centre of mass by rebuild count `comAt`, what ships shed this tick `sheds`), spawn checks, the shared step (`step`, ShipBridge.stepDebrisWorld), `touched` (debris moved otherwise, and what knocked into it, till the snapshot: Replication keyframes them), `told` (pieces something else changed: no longer the clients' to run), `shifted`/`recentred`/`offLegacy` (a rebuild's recentring, worked out by clients; legacy ones get keyframes), and `intangible` (ShipBridge's) |
+| common/src/ships/contactPass.ts, client/src/ships/causes/ContactWorld.ts | ~70 / ~270 | contacts on the tick layer (CAPS.CONTACTS): the pass's candidate pairs and order (`contactCandidates`, by id), shared with the server's pass; the client's per-tick pairs among the ships it holds in step, merged into each ship's causes by their place in the pass |
+| server/src/net/causes/contactLog.ts, contactsFor.ts | ~60 / ~110 | contacts on the tick layer, the server side: each tick's pass as a client needs it (`ContactLog`, noted by `resolveContacts`), and per client and window which contacts it finds itself and which ships it must leave out (`contactWindow`, Replication `found`) |
 | common/src/ships/debrisLife.ts, client/src/ships/debris/DebrisLives.ts | 45 / 154 | a piece's life after its spawn (CAPS.DEBRIS): crumble ticks fixed at the spawn (`debrisDecay`), each crumble's rebuild (`crumbleRebuild`); the client side runs the pieces it was given (`l`): structures by tick, recentring, crumble effects, splits from the pre-recentre body |
 
 ## Public interface
@@ -261,6 +263,29 @@ Debris then drifts and knocks into other debris only (ships ignore it), push onl
   being what the ship has (`AiPilots.fly`); the body flies `CTL.emp`/`CTL.slowed` from it (`bodyStatusBits`). A SYNC
   clears it (BodyNet sends a STATUS after a SYNC while one is under way).
 
+### Contacts on the tick layer (`CAPS.CONTACTS` 1048576, with CAUSES; protocol 53, no wire change)
+Dev builds (`?contacts=0|1`; on by default). The server's contact pass takes its pairs by id (lower first) from one
+shared sweep (common ships/contactPass.ts `contactCandidates`: bounding circles padded by `CONTACT_MARGIN`, from the
+bodies before the pass). A CONTACTS client runs the same sweep on its tick layer (client ships/causes/ContactWorld.ts):
+on each tick, over the ships it held before the snapshot's window and holds in step through it (no keyframe in it, not
+gone or out of view, ships, not docked, not mid-jump, structure that tick known), from each one's step at that tick
+(`ShipReplicaSet.preAt`, now a step worked out once, `stepPre`, with no causes). Each candidate becomes a row on both
+ships (`CONTACT_FLAG.CHECK`: the pass's centre-distance test first) placed among their told causes by its place in the
+pass (`CAUSE_PLACE`, `pairPlace`, `placeRows`: pulls before the pass, pairs by ids, rebuilds after), and is worked out
+by `applyOwnCauses` as told ones are (ShipCauses `rowsAt`, OwnTick `rowsAt`/`midAt`). Such a pair goes as no record, no
+own row and no `contact` sparks (the client draws its own: `contactFxDue`, the pass's threshold and cooldown); its ships'
+hits are told that window as for a told cause (`SelfHits.onTouched`, Replication `out.caused`). A tick's pairs are worked
+out once (memo) and again when any ship in them is stepped again from that tick (`ReplicaRewinds`: rewinds, keyframes,
+late control rows, removal), every ship that took part stepped again; a window's ticks are final once its snapshot is in.
+The server works out the same set per client and window (server net/causes/contactsFor.ts `contactWindow`, over the
+pass log `ContactLog`, Replication `found`), and tells the client to leave out (a CONTACT record naming one ship twice,
+`isLeftOut`) a ship it can't vouch for: out of the pass but not docked, pinned with a candidate among them, its structure
+that tick not one the client has, or pulled after the pass began. A snapshot always goes when a pair was found in its
+window. Sparks of pairs it doesn't find go with its snapshot (`Replication.contactFxFor`; everyone else gets them at
+once). Tests: server/src/net/causes/causes.test.ts. Measured: docs/audits/contacts-tick-layer-2026-11-05.md. Left: pulls
+(a boss's magnets, a Hookboat's reel, a collapsing star: the moves' and weapons' own steps), contact damage (HP isn't
+worked out on clients yet: group D), contacts with rocks (none are simulated).
+
 ## Invariants
 - Any change to the wire tables needs `PROTOCOL_VERSION` + `PROTOCOL_WIRE_HASH` updated (protocol.test.ts fails otherwise, on purpose). JSON-only messages not in `COMPACT` do not change the hash.
 - The dictionary is append-only (indices are the wire format).
@@ -297,7 +322,7 @@ Debris then drifts and knocks into other debris only (ships ignore it), push onl
 - `npx vitest run common/src/guidance server/src/net/guides` : homing shells and mobs on the tick layer (CAPS.WAYPOINTS): derived, sent, the switch, a drift caught, legacy rows; a volley of mines as LAUNCH rows (CAPS.LAUNCHES).
 - Bandwidth bench: `cd server && npm run bench:net` (server/src/bench/netBench.ts).
 - `npx vitest run server/src/net/cells client/src/ships/cells common/src/network/cells.test.ts` : the focus grid and ships away (leaving and coming back after 2.5 s and 40 s with only what changed, HP changed and a ship destroyed while away, let go by age, the 19 km edge, cell borders, jumps, a new system; both ends' lists agree).
-- `npx vitest run server/src/net/causes server/src/net/own server/src/net/decisions server/src/net/debris server/src/net/crowd` : causes, the own ship, bodies and AI pilots, debris lives, crowd fallbacks; every held ship exact at every snapshot.
+- `npx vitest run server/src/net/causes server/src/net/own server/src/net/decisions server/src/net/debris server/src/net/crowd` : causes, the own ship, bodies and AI pilots, debris lives, crowd fallbacks; every held ship exact at every snapshot. causes.test.ts also runs a client finding its own contact pairs (CAPS.CONTACTS).
 - Crowd bench: `cd server && npm run bench:crowd -- --full --bulk focus --caps 245759` (every cap but CROWD), `--crowd` for the fallbacks. A caps matrix (each bit off in turn, `--case ball:50 --caps N`) is how the review checked each bit restores the old path; numbers in docs/audits/netcode-all-2026-11.md.
 
 ## Gotchas
