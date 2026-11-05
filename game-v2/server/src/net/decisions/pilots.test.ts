@@ -9,6 +9,7 @@
  * A real GameServer; the pilot (a fake client with every cap) flies by input messages, on time, firing at the nearest.
  */
 import { describe, it, expect } from 'vitest';
+import { DECISION } from '@space-game/common';
 import { fight, BODIES } from '../../testkits/decisionFight.testkit.js';
 
 describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides (CAPS.PILOTS)', () => {
@@ -27,6 +28,29 @@ describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides
     // The legacy observer: them the old way, no decisions
     expect(r.got.B.decisions).toBe(0);
     expect(r.got.B.running).toBe(0);
+  }, 240_000);
+
+  it("EMP'd and slowed mid-fight (struck, then struck again before it wore off): a STATUS each, its body flies it crippled, no keyframe of it", () => {
+    let foe = -1;
+    const r = fight({
+      ticks: 900,
+      each: (t, server, foes) => {
+        const ships = server.getShips();
+        if (t === 300) { foe = foes[0]; ships.emp(foe, 90); }
+        if (t === 350) ships.emp(foe, 120);
+        if (t === 420 && foes[1] !== undefined) ships.slow(foes[1], 100);
+      },
+    });
+    if (process.env.BODY_DEBUG) console.log('STATUS', JSON.stringify({ got: { ...r.got.A, ran: [...r.got.A.ran] }, stats: r.stats, rep: r.rep }));
+    expect(r.got.A.ops[DECISION.STATUS] ?? 0).toBeGreaterThanOrEqual(3);
+    expect(r.got.A.checked).toBeGreaterThan(300);
+    expect(r.got.A.off).toBe(0);
+    expect(r.stats.off).toBe(0);
+    // (its shadow, as the clients running it fly it, never left the ship: no keyframe for what it was struck by, only
+    // each one's first sight; nor of its pack's, whose bodies read it)
+    expect(Object.values(r.rep.why).reduce((a, b) => a + b, 0)).toBe(0);
+    expect(r.rep.keyframes).toBe(r.got.A.syncs);
+    expect(r.stats.targetKeyed).toBe(0);
   }, 240_000);
 
   it('a decision lost: its check catches it, SYNCs put it right', () => {

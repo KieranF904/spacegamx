@@ -16,15 +16,19 @@
  *   PERSONAL [slot, attack, seed]: a personal attack drawn (common bosses/personal.ts): on the pilot in that slot of the
  *           boss's pilot list, from its stage's pool, with its own seed. Its body's flight doesn't change (the attack's
  *           shots and strikes are the boss's, told the usual way): clients may play its tell from it
+ *   STATUS  [emp, slowed]: from this tick its drive is EMP'd for `emp` ticks and slowed (a Frostbite's beam) for
+ *           `slowed` (0: not): its flight crippled as the server's is (bodyStatusBits), told when what the body had
+ *           stops being what the ship has (struck, or struck again before it wore off). A SYNC clears it
  */
 
 import { quantizeCursorAngle } from '../network/cursorState.js';
 import { ownSimCaps } from '../network/ownTick.js';
 import { CAPS } from '../network/hits.js';
+import { CTL } from '../ships/replica.js';
 
-export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6 } as const;
+export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6, STATUS: 7 } as const;
 /** Ops there are (a row whose op is past this is dropped) */
-export const DECISION_OPS = 7;
+export const DECISION_OPS = 8;
 
 /**
  * A want: [kind, ...args], angles in the 13-bit aim quantisation (q13)
@@ -75,6 +79,20 @@ export interface BodyState {
   wantAt: number;
   /** The body flies it (false: OFF, the enemy AI does: the old way) */
   on: boolean;
+  /** The ticks its drive is EMP'd until, and slowed until (STATUS; absent: neither) */
+  empUntil?: number;
+  slowUntil?: number;
+}
+
+/** Its flight's status bits on tick t (STATUS): CTL.emp while EMP'd, CTL.slowed while slowed, as the server's ship flies */
+export function bodyStatusBits(s: BodyState, t: number): number {
+  return (t < (s.empUntil ?? 0) ? CTL.emp : 0) | (t < (s.slowUntil ?? 0) ? CTL.slowed : 0);
+}
+
+/** A STATUS's args for what a ship has from tick t (ticks left EMP'd and slowed), or null: the state says it already */
+export function statusArgs(s: BodyState, t: number, emp: number, slowed: number): number[] | null {
+  const had = bodyStatusBits(s, t), now = (emp > 0 ? CTL.emp : 0) | (slowed > 0 ? CTL.slowed : 0);
+  return had === now ? null : [Math.max(0, emp), Math.max(0, slowed)];
 }
 
 export function cloneBodyState(s: BodyState): BodyState {
@@ -86,6 +104,8 @@ export function bodyStateOfSync(args: readonly number[], tick: number): BodyStat
   return {
     kind: args[0] ?? 0, homeX: args[1] ?? 0, homeY: args[2] ?? 0, stage: Math.max(1, args[3] ?? 1), side: args[4] ? 1 : -1,
     target: (args[5] ?? 0) - 1, want: args.length > 6 ? args.slice(6) : [WANT.FLY], wantAt: tick, on: true,
+    // (a SYNC clears a STATUS: one still under way follows it)
+    empUntil: undefined, slowUntil: undefined,
   };
 }
 
@@ -103,6 +123,7 @@ export function applyDecision(s: BodyState, op: number, args: readonly number[],
     case DECISION.SIDE: s.side = args[0] ? 1 : -1; break;
     case DECISION.STAGE: s.stage = Math.max(1, args[0] ?? 1); break;
     case DECISION.WANT: s.want = args.length ? args.slice() : [WANT.FLY]; s.wantAt = tick; break;
+    case DECISION.STATUS: s.empUntil = (args[0] ?? 0) > 0 ? tick + args[0] : undefined; s.slowUntil = (args[1] ?? 0) > 0 ? tick + args[1] : undefined; break;
   }
 }
 
