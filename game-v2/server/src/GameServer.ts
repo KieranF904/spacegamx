@@ -168,7 +168,7 @@ import { Replication } from './net/Replication.js';
 import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js';
 import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
-import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, insideArena, type Terrain } from '@space-game/common';
+import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, insideArena, WEAPON_KIND_TYPE, type Terrain } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
@@ -198,6 +198,8 @@ import { SnapshotBuilder, type RoundSkip, designHash, playerQuery, projectileQue
 // ============================================
 
 const SPATIAL_CHUNK_SIZE = 500;
+/** Projectile weapon kinds by their snapshot WeaponType (a shot's mining tool: hurtAsteroid) */
+const KIND_OF_TYPE = new Map(Object.entries(WEAPON_KIND_TYPE).map(([k, t]) => [t, k]));
 
 interface SpatialEntity {
   id: number;
@@ -780,7 +782,8 @@ export class GameServer implements ServerCtx {
       nudge: (eid, ax, ay) => this.ships.push(eid, ax, ay),
       miningTool: (kind, turret) => {
         const t = this.gameData.miningTable.tools as unknown as Record<string, { yield: number; hardness: number }>;
-        return kind === 'cannon' ? t[turret ? 'turret' : 'fixed'] : t[kind] ?? { yield: 0.05, hardness: 1 };
+        // (A kind with no entry of its own mines like a fixed gun's shells)
+        return kind === 'cannon' ? t[turret ? 'turret' : 'fixed'] : t[kind] ?? t.fixed;
       },
     }, this.ships, this.ships.tuning);
     this.enemies = new Enemies(this.createEnemyHost(), this.ships, withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id)), this.ships.enemyDesigns);
@@ -1867,8 +1870,8 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /** A weapon beam (laser, lance) on asteroids: it burns the first one and mines it a little */
   private beamAsteroid(eid: number, x: number, y: number, angle: number, range: number, damage: number, kind: string): number {
-    const tools = this.gameData.miningTable.tools as unknown as Record<string, { yield: number; hardness: number }>;
-    const tool = tools[kind] ?? { yield: 0.05, hardness: 1 };
+    const tools = this.gameData.miningTable.tools as unknown as Record<string, { yield: number; hardness: number; mining?: boolean }>;
+    const tool = tools[kind] ?? tools.fixed;
     const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
     const systemNum = InSystem.systemId[eid];
     let best = 1, hit = -1;
@@ -3878,10 +3881,13 @@ this.devTeleport = opts.devTeleport ?? false;
     const ax = Position.x[hitAsteroid];
     const ay = Position.y[hitAsteroid];
     Asteroid.hp[hitAsteroid] -= damage;
-    // Any weapon mines a little (mining tools far more)
+    // Any weapon mines soft rock, keeping little of it (mining tools crack harder rock and keep all they work: Mining.extract)
     if (Projectile.miningYield[proj] > 0) {
       const nl = dhypot(hitX - ax, hitY - ay) || 1;
-      this.mining.extract(hitAsteroid, ownerId, damage, { yield: Projectile.miningYield[proj], hardness: Projectile.miningHardness[proj] },
+      // (A mining tool's shot, a mining charge, keeps all it works; any other is a gun's: Mining.extract)
+      const tools = this.gameData.miningTable.tools as unknown as Record<string, { mining?: boolean }>;
+      const mining = !!tools[KIND_OF_TYPE.get(Projectile.weaponType[proj]) ?? '']?.mining;
+      this.mining.extract(hitAsteroid, ownerId, damage, { yield: Projectile.miningYield[proj], hardness: Projectile.miningHardness[proj], mining },
         hitX, hitY, (hitX - ax) / nl, (hitY - ay) / nl);
     }
     addComponent(this.world, Dead, proj);

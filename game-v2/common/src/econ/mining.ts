@@ -21,7 +21,7 @@ export interface MiningTable {
    * name and size [min, max]: a rock type of its own (econ/rocks.ts), moving
    * and spawning `like` another type.
    */
-  types: Record<string, { hardness: number; ores: Bag; traceMul?: number; traceBoost?: Record<string, number>; name?: string; size?: [number, number]; like?: string; gas?: boolean; crowd?: string }>;
+  types: Record<string, { hardness: number; ores: Bag; traceMul?: number; traceBoost?: Record<string, number>; name?: string; size?: [number, number]; like?: string; gas?: boolean }>;
   /** The comet's passes (server/src/GameServer.ts) */
   comet?: { days: number; hours: number; systems: string[]; traceTier: number };
   /** Each belt's mix of rock types by weight (econ/rocks.ts) */
@@ -30,25 +30,35 @@ export interface MiningTable {
   danger: Record<string, { seamChance: number; boost: Bag }>;
   seams: { gem: string; hardness: number; minTier: number; weight: number }[];
   seamGemChance: number;
-  /** A mining laser's yield by (its grade − the rock's tier), clamped to ±2 */
-  tierEfficiency?: Record<string, number>;
-  /** Weapons (no mining grade) by the rock's tier (the system's Mk): practical on Mk I rock, much less after */
-  weaponTierEfficiency?: Record<string, number>;
-  /** Weapons waste rock: `wasted` the chance each unit mined blasts another away for nothing; ores not in `common`
-   *  (and gems) come out only `keepOther` of the time */
-  weaponLoss?: { wasted: number; common: string[]; keepOther: number };
-  /** Mining lasers sharing a rock (crowdFactor) */
-  crowd?: CrowdTable;
+  /**
+   * Mining lasers by gap = the laser's grade − the rock's tier (the system's Mk), clamped to +2: `work` scales how
+   * fast it works the rock (so how often chunks come), `keep` the share of what it works that it keeps (the rest is
+   * lost). No entry (a laser more than two grades behind): it can't mine the rock at all.
+   */
+  laserGap?: Record<string, { work: number; keep: number }>;
+  /** Guns (tools that aren't mining tools: MiningTool.mining) on soft rock (econ docs: GunMining) */
+  guns?: GunMining;
   /** The rare outsized rocks (asteroid/generation.ts rolls them; server/src/game/Mining.ts mines them down a stage at a time) */
   outliers?: OutlierTable;
   /** Rare traces found when their carrier ores are refined (econ/traces.ts) */
   traces?: Record<string, TraceDef>;
+  /** By weapon kind (cannon shells: fixed, turret; mining lasers: miner, their hardness by material) */
   tools: {
-    fixed: { yield: number; hardness: number };
-    turret: { yield: number; hardness: number };
-    miner: { yield: number; hardness: number };
+    fixed: MiningToolDef;
+    turret: MiningToolDef;
+    miner: MiningToolDef;
     minerByMaterial: Record<string, number>;
   };
+}
+
+/**
+ * A tool: rock units it works per damage (÷ damagePerUnit) and the hardest ore or gem seam it cracks. `mining`: a
+ * mining tool (charges, the siphon) that keeps all it works; anything else is a gun (GunMining).
+ */
+export interface MiningToolDef {
+  yield: number;
+  hardness: number;
+  mining?: boolean;
 }
 
 /**
@@ -71,55 +81,20 @@ export interface OutlierTable {
 }
 
 /**
- * Mining lasers sharing a rock: each laser's extraction × crowdFactor(n, k,
- * sharp) × the profile's base, n being the mining lasers on the rock. A rock
- * type names its profile (`types[t].crowd`, else `default`). Lasers below the
- * rock's tier find its k `kByGap` times as high (clamped to -2).
+ * Guns on soft (hardness 1) rock; they can't touch anything harder. They work
+ * the rock at a mining laser's sort of pace, normalised: damage × the tool's
+ * yield ÷ damagePerUnit, and past `refDps` damage a second on the rock the pace
+ * grows only with the square root of it (a big gunship works it faster, not
+ * five times faster). They keep little of it: `keep` of the common ores,
+ * `keepOther` times that of anything else (gems too), and `keepByTier` times
+ * that again by the rock's tier (the system's Mk).
  */
-export interface CrowdTable {
-  /** Ticks a laser counts towards n after its last cut (about a pulse) */
-  window: number;
-  default: string;
-  profiles: Record<string, CrowdProfile>;
-  kByGap?: Record<string, number>;
-}
-
-export interface CrowdProfile {
-  /** The efficient number of lasers on it */
-  k: number;
-  /** How steeply each laser's share climbs towards k (a whole number, 2 or more) */
-  sharp: number;
-  /** Every laser's extraction on it × this */
-  base: number;
-  /** Shown to its miners (e.g. a hard rock's hint) */
-  hint?: boolean;
-}
-
-/**
- * Each laser's efficiency with `n` on a rock whose efficient number is `k`:
- * g(n) = q·y^(q-1) / (1 + (q-1)·y^q), y = n/k, q = `sharp`. It peaks at
- * g(k) = 1, and the total n·g(n) only ever rises, towards k·q/(q-1) (2k for
- * q = 2: Kieran's 2kn / (k² + n²)). A higher q climbs more steeply to k and
- * gains less past it. Integer powers only (deterministic).
- */
-export function crowdFactor(n: number, k: number, sharp: number): number {
-  if (n <= 0 || k <= 0) return 1;
-  const q = Math.max(2, Math.round(sharp));
-  const y = n / k;
-  let yq1 = 1;
-  for (let i = 1; i < q; i++) yq1 *= y;
-  return (q * yq1) / (1 + (q - 1) * yq1 * y);
-}
-
-/** A rock type's crowd profile for a laser `gap` grades from its tier (k raised for lasers below it) */
-export function rockCrowd(table: MiningTable, type: string, gap: number): CrowdProfile | null {
-  const c = table.crowd;
-  if (!c) return null;
-  const p = c.profiles[table.types[type]?.crowd ?? c.default] ?? c.profiles[c.default];
-  if (!p) return null;
-  const g = Math.max(-2, Math.min(0, Math.round(gap)));
-  const kMul = g < 0 ? c.kByGap?.[String(g)] ?? 1 : 1;
-  return { ...p, k: p.k * kMul };
+export interface GunMining {
+  refDps: number;
+  keep: number;
+  common: string[];
+  keepOther: number;
+  keepByTier: Record<string, number>;
 }
 
 export interface Composition {

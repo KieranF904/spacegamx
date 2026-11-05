@@ -72,10 +72,61 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 ## Related areas
 server-core (hosts, stores, message switch), networking (econProtocol, pilot row `cargo` mass), ship-parts (generated part items/recipes, `FunctionDef`), bosses-ai (boss rewards, kill pay), world-sim (stations, sieges, outposts' sites), hangar-ui and ui-hud-input (station/trade/quest windows), weapons (ammo crates), docs/lore-canon.md (quest text rules). Docs: docs/areas/<slug>.md.
 
+## Mining: work and keep (server/src/game/Mining.ts `extract`, data/mining.json)
+
+Mining has two separate sides (Kieran, 2026-11-05):
+
+- **Work** sets how often chunks come. A hit works `damage × tool.yield × work ÷ damagePerUnit` rock units (96). The rock loses every unit worked, kept or not. A chunk is thrown every 5 to 10 units worked (`chunkUnits`, rolled per chunk).
+- **Keep** sets how much ore is in each chunk. Each unit worked adds its keep to a per-miner running total, and a unit is kept each time that makes a whole one. The share is exact and steady, and kept ores come out in proportion to their keep. Lost ore is gone. A drop where nothing was kept is skipped, and the running total carries on into the next one, so no chunk is empty. When the rock is spent, whatever was kept is thrown with it.
+
+**Mining lasers** (they have a grade) use `laserGap`, indexed by the laser's grade minus the rock's tier (the system's Mk), clamped to +2:
+
+| Gap | +2 | +1 | 0 | −1 | −2 | −3 or less |
+|---|---|---|---|---|---|---|
+| work | 1.3 | 1.2 | 1 | 0.85 | 0.7 | can't mine ("fit a better one") |
+| keep | 1 | 1 | 1 | 0.8 | 0.6 | |
+
+Every laser mines independently. The crowd mechanic (`crowd`, `kByGap`, `crowdFactor`, "works best with N lasers") is gone: four lasers mine four times as fast. **Power is the limit on laser spam.** A Mining Laser draws 30 a second (it was 12) and a Bore 40 (was 18). On the pool core, `payMining` records the share of their draw the lasers got (`ShipState.mineShare`), and `stepMiners` cuts by it, so lasers beyond what the generators can run brown out. Before this change the pool's share was ignored: a laser cut at full strength whatever it got, unless it got nothing at all. The ports core already cut by fulfilment, and its port rates were not changed.
+
+**Guns** are any tool that is neither a mining laser nor a `mining: true` tool (charges, the siphon). They use `guns`:
+- They mine hardness-1 rock only. On anything harder they say "fit a mining laser". Their tool hardness only decides which harder ores and gem seams inside soft rock they can take.
+- Every gun kind has the same normalised yield, 0.6 (the EMP has 0). A starter's 112 damage a second works about 0.7 units a second, the same as a Mk I laser. A miner's damage on the rock is tracked as a leaking one-second sum. Above `refDps` (112) the pace grows only with the square root of it: `work × √(refDps ÷ dps)`. A gunship with twice a starter's damage works a rock about 1.4× as fast, not 2×.
+- Keep = `keep` (0.32) for the common ores (`common`: iron, nickel, silicate, ice). Other ores and gems keep `keepOther` (0.5) times that. All of it is multiplied by `keepByTier[rock tier]` (Mk I 1, II 0.4, III 0.15, IV 0.08, V 0.05).
+
+Why the numbers: guns keep about 30% of a Mk I Chondrite, so a Mk I laser gets about 3.3× the ore from a chunk cadence that is the same. A Mk I laser one or two grades behind still beats guns by 6× or more. Rocks hold `size × 0.15` units and `size × 30..120` HP. Guns work a rock out after about `size × 24` damage, so they mine a rock out before they break it.
+
+### The numbers (mining.test.ts "the numbers"; 600 s on a big rock, steady fire)
+
+| Rig | Rock | Ore/min | Chunks/min |
+|---|---|---|---|
+| Starter's 2 Pips (112 dps) | Mk I soft (Chondrite) | 12.7 | 5.5 |
+| Starter's 2 Pips | Mk II soft | 5.0 | 4.7 |
+| Starter's 2 Pips | Mk III soft | 1.9 | 1.9 |
+| Dev Gale (2 Chainsaws 160 dps, 2 Sparks 77 dps) | Mk I soft | 18.6 | 8.1 |
+| Mk I Mining Laser (Prospector, 42 dps), gap 0 | Mk I | 41.9 | 5.5 |
+| Mk I Mining Laser, gap −1 | Mk II hard (Neutron Slug) | 28.5 | 4.8 |
+| Mk I Mining Laser, gap −2 | Mk III hard (Neutron Slug) | 17.1 | 3.9 |
+| Mk I Mining Laser, gap −3 | Mk IV | 0 (can't) | 0 |
+| Mk III laser, gap 0, alone | Mk III hard (Cobaltite) | 41.9 | 5.5 |
+| 3 Mk III lasers (3 ships) | Mk III hard (Cobaltite) | 125.2 | 17.0 |
+
+main_01 (10 ore with the starter's guns) takes about 47 s of steady fire. Flight School's "mine a rock" step finishes on the first chunk, after about 10 s.
+
+**Lasers on power** (pool core, Mk I Cell Reactor 35/s, core + reactor + N Mk I lasers, mining held from full; ore/min on Mk I rock = N × 41.9 × share):
+
+| Mk I lasers on 1 Cell Reactor | Before: share (brownout at) | After: share, 1st min / steady (brownout at) | After: ore/min, steady |
+|---|---|---|---|
+| 1 | 1 (never) | 1 / 1 (never) | 41.9 |
+| 2 | 1 (never) | 0.67 / 0.60 (10 s) | 50.4 |
+| 3 | 1 (never in a minute) | 0.45 / 0.41 (4.5 s) | 51.2 |
+| 4 | 0.83 / 0.75 (20 s) | 0.34 / 0.31 (2.9 s) | 52.0 |
+
+Before, one Cell Reactor ran about 2.9 Mk I lasers (35 ÷ 12), and a brownout didn't slow them anyway. Now it runs one, with a little to spare. The Prospector (2 Cell Reactors, 1 laser, 2 Ion Drives) still runs its laser at full strength while thrusting: 30 + 18 of 70.
+
 ## Notes (moved from DEVELOPMENT.md and the old engine-map)
 - **Saves and backups**: profiles are `data/profiles/<accountId>.json` (gitignored, kept by deploys) in dev and the JSON store; production uses the Postgres store. Each JSON write goes to a temp file, is flushed and renamed into place; a failed write leaves the last good one. The first save of an account each day copies the previous one to `data/profiles/backups/<accountId>/<yyyy-mm-dd>.json`, keeping 7 days (`BACKUP_DAYS` in `JsonProfileStore.ts`); a save that will not parse is moved aside (`<id>.json.broken-<time>`) and the newest backup is loaded. Manual rollback: stop the server, copy a backup over `<id>.json`, start it. See `docs/audits/server-robustness.md`. Guests get a fresh profile that is never saved; `migrateProfile` upgrades old saves. A logged-in pilot's ships (active and hangar) are in the profile (`data/ships/players/` is a leftover, unused).
 - **Profile lifecycle** (`Pilots`): login, autosave every 30 s, save on dock/logout/shutdown, credits, XP and levels, cargo vs shared storage, item actions, hangar refits that use only owned parts, the rebuild bill, death, skills, quest rewards (`grant`). It emits events (`onEvent`) that quests listen to. One session per account: `GameServer.loginPilot` saves and signs out any other connection on the account before loading the profile.
-- **Mining, pods, services**: ore breaks off as chunks tagged with their miner; pods pull towards ships with room; stations refine, fabricate (instant or queued) and trade (`Mining`/`LootPods`/`StationServices`). Mining lasers yield by grade against the system's rock tier (`mining.json tierEfficiency`: a grade behind 35%, two behind 8%, ahead 120%).
+- **Mining, pods, services**: ore breaks off as chunks tagged with their miner; pods pull towards ships with room; stations refine, fabricate (instant or queued) and trade (`Mining`/`LootPods`/`StationServices`). How mining yields is below.
 - **Levels and money** (`levels.ts`): XP to a level is `75 x (level - 1)^3`; grade licences (`material:*`) need a level (`GRADE_LEVEL`: Mk II 5, III 10, IV 15, V 20); higher grades take more plates per cell (`parts.platesPerAreaByGrade`), more ore, longer refining and fabrication (`parts.timeByGrade`). Credits are scarce by design: quest and ribbon credits are small, bounties pay `CREDIT_SCALE` of old rates, ore-run and supply-drop bounties scale through `payOut`, bosses pay the most.
 - **Structure vs modules** (`econ/salvage.ts`): structure (hull, armour, conduits, cargo holds) is never fabricated or kept as an item; placing it in the hangar costs its refined materials (`placeCost`), and items arriving otherwise are turned into materials (`Pilots.give`, login, enemy salvage). Modules are fabricated and kept as items. Refining always takes time (`recipes.json` refining `time`) in a per-station refinery queue separate from the fabricator's (`refine:<id>` jobs). The fabricator never refines on its own: it says what is short.
 - **Hangar** (`server/src/game/Hangar.ts`): Save builds what it can (modules from storage, structure from materials); edits lose nothing. Build (`slotBuild`) puts a slot on order (`ShipRecord.auto`); each second `Hangar.tick` -> `work` fabricates missing modules (`StationServices.makeFor`) and refines short materials from storage ore (`refineFor`), at this station, else home, else any with the service; `fill` fits arrivals. Scrap (`slotClear`) breaks parts down with `salvageParts`: 70% of minerals back as raw ore (`SALVAGE`), every component in full; `scrapItem` does the same for modules. Priority: `ShipRecord.rank` and `paused`; `orderRanking` orders `tick`'s work; `slotOrder` holds, resumes, moves to front (`top`) or calls off (`cancel`, refunding). Jobs the hangar queues carry `for` and `slot`. Station jobs can be held, resumed, moved to the front or called off (`job` message, `StationServices.jobAction`; a held job keeps its progress `heldMs`; calling off refunds unfinished runs, and calling off an order's job also holds the order). **Order plans** (`econ/orders.ts planOrders`) cost every unfinished slot down to ore in priority order; the client runs the same planner (`PilotState.orders`) for the Ships tab and the refinery/fabricator Waiting lists.

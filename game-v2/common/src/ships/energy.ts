@@ -562,9 +562,11 @@ export function remapCharge(before: ShipDerived, after: ShipDerived, c: Charge):
  * Mining lasers, one tick: a pulse (MINE_CYCLE ticks) runs to its end once
  * started, drawing on the ship as it goes (gunLoad); none starts, and one
  * running stops, while the ship can give them nothing. Returns whether the
- * beams are on this tick; `ship.mineUntil` is updated.
+ * beams are on this tick; `ship.mineUntil` is updated, and `ship.mineShare`:
+ * the share of their draw they got (a brownout: more lasers than the
+ * generators can run cut that much slower).
  */
-export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineUntil?: number }, on: boolean, tick: number, c: { charge: Charge }, stop = false): boolean {
+export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineUntil?: number; mineShare?: number }, on: boolean, tick: number, c: { charge: Charge }, stop = false): boolean {
   const miners = ship.derived.miners;
   if (!miners.length) return false;
   // A ports ship: each mining laser runs its own pulses off its own buffer and cuts by its fulfilment (power/ports.ts portsMineStep)
@@ -581,6 +583,7 @@ export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineU
   let share = 1;
   for (const m of miners) share = Math.min(share, feedShare(ship.derived, c.charge, m.part, 'gun'));
   if (share <= 0.001) { ship.mineUntil = 0; return false; }
+  ship.mineShare = share;
   if (!running) ship.mineUntil = tick + MINE_CYCLE;
   return true;
 }

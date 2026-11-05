@@ -4,11 +4,11 @@ Mk I · Panel · 2 cells
 Hull · mass150 hp · 2.8
 Armour · build1 · 2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Power draw18/s
+Power draw40/s
 
 == partStats (stats rows) ==
 GradeMk I
-Power draw18
+Power draw40
 Hull · mass150 hp · 2.8
 Armour · build1 · 2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
@@ -27,7 +27,7 @@ Medium · Panel
 cuts harder rock
 
 == keyStats ==
-draws 18
+draws 40
 
 == mountBadge ==
 
@@ -42,4 +42,4 @@ draws 18
 {"open":true,"badge":"Lv 10","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"","area":2,"hp":150.4,"mass":2.8,"firepower":0,"toughness":150.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":18}
+{"grade":1,"mark":"Mk I","size":"","area":2,"hp":150.4,"mass":2.8,"firepower":0,"toughness":150.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":40}

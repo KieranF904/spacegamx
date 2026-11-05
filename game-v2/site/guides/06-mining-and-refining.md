@@ -3,50 +3,67 @@ title: Mining and refining
 order: 6
 group: Economy
 summary: Rock types, mining tools and how hard a rock is, what each ore is worth, and how refining turns ore into plate.
-checked: 2026-11-04
+checked: 2026-11-05
 sources: data/mining.json, data/recipes.json (refining), data/items.json, server/src/game/Mining.ts, common/src/econ/mining.ts, traces.ts, rocks.ts, items.ts, common/src/econ/quests.ts (SKILLS), server/src/game/Party.ts, data/unlocks.json
 ---
-<!-- TODO: the "about 0.7 ore units a second" for a Mining Laser is 42 damage a second (tuning miner.dps) times yield 1.6 divided by 96 (damagePerUnit). Not measured in the game: a material's output may scale the beam's damage. -->
+<!-- TODO: the "about 42 ore a minute" for a Mining Laser is 42 damage a second (tuning miner.dps) times yield 1.6 divided by 96 (damagePerUnit), and the guns' figures come from server/src/game/mining.test.ts "the numbers" (steady fire on one rock). Not measured in live play: aim, travel and a material's output change them. -->
 <!-- TODO: the Bore (steel, level 10) shares the Mining Laser's yield and hardness in data; what it does better is not confirmed beyond being a grade II tool. Described here only as a grade II miner. -->
 
 ## How mining works
 
-Aim at an asteroid and hold fire. Ore breaks off in chunks. Fly through a chunk to scoop it into your hold. Each unit takes 1 hold space.
+Aim at an asteroid and hold fire. Ore breaks off in chunks, and your ship pulls them in. Each unit takes 1 hold space.
 
-- **Guns** crack soft rock: hardness 1 only, and slowly.
+- **Guns** mine soft rock (hardness 1) only. Every gun works.
 - A **Mining Laser** (level 0) is the proper tool. If your ship has one, the **right mouse button** runs it. The left button fires your guns.
 - A **Demolition Launcher** (level 8) fires charges that stick to rock and blow it open, and it cracks the hardest rock. It uses mining charges from your hold.
 - A **Siphon** (level 12) drinks gas from gas pockets.
 
 Rest your cursor on a rock to see roughly what it holds. A **Scanner** reads the exact shares and finds gem seams.
 
-The amount of ore a hit frees is:
+### How often chunks come, and how much is in them
 
-`ore units = damage × the tool's yield × efficiency ÷ 12`
+Mining a rock does two things:
 
-| Tool | Yield | Hardest rock |
+- It **breaks the rock down**. A chunk comes off every 5 to 10 units of rock. Guns and a Mining Laser break rock down at about the same speed, so chunks come about as often with either.
+- Some of what breaks off is **kept**, and the rest is lost. That decides how much ore is in each chunk.
+
+A Mining Laser keeps everything on rock of its own grade. Guns keep about a third of the common ores (iron, nickel, silicate, ice), and less of anything rarer. So your guns throw chunks as often as a laser does, but small ones.
+
+| Tool on a danger 1 rock | Chunks a minute | Ore a minute |
 |---|---|---|
-| Mining Laser | 1.6 | 2 |
-| Demolition charge | 2.5 | 3 |
-| Fixed gun | 0.06 | 1 |
-| Turret | 0.04 | 1 |
-| Beam laser (Glint, Cutter) | 0.275 | 2 |
-| Lance, Phase, Prism | 0.06 to 0.1 | 3 |
-| Siphon (gas only) | 1.4 | 1 |
+| Starter's two Pips | about 5 | about 12 |
+| Mining Laser (grade I) | about 5 | about 42 |
 
-A Mining Laser does 42 damage a second to rock, which is about 0.7 ore units a second at full efficiency.
+A rock loses everything that breaks off, kept or not. Guns use a rock up three times faster for the same ore.
 
-If a rock is too hard for your tool the game tells you, and the ore it cannot crack stays in the rock.
+Bigger guns break rock down faster, but not in proportion. A ship with twice a starter's firepower mines about 1.4 times as fast.
 
-### Efficiency: laser grade against system danger
+If a rock is too hard for your tool, the game tells you, and the ore your tool cannot crack stays in the rock.
 
-A mining laser's efficiency depends on its grade against the **danger** of the system the rock is in.
+### Guns in more dangerous systems
 
-| Laser grade minus system danger | −2 or less | −1 | 0 | +1 | +2 |
+Guns keep less in more dangerous systems:
+
+| System danger | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
-| Efficiency | 8% | 35% | 100% | 120% | 130% |
+| Guns keep (common ores) | 32% | 13% | 5% | 3% | 2% |
 
-The starter Mining Laser is grade I, so it is full strength only in danger 1 systems (Sol, Ashfall). In a danger 2 system it gets 35%, and in danger 3 and up 8%. Bring a better grade: a steel **Bore** (level 10) is grade II. Guns are not affected by this.
+Past danger 1, fit a Mining Laser.
+
+### Laser grade against system danger
+
+A Mining Laser does best in systems of its own grade or lower:
+
+| Laser grade minus system danger | +1 or more | 0 | −1 | −2 | −3 or less |
+|---|---|---|---|---|---|
+| Speed | 120 to 130% | 100% | 85% | 70% | can't mine |
+| Ore kept | 100% | 100% | 80% | 60% | |
+
+The starter Mining Laser is grade I. In a danger 2 system it is a little slower and keeps 80%. In danger 3 it keeps 60%. From danger 4 up it cannot mine at all. A steel **Bore** (level 10) is grade II.
+
+### Power
+
+Each laser mines on its own, so two lasers mine twice as fast, as long as your ship can power them. A Mining Laser draws 30 E/s while it runs, and a Cell Reactor makes 35, so one reactor runs about one laser. Fit more lasers than your generators can run and they all slow down to the share they get (see [Energy and ports](/guides/energy-and-ports)). Two lasers on one reactor mine only a little faster than one.
 
 ### Skills, wingmates, XP
 

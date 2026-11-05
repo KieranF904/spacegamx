@@ -2,17 +2,24 @@
  * Mining: turning damage done to asteroids into ore.
  *
  * Every asteroid has a composition (common/src/econ/mining.ts): an ore mix, a
- * hardness, maybe a gem seam, and a number of ore units. Any weapon mines: the
- * ore extracted is damage × the tool's yield ÷ damagePerUnit, provided the tool
- * is hard enough for the rock (harder ores and gems need better tools).
- * Extracted ore breaks off as small chunks (loot pods) that the miner's tractor
- * pulls in. Breaking an asteroid wastes most of what's left; mining lasers
- * extract far more per damage, so they get the most out of a rock.
- * Broken asteroids come back after a while.
+ * hardness, maybe a gem seam, and a number of ore units. Mining has two sides:
  *
- * Mining lasers on one rock share a crowd factor (common crowdFactor): each
- * cuts best with the rock's efficient number on it, and more always mine it
- * faster in all, with less from each. Other weapons get none.
+ * - The work: how fast a tool takes the rock apart (rock units: damage x the
+ *   tool's yield x its work rate / damagePerUnit). The rock loses every unit
+ *   worked, kept or not, and a chunk is thrown every 5 to 10 units worked, so
+ *   the work sets how often chunks come.
+ * - The keep: the share of what's worked that ends up in the chunk; the rest
+ *   is lost. A chunk holds what was kept (a gun's are small but steady).
+ *
+ * Mining lasers keep all they work on rock of their grade or below (a grade or
+ * two ahead works it a little faster). A grade or two behind the rock's tier
+ * (the system's Mk) they work it a little slower and keep less (laserGap);
+ * further behind, or on rock too hard for them, they can't mine it. Each laser
+ * mines on its own: two on a rock mine it twice as fast. What limits them is
+ * the power to run them (a mining laser draws most of a Cell Reactor).
+ *
+ * Guns (anything but a mining tool) mine soft rock only (hardness 1), at about
+ * a mining laser's pace, and keep little of it (GunMining).
  *
  * Outliers (a rock in a hundred or so, several times the size) come apart in
  * stages: mined down to what the next stage holds, or blasted apart, a stage
@@ -20,13 +27,30 @@
  * last stage breaks up like any other rock.
  */
 
-import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, crowdFactor, rockCrowd, type TraceSource, dcos, dhypot, dsin } from '@space-game/common';
+import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource, dcos, dhypot, dsin } from '@space-game/common';
 
 export interface MiningTool {
   yield: number;
   hardness: number;
-  /** A mining laser's grade (its yield depends on it against the rock's tier) */
+  /** A mining laser's grade (how it does depends on it against the rock's tier: laserGap) */
   grade?: number;
+  /** A mining tool with no grade (charges, the siphon): it keeps all it works. Without either, a gun */
+  mining?: boolean;
+}
+
+/** A miner's work on one rock */
+interface Work {
+  /** Rock units owed (the fraction of the next), and the keep owed (a unit is kept each time it reaches 1) */
+  owed: number;
+  keep: number;
+  /** Rock units worked since the last chunk, and how many the next chunk wants (chunkUnits) */
+  worked: number;
+  want: number;
+  /** What's been kept and not yet thrown */
+  bag: Bag;
+  /** Guns: damage on the rock in about the last second (a leaking sum), as of tick `t` */
+  dps: number;
+  t: number;
 }
 
 /** A chunk thrown at its miner flies this much faster (units a tick, on top of 1.2 to 2.6) */
@@ -64,14 +88,11 @@ interface Rock extends Composition {
   systemNum: number;
   index: number;
   left: number;
-  /** Fractional units owed per miner, and ore broken off but not yet thrown out */
-  progress: Map<number, number>;
-  pending: Map<number, Bag>;
+  /** Each miner's work on it */
+  work: Map<number, Work>;
   seed: number;
   /** An outlier: its size whole (each stage's is a share of that) */
   wholeSize?: number;
-  /** Mining lasers on it, by miner: the tick of their last cut, cuts that tick and the tick before */
-  lasers?: Map<number, { tick: number; cur: number; last: number }>;
 }
 
 export class Mining {
@@ -86,7 +107,7 @@ export class Mining {
   register(eid: number, systemNum: number, index: number, type: string, key: string, size: number, tier: number, outlier?: { stage: number; wholeSize: number; left?: number }): void {
     const c = asteroidComposition(this.table, type, key, size, tier, outlier?.stage);
     this.rocks.set(eid, {
-      ...c, systemNum, index, left: Math.min(c.units, outlier?.left ?? c.units), progress: new Map(), pending: new Map(), seed: (eid * 2654435761) >>> 0, tier: this.host.rockTier?.(systemNum) ?? 1,
+      ...c, systemNum, index, left: Math.min(c.units, outlier?.left ?? c.units), work: new Map(), seed: (eid * 2654435761) >>> 0, tier: this.host.rockTier?.(systemNum) ?? 1,
       ...(outlier ? { wholeSize: outlier.wholeSize } : {}),
     });
   }
@@ -119,49 +140,51 @@ export class Mining {
 
   /**
    * A tool did `damage` to an asteroid at (x, y); (nx, ny) points out of the
-   * surface. Extract what it can, throwing chunks out as they fill.
+   * surface. Work the rock, keep what the tool keeps, and throw a chunk out
+   * every 5 to 10 units worked.
    */
   extract(asteroid: number, miner: number, damage: number, tool: MiningTool, x: number, y: number, nx: number, ny: number): void {
     const r = this.rocks.get(asteroid);
     if (!r || r.left <= 0 || damage <= 0 || tool.yield <= 0) return;
-    if (tool.hardness < r.hardness) {
-      this.warn(miner, `This rock is too hard for your ${tool.hardness <= 1 ? 'guns: fit a mining laser' : 'tools'}`);
+    const isGun = tool.grade === undefined && !tool.mining, gun = isGun ? this.table.guns : undefined;
+    // Guns crack soft rock only; anything else needs a hard enough tool
+    if (isGun ? r.hardness > 1 : tool.hardness < r.hardness) {
+      this.warn(miner, `This rock is too hard for your ${isGun ? 'guns: fit a mining laser' : tool.grade !== undefined ? 'mining laser: fit a harder one' : 'tools'}`);
       return;
     }
-    // A mining laser behind the system's tier makes slow work of its rock, and shares it with the others on it
-    let eff = 1;
+    let work = 1, keep = 1;
     if (tool.grade !== undefined) {
-      const gap = Math.max(-2, Math.min(2, tool.grade - r.tier));
-      const tierEff = (eff = this.table.tierEfficiency?.[String(gap)] ?? 1);
-      const crowd = rockCrowd(this.table, r.type, gap);
-      if (crowd) {
-        const n = this.lasersOn(r, miner);
-        eff *= crowd.base * crowdFactor(n, crowd.k, crowd.sharp);
-        const lo = Math.max(1, Math.floor(crowd.k * 0.8)), best = `works best with ${lo}-${Math.max(2, Math.ceil(crowd.k * 1.2))} lasers on it`;
-        if (gap < 0) {
-          // (One laser alone, against one of the rock's own grade alone)
-          const own = rockCrowd(this.table, r.type, 0)!;
-          const pct = Math.round((tierEff * crowdFactor(1, crowd.k, crowd.sharp) / crowdFactor(1, own.k, own.sharp)) * 100);
-          this.warn(miner, `Mk ${MARKS[r.tier]} rock: a Mk ${MARKS[tool.grade]} mining laser alone gets ${pct}% of what a Mk ${MARKS[r.tier]} one would, and ${best}`);
-        } else if (crowd.hint && n < lo) this.warn(miner, `Hard rock: ${best}`);
-      } else if (eff < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: your Mk ${MARKS[tool.grade]} mining laser gets ${Math.round(eff * 100)}% of what a Mk ${MARKS[r.tier]} one would`);
-    } else {
-      // Guns: worth it on Mk I rock (enough for a first mining laser and early builds), slow work past it
-      eff = this.table.weaponTierEfficiency?.[String(r.tier)] ?? 1;
-      if (eff < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: guns only chip it (${Math.round(eff * 100)}%): fit a mining laser`);
+      // A mining laser against the rock's tier: behind it, a little slower and it keeps less; too far behind, nothing
+      const gap = Math.min(2, tool.grade - r.tier);
+      const g = this.table.laserGap?.[String(gap)];
+      if (this.table.laserGap && !g) {
+        this.warn(miner, `Mk ${MARKS[r.tier]} rock is too far past your Mk ${MARKS[tool.grade]} mining laser: fit a better one`);
+        return;
+      }
+      if (g) { work = g.work; keep = g.keep; }
+      if (keep < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: your Mk ${MARKS[tool.grade]} mining laser works it ${Math.round(work * 100)}% as fast and keeps ${Math.round(keep * 100)}% of the ore`);
+    } else if (gun) {
+      // Guns keep little of what they knock loose, less again past Mk I
+      keep = gun.keep * (gun.keepByTier[String(r.tier)] ?? 1);
+      if (r.tier > 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: guns keep only ${Math.round(keep * 100)}% of the ore: fit a mining laser`);
     }
-    let owed = (r.progress.get(miner) ?? 0) + (damage * tool.yield * eff) / this.table.damagePerUnit;
-    const bag = r.pending.get(miner) ?? {};
+    const w = this.workOf(r, miner);
+    // Guns: past refDps damage a second on the rock, the pace grows only with its square root
+    if (gun) {
+      const now = this.host.tick(), dt = now - w.t;
+      w.dps = (dt >= 60 ? 0 : w.dps * (1 - dt / 60)) + damage;
+      w.t = now;
+      if (w.dps > gun.refDps) work *= Math.sqrt(gun.refDps / w.dps);
+    }
+    w.owed += (damage * tool.yield * work) / this.table.damagePerUnit;
     const got: Bag = {};
     let units = 0;
     // (An outlier's stage gives only its share: the rest stays for the next)
     const floor = this.nextStage(r)?.units ?? 0;
-    // Guns are crude: they blast some of the rock away for nothing, and most of what isn't a common ore with it
-    const crude = tool.grade === undefined ? this.table.weaponLoss : undefined;
-    while (owed >= 1 && r.left > floor) {
-      owed -= 1;
+    while (w.owed >= 1 && r.left > floor) {
+      w.owed -= 1;
       r.left -= 1;
-      if (crude && r.left > floor && this.rand(r) < crude.wasted) r.left -= 1;
+      w.worked++;
       // A gem from the seam, or an ore the tool can crack (harder ores are left in the rock)
       let id: string;
       if (r.seam && tool.hardness >= r.seam.hardness && this.rand(r) < this.table.seamGemChance) id = r.seam.gem;
@@ -169,60 +192,59 @@ export class Mining {
         id = pickOre(r, this.rand(r));
         if ((this.table.oreHardness[id] ?? 1) > tool.hardness) id = this.softest(r, tool);
       }
-      if (crude && !crude.common.includes(id) && this.rand(r) >= crude.keepOther) continue;
-      units++;
-      let n = 1;
-      // Skilled miners get more out of the same rock
-      // Mining skill (and a wing): the chance of an extra unit
-      const bonus = this.host.miningSkill?.(miner) ?? 0;
-      if (bonus > 0 && this.rand(r) < bonus) n++;
-      bag[id] = (bag[id] ?? 0) + n;
-      got[id] = (got[id] ?? 0) + n;
+      // Kept or lost, a steady share: each unit adds its keep, and one is kept each time that makes a whole one
+      w.keep += gun && !gun.common.includes(id) ? keep * gun.keepOther : keep;
+      if (w.keep >= 1) {
+        w.keep -= 1;
+        units++;
+        let n = 1;
+        // Mining skill (and a wing): the chance of an extra unit
+        const bonus = this.host.miningSkill?.(miner) ?? 0;
+        if (bonus > 0 && this.rand(r) < bonus) n++;
+        w.bag[id] = (w.bag[id] ?? 0) + n;
+        got[id] = (got[id] ?? 0) + n;
+      }
+      // Worked enough for a chunk: throw what was kept (nothing kept: no chunk, and the keep owed carries on to the next)
+      if (w.worked >= w.want) {
+        if (Object.keys(w.bag).length) this.throwChunk(r, miner, w, x, y, nx, ny);
+        w.worked = 0;
+        w.want = this.chunkWant(r);
+      }
     }
     if (units) this.host.mined?.(miner, got, { tier: Math.max(r.tier, this.host.traceTier?.(r.systemNum, r.type) ?? 0), seam: !!r.seam, traceMul: this.table.types[r.type]?.traceMul, traceBoost: this.table.types[r.type]?.traceBoost });
-    r.progress.set(miner, owed);
-    r.pending.set(miner, bag);
     if (units) this.addXp(miner, units * this.table.xpPerUnit);
-    // Throw a chunk out once it's big enough (or the rock is spent)
-    const total = Object.values(bag).reduce((a, b) => a + b, 0);
-    const [lo, hi] = this.table.chunkUnits;
-    const want = lo + Math.floor(this.rand(r) * (hi - lo + 1));
-    if (total >= want || (r.left <= floor && total > 0)) {
-      let s = 1.2 + this.rand(r) * 1.4, spread = (this.rand(r) - 0.5) * 1.4;
-      const sx = x + nx * 14, sy = y + ny * 14;
-      // Thrown towards whoever broke it off, with a little extra speed (a loose chunk drifts the rest of the way); with no miner to aim at, straight out of the rock
-      let dx = nx, dy = ny;
-      const at = this.host.minerAt?.(miner);
-      if (at) {
-        const d = dhypot(at.x - sx, at.y - sy);
-        if (d > 1) { dx = (at.x - sx) / d; dy = (at.y - sy) / d; spread *= 0.25; s += CHUNK_BOOST; }
-      }
-      const c = dcos(spread), sn = dsin(spread);
-      this.host.spawnChunk(r.systemNum, sx, sy, (dx * c - dy * sn) * s, (dx * sn + dy * c) * s, bag, miner);
-      r.pending.set(miner, {});
-    }
-    // Mined out (or an outlier, mined down to its next stage): nothing left to hold it together
-    if (r.left <= floor) this.host.crumble(asteroid);
+    if (r.left > floor) return;
+    // The rock spent (or an outlier, mined down to its next stage): what's kept goes out with it, and nothing's left to hold it together
+    if (Object.keys(w.bag).length) this.throwChunk(r, miner, w, x, y, nx, ny);
+    this.host.crumble(asteroid);
   }
 
-  /**
-   * Count a miner's laser cut on a rock this tick, and how many mining lasers
-   * are on it: each miner's cuts this tick or the tick before (one a laser a
-   * tick), for those who cut it within the window.
-   */
-  private lasersOn(r: Rock, miner: number): number {
-    const now = this.host.tick(), window = this.table.crowd?.window ?? 54;
-    const lasers = (r.lasers ??= new Map());
-    let e = lasers.get(miner);
-    if (!e) lasers.set(miner, (e = { tick: now, cur: 0, last: 0 }));
-    else if (e.tick !== now) { e.last = now - e.tick <= window ? e.cur : 0; e.cur = 0; e.tick = now; }
-    e.cur++;
-    let n = 0;
-    for (const [id, l] of lasers) {
-      if (now - l.tick > window) { lasers.delete(id); continue; }
-      n += Math.max(l.cur, l.last);
+  private workOf(r: Rock, miner: number): Work {
+    let w = r.work.get(miner);
+    if (!w) r.work.set(miner, (w = { owed: 0, keep: 0, worked: 0, want: this.chunkWant(r), bag: {}, dps: 0, t: this.host.tick() }));
+    return w;
+  }
+
+  /** Rock units the next chunk wants worked (chunkUnits) */
+  private chunkWant(r: Rock): number {
+    const [lo, hi] = this.table.chunkUnits;
+    return lo + Math.floor(this.rand(r) * (hi - lo + 1));
+  }
+
+  /** Throw a miner's kept ore out of the rock as a chunk */
+  private throwChunk(r: Rock, miner: number, w: Work, x: number, y: number, nx: number, ny: number): void {
+    let s = 1.2 + this.rand(r) * 1.4, spread = (this.rand(r) - 0.5) * 1.4;
+    const sx = x + nx * 14, sy = y + ny * 14;
+    // Thrown towards whoever broke it off, with a little extra speed (a loose chunk drifts the rest of the way); with no miner to aim at, straight out of the rock
+    let dx = nx, dy = ny;
+    const at = this.host.minerAt?.(miner);
+    if (at) {
+      const d = dhypot(at.x - sx, at.y - sy);
+      if (d > 1) { dx = (at.x - sx) / d; dy = (at.y - sy) / d; spread *= 0.25; s += CHUNK_BOOST; }
     }
-    return n;
+    const c = dcos(spread), sn = dsin(spread);
+    this.host.spawnChunk(r.systemNum, sx, sy, (dx * c - dy * sn) * s, (dx * sn + dy * c) * s, w.bag, miner);
+    w.bag = {};
   }
 
   /** The most common ore in the rock that the tool can crack */
@@ -240,7 +262,7 @@ export class Mining {
     if (!r) return;
     this.rocks.delete(asteroid);
     // Chunks still owed to miners
-    for (const [miner, bag] of r.pending) if (Object.keys(bag).length) this.host.spawnChunk(r.systemNum, x, y, 0, 0, bag, miner);
+    for (const [miner, w] of r.work) if (Object.keys(w.bag).length) this.host.spawnChunk(r.systemNum, x, y, 0, 0, w.bag, miner);
     // An outlier's stage: the next takes the ore that's left (what it can't hold spills, as from any break)
     const next = this.nextStage(r);
     const keep = next && this.host.shed ? Math.min(r.left, next.units) : 0;

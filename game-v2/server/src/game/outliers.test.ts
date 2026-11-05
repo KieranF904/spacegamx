@@ -21,7 +21,7 @@ function host() {
   return { m, calls };
 }
 
-const LASER = { yield: 1, hardness: 3 };
+const LASER = { yield: 1, hardness: 3, grade: 1 };
 
 describe('outlier asteroids', () => {
   it('about one rock in 130 is an outlier, several times the size, the same on every side', () => {

@@ -343,23 +343,21 @@ const SHAPES: Record<string, Spec> = {
   }),
   'mining.json': strict({
     respawnSeconds: 'number', unitsPerSize: 'number', damagePerUnit: 'number', chunkUnits: 'number[]', breakFraction: 'number', xpPerUnit: 'number',
-    types: rec(obj({ hardness: 'number', ores: rec('number'), 'traceMul?': 'number', 'traceBoost?': rec('number'), 'name?': 'string', 'size?': 'number[]', 'like?': 'string', 'gas?': 'boolean', 'crowd?': 'string' })),
+    types: rec(obj({ hardness: 'number', ores: rec('number'), 'traceMul?': 'number', 'traceBoost?': rec('number'), 'name?': 'string', 'size?': 'number[]', 'like?': 'string', 'gas?': 'boolean' })),
     'fields?': rec(rec('number')),
     'comet?': obj({ days: 'number', hours: 'number', systems: 'string[]', traceTier: 'number' }),
     oreHardness: rec('number'),
     danger: rec(obj({ seamChance: 'number', boost: rec('number') })),
     seams: arr(obj({ gem: 'string', hardness: 'number', minTier: 'number', weight: 'number' })),
     seamGemChance: 'number',
-    'tierEfficiency?': rec('number'),
-    'weaponTierEfficiency?': rec('number'),
-    'weaponLoss?': strict({ wasted: 'number', common: 'string[]', keepOther: 'number' }),
-    'crowd?': strict({ window: 'number', default: 'string', profiles: rec(strict({ k: 'number', sharp: 'number', base: 'number', 'hint?': 'boolean' })), 'kByGap?': rec('number') }),
+    'laserGap?': rec(strict({ work: 'number', keep: 'number' })),
+    'guns?': strict({ refDps: 'number', keep: 'number', common: 'string[]', keepOther: 'number', keepByTier: rec('number') }),
     'outliers?': strict({ chance: 'number', scale: 'number[]', stages: 'number[]', 'exclude?': 'string[]', 'systems?': rec('number'), common: 'number', boost: rec('number'), rare: 'number' }),
     'traces?': rec(obj({ from: 'string[]', per100: 'number[]', 'seamMul?': 'number', 'megaOnly?': 'boolean' })),
     tools: (v, path, c) => {
       check(c, obj({ fixed: 'any', turret: 'any', miner: 'any', minerByMaterial: rec('number') }), v, path);
       if (!isObj(v)) return;
-      for (const [k, t] of Object.entries(v)) if (!k.startsWith('_') && k !== 'minerByMaterial') check(c, obj({ yield: 'number', hardness: 'number' }), t, join(path, k));
+      for (const [k, t] of Object.entries(v)) if (!k.startsWith('_') && k !== 'minerByMaterial') check(c, strict({ yield: 'number', hardness: 'number', 'mining?': 'boolean' }), t, join(path, k));
     },
   }),
   'bosses.json': strict({
@@ -967,9 +965,12 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
       item(F, `traces.${t}`, t);
       list(def?.from).forEach((o, i) => item(F, `traces.${t}.from[${i}]`, o));
     }
-    for (const [k] of entries(m?.tools)) {
+    list(m?.guns?.common).forEach((o, i) => item(F, `guns.common[${i}]`, o));
+    for (const [k, t] of entries(m?.tools)) {
       if (['fixed', 'turret', 'miner', 'siphon', 'minerByMaterial'].includes(k)) continue;
       if (ships && !weaponKinds.has(k)) c.warn(`tools.${k}`, `"${k}" is not a weapon kind, so nothing uses this tool`, F);
+      // Every gun mines soft rock (all but the EMP, which does no damage to it)
+      if (k !== 'emp' && !(t as any)?.yield) c.warn(`tools.${k}`, `"${k}" mines nothing: every gun should mine soft rock (yield > 0)`, F);
     }
     for (const [k] of entries(m?.tools?.minerByMaterial)) material(F, `tools.minerByMaterial.${k}`, k);
   }

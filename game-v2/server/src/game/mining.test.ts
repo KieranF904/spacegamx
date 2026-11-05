@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
-import { registerRockTypes, crowdFactor, rockCrowd, type Bag, type MiningTable } from '@space-game/common';
+import { registerRockTypes, type Bag, type MiningTable } from '@space-game/common';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { Mining, type MiningHost } from './Mining.js';
 
@@ -9,7 +9,7 @@ const table = files.mining as unknown as MiningTable;
 registerRockTypes(table);
 
 /** A rock at the origin and a miner at (`mx`, `my`): the chunks thrown, as (position, velocity) */
-function mine(miner: { x: number; y: number } | null, tool = { yield: 1.6, hardness: 2 }) {
+function mine(miner: { x: number; y: number } | null, tool = { yield: 1.6, hardness: 2, grade: 1 }) {
   const thrown: { x: number; y: number; vx: number; vy: number }[] = [];
   const h: MiningHost = {
     spawnChunk: (_s, x, y, vx, vy, _items: Bag) => { thrown.push({ x, y, vx, vy }); },
@@ -47,43 +47,164 @@ describe('mined chunks', () => {
   });
 });
 
-describe('mining tools', () => {
-  it('cannon shells mine Mk I rock at about a third of a Mk I mining laser, and only chip rock past Mk I', () => {
-    const t = table.tools as unknown as Record<string, { yield: number }>;
-    // (Before: laser 0.55, shells from a fixed gun 0.12, from a turret 0.08, a lance 0.12)
-    expect(t.laser.yield).toBeCloseTo(0.275);
-    expect(t.fixed.yield).toBeCloseTo(0.17);
-    expect(t.turret.yield).toBeCloseTo(0.11);
-    expect(t.lance.yield).toBeCloseTo(0.06);
-    expect(t.miner.yield).toBe(1.6);
-    expect(t.siphon.yield).toBe(1.4);
-    expect(t.charge.yield).toBe(2.5);
-    // A starter's two Pips (112 damage a second) on Mk I rock, against the Prospector's Mk I laser (0.7 ore/s)
-    const pips = (112 * t.fixed.yield) / table.damagePerUnit;
-    expect(pips).toBeGreaterThan(0.18);
-    expect(pips).toBeLessThan(0.7 / 2.5);
-    const w = table.weaponTierEfficiency!;
-    expect(w['1']).toBe(1);
-    expect(pips * w['2']).toBeLessThan(0.1);
+/** A Mk `grade` mining laser (the Prospector's is Mk I, alloy: hardness 2) */
+const laser = (grade = 1, hardness = 2) => ({ yield: table.tools.miner.yield, hardness, grade });
+const tools = table.tools as unknown as Record<string, { yield: number; hardness: number; mining?: boolean }>;
+
+/**
+ * `seconds` of mining a big `type` rock of tier `tier` (the system's Mk): each tool in `rigs` doing `dps` damage a
+ * second to it, in hits of `hit` damage (a laser's every tick), from ship `ship` (default one ship for all). Ore kept
+ * and chunks thrown a minute, in all.
+ */
+function rate(type: string, tier: number, rigs: { tool: { yield: number; hardness: number; grade?: number; mining?: boolean }; dps: number; hit?: number; ship?: number }[], seconds = 600) {
+  let t = 0, chunks = 0, ore = 0;
+  const h: MiningHost = {
+    spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { chunks++; ore += Object.values(items).reduce((a, b) => a + b, 0); },
+    awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => tier,
+  };
+  const m = new Mining(h, table);
+  m.register(1, 0, 0, type, `rate:${type}`, 1e6, tier);
+  const owed = rigs.map(() => 0);
+  for (t = 0; t < seconds * 60; t++) {
+    rigs.forEach((r, i) => {
+      const hit = r.hit ?? r.dps / 60;
+      owed[i] += r.dps / 60;
+      while (owed[i] >= hit) { owed[i] -= hit; m.extract(1, 100 + (r.ship ?? 0), hit, r.tool, 0, 0, 1, 0); }
+    });
+  }
+  return { ore: (ore / seconds) * 60, chunks: (chunks / seconds) * 60 };
+}
+
+/** The Prospector's Mk I mining laser: 42 damage a second (tuning miner.dps) */
+const LASER_DPS = 42;
+/** A starter's two Pips: 56 damage a second each (partStats), shells of about 28 */
+const pips = () => [{ tool: tools.fixed, dps: 56, hit: 28 }, { tool: tools.fixed, dps: 56, hit: 28 }];
+
+describe('mining: work and keep', () => {
+  it('every gun mines soft rock at one normalised yield (the EMP does no damage to rock); the mining tools keep theirs', () => {
+    for (const [k, t] of Object.entries(tools)) {
+      if (k.startsWith('_') || k === 'minerByMaterial' || k === 'miner') continue;
+      if (k === 'emp') { expect(t.yield).toBe(0); continue; }
+      if (t.mining) continue;
+      expect(t.yield, k).toBe(tools.fixed.yield);
+    }
+    expect(tools.charge.mining).toBe(true);
+    expect(tools.siphon.mining).toBe(true);
+    expect(table.tools.miner.yield).toBe(1.6);
+  });
+
+  it("a starter's Pips throw chunks about as often as a Mk I laser on Mk I rock; the laser gets about three times the ore", () => {
+    const gun = rate('asteroid_metal', 1, pips()), mk1 = rate('asteroid_metal', 1, [{ tool: laser(), dps: LASER_DPS }]);
+    expect(gun.chunks / mk1.chunks).toBeGreaterThan(0.8);
+    expect(gun.chunks / mk1.chunks).toBeLessThan(1.25);
+    expect(mk1.ore / gun.ore).toBeGreaterThan(2.6);
+    expect(mk1.ore / gun.ore).toBeLessThan(3.8);
+    // The laser: about 0.7 ore a second, all of it kept
+    expect(mk1.ore).toBeGreaterThan(0.65 * 60);
+    expect(mk1.ore).toBeLessThan(0.75 * 60);
+  });
+
+  it('guns keep less past Mk I, and much less again further out; chunks still come as often', () => {
+    const one = rate('asteroid_metal', 1, pips()), two = rate('asteroid_metal', 2, pips()), three = rate('asteroid_metal', 3, pips());
+    expect(two.ore).toBeLessThan(one.ore * 0.5);
+    expect(three.ore).toBeLessThan(two.ore * 0.5);
+    expect(two.chunks).toBeGreaterThan(one.chunks * 0.8);
+    // A Mk I laser a grade or two behind still beats them
+    expect(rate('asteroid_metal', 2, [{ tool: laser(), dps: LASER_DPS }]).ore).toBeGreaterThan(two.ore * 3);
+    expect(rate('asteroid_metal', 3, [{ tool: laser(), dps: LASER_DPS }]).ore).toBeGreaterThan(three.ore * 3);
+  });
+
+  it('a big gunship works the rock faster, but only with the square root of its damage past a starter\'s', () => {
+    const starter = rate('asteroid_metal', 1, pips());
+    const gale = rate('asteroid_metal', 1, [{ tool: tools.autocannon, dps: 160, hit: 5 }, { tool: tools.arc, dps: 77, hit: 8 }]);
+    const ratio = gale.chunks / starter.chunks;
+    expect(ratio).toBeGreaterThan(1.2);
+    expect(ratio).toBeLessThan(Math.sqrt(237 / 112) * 1.15);
+  });
+
+  it('guns keep about a third of the common ores, and half that of the rest', () => {
+    const got: Bag = {};
+    let t = 0;
+    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {} };
+    const m = new Mining({ ...h, mined: (_m, bag) => { for (const [k, n] of Object.entries(bag)) got[k] = (got[k] ?? 0) + n; } }, table);
+    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
+    const before = m.remaining(1);
+    for (t = 0; t < 360000; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
+    const kept = Object.values(got).reduce((a, b) => a + b, 0), gone = before - m.remaining(1);
+    expect(kept / gone).toBeGreaterThan(0.27);
+    expect(kept / gone).toBeLessThan(0.33);
+    // Copper is 10 of the Chondrite's 111 (a third of it lost the more)
+    expect((got.copper_ore ?? 0) / kept).toBeLessThan(0.07);
+    expect((got.copper_ore ?? 0) / kept).toBeGreaterThan(0.02);
+    expect((got.iron_ore ?? 0) / kept).toBeGreaterThan(0.5);
+  });
+
+  it('guns crack soft rock only, and say to fit a mining laser; a mining charge cracks the hardest', () => {
+    const said: string[] = [];
+    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: (_e, text) => said.push(text), tick: () => 0, respawn: () => {}, crumble: () => {} };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, 'rock_rutile', 'a', 1e6, 1);
+    m.register(2, 0, 0, 'rock_cobaltite', 'b', 1e6, 1);
+    const r = m.remaining(1);
+    // (A lance is as hard as they come, and still a gun)
+    for (let k = 0; k < 100; k++) m.extract(1, 7, 50, tools.lance, 0, 0, 1, 0);
+    expect(m.remaining(1)).toBe(r);
+    expect(said[0]).toBe('This rock is too hard for your guns: fit a mining laser');
+    const c = m.remaining(2);
+    m.extract(2, 8, 400, tools.charge, 0, 0, 1, 0);
+    expect(m.remaining(2)).toBeLessThan(c);
   });
 });
 
-describe('chunks', () => {
-  it('break off 5 to 10 units at a time (what is left still drops when the rock is mined out)', () => {
+describe('chunks follow the rock', () => {
+  it('break off every 5 to 10 units worked, with whatever was kept in them (none empty)', () => {
+    const sizes: number[] = [];
+    let t = 0;
+    const h: MiningHost = {
+      spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { sizes.push(Object.values(items).reduce((a, b) => a + b, 0)); },
+      awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {},
+    };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
+    const before = m.remaining(1);
+    for (t = 0; t < 60 * 120; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
+    const worked = before - m.remaining(1);
+    expect(sizes.length).toBeGreaterThan(worked / 10 - 1);
+    expect(sizes.length).toBeLessThanOrEqual(worked / 5 + 1);
+    for (const n of sizes) { expect(n).toBeGreaterThanOrEqual(1); expect(n).toBeLessThanOrEqual(4); }
+  });
+
+  it('a laser keeps it all: 5 to 10 units a chunk (what is left still drops when the rock is mined out)', () => {
     const sizes: number[] = [];
     let crumbled = false;
     const h: MiningHost = {
       spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { sizes.push(Object.values(items).reduce((a, b) => a + b, 0)); },
       awardXp: () => {}, notify: () => {}, tick: () => 0, respawn: () => {}, crumble: () => { crumbled = true; },
     };
-    const m = new Mining(h, { ...table, weaponLoss: undefined });
+    const m = new Mining(h, table);
     m.register(1, 0, 0, 'asteroid_metal', 'sol:0:0', 400, 1);
     const units = m.get(1)!.units;
-    for (let k = 0; k < 2000 && !crumbled; k++) m.extract(1, 99, 2, { yield: 1.6, hardness: 2 }, 0, 0, 1, 0);
+    for (let k = 0; k < 2000 && !crumbled; k++) m.extract(1, 99, 2, laser(), 0, 0, 1, 0);
     expect(crumbled).toBe(true);
     expect(sizes.reduce((a, b) => a + b, 0)).toBe(units);
     for (const n of sizes.slice(0, -1)) { expect(n).toBeGreaterThanOrEqual(5); expect(n).toBeLessThanOrEqual(10); }
     expect(sizes.at(-1)!).toBeLessThanOrEqual(10);
+  });
+
+  it('a drop with nothing kept is skipped, and what was owed carries into the next', () => {
+    const sizes: number[] = [];
+    let t = 0;
+    const h: MiningHost = { spawnChunk: (_s, _x, _y, _vx, _vy, items: Bag) => { sizes.push(Object.values(items).reduce((a, b) => a + b, 0)); }, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 4 };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 4);
+    const before = m.remaining(1);
+    // (Mk IV rock: guns keep a fortieth or so)
+    for (t = 0; t < 60 * 600; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
+    const worked = before - m.remaining(1);
+    expect(sizes.every((n) => n >= 1)).toBe(true);
+    expect(sizes.length).toBeLessThan(worked / 10);
+    const kept = sizes.reduce((a, b) => a + b, 0);
+    expect(kept / worked).toBeCloseTo(table.guns!.keep * table.guns!.keepByTier['4'] * 0.95, 2);
   });
 
   it('rocks hold 1.5x the ore they did (0.1 a unit of size before)', () => {
@@ -91,113 +212,74 @@ describe('chunks', () => {
   });
 });
 
-describe('the laser crowd curve', () => {
-  it('each laser is most efficient with k on the rock; the total always rises, towards k·q/(q-1)', () => {
-    for (const k of [1.5, 4, 5, 10]) for (const q of [2, 3, 4]) {
-      expect(crowdFactor(k, k, q)).toBeCloseTo(1, 12);
-      for (const d of [0.25, 1, 3]) {
-        expect(crowdFactor(k + d, k, q)).toBeLessThan(1);
-        if (k - d > 0) expect(crowdFactor(k - d, k, q)).toBeLessThan(1);
-      }
-      let last = 0;
-      for (let n = 1; n <= 60; n++) {
-        const total = n * crowdFactor(n, k, q);
-        expect(total).toBeGreaterThan(last);
-        expect(total).toBeLessThan((k * q) / (q - 1));
-        last = total;
-      }
-    }
-    // Kieran's form at q = 2: 2kn / (k² + n²)
-    expect(crowdFactor(3, 1.5, 2)).toBeCloseTo((2 * 1.5 * 3) / (1.5 * 1.5 + 9), 12);
+describe('mining lasers against the rock', () => {
+  it('full yield at their grade or below; a grade behind a little slower and keeping 80%; two behind slower again keeping 60%; further, nothing', () => {
+    expect(table.laserGap!['0']).toEqual({ work: 1, keep: 1 });
+    expect(table.laserGap!['-1']).toEqual({ work: 0.85, keep: 0.8 });
+    expect(table.laserGap!['-2']).toEqual({ work: 0.7, keep: 0.6 });
+    const at = (tier: number, grade = 1) => rate('asteroid_metal', tier, [{ tool: laser(grade, 3), dps: LASER_DPS }], 300);
+    const own = at(1), one = at(2), two = at(3), three = at(4);
+    expect(one.chunks / own.chunks).toBeCloseTo(0.85, 1);
+    expect(one.ore / own.ore).toBeCloseTo(0.85 * 0.8, 1);
+    expect(two.chunks / own.chunks).toBeCloseTo(0.7, 1);
+    expect(two.ore / own.ore).toBeCloseTo(0.7 * 0.6, 1);
+    expect(three.ore).toBe(0);
+    // A grade ahead: a little faster
+    expect(at(1, 2).ore).toBeGreaterThan(own.ore * 1.1);
   });
 
-  /**
-   * Units a second (a full-strength 42 dps mining laser) each of `n` lasers of `gap` grades from the rock's tier gets on a `type` rock,
-   * at the table's damagePerUnit scaled back to 12 (the curve's shape, measured in a few seconds; 'mining pace' below pins the real pace)
-   */
-  function perLaser(type: string, n: number, gap = 0): number {
-    let t = 0;
-    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 3 };
-    const m = new Mining(h, { ...table, damagePerUnit: 12 });
-    m.register(1, 0, 0, type, 'k', 1e6, 3);
-    const before = m.remaining(1);
-    for (t = 0; t < 600; t++) for (let i = 0; i < n; i++) m.extract(1, 100 + i, 42 / 60, { yield: 1.6, hardness: 3, grade: 3 + gap }, 0, 0, 1, 0);
-    return (before - m.remaining(1)) / 10 / n;
-  }
-
-  it('one matching laser on a soft rock mines about as fast as before (5.6 units a second); more mine faster in all, each a little less past two', () => {
-    const one = perLaser('asteroid_metal', 1), two = perLaser('asteroid_metal', 2), four = perLaser('asteroid_metal', 4), six = perLaser('asteroid_metal', 6);
-    expect(one).toBeGreaterThan(5.6 * 0.95);
-    expect(one).toBeLessThan(5.6 * 1.05);
-    expect(2 * two).toBeGreaterThan(one);
-    expect(4 * four).toBeGreaterThan(2 * two);
-    expect(6 * six).toBeGreaterThan(4 * four);
-    expect(four).toBeLessThan(two);
-    expect(six).toBeLessThan(four);
-  });
-
-  it('hard rocks are slow alone and want about five lasers on them', () => {
-    expect(rockCrowd(table, 'rock_cobaltite', 0)!.k).toBe(5);
-    const one = perLaser('rock_cobaltite', 1), five = perLaser('rock_cobaltite', 5);
-    expect(one).toBeLessThan(5.6 * 0.1);
-    expect(five).toBeGreaterThan(one * 5);
-  });
-
-  it("a laser below the rock's tier needs more on the rock, and never out-mines matching ones however many", () => {
-    expect(rockCrowd(table, 'rock_cobaltite', -1)!.k).toBe(10);
+  it('each laser mines on its own: twice the lasers, twice the ore (no crowding)', () => {
     for (const type of ['asteroid_metal', 'rock_cobaltite']) {
-      // Alone, a grade behind is slow work; two behind is hardly worth it
-      const own = perLaser(type, 1);
-      expect(perLaser(type, 1, -1)).toBeLessThan(own * 0.4);
-      expect(perLaser(type, 1, -2)).toBeLessThan(own * 0.1);
-      for (const n of [1, 2, 4, 8, 16, 40]) {
-        expect(perLaser(type, n, -1)).toBeLessThanOrEqual(perLaser(type, n, 0) * 1.0001);
-        expect(perLaser(type, n, -2)).toBeLessThanOrEqual(perLaser(type, n, -1) * 1.0001);
-      }
+      const one = rate(type, 3, [{ tool: laser(3, 3), dps: LASER_DPS }], 120);
+      const four = rate(type, 3, [0, 1, 2, 3].map((ship) => ({ tool: laser(3, 3), dps: LASER_DPS, ship })), 120);
+      expect(four.ore / one.ore).toBeGreaterThan(3.7);
+      expect(four.ore / one.ore).toBeLessThan(4.3);
     }
-    // A soft rock a grade behind alone: about a third of a matching laser (as it was before the curve)
-    expect(perLaser('asteroid_metal', 1, -1) / perLaser('asteroid_metal', 1)).toBeGreaterThan(0.28);
   });
 
-  it('other weapons get no crowd factor', () => {
-    let t = 0;
-    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {} };
-    // (Without the guns' waste, which has a test of its own)
-    const m = new Mining(h, { ...table, weaponLoss: undefined });
-    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
-    const before = m.remaining(1);
-    for (t = 0; t < 600; t++) for (let i = 0; i < 4; i++) m.extract(1, 100 + i, 10, { yield: 0.06, hardness: 1 }, 0, 0, 1, 0);
-    expect(before - m.remaining(1)).toBe(Math.floor((600 * 10 * 0.06) / table.damagePerUnit) * 4);
-  });
-
-  it("guns waste rock: half as much again blasted away, and only some of the uncommon ores kept", () => {
-    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: () => {}, tick: () => 0, respawn: () => {}, crumble: () => {} };
-    const got: Bag = {};
-    const m = new Mining({ ...h, mined: (_m, bag) => { for (const [k, n] of Object.entries(bag)) got[k] = (got[k] ?? 0) + n; } }, table);
-    m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
-    const before = m.remaining(1);
-    for (let k = 0; k < 3000; k++) m.extract(1, 99, 10, { yield: 0.17, hardness: 1 }, 0, 0, 1, 0);
-    const kept = Object.values(got).reduce((a, b) => a + b, 0), gone = before - m.remaining(1);
-    expect(gone / kept).toBeGreaterThan(1.5);
-    // Copper is 10 of the Chondrite's 111: kept about a third of the time
-    expect((got.copper_ore ?? 0) / kept).toBeLessThan(0.06);
-    expect((got.iron_ore ?? 0) / kept).toBeGreaterThan(0.55);
-  });
-
-  it('a hard rock with too few lasers on it says so, quietly; a soft rock says nothing', () => {
+  it('a laser behind the rock says what it gets, quietly; at its grade it says nothing', () => {
     const said: string[] = [];
     let t = 0;
-    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: (_e, text) => said.push(text), tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 3 };
+    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: (_e, text) => said.push(text), tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 2 };
     const m = new Mining(h, table);
-    m.register(1, 0, 0, 'asteroid_metal', 'a', 1e6, 3);
-    m.register(2, 0, 0, 'rock_cobaltite', 'b', 1e6, 3);
-    for (t = 0; t < 600; t++) m.extract(1, 7, 1, { yield: 1.6, hardness: 3, grade: 3 }, 0, 0, 1, 0);
+    m.register(1, 0, 0, 'asteroid_metal', 'a', 1e6, 2);
+    for (t = 0; t < 600; t++) m.extract(1, 7, 1, laser(2), 0, 0, 1, 0);
     expect(said).toEqual([]);
-    for (; t < 1200; t++) m.extract(2, 7, 1, { yield: 1.6, hardness: 3, grade: 3 }, 0, 0, 1, 0);
-    expect(said.length).toBeGreaterThan(0);
-    expect(said[0]).toBe('Hard rock: works best with 4-6 lasers on it');
+    for (; t < 1200; t++) m.extract(1, 7, 1, laser(1), 0, 0, 1, 0);
+    expect(said[0]).toBe('Mk II rock: your Mk I mining laser works it 85% as fast and keeps 80% of the ore');
     // (Throttled: once every 6 seconds)
     expect(said.length).toBeLessThanOrEqual(2);
+  });
+
+  it('too hard for the laser: it says to fit a harder one', () => {
+    const said: string[] = [];
+    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: (_e, text) => said.push(text), tick: () => 0, respawn: () => {}, crumble: () => {} };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, 'rock_cobaltite', 'a', 1e6, 1);
+    const r = m.remaining(1);
+    m.extract(1, 7, 500, laser(1, 2), 0, 0, 1, 0);
+    expect(m.remaining(1)).toBe(r);
+    expect(said[0]).toBe('This rock is too hard for your mining laser: fit a harder one');
+  });
+});
+
+describe('the numbers (docs/areas/economy-quests.md)', () => {
+  it('ore and chunks a minute', () => {
+    const L = (grade: number) => ({ tool: laser(grade, 3), dps: LASER_DPS });
+    const rows: [string, { ore: number; chunks: number }][] = [
+      ['Starter Pips, Mk I soft rock', rate('asteroid_metal', 1, pips())],
+      ['Starter Pips, Mk II soft rock', rate('asteroid_metal', 2, pips())],
+      ['Starter Pips, Mk III soft rock', rate('asteroid_metal', 3, pips())],
+      ['Gale (2 Chainsaws, 2 Sparks), Mk I soft rock', rate('asteroid_metal', 1, [{ tool: tools.autocannon, dps: 160, hit: 5 }, { tool: tools.arc, dps: 77, hit: 8 }])],
+      ['Mk I laser, Mk I rock (gap 0)', rate('asteroid_metal', 1, [L(1)])],
+      ['Mk I laser, Mk II hard rock (gap -1)', rate('asteroid_mega', 2, [L(1)])],
+      ['Mk I laser, Mk III hard rock (gap -2)', rate('asteroid_mega', 3, [L(1)])],
+      ['Mk III laser, Mk III hard rock', rate('rock_cobaltite', 3, [L(3)])],
+      ['3 Mk III lasers (3 ships), Mk III hard rock', rate('rock_cobaltite', 3, [0, 1, 2].map((ship) => ({ ...L(3), ship })))],
+    ];
+    console.log(rows.map(([k, v]) => `${k}: ${v.ore.toFixed(1)} ore/min, ${v.chunks.toFixed(1)} chunks/min`).join('\n'));
+    // main_01: 10 ore with a starter's guns well inside 90 seconds of mining
+    expect(600 / rows[0][1].ore).toBeLessThan(60);
   });
 });
 
@@ -221,7 +303,7 @@ describe('mining pace', () => {
     expect(large).toBeLessThan(30);
   });
 
-  it('more lasers on a soft rock mine it out sooner', () => {
+  it('more lasers on a rock mine it out sooner', () => {
     expect(mineOut('asteroid_metal', 33, 2)).toBeLessThan(mineOut('asteroid_metal', 33, 1));
     expect(mineOut('asteroid_metal', 33, 4)).toBeLessThan(mineOut('asteroid_metal', 33, 2));
   });

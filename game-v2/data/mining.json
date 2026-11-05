@@ -61,8 +61,7 @@
         "leestone_ore": 2
       },
       "traceMul": 3,
-      "name": "Neutron Slug",
-      "crowd": "hard"
+      "name": "Neutron Slug"
     },
     "comet": {
       "hardness": 1,
@@ -130,8 +129,7 @@
       "like": "asteroid_crystal",
       "traceBoost": {
         "voidglass": 3
-      },
-      "crowd": "hard"
+      }
     },
     "rock_polymer_tar": {
       "name": "Polymer Tar",
@@ -157,8 +155,7 @@
         20,
         45
       ],
-      "like": "asteroid_metal",
-      "crowd": "hard"
+      "like": "asteroid_metal"
     },
     "rock_cobaltite": {
       "name": "Cobaltite",
@@ -171,8 +168,7 @@
         30,
         80
       ],
-      "like": "asteroid_metal",
-      "crowd": "hard"
+      "like": "asteroid_metal"
     },
     "rock_platinoid": {
       "name": "Platinoid Shard",
@@ -185,8 +181,7 @@
         15,
         35
       ],
-      "like": "asteroid_crystal",
-      "crowd": "hard"
+      "like": "asteroid_crystal"
     },
     "rock_opal_husk": {
       "name": "Opal Husk",
@@ -200,8 +195,7 @@
         30,
         80
       ],
-      "like": "asteroid_crystal",
-      "crowd": "hard"
+      "like": "asteroid_crystal"
     },
     "gas_pocket": {
       "name": "Gas Pocket",
@@ -370,52 +364,46 @@
     }
   ],
   "seamGemChance": 0.3,
-  "_tierComment": "A mining laser's yield by its grade against the rock's tier (the system's Mk). Below the rock's tier it also needs more lasers on the rock to work well (crowd.kByGap); the two multiply to 1, so a lesser laser never out-mines a matching one however many are on it: a grade behind is slow work alone (about a third), two behind is hardly worth it; a grade ahead is a little better.",
-  "tierEfficiency": {
-    "0": 1,
-    "1": 1.2,
-    "2": 1.3,
-    "-2": 0.2,
-    "-1": 0.5
+  "_laserGapComment": "A mining laser by its gap: its grade minus the rock's tier (the system's Mk), clamped to +2. `work` scales how fast it works the rock (so how often chunks come: one every chunkUnits worked), `keep` the share of what it works that it keeps. A grade behind is a little slower and loses a fifth; two behind, slower again and loses two fifths; further behind it can't mine the rock. Each laser mines on its own (no crowding): what limits a ship's lasers is the power to run them (a Mining Laser draws most of a Cell Reactor: models.json).",
+  "laserGap": {
+    "2": {
+      "work": 1.3,
+      "keep": 1
+    },
+    "1": {
+      "work": 1.2,
+      "keep": 1
+    },
+    "0": {
+      "work": 1,
+      "keep": 1
+    },
+    "-1": {
+      "work": 0.85,
+      "keep": 0.8
+    },
+    "-2": {
+      "work": 0.7,
+      "keep": 0.6
+    }
   },
-  "_weaponTierComment": "Weapons (tools with no mining grade) by the rock's tier (the system's Mk). A starter's two Pips mine Mk I rock at under a third of a Mk I mining laser and waste a lot of it (weaponLoss: half as much again blasted away, and only a third of anything but the common ores kept): enough for the first laser and early builds. Past Mk I they only chip it.",
-  "weaponTierEfficiency": {
-    "1": 1,
-    "2": 0.3,
-    "3": 0.12,
-    "4": 0.06,
-    "5": 0.04
-  },
-  "weaponLoss": {
-    "wasted": 0.5,
+  "_gunsComment": "Guns (every tool but a mining tool: tools[k].mining, or a mining laser) mine soft rock only (hardness 1). They work it at about a Mk I mining laser's pace: damage x tools[kind].yield / damagePerUnit, and past refDps damage a second on the rock the pace grows only with its square root (a starter's two Pips, 112 a second, about 0.7 rock units a second like the laser; a gunship twice that, about 1.4x). They keep `keep` of the common ores, keepOther times that of anything else (gems too), and keepByTier times that again by the rock's tier: a Mk I laser gets about three times the ore off Mk I rock, from chunks as often.",
+  "guns": {
+    "refDps": 112,
+    "keep": 0.32,
     "common": [
       "iron_ore",
       "nickel_ore",
       "silicate",
       "ice"
     ],
-    "keepOther": 0.35
-  },
-  "_crowdComment": "Mining lasers sharing a rock (common/src/econ/mining.ts crowdFactor): each laser's extraction x base x g(n), n the mining lasers on the rock in the last `window` ticks (any ships). g peaks at 1 with k lasers on it and the total always rises, more slowly past k; `sharp` (2, 3, ...) climbs more steeply to k and gains less past it. Lasers below the rock's tier find k kByGap times as high. Rock types name their profile (types[t].crowd, else `default`); other weapons and the siphon get no crowd factor.",
-  "crowd": {
-    "window": 54,
-    "default": "soft",
-    "profiles": {
-      "soft": {
-        "k": 1.5,
-        "sharp": 2,
-        "base": 1.08
-      },
-      "hard": {
-        "k": 5,
-        "sharp": 3,
-        "base": 0.4,
-        "hint": true
-      }
-    },
-    "kByGap": {
-      "-1": 2,
-      "-2": 5
+    "keepOther": 0.5,
+    "keepByTier": {
+      "1": 1,
+      "2": 0.4,
+      "3": 0.15,
+      "4": 0.08,
+      "5": 0.05
     }
   },
   "_outliersComment": "Outliers: about one belt rock in 130 is 3.5-4.5x its size. Mining it (or blasting it) breaks it down through `stages` (its size as a fraction of the first), each a fresh smaller rock carrying the ore that's left, until the last breaks up. `common` of them are a lump of common ore: each ore's weight x its boost (unlisted ores x rare).",
@@ -513,13 +501,13 @@
     }
   },
   "tools": {
-    "_comment": "yield: ore extracted per damage relative to damagePerUnit; hardness: hardest rock it cracks",
+    "_comment": "yield: rock units worked per damage (relative to damagePerUnit); hardness: the hardest ore or gem seam it cracks. Guns (all but `mining` tools and the mining lasers, `miner`) share one normalised yield and mine hardness-1 rock only (guns above); their hardness only decides which harder ores and gem seams inside soft rock they take. The EMP does no damage to rock.",
     "fixed": {
-      "yield": 0.17,
+      "yield": 0.6,
       "hardness": 1
     },
     "turret": {
-      "yield": 0.11,
+      "yield": 0.6,
       "hardness": 1
     },
     "miner": {
@@ -527,51 +515,51 @@
       "hardness": 2
     },
     "laser": {
-      "yield": 0.275,
+      "yield": 0.6,
       "hardness": 2
     },
     "lance": {
-      "yield": 0.06,
+      "yield": 0.6,
       "hardness": 3
     },
     "railgun": {
-      "yield": 0.025,
+      "yield": 0.6,
       "hardness": 3
     },
     "flak": {
-      "yield": 0.02,
+      "yield": 0.6,
       "hardness": 1
     },
     "missile": {
-      "yield": 0.05,
+      "yield": 0.6,
       "hardness": 2
     },
     "hive": {
-      "yield": 0.04,
+      "yield": 0.6,
       "hardness": 2
     },
     "frostbite": {
-      "yield": 0.2,
+      "yield": 0.6,
       "hardness": 3
     },
     "cinder_bloom": {
-      "yield": 0.075,
+      "yield": 0.6,
       "hardness": 2
     },
     "prism": {
-      "yield": 0.1,
+      "yield": 0.6,
       "hardness": 3
     },
     "prism_shard": {
-      "yield": 0.05,
+      "yield": 0.6,
       "hardness": 2
     },
     "phase": {
-      "yield": 0.06,
+      "yield": 0.6,
       "hardness": 3
     },
     "singularity": {
-      "yield": 0.25,
+      "yield": 0.6,
       "hardness": 3
     },
     "emp": {
@@ -588,31 +576,33 @@
     },
     "charge": {
       "yield": 2.5,
-      "hardness": 3
+      "hardness": 3,
+      "mining": true
     },
     "autocannon": {
-      "yield": 0.03,
+      "yield": 0.6,
       "hardness": 1
     },
     "pulse": {
-      "yield": 0.025,
+      "yield": 0.6,
       "hardness": 1
     },
     "arc": {
-      "yield": 0.025,
+      "yield": 0.6,
       "hardness": 1
     },
     "torpedo": {
-      "yield": 0.05,
+      "yield": 0.6,
       "hardness": 2
     },
     "mortar": {
-      "yield": 0.025,
+      "yield": 0.6,
       "hardness": 1
     },
     "siphon": {
       "yield": 1.4,
-      "hardness": 1
+      "hardness": 1,
+      "mining": true
     }
   },
   "_fieldsComment": "Each belt's mix of rock types by weight (econ/rocks.ts): a type with a name and a size band is a rock type of its own; the rest are built in (AsteroidDefinition).",
