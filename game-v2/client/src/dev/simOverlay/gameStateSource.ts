@@ -6,7 +6,7 @@
  * The prediction CPU is measured by wrapping GameState's shipPhysics / shipGuns hooks while the overlay is on (restored when it
  * is switched off). Stage 3 / Stage 4 sources replace this adapter, or add to it through the SimOverlaySource's optional members.
  */
-import { EntityType } from '@space-game/common';
+import { EntityType, ReplicaMode } from '@space-game/common';
 import type { GameState } from '../../state/GameState';
 import type { ShipClient } from '../../ships/ShipClient';
 import type { Renderer } from '../../rendering/Renderer';
@@ -80,8 +80,10 @@ export class GameStateSource implements SimOverlaySource {
     this.sample(now);
     const out: OverlayShip[] = [];
     const tick = Math.floor(s.getRawServerTick());
-    for (const type of [EntityType.Player, EntityType.Enemy, EntityType.NPC]) {
+    // (Ship bodies too: drones and dummies; not debris)
+    for (const type of [EntityType.Player, EntityType.Enemy, EntityType.NPC, EntityType.ShipBody]) {
       for (const e of s.entities.ofType(type)) {
+        if (type === EntityType.ShipBody && this.d.shipClient.replicas.modeOf(e.id) === ReplicaMode.Drift) continue;
         const own = e.id === s.playerId;
         let st: PoseXY | null = null;
         if (own) {

@@ -74,6 +74,17 @@ export class BodyRunner {
     for (const [id, run] of this.runs) if (BODY_KINDS[run.states.get(run.syncTick)?.kind ?? -1]?.toldHits) yield id;
   }
 
+  /**
+   * Flown here from its decisions and its hits found here (an AI pilot, a custom enemy: not a boss, whose hits are
+   * told): the client can step it ahead of the last snapshot (the dev prediction modes C1-C3, client dev/predict)
+   */
+  ahead(id: number): boolean {
+    const run = this.runs.get(id);
+    if (!run) return false;
+    const kind = BODY_KINDS[run.states.get(run.syncTick)?.kind ?? -1];
+    return !!kind && !kind.toldHits;
+  }
+
   /** A snapshot's decisions, after its keyframes and rows went in (ShipReplicaSet.apply) */
   onSnapshot(tick: number, rows: readonly (readonly number[])[] | undefined): void {
     const prev = this.snapTick;

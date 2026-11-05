@@ -68,6 +68,8 @@ export class RandomFlight implements BotTask {
   phase: Phase = 'travelOut';
   /** Whom to shoot at (shoot=1): a point, or null for nobody */
   target: (() => Pt | null) | null = null;
+  /** Where home is now, if it moves (the Rockery's `near` bots: the player who asked); null: where it started */
+  homeOf: (() => Pt | null) | null = null;
   /** Input changes made so far (the tests and the status line) */
   changes = 0;
   private r: () => number;
@@ -85,7 +87,7 @@ export class RandomFlight implements BotTask {
   step(c: TaskCtx): void {
     const d = c.driver, p = d.pose();
     if (!this.home) { this.home = { x: p.x, y: p.y }; this.heading = this.r() * Math.PI * 2; }
-    const home = this.home;
+    const home = this.homeOf?.() ?? this.home;
     const away = Math.hypot(p.x - home.x, p.y - home.y);
     if (this.nextAt < 0 || c.tick >= this.nextAt) this.change(c, away > this.o.leash, p, home);
     const out = this.mode === 'stop' ? hold(p, this.keys) : this.fly();

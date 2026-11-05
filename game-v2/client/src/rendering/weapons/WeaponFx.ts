@@ -205,7 +205,9 @@ const PENDING_FRAMES = 40;
 export function shotTimelines(state: GameState): [present: number, render: number] {
   // (One Timeline for every kind's draw tick: common sim/timeline.ts, GameState.timeline)
   const tl = state.timelineAt();
-  return [tl.drawTick('ownShot'), tl.drawTick('pilotShot')];
+  // (A dev prediction mode may draw yours elsewhere, with your ship: GameState.drawMode)
+  const own = tl.drawTick('ownShot'), dm = state.drawMode;
+  return [dm?.own ? dm.own(own) : own, tl.drawTick('pilotShot')];
 }
 
 export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number; arm?: number }
@@ -351,6 +353,13 @@ export class WeaponFx {
   private spent = new Map<number, number>();
   /** Shells stopped at a drawn surface, and hits the server told that a drawn one had already shown (the probe, tests) */
   readonly stats = { struck: 0, confirmed: 0, serverLanded: 0, early: 0 };
+  /**
+   * Told of each count in `stats` as it happens, by shell (dev Sim tools' hit agreement, client dev/predict/hitTally.ts;
+   * null otherwise): 'struck' drawn striking `target`, 'confirmed' a told hit on a shell drawn striking, 'landed' a told
+   * hit no drawn surface took first, 'renamed' a shell fired here taking the server's id (`target`: the id it had),
+   * 'orphan' a told hit no shell here took (at x, y). `owner` -1 where the shell is no longer held
+   */
+  tally: ((what: 'struck' | 'confirmed' | 'landed' | 'renamed' | 'orphan', shot: number, owner: number, target: number, x?: number, y?: number) => void) | null = null;
   private readonly normalScratch: SurfaceNormal = { nx: 0, ny: 0 };
   private readonly aim: Aim = { a: 0, nx: 0, ny: 0, surface: false };
   /** Hits reported for shells not yet seen (the hit's message comes ahead of the snapshot that brings its shell): matched up on the next update */
@@ -445,7 +454,7 @@ export class WeaponFx {
     if (this.early.length) {
       for (const h of this.early) {
         const s = this.shots.get(h.id) ?? this.adopt(h, presentTick);
-        if (s) this.strike(s, h.x, h.y); else this.impactAt(undefined, h.x, h.y);
+        if (s) this.strike(s, h.x, h.y); else { this.tally?.('orphan', h.id, -1, -1, h.x, h.y); this.impactAt(undefined, h.x, h.y); }
       }
       this.early.length = 0;
     }
@@ -527,7 +536,7 @@ export class WeaponFx {
     const shot = projectileId !== undefined ? this.shots.get(projectileId) : undefined;
     if (shot) { this.strike(shot, x, y); return; }
     // (a shell that ended here and was let go: the server only confirms it)
-    if (projectileId !== undefined && this.spent.has(projectileId)) { this.stats.confirmed++; return; }
+    if (projectileId !== undefined && this.spent.has(projectileId)) { this.stats.confirmed++; this.tally?.('confirmed', projectileId, -1, -1); return; }
     // (A shell not seen yet: its snapshot is usually right behind this message, so it's matched on the next update)
     if (projectileId !== undefined && projectileId >= 0) { this.early.push({ id: projectileId, x, y }); return; }
     this.impactAt(undefined, x, y);
@@ -569,8 +578,8 @@ export class WeaponFx {
    */
   private strike(shot: Shot, x: number, y: number): void {
     // (Drawn already: it ended at a surface here, or passed one the server now tells. Its hit only confirms)
-    if (shot.ended) { this.stats.confirmed++; return; }
-    if (shot.unconfirmed > 0) { shot.unconfirmed--; this.stats.confirmed++; return; }
+    if (shot.ended) { this.stats.confirmed++; this.tally?.('confirmed', shot.id, shot.owner, -1); return; }
+    if (shot.unconfirmed > 0) { shot.unconfirmed--; this.stats.confirmed++; this.tally?.('confirmed', shot.id, shot.owner, -1); return; }
     if (shot.style.motion === 'linear' && shot.fading === null) {
       const age = hitAge(shot.spawnX, shot.spawnY, shot.vx, shot.vy, x, y);
       if (age > shot.t - shot.spawnTick + 0.5 && age < shot.endAt - shot.spawnTick + 1) {
@@ -596,6 +605,7 @@ export class WeaponFx {
     // (The server's hit on something not drawn in its way here: the drawn world had the target a little elsewhere, or
     // this shell on another line)
     this.stats.serverLanded++;
+    this.tally?.('landed', shot.id, shot.owner, -1);
     let target = -1;
     // A piercing round that still has hulls to pass keeps flying (tracer, contrail and line carry on); only its last hit ends it
     if (shot.pierceLeft > 0) shot.pierceLeft--;
@@ -625,8 +635,9 @@ export class WeaponFx {
     const h = this.drawn, head = shot.head!;
     if (!this.castHit!(x0, y0, head.x, head.y, shot.owner, shot.passed, h)) return;
     this.stats.struck++;
+    this.tally?.('struck', shot.id, shot.owner, h.target, h.x, h.y);
     const x = h.x, y = h.y;
-    if (shot.pending?.length) { shot.pending.shift(); if (!shot.pending.length) shot.pending = null; this.stats.confirmed++; }
+    if (shot.pending?.length) { shot.pending.shift(); if (!shot.pending.length) shot.pending = null; this.stats.confirmed++; this.tally?.('confirmed', shot.id, shot.owner, h.target); }
     else shot.unconfirmed++;
     if (shot.pierceLeft > 0) {
       shot.pierceLeft--;
@@ -1052,6 +1063,7 @@ export class WeaponFx {
     }
     if (!best || bd > 120) return null;
     this.shots.delete(best.id);
+    this.tally?.('renamed', e.id, best.owner, best.id);
     best.id = e.id;
     best.predicted = false;
     return best;
@@ -1078,6 +1090,7 @@ export class WeaponFx {
     }
     if (!best) return null;
     this.shots.delete(best.id);
+    this.tally?.('renamed', h.id, best.owner, best.id);
     best.id = h.id;
     best.predicted = false;
     this.shots.set(h.id, best);
@@ -1085,6 +1098,8 @@ export class WeaponFx {
   }
 
   private timeline(shot: Shot, state: GameState, presentTick: number, renderTick: number): number {
+    // (A dev prediction mode's pick: GameState.drawMode, state/drawMode.ts)
+    if (state.drawMode?.shot) return state.drawMode.shot(shot.owner, presentTick, renderTick);
     return !state.predictionEnabled || shot.owner === state.playerId ? presentTick : renderTick;
   }
 
