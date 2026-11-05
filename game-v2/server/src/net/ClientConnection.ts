@@ -80,6 +80,8 @@ export interface ClientConnection {
   /** Its system map is open (mapView), and it's owed a list now (just opened) */
   mapOpen?: boolean;
   mapDotsDue?: boolean;
+  /** Owed every hostile population of its system (pops, full): a new system or connection */
+  popsFresh?: boolean;
   /** State hashes the client sent for ticks we hadn't reached yet (it predicts ahead): tick → hash */
   aheadHashes: Map<number, number>;
   /** Ship designs (blueprint hashes) this client has been sent: another ship of one is sent by its hash */

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, EffectType, NEST_RADIUS, ServerMessage } from '@space-game/common';
+import { Position, Velocity, InSystem, EffectType, NEST_RADIUS, ServerMessage, ghostShip } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData, type GameDataFiles } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -58,40 +58,76 @@ const quickNest = (f: any) => {
 };
 
 describe('nests', () => {
-  it('is found already stocked as a pilot arrives, and launches replacements visibly from the nest', () => {
-    const { step, got, nest, watch, kill } = world();
+  it('is there before anyone comes: its packs are ghosts, loaded exactly where their ghosts are as a pilot arrives', () => {
+    const { server, step, nest, watch, enemies, num } = world();
     const def = (files.factions as any).spawns.ashfall.nests.find((q: any) => q.id === DIG);
+    const pop = () => enemies.population(num, DIG)!;
+    // Already out (a fresh world's are full), nothing simulated: no ships, just ghosts
     expect(nest(DIG).packs.length).toBe(0);
-    step(60, () => watch(DIG));
-    // Every pack out at once, on patrol round it (not at the hull, no launch seen)
-    let n = nest(DIG);
-    expect(n.packs.length).toBe(def.packs);
-    for (const pack of n.packs) for (const eid of pack) expect(Math.hypot(Position.x[eid] - n.x, Position.y[eid] - n.y)).toBeLessThan(NEST_RADIUS + (def.roam ?? 2400) + 1500);
-    // (Launch flashes at the hull's edge, wherever the nest has got to on its orbit)
-    let flashes = 0;
-    const seen = () => { const at = nest(DIG); for (const m of got.splice(0)) if (m.type === 'effect' && (m as any).effectType === EffectType.WarpOut && Math.hypot((m as any).x - at.x, (m as any).y - at.y) < NEST_RADIUS + 400) flashes++; };
-    seen();
-    expect(flashes).toBe(0);
-    // A pack wiped out: its replacement comes out of the hull, seen launching, once the nest has rebuilt it
-    for (const eid of n.packs[0]) kill(eid);
-    step(60 * ((def.respawnSeconds ?? (files.factions as any).rules.respawnSeconds) + 20), () => { watch(DIG); seen(); });
-    n = nest(DIG);
-    expect(n.packs.length).toBe(def.packs);
-    expect(flashes).toBeGreaterThan(0);
+    expect(pop().slots.length).toBe(def.packs);
+    for (const s of pop().slots) { expect(s.loaded).toBe(false); expect(s.alive).toBe((1 << def.groups[s.group].ships.length) - 1); }
+    // A pilot comes near: each pack appears all at once where its ghost is, ship by ship (common ghostShip), none from the hull
+    let loaded = 0;
+    for (let i = 0; i < 180 && loaded < def.packs; i++) {
+      const was = pop().slots.map((s) => s.loaded);
+      const t = server.getTick();
+      step(1, () => watch(DIG));
+      pop().slots.forEach((s, slot) => {
+        if (!s.loaded || was[slot]) return;
+        loaded++;
+        const c = enemies.ghostAt(num, DIG, slot, t)!;
+        expect(s.ships.length).toBe(def.groups[s.group].ships.length);
+        for (const eid of s.ships) {
+          const at = ghostShip(c, (enemies as any).enemies.get(eid).pop.k);
+          expect(Math.hypot(Position.x[eid] - at.x, Position.y[eid] - at.y)).toBeLessThan(60);
+        }
+      });
+    }
+    expect(loaded).toBe(def.packs);
   });
 
-  it('a nest sleeps while nobody is near it; once it has sent its packs out they stay out, distant, after it is left', () => {
-    const { step, nest, watch, bridge } = world();
-    step(60 * 5, () => watch(DIG, 60000));
+  it('lost ships come back one at a time at its spawn rate, seen launching from the nest', () => {
+    const { step, got, nest, watch, kill, enemies, num } = world();
+    const def = (files.factions as any).spawns.ashfall.nests.find((q: any) => q.id === DIG);
+    const every = (def.respawnSeconds ?? (files.factions as any).rules.respawnSeconds) * 60;
+    step(60 * 3, () => watch(DIG));
+    const alive = () => enemies.population(num, DIG)!.slots.reduce((n, s) => { let c = 0; for (let a = s.alive; a; a &= a - 1) c++; return n + c; }, 0);
+    const full = alive();
+    expect(nest(DIG).packs.flat().length).toBe(full);
+    let flashes = 0;
+    const seen = () => { const at = nest(DIG); for (const m of got.splice(0)) if (m.type === 'effect' && (m as any).effectType === EffectType.WarpOut && Math.hypot((m as any).x - at.x, (m as any).y - at.y) < NEST_RADIUS + 400) flashes++; };
+    got.length = 0;
+    // A whole pack shot down (and another's ship): they're remembered as lost, and come back one ship an interval, not at once
+    const [pack, other] = nest(DIG).packs;
+    for (const eid of [...pack, other[0]]) kill(eid);
+    step(30, () => { watch(DIG); seen(); });
+    const lost = pack.length + 1;
+    expect(alive()).toBe(full - lost);
+    for (let k = 1; k <= lost; k++) {
+      step(every, () => { watch(DIG); seen(); });
+      expect(alive()).toBe(Math.min(full, full - lost + k));
+      expect(nest(DIG).packs.flat().length).toBe(alive());
+    }
+    // (Each one out of the hull, seen launching)
+    expect(flashes).toBe(lost);
+  });
+
+  it("a pack nobody's near goes back to a ghost, as it was: leaving and coming back doesn't restock it", () => {
+    const { step, nest, watch, kill, enemies, num } = world();
+    step(60 * 3, () => watch(DIG));
+    const [pack] = nest(DIG).packs;
+    kill(pack[0]);
+    step(30, () => watch(DIG));
+    const was = enemies.population(num, DIG)!.slots.map((s) => s.alive);
+    const ships = nest(DIG).packs.flat().length;
+    // Gone a long way off: nothing of it's simulated any more, but it's all still there, short as it was
+    step(60 * 25, () => watch(DIG, 90000));
     expect(nest(DIG).packs.length).toBe(0);
-    step(60 * 20, () => watch(DIG));
-    const out = nest(DIG).packs.length;
-    expect(out).toBeGreaterThan(0);
-    // (Nothing goes back in: far from pilots they cost next to nothing, and a system left empty is remembered whole)
-    const idle = (files.factions as any).rules.idleDespawnSeconds;
-    step(60 * (idle + 5), () => watch(DIG, 80000));
-    expect(nest(DIG).packs.length).toBe(out);
-    expect(nest(DIG).packs.flat().every((e) => bridge.isDormant(e))).toBe(true);
+    expect(enemies.population(num, DIG)!.slots.every((s) => !s.loaded)).toBe(true);
+    expect(enemies.population(num, DIG)!.slots.map((s) => s.alive)).toEqual(was);
+    // Back: the same ships, where their ghosts are, no more (the lost one isn't due for a while yet)
+    step(60 * 3, () => watch(DIG));
+    expect(nest(DIG).packs.flat().length).toBe(ships);
   });
 
   it('its ships roam within a leash of it, following it round its orbit, and come back when dragged off', () => {
@@ -202,19 +238,22 @@ describe('nests', () => {
     expect((enemies as any).packs.get((enemies as any).enemies.get(nest(BELT).packs[0][0]).pack).style).toBe('loose');
   }, 60000);
 
-  it("nomads travel Sol's middle between places, never into the safe space, and stay out, distant, once left alone", () => {
+  it("nomads travel Sol's middle between places, never into the safe space, and are a ghost again once left alone", () => {
     const CAMP = 'sol_camp_lanes';
     const { server, step, enemies, hold } = world((f) => {
       f.factions.spawns.sol.nests = [{ id: CAMP, packs: 1, respawnSeconds: 10, style: 'nomad', groups: [{ faction: 'redtooth', ships: ['redtooth_cutter', 'redtooth_cutter'], weight: 1 }] }];
     });
     const pid = (server as any).clients.values().next().value.playerId;
     const sol = server.gameData.getSystemNum('sol');
-    const camp = enemies.nest(sol, CAMP)!;
-    // A pilot in the middle band, but on the far side of Sol from the camp: the nest still sends its nomads out
-    const far = { x: -camp.x / Math.hypot(camp.x, camp.y) * 110000, y: -camp.y / Math.hypot(camp.x, camp.y) * 110000 };
-    (server as any).travelTo(server.pilots.connOf(pid), sol, far.x, far.y, false);
+    // Its ghost travels the middle band on its own (the same for every client): out of the safe space wherever it is
+    const ghost = (t?: number) => enemies.ghostAt(sol, CAMP, 0, t)!;
+    for (let t = 0; t < 60 * 60 * 60; t += 60 * 60) expect(Math.hypot(ghost(t).x, ghost(t).y)).toBeGreaterThan(76000);
+    // A pilot near where it is now: it's loaded there
+    const g = ghost(), r0 = Math.hypot(g.x, g.y);
+    const near = { x: g.x * (r0 + 15000) / r0, y: g.y * (r0 + 15000) / r0 };
+    (server as any).travelTo(server.pilots.connOf(pid), sol, near.x, near.y, false);
     step(130);
-    step(60 * 20, () => hold(far.x, far.y));
+    step(60 * 3, () => hold(near.x, near.y));
     expect(enemies.nest(sol, CAMP)!.packs.length).toBe(1);
     const packOf = () => { const [m] = enemies.nest(sol, CAMP)!.packs[0] ?? []; return m === undefined ? undefined : (enemies as any).packs.get((enemies as any).enemies.get(m).pack); };
     // Follow it about (out of its sight) for a while: it travels on and settles, round the centre, out of the safe space
@@ -230,12 +269,10 @@ describe('nests', () => {
     for (let i = 1; i < homes.length; i++) travelled += Math.hypot(homes[i].x - homes[i - 1].x, homes[i].y - homes[i - 1].y);
     expect(travelled).toBeGreaterThan(30000);
     for (const h of homes) expect(Math.hypot(h.x, h.y)).toBeGreaterThan(76000);
-    // Left alone (the pilot back in inner Sol): its pack stays out where it got to, distant, and no more come out
-    const idle = (files.factions as any).rules.idleDespawnSeconds;
-    step(60 * (idle + 5), () => hold(40000, 0));
-    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(1);
+    // Left alone (the pilot back in inner Sol): a ghost again, all its ships still alive, none more sent
     step(60 * 60, () => hold(40000, 0));
-    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(1);
+    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(0);
+    expect(enemies.population(sol, CAMP)!.slots).toEqual([{ group: 0, alive: 3, loaded: false, ships: [] }]);
   }, 120000);
 
   it("Ashfall's nests mix small, medium and rare heavy hostiles", () => {

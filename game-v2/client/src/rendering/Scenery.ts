@@ -1,7 +1,7 @@
 /**
  * Scenery besides planets: comets (an icy nucleus, a glowing coma, and ion and
  * dust tails streaming away from the star, longer the closer it gets) and
- * built structures such as a solar collector ring around the star and the
+ * built structures such as a solar collector ring around the star (solarRing.ts) and the
  * broken Halden ring at Ashfall, and the stillstones ("lodestones" in the
  * code), huge grey bodies whose fields charge a jump drive
  * (common/src/ships/jumpFields.ts).
@@ -11,7 +11,6 @@
  * it is drawn once; only the lights that blink are redrawn.
  */
 
-import { clearIfDrawn } from './gfx';
 import { Container, Graphics, Text, TextStyle, type Texture, type UniformGroup } from 'pixi.js';
 import {
   CometData, StructureData, LodestoneData, cometPosition, lodestonePosition, lodestoneLabel, lodestoneSize, lodestoneLive, lodestoneFieldRadius,
@@ -24,6 +23,7 @@ import { stillstoneDisc, stillstoneShader } from './StillstoneShader';
 import { stillstoneMapData } from './procedural';
 import shipTuning from '../../../data/ships/tuning.json';
 import { createShaderQuad, ShaderQuad } from './shaderQuad';
+import { SolarRingView } from './solarRing';
 
 const JUMP = jumpTuning(shipTuning as unknown as ShipTuning);
 /** The Halden's visual language: slate faces, a darker edge, a greyseam inlay (cold), and scorch where it faced a fire */
@@ -112,142 +112,6 @@ class CometView {
     this.coma.u.uniforms.uStrength = 0.5 + 0.5 * heat;
     keepUpright(this.label);
     return { x, y };
-  }
-}
-
-/**
- * A ring of solar collectors round the star: two rails joined by a lattice,
- * a collector blade on a strut every segment facing the star (each a grid of
- * cells in a gold frame), a collector hub every tenth with radiator fins and a
- * beacon, and beacons blinking along the outer rail. Sized from its radius, so
- * it reads at the scale of the star it circles.
- */
-/** The Helios Array's lights are redrawn at most this often (they blink and sweep slowly) */
-const GLINT_HZ = 30;
-
-class SolarRingView {
-  readonly container = new Container();
-  private ring = new Graphics();
-  private glints = new Graphics();
-  private time = 0;
-  private label: Text;
-
-  constructor(readonly data: StructureData) {
-    const R = data.radius, n = data.segments, arc = data.oldArc;
-    const seg = (Math.PI * 2 * R) / n;
-    const railGap = 260, bladeIn = R - railGap - 140, bladeDepth = Math.min(700, seg * 0.45), bladeHalf = seg * 0.42;
-    const g = this.ring;
-    // Rails
-    for (const rr of [R - railGap, R + railGap]) {
-      g.circle(0, 0, rr).stroke({ color: 0x5d6878, width: 46, alpha: 0.95 });
-      g.circle(0, 0, rr).stroke({ color: 0xb8c4d4, width: 10, alpha: 0.9 });
-    }
-    const P = (r: number, a: number): [number, number] => [Math.cos(a) * r, Math.sin(a) * r];
-    // Lattice between the rails
-    for (let i = 0; i < n * 2; i++) {
-      const a0 = (i / (n * 2)) * Math.PI * 2, a1 = ((i + 1) / (n * 2)) * Math.PI * 2;
-      const [x0, y0] = P(i % 2 ? R + railGap : R - railGap, a0), [x1, y1] = P(i % 2 ? R - railGap : R + railGap, a1);
-      g.moveTo(x0, y0).lineTo(x1, y1).stroke({ color: 0x7d899a, width: 12 });
-    }
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const c = Math.cos(a), s = Math.sin(a), tx = -s, ty = c;
-      if (i % 10 === 0) {
-        // A collector hub: a hexagon astride the rails, radiators fanned outward
-        const [hx, hy] = P(R, a);
-        const hex: number[] = [];
-        for (let k = 0; k < 6; k++) { const b = a + (k / 6) * Math.PI * 2 + Math.PI / 6; hex.push(hx + Math.cos(b) * 420, hy + Math.sin(b) * 420); }
-        for (const side of [-1, 1]) {
-          const fx = hx + c * 300 + tx * side * 260, fy = hy + s * 300 + ty * side * 260;
-          g.poly([fx - tx * 90, fy - ty * 90, fx + tx * 90, fy + ty * 90, fx + tx * 70 + c * 900, fy + ty * 70 + s * 900, fx - tx * 70 + c * 900, fy - ty * 70 + s * 900])
-            .fill({ color: 0xd8dce3 }).stroke({ color: 0x8e98a6, width: 8 });
-        }
-        g.poly(hex).fill({ color: 0x8f9bab }).stroke({ color: 0x4d5766, width: 14 });
-        g.circle(hx, hy, 210).fill({ color: 0x3a4250 }).stroke({ color: 0xd9b45a, width: 10 });
-        g.circle(hx, hy, 90).fill({ color: 0x252b36 });
-        continue;
-      }
-      // The oldest arc is Halden work: the same shape (the colony copied it), not the same make
-      const old = !!arc && (i - arc.from + n) % n < arc.count;
-      // Strut in to the blade
-      const [sx0, sy0] = P(R - railGap, a), [sx1, sy1] = P(bladeIn, a);
-      g.moveTo(sx0, sy0).lineTo(sx1, sy1).stroke({ color: old ? HALDEN.edge : 0x8b97a8, width: 22 });
-      // The blade: across the strut, facing the star, cells in a grid
-      const mid = bladeIn - bladeDepth / 2;
-      const px = c * mid, py = s * mid, hd = bladeDepth / 2;
-      if (old) {
-        // Notched corners and a greyseam inlay down the middle, in place of the cells
-        const nb = bladeHalf * 0.12, nd = hd * 0.25;
-        g.poly([
-          px + tx * (bladeHalf - nb) - c * hd, py + ty * (bladeHalf - nb) - s * hd,
-          px - tx * (bladeHalf - nb) - c * hd, py - ty * (bladeHalf - nb) - s * hd,
-          px - tx * bladeHalf - c * (hd - nd), py - ty * bladeHalf - s * (hd - nd),
-          px - tx * bladeHalf + c * hd, py - ty * bladeHalf + s * hd,
-          px + tx * bladeHalf + c * hd, py + ty * bladeHalf + s * hd,
-          px + tx * bladeHalf - c * (hd - nd), py + ty * bladeHalf - s * (hd - nd),
-        ]).fill({ color: i % 2 ? HALDEN.face : HALDEN.faceLight }).stroke({ color: HALDEN.edge, width: 14 });
-        g.moveTo(px - tx * bladeHalf * 0.8, py - ty * bladeHalf * 0.8)
-          .lineTo(px - c * hd * 0.35, py - s * hd * 0.35)
-          .lineTo(px + tx * bladeHalf * 0.8, py + ty * bladeHalf * 0.8)
-          .stroke({ color: HALDEN.inlay, width: 7, alpha: 0.5 });
-        const [bx, by] = P(R + railGap + 40, a);
-        g.circle(bx, by, 34).fill({ color: 0x9aa6b6 });
-        continue;
-      }
-      g.poly([
-        px + tx * bladeHalf - c * hd, py + ty * bladeHalf - s * hd,
-        px - tx * bladeHalf - c * hd, py - ty * bladeHalf - s * hd,
-        px - tx * bladeHalf + c * hd, py - ty * bladeHalf + s * hd,
-        px + tx * bladeHalf + c * hd, py + ty * bladeHalf + s * hd,
-      ]).fill({ color: 0x1c3a63 }).stroke({ color: 0xd9b45a, width: 14 });
-      for (let k = -3; k <= 3; k++) {
-        const ox = px + tx * bladeHalf * (k / 4), oy = py + ty * bladeHalf * (k / 4);
-        g.moveTo(ox - c * hd * 0.94, oy - s * hd * 0.94).lineTo(ox + c * hd * 0.94, oy + s * hd * 0.94).stroke({ color: 0x4f78a8, width: 6 });
-      }
-      g.moveTo(px - tx * bladeHalf * 0.96, py - ty * bladeHalf * 0.96).lineTo(px + tx * bladeHalf * 0.96, py + ty * bladeHalf * 0.96).stroke({ color: 0x4f78a8, width: 6 });
-      // Beacon housing on the outer rail
-      const [bx, by] = P(R + railGap + 40, a);
-      g.circle(bx, by, 34).fill({ color: 0x9aa6b6 });
-    }
-    // The beacons as they are most of the time (dim): drawn once with the ring; only the lit ones are drawn each frame
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const br = i % 10 === 0 ? R : R + 300;
-      g.circle(Math.cos(a) * br, Math.sin(a) * br, 18).fill({ color: i % 10 === 0 ? 0xffd890 : i % 2 ? 0xff5050 : 0x50ff80, alpha: 0.35 });
-    }
-    this.glints.blendMode = 'add';
-    this.label = new Text({ text: data.name.toUpperCase(), style: LABEL });
-    this.label.anchor.set(0.5, 0);
-    this.label.alpha = 0.5;
-    this.label.scale.set(Math.min(6, Math.max(1, R / 6000)));
-    this.label.y = R + railGap + 400;
-    this.container.addChild(this.ring, this.glints, this.label);
-  }
-
-  /** Seconds since the lights were last drawn (they're redrawn at most GLINT_HZ times a second) */
-  private glintWait = 0;
-
-  update(dt: number): void {
-    this.time += dt;
-    this.ring.rotation += dt * 0.0015;
-    keepUpright(this.label);
-    this.glints.rotation = this.ring.rotation;
-    this.glintWait += dt;
-    if (this.glintWait < 1 / GLINT_HZ) return;
-    this.glintWait = 0;
-    // A sweep of light running round the blades, and the beacons blinking (the dim ones are part of the ring)
-    const g = this.glints;
-    clearIfDrawn(g);
-    const R = this.data.radius, n = this.data.segments;
-    const seg = (Math.PI * 2 * R) / n, bladeMid = R - 260 - 140 - Math.min(700, seg * 0.45) / 2;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const sweep = Math.max(0, Math.cos(a * 2 - this.time * 0.25)) ** 16;
-      if (sweep > 0.02 && i % 10) g.circle(Math.cos(a) * bladeMid, Math.sin(a) * bladeMid, 380 * sweep + 60).fill({ color: 0xfff1c0, alpha: 0.4 * sweep });
-      if (((this.time * 0.8 + i * 0.37) % 1) >= 0.12) continue;
-      const br = i % 10 === 0 ? R : R + 300;
-      g.circle(Math.cos(a) * br, Math.sin(a) * br, i % 10 === 0 ? 120 : 46).fill({ color: i % 10 === 0 ? 0xffd890 : i % 2 ? 0xff5050 : 0x50ff80, alpha: 1 });
-    }
   }
 }
 
@@ -444,7 +308,7 @@ export class SceneryRenderer {
     for (const v of [...this.comets, ...this.rings]) v.container.destroy({ children: true });
     for (const v of this.lodestones) v.destroy();
     this.container.removeChildren();
-    this.rings = structures.flatMap<SolarRingView | RuinRingView>((s) => (s.kind === 'solar_ring' ? [new SolarRingView(s)] : s.kind === 'ruin_ring' ? [new RuinRingView(s)] : []));
+    this.rings = structures.flatMap<SolarRingView | RuinRingView>((s) => (s.kind === 'solar_ring' ? [new SolarRingView(s, this.lighting)] : s.kind === 'ruin_ring' ? [new RuinRingView(s)] : []));
     this.comets = comets.map((c) => new CometView(c));
     this.lodestones = lodestones.map((l) => new LodestoneView(l, this.lighting));
     for (const v of [...this.rings, ...this.lodestones, ...this.comets]) this.container.addChild(v.container);
@@ -460,7 +324,7 @@ export class SceneryRenderer {
     for (const r of this.rings) {
       const R = r.data.radius * 1.08 + 1400;
       r.container.visible = R > view.x0 && -R < view.x1 && R > view.y0 && -R < view.y1;
-      if (r.container.visible) r.update(dt);
+      if (r.container.visible) r.update(dt, tick);
     }
     for (const c of this.comets) {
       c.update(dt, tick);

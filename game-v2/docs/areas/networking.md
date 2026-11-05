@@ -109,7 +109,8 @@ forgot it on leaving), its row only if the key changed (stripped of its place), 
 rebuild as a light sync, never its blueprint unless the ship was replaced by a design the client hasn't seen. Nothing
 is replayed: no client catching up. A ship destroyed or gone while away goes in the snapshot's `removed`. Debris
 isn't kept. A `b` for a ship the client has nothing of (cleared when the server didn't) sends `shipNeed`, which also
-resends its row and name. Ghosts: with the map shut a capable client still gets `mapDots`, for ships homed in its
+resends its row and name. (Hostile populations' ghosts, packs nobody's near, cost nothing here: `pops` alive bits, places worked out
+by the client, world-sim guide.) Ghosts: with the map shut a capable client still gets `mapDots`, for ships homed in its
 ring or focus cells it doesn't hold, its party and its target (`FocusCells.ghost`); the client draws them as markers
 (client ships/cells/GhostLayer.ts) and fades held ships from hull to marker over 18-19 km (`ShipRenderer.ghostOf`). A
 new system, a new connection or switching the cap off starts it

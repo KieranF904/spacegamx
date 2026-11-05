@@ -29,6 +29,7 @@ import { nestPosition, pocketsFrom, type NestData } from '@space-game/common';
 import factionsFile from '../../../data/factions.json';
 import shipTuning from '../../../data/ships/tuning.json';
 import { THREAT_COLOR, threatTag } from './threat';
+import { drawStructure } from './mapStructures';
 import { hazardRows } from './hazardSums';
 import type { GameState } from '../state/GameState';
 import { etaText, type AutoDest, type RouteView } from '../ships/Autopilot';
@@ -48,6 +49,8 @@ const LODE_COLOR = '#a3c2cf';
 const LODE_DEAD = '#7d8590';
 /** Factions (nests' colours and names) */
 const FACTIONS = (factionsFile as unknown as { factions: Record<string, { name: string; color: string }> }).factions;
+/** Factions by index (a ghost's faction) */
+const FACTION_LIST = Object.values(FACTIONS);
 /** Danger bands: ring colour and word */
 const REGION_STYLE: Record<SystemRegionData['danger'], { color: string; word: string }> = {
   safe: { color: '#5eead4', word: 'safe' }, contested: { color: '#fbbf24', word: 'contested' }, hostile: { color: '#f87171', word: 'hostile' },
@@ -216,6 +219,8 @@ export class SystemMapUI {
   private camSystemId = '';
   private systems: StarSystemData[];
   private byId: Map<string, StarSystemData>;
+  /** The ghosts drawn this frame (reused) */
+  private ghostList: import('../state/Populations').PopGhost[] = [];
   private sectorColor = new Map<string, string>();
   private belt: { inner: number; outer: number } | null = null;
   private liveCentral: { type: string; radius?: number; hue?: number; diskHue?: number; beamHue?: number } | null = null;
@@ -1228,11 +1233,7 @@ export class SystemMapUI {
 
     // Built structures (a ring about the star)
     for (const st of sys?.structures ?? []) {
-      ctx.strokeStyle = 'rgba(232, 197, 106, 0.75)';
-      ctx.lineWidth = Math.max(2, 140 * S);
-      ctx.setLineDash([Math.max(2, 200 * S), Math.max(2, 120 * S)]);
-      ctx.beginPath(); ctx.arc(ox, oy, st.radius * S, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
+      drawStructure(ctx, st, ox, oy, S, this.state.getRawServerTick());
       const lx = ox, ly = oy - st.radius * S;
       this.label(ctx, st.name, lx, ly - 10, '#f0d99a', 3, ly);
       this.hits.push({ kind: 'structure', structure: st, x: 0, y: -st.radius, sx: lx, sy: ly });
@@ -1331,6 +1332,22 @@ export class SystemMapUI {
 
     // The system's ships: those in snapshot range, and the rest from the map's own list (mapDots)
     const ships = this.mapShips();
+
+    // Ghosts: the packs nobody's near (not simulated: worked out here from the populations, state/Populations.ts), as
+    // hollow rings in their faction's colour, faint; they're real ships once a pilot comes near, where they're drawn
+    const ghosts = this.state.populations.ghosts(this.state.systemId, this.byId.get(this.state.systemId), this.state.getRawServerTick(), this.ghostList);
+    if (ghosts.length) {
+      ctx.save();
+      ctx.lineWidth = 1.2;
+      for (const g of ghosts) {
+        const x = sx(g.x), y = sy(g.y);
+        if (x < -10 || y < -10 || x > w + 10 || y > h + 10) continue;
+        ctx.strokeStyle = g.calm ? 'rgba(154, 163, 178, 0.5)' : FACTION_LIST[g.faction]?.color ?? '#ff5a4a';
+        ctx.globalAlpha = g.calm ? 0.5 : 0.55;
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // Hostile ships: red, elites amber, bosses orange and bigger; a calm passive pack
     // (data[9], nobody's provoked it) grey

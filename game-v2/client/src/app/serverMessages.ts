@@ -353,6 +353,7 @@ const TABLE: Handlers = {
   },
   bossIntro: (h, msg) => { h.bossUI.intro(msg.name, msg.title, msg.text); },
   mapDots: (h, msg) => { h.state.farShips.apply(msg, h.state.systemId, h.state.getRawServerTick()); },
+  pops: (h, msg) => { h.state.populations.apply(msg, h.state.systemId); },
   bossPhase: (h, msg) => {
     // (no line: a reminder of the phase it's in, for someone arriving mid-fight)
     if (msg.text) h.bossUI.onPhase(msg.text);

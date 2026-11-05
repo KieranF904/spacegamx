@@ -181,7 +181,8 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     expect(gaps(w.seen.snaps.slice(s4 + 1, s5))).toEqual(Array(s5 - s4 - 2).fill(6));
     expect(gaps(w.seen.snaps.slice(s5 + 1, s0))).toEqual(Array(s0 - s5 - 2).fill(9));
     expect(gaps(w.seen.snaps.slice(s0 + 1))).toEqual(Array(w.seen.snaps.length - s0 - 2).fill(3));
-    expect(gaps(w.seen.legacySnaps.slice(l5 + 1, l0)).every((g) => g === 9)).toBe(true);
+    // (A legacy client's snapshot is left out of a round with nothing in it for it: what goes is on the window's beat)
+    expect(gaps(w.seen.legacySnaps.slice(l5 + 1, l0)).every((g) => g % 9 === 0)).toBe(true);
     expect(w.seen.crowd.map((m) => m.w)).toEqual([6, 9, 3]);
     expect(w.seen.checked).toBeGreaterThan(300);
     expect(w.seen.offIds).toEqual([]);

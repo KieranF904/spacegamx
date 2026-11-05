@@ -17,10 +17,10 @@
 import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, InSystem, Player, Dead, Health, Boost, Input, Projectile, Lifetime, DroppedItem, Station, Portal,
-  ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
+  ASTEROID_SEED, MAP_DOT_SLACK, MAP_PT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packSheds, packRanges, DEBRIS_STATUS, TICK_RATE,
-  FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor, debrisFor,
+  FOCUS_RANGE, RING_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor, debrisFor, FEED_TIERS, feedMidRadius,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
@@ -914,6 +914,27 @@ export class SnapshotBuilder {
     const dotsDue = this.currentTick - this.lastMapDotsTick >= MAP_DOTS_TICKS;
     if (dotsDue) this.lastMapDotsTick = this.currentTick;
     this.sendMapDots(dotsDue);
+    this.sendPops();
+  }
+
+  /**
+   * Hostile populations (Enemies: nests' and zones' packs, ship by ship) to the clients in their systems: everything
+   * once (a new system or connection), then only the spawners that changed (a death, a ship back, a pack loaded or
+   * put back to a ghost). The clients work out every ghost's place from it (common world/populations.ts).
+   */
+  sendPops(): void {
+    const changed = this.enemies.popChanges();
+    for (const conn of this.clients.values()) {
+      if (!conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
+      const num = InSystem.systemId[conn.playerId];
+      if (conn.popsFresh) {
+        conn.popsFresh = false;
+        this.send(conn.ws, { type: 'pops', p: this.enemies.popRows(num), full: 1 });
+        continue;
+      }
+      const rows = changed.get(num);
+      if (rows?.length) this.send(conn.ws, { type: 'pops', p: rows });
+    }
   }
 
   private lastMapDotsTick = -Infinity;
@@ -1080,6 +1101,10 @@ export class SnapshotBuilder {
       return rows;
     };
     const now = this.currentTick;
+    // Hostiles (loaded and active: not predictable from the client) go as places at their distance's rate
+    // (FEED_TIERS): in the client's ring every round, in the system's first band (inner Sol) every 2 s, past it every 5 s
+    const mid = new Map<number, number>();
+    const midOf = (num: number) => { let r = mid.get(num); if (r === undefined) mid.set(num, (r = feedMidRadius(this.gameData.getSystemByNum(num), FEED_TIERS))); return r; };
     for (const conn of this.clients.values()) {
       // (Holding cells with its map shut: its ghosts, the ring's ships as legs: CAPS.FOCUS)
       if (!(conn.mapOpen || conn.focus) || !(due || conn.mapDotsDue) || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
@@ -1088,16 +1113,24 @@ export class SnapshotBuilder {
       const sent = (conn.mapSent ??= new Map());
       const full = conn.mapFresh === true;
       conn.mapFresh = false;
-      const dots: number[] = [], routes: number[] = [], info: number[] = [], gone: number[] = [];
+      const dots: number[] = [], routes: number[] = [], info: number[] = [], gone: number[] = [], pts: number[] = [];
       const names: (number | string)[] = [];
       const on = new Set<number>();
-      for (const r of rowsFor(InSystem.systemId[conn.playerId])) {
+      const num = InSystem.systemId[conn.playerId], px = Position.x[conn.playerId], py = Position.y[conn.playerId], midR = midOf(num);
+      for (const r of rowsFor(num)) {
         if (r.eid === conn.playerId || conn.shipView.has(r.eid) || (ghost && !ghost(r.eid))) continue;
         on.add(r.eid);
         const was = sent.get(r.eid);
-        // (A live one: how far it's strayed from where the client has it, carried on along what it was sent)
-        const off = was && r.seq < 0 ? (() => { const p = legAt(was.leg, now - was.tick); return dhypot(p.x - r.leg.x, p.y - r.leg.y); })() : 0;
-        if (!was || was.seq !== r.seq || off > MAP_DOT_SLACK) {
+        if ((r.look & 7) === 3) {
+          // (A hostile: its place, when its tier's due and it's moved; seq -2 marks a place sent, not a leg)
+          const every = nearerThan(r.leg.x - px, r.leg.y - py, RING_RANGE) ? MAP_DOTS_TICKS : nearerThan(r.leg.x, r.leg.y, midR) ? FEED_TIERS.midTicks : FEED_TIERS.farTicks;
+          if (!was || was.seq !== -2 || (now - was.tick >= every - 1 && dhypot(was.leg.x - r.leg.x, was.leg.y - r.leg.y) > MAP_PT_SLACK)) {
+            const x = Math.round(r.leg.x / 10), y = Math.round(r.leg.y / 10);
+            pts.push(r.eid, x, y);
+            sent.set(r.eid, { leg: { x: x * 10, y: y * 10, vx: 0, vy: 0, wx: 0, wy: 0, thrust: -1 }, tick: now, seq: -2, look: was?.look ?? -1 });
+          }
+        } else if (!was || was.seq !== r.seq || (r.seq < 0 && (() => { const p = legAt(was.leg, now - was.tick); return dhypot(p.x - r.leg.x, p.y - r.leg.y); })() > MAP_DOT_SLACK)) {
+          // (A live one: sent again once it's strayed from where the client has it, carried on along what it was sent)
           const at = dots.length;
           if (r.patrol) packMapRoute(routes, r.eid, now, r.patrol.p, r.patrol.s);
           else packMapLeg(dots, r.eid, r.leg);
@@ -1109,8 +1142,8 @@ export class SnapshotBuilder {
       }
       for (const id of sent.keys()) if (!on.has(id)) { gone.push(id); sent.delete(id); }
       // (Nothing's changed: nothing to say)
-      if (!full && !dots.length && !routes.length && !info.length && !gone.length && !names.length) continue;
-      this.send(conn.ws, { type: 'mapDots', tick: now, dots, ...(routes.length ? { routes } : {}), ...(info.length ? { info } : {}), ...(gone.length ? { gone } : {}), ...(names.length ? { names } : {}), ...(full ? { full: 1 as const } : {}) });
+      if (!full && !dots.length && !routes.length && !info.length && !gone.length && !names.length && !pts.length) continue;
+      this.send(conn.ws, { type: 'mapDots', tick: now, dots, ...(routes.length ? { routes } : {}), ...(info.length ? { info } : {}), ...(gone.length ? { gone } : {}), ...(names.length ? { names } : {}), ...(full ? { full: 1 as const } : {}), ...(pts.length ? { pts } : {}) });
     }
   }
 
@@ -1151,6 +1184,7 @@ export class SnapshotBuilder {
     conn.mapNamed.clear();
     conn.mapSent?.clear();
     conn.mapFresh = true;
+    conn.popsFresh = true;
 
     const systemData = this.gameData.getSystemByNum(playerSystemId);
     const belt = systemData?.asteroidBelt;

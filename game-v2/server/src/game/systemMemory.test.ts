@@ -180,6 +180,39 @@ describe('system memory', () => {
     expect(w2.enemies.nest(ash, DIG)!.packs.length).toBe(0);
   }, 60000);
 
+  it("a nest's losses are remembered through its system being put away and a restart, and come back at its rate, time away counting", async () => {
+    const { store, written } = memStore();
+    const clock = { t: 1_000_000 };
+    const w = world(store, clock);
+    const ash = w.num('ashfall');
+    const DIG = 'ashfall_dig_cinderjack';
+    const def = (files.factions as any).spawns.ashfall.nests.find((q: any) => q.id === DIG);
+    const every = def.respawnSeconds ?? (files.factions as any).rules.respawnSeconds;
+    const alive = (ww: typeof w) => ww.enemies.population(ash, DIG)!.slots.reduce((n, s) => { let c = 0; for (let a = s.alive; a; a &= a - 1) c++; return n + c; }, 0);
+    const near = (ww: typeof w, s: number) => { const n = ww.enemies.nest(ash, DIG)!; ww.at('ashfall', n.x + 20000, n.y, s); };
+    w.at('ashfall', 0, 60000, 1);
+    near(w, 3);
+    const full = alive(w);
+    for (const e of w.enemies.nest(ash, DIG)!.packs.flat()) { const s = w.bridge.get(e)!; w.bridge.hurt(e, s, s.blueprint.parts.findIndex((p) => p.fn === 'core'), 1e9, w.pid); }
+    near(w, 1);
+    expect(alive(w)).toBe(0);
+    // Left (Ashfall put away): still none, the first not due yet
+    w.away();
+    expect(w.memory.remembers('ashfall')).toBe(true);
+    expect(alive(w)).toBe(0);
+    await w.server.saveAll();
+    expect(written()!.populations?.ashfall?.[DIG]?.slots.every((s) => s.alive === 0)).toBe(true);
+    // Down for two and a half of its intervals: two ships back (one an interval), not the lot
+    clock.t += every * 2.5 * 1000;
+    const w2 = world(store, clock);
+    w2.at('sol', 120000, 0, 1);
+    expect(alive(w2)).toBe(2);
+    expect(full).toBeGreaterThan(2);
+    // And on, one an interval, wherever the pilots are
+    w2.at('sol', 120000, 0, every);
+    expect(alive(w2)).toBe(3);
+  }, 120000);
+
   it("a pilot at a gate's mouth has where it goes brought back before they're through", () => {
     const w = world();
     const ash = w.num('ashfall');

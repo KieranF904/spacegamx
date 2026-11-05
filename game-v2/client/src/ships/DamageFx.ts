@@ -79,6 +79,8 @@ export class DamageFx {
   /** Redrawn every frame, so a render group of its own: Pixi rebuilds its draw list, not the whole glow layer's */
   private addGroup = new Container({ isRenderGroup: true });
   private addSprites = new ParticlePool('add');
+  /** Shield bubbles (rim, fill, hex, the regen flash): their own pool, a pool draws from at most four textures */
+  private shieldSprites = new ParticlePool('add');
   /** Shockwave and charge rings, charge glows */
   private rings = new ParticlePool('add', 'rings');
   /** Chunks' hot edges: one per glowing chunk, kept for it (its outline stroked once), spares parked */
@@ -118,7 +120,7 @@ export class DamageFx {
   constructor(layer: Container, private source: ShipSource, private state: GameState, private sound: Sound, private repairRange: number) {
     this.add.blendMode = 'add';
     this.addGroup.addChild(this.add);
-    this.glowRoot.addChild(this.addSprites.container, this.rings.container, this.hotLayer, this.addGroup);
+    this.glowRoot.addChild(this.shieldSprites.container, this.addSprites.container, this.rings.container, this.hotLayer, this.addGroup);
     layer.addChild(this.smokeSprites.container, this.chunkLayer, this.glowRoot);
   }
 
@@ -684,11 +686,11 @@ export class DamageFx {
         const tint = flash > 0.3 ? look.hit : rf > 0.3 ? 0xffffff : look.tint;
         const rim = rest + 0.35 * flash + 0.15 * rg + 0.8 * rf;
         const fill = (own ? 0 : 0.3 * rest) + 0.55 * f2 + 0.18 * rg + 0.3 * rf;
-        this.addSprites.take(bubbleRim(), e.renderX, e.renderY, 0.5, 0.5, tint, rim, 0, b, b);
-        if (fill > 0.01) this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, tint, fill, 0, b, b);
-        if (look.inner) this.addSprites.take(bubbleRim(), e.renderX, e.renderY, 0.5, 0.5, look.inner, rim * 0.8, 0, b * 0.9, b * 0.9);
-        if (look.hex) this.addSprites.take(hexShield(), e.renderX, e.renderY, 0.5, 0.5, look.hex, (0.06 + 0.12 * k) * sh * (own ? settings.data.display.ownShield : 1) + 0.45 * f2 + 0.15 * rg, this.time * 0.05 + id, b, b);
-        if (rf > 0) this.addSprites.take(glowBall(), e.renderX, e.renderY, 0.5, 0.5, 0xffffff, 0.7 * rf, 0, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE);
+        this.shieldSprites.take(bubbleRim(), e.renderX, e.renderY, 0.5, 0.5, tint, rim, 0, b, b);
+        if (fill > 0.01) this.shieldSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, tint, fill, 0, b, b);
+        if (look.inner) this.shieldSprites.take(bubbleRim(), e.renderX, e.renderY, 0.5, 0.5, look.inner, rim * 0.8, 0, b * 0.9, b * 0.9);
+        if (look.hex) this.shieldSprites.take(hexShield(), e.renderX, e.renderY, 0.5, 0.5, look.hex, (0.06 + 0.12 * k) * sh * (own ? settings.data.display.ownShield : 1) + 0.45 * f2 + 0.15 * rg, this.time * 0.05 + id, b, b);
+        if (rf > 0) this.shieldSprites.take(glowBall(), e.renderX, e.renderY, 0.5, 0.5, 0xffffff, 0.7 * rf, 0, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE);
       }
       if (emp && Math.random() < 0.5 * frames) {
         // (Sparks on a live part, not a random spot in the hull's disc)
@@ -831,6 +833,7 @@ export class DamageFx {
     this.fires(frames);
     if (this.anchors.live.length) this.anchors.step(this.state.entities, frames);
     this.addSprites.begin();
+    this.shieldSprites.begin();
     this.smokeSprites.begin();
     this.rings.begin();
     this.draw(frames);
@@ -838,6 +841,7 @@ export class DamageFx {
     this.drawRipples(frames);
     this.drawCharges();
     this.addSprites.end();
+    this.shieldSprites.end();
     this.smokeSprites.end();
     this.rings.end();
   }

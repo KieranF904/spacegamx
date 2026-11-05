@@ -37,7 +37,7 @@ import { dirname } from 'path';
 import { LIFE_ASLEEP_RESET, type ShipState } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { FarPose } from '../ships/SimLod.js';
-import type { PackMemory } from './Enemies.js';
+import type { PackMemory, PopulationMemory } from './Enemies.js';
 import type { BossMemory } from './Bosses.js';
 import { mergeRules } from '../data/rules.js';
 
@@ -93,6 +93,12 @@ export interface MemoryFile {
   timers: MemoryTimers;
   /** Every remembered system, by id: put away, or as it was when written */
   systems: Record<string, SystemSnapshot>;
+  /**
+   * Every nest's and zone's population (Enemies.ts), by system id then spawner id: which of each pack's ships are
+   * alive, hurt ones' HP, when its next ship's back. Kept whether its system's in the world or not (a ghost costs
+   * nothing), so a nest you cleared is still short when you come back, however you came and went.
+   */
+  populations?: Record<string, Record<string, PopulationMemory>>;
 }
 
 export interface WorldStore {
@@ -116,6 +122,9 @@ export interface MemoryHost {
   restore(num: number, snap: SystemSnapshot, offset: number, mend: { ships: number; bosses: number }, from: number): void;
   timers(offset: number): MemoryTimers;
   setTimers(t: MemoryTimers, offset: number): void;
+  /** The populations (MemoryFile.populations) */
+  populations?(offset: number): MemoryFile['populations'];
+  setPopulations?(p: MemoryFile['populations'], offset: number): void;
 }
 
 const round = (v: number, k: number) => Math.round(v * k) / k;
@@ -172,6 +181,7 @@ export class SystemMemory {
       const known = new Set(this.ids.values());
       for (const [id, snap] of Object.entries(file.systems)) if (known.has(id) && snap && typeof snap.at === 'number') this.kept.set(id, snap);
       if (file.timers) this.host.setTimers(file.timers, this.offset);
+      if (file.populations) this.host.setPopulations?.(file.populations, this.offset);
       this.log(`${this.kept.size} systems remembered, written ${Math.round(down / 60000)} min ago`);
     }
     for (const [num, id] of this.ids) if (!this.kept.has(id)) this.resident.add(num);
@@ -263,7 +273,8 @@ export class SystemMemory {
     for (const num of [...this.coming.keys()]) this.enter(num);
     const systems: Record<string, SystemSnapshot> = Object.fromEntries(this.kept);
     for (const num of this.resident) systems[this.ids.get(num)!] = { at: this.worldTick(), ...this.host.capture(num, this.offset, false) };
-    return { version: MEMORY_VERSION, savedAt: this.host.now(), worldTick: this.worldTick(), timers: this.host.timers(this.offset), systems };
+    const populations = this.host.populations?.(this.offset);
+    return { version: MEMORY_VERSION, savedAt: this.host.now(), worldTick: this.worldTick(), timers: this.host.timers(this.offset), systems, ...(populations ? { populations } : {}) };
   }
 
   /** Write it all to the store (one write at a time; the last asked for is the one that lands) */

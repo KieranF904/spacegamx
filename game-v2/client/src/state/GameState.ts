@@ -13,6 +13,8 @@
 
 import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, type Charge } from '@space-game/common';
 import { FarShips } from './FarShips';
+import { Populations } from './Populations';
+import factionsFile from '../../../data/factions.json';
 import {
   ServerSnapshotMessage,
   ClientInputMessage,
@@ -269,6 +271,11 @@ export class GameState {
   public systemId: string = 'sol';
   /** This system's ships past the snapshot's view, for the system map (mapDots) */
   public readonly farShips = new FarShips();
+  /** This system's hostile populations: the ghosts of packs nobody's near (pops; common world/populations.ts) */
+  public readonly populations = new Populations(
+    (factionsFile as unknown as { spawns: ConstructorParameters<typeof Populations>[0] }).spawns,
+    Object.keys((factionsFile as unknown as { factions: Record<string, unknown> }).factions),
+  );
   /** Per system id: what its hostiles rate (the welcome message; ships/rating.ts) */
   public threats: Record<string, number> = {};
   /** Systems with danger bands (Sol): the threat in each band (system id -> region id -> rating) */
@@ -975,6 +982,7 @@ export class GameState {
   /** Travelled to another system: forget everything from the old one except our own ship. */
   clearForSystemChange(): void {
     this.farShips.clear();
+    this.populations.clear();
     for (const id of [...this.entities.keys()]) {
       if (id !== this.playerId) this.entities.delete(id);
     }

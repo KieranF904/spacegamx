@@ -17,42 +17,15 @@
  * nomad crossing to the far side of the Drift never cuts through inner Sol.
  */
 
-import type { NestData, PlanetData, StarSystemData } from '@space-game/common';
-import { planetPosition, nestReach, datan2, dcos, dhypot, dsin } from '@space-game/common';
+import type { PlanetData, StarSystemData } from '@space-game/common';
+import { planetPosition, datan2, dcos, dhypot, dsin } from '@space-game/common';
 
-export type RoamStyle = 'anchored' | 'loose' | 'nomad';
-export type XY = { x: number; y: number };
-export interface Band { min: number; max: number }
+// (The styles, bands and clamp are shared with the clients' ghosts: common world/populations.ts)
+export { nestBand, clampBand, type RoamStyle, type XY, type Band } from '@space-game/common';
+import { clampBand, type Band, type XY } from '@space-game/common';
 
 /** How far a loose pack strays: up to this many times its `roam` from the nest */
 export const LOOSE_REACH = 3.5;
-
-/** The ring of the system a nest's packs keep to: its region band (or the whole system), clear of the central body */
-export function nestBand(sys: Pick<StarSystemData, 'regions' | 'centralBody' | 'starRadius' | 'asteroidBelt' | 'portals' | 'planets'> | undefined, place: NestData): Band {
-  const reach = nestReach(place, sys?.planets);
-  const r = (reach.min + reach.max) / 2;
-  const cb = sys?.centralBody as { radius?: number; gravity?: { horizon?: number } } | undefined;
-  const body = Math.max(cb?.gravity?.horizon ?? 0, cb?.radius ?? sys?.starRadius ?? 0) + 6000;
-  const belts = [sys?.asteroidBelt, ...(sys?.asteroidBelt?.extra ?? [])].map((b) => b?.outerRadius ?? 0);
-  const edge = Math.max(reach.max, ...belts, ...(sys?.planets ?? []).map((p) => p.orbit.radius + p.radius + 4000), ...(sys?.portals ?? []).map((g) => dhypot(g.position.x, g.position.y))) * 1.08;
-  const regions = sys?.regions ?? [];
-  if (!regions.length) return { min: body, max: edge };
-  let i = regions.findIndex((g) => r <= g.outer);
-  if (i < 0) i = regions.length - 1;
-  const inner = i > 0 ? regions[i - 1].outer : 0;
-  // (Out of a safe band by a margin: a pack's ships reach a little past their home)
-  const margin = i > 0 && regions[i - 1].danger === 'safe' ? 3000 : 0;
-  return { min: Math.max(body, inner + margin), max: i === regions.length - 1 ? Math.max(edge, regions[i].outer) : regions[i].outer };
-}
-
-/** A point pushed back into the band (radially) */
-export function clampBand(p: XY, b: Band): XY {
-  const r = dhypot(p.x, p.y);
-  if (r >= b.min && r <= b.max) return p;
-  if (r < 1) return { x: b.min, y: 0 };
-  const k = Math.min(b.max, Math.max(b.min, r)) / r;
-  return { x: p.x * k, y: p.y * k };
-}
 
 /**
  * Move `from` towards `to` by about `step`, round the centre (radius and
