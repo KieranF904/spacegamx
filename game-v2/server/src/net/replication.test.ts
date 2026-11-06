@@ -3,7 +3,7 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, InSystem, ServerMessage, ShipReplicaSet, ReplicaMode, replicaAngle, quantizeReplicaAngle,
-  rebuildVolley, Player, Projectile, createShipState, stepGuns, volleyShells, firesStraight, weaponDef, isWeaponFn,
+  rebuildVolley, Player, Projectile, otherShotWireOf, isOtherShotWire, createShipState, stepGuns, volleyShells, firesStraight, weaponDef, isWeaponFn,
   parseBlueprint, stackMods, TELL_CHARGE_START, TELL_CHARGE_CANCEL, type Blueprint, type Charge, type PortsState, type ReplicaEnv, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { readFileSync } from 'fs';
@@ -157,10 +157,15 @@ describe('fire events', () => {
     }
     if (mode === 'ammo') server.pilots.get(server.pilots.connOf(a.pid())!)!.cargo.push({ id: 'cannon_hv', n: 5 });
     let ammoShots = 0;
-    let built = 0, rows = 0, worst = 0;
+    let built = 0, rows = 0, worst = 0, derived = 0;
     const misses: string[] = [];
     // (Their shots only: the system's own nests have ships out too, and this is about these two sides)
     const fighting = new Set<number>();
+    // (A shell the watcher builds from another ship's gun lane is named by its shot id, common sim/otherGuns.ts: the
+    // server's shell with that shot, by its fire record as it goes in)
+    const byShot = new Map<number, number>();
+    const fired = ships.fired, push = fired.push.bind(fired);
+    fired.push = (...fs) => { for (const f of fs) f.ids.forEach((eid, k) => byShot.set(otherShotWireOf(f.owner, f.tick, f.part, k), eid)); return push(...fs); };
     // Bree watches with the client's tick layer (its replicas as the server's, causes and all): each fire event's
     // shells rebuilt from the firing ship's replica as the shot left it, against the server's own shells
     const b = watcher(server, 'Bree_watch', (m, w) => {
@@ -179,12 +184,14 @@ describe('fire events', () => {
         if (!v) { misses.push(`no volley for ${owner} part ${part}`); continue; }
         const moved = hasComponent(server['world'], Player, owner) ? 1 : 0;
         for (const s of v.shells) {
+          const id = isOtherShotWire(s.id) ? byShot.get(s.id) ?? -1 : s.id;
+          if (isOtherShotWire(s.id)) derived++;
           // (already hit something; or gone and its id since reused for another ship's shot)
-          if (!hasComponent(server['world'], Projectile, s.id) || Projectile.ownerId[s.id] !== owner) continue;
+          if (id < 0 || !hasComponent(server['world'], Projectile, id) || Projectile.ownerId[id] !== owner) continue;
           // (the shell now, the server's step since the snapshot's tick: a frame may wait, coalesced)
           const age = server.getTick() - tick + moved;
-          const err = Math.max(Math.abs(s.x + s.vx * age - Position.x[s.id]), Math.abs(s.y + s.vy * age - Position.y[s.id]),
-            Math.abs(s.vx - Velocity.x[s.id]) * 100, Math.abs(s.vy - Velocity.y[s.id]) * 100);
+          const err = Math.max(Math.abs(s.x + s.vx * age - Position.x[id]), Math.abs(s.y + s.vy * age - Position.y[id]),
+            Math.abs(s.vx - Velocity.x[id]) * 100, Math.abs(s.vy - Velocity.y[id]) * 100);
           worst = Math.max(worst, err);
           built++;
         }
@@ -202,7 +209,9 @@ describe('fire events', () => {
       Position.x[b.pid()] = 26000; Position.y[b.pid()] = 23000; Velocity.x[b.pid()] = 0; Velocity.y[b.pid()] = 0;
       server.step();
     }
-    console.log(`fire events (${mode}): ${built} shells built (${ammoShots} with ammunition), ${rows} sent as rows, worst error ${worst.toFixed(4)}`);
+    console.log(`fire events (${mode}): ${built} shells built (${derived} from gun lanes, ${ammoShots} with ammunition), ${rows} sent as rows, worst error ${worst.toFixed(4)}`);
+    // (most from the other ships' gun lanes now: their fire records go only where the server's state alone decided)
+    expect(derived).toBeGreaterThan(20);
     if (mode === 'ammo') expect(ammoShots).toBeGreaterThan(10);
     expect(misses.slice(0, 3)).toEqual([]);
     expect(built).toBeGreaterThan(50);
@@ -219,10 +228,14 @@ describe('fire events', () => {
   };
 
   for (const guns of [null, ['railgun_rail_driver', 'cannon_longbarrel'], ['autocannon_stinger', 'autocannon_chainsaw'], ['flak_cloudmaker', 'emp_blackout']] as const) it(`a pilot's client fires the same shells on the same ticks as the server, from the same barrels${guns ? ` (firing models: ${guns.join(', ')})` : ''}`, () => {
-    const { server, a, b } = world();
+    const { server, a } = world();
     const ships = server.getShips();
     const p = a.pid();
     if (guns) ships.respawnInPlace(p, armed(guns[0], guns[1]));
+    // (The watcher steps Ash's guns itself (common sim/otherGuns.ts): a charge's tells are its lane's records, the
+    // fire rows it builds at each snapshot, or the server's where it told them)
+    const tells: number[][] = [];
+    const b = watcher(server, 'Bree_watch', (m) => { for (const f of m.fire ?? []) tells.push(f); });
     // (Charge tells reach the watcher as shell-less fire events. Fixed guns fire along the nose: the aim sweeps a little)
     Position.x[b.pid()] = 26000; Position.y[b.pid()] = 21000;
     let starts = 0, cancels = 0;
@@ -251,7 +264,7 @@ describe('fire events', () => {
       const energy = theirCharge && { charge: theirCharge };
       theirCharge = undefined;
       const { shots } = stepGuns(mine, pose, { firing: Input.fireLeft[p] === 1, aimWorld: Input.targetAngle[p], aimDist: Input.cursorDist[p], energy }, tick, ships.tuning);
-      for (const m of b.got.splice(0)) for (const [owner, , partAmmo, , ...ids] of (m.type === 'snapshot' ? m.fire : undefined) ?? []) {
+      for (const [owner, , partAmmo, , ...ids] of tells.splice(0)) {
         if (owner !== p) continue;
         const code = Math.floor(partAmmo / 256);
         if (code === TELL_CHARGE_START) { starts++; expect(ids).toEqual([]); }
