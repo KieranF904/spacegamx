@@ -82,7 +82,7 @@ export class PredictSource implements SimOverlaySource {
     this.sample(performance.now());
     const r = (k: string) => this.deltas.rate(k);
     const ticks = this.deltas.delta('ticks').d;
-    const hits = this.pc.tally.read(), strikes = this.pc.strikes.read(), gp = this.pc.drawGap.pilot.read(), ga = this.pc.drawGap.ai.read();
+    const hits = this.pc.tally.read(), strikes = this.pc.strikes.read(), gp = this.pc.drawGap.pilot.read(), ga = this.pc.drawGap.ai.read(), gb = this.pc.drawGap.boss.read();
     const checks = this.deltas.delta('checks').d, misses = this.deltas.delta('misses').d;
     return {
       ptShips: [...this.pc.layer.ring.ids()].length,
@@ -108,8 +108,28 @@ export class PredictSource implements SimOverlaySource {
       drawGapPilotOnPct: gp.onTargetPct,
       drawGapAi: ga.gapMean,
       drawGapAiOnPct: ga.onTargetPct,
+      drawGapBoss: gb.gapMean,
+      drawGapBossOnPct: gb.onTargetPct,
+      ...this.kindRows(),
       correctionMean: this.deltas.delta('corrections').d > 0 ? this.deltas.delta('correctionDist').d / this.deltas.delta('corrections').d : 0,
     };
+  }
+
+  /** The PT timeline's other kinds (bodies, guides, moves: predict/ptKinds.ts), since the mode was switched */
+  private kindRows(): Record<string, number> {
+    const out: Record<string, number> = {}, secs = Math.max(1e-3, (performance.now() - this.pc.switchedAt) / 1000);
+    for (const k of this.pc.world.kinds.all()) {
+      if (k.name === 'ships') continue;
+      const s = k.stats, n = k.name;
+      out[`${n}MatchPct`] = s.checks > 0 ? (100 * s.matches) / s.checks : NaN;
+      out[`${n}RestepsPerSec`] = s.restepThings / secs;
+      out[`${n}CorrMean`] = s.corrections > 0 ? s.correctionDist / s.corrections : 0;
+      out[`${n}AheadPct`] = s.ahead + s.late > 0 ? (100 * s.ahead) / (s.ahead + s.late) : NaN;
+      out[`${n}LateTicks`] = s.late > 0 ? s.lateTicks / s.late : 0;
+      out[`${n}WrongPerSec`] = s.wrong / secs;
+      out[`${n}MsPerTick`] = s.ticks > 0 ? (s.advanceMs + s.restepMs) / s.ticks : 0;
+    }
+    return out;
   }
 
   counters(): Partial<OverlayCounters> {
@@ -154,6 +174,12 @@ export class PredictSource implements SimOverlaySource {
         're-step CPU / tick': `${f(n.restepMsPerTick, 3)} ms`,
         'PT step CPU / tick': `${f(n.advanceMsPerTick, 3)} ms`,
         'ease (lerp)': `${this.pc.lerpMs} ms`,
+        'drawn vs ST: bosses': Number.isFinite(n.drawGapBossOnPct) ? `${f(n.drawGapBoss)} u, ${f(n.drawGapBossOnPct, 0)} % on` : '-',
+        'PT bosses: ST match': Number.isFinite(n.bodiesMatchPct) ? `${f(n.bodiesMatchPct, 0)} %, ${f(n.bodiesRestepsPerSec)} re-steps/s, corr ${f(n.bodiesCorrMean)} u` : '-',
+        'PT shells+mobs: ST match': Number.isFinite(n.guidesMatchPct) ? `${f(n.guidesMatchPct, 0)} %, ${f(n.guidesRestepsPerSec)} re-steps/s, corr ${f(n.guidesCorrMean)} u` : '-',
+        'PT boss moves: ST match': Number.isFinite(n.movesMatchPct) ? `${f(n.movesMatchPct, 0)} %, ${f(n.movesRestepsPerSec)} re-steps/s` : '-',
+        '  looks+shells ahead': Number.isFinite(n.movesAheadPct) ? `${f(n.movesAheadPct, 0)} % (late ones ${f(n.movesLateTicks)} ticks), wrong ${f(n.movesWrongPerSec)}/s` : '-',
+        'world kinds CPU / tick': `${f(n.bodiesMsPerTick + n.guidesMsPerTick + n.movesMsPerTick, 3)} ms`,
       });
     }
     return rows;

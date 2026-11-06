@@ -11,10 +11,13 @@ import { PtStLayer } from './ptst';
 import { ReplicaPtWorld } from './replicaWorld';
 import { HitTally, StrikeOffsets } from './hitTally';
 import { shieldOf } from '../../ships/drawnHit';
-import { PREDICT_MODES, modeById, type ModeCtx, type ModeId, type PredictMode } from './modes';
+import { PREDICT_MODES, modeById, ptDrawTick, type ModeCtx, type ModeId, type PredictMode } from './modes';
+import { worldKinds, type WorldKinds } from './worldKinds';
 
 export class PredictController {
   readonly layer: PtStLayer;
+  /** The rest of the world on the PT timeline with the ships (C2/C3): bosses, homing shells and mobs, boss attacks */
+  readonly world: WorldKinds;
   readonly tally: HitTally;
   readonly strikes: StrikeOffsets;
   /**
@@ -22,7 +25,7 @@ export class PredictController {
    * drawn place and the tick your shells are drawn at, against its ST there once confirmed (StrikeOffsets' gap),
    * apart for other pilots and for AI ships
    */
-  readonly drawGap: { pilot: StrikeOffsets; ai: StrikeOffsets };
+  readonly drawGap: { pilot: StrikeOffsets; ai: StrikeOffsets; boss: StrikeOffsets };
   readonly ctx: ModeCtx;
   private current: PredictMode = PREDICT_MODES[0];
   /** When the mode was last switched (the overlay's rates start again from there) */
@@ -38,17 +41,17 @@ export class PredictController {
     this.strikes = new StrikeOffsets((id, t) => sc.replicas.at(id, t)?.body ?? null, () => state.serverTick);
     const tally = this.tally.tally;
     const st = (id: number, t: number) => sc.replicas.at(id, t)?.body ?? null, conf = () => state.serverTick;
-    this.drawGap = { pilot: new StrikeOffsets(st, conf), ai: new StrikeOffsets(st, conf) };
+    this.drawGap = { pilot: new StrikeOffsets(st, conf), ai: new StrikeOffsets(st, conf), boss: new StrikeOffsets(st, conf) };
     window.setInterval(() => {
       const me = state.entities.get(state.playerId);
       if (!me || state.predictedTick <= 0) return;
-      const k = Math.round(state.ownDrawTick());
+      const k = Math.round(state.ownDrawTick()), bosses = new Set(sc.bodies.told());
       for (const [id, e] of state.entities) {
         if (id === state.playerId || !ship(id) || Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) > 2500) continue;
         const m = sc.replicas.modeOf(id), r = sc.store.get(id)?.derived.radius;
         if (m === undefined || m === ReplicaMode.Drift || m === ReplicaMode.Docked || !r) continue;
         const pilot = m === ReplicaMode.Player;
-        (pilot ? this.drawGap.pilot : this.drawGap.ai).strike(id, k, pilot, e.renderX, e.renderY, r);
+        (pilot ? this.drawGap.pilot : bosses.has(id) ? this.drawGap.boss : this.drawGap.ai).strike(id, k, pilot, e.renderX, e.renderY, r);
       }
     }, 250);
     renderer.shotTally = (what, shot, owner, target) => {
@@ -68,6 +71,8 @@ export class PredictController {
       pilot: (id) => sc.replicas.modeOf(id) === ReplicaMode.Player,
       layer: this.layer,
     };
+    this.world = worldKinds(state, sc, renderer, this.layer, (id) => ptDrawTick(this.ctx, id, this.ctx.ownDraw()));
+    this.ctx.kinds = this.world.kinds;
   }
 
   get mode(): PredictMode { return this.current; }
@@ -79,16 +84,23 @@ export class PredictController {
     this.current = m;
     this.layer.reset();
     if (m.ptst) this.layer.set({ touch: m.ptst.touch });
+    // (the world's kinds run with the ships layer: in C2/C3, else the snapshots' runners draw as they always have)
+    if (m.ptst) this.world.install(); else this.world.uninstall();
     this.state.drawMode = m.hook(this.ctx);
     this.tally.reset();
     this.strikes.reset();
     this.drawGap.pilot.reset();
     this.drawGap.ai.reset();
+    this.drawGap.boss.reset();
     this.switchedAt = performance.now();
     this.onChange?.(m);
     return true;
   }
 
   get lerpMs(): number { return this.layer.opts.lerpMs; }
-  set lerpMs(v: number) { this.layer.set({ lerpMs: v }); }
+  set lerpMs(v: number) {
+    this.layer.set({ lerpMs: v });
+    this.world.bodies.ease.lerpMs = v;
+    this.world.guides.ease.lerpMs = v;
+  }
 }

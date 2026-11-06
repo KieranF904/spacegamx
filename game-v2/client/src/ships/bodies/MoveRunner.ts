@@ -35,7 +35,20 @@ export interface MoveRunnerHost {
   terrain(): Terrain | null | undefined;
   /** factions.json custom.designs (the custom enemies' numbers) */
   custom?: { designs: Record<string, CustomStats> };
+  /**
+   * A fork (the PT timeline's moves, client predict/kinds/movesKind.ts): its bodies' runs begin at this tick at the
+   * earliest (a move under way then is sat out, as on a SYNC), so it can be made afresh from a recent tick and stepped
+   * ahead of the snapshots
+   */
+  from?: number;
+  /** A fork of these bodies only */
+  only?: (id: number) => boolean;
+  /** How a fork reads other ships (predict/aheadReads.ts: past the snapshots, never stepping them ahead on the layer) */
+  read?: { now(id: number, t: number): FlightBody | null };
 }
+
+/** A look its moves gave, with the tick and body it's of */
+export interface TimedMoveMsg { tick: number; owner: number; msg: ServerMessage }
 
 interface Run {
   since: number;
@@ -58,6 +71,7 @@ export class MoveRunner {
   private readonly shells = new Map<number, LocalShell>();
   private nextId = LOCAL_ID0;
   private msgs: ServerMessage[] = [];
+  private timed: TimedMoveMsg[] = [];
   private rows: EntityState[] = [];
   private gone: number[] = [];
   private customs: Record<string, DesignMoves>;
@@ -71,6 +85,7 @@ export class MoveRunner {
   /** A connection afresh: nothing runs, its shells go */
   reset(): void {
     this.runs.clear();
+    this.timed = [];
     for (const id of this.shells.keys()) this.gone.push(id);
     this.shells.clear();
   }
@@ -82,13 +97,17 @@ export class MoveRunner {
   advance(tick: number, self: number): { rows: EntityState[]; removed: number[] } {
     const bodies = this.host.bodies;
     for (const id of [...this.runs.keys()]) if (!bodies.view(id)) this.runs.delete(id);
+    const from = this.host.from ?? -Infinity, only = this.host.only;
     for (const id of bodies.ids()) {
+      if (only && !only(id)) continue;
       const v = bodies.view(id)!;
+      // (a fork's runs begin at its start at the earliest)
+      const since = Math.max(v.syncTick, from);
       let run = this.runs.get(id);
-      if (!run || run.since !== v.syncTick) {
-        const s = v.state(v.syncTick);
+      if (!run || run.since !== since) {
+        const s = v.state(since);
         if (!s) continue;
-        const made = this.makeRun(id, s.kind, v.syncTick);
+        const made = this.makeRun(id, s.kind, since);
         if (!made) continue;
         this.runs.set(id, (run = made));
       }
@@ -113,6 +132,15 @@ export class MoveRunner {
   take(): ServerMessage[] {
     const m = this.msgs;
     this.msgs = [];
+    this.timed = [];
+    return m;
+  }
+
+  /** take, each with its tick and body (the PT timeline's moves compare and time them: predict/kinds/movesKind.ts) */
+  takeTimed(): TimedMoveMsg[] {
+    const m = this.timed;
+    this.msgs = [];
+    this.timed = [];
     return m;
   }
 
@@ -132,6 +160,11 @@ export class MoveRunner {
   /** Is this one of its own shells */
   owns(id: number): boolean {
     return this.shells.has(id);
+  }
+
+  /** The tick one of its shells is gone at (its life's end, or the rock it meets) */
+  until(id: number): number | undefined {
+    return this.shells.get(id)?.until;
   }
 
   private makeRun(id: number, kind: number, since: number): Run | null {
@@ -156,7 +189,7 @@ export class MoveRunner {
     // (its parts as they were on the tick: PART decisions, part damage being the server's)
     for (const d of ds) if (d[0] === DECISION.PART && run.parts) run.parts[d[1] ?? -1] = d[2] ?? 0;
     if (ds.some((d) => d[0] === DECISION.MOVE)) this.stats.moves++;
-    for (const msg of tr.tick(t, ds, self, id, hold)) this.msg(msg);
+    for (const msg of tr.tick(t, ds, self, id, hold)) this.msg(msg, t, id);
   }
 
   private stepCustom(run: Run, id: number, t: number, target: number, w: readonly number[], goneNow: number | undefined): void {
@@ -166,8 +199,9 @@ export class MoveRunner {
     run.custom!.tick(t, w, this.customs[design], this.customAct(run, id, t, target, design, stats, goneNow ?? w[CO.GONE] ?? 0));
   }
 
-  private msg(m: ServerMessage): void {
+  private msg(m: ServerMessage, tick: number, owner: number): void {
     this.msgs.push(m);
+    this.timed.push({ tick, owner, msg: m });
     this.stats.msgs++;
   }
 
@@ -179,13 +213,13 @@ export class MoveRunner {
       tick: () => h.t,
       // (its own pose before its own step this tick; another ship's as the server's step read it)
       me: () => asPose(reps.at(owner, h.t - 1)?.body) ?? NOBODY,
-      pose: (id: number) => asPose(reps.preAt(id, h.t)),
+      pose: (id: number) => asPose(self.host.read ? self.host.read.now(id, h.t) : reps.preAt(id, h.t)),
       ship: () => store.get(owner)!,
       get catalog() { return store.catalog; },
       geometry: (s: ShipState) => store.geometry(s),
       cellSize: this.host.tuning.cellSize,
       terrain: () => self.host.terrain(),
-      fx: (msg: ServerMessage) => self.msg(msg),
+      fx: (msg: ServerMessage) => self.msg(msg, h.t, owner),
       shoot: (s: MoveShot) => self.shoot(owner, h.t, h.n++, s, h.me()),
       cap: (_x: number, _y: number, angles: number[]) => {
         const r = self.runs.get(owner)?.staged;
@@ -227,7 +261,8 @@ export class MoveRunner {
     // (its pieces gone as the server's moves read them on the tick: GONE decisions, else its order's)
     const gone = () => goneBits;
     const bit = (g: string) => { const i = groups.indexOf(g); return i < 0 ? 0 : 1 << i; };
-    const me = () => h.me(), tp = () => asPose(reps.preAt(target, t)) ?? NOBODY;
+    const pre = (id: number, k: number) => (this.host.read ? this.host.read.now(id, k) : reps.preAt(id, k));
+    const me = () => h.me(), tp = () => asPose(pre(target, t)) ?? NOBODY;
     return {
       // (its damage scale is its grade's: only the server's damage reads it)
       eid, now: t, target, design, stats, dmg: 1, st: run.custom!.st,
@@ -242,10 +277,10 @@ export class MoveRunner {
       ahead: (ticks) => {
         // (its trail: its velocity the ticks it was fought, oldest first, as the server noted it)
         const tr: number[] = [];
-        for (let k = t - CUSTOM_TRAIL + 1; k <= t; k++) { const p = reps.preAt(target, k); if (p) tr.push(p.vx, p.vy); }
+        for (let k = t - CUSTOM_TRAIL + 1; k <= t; k++) { const p = pre(target, k); if (p) tr.push(p.vx, p.vy); }
         return aheadOf(tp(), tr, Math.max(0, Math.round(ticks)));
       },
-      fx: (msg) => self.msg(msg),
+      fx: (msg) => self.msg(msg, t, eid),
       shoot: (s) => self.shoot(eid, t, h.n++, s, me()),
       rng: () => 0,
       mobs: true,

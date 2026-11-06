@@ -1141,6 +1141,8 @@ export class GameState {
       // (A dev prediction mode may place it at another tick, and move it after: state/drawMode.ts)
       const dm = this.drawMode;
       if (this.replicaPose?.(entity, dm?.ship ? dm.ship(entity, renderTick) : renderTick)) { dm?.placed?.(entity); continue; }
+      // (Or another thing a dev prediction mode steps ahead itself: a homing shell, a mob)
+      if (dm?.entity?.(entity, renderTick)) continue;
 
       // Loot pods drifting from their anchor (data[3] its tick: see podDrift)
       if (entity.type === EntityType.DroppedItem && entity.data && entity.data.length >= 4 && entity.hist?.length) {

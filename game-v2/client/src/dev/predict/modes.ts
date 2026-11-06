@@ -13,7 +13,8 @@
  *       checked against ST each snapshot, re-stepped once on a miss and eased from old PT to new
  *   C3  C2 plus the touch register: what a missed ship touched is re-stepped with it
  */
-import { AHEAD_BACK } from '@space-game/common';
+import { AHEAD_BACK, EntityType } from '@space-game/common';
+import type { PtKinds } from '../../predict/ptKinds';
 import type { DrawModeHook } from '../../state/drawMode';
 import type { InterpolatedEntity } from '../../state/GameState';
 import type { PtStLayer } from './ptst';
@@ -37,6 +38,11 @@ export interface ModeCtx {
   pilot(id: number): boolean;
   /** The PT/ST layer (C2/C3) */
   layer: PtStLayer;
+  /**
+   * The PT timeline's kinds (C2/C3; predict/ptKinds.ts): the ships layer first, then bodies (bosses), guides (homing
+   * shells, mobs) and moves (boss attacks), all stepped to your tick and drawn there. Absent: the ships layer alone
+   */
+  kinds?: PtKinds;
 }
 
 export interface PredictMode {
@@ -60,22 +66,39 @@ export function ptDrawTick(ctx: ModeCtx, id: number, ownDraw: number): number {
 
 function ptstHook(ctx: ModeCtx): DrawModeHook {
   let od = 0;
-  const place = (e: InterpolatedEntity) => {
-    const p = ctx.layer.pose(e.id, ptDrawTick(ctx, e.id, od));
-    if (!p) return;
+  const k = ctx.kinds, bodies = k?.get('bodies'), guides = k?.get('guides');
+  const set = (e: InterpolatedEntity, p: { x: number; y: number; angle: number }) => {
     e.x = e.renderX = p.x;
     e.y = e.renderY = p.y;
     e.angle = e.renderAngle = p.angle;
   };
+  const place = (e: InterpolatedEntity) => {
+    const p = k ? k.pose(e.id, ptDrawTick(ctx, e.id, od)) : ctx.layer.pose(e.id, ptDrawTick(ctx, e.id, od));
+    if (p) { set(e, p); return; }
+    // (a boss, placed by the replica layer at its PT tick: what's left of a re-step's ease)
+    if (bodies?.has?.(e.id)) set(e, k!.eased(e.id, { x: e.renderX, y: e.renderY, angle: e.renderAngle }));
+  };
   return {
     frame() {
-      // (Check what's newly confirmed first, then step on to the own tick: a miss is re-stepped once, to the head as it stood)
-      ctx.layer.confirm(ctx.confirmedTick());
-      ctx.layer.advance(ctx.predictedTick());
       od = ctx.ownDraw();
+      // (Check what's newly confirmed first, then step on to the own tick: a miss is re-stepped once, to the head as it stood)
+      if (k) k.frame(ctx.confirmedTick(), ctx.predictedTick());
+      else {
+        ctx.layer.confirm(ctx.confirmedTick());
+        ctx.layer.advance(ctx.predictedTick());
+      }
     },
+    ship: (e, rt) => (bodies?.has?.(e.id) ? ptDrawTick(ctx, e.id, od) : rt),
     placed: place,
-    shot: (owner, present, render) => (owner === ctx.self() ? present : ctx.layer.has(owner) ? ptDrawTick(ctx, owner, od) : render),
+    shot: (owner, present, render) => (owner === ctx.self() ? present : (k ? k.has(owner) : ctx.layer.has(owner)) ? ptDrawTick(ctx, owner, od) : render),
+    entity: (e) => {
+      if (!guides || (e.type !== EntityType.Projectile && e.type !== EntityType.Enemy) || !guides.has?.(e.id)) return false;
+      const p = guides.pose?.(e.id, ptDrawTick(ctx, e.id, od));
+      if (!p) return false;
+      set(e, p);
+      return true;
+    },
+    ahead: (rt) => Math.max(rt, od - AHEAD_BACK),
   };
 }
 
