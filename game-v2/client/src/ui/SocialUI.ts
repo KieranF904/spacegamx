@@ -1,9 +1,11 @@
 /**
- * Playing together on the client: your party (a compact panel on the left and
- * the Social window, P, with its Party and Friends tabs), invitations, friend
- * and trade requests, and the rally buttons when you're destroyed.
+ * Playing together on the client: your party (a compact list on the left, and
+ * the side panel's Party tab), your friends (the side panel's Social tab:
+ * FriendsPanel), invitations, friend and trade requests, and the rally buttons
+ * when you're destroyed. The side panel (ui/hub) draws the two tabs through
+ * renderParty and friends.render; this class keeps the state.
  *
- *   P            Social window (hovering over another pilot: invite them)
+ *   P            the side panel's Social tab (hovering over another pilot: invite them)
  *   /p message   party chat; /invite name, /leave, /kick name, /promote name
  */
 
@@ -13,7 +15,7 @@ import {
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { AutoDest } from '../ships/Autopilot';
-import { GameWindow, injectWindowStyles, openMenu } from './windowKit';
+import { injectWindowStyles, openMenu } from './windowKit';
 import { boundKeyName } from '../input/keybindings';
 import { FriendsPanel } from './social/FriendsPanel';
 import { onlineCount } from './social/friendsView';
@@ -37,23 +39,23 @@ export interface SocialDeps {
   chatTo(name: string): void;
   /** Friends online changed */
   friendsOnline(n: number): void;
+  /** Show a side panel tab (the Social or Party tab) */
+  openTab(tab: SocialTab): void;
 }
 
-/** The Social window's tabs */
-export type SocialTab = 'party' | 'friends';
+/** The side panel's tabs this draws */
+export type SocialTab = 'social' | 'party';
 
 export class SocialUI {
   party: ServerPartyMessage = { type: 'party', id: 0, leader: '', members: [] };
   private hud: HTMLDivElement;
   private prompts: HTMLDivElement;
   private rally: HTMLDivElement;
-  readonly window: GameWindow;
   private visible = false;
   private listeners = new Set<() => void>();
   readonly friends: FriendsPanel;
-  private tab: SocialTab = 'party';
-  /** The window's tabs: each draws into the body */
-  private readonly tabDefs: { id: SocialTab; label: string; render: (body: HTMLElement) => void; badge?: () => number }[];
+  /** The Party tab's "What a party gives you" is open (kept across its redraws) */
+  private perksOpen = false;
 
   constructor(private d: SocialDeps) {
     injectWindowStyles();
@@ -78,14 +80,29 @@ export class SocialUI {
 @keyframes spin { from { transform: translateY(-8px); opacity: 0; } }
 .sp-card b { color: #86efac; }
 .sp-rally { position: fixed; left: 50%; top: calc(50% + 70px); transform: translateX(-50%); display: none; gap: 8px; z-index: 2300; flex-wrap: wrap; justify-content: center; }
-.pw-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; }
-.pw-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; background: rgba(255,255,255,0.03); margin-bottom: 5px; }
-.pw-row .who { flex: 1; min-width: 0; }
+.pw { display: flex; flex-direction: column; gap: 2px; color: #b4c2d4; }
+.pw-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 3px; font: 600 9.5px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #8b9cb3; }
+.pw-h:first-child { margin-top: 0; }
+.pw-h::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(140, 170, 210, 0.3), transparent); }
+.pw-h b { color: #b4c2d4; font-weight: 600; letter-spacing: 1px; }
+.pw-row { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 4px; background: rgba(3, 6, 12, 0.4); }
+.pw-row .who { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pw-row .who b { color: #e5ecf7; }
-.pw-row .who div { color: #8394ad; font-size: 11px; }
-.pw-row .sgw-btn { padding: 4px 9px; font-size: 11px; }
-.pw-perks { margin: 0; padding-left: 18px; color: #a9b6c9; line-height: 1.6; font-size: 12px; }
-.pw-perks b { color: #86efac; font-weight: 600; }`;
+.pw-row .who div { color: #8394ad; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+.pw-row .sgw-btn { padding: 1px 8px; font-size: 10.5px; border-radius: 5px; }
+.pw-row .bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.08); margin-top: 3px; overflow: hidden; }
+.pw-row .bar i { display: block; height: 100%; background: linear-gradient(90deg, #22c55e, #86efac); }
+.pw-row .bar i.low { background: linear-gradient(90deg, #dc2626, #f97316); }
+.pw-inv { display: flex; gap: 5px; margin: 6px 0 2px; }
+.pw-inv input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; border-radius: 6px; }
+.pw-inv .sgw-btn { padding: 3px 10px; font-size: 11px; border-radius: 6px; }
+.pw-empty { color: #8b9cb3; font-size: 11px; padding: 2px; }
+.pw details { margin-top: 6px; font-size: 11px; }
+.pw summary { cursor: pointer; color: #8b9cb3; font-size: 10.5px; }
+.pw summary:hover { color: #e5ecf7; }
+.pw-perks { margin: 4px 0 0; padding-left: 16px; color: #a9b6c9; line-height: 1.45; font-size: 11px; }
+.pw-perks b { color: #86efac; font-weight: 600; }
+.pw button:focus-visible, .pw input:focus-visible, .pw summary:focus-visible { outline: 2px solid #6cc8ff; outline-offset: 1px; }`;
     document.head.appendChild(css);
     this.hud = document.createElement('div');
     this.hud.className = 'pty';
@@ -95,35 +112,20 @@ export class SocialUI {
     this.rally = document.createElement('div');
     this.rally.className = 'sp-rally';
     document.body.append(this.hud, this.prompts, this.rally);
-    this.window = new GameWindow('Social');
-    this.window.root.style.width = 'min(860px, calc(100vw - 32px))';
     this.friends = new FriendsPanel({
       send: (m) => this.d.send(m),
       chatTo: (n) => this.d.chatTo(n),
       inParty: (n) => this.party.members.some((m) => m.name.toLowerCase() === n.toLowerCase()),
       canInvite: () => !this.inParty() || this.amLeader(),
-      close: () => this.window.close(),
     });
-    this.tabDefs = [
-      { id: 'party', label: 'Party', render: (b) => this.renderParty(b) },
-      { id: 'friends', label: 'Friends', render: (b) => { this.window.sub.textContent = this.friends.data.account ? `${onlineCount(this.friends.data)} of ${this.friends.data.friends.length} friends online` : 'Signed out'; this.friends.render(b); }, badge: () => this.friends.data.incoming.length },
-    ];
-    this.window.tabs.style.display = 'flex';
   }
 
-  private renderTabs(): void {
-    const t = this.window.tabs;
-    t.replaceChildren();
-    for (const def of this.tabDefs) {
-      const b = document.createElement('button');
-      b.className = `sgw-tab${def.id === this.tab ? ' on' : ''}`;
-      const n = def.badge?.() ?? 0;
-      b.innerHTML = `${def.label}${n ? `<span class="badge">${n}</span>` : ''}`;
-      b.onclick = () => { this.tab = def.id; this.renderWindow(); };
-      t.appendChild(b);
-    }
+  /** The party list's bottom edge on screen (0 while hidden): the side panel keeps below it */
+  hudBottom(): number {
+    return this.hud.style.display === 'flex' ? this.hud.getBoundingClientRect().bottom : 0;
   }
 
+  /** Party or friends changed (the side panel's tabs redraw) */
   onChange(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -156,7 +158,6 @@ export class SocialUI {
     this.party = m;
     if (!was && m.members.length) this.d.sound('ui_open', 0.5);
     this.render();
-    if (this.window.isOpen) this.renderWindow();
     for (const fn of this.listeners) fn();
   }
 
@@ -184,8 +185,18 @@ export class SocialUI {
     const first = !this.friends.data.account && m.account;
     this.friends.data = m;
     this.d.friendsOnline(onlineCount(m));
-    if (first && m.incoming.length) this.d.message(`${m.incoming.length} friend request${m.incoming.length > 1 ? 's' : ''} waiting: Social window (${boundKeyName('party', settings.data.bindings)}), Friends`, '#7dd3fc');
-    if (this.window.isOpen) this.renderWindow();
+    if (first && m.incoming.length) this.d.message(`${m.incoming.length} friend request${m.incoming.length > 1 ? 's' : ''} waiting: the side panel's Social tab (${boundKeyName('party', settings.data.bindings)})`, '#7dd3fc');
+    for (const fn of this.listeners) fn();
+  }
+
+  /** Friend requests waiting for an answer (the Social tab's badge) */
+  requests(): number {
+    return this.friends.data.incoming.length;
+  }
+
+  /** Friends online, of how many */
+  friendsLine(): string {
+    return this.friends.data.account ? `${onlineCount(this.friends.data)} of ${this.friends.data.friends.length} friends online` : 'Signed out';
   }
 
   onTradeRequest(m: ServerTradeRequestMessage): void {
@@ -245,7 +256,7 @@ export class SocialUI {
     this.hud.style.display = 'flex';
     const me = ms.find((m) => m.eid === this.d.state.playerId);
     const wing = me && me.wing > 1 ? `<b>WING +${Math.round((me.wing - 1) * 100)}%</b>` : '';
-    this.hud.innerHTML = `<div class="pty-h"><span>PARTY · P</span>${wing}</div>` + ms.map((m) => {
+    this.hud.innerHTML = `<div class="pty-h"><span>PARTY</span>${wing}</div>` + ms.map((m) => {
       const here = m.system === this.d.state.systemId;
       return `<div class="pty-m${m.alive ? '' : ' dead'}" data-n="${esc(m.name)}" title="Click for options">
         <div class="n"><b>${m.leader ? '★ ' : ''}${esc(m.name)}</b><span>L${m.level}${m.alive ? (here ? '' : ` · ${esc(sysName(m.system))}`) : ' · down'}</span></div>
@@ -268,109 +279,87 @@ export class SocialUI {
       items.push({ label: 'Remove from party', bad: true, run: () => this.d.send({ type: 'partyKick', name: m.name }) });
     }
     if (self) items.push({ label: 'Leave party', bad: true, run: () => this.d.send({ type: 'partyLeave' }) });
-    items.push({ label: `Social window (${boundKeyName('party', settings.data.bindings)})`, run: () => this.openWindow('party') });
+    items.push({ label: 'Party tab', run: () => this.d.openTab('party') });
     openMenu(x, y, items);
   }
 
   // ---------------------------------------------------------------------------
-  // Party window
+  // The side panel's Party tab
   // ---------------------------------------------------------------------------
 
-  openWindow(tab?: SocialTab): void {
-    if (tab) this.tab = tab;
-    this.renderWindow();
-    this.window.open();
-  }
-
-  toggleWindow(): void {
-    if (this.window.isOpen) this.window.close(); else this.openWindow();
-  }
-
-  renderWindow(): void {
-    this.renderTabs();
-    this.tabDefs.find((t) => t.id === this.tab)!.render(this.window.body);
-  }
-
-  private renderParty(b: HTMLElement): void {
-    b.replaceChildren();
-    this.window.sub.textContent = this.inParty() ? `${this.party.members.length} of 4 pilots · led by ${this.party.leader}` : 'Flying solo';
-    const grid = document.createElement('div');
-    grid.className = 'pw-grid';
+  /** Your party (or how to start one), invite by name, the pilots nearby, and what a party gives you */
+  renderParty(into: HTMLElement): void {
+    into.replaceChildren();
+    const root = document.createElement('div');
+    root.className = 'pw';
+    const head = (html: string) => { const h = document.createElement('div'); h.className = 'pw-h'; h.innerHTML = html; root.appendChild(h); };
+    const btn = (label: string, cls: string, run: (e: MouseEvent) => void, aria?: string) => {
+      const b = document.createElement('button');
+      b.className = `sgw-btn${cls ? ` ${cls}` : ''}`;
+      b.textContent = label;
+      if (aria) b.setAttribute('aria-label', aria);
+      b.onclick = run;
+      return b;
+    };
     // Your party
-    const left = document.createElement('div');
-    left.className = 'sgw-col';
-    left.innerHTML = '<h4>Your party</h4>';
     if (this.inParty()) {
+      const me = this.party.members.find((m) => m.eid === this.d.state.playerId);
+      head(`Party <b>${this.party.members.length}/4</b>${me && me.wing > 1 ? ` <b style="color:#fde68a">wing +${Math.round((me.wing - 1) * 100)}%</b>` : ''}`);
       for (const m of this.party.members) {
         const row = document.createElement('div');
         row.className = 'pw-row';
         row.innerHTML = `<div class="who"><b>${m.leader ? '★ ' : ''}${esc(m.name)}</b> <span style="color:#8394ad">L${m.level}</span>
-          <div>${m.alive ? `${esc(m.ship || 'Ship')} · ${esc(sysName(m.system))} · hull ${m.hull}%${m.wing > 1 ? ` · wing +${Math.round((m.wing - 1) * 100)}%` : ''}` : 'Destroyed'}</div></div>`;
-        const btn = document.createElement('button');
-        btn.className = 'sgw-btn';
-        btn.textContent = '⋯';
-        btn.onclick = (e) => this.memberMenu(m, e.clientX, e.clientY);
-        row.appendChild(btn);
-        left.appendChild(row);
+          <div>${m.alive ? `${esc(m.ship || 'Ship')} · ${esc(sysName(m.system))}` : 'Destroyed'}</div>
+          <div class="bar"><i class="${m.hull < 35 ? 'low' : ''}" style="width:${m.alive ? m.hull : 0}%"></i></div></div>`;
+        row.appendChild(btn('⋯', '', (e) => this.memberMenu(m, e.clientX, e.clientY), `Options: ${m.name}`));
+        root.appendChild(row);
       }
-      const leave = document.createElement('button');
-      leave.className = 'sgw-btn';
-      leave.textContent = 'Leave party';
-      leave.style.marginTop = '6px';
-      leave.onclick = () => this.d.send({ type: 'partyLeave' });
-      left.appendChild(leave);
     } else {
-      left.insertAdjacentHTML('beforeend', '<div class="sgw-empty" style="padding:6px 0">No party yet. Invite a pilot nearby, or by name.</div>');
+      head('Party');
+      root.insertAdjacentHTML('beforeend', '<div class="pw-empty">Flying solo. Invite a pilot nearby, or by name.</div>');
     }
     // Invite by name
     const inv = document.createElement('div');
-    inv.style.cssText = 'display:flex; gap:6px; margin-top:12px;';
-    inv.innerHTML = '<input class="sgw-input" placeholder="Pilot name" style="flex:1"><button class="sgw-btn primary">Invite</button>';
+    inv.className = 'pw-inv';
+    inv.innerHTML = '<input class="sgw-input" placeholder="Pilot name" maxlength="40" aria-label="Pilot name to invite"><button class="sgw-btn primary">Invite</button>';
     const input = inv.querySelector('input')!;
     const go = () => { const n = input.value.trim(); if (n) { this.d.send({ type: 'partyInvite', name: n }); input.value = ''; } };
     inv.querySelector('button')!.onclick = go;
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-    left.appendChild(inv);
-    left.insertAdjacentHTML('beforeend', `<h4 style="margin-top:16px">Flying together</h4><ul class="pw-perks">
+    root.appendChild(inv);
+    if (this.inParty()) {
+      const leave = btn('Leave party', '', () => this.d.send({ type: 'partyLeave' }));
+      leave.style.cssText = 'align-self: flex-start; padding: 2px 10px; font-size: 11px; border-radius: 6px; margin-top: 2px;';
+      root.appendChild(leave);
+    }
+    // Pilots nearby
+    const me = this.d.state.entities.get(this.d.state.playerId);
+    const near = [...this.d.state.entities.values()].filter((e) => e.type === EntityType.Player && e.id !== this.d.state.playerId)
+      .map((e) => ({ e, d: me ? Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) : 0 })).sort((a, b) => a.d - b.d);
+    head(`Nearby <b>${near.length}</b>`);
+    if (!near.length) root.insertAdjacentHTML('beforeend', '<div class="pw-empty">Nobody else in this system right now.</div>');
+    for (const { e, d } of near.slice(0, 8)) {
+      const name = e.name ?? 'Pilot';
+      const row = document.createElement('div');
+      row.className = 'pw-row';
+      row.innerHTML = `<div class="who"><b>${esc(name)}</b> <span style="color:#8394ad; font-size:10.5px">${(d / 1000).toFixed(1)} km${this.isMember(e.id) ? ' · party' : ''}</span></div>`;
+      if (!this.isMember(e.id)) row.appendChild(btn('Invite', 'primary', () => this.invite(e.id), `Invite ${name}`));
+      row.appendChild(btn('⋯', '', (ev) => openMenu(ev.clientX, ev.clientY, [
+        { label: 'Trade (within 2.5 km)', run: () => this.d.send({ type: 'tradeRequest', id: e.id }) },
+        { label: 'Fly to them (autopilot)', run: () => this.d.flyTo({ kind: 'player', id: e.id, system: this.d.state.systemId, name }) },
+      ]), `Options: ${name}`));
+      root.appendChild(row);
+    }
+    if (near.length > 8) root.insertAdjacentHTML('beforeend', `<div class="pw-empty">and ${near.length - 8} more further out</div>`);
+    root.insertAdjacentHTML('beforeend', `<details${this.perksOpen ? ' open' : ''}><summary>What a party gives you</summary><ul class="pw-perks">
       <li><b>Shared kills:</b> a kill counts for everyone in the party within 8 km, for jobs and bounties too, with a share of XP and credits</li>
       <li><b>Wing bonus:</b> each wingmate within 3 km adds 8% weapon damage and mining yield</li>
       <li><b>Fleet operations:</b> party jobs on station boards (uplinks, convoys, sieges) that need two or more pilots</li>
       <li><b>Rally:</b> when you're destroyed, respawn beside a party member who isn't in a fight</li>
       <li><b>Map and markers:</b> see your party anywhere, and autopilot to them</li>
-      <li><b>Party chat:</b> start a chat line with /p</li></ul>`);
-    // Pilots nearby
-    const right = document.createElement('div');
-    right.className = 'sgw-col';
-    right.innerHTML = '<h4>Pilots nearby</h4>';
-    const me = this.d.state.entities.get(this.d.state.playerId);
-    const near = [...this.d.state.entities.values()].filter((e) => e.type === EntityType.Player && e.id !== this.d.state.playerId)
-      .map((e) => ({ e, d: me ? Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) : 0 })).sort((a, b) => a.d - b.d);
-    if (!near.length) right.insertAdjacentHTML('beforeend', '<div class="sgw-empty" style="padding:6px 0">Nobody else in this system right now.</div>');
-    for (const { e, d } of near) {
-      const row = document.createElement('div');
-      row.className = 'pw-row';
-      row.innerHTML = `<div class="who"><b>${esc(e.name ?? 'Pilot')}</b><div>${(d / 1000).toFixed(1)} km away${this.isMember(e.id) ? ' · in your party' : ''}</div></div>`;
-      if (!this.isMember(e.id)) {
-        const i = document.createElement('button');
-        i.className = 'sgw-btn primary';
-        i.textContent = 'Invite';
-        i.onclick = () => this.invite(e.id);
-        row.appendChild(i);
-      }
-      const t = document.createElement('button');
-      t.className = 'sgw-btn';
-      t.textContent = 'Trade';
-      t.title = 'Within 2.5 km';
-      t.onclick = () => this.d.send({ type: 'tradeRequest', id: e.id });
-      const f = document.createElement('button');
-      f.className = 'sgw-btn';
-      f.textContent = 'Fly to';
-      f.onclick = () => { this.window.close(); this.d.flyTo({ kind: 'player', id: e.id, system: this.d.state.systemId, name: e.name ?? 'pilot' }); };
-      row.append(t, f);
-      right.appendChild(row);
-    }
-    right.insertAdjacentHTML('beforeend', `<div style="color:#8394ad; font-size:11px; margin-top:8px">Hover over a ship to see who flies it, and press ${boundKeyName('party', settings.data.bindings)} to invite them.</div>`);
-    grid.append(left, right);
-    b.appendChild(grid);
+      <li><b>Party chat:</b> start a chat line with /p</li>
+      <li>Hover over a ship to see who flies it, and press ${boundKeyName('party', settings.data.bindings)} to invite them</li></ul></details>`);
+    root.querySelector('details')!.addEventListener('toggle', (e) => { this.perksOpen = (e.currentTarget as HTMLDetailsElement).open; });
+    into.appendChild(root);
   }
 }

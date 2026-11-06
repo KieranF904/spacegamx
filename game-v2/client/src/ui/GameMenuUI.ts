@@ -1,7 +1,8 @@
 /**
- * The Escape menu: Resume, Map, Status (pilot + ship), Field guide, Settings,
- * Controls (rebindable), Server, and Leave / Log out. The game keeps running
- * underneath (it's multiplayer), but flight input is off while it's open.
+ * The Escape menu: Resume, Map, Field guide, Settings, Controls (rebindable),
+ * Server, and Leave / Log out. The game keeps running underneath (it's
+ * multiplayer), but flight input is off while it's open. (Pilot & ship and the
+ * component guide are tabs of the side panel on the HUD now: ui/hub.)
  *
  *   Esc  open · back to the main list from a page · close
  */
@@ -79,11 +80,11 @@ export interface MenuDeps {
   level?(): number;
   xp?(): number;
   icon?(id: string): string;
-  /** The component guide (every part, its level and what it takes) */
+  /** The component guide (the side panel's tab: the field guide's Ships page links to it) */
   openComponents?(): void;
 }
 
-type Page = 'main' | 'status' | 'guide' | 'settings' | 'controls' | 'server';
+type Page = 'main' | 'guide' | 'settings' | 'controls' | 'server';
 type SettingsTab = 'audio' | 'display' | 'ui' | 'gameplay';
 
 /** The field guide's pages, split out of the main chunk (Game prefetches it after sign-in) */
@@ -176,9 +177,7 @@ const CSS = `
 const ITEMS: { page: Page | 'resume' | 'map' | 'components' | 'leave'; label: string; icon: string; key?: string; danger?: boolean }[] = [
   { page: 'resume', label: 'Resume', icon: '▶', key: 'Esc' },
   { page: 'map', label: 'Galaxy map', icon: '✦' },
-  { page: 'status', label: 'Pilot & ship', icon: '◈' },
   { page: 'guide', label: 'Field guide', icon: '❖' },
-  { page: 'components', label: 'Component guide', icon: '⬢' },
   { page: 'settings', label: 'Settings', icon: '⚙' },
   { page: 'controls', label: 'Controls', icon: '⌨' },
   { page: 'server', label: 'Server', icon: '◉' },
@@ -240,10 +239,10 @@ export class GameMenuUI {
     this.deps.sound('ui_open', 0.6);
     this.render();
     this.deps.onOpenChange(true);
-    // Live pages (status, server) refresh twice a second
+    // The live page (server) refreshes twice a second
     clearInterval(this.refreshTimer);
     this.refreshTimer = window.setInterval(() => {
-      if (this.page === 'status' || this.page === 'server') this.renderMain();
+      if (this.page === 'server') this.renderMain();
     }, 500);
   }
 
@@ -286,8 +285,7 @@ export class GameMenuUI {
       }
       const b = document.createElement('button');
       b.className = `gm-item${it.danger ? ' danger' : ''}${this.page === it.page ? ' active' : ''}`;
-      if (it.page === 'components' && !this.deps.openComponents) continue;
-      const key = it.page === 'map' ? keyName(settings.data.bindings.map ?? 'KeyM') : it.page === 'components' ? keyName(settings.data.bindings.components ?? 'KeyC') : it.key;
+      const key = it.page === 'map' ? keyName(settings.data.bindings.map ?? 'KeyM') : it.key;
       b.innerHTML = `<span class="ic">${it.icon}</span>${it.label}${key ? `<span class="k">${key}</span>` : ''}`;
       b.addEventListener('click', () => this.choose(it.page));
       this.side.appendChild(b);
@@ -314,7 +312,6 @@ export class GameMenuUI {
     panel.className = 'gm-panel';
     switch (this.page) {
       case 'main': this.main.innerHTML = ''; this.main.appendChild(this.welcome()); return;
-      case 'status': this.statusPage(panel); break;
       case 'guide': this.guidePage(panel); break;
       case 'settings': this.settingsPage(panel); break;
       case 'controls': this.controlsPage(panel); break;
@@ -355,46 +352,6 @@ export class GameMenuUI {
     el.querySelector('[data-a=map]')!.addEventListener('click', () => this.choose('map'));
     el.querySelector('[data-a=dock]')?.addEventListener('click', () => { this.close(); this.deps.dock(); });
     return el;
-  }
-
-  private statusPage(panel: HTMLElement): void {
-    const p = this.deps.pilot();
-    const s = this.deps.ship();
-    const dock = this.deps.dockableStation();
-    let html = `<h2>Pilot & ship</h2><p class="muted">Live readout</p>
-      <h3>Pilot</h3>
-      <div class="grid">
-        <div class="stat"><span>Callsign</span><b>${esc(p.name)}${p.owner ? ' <small class="muted">owner</small>' : p.admin ? ' <small class="muted">admin</small>' : ''}</b></div>
-        <div class="stat"><span>Level ${p.level}</span><b>${p.xp} / ${p.xpToNext} XP</b><div class="bar"><i style="width:${pct(p.xp, p.xpToNext)}%"></i></div></div>
-        <div class="stat"><span>Credits</span><b>${p.credits.toLocaleString()}</b></div>
-        <div class="stat"><span>Location</span><b>${esc(p.system)}</b></div>
-      </div>`;
-    if (s) {
-      const j = s.jump;
-      const jumpText = j.phase === 'ready' ? 'Ready' : j.phase === 'cooldown' ? `Cooling · ${j.cooldownSecs}s` : j.phase === 'charging' ? 'Spooling' : 'Jumping';
-      html += `
-        <h3>${esc(s.name)}</h3>
-        <div class="grid">
-          <div class="stat"><span>Core</span><b>${Math.round(s.coreHp)} / ${Math.round(s.coreMax)}</b><div class="bar"><i style="width:${pct(s.coreHp, s.coreMax)}%; background: linear-gradient(90deg,#16a34a,#4ade80)"></i></div></div>
-          <div class="stat"><span>Parts</span><b>${s.parts}</b></div>
-          <div class="stat"><span>Mass</span><b>${s.mass.toFixed(0)}</b></div>
-          <div class="stat"><span>Length</span><b>${Math.round(s.radius * 2)} u</b></div>
-          <div class="stat"><span>Top speed</span><b>${s.topSpeed.toFixed(1)} u/tick</b></div>
-          <div class="stat"><span>Acceleration</span><b>${s.accel.toFixed(3)}</b></div>
-          <div class="stat"><span>Turn rate</span><b>${s.turn.toFixed(4)}</b></div>
-          <div class="stat"><span>Power</span><b>${Math.round(s.power.supply)} / ${Math.round(s.power.demand)}</b></div>
-          <div class="stat"><span>Guns</span><b>${s.guns}${s.turrets ? ` <small class="muted">(${s.turrets} turrets)</small>` : ''}</b></div>
-          <div class="stat"><span>Engines</span><b>${s.engines}</b></div>
-          <div class="stat"><span>Controls</span><b>${s.controls}</b></div>
-          <div class="stat"><span>Jump drive</span><b>${jumpText}</b><div class="bar"><i style="width:${(j.phase === 'ready' ? 100 : j.progress * 100).toFixed(0)}%"></i></div></div>
-        </div>
-        <p class="muted" style="margin-top:12px">One jump carries you about ${(j.distance / 1000).toFixed(0)}k units along your nose.</p>`;
-    } else {
-      html += `<h3>Ship</h3><p>No ship right now. Press <kbd>${keyName(settings.data.bindings.respawn ?? 'KeyR')}</kbd> to respawn.</p>`;
-    }
-    html += `<div class="actions">${dock ? `<button class="btn primary" data-a="dock">Dock at ${esc(dock)}</button>` : `<span class="muted">Fly into a station's docking ring to refit your ship in its hangar.</span>`}</div>`;
-    panel.innerHTML = html;
-    panel.querySelector('[data-a=dock]')?.addEventListener('click', () => { this.close(); this.deps.dock(); });
   }
 
   private guidePage(panel: HTMLElement): void {

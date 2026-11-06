@@ -57,7 +57,12 @@ export class PilotHud {
     pilot.onChange(() => this.render());
   }
 
-  /** Its bottom edge on screen (0 while hidden): the cargo panel keeps below it */
+  /** Its top edge on screen (0 while hidden): the side panel lifts no higher than this when the column is short */
+  top(): number {
+    return this.root.style.display === 'none' ? 0 : this.root.getBoundingClientRect().top;
+  }
+
+  /** Its bottom edge on screen (0 while hidden): the side panel and the cargo panel keep below it */
   bottom(): number {
     return this.root.style.display === 'none' ? 0 : this.root.getBoundingClientRect().bottom;
   }

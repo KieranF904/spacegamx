@@ -39,7 +39,7 @@ import { beamLightSound, beamLoopFor, hasOwnShotSound } from './audio/weaponSoun
 import { PerfMonitor } from './ui/PerfMonitor';
 
 
-import { GameMenuUI } from './ui/GameMenuUI';
+import { GameMenuUI, type MenuPilotInfo } from './ui/GameMenuUI';
 import { settings, SettingsData } from './settings/Settings';
 import { AutoQuality, PROFILES, type QualityTier } from './settings/quality';
 import { ACTIONS, boundKeyName } from './input/keybindings';
@@ -328,7 +328,7 @@ this.xpFillEl = document.getElementById('xpFill');
       canFocus: () => !this.menu.isOpen && this.network.isConnected(),
       ensureShown: () => { if (!settings.data.ui.chat) settings.update((d) => { d.ui.chat = true; }); },
       onFocusChange: (f) => { this.chatFocused = f; },
-      openFriends: () => this.w.social.openWindow('friends'),
+      openFriends: () => this.w.hub.open('social'),
       sound: (id, v) => this.audio.playUI(id, v ?? 0.5),
     });
 
@@ -569,20 +569,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.menu= new GameMenuUI({
       proto: !!this.proto,
       openMap: () => this.w.systemMapUI.toggle(),
-      pilot: () => {
-        const sys = this.currentSystem();
-        return {
-          name: this.state.playerName || 'Pilot',
-          level: this.state.level,
-          xp: this.state.xp,
-          xpToNext: xpToReach(this.state.level + 1),
-          credits: this.state.credits,
-          system: sys?.name ?? this.systemNames.get(this.state.systemId) ?? 'Deep space',
-          sector: (sys?.sector ?? 'uncharted').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' sector',
-          admin: this.isAdmin,
-          owner: this.isOwner,
-        };
-      },
+      pilot: () => this.pilotInfo(),
       ship: () => this.shipClient.menuShipInfo(),
       server: () => {
         let pilots = 0;
@@ -611,8 +598,24 @@ this.xpFillEl = document.getElementById('xpFill');
       level: () => this.pilot.profile?.level ?? this.state.level,
       xp: () => this.pilot.profile?.xp ?? this.state.xp,
       icon: (id) => itemIcon(this.pilot.econ, id),
-      openComponents: () => this.w.componentGuide.use((g) => g.open()),
+      openComponents: () => this.w.hub.open('components'),
     });
+  }
+
+  /** You as the readouts show you (the Esc menu's front page, the side panel's Pilot tab) */
+  private pilotInfo(): MenuPilotInfo {
+    const sys = this.currentSystem();
+    return {
+      name: this.state.playerName || 'Pilot',
+      level: this.state.level,
+      xp: this.state.xp,
+      xpToNext: xpToReach(this.state.level + 1),
+      credits: this.state.credits,
+      system: sys?.name ?? this.systemNames.get(this.state.systemId) ?? 'Deep space',
+      sector: (sys?.sector ?? 'uncharted').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' sector',
+      admin: this.isAdmin,
+      owner: this.isOwner,
+    };
   }
 
   /**
@@ -899,6 +902,7 @@ this.xpFillEl = document.getElementById('xpFill');
       toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
       chatTo: (name) => g.chat.messageTo(name),
       friendsOnline: (n) => g.chat.setFriendsOnline(n),
+      pilotInfo: () => g.pilotInfo(),
     };
   }
 
@@ -910,7 +914,7 @@ this.xpFillEl = document.getElementById('xpFill');
       get proto() { return g.proto; },
       get menu() { return g.menu; },
       get dialogue() { return g.w.dialogue; },
-      get componentGuide() { return g.w.componentGuide; },
+      get hub() { return g.w.hub; },
       get inventoryWindow() { return g.w.inventoryWindow; },
       get tradeWindow() { return g.w.tradeWindow; },
       get social() { return g.w.social; },
@@ -1113,7 +1117,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.w.farMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen);
     this.w.farMarkers.update();
     const blocked = !this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen;
-    const windowOpen = this.stationOpen || this.w.inventoryWindow.isOpen || this.w.tradeWindow.isOpen || this.w.social.window.isOpen || this.w.quests.log.isOpen || !!this.w.componentGuide.value?.isOpen;
+    const windowOpen = this.stationOpen || this.w.inventoryWindow.isOpen || this.w.tradeWindow.isOpen || this.w.quests.log.isOpen;
     this.w.targetUI.setHidden(blocked);
     this.w.targetUI.update();
     this.w.infoPanel.update(!blocked && !windowOpen && !this.localDead);
@@ -1128,6 +1132,8 @@ this.xpFillEl = document.getElementById('xpFill');
     // The hold above the chat: not while docked (the station's storage has it) or behind a full-screen view
     {
       const me = this.state.entities.get(this.state.playerId);
+      // The side panel on top of it: hidden behind the menu or the map; over the station or the hangar only when its key calls it up
+      this.w.hub.update(!this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen ? 'off' : blocked || this.stationOpen || !me ? 'covered' : 'on');
       this.w.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
     }
     this.updateHeatGauge();

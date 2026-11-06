@@ -10,7 +10,7 @@
  */
 import type { Lazy } from '../lazy';
 import type { InventoryWindow } from '../ui/InventoryWindow';
-import type { ComponentGuideUI } from '../ui/ComponentGuideUI';
+import type { HubPanel } from '../ui/hub/HubPanel';
 import type { StationWindow } from '../ui/StationWindow';
 import type { TradeWindow } from '../ui/TradeWindow';
 import type { SocialUI } from '../ui/SocialUI';
@@ -42,7 +42,8 @@ export interface KeyHost {
   readonly proto: ProtoHooks | null;
   readonly menu: GameMenuUI;
   readonly dialogue: DialogueUI;
-  readonly componentGuide: Lazy<ComponentGuideUI>;
+  /** The side panel on the HUD (Social, Party, Pilot, Components) */
+  readonly hub: HubPanel;
   readonly inventoryWindow: InventoryWindow;
   readonly tradeWindow: TradeWindow;
   readonly social: SocialUI;
@@ -84,16 +85,13 @@ export const MODAL_CHAIN: readonly KeyFn[] = [
   },
   // A conversation: digits answer, Space skips ahead, Esc walks away
   (h, code) => h.dialogue.onKey(code),
-  // The component guide sits over everything else (the hangar, the station)
-  (h, code) => {
-    if (!h.componentGuide.value?.isOpen) return false;
-    if (code === 'Escape' || code === 'KeyC') h.componentGuide.value.close();
-    return true;
-  },
-  // C: the component guide (anywhere but the map, which centres on C)
+  // Esc puts away the side panel when it was called up over the station or the hangar
+  (h, code) => code === 'Escape' && h.hub.dismiss(),
+  // C: the side panel's component guide, again folds it (anywhere but the map, which centres on C; over the
+  // station and the hangar it's called up over them)
   (h, code) => {
     if (code === 'KeyC' && h.loggedIn && !h.systemMapUI.isOpen) {
-      h.componentGuide.use((g) => g.open());
+      h.hub.toggle('components');
       return true;
     }
     return false;
@@ -106,11 +104,6 @@ export const MODAL_CHAIN: readonly KeyFn[] = [
   (h, code) => {
     if (!h.tradeWindow.isOpen) return false;
     if (code === 'Escape') h.tradeWindow.close();
-    return true;
-  },
-  (h, code) => {
-    if (!h.social.window.isOpen) return false;
-    if (code === 'Escape' || code === 'KeyP') h.social.window.close();
     return true;
   },
   (h, code) => {
@@ -155,11 +148,11 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
   KeyI: flying((h) => h.inventoryWindow.open()),
   // 1-5: the quick bar
   Digit1: quick(0), Digit2: quick(1), Digit3: quick(2), Digit4: quick(3), Digit5: quick(4),
-  // P: invite the pilot under the cursor, or the party window
+  // P: invite the pilot under the cursor, or the side panel's Social tab (again: fold it)
   KeyP: flying((h) => {
     const over = h.infoPanel.hovered;
     if (over > 0 && !h.social.isMember(over)) h.social.invite(over);
-    else h.social.openWindow();
+    else h.hub.toggle('social');
   }),
   // B: ping what's under the cursor for the party (Shift: danger)
   KeyB: flying((h) => h.pingUI.pingAtCursor(h.input.isKeyDown('ShiftLeft') || h.input.isKeyDown('ShiftRight'))),

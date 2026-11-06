@@ -9,10 +9,10 @@ function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: stri
     loggedIn: true, stationOpen: false, proto: null,
     menu: { isOpen: false, back: rec('menu.back'), open: rec('menu.open') },
     dialogue: { onKey: () => false },
-    componentGuide: { value: null, use: rec('guide.use') },
+    hub: { dismiss: () => false, toggle: (id: string) => { calls.push('hub:' + id); } },
     inventoryWindow: { isOpen: false, open: rec('inv.open'), close: rec('inv.close') },
     tradeWindow: { isOpen: false, close: rec('trade.close') },
-    social: { window: { isOpen: false, close: rec('social.close') }, isMember: () => false, invite: rec('invite'), openWindow: rec('party') },
+    social: { isMember: () => false, invite: rec('invite') },
     quests: { log: { isOpen: false, close: rec('log.close'), toggle: rec('log.toggle'), open: rec('log.open') } },
     stationWindow: { value: null },
     shipClient: { hangarOpen: false, onKey: () => false },
@@ -39,7 +39,31 @@ function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: stri
 
 describe('keys: the modal chain and tables', () => {
   it('has the chain in its fixed order (menu first, station last)', () => {
-    expect(MODAL_CHAIN.length).toBe(9);
+    expect(MODAL_CHAIN.length).toBe(8);
+  });
+
+  it('P opens the side panel on Social, or invites the pilot under the cursor', () => {
+    const { h, calls } = fakeHost();
+    handleKey(h, 'KeyP');
+    expect(calls).toEqual(['hub:social']);
+    const b = fakeHost({ infoPanel: { hovered: 7 } });
+    handleKey(b.h, 'KeyP');
+    expect(b.calls).toEqual(['invite']);
+  });
+
+  it('C opens the side panel on the component guide, but not on the map', () => {
+    const { h, calls } = fakeHost();
+    handleKey(h, 'KeyC');
+    expect(calls).toEqual(['hub:components']);
+    const m = fakeHost({ systemMapUI: { isOpen: true, toggle: () => {} } });
+    handleKey(m.h, 'KeyC');
+    expect(m.calls).toEqual([]);
+  });
+
+  it('Esc puts away a side panel called up over the station before anything else below the menu', () => {
+    const { h, calls } = fakeHost({ hub: { dismiss: () => { calls.push('hub.dismiss'); return true; }, toggle: () => {} } });
+    handleKey(h, 'Escape');
+    expect(calls).toEqual(['hub.dismiss']);
   });
 
   it('Esc with the menu open only steps the menu back', () => {
