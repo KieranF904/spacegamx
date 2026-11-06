@@ -219,21 +219,24 @@
   },
   {
    "id": "railgun_shot",
-   "prompt": "Railgun firing, a deep electromagnetic thump and crack as a slug launches, powerful and low, no high whine",
-   "duration": 1.2,
-   "influence": 0.6
+   "prompt": "Low pitched railgun firing",
+   "duration": 0.7,
+   "influence": 0.6,
+   "variants": 1
   },
   {
    "id": "flak_shot",
-   "prompt": "Flak cannon firing, a short deep muffled boom",
+   "prompt": "medium sized cannon firing",
    "duration": 0.6,
-   "influence": 0.6
+   "influence": 0.6,
+   "variants": 1
   },
   {
    "id": "missile_launch",
-   "prompt": "Missile launching from a ship, rocket ignition whoosh with a low roar",
+   "prompt": "crack, and missile hissing as it flies away",
    "duration": 1.4,
-   "influence": 0.6
+   "influence": 0.6,
+   "variants": 1
   },
   {
    "id": "emp_shot",
@@ -243,17 +246,19 @@
   },
   {
    "id": "laser_loop",
-   "prompt": "Continuous combat laser beam firing, steady deep pulsing energy hum with soft crackle, no shrill whine",
+   "prompt": "powerful bassy energy streaming",
    "duration": 3,
    "influence": 0.6,
-   "loop": true
+   "loop": true,
+   "variants": 1
   },
   {
    "id": "lance_loop",
-   "prompt": "Continuous heavy plasma lance beam, deep low roaring blowtorch rumble with a gritty crackling electric buzz on top, powerful and bassy, sci-fi spaceship weapon",
+   "prompt": "powerful bassy energy streaming with quiet hiss",
    "duration": 3,
    "influence": 0.7,
-   "loop": true
+   "loop": true,
+   "variants": 1
   },
   {
    "id": "shield_hit",
@@ -299,17 +304,17 @@
   },
   {
    "id": "autocannon_shot",
-   "prompt": "Single short autocannon round firing, deep low punchy thump with a dull mechanical knock, bassy, tight, no echo, sci-fi spaceship gun",
-   "duration": 0.5,
+   "prompt": "short cannon round firing, bassy",
+   "duration": 0.6,
    "influence": 0.7,
-   "variants": 2
+   "variants": 1
   },
   {
    "id": "pulse_shot",
-   "prompt": "Short deep plasma pulse bolt fired, low bassy energy thump with a soft electric buzz, smooth, sci-fi, not shrill",
+   "prompt": "fast, bassy energy bust",
    "duration": 0.6,
    "influence": 0.7,
-   "variants": 2
+   "variants": 1
   },
   {
    "id": "arc_shot",
@@ -327,10 +332,11 @@
   },
   {
    "id": "frost_loop",
-   "prompt": "Continuous freezing ice beam, deep cold resonant hum with soft crystalline crackle of ice forming, low and smooth, sci-fi",
+   "prompt": "Continuous freezing ice beam, deep cold resonant with soft crystalline crackle of ice forming",
    "duration": 3,
    "influence": 0.6,
-   "loop": true
+   "loop": true,
+   "variants": 1
   },
   {
    "id": "repair_loop",
@@ -347,10 +353,10 @@
   },
   {
    "id": "mortar_shot",
-   "prompt": "Heavy mortar firing, deep hollow thoomp from a large tube, low bassy boom, short, muffled",
+   "prompt": "Heavy mortar firing, thoomp, bassy",
    "duration": 0.9,
    "influence": 0.7,
-   "variants": 2
+   "variants": 1
   },
   {
    "id": "charge_launch",
@@ -485,7 +491,7 @@
   {
    "id": "coilgun_shot",
    "prompt": "Coilgun firing, deep magnetic thump with a rising electric thrum and a heavy slug crack, low, sci-fi spaceship weapon, bassy, no high whine, no echo",
-   "duration": 1.0,
+   "duration": 1,
    "influence": 0.75
   },
   {

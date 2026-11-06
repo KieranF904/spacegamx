@@ -1,0 +1,241 @@
+{
+  "sounds": {
+    "railgun_shot": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-06-16-025.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:06:32.510Z"
+        },
+        "2026-11-06T02-06-46-713.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:07:07.327Z"
+        },
+        "2026-11-06T02-07-00-524.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:07:08.578Z"
+        }
+      },
+      "draft": {
+        "prompt": "Low pitched railgun firing",
+        "duration": 0.7,
+        "influence": 0.6,
+        "loop": false
+      },
+      "chosen": "2026-11-06T02-07-00-524.mp3"
+    },
+    "flak_shot": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-08-03-313.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:08:13.864Z"
+        },
+        "2026-11-06T02-08-19-054.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:08:26.694Z"
+        }
+      },
+      "draft": {
+        "prompt": "medium sized cannon firing",
+        "duration": 0.6,
+        "influence": 0.6,
+        "loop": false
+      },
+      "chosen": "2026-11-06T02-08-19-054.mp3"
+    },
+    "missile_launch": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-09-02-659.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:09:25.984Z"
+        },
+        "2026-11-06T02-09-54-642.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:10:32.461Z"
+        }
+      },
+      "draft": {
+        "prompt": "crack, and missile hissing as it flies away",
+        "duration": 1.4,
+        "influence": 0.6,
+        "loop": false
+      },
+      "chosen": "2026-11-06T02-09-54-642.mp3"
+    },
+    "laser_loop": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-11-43-444.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:11:55.545Z"
+        },
+        "2026-11-06T02-11-05-103.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:11:56.637Z"
+        }
+      },
+      "draft": {
+        "prompt": "powerful bassy energy streaming",
+        "duration": 3,
+        "influence": 0.6,
+        "loop": true
+      },
+      "chosen": "2026-11-06T02-11-43-444.mp3"
+    },
+    "lance_loop": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-12-21-845.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:12:29.050Z"
+        }
+      },
+      "draft": {
+        "prompt": "powerful bassy energy streaming with quiet hiss",
+        "duration": 3,
+        "influence": 0.7,
+        "loop": true
+      },
+      "chosen": "2026-11-06T02-12-21-845.mp3"
+    },
+    "autocannon_shot": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-13-44-656.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:13:53.560Z"
+        },
+        "2026-11-06T02-13-58-535.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:14:17.440Z"
+        },
+        "2026-11-06T02-14-10-349.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:14:41.374Z"
+        },
+        "2026-11-06T02-14-35-167.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:14:42.203Z"
+        }
+      },
+      "draft": {
+        "prompt": "short cannon round firing, bassy",
+        "duration": 0.6,
+        "influence": 0.7,
+        "loop": false
+      },
+      "chosen": "2026-11-06T02-14-35-167.mp3"
+    },
+    "pulse_shot": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-17-39-075.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:55.926Z"
+        },
+        "2026-11-06T02-17-18-962.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:56.432Z"
+        },
+        "2026-11-06T02-17-04-633.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:56.896Z"
+        },
+        "2026-11-06T02-16-16-577.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:57.422Z"
+        },
+        "2026-11-06T02-15-47-997.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:57.859Z"
+        },
+        "2026-11-06T02-15-29-774.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:58.403Z"
+        },
+        "2026-11-06T02-15-10-175.mp3": {
+          "status": "discarded",
+          "at": "2026-11-06T02:17:59.041Z"
+        },
+        "2026-11-06T02-18-20-696.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:18:26.403Z"
+        }
+      },
+      "draft": {
+        "prompt": "fast, bassy energy bust",
+        "duration": 0.6,
+        "influence": 0.7,
+        "loop": false
+      },
+      "chosen": "2026-11-06T02-18-20-696.mp3"
+    },
+    "arc_shot": {
+      "note": "only use arc shot 1\n",
+      "candidates": {},
+      "draft": {
+        "prompt": "Low electric arc discharge, deep bassy crackling zap with a heavy thump, short, sci-fi tesla weapon, not shrill",
+        "duration": 0.7,
+        "influence": 0.7,
+        "loop": false
+      }
+    },
+    "frost_loop": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-19-24-126.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:19:32.758Z"
+        }
+      },
+      "draft": {
+        "prompt": "Continuous freezing ice beam, deep cold resonant with soft crystalline crackle of ice forming",
+        "duration": 3,
+        "influence": 0.6,
+        "loop": true
+      },
+      "chosen": "2026-11-06T02-19-24-126.mp3"
+    },
+    "mortar_shot": {
+      "note": "",
+      "candidates": {
+        "2026-11-06T02-20-44-511.mp3": {
+          "status": "chosen",
+          "at": "2026-11-06T02:20:47.676Z"
+        }
+      },
+      "draft": {
+        "prompt": "Heavy mortar firing, thoomp, bassy",
+        "duration": 0.9,
+        "influence": 0.7,
+        "loop": false
+      },
+      "chosen": "2026-11-06T02-20-44-511.mp3"
+    }
+  },
+  "reviewed": [
+    "shot",
+    "turret_shot",
+    "railgun_shot",
+    "flak_shot",
+    "missile_launch",
+    "emp_shot",
+    "laser_loop",
+    "lance_loop",
+    "hive_launch",
+    "cinder_shot",
+    "prism_shot",
+    "phase_shot",
+    "singularity_fire",
+    "autocannon_shot",
+    "pulse_shot",
+    "arc_shot",
+    "arc_loop",
+    "frost_loop",
+    "repair_loop",
+    "torpedo_launch",
+    "mortar_shot"
+  ]
+}

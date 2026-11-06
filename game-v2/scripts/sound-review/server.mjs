@@ -177,7 +177,7 @@ const server = http.createServer(async (req, res) => {
       const man = loadManifest();
       return sendJson(res, 200, {
         fake: FAKE, hasKey: FAKE || !!falKey(), endpoint: ENDPOINT, busy: [...inflight.keys()],
-        sounds: SOUNDS.map((s) => ({ ...s, review: { note: man.sounds[s.id]?.note ?? '', draft: man.sounds[s.id]?.draft ?? null, chosen: man.sounds[s.id]?.chosen ?? null }, candidates: candidatesOf(s.id, man) })),
+        sounds: SOUNDS.map((s) => ({ ...s, reviewed: (man.reviewed ?? []).includes(s.id), review: { note: man.sounds[s.id]?.note ?? '', draft: man.sounds[s.id]?.draft ?? null, chosen: man.sounds[s.id]?.chosen ?? null }, candidates: candidatesOf(s.id, man) })),
       });
     }
     if ((m = p.match(/^\/part\/([\w.\-]+)$/)) && safe(m[1])) return sendFile(res, path.join(partsDir, m[1]));
