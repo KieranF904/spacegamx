@@ -13,7 +13,13 @@
  *            stores, damage, a tow), the lane is put back to the real ship's (a new lane version: every client deriving
  *            it gets a gunSync), at most once per FIX_GAP ticks a ship
  *   rows     a pilot's gun controls (its triggers, its cursor distance on the input's 4-unit grid) as they change:
- *            gun rows (gunCtl), packed once a round for every client
+ *            gun rows (gunCtl), packed once a round for every client. The distance goes exactly only where the lanes
+ *            need it: on a tick a trigger changes, every tick one is held, and SEMI_BUFFER ticks after (a semi-automatic
+ *            gun's click still fires). Not firing, a turret points straight at the aim and carries nothing (ships/guns.ts
+ *            stepGuns), so there it goes roughly (idleDue: when the change would turn a gun's line to the aim by
+ *            IDLE_TURN, sooner the bigger it is, at most every IDLE_MIN_GAP ticks, at least every IDLE_MAX_GAP if it
+ *            moved at all): its clients' turrets look right (OtherGuns.distAt eases between). The server's lane steps
+ *            on the exact distance; what differs (idle aim) is left out of the hash (laneHash)
  *   clients  a client steps a ship's lane only while it's worth it (forClient): the ship held, near its own (GUN_REACH,
  *            kept to GUN_KEEP), and lately firing or its trigger held (GUN_ACTIVE). Until then its fire records go as
  *            before; the first volley after a quiet spell goes told, with the gunSync. A lane it no longer should step
@@ -23,7 +29,7 @@
  * fire record (always told), put into the lane as its clients put it in (lanePd).
  */
 import {
-  Input, Position, Velocity, Rotation, ReplicaMode, quantizeCursorDist, gunStateOf, firedRec, sameRecs, laneRecords, lanePilot,
+  Input, Position, Velocity, Rotation, ReplicaMode, SEMI_BUFFER, shipPointToWorld, quantizeCursorDist, gunStateOf, firedRec, sameRecs, laneRecords, lanePilot,
   lanePilotless, lanePd, laneRemap, laneHash, laneOf, pdParts, packGunRow, packGunSync, ownStructure, TELL_PD, TELL_NONE, GUN_FIRE, GUN_ALT,
   type FlightBody, type GunCtl, type LaneRec, type OwnExtras, type ReplicaEnv, type ServerGunSyncMessage, type ShipState,
   type SimEnv, type SimEvent, type FieldEnv,
@@ -32,6 +38,14 @@ import type { ShipBridge } from '../../ships/ShipBridge.js';
 
 /** Ticks after a lane is put back to the real ship's in which it isn't again (a shield draining the stores every hit) */
 export const GUN_FIX_GAP = 60;
+/**
+ * Not firing, a pilot's aim distance goes to its lanes' clients when the change since the last sent would turn some
+ * gun's line to the aim point by IDLE_TURN radians (0.5°) at IDLE_MIN_GAP ticks since (250 ms), proportionally less the
+ * longer since (IDLE_TURN · IDLE_MIN_GAP / ticks: a small change waits longer), and any change at IDLE_MAX_GAP (3 s)
+ */
+export const IDLE_TURN = 0.5 * (Math.PI / 180);
+export const IDLE_MIN_GAP = 15;
+export const IDLE_MAX_GAP = 180;
 /** Ticks of told ticks kept (longer than the widest snapshot window) */
 const KEEP_TICKS = 120;
 /** A client starts stepping a ship's guns within this of its own ship, and stops past GUN_KEEP (world units) */
@@ -60,8 +74,15 @@ export interface GunLane {
   /** Ticks whose records are told (the lane's differ from the real ship's), and those where nothing really fired */
   told: Set<number>;
   none: Set<number>;
-  /** A pilot's gun controls now, as of the last round (gun rows step from it), and their changes since: [tick, bits, dist/4] */
+  /**
+   * A pilot's gun controls now as its clients' lanes have them (gun rows step from it: the distance exact while a
+   * trigger is held, rough while not), and their changes since the last round: [tick, bits, dist/4]
+   */
   ctl: GunCtl;
+  /** The pilot's exact distance last tick, the tick the distance last went, and the last tick it must go exactly */
+  exactDist: number;
+  distAt: number;
+  exactTo: number;
   sent: GunCtl;
   events: [number, number, number][];
   /** This round's row, packed once for every client (null: none due) */
@@ -92,7 +113,11 @@ export class GunNet {
   readonly lanes = new Map<number, GunLane>();
   /** Lane versions, one count for every lane (a lane made again never repeats one a client holds) */
   private verSeq = 0;
-  readonly stats = { steps: 0, toldTicks: 0, noneTicks: 0, fixes: 0, syncs: 0, derivedRecs: 0, toldRecs: 0, pdRecs: 0 };
+  /**
+   * idleChanges: ticks a pilot's exact distance changed with no trigger held (what went before the idle rule);
+   * idleSent: those that went (idleDue); exactSent: distance changes that went exactly (a trigger held or changing)
+   */
+  readonly stats = { steps: 0, toldTicks: 0, noneTicks: 0, fixes: 0, syncs: 0, derivedRecs: 0, toldRecs: 0, pdRecs: 0, idleChanges: 0, idleSent: 0, exactSent: 0 };
 
   /** gunSyncs by why (a lane new to the client, a new version, its ship keyframed) */
   readonly why: Record<string, number> = {};
@@ -113,7 +138,7 @@ export class GunNet {
     const ctl = kind === 'pilot' ? pilotCtl(eid) : { bits: 0, dist: 0 };
     l = {
       kind, x: laneOf(gunStateOf(ship), b.chargeOf(eid)), ver: ++this.verSeq, fixAt: -Infinity, pd: pdParts(ship, b.tuning), at: now,
-      told: new Set(), none: new Set(), ctl, sent: { ...ctl }, events: [], ship, derived: ship.derived, round: now, roundFrom: now, active: -Infinity,
+      told: new Set(), none: new Set(), ctl, sent: { ...ctl }, events: [], exactDist: ctl.dist, distAt: now, exactTo: -Infinity, ship, derived: ship.derived, round: now, roundFrom: now, active: -Infinity,
     };
     this.lanes.set(eid, l);
     return null;
@@ -137,7 +162,7 @@ export class GunNet {
     const g = pilotCtl(eid);
     const l = this.lane(eid, 'pilot', ship);
     if (!l) return;
-    if (l.ctl.bits !== g.bits || l.ctl.dist !== g.dist) { l.ctl = g; l.events.push([t, g.bits, g.dist / 4]); }
+    this.ctlTick(eid, l, ship, g, t);
     const rc = b.replicaCtl.get(eid), before = l.before;
     l.before = undefined;
     // (Not flown this tick (docked): no lane, a new one when it flies again. Its body before not known, or a tick
@@ -169,6 +194,43 @@ export class GunNet {
     EVENTS.length = 0;
     const x = lanePilotless(eid, l.x, bodyOf(eid, ship), rc.bits, fire, aim, aimDist, ship, t, b.tuning, EVENTS);
     this.settle(eid, l, x, ship, t, from);
+  }
+
+  /**
+   * A pilot's gun controls on tick t into what its clients' lanes get (a gun row event when they change): the triggers
+   * always, the distance exactly while they need it (a trigger held or changing, SEMI_BUFFER ticks after), else idleDue
+   */
+  private ctlTick(eid: number, l: GunLane, ship: ShipState, g: GunCtl, t: number): void {
+    if (g.bits) l.exactTo = t + SEMI_BUFFER;
+    const exact = g.bits !== 0 || g.bits !== l.ctl.bits || t <= l.exactTo;
+    if (!exact && g.dist !== l.exactDist) this.stats.idleChanges++;
+    l.exactDist = g.dist;
+    let dist = l.ctl.dist;
+    if (g.dist !== dist && (exact || this.idleDue(eid, ship, l.ctl.dist, g.dist, t - l.distAt))) {
+      dist = g.dist;
+      l.distAt = t;
+      if (exact) this.stats.exactSent++; else this.stats.idleSent++;
+    }
+    if (l.ctl.bits !== g.bits || l.ctl.dist !== dist) { l.ctl = { bits: g.bits, dist }; l.events.push([t, g.bits, dist / 4]); }
+  }
+
+  /**
+   * Is a pilot's idle distance due to go (from `was`, sent `gap` ticks ago, to `now`): the most any gun's line from its
+   * pivot (a turret's) or muzzle (a fixed gun's) to the aim point turns, against IDLE_TURN · IDLE_MIN_GAP / gap
+   */
+  private idleDue(eid: number, ship: ShipState, was: number, now: number, gap: number): boolean {
+    if (gap < IDLE_MIN_GAP) return false;
+    if (gap >= IDLE_MAX_GAP) return true;
+    const a = Input.targetAngle[eid], ca = Math.cos(a), sa = Math.sin(a), cs = this.host.ships().tuning.cellSize;
+    const pose = { x: Position.x[eid], y: Position.y[eid], angle: Rotation.angle[eid] };
+    const line = (px: number, py: number, d: number) => (d > 0 ? Math.atan2(pose.y + sa * d - py, pose.x + ca * d - px) : a);
+    let turn = 0;
+    for (const w of ship.derived.weapons) {
+      const [px, py] = shipPointToWorld(ship, pose, w.window ? w.window.pivot : w.muzzle, cs);
+      const d = Math.abs(line(px, py, now) - line(px, py, was));
+      turn = Math.max(turn, Math.min(d, 2 * Math.PI - d));
+    }
+    return turn * gap >= IDLE_TURN * IDLE_MIN_GAP;
   }
 
   /** (A rebuild since its last tick: its stores onto the new structure, as the server's rebuild moved the real ship's: laneRemap) */

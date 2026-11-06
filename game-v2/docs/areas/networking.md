@@ -479,6 +479,17 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
   - *Controls*: a pilot's held keys and aim are its control rows; its triggers and cursor distance (the input's 4-unit
     grid) are gun rows, a plain `gunCtl` message just before the snapshot (`packGunRow`: [id, bits × 8 + ago, distance
     step, ...], a run form like the control rows'). They go when they change, and only to clients stepping that ship.
+    The distance goes exactly only where a lane needs it (GunNet `ctlTick`): on the tick a trigger changes, every tick
+    one is held, and `SEMI_BUFFER` (5) ticks after a release (a semi-automatic click still fires). With no trigger held
+    a turret points straight at the aim and carries nothing (the turret rule, docs/areas/weapons.md), so there the
+    distance goes roughly (`idleDue`): when the change since the last sent would turn some gun's line to the aim point
+    (from a turret's pivot, a fixed gun's muzzle) by `IDLE_TURN` (0.5°) at `IDLE_MIN_GAP` (15 ticks, 250 ms) since,
+    proportionally less the longer since (0.5° × 15 / ticks: a small change waits longer, a big one goes at 250 ms),
+    and any change at all at `IDLE_MAX_GAP` (180 ticks, 3 s); unchanged, nothing. A pilot holding its cursor on a
+    moving target now sends about 0.25-0.4 idle updates a second instead of 10-16 (crowd bench). The server's lane
+    steps on the exact distance; the clients' on what they were sent (held between); what that changes, an idle
+    turret's aim, is left out of the lane hash. For drawing, `OtherGuns.distAt` eases between two idle updates
+    (ShipClient.placeReplica's cursor distance, in place of the status row's hundreds, for a ship whose lane it steps).
     An AI pilot's trigger, lead and distance are its body's (common bodies/aiPilot.ts: the trigger rule `aiFires` moved
     there from Enemies.ts, its target's size read where each end has its structure, `lobs` in the ENGAGE order's
     hitBy field), so a client flying its body (CAPS.PILOTS) fires it too: nothing goes for them.
@@ -497,7 +508,7 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
     records, `firedRec`/`sameRecs`): a tick they differ on is told, its fire records sent as before (an ammunition round,
     a sheltered pilot, a bot aiming off the input grid); one where the lane fired and the real ship didn't gets a
     TELL_NONE record. A told tick replaces the client's own records of that ship and tick. At each snapshot round the
-    lane's state hash (`laneHash`: stores and gun state, point defence's aim and the towed entity left out) is held to
+    lane's state hash (`laneHash`: stores and gun state, point defence's aim, every gun's aim while no trigger is held, and the towed entity left out) is held to
     the real ship's; off (a shield drawing on the stores), it's put back to the real ship's, a new version, at most once
     per `GUN_FIX_GAP` (60 ticks). A respawn starts a lane again; docked, a pilot has none.
   - *Which clients step which ships* (`GunNet.forClient`): a ship it holds, within `GUN_REACH` (8 km) of its own (kept to

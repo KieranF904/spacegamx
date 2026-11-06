@@ -78,6 +78,13 @@ for (const r of results) {
   console.log(`${r.layout} ${r.n}: ${r.timing.debrisMean}/${r.timing.debrisMax}, ${r.timing.debrisStepMsPerTick} ms, client ${r.probeDebrisMsPerTick} ms, ${tot} B/s ${JSON.stringify(d)}, corr ${c?.n ?? 0}, ${r.agreement.debrisOff}/${r.agreement.debrisChecked} (${r.agreement.debrisDisagree})`);
 }
 
+console.log('\nother ships\' guns (GunNet): a pilot\'s aim distance with no trigger held, per pilot per second: changes (each one a gun row event before the idle rule) -> updates sent; exact updates (a trigger held or changing); gunCtl B/s over the probes');
+for (const r of results) {
+  const g = r.guns;
+  if (!g) continue;
+  console.log(`${r.layout} ${r.n}: idle ${g.idleChangesPerPilotSec}/s -> ${g.idleSentPerPilotSec}/s, exact ${g.exactSentPerPilotSec}/s, gunCtl ${r.bytes.capable.subTypesBps?.gunCtl ?? 0} B/s`);
+}
+
 console.log('\nprobe PT (the game\'s prediction of other ships, C3, per probe): ms/tick (advance + re-step), ships on PT, left out by LOD, ST match %, misses/s, re-stepped ships/s (touched), re-step ticks/s, corrections/s, mean correction, PT contacts/s');
 for (const r of results) {
   const p = r.pt;

@@ -5,7 +5,9 @@
  * stepped each tick beside its replica by the same cores the server's real ship runs, from the controls everyone has:
  *
  *   pilot      (replica mode Player) its held keys and aim (control rows) and its trigger, mining trigger and cursor
- *              distance (gun rows, snapshot.gun: packGunRow), stepped by the own ship's step (ownStep.ts stepOwnShip:
+ *              distance (gun rows, snapshot.gun: packGunRow; the distance exact only while a trigger is held or
+ *              changing, rough otherwise: an idle turret points at the aim and carries nothing, ships/guns.ts
+ *              stepGuns, and laneHash leaves idle aim out), stepped by the own ship's step (ownStep.ts stepOwnShip:
  *              the accounted flight, for its stores) from its replica as it ended t - 1, then its guns (guns.ts
  *              stepShipGuns) at its replica's pose after t's step, before t's causes (where the server's fired from)
  *   pilotless  an AI pilot flown by its body on the client's tick layer (CAPS.PILOTS): its trigger and lead are its
@@ -240,14 +242,17 @@ const HASH_STATE: SimShipState = {
 
 /**
  * A lane's state hash (what the server's lane and the real ship are compared by, and the PT layer's lane against the
- * confirmed one): its stores and gun state, less point defence's aim (pd: its parts) and the Tow Beam's towed entity
- * (the tow feature's). Pose, controls, hazards and priming aren't the lane's (its replica's)
+ * confirmed one): its stores and gun state, less point defence's aim (pd: its parts), every gun's aim while the
+ * trigger isn't held (an idle turret points at the aim and carries nothing to the next tick: ships/guns.ts stepGuns;
+ * other pilots' idle aim distance is sent only roughly, GunNet) and the Tow Beam's towed entity (the tow feature's).
+ * Pose, controls, hazards and priming aren't the lane's (its replica's)
  */
 export function laneHash(id: number, x: Readonly<OwnExtras>, pd: readonly number[] = []): number {
   const s = HASH_STATE, g = x.guns;
   s.id = id; s.charge = x.charge;
   let aim = g.aim;
-  if (pd.length) { aim = [...g.aim]; for (const p of pd) aim[p] = 0; }
+  if (!g.triggerHeld) aim = g.aim.length ? new Array<number>(g.aim.length).fill(0) : g.aim;
+  else if (pd.length) { aim = [...g.aim]; for (const p of pd) aim[p] = 0; }
   s.guns = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim, triggerHeld: g.triggerHeld, clickAt: g.clickAt, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare };
   return shipHash(s);
 }

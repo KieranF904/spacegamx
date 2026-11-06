@@ -99,6 +99,17 @@ export class OtherGuns implements ReplicaSideSteps {
     return l ? ctlOf(l, t) : undefined;
   }
 
+  /**
+   * A pilot's aim distance to draw its turrets by at tick t (fractional: the render tick). Not firing, its distance
+   * comes only roughly (server GunNet idleDue), so between two such changes it's eased from one to the next; held
+   * otherwise (a trigger held: each tick's exact, as the lane steps). Undefined: no lane of it
+   */
+  distAt(id: number, t: number): number | undefined {
+    const l = this.lanes.get(id);
+    if (!l || l.drop) return undefined;
+    return easedDist(l.ctlTicks, l.ctls, t);
+  }
+
   /** Its lane's hash as tick t ended (the PT layer's check) */
   hashAt(id: number, t: number): number | undefined {
     const x = this.lanes.get(id)?.states.get(t), ship = this.host.ship(id);
@@ -269,6 +280,21 @@ function ctlOf(l: Lane, t: number): GunCtl {
   let lo = 0, hi = k.length;
   while (lo < hi) { const mid = (lo + hi) >> 1; if (k[mid] <= t) lo = mid + 1; else hi = mid; }
   return (lo ? l.ctls.get(k[lo - 1]) : undefined) ?? { bits: 0, dist: 0 };
+}
+
+/**
+ * The distance between gun-control changes (`ticks` sorted, `ctls` by tick) at tick t: from a change with no trigger
+ * held to the next (also none held) it goes linearly from one's distance to the other's; otherwise the last change's
+ */
+export function easedDist(ticks: readonly number[], ctls: ReadonlyMap<number, GunCtl>, t: number): number {
+  let lo = 0, hi = ticks.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (ticks[mid] <= t) lo = mid + 1; else hi = mid; }
+  if (!lo) return ctls.get(ticks[0])?.dist ?? 0;
+  const t0 = ticks[lo - 1], a = ctls.get(t0)!;
+  if (lo >= ticks.length || a.bits) return a.dist;
+  const t1 = ticks[lo], b = ctls.get(t1)!;
+  if (b.bits) return a.dist;
+  return a.dist + ((b.dist - a.dist) * (t - t0)) / (t1 - t0);
 }
 
 const PD = new WeakMap<ShipDerived, number[]>();

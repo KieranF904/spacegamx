@@ -62,7 +62,7 @@ interface Run {
   laneOff: string[];
 }
 
-export function otherGunsFight(opts: { pairs?: [string, string][]; pirates?: boolean; ticksPer?: number; pd?: boolean } = {}): Run {
+export function otherGunsFight(opts: { pairs?: [string, string][]; pirates?: boolean; ticksPer?: number; pd?: boolean; bursts?: boolean } = {}): Run {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -153,10 +153,16 @@ export function otherGunsFight(opts: { pairs?: [string, string][]; pirates?: boo
     // (a dummy for it to shoot at, off A's side: shells that miss it fly out their life)
     ships.spawnDummy(ships.library.get('hauler')!, x0 + 900, y0 - 800, 0, num);
     for (let t = -40; t < 0; t++) step(-1);
-    script = (t) => ({
-      forward: t % 200 < 40, left: t % 300 > 250, fireLeft: t % 120 < 90, fireRight: t % 170 > 30,
-      targetAngle: -Math.PI / 2 + Math.sin(t / 37) * 0.4, cursorDist: 300 + (t % 90) * 8,
-    });
+    script = opts.bursts
+      // (short bursts and taps, the cursor swept all the while: its distance between them goes only roughly, GunNet idleDue)
+      ? (t) => ({
+        forward: t % 200 < 40, left: t % 300 > 250, fireLeft: t % 70 < 9 || t % 97 === 50, fireRight: t % 130 > 118,
+        targetAngle: -Math.PI / 2 + Math.sin(t / 23) * 0.6, cursorDist: 250 + ((t * 13) % 1100),
+      })
+      : (t) => ({
+        forward: t % 200 < 40, left: t % 300 > 250, fireLeft: t % 120 < 90, fireRight: t % 170 > 30,
+        targetAngle: -Math.PI / 2 + Math.sin(t / 37) * 0.4, cursorDist: 300 + (t % 90) * 8,
+      });
     for (let t = 0; t < per; t++) step(t);
     script = () => ({});
     for (let t = 0; t < 120; t++) step(-1);
@@ -212,6 +218,22 @@ describe('other ships\' guns stepped from their inputs', () => {
     expect(r.exact).toBe(r.derivedShells);
     // (records it was told of B: only where the server's state alone decided)
     expect(r.stats.derivedRecs).toBeGreaterThan(20 * r.stats.toldTicks);
+  }, 300_000);
+
+  it("another pilot in short bursts and taps, its idle distance sent only roughly: every shell still the server's exactly", () => {
+    const r = otherGunsFight({ bursts: true });
+    if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ exact: r.exact, inexact: r.inexact.slice(0, 10), n: r.inexact.length, derived: r.derivedShells, stats: r.stats, lane: r.laneStats, toldB: r.toldB }));
+    expect(r.derivedShells).toBeGreaterThan(60);
+    expect(r.inexact).toEqual([]);
+    expect(r.exact).toBe(r.derivedShells);
+    expect(r.A.hits.stats.missed).toBe(0);
+    expect(r.laneChecks).toBeGreaterThan(200);
+    expect(r.laneOff).toEqual([]);
+    expect(r.stats.toldTicks).toBe(0);
+    expect(r.stats.fixes).toBe(0);
+    // (the idle distance changed nearly every idle tick; a small share of those went)
+    expect(r.stats.idleChanges).toBeGreaterThan(500);
+    expect(r.stats.idleSent).toBeLessThan(r.stats.idleChanges / 4);
   }, 300_000);
 
   it("point defence (server-only threats): its shots told as TELL_PD, put into the lane, which stays exactly the server's", () => {

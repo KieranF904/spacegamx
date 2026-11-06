@@ -548,3 +548,62 @@ gunSync is gone from the ball's byte breakdown. What's left is gunCtl: 3.6 KB/s 
 summed over the 4 probes. Every bot keeps its cursor on a moving target, so its distance changes every tick.
 
 pirates (bench:table): 1089 → **1080** B/s, 9.45 → **9.00** msgs/s, wire 1713 → **1674**.
+
+### Follow-up: idle aim distance and the turret rule (Kieran's decisions)
+
+1. **Turrets slew only while firing** (a game rule, common ships/guns.ts `stepGuns`). A turret turns at
+   `turret.slewRate` only on a tick its trigger was held through from the tick before. Not firing, and on the tick
+   the trigger goes down, it points straight at the aim (turret.ts `pointTurretAim`, clamped to its base window) and
+   carries nothing. So what fires on a trigger-down depends only on that tick's aim. Fixed guns were already
+   stateless. Point defence keeps its own targeting and slew (server-only threats; not hashed in lanes). The step is
+   shared, so the server's ships, the own prediction, other ships' lanes and AI ships (`aiFires` on both ends) all
+   run it the same way.
+   Gameplay: slew while firing is unchanged. An idle turret is always on the aim, so a burst's first shot never waits
+   for the turret to catch up, for pilots and for engaged AI holding fire alike. The frameHash world hash moved and
+   was re-pinned; with the old rule put back it matched again, so the move is the rule's alone.
+2. **Idle aim distance goes roughly** (server net/guns/GunNet.ts `ctlTick`, `idleDue`). Gun rows carry the exact
+   distance on a trigger change, every tick a trigger is held, and for `SEMI_BUFFER` (5) ticks after a release,
+   because a semi-automatic click can still fire then. With no trigger held, the distance goes when the change since
+   the last sent value would turn some gun's line to the aim point by `IDLE_TURN` = 0.5°. That threshold applies at
+   `IDLE_MIN_GAP` = 15 ticks (250 ms) after the last update and shrinks the longer it waits (0.5° × 15 / ticks), so
+   small changes wait longer and big ones go sooner. After `IDLE_MAX_GAP` = 180 ticks (3 s), any change goes;
+   unchanged, nothing does. The turn is measured from each turret's pivot and each fixed gun's muzzle, so a distance
+   change at long range is nearly free. The server's lane steps on the exact distance, and clients' lanes step on what
+   they were sent. The one thing that differs is an idle gun's aim, and `laneHash` now leaves every gun's aim out while
+   no trigger is held. gunSync and TELL still correct real drift.
+3. **Drawn turrets ease** (client ships/turretEase.ts, ShipRenderer; visual only). The barrel chases the simulated
+   angle with a 3-frame (~50 ms) time constant, so an idle turret on a flicked cursor, or an exact distance arriving
+   at trigger-down, never snaps. On a shot the drawn barrel is pulled within `FIRE_GAP` = 3° of the angle it fired
+   at, so a shell never visibly leaves a barrel pointing elsewhere. Shells and muzzle flashes come from the exact
+   barrel. Another pilot's cursor distance for drawing comes from its gun lane, eased between idle updates
+   (`OtherGuns.distAt`), instead of the status row's hundreds.
+
+Tests: otherGuns, which adds a pilot in short bursts and taps with its cursor swept all the while: 1155 idle changes,
+50 sent, 88 shells all exact, 0 told ticks, 0 fixes, every lane hash equal. With the hash's idle exclusion taken out,
+199 lane checks go off, so the test does exercise rough distances. Also otherGunsPt (151 of 162 ahead, all exact; AI
+238 of 257), replication, packedFrames and the goldens (frameHash re-pinned: streams and world, the rule). turret.test
+covers the rule: idle points at the aim, held slews at its rate, and what fires after a trigger-down doesn't depend on
+the idle ticks. Its two new cases fail with the old rule. turretEase.test covers the easing as pure functions.
+
+Crowd (`crowdBench.ts --layouts ball,cruise`). Before is refactor/split 6001d27. "Rule only" adds the turret rule but
+still sends every idle change exactly (a temporary switch, not committed). After is both changes. Bulk bots are on
+the 4-unit grid in all three. gunCtl is summed over the 4 probes.
+
+| layout | n | server tick ms mean / p95 | probe client ms/tick | capable raw B/s | bulk raw B/s | gunCtl B/s | idle dist updates / pilot / s |
+|---|---:|---|---|---|---|---|---|
+| ball | 20 | 2.68 / 6.67 → **2.52 / 6.39** | 0.971 → **0.886** | 4590 → 3227 → **2751** | 5031 → 3688 → **3201** | 3824 → 2476 → **1332** | 9.98 → **0.245** |
+| ball | 50 | 9.42 / 24.0 → **9.36 / 22.8** | 2.793 → **2.764** | 17384 → 15927 → **13899** | 19399 → 17895 → **15861** | 11852 → 10825 → **5810** | 16.42 → **0.418** |
+| cruise | 20 | 2.08 / 4.48 → **2.08 / 4.57** | 0.146 → **0.150** | 1013 → **1013** | 1955 → **1955** | 0 | 0 |
+| cruise | 50 | 4.51 / 10.3 → **4.54 / 10.2** | 0.226 → **0.229** | 1650 → **1650** | 1801 → **1800** | 0 | 0 |
+
+The idle part of gunCtl is nearly gone: 2.5 % of the old idle updates still go. Against "rule only", gunCtl is −46 %
+in both balls. Against the old baseline it's −65 % (ball 20) and −51 % (ball 50), but part of that is the rule itself:
+turrets on target at once change how the ball's fights go, including its snapshot bytes (ball 20 snapshot 7792 →
+5466 B/s). What's left of gunCtl is the exact distance while a trigger is held, 7.2 a second a pilot in ball 20 and
+13.4 in ball 50, because the bench bots fire most of the time and track moving targets. That's the floor under the
+rule Kieran chose (exact while held). No told ticks or lane fixes in any case. Agreement checks show 0 disagreements
+on the tick layer.
+
+pirates (bench:table): 1085 → **788** B/s, 9.00 → **8.10** msgs/s, wire 1679 → **1322**. The scenario's line reads
+"firing 87 % of ticks" before and "100 %" after: its pilot's turrets are on the aim at once. That's the rule's
+gameplay effect, not a netcode saving (a single pilot has no other pilot's gun rows to save).

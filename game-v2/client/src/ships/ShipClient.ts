@@ -925,7 +925,9 @@ export class ShipClient {
       const s = e.status ?? [];
       e.data = [
         packCursorWeaponState(p.aim, (s[2] ?? 10) / 10, s[3] === 1, s[4] === 1),
-        0, (s[5] ?? 0) * 100, p.jump, s[0] ?? 0, s[1] ?? 0, Math.round(p.jumpScale * 1000), 0,
+        // (its cursor distance: from its gun lane where this client steps one, eased between the rough idle
+        // updates, else the status row's hundreds)
+        0, this.otherGuns.distAt(e.id, renderTick) ?? (s[5] ?? 0) * 100, p.jump, s[0] ?? 0, s[1] ?? 0, Math.round(p.jumpScale * 1000), 0,
       ];
     }
     return true;

@@ -4,7 +4,8 @@ import { join } from 'path';
 import type { Blueprint, InventoryStub, PlacedPart, Rot } from './types.js';
 import { parseBlueprint, validateBlueprint } from './blueprint.js';
 import { createShipState, damagePart, rebuildShip } from './state.js';
-import { stepTurretAim, TurretWindow } from './turret.js';
+import { stepTurretAim, pointTurretAim, TurretWindow } from './turret.js';
+import { stepGuns } from './guns.js';
 import { stepFlight, FlightBody } from './flight.js';
 import type { ShipTuning } from './tuning.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
@@ -113,6 +114,55 @@ describe('turret aiming', () => {
       fired ||= r.canFire;
     }
     expect(fired).toBe(false);
+  });
+});
+
+describe('turret slew only while firing (stepGuns)', () => {
+  const s = createShipState(catalog, tuning, 1, corsair(), 0);
+  const tw = s.derived.weapons.find((x) => x.mount === 'turret')!;
+  const w = tw.window!, p = tw.part;
+  const pose = { x: 0, y: 0, angle: 0 };
+  // (an aim along the window, as a world angle: grid forward is -y)
+  const world = (local: number) => local + Math.PI / 2;
+  const far = w.center + w.half * 0.8, near = w.center - w.half * 0.8;
+
+  it('pointTurretAim points straight at the aim (clamped to its base window), from anywhere', () => {
+    expect(pointTurretAim(w, far, tuning).offset).toBeCloseTo(w.half * 0.8, 12);
+    expect(pointTurretAim(w, w.center + w.half + 0.1, tuning).offset).toBeCloseTo(w.half, 12);
+  });
+
+  it('idle: the turret points at the aim every tick, carrying nothing; held: it slews at its rate from the trigger-down aim', () => {
+    s.triggerHeld = false;
+    s.aim[p] = 0;
+    // (idle, the aim swung across: on it at once, tick by tick)
+    stepGuns(s, pose, { firing: false, aimWorld: world(far), aimDist: 0 }, 1, tuning);
+    expect(s.aim[p]).toBeCloseTo(w.half * 0.8, 12);
+    stepGuns(s, pose, { firing: false, aimWorld: world(near), aimDist: 0 }, 2, tuning);
+    expect(s.aim[p]).toBeCloseTo(-w.half * 0.8, 12);
+    // (the trigger goes down on another aim: on it at once, whatever the idle ticks before had)
+    stepGuns(s, pose, { firing: true, aimWorld: world(far), aimDist: 0 }, 3, tuning);
+    expect(s.aim[p]).toBeCloseTo(w.half * 0.8, 6);
+    // (held, the aim swung across: it slews, its rate a tick)
+    const was = s.aim[p];
+    stepGuns(s, pose, { firing: true, aimWorld: world(near), aimDist: 0 }, 4, tuning);
+    expect(was - s.aim[p]).toBeCloseTo(tuning.turret.slewRate, 2);
+    // (let go: on the aim again at once)
+    stepGuns(s, pose, { firing: false, aimWorld: world(near), aimDist: 0 }, 5, tuning);
+    expect(s.aim[p]).toBeCloseTo(-w.half * 0.8, 12);
+  });
+
+  it('what fires after a trigger-down depends only on the aim from then, not the idle ticks before it', () => {
+    const run = (idle: number[]) => {
+      const t = createShipState(catalog, tuning, 1, corsair(), 0);
+      idle.forEach((a, i) => stepGuns(t, pose, { firing: false, aimWorld: world(a), aimDist: 900 + 50 * i }, i + 1, tuning));
+      const out: number[] = [];
+      for (let k = 0; k < 40; k++) {
+        const st = stepGuns(t, pose, { firing: true, aimWorld: world(w.center + 0.3 * Math.sin(k / 5)), aimDist: 700 }, 100 + k, tuning);
+        out.push(...st.shots.map((x) => x.aimQ * 1000 + x.w.part), ...t.aim);
+      }
+      return out;
+    };
+    expect(run([far, near, far])).toEqual(run([near, w.center, near, far, near]));
   });
 });
 

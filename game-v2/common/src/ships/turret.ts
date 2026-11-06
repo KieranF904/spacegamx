@@ -227,6 +227,18 @@ export function stepTurretAim(
 }
 
 /**
+ * A turret not firing: it points straight at the desired angle (clamped to its base window; a full-circle turret
+ * anywhere), with no slew and nothing carried from the tick before. stepGuns slews (stepTurretAim) only on a tick the
+ * trigger was held through from the tick before, so a turret's state on the tick its trigger goes down depends only
+ * on that tick's aim: the netcode sends other pilots' aim distance exactly only while a trigger is held (GunNet)
+ */
+export function pointTurretAim(w: TurretWindow, desiredLocalAngle: number, tuning: ShipTuning): { offset: number; canFire: boolean } {
+  const want = wrapPi(desiredLocalAngle - w.center);
+  const full = w.half >= Math.PI - 1e-9;
+  return stepTurretAim(w, full ? want : Math.max(-w.half, Math.min(w.half, want)), desiredLocalAngle, tuning);
+}
+
+/**
  * Fixed guns: a tiny gimbal. `desired` is the target's angle relative to the
  * gun's facing (radians); the gun points as close to it as its gimbal allows
  * and is clear to fire when the target is within reach of the gimbal.

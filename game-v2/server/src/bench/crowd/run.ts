@@ -166,6 +166,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   for (const p of probes.values()) p.measuring = true;
   const focus0 = snap(srv.snapshots.focus.stats), away0 = snap(srv.snapshots.away.stats), mem0 = [...probes.values()].map((p) => snap(p.fake.away.stats));
   const held: number[] = [];
+  const guns0 = snap(srv.gunNet?.stats ?? {});
   const hits0 = snap(srv.hits.stats), reasons0 = snap(srv.replication.reasons), bodies0 = snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats });
   const m0 = server.getTick();
   const ticks = o.secs * 60;
@@ -265,6 +266,12 @@ export async function runCase(o: CaseOpts): Promise<any> {
       return { ...Object.fromEntries(Object.entries(t).map(([kk, v]) => [kk, r2(v)])), perProbeShipsPerSec: r2(t.ships / secs / Math.max(1, probeList.length)),
         bytesPerShip: r2(t.bytes / ships), bytesPerProbePerSec: r2(t.bytes / secs / Math.max(1, probeList.length)),
         firstStepUsMean: r2((t.firstStepMs / Math.max(1, t.firstSteps)) * 1000), firstStepMsPerProbePerSec: r2(t.firstStepMs / secs / Math.max(1, probeList.length)) };
+    })(),
+    // (Other ships' guns, server net/guns/GunNet.ts: a pilot's aim distance while no trigger is held, per pilot per
+    // second: the ticks it changed (each one a gun row event before the idle rule) and the updates that went)
+    guns: (() => {
+      const d = numericDiff(snap(srv.gunNet?.stats ?? {}), guns0) as Record<string, number>, per = (v: number) => r2((v ?? 0) / secs / Math.max(1, o.n));
+      return { ...d, idleChangesPerPilotSec: per(d.idleChanges), idleSentPerPilotSec: per(d.idleSent), exactSentPerPilotSec: per(d.exactSent) };
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
     probeDebrisMsPerTick: r2(mean(probeList.map((p) => p.debrisMs / ticks))),

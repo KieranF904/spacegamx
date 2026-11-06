@@ -32,6 +32,7 @@ import { turretHead, type GunShape } from './gunDecor';
 import { animOf, lightsLit, reloadShare, type GunAnimSpec } from './gunAnim';
 import { cameraView } from '../rendering/cameraView';
 import factionsData from '../../../data/factions.json';
+import { easeTurret, fireCatch } from './turretEase';
 
 /** Hostile factions' colours by index (snapshot data[3]) */
 export const FACTION_COLORS = Object.values((factionsData as { factions: Record<string, { color: string }> }).factions).map((f) => parseInt(f.color.slice(1), 16));
@@ -119,6 +120,12 @@ interface Turret {
   /** Recoil (1 just fired, easing back to 0) and barrel heat (builds with sustained fire) */
   kick: number;
   heat: number;
+  /**
+   * The drawn aim (offset from its window's centre), easing after the simulated one (ship.aim: turretEase.ts); a shot
+   * just left it (`fired`): pulled within FIRE_GAP of it on the next draw
+   */
+  drawn: number;
+  fired?: boolean;
   /** Its state-driven decor (gunAnim.ts), the Graphics it draws on and what that last showed, and a frame count for its vents */
   anim?: GunAnimSpec;
   deco?: Graphics;
@@ -411,15 +418,17 @@ export class ShipRenderer {
     const view = this.views.get(owner);
     if (!view || (!view.turrets.length && !view.fixed.length)) return;
     const c = view.container, cos = Math.cos(c.rotation), sin = Math.sin(c.rotation);
-    let best: { kick: number; heat: number; len: number } | null = null, bestD = Infinity;
-    const near = (g: { kick: number; heat: number; len: number }, tx: number, ty: number) => {
+    let best: { kick: number; heat: number; len: number; fired?: boolean } | null = null, bestD = Infinity;
+    const near = (g: { kick: number; heat: number; len: number; fired?: boolean }, tx: number, ty: number) => {
       const d = Math.hypot(c.x + tx * cos - ty * sin - x, c.y + tx * sin + ty * cos - y);
       if (d < bestD) { bestD = d; best = g; }
     };
     for (const t of view.turrets) near(t, t.x0 + Math.cos(t.barrel.rotation) * t.len, t.y0 + Math.sin(t.barrel.rotation) * t.len);
     for (const b of view.fixed) near(b, b.x0 + b.rx * b.len, b.y0 + b.ry * b.len);
-    const hit = best as { kick: number; heat: number; len: number } | null;
+    const hit = best as { kick: number; heat: number; len: number; fired?: boolean } | null;
     if (!hit || bestD > hit.len + 40) return;
+    // (a turret's drawn barrel caught up with the angle it fired at: turretEase.ts fireCatch)
+    if (view.turrets.includes(hit as Turret)) hit.fired = true;
     hit.kick = Math.min(1.4, power);
     hit.heat = Math.min(1, hit.heat + HEAT_PER_SHOT);
   }
@@ -1101,14 +1110,18 @@ export class ShipRenderer {
         const x0 = (w.window.pivot[0] - cx) * cs, y0 = (w.window.pivot[1] - cy) * cs;
         barrel.position.set(x0, y0);
         view.guns.addChild(barrel);
-        view.turrets.push({ part: w.part, weapon: wi, barrel, metal, lit, look, x0, y0, len: w.window.barrel * cs, kick: 0, heat: 0, tm: -1, tl: -1, anim: animOf(fn) });
+        view.turrets.push({ part: w.part, weapon: wi, barrel, metal, lit, look, x0, y0, len: w.window.barrel * cs, kick: 0, heat: 0, drawn: NaN, tm: -1, tl: -1, anim: animOf(fn) });
       }
     }
     for (const t of near ? view.turrets : []) {
       const w = ship.derived.weapons[t.weapon];
       if (!w?.window) continue;
       const open = ship.kind === 'ship' && isOpen(w.window, ship.aim[t.part]);
-      const r = w.window.center + ship.aim[t.part];
+      // (drawn easing after the simulated aim, caught up on a shot: turretEase.ts)
+      const full = w.window.half >= Math.PI - 1e-9, aim = ship.aim[t.part] ?? 0;
+      if (t.fired) { t.drawn = fireCatch(t.drawn, aim, full); t.fired = false; }
+      t.drawn = easeTurret(t.drawn, aim, frames, full);
+      const r = w.window.center + t.drawn;
       t.barrel.rotation = r;
       // Recoil: straight back on firing, easing home
       const back = t.kick > 0 ? RECOIL * t.len * t.kick * t.kick : 0;

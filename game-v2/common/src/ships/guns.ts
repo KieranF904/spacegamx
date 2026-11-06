@@ -1,6 +1,7 @@
 /**
  * One tick of a ship's guns, the same on the server and on the firing
- * pilot's client: cooldowns tick down, turrets slew and fixed guns gimbal
+ * pilot's client: cooldowns tick down, turrets slew (only while the trigger
+ * is held: idle, they point straight at the aim) and fixed guns gimbal
  * towards the aim, and the guns that are ready, aligned and told to fire
  * do. Barrels and shells are deterministic (launch.ts), so a pilot's client
  * fires its own shells on the very tick the server does, from the very same
@@ -20,7 +21,7 @@ import type { ShipTuning } from './tuning.js';
 import type { WeaponInfo } from './rebuild.js';
 import type { FireSpec, WeaponMods } from './types.js';
 import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from './shot.js';
-import { stepFixedGunAim, stepTurretAim } from './turret.js';
+import { pointTurretAim, stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
 import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
@@ -293,6 +294,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const aimY = aimWorld === undefined ? 0 : pose.y + dsin(aimWorld) * aimDist;
   const ready: WeaponInfo[] = [];
   letGo.clear();
+  // Turrets slew (their turn rate) only while the trigger is held through from the tick before; not firing, or on the
+  // tick it goes down, a turret points straight at the aim (pointTurretAim): no slew state is carried while idle, so
+  // what fires on a trigger-down depends only on that tick's aim (other pilots' idle aim distance isn't sent exactly)
+  const slewing = orders.firing && ship.triggerHeld;
   // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
   if (orders.firing && !ship.triggerHeld) ship.clickAt = tick;
   ship.triggerHeld = orders.firing;
@@ -324,7 +329,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
         // World angle → local grid frame (grid forward is -y)
         desired = worldAngle - (pose.angle + Math.PI / 2);
       }
-      const res = stepTurretAim(w.window, ship.aim[p], desired, tuning);
+      const res = slewing ? stepTurretAim(w.window, ship.aim[p], desired, tuning) : pointTurretAim(w.window, desired, tuning);
       ship.aim[p] = res.offset;
       canFire = res.canFire;
     } else if (aimWorld !== undefined) {
