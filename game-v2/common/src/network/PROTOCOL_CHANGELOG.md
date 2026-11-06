@@ -49,3 +49,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 57 (2026-11-06): hazards-only ownSync (c/g/p optional); rebuilt generators use the wire HP tenths (wire hash unchanged: plain messages)
 - 58 (2026-11-06): pulls message (pull fields worked out on both sides); social messages (friends, status, whisper); shown hit numbers in fixed point (wire hash unchanged: plain messages)
 - 59 (2026-11-06): other ships' guns stepped from inputs (gunCtl, gunSync, lane drop messages; derived volleys) (wire hash unchanged: plain messages)
+- 60 (2026-11-06): turrets slew only while firing; idle aim distance sent by angle delta, lane hash excludes idle aim; friends in the lobby; flat jump charge, no minimum jump (wire hash unchanged)
