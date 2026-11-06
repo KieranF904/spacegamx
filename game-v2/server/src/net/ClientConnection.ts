@@ -110,6 +110,9 @@ export interface ClientConnection {
   ownLate?: boolean;
   /** Its check found its own ship's state off (OwnChecks): an ownSync goes with the next snapshot (SnapshotBuilder) */
   ownSyncDue?: boolean;
+  /** Pull fields it was told, by id: the version each stood at (bridge/pullFields.ts forClient); its last system's to forget (pullsReset) */
+  pullsTold?: Map<number, number>;
+  pullsReset?: boolean;
   /** Its own ship's hazards as its last ownSync told them (SnapshotBuilder ownHazardKey runs them on to now) */
   ownHazards?: HazardState;
   /** Its own shells (CAPS.SHOT_IDS) since the last snapshot it was sent: told, all of them, if that window's own ship was put right */

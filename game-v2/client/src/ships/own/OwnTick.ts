@@ -193,6 +193,8 @@ export class OwnTick implements OwnTimeline {
     if (!this.on || !ship || ship.kind !== 'ship') return null;
     const prev = this.extrasBefore(t) ?? (this.seed ??= seedOwnExtras(ship));
     OWN_ENV.tick = t; OWN_ENV.tuning = this.host.tuning; OWN_ENV.gravity = env.gravity; OWN_ENV.terrain = env.terrain ?? null; OWN_ENV.hazard = env.hazard;
+    // (Its pulls: the fields' it works out, or what the server told for the tick, pulls(t); in its step, after the motion)
+    OWN_ENV.pulls = env.pulls;
     OWN_FIELDS.central = env.central; OWN_FIELDS.lodestones = env.lodestones;
     const events: SimEvent[] = [];
     const s = stepOwnShip(self, prev, body, bits, q, this.inputAt(t), ownStructure(derived, ship), OWN_ENV, events);
@@ -351,6 +353,16 @@ export class OwnTick implements OwnTimeline {
   preStep(t: number, body: FlightBody): void {
     const rows = this.causes.get(t);
     if (rows) cargoBefore(body, rows);
+  }
+
+  /**
+   * Its pulls on tick t as the server told them (where it can't work them out: a pull only the server has, or a field
+   * whose puller it doesn't hold as the server had it): its step takes all of them in place of the fields' (common
+   * network/ownTick.ts PULL). Undefined: none told, its step works its pulls out itself
+   */
+  pulls(t: number): readonly (readonly number[])[] | undefined {
+    const rows = this.causes.get(t);
+    return rows?.some((r) => r[0] === OWN_CAUSE.PULL) ? rows : undefined;
   }
 
   /** Finding contact pairs itself (ContactWorld) */

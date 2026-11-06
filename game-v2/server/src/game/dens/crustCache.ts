@@ -11,6 +11,7 @@
 
 import { LIFE, hashString, type Bag, type Blueprint, type DenCacheData, type PlacedPart } from '@space-game/common';
 import type { DenFactory } from './types.js';
+import { PayoutDice } from '../payoutDice.js';
 
 /** Its system's den features step every tick; the crust looks after itself this often */
 const EVERY = 30;
@@ -49,6 +50,7 @@ export const crustCache: DenFactory<DenCacheData> = (host, num, c) => {
   /** When each pilot (by who they are) was last paid */
   const paid = new Map<string, number>();
   const every = c.everyMinutes * 60 * 60;
+  const dice = host.payout ?? new PayoutDice();
 
   const grow = () => {
     const bp = crustBlueprint(c);
@@ -79,7 +81,8 @@ export const crustCache: DenFactory<DenCacheData> = (host, num, c) => {
         continue;
       }
       paid.set(who, now);
-      host.reward(p, rollCache(c, hashString(`${c.id}:${who}:${now}`)), `You cracked the ${c.name}: what it held is waiting in your station storage`);
+      // (its roll's seed from the server's secret, not from who and when, which a client could know: payoutDice.ts)
+      host.reward(p, rollCache(c, dice.seed('den cache', hashString(c.id), hashString(who), now)), `You cracked the ${c.name}: what it held is waiting in your station storage`);
     }
     dealt.clear();
   };

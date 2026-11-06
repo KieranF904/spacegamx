@@ -37,6 +37,7 @@ import type { Tutorial } from '../ui/Tutorial';
 import type { QuestClient } from '../ui/QuestUI';
 import type { BuildSites } from '../rendering/BuildSites';
 import type { SocialUI } from '../ui/SocialUI';
+import type { ChatPanel } from '../ui/ChatPanel';
 import type { TradeWindow } from '../ui/TradeWindow';
 import type { InfoPanel } from '../ui/InfoPanel';
 import type { OpsUI } from '../ui/OpsUI';
@@ -74,6 +75,8 @@ export interface MessageHost {
   readonly quests: QuestClient;
   readonly buildSites: BuildSites | null;
   readonly social: SocialUI;
+  /** The chat box (private messages go straight to it) */
+  readonly chat: Pick<ChatPanel, 'addPrivate'>;
   readonly tradeWindow: TradeWindow;
   readonly infoPanel: InfoPanel;
   readonly opsUI: OpsUI;
@@ -306,6 +309,9 @@ const TABLE: Handlers = {
   party: (h, msg) => { h.social.setParty(msg); },
   partyInvite: (h, msg) => { h.social.onInvite(msg); },
   tradeRequest: (h, msg) => { h.social.onTradeRequest(msg); },
+  friends: (h, msg) => { h.social.setFriends(msg); },
+  friendRequest: (h, msg) => { h.social.onFriendRequest(msg); },
+  whisper: (h, msg) => { h.chat.addPrivate(msg); },
   trade: (h, msg) => { h.tradeWindow.onTrade(msg); },
   pilotInfo: (h, msg) => { h.infoPanel.onInfo(msg); },
   ops: (h, msg) => { h.opsUI.setOps(msg); },
@@ -386,6 +392,8 @@ const TABLE: Handlers = {
   // (Other ships' gun lanes, and pilots' gun controls: their guns stepped here from their inputs, ships/guns/OtherGuns.ts)
   gunSync: (h, msg) => { h.shipClient.onGunSync(msg); },
   gunCtl: (h, msg) => { h.shipClient.onGunCtl(msg); },
+  // (Pull fields its tick layer works out itself, opened or ended early: before the snapshot they go with)
+  pulls: (h, msg) => { h.shipClient.onPulls(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);

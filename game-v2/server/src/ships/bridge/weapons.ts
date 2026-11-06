@@ -17,7 +17,7 @@ import {
   endsAtAim, aimReach, buildShot, gunsTick, gunControls, miningTick, shotId, SHOT_ID_BARRELS, SHOT_ID_SLOTS, SHOT_ID_OWNERS, type SimEvent,
 } from '@space-game/common';
 import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
-import { lastHurtSoak } from './damage.js';
+import { lastHurtSoak, lastHurtShown } from './damage.js';
 import { fireBeamHook, tickWeaponHooks } from '../features/weapons.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
@@ -532,8 +532,9 @@ export function hitProjectile(
   const hx = x0 + (x1 - x0) * best.t, hy = y0 + (y1 - y0) * best.t;
   const dealt = b.hurt(best.eid, best.ship, best.part, Projectile.damage[proj], ownerId, { ...b.host.shotVs?.(proj), at: b.worldToGrid(best.eid, best.ship, hx, hy) });
   const glancing = b.lastThrough < GLANCING;
-  b.host.notifyDamage(best.eid, dealt, ownerId, glancing);
-  b.host.notifyProjectileHit(proj, hx, hy, { target: best.eid, part: best.part, dealt, glancing, soak: dealt > 0 ? lastHurtSoak() : 0, rebuilds: best.ship.rebuilds });
+  const shown = dealt > 0 ? lastHurtShown() : 0;
+  b.host.notifyDamage(best.eid, dealt, ownerId, glancing, shown);
+  b.host.notifyProjectileHit(proj, hx, hy, { target: best.eid, part: best.part, dealt, shown, glancing, soak: dealt > 0 ? lastHurtSoak() : 0, rebuilds: best.ship.rebuilds });
   return { eid: best.eid, x: hx, y: hy, part: best.part };
 }
 

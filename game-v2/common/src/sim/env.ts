@@ -15,14 +15,15 @@ import type { SimInput } from './input.js';
 import type { SimEvent } from './events.js';
 
 /**
- * Pulls as forces inside the step (Stage 1C fills this in; magnets, the Hookboat's reel, custom pulls, collapsing
- * stars). Worked out on both ends from state both hold as the tick starts (the puller's and the pulled's states at
- * t - 1, from the StateRing), never from a message. The step adds each pull's velocity (quantizePull'd) after the
- * motion, where today's push queue lands them, and emits a 'pull' event. Order: by puller id, ascending.
+ * Pulls as forces inside the step (magnets, the Hookboat's reel, custom pulls, collapsing stars: sim/pullFields.ts).
+ * Worked out on both ends from state both hold: the puller as it ended tick t - 1 (the StateRing) and the pulled ship
+ * after its motion on tick t (`at`, the step's body, velocity too), never from a message (the field that pulls is a
+ * decision, sent once). The step adds each pull's velocity (quantizePull'd, then back on the velocity grid: pulls.ts
+ * addPull) after the motion, before any of the tick's causes, and emits a 'pull' event. Order: by puller id, ascending.
  */
 export interface PullSource {
   /** The pulls on ship `id` for tick t: [puller id, ax, ay] each (world units / tick). Empty: none */
-  on(id: number, t: number, at: { x: number; y: number }): readonly (readonly [number, number, number])[];
+  on(id: number, t: number, at: { x: number; y: number; vx?: number; vy?: number }): readonly (readonly [number, number, number])[];
 }
 
 /**

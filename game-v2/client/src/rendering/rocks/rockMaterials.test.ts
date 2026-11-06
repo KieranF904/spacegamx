@@ -18,7 +18,7 @@ describe('asteroid materials', () => {
     const want: Record<string, string> = {
       asteroid_metal: 'stone', asteroid_ice: 'ice', asteroid_fuel: 'ice', asteroid_crystal: 'crystal', asteroid_mega: 'metal', comet: 'ice',
       rock_cuprite: 'metal', rock_rutile: 'metal', rock_slag: 'metal', rock_gem_seam: 'crystal', rock_polymer_tar: 'tar', rock_chromite: 'metal',
-      rock_cobaltite: 'metal', rock_platinoid: 'metal', rock_opal_husk: 'crystal', rock_ashback: 'stone', rock_aurora_floe: 'ice', rock_leestone: 'leestone',
+      rock_cobaltite: 'metal', rock_platinoid: 'metal', rock_opal_husk: 'crystal', rock_ashback: 'stone', rock_aurora_floe: 'ice', rock_leestone: 'leestone', rock_taenite: 'metal',
     };
     for (const [type, mat] of Object.entries(want)) expect(rockMaterial(compOf(type)), type).toBe(mat);
     expect(rockMaterial(undefined)).toBe('stone');

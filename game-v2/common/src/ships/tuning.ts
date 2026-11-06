@@ -249,6 +249,24 @@ export function hpWire(h: number): number {
 }
 
 /**
+ * Damage numbers (what a hit shows, summed per target, source and glancing each snapshot) are summed in fixed point,
+ * the same on the server and its clients: each hit's number in 1/65536ths (a binary scale, so the same number counts
+ * the same on both ends), the sum an integer (no order to it, nothing drifts), rounded once, to the wire's tenth, as
+ * it's shown (damageTenths). Hit numbers: hitRules.ts partHit `shown`
+ */
+export const DAMAGE_UNITS = 65536;
+
+/** A hit's number in fixed-point units */
+export function damageUnits(x: number): number {
+  return Math.round(x * DAMAGE_UNITS);
+}
+
+/** A sum of units as the wire carries it: in tenths (a damage message's amount is this / 10) */
+export function damageTenths(units: number): number {
+  return Math.round((units * 10) / DAMAGE_UNITS);
+}
+
+/**
  * A part's output against its health, as a rebuild works it out (rebuild.ts): from its HP as the wire carries it (hpWire),
  * on both ends. A client rebuilds a ship from the HP its sync carried (to a tenth), so the server derives from the same
  * tenths, or a damaged generator makes a hair more or less on one end and the stores it feeds drift apart

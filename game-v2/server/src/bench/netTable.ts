@@ -31,6 +31,8 @@ const { Position, Velocity, Input, InSystem, Asteroid, encodeMessage, decodeMess
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(here, '../../../data');
 const argv = process.argv.slice(2);
+// (The payout dice's secret fixed: a rock's chunks the same every run, so the bytes are too. game/payoutDice.ts)
+process.env.PAYOUT_SECRET ??= 'bench';
 const arg = (name: string, d?: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : d; };
 
 /** Scenario: what it is (for the table), the measured pilot's ship, seconds measured */
@@ -191,8 +193,7 @@ async function runCase(sc: string): Promise<void> {
     const msg = { type: 'input', seq: m.seq++, tick: 0, targetTick: now + 1, ...c, ...(acks ? { acks } : {}), ...(rep ? { hitReport: rep } : {}), ...(chk ? { ownCheck: chk } : {}), ...(bck ? { bodyCheck: bck } : {}) };
     const enc = encodeMessage(msg) as ArrayBuffer;
     const sent = m.fake && CAPS?.INPUTS && (caps & CAPS.INPUTS) && K.InputEncoder ? ((m as any).ienc ??= new K.InputEncoder()).encode(msg, true) as ArrayBuffer : enc;
-    if (measuring) { m.upMsgs++; m.upBytes += sent.byteLength; }
-    const dec = decodeMessage(enc);
+    if (measuring) { m.upMsgs++; m.upBytes += sent.byteLength; }    const dec = decodeMessage(enc);
     m.fake?.noteInput?.(dec);
     m.link.receive(dec);
   }
@@ -208,7 +209,8 @@ async function runCase(sc: string): Promise<void> {
     if (chk) m.chkQ.push({ at: now + LAT, v: chk });
     const bck = f.bodies?.takeCheck?.(m.sentAt === now - 1, now);
     if (bck) m.bckQ.push({ at: now + LAT, v: bck });
-    for (const msg of f.outbox.splice(0)) { m.up.push({ at: now + LAT, msg }); if (measuring) { m.upMsgs++; m.upBytes += (encodeMessage(msg) as ArrayBuffer).byteLength; } }
+    // (a message that goes as JSON, an hpResync, encodes to a string)
+    for (const msg of f.outbox.splice(0)) { m.up.push({ at: now + LAT, msg }); if (measuring) { m.upMsgs++; const e = encodeMessage(msg) as ArrayBuffer | string; m.upBytes += typeof e === 'string' ? Buffer.byteLength(e) : e.byteLength; } }
     while (m.up.length && m.up[0].at <= now) f.link?.receive(m.up.shift()!.msg);
   }
   /** The other pilots: plain sockets that count nothing, their controls straight onto the ECS (as the crowd bench's bulk) */

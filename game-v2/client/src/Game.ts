@@ -2,9 +2,7 @@
  * Game - Main client orchestrator
  */
 
-import { ChatLog, lineText, parseTab, type ChatTab } from './ui/chatLog';
-
-const CHAT_TAB_KEY = 'spacegame.chatTab';
+import { ChatPanel } from './ui/ChatPanel';
 import { buildWindows, type WindowHost, type WindowSet } from './app/windows';
 import { prefetchScreens } from './app/lazyScreens';
 import { installDevTools } from './app/devTools';
@@ -228,12 +226,9 @@ private xpFillEl: HTMLElement | null;
   private systemInfoEl: HTMLElement | null;
 
   // Chat elements
-  private chatMessagesEl: HTMLElement | null;
-  private chatInputEl: HTMLInputElement | null;
-  private chatSendBtn: HTMLElement | null;
+  /** The chat box: channel toggles, lines, the input and its private-message mode (ui/ChatPanel.ts) */
+  private chat: ChatPanel;
   private chatFocused = false;
-  private chatLog = new ChatLog();
-  private chatTab: ChatTab = 'all';
   
   private lastStateHashTime = 0;
 
@@ -326,10 +321,16 @@ this.xpFillEl = document.getElementById('xpFill');
     this.creditsEl = document.getElementById('credits');
     this.systemInfoEl = document.getElementById('systemInfo');
 
-    // Chat elements
-    this.chatMessagesEl = document.getElementById('chatMessages');
-    this.chatInputEl = document.getElementById('chatInput') as HTMLInputElement;
-    this.chatSendBtn = document.getElementById('chatSendBtn');
+    // Chat
+    this.chat = new ChatPanel({
+      send: (m) => this.network.send(m),
+      setGameInput: (on) => this.input.setEnabled(on),
+      canFocus: () => !this.menu.isOpen && this.network.isConnected(),
+      ensureShown: () => { if (!settings.data.ui.chat) settings.update((d) => { d.ui.chat = true; }); },
+      onFocusChange: (f) => { this.chatFocused = f; },
+      openFriends: () => this.w.social.openWindow('friends'),
+      sound: (id, v) => this.audio.playUI(id, v ?? 0.5),
+    });
 
     // Performance monitor (Settings > Performance monitor): its own panel, fed every frame
     this.perfMonitor = new PerfMonitor(document.getElementById('ui-overlay') ?? document.body, () => ({
@@ -896,6 +897,8 @@ this.xpFillEl = document.getElementById('xpFill');
       wreckMarker: () => g.wreckMarker(),
       siegeMarkers: () => g.siegePanel.markers().map((m) => ({ ...m, system: g.state.systemId })),
       toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
+      chatTo: (name) => g.chat.messageTo(name),
+      friendsOnline: (n) => g.chat.setFriendsOnline(n),
     };
   }
 
@@ -1254,6 +1257,7 @@ this.xpFillEl = document.getElementById('xpFill');
   private makeMessageHost(): MessageHost {
     const g = this;
     return {
+      get chat() { return g.chat; },
       get proto() { return g.proto; },
       get network() { return g.network; },
       get state() { return g.state; },
@@ -1316,96 +1320,15 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   private setupChat(): void {
-    document.querySelectorAll<HTMLElement>('#chatTabs button[data-tab]').forEach((b) => b.addEventListener('click', () => this.setChatTab(parseTab(b.dataset.tab))));
     // Hide / show the chat in place (the same setting as Settings > Chat box), e.g. for recording videos
     document.getElementById('chatHideBtn')?.addEventListener('click', () => settings.update((d) => { d.ui.chat = false; }));
     document.getElementById('chatShowBtn')?.addEventListener('click', () => settings.update((d) => { d.ui.chat = true; }));
-    let saved: string | null = null;
-    try { saved = localStorage.getItem(CHAT_TAB_KEY); } catch { /* no storage */ }
-    this.setChatTab(parseTab(saved));
-    if (!this.chatInputEl || !this.chatSendBtn) return;
-    
-    // Send on Enter key
-    this.chatInputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        this.sendChatMessage();
-      }
-      // Prevent game input while typing
-      e.stopPropagation();
-    });
-    
-    // Track focus state
-    this.chatInputEl.addEventListener('focus', () => {
-      this.chatFocused = true;
-      this.input.setEnabled(false);
-    });
-    
-    this.chatInputEl.addEventListener('blur', () => {
-      this.chatFocused = false;
-      this.input.setEnabled(true);
-    });
-    
-    // Send button click
-    this.chatSendBtn.addEventListener('click', () => this.sendChatMessage());
-    
-    // Global Enter to focus chat
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !this.chatFocused && !this.menu.isOpen && this.network.isConnected()) {
-        e.preventDefault();
-        // A hidden chat comes back to type in
-        if (!settings.data.ui.chat) settings.update((d) => { d.ui.chat = true; });
-        this.chatInputEl?.focus();
-      }
-    });
+    this.chat.install();
   }
-  
-  private sendChatMessage(): void {
-    if (!this.chatInputEl) return;
-    const text = this.chatInputEl.value.trim();
-    if (!text) return;
-    
-    this.network.send({ type: 'chat', text });
-    this.chatInputEl.value = '';
-    this.chatInputEl.blur();
-  }
-  
-  /** A line for the chat panel: the game's own (isSystem) or a player's. See ui/chatLog.ts */
+
+  /** A line for the chat panel: the game's own (isSystem) or a player's. See ui/ChatPanel.ts */
   private addChatMessage(playerName: string, text: string, isSystem = false, color?: string): void {
-    this.chatLog.add(isSystem ? 'game' : 'chat', isSystem ? '' : playerName, text, color);
-    this.renderChat();
-  }
-
-  private renderChat(): void {
-    const box = this.chatMessagesEl;
-    if (!box) return;
-    box.textContent = '';
-    for (const line of this.chatLog.visible(this.chatTab)) {
-      const msgEl = document.createElement('div');
-      msgEl.className = 'chat-message' + (line.channel === 'game' ? ' system' : '');
-      if (line.channel === 'game') {
-        msgEl.textContent = lineText(line);
-        msgEl.style.whiteSpace = 'pre-wrap';
-        if (line.color) msgEl.style.color = line.color;
-      } else {
-        msgEl.innerHTML = `<span class="player-name">${this.escapeHtml(line.name)}:</span> <span class="message-text">${this.escapeHtml(line.text)}</span>`;
-      }
-      box.appendChild(msgEl);
-    }
-    box.scrollTop = box.scrollHeight;
-  }
-
-  private setChatTab(tab: ChatTab): void {
-    this.chatTab = tab;
-    try { localStorage.setItem(CHAT_TAB_KEY, tab); } catch { /* storage blocked: the tab just isn't remembered */ }
-    document.querySelectorAll<HTMLElement>('#chatTabs button[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-    this.renderChat();
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    this.chat.add(playerName, text, isSystem, color);
   }
 
   private onConnected(): void {

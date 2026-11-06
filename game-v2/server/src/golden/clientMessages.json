@@ -20,6 +20,9 @@
   "fabOrder",
   "fabOrderCancel",
   "feedSwitch",
+  "friendRemove",
+  "friendRequest",
+  "friendRespond",
   "gemCut",
   "gemSocket",
   "gemUnsocket",
@@ -59,6 +62,7 @@
   "restockLoadout",
   "ribbons",
   "scrapItem",
+  "setStatus",
   "shareDesign",
   "shipEdit",
   "shipNeed",
@@ -83,5 +87,6 @@
   "trainingDrone",
   "undock",
   "vendorBuy",
-  "vendorOpen"
+  "vendorOpen",
+  "whisper"
 ]

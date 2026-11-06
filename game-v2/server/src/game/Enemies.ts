@@ -48,6 +48,7 @@ import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
 import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
 import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
 import { SimPass } from '../sim/SystemClocks.js';
+import { PayoutDice, type Dice } from './payoutDice.js';
 
 export interface FactionDef {
   name: string;
@@ -417,7 +418,12 @@ export class Enemies {
   /** What mines are laid as (set once mobs exist) */
   mobs: Mobs | undefined;
 
-  constructor(private host: EnemyHost, private ships: ShipBridge, private data: FactionsFile, private designs: Record<string, Blueprint>) {
+  /** A kill's loot and salvaged parts: payout dice, from the server's secret (payoutDice.ts) */
+  private readonly lootDice: Dice;
+
+  /** `payout`: the server's payout dice (GameServer's; none: a secret of its own) */
+  constructor(private host: EnemyHost, private ships: ShipBridge, private data: FactionsFile, private designs: Record<string, Blueprint>, payout: PayoutDice = new PayoutDice()) {
+    this.lootDice = payout.stream('kill loot');
     this.pilots = new AiPilots({
       tick: () => host.tick(), decide: host.decide ? (e, op, args, st) => host.decide!(e, op, args, st) : undefined,
       status: (e) => [ships.empTicksLeft(e), ships.slowedTicksLeft(e)],
@@ -1679,14 +1685,14 @@ export class Enemies {
     const bag: Bag = {};
     for (let r = 0; r < k; r++) {
       for (const l of f.loot) {
-        if (this.rng() >= l.chance) continue;
-        const n = l.min + Math.floor(this.rng() * (l.max - l.min + 1));
+        if (this.lootDice() >= l.chance) continue;
+        const n = l.min + Math.floor(this.lootDice() * (l.max - l.min + 1));
         bag[l.item] = (bag[l.item] ?? 0) + n;
       }
     }
     if (ship) {
       ship.blueprint.parts.forEach((p, i) => {
-        if (p.fn === 'core' || !(ship.rebuildHp[i] > 0) || this.rng() >= f.partSalvage) return;
+        if (p.fn === 'core' || !(ship.rebuildHp[i] > 0) || this.lootDice() >= f.partSalvage) return;
         // (The game's own ships' parts, and bespoke shapes, are never salvage)
         if (this.ships.catalog.functions.get(p.fn)?.exclusive || this.ships.catalog.pieces.get(p.piece)?.bespoke) return;
         // Modules come as their models (an enemy's are legacy parts: ships/migrate.ts); structure as the materials it's made of

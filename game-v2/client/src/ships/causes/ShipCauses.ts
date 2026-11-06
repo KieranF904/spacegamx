@@ -187,6 +187,15 @@ export class ShipCauses implements ReplicaCauses {
   }
 
   /**
+   * Its pulls on tick t as the server told them (it couldn't work them out here: common network/ownTick.ts PULL): the
+   * replica's step takes all of them in place of the fields'. Undefined: none told
+   */
+  pulls(id: number, t: number): readonly (readonly number[])[] | undefined {
+    const rows = this.rows.get(id)?.get(t);
+    return rows?.some((r) => r.row[0] === OWN_CAUSE.PULL) ? rows.map((r) => r.row) : undefined;
+  }
+
+  /**
    * A ship's causes on tick t, in the order the server's step had them: those told, and (CAPS.CONTACTS) the pairs found
    * here, each by its place in the pass (a pair told isn't one found: told wins)
    */

@@ -28,6 +28,7 @@ import type { Enemies, Behaviour, EnemyAi } from './Enemies.js';
 import type { FarPose } from '../ships/SimLod.js';
 import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
 import { stageHpOf } from './bosses/stageHp.js';
+import { PayoutDice, type Dice } from './payoutDice.js';
 import type { Mobs } from './Mobs.js';
 import type { BossBrain, BrainHost } from './brains/kit.js';
 import { PyreclastBrain } from './brains/pyreclast.js';
@@ -213,7 +214,12 @@ export class Bosses {
   /** (dev) ships that can't be hurt (the boss tools' dummy pilots) */
   readonly unhurt = new Set<number>();
 
-  constructor(private host: BossHost, private enemies: Enemies, private ships: ShipBridge, readonly file: BossesFile, private designs: Record<string, Blueprint>) {
+  /** A kill's loot: payout dice, from the server's secret (payoutDice.ts) */
+  private readonly lootDice: Dice;
+
+  /** `payout`: the server's payout dice (GameServer's; none: a secret of its own) */
+  constructor(private host: BossHost, private enemies: Enemies, private ships: ShipBridge, readonly file: BossesFile, private designs: Record<string, Blueprint>, payout: PayoutDice = new PayoutDice()) {
+    this.lootDice = payout.stream('boss loot');
     enemies.bosses = {
       onDestroyed: (eid, killer, ship) => this.onDestroyed(eid, killer, ship),
       name: (eid) => this.byEid.get(eid)?.def.name,
@@ -558,8 +564,8 @@ export class Bosses {
   private rollLoot(def: BossDef): Bag {
     const bag: Bag = {};
     for (const l of def.loot) {
-      if (this.rng() >= l.chance) continue;
-      bag[l.item] = (bag[l.item] ?? 0) + l.min + Math.floor(this.rng() * (l.max - l.min + 1));
+      if (this.lootDice() >= l.chance) continue;
+      bag[l.item] = (bag[l.item] ?? 0) + l.min + Math.floor(this.lootDice() * (l.max - l.min + 1));
     }
     return bag;
   }

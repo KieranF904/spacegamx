@@ -9,8 +9,12 @@
 import type { OwnShape, ShipState, Vec2 } from '@space-game/common';
 import { CONTACT_BIG_BODY } from '@space-game/common';
 
-/** `seq`: its place in the tick's causes, every ship's (set as it's noted: the order clients work them out in) */
-export interface OwnPull { kind: 0; dvx: number; dvy: number; seq?: number }
+/**
+ * `seq`: its place in the tick's causes, every ship's (set as it's noted: the order clients work them out in). A pull
+ * `derived` is a pull field's (common sim/pullFields.ts), worked out in the pilot's step by puller `from`: its clients
+ * work it out themselves unless they can't have that puller as the server had it (net/Replication.ts)
+ */
+export interface OwnPull { kind: 0; dvx: number; dvy: number; seq?: number; from?: number; derived?: boolean }
 export interface OwnContact {
   kind: 1;
   other: number;

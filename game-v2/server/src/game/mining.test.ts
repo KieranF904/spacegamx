@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
-import { registerRockTypes, type Bag, type MiningTable } from '@space-game/common';
+import { asteroidComposition, registerRockTypes, type Bag, type MiningTable } from '@space-game/common';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { Mining, type MiningHost } from './Mining.js';
 
@@ -99,9 +99,10 @@ describe('mining: work and keep', () => {
     expect(gun.chunks / mk1.chunks).toBeLessThan(1.25);
     expect(mk1.ore / gun.ore).toBeGreaterThan(2.6);
     expect(mk1.ore / gun.ore).toBeLessThan(3.8);
-    // The laser: about 0.7 ore a second, all of it kept
-    expect(mk1.ore).toBeGreaterThan(0.65 * 60);
-    expect(mk1.ore).toBeLessThan(0.75 * 60);
+    // The laser: about 0.7 ore a second at the old 96 damage a unit (0.91 at today's 74), all of it kept
+    const pace = 96 / table.damagePerUnit;
+    expect(mk1.ore).toBeGreaterThan(0.65 * 60 * pace);
+    expect(mk1.ore).toBeLessThan(0.75 * 60 * pace);
   });
 
   it('guns keep less past Mk I, and much less again further out; the drops that roll nothing are skipped', () => {
@@ -161,7 +162,7 @@ describe('mining: work and keep', () => {
 });
 
 describe('chunks follow the rock', () => {
-  it('break off every 5 to 10 units worked, with whatever was kept in them (none empty)', () => {
+  it('break off every chunkUnits units worked, with whatever was kept in them (none empty)', () => {
     const sizes: number[] = [];
     let t = 0;
     const h: MiningHost = {
@@ -174,12 +175,13 @@ describe('chunks follow the rock', () => {
     for (t = 0; t < 60 * 120; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
     const worked = before - m.remaining(1);
     // (A drop whose rolls all failed is skipped: at a third kept, one in ten or so)
-    expect(sizes.length).toBeGreaterThan((worked / 10) * 0.7);
-    expect(sizes.length).toBeLessThanOrEqual(worked / 5 + 1);
-    for (const n of sizes) { expect(n).toBeGreaterThanOrEqual(1); expect(n).toBeLessThanOrEqual(10); }
+    const [lo, hi] = table.chunkUnits;
+    expect(sizes.length).toBeGreaterThan((worked / hi) * 0.7);
+    expect(sizes.length).toBeLessThanOrEqual(worked / lo + 1);
+    for (const n of sizes) { expect(n).toBeGreaterThanOrEqual(1); expect(n).toBeLessThanOrEqual(hi); }
   });
 
-  it('a laser keeps it all: 5 to 10 units a chunk (what is left still drops when the rock is mined out)', () => {
+  it('a laser keeps it all: chunkUnits units a chunk (what is left still drops when the rock is mined out)', () => {
     const sizes: number[] = [];
     let crumbled = false;
     const h: MiningHost = {
@@ -192,8 +194,9 @@ describe('chunks follow the rock', () => {
     for (let k = 0; k < 2000 && !crumbled; k++) m.extract(1, 99, 2, laser(), 0, 0, 1, 0);
     expect(crumbled).toBe(true);
     expect(sizes.reduce((a, b) => a + b, 0)).toBe(units);
-    for (const n of sizes.slice(0, -1)) { expect(n).toBeGreaterThanOrEqual(5); expect(n).toBeLessThanOrEqual(10); }
-    expect(sizes.at(-1)!).toBeLessThanOrEqual(10);
+    const [lo, hi] = table.chunkUnits;
+    for (const n of sizes.slice(0, -1)) { expect(n).toBeGreaterThanOrEqual(lo); expect(n).toBeLessThanOrEqual(hi); }
+    expect(sizes.at(-1)!).toBeLessThanOrEqual(hi);
   });
 
   it('a drop whose rolls all failed is skipped; over many rolls the keep averages out', () => {
@@ -228,8 +231,9 @@ describe('chunks follow the rock', () => {
     const worked = before - m.remaining(1), kept = sizes.reduce((a, b) => a + b, 0);
     expect(kept / worked).toBeGreaterThan(0.75);
     expect(kept / worked).toBeLessThan(0.85);
-    // Mining XP is per unit kept (what's owed and not yet paid out in whole points)
-    expect((m as unknown as { xpOwed: Map<number, number> }).xpOwed.get(99)).toBeCloseTo(kept * table.xpPerUnit, 6);
+    // Mining XP is per unit kept (what's owed and not yet paid out in whole points), the next chunk's kept units too
+    const pending = Object.values(m.get(1)!.work.get(99)?.bag ?? {}).reduce((a, b) => a + b, 0);
+    expect((m as unknown as { xpOwed: Map<number, number> }).xpOwed.get(99)).toBeCloseTo((kept + pending) * table.xpPerUnit, 6);
     // Variance: for one chunk length the kept count differs chunk to chunk (a running total would give the same each time)
     expect(new Set(sizes).size).toBeGreaterThan(4);
     expect(Math.min(...sizes)).toBeLessThan(5);
@@ -256,14 +260,31 @@ describe('chunks follow the rock', () => {
     m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
     const before = m.remaining(1);
     for (t = 0; t < 60 * 3000; t++) if (t % 15 === 0) m.extract(1, 99, 28, tools.fixed, 0, 0, 1, 0);
-    // 5 to 10 units a drop (7.5 on average); a few in a hundred roll nothing at all
-    const drops = (before - m.remaining(1)) / 7.5;
+    // chunkUnits a drop (6.5 on average at 4 to 9); a few in a hundred roll nothing at all
+    const drops = (before - m.remaining(1)) / ((table.chunkUnits[0] + table.chunkUnits[1]) / 2);
     expect(chunks).toBeLessThan(drops * 0.99);
     expect(chunks).toBeGreaterThan(drops * 0.85);
   });
 
   it('rocks hold 1.5x the ore they did (0.1 a unit of size before)', () => {
     expect(table.unitsPerSize).toBeCloseTo(0.15);
+  });
+});
+
+describe('Taenite', () => {
+  it('is small, dense soft rock: half again the ore of a same-size rock, in the Sol belt', () => {
+    expect(table.types.rock_taenite.hardness).toBe(1);
+    expect(table.types.rock_taenite.density).toBe(1.5);
+    expect(table.fields!.sol_belt.rock_taenite).toBe(5);
+    const [lo, hi] = table.types.rock_taenite.size!;
+    expect(lo).toBeGreaterThanOrEqual(25);
+    expect(hi).toBeLessThanOrEqual(45);
+    // Same size, same everything else: only the density differs
+    const dense = asteroidComposition(table, 'rock_taenite', 'k', 40, 1).units;
+    const plain = asteroidComposition({ ...table, types: { ...table.types, rock_taenite: { ...table.types.rock_taenite, density: undefined } } }, 'rock_taenite', 'k', 40, 1).units;
+    expect(dense).toBe(Math.round(40 * 0.15 * 1.5));
+    expect(plain).toBe(Math.round(40 * 0.15));
+    expect(dense).toBeGreaterThan(plain);
   });
 });
 

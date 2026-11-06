@@ -25,6 +25,7 @@ import { TORCH_TICKS } from '../custom/heliosDrone.js';
 import { DART_IN, DART_WARN, DART_FIRE } from '../custom/scrapDarter.js';
 import type { MoveOrder } from '../custom/order.js';
 import type { MovePose, MoveShot, MoveHurt } from './host.js';
+import { PULL_FIELD, type PullDecl } from '../../sim/pullFields.js';
 
 /** A design's numbers (factions.json custom.designs) */
 export interface CustomStats {
@@ -59,7 +60,15 @@ export interface CustomWork {
   segmentHit(id: number, x0: number, y0: number, x1: number, y1: number, half: number): { part: number; t: number } | null;
   damage(id: number, part: number, amount: number, how: MoveHurt): void;
   splash(x: number, y: number, radius: number, amount: number, source: number): void;
+  /** A push on a ship's velocity that isn't a pull field (a pull on anything but a pilot: pullTowards) */
   push(id: number, dx: number, dy: number): void;
+  /**
+   * A pull on the next tick as a field every pilot's step works out (common sim/pullFields.ts; `key` names it among this
+   * ship's), said every tick it goes on. Only on a pilot (`pilot`): anything else is pushed (pullTowards)
+   */
+  pull?(key: string, d: PullDecl): void;
+  /** Is this ship a pilot's (a pull field reaches it: pull) */
+  pilot?(id: number): boolean;
   emp(x: number, y: number, radius: number, ticks: number): void;
   launch(kind: string, p: LaunchPattern, scale: number): void;
   has(id: number): boolean;
@@ -164,7 +173,10 @@ export function burnLine(a: CustomAct, x0: number, y0: number, angle: number, le
   }
 }
 
-/** Pull a ship towards a point: `k` world units a tick at its middle, falling to nothing at `r` (the server's) */
+/**
+ * Pull a ship that isn't a pilot towards a point: `k` world units a tick at its middle, falling to nothing at `r` (the
+ * server's push; a pilot is pulled by a field its step works out: CustomWork.pull)
+ */
 export function pullTowards(a: CustomAct, who: number, at: MovePose, x: number, y: number, r: number, k: number): void {
   const dx = x - at.x, dy = y - at.y, d = dhypot(dx, dy);
   if (d > r || d < 1) return;
@@ -302,6 +314,12 @@ export function customMoves(next: (a: CustomAct) => number): Record<string, Desi
         const t = a.st.tether, w = a.work;
         if (!t || !w) return;
         if (a.now >= t.until || !a.has('harpoon') || !w.has(t.target)) { a.st.tether = undefined; return; }
+        // (A pilot: a field its step works out from the next tick, a tick ahead each time (common sim/pullFields.ts REEL:
+        // a tow, not a sling, so no more pull once it's coming in at REEL_MAX))
+        if (w.pilot?.(t.target)) {
+          if (a.now + 1 < t.until) w.pull?.('reel', { kind: PULL_FIELD.REEL, target: t.target, a: [num(a, 'harpoon', 'slack', 320), REEL_MAX, num(a, 'harpoon', 'length', 1300) * 1.6, num(a, 'harpoon', 'pull', 0.4) * 1.6], until: t.until - 1 });
+          return;
+        }
         const tp = w.pose(t.target), me = a.me();
         if (!tp) return;
         const d = dhypot(tp.x - me.x, tp.y - me.y);
@@ -335,7 +353,12 @@ export function customMoves(next: (a: CustomAct) => number): Record<string, Desi
       step(a, _m, k) {
         const R = num(a, 'pull', 'radius', 1300), me = a.me();
         if (k === 0) ringWarn(a, 'magnet', R, CRAWLER_PULL);
-        if (a.has('magnet') && k >= 18) pullTowards(a, a.target, a.tpose(), me.x, me.y, R, num(a, 'pull', 'pull', 0.45));
+        if (a.has('magnet')) {
+          // (A pilot: a field its step works out (common sim/pullFields.ts POINT), said a tick ahead, so from tick 18 of the
+          // move to its end; anything else pushed now)
+          if (a.work?.pilot?.(a.target)) { if (k + 1 >= 18 && k + 1 < CRAWLER_PULL) a.work.pull?.('magnet', { kind: PULL_FIELD.POINT, target: a.target, a: [R, num(a, 'pull', 'pull', 0.45)], until: a.now - k + CRAWLER_PULL - 1 }); }
+          else if (k >= 18) pullTowards(a, a.target, a.tpose(), me.x, me.y, R, num(a, 'pull', 'pull', 0.45));
+        }
         // The claws snap shut just ahead of it (each one on, half the bite)
         const claws = (a.has('claw_l') ? 0.5 : 0) + (a.has('claw_r') ? 0.5 : 0), ahead = num(a, 'pull', 'snap', 150);
         const x = me.x + dcos(nose(a)) * ahead, y = me.y + dsin(nose(a)) * ahead;

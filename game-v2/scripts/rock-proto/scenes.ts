@@ -82,7 +82,7 @@ function pickType(field: string, r: () => number): string {
   for (const [id, k] of Object.entries(w)) { roll -= k; if (roll <= 0) return id; }
   return Object.keys(w)[0];
 }
-const SIZES: Record<string, [number, number]> = { asteroid_ice: [30, 100], asteroid_metal: [25, 80], asteroid_crystal: [20, 60], asteroid_fuel: [30, 90], asteroid_mega: [150, 300], comet: [40, 80] };
+const SIZES: Record<string, [number, number]> = { asteroid_ice: [30, 100], asteroid_metal: [25, 80], asteroid_crystal: [20, 60], asteroid_fuel: [30, 90], asteroid_mega: [150, 300], comet: [40, 80], rock_taenite: [25, 45] };
 const sizeOf = (type: string, r: () => number) => { const [a, b] = SIZES[type] ?? [25, 80]; return (a + r() * (b - a)) * 2.5; };
 
 /** `n` rocks of a field scattered over a w × h patch about (cx, cy), none overlapping */
@@ -168,7 +168,9 @@ function job(id: string, rocks: Rock[], view: View, v: Variant, extra: Record<st
 
 // The scenes: rocks in Sol's belt (x ≈ 50 000 from the sun, lit from the left), a close rock, a rich-ore rock, Glasswater
 const BX = 50000;
-type Scene = { id: string; rocks: Rock[]; view: View; label: string };
+type Scene = { id: string; rocks: Rock[]; view: View; label: string; rocksBefore?: Rock[] };
+/** The same rocks with every Taenite a Chondrite of its place and size (Sol's belt as it was: the 'before' of the Taenite panels) */
+const noTaenite = (rocks: Rock[]) => rocks.map((r) => (r.type === 'rock_taenite' ? { ...r, type: 'asteroid_metal' } : r));
 const scenes: Scene[] = [];
 {
   // a close rock: a big chondrite, filling the view
@@ -186,6 +188,11 @@ const scenes: Scene[] = [];
   scenes.push({ id: 'rich', label: 'Rich ore: platinoid (Void)', rocks: rich, view: { w: 1280, h: 800, zoom: 1.7, cam: [BX, 0], ...SOL } });
   // another system's palette: Glasswater's crystal and ice field, under its blue-white star
   scenes.push({ id: 'glasswater', label: 'Glasswater field', rocks: belt('glasswater_field', 50, BX, 0, 3000, 1900, 777, 3), view: { w: 1280, h: 800, zoom: 0.42, cam: [BX, 0], ...GLASSWATER } });
+  // Taenite (before: those rocks Chondrite): a pair side by side, close; and a patch of Sol's belt with its few Taenites
+  const pair: Rock[] = [{ id: 7331, size: 120, type: 'asteroid_metal', x: BX - 150, y: 0, rot: 0.6, tier: 1 }, { id: 4412, size: 100, type: 'rock_taenite', x: BX + 130, y: 20, rot: 2.2, tier: 1 }];
+  scenes.push({ id: 'taenite-pair', label: 'Chondrite and Taenite (Sol)', rocks: pair, rocksBefore: noTaenite(pair), view: { w: 1280, h: 800, zoom: 2.2, cam: [BX, 0], ...SOL } });
+  const tb = belt('sol_belt', 70, BX, 0, 2400, 1500, 31337, 1);
+  scenes.push({ id: 'taenite-belt', label: 'Sol belt patch with Taenite', rocks: tb, rocksBefore: noTaenite(tb), view: { w: 1280, h: 800, zoom: 0.55, cam: [BX, 0], ...SOL } });
 }
 
 // Stress (bench only, to make small differences measurable): a close rock filling a 2560 × 1600 view, drawn 30 times
@@ -214,7 +221,7 @@ if (set === 'cpu') {
 const variants: Variant[] =(process.env.ROCK_VARIANTS ?? 'before,after').split(',') as Variant[];
 // (alternating before and after, so drift in the GPU's clocks falls on both)
 const only = process.env.ROCK_ONLY?.split(',');
-const jobs = [...scenes, ...stress].filter((s) => !only || only.includes(s.id)).flatMap((s) => variants.map((v) => job(s.id, s.rocks, s.view, v, {
+const jobs = [...scenes, ...stress].filter((s) => !only || only.includes(s.id)).flatMap((s) => variants.map((v) => job(s.id, v === 'before' ? s.rocksBefore ?? s.rocks : s.rocks, s.view, v, {
   out: set === 'bench' ? undefined : join(out, `${s.id}-${v}.png`), bench: set !== 'stills', label: s.label,
   repeat: (s as { repeat?: number }).repeat ?? 1, uniforms: (s as { uniforms?: object }).uniforms,
 })));

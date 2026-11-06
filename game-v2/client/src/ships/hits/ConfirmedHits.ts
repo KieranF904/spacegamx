@@ -4,7 +4,8 @@
  * rules (common ships/hitRules.ts), on the same copy of the ships the server worked it out on for this client:
  *
  *   the hit point   the shell's line at the hit's tick, cast against the part it struck where the ship was then
- *   the damage      deriveShellHit (or the record's D), summed per target, source and glancing as the server sums it
+ *   the damage      deriveShellHit's number (or the record's D), summed per target, source and glancing as the
+ *                   server sums it (in fixed point: damageUnits)
  *   the part's HP   straight into the ship store (not when a shield took some: the shipHps after the records has it)
  *   the fire        igniteRule (or the record's I)
  *   the end         hitEndFx; the shell removed when the record says it's spent
@@ -20,7 +21,7 @@
  * own hit is dropped), then `flush` at the frame's end hands out the messages.
  */
 import {
-  unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
+  unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, damageUnits, damageTenths, castParts, worldToLocalDir, shipPointToWorld,
   type ClientMessage, type ServerMessage, type ServerHitsMessage, type ServerHpCheckMessage, type ShipState, type HitCtx, type PlacedGeom,
   hpWire, isOwnShotWire, OWN_SHOT_WIRE0, SHOT_ID_BARRELS, SHOT_ID_SLOTS, type ShellHitRecord, type HitEndFx,
 } from '@space-game/common';
@@ -71,6 +72,7 @@ export interface HitDone {
   owner: number;
   glancing: boolean;
   gone: boolean;
+  /** Its number (hitRules.ts PartHitResult.shown, or the record's tenths) */
   dealt: number;
   ignite: number;
   igniteTicks: number;
@@ -343,7 +345,7 @@ export class ConfirmedHits {
   /** Hits as the messages the server would have sent: each one's impact, fire and end, then the damage summed */
   private messages(done: readonly HitDone[]): HitsOutcome {
     const out: HitsOutcome = { msgs: [], ships: new Set(), gone: [] };
-    const sums = new Map<string, { target: number; source: number; glancing: boolean; amount: number }>();
+    const sums = new Map<string, { target: number; source: number; glancing: boolean; units: number }>();
     for (const d of done) {
       if (d.gone) out.gone.push(d.shell);
       if (d.undo) out.ships.add(d.target);
@@ -352,11 +354,12 @@ export class ConfirmedHits {
       if (d.fx) out.msgs.push({ type: 'detonation', kind: d.fx.kind, x: Math.round(d.at[0]), y: Math.round(d.at[1]), radius: d.fx.radius });
       const key = `${d.target},${d.owner},${d.glancing ? 1 : 0}`;
       const e = sums.get(key);
-      if (e) e.amount += d.dealt; else sums.set(key, { target: d.target, source: d.owner, glancing: d.glancing, amount: d.dealt });
+      const units = damageUnits(d.dealt);
+      if (e) e.units += units; else sums.set(key, { target: d.target, source: d.owner, glancing: d.glancing, units });
     }
-    // The damage, summed and rounded as the server's flushDamage does
+    // The damage, summed in fixed point and rounded once as the server's flushDamage does
     for (const e of sums.values()) {
-      const amount = Math.round(e.amount * 10) / 10;
+      const amount = damageTenths(e.units) / 10;
       if (amount > 0) out.msgs.push({ type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) });
     }
     return out;

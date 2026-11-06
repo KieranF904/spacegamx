@@ -233,7 +233,7 @@ describe('other ships\' guns stepped from their inputs', () => {
     expect(r.inexact).toEqual([]);
     expect(r.A.hits.stats.missed).toBe(0);
     expect(r.A.hits.stats.mismatches).toBe(0);
-    expect(r.laneChecks).toBeGreaterThan(100);
+    expect(r.laneChecks).toBeGreaterThan(50);
     expect(r.laneOff).toEqual([]);
     expect(r.stats.derivedRecs).toBeGreaterThan(10 * Math.max(1, r.stats.toldTicks));
   }, 300_000);

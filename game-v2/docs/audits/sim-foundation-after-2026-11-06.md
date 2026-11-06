@@ -166,6 +166,123 @@ All other rows (idle, cruise, crowd-20/50/100, rock-starter, rock-gale, map, ree
 - **pyreclast and pirates** move by a few bytes because the fights play out a little differently. Those pilots' rebuilt
   generators now make what the wire's tenths say.
 
+## Pull fields (game-wide C3, track B)
+
+Every pull on a pilot's ship is now part of that ship's step, on every end. A Scrap Mother's haul and intake, a Scrap
+Crawler's magnet, a Hookboat's reel and a parked collapsing star are no longer sent tick by tick as `PULL` causes.
+
+### Why the first attempt was blocked
+
+The attempt in stage 1C had the client run the boss's move (MoveRunner) and log each pull it made, then feed those to
+the pilots' steps. It hit three walls:
+
+- **Order.** A move's pull on tick t reads the pilot after its step on t. The client runs moves on their own timeline,
+  so a move could run before or after the pilot it pulls had been stepped. The two needed stepping in turn, tick by
+  tick.
+- **The tether.** A Hookboat's reel starts when its harpoon hits. Only the server finds that hit.
+- **The star.** A collapsing star pulls from where its orb is held, and the client didn't know that point exactly.
+
+### What was done instead
+
+The decision and the force are now separate things.
+
+- **The decision is a field, sent once.** A move says "I pull on the next tick", every tick it pulls
+  (`MoveWork.pull` / `CustomWork.pull`, through `PullDeclarer`, common sim/pullFields.ts). A declaration that stays the
+  same keeps the field open. The server sends the record when the field opens, and again only if it ends early
+  (`pulls` message: `[id, from, kind, t0, t1, target, skip, ...args]`). Five shapes cover every pull: CONE (haul), LANE
+  (intake), POINT (crawler), REEL (hookboat, where the tether is a field with its target) and STAR (a fixed point and
+  its owner skipped).
+- **The force is a pure function of state both ends hold** (`fieldPull`). It reads the puller as it ended tick t - 1
+  and the pilot after its motion on tick t. That is what the server's move read before, so the arithmetic is
+  unchanged. On the server, `stepMovement` passes `env.pulls`. On a client, `ShipReplicaSet` passes it into every
+  pilot's step: replicas (`replicaStep`, now with the pilot's id), the own ship (`OwnTick.step`) and the dev PT layer
+  (`stepAlone`). The puller comes from the replica ring at t - 1, stepped there if need be. That reading in turn is
+  what lets each tick go in order without a separate scheduler.
+- **Order solved by dependency, not by scheduling.** When a puller is stepped again from a tick, the ships its fields
+  act on are stepped again from the next tick (`dropped` cascade). Puller poses are kept as read, so a puller that
+  is removed still pulled on the ticks before it went. Pulls in a window an earlier snapshot has closed are final
+  (`pullsFinal`). Without this, a boss's body stopping and its rows taking over from an old keyframe re-stepped the
+  own ship 240 ticks back.
+- **One arithmetic everywhere.** Every pull on a pilot is `addPull`: put on the PULL grid, then the velocity back on its
+  own grid at once. It is applied after the motion and before every cause. A told `PULL` row is taken by the step's
+  pull phase in place of the fields' pulls (it is a no-op among the causes after the step). The server's shadows apply
+  pull rows straight after their replica step, before `pre`.
+
+### When a pull is still told
+
+A pull is still told as a `PULL` row in these cases. Each tick is told whole or not at all.
+
+- **The pull is the server's alone.** A Grapple gem's moving shell, or a pull on an AI ship (that is a push, as before).
+- **The client can't have the puller as the server had it.** `Replication.forClient` decides this per client:
+  - the client didn't hold the puller before this snapshot, or the puller is out of its view;
+  - a shadow of the puller differs from the pose the pulls read (`notePullers`, against `ServerPulls.usedAt`);
+  - the puller has causes the client can't work out;
+  - the puller is keyframed now, on this round's ticks.
+- **A zero row.** On a tick where such a field could have pulled the ship but the server's step had no pull, a zero
+  row (`[ago, 0, 0, 0]`) goes. This stops the client from working one out from the wrong place.
+- **Each tick is judged once**, in the first round that covers it (`pullsJudged`). A round that sends nothing has left
+  its ticks' pulls to be worked out.
+
+### Behaviour changes (intentional)
+
+These are why world hashes in a pull fight differ from before. The frameHash golden has no pulls, and its world
+hashes are unchanged.
+
+- A pull acts on the tick after the move decides it. The haul, intake and crawler are declared a tick early, so they
+  keep their ticks. The reel starts one tick after the harpoon strikes, and a star one tick after its orb parks.
+- A pull's end, when its source is lost (magnets or throat shot off, the boss gone), takes effect one tick later.
+- Several pulls on one ship in a tick go in puller-id order, each rounded. A pull and a contact on the same tick now
+  have the velocity rounded between them.
+- An admin hidden from bosses is pulled like any pilot.
+
+### Proof
+
+`server/src/net/causes/pullFields.test.ts` (real GameServer, two full-caps fake clients) checks four cases. In each,
+both pilots (A's own layer, A's replica of B, B's of A) and every body A runs are the server's state bit for bit at
+every snapshot tick:
+
+| case | pulls applied | told to the pilot | worked out | records |
+|---|---:|---:|---:|---:|
+| Mother haul + intake | 226 | 0 | 226 | 4 |
+| Hookboat reel + Crawler magnet | 948 | 0 | 948 | 88 (29 fields) |
+| Pullers shoved on the server alone, mid-pull | 941 | 124 | 817 | 22 |
+| Collapsing star | 172 | 0 | 172 | 2 |
+
+The shoved case drives the told path: those ticks' pulls go told and nothing goes off.
+
+Tests re-pinned or changed:
+
+- `structure.test`: `ShipBridge` `isPilot` and `pulls`, and the `pulls` server message.
+- `scrapDarter.test`: body checks > 400 becomes > 250. The crawler's magnet no longer forces a snapshot every round:
+  137 snapshots, 232 before.
+
+The wire tables are unchanged (`wire:bump` found nothing): protocol 57. A cached 57 client would not know the `pulls`
+message. Nothing is deployed (deploy freeze), so no bump was made.
+
+### Bytes
+
+`cd game-v2/server && npm run bench:table -- --only mother,custom,pirates,crowd-20`. Before is refactor/split c2ce196.
+B/s except msgs/s:
+
+| scenario | before payload | **after payload** | before msgs/s | **after msgs/s** | before wire | **after wire** | up (before / after) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| mother | 1653 | **1623** | 15.15 | **15.05** | 2653 | **2616** | 580 / 580 |
+| custom | 1190 | **1164** | 10.90 | **10.75** | 1910 | **1874** | 561 / 564 |
+| pirates | 639 | **621** | 8.25 | **8.45** | 1184 | **1179** | 685 / 687 |
+| crowd-20 | 980 | **980** | 8.57 | **8.57** | 1545 | **1545** | 137 / 137 |
+
+The measured pilot's own `PULL` rows over the 20 s:
+
+- **mother:** 90 → 0, plus one record (43 B). Snapshots 307 → 297.
+- **custom:** 102 → 0, plus one record (34 B). Snapshots 234 → 221.
+- **pirates:** 23 → 0.
+
+Every other count is the same or within a fight's drift: keyframes, head misses (0), fixes, hits.
+
+These scenes pull for under 2 s in 20, so the saving is 2-3%. A fight spent in a magnet saves about 5 B per pulled
+tick per pilot. It also stops the snapshot a round that each pull forced, and the PT layer's misprediction of every
+pulled ship.
+
 ## Track D: own-shell hits matched and told by one name (2026-11-06)
 
 The Stage 4 overlay's *hit agreement* (drawn strikes of your shells against told hits for them, client
@@ -232,3 +349,121 @@ old way; most derived hits now send nothing at all.
 Open: crowd dilation. The server's tick and a system's tick differ there, and a rebuild sync's `at` is the system's,
 so a hit's tick and `at` would be compared across clocks. Both sides make the same comparison, so it's safe, but it
 may fall back to told. Mode B ordering is open too.
+
+## Hit numbers: one rounding on both ends (2026-11-06)
+
+What was left told on drones after Track D was the quiet rule: a key's sum (target, source, glancing) of the client's
+hit numbers rounded to another tenth than the server's, so its records went with d10 0 and the server's damage
+message carried the number.
+
+**Cause.** The hit that breaks a part deals what the part had left. The server knows that exactly (say 1.84). The
+client's copy of the HP is to the wire's tenth (hpWire: 1.8). Each record's own number was in the same tenth, so it
+carried no d10, but the sums drifted apart. In the pack run one key summed to 3.565 on the server (3.6) and 3.525 on
+the client (3.5).
+On top of that both ends summed floats, so the order the hits were added in could also move a sum that sat on a .x5.
+
+**Fix.** One scheme, the same on both ends:
+
+1. A hit's number (common `hitRules.ts` partHit `shown`) is what the shield took, plus what got through to the hull,
+   capped at the HP the part *showed* (hpWire of its HP, above its ruin floor). It depends only on the shell's amount
+   and the part's HP to the tenth, and a client in step has exactly that, so both ends get the same float. The hit that
+   breaks a 1.84 part shows 1.8, the HP the player saw it had. deriveShellHit returns this number. The server's HP
+   maths is untouched: the part still loses its exact HP and dies, and bosses and arenas still count the exact damage.
+2. Numbers are summed in fixed point (`tuning.ts` damageUnits: 1/65536ths, so the sum is an integer and the order
+   doesn't matter). The sum is rounded once, to the tenth, when it's shown (damageTenths). This happens on the server
+   (Outbox.addDamage / flushDamage, using a shell hit's `shown` passed through notifyDamage) and on the client
+   (ConfirmedHits.messages). HitLedger compares the two sums in the same units.
+
+The quiet rule stays as a safety net for real differences: other damage in the same sum (a blast, a burn, a hit told
+the old way), a shield's records (they carry their tenths), or a client whose HP copy is off. Per-tick damage
+(burns, beams, mining lasers, contact) is still summed exactly. Only its addition is fixed point.
+
+I didn't make the HP itself whole tenths. That would round every per-tick hurt (a burn's 0.03 a tick) to nothing.
+
+World and frame hashes, the hit-rules golden and parity tests are unchanged: no damage maths changed, only the numbers
+shown. hitRules.test.ts has a new case: a view with HP to the tenth shows the server's number, breaking hits included.
+rebuiltHits.test.ts now pins `quiet` at 0 on the drone pack.
+
+Hit ledger counters (hitsFight testkit, both clients; `quiet` = records sent with d10 0):
+
+| scenario | records | found (own) before → after | told before → after | quiet before → after |
+|---|---:|---:|---:|---:|
+| still freighter, 600 ticks | 160 | 156 → 156 | 4 → 4 (start-up) | 0 → 0 |
+| freighter shot apart, 900 | 142 | 104 → 104 | 38 → 38 (debris) | 0 → 0 |
+| freighter coasting, 600 | 160 | 156 → 156 | 4 → 4 | 0 → 0 |
+| **3 Helios drones, 600** | 112 | **104 → 112** | **8 → 0** | **8 → 0** |
+| **3 Helios drones, 900** | 162 | **146 → 162** | **16 → 0** | **16 → 0** |
+| shielded freighter, 600 | 160 | 0 → 0 | 160 → 160 (the shield's) | 0 → 0 |
+
+0 corrections and 0 HP mismatches throughout.
+
+Bytes (`npm run bench:table`, before = refactor/split f242485, both run alone): mother wire 2616 → **2615**, custom
+payload 1179 → **1178**. Every other row is the same to the byte. crowd-100 moves between runs with machine load
+(1071-1223 on the same code), so it isn't a result. The drone fights in the benches are few, so the saving there is
+small. Each quiet record was a told record (about 3 B) plus a damage message.
+
+## Payout dice on a server-only secret (2026-11-06)
+
+Kieran: clients may only work out the *odds*, which the game will show anyway. The rolls themselves come from a seed
+only the server has.
+
+**Before.** Mining's dice were seeded from the rock's entity id (`(eid * 2654435761) >>> 0`), which every client
+knows. The other payout rolls drew from `mulberry32` of a constant written in the source, and kill loot shared its
+generator with the AI's strafe, aim and elite rolls. A den cache's roll was seeded from `id:who:tick`.
+
+**Now.** `server/src/game/payoutDice.ts` holds a 256-bit secret: random each boot (`crypto.getRandomValues`), or
+fixed by `GameServerOptions.payoutSecret` or `PAYOUT_SECRET`. It is never sent anywhere. Each stream runs SHA-256's
+compression function over the secret, the stream's name and numbers, and a counter, giving eight draws a block. The
+code is plain JS because the server also runs in the browser (proto mode); a test checks it against node:crypto on
+FIPS 180-4's 'abc' block. The rolls can't be worked back to the secret, and one stream's rolls say nothing of
+another's. `GameServer.payout` owns it and hands it to each system.
+
+Payout rolls moved onto it:
+
+| where | rolls | stream |
+|---|---|---|
+| Mining.ts | the seam gem roll, the ore pick, the keep roll, the skill bonus roll, each chunk's size (units worked) and throw, the spill when a rock breaks | `rock`, id, registration count: each rock its own, a rock come back under the same id too |
+| Enemies.ts | a kill's faction loot (chance and count, twice for elites) and each salvaged part's roll | `kill loot` |
+| Bosses.ts | a boss's loot table | `boss loot` |
+| Events.ts | a salvage field's pod count, goods, counts and rare find; a signal peak's pod goods and counts (their scatter stays on the events' own generator) | `event pods` |
+| dens/crustCache.ts | a cracked cache's loot (its seed) | `den cache`, cache, pilot, tick |
+| StationServices.ts | whether a gem cut fails | `gem cuts` |
+
+Left as they are: rock composition and looks (`asteroidComposition`, computed on the client for looks and odds),
+quest and bounty generation (offers shown before they're taken, not dice), derelict wreck shapes (seen), elite
+spawns (seen, and they shape combat), loot pod scatter, and every movement or combat seed.
+
+The rule is written in docs/areas/economy-quests.md (Invariants, "Two kinds of seed") and in common math/rng.ts. Seeds
+both sides know are for anything that shapes movement, combat or visuals. The server's secret is for anything that
+pays out.
+
+Tests and benches fix the secret: vitest.config.ts sets `PAYOUT_SECRET=tests`, and netTable, customFight and
+playerBot set `bench`. payoutDice.test.ts checks the SHA-256 block, that a fixed secret repeats and another differs,
+that streams are independent, that no secret means a fresh one each boot, that the draws are even, and that the same
+rock under another secret pays otherwise.
+
+The world and frame hashes, parity and golden tests are unchanged, and so are the mining, bosses, dens, economy,
+outliers, quests, enemies, gems, econ and bots tests (28 files).
+
+Bytes (`npm run bench:table`, after the hit-number fix → after this): every row is the same to the byte except
+these:
+
+| scenario | payload | wire | up | why |
+|---|---:|---:|---:|---|
+| pirates | 619 → 1102 | 1164 → 1739 | 686 → 687 | a different fight, not more bytes per thing |
+| custom | 1178 → 1154 | 1898 → 1870 | 561 → 574 | the same |
+| reentry | 104 → 107 | 217 → 221 | 1 → 1 | the same |
+
+Kill loot no longer draws from the AI's generator, so after the first kill every strafe flip and aim seed rolls
+differently and the fight plays out another way. Putting the loot rolls back on `Enemies.rng` alone gives 619 / 1164
+exactly. Compare pirates against this new baseline from here on.
+
+**Found on the way (not fixed, pre-existing).** The new pirates fight produces an HP mismatch. At tick ~783 a
+FakeHitsClient's copy of a Pirate Skiff's *debris* piece reads [54.6, 0, 60, 30.5] against the server's
+[18.6, 0, 27.7, 30.5]: two hits on the debris never reached it. The hpCheck / hpResync safety net puts it right.
+The same happens on the tree before the hit-number fix (f242485 with only the dice change), so the cause is the debris
+hit path, not either change here. To reproduce: `npx tsx --tsconfig ../scripts/net/tsconfig.json
+src/bench/netTable.ts --case pirates` and log ConfirmedHits.check mismatches.
+
+That mismatch also exposed a bench bug: the up-bytes count took `.byteLength` of an hpResync, which encodes as JSON (a
+string), so `up B/s` printed null. netTable counts strings by their UTF-8 length now.

@@ -24,6 +24,7 @@ import type { PlacedGeom } from '../../ships/grid.js';
 import type { Terrain } from '../../terrain.js';
 import { hashInts, mulberry32 } from '../../math/rng.js';
 import { isRuined } from '../../ships/stages.js';
+import type { PullDecl } from '../../sim/pullFields.js';
 
 export interface MovePose { x: number; y: number; angle: number; vx: number; vy: number }
 
@@ -41,8 +42,13 @@ export interface MoveWork {
   segmentHit(id: number, x0: number, y0: number, x1: number, y1: number, half: number): number;
   damage(id: number, part: number, amount: number, how: MoveHurt): void;
   splash(x: number, y: number, radius: number, amount: number): void;
-  /** A push on a ship (a pull: a cause on its pilot's client) */
+  /** A push on a ship's velocity that isn't a pull field (a pull on anything but a pilot: the server's alone) */
   push(id: number, dx: number, dy: number): void;
+  /**
+   * A pull on the next tick (sim/pullFields.ts: a field every pilot's step works out, on every end; `key` names it
+   * among this body's). Said every tick it goes on; the first time, its record goes to every client of the system
+   */
+  pull?(key: string, d: PullDecl): void;
   /** A homing shell (its guide is the server's: a row, or a guide SYNC) */
   homing(kind: string, x: number, y: number, angle: number, scale: number, target: number): void;
   /** A mob out of it (-1: none) */

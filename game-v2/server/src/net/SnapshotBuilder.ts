@@ -978,7 +978,11 @@ export class SnapshotBuilder {
       const headDue = hudRound && !!ownNow && this.currentTick - conn.lastSnapshotSentTick >= HEAD_HASH_TICKS;
 
       // (Records count from the snapshot they follow: one always goes with them)
-      const shouldSend = conn.forceSnapshot || split || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
+      // (Pull fields of its system it hasn't been told as they stand, opened or ended early: its tick layer works their
+      // pulls out itself, common sim/pullFields.ts; just before the snapshot, as an ownSync goes)
+      const pullRows = this.ships.pulls.any || conn.pullsTold?.size ? this.ships.pulls.forClient(conn.pullsTold ??= new Map(), playerSystemId) : null;
+      const pullReset = !!conn.pullsReset;
+      const shouldSend = !!pullRows || pullReset || conn.forceSnapshot || split || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
         || (hitsOn && this.hits!.pending(conn)) || syncing || headDue || !!guns?.syncs.length || !!guns?.rows.length;
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
@@ -993,6 +997,7 @@ export class SnapshotBuilder {
         for (const m of guns.syncs) this.send(conn.ws, m);
         if (guns.rows.length) this.send(conn.ws, { type: 'gunCtl', t: this.currentTick, r: guns.rows });
       }
+      if (pullRows || pullReset) { this.send(conn.ws, pullReset ? { type: 'pulls', f: pullRows ?? [], r: 1 } : { type: 'pulls', f: pullRows! }); conn.pullsReset = false; }
       if (ownNow) conn.ownSyncDue = false;
       this.send(conn.ws, {
         type: 'snapshot',
@@ -1294,6 +1299,8 @@ export class SnapshotBuilder {
     conn.knownEntities.clear();
     conn.shipSynced.clear();
     conn.shipHpSent.clear();
+    // (Pull fields: the new system's from scratch, its client's last system's forgotten first)
+    if (conn.pullsTold?.size) { conn.pullsTold.clear(); conn.pullsReset = true; }
     conn.sentNames.clear();
     conn.repKnown.clear();
     conn.shipView.clear();

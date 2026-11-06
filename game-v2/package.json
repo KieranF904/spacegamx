@@ -29,6 +29,7 @@
     "features:gen": "node scripts/features/gen.mjs",
     "features:check": "node scripts/features/gen.mjs --check",
     "slideshow": "node scripts/slideshow/build.mjs",
+    "sounds:review": "node scripts/sound-review/server.mjs",
     "det:engines": "node scripts/det/engines.mjs",
     "net:inputs": "node scripts/net/inputs.mjs"
   },

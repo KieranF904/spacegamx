@@ -184,6 +184,9 @@ export class CustomEnemies {
         damage: (id, part, amount, how) => host.ships.damagePartBy(id, part, amount, eid, how),
         splash: (x, y, r, amount, source) => host.ships.splashAt(num, x, y, r, amount, source),
         push: (id, dx, dy) => host.ships.push(id, dx, dy),
+        // (A pull field on a pilot, from the next tick: its step works it out, as its clients' do: ships/bridge/pullFields.ts)
+        pull: (key, d) => host.ships.pulls.declare(eid, key, d, now),
+        pilot: (id) => host.ships.isPilot(id),
         emp: (x, y, r, ticks) => { host.ships.empAt(num, x, y, r, ticks, eid); },
         launch: (kind, p, scale) => { host.mobs?.launch(kind, num, p, eid, scale); },
         has: (id) => host.ships.has(id),

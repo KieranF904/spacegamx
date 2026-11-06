@@ -137,6 +137,7 @@ import { LootPods, PodHost } from './game/LootPods.js';
 import { ServerFeatures } from './ships/features/host.js';
 import { SERVER_FEATURES } from './ships/features/index.js';
 import { Mining, MiningHost } from './game/Mining.js';
+import { PayoutDice } from './game/payoutDice.js';
 import { AsteroidOrbits } from './game/AsteroidOrbits.js';
 import { StationServices } from './game/StationServices.js';
 import { Weapons } from './game/Weapons.js';
@@ -160,6 +161,7 @@ import { Surfaces, type SurfaceHost } from './game/Surfaces.js';
 import { Sieges, type SiegeHost } from './game/Sieges.js';
 import { Hangar } from './game/Hangar.js';
 import { Party } from './game/Party.js';
+import { Social } from './game/social/Social.js';
 import type { Support } from './ships/features/support/Support.js';
 import { Trade } from './game/Trade.js';
 import { Operations } from './game/Operations.js';
@@ -182,6 +184,7 @@ import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
 import { HandlerRegistry, dispatch, registerHandlers, type Handler, type HandlerTable } from './net/dispatch.js';
 import * as flight from './net/handlers/flight.js';
 import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
+import { registerSocialHandlers } from './net/handlers/social.js';
 import { Outbox } from './net/snapshot/Outbox.js';
 import { HitLedger } from './net/hits/HitLedger.js';
 import { OwnChecks } from './net/own/OwnChecks.js';
@@ -524,6 +527,11 @@ export interface GameServerOptions {
   contributorStore?: ContribStore;
   /** Where the world's memory is kept between restarts (worldFileStore: data/world/memory.json); none: in memory only */
   worldStore?: WorldStore;
+  /**
+   * The payout dice's secret (game/payoutDice.ts): fixed, the same rolls every run (tests, benches). None: the
+   * PAYOUT_SECRET environment variable if set, else a random one each boot (the real server). Never sent anywhere
+   */
+  payoutSecret?: string;
 }
 
 /** A player who quits within this long of taking damage leaves their ship in space... */
@@ -544,6 +552,11 @@ export class GameServer implements ServerCtx {
   readonly world: IWorld;
   /** Server-only randomness, seeded (math/rng.ts): spawn spots and groups, the people's chatter */
   private rng = mulberry32(0x6a3e5);
+  /**
+   * Payout dice (game/payoutDice.ts): every roll that decides what a pilot gets (mining, loot, salvage, pods, caches,
+   * gem cuts) draws from these, keyed by a secret that never leaves the server (GameServerOptions.payoutSecret)
+   */
+  readonly payout: PayoutDice;
   gameData: GameData;
   clients: Map<ClientSocket, ClientConnection> = new Map();
   scene: 'sectors' | 'empty';
@@ -676,6 +689,8 @@ export class GameServer implements ServerCtx {
   /** A system nobody's in is put away whole and brought back as it was, through restarts too (game/SystemMemory.ts) */
   readonly memory: SystemMemory;
   readonly achievements: Achievements;
+  /** Friends, status and private messages (game/social/Social.ts) */
+  readonly social: Social;
   /** Pilotless ships players protect (escorted freighters, outposts): their names */
   private wards = new Map<number, string>();
   /** People's ships, parked where they live (people.json craft): untouchable, by name. The same Map as derelictsMod.personCraft */
@@ -719,6 +734,7 @@ export class GameServer implements ServerCtx {
   private gameLoopTimer: unknown = null;
 
   constructor(opts: GameServerOptions) {
+    this.payout = new PayoutDice(opts.payoutSecret);
     this.world = createWorld();
     this.net = new Outbox(this);
     this.hits = new HitLedger(this);
@@ -774,7 +790,7 @@ export class GameServer implements ServerCtx {
     }
     this.support = this.features.get('support') as unknown as Support;
     // ---- (end part features)
-    this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable);
+    this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable, this.payout);
     this.weapons = new Weapons({
       world: this.world,
       tick: () => this.currentTick,
@@ -790,7 +806,7 @@ export class GameServer implements ServerCtx {
         return kind === 'cannon' ? t[turret ? 'turret' : 'fixed'] : t[kind] ?? t.fixed;
       },
     }, this.ships, this.ships.tuning);
-    this.enemies = new Enemies(this.createEnemyHost(), this.ships, withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id)), this.ships.enemyDesigns);
+    this.enemies = new Enemies(this.createEnemyHost(), this.ships, withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id)), this.ships.enemyDesigns, this.payout);
     this.enemies.econ = this.econ;
     const profileStore = opts.profileStore ?? new MemoryProfileStore();
     this.pilots = new Pilots(this.createPilotHost(), this.econ, this.ships, profileStore, {
@@ -831,7 +847,7 @@ export class GameServer implements ServerCtx {
       refined: (conn, used) => this.releaseTraces(conn, used),
       station: (id) => this.gameData.getStation(id) ?? null,
       stationsWith: (service) => this.gameData.getAllStations().filter((st) => st.services.includes(service as never)),
-    }, this.pilots, this.econ, this.market);
+    }, this.pilots, this.econ, this.market, this.payout);
     this.ammo = new Ammo(this.pilots, this.ships.tuning, this.ships.catalog);
     this.ammo.hangar = (conn) => this.hangar?.send(conn);
     this.hazards = new Hazards({
@@ -906,7 +922,7 @@ export class GameServer implements ServerCtx {
       releaseControls: (eid) => this.releaseControls(eid),
     });
     this.dockedShips = this.docking.dockedShips;
-    this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns);
+    this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns, this.payout);
     this.mobs = new Mobs(this.createMobHost(), this.gameData.mobsFile as MobsFile);
     this.bosses.mobs = this.mobs;
     this.arenaGates = new ArenaGates({
@@ -949,7 +965,7 @@ export class GameServer implements ServerCtx {
     });
     const bossHost = this.createBossHost();
     this.dens = new Dens({
-      tick: () => this.currentTick, ships: this.ships, players: bossHost.players, send: bossHost.send, terrain: bossHost.terrain,
+      tick: () => this.currentTick, ships: this.ships, players: bossHost.players, send: bossHost.send, terrain: bossHost.terrain, payout: this.payout,
       systems: () => this.gameData.getAllSystems().filter((s) => s.den?.length).map((s) => ({ num: this.gameData.getSystemNum(s.id), den: s.den! })),
       who: (eid) => this.pilots.connOf(eid)?.username ?? null,
       toast: (eid, text, kind) => { const pc = this.pilots.connOf(eid); if (pc) this.pilots.toast(pc, text, kind); },
@@ -962,7 +978,7 @@ export class GameServer implements ServerCtx {
       },
     });
     this.enemies.mobs = this.mobs;
-    this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile);
+    this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile, this.payout);
     this.party = new Party(this.createPartyHost());
     this.admin = new AdminTools(this.createAdminHost());
     this.contrib = new ContributorNotes<ClientConnection>({
@@ -999,6 +1015,14 @@ export class GameServer implements ServerCtx {
       broadcast: (msg) => { for (const c of this.clients.values()) this.send(c.ws, msg); },
       now: this.clock,
     }, this.pilots, this.gameData.achievementsFile as RibbonsFile, profileStore);
+    this.social = new Social({
+      send: (conn, msg) => this.send((conn as ClientConnection).ws, msg),
+      toast: (conn, text, kind) => this.pilots.toast(conn as ClientConnection, text, kind),
+      note: (conn, text, color) => this.send((conn as ClientConnection).ws, { type: 'systemMessage', text, color }),
+      conns: () => this.clients.values(),
+      now: this.clock,
+    }, profileStore);
+    this.pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.social.join(conn); });
     // New arrivals hear about this week's hunt
     this.pilots.onEvent((conn, ev) => {
       if (ev.type !== 'login') return;
@@ -2433,6 +2457,7 @@ this.devTeleport = opts.devTeleport ?? false;
       try {
         for (const conn of await this.pilots.forgetAccount(id)) this.rejectAuth(conn as ClientConnection, 'This account has been deleted.');
         this.achievements.forget(id);
+        this.social.forget(id);
         this.forgotten.add(id);
       } catch (e) {
         console.error(`[Accounts] could not delete the profile of account ${id}:`, e);
@@ -2448,6 +2473,7 @@ this.devTeleport = opts.devTeleport ?? false;
       () => this.pilots.saveAll(),
       () => this.contrib.flush(),
       () => this.achievements.save(true),
+      () => this.social.save(),
       () => this.memory.save(),
     ].map(async (save) => save()));
     const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
@@ -2504,7 +2530,7 @@ this.devTeleport = opts.devTeleport ?? false;
       partLost: (eid, uid) => { const pc = this.pilots.connOf(eid); if (pc) this.hangar.gemsLost(pc, uid); },
       spendAmmo: (eid, kind, free) => { const pc = this.pilots.connOf(eid); return pc ? this.ammo.spend(pc, kind, free) : { scale: 1, dry: false }; },
       beamAsteroid: (eid, x, y, angle, range, damage, kind) => this.beamAsteroid(eid, x, y, angle, range, damage, kind),
-      notifyDamage: (targetEid, amount, sourceEid, glancing) => {
+      notifyDamage: (targetEid, amount, sourceEid, glancing, shown) => {
         this.combat.note(targetEid, sourceEid, this.currentTick);
         this.bossDev?.onDamage(targetEid, amount, sourceEid);
         this.recovery?.hurt(targetEid, sourceEid);
@@ -2512,7 +2538,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.dens?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
-        this.net.addDamage(InSystem.systemId[targetEid], targetEid, amount, sourceEid, !!glancing);
+        // (a shell hit's sum is of its numbers, as a client works them out: tuning.ts damageUnits)
+        this.net.addDamage(InSystem.systemId[targetEid], targetEid, shown ?? amount, sourceEid, !!glancing);
       },
       // (A shell's hit on a ship: confirmed hits tell clients their own way, net/hits/HitLedger.ts)
       notifyProjectileHit: (proj, x, y, hit) => this.hits.shellHit(proj, x, y, hit),
@@ -2972,6 +2999,7 @@ this.devTeleport = opts.devTeleport ?? false;
         this.net.outbox.delete(ws);
         this.net.lazy.delete(ws);
         this.guard('close', () => this.party.remove(conn));
+        this.guard('close', () => this.social.leave(conn));
         this.guard('close', () => this.trade.remove(conn));
         this.guard('close', () => this.admin.forget(conn));
         this.guard('close', () => this.contrib.forget(conn));
@@ -3065,6 +3093,7 @@ this.devTeleport = opts.devTeleport ?? false;
     registerHandlers(t, registerAuthHandlers);
     registerHandlers(t, registerShipEditHandlers);
     registerHandlers(t, registerFlightHandlers);
+    registerHandlers(t, registerSocialHandlers);
     t.on('chat', (_ctx, conn, msg) => {
       this.handleChat(conn, msg);
     });
@@ -3314,6 +3343,8 @@ this.devTeleport = opts.devTeleport ?? false;
     const cmd = /^\/(\w+)\s*(.*)$/.exec(text);
     if (cmd) {
       const [, c, arg] = cmd;
+      // Private messages and friends (/w name message, /friend name)
+      if (this.social.chatCommand(conn, c.toLowerCase(), arg)) return;
       switch (c.toLowerCase()) {
         case 'p': case 'party': if (arg) this.party.chat(conn, arg); return;
         case 'invite': this.party.invite(conn, { name: arg }); return;
@@ -3321,7 +3352,7 @@ this.devTeleport = opts.devTeleport ?? false;
         case 'kick': this.party.kick(conn, arg); return;
         case 'promote': this.party.promote(conn, arg); return;
         case 'help':
-          this.send(conn.ws, { type: 'systemMessage', text: 'Chat commands: /p message (party chat) · /invite name · /leave · /kick name · /promote name', color: '#7dd3fc' });
+          this.send(conn.ws, { type: 'systemMessage', text: 'Chat commands: /p message (party chat) · /w name message (private) · /friend name · /invite name · /leave · /kick name · /promote name', color: '#7dd3fc' });
           return;
       }
     }
@@ -3746,6 +3777,8 @@ this.devTeleport = opts.devTeleport ?? false;
   // ============================================
 
   private playerMovementSystem(): void {
+    // (Pull fields not declared last tick act no more: before any pilot's step reads them, ships/bridge/pullFields.ts)
+    this.ships.pulls.settle(this.currentTick, (sys) => SimPass.on(sys));
     for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) { this.gunNet.beforePilot(eid); this.ships.stepMovement(eid); }
   }
 

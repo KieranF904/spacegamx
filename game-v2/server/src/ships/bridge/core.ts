@@ -45,13 +45,16 @@ export interface ShipHost {
   /** A zap leapt to (x, y) from (fromX, fromY) (a Tesla's chain): everyone in the system sees the arc */
   arcHop?(systemNum: number, x: number, y: number, fromX: number, fromY: number): void;
   beamAsteroid?(eid: number, x: number, y: number, angle: number, range: number, damage: number, kind: string): number;
-  /** `glancing`: the hit barely got through the armour it struck (a gun too weak for it) */
-  notifyDamage(targetEid: number, amount: number, sourceEid: number, glancing?: boolean): void;
+  /**
+   * `glancing`: the hit barely got through the armour it struck (a gun too weak for it). `shown`: a shell hit's number
+   * (common hitRules.ts PartHitResult.shown), what its damage message sums; else `amount`
+   */
+  notifyDamage(targetEid: number, amount: number, sourceEid: number, glancing?: boolean, shown?: number): void;
   /**
    * A projectile hit something at (x, y). A shell's hit on a ship says what it did (`hit`: the part it struck, the
    * damage, glancing, what a shield took, the ship's rebuild count): confirmed hits (net/hits/HitLedger.ts)
    */
-  notifyProjectileHit(proj: number, x: number, y: number, hit?: { target: number; part: number; dealt: number; glancing: boolean; soak: number; rebuilds: number }): void;
+  notifyProjectileHit(proj: number, x: number, y: number, hit?: { target: number; part: number; dealt: number; shown: number; glancing: boolean; soak: number; rebuilds: number }): void;
   /**
    * Ship bodies whose bounding circles may come within `pad` of a segment (the
    * tick's broadphase; beams cast through it). Absent: every body is tried.

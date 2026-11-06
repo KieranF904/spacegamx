@@ -192,15 +192,15 @@
     "loop": false
   },
   "autocannon_shot": {
-    "variants": 2,
+    "variants": 1,
     "loop": false
   },
   "pulse_shot": {
-    "variants": 2,
+    "variants": 1,
     "loop": false
   },
   "arc_shot": {
-    "variants": 2,
+    "variants": 1,
     "loop": false
   },
   "arc_loop": {
@@ -220,7 +220,7 @@
     "loop": false
   },
   "mortar_shot": {
-    "variants": 2,
+    "variants": 1,
     "loop": false
   },
   "charge_launch": {

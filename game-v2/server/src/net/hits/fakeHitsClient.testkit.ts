@@ -287,6 +287,8 @@ export class FakeHitsClient {
   messages = 0;
   frames = 0;
   bytes = 0;
+  /** Pull field records it was sent (common sim/pullFields.ts) */
+  pullRecords = 0;
 
   /** One WebSocket message from the server: each frame's messages, then the frame's end */
   frame(data: Uint8Array): void {
@@ -329,6 +331,8 @@ export class FakeHitsClient {
       case 'ownSync': this.own.onOwnSync(m); break;
       case 'gunSync': this.otherGuns.onGunSync(m); break;
       case 'gunCtl': this.otherGuns.onGunCtl(m); break;
+      // (Pull fields its tick layer works out itself, as a client's ShipClient.onPulls)
+      case 'pulls': this.pullRecords += m.f.length; if (m.r) this.reps.pulls.clear(); this.reps.notePulls(m.f, this.snapTick); break;
       case 'netCaps':
         // (the first after its join: finding hits here starts with the next snapshot; each says its level, ShipClient.onNetCaps)
         this.findHits();

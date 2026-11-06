@@ -8,6 +8,7 @@ import { wantAim, wantDrive, wantFace, wantFly, wantHold } from '../decisions.js
 import type { StagedFlightTables } from '../stagedFlight.js';
 import { densityCap, type MoveHost, type MoveOrigin } from './host.js';
 import { StagedMoves, wrapTurn as wrap, type Move } from './staged.js';
+import { PULL_FIELD } from '../../sim/pullFields.js';
 
 const P = (name: string) => `scrapmother_${name}`;
 
@@ -151,17 +152,16 @@ export class ScrapMotherMoves extends StagedMoves {
   private *haul(): Move {
     const pullTicks = 90, reach = 3600, r = this.ship.derived.radius;
     for (const m of this.magnets()) this.glow(m, 'glow_green', TELL_AREA + pullTicks, 200);
-    yield* this.hold(TELL_AREA);
+    // (The pull, towards her front only (beside or behind her nothing pulls), not through rock: a field every pilot's
+    // step works out (common sim/pullFields.ts CONE), said a tick ahead, from the tell's last tick through the haul's)
+    const field = { kind: PULL_FIELD.CONE, target: -1, a: [r * 0.55, reach, 0.75, 1], until: this.h.tick() + TELL_AREA + pullTicks - 1 };
+    yield* this.hold(TELL_AREA - 1);
+    if (this.magnets().length) this.pullNext('haul', field);
+    yield* this.hold(1);
     const snapAt = pullTicks - 30, claws = this.wrists().length > 0;
     for (let i = 0; i < pullTicks; i++) {
       if (!this.magnets().length) break;
-      const p = this.ahead(r * 0.55), me = this.me();
-      for (const q of this.h.work?.players() ?? []) {
-        // (her front only: beside or behind her, nothing pulls)
-        const qp = this.at(q), dx = qp.x - me.x, dy = qp.y - me.y;
-        if (dx * dcos(me.angle) + dy * dsin(me.angle) <= 0) continue;
-        this.pullOne(q, p.x, p.y, reach, 0.75);
-      }
+      if (i + 1 < pullTicks) this.pullNext('haul', field);
       if (claws && i === snapAt) {
         const tx = r * 0.75;
         for (const w of this.wrists()) {
@@ -241,17 +241,17 @@ export class ScrapMotherMoves extends StagedMoves {
     this.glow(throat, 'glow_green', TELL_AREA + ticks, 260);
     for (const ro of this.rotors()) this.glow(ro, 'grind', TELL_AREA + ticks, 160);
     this.h.fx({ type: 'bossTelegraph', shape: 'line', kind: 'intake', bodyId: this.eid, x: Math.round(at.x), y: Math.round(at.y), angle: 0, length: 3000, width: half * 2, ticks: TELL_AREA + ticks });
-    yield* this.face(heading, TELL_AREA);
+    // (The pull towards her maw, in the lane only (out of it sideways, nothing pulls), not through rock: a field every
+    // pilot's step works out (common sim/pullFields.ts LANE), said a tick ahead)
+    const field = { kind: PULL_FIELD.LANE, target: -1, a: [r * 0.45, 3000, 0.6, half, -200, 3000, 1], until: this.h.tick() + TELL_AREA + ticks - 1 };
+    yield* this.face(heading, TELL_AREA - 1);
+    if (this.named(P('throat')) >= 0) this.pullNext('intake', field);
+    yield* this.face(heading, 1);
     const grind = this.rotors().length;
     for (let i = 0; i < ticks; i++) {
       if (this.named(P('throat')) < 0) break;
-      const maw = this.ahead(r * 0.45), me = this.me(), c = dcos(me.angle), s = dsin(me.angle);
-      for (const q of this.h.work?.players() ?? []) {
-        // (in the lane only: out of it sideways, nothing pulls)
-        const qp = this.at(q), dx = qp.x - maw.x, dy = qp.y - maw.y, along = dx * c + dy * s, across = -dx * s + dy * c;
-        if (along < -200 || along > 3000 || Math.abs(across) > half) continue;
-        this.pullOne(q, maw.x, maw.y, 3000, 0.6);
-      }
+      if (i + 1 < ticks) this.pullNext('intake', field);
+      const maw = this.ahead(r * 0.45), me = this.me();
       if (grind && i % 10 === 0) this.land([{ x: maw.x, y: maw.y, at: 0 }], 420 + 100 * grind, 26 * grind, 'scrap');
       // (the lane follows its target, slowly, a step every 15 ticks (each a want: a decision): keep going sideways)
       const t = this.target;
