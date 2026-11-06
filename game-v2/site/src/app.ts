@@ -18,7 +18,7 @@
  *   GET  /account                  POST /account/email|password|signout-all|delete
  *   GET  /pilots[?period=weekly]   GET /pilots/:name   GET /pilots/find?name=
  *   GET  /play                     the game, handed this session (play.ts)
- *   /admin/...                     posts, comments, suggestions, shoutbox, pilots & bans, API tokens
+ *   /admin/...                     posts, comments, suggestions, shoutbox, pilots & bans, API tokens, activity (src/routes/activity.ts)
  *
  * Ranks (the lobby's): owner > admin. Admins moderate (comments, suggestions, the shoutbox, shared ships, bans
  * of pilots) and write drafts. The owner alone (requireOwner, and `api.owner` for the API) publishes and
@@ -56,6 +56,8 @@ import { BOARDS, type PilotSource } from './pilots.js';
 import { postImages } from './postImages.js';
 import { gameIndex, injectHandoff, isDevGamePath, proxyToDev, proxyUpgradeToDev } from './play.js';
 import { checkPost } from './posts.js';
+import { HttpActivityClient, type ActivityClient } from './activity.js';
+import { registerActivity } from './routes/activity.js';
 import { registerCatalog } from './routes/catalog.js';
 import { registerChangelog } from './routes/changelog.js';
 import type { RouteEnv } from './routes/env.js';
@@ -86,6 +88,8 @@ export interface AppDeps {
   limiter?: RateLimiter;
   catalog?: CatalogBook;
   status?: { get(): Promise<ServerStatus | null> };
+  /** (tests) The lobbies' activity feeds */
+  activity?: ActivityClient;
 }
 
 export interface Ctx {
@@ -856,7 +860,10 @@ export function createApp(deps: AppDeps) {
     limited: (ctx, key, rule) => limited(ctx, key, rule),
     requireAdmin: (ctx) => requireAdmin(ctx),
     fields: (ctx, max) => fields(ctx, max),
+    activity: deps.activity ?? new HttpActivityClient(),
+    setCookie: (ctx, c) => appendCookie(ctx.res, c),
   };
+  registerActivity(env);
   registerCatalog(env);
   registerChangelog(env);
   registerShips(env);

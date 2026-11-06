@@ -21,6 +21,9 @@
  *   GAME_INDEX_FILE      ../client/dist/index.html
  *   GAME_URL             http://localhost:5273 (link mode, and the direct link)
  *   SITE_STORE_BACKEND   json | postgres (+ DATABASE_URL)
+ *   ACTIVITY_LOBBIES     the lobbies the admin Activity page reads, "Name=url,Name=url" (dev default: Local=LOBBY_URL and
+ *                        Production=https://space.brotherk3d.com/lobby; production default: LOBBY_URL alone). The one
+ *                        at LOBBY_URL uses your site session; any other, a session you sign in to on that page
  *   NODE_ENV=production  Secure cookies, HSTS, no dev defaults: a missing secret stops the site with a message
  *
  * (.env.example lists them all; deploy/vps keeps the real values in /etc/spacegame/site.env, never in the repo.
@@ -58,6 +61,8 @@ export interface SiteConfig {
   gameKey: string;
   lobbyUrl: string;
   lobbyAdminSecret: string;
+  /** The lobbies the admin Activity page reads (src/activity.ts); `own`: this site's lobby (its session works there) */
+  activityLobbies: ActivityLobby[];
   game: { mode: 'proxy' | 'static' | 'link'; devUrl: string; indexFile: string; url: string };
 }
 
@@ -80,6 +85,26 @@ export function parseAuthors(v: string): Record<string, string> {
     const i = part.indexOf('=');
     const k = part.slice(0, i).trim().toLowerCase(), n = part.slice(i + 1).trim().slice(0, 40);
     if (i > 0 && k && n) out[k] = n;
+  }
+  return out;
+}
+
+export interface ActivityLobby { id: string; name: string; url: string; own: boolean }
+
+/** The production lobby's public address (nginx: /lobby/activity/ goes to it) */
+export const PRODUCTION_LOBBY = 'https://space.brotherk3d.com/lobby';
+
+/** "Local=http://localhost:8787,Production=https://..." (http(s) only; at most 6) */
+export function parseActivityLobbies(v: string | undefined, lobbyUrl: string, production: boolean): ActivityLobby[] {
+  const spec = v ?? (production ? `Live=${lobbyUrl}` : `Local=${lobbyUrl},Production=${PRODUCTION_LOBBY}`);
+  const out: ActivityLobby[] = [];
+  for (const part of spec.split(',')) {
+    const i = part.indexOf('=');
+    const name = part.slice(0, i).trim().slice(0, 24), url = part.slice(i + 1).trim().replace(/\/$/, '');
+    if (i <= 0 || !name || !/^https?:\/\/[^\s]+$/.test(url) || out.length >= 6) continue;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `l${out.length}`;
+    if (out.some((l) => l.id === id)) continue;
+    out.push({ id, name, url, own: url === lobbyUrl });
   }
   return out;
 }
@@ -109,6 +134,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
     gameKey: env.SITE_GAME_KEY || '',
     lobbyUrl: (env.LOBBY_URL || 'http://localhost:8787').replace(/\/$/, ''),
     lobbyAdminSecret: env.LOBBY_ADMIN_SECRET || (production ? '' : 'dev-lobby-admin-secret'),
+    activityLobbies: parseActivityLobbies(env.ACTIVITY_LOBBIES, (env.LOBBY_URL || 'http://localhost:8787').replace(/\/$/, ''), production),
     game: {
       mode: ['proxy', 'static', 'link'].includes(mode) ? mode : 'link',
       devUrl: (env.GAME_DEV_URL || 'http://localhost:5273').replace(/\/$/, ''),
