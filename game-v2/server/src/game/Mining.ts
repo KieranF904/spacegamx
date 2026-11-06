@@ -119,7 +119,7 @@ export class Mining {
     const at = r.stage?.at;
     if (at === undefined || !r.wholeSize || !stages || at + 1 >= stages.length) return null;
     const size = r.wholeSize * stages[at + 1];
-    return { size, units: Math.max(3, Math.round(size * this.table.unitsPerSize)) };
+    return { size, units: Math.max(3, Math.round(size * this.table.unitsPerSize * (this.table.types[r.type]?.density ?? 1))) };
   }
 
   get(eid: number): Composition | undefined {

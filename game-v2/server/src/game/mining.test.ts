@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
-import { registerRockTypes, type Bag, type MiningTable } from '@space-game/common';
+import { asteroidComposition, registerRockTypes, type Bag, type MiningTable } from '@space-game/common';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { Mining, type MiningHost } from './Mining.js';
 
@@ -264,6 +264,23 @@ describe('chunks follow the rock', () => {
 
   it('rocks hold 1.5x the ore they did (0.1 a unit of size before)', () => {
     expect(table.unitsPerSize).toBeCloseTo(0.15);
+  });
+});
+
+describe('Taenite', () => {
+  it('is small, dense soft rock: half again the ore of a same-size rock, in the Sol belt', () => {
+    expect(table.types.rock_taenite.hardness).toBe(1);
+    expect(table.types.rock_taenite.density).toBe(1.5);
+    expect(table.fields!.sol_belt.rock_taenite).toBe(5);
+    const [lo, hi] = table.types.rock_taenite.size!;
+    expect(lo).toBeGreaterThanOrEqual(25);
+    expect(hi).toBeLessThanOrEqual(45);
+    // Same size, same everything else: only the density differs
+    const dense = asteroidComposition(table, 'rock_taenite', 'k', 40, 1).units;
+    const plain = asteroidComposition({ ...table, types: { ...table.types, rock_taenite: { ...table.types.rock_taenite, density: undefined } } }, 'rock_taenite', 'k', 40, 1).units;
+    expect(dense).toBe(Math.round(40 * 0.15 * 1.5));
+    expect(plain).toBe(Math.round(40 * 0.15));
+    expect(dense).toBeGreaterThan(plain);
   });
 });
 

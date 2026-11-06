@@ -39,7 +39,7 @@ export const ROCK_LOD = { light: 10, detailFrom: 4, detailFull: 14 };
 /** Rock types whose material isn't their main ore's */
 const MATERIAL_OF_TYPE: Record<string, RockMaterial> = {
   asteroid_metal: 'stone', rock_ashback: 'stone',
-  asteroid_mega: 'metal', rock_slag: 'metal',
+  asteroid_mega: 'metal', rock_slag: 'metal', rock_taenite: 'metal',
   asteroid_crystal: 'crystal',
 };
 const MATERIAL_OF_ORE: Record<string, RockMaterial> = {

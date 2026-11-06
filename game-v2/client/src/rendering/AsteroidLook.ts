@@ -24,6 +24,8 @@ const ORE_COLOR: Record<string, number> = {
 for (const i of (itemsData as unknown as { items: { id: string; color: string; family?: string }[] }).items) {
   if (i.family && ORE_COLOR[i.id] === undefined) ORE_COLOR[i.id] = mix(parseInt(i.color.slice(1), 16), 0x6b6b6b, 0.35);
 }
+/** Rock types tinted by themselves, not by their main ore (Taenite: pale brassy nickel-iron) */
+const TYPE_COLOR: Record<string, number> = { rock_taenite: 0xcdbb86 };
 /** Rock types that are gas, not rock (mining.json gas) */
 export const GAS_TYPES = new Set(Object.entries((miningData as unknown as { types: Record<string, { gas?: boolean }> }).types).filter(([, t]) => t.gas).map(([id]) => id));
 const GEM_COLOR: Record<string, number> = { ruby: 0xff3355, sapphire: 0x3d7bff, emerald: 0x2ee59d, void_opal: 0xc28bff };
@@ -270,7 +272,7 @@ export function drawAsteroid(container: Container, id: number, size: number, com
   const verts = getAsteroidPolygon(id, 0, 0, size);
   const rng = mulberry32(hashString(`asteroid-color:${id}`));
   const jitter = mulberry32(hashString(`asteroid-normals:${id}`));
-  const base = comp ? ORE_COLOR[comp.primary] ?? 0x777777 : [0x666666, 0x886644, 0x4488aa][Math.floor(rng() * 3)];
+  const base = comp ? TYPE_COLOR[comp.type] ?? ORE_COLOR[comp.primary] ?? 0x777777 : [0x666666, 0x886644, 0x4488aa][Math.floor(rng() * 3)];
   const hard = (comp?.hardness ?? 1) >= 2;
   // Its material, its own seed (turning and shifting the relief), and greyseam: one rock in three (or the system's share), never in ice
   const material = rockMaterial(comp), ice = material === 'ice';

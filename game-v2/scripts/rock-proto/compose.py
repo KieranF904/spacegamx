@@ -19,8 +19,12 @@ PANELS = {
     'rich': ('rich-ore', (280, 40, 1000, 760)),
     'belt': ('dense-belt', (0, 0, 1280, 800)),
     'glasswater': ('glasswater', (0, 0, 1280, 800)),
+    'taenite-pair': ('taenite-pair', (60, 120, 1140, 680)),
+    'taenite-belt': ('taenite-belt', (0, 0, 1280, 800)),
 }
 for scene, (name, box) in PANELS.items():
+    if not os.path.exists(os.path.join(src, f'{scene}-before.png')):
+        continue
     a = Image.open(os.path.join(src, f'{scene}-before.png')).crop(box)
     b = Image.open(os.path.join(src, f'{scene}-after.png')).crop(box)
     a.save(os.path.join(dst, f'{name}-before.png'))

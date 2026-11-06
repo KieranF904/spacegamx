@@ -22,7 +22,7 @@
   "field": {
     "asteroid_metal": 10, "asteroid_ice": 10, "asteroid_fuel": 10, "asteroid_crystal": 10, "asteroid_mega": 10, "comet": 10,
     "rock_cuprite": 10, "rock_rutile": 10, "rock_slag": 10, "rock_gem_seam": 10, "rock_polymer_tar": 10, "rock_chromite": 10,
-    "rock_cobaltite": 10, "rock_platinoid": 10, "rock_opal_husk": 10, "rock_ashback": 10, "rock_aurora_floe": 10, "rock_leestone": 10,
+    "rock_cobaltite": 10, "rock_platinoid": 10, "rock_opal_husk": 10, "rock_ashback": 10, "rock_aurora_floe": 10, "rock_leestone": 10, "rock_taenite": 10,
     "gas_pocket": 4
   },
   "_outlierComment": "Outliers (3.5-4.5x size) about 12x as often as usual: some 25 of the 320",
