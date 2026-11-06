@@ -83,7 +83,7 @@ export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number,
   <div class="hero-art" aria-hidden="true"><img src="/static/img/hero-corsair.webp" alt="" width="1600" height="900"></div>
   <div class="wrap hero-in">
     <p class="eyebrow eyebrow-hero">Space game <span class="sep">/</span> in development</p>
-    <h1>Build it part by part.<br><span class="accent">Fly it into the dark.</span></h1>
+    <h1>Build your own ship.<br><span class="accent">Then go fly it.</span></h1>
     <p class="lede">A space game about building ships. Mine, trade and take jobs at stations. You build your ship one part at a time and fly it yourself. Still in development.</p>
     <div class="hero-cta">
       <a class="btn-play btn-play-lg" href="/play"><span>Play now</span><small>in the browser</small></a>
