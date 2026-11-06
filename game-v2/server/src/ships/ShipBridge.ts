@@ -304,6 +304,9 @@ export class ShipBridge {
   /** Where its autopilot is taking it (null: none) */
   autopilotOf(eid: number): { x: number; y: number; arriveRadius: number } | null { return plt.autopilotOf(this.ctx, eid); }
 
+  /** The heading its autopilot last steered by (undefined: none yet): what it flew with, as its replicas have it, is that on the aim grid */
+  autopilotHeading(eid: number): number | undefined { return this.apHeading.get(eid); }
+
   /** Give a pilotless ship an AI pilot (null: none) */
   setController(eid: number, fn: ((eid: number, ship: ShipState) => PilotOrders | null) | null): void { return plt.setController(this.ctx, eid, fn); }
 

@@ -40,9 +40,10 @@ export class AiPilots {
 
   /**
    * This tick's flight for ship `eid`: its target (-1: none), strafe side and order; `bodied` false for a pilot whose
-   * flight a boss's brain takes over (Enemies.pilot: no decisions of it, the brain has its own body)
+   * flight a boss's brain takes over (Enemies.pilot: no decisions of it, the brain has its own body). `prev`: the aim
+   * and controls it flew with last tick, for a ship this didn't fly then (a freighter its autopilot flew: Defenders)
    */
-  fly(eid: number, target: number, side: number, want: WantRec, me: BodyPose, tgt: BodyPose | null, centroid: readonly [number, number] | null, bodied: boolean): AiPilotOut {
+  fly(eid: number, target: number, side: number, want: WantRec, me: BodyPose, tgt: BodyPose | null, centroid: readonly [number, number] | null, bodied: boolean, prev?: { q: number; bits: number }): AiPilotOut {
     const now = this.host.tick();
     let f = this.flown.get(eid);
     if (!f) this.flown.set(eid, (f = { body: { kind: AI_KIND, homeX: 0, homeY: 0, stage: 1, side: 1, target: -1, want, wantAt: now, on: false } }));
@@ -65,7 +66,7 @@ export class AiPilots {
       const [emp, slowed] = this.host.status(eid), st = statusArgs(b, now, emp, slowed);
       if (st) this.decide(eid, b, DECISION.STATUS, st);
     }
-    const out = aiPilot(b, me, tgt, centroid, now, eid, f.q ?? quantizeCursorAngle(me.angle), f.bits ?? 0);
+    const out = aiPilot(b, me, tgt, centroid, now, eid, prev?.q ?? f.q ?? quantizeCursorAngle(me.angle), prev?.bits ?? f.bits ?? 0);
     if (bodied) out.bits |= bodyStatusBits(b, now);
     f.q = out.q;
     f.bits = out.bits;

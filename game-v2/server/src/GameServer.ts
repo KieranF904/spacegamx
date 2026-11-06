@@ -1541,6 +1541,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.ships.scaleHp(eid, kind === 'outpost' ? 4 : 1.6);
         this.wards.set(eid, name);
         this.enemies.addWard(eid);
+        // (An escorted freighter keeps to its path but shoots back at what hurts it: game/enemies/defenders.ts)
+        if (kind === 'freighter') this.enemies.defend(eid);
         return eid;
       },
       steer: (eid: number, to: { x: number; y: number; arrive: number } | null) => this.ships.setAutopilot(eid, to ? { x: to.x, y: to.y, arriveRadius: to.arrive } : null),
@@ -2000,6 +2002,7 @@ this.devTeleport = opts.devTeleport ?? false;
       stationDefence: (st: number) => this.gameData.getStationByNum(Station.stationId[st])?.defence,
       stationBeam: (num: number, station: number, target: number, turret: number) => this.broadcastToSystem(num, { type: 'stationFire', station, target, turret }),
       sheltered: (p: number) => this.dockedShips.has(p) || (hasComponent(this.world, Player, p) && this.stationInRange(p) >= 0),
+      docked: (p: number) => this.dockedShips.has(p),
       partyOf: (player: number) => {
         const pc = this.pilots.connOf(player);
         return pc ? this.party.members(pc).filter((m) => m !== pc).map((m) => m.playerId) : [];
@@ -4235,6 +4238,8 @@ this.devTeleport = opts.devTeleport ?? false;
         if (!bp || st < 0) continue;
         const a = (hashString(slot.data.id) % 628) / 100;
         slot.eid = this.ships.spawnDummy(bp, Position.x[st] + dcos(a) * 900, Position.y[st] + dsin(a) * 900, a + Math.PI, slot.systemNum);
+        // (It keeps its route, but shoots back at whoever hurts it: game/enemies/defenders.ts)
+        this.enemies.defend(slot.eid);
         slot.leg = 1 % slot.data.route.length;
         slot.dwell = 0;
       }
@@ -4336,6 +4341,7 @@ this.devTeleport = opts.devTeleport ?? false;
           slot.eid = this.ships.spawnDummy(bp, m.ship.x, m.ship.y, m.ship.a, num);
           Velocity.x[slot.eid] = m.ship.vx; Velocity.y[slot.eid] = m.ship.vy;
           restoreHp(this.ships, slot.eid, m.ship.hp, mend.ships);
+          this.enemies.defend(slot.eid);
           adopt(slot.eid, pose(m.ship));
         }
         for (const m of snap.derelicts ?? []) {
