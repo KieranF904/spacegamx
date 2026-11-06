@@ -203,7 +203,7 @@ export class Replication {
 
   private real(eid: number): FlightBody {
     const s = this.ships.get(eid)!;
-    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel, jump: s.jump, jumpScale: s.jumpScale, cargo: s.cargo, dodge: s.dodge, dodgeDir: s.dodgeDir };
+    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel, jump: s.jump, jumpScale: s.jumpScale, jumpAim: s.jumpAim, jumpTo: s.jumpTo, cargo: s.cargo, dodge: s.dodge, dodgeDir: s.dodgeDir };
   }
 
   /**
@@ -300,6 +300,8 @@ export class Replication {
       const b = s.body;
       if (b.x !== rx || b.y !== ry || b.vx !== rvx || b.vy !== rvy || b.angle !== ra || b.angVel !== ship.angVel
         || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1)
+        // (A charging jump's locked heading: its distance a replica doesn't know, -1, unless a keyframe told it)
+        || b.jumpAim !== ship.jumpAim
         // (The hold's mass: a load taken on or off needs a keyframe carrying it)
         || (b.cargo ?? 0) !== (ship.cargo ?? 0)
         // (A Burst Strafer's counter and way: ships/features/strafer)
@@ -423,7 +425,9 @@ export class Replication {
     const b = s.body, ship = this.ships.get(eid)!;
     if (b.x !== Position.x[eid] || b.y !== Position.y[eid] || b.vx !== Velocity.x[eid] || b.vy !== Velocity.y[eid] || b.angle !== Rotation.angle[eid] || b.angVel !== ship.angVel
       || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1) || (b.cargo ?? 0) !== (ship.cargo ?? 0)
-      || (b.dodge ?? 0) !== (ship.dodge ?? 0) || (b.dodgeDir ?? 0) !== (ship.dodgeDir ?? 0)) {
+      || (b.dodge ?? 0) !== (ship.dodge ?? 0) || (b.dodgeDir ?? 0) !== (ship.dodgeDir ?? 0)
+      // (A charging jump's lock, its distance too: its client knows it, ownStep.ts)
+      || b.jumpAim !== ship.jumpAim || (b.jumpAim !== undefined && b.jumpTo !== ship.jumpTo)) {
       hard(worked ? 'unexplained, with causes' : 'unexplained');
     }
   }

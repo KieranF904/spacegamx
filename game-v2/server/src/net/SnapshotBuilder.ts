@@ -667,7 +667,7 @@ export class SnapshotBuilder {
     if (!ship || !ctl || !conn.repKnown.has(id) || this.replication.ownHeld(id) || hasComponent(this.world, Dead, id)) return null;
     const x = this.ships.ownExtras(id, this.currentTick);
     if (!x) return null;
-    const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
+    const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, jumpAim: ship.jumpAim, jumpTo: ship.jumpTo, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
     return { x, hash: ownStateHash(id, body, ctl.bits, ctl.q, x, this.currentTick) };
   }
 

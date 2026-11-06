@@ -3,10 +3,11 @@
  *
  *   ships  keyframes, only for ships a client is new to or that left the
  *          path their controls predicted:
- *          [id, mode, x, y, vx, vy, angle, angVel, jump, jumpScale, bits, q, cargo?, station?, ox?, oy?, dodge?, dodgeDir?]
+ *          [id, mode, x, y, vx, vy, angle, angVel, jump, jumpScale, bits, q, cargo?, station?, ox?, oy?, dodge?, dodgeDir?, jumpAimQ?, jumpTo?]
  *          (cargo, the hold's mass, goes when it's set or the ship is docked or
  *          has dodged; station -1 when it isn't docked but a Burst Strafer's
- *          counter and way follow)
+ *          counter and way follow; a charging jump's lock, flight.ts FlightBody
+ *          jumpAim/jumpTo, last: its heading's aim step and the distance asked)
  *   ctl    control changes since the last snapshot, per ship:
  *          [id, tb, dq, tb, dq, ...]  where tb = bits × 8 + ticksAgo
  *          (ticksAgo counts back from the snapshot's tick: the step at that tick
@@ -30,7 +31,7 @@ import type { Vec2 } from '../ships/types.js';
 import { StateRing } from '../sim/ring.js';
 import { ReplicaState } from '../sim/c-replicaState.js';
 import { CtlChangeInputs, DriverInputs } from '../sim/d-sources.js';
-import type { InputSource, SimInput } from '../sim/input.js';
+import { simAim, simAimQ, type InputSource, type SimInput } from '../sim/input.js';
 import type { PullSource } from '../sim/env.js';
 import { PullBook, fieldPulls, unpackPullField, type PullerPose, type PullFieldRow } from '../sim/pullFields.js';
 
@@ -84,11 +85,14 @@ export function packKeyframe(k: Keyframe): KeyframeRow {
   const b = k.body;
   const row = [k.id, k.mode, b.x, b.y, b.vx, b.vy, b.angle, b.angVel, b.jump ?? 0, b.jumpScale ?? 1, k.ctl.bits, k.q];
   const dodge = !!(b.dodge || b.dodgeDir);
-  if (k.dock || b.cargo || dodge) row.push(b.cargo ?? 0);
+  const lock = b.jumpAim !== undefined;
+  if (k.dock || b.cargo || dodge || lock) row.push(b.cargo ?? 0);
   if (k.dock) row.push(k.dock.station, Math.round(k.dock.ox * 100) / 100, Math.round(k.dock.oy * 100) / 100);
-  else if (dodge) row.push(-1, 0, 0);
+  else if (dodge || lock) row.push(-1, 0, 0);
   // (The Burst Strafer's counter and the way it last dodged: ships/features/strafer)
-  if (dodge) row.push(b.dodge ?? 0, b.dodgeDir ?? 0);
+  if (dodge || lock) row.push(b.dodge ?? 0, b.dodgeDir ?? 0);
+  // (A charging jump's lock: its heading as its aim step (it is on the aim grid: flight.ts) and the distance asked)
+  if (lock) row.push(simAimQ(b.jumpAim!), b.jumpTo ?? 0);
   return row;
 }
 
@@ -96,7 +100,7 @@ export function unpackKeyframe(r: KeyframeRow): Keyframe {
   const mode = r[1] as ReplicaMode;
   return {
     id: r[0], mode,
-    body: { x: r[2], y: r[3], vx: r[4], vy: r[5], angle: r[6], angVel: r[7], jump: r[8], jumpScale: r[9], ...(r[12] ? { cargo: r[12] } : {}), ...(r[16] ? { dodge: r[16] } : {}), ...(r[17] ? { dodgeDir: r[17] } : {}) },
+    body: { x: r[2], y: r[3], vx: r[4], vy: r[5], angle: r[6], angVel: r[7], jump: r[8], jumpScale: r[9], ...(r[12] ? { cargo: r[12] } : {}), ...(r[16] ? { dodge: r[16] } : {}), ...(r[17] ? { dodgeDir: r[17] } : {}), ...(r.length > 19 ? { jumpAim: simAim(r[18]), jumpTo: r[19] } : {}) },
     ctl: { bits: r[10], targetAngle: replicaAngle(mode, r[11]) },
     q: r[11],
     dock: r.length > 13 && r[13] >= 0 ? { station: r[13], ox: r[14], oy: r[15] } : undefined,
@@ -221,7 +225,7 @@ function fixWeight(f: { t: number; s: number }, t: number): number {
   return t < f.t ? k : 1 - smoothstep((t - f.t) / SMOOTH_TICKS);
 }
 
-const cloneBody = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump, jumpScale: b.jumpScale, cargo: b.cargo, dodge: b.dodge, dodgeDir: b.dodgeDir });
+const cloneBody = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump, jumpScale: b.jumpScale, jumpAim: b.jumpAim, jumpTo: b.jumpTo, cargo: b.cargo, dodge: b.dodge, dodgeDir: b.dodgeDir });
 
 /**
  * A pilot's own ship on its tick-aligned layer (CAPS.OWN_SIM, network/ownTick.ts): its controls are its own inputs

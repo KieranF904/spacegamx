@@ -7,6 +7,7 @@
 
 import { wireTables, encodeServerMessage, serverFrame, encodeInputBinary, type ClientInputMessage } from './protocol.js';
 import { packKeyframe } from './replication.js';
+import { dequantizeCursorAngle } from './cursorState.js';
 import { PackedIO } from './packed/packedIO.js';
 import { fireBody } from './packed/blocks.js';
 import { CTL, ReplicaMode } from '../ships/replica.js';
@@ -35,6 +36,8 @@ export function computeWireHash(): string {
     ctl: CTL, chargeGroups: [CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS, CHARGE_GROUPS_LAYOUT, PORTS_SLOT_LAYOUT], pilotRow: PILOT_ROW,
     gunState: GUN_STATE_LAYOUT, tells: [TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE],
     keyframe: packKeyframe({ id: 2, mode: ReplicaMode.Player, body: { x: 1, y: 2, vx: 3, vy: 4, angle: 0.5, angVel: 0, jump: 0, cargo: 6, dodge: 7, dodgeDir: 8 }, ctl: { bits: 16, targetAngle: 0 }, q: 4000 }),
+    // (and one charging a jump: its lock, last, flight.ts FlightBody.jumpAim/jumpTo)
+    keyframeLock: packKeyframe({ id: 2, mode: ReplicaMode.Player, body: { x: 1, y: 2, vx: 3, vy: 4, angle: 0.5, angVel: 0, jump: 40, jumpAim: Math.fround(dequantizeCursorAngle(1234)), jumpTo: 4800 }, ctl: { bits: 272, targetAngle: 0 }, q: 4000 }),
   };
   const msgs = [
     {

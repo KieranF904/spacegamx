@@ -150,6 +150,8 @@ export class ShipClient {
   private hazardFor = (d: ShipDerived, x: number, y: number) => (this.hazardSys ? hazardFlight(HAZARD_RULES, this.hazardSys, d, x, y) : undefined);
   /** Where the next jump is aimed: distance, and what it locked on to */
   private jumpAimInfo: { dist: number; label: string | null; bearing?: number; sent?: number } = { dist: 0, label: null };
+  /** What a locked charge was aimed at (jumpLocked: undefined while there's none) */
+  private lockLabel: string | null | undefined;
   private dockHint: HTMLDivElement;
   private planetHint: string | null = null;
   private planetVerb = 'Descend to';
@@ -1070,8 +1072,10 @@ export class ShipClient {
     const ship = me && this.store.get(me.id);
     const reach = this.jumpReach();
     if (!me || !ship || !reach) return null;
-    const bearing = this.helmMode() ? me.renderAngle : this.jumpAimInfo.bearing ?? me.renderAngle;
-    const at = jumpLanding({ x: me.renderX, y: me.renderY, vx: me.vx, vy: me.vy }, me.jump ?? 0, bearing, this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, reach, this.jump,
+    // (A charge under way goes where it was locked as it started: jumpLocked)
+    const lock = this.jumpLocked();
+    const bearing = lock ? lock.angle : this.helmMode() ? me.renderAngle : this.jumpAimInfo.bearing ?? me.renderAngle;
+    const at = jumpLanding({ x: me.renderX, y: me.renderY, vx: me.vx, vy: me.vy }, me.jump ?? 0, bearing, lock ? lock.dist : this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, reach, this.jump,
       { friction: FRICTION, gravity: this.gravity, hazard: this.hazardFor(ship.derived, me.x, me.y) });
     return { x: at[0], y: at[1], reach };
   }
@@ -1250,6 +1254,19 @@ export class ShipClient {
   jumpAiming(): boolean {
     const ph = this.localJump().phase;
     return ph === 'charging' || (ph === 'ready' && (this.jumpLatched || this.opts.isKeyDown('KeyJ')));
+  }
+
+  /**
+   * A charge under way: where it goes, locked as it started (common flight.ts FlightBody.jumpAim/jumpTo, as the own
+   * ship's tick layer has them): its heading, the distance asked (0: as far as it reaches), and what it was aimed at
+   * then (the label the aim had as the lock first showed). Null when not charging or there's no lock
+   */
+  jumpLocked(): { angle: number; dist: number; label: string | null } | null {
+    const me = this.opts.state.entities.get(this.opts.state.playerId);
+    if (!me || me.jumpAim === undefined || this.localJump().phase !== 'charging') { this.lockLabel = undefined; return null; }
+    if (this.lockLabel === undefined) this.lockLabel = this.jumpAimInfo.label;
+    const dist = me.jumpTo ?? 0;
+    return { angle: me.jumpAim, dist: dist > 0 ? dist : this.jumpReach(), label: this.lockLabel };
   }
 
   /** Where the jump is aimed (Game sets it from the cursor, snapped to a destination) */
@@ -1757,7 +1774,7 @@ export class ShipClient {
     const me = state.entities.get(state.playerId);
     this.jumpFx?.update(dt, {
       hidden: this.hangarOpen || !this.store.get(state.playerId), latched: this.jumpLatched,
-      aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
+      aiming: this.jumpAiming(), aimDist: this.jumpLocked()?.dist ?? this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), landing: this.jumpAiming() ? this.jumpLanding() : null, field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
     // (Part features' chips: the Burst Strafer's, ready or cooling and whether the ship can pay; the Tow Beam's while it tows)

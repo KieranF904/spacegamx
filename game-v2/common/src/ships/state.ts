@@ -39,6 +39,9 @@ export interface ShipState {
   jump: number;
   /** This jump's speed scale (set when its burn starts) */
   jumpScale?: number;
+  /** A charging jump's locked heading and distance (flight.ts FlightBody.jumpAim/jumpTo), absent = none */
+  jumpAim?: number;
+  jumpTo?: number;
   /** Mass of the cargo in its hold (load.ts), absent = 0 */
   cargo?: number;
   /** Burst Strafer (features/strafer/strafer.ts): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local), absent = 0 */

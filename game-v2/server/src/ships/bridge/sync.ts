@@ -55,7 +55,7 @@ export function pose(eid: number) {
 }
 
 export function readBody(eid: number, ship: ShipState): FlightBody {
-  return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
+  return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, jumpAim: ship.jumpAim, jumpTo: ship.jumpTo, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
 }
 
 /** Jump range multiplier where this ship is (a star's ring, or a lodestone's priming) */
@@ -113,8 +113,10 @@ export function isJumping(b: BridgeCtx, ship: ShipState): boolean {
   return jumpPhase(ship.jump, jumpTuning(b.tuning)).phase === 'burn';
 }
 
-export function writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void {
+export function writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; jumpAim?: number; jumpTo?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void {
   if (b.jump !== undefined) ship.jump = b.jump;
+  // (A charging jump's lock: stepFlight sets and clears it, so it's taken as it comes; a body without the key leaves it)
+  if ('jumpAim' in b) { ship.jumpAim = b.jumpAim; ship.jumpTo = b.jumpAim === undefined ? undefined : b.jumpTo; }
   // (The Burst Strafer's: stepFlight leaves them absent at 0, so they're taken as they come)
   if ('dodge' in b) { ship.dodge = b.dodge || undefined; ship.dodgeDir = b.dodgeDir || undefined; }
   if (b.jumpScale !== undefined) ship.jumpScale = b.jumpScale;
