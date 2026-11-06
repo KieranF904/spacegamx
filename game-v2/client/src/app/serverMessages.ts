@@ -210,6 +210,8 @@ function gained(h: MessageHost, msg: Msg<'gained'>): void {
     h.floatingRewardsUI.addItem(at.x, at.y - k++ * 26, `+${n} ${d?.name ?? id}`, d?.rarity ?? 'common');
   }
   if (k) h.audio.playUI('credits', 0.35);
+  // (Ore you broke off: the drop your mining progress ring was filling towards)
+  if (k && msg.source === 'mined') h.shipClient.minedDrop();
   if (msg.xp) h.floatingRewardsUI.addXP(at.x + 40, at.y - k * 26, msg.xp);
   if (msg.credits) h.floatingRewardsUI.addCredits(at.x - 40, at.y - k * 26, msg.credits);
   if (msg.source?.startsWith('kill:')) {

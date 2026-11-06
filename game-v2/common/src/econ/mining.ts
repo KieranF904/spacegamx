@@ -178,3 +178,31 @@ export function pickOre(c: Composition, roll: number): string {
   }
   return c.primary;
 }
+
+/**
+ * A tool's work rate and keep (of the common ores) on rock of `tier` (the system's Mk): a mining laser's by its grade
+ * against it (laserGap; work and keep 0 where it can't mine the rock), a gun's (guns.keep × keepByTier), a mining
+ * tool's all. Server (Mining.extract) and client (the progress ring: client/src/ships/MiningProgress.ts) read the same.
+ */
+export function toolKeep(table: MiningTable, tool: { grade?: number; mining?: boolean }, tier: number): { work: number; keep: number } {
+  if (tool.grade !== undefined) {
+    if (!table.laserGap) return { work: 1, keep: 1 };
+    const g = table.laserGap[String(Math.min(2, tool.grade - tier))];
+    return g ? { work: g.work, keep: g.keep } : { work: 0, keep: 0 };
+  }
+  if (tool.mining || !table.guns) return { work: 1, keep: 1 };
+  return { work: 1, keep: table.guns.keep * (table.guns.keepByTier[String(tier)] ?? 1) };
+}
+
+/**
+ * Rock units a tool keeping `keep` of what it works takes, on average, from one drop to the next. A chunk is due every
+ * chunkUnits worked (rolled per chunk, lo..hi); one due with nothing kept yet waits for the next unit that is kept
+ * (the carry, Mining.extract), so a want of w at a keep of p takes w + (1-p)^w / p units on average.
+ */
+export function unitsPerDrop(table: MiningTable, keep: number): number {
+  if (keep <= 0) return Infinity;
+  const [lo, hi] = table.chunkUnits;
+  let sum = 0;
+  for (let w = lo; w <= hi; w++) sum += keep >= 1 ? w : w + Math.pow(1 - keep, w) / keep;
+  return sum / (hi - lo + 1);
+}

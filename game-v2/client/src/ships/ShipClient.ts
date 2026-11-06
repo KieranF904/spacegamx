@@ -16,7 +16,7 @@ import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { cloneCharge, type SimShipState, type ServerOwnSyncMessage, type ServerPullsMessage } from '@space-game/common';
+import { cloneCharge, gradeOf, type MiningTable, type SimShipState, type ServerOwnSyncMessage, type ServerPullsMessage } from '@space-game/common';
 import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
@@ -51,6 +51,8 @@ import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import { AUG } from '../rendering/weapons/weaponStyles';
 import { strikeRolls } from '../rendering/weapons/MiningStrikeFx';
+import { MiningProgress } from './MiningProgress';
+import miningTable from '../../../data/mining.json';
 import { rockMaterial } from '../rendering/rocks/RockMaterials';
 import { hitSurface } from './hitSurface';
 import { DrawnWorld } from './drawnHit';
@@ -80,6 +82,8 @@ import { GhostLayer, type Ghost } from './cells/GhostLayer';
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
+/** Your working hits on rock tick at most this often (seconds) */
+const MINE_TICK_EVERY = 0.16;
 /** A shell's weapon kind from its snapshot weapon type (WEAPON_KIND_TYPE turned round) */
 const KIND_OF_TYPE = new Map(Object.entries(WEAPON_KIND_TYPE).map(([k, t]) => [t, k]));
 
@@ -386,7 +390,7 @@ export class ShipClient {
    * a rock (`target`, as drawn here), its mining strike or sparks, which the server no longer sends (GameServer.hurtAsteroid).
    * Every hit's sound is its drawn impact's (WeaponFx.impactAt -> audio/CombatSounds.ts)
    */
-  private struckFx(id: number, x: number, y: number, type: number, target = -1): void {
+  private struckFx(id: number, x: number, y: number, type: number, target = -1, owner = -1): void {
     this.damageFx?.shieldHit(x, y, this.shellLooks.get(id)?.model);
     // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
     const kind = KIND_OF_TYPE.get(type);
@@ -395,8 +399,14 @@ export class ShipClient {
     if (rockAt?.type === EntityType.Asteroid) {
       // A hit that mines rolls for ore on the server (Mining.extract): a mining strike, rock dust and grit off the face
       // (nothing's sent for it, so it plays whatever the roll); one that can't mine there, a shell's plain sparks
-      if (strikeRolls(kind, rockAt.composition?.hardness)) this.scene?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
-      else this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
+      if (strikeRolls(kind, rockAt.composition?.hardness)) {
+        this.scene?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
+        // Your own: the work it did towards your next drop (MiningProgress), and a light tick
+        if (owner === this.opts.state.playerId && this.miningProgress) {
+          this.miningProgress.shell(target, kind, this.ownShellDamage(type), this.systemTier(), x, y);
+          this.mineTick();
+        }
+      } else this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
       // (its sound is the impact's, heard as WeaponFx draws it: audio/CombatSounds.ts)
     }
   }
@@ -404,6 +414,36 @@ export class ShipClient {
   /** Is a raised shield's bubble at (x, y)? A shell's impact there is heard as shield_hit (audio/CombatSounds.ts) */
   shieldAt(x: number, y: number): boolean {
     return this.damageFx?.bubbleAt(x, y) ?? false;
+  }
+
+  /** What your own shell of snapshot `type` hits with: your first gun of its kind's (a rock's work: MiningProgress) */
+  private ownShellDamage(type: number): number {
+    const ship = this.store.get(this.opts.state.playerId), kind = KIND_OF_TYPE.get(type);
+    const w = ship?.derived.weapons.find((x) => x.kind === kind);
+    const sh = ship && w ? gunShell(this.store.tuning, ship, w.part) : null;
+    return sh ? (sh.def.damage ?? 14) * sh.strength : 14;
+  }
+
+  /** The system's rock tier (its Mk: the server's MiningHost.rockTier, from factions.json spawns) */
+  private systemTier(): number {
+    return (factionsData as { spawns?: Record<string, { grade?: number }> }).spawns?.[this.opts.state.systemId]?.grade || 1;
+  }
+
+  /** Your mining progress (MiningProgress), and when its tick last sounded (seconds) */
+  private miningProgress: MiningProgress | null = null;
+  private mineTickAt = 0;
+
+  /** Ore you broke off came into your hold (serverMessages 'gained'): your progress ring's drop */
+  minedDrop(): void {
+    this.miningProgress?.dropped();
+  }
+
+  /** A light, gritty tick for a working hit of yours on rock: at most one every MINE_TICK_EVERY */
+  private mineTick(): void {
+    const t = performance.now() / 1000;
+    if (t - this.mineTickAt < MINE_TICK_EVERY) return;
+    this.mineTickAt = t;
+    this.opts.sound?.('mine_tick', undefined, 0.32);
   }
 
   /** About what a shell hits with (a rock's sparks are sized by it), from its gun where known */
@@ -930,7 +970,10 @@ export class ShipClient {
     renderer.surfaceAt = (x, y, dx, dy, owner, out) => hitSurface(this.store, this.opts.state, x, y, dx, dy, owner, out);
     // Every drawn shell stops at the first drawn surface it touches (ships/drawnHit.ts), and its hit shows there
     renderer.castHit = (x0, y0, x1, y1, owner, skip, out) => this.drawnWorld.cast(x0, y0, x1, y1, owner, skip, out);
-    renderer.onStruck = (id, x, y, type, target) => this.struckFx(id, x, y, type, target);
+    renderer.onStruck = (id, x, y, type, target, owner) => this.struckFx(id, x, y, type, target, owner);
+    // Your mining progress: a ring round the rock you're working, filling towards your next drop (a mined chunk appearing by your strikes)
+    this.miningProgress = new MiningProgress(renderer.getEffectLayer(), miningTable as unknown as MiningTable, () => performance.now() / 1000);
+    renderer.onPodAppeared = (x, y) => { this.miningProgress?.dropAt(x, y); };
     // A guided shell's guide line runs to your cursor while you hold fire
     renderer.guideTo = () => {
       if (!this.fireHeld) return null;
@@ -957,7 +1000,14 @@ export class ShipClient {
     // A mining laser's pulse: a deep, soft throb, one a ship however many miners it has
     this.beamFx.onMiningPulse = (x, y, own) => { this.opts.sound?.('mining_pulse', own ? undefined : { x, y }, own ? 0.5 : 0.6); };
     // ...and where it lands on rock, a mining strike (a roll for ore: nothing's sent for it)
-    this.beamFx.onMiningStrike = (x, y, dx, dy, material) => this.scene?.miningStrike(x, y, dx, dy, material, 1.4);
+    this.beamFx.onMiningStrike = (x, y, dx, dy, material, owner) => {
+      this.scene?.miningStrike(x, y, dx, dy, material, 1.4);
+      if (owner === this.opts.state.playerId) this.mineTick();
+    };
+    // Your own laser cutting rock: its work towards your next drop
+    this.beamFx.onOwnCut = (rock, x, y, dps, dt, material) => {
+      this.miningProgress?.laser(rock, dps, dt, gradeOf(this.store.catalog.materials.get(material)), this.systemTier(), x, y);
+    };
     this.chargeFx = new ChargeFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, this.chargeTells);
     renderer.addBloomSource(this.chargeFx.glowLayer);
     this.scannerFx = new ScannerFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.pilot.econ);
@@ -1717,6 +1767,7 @@ export class ShipClient {
     if (this.scene && this.incomingUI) this.incomingUI.update(dt, this.scene.incomingShells, (x, y) => this.scene!.worldToScreen(x, y), this.scene.screenSize());
     this.bossFx?.update(dt);
     this.scannerFx?.update(dt, this.zoom());
+    this.miningProgress?.update(dt, this.zoom(), (id) => { const e = state.entities.get(id); return e?.type === EntityType.Asteroid ? e : undefined; });
     this.updateRepairHint();
 
     // "Press H to dock" while inside a station's docking ring (not while docked: the station's screen is up);

@@ -192,6 +192,14 @@ const RECIPES: Record<string, Recipe> = {
     modal(ctx, out, 0, [1, 1.593, 2.136, 2.83, 3.61].map((m, i) => [b * m * (0.98 + r() * 0.04), [0.15, 0.11, 0.08, 0.055, 0.035][i], [0.34, 0.27, 0.2, 0.14, 0.1][i] * (0.8 + r() * 0.4)] as [number, number, number]));
     grains(ctx, out, r, 0.01, 0.3, 10, 1500, 7000, 0.35);
   } },
+  // A working hit of yours on rock (ShipClient.mineTick, throttled): light and dry, rock not metal: a soft chip of
+  // stone (a short low-mid knock), a trickle of grit falling off the face, nothing ringing
+  mine_tick: { duration: 0.28, variants: 4, reverb: 0.08, build(ctx, out, r) {
+    const k = 0.85 + r() * 0.3;
+    burst(ctx, out, r, 0, 0.32, 0.0008, 0.035, [filter(ctx, 'bandpass', 900 * k, 1.1), drive(ctx, 1.6)]);
+    thump(ctx, out, 0, 210 * k, 120 * k, 0.18, 0.05);
+    grains(ctx, out, r, 0.012, 0.16, 7, 2200, 6500, 0.16);
+  } },
   // A mining laser's pulse (MiningBeamFx: 54 ticks, its peak 0.4 of the way in,
   // ~0.36 s; the next starts as it ends, ~0.9 s): the pulse laser's low
   // end, softer and deeper, nothing at the top: a sub gathering, a round thoom

@@ -1,11 +1,11 @@
 {
-  "_comment": "Mining. Every asteroid type has an ore mix and a hardness; the system's danger tier boosts rarer ores and makes gem seams more common. A shot or beam extracts ore in proportion to damage × the tool's yield, provided the tool is hard enough. Asteroids respawn after respawnSeconds.",
+  "_comment": "Mining. Every asteroid type has an ore mix and a hardness; the system's danger tier boosts rarer ores and makes gem seams more common. A shot or beam works the rock in proportion to damage × the tool's yield ÷ damagePerUnit, provided the tool is hard enough; a chunk is due every chunkUnits worked (rolled per chunk), and one due with nothing kept waits for the next kept unit. 2026-11-06 (Kieran: drops three times as often, at least twice the ore): damagePerUnit 74 -> 37, chunkUnits 4-9 -> 3-5. Asteroids respawn after respawnSeconds.",
   "respawnSeconds": 300,
   "unitsPerSize": 0.15,
-  "damagePerUnit": 74,
+  "damagePerUnit": 37,
   "chunkUnits": [
-    4,
-    9
+    3,
+    5
   ],
   "breakFraction": 0.3,
   "xpPerUnit": 0.35,
@@ -404,7 +404,7 @@
       "keep": 0.6
     }
   },
-  "_gunsComment": "Guns (every tool but a mining tool: tools[k].mining, or a mining laser) mine soft rock only (hardness 1). They work it at about a Mk I mining laser's pace: damage x tools[kind].yield / damagePerUnit, and past refDps damage a second on the rock the pace grows only with its square root (a starter's two Pips, 112 a second, about 0.7 rock units a second like the laser; a gunship twice that, about 1.4x). They keep `keep` of the common ores, keepOther times that of anything else (gems too), and keepByTier times that again by the rock's tier: a Mk I laser gets about three times the ore off Mk I rock, from chunks as often.",
+  "_gunsComment": "Guns (every tool but a mining tool: tools[k].mining, or a mining laser) mine soft rock only (hardness 1). They work it at about a Mk I mining laser's pace: damage x tools[kind].yield / damagePerUnit, and past refDps damage a second on the rock the pace grows only with its square root (a starter's two Pips, 112 a second, about 1.8 rock units a second like the laser; a gunship twice that, about 1.4x). They keep `keep` of the common ores, keepOther times that of anything else (gems too), and keepByTier times that again by the rock's tier: a Mk I laser gets about three times the ore off Mk I rock, from chunks as often.",
   "guns": {
     "refDps": 112,
     "keep": 0.32,
