@@ -2210,18 +2210,23 @@
       ]
     },
     "sol_scrap_nest": {
+      "_comment": "The Scrap Mother's den (docs/bosses/rework-2026-11.md 9.1, 14): heaps in its chambers (systems.json nests, fixed), each chamber's packs anchored round its open middle (`post`: the heaps are piled against the walls), their patrols kept clear of the rock (server Roaming.ts anchoredWaypoint); heaps off its faces patrol outside. Gullet 4 ships, Sorting Floor 6, Smelter 5, Gallery 7 (its guard back after 10 min), each face about 7 and the Seam 4. None in the Heart.",
       "grade": 1,
       "packs": 0,
       "groups": [],
       "nests": [
         {
           "id": "nest_gullet",
-          "packs": 1,
-          "respawnSeconds": 90,
-          "roam": 1500,
+          "packs": 2,
+          "respawnSeconds": 120,
+          "roam": 2200,
           "style": "anchored",
           "aggro": 2600,
           "leash": 5000,
+          "post": {
+            "x": 0,
+            "y": 12500
+          },
           "groups": [
             {
               "faction": "scrapborn",
@@ -2229,18 +2234,32 @@
                 "scrap_crawler",
                 "scrap_crawler"
               ],
-              "weight": 1
+              "weight": 1,
+              "limit": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_darter"
+              ],
+              "weight": 1,
+              "limit": 1
             }
           ]
         },
         {
           "id": "nest_sorting",
-          "packs": 2,
+          "packs": 3,
           "respawnSeconds": 80,
-          "roam": 2400,
+          "roam": 2800,
           "style": "anchored",
           "aggro": 2600,
           "leash": 6000,
+          "post": {
+            "x": -13500,
+            "y": 5500
+          },
           "groups": [
             {
               "faction": "scrapborn",
@@ -2259,17 +2278,30 @@
               ],
               "weight": 2,
               "limit": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "rivet_sower"
+              ],
+              "weight": 2,
+              "limit": 1
             }
           ]
         },
         {
           "id": "nest_smelter",
-          "packs": 1,
+          "packs": 2,
           "respawnSeconds": 90,
-          "roam": 2400,
+          "roam": 2800,
           "style": "anchored",
           "aggro": 2600,
           "leash": 6000,
+          "post": {
+            "x": 13500,
+            "y": 4500
+          },
           "groups": [
             {
               "faction": "scrapborn",
@@ -2278,18 +2310,32 @@
                 "scrap_crawler",
                 "scrap_crawler"
               ],
-              "weight": 1
+              "weight": 1,
+              "limit": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler"
+              ],
+              "weight": 1,
+              "limit": 1
             }
           ]
         },
         {
           "id": "nest_gallery",
-          "packs": 1,
-          "respawnSeconds": 600,
-          "roam": 2000,
+          "packs": 2,
+          "respawnSeconds": 120,
+          "roam": 2400,
           "style": "anchored",
           "aggro": 2600,
           "leash": 6000,
+          "post": {
+            "x": 0,
+            "y": -14000
+          },
           "groups": [
             {
               "faction": "scrapborn",
@@ -2300,13 +2346,24 @@
                 "scrap_darter",
                 "scrap_darter"
               ],
-              "weight": 1
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 600
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler"
+              ],
+              "weight": 1,
+              "limit": 1
             }
           ]
         },
         {
           "id": "nest_rim_w",
-          "packs": 2,
+          "packs": 3,
           "respawnSeconds": 70,
           "roam": 3500,
           "style": "anchored",
@@ -2341,7 +2398,7 @@
         },
         {
           "id": "nest_rim_n",
-          "packs": 2,
+          "packs": 3,
           "respawnSeconds": 70,
           "roam": 3500,
           "style": "anchored",
@@ -2376,7 +2433,7 @@
         },
         {
           "id": "nest_seam",
-          "packs": 1,
+          "packs": 2,
           "respawnSeconds": 80,
           "roam": 3000,
           "style": "anchored",

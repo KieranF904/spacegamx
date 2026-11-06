@@ -91,6 +91,30 @@ export function looseWaypoint(at: XY, home: XY, roam: number, bias: number, band
   return { wp: clampBand(wp, band), pause: false };
 }
 
+/** A clear straight run for a ship: whether it can fly from `from` to `to` without touching rock */
+export type ClearRun = (from: XY, to: XY) => boolean;
+
+/** How many places an anchored ship tries before it settles for its home (or stays put) */
+export const PATROL_TRIES = 8;
+
+/** How long (ticks) a patrolling ship goes without getting any nearer its waypoint before it picks another */
+export const PATROL_STALL = 60 * 6;
+
+/**
+ * An anchored ship's next patrol point: somewhere round its home (600 to `roam` out) that it can fly straight to
+ * without meeting rock (`clear`; none in an open system, so the first point drawn is the one, as it always was). A
+ * den's chambers are walled: a point in the rock, or round a corner, would have it pressed on the wall for good.
+ * None found: its home if it can get there, else where it is (it tries again the next time it thinks).
+ */
+export function anchoredWaypoint(from: XY, home: XY, roam: number, rng: () => number, clear?: ClearRun): XY {
+  for (let i = 0; i < PATROL_TRIES; i++) {
+    const a = rng() * Math.PI * 2, r = 600 + rng() * (roam - 600);
+    const wp = { x: home.x + dcos(a) * r, y: home.y + dsin(a) * r };
+    if (!clear || clear(from, wp)) return wp;
+  }
+  return clear!(from, home) ? { ...home } : { ...from };
+}
+
 /** A nomad pack's next stop: often near a pilot in its band (if any), else a place of interest, not where it is now */
 export function nomadDestination(at: XY, places: XY[], pilots: XY[], band: Band, rng: () => number): XY {
   const inBand = pilots.filter((p) => { const r = dhypot(p.x, p.y); return r >= band.min - 4000 && r <= band.max + 4000; });

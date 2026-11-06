@@ -9,6 +9,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { BossesFile } from './Bosses.js';
+import { liveTracks, ghostTracks, summarise } from '../bench/nestRoam.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -199,6 +200,35 @@ describe("the Scrap Mother's nest", () => {
     for (const t of ['scrap_crawler', 'rivet_sower', 'scrap_darter']) expect(seen.get(t) ?? 0, t).toBeGreaterThan(0);
     expect(inHeart).toBe(0);
   }, 120_000);
+
+  it("its chambers' packs roam their own chamber's open floor, spread out, never pressed on the walls; their ghosts are never in the rock", () => {
+    // (Kieran's playtest: they gathered in a corner and stuck there. The heaps are piled against the walls, so their
+    // patrols centred on the heap had half their points in the rock: bench/nestRoam.ts measures it)
+    // (a pilot held where every heap is in reach to load, nobody going for it: they only patrol)
+    const { tracks, rock } = liveTracks(-8000, 0, 60 * 120, 30, true);
+    const s = summarise(tracks.values(), rock);
+    const own: Record<string, string> = { nest_gullet: 'gullet', nest_sorting: 'sorting', nest_smelter: 'smelter', nest_gallery: 'gallery' };
+    const ships: Record<string, number> = { nest_gullet: 4, nest_sorting: 6, nest_smelter: 5, nest_gallery: 7 };
+    for (const [nest, chamber] of Object.entries(own)) {
+      const h = s[nest];
+      expect(h?.ships, nest).toBeGreaterThanOrEqual(ships[nest]);
+      // In its own chamber, all over its floor, the pack not bunched up
+      expect(h.areas[chamber], nest).toBeGreaterThan(95);
+      expect(h.cells, nest).toBeGreaterThan(12);
+      expect(h.spread, nest).toBeGreaterThan(500);
+      // Never on the rock
+      expect(h.walled, nest).toBeLessThan(3);
+      expect(h.stuck, nest).toBe(0);
+    }
+    // Off its faces they keep out of the rock too
+    for (const nest of ['nest_rim_w', 'nest_rim_n', 'nest_seam']) expect(s[nest].stuck, nest).toBeLessThan(2);
+    // Their ghosts (nobody there), over half an hour, where a ship would load: always out in the open
+    const g = summarise(ghostTracks(60 * 60 * 30).tracks.values(), rock);
+    for (const [nest, h] of Object.entries(g)) {
+      expect(h.areas.rock ?? 0, nest).toBe(0);
+      if (own[nest]) expect(h.areas[own[nest]], nest).toBe(100);
+    }
+  }, 300_000);
 
   it('its rocks are mined, and found by shots, as anywhere', () => {
     const { server, pid, step, num, rocks, at } = world();
