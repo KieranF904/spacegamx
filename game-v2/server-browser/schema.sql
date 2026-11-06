@@ -79,3 +79,19 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_user  ON messages(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_batch ON messages(batch);
+
+-- The player activity feed (server-browser/src/activity): what pilots do on each game server, for the website's admin
+-- panel only (never chat or private-message contents). Each server keeps its newest 5000 rows (pruned by the store).
+-- PostgresActivityStore makes this at start too when it is missing. The JSON store (JsonActivityStore,
+-- data/lobby/activity.json) holds the same rows.
+CREATE TABLE IF NOT EXISTS activity (
+    id      BIGSERIAL PRIMARY KEY,
+    at      BIGINT NOT NULL,                 -- epoch ms
+    server  TEXT NOT NULL,                   -- the game server's name ("AUS Main"), or 'Lobby'
+    type    TEXT NOT NULL,                   -- join, leave, death, boss_kill, ...
+    player  TEXT NOT NULL DEFAULT '',
+    other   TEXT NOT NULL DEFAULT '',        -- a second pilot it names (trade partner, PvP killer, admin's target)
+    detail  TEXT NOT NULL DEFAULT ''         -- one short line, plain text (escaped on display)
+);
+CREATE INDEX IF NOT EXISTS idx_activity_server ON activity(server, id DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_player ON activity(lower(player), id DESC);
