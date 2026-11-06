@@ -231,8 +231,9 @@ describe('chunks follow the rock', () => {
     const worked = before - m.remaining(1), kept = sizes.reduce((a, b) => a + b, 0);
     expect(kept / worked).toBeGreaterThan(0.75);
     expect(kept / worked).toBeLessThan(0.85);
-    // Mining XP is per unit kept (what's owed and not yet paid out in whole points)
-    expect((m as unknown as { xpOwed: Map<number, number> }).xpOwed.get(99)).toBeCloseTo(kept * table.xpPerUnit, 6);
+    // Mining XP is per unit kept (what's owed and not yet paid out in whole points), the next chunk's kept units too
+    const pending = Object.values(m.get(1)!.work.get(99)?.bag ?? {}).reduce((a, b) => a + b, 0);
+    expect((m as unknown as { xpOwed: Map<number, number> }).xpOwed.get(99)).toBeCloseTo((kept + pending) * table.xpPerUnit, 6);
     // Variance: for one chunk length the kept count differs chunk to chunk (a running total would give the same each time)
     expect(new Set(sizes).size).toBeGreaterThan(4);
     expect(Math.min(...sizes)).toBeLessThan(5);
