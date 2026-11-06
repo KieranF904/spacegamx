@@ -12,7 +12,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 | client/src/ships/shipSummary.ts | 114 | `shipSummary(catalog, tuning, econ, bp)` -> `ShipSummary` (stats shown/compared), `BIGGER_IS_BETTER`, `jumpRatioNote` |
 | client/src/ships/ShipStore.ts, blueprintApi.ts | 122/31 | live ship source; blueprint file list/load/save (`listBlueprints, loadBlueprint, saveBlueprint`) |
 | client/src/ships/HangarLitView.ts, hullPreview2d.ts | 102/26 | lit WebGL layer under the grid (render-ships); 2D part colours |
-| client/src/ui/ComponentGuideUI.ts | 399 | Component Guide window (`ComponentGuideUI`, `ComponentGuideDeps`) |
+| client/src/ui/ComponentGuideUI.ts | ~410 | The component guide view (`ComponentGuideUI`, `ComponentGuideDeps`; `mount(host)`/`hide()`), shown in the HUD side panel's Components tab (C; ui/hub, see ui-hud-input) |
 | client/src/ui/componentGuide.ts | 199 | pure data for it: tabs (`COMP_TABS`, `tabOf`), `guideRows`, `rowsOf`, `rowGates`/`requirementLine` (unlock gates), `questTeaches`, `bossDrops`, `rareParts` |
 | client/src/ui/componentSprites.ts | 130 | part sprites for the guide: `partSprite`, `peekSprite`, `PART_SPRITES_VERSION` (asset cache) |
 | common/src/ships/{mounting,blueprint,energy,circuits,wires}.ts | | the rules: `checkMounting`, `partMountingProblems`, `mountingWords`, blueprint validation (`badMounting` etc.), `loadTest`/`BROWNOUT` |

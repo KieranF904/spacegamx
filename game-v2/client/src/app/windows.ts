@@ -39,7 +39,14 @@ import { BossUI } from '../ui/BossUI';
 import { QuickBar } from '../ui/QuickBar';
 import { SystemMapUI } from '../ui/SystemMapUI';
 import { ObjectiveBanner } from '../ui/ObjectiveBanner';
-import type { GameMenuUI } from '../ui/GameMenuUI';
+import { HubPanel } from '../ui/hub/HubPanel';
+import { socialTab } from '../ui/hub/tabs/socialTab';
+import { partyTab } from '../ui/hub/tabs/partyTab';
+import { pilotTab } from '../ui/hub/tabs/pilotTab';
+import { componentsTab } from '../ui/hub/tabs/componentsTab';
+import { boundKeyName } from '../input/keybindings';
+import { settings } from '../settings/Settings';
+import type { GameMenuUI, MenuPilotInfo } from '../ui/GameMenuUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ComponentGuideUI } from '../ui/ComponentGuideUI';
 import type { StationWindow } from '../ui/StationWindow';
@@ -91,6 +98,8 @@ export interface WindowHost {
   chatTo(name: string): void;
   /** Friends online changed (the chat box's Friends button) */
   friendsOnline(n: number): void;
+  /** You as the pilot readout shows you (the Esc menu's front page and the side panel's Pilot tab) */
+  pilotInfo(): MenuPilotInfo;
 }
 
 export interface WindowSet {
@@ -109,6 +118,8 @@ export interface WindowSet {
   /** The right-click menu: dock, travel, land, talk, target, fly or jump there (ContextActions.ts) */
   context: ContextActions;
   social: SocialUI;
+  /** The side panel on the left of the HUD, on top of the cargo panel: Social, Party, Pilot, Components (ui/hub) */
+  hub: HubPanel;
   infoPanel: InfoPanel;
   tradeWindow: TradeWindow;
   targetUI: TargetUI;
@@ -135,7 +146,8 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.componentGuide = makeComponentGuide(host);
     w.pilotHud = new PilotHud(host.pilot);
     w.cargoPanel = new CargoPanelUI(host.pilot, (m) => host.network.send(m), (id) => host.audio.playUI(id, 0.4));
-    w.cargoPanel.ceiling = () => w.pilotHud.bottom();
+    // (Below the pilot readout and the party list, and below the side panel once it's placed: HubPanel.cargoCeiling)
+    w.cargoPanel.ceiling = () => w.hub?.cargoCeiling() || Math.max(w.pilotHud.bottom(), w.social?.hudBottom() ?? 0);
     // (The load is weighed against the ship you fly: common/src/ships/load.ts)
     w.cargoPanel.ship = () => host.shipClient.myShip()?.derived ?? null;
     host.shipClient.ownAmmo = (kind) => {
@@ -206,7 +218,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       people: () => w.peopleUI?.here() ?? [],
       talkRange: TALK_RANGE,
       enabled: () => host.loggedIn && !host.localDead && !host.shipClient.hangarOpen && !host.menu.isOpen && !w.systemMapUI.isOpen
-        && !host.stationOpen && !w.inventoryWindow.isOpen && !w.tradeWindow.isOpen && !w.social.window.isOpen && !w.quests.log.isOpen && !w.componentGuide.value?.isOpen
+        && !host.stationOpen && !w.inventoryWindow.isOpen && !w.tradeWindow.isOpen && !w.quests.log.isOpen
         && !host.adminPanel?.capturesFlight,
       menuModifier: () => host.input.isKeyDown('KeyZ'),
       autopilot: w.autopilot,
@@ -245,7 +257,33 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       message: (t, c) => host.showSystemMessage(t, c),
       chatTo: (name) => host.chatTo(name),
       friendsOnline: (n) => host.friendsOnline(n),
+      openTab: (tab) => w.hub.open(tab),
     });
+    // The side panel: its tabs in order (each its own module, ui/hub/tabs/)
+    w.hub = new HubPanel({
+      player: () => host.state.playerName || '',
+      column: () => {
+        const c = w.cargoPanel.column();
+        return {
+          floor: c.floor, cargoMin: c.min, cargoTop: c.top, left: c.left, width: c.width,
+          ceiling: Math.max(w.pilotHud.bottom(), w.social.hudBottom()) + 8,
+          lift: w.pilotHud.top() || 16,
+        };
+      },
+      relayoutCargo: () => w.cargoPanel.relayout(),
+      sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
+    });
+    w.cargoPanel.onPlace = () => w.hub.position();
+    w.hub.register(socialTab(w.social));
+    w.hub.register(partyTab(w.social));
+    w.hub.register(pilotTab({
+      pilot: () => host.pilotInfo(),
+      ship: () => host.shipClient.menuShipInfo(),
+      dockableStation: () => host.shipClient.dockableStationName(),
+      dock: () => { host.shipClient.onKey('KeyH'); },
+      keyName: (a) => boundKeyName(a, settings.data.bindings),
+    }));
+    w.hub.register(componentsTab(w.componentGuide));
     // (With the system map open, the cursor is the map's)
     const cursorWorld = () => w.systemMapUI?.aimWorld() ?? host.renderer.screenToWorld(host.input.mouseX, host.input.mouseY);
     const shipRadius = (id: number) => host.shipClient.store.get(id)?.derived.radius ?? 60;

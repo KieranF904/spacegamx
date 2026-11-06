@@ -6,7 +6,9 @@
  * right-click jettisons. Your ammunition loadout's crates are tagged LOAD and
  * utility (consumables, the quick bar) UTIL: the storage controls leave both
  * aboard. A fixed height that scrolls (drag the top edge to resize; it keeps
- * clear of the pilot readout above), or folds down to just the fill bar.
+ * clear of the side panel and the pilot readout above: `ceiling`), or folds
+ * down to just the fill bar. The side panel (ui/hub) sits on top of it and
+ * shares the column: `column()` tells it the room, `relayout()` re-places it.
  * Hidden while docked (the station's storage screen has the hold then); I
  * opens the full window.
  */
@@ -90,8 +92,10 @@ export class CargoPanelUI {
   /** The list's height as the pilot left it (px), and when its fit was last checked */
   private want = DEFAULT_H;
   private placedAt = 0;
-  /** The bottom of whatever sits above it in the left column (the pilot readout), so it never grows into it */
+  /** The bottom of whatever sits above it in the left column (the side panel, the pilot readout), so it never grows into it */
   ceiling?: () => number;
+  /** It was placed (the side panel sits on top of it) */
+  onPlace?: () => void;
   /** The ship you fly (its mass: what the load is weighed against, common/src/ships/load.ts) */
   ship?: () => { mass: number; fullMass?: number } | null;
   private load: HTMLDivElement;
@@ -131,7 +135,29 @@ export class CargoPanelUI {
     window.addEventListener('resize', () => this.place());
   }
 
+  /** Place it again now (the side panel's room changed) */
+  relayout(): void {
+    this.place();
+  }
+
+  /** The left column as it is: its floor (above the chat box), its least height and its top (0 for both while hidden), and the column's left and width */
+  column(): { floor: number; min: number; top: number; left: number; width: number } {
+    const chat = document.getElementById('chatBox')?.getBoundingClientRect();
+    const on = !!chat && chat.height > 0;
+    const floor = on ? chat!.top - 6 : innerHeight - 20;
+    const left = on ? chat!.left : 16, width = on ? chat!.width : 320;
+    if (this.hidden) return { floor, min: 0, top: 0, left, width };
+    const box = this.root.offsetHeight;
+    const min = this.collapsed || !this.pilot.cargo.length ? box : box - this.grid.offsetHeight + MIN_H;
+    return { floor, min, top: this.root.getBoundingClientRect().top, left, width };
+  }
+
   private place(): void {
+    this.placeIn();
+    this.onPlace?.();
+  }
+
+  private placeIn(): void {
     this.placedAt = performance.now();
     const chat = document.getElementById('chatBox')?.getBoundingClientRect();
     let floor = innerHeight - 20;

@@ -20,7 +20,7 @@ export interface ChatPanelHost {
   /** The chat box is hidden (settings): show it to type */
   ensureShown(): void;
   onFocusChange(focused: boolean): void;
-  /** The friends list (the Social window's Friends tab) */
+  /** The friends list (the side panel's Social tab) */
   openFriends(): void;
   sound?(id: string, v?: number): void;
 }
@@ -195,7 +195,7 @@ export class ChatPanel {
     };
     mk('all', 'All', 'Show every channel').addEventListener('click', () => this.setToggles(new Set(ALL_CHANNELS)));
     for (const c of CHAT_CHANNELS) mk(c.id, c.label, `Show or hide ${c.label.toLowerCase()} lines`).addEventListener('click', () => this.setToggles(toggleChannel(this.on, c.id)));
-    this.friendsBtn = mk('friends', 'Friends', 'Your friends (the Social window)');
+    this.friendsBtn = mk('friends', 'Friends', 'Your friends (the side panel)');
     this.friendsBtn.classList.add('chat-friends');
     this.friendsBtn.addEventListener('click', () => this.host.openFriends());
     this.paintToggles();
