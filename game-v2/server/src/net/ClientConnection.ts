@@ -54,6 +54,13 @@ export interface ClientConnection {
   shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number; kept?: number[]; dmg?: number }>;
   /** Last part HP sent to this client, per ship body */
   shipHpSent: Map<number, number[]>;
+  /**
+   * This snapshot window's rebuild syncs of ships it had (not new to it, each stamped with its rebuild's tick: CAPS.STRUCTS),
+   * in the order they went: the rebuild tick, the rebuild counts before and after, and its HP copy just before (what it
+   * works a hit on the structure before out on: HitLedger.derive, client ShipStore.asOf). Null: a sync it can't have
+   * the structure before of (new to it, or no tick), so its hits this window are told. Cleared as each snapshot goes
+   */
+  hpBefore?: Map<number, { at: number; from: number; rebuilds: number; hp: number[] }[] | null>;
   /** Entity names this client has been sent (names go once) */
   sentNames: Map<number, string>;
   /** Ship keyframe versions this client has (replication) */

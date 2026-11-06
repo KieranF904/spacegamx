@@ -27,6 +27,13 @@ export interface StructSource {
   rebuildAt?(id: number, t: number): { from: Vec2; to: Vec2 } | null | undefined;
 }
 
+/** A ship as it was on a tick, for the hits struck then (ShipStore.asOf) */
+export interface HitShipSource {
+  get(id: number): ShipState | undefined;
+  /** The ship as a hit on tick t struck it: before a rebuild sync whose rebuild came on t or after, else as it is */
+  asOf?(id: number, t: number): ShipState | undefined;
+}
+
 export class ShipStore implements ShipSource, StructSource {
   readonly bodies = new Map<number, ShipState>();
   private geomCache = new WeakMap<Blueprint, PlacedGeom[]>();
@@ -43,6 +50,13 @@ export class ShipStore implements ShipSource, StructSource {
   private structs = new Map<number, { at: number; derived: ShipDerived }[]>();
   /** Debris only to be seen (a boss's shed plates): it knocks nothing */
   readonly aloof = new Set<number>();
+  /**
+   * Each ship as it was before its latest rebuild syncs (one a sync of a ship it had, stamped with its rebuild's tick:
+   * CAPS.STRUCTS), oldest first: its structure, detached and ghost parts, and its HP then, as a view over the ship
+   * (asOf). A hit on a tick up to a rebuild struck the structure before it, and is worked out on that and the HP it had
+   * (the server does the same on its copy: HitLedger.derive); the sync's own HP, which has those hits in, stands
+   */
+  private befores = new Map<number, { at: number; view: ShipState }[]>();
 
   constructor(readonly catalog: Catalog, readonly tuning: ShipTuning) {}
 
@@ -59,6 +73,11 @@ export class ShipStore implements ShipSource, StructSource {
     return g;
   }
 
+  /** Will this sync keep the ship before it for the hits struck up to its rebuild (asOf)? Asked before it's applied */
+  keepsBefore(msg: ServerShipSyncMessage): boolean {
+    return msg.at !== undefined && msg.design === undefined && !msg.blueprint && this.bodies.has(msg.id);
+  }
+
   /** Returns the parts that came back since the last sync (station repair) */
   onSync(msg: ServerShipSyncMessage): number[] {
     if (msg.blueprint && msg.design) {
@@ -72,12 +91,16 @@ export class ShipStore implements ShipSource, StructSource {
       msg = { ...msg, blueprint: bp };
     }
     const prev = this.bodies.get(msg.id);
+    // (A rebuild of the ship we have, stamped with its tick (the server sent no design: not new to us): the ship before it
+    // kept for the hits struck up to then, asOf)
+    const kept = this.keepsBefore(msg);
     // Without a blueprint it's the ship we have, rebuilt; with one it may be a new design
     if (!msg.blueprint && !prev) { this.onMissing?.(msg.id); return []; }
     const sameShape = !!prev && (!msg.blueprint || sameBlueprint(prev.blueprint, msg.blueprint));
     const wasAlive = sameShape && prev && prev.kind === 'ship' ? [...prev.derived.alive] : null;
     // (A piece of debris's structure before this sync: the one it flew till the rebuild's tick, for its knocks then)
     const before = sameShape && prev?.kind === 'debris' ? prev.derived : undefined;
+    this.noteBefore(msg.id, kept && sameShape ? msg.at! : undefined, prev);
     const ship = sameShape
       ? prev!
       : createShipState(this.catalog, this.tuning, msg.id, msg.blueprint!, 0, { kind: msg.kind });
@@ -133,6 +156,7 @@ export class ShipStore implements ShipSource, StructSource {
     this.bodies.delete(id);
     this.lastSeen.delete(id);
     this.structs.delete(id);
+    this.befores.delete(id);
     this.aloof.delete(id);
   }
 
@@ -144,6 +168,31 @@ export class ShipStore implements ShipSource, StructSource {
     if (list.length && list[list.length - 1].at >= at) list.length = list.findIndex((e) => e.at >= at);
     list.push({ at, derived });
     if (list.length > 16) list.shift();
+  }
+
+  /** A sync about to be applied: the ship before it kept (a rebuild stamped `at`), else what was kept goes */
+  private noteBefore(id: number, at: number | undefined, prev: ShipState | undefined): void {
+    if (at === undefined || !prev) { this.befores.delete(id); return; }
+    const view = Object.create(prev) as ShipState;
+    view.hp = [...prev.hp];
+    view.detached = [...prev.detached];
+    view.ghost = [...prev.ghost];
+    view.derived = prev.derived;
+    let list = this.befores.get(id);
+    if (!list) this.befores.set(id, (list = []));
+    if (list.length && list[list.length - 1].at >= at) list.length = list.findIndex((e) => e.at >= at);
+    list.push({ at, view });
+    if (list.length > 8) list.shift();
+  }
+
+  /**
+   * The ship as a hit on tick t struck it: before the first rebuild kept on t or after (a ship rebuilds at the end of its
+   * tick, after the collision step), else as it is now
+   */
+  asOf(id: number, t: number): ShipState | undefined {
+    const list = this.befores.get(id);
+    if (list) for (const e of list) if (e.at >= t) return e.view;
+    return this.bodies.get(id);
   }
 
   /**
