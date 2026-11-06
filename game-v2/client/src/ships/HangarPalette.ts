@@ -187,7 +187,7 @@ export class HangarPalette {
   private rows: PaletteRow[];
   /** Rows with their facts open */
   private openRows = new Set<string>();
-  private lockedOpen = true;
+  private lockedOpen = false;
   /** The shape each function was last used in (a component's default next time) */
   private shapeMemory = new Map<string, string>();
   /** Each part's key numbers, worked out once */
