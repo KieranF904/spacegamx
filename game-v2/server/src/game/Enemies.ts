@@ -40,6 +40,7 @@ import {
   spawnersOf, seedGroups, pickGroup, ghostCentre, ghostShip, slotStyle, packPopSlot, lureSector, packLure, LIFE_ASLEEP_RESET, FOCUS_RANGE, GHOST_STEP,
   type Spawner, type Lure } from '@space-game/common';
 import { AiPilots } from './brains/aiPilot.js';
+import { Defenders } from './enemies/defenders.js';
 import { CustomEnemies } from './custom/CustomEnemies.js';
 import type { CustomTable } from './custom/types.js';
 import type { Mobs } from './Mobs.js';
@@ -247,6 +248,8 @@ export interface EnemyHost {
   supportersOf?(player: number): number[];
   /** Docked, or in a station's docking ring: hostiles leave them be */
   sheltered?(player: number): boolean;
+  /** Docked (out of the fight: a freighter stops shooting back at it, enemies/defenders.ts) */
+  docked?(eid: number): boolean;
   /** An arrival's effect: a gate spooling up (`warning`), or a ship coming through (`warpIn`) / launching (`launch`) */
   effect?(num: number, x: number, y: number, kind: 'warning' | 'warpIn' | 'launch'): void;
   /** A system's gates */
@@ -411,10 +414,17 @@ export class Enemies {
     this.wards.delete(eid);
   }
 
+  /** A pilotless ship that keeps its course but shoots back at whoever hurts it (a freighter: enemies/defenders.ts) */
+  defend(eid: number): void {
+    this.defenders.add(eid);
+  }
+
   /** Its ships' pilots: the commander's orders flown by the shared pilot body (brains/aiPilot.ts) */
   private readonly pilots: AiPilots;
   /** Custom enemies' pieces and moves (custom/CustomEnemies.ts) */
   readonly custom: CustomEnemies;
+  /** Freighters that keep their course but shoot back at whoever hurts them (enemies/defenders.ts), flown by the same pilots */
+  readonly defenders: Defenders;
   /** What mines are laid as (set once mobs exist) */
   mobs: Mobs | undefined;
 
@@ -428,6 +438,7 @@ export class Enemies {
       tick: () => host.tick(), decide: host.decide ? (e, op, args, st) => host.decide!(e, op, args, st) : undefined,
       status: (e) => [ships.empTicksLeft(e), ships.slowedTicksLeft(e)],
     });
+    this.defenders = new Defenders({ world: host.world, tick: () => host.tick(), docked: host.docked ? (e) => host.docked!(e) : undefined }, ships, this.pilots);
     const self = this;
     this.custom = new CustomEnemies({
       tick: () => host.tick(), ships, players: (num) => host.players(num), get mobs() { return self.mobs; },
@@ -732,6 +743,7 @@ export class Enemies {
 
   tick(): void {
     const now = this.host.tick();
+    this.defenders.tick();
     // Forget the dead
     for (const [eid, e] of this.enemies) {
       if (!this.ships.has(eid)) {

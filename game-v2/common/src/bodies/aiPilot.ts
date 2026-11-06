@@ -20,6 +20,11 @@
  *                                          fight from round the side the pack is on (its centroid as the ships ended
  *                                          the last tick, summed in id order); flank 0: alone, from its own side
  *   FLEE    [3]                            away from its target, boosting
+ *   HAUL    [5, arrive, reach, flags, errMax, seed, wx, wy]
+ *                                          a freighter on its course (flags bit 0: to (wx, wy), flown as the autopilot
+ *                                          flies one, bridge/pilotless.ts autopilotControls; else holding its heading),
+ *                                          never turning to fight; its guns on its target (whoever last shot it) as an
+ *                                          ENGAGE's are: reach, lobs (flags bit 1), aim error and trigger alike (aiFires)
  *
  * Its heading is held until the wanted one drifts (a hair in a fight, more otherwise), as the aim it steered by last
  * tick has it (`prevQ`: the replica's), so it changes its controls no more often than before.
@@ -28,15 +33,18 @@
 import { datan2, dcos, dhypot, dsin } from '../math/detTrig.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from '../network/cursorState.js';
 import { CTL } from '../ships/replica.js';
+import { FRICTION } from '../constants.js';
 import { hashUnit } from '../math/rng.js';
 import type { BodyState, WantRec } from './decisions.js';
 import type { BodyOut, BodyPose } from './stagedFlight.js';
 import { CUSTOM_DESIGNS, CO, moveAt, type CustomCtx, type CustomFlight } from './custom/index.js';
 
 /** CUSTOM: a custom enemy's ENGAGE, its design, pieces gone and move in it (bodies/custom/order.ts) */
-export const AI_ORDER = { PATROL: 0, RETURN: 1, ENGAGE: 2, FLEE: 3, CUSTOM: 4 } as const;
+export const AI_ORDER = { PATROL: 0, RETURN: 1, ENGAGE: 2, FLEE: 3, CUSTOM: 4, HAUL: 5 } as const;
 /** An order that fights its target (ENGAGE, or a custom enemy's) */
 const engages = (w: WantRec) => w[0] === AI_ORDER.ENGAGE || w[0] === AI_ORDER.CUSTOM;
+/** An order whose guns aim at its target with an aim error (an engage, or a freighter shooting back) */
+const aims = (w: WantRec) => engages(w) || w[0] === AI_ORDER.HAUL;
 /** Where an engage order's mates start */
 const matesAt = (w: WantRec) => (w[0] === AI_ORDER.CUSTOM ? CO.MATES : 8);
 /** The aim error's grid (radians × this) */
@@ -53,6 +61,12 @@ export const orderPatrol = (wx: number, wy: number, pace: number, pauseUntil: nu
   [AI_ORDER.PATROL, Math.round(wx), Math.round(wy), Math.floor(120 * pace), Math.max(0, Math.ceil(pauseUntil))];
 export const orderReturn = (hx: number, hy: number): WantRec => [AI_ORDER.RETURN, Math.round(hx), Math.round(hy)];
 export const orderFlee = (): WantRec => [AI_ORDER.FLEE];
+/**
+ * A freighter on its course (`to`: its autopilot's, null: holding its heading), its guns at its target from up to
+ * `reach` (its guns' real reach), its aim off by up to `errMax` radians from `seed`; `lobs` as orderEngage's
+ */
+export const orderHaul = (to: { x: number; y: number; arrive: number } | null, reach: number, errMax: number, seed: number, lobs = false): WantRec =>
+  [AI_ORDER.HAUL, Math.round(to?.arrive ?? 0), Math.round(reach), (to ? 1 : 0) | (lobs ? 2 : 0), Math.round(errMax * AIM_ERR_GRID), seed & 255, Math.round(to?.x ?? 0), Math.round(to?.y ?? 0)];
 /**
  * At its target. `strafe`: its behaviour's share of the time it strafes (undefined: always); `flank` (radians) and
  * `mates` (its pack's other ships, ids) only for a pack of more than one
@@ -89,14 +103,14 @@ export function packCentroid(ids: readonly number[], at: (id: number) => { x: nu
 
 /** An engage order's aim error at tick t (radians): re-rolled every 12 + id % 7 ticks from the order's seed */
 export function aiAimError(w: WantRec, id: number, t: number): number {
-  if (!engages(w) || !w[4]) return 0;
+  if (!aims(w) || !w[4]) return 0;
   return (w[4] / AIM_ERR_GRID) * (hashUnit(w[5], id, Math.floor(t / (12 + (id % 7)))) * 2 - 1);
 }
 
 /** Ships its body reads besides itself (its target, its pack's): a client must hold them all to run it */
 export function aiReads(id: number, s: BodyState): number[] {
   const w = s.want;
-  if (!engages(w) && w[0] !== AI_ORDER.FLEE) return [];
+  if (!aims(w) && w[0] !== AI_ORDER.FLEE) return [];
   const out = s.target >= 0 ? [s.target] : [];
   for (const m of orderPack(id, w) ?? []) if (m !== id) out.push(m);
   return out;
@@ -125,6 +139,7 @@ export interface AiPilotOut extends BodyOut {
  */
 export function aiPilot(s: BodyState, me: BodyPose, tgt: (BodyPose & { r?: number }) | null, centroid: readonly [number, number] | null, tick: number, id: number, prevQ: number, prevBits = 0): AiPilotOut {
   const w = s.want, state = w[0];
+  if (state === AI_ORDER.HAUL) return haul(w, me, tgt, tick, id, prevQ);
   let mx = 0, my = 0, face = me.angle, boost = false, aim: number | undefined, aimDist = 0, d = 0, across = 0, tof = 0, fire = false;
   // (A custom enemy: its module, the move under way and its pieces gone: bodies/custom)
   const custom = state === AI_ORDER.CUSTOM && tgt ? customCtx(w, id, tick, me, tgt, prevBits) : null;
@@ -181,6 +196,38 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: (BodyPose & { r?: numbe
   if (q === AIM_TURN) q = 0;
   // Mouse-steer controls are screen-relative: press the directions nearest the wanted motion
   const bits = (my < -0.38 ? CTL.forward : 0) | (my > 0.38 ? CTL.backward : 0) | (mx < -0.38 ? CTL.left : 0) | (mx > 0.38 ? CTL.right : 0) | (boost ? CTL.boost : 0);
+  return { bits, q, ix: 0, iy: 0, aim, aimDist, d, across, tof, fire };
+}
+
+/**
+ * A HAUL order's tick: its course as the autopilot flies one (bridge/pilotless.ts autopilotControls: the heading held
+ * until the course drifts 0.02 rad, the screen directions nearest the nose pressed while roughly facing it and not yet
+ * due to coast to a stop at the arrival radius), its guns led onto its target as an ENGAGE's are, never steering for it
+ */
+function haul(w: WantRec, me: BodyPose, tgt: (BodyPose & { r?: number }) | null, tick: number, id: number, prevQ: number): AiPilotOut {
+  let q = prevQ, bits = 0, aim: number | undefined, aimDist = 0, d = 0, across = 0, tof = 0, fire = false;
+  if (w[3] & 1) {
+    const arrive = w[1], dx = w[6] - me.x, dy = w[7] - me.y, dist = dhypot(dx, dy), want = datan2(dy, dx), held = dequantizeCursorAngle(prevQ);
+    if (Math.abs(datan2(dsin(want - held), dcos(want - held))) >= 0.02 || dist <= arrive) q = quantizeCursorAngle(want);
+    const course = dequantizeCursorAngle(q), err = datan2(dsin(course - me.angle), dcos(course - me.angle));
+    // (Friction alone stops a ship moving at v within about v / (1 - FRICTION))
+    if (Math.abs(err) < 0.5 && dist - arrive > dhypot(me.vx, me.vy) / (1 - FRICTION)) {
+      const cx = dcos(me.angle), cy = dsin(me.angle);
+      bits = (cy < -0.38 ? CTL.forward : 0) | (cy > 0.38 ? CTL.backward : 0) | (cx < -0.38 ? CTL.left : 0) | (cx > 0.38 ? CTL.right : 0);
+    }
+  }
+  // (a whole turn is no turn: the aim as the server's step rounds it again; its autopilot's course can be on it)
+  if (q === AIM_TURN) q = 0;
+  if (tgt) {
+    const dx = tgt.x - me.x, dy = tgt.y - me.y;
+    d = dhypot(dx, dy) || 1;
+    tof = Math.min(40, d / 45);
+    const rvx = tgt.vx - me.vx, rvy = tgt.vy - me.vy, lx = dx + rvx * tof, ly = dy + rvy * tof;
+    aim = datan2(ly, lx) + aiAimError(w, id, tick);
+    aimDist = dhypot(lx, ly);
+    across = Math.abs((rvx * dy - rvy * dx) / d);
+    fire = aiFires(w, id, tick, d, across, tof, tgt.r);
+  }
   return { bits, q, ix: 0, iy: 0, aim, aimDist, d, across, tof, fire };
 }
 

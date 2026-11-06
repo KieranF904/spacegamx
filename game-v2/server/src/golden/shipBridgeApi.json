@@ -1,6 +1,7 @@
 [
   "addToSpatialGrid",
   "attach",
+  "autopilotHeading",
   "autopilotOf",
   "beamState",
   "bodies",
