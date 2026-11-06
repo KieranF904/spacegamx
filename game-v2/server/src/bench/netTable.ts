@@ -223,7 +223,8 @@ async function runCase(sc: string): Promise<void> {
   function direct(p: number, c: Ctl): void {
     for (const k of ['forward', 'backward', 'left', 'right', 'fireLeft', 'fireRight', 'boost'] as const) Input[k][p] = c[k] ? 1 : 0;
     Input.targetAngle[p] = K.replicaAngle && K.ReplicaMode ? K.replicaAngle(K.ReplicaMode.Player, K.quantizeReplicaAngle(c.targetAngle)) : c.targetAngle;
-    Input.cursorDist[p] = c.cursorDist;
+    // (on the 4-unit grid a client's input puts it on, as the measured pilots' inputs are)
+    Input.cursorDist[p] = Math.round(c.cursorDist / 4) * 4;
   }
   const lib = (name: string) => {
     const hit = ships.library.get(name);

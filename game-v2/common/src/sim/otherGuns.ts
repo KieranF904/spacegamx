@@ -278,6 +278,11 @@ export interface ServerGunSyncMessage {
    * nothing, it decided then, and the client works them out from the lane it had). Absent: t + 1 (all through t told)
    */
   w?: number;
+  /**
+   * The lane stands (z empty): the ship was keyframed in this snapshot, so this round's span (from w) is told, as rows;
+   * the client keeps its lane and steps on from it
+   */
+  keep?: 1;
 }
 
 /** The gun state's and a ports ship's stores' arrays (by part, by port): sent sparse (packArr) */

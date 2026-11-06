@@ -503,8 +503,10 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
   - *Which clients step which ships* (`GunNet.forClient`): a ship it holds, within `GUN_REACH` (8 km) of its own (kept to
     `GUN_KEEP`, 10 km), lately firing or its trigger held (`GUN_ACTIVE`, 600 ticks); an AI pilot only while it flies its
     body. Then it gets a `gunSync` (plain, before the snapshot: the lane state as one sparse list, `packGunSync`), again
-    with every keyframe of that ship (what its replica had of the window wasn't the server's) and every new lane version;
-    an empty one drops the lane (gone far). Until then, and for the span of the round a gunSync goes in (`w`: the ticks
+    only for a new lane version (its hash drifted from the real ship's, a respawn); an empty one drops the lane (gone
+    far). A keyframe of the ship doesn't resend its lane: an empty `keep` gunSync says where that round's told span
+    starts (its volleys go as rows), and the lane steps on from the state it had at the keyframe's tick (OtherGuns
+    `stash`; the pose its guns fired from in that window wasn't the server's, so a drift shows in the hash and is resynced). Until then, and for the span of the round a gunSync goes in (`w`: the ticks
     before it were decided in rounds that sent the client nothing, and it works them out from the lane it had: the
     client installs a gunSync at its snapshot, `carry`), its fire records go as before. The first volley after a quiet
     spell is told and its gunSync goes with it; cruising crowds get none.
