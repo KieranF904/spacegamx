@@ -20,6 +20,7 @@ import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';
 import { BotManager } from './bots/index.js';
 import { installRockeryTools } from './bots/rockeryTools.js';
+import { activity } from './activity/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -109,6 +110,12 @@ if (DEV_MODE) {
     for (let i = 0; i < Math.max(1, Number(n) || 1); i++) bots.spawn(task, kind === 'npc' ? 'npc' : 'client');
   }
 }
+// Player activity for the website's admin panel, sent to the lobby in batches under SERVER_NAME (server/src/activity);
+// it needs the lobby's admin secret, and ACTIVITY_FEED=0 turns it off
+if (LOBBY_ADMIN_SECRET && process.env.ACTIVITY_FEED !== '0') {
+  activity.start({ url: BROWSER_URL, secret: LOBBY_ADMIN_SECRET, server: SERVER_NAME });
+  activity.watch(gameServer.pilots);
+}
 const transport = new SocketTransport(gameServer, PORT, HOST);
 
 // How it's running, every 2 s, for the box's resource monitor (deploy/vps/monitor): written whole, then swapped in
@@ -147,6 +154,8 @@ async function shutdown(signal: string, code = 0) {
     ]);
     if (saved === 'late') console.error(`Shutdown: saves still running after ${SHUTDOWN_SAVE_MS / 1000} s; exiting anyway`);
     else console.log('Shutdown: everything saved');
+    // (The last activity lines, best effort: 2 s at most)
+    await activity.stop(2000).catch(() => {});
   } catch (e) {
     console.error('Shutdown save failed:', e);
     code ||= 1;

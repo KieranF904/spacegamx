@@ -10,6 +10,7 @@ import type { ClientConnection } from './ClientConnection.js';
 import type { HandlerRegistry } from './dispatch.js';
 import type { ServerCtx } from './ServerCtx.js';
 import { notifier } from '../auth/pushover.js';
+import { activity } from '../activity/index.js';
 
 /** The join and sign-in messages */
 export function registerAuthHandlers(t: HandlerRegistry): void {
@@ -32,6 +33,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
   // on. A join that says neither its protocol nor its caps is an in-process tool (tests, benches, bots): it gets the full set
   const said = msg.protocol !== undefined || msg.caps !== undefined;
   if ((msg.protocol !== undefined && msg.protocol !== PROTOCOL_VERSION) || (said && !fullCaps(msg.caps))) {
+    activity.protocol(msg.protocol, PROTOCOL_VERSION);
     conn.ws.close?.(PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON);
     return;
   }
@@ -74,7 +76,8 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     conn.isContributor = false;
     notifier.join(conn.username, true, online(ctx));
   }
-  
+  activity.join(conn);
+
   // Send auth result back
   ctx.send(conn.ws, {
     type: 'authResult',
@@ -141,6 +144,7 @@ export async function accountOwner(ctx: ServerCtx, name: string): Promise<'admin
 }
 
 export function rejectAuth(ctx: ServerCtx, conn: ClientConnection, error: string | undefined): void {
+  activity.refused(conn, error);
   ctx.send(conn.ws, { type: 'authResult', success: false, error });
   // A moment for the answer to get out before the socket closes
   setTimeout(() => conn.ws.close?.(), 250);

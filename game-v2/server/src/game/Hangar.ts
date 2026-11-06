@@ -34,6 +34,7 @@ import {
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { StationServices, JobTag } from './StationServices.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
+import { activity } from '../activity/index.js';
 
 export interface HangarHost {
   send(conn: PilotConn, msg: ServerMessage): void;
@@ -258,6 +259,7 @@ export class Hangar {
     this.pilots.reapplyShip(conn);
     this.pilots.emitRefit(conn);
     this.pilots.toast(conn, `Now flying the ${rec.blueprint.name}`, 'good');
+    activity.ship(conn, rec.blueprint.name);
     this.pilots.markDirty(conn);
     this.pilots.sendItems(conn);
     this.pilots.saveNow(conn);
@@ -636,6 +638,7 @@ export class Hangar {
       rec.paused = false;
       delete rec.rank;
       changed = true;
+      activity.built(conn, rec.blueprint.name, !!rec.lost);
       if (rec.lost) {
         rec.lost = false;
         this.pilots.toast(conn, `The ${rec.blueprint.name} is rebuilt: fly it from the hangar at a station`, 'good');

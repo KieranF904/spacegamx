@@ -38,6 +38,7 @@ import { SimPass } from '../sim/SystemClocks.js';
 import { Lifecycle } from './bosses/Lifecycle.js';
 import type { ArenaGates } from './arenas/ArenaGates.js';
 import { LIFE_ASLEEP_RESET, type ArenaDef, type LifeState } from '@space-game/common';
+import { activity } from '../activity/index.js';
 
 /** Bosses with a mind of their own (bosses.json `brain`): their moves are written out in server/src/game/brains */
 const BRAINS: Record<string, (host: BrainHost) => BossBrain> = {
@@ -428,6 +429,7 @@ export class Bosses {
   private engage(b: Live): void {
     if (b.engaged) return;
     b.engaged = true;
+    activity.boss('start', b.def.name, this.host.players(b.systemNum));
     this.host.send(b.systemNum, { type: 'bossIntro', bodyId: b.eid, name: b.def.name, title: b.def.title, text: b.def.intro });
     if (b.def.codex) this.host.encountered?.(b.def, this.host.players(b.systemNum));
   }
@@ -474,7 +476,7 @@ export class Bosses {
     // A wanderer moves on while nobody's fighting it
     const roamed = this.roam(b, now, target);
     // Quiet again (everyone left or died): the next one gets the card too
-    if (!roamed && b.engaged && !this.host.players(b.systemNum).some((p) => dhypot(Position.x[p] - x, Position.y[p] - y) < this.file.rules.barRange)) b.engaged = false;
+    if (!roamed && b.engaged && !this.host.players(b.systemNum).some((p) => dhypot(Position.x[p] - x, Position.y[p] - y) < this.file.rules.barRange)) { b.engaged = false; activity.boss('fail', b.def.name, [...b.dealt.keys()]); }
     // Novas: warn, then fire a ring of shots
     if (b.nova && b.novaAt < 0 && now >= b.nextNova && target >= 0) {
       b.novaAt = now + b.nova.warnTicks;
@@ -554,6 +556,7 @@ export class Bosses {
       this.host.reward(p, b.id, b.def, b.def.xp, credits, loot);
     }
     this.host.defeated?.(b.id, b.def, [...winners]);
+    activity.boss('kill', b.def.name, [...winners]);
     this.host.send(b.systemNum, { type: 'bossDefeated', bodyId: eid, name: b.def.name, x: Math.round(x), y: Math.round(y) });
     this.host.announce(b.systemNum, `${b.def.name} is destroyed!`, 'good');
     if (!b.def.arena) this.nextSpawn.set(b.id, now + b.def.respawnSeconds * 60);

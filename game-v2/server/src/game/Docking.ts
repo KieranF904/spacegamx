@@ -20,6 +20,7 @@ import type { Pilots } from './Pilots.js';
 import type { Ammo } from './Ammo.js';
 import type { Quests } from './Quests.js';
 import { SimPass } from '../sim/SystemClocks.js';
+import { activity } from '../activity/index.js';
 
 /** Every station (GameServer reads the same query) */
 export const stationQuery = defineQuery([Station, Position]);
@@ -105,6 +106,7 @@ export class Docking {
     // (Quiet when there was nothing to load: every dock shouldn't say so)
     this.ammo.restock(conn, { report: true, quiet: true });
     if (sd) this.pilots.bumpStat(conn, `dock:${sd.id}`);
+    if (sd) activity.dock(conn, sd.name);
     if (sd) this.quests.rumourAt(conn, sd.id, sd.system, Math.floor(this.clock() / 86_400_000));
     reply(true, sd?.name ?? 'Station');
   }

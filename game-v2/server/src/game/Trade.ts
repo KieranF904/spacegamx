@@ -10,6 +10,7 @@
 
 import { Bag, ServerMessage, TradeOfferView, countOf } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
+import { activity } from '../activity/index.js';
 
 /** Pilots must stay this close to trade */
 export const TRADE_RANGE = 2500;
@@ -135,6 +136,7 @@ export class Trade {
     if (Object.keys(oa.items).length) this.pilots.give(s.b, oa.items, { toStorage: true, source: 'trade' });
     for (const c of [s.a, s.b]) { this.pilots.bumpStat(c, 'trades'); this.pilots.sendItems(c); this.pilots.saveNow(c); }
     this.host.log?.(`trade ${s.a.username} ⇄ ${s.b.username}: ${JSON.stringify(oa)} for ${JSON.stringify(ob)}`);
+    activity.trade(s.a, s.b, oa, ob);
     this.close(s, 'Trade complete: what you received is in storage', true);
   }
 
