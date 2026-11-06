@@ -19,9 +19,10 @@
 import {
   Economy, StationData, Bag, CraftRecipe, ServerMessage, CraftJob,
   canCraft, sellPrice, buyPrice, queueSlots, unlocks, countOf, removeFrom, isStructuralItem, cutInputs, gemItemId, type GemsFile,
-  stationPerks, stationLearned, armouryRound, stationTable, type Outpost, mulberry32,
+  stationPerks, stationLearned, armouryRound, stationTable, type Outpost,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
+import { PayoutDice, type Dice } from './payoutDice.js';
 import type { Market } from './Market.js';
 
 export interface StationHost {
@@ -62,10 +63,13 @@ export const isRefineJob = (j: { recipe: string }) => j.recipe.startsWith(REFINE
 export class StationServices {
   /** Cut gems (data/gems.json) */
   gems?: GemsFile;
-  /** Server-only randomness, seeded (math/rng.ts): whether a gem cut fails */
-  private rng = mulberry32(0xc075);
+  /** Whether a gem cut fails: payout dice, from the server's secret (payoutDice.ts) */
+  private readonly rng: Dice;
 
-  constructor(private host: StationHost, private pilots: Pilots, private econ: Economy, private market?: Market) {}
+  /** `payout`: the server's payout dice (GameServer's; none: a secret of its own) */
+  constructor(private host: StationHost, private pilots: Pilots, private econ: Economy, private market?: Market, payout: PayoutDice = new PayoutDice()) {
+    this.rng = payout.stream('gem cuts');
+  }
 
   /** Cut a gem: its inputs now, the gem when the job's done (or half the inputs back, if the cut fails) */
   cutGem(conn: PilotConn, msg: { gem: string; level: number }): void {

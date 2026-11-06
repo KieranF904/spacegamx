@@ -137,6 +137,7 @@ import { LootPods, PodHost } from './game/LootPods.js';
 import { ServerFeatures } from './ships/features/host.js';
 import { SERVER_FEATURES } from './ships/features/index.js';
 import { Mining, MiningHost } from './game/Mining.js';
+import { PayoutDice } from './game/payoutDice.js';
 import { AsteroidOrbits } from './game/AsteroidOrbits.js';
 import { StationServices } from './game/StationServices.js';
 import { Weapons } from './game/Weapons.js';
@@ -523,6 +524,11 @@ export interface GameServerOptions {
   contributorStore?: ContribStore;
   /** Where the world's memory is kept between restarts (worldFileStore: data/world/memory.json); none: in memory only */
   worldStore?: WorldStore;
+  /**
+   * The payout dice's secret (game/payoutDice.ts): fixed, the same rolls every run (tests, benches). None: the
+   * PAYOUT_SECRET environment variable if set, else a random one each boot (the real server). Never sent anywhere
+   */
+  payoutSecret?: string;
 }
 
 /** A player who quits within this long of taking damage leaves their ship in space... */
@@ -543,6 +549,11 @@ export class GameServer implements ServerCtx {
   readonly world: IWorld;
   /** Server-only randomness, seeded (math/rng.ts): spawn spots and groups, the people's chatter */
   private rng = mulberry32(0x6a3e5);
+  /**
+   * Payout dice (game/payoutDice.ts): every roll that decides what a pilot gets (mining, loot, salvage, pods, caches,
+   * gem cuts) draws from these, keyed by a secret that never leaves the server (GameServerOptions.payoutSecret)
+   */
+  readonly payout: PayoutDice;
   gameData: GameData;
   clients: Map<ClientSocket, ClientConnection> = new Map();
   scene: 'sectors' | 'empty';
@@ -716,6 +727,7 @@ export class GameServer implements ServerCtx {
   private gameLoopTimer: unknown = null;
 
   constructor(opts: GameServerOptions) {
+    this.payout = new PayoutDice(opts.payoutSecret);
     this.world = createWorld();
     this.net = new Outbox(this);
     this.hits = new HitLedger(this);
@@ -771,7 +783,7 @@ export class GameServer implements ServerCtx {
     }
     this.support = this.features.get('support') as unknown as Support;
     // ---- (end part features)
-    this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable);
+    this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable, this.payout);
     this.weapons = new Weapons({
       world: this.world,
       tick: () => this.currentTick,
@@ -787,7 +799,7 @@ export class GameServer implements ServerCtx {
         return kind === 'cannon' ? t[turret ? 'turret' : 'fixed'] : t[kind] ?? t.fixed;
       },
     }, this.ships, this.ships.tuning);
-    this.enemies = new Enemies(this.createEnemyHost(), this.ships, withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id)), this.ships.enemyDesigns);
+    this.enemies = new Enemies(this.createEnemyHost(), this.ships, withNests(withZoneSpots(this.gameData.factionsFile as FactionsFile, (id) => this.gameData.getSystem(id)), (id) => this.gameData.getSystem(id)), this.ships.enemyDesigns, this.payout);
     this.enemies.econ = this.econ;
     const profileStore = opts.profileStore ?? new MemoryProfileStore();
     this.pilots = new Pilots(this.createPilotHost(), this.econ, this.ships, profileStore, {
@@ -828,7 +840,7 @@ export class GameServer implements ServerCtx {
       refined: (conn, used) => this.releaseTraces(conn, used),
       station: (id) => this.gameData.getStation(id) ?? null,
       stationsWith: (service) => this.gameData.getAllStations().filter((st) => st.services.includes(service as never)),
-    }, this.pilots, this.econ, this.market);
+    }, this.pilots, this.econ, this.market, this.payout);
     this.ammo = new Ammo(this.pilots, this.ships.tuning, this.ships.catalog);
     this.ammo.hangar = (conn) => this.hangar?.send(conn);
     this.hazards = new Hazards({
@@ -903,7 +915,7 @@ export class GameServer implements ServerCtx {
       releaseControls: (eid) => this.releaseControls(eid),
     });
     this.dockedShips = this.docking.dockedShips;
-    this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns);
+    this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns, this.payout);
     this.mobs = new Mobs(this.createMobHost(), this.gameData.mobsFile as MobsFile);
     this.bosses.mobs = this.mobs;
     this.arenaGates = new ArenaGates({
@@ -946,7 +958,7 @@ export class GameServer implements ServerCtx {
     });
     const bossHost = this.createBossHost();
     this.dens = new Dens({
-      tick: () => this.currentTick, ships: this.ships, players: bossHost.players, send: bossHost.send, terrain: bossHost.terrain,
+      tick: () => this.currentTick, ships: this.ships, players: bossHost.players, send: bossHost.send, terrain: bossHost.terrain, payout: this.payout,
       systems: () => this.gameData.getAllSystems().filter((s) => s.den?.length).map((s) => ({ num: this.gameData.getSystemNum(s.id), den: s.den! })),
       who: (eid) => this.pilots.connOf(eid)?.username ?? null,
       toast: (eid, text, kind) => { const pc = this.pilots.connOf(eid); if (pc) this.pilots.toast(pc, text, kind); },
@@ -959,7 +971,7 @@ export class GameServer implements ServerCtx {
       },
     });
     this.enemies.mobs = this.mobs;
-    this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile);
+    this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile, this.payout);
     this.party = new Party(this.createPartyHost());
     this.admin = new AdminTools(this.createAdminHost());
     this.contrib = new ContributorNotes<ClientConnection>({

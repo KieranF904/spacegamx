@@ -19,6 +19,7 @@
 
 import { Position, Bag, ServerMessage, mulberry32, dcos, dhypot, dsin } from '@space-game/common';
 import type { Enemies, FactionsFile } from './Enemies.js';
+import { PayoutDice, type Dice } from './payoutDice.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 
 export interface EventHost {
@@ -195,7 +196,12 @@ export class Events {
   private t: Texts<keyof typeof EVENT_STRINGS>;
 
   /** `rules`: data/rules.json `events` (over the defaults); `strings`: data/strings.json */
-  constructor(private host: EventHost, private enemies: Enemies, private factions: FactionsFile, rules?: RulesPatch<EventRules>, strings?: StringsFile) {
+  /** What the pods hold (how many, what, how much, a rare find): payout dice, from the server's secret (payoutDice.ts) */
+  private readonly podDice: Dice;
+
+  /** `rules`: data/rules.json `events` (over the defaults); `strings`: data/strings.json; `payout`: the server's payout dice */
+  constructor(private host: EventHost, private enemies: Enemies, private factions: FactionsFile, rules?: RulesPatch<EventRules>, strings?: StringsFile, payout: PayoutDice = new PayoutDice()) {
+    this.podDice = payout.stream('event pods');
     this.rules = mergeRules(DEFAULT_EVENT_RULES, rules);
     this.t = texts(EVENT_STRINGS, strings);
   }
@@ -257,12 +263,12 @@ export class Events {
     const d = Math.max(1, this.host.danger(num));
     const goods = S.goods;
     const rare = S.rare;
-    const pods = S.podsMin + Math.floor(this.rng() * S.podsExtra);
+    const pods = S.podsMin + Math.floor(this.podDice() * S.podsExtra);
     for (let i = 0; i < pods; i++) {
       const bag: Bag = {};
-      const id = goods[Math.floor(this.rng() * goods.length)];
-      bag[id] = S.countMin + Math.floor(this.rng() * (S.countSpread + d));
-      if (this.rng() < S.rareChancePerDanger * d) bag[rare[Math.floor(this.rng() * rare.length)]] = 1;
+      const id = goods[Math.floor(this.podDice() * goods.length)];
+      bag[id] = S.countMin + Math.floor(this.podDice() * (S.countSpread + d));
+      if (this.podDice() < S.rareChancePerDanger * d) bag[rare[Math.floor(this.podDice() * rare.length)]] = 1;
       const a = this.rng() * Math.PI * 2, r = S.scatterMin + this.rng() * S.scatterExtra;
       this.host.spawnPod(num, at.x + dcos(a) * r, at.y + dsin(a) * r, dcos(a) * S.drift, dsin(a) * S.drift, bag, S.podLifeSeconds);
     }
@@ -325,9 +331,9 @@ export class Events {
     if (!pk || !pk.goods.length) return null;
     const at = { x: pk.x, y: pk.y };
     for (let i = 0; i < pk.pods; i++) {
-      const id = pk.goods[Math.floor(this.rng() * pk.goods.length)];
+      const id = pk.goods[Math.floor(this.podDice() * pk.goods.length)];
       const a = this.rng() * Math.PI * 2, r = P.scatterMin + this.rng() * P.scatterExtra;
-      this.host.spawnPod(num, at.x + dcos(a) * r, at.y + dsin(a) * r, dcos(a) * P.drift, dsin(a) * P.drift, { [id]: P.countMin + Math.floor(this.rng() * P.countSpread) }, P.podLifeSeconds);
+      this.host.spawnPod(num, at.x + dcos(a) * r, at.y + dsin(a) * r, dcos(a) * P.drift, dsin(a) * P.drift, { [id]: P.countMin + Math.floor(this.podDice() * P.countSpread) }, P.podLifeSeconds);
     }
     // The flock bursts out of the middle and flies off, away from it
     const away = this.rng() * Math.PI * 2;

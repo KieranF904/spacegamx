@@ -9,8 +9,8 @@
  *   worked, kept or not, and a chunk is thrown every 5 to 10 units worked, so
  *   the work sets how often chunks come.
  * - The keep: the chance each unit worked ends up in the chunk; every unit is
- *   a dice roll (the rock's seeded RNG), and a failed roll is lost from the
- *   rock all the same. A chunk holds what was kept; a chunk whose rolls all
+ *   a dice roll (the rock's dice, from the server's secret: payoutDice.ts), and
+ *   a failed roll is lost from the rock all the same. A chunk holds what was kept; a chunk whose rolls all
  *   failed is skipped. The averages are the keep; the drops vary.
  *
  * Mining lasers keep all they work on rock of their grade or below (a grade or
@@ -30,6 +30,7 @@
  */
 
 import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource, dcos, dhypot, dsin } from '@space-game/common';
+import { PayoutDice, type Dice } from './payoutDice.js';
 
 export interface MiningTool {
   yield: number;
@@ -91,7 +92,12 @@ interface Rock extends Composition {
   left: number;
   /** Each miner's work on it */
   work: Map<number, Work>;
-  seed: number;
+  /**
+   * Its dice (its keep, gem, ore and bonus rolls, its chunks' sizes and throws): from the server's secret, never from
+   * anything a client knows (payoutDice.ts). Its composition, which a client works out for its looks and odds, is
+   * from the rock's own key as ever
+   */
+  dice: Dice;
   /** An outlier: its size whole (each stage's is a share of that) */
   wholeSize?: number;
 }
@@ -102,13 +108,17 @@ export class Mining {
   private xpOwed = new Map<number, number>();
   private warned = new Map<number, number>();
 
-  constructor(private host: MiningHost, readonly table: MiningTable) {}
+  /** Rocks registered so far: each one's dice are its own (a rock come back under the same id too) */
+  private registered = 0;
+
+  /** `payout`: the server's payout dice (GameServer's; none: a secret of its own) */
+  constructor(private host: MiningHost, readonly table: MiningTable, private readonly payout: PayoutDice = new PayoutDice()) {}
 
   /** `outlier`: an outlier's stage, its size whole and (past the first stage) the units it still holds */
   register(eid: number, systemNum: number, index: number, type: string, key: string, size: number, tier: number, outlier?: { stage: number; wholeSize: number; left?: number }): void {
     const c = asteroidComposition(this.table, type, key, size, tier, outlier?.stage);
     this.rocks.set(eid, {
-      ...c, systemNum, index, left: Math.min(c.units, outlier?.left ?? c.units), work: new Map(), seed: (eid * 2654435761) >>> 0, tier: this.host.rockTier?.(systemNum) ?? 1,
+      ...c, systemNum, index, left: Math.min(c.units, outlier?.left ?? c.units), work: new Map(), dice: this.payout.stream('rock', eid, this.registered++), tier: this.host.rockTier?.(systemNum) ?? 1,
       ...(outlier ? { wholeSize: outlier.wholeSize } : {}),
     });
   }
@@ -132,11 +142,7 @@ export class Mining {
   }
 
   private rand(r: Rock): number {
-    r.seed = (r.seed + 0x6d2b79f5) >>> 0;
-    let t = r.seed;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return r.dice();
   }
 
   /**
@@ -193,8 +199,8 @@ export class Mining {
         id = pickOre(r, this.rand(r));
         if ((this.table.oreHardness[id] ?? 1) > tool.hardness) id = this.softest(r, tool);
       }
-      // Kept or lost, a dice roll: each unit worked rolls against the keep (the rock's own seeded dice, so it
-      // replays the same); a failed roll still takes the unit out of the rock. (A full keep needs no roll.)
+      // Kept or lost, a dice roll: each unit worked rolls against the keep (the rock's dice, from the server's
+      // secret); a failed roll still takes the unit out of the rock. (A full keep needs no roll.)
       const p = gun && !gun.common.includes(id) ? keep * gun.keepOther : keep;
       if (p >= 1 || this.rand(r) < p) {
         units++;
