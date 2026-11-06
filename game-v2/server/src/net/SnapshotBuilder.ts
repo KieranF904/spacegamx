@@ -41,6 +41,7 @@ function ownHazardKey(h: Readonly<HazardState>, tick: number): string {
 import type { ClientConnection } from './ClientConnection.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { nextSync, type StructEntry } from '../ships/bridge/structLog.js';
+import { toldShips } from './hits/toldShips.js';
 import type { SimLod } from '../ships/SimLod.js';
 import type { Enemies } from '../game/Enemies.js';
 import type { Party } from '../game/Party.js';
@@ -335,12 +336,29 @@ export class SnapshotBuilder {
   private sendBetween(conn: ClientConnection, id: number, ship: ShipState, e: StructEntry): void {
     const hp = e.hp.map(hpWire), had = conn.shipHpSent.get(id);
     const hpd = had && had.length === hp.length ? hp.flatMap((h, i) => (had[i] !== h ? [[i, h] as [number, number]] : [])) : undefined;
+    this.noteBefore(conn, id, e.tick, e.rebuilds, hpd ? had : undefined, conn.shipSynced.get(id)?.ship === ship ? conn.shipSynced.get(id)!.rebuilds : -1);
     conn.shipHpSent.set(id, [...hp]);
     this.send(conn.ws, {
       type: 'shipSync', id, kind: ship.kind, hp: hpd ? undefined : hp, hpd: hpd?.length ? hpd : undefined,
       maxHp: !hpd && ship.scaledHp ? ship.maxHp.map(hpWire) : undefined,
       detached: [...e.detached], rebuilds: e.rebuilds, ghosts: e.ghosts ? [...e.ghosts] : undefined, at: e.tick,
     });
+  }
+
+  /**
+   * A rebuild sync of a ship this client has, about to go (its HP copy `had` just before it; undefined: it gets the
+   * HP whole, or the ship is new to it): kept for the window's hits on the structure before (HitLedger.derive). The
+   * rebuild count it had before is the last such sync's this window, else `was` (-1: none)
+   */
+  private noteBefore(conn: ClientConnection, id: number, at: number | undefined, rebuilds: number, had: readonly number[] | undefined, was: number): void {
+    if (!this.hits) return;
+    const map = (conn.hpBefore ??= new Map());
+    const list = map.get(id);
+    if (list === null) return;
+    const from = list?.length ? list[list.length - 1].rebuilds : was;
+    if (at === undefined || !had || from < 0) { map.set(id, null); return; }
+    const e = { at, from, rebuilds, hp: had.slice() };
+    if (list) list.push(e); else map.set(id, [e]);
   }
 
   /**
@@ -379,6 +397,7 @@ export class SnapshotBuilder {
         const fresh = !synced || synced.ship !== ship;
         // (Keeping each structure by its tick, CAPS.STRUCTS: the ones between go first, in order, each with its tick)
         const next = nextSync(this.ships.structLog, id, ship, synced);
+        const was = fresh ? -1 : synced!.rebuilds;
         for (const e of next.between) this.sendBetween(conn, id, ship, e);
         const kept: number[] | undefined = next.kept, at: number | undefined = next.at;
         // (Its shells' damage multiplier: on a new ship's sync when it isn't 1, then whenever it changed)
@@ -390,6 +409,8 @@ export class SnapshotBuilder {
         // After a rebuild the client has this ship's HP already, bar what changed since
         const had = fresh ? undefined : conn.shipHpSent.get(id);
         const hpd = had && had.length === hp.length ? hp.flatMap((h, i) => (had[i] !== h ? [[i, h] as [number, number]] : [])) : undefined;
+        if (fresh) conn.hpBefore?.delete(id);
+        this.noteBefore(conn, id, at, ship.rebuilds, hpd ? had : undefined, was);
         conn.shipHpSent.set(id, [...hp]);
         // A design this client has seen (another ship of it) goes by its hash
         const design = fresh ? (sync.design ??= designHash(ship.blueprint)) : undefined;
@@ -868,7 +889,7 @@ export class SnapshotBuilder {
       const hitsOn = !!this.hits;
       this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
       // (Hits on a ship its causes moved this window are told, as on one keyframed: its client leaves them, SelfHits.onCaused)
-      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id), rep.caused ? new Set([...keyed, ...rep.caused]) : keyed) : null;
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id), rep.caused ? toldShips(keyed, rep.causes, rep.found?.touched, (id) => hasComponent(this.world, Player, id)) : keyed) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {
@@ -963,6 +984,8 @@ export class SnapshotBuilder {
       if (conn.ownWindow) conn.ownWindow.length = 0;
       this.lastEntityStates.set(conn.playerId, newStates);
       if (hitsOn) this.afterHits(conn, playerSystemId);
+      // (its window's rebuild syncs are done with: HitLedger.derive)
+      conn.hpBefore?.clear();
       // What its check of its own ship should say for this snapshot (net/own/OwnChecks.ts)
       if (this.ownChecks && conn.repKnown.has(conn.playerId)) this.noteOwn(conn, ownNow);
       // ...and of the bodies it runs (net/decisions/BodyNet.ts)

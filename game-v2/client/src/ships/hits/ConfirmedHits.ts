@@ -33,7 +33,7 @@ export interface HitShell { owner: number; gun: number; spawnTick: number; x: nu
 
 export interface ConfirmedHitsHost {
   /** The ships (ShipStore): the rules read their blueprints and geometry, and the hits change their HP */
-  readonly store: HitCtx & { get(id: number): ShipState | undefined };
+  readonly store: HitCtx & { get(id: number): ShipState | undefined; asOf?(id: number, t: number): ShipState | undefined };
   /** A shell it has (a projectile row, or a fire event's), null if none or not from a gun */
   shell(id: number): HitShell | null;
   /**
@@ -78,8 +78,11 @@ export interface HitDone {
   at: [number, number];
   /** It found this one itself (else the server's record) */
   own: boolean;
-  /** The HP part it changed, what it was before and after, to take back (a shield's record, or the old way) */
-  undo: { part: number; hp: number; after: number } | null;
+  /**
+   * The HP part it changed, what it was before and after, to take back (a shield's record, or the old way), and the
+   * copy it changed when that isn't the ship's own (`ship`: one struck before a rebuild this window, ShipStore.asOf)
+   */
+  undo: { part: number; hp: number; after: number; ship?: ShipState } | null;
   /** The shell's pass count before it */
   prev: number;
 }
@@ -165,7 +168,7 @@ export class ConfirmedHits {
   own(hits: readonly OwnHit[]): void {
     const { store } = this.host;
     for (const o of hits) {
-      const s = this.shellOf(o.shell), ship = store.get(o.target), owner = s ? store.get(s.owner) : undefined;
+      const s = this.shellOf(o.shell), ship = this.shipAt(o.target, o.tick), owner = s ? store.get(s.owner) : undefined;
       const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
       if (!s || !ship || !sh) continue;
       const passes = this.passes.get(o.shell) ?? 0;
@@ -176,7 +179,7 @@ export class ConfirmedHits {
       this.pending.push({
         shell: o.shell, target: o.target, part: o.part, tick: o.tick, owner: s.owner, glancing: d.glancing, gone: d.gone, dealt: d.dealt,
         ignite: d.ignite, igniteTicks: sh.def.ignite?.ticks ?? 0, fx: d.fx, at: [Math.round(o.x * 10) / 10, Math.round(o.y * 10) / 10], own: true,
-        undo: d.part >= 0 ? { part: d.part, hp: before[d.part], after: ship.hp[d.part] } : null, prev: passes,
+        undo: d.part >= 0 ? this.undoOf(o.target, ship, d.part, before[d.part]) : null, prev: passes,
       });
     }
   }
@@ -314,7 +317,7 @@ export class ConfirmedHits {
     this.stats.records++;
     const passes = this.passes.get(r.shell) ?? 0;
     if (r.gone) this.passes.delete(r.shell); else this.passes.set(r.shell, passes + 1);
-    const s = this.shellOf(r.shell) ?? this.unbuiltOwn(r.shell, r.target, tick), ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
+    const s = this.shellOf(r.shell) ?? this.unbuiltOwn(r.shell, r.target, tick), ship = this.shipAt(r.target, tick), owner = s ? store.get(s.owner) : undefined;
     const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
     if (!s || !ship || !sh) { this.stats.missed++; if (hp) this.resync.add(r.target); return null; }
     const at = this.hitPoint(s, ship, r.target, r.part, tick);
@@ -327,7 +330,7 @@ export class ConfirmedHits {
       const d = deriveShellHit({ ctx: store, ship, struck: r.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes });
       dealt = d.dealt;
       ignite = d.ignite;
-      if (d.part >= 0) undo = { part: d.part, hp: before[d.part], after: ship.hp[d.part] };
+      if (d.part >= 0) undo = this.undoOf(r.target, ship, d.part, before[d.part]);
     }
     if (r.d10 !== undefined) dealt = r.d10 / 10;
     if (r.ignite !== undefined) ignite = r.ignite;
@@ -359,9 +362,21 @@ export class ConfirmedHits {
     return out;
   }
 
+  /** The ship as a hit on tick t struck it (before a rebuild this window: ShipStore.asOf), else as it is */
+  private shipAt(id: number, t: number): ShipState | undefined {
+    const { store } = this.host;
+    return store.asOf ? store.asOf(id, t) : store.get(id);
+  }
+
+  private undoOf(target: number, ship: ShipState, part: number, hp: number): NonNullable<HitDone['undo']> {
+    const u: NonNullable<HitDone['undo']> = { part, hp, after: ship.hp[part] };
+    if (ship !== this.host.store.get(target)) u.ship = ship;
+    return u;
+  }
+
   /** A hit's HP taken back: what it took, given back (other hits on the part since keep theirs) */
-  private takeBack(target: number, u: { part: number; hp: number; after: number }): void {
-    const ship = this.host.store.get(target);
+  private takeBack(target: number, u: { part: number; hp: number; after: number; ship?: ShipState }): void {
+    const ship = u.ship ?? this.host.store.get(target);
     if (ship) ship.hp[u.part] = hpWire(ship.hp[u.part] + (u.hp - u.after));
   }
 

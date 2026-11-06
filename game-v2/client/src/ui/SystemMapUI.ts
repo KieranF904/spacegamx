@@ -192,6 +192,8 @@ export class SystemMapUI {
 
   private root: HTMLDivElement;
   private canvas: HTMLCanvasElement;
+  /** A layer over the canvas (the same box, under the bar, the hint and the tooltip) for overlays placed with toCanvas */
+  readonly overlay: HTMLDivElement;
   private ctx: CanvasRenderingContext2D;
   private tooltip: HTMLDivElement;
   private titleEl: HTMLDivElement;
@@ -203,6 +205,15 @@ export class SystemMapUI {
 
   get isOpen(): boolean {
     return this.visible;
+  }
+
+  /** A world point in the open system view, as px in the canvas (and `overlay`), into `out`; false if it isn't showing */
+  toCanvas(x: number, y: number, out: { x: number; y: number }): boolean {
+    if (!this.visible || this.view !== 'system') return false;
+    const cam = this.cam();
+    out.x = (x - cam.x) * cam.scale + this.canvas.clientWidth / 2;
+    out.y = (y - cam.y) * cam.scale + this.canvas.clientHeight / 2;
+    return true;
   }
 
   /** Opened or closed (the server sends the far ships while it's open: mapView) */
@@ -265,6 +276,7 @@ export class SystemMapUI {
         </div>
       </div>
       <canvas></canvas>
+      <div class="gm-over"></div>
       <div class="gm-hint"></div>
       <div class="gm-tip"></div>`;
     // On the body, not the game's UI overlay: that layer ignores pointer events
@@ -272,6 +284,7 @@ export class SystemMapUI {
     document.body.appendChild(this.root);
     void container;
     this.canvas = this.root.querySelector('canvas')!;
+    this.overlay = this.root.querySelector('.gm-over')!;
     this.ctx = this.canvas.getContext('2d')!;
     this.tooltip = this.root.querySelector('.gm-tip')!;
     this.titleEl = this.root.querySelector('.gm-title')!;
@@ -1859,6 +1872,7 @@ export class SystemMapUI {
     style.textContent = `
       #galaxy-map { position: fixed; inset: 0; z-index: 2500; pointer-events: auto; background: #02040c; font-family: 'Segoe UI', system-ui, sans-serif; color: #cfd8e6; }
       #galaxy-map canvas { position: absolute; z-index: 1; left: 0; top: 52px; width: 100%; height: calc(100% - 52px - 30px); display: block; }
+      #galaxy-map .gm-over { position: absolute; z-index: 1; left: 0; top: 52px; width: 100%; height: calc(100% - 52px - 30px); pointer-events: none; overflow: hidden; }
       #galaxy-map .gm-bar { position: absolute; z-index: 2; left: 0; right: 0; top: 0; height: 52px; display: flex; align-items: center; gap: 18px;
         padding: 0 16px; border-bottom: 1px solid rgba(100, 160, 255, 0.18); background: linear-gradient(180deg, rgba(20, 40, 80, 0.55), rgba(2, 4, 12, 0.9)); }
       #galaxy-map .gm-titles { min-width: 260px; }

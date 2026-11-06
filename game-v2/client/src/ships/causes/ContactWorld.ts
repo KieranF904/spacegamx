@@ -20,6 +20,8 @@
  * whose live pairs changed (it comes close to one re-stepped, or a snapshot left one of its pairs out) is stepped
  * again from there. What was found before and not yet found again waits in `was` until something reads the layer
  * (settle: every replica step asks first, and every snapshot's end). A window's ticks are final once its snapshot is in.
+ * Nothing is found past the newest snapshot (predicted ticks have the PT layer's own pass, client predict/contacts.ts):
+ * a ship stepped there is stepped again from the window when the next snapshot begins.
  */
 import {
   CONTACT_BIG_BODY, CONTACT_FLAG, OWN_CAUSE, ReplicaMode, ContactPairCache, contactJumping, contactFxDue, contactLive, contactPairs, contactPieces, contactPair,
@@ -128,6 +130,10 @@ export class ContactWorld implements ReplicaRewinds {
     this.windows.push({ from: prev + 1, to: m.tick, out });
     while (this.windows.length && this.windows[0].to < m.tick - KEEP_TICKS) this.windows.shift();
     this.final = Math.max(this.final, prev);
+    // (Ships stepped past the last snapshot (AI stepped ahead for the PT layer, a pose drawn a tick ahead) were stepped
+    // with no pairs there: the window's pairs are found now, so they're stepped again from it)
+    const reps = this.host.reps, self = this.host.self();
+    for (const id of [...reps.ids()]) if (id !== self && (reps.lastOf(id) ?? -Infinity) > prev) reps.rewind(id, prev + 1);
     // (Found again with the window's ships left out, and held against what was found: settle)
     this.stale(prev + 1);
   }
@@ -344,6 +350,10 @@ export class ContactWorld implements ReplicaRewinds {
     const have = this.memo.get(t);
     if (have) return have;
     if (t <= this.since) return EMPTY;
+    // (Past the newest snapshot: no pairs. Its ships aren't final there, and finding them meant stepping every ship it
+    // holds to that tick; the PT layer's pass covers predicted ticks (client predict/contacts.ts). beginSnapshot steps
+    // what went past it again once its window is in)
+    if (t > this.snapTick) return EMPTY;
     if (this.busy.has(t)) { this.stats.reentry++; return EMPTY; }
     this.busy.add(t);
     try {

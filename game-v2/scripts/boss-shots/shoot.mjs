@@ -71,8 +71,10 @@ for (const s of steps) {
   if (s.wheel) for (let i = 0; i < (s.times ?? 1); i++) { await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 640, y: 400, deltaX: 0, deltaY: s.wheel }); await sleep(60); }
   if (s.wait) await sleep(s.wait);
   if (s.shot) {
-    // Shots never show the chat box (a step can keep it with { shot, chat: true })
+    // Shots never show the chat box nor the chat bubbles over ships (a step can keep them: { shot, chat: true } both,
+    // { shot, bubbles: true } just the bubbles)
     if (!s.chat) await send('Runtime.evaluate', { expression: "(() => { const c = document.getElementById('chatBox'); if (c) c.style.visibility = 'hidden'; })()" });
+    await send('Runtime.evaluate', { expression: `(() => { const c = document.getElementById('chatBubbles'); if (c) c.style.visibility = '${s.chat || s.bubbles ? '' : 'hidden'}'; })()` });
     const r = await send('Page.captureScreenshot', { format: 'png', ...(s.clip ? { clip: { ...s.clip, scale: s.scale ?? 1 } } : {}) });
     writeFileSync(`${out}-${shot++}.png`, Buffer.from(r.result.data, 'base64'));
   }

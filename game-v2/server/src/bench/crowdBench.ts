@@ -10,6 +10,9 @@
  *   (cruise: pilots flying out and back over 24 km, the focus grid's churn; every client runs the full caps set,
  *   DEFAULT_CAPS: probes and counting sockets alike)
  *   --case <layout>:<n>                    one case in this process (what the matrix runs), prints one JSON line
+ *   --pt 0                                 probes without the game's prediction of other ships (client predict/, C3; on by
+ *                                          default: its CPU is reported apart, "probe PT"); --pt-reach 1e9 lifts its
+ *                                          level of detail (every held ship on PT)
  *   --crowd                                crowd fallbacks on and automatic (CAPS.CROWD, probes with every cap): each
  *                                          second's level and base-tick time, where it settled (try --secs 40)
  */
@@ -28,6 +31,7 @@ const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
   layout, n, secs: Number(arg('secs', full ? '15' : '10')),   crowd: flag('crowd'),
   probes: Number(arg('probes', '4')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
+  pt: arg('pt', '1') !== '0', ptReach: arg('pt-reach') ? Number(arg('pt-reach')) : undefined,
 });
 
 const one = arg('case');
@@ -72,6 +76,13 @@ console.log('\ndebris: pieces mean/max, server step ms/tick, probe client debris
 for (const r of results) {
   const d = r.bytes.capable.debrisBps ?? {}, tot = Object.values(d).reduce((a: number, b) => a + (b as number), 0), c = r.agreement.correctionsByClass?.debris;
   console.log(`${r.layout} ${r.n}: ${r.timing.debrisMean}/${r.timing.debrisMax}, ${r.timing.debrisStepMsPerTick} ms, client ${r.probeDebrisMsPerTick} ms, ${tot} B/s ${JSON.stringify(d)}, corr ${c?.n ?? 0}, ${r.agreement.debrisOff}/${r.agreement.debrisChecked} (${r.agreement.debrisDisagree})`);
+}
+
+console.log('\nprobe PT (the game\'s prediction of other ships, C3, per probe): ms/tick (advance + re-step), ships on PT, left out by LOD, ST match %, misses/s, re-stepped ships/s (touched), re-step ticks/s, corrections/s, mean correction, PT contacts/s');
+for (const r of results) {
+  const p = r.pt;
+  if (!p) continue;
+  console.log(`${r.layout} ${r.n}: ${p.msPerTick} ms (${p.advanceMsPerTick} + ${p.restepMsPerTick}), ${p.ships} ships, ${p.lodOut} out, ${p.matchPct} %, ${p.missesPerSec}/s, ${p.restepShipsPerSec}/s (${p.touchShipsPerSec}), ${p.restepTicksPerSec}/s, ${p.correctionsPerSec}/s, ${p.correctionMean} u, ${p.contactsPerSec}/s; probe client ${r.probeClientMsPerTick} ms`);
 }
 
 if (flag('crowd')) {

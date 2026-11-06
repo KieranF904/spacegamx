@@ -62,8 +62,8 @@ import type { OwnStepped } from '../state/GameState';
 import { ShipCauses } from './causes/ShipCauses';
 import { ContactWorld } from './causes/ContactWorld';
 import { DebrisSplits } from './debris/DebrisSplits';
-import { BodyRunner } from './bodies/BodyRunner';
-import { MoveRunner } from './bodies/MoveRunner';
+import { BodyRunner, type BodyRunnerHost } from './bodies/BodyRunner';
+import { MoveRunner, type MoveRunnerHost, type TimedMoveMsg } from './bodies/MoveRunner';
 import type { CustomStats } from '@space-game/common';
 import factionsData from '../../../data/factions.json';
 import { GuideRunner } from './guides/GuideRunner';
@@ -302,7 +302,7 @@ export class ShipClient {
     this.ownShells = new OwnShells({ self: () => opts.state.playerId, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, firePose: (t) => this.own.firePose(t) });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
-    this.bodies = new BodyRunner({ reps: this.replicas });
+    this.bodies = new BodyRunner((this.bodyHost = { reps: this.replicas }));
     // (Their moves worked out here: ships/bodies/MoveRunner.ts)
     this.moves = new MoveRunner({
       reps: this.replicas, bodies: this.bodies, store: this.store, tuning: opts.tuning, terrain: () => this.terrain,
@@ -315,7 +315,7 @@ export class ShipClient {
     // (Contact pairs found on the tick layer: ships/causes/ContactWorld.ts)
     this.contacts = new ContactWorld({
       reps: this.replicas, store: this.store, self: () => opts.state.playerId, ownOn: () => this.own.on, tuning: opts.tuning,
-      derivedAt: (id, t) => (id === opts.state.playerId ? this.own.derived(t) : this.causes.derived(id, t) ?? this.store.get(id)?.derived),
+      derivedAt: (id, t) => this.derivedAt(id, t),
       mid: (id, t, place) => (id === opts.state.playerId ? this.own.midAt(t, place) : this.causes.midOf(id, t, place)),
       forget: (t) => { this.causes.cursors.forget(t); this.own.cursors.forget(t); },
     });
@@ -330,6 +330,12 @@ export class ShipClient {
 
   /** Ships out of view it keeps: back, the server sends only what changed */
   readonly away: ShipMemory<InterpolatedEntity>;
+  /** The flight tuning (the PT layer's contact pass reads it: predict/world.ts) */
+  get tuning(): ShipTuning { return this.opts.tuning; }
+  /** The structure a ship flew tick t with (its own: OwnTick's; others: by tick where kept, else its current) */
+  derivedAt(id: number, t: number): ShipDerived | null | undefined {
+    return id === this.opts.state.playerId ? this.own.derived(t) : this.causes.derived(id, t) ?? this.store.get(id)?.derived;
+  }
   /** Other ships' causes */
   private readonly causes: ShipCauses;
   private readonly contacts: ContactWorld;
@@ -408,6 +414,28 @@ export class ShipClient {
   readonly own: OwnTick;
   /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (bodies/BodyRunner.ts) */
   readonly bodies: BodyRunner;
+  /** Its host (the PT timeline sets how a body stepped past the snapshots reads other ships: predict/aheadReads.ts) */
+  readonly bodyHost: BodyRunnerHost;
+  /**
+   * The PT timeline's moves (dev prediction modes C2/C3: predict/kinds/movesKind.ts): the snapshots' moves' shells and
+   * looks go by it, which draws the looks it drew ahead once, and those it didn't late. Null: drawn as they come
+   */
+  ptMoves: { stRows(rows: readonly EntityState[]): void; stMsgs(timed: readonly TimedMoveMsg[]): ServerMessage[] } | null = null;
+  /** The frame's message handler (Game's), for what the PT timeline draws between frames */
+  private handler: ((m: ServerMessage) => void) | null = null;
+
+  /** A fork of one body's moves, its runs beginning at `from` (the PT timeline's moves: predict/kinds/movesKind.ts) */
+  forkMoves(from: number, id: number, read: MoveRunnerHost['read']): MoveRunner {
+    return new MoveRunner({
+      reps: this.replicas, bodies: this.bodies, store: this.store, tuning: this.opts.tuning, terrain: () => this.terrain,
+      custom: (factionsData as { custom?: { designs: Record<string, CustomStats> } }).custom, from, only: (x) => x === id, read,
+    });
+  }
+
+  /** Draw a message as the server's would be (the PT timeline's looks, as their body's draw tick reaches them) */
+  show(m: ServerMessage): void {
+    this.handler?.(m);
+  }
   /** Their moves' looks and straight shells worked out on the tick-aligned layer (bodies/MoveRunner.ts) */
   readonly moves: MoveRunner;
   /** Homing shells flown on the tick-aligned layer by the waypoint law (guides/GuideRunner.ts) */
@@ -516,8 +544,10 @@ export class ShipClient {
 
   /** The frame's end: this frame's hits (found here and told) handed out, and into the chain */
   frameEnd(handle: (m: ServerMessage) => void): void {
-    // (what bodies' moves drew this frame, CAPS.MOVES: as if the server had sent it)
-    for (const msg of this.moves.take()) handle(msg);
+    this.handler = handle;
+    // (what bodies' moves drew this frame, CAPS.MOVES: as if the server had sent it; on the PT timeline, by it)
+    const timed = this.moves.takeTimed();
+    for (const msg of this.ptMoves ? this.ptMoves.stMsgs(timed) : timed.map((t) => t.msg)) handle(msg);
     this.findHits();
     // (Switched off in this frame, its hits still go: the netCaps came after the snapshot's records)
     if (!this.selfHits.on && !this.hits.hasPending) return;
@@ -649,6 +679,7 @@ export class ShipClient {
     out.push(...this.debris.takeRows());
     // (bodies' moves through this window: their straight shells as rows, those spent gone; their looks at the frame's end)
     const mv = this.moves.advance(m.tick, this.opts.state.playerId);
+    this.ptMoves?.stRows(mv.rows);
     out.push(...mv.rows);
     if (mv.removed.length) m.removed.push(...mv.removed);
     // (homing shells: flown on the tick layer from their SYNCs and waypoints; drawn where it has them)
@@ -1241,7 +1272,7 @@ export class ShipClient {
         return true;
       case 'shipSync':
         this.debris.onSync(msg);
-        this.selfHits.onSync(msg.id);
+        this.selfHits.onSync(msg.id, this.store.keepsBefore(msg));
         this.own.beforeSync(msg.id);
         this.causes.beforeSync(msg.id);
         for (const part of this.store.onSync(msg)) this.damageFx?.onPartRestored(msg.id, part);

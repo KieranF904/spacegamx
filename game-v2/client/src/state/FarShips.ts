@@ -91,6 +91,15 @@ export class FarShips {
     return out;
   }
 
+  /** One far ship's drawn place at server tick `tick`, into `out` (false: not one of this system's) */
+  position(id: number, system: string, tick: number, out: { x: number; y: number }): boolean {
+    const t = system === this.system ? this.tracks.get(id) : undefined;
+    if (!t) return false;
+    const p = this.at(t, tick);
+    out.x = p.x; out.y = p.y;
+    return true;
+  }
+
   get size(): number {
     return this.tracks.size;
   }

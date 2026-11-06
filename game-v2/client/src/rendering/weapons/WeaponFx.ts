@@ -465,7 +465,8 @@ export class WeaponFx {
         // Not confirmed yet: it flies on its own (and fades if the server never fired it)
         if (shot.fading !== null) continue;
         if (presentTick - shot.spawnTick > CONFIRM_TICKS) { shot.fading = 0; continue; }
-        this.fly(shot, undefined, presentTick, state);
+        // (another ship's, drawn ahead by the PT timeline (a boss's move): on its owner's timeline, as its rows are)
+        this.fly(shot, undefined, shot.owner === state.playerId ? presentTick : this.timeline(shot, state, presentTick, renderTick), state);
         continue;
       }
       if (!seen.has(shot.id) && shot.fading === null) {
@@ -1030,8 +1031,12 @@ export class WeaponFx {
     }
   }
 
-  /** A shell your client just fired (guns.ts): it flies from your barrel now, the server's copy takes it over when it comes */
-  predict(p: PredictedShell): void {
+  /**
+   * A shell your client just fired (guns.ts): it flies from your barrel now, the server's copy takes it over when it
+   * comes. Or another ship's drawn ahead by the PT timeline (predict/kinds/movesKind.ts), on its owner's timeline.
+   * Returns its id here (retract takes it back)
+   */
+  predict(p: PredictedShell): number {
     const style = weaponStyle(p.type, p.grade, p.model);
     const id = this.nextPredicted--;
     this.shots.set(id, {
@@ -1042,6 +1047,13 @@ export class WeaponFx {
       endAt: p.life ? p.spawnTick + p.life : Infinity, gone: false, pending: null, head: null, tail: null, ctX: NaN, ctY: NaN,
       ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: p.arm ?? 0,
     });
+    return id;
+  }
+
+  /** A shell drawn ahead that never was (the PT timeline's re-step took it back): it fades where it is */
+  retract(id: number): void {
+    const s = this.shots.get(id);
+    if (s && s.predicted && s.fading === null) s.fading = 0;
   }
 
   /**
