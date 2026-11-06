@@ -54,8 +54,9 @@ export class PredictController {
         (pilot ? this.drawGap.pilot : bosses.has(id) ? this.drawGap.boss : this.drawGap.ai).strike(id, k, pilot, e.renderX, e.renderY, r);
       }
     }, 250);
-    renderer.shotTally = (what, shot, owner, target) => {
-      tally(what, shot, owner, target);
+    renderer.shotTally = (what, shot, owner, target, x, y) => {
+      // (with the point: a told hit no shell here took is matched to the drawn strike nearest it, HitTally 'orphan')
+      tally(what, shot, owner, target, x, y);
       // (A strike on a hull: where the ship was drawn, for the gap to where it really was then)
       if (what !== 'struck' || owner !== self() || !ship(target) || shielded(target)) return;
       const e = state.entities.get(target)!, r = sc.store.get(target)?.derived.radius;

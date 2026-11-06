@@ -8,7 +8,7 @@
  * At most one entry a tick: a ship that breaks apart rebuilds twice on its tick (rebuildNow), and only how that tick
  * left it was ever flown.
  */
-import type { ShipState, Vec2 } from '@space-game/common';
+import type { ShipDerived, ShipState, Vec2 } from '@space-game/common';
 
 export interface StructEntry {
   tick: number;
@@ -16,6 +16,8 @@ export interface StructEntry {
   /** The ship state it was (a refit or respawn makes a new one: entries of another aren't its) */
   ship: ShipState;
   com: Vec2;
+  /** The structure itself (a hit on it before the next rebuild is worked out on it: HitLedger.derive) */
+  derived: ShipDerived;
   hp: readonly number[];
   detached: readonly number[];
   ghosts?: readonly number[];
@@ -34,7 +36,7 @@ export class StructLog {
     // (Another ship state, or a tick before the last one's (a clock it moved off: travel): it starts over)
     if (list.length && (list[list.length - 1].ship !== ship || list[list.length - 1].tick > tick)) list.length = 0;
     const e: StructEntry = {
-      tick, rebuilds: ship.rebuilds, ship, com: ship.derived.com, hp: [...ship.rebuildHp],
+      tick, rebuilds: ship.rebuilds, ship, com: ship.derived.com, derived: ship.derived, hp: [...ship.rebuildHp],
       detached: ship.detached.flatMap((d, i) => (d ? [i] : [])),
       ghosts: ship.ghost.some(Boolean) ? ship.ghost.flatMap((g, i) => (g ? [i] : [])) : undefined,
     };

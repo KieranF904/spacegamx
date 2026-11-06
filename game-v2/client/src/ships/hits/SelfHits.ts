@@ -55,7 +55,7 @@ interface Shell {
 
 export interface SelfHitsHost {
   /** The ships (ShipStore) */
-  readonly store: HitCtx & { get(id: number): ShipState | undefined };
+  readonly store: HitCtx & { get(id: number): ShipState | undefined; asOf?(id: number, t: number): ShipState | undefined };
   /** This client's own ship */
   self(): number;
   /** The ships it could find hits on (replicated, in view) */
@@ -214,9 +214,14 @@ export class SelfHits {
     for (const id of ids) { this.shells.delete(id); this.dropped.delete(id); }
   }
 
-  /** A ship synced this frame (a rebuild, or new to this client): left to the server's records this window */
-  onSync(id: number): void {
-    this.synced.add(id);
+  /**
+   * A ship synced this frame (a rebuild, or new to this client): left to the server's records this window. Not a rebuild
+   * of a ship it had stamped with its rebuild's tick (`kept`: ShipStore keeps the ship before it, and the hits on each
+   * structure are found by tick, ShipStore.asOf), unless it's a pilot's (it moves before the collision step: on the
+   * rebuild's tick its replica's pose is already recentred), as the server's HitLedger.unfindable 'synced'
+   */
+  onSync(id: number, kept = false): void {
+    if (!kept || this.host.side(id) & SIDE.PILOT) this.synced.add(id);
   }
 
   /**
@@ -233,7 +238,12 @@ export class SelfHits {
    */
   onCaused(rows: readonly (readonly number[])[] | undefined): void {
     // (network/causes.ts records: [ago, kind, id, (a contact's other), ...])
-    if (rows) for (const r of rows) { this.synced.add(r[2]); if (r[1] === OWN_CAUSE.CONTACT) this.synced.add(r[3]); }
+    // (Not a rebuild of a ship that isn't a pilot's: its poses either side are exact, as the server's toldShips)
+    if (rows) for (const r of rows) {
+      if (r[1] === OWN_CAUSE.REBUILD && !(this.host.side(r[2]) & SIDE.PILOT)) continue;
+      this.synced.add(r[2]);
+      if (r[1] === OWN_CAUSE.CONTACT) this.synced.add(r[3]);
+    }
   }
 
   /** Ships a contact pair it found itself touched this window (CAPS.CONTACTS: ContactWorld.endSnapshot): as onCaused */
@@ -308,7 +318,8 @@ export class SelfHits {
           const sideA = this.host.side(s.owner);
           for (const t of targets) {
             if (t === s.owner || s.hit?.has(t) || sidesHurt(sideA, this.host.side(t)) !== 1) continue;
-            const ship = store.get(t)!;
+            // (as it was on tick k: before a rebuild this window on k or after, the structure before, ShipStore.asOf)
+            const ship = store.asOf?.(t, k) ?? store.get(t)!;
             const pose = this.host.at(t, this.host.side(t) & SIDE.PILOT ? k : k - 1);
             if (!pose) continue;
             const h = shipSegmentHit(store, ship, pose.x, pose.y, pose.angle, x0, y0, x1, y1);

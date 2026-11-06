@@ -1266,7 +1266,7 @@ export class ShipClient {
         return true;
       case 'shipSync':
         this.debris.onSync(msg);
-        this.selfHits.onSync(msg.id);
+        this.selfHits.onSync(msg.id, this.store.keepsBefore(msg));
         this.own.beforeSync(msg.id);
         this.causes.beforeSync(msg.id);
         for (const part of this.store.onSync(msg)) this.damageFx?.onPartRestored(msg.id, part);
