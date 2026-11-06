@@ -24,5 +24,7 @@ export * from './d-sources.js';
 export * from './c-replicaState.js';
 export * from './c-contactCache.js';
 export * from './c-pulls.js';
+// Pull fields: the pulls on pilots both ends work out in the step (game-wide C3, track B)
+export * from './pullFields.js';
 // The own ship's whole step on its client (Stage 3b) and its exact correction (ownSync)
 export * from './ownStep.js';

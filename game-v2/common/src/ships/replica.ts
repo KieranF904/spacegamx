@@ -19,7 +19,8 @@ import type { FieldEnv } from './jumpFields.js';
 import { stepShipMotion, stepHazards, type StepHazards } from '../sim/step.js';
 import { SimShipView, aimQ } from '../sim/a-adapt.js';
 import type { SimInput } from '../sim/input.js';
-import type { SimEnv } from '../sim/env.js';
+import type { SimEnv, PullSource } from '../sim/env.js';
+import { stepPulls } from '../sim/pulls.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { getPlan } from './features/plan.js';
@@ -112,6 +113,11 @@ export interface ReplicaEnv extends FieldEnv {
   central: { type?: string; radius?: number } | null;
   /** A surface's rock (terrain.ts): ships are pushed out of it */
   terrain?: Terrain | null;
+  /**
+   * The pulls on pilots here (sim/pullFields.ts: fields both ends work out, or the pulls told for a tick): a pilot's
+   * replica step takes them after its motion, as its own step does (sim/pulls.ts). Absent: none
+   */
+  pulls?: PullSource;
 }
 
 /**
@@ -122,7 +128,7 @@ export interface ReplicaEnv extends FieldEnv {
  * station). `tick` is the tick being stepped into (lodestones move with it).
  * A stillstone's priming is state here too: kept on the body (`jumpPrime`).
  */
-export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaControls, derived: ShipDerived, tuning: ShipTuning, env: ReplicaEnv, tick = 0): void {
+export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaControls, derived: ShipDerived, tuning: ShipTuning, env: ReplicaEnv, tick = 0, id = -1): void {
   if (mode === ReplicaMode.Docked) return;
   const s = (VIEW ??= new SimShipView()).load(0, mode, body, derived, undefined, FULL_CHARGE, false, body.jumpPrime ?? 0);
   IN.bits = c.bits;
@@ -131,6 +137,8 @@ export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaContr
   FIELDS.central = env.central; FIELDS.lodestones = env.lodestones;
   stepShipMotion(s, IN, ENV, stepHazards(s, IN, tick, HZ));
   if (s.jumpPrime || body.jumpPrime !== undefined) body.jumpPrime = s.jumpPrime;
+  // (A pilot's pulls, after its motion: the step's pull phase, sim/pulls.ts; `id` names it to its source)
+  if (mode === ReplicaMode.Player && env.pulls && id >= 0) { ENV.pulls = env.pulls; stepPulls(id, body, ENV); ENV.pulls = undefined; }
 }
 
 /** (replicaStep's scratch: the view, its input (where a jump lands isn't replicated: -1, the charge waits), env, hazards) */

@@ -4,9 +4,12 @@
  * step (ships/replica.ts), plus the few things that moved the ship which its inputs don't say, each sent as its cause
  * at its tick (a snapshot's `own` rows) and worked out here alike on both sides:
  *
- *   PULL     [ago, 0, dvx, dvy]: a pull's push on the ship's velocity (on the PULL_PLACES grid). TEMPORARY: boss and
- *            weapon pulls (a Scrap Mother's magnets, a collapsing star) come from server-side decisions; they go as
- *            their push until those decisions are inputs the client steps itself
+ *   PULL     [ago, 0, dvx, dvy]: a pull's push on the ship's velocity (on the PULL_PLACES grid), told where the client
+ *            can't work it out itself: a pull only the server works out (a Grapple gem's shell), or a field's
+ *            (sim/pullFields.ts) whose puller the client doesn't hold as the server had it. Every pull is part of
+ *            the ship's step (after its motion, before every other cause: sim/pulls.ts), so a tick with a PULL told
+ *            has ALL its pulls told, and the client's step takes those in place of working any out (the rows are a
+ *            no-op among the causes after the step: applyCauseRows)
  *   CONTACT  [ago, 1, other, flags, (x, y, angle, vx, vy)]: the ship touched another body; the push is worked out
  *            here (ships/contact.ts contactPair), from the other's pose as the client has it (its replica), or as the
  *            row gives it (CONTACT_FLAG.STATE: the client's replica of it isn't the server's on that tick, e.g. a boss
@@ -25,7 +28,7 @@
 import type { FlightBody } from '../ships/flight.js';
 import type { PlacedGeom } from '../ships/grid.js';
 import type { Vec2 } from '../ships/types.js';
-import { quantizeShipBody, SHIP_PRECISION } from '../ships/physics.js';
+import { quantizeShipBody, quantizeShipValue, SHIP_PRECISION } from '../ships/physics.js';
 import { contactPieces, contactPair, recentreShift, type ContactBody } from '../ships/contact.js';
 import { dpow, dhypot } from '../math/detTrig.js';
 import { hpChecksum, CONFIRM } from './hits.js';
@@ -52,13 +55,30 @@ export const CONTACT_FLAG = {
   CHECK: 32,
 } as const;
 
-/** TEMPORARY (with boss decisions as inputs it goes): a pull's push, rounded to this many places so it is sent exactly */
+/** A pull's push, rounded to this many places (the same on every end; exact when it is told) */
 export const PULL_PLACES = 5;
 
 const PULL_K = dpow(10, PULL_PLACES);
 export function quantizePull(v: number): number {
   const r = Math.round(v * PULL_K) / PULL_K;
   return r === 0 ? 0 : r;
+}
+
+/**
+ * One pull's push (on the PULL grid) on a body's velocity, the velocity back on its grid at once: how every pull on a
+ * pilot is applied, wherever (the step's pull phase, sim/pulls.ts; the server's push of one only it works out; a shadow's
+ * told rows, applyPullRows), so every end does the same arithmetic in the same order
+ */
+export function addPull(body: { vx: number; vy: number }, dvx: number, dvy: number): void {
+  body.vx = quantizeShipValue('vel', body.vx + dvx);
+  body.vy = quantizeShipValue('vel', body.vy + dvy);
+}
+
+/** A tick's PULL rows ([kind, ...]) onto a body as its step's pull phase has them (after its motion, before its causes) */
+export function applyPullRows(body: { vx: number; vy: number }, rows: readonly (readonly number[])[]): boolean {
+  let any = false;
+  for (const r of rows) if (r[0] === OWN_CAUSE.PULL) { addPull(body, r[1], r[2]); any = true; }
+  return any;
 }
 
 /** What a contact needs of a body's structure: its parts' outlines, which stand, its centre of mass, mass and reach */
@@ -107,8 +127,7 @@ export function applyCauseRows(body: FlightBody, rows: readonly (readonly number
   for (const r of rows) {
     switch (r[0]) {
       case OWN_CAUSE.PULL:
-        body.vx += r[1];
-        body.vy += r[2];
+        // (Part of the step: its pull phase took it, before these causes (applyPullRows, sim/pulls.ts))
         break;
       case OWN_CAUSE.CONTACT: {
         const id = r[1], flags = r[2];

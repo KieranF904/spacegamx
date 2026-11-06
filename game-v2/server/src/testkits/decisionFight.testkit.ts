@@ -40,8 +40,8 @@ export interface Opts {
   /** Its hull brought down to this share at this tick (its phases: escorts, novas, blinks) */
   hurtAt?: number;
   hurt?: number;
-  /** Before each tick (between ticks, as a message is): `foes` the hostiles now */
-  each?: (t: number, server: GameServer, foes: number[]) => void;
+  /** Before each tick (between ticks, as a message is): `foes` the hostiles now, `clients` the pilot and the watcher */
+  each?: (t: number, server: GameServer, foes: number[], clients: { A: FakeHitsClient; B: FakeHitsClient }) => void;
   /** The pilot's frames handed in this many ticks late (its downlink's latency; its inputs still on time) */
   lag?: number;
   /** After each tick, once the pilot's due frames are in (the PT timeline's tests step their kinds here) */
@@ -173,7 +173,7 @@ export function fight(o: Opts = {}) {
       ships.setPartHp(boss, () => o.hurt ?? 0.5);
     }
     if (o.loseAt === t && o.lose) for (const id of foeIds()) { const sh = ships.get(id)!; ships.setPartHp(id, (uid) => (o.lose!(sh, uid) ? 0 : 1)); }
-    o.each?.(t, server, foeIds());
+    o.each?.(t, server, foeIds(), { A, B });
     step(t);
   }
   return { server, got, A, B, boss, mobs, stats: server.bodies.stats, rep: server.replication.bodyStats };

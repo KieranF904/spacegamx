@@ -29,6 +29,7 @@ import { DebrisNet } from './bridge/debrisNet.js';
 import { StructLog } from './bridge/structLog.js';
 import { OwnCauses } from './bridge/ownCauses.js';
 import { ContactLog } from '../net/causes/contactLog.js';
+import { ServerPulls } from './bridge/pullFields.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -54,6 +55,11 @@ export class ShipBridge {
   readonly ownCauses = new OwnCauses();
   /** Each tick's contact pass as a client finding its own pairs needs it (CAPS.CONTACTS: net/causes/contactLog.ts) */
   readonly contactLog = new ContactLog();
+  /**
+   * Pull fields the moves declare (a magnet, a reel, a collapsing star: bridge/pullFields.ts): its pilots' steps take
+   * their pulls from them (stepMovement), as every client's steps do from the records it is sent
+   */
+  readonly pulls = new ServerPulls((e) => this.bodies.has(e), (e) => this.host?.terrainAt?.(e));
   /** Repair kits only work on a ship holding still (world units per tick) */
   static readonly KIT_STILL_SPEED = 0.8;
   /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */
@@ -232,10 +238,14 @@ export class ShipBridge {
   teleport(eid: number, x: number, y: number): void { return flt.teleport(this.ctx, eid, x, y); }
 
   /**
-   * A pull on a body's velocity (a boss's magnet, a collapsing star). A pilot's is rounded to the PULL grid and noted as
-   * its client's cause (TEMPORARY: until boss decisions are inputs its client steps itself, network/ownTick.ts)
+   * A pull on a body's velocity that no pull field says (a pull on an AI ship; a Grapple gem's shell on anything). A
+   * pilot's is put on the PULL grid and told to its clients as a cause: they can't work it out (network/ownTick.ts
+   * PULL). A pull on a pilot from a body or a parked star is a field instead (`pulls`, bridge/pullFields.ts)
    */
   push(eid: number, ax: number, ay: number): void { return flt.push(this.ctx, eid, ax, ay); }
+
+  /** Is this a pilot's ship (a pull field reaches it: `pulls`) */
+  isPilot(eid: number): boolean { return flt.isPilot(this.ctx, eid); }
 
   /** Fix a pilotless ship where it stands (or free it): rams and blasts no longer move it */
   pin(eid: number, on = true): void { return flt.pin(this.ctx, eid, on); }

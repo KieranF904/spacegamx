@@ -3756,6 +3756,8 @@ this.devTeleport = opts.devTeleport ?? false;
   // ============================================
 
   private playerMovementSystem(): void {
+    // (Pull fields not declared last tick act no more: before any pilot's step reads them, ships/bridge/pullFields.ts)
+    this.ships.pulls.settle(this.currentTick, (sys) => SimPass.on(sys));
     for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) this.ships.stepMovement(eid);
   }
 

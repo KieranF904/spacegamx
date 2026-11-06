@@ -143,6 +143,8 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.ungridded.delete(eid);
   b.debrisNet.forget(eid);
   b.structLog.forget(eid);
+  // (A puller gone: its pull fields act no more from the next tick, common sim/pullFields.ts)
+  b.pulls?.drop(eid, b.host.getTick());
   b.host.shipForgotten?.(eid);
   for (const [k, v] of b.targets) if (v === eid) b.targets.delete(k);
 }

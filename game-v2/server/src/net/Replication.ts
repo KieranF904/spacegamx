@@ -21,15 +21,15 @@
 
 import {
   Position, Velocity, Rotation, InSystem, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
-  replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, cargoBefore, quantizeShipBody, OWN_CAUSE,
-  type ShipState, replicaHash, replicasByte, CTL_POWER_MASK, CTL_SHARE_MASK, CTL_NO_BOOST,
+  replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, applyPullRows, cargoBefore, quantizeShipBody, OWN_CAUSE, fieldOn,
+  type ShipState, replicaHash, replicasByte, CTL_POWER_MASK, CTL_SHARE_MASK, CTL_NO_BOOST, type PullFieldRec,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 
 /** CTL bits a pilot's own client works out itself (its engines' power, share, a refused boost: common sim/ownStep.ts) */
 const OWN_DERIVED_BITS = CTL_POWER_MASK | CTL_SHARE_MASK | CTL_NO_BOOST;
 import type { OwnCause } from '../ships/bridge/ownCauses.js';
-import { workCauses, recordCauses, settleContacts, causeRow, causeRecords, type CauseEvent, type WorkedCauses } from './causes/shadowCauses.js';
+import { workCauses, recordCauses, settleContacts, causeRow, causeRecords, untoldPulls, type CauseEvent, type WorkedCauses } from './causes/shadowCauses.js';
 import { contactWindow, type ContactWindow } from './causes/contactsFor.js';
 import type { ServerContactMessage } from '@space-game/common';
 import { SimPass } from '../sim/SystemClocks.js';
@@ -153,9 +153,16 @@ export class Replication {
   readonly reasons: Record<string, number> = {};
   private why(r: string): void { this.reasons[r] = (this.reasons[r] ?? 0) + 1; }
   /** Pilots' own ships (CAPS.OWN_SIM): causes told, keyframes of their own ship and why, exceptions rows */
-  readonly ownStats = { causes: 0, pull: 0, contact: 0, contactState: 0, rebuild: 0, cargo: 0, keyframes: 0, exc: 0, why: {} as Record<string, number> };
+  readonly ownStats = { causes: 0, pull: 0, contact: 0, contactState: 0, rebuild: 0, cargo: 0, keyframes: 0, exc: 0, why: {} as Record<string, number>, pullDerived: 0, pullZero: 0 };
   /** Other ships' causes (CAPS.CAUSES): ticks a ship's were worked out, rows sent, contacts sent without state, keyframes for ones a client couldn't work out */
-  readonly causeStats = { worked: 0, failed: {} as Record<string, number>, rows: 0, stateless: 0, unworkable: 0 };
+  readonly causeStats = { worked: 0, failed: {} as Record<string, number>, rows: 0, stateless: 0, unworkable: 0, pullDerived: 0, pullZero: 0 };
+  /**
+   * Pullers whose clients' replicas weren't the real ship as a tick began (a shadow of it off: a keyframe due), by the
+   * tick their fields acted on: no client works a pull of theirs out for that tick, it is told (forClient)
+   */
+  private readonly pullOff = new Map<number, Set<number>>();
+  /** Each client's last tick its pulls were judged through (forClient: by its `known` map, one per connection) */
+  private readonly pullsJudged = new WeakMap<object, number>();
   /** Contacts its clients found themselves (CAPS.CONTACTS): rows not sent (own rows, records' sides), ships left out */
   readonly contactStats = { found: 0, ownRows: 0, records: 0, leftOut: 0, windows: 0, fxSent: 0, fxFound: 0 };
   /** Contacts' sparks lately (CAPS.CONTACTS clients get those of pairs they don't find at their snapshot: contactFxFor) */
@@ -199,6 +206,7 @@ export class Replication {
    */
   endTick(): void {
     const tick = this.host.tick();
+    this.notePullers(tick);
     for (const [id, s] of this.shadows) {
       if (this.ships.has(id)) continue;
       // (Gone with causes this window, which then never go: what clients have of it at its end is off, causedInWindow)
@@ -269,6 +277,8 @@ export class Replication {
       // (The hold's mass it flew this step with, if that changed: a CARGO cause goes in first)
       if (worked) cargoBefore(s.body, worked.rows);
       replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, rec?.derived ?? ship.derived, this.ships.tuning, this.host.env(eid), tick);
+      // (Its pulls are part of its step, before every other cause: what a client works out or is told, common sim/pulls.ts)
+      if (worked) applyPullRows(s.body, worked.rows);
       s.stepped = tick;
       // Its causes, worked out as its clients work them out (ones that can't be: a keyframe for everyone)
       if (causes?.length) {
@@ -298,6 +308,29 @@ export class Replication {
     // (stepped this tick, in step, the very numbers): then the row needn't carry the other's state
     const other = (id: number) => this.shadows.get(id);
     for (const s of this.shadows.values()) if (s.causes.length) settleContacts(s.causes, tick, other);
+  }
+
+  /**
+   * The pullers of this tick's pull fields (common sim/pullFields.ts), as every client has them as the tick begins: one
+   * whose shadow (any: its clients' view of it) left the real ship before this tick is off for it. Before any shadow is
+   * stepped this tick, so the shadows are as they ended the tick before
+   */
+  private notePullers(tick: number): void {
+    const pulls = this.ships.pulls;
+    if (!pulls.any) return;
+    const same = (b: FlightBody, u: { x: number; y: number; angle: number; vx: number; vy: number }) => b.x === u.x && b.y === u.y && b.angle === u.angle && b.vx === u.vx && b.vy === u.vy;
+    for (const f of pulls.declarer.activeAt(tick)) {
+      if (f.sys === undefined || !SimPass.on(f.sys) || !pulls.needsPuller(f.from)) continue;
+      // (As the pulls read it: its clients' replica of it, each shadow as it ended the tick before, must be that. Moved
+      // since its shadow was last stepped (between ticks, a blink), it isn't, though no shadow has seen it go off yet)
+      const s = this.shadows.get(f.from), u = pulls.usedAt(f.from, tick);
+      if (!u) continue;
+      if (s && !s.diverged && same(s.body, u) && (!s.bodied || (!s.bodied.diverged && same(s.bodied.body, u)))) continue;
+      let set = this.pullOff.get(f.from);
+      if (!set) this.pullOff.set(f.from, (set = new Set()));
+      set.add(tick);
+    }
+    if (tick % 60 === 0) for (const [id, set] of this.pullOff) { for (const t of set) if (t < tick - 120) set.delete(t); if (!set.size) this.pullOff.delete(id); }
   }
 
   /**
@@ -358,6 +391,8 @@ export class Replication {
     if (worked) cargoBefore(s.body, worked.rows);
     replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, derived, this.ships.tuning, this.host.env(eid), tick);
     if (worked) {
+      // (Its pulls: part of its step, before its other causes, as its client's own step takes them)
+      applyPullRows(s.body, worked.rows);
       s.pre = { ...s.body };
       s.preTick = tick;
       if (!applyOwnCauses(s.body, worked.rows, worked.env)) return hard('cause');
@@ -389,6 +424,7 @@ export class Replication {
     b.vx += by.ix; b.vy += by.iy;
     if (worked) cargoBefore(b, worked.rows);
     replicaStep(ReplicaMode.Pilotless, b, { bits: by.bits, targetAngle: replicaAngle(ReplicaMode.Pilotless, by.q) }, derived, this.ships.tuning, this.host.env(eid), tick);
+    if (worked) applyPullRows(b, worked.rows);
     this.bodyStats.stepped++;
     sb.stepped = tick;
     // (Its causes: CAUSES clients running it work them out; the rest are sent a keyframe of it)
@@ -549,9 +585,10 @@ export class Replication {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[]; found?: ContactWindow } = {};
-    // (The ships it held before this snapshot: the ones it may take in its own contact pass)
-    const before = since !== undefined ? new Set(known.keys()) : null;
-    if (before) this.ships.contactLog.wanted = true;
+    // (The ships it held before this snapshot: the ones it may take in its own contact pass, and the pullers whose
+    // fields' pulls it works out itself)
+    const before = since !== undefined || this.ships.pulls.any ? new Set(known.keys()) : null;
+    if (since !== undefined) this.ships.contactLog.wanted = true;
     // (Which version of a ship this client goes by: moved only when causes don't explain it; a piece of debris, only
     // when it left what it works out)
     const ver = (s: Shadow) => (s.mode === ReplicaMode.Drift ? s.dver : s.cver);
@@ -568,6 +605,8 @@ export class Replication {
     }
     // (CAPS.CAUSES: ships whose causes go this snapshot, and those keyframed: a contact with one of them carries its state)
     const caused: [number, Shadow][] = [];
+    // (A ship whose causes this client can't work out: its replica of it is off from the first of them, a keyframe now)
+    const unworkable = new Map<number, number>();
     const keyed = new Set<number>();
     for (const [eid, s] of this.shadows) {
       if ((eid === self && mine?.own) || InSystem.systemId[eid] !== systemId) continue;
@@ -576,7 +615,7 @@ export class Replication {
       // Out of the client's view: nothing (and a keyframe when it comes back)
       if (view && !view.has(eid)) { known.delete(eid); continue; }
       // (Causes it can't work out: a contact with a ship whose structure it hasn't got as the pass had it: a keyframe)
-      if (s.causes.length && !this.workable(s, synced, self, mine, view, eid, kept)) { known.delete(eid); this.causeStats.unworkable++; }
+      if (s.causes.length && !this.workable(s, synced, self, mine, view, eid, kept)) { known.delete(eid); this.causeStats.unworkable++; unworkable.set(eid, s.causes[0].tick); }
       // Flown by its body on this client's tick layer (CAPS.BODIES): a keyframe only when its bodied shadow left the ship
       if (s.bodied && bodies?.(eid)) {
         if (known.get(eid) !== bver(s)) {
@@ -619,7 +658,25 @@ export class Replication {
     }
     // (CAPS.CONTACTS: the window's contacts it finds itself, between ships it held before and holds in step: neither
     // as own rows nor as records, net/causes/contactsFor.ts)
-    const found = before ? this.found(systemId, self, before, known, ships, snapshotTick, since!, mine, view, held, synced, kept) : null;
+    const found = before && since !== undefined ? this.found(systemId, self, before, known, ships, snapshotTick, since, mine, view, held, synced, kept) : null;
+    // (Pull fields' pulls it works out itself: a puller it held before this snapshot, in view, not keyframed now, its
+    // clients' replica of it the real ship as the tick began. A tick whose pulls aren't all so is told whole)
+    const pulls = this.ships.pulls;
+    // (Each tick judged once, in the first round that covers it: a round that sends nothing has left its ticks' pulls to
+    // be worked out, though the next sent snapshot's window starts from the last one sent. A puller keyframed now: what
+    // this client had of it on this round's ticks may be off, whatever the reason)
+    const judged = Math.max(since ?? -Infinity, this.pullsJudged.get(known) ?? -Infinity);
+    if (pulls.any) this.pullsJudged.set(known, snapshotTick);
+    const derivable = (from: number, t: number) => !pulls.needsPuller(from)
+      || (!!before?.has(from) && (!view || view.has(from)) && !this.pullOff.get(from)?.has(t) && !((unworkable.get(from) ?? Infinity) <= t - 1) && !(keyed.has(from) && t > judged));
+    // (A tick a field could have acted on ship `id` from a puller it can't work that one out from: that tick's pulls of
+    // the ship go whole, or as a zero row if the server had none, so its step works none out from the wrong place)
+    const offFields = new Map<number, PullFieldRec[]>();
+    const whole = (id: number, t: number) => {
+      let off = offFields.get(t);
+      if (!off) offFields.set(t, (off = pulls.activeAt(systemId, t).filter((f) => !derivable(f.from, t))));
+      return off.length > 0 && off.some((f) => fieldOn(f, id, t));
+    };
     if (found) {
       out.found = found;
       if (out.own && out.ownEvents) {
@@ -640,7 +697,12 @@ export class Replication {
         if (r[1] === OWN_CAUSE.CONTACT && r.length === 4 && keyed.has(r[2])) out.own[i] = causeRow(e, snapshotTick, false);
       }
     }
+    if (pulls.any && mine?.own) this.ownPulls(out, self, snapshotTick, judged, derivable, whole);
     out.ownEvents = undefined;
+    // (Pilots it holds a field may have pulled from a puller it can't have as the server had it, on a tick the server
+    // had no pull of theirs: a zero PULL record each, so its step doesn't work one out from the wrong place)
+    const zeros = pulls.any && Number.isFinite(judged) ? this.zeroPulls(self, known, keyed, view, snapshotTick, judged, whole) : null;
+    if (zeros) for (const id of zeros.keys()) if (!caused.some(([e]) => e === id)) caused.push([id, this.shadows.get(id)!]);
     // Their causes (CAPS.CAUSES), a contact without the other's state where its replica of the other is the pass's: in
     // step (no keyframe of it since the contact, none now) and not flown by its body here
     if (caused.length || found?.leftOut.length) {
@@ -657,9 +719,16 @@ export class Replication {
       };
       // (Contacts it finds itself go as no record, CAPS.CONTACTS)
       const lists = caused.map(([eid, s]) => {
-        if (!found) return [eid, s.causes] as const;
-        const l = s.causes.filter((e) => !found.found(eid, e));
-        this.contactStats.records += s.causes.length - l.length;
+        let l: readonly CauseEvent[] = s.causes;
+        if (found) {
+          l = s.causes.filter((e) => !found.found(eid, e));
+          this.contactStats.records += s.causes.length - l.length;
+        }
+        // (Pull fields' pulls it works out itself: common sim/pullFields.ts)
+        const d = pulls.any ? untoldPulls(l, derivable, (t) => whole(eid, t)) : null;
+        if (d) { l = l.filter((e) => !d.has(e)); this.causeStats.pullDerived += d.size; }
+        const z = zeros?.get(eid);
+        if (z) l = [...l, ...z].sort((a, b) => a.tick - b.tick || a.seq - b.seq);
         return [eid, l] as const;
       });
       const { rows, stateless } = causeRecords(lists, snapshotTick,
@@ -754,6 +823,65 @@ export class Replication {
     if (!ship || ship.derived.com[0] !== r.to[0] || ship.derived.com[1] !== r.to[1]) return false;
     const has = synced ? synced(eid) : undefined, had = has === undefined ? undefined : this.ships.debrisNet.comAt(eid, has);
     return !!had && had[0] === r.from[0] && had[1] === r.from[1];
+  }
+
+  /**
+   * Its own ship's pulls this window (pull fields, common sim/pullFields.ts): a tick whose pulls are all fields' it can
+   * work out goes untold; any other tick's go whole. And a tick a field might have pulled it on, from a puller it can't
+   * have as the server had it, with no pull of the server's: a zero PULL row, so its step doesn't work one out from
+   * that puller (it would from the wrong place). Its rows and events go in step (`out.own`, `out.ownEvents`)
+   */
+  private ownPulls(out: { own?: number[][]; ownEvents?: CauseEvent[] }, self: number, snapshotTick: number, since: number, derivable: (from: number, t: number) => boolean, whole: (id: number, t: number) => boolean): void {
+    if (out.own && out.ownEvents) {
+      const d = untoldPulls(out.ownEvents, derivable, (t) => whole(self, t));
+      if (d) {
+        const keep = out.ownEvents.map((e) => !d.has(e));
+        out.own = out.own.filter((_, i) => keep[i]);
+        out.ownEvents = out.ownEvents.filter((_, i) => keep[i]);
+        this.ownStats.pullDerived += d.size;
+        this.ownStats.pull -= d.size;
+        if (!out.own.length) { out.own = undefined; out.ownEvents = undefined; }
+      }
+    }
+    if (!Number.isFinite(since)) return;
+    const told = new Set<number>();
+    for (const e of out.ownEvents ?? []) if (e.row[0] === OWN_CAUSE.PULL) told.add(e.tick);
+    let zero: number[] | null = null;
+    for (let t = since + 1; t <= snapshotTick; t++) if (!told.has(t) && whole(self, t)) (zero ??= []).push(t);
+    if (!zero) return;
+    // (Each first among its tick's rows: a pull is the step's, before every other cause)
+    const rows = out.own ?? [], evs = out.ownEvents ?? [];
+    for (const t of zero) {
+      let i = 0;
+      while (i < rows.length && snapshotTick - rows[i][0] < t) i++;
+      rows.splice(i, 0, [snapshotTick - t, OWN_CAUSE.PULL, 0, 0]);
+      evs.splice(i, 0, { tick: t, seq: -1, row: [OWN_CAUSE.PULL, 0, 0] });
+      this.ownStats.pullZero++;
+    }
+    out.own = rows;
+    out.ownEvents = evs;
+  }
+
+  /**
+   * The other pilots' zero PULL records this window (forClient): on a tick a field could act on one it holds (in view,
+   * not keyframed now) from a puller this client can't have as the server had it, with no pull of the server's on it
+   * then. Null: none
+   */
+  private zeroPulls(self: number, known: ReadonlyMap<number, number>, keyed: ReadonlySet<number>, view: Set<number> | undefined, snapshotTick: number, since: number, whole: (id: number, t: number) => boolean): Map<number, CauseEvent[]> | null {
+    let out: Map<number, CauseEvent[]> | null = null;
+    for (let t = since + 1; t <= snapshotTick; t++) {
+      for (const id of known.keys()) {
+        if (id === self || keyed.has(id) || (view && !view.has(id))) continue;
+        const s = this.shadows.get(id);
+        if (!s || s.mode !== ReplicaMode.Player || !whole(id, t)) continue;
+        if (s.causes.some((e) => e.tick === t && e.row[0] === OWN_CAUSE.PULL)) continue;
+        let l = (out ??= new Map()).get(id);
+        if (!l) out.set(id, (l = []));
+        l.push({ tick: t, seq: -1, row: [OWN_CAUSE.PULL, 0, 0] });
+        this.causeStats.pullZero++;
+      }
+    }
+    return out;
   }
 
   /** One pilot's own ship (CAPS.OWN_SIM): see forClient */
