@@ -103,7 +103,7 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
       const server = fakeBridge(eid, serverShip, START, cloneCharge(FULL_CHARGE));
       // The pilot's own ship on its tick layer (client OwnTick.step: stepOwnShip on its extras, its hazards as the server tells them)
       const clientShip = mk();
-      const own: { body: FlightBody; x: OwnExtras; bits: number } = { body: { ...START }, x: seedOwnExtras(clientShip, cloneCharge(FULL_CHARGE)), bits: 0 };
+      const own: { body: FlightBody; x: OwnExtras; bits: number; q?: number } = { body: { ...START }, x: seedOwnExtras(clientShip, cloneCharge(FULL_CHARGE)), bits: 0 };
       // A replica on the bits the server's step sent, and stepShip itself
       const replica: FlightBody = { ...START };
       let direct: SimShipState = newSimShip({ id: eid, derived: mk().derived, ship: mk(), body: START, charge: FULL_CHARGE });
@@ -122,9 +122,11 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
         own.x.hazard.slowUntil = slowedAt(t) ? SLOW_END : 0;
         own.x.hazard.numb = numbAt(t) ? COLD.control : 1;
         const msg = { type: 'input', seq: t, tick: 0, fireLeft: false, fireRight: false, forward: false, backward: false, left: false, right: false, boost: false, ...keys, targetAngle: wireAim(s.aim), cursorDist: distOf(s) };
-        const os = stepOwnShip(eid, own.x, own.body, controlBits(buildFlightInputs(msg as never, false)), simAimQ(msg.targetAngle), { fire: false, fireAlt: false, jumpDist: msg.cursorDist, aimDist: msg.cursorDist }, ownStructure(clientShip.derived, clientShip), simEnv(t), []);
+        const os = stepOwnShip(eid, own.x, own.body, controlBits(buildFlightInputs(msg as never, false)), simAimQ(msg.targetAngle), { fire: false, fireAlt: false, jumpDist: msg.cursorDist, aimDist: msg.cursorDist }, ownStructure(clientShip.derived, clientShip), simEnv(t), [], own.q);
         own.x = { charge: os.charge, guns: os.guns, hazard: os.hazard, jumpPrime: os.jumpPrime };
         own.bits = os.ctl.bits;
+        // (its applied aim, the held one where it flew the same: common sim/aimHold.ts, as the server works it out)
+        own.q = os.ctl.q;
         // Replica: the server's replicated controls
         const ctl = (server.b as unknown as { replicaCtl: Map<number, { bits: number; q: number }> }).replicaCtl.get(eid)!;
         replicaStep(ReplicaMode.Player, replica, { bits: ctl.bits, targetAngle: replicaAngle(ReplicaMode.Player, ctl.q) }, serverShip.derived, tuning, REPLICA_ENV, t);
@@ -132,7 +134,7 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
         direct.hazard.empUntil = empAt(t) ? EMP_END : 0;
         direct.hazard.slowUntil = slowedAt(t) ? SLOW_END : 0;
         direct.hazard.numb = numbAt(t) ? COLD.control : 1;
-        direct = stepShip(direct, pilotInput({ ...keys, targetAngle: wireAim(s.aim), cursorDist: distOf(s) } as never), simEnv(t)).state;
+        direct = stepShip(direct, { ...pilotInput({ ...keys, targetAngle: wireAim(s.aim), cursorDist: distOf(s) } as never), heldQ: t > 1 ? direct.ctl.q : undefined }, simEnv(t)).state;
 
         const sb = { ...server.st.body, jump: serverShip.jump, jumpScale: serverShip.jumpScale, cargo: serverShip.cargo, dodge: serverShip.dodge, dodgeDir: serverShip.dodgeDir };
         const at = `${name} tick ${t}`;
@@ -149,6 +151,7 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
         expect(direct.ctl.bits, at).toBe(ctl.bits);
         expect(own.bits, at).toBe(ctl.bits);
         expect(direct.ctl.q, at).toBe(ctl.q);
+        expect(own.q, at).toBe(ctl.q);
         primed = Math.max(primed, serverShip.jumpPrime ?? 0);
       });
       // (The script did meet each hazard and the stone)

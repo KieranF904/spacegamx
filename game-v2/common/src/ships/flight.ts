@@ -54,6 +54,12 @@ export interface FlightControls {
   jumpDist?: number;
   /** Burst Strafer: held to dodge, the way the movement keys ask; one burst a press (features/strafer: its input, filled from the plan's held inputs) */
   dodge?: boolean;
+  /**
+   * A pilot's held aim (sim/aimHold.ts: the aim it flew last tick, as the others have it): the step still flies
+   * targetAngle, and also works out whether flying this instead would have done exactly the same (FlightResult.aimHeld).
+   * Absent: not asked
+   */
+  heldAngle?: number;
 }
 
 export interface FlightConstants {
@@ -118,6 +124,11 @@ export interface FlightResult {
   accel: number;
   /** What a replica must be told in the control bits to fly this step the same (power, a refused boost): ctlOfPower */
   ctlPower: number;
+  /**
+   * Flying input.heldAngle instead of targetAngle would have done this step bit for bit (sim/aimHold.ts): the same jump
+   * counter and the same spin out of the turn, and no burn starting along the aim. True when no held aim was given
+   */
+  aimHeld: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -534,11 +545,18 @@ export function stepFlight(
     need = jumpChargeNeed(go, jt);
   }
   const j = stepJump(prev, !!input.jump && d.mass > 0, jt, !jumpAimed(body, input), need);
+  // (The held aim, sim/aimHold.ts: would it do the same? Not at the helm, where the aim steers nothing. Charging, the
+  // drive waits on the nose being aimed: the same only if it is aimed, or not, either way; the burn goes along the aim)
+  const held = input.heldAngle;
+  let same = true;
+  const ask = held !== undefined && held !== input.targetAngle && !input.helm;
+  if (ask && prev > 0 && prev < burnAt && (Math.abs(wrapAngle(held - body.angle)) <= JUMP_ALIGN) !== jumpAimed(body, input)) same = false;
   body.jump = j;
   // The burn starts: fix how far this jump goes, and along the aim itself
   // (the nose is within JUMP_ALIGN of it: the last of the turn is taken in the launch flash)
   if (j === burnAt && prev > 0 && prev < burnAt) {
     if (!input.helm) body.angle = wrapAngle(input.targetAngle);
+    if (ask) same = false;
     body.jumpScale = jumpScaleFor(go, jt, k.friction);
   }
   const jp = jumpPhase(j, jt).phase;
@@ -550,7 +568,7 @@ export function stepFlight(
     body.vy = SC[0] * speed;
     body.x = Math.max(-k.worldSize, Math.min(k.worldSize, body.x + body.vx));
     body.y = Math.max(-k.worldSize, Math.min(k.worldSize, body.y + body.vy));
-    return { charge: boost.charge, isBoosting: false, accel: 0, power: 1, ctlPower: 0 };
+    return { charge: boost.charge, isBoosting: false, accel: 0, power: 1, ctlPower: 0, aimHeld: same };
   }
   const charging = jp === 'charging';
 
@@ -568,7 +586,16 @@ export function stepFlight(
       // (Turning cw, it brakes with the ccw cap, and the other way round. A boss, Blueprint `turn`, swings slower and eases in gentler)
       const err = wrapAngle(input.targetAngle - body.angle);
       const boss = !!d.turn;
-      alpha = steerSpin(err, err > 0 ? maxCcw : maxCw, boss ? ft.bossMaxAngularSpeed : ft.maxAngularSpeed, boss ? ft.bossTurnGain : ft.turnGain, ft.turnBrakeMargin) - body.angVel;
+      const maxSpin = boss ? ft.bossMaxAngularSpeed : ft.maxAngularSpeed, gain = boss ? ft.bossTurnGain : ft.turnGain;
+      alpha = steerSpin(err, err > 0 ? maxCcw : maxCw, maxSpin, gain, ft.turnBrakeMargin) - body.angVel;
+      // (The held aim's turn, capped alike: flat out, or held to the torque either way, it is the same spin)
+      if (ask && same) {
+        const eh = wrapAngle(held! - body.angle);
+        const ah = Math.max(-maxCcw, Math.min(maxCw, steerSpin(eh, eh > 0 ? maxCcw : maxCw, maxSpin, gain, ft.turnBrakeMargin) - body.angVel));
+        const vh = Math.max(-ft.maxAngularSpeed, Math.min(ft.maxAngularSpeed, body.angVel + ah));
+        const vr = Math.max(-ft.maxAngularSpeed, Math.min(ft.maxAngularSpeed, body.angVel + Math.max(-maxCcw, Math.min(maxCw, alpha))));
+        if (vh !== vr) same = false;
+      }
     }
     alpha = Math.max(-maxCcw, Math.min(maxCw, alpha));
     body.angVel = Math.max(-ft.maxAngularSpeed, Math.min(ft.maxAngularSpeed, body.angVel + alpha));
@@ -684,7 +711,7 @@ export function stepFlight(
 
   // What a replica must be told to fly this step as it was flown: the engines' power, and a boost the stores refused
   const refused = boost.drainRate > 0 && !!d.energy && thrusting && !!input.boost && !isBoosting;
-  return { charge, isBoosting, accel, power, ctlPower: ctlOfPower(power) | ctlOfShare(c.shares) | (refused ? CTL_NO_BOOST : 0) };
+  return { charge, isBoosting, accel, power, ctlPower: ctlOfPower(power) | ctlOfShare(c.shares) | (refused ? CTL_NO_BOOST : 0), aimHeld: same };
 }
 
 /**

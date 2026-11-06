@@ -120,10 +120,10 @@ describe('snapshot frames', () => {
 });
 
 describe('control rows', () => {
-  it('aims go as steps from the last one the client has; a run of them shares its ticks and buttons', async () => {
+  it('aims go as steps from the last one the client has, each later step as its change from the one before; a run of them shares its ticks and buttons', async () => {
     const { packControlRow, unpackControlRow, controlRowId } = await import('./replication.js');
     const run: [number, number, number][] = [[2, 9, 5249], [1, 9, 5161], [0, 9, 5133]];
-    expect(packControlRow(2250, run, 5270)).toEqual([-2251, 9 * 8 + 2, -21, -88, -28]);
+    expect(packControlRow(2250, run, 5270)).toEqual([-2251, 9 * 8 + 2, -21, -88 + 21, -28 + 88]);
     expect(controlRowId(packControlRow(2250, run, 5270))).toBe(2250);
     expect(unpackControlRow(packControlRow(2250, run, 5270), 5270)).toEqual(run);
     expect(controlRowId(packControlRow(0, run, 0))).toBe(0);
@@ -134,10 +134,20 @@ describe('control rows', () => {
     expect(unpackControlRow(packControlRow(7, old, 0), 0)).toEqual(old);
     expect(unpackControlRow(packControlRow(7, [[12, 5, 1], [11, 5, 2]], 0), 0)).toEqual([[12, 5, 1], [11, 5, 2]]);
     expect(unpackControlRow(packControlRow(7, mixed, 100), 100)).toEqual(mixed);
-    // Across the wrap: 8190 -> 3 is a step of 5
+    // Across the wrap: 8190 -> 3 is a step of 5 (3 more than the step before)
     const wrap: [number, number, number][] = [[1, 0, 8190], [0, 0, 3]];
-    expect(packControlRow(1, wrap, 8188)).toEqual([-2, 1, 2, 5]);
+    expect(packControlRow(1, wrap, 8188)).toEqual([-2, 1, 2, 3]);
     expect(unpackControlRow(packControlRow(1, wrap, 8188), 8188)).toEqual(wrap);
+    // (a change in step past half the circle wraps too: 4000 then -4000 is a change of 192)
+    const swing: [number, number, number][] = [[1, 0, 4000], [0, 0, 0]];
+    expect(packControlRow(1, swing, 0)).toEqual([-2, 1, 4000, 192]);
+    expect(unpackControlRow(packControlRow(1, swing, 0), 0)).toEqual(swing);
+    // (a smooth sweep: its steps nearly equal, the changes mostly 0)
+    const sweep: [number, number, number][] = Array.from({ length: 12 }, (_, k) => [11 - k, 3, (8000 + 7 * k + (k % 3 === 0 ? 1 : 0)) % 8192]);
+    const row = packControlRow(9, sweep, 7990);
+    expect(row[0]).toBe(-10);
+    expect(row.slice(5).every((v) => Math.abs(v) <= 2)).toBe(true);
+    expect(unpackControlRow(row, 7990)).toEqual(sweep);
   });
 });
 

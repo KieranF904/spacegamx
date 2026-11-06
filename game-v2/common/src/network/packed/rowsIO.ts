@@ -4,8 +4,51 @@
  * (blocks.ts) both use them, each with its own base: the connection's last values of that entity, or the entity's
  * chain shared by every holder.
  */
-import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_DATA_CHUNK, PK_KEYFRAME, PK_KEYFRAME_TAIL, PK_GUESS_TICKS, PK_GUN } from './tables.js';
+import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_DATA_CHUNK, PK_KEYFRAME, PK_KEYFRAME_TAIL, PK_GUESS_TICKS, PK_GUN, PK_CONTROL } from './tables.js';
 import { isId, nullish, E_X, E_Y, E_ANGLE, E_VX, E_VY, E_AV, E_HP, E_MAXHP, E_TICK, type PackedIO } from './packedIO.js';
+
+/** Is this a control row's body of whole numbers in packControlRow's order (tb ≥ 0, its ticks ago ≥ 0, the aim steps) */
+function controlRowOk(row: readonly unknown[], run: boolean): boolean {
+  let tb = true;
+  for (let i = 1; i < row.length; i++) {
+    const v = row[i];
+    if (typeof v !== 'number' || !Number.isSafeInteger(v)) return false;
+    if (tb) {
+      if (v < 0) return false;
+      if (v % 8 === 7) { const t = row[++i]; if (typeof t !== 'number' || !Number.isSafeInteger(t) || t < 0) return false; }
+      tb = false;
+    } else if (!run) tb = true;
+  }
+  return true;
+}
+
+/**
+ * A control row's values after its id (`len` of them with the id: [tb, ago?, step, ...] or a run's [tb, ago?, step,
+ * change, ...]), into a list: a bit for a row in that order (controlRowOk), then each field by its own chunk (PK_CONTROL);
+ * otherwise each value as itself. Both the snapshot section (snapshotSections.ts controlsIO) and the encode-once block
+ * (blocks.ts controlBody) write them so
+ */
+export function controlValuesIO(io: PackedIO, row: readonly unknown[] | undefined, len: number, run: boolean): unknown[] {
+  const out: unknown[] = [];
+  if (!io.bit(!!row && controlRowOk(row, run))) {
+    for (let i = 1; i < len; i++) out.push(io.num(row?.[i], 0, PK_CONTROL[4]));
+    return out;
+  }
+  const at = (i: number) => (row?.[i] as number | undefined) ?? 0;
+  let tb = true, steps = 0;
+  for (let i = 1; i < len; i++) {
+    if (tb) {
+      const v = io.vu(at(i), PK_CONTROL[0]);
+      out.push(v);
+      if (v % 8 === 7 && i + 1 < len) out.push(io.vu(at(++i), PK_CONTROL[1]));
+      tb = false;
+    } else {
+      out.push(io.vs(at(i), steps++ ? PK_CONTROL[3] : PK_CONTROL[2]));
+      if (!run) tb = true;
+    }
+  }
+  return out;
+}
 
 /** The ticks since an entity's last row (for the guesses), and that row's tick noted */
 export function ticksSince(pv: number[], at: number, tick: number): number {

@@ -15,6 +15,7 @@ import {
   WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, ammoCode, outputOf, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
   endsAtAim, aimReach, buildShot, gunsTick, gunControls, miningTick, shotId, SHOT_ID_BARRELS, SHOT_ID_SLOTS, SHOT_ID_OWNERS, type SimEvent,
+  ReplicaMode, simAim,
 } from '@space-game/common';
 import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
 import { lastHurtSoak, lastHurtShown } from './damage.js';
@@ -102,8 +103,18 @@ export function stepWeapons(b: BridgeCtx, eid: number): boolean {
   const c = gunControls(ship, Input.fireLeft[eid] === 1, Input.fireRight[eid] === 1, jumping);
   // Shots spend stored energy (energy.ts); then the mining lasers pay for their segment from what's left
   const energy = { charge: b.chargeOf(eid) };
-  // (a pilot's guns: their aim distance held while the trigger is, common ships/guns.ts distDue)
+  // (a pilot's guns: their aim distance held while the trigger is, common ships/guns.ts distDue; its aim held where its
+  // flight and guns do the same on it, fireWeapons, but mining takes the raw one (its beams are drawn along it): common
+  // sim/aimHold.ts)
+  const rec = b.replicaCtl.get(eid);
+  const was = rec?.mode === ReplicaMode.Player ? rec.heldQ : undefined, raw = rec?.rawQ, flightHeld = rec !== undefined && raw !== undefined && rec.q !== raw;
+  if (rec && flightHeld && c.mining) { rec.q = raw!; ship.aimQ = raw; }
   b.fireWeapons(eid, ship, c.firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy, true);
+  if (was !== undefined && raw !== undefined) {
+    const st = b.stats.aimHold;
+    st.ticks++;
+    if (raw !== was) { st.moved++; if (!flightHeld) st.flight++; else if (rec!.q === raw) st.guns++; else st.held++; }
+  }
   const tick = b.host.getTick();
   GUN_EVENTS.length = 0;
   const mining = miningTick(ship, eid, b.pose(eid), c, tick, energy, GUN_EVENTS);
@@ -191,7 +202,12 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   // The guns' tick (the step's gun phase, shared with the pilot's client, which fires its own shells on the same tick
   // with the same shot ids: common sim/guns.ts gunsTick). Its fire events name each shell by its shot id
   GUN_EVENTS.length = 0;
-  const { shots, beams, pulses, tells, dist: aimDist } = gunsTick(ship, eid, pose, { firing, aimWorld, aimDist: cursorDist, energy, hold }, tick, b.tuning, GUN_EVENTS);
+  // (A pilot's held aim, where its flight kept it this tick (bridge/flight.ts stepMovement): the guns weigh it too, and
+  // where they'd have aimed otherwise on it, the tick's applied aim is the raw one: common sim/aimHold.ts)
+  const rec = hold ? b.replicaCtl.get(eid) : undefined;
+  const heldQ = rec && rec.mode === ReplicaMode.Player && rec.rawQ !== undefined && rec.q !== rec.rawQ ? rec.q : undefined;
+  const { shots, beams, pulses, tells, dist: aimDist, aimHeld } = gunsTick(ship, eid, pose, { firing, aimWorld, aimDist: cursorDist, energy, hold, heldAim: heldQ === undefined ? undefined : simAim(heldQ) }, tick, b.tuning, GUN_EVENTS);
+  if (rec && heldQ !== undefined && !aimHeld) { rec.q = rec.rawQ!; ship.aimQ = rec.q; }
   // (the shells fly the distance the guns stepped on, `aimDist`: a pilot's held one, as every end has it; a guided
   // shell steers to the cursor's, which only the server reads)
   // Where the guns aim this tick and whether the trigger is held: a guided shell steers to it (features/weaponry guided; Weapons.guide)

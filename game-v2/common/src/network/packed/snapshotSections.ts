@@ -6,9 +6,9 @@ import { COMPACT_TYPES } from '../protocol.js';
 import { decisionRowOk } from '../../bodies/decisions.js';
 import { guideRowOk } from '../../guidance/records.js';
 import { PAIR } from '../causes.js';
-import { PK_PROJECTILE, PK_CONTROL } from './tables.js';
+import { PK_PROJECTILE } from './tables.js';
 import { PackedIO, isId, bitsFor, K, K_TICK } from './packedIO.js';
-import { entityFieldsIO, keyframeFieldsIO, ticksSince, gunRowOk, gunRowBody } from './rowsIO.js';
+import { entityFieldsIO, keyframeFieldsIO, ticksSince, gunRowOk, gunRowBody, controlValuesIO } from './rowsIO.js';
 
 export const SNAPSHOT_CODE = COMPACT_TYPES.indexOf('snapshot');
 const isArr = Array.isArray;
@@ -285,7 +285,7 @@ export function controlsIO(io: PackedIO, rows: unknown[][] | null): unknown[][] 
     const run = io.bit(r0 % 2 === 1);
     const len = io.vu(row?.length ?? 1, 2);
     const o: unknown[] = [(id - prev) * 2 + (run ? 1 : 0)];
-    for (let i = 1; i < len; i++) o.push(io.num(row?.[i], 0, PK_CONTROL[Math.min(i, PK_CONTROL.length) - 1]));
+    o.push(...controlValuesIO(io, row, len, run));
     prev = id;
     out.push(o);
   }

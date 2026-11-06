@@ -79,16 +79,18 @@ const INPUT: SimInput = { bits: 0, q: 0, jumpDist: 0, fire: false, fireAlt: fals
  * stepped in place), the controls (`bits`, `q`: held controls; the engines' power bits a server's row carried are
  * dropped, the step works out its own) and the rest of its input. The gun phase runs in the step (env.gunsByHost must be off): its
  * fire and fx events go to `events`. Returns the new state (its body is `body`). A server's row's hazard bits (EMP,
- * numb, slowed) stay in: the server flew them then, as its hazards were before the client heard of them
+ * numb, slowed) stay in: the server flew them then, as its hazards were before the client heard of them. `heldQ`: the
+ * aim it was applied at the tick before, where `q` is its own raw aim (its client's own layer): the state's ctl.q is then
+ * the tick's applied aim (sim/aimHold.ts), as the server works it out. Absent (a gun lane, on the aim it was sent): `q`
  */
-export function stepOwnShip(id: number, prev: Readonly<OwnExtras>, body: FlightBody, bits: number, q: number, x: Readonly<OwnInputExtras>, structure: SimStructure, env: SimEnv, events: SimEvent[]): SimShipState {
+export function stepOwnShip(id: number, prev: Readonly<OwnExtras>, body: FlightBody, bits: number, q: number, x: Readonly<OwnInputExtras>, structure: SimStructure, env: SimEnv, events: SimEvent[], heldQ?: number): SimShipState {
   const e = cloneOwnExtras(prev);
   const s: SimShipState = {
     id, mode: 0 /* ReplicaMode.Player */, body, ctl: { bits: 0, q: 0 }, charge: e.charge, accounted: true, jumpPrime: e.jumpPrime,
     hazard: e.hazard, guns: e.guns, structure,
   };
   INPUT.bits = bits & ~OWN_DERIVED_BITS; INPUT.q = q;
-  INPUT.jumpDist = x.jumpDist; INPUT.fire = x.fire; INPUT.fireAlt = x.fireAlt; INPUT.aimDist = x.aimDist; INPUT.impulse = undefined;
+  INPUT.jumpDist = x.jumpDist; INPUT.fire = x.fire; INPUT.fireAlt = x.fireAlt; INPUT.aimDist = x.aimDist; INPUT.impulse = undefined; INPUT.heldQ = heldQ;
   ensurePortsCharge(structure.derived, s.charge);
   stepShip(s, INPUT, env, s, events);
   return s;

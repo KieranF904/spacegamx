@@ -41,6 +41,11 @@ export interface GunOrders {
    */
   hold?: boolean;
   /**
+   * A pilot's held aim (sim/aimHold.ts), where the flight kept it: the guns still aim on aimWorld, and also work out
+   * whether this would have aimed them exactly the same (GunStep.aimHeld). Absent: not asked
+   */
+  heldAim?: number;
+  /**
    * The charge after this tick's power step (energy.ts powerTick): each gun
    * draws on the ship as its model says (gunLoad: its banks first), and reloads,
    * regrows or charges at the share of that it got (a brownout: slower); a beam
@@ -79,6 +84,12 @@ export interface GunStep {
   tells: readonly GunTell[];
   /** The aim distance the guns stepped on (a pilot's held one: distDue; else orders.aimDist) */
   dist: number;
+  /**
+   * orders.heldAim would have done all this exactly the same (sim/aimHold.ts): every aimed gun's offset and readiness
+   * alike on a tick the trigger is down, held or let go, a semi-automatic click waits, or anything fired. True when no
+   * held aim was given
+   */
+  aimHeld: boolean;
 }
 
 /** Ticks a click waits for a semi-automatic gun to be ready (a click just before the gun is) */
@@ -363,6 +374,13 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   } else if (ship.heldDist !== undefined) ship.heldDist = undefined;
   const aimX = aimWorld === undefined ? 0 : pose.x + dcos(aimWorld) * aimDist;
   const aimY = aimWorld === undefined ? 0 : pose.y + dsin(aimWorld) * aimDist;
+  // (The held aim, sim/aimHold.ts: each aimed gun's aim worked out on it too, and compared. `heldDiff`: some gun's differs)
+  const heldAim = aimWorld === undefined ? undefined : orders.heldAim;
+  const heldX = heldAim === undefined ? 0 : pose.x + dcos(heldAim) * aimDist;
+  const heldY = heldAim === undefined ? 0 : pose.y + dsin(heldAim) * aimDist;
+  let heldDiff = false;
+  // (The trigger down, held or let go this tick: what the guns aim at is read (a turret's slew, a charge let go's tell))
+  const reads = orders.firing || ship.triggerHeld;
   const ready: WeaponInfo[] = [];
   letGo.clear();
   // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
@@ -370,6 +388,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   ship.triggerHeld = orders.firing;
   const semiReady: WeaponInfo[] = [];
   const clicked = tick - ship.clickAt <= SEMI_BUFFER;
+  let semiWaits = false;
   for (const w of ship.derived.weapons) {
     const f = w.fire, p = w.part;
     // (Reloading, a cycle gun loads at its share: a browned-out gun reloads slower. Every other model's beat needs no power)
@@ -385,31 +404,44 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // (Point defence reloads here, drawing its power as any gun does, but aims and fires on its own: support.ts)
     if (f.model === 'auto' || weapons[w.kind]?.pointDefence) continue;
     let canFire = true;
+    if (f.semi && clicked) semiWaits = true;
     if (w.window) {
       let desired = w.window.center + ship.aim[p];
+      let px = 0, py = 0;
       if (aimWorld !== undefined) {
         let worldAngle = aimWorld;
         if (aimDist > 0) {
-          const [px, py] = shipPointToWorld(ship, pose, w.window.pivot, tuning.cellSize);
+          [px, py] = shipPointToWorld(ship, pose, w.window.pivot, tuning.cellSize);
           worldAngle = datan2(aimY - py, aimX - px);
         }
         // World angle → local grid frame (grid forward is -y)
         desired = worldAngle - (pose.angle + Math.PI / 2);
       }
       const res = slewing ? stepTurretAim(w.window, ship.aim[p], desired, tuning) : pointTurretAim(w.window, desired, tuning);
+      if (heldAim !== undefined && !heldDiff) {
+        const dh = (aimDist > 0 ? datan2(heldY - py, heldX - px) : heldAim) - (pose.angle + Math.PI / 2);
+        const rh = slewing ? stepTurretAim(w.window, ship.aim[p], dh, tuning) : pointTurretAim(w.window, dh, tuning);
+        if (rh.offset !== res.offset || rh.canFire !== res.canFire) heldDiff = true;
+      }
       ship.aim[p] = res.offset;
       canFire = res.canFire;
     } else if (aimWorld !== undefined) {
       // Fixed gun: fires when the cursor point is (almost) straight down its barrel,
       // or when the ship itself is pointed at it (close targets, guns out on the wings)
       let worldAngle = aimWorld;
+      let mx = 0, my = 0;
       if (aimDist > 0) {
-        const [mx, my] = shipPointToWorld(ship, pose, w.muzzle, tuning.cellSize);
+        [mx, my] = shipPointToWorld(ship, pose, w.muzzle, tuning.cellSize);
         worldAngle = datan2(aimY - my, aimX - mx);
       }
       const facing = datan2(w.dir[1], w.dir[0]);
       const local = (a: number) => a - (pose.angle + Math.PI / 2) - facing;
-      const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), f.model === 'beam' || weapons[w.kind]?.type === 'beam', weapons[w.kind]?.gimbalDeg);
+      const beam = f.model === 'beam' || weapons[w.kind]?.type === 'beam', gimbal = weapons[w.kind]?.gimbalDeg;
+      const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), beam, gimbal);
+      if (heldAim !== undefined && !heldDiff) {
+        const rh = stepFixedGunAim(local(aimDist > 0 ? datan2(heldY - my, heldX - mx) : heldAim), tuning, local(heldAim), beam, gimbal);
+        if (rh.offset !== res.offset || rh.canFire !== res.canFire) heldDiff = true;
+      }
       ship.aim[p] = res.offset;
       canFire = res.canFire;
     }
@@ -482,5 +514,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (f.model === 'clip') ship.rounds[p] -= f.rounds ?? 1;
     if ((f.model === 'cycle' || f.model === 'ammo') && weapons[w.kind]?.stagger) stagger(ship, w);
   }
-  return { shots, beams, pulses, tells, dist: aimDist };
+  // (Held: unless a gun's aim differed on it where it's read: the trigger down, held or let go, a click waiting, a shot)
+  const aimHeld = !heldDiff || !(reads || semiWaits || shots.length > 0 || beams.length > 0 || pulses.length > 0 || tells.length > 0);
+  return { shots, beams, pulses, tells, dist: aimDist, aimHeld };
 }

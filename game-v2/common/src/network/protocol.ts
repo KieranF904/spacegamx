@@ -40,7 +40,7 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
 export const PROTOCOL_VERSION = 61;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'ee83df65';
+export const PROTOCOL_WIRE_HASH = 'e6451693';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';

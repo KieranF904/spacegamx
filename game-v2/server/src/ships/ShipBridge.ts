@@ -13,7 +13,7 @@ import {
   Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
   GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, standing,
-  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot,
+  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot, newAimHoldStats,
 } from '@space-game/common';
 import {
   STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type PendingSalvoShell,
@@ -45,12 +45,12 @@ export class ShipBridge {
   readonly library: Map<string, Blueprint>;
   readonly enemyDesigns: Record<string, Blueprint>;
   readonly devDesigns: Record<string, Blueprint>;
-  readonly stats: ShipBridgeStats = { lastRebuildMs: 0, rebuildCount: 0, debrisCount: 0 };
+  readonly stats: ShipBridgeStats = { lastRebuildMs: 0, rebuildCount: 0, debrisCount: 0, aimHold: newAimHoldStats() };
   /**
    * What each body flew with this tick (replication: the server's shadow of each
    * ship replays exactly this, with the structure the step used)
    */
-  readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived']; body?: PilotOrders['body'] }>();
+  readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived']; body?: PilotOrders['body']; rawQ?: number; heldQ?: number }>();
   /** What moved each pilot's ship this tick besides its controls (CAPS.OWN_SIM: Replication hands them to its client as causes) */
   readonly ownCauses = new OwnCauses();
   /** Each tick's contact pass as a client finding its own pairs needs it (CAPS.CONTACTS: net/causes/contactLog.ts) */

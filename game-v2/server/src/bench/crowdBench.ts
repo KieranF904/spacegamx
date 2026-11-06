@@ -85,6 +85,12 @@ for (const r of results) {
   console.log(`${r.layout} ${r.n}: idle ${g.idleChangesPerPilotSec}/s -> ${g.idleSentPerPilotSec}/s, exact ${g.exactChangesPerPilotSec ?? '?'}/s -> ${g.exactSentPerPilotSec}/s, gunCtl ${r.bytes.capable.subTypesBps?.gunCtl ?? 0} B/s`);
 }
 
+console.log('\npilots\' aims (common sim/aimHold.ts): of the pilot ticks whose aim moved off the one last applied, the share held (nothing sent), and those taken for the flight or the guns');
+for (const r of results) {
+  const a = r.aimHold;
+  if (a) console.log(`${r.layout} ${r.n}: ${a.ticks} pilot ticks, moved ${a.moved}, held ${a.held} (${Math.round((a.heldShare ?? 0) * 100)}%), taken: flight ${a.flight}, guns ${a.guns}`);
+}
+
 console.log('\npacked bytes per client per second by message type (the real wire bits; snapshot.* its BLOCKS parts: e status rows, p shells, r removed, k keyframes, c control rows, g gun rows, o out, f fire, n own, d decisions, x causes, w guides, hh head hash)');
 const kinds = (o: Record<string, number>) => Object.entries(o).map(([t, b]) => `${t} ${Math.round(b)}`).join(', ');
 for (const r of results) if (r.packedBps) console.log(`${r.layout} ${r.n}: every client: ${kinds(r.packedBps)}\n  probes: ${kinds(r.packedProbeBps ?? {})}`);

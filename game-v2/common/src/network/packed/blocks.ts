@@ -18,9 +18,9 @@
  * rows have no base: one form each.
  */
 import { EntityType, SNAP_FIELDS, packProjectile, type EntityState } from '../protocol.js';
-import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_KEYFRAME, PK_CONTROL, PK_PROJECTILE } from './tables.js';
+import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_KEYFRAME, PK_PROJECTILE } from './tables.js';
 import { PackedIO, POW10, isId, E_X, E_Y, E_ANGLE, E_VX, E_VY, E_AV, E_HP, E_MAXHP, E_TICK } from './packedIO.js';
-import { entityFieldsIO, keyframeFieldsIO, gunRowOk, gunRowBody } from './rowsIO.js';
+import { entityFieldsIO, keyframeFieldsIO, gunRowOk, gunRowBody, controlValuesIO } from './rowsIO.js';
 
 /** A block's bits */
 export interface Bits { b: Uint8Array; n: number }
@@ -111,7 +111,7 @@ export function controlBody(io: PackedIO, row: readonly number[] | undefined): {
   const run = io.bit(!!row && row[0] < 0);
   const len = io.vu(row?.length ?? 1, 2);
   const rest: unknown[] = [];
-  for (let i = 1; i < len; i++) rest.push(io.num(row?.[i], 0, PK_CONTROL[Math.min(i, PK_CONTROL.length) - 1]));
+  rest.push(...controlValuesIO(io, row, len, run));
   return { run, rest };
 }
 

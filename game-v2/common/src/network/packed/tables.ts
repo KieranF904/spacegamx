@@ -118,8 +118,12 @@ export const PK_KEYFRAME_TAIL: readonly [number, number] = [2, 6];
 /** A guess from a velocity looks this many ticks ahead at most */
 export const PK_GUESS_TICKS = 60;
 
-/** Control rows (`c`, after the id): chunk per field (the last one for the rest) */
-export const PK_CONTROL: readonly number[] = [4, 2, 3];
+/**
+ * Control rows (`c`, after the id; replication.ts packControlRow): chunks of each tb (bits × 8 + ticks ago), of the ticks
+ * ago past its 3-bit field (7 and more), of the first aim step, of each later step's change from the one before (a smooth
+ * sweep's: mostly 0 or ±1), and (a row of anything but whole numbers in that order: every value as itself) the rest
+ */
+export const PK_CONTROL: readonly [number, number, number, number, number] = [4, 3, 2, 1, 3];
 
 /**
  * Gun rows (`g`, sim/otherGuns.ts packGunRow after the id): chunks of the trigger bits, of an event's ticks ago past
