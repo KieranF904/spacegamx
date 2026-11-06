@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '@space-game/common';
+import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, type ServerGunSyncMessage, type ServerGunCtlMessage, type LaneRec, type ReplicaEnv } from '@space-game/common';
 import { bossRise, clearBossLives } from './bossLife';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -56,6 +56,7 @@ import { hitSurface } from './hitSurface';
 import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
+import { OtherGuns } from './guns/OtherGuns';
 import { OwnShells } from './hits/OwnShells';
 import { OwnTick, type OwnTickEvents } from './own/OwnTick';
 import type { OwnStepped } from '../state/GameState';
@@ -302,7 +303,9 @@ export class ShipClient {
     this.ownShells = new OwnShells({ self: () => opts.state.playerId, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, firePose: (t) => this.own.firePose(t) });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
-    this.bodies = new BodyRunner((this.bodyHost = { reps: this.replicas }));
+    this.bodies = new BodyRunner((this.bodyHost = { reps: this.replicas, radius: (id) => this.store.get(id)?.derived.radius }));
+    // (Other ships' guns stepped here from their inputs: ships/guns/OtherGuns.ts)
+    this.otherGuns = new OtherGuns({ reps: this.replicas, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, self: () => opts.state.playerId });
     // (Their moves worked out here: ships/bodies/MoveRunner.ts)
     this.moves = new MoveRunner({
       reps: this.replicas, bodies: this.bodies, store: this.store, tuning: opts.tuning, terrain: () => this.terrain,
@@ -410,6 +413,8 @@ export class ShipClient {
   readonly selfHits: SelfHits;
   /** Your own straight shells worked out here, named by shot id (hits/OwnShells.ts) */
   readonly ownShells: OwnShells;
+  /** Other ships' guns on the tick layer, stepped from their inputs (common sim/otherGuns.ts) */
+  readonly otherGuns: OtherGuns;
   /** Its own ship on the tick-aligned layer, stepped from its own inputs and the causes it's told (own/OwnTick.ts) */
   readonly own: OwnTick;
   /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (bodies/BodyRunner.ts) */
@@ -479,6 +484,7 @@ export class ShipClient {
     for (const id of r.gone) { this.opts.state.removeShell(id); this.guides.remove(id); }
     this.selfHits.spent(r.gone);
     this.ownShells.gone(r.gone);
+    this.otherGuns.gone(r.gone);
   }
 
   /** A connection afresh: confirmed and client-detected hits start over, as the server's do, and so do bosses' bodies (BodyRunner.reset) */
@@ -487,6 +493,7 @@ export class ShipClient {
     this.hits.reset();
     this.selfHits.reset();
     this.ownShells.reset();
+    this.otherGuns.reset();
     this.bodies.reset();
     this.moves.reset();
     this.guides.reset();
@@ -582,6 +589,16 @@ export class ShipClient {
   /** Its own ship's stores, guns, hazards and priming as the server has them at a snapshot's tick (OwnTick.onOwnSync) */
   onOwnSync(m: ServerOwnSyncMessage): void {
     this.own.onOwnSync(m);
+  }
+
+  /** Another ship's gun lane as the server has it at a snapshot's tick: stepped here from there (OtherGuns) */
+  onGunSync(m: ServerGunSyncMessage): void {
+    this.otherGuns.onGunSync(m);
+  }
+
+  /** Pilots' gun controls through a snapshot's window (OtherGuns) */
+  onGunCtl(m: ServerGunCtlMessage): void {
+    this.otherGuns.onGunCtl(m);
   }
 
   /** An input it sent: its own ship's controls on the tick-aligned layer from its target tick (OwnTick) */
@@ -693,7 +710,10 @@ export class ShipClient {
     this.confirmOwnFires(m.tick);
     const keyed = !!m.ships?.some((k) => k[0] === this.opts.state.playerId) || this.own.syncedAt === m.tick, ended: number[] = [];
     out.push(...this.ownShells.snapshot(m.tick, ended, keyed));
+    // (other ships' shells built here from their gun lanes: those whose life has ended; then this window's, as fire rows)
+    this.otherGuns.expire(m.tick, ended);
     if (ended.length) { m.removed.push(...ended); this.selfHits.onRemoved(ended); }
+    this.otherGuns.confirm(m);
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
@@ -713,6 +733,8 @@ export class ShipClient {
       if (ammo === TELL_BEAM_PIECE) { this.beamFx?.startPiece(owner, part, tick); continue; }
       // A ports ship's mining laser started a pulse (its aim field: the fulfilment it started at, 0..255)
       if (ammo === TELL_MINE_PULSE) { this.beamFx?.startMinePulse(owner, part, tick, aimQ / 255); continue; }
+      // (Nothing fired there, a point-defence shot: for the gun lanes, OtherGuns.confirm; drawn by nothing, or its intercept)
+      if (ammo === TELL_NONE || ammo === TELL_PD) continue;
       if (ammo === TELL_CHARGE_CANCEL) {
         this.chargeTells.delete(owner * 256 + part);
         this.tellSounds.get(owner * 256 + part)?.();
@@ -758,6 +780,8 @@ export class ShipClient {
       const grade = ship.derived.weapons.find((w) => w.part === part)?.grade ?? 1;
       for (const s of v.shells) {
         const age = m.tick - spawnTick;
+        // (built from a gun lane: it ends on its own, OtherGuns.expire)
+        this.otherGuns.built(s.id, tick + s.life - 1);
         out.push({
           id: s.id, type: EntityType.Projectile, x: s.x + s.vx * age, y: s.y + s.vy * age, vx: s.vx, vy: s.vy,
           // (no end; the gun as the fire event packs it, which a confirmed hit works out from: data[10])
@@ -791,6 +815,7 @@ export class ShipClient {
     for (const s of m.entities) if (s.type === EntityType.ShipBody) this.fillHull(s.id);
     // (debris it runs knocks in the world till the removal's tick: ShipReplicaSet.remove)
     for (const id of m.removed) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id, m.tick); }
+    this.otherGuns.gone(m.removed);
     for (const id of m.out ?? []) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
     // (the ships it holds now, for its check: CAPS.CAUSES)
     this.causes.noteHeld(m.tick);
@@ -1059,6 +1084,33 @@ export class ShipClient {
         this.scene.predictShot({ owner: ship.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, spawnX: sh.x, spawnY: sh.y, spawnTick: tick - 1, vx: sh.vx, vy: sh.vy, size: sh.size, pose });
       }
     }
+  }
+
+  /** The world the replicas fly in (gravity, the central body, lodestones, hazards, a surface's rock): the gun lanes' too */
+  replicaEnv(): ReplicaEnv {
+    return { gravity: this.gravity, central: this.central, lodestones: this.lodestones, hazard: this.hazardFor, terrain: this.terrain };
+  }
+
+  /**
+   * Another ship's volley drawn ahead of the snapshots (the PT timeline, predict/kinds/shellsKind.ts): fired on tick t
+   * from `pose` (a pilot's shells move on their fire tick: spawned a tick earlier, as the fire rows have it). The drawn
+   * shells' handles (the snapshot's built shell, the same shot, takes one over: WeaponFx.claim)
+   */
+  predictOtherVolley(owner: number, t: number, rec: LaneRec, pose: FlightBody, pilot: boolean): number[] {
+    const ship = this.store.get(owner), scene = this.scene;
+    if (!ship || ship.kind !== 'ship' || !scene) return [];
+    const w = ship.derived.weapons.find((x) => x.part === rec.part);
+    if (!w) return [];
+    const v = fireVolley({ owner, tick: t, part: rec.part, aimQ: rec.aimQ, ammo: 0, aug: rec.aug ? 1 : undefined }, ship, pose, this.opts.tuning);
+    if (!v) return [];
+    const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w), at = { x: pose.x, y: pose.y, angle: pose.angle };
+    const model = (ship.blueprint.parts[w.part]?.fn ?? '') + (rec.aug ? AUG : '');
+    return v.shells.map((sh) => scene.predictShot({ owner, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model, damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, spawnX: sh.x, spawnY: sh.y, spawnTick: pilot ? t - 1 : t, vx: sh.vx, vy: sh.vy, size: sh.size, pose: at }));
+  }
+
+  /** Take back a shell drawn ahead that never was */
+  retractOther(handle: number): void {
+    this.scene?.retractShot(handle);
   }
 
   /** The ammunition each own volley was drawn with (by tick * 256 + part), for the shells built on the tick layer */

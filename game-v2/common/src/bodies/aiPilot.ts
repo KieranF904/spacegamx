@@ -10,8 +10,9 @@
  *                                          at most `pace`, holding still before tick `pauseUntil`
  *   RETURN  [1, hx, hy]                    home, straight
  *   ENGAGE  [2, range, reach, hitBy, errMax, seed, strafe, flank, ...mates]
- *                                          at its target: its fighting range and its guns' reach; hitBy 1 while its
- *                                          target has shot it lately (shot at from past its reach it closes in);
+ *                                          at its target: its fighting range and its guns' reach; hitBy bit 0 while its
+ *                                          target has shot it lately (shot at from past its reach it closes in), bit 1
+ *                                          when one of its guns lobs (it fires from further off: aiFires);
  *                                          its aim off by up to errMax (1/AIM_ERR_GRID radians) either way, re-rolled
  *                                          every 12 + id % 7 ticks from its seed (aiAimError: the commander rolled the
  *                                          seed, so nobody works its misses out ahead); strafing while (tick + id × 7) % 180 is
@@ -56,8 +57,8 @@ export const orderFlee = (): WantRec => [AI_ORDER.FLEE];
  * At its target. `strafe`: its behaviour's share of the time it strafes (undefined: always); `flank` (radians) and
  * `mates` (its pack's other ships, ids) only for a pack of more than one
  */
-export function orderEngage(id: number, range: number, reach: number, hitBy: boolean, errMax: number, seed: number, strafe: number | undefined, flank?: number, mates?: readonly number[]): WantRec {
-  const out = [AI_ORDER.ENGAGE, Math.round(range), Math.round(reach), hitBy ? 1 : 0, Math.round(errMax * AIM_ERR_GRID), seed & 255,
+export function orderEngage(id: number, range: number, reach: number, hitBy: boolean, errMax: number, seed: number, strafe: number | undefined, flank?: number, mates?: readonly number[], lobs = false): WantRec {
+  const out = [AI_ORDER.ENGAGE, Math.round(range), Math.round(reach), (hitBy ? 1 : 0) | (lobs ? 2 : 0), Math.round(errMax * AIM_ERR_GRID), seed & 255,
     strafe === undefined ? ALWAYS_STRAFE : Math.max(0, Math.min(ALWAYS_STRAFE, Math.ceil(180 * strafe))), 0];
   if (flank !== undefined && mates?.length) {
     out[7] = quantizeCursorAngle(flank) + 1;
@@ -101,11 +102,16 @@ export function aiReads(id: number, s: BodyState): number[] {
   return out;
 }
 
-/** What the pilot flies with this tick, and how its shot looks (the server's to decide whether it fires) */
+/** What the pilot flies with this tick, and whether and where its guns fire */
 export interface AiPilotOut extends BodyOut {
   /** The guns' aim (world angle) and how far, when it has a target */
   aim?: number;
   aimDist: number;
+  /**
+   * Its trigger (aiFires): an ENGAGE order at its target, within its guns' real reach, when a hit is likely. Part of
+   * its controls on both ends (bodies flown on a client's tick layer fire there too: sim/otherGuns.ts)
+   */
+  fire: boolean;
   /** Its distance to the target, how fast the target crosses its line, and a shell's time of flight */
   d: number;
   across: number;
@@ -117,9 +123,9 @@ export interface AiPilotOut extends BodyOut {
  * ENGAGE order with mates); `prevQ`: the aim it steered by last tick; `prevBits`: the controls it flew with then (a
  * custom enemy's module holds a thrust it's making rather than flick it on and off: bodies/custom/flight.ts keepAt)
  */
-export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centroid: readonly [number, number] | null, tick: number, id: number, prevQ: number, prevBits = 0): AiPilotOut {
+export function aiPilot(s: BodyState, me: BodyPose, tgt: (BodyPose & { r?: number }) | null, centroid: readonly [number, number] | null, tick: number, id: number, prevQ: number, prevBits = 0): AiPilotOut {
   const w = s.want, state = w[0];
-  let mx = 0, my = 0, face = me.angle, boost = false, aim: number | undefined, aimDist = 0, d = 0, across = 0, tof = 0;
+  let mx = 0, my = 0, face = me.angle, boost = false, aim: number | undefined, aimDist = 0, d = 0, across = 0, tof = 0, fire = false;
   // (A custom enemy: its module, the move under way and its pieces gone: bodies/custom)
   const custom = state === AI_ORDER.CUSTOM && tgt ? customCtx(w, id, tick, me, tgt, prevBits) : null;
   if ((state === AI_ORDER.ENGAGE || state === AI_ORDER.CUSTOM) && tgt) {
@@ -134,7 +140,7 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centro
     aim = face;
     aimDist = dhypot(lx, ly);
     // Shot at from beyond its own guns' reach, it closes in fast instead of sitting there taking it
-    const outgunned = w[3] === 1 && d > reach * 0.85;
+    const outgunned = (w[3] & 1) === 1 && d > reach * 0.85;
     const want = outgunned ? Math.min(range, reach * 0.6) : range;
     // Where to fight from: its range, round the target at its place in the pack's spread
     const side = w[7] && centroid ? datan2(centroid[1] - ty, centroid[0] - tx) + dequantizeCursorAngle(w[7] - 1) : datan2(me.y - ty, me.x - tx);
@@ -151,6 +157,8 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centro
       if (v > 0.6) { mx = -me.vx / v; my = -me.vy / v; }
     }
     across = Math.abs(rvx * uy - rvy * ux);
+    // (A custom enemy fires no part guns: its moves are its attacks, bodies/moves)
+    if (state === AI_ORDER.ENGAGE) fire = aiFires(w, id, tick, d, across, tof, tgt.r);
     if (custom?.design.fly) {
       const f: CustomFlight = { mx, my, face, boost };
       custom.design.fly(custom.c, f);
@@ -173,7 +181,17 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centro
   if (q === AIM_TURN) q = 0;
   // Mouse-steer controls are screen-relative: press the directions nearest the wanted motion
   const bits = (my < -0.38 ? CTL.forward : 0) | (my > 0.38 ? CTL.backward : 0) | (mx < -0.38 ? CTL.left : 0) | (mx > 0.38 ? CTL.right : 0) | (boost ? CTL.boost : 0);
-  return { bits, q, ix: 0, iy: 0, aim, aimDist, d, across, tof };
+  return { bits, q, ix: 0, iy: 0, aim, aimDist, d, across, tof, fire };
+}
+
+/**
+ * An ENGAGE order's trigger: within its guns' real reach (the order's), when a hit is likely: a big, slow, near target,
+ * or a lobbed shell. `size`: its target's radius as this end has its structure (60 not known). Was the commander's
+ * (server Enemies.ts); a body flown on a client's tick layer works it out the same
+ */
+export function aiFires(w: WantRec, id: number, tick: number, d: number, across: number, tof: number, size = 60): boolean {
+  const spread = d * (Math.abs(aiAimError(w, id, tick)) + 0.015) + across * tof * 0.6;
+  return d <= w[2] * 0.95 && (d < 900 || (w[3] & 2) !== 0 || size / Math.max(1, spread) > 0.25);
 }
 
 /** A custom enemy's module and what it reads this tick (null: its design isn't known: it flies as the plain AI) */

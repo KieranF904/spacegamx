@@ -67,6 +67,8 @@ export interface RoundSkip { has(system: number): boolean; readonly size: number
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { GuideNet } from './guides/GuideNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
+import type { GunNet, GunClient } from './guns/GunNet.js';
+import { otherShotWire, TELL_PD } from '@space-game/common';
 
 /** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
 const DEBRIS_ROW_KEY = DEBRIS_STATUS.join(',');
@@ -171,6 +173,8 @@ export interface SnapshotHost {
   readonly blocks?: BlockStore | null;
   /** Crowd fallbacks (net/crowd/CrowdControl.ts): each system's window and focus radius, charged its rounds' time */
   readonly crowd?: CrowdControl | null;
+  /** Other ships' guns stepped on clients' tick layers (net/guns/GunNet.ts) */
+  readonly gunNet?: GunNet | null;
 }
 
 export class SnapshotBuilder {
@@ -209,6 +213,9 @@ export class SnapshotBuilder {
   private readonly guides: GuideNet | null;
   private readonly blocks: BlockStore | null;
   private readonly crowd: CrowdControl | null;
+  private readonly gunNet: GunNet | null;
+  /** Other ships' shells clients work out themselves from their gun lanes, named by shot id (net/guns/GunNet.ts) */
+  readonly otherShotLog = new OwnShotLog();
   /** Each fire event's row this snapshot (one array for every client, so it's encoded once: CAPS.BLOCKS) */
   private fireRows = new WeakMap<object, number[]>();
   /** Pilots' own shells they work out themselves, named by shot id (CAPS.SHOT_IDS: snapshot/ownShots.ts) */
@@ -254,6 +261,7 @@ export class SnapshotBuilder {
     this.guides = host.guides ?? null;
     this.blocks = host.blocks ?? null;
     this.crowd = host.crowd ?? null;
+    this.gunNet = host.gunNet ?? null;
     this.ticks = ticks;
     this.focus = new FocusCells({
       bodies: () => this.ships.bodies.keys(),
@@ -727,6 +735,7 @@ export class SnapshotBuilder {
     this.syncWire.clear();
     const bySystem = new Map<number, SnapRow[]>();
     this.replication.beginSnapshot(due);
+    this.gunNet?.beginRound(due);
     // (The focus grid's home cells, for the systems with a client in them)
     const focusSystems = new Set<number>();
     for (const conn of this.clients.values()) if (hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
@@ -814,9 +823,25 @@ export class SnapshotBuilder {
       // the window from isn't the server's; their hits are told, as rows' are, every one since the last snapshot it got.
       // Client ShipClient.preSnapshot, OwnShells.snapshot's `keyed`)
       const ownTold = keyed.has(conn.playerId) || fullSync;
-      // (its own straight shells it works out itself, CAPS.SHOT_IDS: no record, no row, named by shot id in its hits and removals)
-      if (this.hits && !this.hits.shellName) { const log = this.ownShotLog; this.hits.shellName = (c, id) => log.wireOf(c, id) ?? id; }
+      // (its own straight shells it works out itself, CAPS.SHOT_IDS: no record, no row, named by shot id in its hits and
+      // removals; other ships' it steps the guns of too: net/guns/GunNet.ts)
+      if (this.hits && !this.hits.shellName) { const log = this.ownShotLog, other = this.otherShotLog; this.hits.shellName = (c, id) => log.wireOf(c, id) ?? other.wireOf(c, id) ?? id; }
+      // (Other ships' guns it steps itself: what it's owed of them this round, GunNet.forClient)
+      const guns: GunClient | null = this.gunNet ? this.gunNet.forClient(conn, conn.playerId, (e) => conn.repKnown.has(e) && conn.shipView.has(e) && InSystem.systemId[e] === playerSystemId,
+        (e) => !!bodies?.runs(conn, e), keyed, conn.lastSnapshotSentTick) : null;
       for (const f of this.ships.fired) {
+        // (Another ship's guns it steps itself: no record of what its lane fired too; a point-defence shot told, GunNet)
+        if (guns && f.owner !== conn.playerId) {
+          if (f.ammo === TELL_PD) {
+            if (guns.steps(f.owner, f.tick)) { fire.push([f.owner, this.currentTick - f.tick, f.part + 256 * TELL_PD, 0]); this.gunNet!.stats.pdRecs++; }
+            continue;
+          }
+          if (guns.derives(f.owner, f.tick)) {
+            if (f.ids.length) this.otherShotLog.derive(conn, f, otherShotWire);
+            this.gunNet!.stats.derivedRecs++;
+            continue;
+          }
+        } else if (f.ammo === TELL_PD) continue;
         if (f.owner === conn.playerId && OwnShotLog.derivable(this.ships, f)) {
           this.ownShotLog.derive(conn, f);
           // (its own shells since the last snapshot it was sent: its client builds them all with the next it gets)
@@ -833,6 +858,7 @@ export class SnapshotBuilder {
         fire.push(row);
         for (const id of f.ids) covered.add(id);
       }
+      if (guns) { for (const r of guns.none) fire.push(r); }
       if (ownTold && conn.ownWindow) for (const id of conn.ownWindow) this.hits?.rowShell(conn, id);
       for (const r of rows) {
         if ((r.kind === 'player' || r.kind === 'ship') && !conn.shipView.has(r.id)) continue;
@@ -840,8 +866,8 @@ export class SnapshotBuilder {
         if (conn.debrisHeld.has(r.id)) continue;
         if (conn.debrisRowOk.size && conn.debrisRowOk.delete(r.id) && r.key === DEBRIS_ROW_KEY) { newStates.set(r.id, r.key); continue; }
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
-        // (its own shell it works out itself, CAPS.SHOT_IDS: no row, ever)
-        if (r.kind === 'projectile' && this.ownShotLog.has(conn, r.id)) continue;
+        // (its own shell it works out itself, CAPS.SHOT_IDS: no row, ever; nor another ship's whose guns it steps)
+        if (r.kind === 'projectile' && (this.ownShotLog.has(conn, r.id) || this.otherShotLog.has(conn, r.id))) continue;
         // (a body's move's straight shell it makes itself, CAPS.MOVES: no row, nor a removal)
         if (r.kind === 'projectile' && bodies?.shellDerived(conn, conn.playerId, r.id, prevStates.has(r.id))) continue;
         // (a homing shell it runs, its row once sent: it flies it itself)
@@ -889,7 +915,7 @@ export class SnapshotBuilder {
       const hitsOn = !!this.hits;
       this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
       // (Hits on a ship its causes moved this window are told, as on one keyframed: its client leaves them, SelfHits.onCaused)
-      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id), rep.caused ? toldShips(keyed, rep.causes, rep.found?.touched, (id) => hasComponent(this.world, Player, id)) : keyed) : null;
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id) || this.otherShotLog.has(conn, id), rep.caused ? toldShips(keyed, rep.causes, rep.found?.touched, (id) => hasComponent(this.world, Player, id)) : keyed) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {
@@ -924,9 +950,10 @@ export class SnapshotBuilder {
       // (its own shells it works out, CAPS.SHOT_IDS: removed by their shot-id names, and only those it can't work out)
       let renamed: Map<number, number> | null = null;
       for (const [eid] of this.pendingRemovedEntities) {
-        if (this.ownShotLog.has(conn, eid)) {
+        const log = this.ownShotLog.has(conn, eid) ? this.ownShotLog : this.otherShotLog.has(conn, eid) ? this.otherShotLog : null;
+        if (log) {
           // (ended before its life did: a rock, point defence. Expired: its client removes it itself; spent by a hit: its record says so)
-          const wire = this.ownShotLog.removed(conn, eid, Lifetime.remaining[eid] > 0, !!gone?.has(eid));
+          const wire = log.removed(conn, eid, Lifetime.remaining[eid] > 0, !!gone?.has(eid));
           if (wire !== null) { removed.push(eid); (renamed ??= new Map()).set(eid, wire); }
           continue;
         }
@@ -952,7 +979,7 @@ export class SnapshotBuilder {
 
       // (Records count from the snapshot they follow: one always goes with them)
       const shouldSend = conn.forceSnapshot || split || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
-        || (hitsOn && this.hits!.pending(conn)) || syncing || headDue;
+        || (hitsOn && this.hits!.pending(conn)) || syncing || headDue || !!guns?.syncs.length || !!guns?.rows.length;
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
         if (hitsOn) this.afterHits(conn, playerSystemId);
@@ -961,6 +988,11 @@ export class SnapshotBuilder {
 
       // (The ownSync goes first: its client takes it before the snapshot's own processing, OwnTick.onOwnSync)
       if (syncing) { this.send(conn.ws, fullSync ? packOwnSync(this.currentTick, ownNow!.x) : packOwnHazards(this.currentTick, ownNow!.x.hazard)); this.ownSyncs++; }
+      // (Other ships' gun lanes it starts from here, and the pilots' gun controls it steps them on: before the snapshot, as the ownSync)
+      if (guns) {
+        for (const m of guns.syncs) this.send(conn.ws, m);
+        if (guns.rows.length) this.send(conn.ws, { type: 'gunCtl', t: this.currentTick, r: guns.rows });
+      }
       if (ownNow) conn.ownSyncDue = false;
       this.send(conn.ws, {
         type: 'snapshot',
@@ -1050,6 +1082,7 @@ export class SnapshotBuilder {
       if (sweep) this.blocks?.sweep(this.currentTick);
       this.pendingRemovedEntities.clear();
       this.ships.fired.length = 0;
+      this.gunNet?.endRound();
       this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
       return;
     }
@@ -1062,6 +1095,7 @@ export class SnapshotBuilder {
     let n = 0;
     for (const f of fired) if (!due(f.owner)) fired[n++] = f;
     fired.length = n;
+    this.gunNet?.endRound(due);
     this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id), due);
   }
 

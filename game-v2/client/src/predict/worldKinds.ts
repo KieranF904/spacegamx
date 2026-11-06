@@ -20,6 +20,7 @@ import { AheadReads } from './aheadReads';
 import { BodiesKind } from './kinds/bodiesKind';
 import { GuidesKind } from './kinds/guidesKind';
 import { MovesKind } from './kinds/movesKind';
+import { ShellsKind } from './kinds/shellsKind';
 import { setLate } from './late';
 import type { PtStLayer } from './ptst';
 
@@ -44,6 +45,7 @@ export interface WorldKinds {
   bodies: BodiesKind;
   guides: GuidesKind;
   moves: MovesKind;
+  shells: ShellsKind;
   reads: AheadReads;
   install(): void;
   uninstall(): void;
@@ -51,7 +53,8 @@ export interface WorldKinds {
 
 /** `drawTick(id)`: the tick a thing on PT is drawn at this frame (the mode's: ptDrawTick) */
 /** `renderer`: the game's, once made (moves' shells are drawn ahead through it; none before it exists) */
-export function worldKinds(state: GameState, sc: ShipClient, renderer: () => Renderer | null, layer: PtStLayer, drawTick: (id: number) => number): WorldKinds {
+/** `kindOf(id)`: the PT kind the ships layer gave a ship (shipKinds.ts: 'ai', 'pilot', 'rows'): other ships' shells read it */
+export function worldKinds(state: GameState, sc: ShipClient, renderer: () => Renderer | null, layer: PtStLayer, drawTick: (id: number) => number, kindOf: (id: number) => string | undefined = () => undefined): WorldKinds {
   const self = () => state.playerId, confirmed = () => state.serverTick;
   const reads = new AheadReads({
     reps: sc.replicas, confirmed, self,
@@ -76,9 +79,18 @@ export function worldKinds(state: GameState, sc: ShipClient, renderer: () => Ren
     },
     retract: (h) => { renderer()?.retractShot(h); },
   });
-  const kinds = new PtKinds().add(new ShipsKind(layer)).add(bodies).add(guides).add(moves);
+  // (Other ships' shells drawn as their guns fire ahead: their gun lanes, ships/guns/OtherGuns.ts)
+  const shells = new ShellsKind({
+    layer, kind: kindOf, guns: sc.otherGuns, tuning: sc.store.tuning, confirmed,
+    ship: (id) => { const s = sc.store.get(id); return s && s.kind === 'ship' ? s : undefined; },
+    env: () => sc.replicaEnv(),
+    pose: (id, t) => sc.replicas.preAt(id, t),
+    draw: (owner, t, rec, pose, pilot) => sc.predictOtherVolley(owner, t, rec, pose, pilot),
+    retract: (h) => sc.retractOther(h),
+  });
+  const kinds = new PtKinds().add(new ShipsKind(layer)).add(bodies).add(guides).add(moves).add(shells);
   return {
-    kinds, bodies, guides, moves, reads,
+    kinds, bodies, guides, moves, shells, reads,
     install() {
       kinds.reset();
       sc.bodyHost.ahead = reads;

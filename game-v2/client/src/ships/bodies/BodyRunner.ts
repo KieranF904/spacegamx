@@ -30,6 +30,8 @@ export interface BodyRunnerHost {
    * read ahead never steps another ship ahead on the replica layer); the replica layer if none
    */
   ahead?: { now(id: number, t: number): FlightBody | null; at(id: number, t: number): FlightBody | null } | null;
+  /** A ship's radius as this client has its structure (an AI pilot's trigger reads its target's: bodies/aiPilot.ts aiFires) */
+  radius?(id: number): number | undefined;
 }
 
 interface Run {
@@ -170,9 +172,10 @@ export class BodyRunner {
         if (!s || !kind) return null;
         // (its target as the server's step reads it; the rest as they ended the tick before)
         const ah = t > this.snapTick ? this.host.ahead : null;
+        const radius = this.host.radius;
         const read: BodyReads = ah
-          ? { now: (o) => ah.now(o, t), before: (o) => ah.at(o, t - 1) }
-          : { now: (o) => this.host.reps.preAt(o, t), before: (o) => this.host.reps.at(o, t - 1)?.body ?? null };
+          ? { now: (o) => ah.now(o, t), before: (o) => ah.at(o, t - 1), radius }
+          : { now: (o) => this.host.reps.preAt(o, t), before: (o) => this.host.reps.at(o, t - 1)?.body ?? null, radius };
         const out = kind.step(id, s, prev, read, t, prevQ, prevBits);
         if (!out) this.stats.blind++;
         return out;

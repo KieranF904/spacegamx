@@ -44,6 +44,11 @@ export interface SimInput {
   fire: boolean;
   fireAlt: boolean;
   aimDist: number;
+  /**
+   * The guns' aim (world angle) where it isn't the steering aim (an AI pilot's: its body leads its target, sim/otherGuns.ts);
+   * null: no aim (an AI with no target: turrets hold, fixed guns don't re-aim). Absent: simAim(q), as a pilot's
+   */
+  gunAim?: number | null;
   /** A decided source's push this tick (an AI order's impulse), applied before the motion unless EMP'd */
   impulse?: readonly [number, number];
 }

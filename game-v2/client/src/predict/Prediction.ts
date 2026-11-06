@@ -67,7 +67,7 @@ export class Prediction {
       drawBack: (id) => this.world.kind(id)?.drawBack ?? AHEAD_BACK,
       layer,
     };
-    this.kinds = worldKinds(state, sc, renderer, layer, (id) => ptDrawTick(this.ctx, id, this.ctx.ownDraw()));
+    this.kinds = worldKinds(state, sc, renderer, layer, (id) => ptDrawTick(this.ctx, id, this.ctx.ownDraw()), (id) => this.world.kind(id)?.name);
     this.ctx.kinds = this.kinds.kinds;
     this.current = modeById(initial) ?? PREDICT_MODES[0];
     this.install();

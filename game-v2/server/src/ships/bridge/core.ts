@@ -102,6 +102,11 @@ export interface ShipHost {
   pdThreats?(eid: number, x: number, y: number, range: number, out: { id: number; x: number; y: number; d: number }[]): void;
   /** A point-defence shot from part `part` of `eid` (its muzzle at x, y) hits shot `proj`: true when that brings it down */
   intercept?(eid: number, part: number, proj: number, x: number, y: number): boolean;
+  /**
+   * A pilotless ship's guns ran this tick (stepPilotless): its fire records from `from` in the list, whether its body
+   * flies it, its trigger, lead and distance as its orders had them (other ships' guns on clients: server net/guns/GunNet.ts)
+   */
+  gunsRan?(eid: number, from: number, bodied: boolean, fire: boolean, aim: number | undefined, aimDist: number): void;
   // --- end support weapons ---
   /** Takes no damage at all (admin god mode, docked) */
   invulnerable?(eid: number): boolean;

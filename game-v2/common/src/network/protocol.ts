@@ -15,6 +15,7 @@ import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import type { HitReport } from './hits.js';
 import type { OwnCheck } from './ownTick.js';
 import type { ServerOwnSyncMessage } from '../sim/ownStep.js';
+import type { ServerGunSyncMessage, ServerGunCtlMessage } from '../sim/otherGuns.js';
 import { CI_FLAG, compactInputTables } from './inputCompactTables.js';
 /**
  * Network Protocol - All client/server message types
@@ -900,6 +901,8 @@ export type ServerMessage =
   | ServerHitFixMessage
   | ServerNetCapsMessage
   | ServerOwnSyncMessage
+  | ServerGunSyncMessage
+  | ServerGunCtlMessage
   | ServerDockResultMessage
   | ServerPartDestroyedMessage
   | ServerContactMessage

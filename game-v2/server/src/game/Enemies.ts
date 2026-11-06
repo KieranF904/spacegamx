@@ -1541,27 +1541,30 @@ export class Enemies {
       const hitBy = now - this.ships.lastDamagedTick(eid) < 150 && this.ships.lastHitter(eid) === t;
       const c = pack?.cent, mates = c && c.ids.includes(eid) ? c.ids.filter((m) => m !== eid) : undefined;
       if (c && mates?.length) cent = [c.x, c.y];
-      want = orderEngage(eid, cs?.range ?? b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined);
+      // (whether one of its guns lobs: its trigger fires from further off, common bodies/aiPilot.ts aiFires)
+      want = orderEngage(eid, cs?.range ?? b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined, !cs && e.lobs === true);
       if (cs) want = this.custom.order(eid, want, t);
     } else if (e.state === 'flee') want = orderFlee();
     else if (e.state === 'return') want = orderReturn(home.x, home.y);
     else want = orderPatrol(e.waypoint.x, e.waypoint.y, pack?.pace ?? 0.58, pack?.pauseUntil ?? 0);
     const fights = e.state === 'engage' || e.state === 'flee';
     const pose = (id: number) => ({ x: Position.x[id], y: Position.y[id], angle: Rotation.angle[id], vx: Velocity.x[id], vy: Velocity.y[id] });
+    // (its target with its size, as its trigger reads it: aiFires)
+    const tpose = (id: number) => ({ ...pose(id), r: this.ships.get(id)?.derived.radius ?? Radius.value[id] ?? 60 });
     // (its body flies it while what it fights is a pilot's ship, or nothing: brains/aiPilot.ts)
     // (Pinned (a fixed boss, a range target): it only turns, its thrust dropped (bridge/pilotless.ts), which its body doesn't know: the rows fly it)
     const bodied = asBody && !this.ships.isPinned(eid) && (!fights || hasComponent(this.host.world, Player, t));
-    const out = this.pilots.fly(eid, fights ? t : -1, e.strafe, want, pose(eid), fights ? pose(t) : null, cent, bodied);
-    let firing = false;
+    const out = this.pilots.fly(eid, fights ? t : -1, e.strafe, want, pose(eid), fights ? tpose(t) : null, cent, bodied);
     // (Its moves and guns: what they do this tick, common bodies/moves/custom.ts; it fires no part guns)
     if (cs) { if (asBody) this.custom.step(eid, t, e.state === 'engage'); }
-    else if (e.state === 'engage') {
-      // Fire within its guns' real reach, when a hit is likely: a big, slow, near target, or a lobbed shell
-      const spread = out.d * (Math.abs(aiAimError(want, eid, now)) + 0.015) + out.across * out.tof * 0.6;
-      const size = this.ships.get(t)?.derived.radius ?? Radius.value[t] ?? 60;
-      firing = out.d <= reach * 0.95 && (out.d < 900 || e.lobs === true || size / Math.max(1, spread) > 0.25);
-    }
-    return this.pilots.orders(eid, out, firing, t);
+    // Its trigger is its pilot's (common bodies/aiPilot.ts aiFires: within its guns' real reach, when a hit is likely),
+    // so a client flying its body fires it too (sim/otherGuns.ts)
+    return this.pilots.orders(eid, out, !cs && e.state === 'engage' && out.fire, t);
+  }
+
+  /** Is this enemy's pilot body on (clients fly it, and its guns: server net/guns/GunNet.ts)? Not a boss's brain's body */
+  aiBodyOn(eid: number): boolean {
+    return this.pilots.on(eid);
   }
 
   /** How far an enemy's guns really reach (its longest), and whether any lob shells */

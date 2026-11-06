@@ -223,7 +223,9 @@ describe('packed frames: what each client is shown is the server\'s fight, in fe
     expect(linkOf(r.server, r.P)!.enc.stats.blocks).toBeGreaterThan(40);
     expect(linkOf(r.server, r.S)!.enc.stats.blocks).toBeGreaterThan(40);
     const st = r.server.net.blocks.stats;
-    expect(st.k + st.c + st.f + st.e).toBeGreaterThan(100);
+    // (the observer steps the shooter's guns itself since other ships' guns are stepped from their inputs: no fire rows of
+    // its shells, net/guns/GunNet.ts; was > 100 with them)
+    expect(st.k + st.c + st.f + st.e).toBeGreaterThan(60);
   }, 120_000);
 
   it("the shooter finds its own hits, so they don't make its frames go early; it still sees every hit", () => {

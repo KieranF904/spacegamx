@@ -35,12 +35,15 @@ export class OwnShotLog {
     return !!f.shots && f.shots.length === f.ids.length && ownVolleyExact(ships, f);
   }
 
-  /** A fire record of its own it builds itself: its shells are its own from here (no row, no record) */
-  derive(conn: object, f: FireRecord): void {
+  /**
+   * A fire record it builds itself: its shells are its own from here (no row, no record), each named by `name` of its
+   * shot id (its own: ownShotWireOf; another ship's, common sim/otherGuns.ts: otherShotWire)
+   */
+  derive(conn: object, f: FireRecord, name: (shot: number) => number = ownShotWireOf): void {
     if (!f.shots || f.shots.length !== f.ids.length) return;
     let m = this.byConn.get(conn);
     if (!m) this.byConn.set(conn, (m = new Map()));
-    for (let i = 0; i < f.ids.length; i++) m.set(f.ids[i], ownShotWireOf(f.shots[i]));
+    for (let i = 0; i < f.ids.length; i++) m.set(f.ids[i], name(f.shots[i]));
     this.stats.derived += f.ids.length;
     this.stats.fireRowsSaved++;
     // (what the record would have cost as JSON: [owner, ago, part+ammo, aimQ, ...ids])

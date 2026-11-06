@@ -28,7 +28,7 @@ import type { Vec2 } from '../ships/types.js';
 import { StateRing } from '../sim/ring.js';
 import { ReplicaState } from '../sim/c-replicaState.js';
 import { CtlChangeInputs, DriverInputs } from '../sim/d-sources.js';
-import type { InputSource } from '../sim/input.js';
+import type { InputSource, SimInput } from '../sim/input.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
@@ -244,8 +244,11 @@ export interface OwnTimeline {
  * from `step`: not this tick (the body is off: the rows fly it).
  */
 export interface BodyDriver {
-  /** Tick t's controls and push, from the ship as it ended tick t - 1 and the aim and controls it flew that tick with */
-  step(t: number, prev: FlightBody, prevQ: number, prevBits: number): { bits: number; q: number; ix: number; iy: number } | null;
+  /**
+   * Tick t's controls and push, from the ship as it ended tick t - 1 and the aim and controls it flew that tick with; an
+   * AI pilot's guns' controls too (`fire`, `aim`, `aimDist`: bodies/aiPilot.ts, flown by other ships' guns, sim/otherGuns.ts)
+   */
+  step(t: number, prev: FlightBody, prevQ: number, prevBits: number): { bits: number; q: number; ix: number; iy: number; fire?: boolean; aim?: number; aimDist?: number } | null;
   /** After its step at tick t (the body's check is of this) */
   after?(t: number, body: FlightBody): void;
 }
@@ -277,6 +280,17 @@ export interface ReplicaRewinds {
   readonly unsettled?: boolean;
   /** Work it out (asked only when the set isn't part way through a step: ShipReplicaSet.busy) */
   settle?(): void;
+}
+
+/**
+ * Something stepped beside every ship's step on the tick layer (other ships' guns: sim/otherGuns.ts, client
+ * ships/guns/OtherGuns.ts): told after each tick t a ship is stepped, with its state before (t - 1, after its causes),
+ * after the step (before t's causes) and the input it flew, and whenever its steps from a tick on are dropped
+ */
+export interface ReplicaSideSteps {
+  stepped(id: number, t: number, mode: ReplicaMode, prev: Readonly<Step>, now: Readonly<Step>, input: Readonly<SimInput>, derived: ShipDerived, env: ReplicaEnv): void;
+  /** Its steps from tick t on are gone (a rewind, a keyframe, removed: -Infinity) */
+  rewound(id: number, t: number): void;
 }
 
 /**
@@ -424,11 +438,18 @@ export class ShipReplicaSet {
     this.hook = h;
   }
 
+  /** Steps beside each ship's (other ships' guns) */
+  private sides: ReplicaSideSteps | null = null;
+  setSideSteps(h: ReplicaSideSteps | null): void {
+    this.sides = h;
+  }
+
   /** A ship's stepped states from tick t on are gone: what was worked out ahead of them goes too */
   private dropped(id: number, t: number): void {
     this.ahead.dropFrom(id, t);
     this.pre.dropFrom(id, t);
     this.hook?.rewound(id, t);
+    this.sides?.rewound(id, t);
   }
 
   /** Its latest keyframe's tick (its path before it is the one it was drawn on; undefined: not held) */
@@ -507,6 +528,7 @@ export class ShipReplicaSet {
     if (flown === null) replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, dt, this.tuning, this.env(), t);
     const st = new ReplicaState(id, r.mode, body, flown ?? bits, q);
     this.ahead.keep(t, st);
+    if (!own && this.sides) this.sides.stepped(id, t, r.mode, prev, st, input, dt, this.env());
     return st;
   }
 

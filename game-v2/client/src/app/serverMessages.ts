@@ -383,6 +383,9 @@ const TABLE: Handlers = {
   crowd: (h, msg) => { h.state.onCrowd(msg); },
   // (Its own ship's stores, guns, hazards and priming put right, exact: its tick layer steps again from there)
   ownSync: (h, msg) => { h.shipClient.onOwnSync(msg); },
+  // (Other ships' gun lanes, and pilots' gun controls: their guns stepped here from their inputs, ships/guns/OtherGuns.ts)
+  gunSync: (h, msg) => { h.shipClient.onGunSync(msg); },
+  gunCtl: (h, msg) => { h.shipClient.onGunCtl(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);

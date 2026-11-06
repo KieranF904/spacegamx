@@ -95,8 +95,11 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   PILOTLESS_USE.load = gunLoadTick(ship, tick);
   const energy = { charge: powerTick(ship.derived, b.chargeOf(eid), PILOTLESS_USE, b.tuning).charge };
   PILOTLESS_USE.load = undefined;
+  const from = b.host.gunsRan ? b.fired.length : 0;
   b.fireWeapons(eid, ship, !!orders?.firing && !emp && !b.isJumping(ship), orders?.aim, orders?.aimDist ?? 0, orders?.target ?? -1, energy);
   b.charge.set(eid, energy.charge);
+  // (What its guns did, for the clients stepping them from its body's controls: server net/guns/GunNet.ts)
+  b.host.gunsRan?.(eid, from, !!orders?.body, !!orders?.firing, orders?.aim, orders?.aimDist ?? 0);
 }
 
 /** stepPilotless' scratch: the view, its input and env (reused every call; the step keeps none of them) */

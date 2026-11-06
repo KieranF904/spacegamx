@@ -82,6 +82,11 @@ export class AiPilots {
     return { controls, firing, aim: out.aim, aimDist: out.aimDist, target, body: on ? { bits: out.bits, q: out.q, ix: 0, iy: 0 } : undefined };
   }
 
+  /** Is its body on (its clients fly it, its guns too: common sim/otherGuns.ts) */
+  on(eid: number): boolean {
+    return !!this.flown.get(eid)?.body.on;
+  }
+
   /** A decision of its moves' (a custom enemy's pieces gone, GONE: CAPS.MOVES), into its body's state and to its clients */
   note(eid: number, op: number, args: readonly number[]): void {
     const f = this.flown.get(eid);

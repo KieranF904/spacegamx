@@ -53,7 +53,11 @@ export type SimEvent =
   /** A pull acted on a ship (pulls phase): the velocity it added */
   | { k: 'pull'; tick: number; target: number; from: number; dvx: number; dvy: number }
   /** A visual with no effect on state (a pulse starting, a charge tell, a muzzle flash) */
-  | { k: 'fx'; tick: number; owner: number; fx: string; part: number; x: number; y: number }
+  /**
+   * `aq`: a gun's fx its aim offset in SHOT_AIM_STEPS as a fire record carries it (a pulse, a charge tell, a beam piece), or
+   * a ports mining laser's fulfilment (0..255): what another ship's client builds the record from (sim/otherGuns.ts)
+   */
+  | { k: 'fx'; tick: number; owner: number; fx: string; part: number; x: number; y: number; aq?: number }
   | { k: 'sound'; tick: number; owner: number; sound: string; x: number; y: number }
   /**
    * Reserved plug-in point for damage (clients don't apply damage yet): what a hit or contact would do to a part.

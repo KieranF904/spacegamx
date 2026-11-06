@@ -190,6 +190,7 @@ import { GuideNet } from './net/guides/GuideNet.js';
 import type { BodyState, MoveOrigin } from '@space-game/common';
 import { CrowdControl } from './net/crowd/CrowdControl.js';
 import { SystemClocks, SimPass, rebaseShipTicks } from './sim/SystemClocks.js';
+import { GunNet } from './net/guns/GunNet.js';
 import { SnapshotBuilder, type RoundSkip, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
 // ============================================
@@ -693,6 +694,8 @@ export class GameServer implements ServerCtx {
   readonly bodies: BodyNet;
   /** Homing shells for the clients that run them on their tick layers (CAPS.WAYPOINTS, net/guides/GuideNet.ts) */
   readonly guides: GuideNet;
+  /** Other ships' guns stepped on clients' tick layers from their controls (net/guns/GunNet.ts) */
+  readonly gunNet: GunNet;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
   readonly snapshots: SnapshotBuilder;
   /** Crowd fallbacks (net/crowd/CrowdControl.ts; the crowd option): each system's level, from its measured cost */
@@ -1088,6 +1091,8 @@ this.devTeleport = opts.devTeleport ?? false;
       occupied: (s) => { for (const c of this.clients.values()) if (hasComponent(this.world, Player, c.playerId) && InSystem.systemId[c.playerId] === s) return true; return false; },
     }) : null;
 
+    // (Other ships' gun lanes: stepped as the clients holding them step them, net/guns/GunNet.ts)
+    this.gunNet = new GunNet({ tick: () => this.currentTick, ships: () => this.ships, env: (eid) => this.replicaEnv(InSystem.systemId[eid]) });
     // The snapshot path (net/SnapshotBuilder.ts): built once, after every module it reads
     this.snapshots = new SnapshotBuilder({
       world: this.world,
@@ -1123,6 +1128,7 @@ this.devTeleport = opts.devTeleport ?? false;
       guides: this.guides,
       blocks: this.net.blocks,
       crowd: this.crowd,
+      gunNet: this.gunNet,
     }, this);
 
     // Hook up admin server events
@@ -2537,6 +2543,8 @@ this.devTeleport = opts.devTeleport ?? false;
       // --- Support weapons (common/src/ships/features/support/support.ts) ---
       canHeal: (a, b) => this.canHeal(a, b),
       onHeal: (healer, target, hp) => this.support.note(healer, target, hp, this.currentTick),
+      // (an AI pilot's guns, while its body flies it on clients: not a boss's, whose brain decides its own)
+      gunsRan: (eid, from, bodied, fire, aim, aimDist) => this.gunNet?.pilotless(eid, from, bodied && this.enemies.aiBodyOn(eid), fire, aim, aimDist),
       pdThreats: (eid, x, y, range, out) => this.weapons.threats(InSystem.systemId[eid], x, y, range, (owner) => owner !== eid && this.canDamage(owner, eid), out),
       intercept: (eid, part, proj, fx, fy) => {
         const x = Position.x[proj], y = Position.y[proj], sys = InSystem.systemId[proj];
@@ -3738,11 +3746,12 @@ this.devTeleport = opts.devTeleport ?? false;
   // ============================================
 
   private playerMovementSystem(): void {
-    for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) this.ships.stepMovement(eid);
+    for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) { this.gunNet.beforePilot(eid); this.ships.stepMovement(eid); }
   }
 
   private weaponSystem(): void {
-    for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) this.ships.stepWeapons(eid);
+    // (Each pilot's gun lane after its guns: what other clients step of them, net/guns/GunNet.ts)
+    for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) { const from = this.ships.fired.length; this.ships.stepWeapons(eid); this.gunNet.pilot(eid, from); }
   }
 
   private fireCannon(shooterEid: number, x: number, y: number, angle: number, item: any, systemId: number, spawnOffset = 30,

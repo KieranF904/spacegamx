@@ -15,6 +15,8 @@ export interface BodyReads {
   now(id: number): BodyPose | null;
   /** A ship as it ended the tick before */
   before(id: number): BodyPose | null;
+  /** A ship's radius as this end has its structure (an AI's trigger reads its target's: aiFires; undefined: not known) */
+  radius?(id: number): number | undefined;
 }
 
 export interface BodyKind {
@@ -59,8 +61,13 @@ const AI_PILOT: BodyKind = {
   reads: aiReads,
   step: (id, s, me, read, t, prevQ, prevBits) => {
     const reads = aiReads(id, s);
-    let tg = null;
-    if (s.target >= 0 && reads.length) { tg = read.now(s.target); if (!tg) return null; }
+    let tg: (BodyPose & { r?: number }) | null = null;
+    if (s.target >= 0 && reads.length) {
+      const p = read.now(s.target);
+      if (!p) return null;
+      // (its trigger reads its target's size: aiFires)
+      tg = { x: p.x, y: p.y, angle: p.angle, vx: p.vx, vy: p.vy, r: read.radius?.(s.target) };
+    }
     const pack = orderPack(id, s.want);
     const c = pack ? packCentroid(pack, read.before) : null;
     if (pack && !c) return null;

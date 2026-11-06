@@ -126,20 +126,27 @@ export class DriverInputs implements InputSource {
   private answered = -Infinity;
   private readonly out: SimInput = { ...NO_INPUT };
   private readonly push: [number, number] = [0, 0];
+  /** Did the driver fly the ship on the tick last asked (false: its fallback, or held) */
+  flew = false;
   constructor(readonly driver: BodyDriver) {}
 
   inputAt(t: number, prev: InputPrev): SimInput {
     if (t > this.answered) this.answered = t;
     const by = this.driver.step(t, prev.body as FlightBody, prev.ctl.q, prev.ctl.bits);
     const o = this.out;
+    // (Flown by its driver this tick: its guns' controls are its body's too, an AI pilot's trigger and lead: sim/otherGuns.ts)
+    this.flew = !!by;
     if (!by) {
       if (this.fallback) return this.fallback.inputAt(t, prev);
       o.bits = prev.ctl.bits; o.q = prev.ctl.q; o.impulse = undefined;
+      o.fire = false; o.gunAim = undefined; o.aimDist = 0;
       return o;
     }
     o.bits = by.bits; o.q = by.q;
     this.push[0] = by.ix; this.push[1] = by.iy;
     o.impulse = this.push;
+    const g = by as { fire?: boolean; aim?: number; aimDist?: number };
+    o.fire = !!g.fire; o.gunAim = g.fire === undefined ? undefined : g.aim ?? null; o.aimDist = g.aimDist ?? 0;
     return o;
   }
 

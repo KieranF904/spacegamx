@@ -1,5 +1,5 @@
 /** The Point Defence Turret's tick (a weapon role of the support feature: ./index.ts). Moved from bridge/weapons.ts. */
-import { pointDefenceOf, stepPointDefenceAim, wrapPi, isOpen, shipPointToWorld, type ShipState, type WeaponInfo, type WeaponTuning } from '@space-game/common';
+import { pointDefenceOf, stepPointDefenceAim, wrapPi, isOpen, shipPointToWorld, TELL_PD, type ShipState, type WeaponInfo, type WeaponTuning } from '@space-game/common';
 import type { WeaponBridge } from '../../bridge/core.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
@@ -43,6 +43,8 @@ export function pointDefence(b: WeaponBridge, eid: number, ship: ShipState, pose
     const [mx, my] = shipPointToWorld(ship, pose, [win.pivot[0] + dcos(a) * win.barrel, win.pivot[1] + dsin(a) * win.barrel], b.tuning.cellSize);
     const cd = ship.cooldown[w.part];
     ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval;
+    // (Told: a fire record with no shells, so clients stepping this ship's guns restart its cooldown too, common sim/otherGuns.ts lanePd)
+    b.fired.push({ owner: eid, tick: b.host.getTick(), part: w.part, aimQ: 0, ids: [], ammo: TELL_PD });
     const target = pick.id;
     if (b.host.intercept!(eid, w.part, target, mx, my)) {
       const i = b.pdList.findIndex((t) => t.id === target);

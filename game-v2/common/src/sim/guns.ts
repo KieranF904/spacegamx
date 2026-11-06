@@ -23,7 +23,7 @@ import type { ShipTuning } from '../ships/tuning.js';
 import type { WeaponInfo } from '../ships/rebuild.js';
 import type { WeaponMods } from '../ships/types.js';
 import { stepGuns, type GunOrders, type GunStep } from '../ships/guns.js';
-import { gunDef } from '../ships/launch.js';
+import { gunDef, shotAimQ } from '../ships/launch.js';
 import { ensurePortsCharge, payMining, type Charge } from '../ships/energy.js';
 import { portsMinePhase, portsPiecePhase, type PortsState } from '../ships/power/ports.js';
 import { jumpPhase, jumpTuning } from '../ships/flight.js';
@@ -72,12 +72,12 @@ export function gunEvents(ship: ShipState, owner: number, pose: GunPose, step: G
       events.push(e);
     }
   }
-  for (const p of step.pulses) events.push({ k: 'fx', tick, owner, fx: GUN_FX.pulse, part: p.w.part, x: pose.x, y: pose.y });
-  for (const t of step.tells) events.push({ k: 'fx', tick, owner, fx: t.start ? GUN_FX.chargeStart : GUN_FX.chargeCancel, part: t.w.part, x: pose.x, y: pose.y });
+  for (const p of step.pulses) events.push({ k: 'fx', tick, owner, fx: GUN_FX.pulse, part: p.w.part, x: pose.x, y: pose.y, aq: p.aimQ });
+  for (const t of step.tells) events.push({ k: 'fx', tick, owner, fx: t.start ? GUN_FX.chargeStart : GUN_FX.chargeCancel, part: t.w.part, x: pose.x, y: pose.y, aq: t.aimQ });
   const pz = ship.derived.ports, pe = pz ? (charge?.e as PortsState | undefined) : undefined;
   for (const w of step.beams) {
     events.push({ k: 'fx', tick, owner, fx: GUN_FX.beam, part: w.part, x: pose.x, y: pose.y });
-    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) events.push({ k: 'fx', tick, owner, fx: GUN_FX.beamPiece, part: w.part, x: pose.x, y: pose.y });
+    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) events.push({ k: 'fx', tick, owner, fx: GUN_FX.beamPiece, part: w.part, x: pose.x, y: pose.y, aq: shotAimQ(ship.aim[w.part]) });
   }
 }
 
@@ -113,7 +113,7 @@ export function miningTick(ship: ShipState, owner: number, pose: GunPose, c: Gun
   if (c.stopped) ship.mineUntil = 0;
   const on = payMining(ship, c.mining, tick, energy, c.stopped);
   const pz = ship.derived.ports, pe = energy.charge.e;
-  if (on && pz && pe) for (const m of ship.derived.miners) if (portsMinePhase(pz, pe, m.part) === 0) events.push({ k: 'fx', tick, owner, fx: GUN_FX.minePulse, part: m.part, x: pose.x, y: pose.y });
+  if (on && pz && pe) for (const m of ship.derived.miners) if (portsMinePhase(pz, pe, m.part) === 0) events.push({ k: 'fx', tick, owner, fx: GUN_FX.minePulse, part: m.part, x: pose.x, y: pose.y, aq: pe.sat[m.part] });
   return on;
 }
 
@@ -147,7 +147,7 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   const pose: GunPose = { x: body.x, y: body.y, angle: body.angle };
   const energy = state.accounted ? { charge: state.charge } : undefined;
   if (energy) ensurePortsCharge(d, energy.charge);
-  gunsTick(view, state.id, pose, { firing: c.firing, aimWorld: simAim(input.q), aimDist: input.aimDist, energy }, t, env.tuning, events);
+  gunsTick(view, state.id, pose, { firing: c.firing, aimWorld: input.gunAim === undefined ? simAim(input.q) : input.gunAim ?? undefined, aimDist: input.aimDist, energy }, t, env.tuning, events);
   if (energy) {
     miningTick(view, state.id, pose, c, t, energy, events);
     state.charge = energy.charge;

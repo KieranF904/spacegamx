@@ -23,8 +23,9 @@ import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
 import { MoveRunner } from '../../../../client/src/ships/bodies/MoveRunner.js';
 import { ContactWorld, type ContactFx } from '../../../../client/src/ships/causes/ContactWorld.js';
-import { ownShotWireOf, type GuideBody, type CustomStats, type Charge, type FireRecord, type ClientInputMessage } from '@space-game/common';
+import { ownShotWireOf, isOtherShotWire, type GuideBody, type CustomStats, type Charge, type FireRecord, type ClientInputMessage } from '@space-game/common';
 import { OwnShells } from '../../../../client/src/ships/hits/OwnShells.js';
+import { OtherGuns } from '../../../../client/src/ships/guns/OtherGuns.js';
 import factionsFile from '../../../../data/factions.json' with { type: 'json' };
 import type { GameServer } from '../../GameServer.js';
 
@@ -111,6 +112,11 @@ export class FakeHitsClient {
    * server's records' for the same ticks
    */
   readonly ownShells: OwnShells;
+  /** Other ships' guns on its tick layer (client ships/guns/OtherGuns.ts), and the shells it built from their lanes */
+  readonly otherGuns: OtherGuns;
+  otherDerived = 0;
+  /** Each lane-built shell: its owner, gun, spawn tick and spawn (by wire name), for the tests */
+  readonly otherShells = new Map<number, { owner: number; tick: number; part: number; x: number; y: number; vx: number; vy: number }>();
   readonly shotPairs: { tick: number; client: number[]; server: number[] }[] = [];
   /** Its own shells it built, by wire name: the server's entity id (from its records), for the tests */
   readonly ownWire = new Map<number, number>();
@@ -151,7 +157,9 @@ export class FakeHitsClient {
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
     this.ownShells = new OwnShells({ self: () => this.pid, ship: (id) => this.store.get(id), tuning: ships.tuning, firePose: (t) => this.own.firePose(t) });
     this.watchServerShots();
-    this.bodies = new BodyRunner({ reps: this.reps });
+    this.bodies = new BodyRunner({ reps: this.reps, radius: (id) => this.store.get(id)?.derived.radius });
+    // (Other ships' guns stepped here from their inputs, as ShipClient: client ships/guns/OtherGuns.ts)
+    this.otherGuns = new OtherGuns({ reps: this.reps, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s as ShipState : undefined; }, tuning: ships.tuning, self: () => this.pid });
     this.moves = new MoveRunner({
       reps: this.reps, bodies: this.bodies, store: this.store, tuning: ships.tuning, terrain: () => opts.env(this.pid).terrain,
       custom: (factionsFile as { custom?: { designs: Record<string, CustomStats> } }).custom,
@@ -319,6 +327,8 @@ export class FakeHitsClient {
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
       case 'welcome': if (this.pid >= 0) this.own.start(); break;
       case 'ownSync': this.own.onOwnSync(m); break;
+      case 'gunSync': this.otherGuns.onGunSync(m); break;
+      case 'gunCtl': this.otherGuns.onGunCtl(m); break;
       case 'netCaps':
         // (the first after its join: finding hits here starts with the next snapshot; each says its level, ShipClient.onNetCaps)
         this.findHits();
@@ -395,6 +405,9 @@ export class FakeHitsClient {
       // (a row's shell is rounded: it sits out, the server tells its hits, as ShipClient.afterSnapshot)
       if (this.selfHits.on) this.selfHits.row(e.id);
     }
+    // (Other ships' gun lanes: their shells whose life has ended, then this window's as fire rows, as ShipClient.preSnapshot)
+    this.otherGuns.expire(s.tick, s.removed);
+    this.otherGuns.confirm(s);
     // Fire events: the shells rebuilt from the firing ship's replica, as ShipClient.preSnapshot does
     for (const [owner, ago, partAmmo, aimQ, ...ids] of s.fire ?? []) {
       for (const id of ids) this.known.add(id);
@@ -408,6 +421,7 @@ export class FakeHitsClient {
       for (const id of ids) {
         const sh = v?.shells.find((x) => x.id === id);
         this.shells.set(id, { owner, gun: partAmmo, spawnTick, x: sh?.x ?? 0, y: sh?.y ?? 0, vx: sh?.vx ?? 0, vy: sh?.vy ?? 0 });
+        if (sh && isOtherShotWire(id)) { this.otherGuns.built(id, tick + sh.life - 1); this.otherDerived++; this.otherShells.set(id, { owner, tick, part, x: sh.x, y: sh.y, vx: sh.vx, vy: sh.vy }); }
         if (sh) this.selfHits?.addShell(id, owner, partAmmo, spawnTick, sh.x, sh.y, sh.vx, sh.vy, sh.size);
       }
     }
@@ -474,6 +488,7 @@ export class FakeHitsClient {
     try { for (const m of r.msgs) this.handle(m); } finally { this.handingOut = false; }
     for (const id of r.gone) { this.removed.add(id); this.shells.delete(id); this.guides?.remove(id); }
     this.ownShells.gone(r.gone);
+    this.otherGuns.gone(r.gone);
     this.selfHits?.spent(r.gone);
   }
 }

@@ -26,3 +26,5 @@ export * from './c-contactCache.js';
 export * from './c-pulls.js';
 // The own ship's whole step on its client (Stage 3b) and its exact correction (ownSync)
 export * from './ownStep.js';
+// Other ships' guns stepped from their inputs on every end (gun lanes, gunSync, gun rows, shot names)
+export * from './otherGuns.js';
