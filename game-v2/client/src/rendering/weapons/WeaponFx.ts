@@ -37,6 +37,7 @@ import type { Lighting } from '../lighting/Lighting';
 import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
 import { BURST, burstLife, burstSpeed, hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
 import { AnchorList, rideStep, type ImpactAnchor } from './impactAnchor';
+import type { CombatSoundFeed } from '../../audio/CombatSounds';
 
 /** Which way a hit throws (impactAim): the angle its directional parts leave at, and the struck surface's normal if one was found */
 interface Aim { a: number; nx: number; ny: number; surface: boolean }
@@ -63,8 +64,12 @@ interface Shot {
   vx: number;
   vy: number;
   hit: { x: number; y: number } | null;
-  /** Its muzzle flash has gone off (at age 0 on its timeline) */
+  /** Its muzzle flash has gone off (at age 0 on its timeline): its shot is heard then (sounds) */
   flashed: boolean;
+  /** Its gun's model, grade and mount, for its shot's sound */
+  model?: string;
+  grade: number;
+  turret: boolean;
   /** Fired by your own client ahead of the server (until the server's copy takes it over) */
   predicted: boolean;
   /** The firing ship's pose on the fire tick (the flash sits on the barrel in its frame) */
@@ -232,6 +237,8 @@ export interface PredictedShell {
   life?: number;
   /** Ticks before it can strike anything (it arms late), if any */
   arm?: number;
+  /** Fired from a turret (its shot's sound) */
+  turret?: boolean;
   spawnX: number;
   spawnY: number;
   spawnTick: number;
@@ -348,6 +355,8 @@ export class WeaponFx {
    * sparks), by its shell's id and type, and what it struck as drawn here (-1: not known, the server's point only)
    */
   onStruck: ((id: number, x: number, y: number, type: number, target: number) => void) | null = null;
+  /** Shots and impacts heard as they're drawn here (audio/CombatSounds.ts) */
+  sounds: CombatSoundFeed | null = null;
   private readonly drawn: DrawnHit = { t: 0, x: 0, y: 0, target: -1 };
   /** Ids of ended shells let go (and their spawn tick): a row or hit for one later doesn't bring it back */
   private spent = new Map<number, number>();
@@ -553,6 +562,10 @@ export class WeaponFx {
     // not when it arrives, which is usually a little early. Shots first seen well downrange don't flash.
     if (!shot.flashed && t >= shot.spawnTick) {
       shot.flashed = true;
+      this.sounds?.shot({
+        id: shot.id, spawnTick: shot.spawnTick, owner: shot.owner, type: shot.type, grade: shot.grade, model: shot.model, turret: shot.turret,
+        x: shot.spawnX, y: shot.spawnY, ahead: shot.predicted && shot.owner !== state.playerId,
+      });
       if (t - shot.spawnTick < 12) {
         if (shot.type === WeaponType.PrismShard) this.splitFlash(shot); else this.muzzleFlash(shot, state.entities.get(shot.owner));
       }
@@ -700,6 +713,7 @@ export class WeaponFx {
     const style = shot?.style ?? weaponStyle(WeaponType.Cannon);
     const aim = this.aimOf(style, shot, x, y);
     this.grouped(this.hitTarget, x, y, () => this.impactParts(style, shot, x, y, aim));
+    this.sounds?.impact({ shell: shot?.id ?? -1, owner: shot?.owner ?? -1, x, y });
   }
 
   /**
@@ -990,6 +1004,7 @@ export class WeaponFx {
       vy: e.vy,
       hit: null,
       flashed: false,
+      model: look?.model, grade: e.data?.[1] ?? 1, turret: e.data?.[8] === 1,
       predicted: false,
       pose: this.firePose?.(e.id),
       endTick: e.data?.[9] ?? 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
@@ -1043,7 +1058,7 @@ export class WeaponFx {
       id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, dim: this.dimOf(style, -id), hot: 0, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
-      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0,
+      hit: null, flashed: false, model: p.model, grade: p.grade ?? 1, turret: p.turret ?? false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0,
       endAt: p.life ? p.spawnTick + p.life : Infinity, gone: false, pending: null, head: null, tail: null, ctX: NaN, ctY: NaN,
       ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: p.arm ?? 0,
     });
@@ -1054,6 +1069,7 @@ export class WeaponFx {
   retract(id: number): void {
     const s = this.shots.get(id);
     if (s && s.predicted && s.fading === null) s.fading = 0;
+    if (s?.predicted) this.sounds?.retracted(id);
   }
 
   /**
@@ -1076,6 +1092,7 @@ export class WeaponFx {
     if (!best || bd > 120) return null;
     this.shots.delete(best.id);
     this.tally?.('renamed', e.id, best.owner, best.id);
+    this.sounds?.renamed(best.id, e.id);
     best.id = e.id;
     best.predicted = false;
     return best;
@@ -1103,6 +1120,7 @@ export class WeaponFx {
     if (!best) return null;
     this.shots.delete(best.id);
     this.tally?.('renamed', h.id, best.owner, best.id);
+    this.sounds?.renamed(best.id, h.id);
     best.id = h.id;
     best.predicted = false;
     this.shots.set(h.id, best);

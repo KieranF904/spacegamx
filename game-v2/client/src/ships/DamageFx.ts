@@ -36,6 +36,8 @@ import { AnchorList, type ImpactAnchor } from '../rendering/weapons/impactAnchor
 import { shotSoundForKind } from '../audio/weaponSounds';
 
 /** A point-defence turret's shot (its part's sfxTurret) */
+/** A shield's drop this soon after a shell's strike rippled it (ms) was that strike's, heard as it was drawn */
+const RIPPLE_HEARD_MS = 700;
 const PD_SOUND = shotSoundForKind('point_defence', true, 'turret_shot');
 
 type Sound = (id: string, at?: { x: number; y: number }, volume?: number) => void;
@@ -658,7 +660,10 @@ export class DamageFx {
       const prev = this.lastShield.get(id) ?? shieldPct;
       const look = shieldLookOf(ship);
       if (shieldPct < prev - 0.5) {
-        if ((this.shieldFlash.get(id) ?? 0) < 0.4) this.sound('shield_hit', { x: e.renderX, y: e.renderY }, 0.6);
+        // (A shell's strike on the bubble was heard as it was drawn (shieldHit's ripple: audio/CombatSounds.ts); this is
+        // for the rest that wears a shield down, beams and blasts)
+        const rippled = performance.now() - (this.rippledAt.get(id) ?? -Infinity) < RIPPLE_HEARD_MS;
+        if (!rippled && (this.shieldFlash.get(id) ?? 0) < 0.4) this.sound('shield_hit', { x: e.renderX, y: e.renderY }, 0.6);
         this.shieldFlash.set(id, 1);
       }
       // A Flash Screen coming back: a white bloom swelling out of the bubble (the server's ShieldFlash effect adds the ring)
@@ -728,9 +733,24 @@ export class DamageFx {
       if (!e || !ship) continue;
       const r = ship.derived.radius * 1.12 + 10;
       if (Math.hypot(x - e.renderX, y - e.renderY) > r * 1.25) continue;
+      this.rippledAt.set(id, performance.now());
       // (At the hull where the server's hit landed, not out on the bubble's rim: the shot met the parts, not a circle)
       if (this.ripples.length < 40) this.ripples.push({ id, a: Math.atan2(y - e.renderY, x - e.renderX) - e.renderAngle, d: Math.min(r, Math.hypot(x - e.renderX, y - e.renderY)), life: 0, model: m });
     }
+  }
+
+  /** When a shell's strike last rippled each ship's bubble (performance.now): its drop in the next rows isn't heard again */
+  private rippledAt = new Map<number, number>();
+
+  /** Is a raised shield's bubble at (x, y)? A shell striking there ripples it (shieldHit): heard as shield_hit */
+  bubbleAt(x: number, y: number): boolean {
+    for (const [id, pct] of this.lastShield) {
+      if (pct <= 0) continue;
+      const e = this.state.entities.get(id), ship = this.source.get(id);
+      if (!e || !ship) continue;
+      if (Math.hypot(x - e.renderX, y - e.renderY) <= (ship.derived.radius * 1.12 + 10) * 1.25) return true;
+    }
+    return false;
   }
 
   /**

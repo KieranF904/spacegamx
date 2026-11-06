@@ -382,8 +382,8 @@ export class ShipClient {
   /**
    * A shell's hit, where it's seen to strike (WeaponFx.onStruck), or where the server says for one not drawn here: a
    * raised shield's ripple and plating's sparks there, and the hit look a shell with no detonation of its own has; on
-   * a rock (`target`, as drawn here), its mining strike or sparks, which the server no longer sends, and (finding its own hits, so told
-   * no projectileHit for it) its sound: GameServer.hurtAsteroid
+   * a rock (`target`, as drawn here), its mining strike or sparks, which the server no longer sends (GameServer.hurtAsteroid).
+   * Every hit's sound is its drawn impact's (WeaponFx.impactAt -> audio/CombatSounds.ts)
    */
   private struckFx(id: number, x: number, y: number, type: number, target = -1): void {
     this.damageFx?.shieldHit(x, y, this.shellLooks.get(id)?.model);
@@ -396,8 +396,13 @@ export class ShipClient {
       // (nothing's sent for it, so it plays whatever the roll); one that can't mine there, a shell's plain sparks
       if (strikeRolls(kind, rockAt.composition?.hardness)) this.scene?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
       else this.scene?.showEffect(EffectType.LaserHit, x, y, [this.shellDamage(id), 30]);
-      if (this.selfHits.on) this.opts.sound?.('hit', { x, y }, 0.7, 0.85 + Math.random() * 0.3);
+      // (its sound is the impact's, heard as WeaponFx draws it: audio/CombatSounds.ts)
     }
+  }
+
+  /** Is a raised shield's bubble at (x, y)? A shell's impact there is heard as shield_hit (audio/CombatSounds.ts) */
+  shieldAt(x: number, y: number): boolean {
+    return this.damageFx?.bubbleAt(x, y) ?? false;
   }
 
   /** About what a shell hits with (a rock's sparks are sized by it), from its gun where known */
@@ -1092,7 +1097,7 @@ export class ShipClient {
       const v = fireVolley(fire, ship, { ...pose, vx: state.body.vx, vy: state.body.vy }, this.opts.tuning);
       if (!v) continue;
       for (const sh of v.shells) {
-        this.scene.predictShot({ owner: ship.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, spawnX: sh.x, spawnY: sh.y, spawnTick: tick - 1, vx: sh.vx, vy: sh.vy, size: sh.size, pose });
+        this.scene.predictShot({ owner: ship.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, turret: v.turret, spawnX: sh.x, spawnY: sh.y, spawnTick: tick - 1, vx: sh.vx, vy: sh.vy, size: sh.size, pose });
       }
     }
   }
@@ -1116,7 +1121,7 @@ export class ShipClient {
     if (!v) return [];
     const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w), at = { x: pose.x, y: pose.y, angle: pose.angle };
     const model = (ship.blueprint.parts[w.part]?.fn ?? '') + (rec.aug ? AUG : '');
-    return v.shells.map((sh) => scene.predictShot({ owner, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model, damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, spawnX: sh.x, spawnY: sh.y, spawnTick: pilot ? t - 1 : t, vx: sh.vx, vy: sh.vy, size: sh.size, pose: at }));
+    return v.shells.map((sh) => scene.predictShot({ owner, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model, damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, sh.life), arm: pdef.arm, turret: v.turret, spawnX: sh.x, spawnY: sh.y, spawnTick: pilot ? t - 1 : t, vx: sh.vx, vy: sh.vy, size: sh.size, pose: at }));
   }
 
   /** Take back a shell drawn ahead that never was */

@@ -1732,6 +1732,11 @@ export class Renderer {
     this.weaponFx.onStruck = fn;
   }
 
+  /** Shots and impacts heard as they're drawn (WeaponFx.sounds: audio/CombatSounds.ts) */
+  set combatSounds(feed: WeaponFx['sounds']) {
+    this.weaponFx.sounds = feed;
+  }
+
   /** Is this shell drawn (now or lately)? Its hit effects then go where it's seen to strike (WeaponFx.draws) */
   drawsShell(id: number): boolean {
     return this.weaponFx.draws(id);

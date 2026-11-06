@@ -178,7 +178,7 @@ export function tickInput(s: InputSendCtx): void {
   const auto = s.loggedIn && inputEnabled && !s.stationOpen ? s.autopilot.tick() : null;
   if (auto) { fireLeft = fireRight = false; }
 
-  // Gun sounds come from the shots themselves (updateSounds); firing stirs the combat music
+  // Gun sounds come from the shots themselves, heard as drawn (audio/CombatSounds.ts); firing stirs the combat music
   if (fireLeft && !s.lastFireLeft) s.playerStatsUI.addShotFired();
   if (fireRight && !s.lastFireRight) s.playerStatsUI.addShotFired();
   if (fireLeft || fireRight) s.audio.bumpCombat(1);

@@ -34,7 +34,8 @@ import { PilotState, createClientEconomy } from './econ/clientEcon';
 import { LoginUI } from './ui/LoginUI';
 import { ServerBrowserUI, ServerInfo } from './ui/ServerBrowserUI';
 import { AudioManager, type BeamSource } from './audio/AudioManager';
-import { beamLightSound, beamLoopFor, hasOwnShotSound } from './audio/weaponSounds';
+import { beamLightSound, beamLoopFor } from './audio/weaponSounds';
+import { CombatSounds } from './audio/CombatSounds';
 
 import { PerfMonitor } from './ui/PerfMonitor';
 
@@ -85,7 +86,6 @@ if (import.meta.env.DEV) {
 registerRockTypes(miningTable as unknown as MiningTable);
 
 /** A cannon shot's pitch by its gun's grade, Mk I-V (heavy shells lower, high-velocity slugs higher) */
-const CANNON_GRADE_PITCH = [1, 0.86, 1.14, 1.06, 0.8];
 
 
 /** Proto mode (npm run proto): in-process server, no login, no prediction. */
@@ -169,8 +169,8 @@ export class Game {
   private serverName = 'Local';
   private serverAddress = '';
   private windowFocused = true;
-  /** Projectiles and ship bodies already heard (so each makes its sound once) */
-  private heard = new Set<number>();
+  /** Shots and impacts heard as WeaponFx draws them (audio/CombatSounds.ts) */
+  private combatSounds!: CombatSounds;
   private systemArrivedAt = 0;
   private lastAlarm = 0;
   private statsPrimed = false;
@@ -182,8 +182,6 @@ export class Game {
   private autoQuality = new AutoQuality();
   /** A full-screen window (hangar, menu) hides the world: it isn't updated or drawn until this is set again (a resize, a setting changed) or the window closes */
   private worldPaused = false;
-  /** The shots in the world this frame (updateSounds; reused) */
-  private shotsAlive = new Set<number>();
   /** The nav markers are placed every hudEvery frames (the quality tier) */
   private hudEvery = 1;
   private navFrames = 0;
@@ -381,6 +379,11 @@ this.xpFillEl = document.getElementById('xpFill');
     // Initialize renderer
     this.renderer = new Renderer(this.app, this.state);
     this.shipClient.init(this.app, this.renderer);
+    this.combatSounds = new CombatSounds({
+      play: (id, x, y, volume, pitch) => { this.audio.play(id, x, y, { volume, pitch }); },
+      shieldAt: (x, y) => this.shipClient.shieldAt(x, y),
+    });
+    this.renderer.combatSounds = this.combatSounds;
     // Render tuning (F8) and ship swap (F9): dev server only (app/devTools.ts)
     installDevTools(this.windowHost);
     
@@ -619,39 +622,13 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   /**
-   * Sounds driven by what's on screen: a shot for each new projectile (a few
-   * per frame at most), parts breaking off as debris, the engine and boost
-   * loops, the event-horizon alarm, and the music's mood.
+   * Sounds driven by what's on screen: the engine and boost loops, held beams, the event-horizon alarm, and the music's
+   * mood. Shots and impacts are heard as WeaponFx draws them, this frame's drawing just after this (audio/CombatSounds.ts)
    */
   private updateSounds(now: number): void {
     const me = this.state.entities.get(this.state.playerId);
-    const settled = now - this.systemArrivedAt > 1500; // don't play everything already there on arrival
-    let shots = 0;
-    const alive = this.shotsAlive;
-    // (One sound a gun's volley: a fan of shells from one ship in one frame is heard once, so a pack can't machine-gun a sample)
-    const volleys = this.volleysHeard;
-    volleys.clear();
-    alive.clear();
-    for (const e of this.state.entities.ofType(EntityType.Projectile)) {
-      alive.add(e.id);
-      if (this.heard.has(e.id)) continue;
-      this.heard.add(e.id);
-      if (settled && shots < 4) {
-        // Its gun's model, known from its fire event (no wire bytes: ShipClient.shellInfo), has its own sound; else the
-        // kind's, by data[0] (the weapon type) and data[8] (fired by a turret)
-        const wt = e.data?.[0] ?? 1;
-        const model = this.shipClient.shellInfo(e)?.model;
-        const id = this.audio.shotSound(model, wt, e.data?.[8] === 1);
-        const volley = `${e.data?.[6] ?? -1}:${id}`;
-        if (volleys.has(volley)) continue;
-        volleys.add(volley);
-        shots++;
-        // (A cannon heard by its kind's sound: data[1], its grade, nudges the pitch, heavier marks deeper)
-        const pitch = wt === 1 && !hasOwnShotSound(model) ? CANNON_GRADE_PITCH[Math.max(0, Math.min(4, (e.data?.[1] ?? 1) - 1))] : 1;
-        if (id) this.audio.play(id, e.spawnX ?? e.x, e.spawnY ?? e.y, { volume: 0.8, pitch });
-      }
-    }
-    for (const id of this.heard) if (!alive.has(id)) this.heard.delete(id);
+    // (don't play every shell already flying on arrival)
+    this.combatSounds.frame(now - this.systemArrivedAt > 1500);
 
     const flying = this.loggedIn && !!me && !this.shipClient.hangarOpen && !this.menu.isOpen;
     const thrusting = flying && ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some((k) => this.input.isKeyDown(k));
@@ -681,8 +658,6 @@ this.xpFillEl = document.getElementById('xpFill');
     this.shipClient.setPlanetHint(wayIn ?? (flying ? this.planetBelow() : null), wayIn ? 'Enter' : undefined);
   }
 
-  /** This frame's shot sounds, by owner and sound (updateSounds) */
-  private readonly volleysHeard = new Set<string>();
   /** Held beams lit last frame (ship * 256 + part), so a beam lighting is heard once */
   private beamsLit = new Set<number>();
   private beamsNow = new Set<number>();

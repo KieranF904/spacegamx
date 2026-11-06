@@ -396,8 +396,8 @@ const TABLE: Handlers = {
   pulls: (h, msg) => { h.shipClient.onPulls(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },
   projectileHit: (h, msg) => {
+    // (its sound is its impact's, heard where and when it's drawn: WeaponFx.impactAt -> audio/CombatSounds.ts)
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);
-    h.audio.play('hit', msg.x, msg.y, { pitch: 0.85 + Math.random() * 0.3, volume: 0.7 });
   },
   asteroidSpawn: (h, msg) => { h.state.handleAsteroidSpawn(msg.tick, msg.asteroids); },
   asteroidSeed: (h, msg) => {
