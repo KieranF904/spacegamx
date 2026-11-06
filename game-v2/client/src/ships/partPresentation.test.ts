@@ -63,9 +63,10 @@ describe('part presentation data', () => {
     for (const f of fns) {
       if (!f.model || !f.weapon) continue;
       const fire = (f as { fire?: { model?: string } }).fire?.model;
+      // (Heard as it is mounted: a model with no sound of its own, like the Pip, has its kind's fixed or turret shot)
       // A held beam is its loop; a pulse laser its pulses (ShipClient beamFx.onPulse: laser_pulse); the rest their shot,
       // the same from a turret or not (a model is one or the other)
-      const sound = fire === 'beam' ? beamLoopFor(f.id, f.weapon) : tuning[f.weapon]?.pulse ? 'laser_pulse' : shotSoundFor(f.id, WEAPON_KIND_TYPE[f.weapon] ?? -1, true);
+      const sound = fire === 'beam' ? beamLoopFor(f.id, f.weapon) : tuning[f.weapon]?.pulse ? 'laser_pulse' : shotSoundFor(f.id, WEAPON_KIND_TYPE[f.weapon] ?? -1, (f as { mount?: string }).mount === 'turret');
       expect(sound, `${f.id}: no sound`).toBeTruthy();
       if (fire !== 'beam' && !tuning[f.weapon]?.pulse) expect(shotSoundFor(f.id, WEAPON_KIND_TYPE[f.weapon] ?? -1, false), f.id).toBe(sound);
       expect(SOUNDS[sound!], `${f.id}: ${sound} exists`).toBeDefined();
