@@ -1,0 +1,3899 @@
+{
+ "version": 1,
+ "tabs": [
+  {
+   "id": "structure",
+   "label": "Structure"
+  },
+  {
+   "id": "weapons",
+   "label": "Weapons"
+  },
+  {
+   "id": "engines",
+   "label": "Engines & jump"
+  },
+  {
+   "id": "power",
+   "label": "Power"
+  },
+  {
+   "id": "shields",
+   "label": "Shields & plating"
+  },
+  {
+   "id": "utility",
+   "label": "Utility"
+  }
+ ],
+ "rows": [
+  {
+   "id": "core",
+   "tab": "structure",
+   "kind": "core",
+   "name": "Ship core",
+   "level": 0,
+   "order": 0,
+   "fn": "core",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/core.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": true,
+   "tradeOff": "The heart: steering, the jump drive and a battery. One per ship",
+   "keyNumbers": "150 hp · armour 1",
+   "cost": {
+    "alloy_plate": 3,
+    "copper_wire": 4,
+    "power_coupling": 1
+   },
+   "seconds": 120
+  },
+  {
+   "id": "structure:alloy",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Alloy structure",
+   "level": 0,
+   "order": 11,
+   "fn": "hull",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-alloy.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Alloy",
+    "mark": "Mk I",
+    "grade": 1,
+    "toughness": 75,
+    "density": 1,
+    "traits": [],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 75,
+      "armour": 1,
+      "mass": 1,
+      "cost": {
+       "alloy_plate": 1
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 188,
+      "armour": 2,
+      "mass": 2.5,
+      "cost": {
+       "alloy_plate": 2
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 60,
+      "armour": 1,
+      "mass": 1,
+      "cost": {
+       "alloy_plate": 2
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 150,
+      "armour": 1,
+      "mass": 1,
+      "cost": {
+       "alloy_plate": 3,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "power_cell_reactor",
+   "tab": "power",
+   "kind": "model",
+   "name": "Cell Reactor",
+   "level": 0,
+   "order": 100,
+   "fn": "power_cell_reactor",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_cell_reactor.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "the starter; explodes when destroyed",
+   "family": "Generators",
+   "size": "Small · Square",
+   "keyNumbers": "+35 power",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_ion_drive",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Ion Drive",
+   "level": 0,
+   "order": 100,
+   "fn": "engine_ion_drive",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/engine_ion_drive.webp",
+    "w": 56,
+    "h": 77
+   },
+   "licence": false,
+   "tradeOff": "efficient, low top speed",
+   "family": "Ion drives",
+   "size": "Small · Square",
+   "keyNumbers": "thrust 2.3 · top 2,040 m/s · draws 9",
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_mining_laser",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Mining Laser",
+   "level": 0,
+   "order": 100,
+   "fn": "utility_mining_laser",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_mining_laser.webp",
+    "w": 56,
+    "h": 78
+   },
+   "licence": false,
+   "tradeOff": "cuts ore, a poor weapon",
+   "family": "Mining lasers",
+   "size": "Small · Square",
+   "keyNumbers": "draws 30",
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 2
+   },
+   "seconds": 0
+  },
+  {
+   "id": "cannon_pip",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Pip",
+   "level": 0,
+   "order": 100,
+   "fn": "cannon_pip",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/cannon_pip.webp",
+    "w": 52,
+    "h": 76
+   },
+   "licence": false,
+   "tradeOff": "light and quick",
+   "family": "Cannons",
+   "size": "Small · Square",
+   "keyNumbers": "56 dmg/s · reach 7,200 · cycle · draws 8",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_battery",
+   "tab": "power",
+   "kind": "model",
+   "name": "Battery",
+   "level": 0,
+   "order": 104,
+   "fn": "power_battery",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_battery.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "the ship's pool: holds and gives quickly",
+   "family": "Batteries",
+   "size": "Small · Square",
+   "keyNumbers": "holds 200 · gives 600/s",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_conduit",
+   "tab": "power",
+   "kind": "model",
+   "name": "Conduit",
+   "level": 0,
+   "order": 109,
+   "fn": "power_conduit",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_conduit.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A power line",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · gives 200/s · power line",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_vernier",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Vernier",
+   "level": 2,
+   "order": 101,
+   "fn": "engine_vernier",
+   "material": "alloy",
+   "piece": "tri",
+   "art": {
+    "src": "/static/img/parts/engine_vernier.webp",
+    "w": 57,
+    "h": 78
+   },
+   "licence": false,
+   "tradeOff": "cheap corner push, no boost",
+   "family": "Ion drives",
+   "size": "Small · Wedge",
+   "keyNumbers": "thrust 0.6 · top 2,400 m/s · draws 2",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_constructor",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Constructor",
+   "level": 2,
+   "order": 106,
+   "fn": "utility_constructor",
+   "material": "titanium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_constructor.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "builds structures",
+   "family": "Constructors",
+   "size": "Small · Square",
+   "keyNumbers": "draws 4",
+   "cost": {
+    "titanium_plate": 2,
+    "copper_wire": 3,
+    "servo_motor": 2
+   },
+   "seconds": 50
+  },
+  {
+   "id": "power_corner",
+   "tab": "power",
+   "kind": "model",
+   "name": "Corner Conduit",
+   "level": 2,
+   "order": 114,
+   "fn": "power_corner",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_corner.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A power line that turns",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · gives 200/s · power line",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "structure:composite",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Composite structure",
+   "level": 3,
+   "order": 11,
+   "fn": "hull",
+   "material": "composite",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-composite.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Composite",
+    "mark": "Mk I",
+    "grade": 1,
+    "toughness": 50,
+    "density": 0.7,
+    "traits": [
+     "light"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 50,
+      "armour": 1,
+      "mass": 0.7,
+      "cost": {
+       "composite_sheet": 1
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 125,
+      "armour": 2,
+      "mass": 1.8,
+      "cost": {
+       "composite_sheet": 2
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 40,
+      "armour": 1,
+      "mass": 0.7,
+      "cost": {
+       "composite_sheet": 2
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 100,
+      "armour": 1,
+      "mass": 0.7,
+      "cost": {
+       "composite_sheet": 3,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "autocannon_rattler",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Rattler",
+   "level": 3,
+   "order": 105,
+   "fn": "autocannon_rattler",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/autocannon_rattler.webp",
+    "w": 51,
+    "h": 70
+   },
+   "licence": false,
+   "tradeOff": "a stream of small shells",
+   "family": "Autocannons",
+   "size": "Small · Square",
+   "keyNumbers": "43 dmg/s · reach 5,400 · cycle · draws 12",
+   "mounting": [
+    "Turret, 270°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 2,
+    "scrap_electronics": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "flak_burst",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Burst",
+   "level": 4,
+   "order": 108,
+   "fn": "flak_burst",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/flak_burst.webp",
+    "w": 52,
+    "h": 68
+   },
+   "licence": false,
+   "tradeOff": "bursts near what it passes · ammo",
+   "family": "Flak",
+   "size": "Small · Square",
+   "keyNumbers": "26 dmg/s · reach 1,700 · ammo",
+   "mounting": [
+    "Turret, 200°",
+    "Side mount (flippable)",
+    "Bolts on at its side only"
+   ],
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 1,
+    "scrap_electronics": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_diode",
+   "tab": "power",
+   "kind": "model",
+   "name": "Diode",
+   "level": 4,
+   "order": 110,
+   "fn": "power_diode",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_diode.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A one-way power line",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · gives 200/s · one way",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "structure:steel",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Steel structure",
+   "level": 5,
+   "order": 12,
+   "fn": "hull",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-steel.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Steel",
+    "mark": "Mk II",
+    "grade": 2,
+    "toughness": 94,
+    "density": 1.4,
+    "traits": [
+     "heavy"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 94,
+      "armour": 2,
+      "mass": 1.4,
+      "cost": {
+       "steel_plate": 1
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 235,
+      "armour": 3,
+      "mass": 3.5,
+      "cost": {
+       "steel_plate": 2
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 75,
+      "armour": 2,
+      "mass": 1.4,
+      "cost": {
+       "steel_plate": 2
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 188,
+      "armour": 2,
+      "mass": 1.4,
+      "cost": {
+       "steel_plate": 3,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "engine_afterburner",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Afterburner",
+   "level": 5,
+   "order": 102,
+   "fn": "engine_afterburner",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/engine_afterburner.webp",
+    "w": 56,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "weak cruise, huge boost; wants a Drive Cell touching it",
+   "family": "Burn engines",
+   "size": "Small · Square",
+   "keyNumbers": "thrust 1.6 · top 3,000 m/s · draws 8",
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 1,
+    "fuel_injector": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_scanner",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Scanner",
+   "level": 5,
+   "order": 104,
+   "fn": "utility_scanner",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_scanner.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "reads rocks, finds seams",
+   "family": "Scanners",
+   "size": "Small · Square",
+   "keyNumbers": "scan 2,400 m · draws 4",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "crystal_lens": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "cannon_hammer",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Hammer",
+   "level": 6,
+   "order": 101,
+   "fn": "cannon_hammer",
+   "material": "alloy",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/cannon_hammer.webp",
+    "w": 86,
+    "h": 82
+   },
+   "licence": false,
+   "tradeOff": "slow heavy shell, punches plate",
+   "family": "Cannons",
+   "size": "Medium · Panel",
+   "keyNumbers": "69 dmg/s · reach 5,700 · cycle · draws 10",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 1 clear cell ahead"
+   ],
+   "cost": {
+    "alloy_plate": 3,
+    "copper_wire": 2,
+    "barrel_assembly": 1
+   },
+   "seconds": 40
+  },
+  {
+   "id": "utility_gyro",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Gyro",
+   "level": 6,
+   "order": 110,
+   "fn": "utility_gyro",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_gyro.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A reaction wheel",
+   "family": "Gyros",
+   "size": "Small · Square",
+   "keyNumbers": "+250 turning · draws 6 turning",
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 1,
+    "servo_motor": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_capacitor",
+   "tab": "power",
+   "kind": "model",
+   "name": "Capacitor",
+   "level": 7,
+   "order": 105,
+   "fn": "power_capacitor",
+   "material": "composite",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_capacitor.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines",
+   "family": "Capacitors",
+   "size": "Small · Square",
+   "keyNumbers": "holds 160 (guns) · gives 2,000/s by touch",
+   "cost": {
+    "composite_sheet": 1,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "mortar_lobber",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Lobber",
+   "level": 7,
+   "order": 110,
+   "fn": "mortar_lobber",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/mortar_lobber.webp",
+    "w": 53,
+    "h": 72
+   },
+   "licence": false,
+   "tradeOff": "lands where you aim · ammo",
+   "family": "Mortars",
+   "size": "Small · Square",
+   "keyNumbers": "28 dmg/s · reach 2,640 · ammo",
+   "mounting": [
+    "Turret, 360°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "alloy_plate": 3,
+    "copper_wire": 1,
+    "servo_motor": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_demolition_launcher",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Demolition Launcher",
+   "level": 8,
+   "order": 102,
+   "fn": "utility_demolition_launcher",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_demolition_launcher.webp",
+    "w": 54,
+    "h": 69
+   },
+   "licence": false,
+   "tradeOff": "cracks rock wide open",
+   "family": "Demolition",
+   "size": "Small · Square",
+   "keyNumbers": "450 dmg/s · reach 2,400 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 1,
+    "servo_motor": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_torch",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Torch",
+   "level": 8,
+   "order": 103,
+   "fn": "engine_torch",
+   "material": "alloy",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/engine_torch.webp",
+    "w": 90,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "full thrust all the time, no boost, burns energy",
+   "family": "Burn engines",
+   "size": "Medium · Panel",
+   "keyNumbers": "thrust 8.0 · top 4,200 m/s · draws 68",
+   "cost": {
+    "alloy_plate": 3,
+    "copper_wire": 2,
+    "fuel_injector": 1,
+    "thrust_nozzle": 1
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_joiner_bank",
+   "tab": "power",
+   "kind": "model",
+   "name": "Joiner Bank",
+   "level": 8,
+   "order": 111,
+   "fn": "power_joiner_bank",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_joiner_bank.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that joins two lines into one",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300 · gives 180/s",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_splitter_bank",
+   "tab": "power",
+   "kind": "model",
+   "name": "Splitter Bank",
+   "level": 8,
+   "order": 112,
+   "fn": "power_splitter_bank",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_bank.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that splits one line into two",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300 · gives 90/s",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_isotope_pile",
+   "tab": "power",
+   "kind": "model",
+   "name": "Isotope Pile",
+   "level": 9,
+   "order": 101,
+   "fn": "power_isotope_pile",
+   "material": "steel",
+   "piece": "round",
+   "art": {
+    "src": "/static/img/parts/power_isotope_pile.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "weak but tough, never explodes",
+   "family": "Generators",
+   "size": "Small · Round",
+   "keyNumbers": "+14 power",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 2,
+    "reactor_core": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "laser_glint",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Glint",
+   "level": 9,
+   "order": 112,
+   "fn": "laser_glint",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/laser_glint.webp",
+    "w": 49,
+    "h": 70
+   },
+   "licence": false,
+   "tradeOff": "a long pulse you time, reaches far",
+   "family": "Lasers",
+   "size": "Small · Square",
+   "keyNumbers": "96 a pulse · reach 5,100 · cycle · draws 15",
+   "mounting": [
+    "Turret, 240°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "crystal_lens": 1,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "structure:insulated_polymer",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Insulated Polymer structure",
+   "level": 10,
+   "order": 12,
+   "fn": "hull",
+   "material": "insulated_polymer",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-insulated_polymer.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Insulated Polymer",
+    "mark": "Mk II",
+    "grade": 2,
+    "toughness": 52,
+    "density": 0.7,
+    "traits": [
+     "conductive"
+    ],
+    "insulation": 0.3,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 52,
+      "armour": 2,
+      "mass": 0.7,
+      "cost": {
+       "insulated_polymer": 1
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 130,
+      "armour": 3,
+      "mass": 1.8,
+      "cost": {
+       "insulated_polymer": 2
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 42,
+      "armour": 2,
+      "mass": 0.7,
+      "cost": {
+       "insulated_polymer": 2
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 104,
+      "armour": 2,
+      "mass": 0.7,
+      "cost": {
+       "insulated_polymer": 3,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "utility_bore",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Bore",
+   "level": 10,
+   "order": 101,
+   "fn": "utility_bore",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/utility_bore.webp",
+    "w": 90,
+    "h": 86
+   },
+   "licence": false,
+   "tradeOff": "cuts harder rock",
+   "family": "Mining lasers",
+   "size": "Medium · Panel",
+   "keyNumbers": "draws 40",
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 3,
+    "crystal_lens": 1
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_drive_cell",
+   "tab": "power",
+   "kind": "model",
+   "name": "Drive Cell",
+   "level": 10,
+   "order": 106,
+   "fn": "power_drive_cell",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_drive_cell.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "touching Drive Cells form a bank that feeds the engines and strafers it touches first",
+   "family": "Drive cells",
+   "size": "Small · Square",
+   "keyNumbers": "holds 320 (engines) · gives 1,400/s by touch",
+   "cost": {
+    "steel_plate": 1,
+    "copper_wire": 2,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_burst_strafer",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Burst Strafer",
+   "level": 10,
+   "order": 109,
+   "fn": "engine_burst_strafer",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/engine_burst_strafer.webp",
+    "w": 56,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "a hard dodge away from its nozzle, short cooldown; no cruising push, big draw",
+   "family": "Strafers",
+   "size": "Small · Square",
+   "keyNumbers": "dodge 14.0 push · every 0.4 s · 140 energy a burst · draws 700 bursting",
+   "cost": {
+    "steel_plate": 1,
+    "fuel_injector": 1,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "pulse_strobe",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Strobe",
+   "level": 10,
+   "order": 115,
+   "fn": "pulse_strobe",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/pulse_strobe.webp",
+    "w": 49,
+    "h": 70
+   },
+   "licence": false,
+   "tradeOff": "steady bursts that strip shields",
+   "family": "Pulse guns",
+   "size": "Small · Square",
+   "keyNumbers": "54 dmg/s · reach 5,040 · cycle · draws 12",
+   "mounting": [
+    "Turret, 220°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "steel_plate": 1,
+    "copper_wire": 2,
+    "crystal_lens": 1,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_passthrough",
+   "tab": "power",
+   "kind": "model",
+   "name": "Passthrough",
+   "level": 10,
+   "order": 116,
+   "fn": "power_passthrough",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_passthrough.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A power line with a pipe through it, side to side",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · gives 200/s · power line",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "insulated_polymer": 2
+   },
+   "seconds": 0
+  },
+  {
+   "id": "feed_pipe",
+   "tab": "power",
+   "kind": "model",
+   "name": "Feed Pipe",
+   "level": 10,
+   "order": 117,
+   "fn": "feed_pipe",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_pipe.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A pipe",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "38 hp · armour 1",
+   "cost": {
+    "alloy_plate": 1,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "legendary_prism",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Prism Splitter",
+   "level": 10,
+   "order": 133,
+   "fn": "legendary_prism",
+   "material": "cobalt",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/legendary_prism.webp",
+    "w": 49,
+    "h": 70
+   },
+   "licence": false,
+   "family": "Legendary",
+   "size": "Small · Square",
+   "keyNumbers": "14 dmg/s · reach 2,800 · cycle · draws 10",
+   "mounting": [
+    "Turret, 270°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "crystal_lens": 2,
+    "copper_wire": 2,
+    "prism_shard": 1
+   },
+   "seconds": 80
+  },
+  {
+   "id": "point_defence_turret",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Point Defence Turret",
+   "level": 10,
+   "order": 137,
+   "fn": "point_defence_turret",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/point_defence_turret.webp",
+    "w": 51,
+    "h": 70
+   },
+   "licence": false,
+   "tradeOff": "shoots down missiles on its own; never ships",
+   "family": "Point defence",
+   "size": "Small · Square",
+   "keyNumbers": "5.0 shots/s at missiles · reach 560 · auto · draws 10",
+   "mounting": [
+    "Turret, 300°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "steel_plate": 1,
+    "copper_wire": 2,
+    "servo_motor": 1,
+    "targeting_chip": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "shield_deflector",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Deflector",
+   "level": 11,
+   "order": 100,
+   "fn": "shield_deflector",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/shield_deflector.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "soaks hits before the hull",
+   "family": "Shields",
+   "size": "Small · Square",
+   "keyNumbers": "shield 40 · refills 8/s after 3 s · draws 16",
+   "cost": {
+    "steel_plate": 1,
+    "copper_wire": 2,
+    "shield_emitter": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "missile_dart",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Dart",
+   "level": 11,
+   "order": 117,
+   "fn": "missile_dart",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/missile_dart.webp",
+    "w": 54,
+    "h": 64
+   },
+   "licence": false,
+   "tradeOff": "locks on · ammo",
+   "family": "Missiles",
+   "size": "Small · Square",
+   "keyNumbers": "28 dmg/s · reach 11,440 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 1 clear cell ahead"
+   ],
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 1,
+    "targeting_chip": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "structure:leestone",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Leestone structure",
+   "level": 12,
+   "order": 13,
+   "fn": "hull",
+   "material": "leestone",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-leestone.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": true,
+   "structure": {
+    "materialName": "Leestone",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 96,
+    "density": 1.8,
+    "traits": [
+     "heavy",
+     "costly repair"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 96,
+      "armour": 3,
+      "mass": 1.8,
+      "cost": {
+       "leestone_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 240,
+      "armour": 4,
+      "mass": 4.5,
+      "cost": {
+       "leestone_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 77,
+      "armour": 3,
+      "mass": 1.8,
+      "cost": {
+       "leestone_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 192,
+      "armour": 3,
+      "mass": 1.8,
+      "cost": {
+       "leestone_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "structure:titanium",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Titanium structure",
+   "level": 12,
+   "order": 13,
+   "fn": "hull",
+   "material": "titanium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-titanium.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Titanium",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 112,
+    "density": 1,
+    "traits": [],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 112,
+      "armour": 3,
+      "mass": 1,
+      "cost": {
+       "titanium_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 280,
+      "armour": 4,
+      "mass": 2.5,
+      "cost": {
+       "titanium_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 90,
+      "armour": 3,
+      "mass": 1,
+      "cost": {
+       "titanium_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 224,
+      "armour": 3,
+      "mass": 1,
+      "cost": {
+       "titanium_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "cannon_twinlink",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Twinlink",
+   "level": 12,
+   "order": 102,
+   "fn": "cannon_twinlink",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/cannon_twinlink.webp",
+    "w": 86,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "the only cannon turret: 16 rounds, then a short reload",
+   "family": "Cannons",
+   "size": "Medium · Panel",
+   "keyNumbers": "62 dmg/s · reach 7,200 · clip 16 · 1.5s reload · draws 8",
+   "mounting": [
+    "Turret, 180°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 3,
+    "barrel_assembly": 2
+   },
+   "seconds": 60
+  },
+  {
+   "id": "plating_reactive_armour",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Reactive Armour",
+   "level": 12,
+   "order": 103,
+   "fn": "plating_reactive_armour",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/plating_reactive_armour.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "blunts small fast hits",
+   "family": "Plating",
+   "size": "Small · Square / Medium · Panel",
+   "keyNumbers": "188 hp · armour 4",
+   "cost": {
+    "steel_plate": 2,
+    "propellant": 1,
+    "scrap_electronics": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_siphon",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Siphon",
+   "level": 12,
+   "order": 103,
+   "fn": "utility_siphon",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_siphon.webp",
+    "w": 56,
+    "h": 78
+   },
+   "licence": false,
+   "tradeOff": "draws gas from pockets",
+   "family": "Siphons",
+   "size": "Small · Square",
+   "keyNumbers": "draws 10",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 2,
+    "coolant": 2
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_tow_beam",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Tow Beam",
+   "level": 12,
+   "order": 108,
+   "fn": "utility_tow_beam",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/utility_tow_beam.webp",
+    "w": 90,
+    "h": 86
+   },
+   "licence": false,
+   "tradeOff": "tows wrecks and pods to salvage; slows you by their mass",
+   "family": "Tow beams",
+   "size": "Medium · Panel",
+   "keyNumbers": "tows within 420 m · draws 24 towing",
+   "cost": {
+    "steel_plate": 2,
+    "coil_winding": 2,
+    "servo_motor": 1,
+    "power_coupling": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "power_combiner",
+   "tab": "power",
+   "kind": "model",
+   "name": "Combiner",
+   "level": 12,
+   "order": 115,
+   "fn": "power_combiner",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_combiner.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Joins a feed to a power line",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · gives 150/s · power line",
+   "cost": {
+    "steel_plate": 2,
+    "power_coupling": 1,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "legendary_hive",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Rustjaw's Hive",
+   "level": 12,
+   "order": 130,
+   "fn": "legendary_hive",
+   "material": "cobalt",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/legendary_hive.webp",
+    "w": 54,
+    "h": 64
+   },
+   "licence": false,
+   "family": "Legendary",
+   "size": "Small · Square",
+   "keyNumbers": "23 dmg/s · reach 9,120 · clip 8 · regrows · draws 12",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 1 clear cell ahead"
+   ],
+   "cost": {
+    "cobalt_alloy": 1,
+    "targeting_chip": 1,
+    "servo_motor": 1,
+    "rustjaw_cog": 1
+   },
+   "seconds": 80
+  },
+  {
+   "id": "legendary_frostbite",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Frostbite Lance",
+   "level": 12,
+   "order": 131,
+   "fn": "legendary_frostbite",
+   "material": "cobalt",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/legendary_frostbite.webp",
+    "w": 49,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "a held freeze beam; slows what it lights by 40% (thrust and turning)",
+   "family": "Legendary",
+   "size": "Medium · Panel",
+   "keyNumbers": "95 dmg/s · reach 760 · held beam · draws 24",
+   "mounting": [
+    "Turret, 150°",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "cobalt_alloy": 1,
+    "copper_wire": 6,
+    "crystal_lens": 2,
+    "frost_gland": 4,
+    "frost_heart": 1
+   },
+   "seconds": 160
+  },
+  {
+   "id": "shield_flash_screen",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Flash Screen",
+   "level": 13,
+   "order": 105,
+   "fn": "shield_flash_screen",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/shield_flash_screen.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "no slow refill, back whole after a break",
+   "family": "Shields",
+   "size": "Small · Square",
+   "keyNumbers": "shield 36 · back in 4 s · draws 16",
+   "cost": {
+    "steel_plate": 1,
+    "copper_wire": 2,
+    "shield_emitter": 1,
+    "capacitor_cell": 2
+   },
+   "seconds": 0
+  },
+  {
+   "id": "railgun_needle",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Needle",
+   "level": 13,
+   "order": 120,
+   "fn": "railgun_needle",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/railgun_needle.webp",
+    "w": 71,
+    "h": 105
+   },
+   "licence": false,
+   "tradeOff": "fast slugs through two ships · ammo",
+   "family": "Railguns",
+   "size": "Medium · Panel",
+   "keyNumbers": "50 dmg/s · reach 9,000 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 2,
+    "coil_winding": 1,
+    "power_coupling": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "autocannon_chainsaw",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Chainsaw",
+   "level": 14,
+   "order": 106,
+   "fn": "autocannon_chainsaw",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/autocannon_chainsaw.webp",
+    "w": 52,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "a hose: hard to dodge, harder to power",
+   "family": "Autocannons",
+   "size": "Medium · Panel",
+   "keyNumbers": "80 dmg/s · reach 5,400 · cycle · spins up · draws 21",
+   "mounting": [
+    "Turret, 240°",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 3,
+    "barrel_assembly": 1,
+    "servo_motor": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "utility_jump_coil",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Jump Coil",
+   "level": 14,
+   "order": 107,
+   "fn": "utility_jump_coil",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/utility_jump_coil.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "more jump for a bigger hull",
+   "family": "Jump coils",
+   "size": "Small · Square",
+   "keyNumbers": "jump 13 cells · draws 8",
+   "cost": {
+    "steel_plate": 1,
+    "coil_winding": 1,
+    "power_coupling": 1,
+    "crystal": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_surge_cell",
+   "tab": "power",
+   "kind": "model",
+   "name": "Surge Cell",
+   "level": 14,
+   "order": 113,
+   "fn": "power_surge_cell",
+   "material": "composite",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_surge_cell.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A fast cell",
+   "family": "Capacitors",
+   "size": "Small · Square",
+   "keyNumbers": "holds 120 · gives 300/s",
+   "cost": {
+    "steel_plate": 1,
+    "capacitor_cell": 2,
+    "coil_winding": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_reaction_thruster",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Reaction Thruster",
+   "level": 15,
+   "order": 112,
+   "fn": "engine_reaction_thruster",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/engine_reaction_thruster.webp",
+    "w": 56,
+    "h": 77
+   },
+   "licence": false,
+   "tradeOff": "An engine built for feed",
+   "family": "Ion drives",
+   "size": "Small · Square",
+   "keyNumbers": "thrust 1.0 · top 3,600 m/s · draws 4",
+   "cost": {
+    "steel_plate": 2,
+    "servo_motor": 1,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "emp_hush",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Hush",
+   "level": 15,
+   "order": 123,
+   "fn": "emp_hush",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/emp_hush.webp",
+    "w": 52,
+    "h": 69
+   },
+   "licence": false,
+   "tradeOff": "switches one ship off for 2 s",
+   "family": "EMP",
+   "size": "Small · Square",
+   "keyNumbers": "1 dmg/s · reach 2,700 · cycle · draws 9",
+   "mounting": [
+    "Turret, 360°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "steel_plate": 1,
+    "coil_winding": 1,
+    "power_coupling": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_plasma_drive",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Plasma Drive",
+   "level": 16,
+   "order": 104,
+   "fn": "engine_plasma_drive",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/engine_plasma_drive.webp",
+    "w": 90,
+    "h": 84
+   },
+   "licence": false,
+   "tradeOff": "the balanced main engine",
+   "family": "Plasma drives",
+   "size": "Medium · Panel",
+   "keyNumbers": "thrust 6.2 · top 3,300 m/s · draws 40",
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 4,
+    "thrust_nozzle": 1,
+    "power_coupling": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "flak_cloudmaker",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Cloudmaker",
+   "level": 16,
+   "order": 109,
+   "fn": "flak_cloudmaker",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/flak_cloudmaker.webp",
+    "w": 76,
+    "h": 80
+   },
+   "licence": false,
+   "tradeOff": "placed clouds at your aim distance, slow reload",
+   "family": "Flak",
+   "size": "Medium · Panel",
+   "keyNumbers": "25 dmg/s · reach 1,700 · clip 4 · 2.5s reload · draws 12",
+   "mounting": [
+    "Turret, 240°",
+    "Side mount (flippable)",
+    "Bolts on at its side only"
+   ],
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 2,
+    "barrel_assembly": 1,
+    "targeting_chip": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "feed_selector",
+   "tab": "power",
+   "kind": "model",
+   "name": "Selector",
+   "level": 16,
+   "order": 118,
+   "fn": "feed_selector",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_selector.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Two feeds in (left and right), one out (front)",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "56 hp · armour 2",
+   "cost": {
+    "steel_plate": 1,
+    "servo_motor": 1,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "feed_tank_catalyst",
+   "tab": "power",
+   "kind": "model",
+   "name": "Catalyst Tank",
+   "level": 16,
+   "order": 125,
+   "fn": "feed_tank_catalyst",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_catalyst.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Catalyst",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 2",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "utility_repair_beam",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Repair Beam",
+   "level": 17,
+   "order": 107,
+   "fn": "utility_repair_beam",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/utility_repair_beam.webp",
+    "w": 49,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "mends allies' parts; nothing for you, big draw",
+   "family": "Repair beams",
+   "size": "Medium · Panel",
+   "keyNumbers": "mends 42 hp/s · reach 520 · draws 28",
+   "mounting": [
+    "Turret, 240°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 3,
+    "crystal_lens": 2,
+    "servo_motor": 1,
+    "power_coupling": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "arc_spark",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Spark",
+   "level": 17,
+   "order": 125,
+   "fn": "arc_spark",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/arc_spark.webp",
+    "w": 52,
+    "h": 69
+   },
+   "licence": false,
+   "tradeOff": "instant zap, chains to 3 more ships",
+   "family": "Arc projectors",
+   "size": "Small · Square",
+   "keyNumbers": "39 dmg/s · reach 3,960 · cycle · draws 18",
+   "mounting": [
+    "Turret, 270°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "steel_plate": 1,
+    "coil_winding": 2,
+    "power_coupling": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "power_fusion_plant",
+   "tab": "power",
+   "kind": "model",
+   "name": "Fusion Plant",
+   "level": 18,
+   "order": 102,
+   "fn": "power_fusion_plant",
+   "material": "steel",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/power_fusion_plant.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "plenty of power, heavy, big blast",
+   "family": "Generators",
+   "size": "Large · Block",
+   "keyNumbers": "+192 power",
+   "cost": {
+    "steel_plate": 6,
+    "copper_wire": 6,
+    "reactor_core": 2,
+    "coolant": 4
+   },
+   "seconds": 120
+  },
+  {
+   "id": "power_pulse_dynamo",
+   "tab": "power",
+   "kind": "model",
+   "name": "Pulse Dynamo",
+   "level": 18,
+   "order": 108,
+   "fn": "power_pulse_dynamo",
+   "material": "titanium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_pulse_dynamo.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "puts 10 a second into each bank it touches, no wires",
+   "family": "Bank chargers",
+   "size": "Small · Square",
+   "keyNumbers": "+10/s into each bank it touches",
+   "cost": {
+    "titanium_plate": 1,
+    "coil_winding": 2,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "laser_cutter",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Cutter",
+   "level": 18,
+   "order": 113,
+   "fn": "laser_cutter",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/laser_cutter.webp",
+    "w": 86,
+    "h": 78
+   },
+   "licence": false,
+   "tradeOff": "burns deeper the longer it stays on one part, short reach",
+   "family": "Lasers",
+   "size": "Medium · Panel",
+   "keyNumbers": "150 dmg/s · reach 900 · held beam · ramps up · draws 32",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 1 clear cell ahead"
+   ],
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 3,
+    "crystal_lens": 2,
+    "capacitor_cell": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "feed_tank_coolant",
+   "tab": "power",
+   "kind": "model",
+   "name": "Coolant Tank",
+   "level": 18,
+   "order": 120,
+   "fn": "feed_tank_coolant",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_coolant.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Coolant",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 2",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "feed_tank_flux",
+   "tab": "power",
+   "kind": "model",
+   "name": "Flux Salts Tank",
+   "level": 18,
+   "order": 122,
+   "fn": "feed_tank_flux",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_flux.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Flux Salts",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 2",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "feed_tank_reaction",
+   "tab": "power",
+   "kind": "model",
+   "name": "Reaction Mass Tank",
+   "level": 18,
+   "order": 126,
+   "fn": "feed_tank_reaction",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_reaction.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Reaction Mass",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 2",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "cannon_slurry",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Slurry Cannon",
+   "level": 18,
+   "order": 138,
+   "fn": "cannon_slurry",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/cannon_slurry.webp",
+    "w": 86,
+    "h": 83
+   },
+   "licence": false,
+   "tradeOff": "The two-input gun",
+   "family": "Cannons",
+   "size": "Medium · Panel",
+   "keyNumbers": "69 dmg/s · reach 5,700 · cycle · draws 36",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "titanium_plate": 3,
+    "barrel_assembly": 2,
+    "insulated_polymer": 2,
+    "servo_motor": 1
+   },
+   "seconds": 100
+  },
+  {
+   "id": "shield_flicker_screen",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Flicker Screen",
+   "level": 19,
+   "order": 101,
+   "fn": "shield_flicker_screen",
+   "material": "steel",
+   "piece": "round",
+   "art": {
+    "src": "/static/img/parts/shield_flicker_screen.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "thin and cheap, back in a second",
+   "family": "Shields",
+   "size": "Small · Round",
+   "keyNumbers": "shield 16 · refills 16/s after 1 s · draws 5",
+   "cost": {
+    "steel_plate": 1,
+    "copper_wire": 2,
+    "shield_emitter": 1,
+    "capacitor_cell": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "torpedo_eel",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Eel",
+   "level": 19,
+   "order": 127,
+   "fn": "torpedo_eel",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/torpedo_eel.webp",
+    "w": 88,
+    "h": 89
+   },
+   "licence": false,
+   "tradeOff": "slow, huge, through shields · ammo",
+   "family": "Torpedoes",
+   "size": "Medium · Panel",
+   "keyNumbers": "117 dmg/s · reach 7,800 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 2,
+    "targeting_chip": 1,
+    "servo_motor": 1
+   },
+   "seconds": 60
+  },
+  {
+   "id": "cannon_longbarrel",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Longbarrel",
+   "level": 20,
+   "order": 103,
+   "fn": "cannon_longbarrel",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/cannon_longbarrel.webp",
+    "w": 86,
+    "h": 105
+   },
+   "licence": false,
+   "tradeOff": "a sniper's cannon: far, slow to fire",
+   "family": "Cannons",
+   "size": "Medium · Panel",
+   "keyNumbers": "49 dmg/s · reach 8,400 · charge 2.0s · draws 10",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 3 clear cells ahead"
+   ],
+   "cost": {
+    "titanium_plate": 3,
+    "copper_wire": 2,
+    "barrel_assembly": 2,
+    "targeting_chip": 1
+   },
+   "seconds": 100
+  },
+  {
+   "id": "utility_long_range_array",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Long-Range Array",
+   "level": 20,
+   "order": 105,
+   "fn": "utility_long_range_array",
+   "material": "titanium",
+   "piece": "round2",
+   "art": {
+    "src": "/static/img/parts/utility_long_range_array.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "twice the reach, twice the power",
+   "family": "Scanners",
+   "size": "Large · Dome",
+   "keyNumbers": "scan 4,800 m · draws 8",
+   "cost": {
+    "titanium_plate": 3,
+    "copper_wire": 4,
+    "crystal_lens": 2,
+    "nav_computer": 1
+   },
+   "seconds": 157
+  },
+  {
+   "id": "power_heavy_bank",
+   "tab": "power",
+   "kind": "model",
+   "name": "Heavy Bank",
+   "level": 20,
+   "order": 107,
+   "fn": "power_heavy_bank",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/power_heavy_bank.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "deep but slow: endurance, not alpha strikes",
+   "family": "Batteries",
+   "size": "Large · Block",
+   "keyNumbers": "holds 1,800 · gives 600/s",
+   "cost": {
+    "titanium_plate": 4,
+    "capacitor_cell": 4,
+    "power_coupling": 1
+   },
+   "seconds": 200
+  },
+  {
+   "id": "utility_heavy_gyro",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Heavy Gyro",
+   "level": 20,
+   "order": 111,
+   "fn": "utility_heavy_gyro",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/utility_heavy_gyro.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "A big reaction wheel for big ships",
+   "family": "Gyros",
+   "size": "Large · Block",
+   "keyNumbers": "+28,000 turning · draws 48 turning",
+   "cost": {
+    "titanium_plate": 4,
+    "coil_winding": 2,
+    "servo_motor": 2,
+    "power_coupling": 1
+   },
+   "seconds": 200
+  },
+  {
+   "id": "feed_tank_overcharge",
+   "tab": "power",
+   "kind": "model",
+   "name": "Overcharge Tank",
+   "level": 20,
+   "order": 119,
+   "fn": "feed_tank_overcharge",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_overcharge.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Overcharge",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "feed_tank_lens",
+   "tab": "power",
+   "kind": "model",
+   "name": "Lens Fluid Tank",
+   "level": 20,
+   "order": 124,
+   "fn": "feed_tank_lens",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_lens.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Lens Fluid",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "missile_swarm",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Swarm",
+   "level": 21,
+   "order": 118,
+   "fn": "missile_swarm",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/missile_swarm.webp",
+    "w": 88,
+    "h": 65
+   },
+   "licence": false,
+   "tradeOff": "six small rockets a salvo, floods point defence · ammo",
+   "family": "Missiles",
+   "size": "Medium · Panel",
+   "keyNumbers": "36 dmg/s · reach 11,440 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Side mount (flippable)",
+    "Bolts on at its side only",
+    "Needs 1 clear cell ahead"
+   ],
+   "cost": {
+    "titanium_plate": 2,
+    "copper_wire": 2,
+    "targeting_chip": 2,
+    "servo_motor": 1
+   },
+   "seconds": 100
+  },
+  {
+   "id": "structure:cobalt",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Cobalt structure",
+   "level": 22,
+   "order": 14,
+   "fn": "hull",
+   "material": "cobalt",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-cobalt.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Cobalt",
+    "mark": "Mk IV",
+    "grade": 4,
+    "toughness": 131,
+    "density": 1.2,
+    "traits": [],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 131,
+      "armour": 4,
+      "mass": 1.2,
+      "cost": {
+       "cobalt_alloy": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 328,
+      "armour": 5,
+      "mass": 3,
+      "cost": {
+       "cobalt_alloy": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 105,
+      "armour": 4,
+      "mass": 1.2,
+      "cost": {
+       "cobalt_alloy": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 262,
+      "armour": 4,
+      "mass": 1.2,
+      "cost": {
+       "cobalt_alloy": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "plating_spaced_plating",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Spaced Plating",
+   "level": 22,
+   "order": 104,
+   "fn": "plating_spaced_plating",
+   "material": "titanium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/plating_spaced_plating.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "half damage from blasts",
+   "family": "Plating",
+   "size": "Small · Square / Medium · Panel",
+   "keyNumbers": "50% less from blasts · 358 hp · armour 3",
+   "cost": {
+    "titanium_plate": 3,
+    "composite_sheet": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "engine_drift_sail",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Drift Sail",
+   "level": 22,
+   "order": 105,
+   "fn": "engine_drift_sail",
+   "material": "titanium",
+   "piece": "round",
+   "art": {
+    "src": "/static/img/parts/engine_drift_sail.webp",
+    "w": 56,
+    "h": 77
+   },
+   "licence": false,
+   "tradeOff": "near-free cruising, slow",
+   "family": "Ion drives",
+   "size": "Small · Round",
+   "keyNumbers": "thrust 0.7 · top 1,560 m/s · draws 2",
+   "cost": {
+    "titanium_plate": 1,
+    "composite_sheet": 3,
+    "copper_wire": 2,
+    "crystal_lens": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "railgun_coilgun",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Coilgun",
+   "level": 22,
+   "order": 121,
+   "fn": "railgun_coilgun",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/railgun_coilgun.webp",
+    "w": 82,
+    "h": 100
+   },
+   "licence": false,
+   "tradeOff": "five slugs in a cone, close range · no ammo",
+   "family": "Railguns",
+   "size": "Medium · Panel",
+   "keyNumbers": "89 dmg/s · reach 2,700 · cycle · draws 16",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "titanium_plate": 2,
+    "coil_winding": 3,
+    "capacitor_cell": 2
+   },
+   "seconds": 100
+  },
+  {
+   "id": "feed_tank_damping",
+   "tab": "power",
+   "kind": "model",
+   "name": "Damping Gel Tank",
+   "level": 22,
+   "order": 121,
+   "fn": "feed_tank_damping",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_damping.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Damping Gel",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "feed_tank_burstgel",
+   "tab": "power",
+   "kind": "model",
+   "name": "Burst Gel Tank",
+   "level": 22,
+   "order": 127,
+   "fn": "feed_tank_burstgel",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_burstgel.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Burst Gel",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "legendary_cinder_bloom",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Cinder Bloom",
+   "level": 22,
+   "order": 132,
+   "fn": "legendary_cinder_bloom",
+   "material": "cobalt",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/legendary_cinder_bloom.webp",
+    "w": 49,
+    "h": 72
+   },
+   "licence": false,
+   "family": "Legendary",
+   "size": "Small · Square",
+   "keyNumbers": "13 dmg/s · reach 3,240 · cycle · draws 12",
+   "mounting": [
+    "Turret, 360°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "cobalt_alloy": 1,
+    "power_coupling": 1,
+    "cinder_ash": 2,
+    "cinder_ember": 1
+   },
+   "seconds": 80
+  },
+  {
+   "id": "power_overclock_reactor",
+   "tab": "power",
+   "kind": "model",
+   "name": "Overclock Reactor",
+   "level": 24,
+   "order": 103,
+   "fn": "power_overclock_reactor",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_overclock_reactor.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "most power, fragile, biggest blast",
+   "family": "Generators",
+   "size": "Medium · Panel",
+   "keyNumbers": "+124 power",
+   "cost": {
+    "titanium_plate": 3,
+    "copper_wire": 4,
+    "reactor_core": 2,
+    "power_coupling": 2
+   },
+   "seconds": 100
+  },
+  {
+   "id": "autocannon_stinger",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Stinger",
+   "level": 24,
+   "order": 107,
+   "fn": "autocannon_stinger",
+   "material": "titanium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/autocannon_stinger.webp",
+    "w": 51,
+    "h": 70
+   },
+   "licence": false,
+   "tradeOff": "accurate, a little slower",
+   "family": "Autocannons",
+   "size": "Small · Square",
+   "keyNumbers": "36 dmg/s · reach 5,400 · clip 12 · 1.2s reload · draws 14",
+   "mounting": [
+    "Turret, 200°",
+    "Bolts on any side"
+   ],
+   "cost": {
+    "titanium_plate": 2,
+    "barrel_assembly": 1,
+    "targeting_chip": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "mortar_quake",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Quake",
+   "level": 24,
+   "order": 111,
+   "fn": "mortar_quake",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/mortar_quake.webp",
+    "w": 87,
+    "h": 85
+   },
+   "licence": false,
+   "tradeOff": "huge splash, slow · ammo",
+   "family": "Mortars",
+   "size": "Medium · Panel",
+   "keyNumbers": "43 dmg/s · reach 2,640 · ammo",
+   "mounting": [
+    "Turret, 360°",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "titanium_plate": 3,
+    "barrel_assembly": 2,
+    "servo_motor": 1
+   },
+   "seconds": 100
+  },
+  {
+   "id": "feed_tank_accelerant",
+   "tab": "power",
+   "kind": "model",
+   "name": "Accelerant Tank",
+   "level": 24,
+   "order": 123,
+   "fn": "feed_tank_accelerant",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_accelerant.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Accelerant",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "pulse_overpulse",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Overpulse",
+   "level": 25,
+   "order": 116,
+   "fn": "pulse_overpulse",
+   "material": "titanium",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/pulse_overpulse.webp",
+    "w": 49,
+    "h": 81
+   },
+   "licence": false,
+   "tradeOff": "dumps a clip of bolts into shields, barely scratches hull",
+   "family": "Pulse guns",
+   "size": "Medium · Panel",
+   "keyNumbers": "40 dmg/s · reach 5,040 · clip 12 · 1.5s reload · draws 13",
+   "mounting": [
+    "Turret, 120°",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "titanium_plate": 2,
+    "crystal_lens": 1,
+    "capacitor_cell": 3,
+    "power_coupling": 1
+   },
+   "seconds": 100
+  },
+  {
+   "id": "laser_searchlight",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Searchlight",
+   "level": 26,
+   "order": 114,
+   "fn": "laser_searchlight",
+   "material": "titanium",
+   "piece": "round",
+   "art": {
+    "src": "/static/img/parts/laser_searchlight.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "reaches furthest, marks what it lights for 20% more damage",
+   "family": "Lasers",
+   "size": "Small · Round",
+   "keyNumbers": "25 dmg/s · reach 7,650 · held beam · draws 15",
+   "mounting": [
+    "Turret, 360°",
+    "Side mount (flippable)",
+    "Bolts on at its side only"
+   ],
+   "cost": {
+    "titanium_plate": 1,
+    "crystal_lens": 3,
+    "capacitor_cell": 1,
+    "targeting_chip": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "legendary_phase",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Phase Cannon",
+   "level": 26,
+   "order": 134,
+   "fn": "legendary_phase",
+   "material": "cobalt",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/legendary_phase.webp",
+    "w": 86,
+    "h": 86
+   },
+   "licence": false,
+   "family": "Legendary",
+   "size": "Medium · Panel",
+   "keyNumbers": "32 dmg/s · reach 3,300 · cycle · draws 14",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 3 clear cells ahead"
+   ],
+   "cost": {
+    "cobalt_alloy": 2,
+    "nav_computer": 1,
+    "void_ichor": 1,
+    "void_pearl": 1
+   },
+   "seconds": 160
+  },
+  {
+   "id": "shield_bulwark_projector",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Bulwark Projector",
+   "level": 27,
+   "order": 102,
+   "fn": "shield_bulwark_projector",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/shield_bulwark_projector.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "deep, slow to refill",
+   "family": "Shields",
+   "size": "Large · Block",
+   "keyNumbers": "shield 240 · refills 20/s after 4 s · draws 77",
+   "cost": {
+    "titanium_plate": 4,
+    "copper_wire": 4,
+    "shield_emitter": 3,
+    "power_coupling": 1
+   },
+   "seconds": 200
+  },
+  {
+   "id": "railgun_spear",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Spear",
+   "level": 28,
+   "order": 122,
+   "fn": "railgun_spear",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/railgun_spear.webp",
+    "w": 82,
+    "h": 147
+   },
+   "licence": false,
+   "tradeOff": "three ships at full damage, 120 E a shot",
+   "family": "Railguns",
+   "size": "Large · Block",
+   "keyNumbers": "84 dmg/s · reach 9,000 · cycle · draws 63",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 3 clear cells ahead"
+   ],
+   "cost": {
+    "titanium_plate": 4,
+    "hardened_steel": 2,
+    "coil_winding": 3,
+    "power_coupling": 2
+   },
+   "seconds": 320
+  },
+  {
+   "id": "arc_tesla",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Tesla",
+   "level": 29,
+   "order": 126,
+   "fn": "arc_tesla",
+   "material": "titanium",
+   "piece": "round",
+   "art": {
+    "src": "/static/img/parts/arc_tesla.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "held storm: 5 zaps a second, chains to 5",
+   "family": "Arc projectors",
+   "size": "Small · Round",
+   "keyNumbers": "70 dmg/s · reach 660 · held beam · draws 30",
+   "mounting": [
+    "Turret, 300°",
+    "Side mount (flippable)",
+    "Bolts on at its side only"
+   ],
+   "cost": {
+    "titanium_plate": 2,
+    "coil_winding": 3,
+    "crystal_lens": 1,
+    "power_coupling": 1
+   },
+   "seconds": 80
+  },
+  {
+   "id": "railgun_rail_driver",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Rail Driver",
+   "level": 29,
+   "order": 136,
+   "fn": "railgun_rail_driver",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/railgun_rail_driver.webp",
+    "w": 82,
+    "h": 147
+   },
+   "licence": false,
+   "tradeOff": "semi-auto rifle: six shots, then a 1.5 s reload",
+   "family": "Railguns",
+   "size": "Large · Block",
+   "keyNumbers": "96 dmg/s · reach 9,000 · clip 6 · 1.5s reload · draws 19",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 3 clear cells ahead"
+   ],
+   "cost": {
+    "titanium_plate": 4,
+    "hardened_steel": 2,
+    "coil_winding": 3,
+    "capacitor_cell": 2,
+    "power_coupling": 2
+   },
+   "seconds": 320
+  },
+  {
+   "id": "structure:dense_ferrite",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Dense Ferrite structure",
+   "level": 30,
+   "order": 13,
+   "fn": "hull",
+   "material": "dense_ferrite",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-dense_ferrite.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Dense Ferrite",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 101,
+    "density": 2.2,
+    "traits": [
+     "heavy",
+     "mass anchor"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 101,
+      "armour": 3,
+      "mass": 2.2,
+      "cost": {
+       "ferrite_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 253,
+      "armour": 4,
+      "mass": 5.5,
+      "cost": {
+       "ferrite_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 81,
+      "armour": 3,
+      "mass": 2.2,
+      "cost": {
+       "ferrite_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 202,
+      "armour": 3,
+      "mass": 2.2,
+      "cost": {
+       "ferrite_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "cannon_bastion",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Bastion",
+   "level": 30,
+   "order": 104,
+   "fn": "cannon_bastion",
+   "material": "cobalt",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/cannon_bastion.webp",
+    "w": 86,
+    "h": 135
+   },
+   "licence": false,
+   "tradeOff": "two huge dodgeable shells, then a long reload",
+   "family": "Cannons",
+   "size": "Large · Block",
+   "keyNumbers": "100 dmg/s · reach 4,800 · clip 2 · 3.0s reload · draws 17",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "cobalt_alloy": 5,
+    "hardened_steel": 2,
+    "barrel_assembly": 3,
+    "servo_motor": 2
+   },
+   "seconds": 320
+  },
+  {
+   "id": "engine_fusion_torch",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Fusion Torch",
+   "level": 30,
+   "order": 106,
+   "fn": "engine_fusion_torch",
+   "material": "cobalt",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/engine_fusion_torch.webp",
+    "w": 90,
+    "h": 118
+   },
+   "licence": false,
+   "tradeOff": "the long-haul racer, heavy",
+   "family": "Plasma drives",
+   "size": "Large · Block",
+   "keyNumbers": "thrust 14.4 · top 5,100 m/s · draws 112",
+   "cost": {
+    "cobalt_alloy": 4,
+    "thrust_nozzle": 2,
+    "reactor_core": 1,
+    "power_coupling": 1
+   },
+   "seconds": 320
+  },
+  {
+   "id": "utility_heavy_coil",
+   "tab": "engines",
+   "kind": "model",
+   "name": "Heavy Coil",
+   "level": 30,
+   "order": 108,
+   "fn": "utility_heavy_coil",
+   "material": "cobalt",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/utility_heavy_coil.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "more jump per cell, and 20% faster to cool",
+   "family": "Jump coils",
+   "size": "Large · Block",
+   "keyNumbers": "jump cooldown −20% · jump 83 cells · draws 32",
+   "cost": {
+    "cobalt_alloy": 4,
+    "coil_winding": 4,
+    "power_coupling": 2,
+    "nav_computer": 1
+   },
+   "seconds": 320
+  },
+  {
+   "id": "legendary_singularity",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Singularity Launcher",
+   "level": 30,
+   "order": 135,
+   "fn": "legendary_singularity",
+   "material": "cobalt",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/legendary_singularity.webp",
+    "w": 49,
+    "h": 71
+   },
+   "licence": false,
+   "family": "Legendary",
+   "size": "Small · Square",
+   "keyNumbers": "12 dmg/s · reach 2,052 · cycle · draws 30",
+   "mounting": [
+    "Turret, 180°",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "cobalt_alloy": 2,
+    "quantum_core": 1,
+    "maw_fragment": 1
+   },
+   "seconds": 80
+  },
+  {
+   "id": "structure:neutronium",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Neutronium structure",
+   "level": 32,
+   "order": 15,
+   "fn": "hull",
+   "material": "neutronium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-neutronium.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Neutronium",
+    "mark": "Mk V",
+    "grade": 5,
+    "toughness": 150,
+    "density": 1.35,
+    "traits": [
+     "heavy"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 150,
+      "armour": 5,
+      "mass": 1.4,
+      "cost": {
+       "neutronium_plate": 3
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 375,
+      "armour": 6,
+      "mass": 3.4,
+      "cost": {
+       "neutronium_plate": 4
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 120,
+      "armour": 5,
+      "mass": 1.4,
+      "cost": {
+       "neutronium_plate": 4
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 300,
+      "armour": 5,
+      "mass": 1.4,
+      "cost": {
+       "neutronium_plate": 5,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "lance_lance",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Lance",
+   "level": 32,
+   "order": 129,
+   "fn": "lance_lance",
+   "material": "cobalt",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/lance_lance.webp",
+    "w": 82,
+    "h": 107
+   },
+   "licence": false,
+   "tradeOff": "the heaviest held beam at point blank; sputters short of power",
+   "family": "Lances",
+   "size": "Medium · Panel",
+   "keyNumbers": "210 dmg/s · reach 500 · held beam · winds up · draws 90",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 4 clear cells ahead"
+   ],
+   "cost": {
+    "cobalt_alloy": 2,
+    "copper_wire": 4,
+    "crystal_lens": 2,
+    "power_coupling": 2,
+    "capacitor_cell": 2
+   },
+   "seconds": 160
+  },
+  {
+   "id": "missile_hammerhead",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Hammerhead",
+   "level": 33,
+   "order": 119,
+   "fn": "missile_hammerhead",
+   "material": "cobalt",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/missile_hammerhead.webp",
+    "w": 88,
+    "h": 105
+   },
+   "licence": false,
+   "tradeOff": "a huge slow warhead · ammo",
+   "family": "Missiles",
+   "size": "Large · Block",
+   "keyNumbers": "44 dmg/s · reach 8,008 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 2 clear cells ahead"
+   ],
+   "cost": {
+    "cobalt_alloy": 4,
+    "targeting_chip": 2,
+    "servo_motor": 2,
+    "nav_computer": 1
+   },
+   "seconds": 320
+  },
+  {
+   "id": "structure:conductive_steel",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Conductive Steel structure",
+   "level": 35,
+   "order": 13,
+   "fn": "hull",
+   "material": "conductive_steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-conductive_steel.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Conductive Steel",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 84,
+    "density": 1.4,
+    "traits": [
+     "heavy",
+     "conductive"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 84,
+      "armour": 3,
+      "mass": 1.4,
+      "cost": {
+       "conductive_steel_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 210,
+      "armour": 4,
+      "mass": 3.5,
+      "cost": {
+       "conductive_steel_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 67,
+      "armour": 3,
+      "mass": 1.4,
+      "cost": {
+       "conductive_steel_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 168,
+      "armour": 3,
+      "mass": 1.4,
+      "cost": {
+       "conductive_steel_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "emp_blackout",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Blackout",
+   "level": 35,
+   "order": 124,
+   "fn": "emp_blackout",
+   "material": "cobalt",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/emp_blackout.webp",
+    "w": 87,
+    "h": 114
+   },
+   "licence": false,
+   "tradeOff": "charged area blackout, 2.8 s",
+   "family": "EMP",
+   "size": "Large · Block",
+   "keyNumbers": "1 dmg/s · reach 3,300 · charge 1.5s · draws 15",
+   "mounting": [
+    "Turret, 120°",
+    "Bolts on from behind only"
+   ],
+   "cost": {
+    "cobalt_alloy": 3,
+    "coil_winding": 3,
+    "power_coupling": 2,
+    "quantum_core": 1
+   },
+   "seconds": 320
+  },
+  {
+   "id": "torpedo_leviathan",
+   "tab": "weapons",
+   "kind": "model",
+   "name": "Leviathan",
+   "level": 38,
+   "order": 128,
+   "fn": "torpedo_leviathan",
+   "material": "cobalt",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/torpedo_leviathan.webp",
+    "w": 88,
+    "h": 138
+   },
+   "licence": false,
+   "tradeOff": "ends a fight, slow · ammo",
+   "family": "Torpedoes",
+   "size": "Large · Block",
+   "keyNumbers": "229 dmg/s · reach 8,580 · ammo",
+   "mounting": [
+    "Fixed: aims with the ship",
+    "Bolts on from behind only",
+    "Needs 3 clear cells ahead"
+   ],
+   "cost": {
+    "cobalt_alloy": 5,
+    "targeting_chip": 2,
+    "nav_computer": 1,
+    "servo_motor": 2
+   },
+   "seconds": 480
+  },
+  {
+   "id": "structure:ceramic_laminate",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Ceramic Laminate structure",
+   "level": 45,
+   "order": 13,
+   "fn": "hull",
+   "material": "ceramic_laminate",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-ceramic_laminate.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Ceramic Laminate",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 68,
+    "density": 0.9,
+    "traits": [
+     "brittle"
+    ],
+    "insulation": 0.15,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 68,
+      "armour": 3,
+      "mass": 0.9,
+      "cost": {
+       "ceramic_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 170,
+      "armour": 4,
+      "mass": 2.3,
+      "cost": {
+       "ceramic_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 54,
+      "armour": 3,
+      "mass": 0.9,
+      "cost": {
+       "ceramic_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 136,
+      "armour": 3,
+      "mass": 0.9,
+      "cost": {
+       "ceramic_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "structure:leaded_iridium",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Leaded Iridium structure",
+   "level": 45,
+   "order": 13,
+   "fn": "hull",
+   "material": "leaded_iridium",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-leaded_iridium.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Leaded Iridium",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 90,
+    "density": 1.9,
+    "traits": [
+     "heavy"
+    ],
+    "insulation": 0,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 90,
+      "armour": 3,
+      "mass": 1.9,
+      "cost": {
+       "leaded_iridium_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 225,
+      "armour": 4,
+      "mass": 4.8,
+      "cost": {
+       "leaded_iridium_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 72,
+      "armour": 3,
+      "mass": 1.9,
+      "cost": {
+       "leaded_iridium_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 180,
+      "armour": 3,
+      "mass": 1.9,
+      "cost": {
+       "leaded_iridium_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "structure:sealed_composite",
+   "tab": "structure",
+   "kind": "structure",
+   "name": "Sealed Composite structure",
+   "level": 45,
+   "order": 13,
+   "fn": "hull",
+   "material": "sealed_composite",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/structure-sealed_composite.webp",
+    "w": 134,
+    "h": 61
+   },
+   "licence": false,
+   "structure": {
+    "materialName": "Sealed Composite",
+    "mark": "Mk III",
+    "grade": 3,
+    "toughness": 84,
+    "density": 1.1,
+    "traits": [
+     "costly repair"
+    ],
+    "insulation": 0.1,
+    "parts": [
+     {
+      "fn": "hull",
+      "name": "Hull",
+      "hp": 84,
+      "armour": 3,
+      "mass": 1.1,
+      "cost": {
+       "sealed_composite_plate": 2
+      }
+     },
+     {
+      "fn": "armor",
+      "name": "Armour",
+      "hp": 210,
+      "armour": 4,
+      "mass": 2.8,
+      "cost": {
+       "sealed_composite_plate": 3
+      }
+     },
+     {
+      "fn": "cargo",
+      "name": "Cargo Hold",
+      "hp": 67,
+      "armour": 3,
+      "mass": 1.1,
+      "cost": {
+       "sealed_composite_plate": 3
+      }
+     },
+     {
+      "fn": "core",
+      "name": "Core",
+      "hp": 168,
+      "armour": 3,
+      "mass": 1.1,
+      "cost": {
+       "sealed_composite_plate": 4,
+       "copper_wire": 4,
+       "power_coupling": 1
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "items": {
+  "iron_ore": "/static/img/items/iron_ore.webp",
+  "nickel_ore": "/static/img/items/nickel_ore.webp",
+  "silicate": "/static/img/items/silicate.webp",
+  "ice": "/static/img/items/ice.webp",
+  "copper_ore": "/static/img/items/copper_ore.webp",
+  "titanium_ore": "/static/img/items/titanium_ore.webp",
+  "cobalt_ore": "/static/img/items/cobalt_ore.webp",
+  "neutronium_ore": "/static/img/items/neutronium_ore.webp",
+  "crystal": "/static/img/items/crystal.webp",
+  "ruby": "/static/img/items/ruby.webp",
+  "sapphire": "/static/img/items/sapphire.webp",
+  "emerald": "/static/img/items/emerald.webp",
+  "void_opal": "/static/img/items/void_opal.webp",
+  "helium3": "/static/img/items/helium3.webp",
+  "ferrite_ore": "/static/img/items/ferrite_ore.webp",
+  "chromite": "/static/img/items/chromite.webp",
+  "aurum": "/static/img/items/aurum.webp",
+  "pale_iridium": "/static/img/items/pale_iridium.webp",
+  "platinoid_ore": "/static/img/items/platinoid_ore.webp",
+  "voidglass": "/static/img/items/voidglass.webp",
+  "hydrazine_slush": "/static/img/items/hydrazine_slush.webp",
+  "aurora_rime": "/static/img/items/aurora_rime.webp",
+  "polymer_precursor": "/static/img/items/polymer_precursor.webp",
+  "cryo_gas": "/static/img/items/cryo_gas.webp",
+  "singularity_dust": "/static/img/items/singularity_dust.webp",
+  "gem_frost_1": "/static/img/items/gem_frost_1.webp",
+  "gem_frost_2": "/static/img/items/gem_frost_2.webp",
+  "gem_ember_1": "/static/img/items/gem_ember_1.webp",
+  "gem_ember_2": "/static/img/items/gem_ember_2.webp",
+  "gem_splitter_1": "/static/img/items/gem_splitter_1.webp",
+  "gem_splitter_2": "/static/img/items/gem_splitter_2.webp",
+  "gem_lance_core_1": "/static/img/items/gem_lance_core_1.webp",
+  "gem_lance_core_2": "/static/img/items/gem_lance_core_2.webp",
+  "gem_grapple_1": "/static/img/items/gem_grapple_1.webp",
+  "gem_grapple_2": "/static/img/items/gem_grapple_2.webp",
+  "gem_scatter_1": "/static/img/items/gem_scatter_1.webp",
+  "gem_scatter_2": "/static/img/items/gem_scatter_2.webp",
+  "gem_keel_1": "/static/img/items/gem_keel_1.webp",
+  "gem_keel_2": "/static/img/items/gem_keel_2.webp",
+  "gem_sight_1": "/static/img/items/gem_sight_1.webp",
+  "gem_sight_2": "/static/img/items/gem_sight_2.webp",
+  "gem_overdrive_1": "/static/img/items/gem_overdrive_1.webp",
+  "gem_overdrive_2": "/static/img/items/gem_overdrive_2.webp",
+  "alloy_plate": "/static/img/items/alloy_plate.webp",
+  "steel_plate": "/static/img/items/steel_plate.webp",
+  "composite_sheet": "/static/img/items/composite_sheet.webp",
+  "titanium_plate": "/static/img/items/titanium_plate.webp",
+  "copper_wire": "/static/img/items/copper_wire.webp",
+  "crystal_lens": "/static/img/items/crystal_lens.webp",
+  "cobalt_alloy": "/static/img/items/cobalt_alloy.webp",
+  "neutronium_plate": "/static/img/items/neutronium_plate.webp",
+  "coolant": "/static/img/items/coolant.webp",
+  "ferrite_plate": "/static/img/items/ferrite_plate.webp",
+  "hardened_steel": "/static/img/items/hardened_steel.webp",
+  "aurum_ingot": "/static/img/items/aurum_ingot.webp",
+  "iridium_ingot": "/static/img/items/iridium_ingot.webp",
+  "catalyst": "/static/img/items/catalyst.webp",
+  "voidglass_pane": "/static/img/items/voidglass_pane.webp",
+  "hush_pane": "/static/img/items/hush_pane.webp",
+  "propellant": "/static/img/items/propellant.webp",
+  "insulated_polymer": "/static/img/items/insulated_polymer.webp",
+  "cryogen": "/static/img/items/cryogen.webp",
+  "singularity_grain": "/static/img/items/singularity_grain.webp",
+  "conductive_steel_plate": "/static/img/items/conductive_steel_plate.webp",
+  "leaded_iridium_plate": "/static/img/items/leaded_iridium_plate.webp",
+  "ceramic_plate": "/static/img/items/ceramic_plate.webp",
+  "sealed_composite_plate": "/static/img/items/sealed_composite_plate.webp",
+  "scrap_electronics": "/static/img/items/scrap_electronics.webp",
+  "servo_motor": "/static/img/items/servo_motor.webp",
+  "targeting_chip": "/static/img/items/targeting_chip.webp",
+  "power_coupling": "/static/img/items/power_coupling.webp",
+  "shield_emitter": "/static/img/items/shield_emitter.webp",
+  "nav_computer": "/static/img/items/nav_computer.webp",
+  "quantum_core": "/static/img/items/quantum_core.webp",
+  "void_ichor": "/static/img/items/void_ichor.webp",
+  "frost_gland": "/static/img/items/frost_gland.webp",
+  "cinder_ash": "/static/img/items/cinder_ash.webp",
+  "barrel_assembly": "/static/img/items/barrel_assembly.webp",
+  "coil_winding": "/static/img/items/coil_winding.webp",
+  "capacitor_cell": "/static/img/items/capacitor_cell.webp",
+  "thrust_nozzle": "/static/img/items/thrust_nozzle.webp",
+  "fuel_injector": "/static/img/items/fuel_injector.webp",
+  "reactor_core": "/static/img/items/reactor_core.webp",
+  "wire_spool": "/static/img/items/wire_spool.webp",
+  "rustjaw_cog": "/static/img/items/rustjaw_cog.webp",
+  "frost_heart": "/static/img/items/frost_heart.webp",
+  "cinder_ember": "/static/img/items/cinder_ember.webp",
+  "prism_shard": "/static/img/items/prism_shard.webp",
+  "void_pearl": "/static/img/items/void_pearl.webp",
+  "maw_fragment": "/static/img/items/maw_fragment.webp",
+  "ancient_relic": "/static/img/items/ancient_relic.webp",
+  "repair_kit": "/static/img/items/repair_kit.webp",
+  "field_repair_kit": "/static/img/items/field_repair_kit.webp",
+  "nanite_repair_kit": "/static/img/items/nanite_repair_kit.webp",
+  "boost_cell": "/static/img/items/boost_cell.webp",
+  "insurance_bond": "/static/img/items/insurance_bond.webp",
+  "scanner_charge": "/static/img/items/scanner_charge.webp",
+  "railgun_slugs": "/static/img/items/railgun_slugs.webp",
+  "flak_canisters": "/static/img/items/flak_canisters.webp",
+  "missile_crate": "/static/img/items/missile_crate.webp",
+  "railgun_sabot": "/static/img/items/railgun_sabot.webp",
+  "railgun_tungsten": "/static/img/items/railgun_tungsten.webp",
+  "railgun_aurum": "/static/img/items/railgun_aurum.webp",
+  "railgun_quench": "/static/img/items/railgun_quench.webp",
+  "flak_incendiary": "/static/img/items/flak_incendiary.webp",
+  "flak_chaff": "/static/img/items/flak_chaff.webp",
+  "flak_frag": "/static/img/items/flak_frag.webp",
+  "missile_shaped": "/static/img/items/missile_shaped.webp",
+  "missile_seeker": "/static/img/items/missile_seeker.webp",
+  "missile_cryo": "/static/img/items/missile_cryo.webp",
+  "torpedo_crate": "/static/img/items/torpedo_crate.webp",
+  "mortar_shells": "/static/img/items/mortar_shells.webp",
+  "mining_charges": "/static/img/items/mining_charges.webp",
+  "cannon_hv": "/static/img/items/cannon_hv.webp",
+  "fractured_plating": "/static/img/items/fractured_plating.webp",
+  "foundry_log": "/static/img/items/foundry_log.webp",
+  "crucible_pattern": "/static/img/items/crucible_pattern.webp",
+  "field_crucible": "/static/img/items/field_crucible.webp",
+  "probe_core": "/static/img/items/probe_core.webp",
+  "drone_core": "/static/img/items/drone_core.webp",
+  "smuggler_cache": "/static/img/items/smuggler_cache.webp",
+  "vigil_log": "/static/img/items/vigil_log.webp",
+  "meridian_beacon": "/static/img/items/meridian_beacon.webp",
+  "buoy_frame": "/static/img/items/buoy_frame.webp",
+  "buoy_mast": "/static/img/items/buoy_mast.webp",
+  "buoy_cell": "/static/img/items/buoy_cell.webp",
+  "buoy_dish": "/static/img/items/buoy_dish.webp",
+  "halvard_log": "/static/img/items/halvard_log.webp",
+  "halden_cache": "/static/img/items/halden_cache.webp",
+  "leestone_ore": "/static/img/items/leestone_ore.webp",
+  "leestone": "/static/img/items/leestone.webp",
+  "leestone_plate": "/static/img/items/leestone_plate.webp",
+  "ark_old_stock": "/static/img/items/ark_old_stock.webp",
+  "helios_cell": "/static/img/items/helios_cell.webp",
+  "helios_perf_logs": "/static/img/items/helios_perf_logs.webp",
+  "helios_drone_logs": "/static/img/items/helios_drone_logs.webp",
+  "kerr_recorder": "/static/img/items/kerr_recorder.webp"
+ }
+}

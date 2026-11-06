@@ -93,6 +93,18 @@ describe('catalog snapshot', () => {
     for (const k of ['parts', 'items', 'ships', 'bosses', 'stations', 'systems'] as const) expect(new Set(file[k].map((x) => x.id)).size, k).toBe(file[k].length);
   });
 
+  it('every buildable part has the game\'s picture, and every picture and icon is a file the site serves', () => {
+    const pub = path.resolve(here, '../../public');
+    for (const p of file.parts) if (p.category !== 'structure') expect(p.guide?.art.src, p.id).toBeTruthy();
+    expect(file.structure?.length).toBeGreaterThan(3);
+    const srcs = [...file.parts.flatMap((p) => (p.guide ? [p.guide.art.src] : [])), ...(file.structure ?? []).map((s) => s.art.src), ...file.items.flatMap((i) => (i.icon ? [i.icon] : []))];
+    expect(srcs.length).toBeGreaterThan(200);
+    for (const s of srcs) {
+      expect(s, s).toMatch(/^\/static\/img\/(parts|items)\/[a-z0-9_-]+\.webp$/);
+      expect(fs.existsSync(path.join(pub, s.slice('/static/'.length))), s).toBe(true);
+    }
+  });
+
   it('every ship plan can be drawn', () => {
     for (const s of file.ships) {
       expect(planBounds(s.plan, file.render), s.id).not.toBeNull();

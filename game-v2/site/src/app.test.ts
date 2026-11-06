@@ -146,10 +146,13 @@ class Browser {
   async signin(name: string, pw: string) { await this.page('/signin'); return this.req('/signin', { method: 'POST', form: { username: name, password: pw, next: '/' } }); }
 }
 
+/** The running app's settings (a test turns the guides on and off again) */
+let siteCfg: ReturnType<typeof loadConfig>;
+
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'site-'));
   store = new JsonSiteStore(join(dir, 'site.json'));
-  const cfg = { ...loadConfig({ SITE_SECRET: 'test-secret', SITE_DATA_DIR: dir, GAME_MODE: 'link', GAME_URL: 'http://game.example' } as NodeJS.ProcessEnv) };
+  const cfg = siteCfg = { ...loadConfig({ SITE_SECRET: 'test-secret', SITE_DATA_DIR: dir, GAME_MODE: 'link', GAME_URL: 'http://game.example' } as NodeJS.ProcessEnv) };
   const app = createApp({ cfg, store, lobby, pilots, uploads: new Uploads(dir), limiter: new RateLimiter(() => Date.now() + limiterSkew), activity });
   server = http.createServer((q, s) => void app.handle(q, s));
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
@@ -166,15 +169,25 @@ describe('site routes', () => {
     expect(home.headers.get('content-security-policy')).toContain("script-src 'self'");
     expect(home.headers.get('x-frame-options')).toBe('DENY');
     expect(home.text).toContain('2 pilots online');
-    for (const p of ['/updates', '/guides', '/suggestions', '/pilots', '/signin', '/register', '/rss.xml']) expect((await b.page(p)).status, p).toBe(200);
+    for (const p of ['/updates', '/suggestions', '/pilots', '/signin', '/register', '/rss.xml']) expect((await b.page(p)).status, p).toBe(200);
     expect((await b.page('/nope')).status).toBe(404);
     const r = await b.signin('admin', 'admin');
     expect(r.status).toBe(303);
     expect(r.headers.getSetCookie().find((c) => c.startsWith('sg_session='))).toMatch(/HttpOnly; Max-Age=/);
   });
 
-  it('guides: the list, one guide with its contents and neighbours, an unknown one is a 404', async () => {
+  it('guides are hidden by default: no link to them, and every guide address is a 404', async () => {
     const b = new Browser();
+    expect(siteCfg.guides).toBe(false);
+    for (const p of ['/guides', '/guides/energy-and-ports', '/guides/getting-started', '/guides/nope']) expect((await b.page(p)).status, p).toBe(404);
+    for (const p of ['/', '/updates', '/database', '/nothing-here']) expect((await b.page(p)).text, p).not.toContain('href="/guides');
+  });
+
+  it('guides (SITE_GUIDES=1): the list, one guide with its contents and neighbours, an unknown one is a 404', async () => {
+    siteCfg.guides = true;
+    try {
+    const b = new Browser();
+    expect((await b.page('/')).text).toContain('href="/guides"');
     const list = await b.page('/guides');
     expect(list.status).toBe(200);
     expect(list.text).toContain('Getting started');
@@ -187,6 +200,7 @@ describe('site routes', () => {
     expect(one.text).not.toContain('TODO');
     expect((await b.page('/guides/nope')).status).toBe(404);
     expect((await b.page('/guides/..%2f..%2fREVIEW')).status).toBe(404);
+    } finally { siteCfg.guides = false; }
   });
 
   it('register, comment (escaped), suggest, vote once, shout with limits', async () => {

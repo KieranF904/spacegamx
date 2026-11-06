@@ -65,12 +65,13 @@ describe('refinements', () => {
     const r = await get('/nothing-here');
     expect(r.status).toBe(404);
     expect(r.text).toMatch(/<h1>Page not found<\/h1>/);
-    expect(r.text).toContain('href="/guides"');
+    expect(r.text).toContain('href="/database"');
+    expect(r.text).not.toContain('href="/guides"'); // (the guides are hidden)
   });
 
-  it('the home page links the guides and database and quotes no game text', async () => {
+  it('the home page links the database (not the hidden guides) and quotes no game text', async () => {
     const { text } = await get('/');
-    expect(text).toContain('href="/guides/building-a-ship"');
+    expect(text).not.toContain('href="/guides');
     expect(text).toContain('href="/database/parts"');
     expect(text).not.toContain('ingame');
     expect(text).not.toContain('In the game');

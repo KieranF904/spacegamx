@@ -10,6 +10,7 @@
  *                                  with Accept: application/json it answers { ok, id, item } (the list item's HTML)
  *   GET  /rss.xml                  RSS 2.0
  *   GET  /guides                   the guides (Markdown files in site/guides: src/guides.ts);  GET /guides/:slug  one guide
+ *                                  (hidden unless SITE_GUIDES=1: a 404, and nothing links to them)
  *   GET  /database[/:kind[/:id]]   parts, items, ships, bosses, stations (src/routes/catalog.ts)
  *   GET  /ships[/:id]              the ship gallery (src/routes/ships.ts);  GET /status  the game server's state (src/routes/status.ts)
  *   GET  /suggestions[?sort=&status=]  POST /suggestions   POST /suggestions/:id/vote
@@ -232,7 +233,7 @@ export function createApp(deps: AppDeps) {
   // ------------------------------------------------------------ home, updates
 
   router.get('/', async (ctx) => {
-    const [{ posts }, shouts, rankings, guideList] = await Promise.all([store.listPosts({ limit: 3 }), store.recentShouts(30), pilots.rankings(), guides.all()]);
+    const [{ posts }, shouts, rankings, guideList] = await Promise.all([store.listPosts({ limit: 3 }), store.recentShouts(30), pilots.rankings(), cfg.guides ? guides.all() : []]);
     const comments = await store.commentCounts(posts.map((p) => p.id));
     page(ctx, 200, V.homePage(ctx.page, { posts, comments, shouts, rankings, guides: guideList }));
   });
@@ -263,10 +264,13 @@ export function createApp(deps: AppDeps) {
 
   // ------------------------------------------------------------ guides
 
-  router.get('/guides', async (ctx) => page(ctx, 200, G.guidesIndexPage(ctx.page, await guides.all())));
+  router.get('/guides', async (ctx) => {
+    if (!cfg.guides) { page(ctx, 404, V.notFoundPage(ctx.page)); return; }
+    page(ctx, 200, G.guidesIndexPage(ctx.page, await guides.all()));
+  });
 
   router.get('/guides/:slug', async (ctx, p) => {
-    const hit = /^[a-z0-9-]{1,60}$/.test(p.slug) ? await guides.get(p.slug) : null;
+    const hit = cfg.guides && /^[a-z0-9-]{1,60}$/.test(p.slug) ? await guides.get(p.slug) : null;
     if (!hit) { page(ctx, 404, V.notFoundPage(ctx.page, 'guide')); return; }
     page(ctx, 200, G.guidePage(ctx.page, hit));
   });
@@ -958,7 +962,7 @@ export function createApp(deps: AppDeps) {
     const live = await pilots.live();
     const ctx: Ctx = {
       req, res, url, path: pathname, ip, token, user, csrf: csrfToken, csrfSeed, api, game,
-      page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin, authors: cfg.authors },
+      page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin, authors: cfg.authors, guides: cfg.guides },
     };
 
     const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET');

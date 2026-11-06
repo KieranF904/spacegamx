@@ -76,7 +76,8 @@ const HOME_GUIDES = ['getting-started', 'controls-and-flight-modes', 'building-a
 
 export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number, number>; shouts: Shout[]; rankings: Rankings | null; guides?: Guide[] }): SafeHtml {
   const [lead, ...rest] = d.posts;
-  const featured = HOME_GUIDES.map((s) => d.guides?.find((g) => g.slug === s)).filter((g): g is Guide => !!g);
+  const featured = ctx.guides ? HOME_GUIDES.map((s) => d.guides?.find((g) => g.slug === s)).filter((g): g is Guide => !!g) : [];
+  const guide = (slug: string, text: string) => (ctx.guides ? html`<a href="/guides/${slug}">Guide: ${text}</a>` : '');
   const body = html`
 <section class="hero">
   <div class="hero-art" aria-hidden="true"><img src="/static/img/hero-corsair.webp" alt="" width="1600" height="900"></div>
@@ -120,7 +121,7 @@ ${featured.length ? html`<section class="wrap block-tight" aria-labelledby="home
         <p class="feature-n">01 <span>Build</span></p>
         <h3>Ships are built from parts</h3>
         <p>Hull plates, generators, batteries, engines, guns and shields go onto a grid in the hangar. Guns have mounting rules, and every part adds mass.</p>
-        <p class="feature-links"><a href="/guides/building-a-ship">Guide: Building a ship</a><a href="/database/parts">Database: every part</a></p>
+        <p class="feature-links">${guide('building-a-ship', 'Building a ship')}<a href="/database/parts">Database: every part</a></p>
       </div>
     </div>
     <div class="feature flip">
@@ -129,7 +130,7 @@ ${featured.length ? html`<section class="wrap block-tight" aria-labelledby="home
         <p class="feature-n">02 <span>Fly</span></p>
         <h3>Mouse or helm controls</h3>
         <p>Steer with the mouse, or switch to helm controls (V): A and D turn, Q and E strafe. Shift boosts, and the jump drive (J) crosses the gaps between systems.</p>
-        <p class="feature-links"><a href="/guides/controls-and-flight-modes">Guide: Controls and flight modes</a><a href="/guides/travel">Guide: Travel</a></p>
+        ${ctx.guides ? html`<p class="feature-links">${guide('controls-and-flight-modes', 'Controls and flight modes')}${guide('travel', 'Travel')}</p>` : ''}
       </div>
     </div>
     <div class="feature">
@@ -138,7 +139,7 @@ ${featured.length ? html`<section class="wrap block-tight" aria-labelledby="home
         <p class="feature-n">03 <span>Fight</span></p>
         <h3>Bosses</h3>
         <p>Bosses fight in stages. Attacks are telegraphed, and shooting a part off stops the move it powers. Everyone who damages a boss gets a share of the reward.</p>
-        <p class="feature-links"><a href="/guides/bosses-the-basics">Guide: Bosses, the basics</a><a href="/database/bosses">Database: every boss</a></p>
+        <p class="feature-links">${guide('bosses-the-basics', 'Bosses, the basics')}<a href="/database/bosses">Database: every boss</a></p>
 
       </div>
     </div>
@@ -408,7 +409,7 @@ export function notFoundPage(ctx: PageCtx, what = 'page'): SafeHtml {
   <p class="eyebrow">404</p>
   <h1>${what === 'page' ? 'Page not found' : `No such ${what}`}</h1>
   <p class="lede">The address may be wrong, or the page has been removed.</p>
-  <p class="nf-links"><a class="btn" href="/">Home</a><a class="btn btn-ghost" href="/updates">Updates</a><a class="btn btn-ghost" href="/guides">Guides</a><a class="btn btn-ghost" href="/database">Database</a></p>
+  <p class="nf-links"><a class="btn" href="/">Home</a><a class="btn btn-ghost" href="/updates">Updates</a>${ctx.guides ? raw('<a class="btn btn-ghost" href="/guides">Guides</a>') : ''}<a class="btn btn-ghost" href="/database">Database</a></p>
 </section>`;
   return layout(ctx, { title: 'Not found', body });
 }

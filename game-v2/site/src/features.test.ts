@@ -93,6 +93,24 @@ describe('Database', () => {
     }
   });
 
+  it('parts read like the game\'s component guide: category tabs, rows by level with the game\'s pictures, each linkable', async () => {
+    const r = await get('/database/parts?category=weapons');
+    expect(r.text).toContain('class="cg-cats"');
+    expect(r.text).toMatch(/<details class="cg-row[^"]*" id="cannon_pip">/);
+    expect(r.text).toContain('src="/static/img/parts/cannon_pip.webp"');
+    expect(r.text).toContain('href="/database/parts/cannon_pip"');
+    expect(r.text).not.toContain('id="engine_ion_drive"');
+    const levels = [...r.text.matchAll(/<small>LV<\/small><b>(\d+)<\/b>/g)].map((m) => Number(m[1]));
+    expect(levels.length).toBeGreaterThan(5);
+    expect(levels).toEqual([...levels].sort((a, b) => a - b));
+    const s = await get('/database/parts?category=structure');
+    expect(s.text).toContain('id="structure-alloy"');
+    expect(s.text).toContain('Starter: every pilot can build it');
+    const img = await fetch(base + '/static/img/parts/cannon_pip.webp');
+    expect(img.status).toBe(200);
+    expect(img.headers.get('content-type')).toBe('image/webp');
+  });
+
   it('searches and filters', async () => {
     const r = await get('/database/parts?q=pip&category=weapons');
     expect(r.text).toContain('Pip');
@@ -313,6 +331,7 @@ describe('no lore on the site', () => {
   it('the Database lists have no description column, and the nav and footer link to the features', async () => {
     const parts = (await get('/database/parts')).text;
     expect(parts).not.toMatch(/<th>Description/i);
-    for (const href of ['/database', '/guides', '/ships', '/status']) expect(parts).toContain(`href="${href}"`);
+    for (const href of ['/database', '/ships', '/status']) expect(parts).toContain(`href="${href}"`);
+    expect(parts).not.toContain('href="/guides"'); // (hidden: SITE_GUIDES=1 brings them back)
   });
 });

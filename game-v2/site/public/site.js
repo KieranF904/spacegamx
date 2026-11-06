@@ -505,4 +505,12 @@
       if (!paused) poll();
     });
   }
+
+  // ---- Database parts: a link to a row (/database/parts#cannon_pip) opens it
+  const openHashRow = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const row = id ? document.getElementById(id) : null;
+    if (row && row.tagName === 'DETAILS' && row.classList.contains('cg-row')) { row.open = true; row.scrollIntoView({ block: 'start' }); }
+  };
+  if ($('.cg-row')) { openHashRow(); window.addEventListener('hashchange', openHashRow); }
 })();
