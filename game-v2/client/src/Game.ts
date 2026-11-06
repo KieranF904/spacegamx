@@ -1202,6 +1202,10 @@ this.xpFillEl = document.getElementById('xpFill');
       }
     }
     
+    // Chat bubbles: after the world's drawn, so they sit on this frame's camera (ui/bubbles)
+    this.w.chatBubbles?.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen);
+    this.w.chatBubbles?.update();
+
     // Update UI
     this.updateUI();
   }
@@ -1284,6 +1288,7 @@ this.xpFillEl = document.getElementById('xpFill');
       get worldEvents() { return g.worldEvents; },
       get adminPanel() { return g.adminPanel; },
       get contribPanel() { return g.contribPanel; },
+      get chatBubbles() { return g.w.chatBubbles; },
       get loggedIn() { return g.loggedIn; },
       set loggedIn(v) { g.loggedIn = v; },
       get localDead() { return g.localDead; },

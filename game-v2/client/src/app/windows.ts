@@ -21,6 +21,7 @@ import { KillFeedUI } from '../ui/KillFeedUI';
 import { PlayerStatsUI } from '../ui/PlayerStatsUI';
 import { NavMarkersUI } from '../ui/NavMarkersUI';
 import { FarZoomMarkers } from '../ui/FarZoomMarkers';
+import { ChatBubbles } from '../ui/bubbles/ChatBubbles';
 import { SocialUI } from '../ui/SocialUI';
 import { InfoPanel } from '../ui/InfoPanel';
 import { TradeWindow } from '../ui/TradeWindow';
@@ -115,6 +116,8 @@ export interface WindowSet {
   playerStatsUI: PlayerStatsUI;
   systemMapUI: SystemMapUI;
   farMarkers: FarZoomMarkers;
+  /** Public chat over pilots' ships (ui/bubbles) */
+  chatBubbles: ChatBubbles;
   /** Proto's empty scene has nothing to navigate to: these three stay null there */
   peopleUI: PeopleUI | null;
   navMarkers: NavMarkersUI | null;
@@ -308,6 +311,11 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
         return [...w.opsUI.markers(), ...w.pingUI.markers(), ...people].filter((m) => !o || o.x === undefined || o.y === undefined || Math.hypot(m.x - o.x, m.y - o.y) > 300);
       });
     w.farMarkers = new FarZoomMarkers(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => host.renderer.getZoom(), () => w.social.memberIds());
+    w.chatBubbles = new ChatBubbles({
+      state: host.state, map: w.systemMapUI,
+      toScreen: (x, y, out) => host.renderer.worldToScreenInto(x, y, out), zoom: () => host.renderer.getZoom(),
+      shipRadius: (id) => host.shipClient.store.get(id)?.derived.radius ?? 60,
+    });
     w.systemMapUI.party = () => w.social.others();
     w.systemMapUI.myRating = () => host.shipClient.myRating();
     w.systemMapUI.myShip = () => host.shipClient.myShip()?.derived ?? null;
