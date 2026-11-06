@@ -47,3 +47,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 55 (2026-11-06): legacy caps removed; netCaps/authResult lose their caps field and joins must offer the full set (wire hash unchanged: those messages are outside the hashed tables)
 - 56 (2026-11-06): own ship drawn from the replica layer; head hash covers the full own state; ownSync message; own control rows drop engine power/share/no-boost bits (wire hash unchanged: plain messages)
 - 57 (2026-11-06): hazards-only ownSync (c/g/p optional); rebuilt generators use the wire HP tenths (wire hash unchanged: plain messages)
+- 58 (2026-11-06): pulls message (pull fields worked out on both sides); social messages (friends, status, whisper); shown hit numbers in fixed point (wire hash unchanged: plain messages)
