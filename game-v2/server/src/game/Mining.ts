@@ -6,12 +6,13 @@
  *
  * - The work: how fast a tool takes the rock apart (rock units: damage x the
  *   tool's yield x its work rate / damagePerUnit). The rock loses every unit
- *   worked, kept or not, and a chunk is thrown every 5 to 10 units worked, so
- *   the work sets how often chunks come.
+ *   worked, kept or not, and a chunk is due every chunkUnits worked (3 to 5),
+ *   so the work sets how often chunks come.
  * - The keep: the chance each unit worked ends up in the chunk; every unit is
  *   a dice roll (the rock's dice, from the server's secret: payoutDice.ts), and
- *   a failed roll is lost from the rock all the same. A chunk holds what was kept; a chunk whose rolls all
- *   failed is skipped. The averages are the keep; the drops vary.
+ *   a failed roll is lost from the rock all the same. A chunk holds what was kept; a chunk due with nothing
+ *   kept yet waits for the next unit that is kept (the carry), so no drop is ever skipped or empty and a tool that
+ *   keeps little still drops about as often as the work says (unitsPerDrop). The averages are the keep; the drops vary.
  *
  * Mining lasers keep all they work on rock of their grade or below (a grade or
  * two ahead works it a little faster). A grade or two behind the rock's tier
@@ -148,7 +149,7 @@ export class Mining {
   /**
    * A tool did `damage` to an asteroid at (x, y); (nx, ny) points out of the
    * surface. Work the rock, keep what the tool keeps, and throw a chunk out
-   * every 5 to 10 units worked.
+   * every chunkUnits worked (or at the first kept unit after, if none was).
    */
   extract(asteroid: number, miner: number, damage: number, tool: MiningTool, x: number, y: number, nx: number, ny: number): void {
     const r = this.rocks.get(asteroid);
@@ -211,9 +212,10 @@ export class Mining {
         w.bag[id] = (w.bag[id] ?? 0) + n;
         got[id] = (got[id] ?? 0) + n;
       }
-      // Worked enough for a chunk: throw what was kept (every roll failed: no chunk, that drop is skipped)
-      if (w.worked >= w.want) {
-        if (Object.keys(w.bag).length) this.throwChunk(r, miner, w, x, y, nx, ny);
+      // Worked enough for a chunk: throw what was kept. Nothing kept yet: it waits for the next kept unit (the carry:
+      // a tool that keeps a third still drops every chunk or so, rather than skipping a drop in two at small chunks)
+      if (w.worked >= w.want && Object.keys(w.bag).length) {
+        this.throwChunk(r, miner, w, x, y, nx, ny);
         w.worked = 0;
         w.want = this.chunkWant(r);
       }

@@ -352,9 +352,9 @@ export class WeaponFx {
   castHit: ((x0: number, y0: number, x1: number, y1: number, owner: number, skip: readonly number[] | null, out: DrawnHit) => boolean) | null = null;
   /**
    * A shell stopped (or passed, piercing) at a drawn surface: what else shows a hit there (a shield's ripple, a rock's
-   * sparks), by its shell's id and type, and what it struck as drawn here (-1: not known, the server's point only)
+   * sparks), by its shell's id and type, what it struck as drawn here (-1: not known, the server's point only) and whose
    */
-  onStruck: ((id: number, x: number, y: number, type: number, target: number) => void) | null = null;
+  onStruck: ((id: number, x: number, y: number, type: number, target: number, owner: number) => void) | null = null;
   /** Shots and impacts heard as they're drawn here (audio/CombatSounds.ts) */
   sounds: CombatSoundFeed | null = null;
   private readonly drawn: DrawnHit = { t: 0, x: 0, y: 0, target: -1 };
@@ -637,7 +637,7 @@ export class WeaponFx {
       shot.endedAt = this.clock;
     }
     this.impactAt(shot, x, y);
-    this.onStruck?.(shot.id, x, y, shot.type, target);
+    this.onStruck?.(shot.id, x, y, shot.type, target, shot.owner);
   }
 
   /**
@@ -668,7 +668,7 @@ export class WeaponFx {
       shot.pending = null;
     }
     this.impactAt(shot, x, y);
-    this.onStruck?.(shot.id, x, y, shot.type, h.target);
+    this.onStruck?.(shot.id, x, y, shot.type, h.target, shot.owner);
   }
 
   /** Has this shell been drawn (now or lately)? Then its hit effects are drawn where it's seen to strike (onStruck) */

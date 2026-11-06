@@ -26,7 +26,7 @@ const AUDIO_MAX_DISTANCE = 6000;
 const AUDIO_REF_DISTANCE = 1200;
 
 /** At most this many copies of one effect at once (turret batteries fire a lot) */
-const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_shot: 8, railgun_shot: 4, hit: 8, explosion_small: 6, part_break: 6, disintegrate: 3, bump: 4, hive_launch: 3, prism_shot: 4, boss_roar: 1, laser_pulse: 5, mining_pulse: 4, boss_charge: 2, magma_charge: 4, magma_shot: 4, magma_burst: 5, boss_beam: 1, gun_charge: 3, gun_clack: 6, gun_vent: 4, gun_spin: 2,
+const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_shot: 8, railgun_shot: 4, hit: 8, explosion_small: 6, part_break: 6, disintegrate: 3, bump: 4, hive_launch: 3, prism_shot: 4, boss_roar: 1, laser_pulse: 5, mining_pulse: 4, mine_tick: 2, boss_charge: 2, magma_charge: 4, magma_shot: 4, magma_burst: 5, boss_beam: 1, gun_charge: 3, gun_clack: 6, gun_vent: 4, gun_spin: 2,
   autocannon_shot: 10, pulse_shot: 8, arc_shot: 6, mortar_shot: 5, torpedo_launch: 3, charge_launch: 4, pd_shot: 6,
   rivet_shot: 8, scrap_chunk_shot: 4, seeker_launch: 4, heart_spark: 8, heart_seeker: 4,
   // (Each model's own: the quick ones need the voices)
@@ -48,7 +48,7 @@ const STEAL = new Set(['laser_pulse', 'mining_pulse']);
 export const FILE_GAIN: Record<string, number> = {
   shot: 0.85, turret_shot: 0.6, hit: 0.5, hurt: 0.8, explosion_small: 0.8, explosion_large: 1,
   part_break: 0.55, armor_break: 0.6, generator_blast: 0.8, thruster_blast: 0.75, weapon_cookoff: 0.65, conduit_spark: 0.45,
-  disintegrate: 0.45, bump: 0.32, repair_part: 0.5,
+  disintegrate: 0.45, bump: 0.32, repair_part: 0.5, mine_tick: 0.35,
   gun_charge: 0.7, gun_clack: 0.6, gun_vent: 0.55, gun_spin: 0.6,
   jump_charge: 0.75, jump_launch: 0.85, jump_arrive: 0.75, jump_ready: 0.35, warp: 0.8, dock: 0.7, undock: 0.65,
   credits: 0.4, level_up: 0.5, error: 0.45, warning: 0.5,

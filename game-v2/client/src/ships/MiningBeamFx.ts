@@ -16,7 +16,7 @@ import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
 import {
-  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL,
+  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL, mineFalloff,
   type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition, type PortsLayout, type PortsState,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
@@ -75,7 +75,13 @@ export class MiningBeamFx {
    * A mining laser's pulse landing on rock: about as often as it works a unit (each a roll for ore on the server,
    * Mining.extract), so its mining strike (rendering/weapons/MiningStrikeFx.ts): where, out of the face, the rock's material
    */
-  onMiningStrike: ((x: number, y: number, dx: number, dy: number, material: string) => void) | null = null;
+  onMiningStrike: ((x: number, y: number, dx: number, dy: number, material: string, owner: number) => void) | null = null;
+  /**
+   * Your own mining laser cutting rock this frame: which rock, where, at what damage a second (its tuning's, times
+   * what it got and the beam's falloff: over a pulse the server's cut averages that), for `dt` seconds, its material
+   * (its grade). The progress ring (MiningProgress) works the rock by it
+   */
+  onOwnCut: ((rock: number, x: number, y: number, dps: number, dt: number, material: string) => void) | null = null;
   /** Is your own beam on (for the loop sound) */
   localActive = false;
   /** Every ship's held beams lit this frame, as drawn (their loops and ignitions: Game.updateSounds) */
@@ -152,18 +158,21 @@ export class MiningBeamFx {
           const ph = pz.phase[mi];
           if (ph >= 0 && (!last || Math.abs(now - ph - last.start) > 3 || now - last.start >= pz.ticks[mi])) {
             runs.push(newRun(id, mi, now - ph));
-            if (t < 0.999) this.onMiningStrike?.(hx, hy, -Math.cos(a), -Math.sin(a), rockMaterial(this.rockHit));
+            if (t < 0.999) this.onMiningStrike?.(hx, hy, -Math.cos(a), -Math.sin(a), rockMaterial(this.rockHit), id);
             if (!miningSounded.has(id)) { miningSounded.add(id); this.onMiningPulse?.(x, y, id === this.state.playerId); }
           } else if (ph < 0 && (!last || now - last.start >= pz.ticks[mi])) continue;
         } else if (!last || now - last.start >= MINING_EVERY) {
           if (!on) continue;
           runs.push(newRun(id, mi, last && now - last.start < MINING_EVERY * 2 ? last.start + MINING_EVERY : now));
-          if (t < 0.999) this.onMiningStrike?.(hx, hy, -Math.cos(a), -Math.sin(a), rockMaterial(this.rockHit));
+          if (t < 0.999) this.onMiningStrike?.(hx, hy, -Math.cos(a), -Math.sin(a), rockMaterial(this.rockHit), id);
           if (!miningSounded.has(id)) { miningSounded.add(id); this.onMiningPulse?.(x, y, id === this.state.playerId); }
         }
         while (runs.length && now - runs[0].start >= (pz ? pz.ticks[mi] : prof.ticks)) runs.shift();
         if (!runs.length) continue;
         miningSeen.add(key);
+        if (id === this.state.playerId && t < 0.999 && this.rockId >= 0 && !m.gas && (!pz || pz.phase[mi] >= 0)) {
+          this.onOwnCut?.(this.rockId, hx, hy, mt.dps * m.satisfaction * (pz ? pz.fill[mi] : 1) * mineFalloff(t * reach, mt.range), this.dt, m.material);
+        }
         // (Its newest pulse sets the beam's brightness; older ones are trailing off under it)
         const rock = t < 0.999 ? rockMaterial(this.rockHit) : null;
         this.miningFx.target = t < 0.999 ? this.rockId : -1;

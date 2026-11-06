@@ -77,8 +77,10 @@ server-core (hosts, stores, message switch), networking (econProtocol, pilot row
 
 Mining has two separate sides (Kieran, 2026-11-05):
 
-- **Work** sets how often chunks come. A hit works `damage × tool.yield × work ÷ damagePerUnit` rock units (96). The rock loses every unit worked, kept or not. A chunk is thrown every 5 to 10 units worked (`chunkUnits`, rolled per chunk).
-- **Keep** sets how much ore is in each chunk. Every unit worked is a dice roll against its keep (Kieran, 2026-11-05: "make every possible mine chance be a dice roll"), on the rock's own payout dice (from the server's secret, never the rock's id: Invariants, "Two kinds of seed"; a run replays the same only where the secret is fixed, as in tests). A failed roll is lost: the rock loses the unit all the same. A full keep (a laser at its grade) needs no roll. The averages are the keep, as before; only the variance is new. A drop whose rolls all failed is skipped, so no chunk is empty; the less a tool keeps, the more drops are skipped (guns on Mk II rock skip about a third). When the rock is spent, whatever was kept is thrown with it. Mining XP is per unit kept.
+- **Work** sets how often chunks come. A hit works `damage × tool.yield × work ÷ damagePerUnit` rock units (37; it was 96, then 74). The rock loses every unit worked, kept or not. A chunk is due every 3 to 5 units worked (`chunkUnits`, rolled per chunk; it was 4 to 9).
+- **Pace (Kieran, 2026-11-06: "drops 3x as frequently regardless of laser or not", "at least twice as much ore per second")**: damagePerUnit 74 → 37 doubles the work, and chunkUnits 4-9 → 3-5 with the carry below makes drops a little over three times as frequent. Measured with `server/src/bench/miningCadence.ts` (steady fire on Sol Mk I Chondrite): a starter's Pips went from a drop every 8.15 s and 0.275 ore/s to every 2.61 s and 0.557 ore/s; a Mk I laser went from every 7.13 s and 0.907 ore/s to every 2.22 s and 1.816 ore/s. The first drop on a fresh rock comes at 2.9 s for the Pips (8.3 s before) and 2.2 s for the laser (7.1 s before). A typical Sol Chondrite (size 52, 8 units) is mined out in about 4.5 s by either rig (9 s before).
+- **Keep** sets how much ore is in each chunk. Every unit worked is a dice roll against its keep (Kieran, 2026-11-05: "make every possible mine chance be a dice roll"), on the rock's own payout dice (from the server's secret, never the rock's id: Invariants, "Two kinds of seed"; a run replays the same only where the secret is fixed, as in tests). A failed roll is lost: the rock loses the unit all the same. A full keep (a laser at its grade) needs no roll. The averages are the keep, as before; only the variance is new. **The carry** (2026-11-06): a chunk that comes due with nothing kept yet is not skipped; it waits for the next kept unit and drops then. No chunk is empty and none is skipped, so a gun keeping a third still drops about every 4.7 units worked (`unitsPerDrop` in common/src/econ/mining.ts: `w + (1-p)^w ÷ p` averaged over the wants). With skipping and 3-5 unit chunks, a gun would lose about a quarter of its drops. When the rock is spent, whatever was kept is thrown with it. Mining XP is per unit kept.
+- **The progress ring** (2026-11-06, `client/src/ships/MiningProgress.ts`): a thin ring around the rock you're working fills toward your next drop, flares when the drop comes, and fades about 1.4 s after you stop. Its width is in screen pixels, so it reads at any zoom. A light, throttled `mine_tick` sound plays on your working hits (`ShipClient.mineTick`, at most one every 0.16 s). No bytes are sent for either. The client works out the rock units from its own hits with the server's formula: your shells striking soft rock (with the guns' √refDps slowdown), and your laser cutting at `miner.dps × satisfaction × fulfilment × falloff`, which over a pulse averages the server's cut. It fills against `unitsPerDrop` for your tool's keep (`toolKeep`, from the system's Mk in factions.json spawns). The chunk size and every keep are on the server's secret dice, so a drop can come a little before or after the ring fills; a full ring breathes until it does. A drop is a chunk appearing near your recent strikes (the same test as `MiningStrikeFx.pod`). The ring can't show kept and lost rolls differently: only the server knows them, and telling the client would mean per-hit traffic.
 - **The strike effect.** Every hit on a rock that rolls shows a mining strike on the client: a burst of rock dust and grit, distinct from a shell's plain spark (`client/src/rendering/weapons/MiningStrikeFx.ts`). No bytes are sent for it: the client draws it from the shell or beam it already sees strike the rock (the rock-bytes audit removed the per-hit spark and `projectileHit`), so it plays on every mining hit whatever the roll. The richer look on a success comes from data the client already has: a chunk of ore thrown out of the rock gets a brighter dust puff where it appears.
 
 **Mining lasers** (they have a grade) use `laserGap`, indexed by the laser's grade minus the rock's tier (the system's Mk), clamped to +2:
@@ -95,26 +97,28 @@ Every laser mines independently. The crowd mechanic (`crowd`, `kByGap`, `crowdFa
 - Every gun kind has the same normalised yield, 0.6 (the EMP has 0). A starter's 112 damage a second works about 0.7 units a second, the same as a Mk I laser. A miner's damage on the rock is tracked as a leaking one-second sum. Above `refDps` (112) the pace grows only with the square root of it: `work × √(refDps ÷ dps)`. A gunship with twice a starter's damage works a rock about 1.4× as fast, not 2×.
 - Keep = `keep` (0.32) for the common ores (`common`: iron, nickel, silicate, ice). Other ores and gems keep `keepOther` (0.5) times that. All of it is multiplied by `keepByTier[rock tier]` (Mk I 1, II 0.4, III 0.15, IV 0.08, V 0.05).
 
-Why the numbers: guns keep about 30% of a Mk I Chondrite, so a Mk I laser gets about 3.3× the ore from a chunk cadence that is the same. A Mk I laser one or two grades behind still beats guns by 6× or more. Rocks hold `size × 0.15` units and `size × 30..120` HP. Guns work a rock out after about `size × 24` damage, so they mine a rock out before they break it.
+Why the numbers: guns keep about 30% of a Mk I Chondrite, so a Mk I laser gets about 3.3× the ore from a chunk cadence that is about the same (a gun's drops come a little less often, 2.6 s against 2.2 s, as some wait on a kept unit). A Mk I laser one or two grades behind still beats guns by 6× or more. Rocks hold `size × 0.15` units and `size × 30..120` HP. Guns work a rock out after about `size × 9` damage, so they mine a rock out well before they break it.
 
 ### The numbers (mining.test.ts "the numbers"; 3000 s on a big rock, steady fire; averages of dice rolls)
 
 | Rig | Rock | Ore/min | Chunks/min |
 |---|---|---|---|
-| Starter's 2 Pips (112 dps) | Mk I soft (Chondrite) | 12.9 | 5.1 |
-| Starter's 2 Pips | Mk II soft | 5.1 | 3.5 |
-| Starter's 2 Pips | Mk III soft | 2.3 | 1.8 |
-| Dev Gale (2 Chainsaws 160 dps, 2 Sparks 77 dps) | Mk I soft | 18.5 | 7.4 |
-| Mk I Mining Laser (Prospector, 42 dps), gap 0 | Mk I | 41.9 | 5.5 |
-| Mk I Mining Laser, gap −1 | Mk II hard (Neutron Slug) | 28.8 | 4.8 |
-| Mk I Mining Laser, gap −2 | Mk III hard (Neutron Slug) | 17.7 | 3.9 |
+| Starter's 2 Pips (112 dps) | Mk I soft (Chondrite) | 33.9 | 22.9 |
+| Starter's 2 Pips | Mk II soft | 13.1 | 12.2 |
+| Starter's 2 Pips | Mk III soft | 4.8 | 4.7 |
+| Dev Gale (2 Chainsaws 160 dps, 2 Sparks 77 dps) | Mk I soft | 49.5 | 33.5 |
+| Mk I Mining Laser (Prospector, 42 dps), gap 0 | Mk I | 108.9 | 27.3 |
+| Mk I Mining Laser, gap −1 | Mk II hard (Neutron Slug) | 73.7 | 22.9 |
+| Mk I Mining Laser, gap −2 | Mk III hard (Neutron Slug) | 46.2 | 18.6 |
 | Mk I Mining Laser, gap −3 | Mk IV | 0 (can't) | 0 |
-| Mk III laser, gap 0, alone | Mk III hard (Cobaltite) | 41.9 | 5.5 |
-| 3 Mk III lasers (3 ships) | Mk III hard (Cobaltite) | 125.9 | 16.9 |
+| Mk III laser, gap 0, alone | Mk III hard (Cobaltite) | 108.9 | 27.3 |
+| 3 Mk III lasers (3 ships) | Mk III hard (Cobaltite) | 326.8 | 81.5 |
 
-main_01 (10 ore with the starter's guns) takes about 47 s of steady fire. Flight School's "mine a rock" step finishes on the first chunk, after about 10 s.
+(2026-11-06, damagePerUnit 37 and chunkUnits 3-5 with the carry. Before, at 74 and 4-9 with skipping: Pips on Mk I rock 16.5 ore/min, a Mk I laser 54.4.)
 
-**Lasers on power** (pool core, Mk I Cell Reactor 35/s, core + reactor + N Mk I lasers, mining held from full; ore/min on Mk I rock = N × 41.9 × share):
+main_01 (10 ore with the starter's guns) takes about 18 s of steady fire. Flight School's "mine a rock" step finishes on the first chunk, after about 3 s.
+
+**Lasers on power** (pool core, Mk I Cell Reactor 35/s, core + reactor + N Mk I lasers, mining held from full; ore/min on Mk I rock = N × 41.9 × share, at the old 96 damage a unit: multiply by 2.6 at today's 37):
 
 | Mk I lasers on 1 Cell Reactor | Before: share (brownout at) | After: share, 1st min / steady (brownout at) | After: ore/min, steady |
 |---|---|---|---|
