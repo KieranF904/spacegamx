@@ -63,6 +63,8 @@ export const CTL = {
 export interface ReplicaControls {
   bits: number;
   targetAngle: number;
+  /** Where its jump goes (its pilot's cursor distance), where that is known: a pilot's own ship as its client steps it (the server's shadow of it). Else -1 */
+  jumpDist?: number;
 }
 
 export function controlBits(c: Partial<FlightControls>): number {
@@ -82,8 +84,8 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
     boost: (b & CTL.boost) !== 0, helm: (b & CTL.helm) !== 0, strafeLeft: (b & CTL.strafeLeft) !== 0, strafeRight: (b & CTL.strafeRight) !== 0,
     jump: (b & CTL.jump) !== 0,
     targetAngle: (b & CTL.hold) !== 0 ? body.angle : c.targetAngle,
-    // Where a jump lands isn't replicated, nor so how long a short one charges (flight.ts jumpChargeNeed): -1, not
-    // known, so the charge waits, and the burn's start brings a keyframe
+    // Where a jump lands isn't replicated: -1, not known, so the charge waits (flight.ts jumpChargeNeed), and the
+    // burn's start brings a keyframe
     jumpDist: -1,
   };
   // (Part features' held inputs from their control bits: the Burst Strafer's dodge)
@@ -133,6 +135,7 @@ export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaContr
   const s = (VIEW ??= new SimShipView()).load(0, mode, body, derived, undefined, FULL_CHARGE, false, body.jumpPrime ?? 0);
   IN.bits = c.bits;
   IN.q = aimQ(c.targetAngle);
+  IN.jumpDist = c.jumpDist ?? -1;
   ENV.tick = tick; ENV.tuning = tuning; ENV.gravity = env.gravity; ENV.terrain = env.terrain ?? null; ENV.hazard = env.hazard;
   FIELDS.central = env.central; FIELDS.lodestones = env.lodestones;
   stepShipMotion(s, IN, ENV, stepHazards(s, IN, tick, HZ));

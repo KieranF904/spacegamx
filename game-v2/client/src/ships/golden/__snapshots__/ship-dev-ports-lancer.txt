@@ -9,7 +9,7 @@
   "hull": 1702.9,
   "shield": 0,
   "cargo": 30,
-  "jump": 55.086,
+  "jump": 56.857,
   "jumpCooldown": 13.216666666666667,
   "jumpRatio": 1.6,
   "power": {

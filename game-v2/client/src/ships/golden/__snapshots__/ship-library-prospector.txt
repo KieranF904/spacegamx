@@ -9,7 +9,7 @@
   "hull": 1297.5,
   "shield": 0,
   "cargo": 80,
-  "jump": 59.914,
+  "jump": 60.942,
   "jumpCooldown": 11.866666666666667,
   "jumpRatio": 2.5,
   "power": {

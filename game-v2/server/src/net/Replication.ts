@@ -20,7 +20,7 @@
  */
 
 import {
-  Position, Velocity, Rotation, InSystem, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
+  Position, Velocity, Rotation, InSystem, Input, jumpBurnAt, jumpTuning, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
   replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, applyPullRows, cargoBefore, quantizeShipBody, OWN_CAUSE, fieldOn,
   type ShipState, replicaHash, replicasByte, CTL_POWER_MASK, CTL_SHARE_MASK, CTL_NO_BOOST, type PullFieldRec,
 } from '@space-game/common';
@@ -389,7 +389,12 @@ export class Replication {
     if (o.held !== undefined) { o.held = undefined; o.heldDock = undefined; return hard('mode'); }
     if (o.hard) { s.body = this.real(eid); return; }
     if (worked) cargoBefore(s.body, worked.rows);
-    replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, derived, this.ships.tuning, this.host.env(eid), tick);
+    // (With the jump distance its client flies, its input's cursor distance: ownStep.ts. The others' replicas don't know
+    // it, so theirs waits at the end of the charge: the burn's start is a keyframe for them, not for its own client)
+    const jumpWas = s.body.jump ?? 0;
+    replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q), jumpDist: Input.cursorDist[eid] }, derived, this.ships.tuning, this.host.env(eid), tick);
+    const burnAt = jumpBurnAt(jumpTuning(this.ships.tuning));
+    if (jumpWas < burnAt && (s.body.jump ?? 0) === burnAt) { if (!s.diverged) this.why(`${ReplicaMode[mode]}:jump`); s.diverged = true; }
     if (worked) {
       // (Its pulls: part of its step, before its other causes, as its client's own step takes them)
       applyPullRows(s.body, worked.rows);

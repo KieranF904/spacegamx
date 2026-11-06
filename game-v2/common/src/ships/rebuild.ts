@@ -19,7 +19,7 @@ import { gunRate } from './launch.js';
 import { type CellMap, cellMap, engineExhaust } from './mounting.js';
 import { type EnergyInfo, gunDrawFlatOut } from './energy.js';
 import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
-import { type PortsLayout, buildPortsLayout } from './power/ports.js';
+import { type PortsLayout, buildPortsLayout, portsFed } from './power/ports.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
 import { dhypot, dpow } from '../math/detTrig.js';
@@ -571,7 +571,10 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let shieldMax = 0, shieldRegen = 0, shieldDelayW = 0, coilCool = 1;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
+  // (A ports design's coils count once the layout says power reaches them: portsCoils, below)
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
+  const portsCoils: number[] = [];
+  const onPorts = blueprint.power === 'ports';
   const miners: MinerInfo[] = [];
   const launchers: LauncherInfo[] = [];
   const dash = { speed: 0, cooldown: 0, coils: 0 };
@@ -580,7 +583,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     if (!alive[i]) continue;
     hullCells += area[i];
     const coil = parts[i].fn === 'core' ? jt.coreCapacity : (fns[i].jumpCapacity ?? 0) * area[i] * satisfaction[i];
-    if (coil > 0) {
+    if (coil > 0 && onPorts && parts[i].fn !== 'core') portsCoils.push(i);
+    else if (coil > 0) {
       const grade = partGrade(catalog, parts[i]);
       jumpCap += coilCapacity(coil, grade, jt);
       jumpGradeSum += coil * grade;
@@ -596,7 +600,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       shieldRegen += rate;
       shieldDelayW += rate * sd;
     }
-    if ((fns[i].jumpCooldown ?? 1) < coilCool && satisfaction[i] > 0) coilCool = fns[i].jumpCooldown!;
+    if ((fns[i].jumpCooldown ?? 1) < coilCool && satisfaction[i] > 0 && !onPorts) coilCool = fns[i].jumpCooldown!;
     if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
       if (isEngine(fns[i])) engineDraw += draw;
@@ -654,6 +658,17 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   if (power) for (const B of power.banks) if (B.kind === 'drive') driveMax += B.cap; else weaponMax += B.cap;
   // ---- (end power layout)
 
+  // (A ports design's coils: those power reaches, through their in ports, count; one cut off is dead weight)
+  if (ports && portsCoils.length) {
+    const fed = portsFed(ports);
+    for (const i of portsCoils) {
+      if (!fed[i]) continue;
+      const coil = (fns[i].jumpCapacity ?? 0) * area[i], grade = partGrade(catalog, parts[i]);
+      jumpCap += coilCapacity(coil, grade, jt);
+      jumpGradeSum += coil * grade;
+      if ((fns[i].jumpCooldown ?? 1) < coilCool) coilCool = fns[i].jumpCooldown!;
+    }
+  }
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
   if (input.memo) input.memo.last = { design: D, tuning, alive: Uint8Array.from(alive, Number), turrets: turretRays, exhaust: exhaustOf };
 

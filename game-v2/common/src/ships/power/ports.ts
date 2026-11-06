@@ -605,6 +605,24 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   return L;
 }
 
+/**
+ * Which parts power can reach at all (1): a generator, and anything its links lead to, through relays and lines, as the
+ * layout is built. What a passive part with no store of its own (a jump coil) counts by: fed, it works; cut off, it doesn't
+ */
+export function portsFed(L: PortsLayout): Uint8Array {
+  const fed = new Uint8Array(L.n);
+  const front: number[] = [];
+  for (let k = 0; k < L.gens.length; k++) { fed[L.gens[k]] = 1; front.push(L.gens[k]); }
+  while (front.length) {
+    const p = front.pop()!;
+    for (let k = L.outStart[p]; k < L.outStart[p + 1]; k++) {
+      const q = L.linkTo[L.outLink[k]];
+      if (!fed[q]) { fed[q] = 1; front.push(q); }
+    }
+  }
+  return fed;
+}
+
 /** FNV-1a over the graph and the caps (not the health-scaled generator rates), 16 bits, never 0 */
 export function portsSig(L: PortsLayout): number {
   let h = 0x811c9dc5 | 0;
