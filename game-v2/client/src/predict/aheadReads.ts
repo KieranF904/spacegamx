@@ -1,9 +1,9 @@
 /**
  * What a kind on the PT timeline reads of another ship past the confirmed tick (a mob's target, a boss's, a move's
  * aim), without touching the tick-accurate layer. Reading the replica layer itself past the snapshots (preAt / at of
- * another pilot there) steps that ship ahead in the layer, and with contact pairs found on the layer (CAPS.CONTACTS:
- * ContactWorld's memo) a tick found ahead of its snapshot is kept, and the ST that is stepped later reads it: a mob's
- * ST drifted off the server's (server net/decisions/ptWorld.test.ts, "mites at a weaving pilot"). So past C:
+ * another pilot there) steps that ship ahead in the layer, and something kept from those steps is read by the ST that
+ * is stepped later: a mob's ST drifted off the server's (server net/decisions/ptWorld.test.ts, "mites at a weaving
+ * pilot"; suspected: contact pairs found on the layer for ticks past the snapshot, ContactWorld's memo). So past C:
  *
  *   your own ship   its own layer (the prediction is its truth there; never asked past the predicted tick)
  *   a ship on PT    the ship kind's PT (`pt`: PtStLayer's ring), when there is one

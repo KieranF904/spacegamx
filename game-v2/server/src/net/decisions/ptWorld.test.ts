@@ -62,7 +62,7 @@ const note = (g: Gap, d: number) => { g.n++; if (d < 1e-6) g.exact++; g.sum += d
 const show = (g: Gap) => ({ n: g.n, exact: g.n ? +(g.exact / g.n).toFixed(3) : 1, mean: g.n ? +(g.sum / g.n).toFixed(2) : 0, max: +g.max.toFixed(1) });
 
 /** A boss's fight with the pilot LAG ticks behind, the world on its PT timeline */
-function ptFight(boss: string, ticks: number, stagesAt: number[], lag: number) {
+function ptFight(boss: string | undefined, ticks: number, stagesAt: number[], lag: number, packs?: { ships: string[]; dx: number; dy: number }[]) {
   let brain: (StagedBrain & { stage: number }) | null = null, shells = new Map<number, number[]>(), release = -1;
   let put: { tick: number; msg: ServerMessage }[] = [];
   let kinds: PtKinds | null = null, moves: MovesKind | null = null, bodies: BodiesKind | null = null, guides: GuidesKind | null = null, head = 0;
@@ -111,7 +111,7 @@ function ptFight(boss: string, ticks: number, stagesAt: number[], lag: number) {
     bd.onSnapshot = (tick, rows) => { if (rows?.some((r) => r[2] !== 0)) decidedWindows++; on(tick, rows); };
   };
   const r = fight({
-    boss, ticks, lag,
+    boss, ticks, lag, ...(packs ? { packs, prey: true } : {}),
     each: (t, server) => {
       if (t === 0) {
         shells = spawned(server);
@@ -142,7 +142,7 @@ function ptFight(boss: string, ticks: number, stagesAt: number[], lag: number) {
         note(body.pt, Math.hypot(s.x - Position.x[id], s.y - Position.y[id]) + Math.abs(s.angle - Rotation.angle[id]));
         note(body.st, Math.hypot(c.x - Position.x[id], c.y - Position.y[id]));
       }
-      for (const [eid] of [...server.mobs.guided(), ...server.weapons.guided()]) {
+      for (const [eid] of [...server.mobs.guided(), ...(server as unknown as { weapons: Weapons }).weapons.guided()]) {
         const p = guides!.pose(eid, head), st = A.guides.state(eid);
         if (!p || !st) continue;
         note(mob.pt, Math.hypot(p.x - Position.x[eid], p.y - Position.y[eid]));
@@ -260,4 +260,15 @@ describe('PT timeline: homing shells and mobs stepped ahead (guidesKind)', () =>
 describe('PT timeline: the world stepped ahead to the own tick (C3 game-wide, track C)', () => {
   it('the Scrap Mother, 100 ms behind: body, mobs, looks and shells at the server\'s tick', () => check(6), 240_000);
   it('the Scrap Mother, 200 ms behind', () => check(12), 240_000);
+  it('custom enemies, 150 ms behind: the looks and shells their moves draw ahead are the snapshots own', () => {
+    const { r, out, moves } = ptFight(undefined, 1200, [], 9, [
+      { ships: ['cinder_zealot', 'maw_lurker', 'hookboat'], dx: 1300, dy: 700 },
+      { ships: ['slag_ray', 'clinker', 'scrap_darter'], dx: -1300, dy: 700 },
+    ]);
+    if (process.env.PT_DEBUG) console.log('PT custom', JSON.stringify({ ...out, moves: moves.stats }));
+    expect(out.shells.offSt).toBe(0);
+    expect(moves.stats.checks).toBeGreaterThan(1000);
+    expect(moves.stats.resteps).toBeLessThanOrEqual(moves.stats.misses);
+    expect(r.got.A.off).toBe(0);
+  }, 240_000);
 });
