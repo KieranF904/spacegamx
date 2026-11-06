@@ -2,7 +2,7 @@
  * The component guide (the side panel's Components tab: C, ui/hub/tabs/componentsTab.ts): every buildable component
  * by category, sorted by the level it's learned at. A row is its level, its picture, its name, what still gates it
  * for you (a level, a licence, a rare boss part) and what making it takes (red where you're short); its chevron opens
- * its full numbers, mounting, trade-off and where its rare part drops. Drawn small for the HUD: the pictures at half
+ * its full numbers, mounting, trade-off and where its rare part drops. Drawn compact for the HUD (rows 30 px: name and materials on one line, the gate under): pictures at a quarter
  * size, tight margins, one column when a row is opened.
  *
  * A view, not a window: mount(host) puts it in the panel's body, hide() takes it out (and stops drawing pictures).
@@ -43,45 +43,47 @@ const DROPS = bossDrops(bossData as unknown as Parameters<typeof bossDrops>[0], 
 const QUESTS = questTeaches(questsData as unknown as Parameters<typeof questTeaches>[0]);
 
 /** The pictures at this share of the size they're drawn at (the HUD panel is narrow) */
-const SPRITE_SCALE = 0.5;
+const SPRITE_SCALE = 0.25;
 
 const RED = '#d0613f';
 const STYLE = `
 .cg { display: flex; flex-direction: column; min-height: 0; flex: 1; color: #c9d4e5; font: 12px 'Segoe UI', system-ui, sans-serif; }
-.cg-cats { display: flex; gap: 3px; padding: 6px 8px 5px; border-bottom: 1px solid rgba(208, 97, 63, 0.55); flex-shrink: 0; overflow-x: auto; scrollbar-width: none; }
+.cg-cats { display: flex; gap: 3px; padding: 4px 6px 3px; border-bottom: 1px solid rgba(208, 97, 63, 0.55); flex-shrink: 0; overflow-x: auto; scrollbar-width: none; }
 .cg-cats::-webkit-scrollbar { display: none; }
-.cg-cat { all: unset; flex-shrink: 0; cursor: pointer; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(140, 170, 220, 0.2); background: rgba(30, 42, 64, 0.55);
-  color: #9fb0c8; font: 700 9px 'Segoe UI', sans-serif; letter-spacing: 0.6px; text-transform: uppercase; white-space: nowrap; }
+.cg-cat { all: unset; flex-shrink: 0; cursor: pointer; padding: 1px 5px; border-radius: 3px; border: 1px solid rgba(140, 170, 220, 0.2); background: rgba(30, 42, 64, 0.55);
+  color: #9fb0c8; font: 700 8.5px/14px 'Segoe UI', sans-serif; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; }
 .cg-cat:hover { color: #fff; background: rgba(44, 60, 90, 0.7); }
 .cg-cat.on { background: ${RED}; border-color: ${RED}; color: #fff; }
 .cg-cat .badge { margin-left: 4px; color: inherit; opacity: 0.75; font-weight: 600; letter-spacing: 0; }
 .cg-cat:focus-visible { outline: 2px solid #6cc8ff; outline-offset: 1px; }
-.cg-sub { color: #6f8099; font-size: 10px; padding: 0 1px 4px; }
-.cg-list { flex: 1; min-height: 0; overflow-y: auto; padding: 5px 4px 8px 8px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(125, 160, 210, 0.35) transparent; }
-.cg-row { margin-bottom: 3px; border-radius: 5px; overflow: hidden; background: rgba(26, 36, 56, 0.72); border: 1px solid rgba(140, 170, 220, 0.09);
-  content-visibility: auto; contain-intrinsic-size: auto 54px; }
+.cg-sub { color: #6f8099; font-size: 9.5px; padding: 0 1px 2px; }
+.cg-list { flex: 1; min-height: 0; overflow-y: auto; padding: 3px 2px 6px 6px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: rgba(125, 160, 210, 0.35) transparent; }
+.cg-row { margin-bottom: 2px; border-radius: 4px; overflow: hidden; background: rgba(26, 36, 56, 0.72); border: 1px solid rgba(140, 170, 220, 0.09);
+  content-visibility: auto; contain-intrinsic-size: auto 28px; }
 .cg-row.open { border-color: rgba(140, 170, 220, 0.24); }
-.cg-main { display: grid; grid-template-columns: 30px 62px minmax(0, 1fr) 22px; min-height: 52px; }
+.cg-main { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr) 20px; min-height: 26px; }
 .cg-lv { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(3, 6, 14, 0.42); }
 .cg-lv small { font: 700 7.5px 'Segoe UI', sans-serif; letter-spacing: 1px; color: #8394ad; }
-.cg-lv b { font: 800 15px 'Segoe UI', sans-serif; color: #f0b54a; line-height: 1.05; font-variant-numeric: tabular-nums; }
-.cg-lv b.none { font-size: 12px; color: #6f8099; }
-.cg-gfx { display: grid; place-items: center; padding: 2px; min-width: 0; }
-.cg-gfx img { max-width: 60px; max-height: 56px; width: auto; height: auto; pointer-events: none; }
-.cg-det { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 6px; min-width: 0; }
-.cg-name { font: 800 11.5px 'Segoe UI', sans-serif; letter-spacing: 0.6px; text-transform: uppercase; color: #f1f5fb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cg-req { display: flex; align-items: flex-start; gap: 4px; font: 600 10.5px 'Segoe UI', sans-serif; color: #f0846a; line-height: 1.3; }
-.cg-req svg { width: 10px; height: 10px; flex-shrink: 0; margin-top: 1px; }
+.cg-lv b { font: 800 12px 'Segoe UI', sans-serif; color: #f0b54a; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.cg-lv b.none { font-size: 10px; color: #6f8099; }
+.cg-gfx { display: grid; place-items: center; padding: 1px; min-width: 0; }
+.cg-gfx img { max-width: 26px; max-height: 22px; width: auto; height: auto; pointer-events: none; }
+.cg-det { display: flex; flex-direction: column; justify-content: center; gap: 0; padding: 1px 5px; min-width: 0; }
+.cg-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cg-name { flex: 1; min-width: 0; font: 800 10.5px/14px 'Segoe UI', sans-serif; letter-spacing: 0.5px; text-transform: uppercase; color: #f1f5fb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-req { display: flex; align-items: center; gap: 3px; font: 600 9.5px/12px 'Segoe UI', sans-serif; color: #f0846a; white-space: nowrap; overflow: hidden; }
+.cg-req span { overflow: hidden; text-overflow: ellipsis; }
+.cg-req svg { width: 8px; height: 8px; flex-shrink: 0; }
 .cg-req.met { color: #7fc79a; font-weight: 500; }
-.cg-mats { display: flex; flex-wrap: wrap; gap: 1px 8px; align-items: center; font: 600 10.5px 'Segoe UI', sans-serif; color: #d6deeb; }
-.cg-mat { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
-.cg-mat img { width: 13px; height: 13px; }
+.cg-mats { display: flex; flex-shrink: 0; gap: 5px; align-items: center; font: 600 9.5px/12px 'Segoe UI', sans-serif; color: #d6deeb; }
+.cg-mat { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.cg-mat img { width: 11px; height: 11px; }
 .cg-mat.short { color: #f87171; }
-.cg-mats .per { color: #6f8099; font-weight: 400; font-size: 10px; }
+.cg-mats .per { color: #6f8099; font-weight: 400; font-size: 9px; }
 .cg-x { all: unset; cursor: pointer; display: grid; place-items: center; color: #9fb0c8; border-left: 1px solid rgba(140, 170, 220, 0.07); }
 .cg-x:hover { background: rgba(125, 211, 252, 0.07); color: #fff; }
 .cg-x:focus-visible { outline: 2px solid #6cc8ff; outline-offset: -2px; }
-.cg-x svg { width: 12px; height: 12px; transition: transform 0.15s; }
+.cg-x svg { width: 10px; height: 10px; transition: transform 0.15s; }
 .cg-row.open .cg-x svg { transform: rotate(180deg); }
 .cg-more { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 6px 8px 8px; border-top: 1px solid rgba(140, 170, 220, 0.1); background: rgba(3, 6, 14, 0.22); font-size: 11px; }
 .cg-more h5 { margin: 6px 0 3px; font: 700 9px 'Segoe UI', sans-serif; letter-spacing: 1.5px; color: #7dd3fc; text-transform: uppercase; }
@@ -103,7 +105,7 @@ const STYLE = `
 .cg-t td { padding: 2px 3px; border-bottom: 1px solid rgba(140, 170, 220, 0.07); color: #c4cfde; }
 .cg-t td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .cg-t .cg-mat img { width: 11px; height: 11px; }
-.cg-you { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; font: 700 9px 'Segoe UI', sans-serif; letter-spacing: 1.5px; color: #f0b54a; text-transform: uppercase; }
+.cg-you { display: flex; align-items: center; gap: 6px; margin: 2px 0 3px; font: 700 9px 'Segoe UI', sans-serif; letter-spacing: 1.5px; color: #f0b54a; text-transform: uppercase; }
 .cg-you::before, .cg-you::after { content: ''; flex: 1; height: 1px; background: rgba(240, 181, 74, 0.35); }
 @media (prefers-reduced-motion: reduce) { .cg-x svg { transition: none; } }`;
 
@@ -228,7 +230,7 @@ export class ComponentGuideUI {
       };
     }
     const list = counts.get(this.tab)!;
-    this.sub.textContent = `Level ${me.level} · ${list.length} components`;
+    this.sub.textContent = `Level ${me.level} · ${list.length} components (the badges: open to you of each)`;
     const scroll = this.list.scrollTop;
     // (A rule where the levels pass yours)
     let html = '', marked = false;
@@ -241,7 +243,7 @@ export class ComponentGuideUI {
       html += `<div class="cg-row${this.open_.has(r.id) ? ' open' : ''}" data-id="${esc(r.id)}">${inner}</div>`;
     }
     this.list.innerHTML = html;
-    this.list.prepend(this.sub);
+    this.cats.title = this.sub.textContent;
     this.list.scrollTop = scroll;
     this.shownKey = `${this.tab}|${me.level}`;
     for (const r of list) this.fillSprite(r);
@@ -287,7 +289,7 @@ export class ComponentGuideUI {
 
   /** A row's picture slot: empty (and holding its place) until `fillSprite` puts the picture in */
   private sprite(r: CompRow): string {
-    return `<img data-spr="${esc(r.id)}" width="30" height="30" alt="" style="visibility:hidden">`;
+    return `<img data-spr="${esc(r.id)}" width="15" height="15" alt="" style="visibility:hidden">`;
   }
 
   /** Put a row's picture in its slot: at once if it has been drawn before, else when the browser has a moment */
@@ -337,12 +339,11 @@ export class ComponentGuideUI {
       return `<span class="cg-mat${have < n ? ' short' : ''}" title="${esc(econ.items.name(id))}: you have ${have}"><img src="${itemIcon(econ, id)}" alt="">x ${n}</span>`;
     }).join('') + (r.kind === 'structure' ? '<span class="per">a hull cell</span>' : '');
     const main = `<div class="cg-main">
-      <div class="cg-lv"><small>LV</small>${r.level === null ? '<b class="none">—</b>' : `<b>${r.level}</b>`}</div>
+      <div class="cg-lv" title="${r.level === null ? 'No level' : `Learned at level ${r.level}`}">${r.level === null ? '<b class="none">—</b>' : `<b>${r.level}</b>`}</div>
       <div class="cg-gfx">${this.sprite(r)}</div>
       <div class="cg-det">
-        <div class="cg-name" title="${esc(r.name)}">${esc(r.name)}</div>
-        <div class="cg-req${req.met ? ' met' : ''}">${req.met ? CHECK : LOCK}<span>${esc(req.text)}</span></div>
-        <div class="cg-mats">${mats || '<span class="per">Nothing to fabricate</span>'}</div>
+        <div class="cg-top"><div class="cg-name" title="${esc(r.name)}">${esc(r.name)}</div><div class="cg-mats">${mats || '<span class="per">nothing to fabricate</span>'}</div></div>
+        <div class="cg-req${req.met ? ' met' : ''}" title="${esc(req.text)}">${req.met ? CHECK : LOCK}<span>${esc(req.text)}</span></div>
       </div>
       <button class="cg-x" data-row="${esc(r.id)}" title="${this.open_.has(r.id) ? 'Less' : 'More details'}" aria-label="${this.open_.has(r.id) ? 'Less' : 'More details'}: ${esc(r.name)}" aria-expanded="${this.open_.has(r.id)}">${CHEVRON}</button>
     </div>`;

@@ -26,23 +26,23 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.ps { display: flex; flex-direction: column; gap: 2px; color: #b4c2d4; }
-.ps-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 3px; font: 600 9.5px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #8b9cb3; }
+.ps { display: flex; flex-direction: column; gap: 1px; color: #b4c2d4; }
+.ps-h { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px; font: 600 8.5px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.6px; text-transform: uppercase; color: #8b9cb3; }
 .ps-h:first-child { margin-top: 0; }
 .ps-h::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(140, 170, 210, 0.3), transparent); }
 .ps-h b { color: #e5ecf7; letter-spacing: 1px; font-weight: 600; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
-.ps-s { background: rgba(3, 6, 12, 0.4); border-radius: 4px; padding: 3px 6px 4px; min-width: 0; }
+.ps-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; }
+.ps-s { background: rgba(3, 6, 12, 0.4); border-radius: 3px; padding: 1px 5px 2px; min-width: 0; }
 .ps-s.w { grid-column: 1 / -1; }
-.ps-s span { display: block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #7a8ba3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ps-s b { display: block; color: #f1f5fb; font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-s span { display: block; font-size: 8px; line-height: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: #7a8ba3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-s b { display: block; color: #f1f5fb; font-weight: 600; font-size: 11px; line-height: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ps-s b small { color: #7a8ba3; font-weight: 400; font-size: 10px; }
-.ps-bar { height: 3px; border-radius: 2px; background: #1b2639; overflow: hidden; margin-top: 3px; }
+.ps-bar { height: 2px; border-radius: 1px; background: #1b2639; overflow: hidden; margin-top: 1px; }
 .ps-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #3b82f6, #7dd3fc); }
 .ps-bar.core > i { background: linear-gradient(90deg, #16a34a, #4ade80); }
-.ps-note { color: #6f8099; font-size: 10.5px; margin-top: 5px; line-height: 1.4; }
+.ps-note { color: #6f8099; font-size: 10px; margin-top: 3px; line-height: 1.3; }
 .ps-note kbd { padding: 0 4px; border-radius: 3px; background: #1a2740; border: 1px solid #33496d; font: 600 10px 'Segoe UI', sans-serif; color: #e8f0fb; }
-.ps .sgw-btn { margin-top: 6px; padding: 4px 10px; font-size: 11px; border-radius: 6px; align-self: flex-start; }
+.ps .sgw-btn { margin-top: 3px; padding: 0 8px; line-height: 18px; font-size: 10.5px; border-radius: 5px; align-self: flex-start; }
 .ps .sgw-btn:focus-visible { outline: 2px solid #6cc8ff; outline-offset: 1px; }`;
   document.head.appendChild(css);
 }
@@ -53,7 +53,7 @@ export function pilotShipHtml(p: MenuPilotInfo, s: MenuShipInfo | null, dock: st
   const bar = (v: number, max: number, cls = '') => `<div class="ps-bar${cls ? ` ${cls}` : ''}"><i style="width:${pct(v, max).toFixed(0)}%"></i></div>`;
   const rank = p.owner ? ' <small>owner</small>' : p.admin ? ' <small>admin</small>' : '';
   let html = `<div class="ps-h">Pilot <b>${esc(p.name)}${rank}</b></div><div class="ps-grid">
-    ${stat(`Level ${p.level}`, `${p.xp.toLocaleString()} / ${p.xpToNext.toLocaleString()} XP`, bar(p.xp, p.xpToNext), true)}
+    ${stat(`Level ${p.level}`, `${p.xp.toLocaleString()} <small>/ ${p.xpToNext.toLocaleString()} XP</small>`, bar(p.xp, p.xpToNext))}
     ${stat('Credits', p.credits.toLocaleString())}
     ${stat('Location', esc(p.system))}
   </div>`;

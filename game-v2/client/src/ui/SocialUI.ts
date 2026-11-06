@@ -80,25 +80,25 @@ export class SocialUI {
 @keyframes spin { from { transform: translateY(-8px); opacity: 0; } }
 .sp-card b { color: #86efac; }
 .sp-rally { position: fixed; left: 50%; top: calc(50% + 70px); transform: translateX(-50%); display: none; gap: 8px; z-index: 2300; flex-wrap: wrap; justify-content: center; }
-.pw { display: flex; flex-direction: column; gap: 2px; color: #b4c2d4; }
-.pw-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 3px; font: 600 9.5px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #8b9cb3; }
+.pw { display: flex; flex-direction: column; gap: 1px; color: #b4c2d4; font-size: 11px; }
+.pw-h { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px; font: 600 8.5px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.6px; text-transform: uppercase; color: #8b9cb3; }
 .pw-h:first-child { margin-top: 0; }
 .pw-h::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(140, 170, 210, 0.3), transparent); }
 .pw-h b { color: #b4c2d4; font-weight: 600; letter-spacing: 1px; }
-.pw-row { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 4px; background: rgba(3, 6, 12, 0.4); }
+.pw-row { display: flex; align-items: center; gap: 5px; padding: 1px 5px; min-height: 18px; border-radius: 3px; background: rgba(3, 6, 12, 0.4); }
 .pw-row .who { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pw-row .who b { color: #e5ecf7; }
-.pw-row .who div { color: #8394ad; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
-.pw-row .sgw-btn { padding: 1px 8px; font-size: 10.5px; border-radius: 5px; }
-.pw-row .bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.08); margin-top: 3px; overflow: hidden; }
+.pw-row .who div { color: #8394ad; font-size: 9.5px; line-height: 12px; overflow: hidden; text-overflow: ellipsis; }
+.pw-row .sgw-btn { padding: 0 6px; line-height: 14px; font-size: 9.5px; border-radius: 4px; }
+.pw-row .bar { height: 2px; border-radius: 1px; background: rgba(255,255,255,0.08); margin-top: 1px; overflow: hidden; }
 .pw-row .bar i { display: block; height: 100%; background: linear-gradient(90deg, #22c55e, #86efac); }
 .pw-row .bar i.low { background: linear-gradient(90deg, #dc2626, #f97316); }
-.pw-inv { display: flex; gap: 5px; margin: 6px 0 2px; }
-.pw-inv input { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px; border-radius: 6px; }
-.pw-inv .sgw-btn { padding: 3px 10px; font-size: 11px; border-radius: 6px; }
-.pw-empty { color: #8b9cb3; font-size: 11px; padding: 2px; }
-.pw details { margin-top: 6px; font-size: 11px; }
-.pw summary { cursor: pointer; color: #8b9cb3; font-size: 10.5px; }
+.pw-inv { display: flex; gap: 4px; margin: 3px 0 1px; }
+.pw-inv input { flex: 1; min-width: 0; padding: 1px 6px; font-size: 11px; border-radius: 5px; }
+.pw-inv .sgw-btn { padding: 0 8px; line-height: 18px; font-size: 10.5px; border-radius: 5px; }
+.pw-empty { color: #8b9cb3; font-size: 10.5px; padding: 1px 2px; }
+.pw details { margin-top: 3px; font-size: 10.5px; }
+.pw summary { cursor: pointer; color: #8b9cb3; font-size: 10px; }
 .pw summary:hover { color: #e5ecf7; }
 .pw-perks { margin: 4px 0 0; padding-left: 16px; color: #a9b6c9; line-height: 1.45; font-size: 11px; }
 .pw-perks b { color: #86efac; font-weight: 600; }
@@ -329,7 +329,7 @@ export class SocialUI {
     root.appendChild(inv);
     if (this.inParty()) {
       const leave = btn('Leave party', '', () => this.d.send({ type: 'partyLeave' }));
-      leave.style.cssText = 'align-self: flex-start; padding: 2px 10px; font-size: 11px; border-radius: 6px; margin-top: 2px;';
+      leave.style.cssText = 'align-self: flex-start; padding: 0 8px; line-height: 16px; font-size: 10px; border-radius: 5px; margin-top: 1px;';
       root.appendChild(leave);
     }
     // Pilots nearby

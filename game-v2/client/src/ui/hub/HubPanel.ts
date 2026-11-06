@@ -20,8 +20,8 @@ import { loadFolded, loadHeight, loadTab, saveFolded, saveHeight, saveTab } from
 import { HubTabs, type HubTab } from './hubTabs';
 
 /** The body's height until the pilot drags it, and the least worth showing */
-const DEFAULT_BODY = 240;
-const MIN_BODY = 96;
+const DEFAULT_BODY = 200;
+const MIN_BODY = 80;
 const GAP = 8;
 
 /** Where it may be: `off` never (signed out, the menu, the map); `covered` only if called up (docked, the hangar, no ship); `on` */
@@ -69,21 +69,21 @@ function injectStyles(): void {
 .hub-grip::after { content: ''; position: absolute; left: 50%; top: 3px; width: 34px; margin-left: -17px; height: 2px; border-radius: 1px; background: rgba(125, 160, 210, 0); transition: background .15s; }
 .hub:hover .hub-grip::after, .hub-grip.drag::after { background: rgba(125, 160, 210, 0.45); }
 .hub.folded .hub-grip { display: none; }
-.hub-bar { display: flex; align-items: stretch; gap: 2px; padding: 4px 4px 0; border-bottom: 1px solid rgba(140, 170, 220, 0.16);
+.hub-bar { display: flex; align-items: stretch; gap: 1px; padding: 2px 3px 0; border-bottom: 1px solid rgba(140, 170, 220, 0.16);
   background: rgba(3, 6, 12, 0.28); border-radius: 9px 9px 0 0; }
-.hub.folded .hub-bar { border-bottom-color: transparent; padding-bottom: 4px; border-radius: 9px; }
-.hub-tab { all: unset; box-sizing: border-box; flex: 1 1 auto; min-width: 0; cursor: pointer; text-align: center; padding: 6px 5px 5px;
+.hub.folded .hub-bar { border-bottom-color: transparent; padding-bottom: 2px; border-radius: 9px; }
+.hub-tab { all: unset; box-sizing: border-box; flex: 1 1 auto; min-width: 0; cursor: pointer; text-align: center; padding: 3px 4px 2px;
   border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font: 700 9.5px 'Segoe UI', sans-serif; letter-spacing: 1.4px; text-transform: uppercase; color: #8394ad; }
+  font: 700 9px/13px 'Segoe UI', sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: #8394ad; }
 .hub-tab:hover { color: #e5ecf7; background: rgba(125, 211, 252, 0.06); }
 .hub-tab[aria-selected="true"] { color: #e8f6ff; border-bottom-color: #6cc8ff; background: rgba(108, 200, 255, 0.09); }
 .hub.folded .hub-tab[aria-selected="true"] { border-bottom-color: transparent; border-radius: 6px; margin-bottom: 0; }
 .hub-tab .badge { display: inline-block; margin-left: 4px; min-width: 13px; padding: 0 3px; border-radius: 7px; box-sizing: border-box;
-  background: rgba(251, 191, 36, 0.18); color: #fcd34d; font-size: 9px; letter-spacing: 0; line-height: 13px; }
+  background: rgba(251, 191, 36, 0.18); color: #fcd34d; font-size: 8.5px; letter-spacing: 0; line-height: 12px; }
 .hub-fold { all: unset; cursor: pointer; flex: 0 0 22px; text-align: center; color: #56657c; font-size: 10px; border-radius: 6px; }
 .hub-fold:hover { color: #c9d4e5; background: rgba(125, 211, 252, 0.06); }
 .hub-tab:focus-visible, .hub-fold:focus-visible { outline: 2px solid #6cc8ff; outline-offset: -2px; color: #fff; }
-.hub-body { overflow-y: auto; padding: 6px 8px 8px; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(125, 160, 210, 0.35) transparent; }
+.hub-body { overflow-y: auto; padding: 4px 6px 5px; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(125, 160, 210, 0.35) transparent; }
 .hub-body::-webkit-scrollbar { width: 6px; }
 .hub-body::-webkit-scrollbar-thumb { background: rgba(125, 160, 210, 0.35); border-radius: 3px; }
 .hub-body.fill { overflow: hidden; padding: 0; display: flex; flex-direction: column; }
