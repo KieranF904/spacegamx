@@ -1,6 +1,8 @@
 /**
  * BodyNet on its own (CAPS.BODIES): a boss let go is forgotten at once, even with no capable client to notice its ship
- * is gone, and its id reused by another ship is never synced as it.
+ * is gone, and its id reused by another ship is never synced as it. A move shell fired in the window its ship went in is
+ * the client's own (it ran the body through that window), not a row as well; a boss put right by a check that the client
+ * can't run at its next snapshot is stopped with an OFF, not left running there while its rows come too.
  */
 import { describe, it, expect } from 'vitest';
 import { DECISION, syncArgs, wantFly, orderEngage, bodyKindOf, type BodyState, type FlightBody } from '@space-game/common';
@@ -62,5 +64,47 @@ describe('BodyNet', () => {
     view.add(6);
     tick += 3;
     expect(rows().some((r) => r[0] === 5 && r[2] === DECISION.SYNC)).toBe(true);
+  });
+
+  it("a boss shot down: the move shells it fired in that last window are the client's own, not rows as well", () => {
+    const { n, live, rows, step } = net();
+    const s = state(true);
+    n.decide(5, DECISION.SYNC, syncArgs(s), s);
+    const conn = {};
+    expect(rows(conn).some((r) => r[0] === 5 && r[2] === DECISION.SYNC)).toBe(true);
+    for (let i = 0; i < 3; i++) step();
+    rows(conn);
+    // (a shot of its move, then its ship gone before the next snapshot: the client works that window out, its removal after)
+    step();
+    n.moveShell(900, 5, { t: 104, who: -1 });
+    step();
+    live.delete(5);
+    step();
+    rows(conn);
+    expect(n.shellDerived(conn, 7, 900, false)).toBe(true);
+    // (one fired before it began running it is still a row)
+    n.moveShell(901, 5, { t: 99, who: -1 });
+    expect(n.shellDerived(conn, 7, 901, false)).toBe(false);
+  });
+
+  it("a boss put right by a check that it can't run at its next snapshot: an OFF, not left running there", () => {
+    const { n, rows, step } = net();
+    const s = state(true);
+    n.decide(5, DECISION.SYNC, syncArgs(s), s);
+    const conn = {};
+    rows(conn);
+    step();
+    expect(n.runs(conn, 5)).toBe(true);
+    n.resync(conn);
+    step();
+    // (out of its view now: it can't run it)
+    expect(n.forClient(conn, 7, () => 1, 1, new Map([[5, 1], [7, 1]]), 102, (e) => e !== 5)).toEqual([[5, 0, DECISION.OFF]]);
+    expect(n.runs(conn, 5)).toBe(false);
+    // (back in its view: synced again; put right while it can run it, synced again at once)
+    expect(rows(conn).some((r) => r[0] === 5 && r[2] === DECISION.SYNC)).toBe(true);
+    step();
+    n.resync(conn);
+    expect(rows(conn).some((r) => r[0] === 5 && r[2] === DECISION.SYNC)).toBe(true);
+    expect(n.runs(conn, 5)).toBe(true);
   });
 });

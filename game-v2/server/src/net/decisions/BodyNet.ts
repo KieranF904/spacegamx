@@ -44,6 +44,18 @@ interface Boss {
 interface Client {
   /** Bosses it runs (synced, and not stopped since) */
   runs: Set<number>;
+  /**
+   * Bosses it ran till a check put them right (check, resync): synced again at its next snapshot if it can run them
+   * then, else stopped there with an OFF (it runs them still till it's told: without one it went on working their moves
+   * out while their rows came too, every move shell drawn twice)
+   */
+  again: Set<number>;
+  /**
+   * Bosses it ran whose ships went (shot down, removed), by the snapshot tick they went at: it ran them through that
+   * snapshot's window (the removal comes after it works the window's moves out), so their move shells of the window
+   * are its own, not rows (shellDerived)
+   */
+  ended: Map<number, number>;
   /** The tick each was synced at (CAPS.MOVES: a move it works out is one decided after it) */
   since: Map<number, number>;
   /** The move shells it made itself (it works out the moves of the bodies it runs, CAPS.MOVES: no rows of them) */
@@ -87,7 +99,7 @@ export class BodyNet {
 
   private client(conn: object): Client {
     let c = this.clients.get(conn);
-    if (!c) this.clients.set(conn, (c = { runs: new Set(), since: new Map(), derived: new Set(), through: -Infinity, from: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
+    if (!c) this.clients.set(conn, (c = { runs: new Set(), again: new Set(), ended: new Map(), since: new Map(), derived: new Set(), through: -Infinity, from: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
     return c;
   }
 
@@ -99,7 +111,8 @@ export class BodyNet {
    */
   derives(conn: object, self: number, eid: number, origin: MoveOrigin): boolean {
     const c = this.clients.get(conn);
-    if (!c || !c.runs.has(eid) || (origin.who >= 0 && origin.who !== self)) return false;
+    if (!c || (origin.who >= 0 && origin.who !== self)) return false;
+    if (!c.runs.has(eid) && !(origin.t <= (c.ended.get(eid) ?? -Infinity))) return false;
     return origin.t > (c.since.get(eid) ?? Infinity);
   }
 
@@ -153,10 +166,10 @@ export class BodyNet {
     // body reading it would fly blind from this tick: off now, with a keyframe, not a keyframe every snapshot it stays out)
     const holds = (id: number) => id === self || view(id);
     for (const [eid, b] of this.bosses) {
-      if (!this.host.has(eid)) { this.bosses.delete(eid); c.runs.delete(eid); continue; }
+      if (!this.host.has(eid)) { this.bosses.delete(eid); if (c.runs.delete(eid)) c.ended.set(eid, tick); continue; }
       const s = b.state, kind = BODY_KINDS[s.kind];
-      const runs = c.runs.has(eid);
-      if (!runs && (!s.on || systemOf(eid) !== systemId)) continue;
+      const runs = c.runs.has(eid), again = c.again.has(eid);
+      if (!runs && !again && (!s.on || systemOf(eid) !== systemId)) continue;
       // (Every ship its body reads held: its target, a pack's other ships)
       const reads = kind?.reads(eid, s) ?? [];
       // (A pack's ship it reads shot down while it runs it: what it made of it this window was off, so it goes again with
@@ -184,13 +197,15 @@ export class BodyNet {
           if (d[0] > tick) break;
           rows.push([eid, d[0] - tick, ...d.slice(1)]);
         }
-      } else if (runs) {
+      } else if (runs || again) {
         rows.push([eid, 0, DECISION.OFF]);
         c.runs.delete(eid);
         this.stats.offs++;
       }
     }
-    for (const eid of c.runs) if (!this.bosses.has(eid)) c.runs.delete(eid);
+    for (const eid of c.runs) if (!this.bosses.has(eid)) { c.runs.delete(eid); c.ended.set(eid, tick); }
+    c.again.clear();
+    for (const [eid, t] of c.ended) if (t < tick - KEEP_TICKS) c.ended.delete(eid);
     c.from = c.through;
     c.through = tick;
     this.stats.rows += rows.length;
@@ -237,12 +252,19 @@ export class BodyNet {
     if (want === (chk.hash & 0xff)) { this.stats.agreed++; return; }
     this.stats.off++;
     c.fixedAt = this.host.tick();
-    c.runs.clear();
+    this.again(c);
   }
 
   /** Every boss it runs synced again with its next snapshot */
   resync(conn: object): void {
-    this.clients.get(conn)?.runs.clear();
+    const c = this.clients.get(conn);
+    if (c) this.again(c);
+  }
+
+  /** Every boss it runs to be synced again at its next snapshot, or stopped there (an OFF) if it can't run it then */
+  private again(c: Client): void {
+    for (const eid of c.runs) c.again.add(eid);
+    c.runs.clear();
   }
 
 }
