@@ -13,6 +13,7 @@ import type { FlightCtx } from './features/types.js';
 import type { FlightEntry } from './features/plan.js';
 import { getPlan } from './features/plan.js';
 import { dhypot, dlog2, dpow, dsincos } from '../math/detTrig.js';
+import { quantizeCursorAngle, dequantizeCursorAngle } from '../network/cursorState.js';
 
 // (dsincos's result, reused: the flight step allocates nothing for its trig)
 const SC: [number, number] = [0, 0];
@@ -26,6 +27,13 @@ export interface FlightBody {
   jump?: number;
   /** This jump's burn as a fraction of a full-power one (set when the burn starts: jumpBurnSpeed) */
   jumpScale?: number;
+  /**
+   * The jump's destination, locked as its charge starts (Kieran, 2026-11-07: "it should jump to wherever my cursor was
+   * when i initiated it"): the heading it goes along (the aim then; at the helm, the nose) and the distance asked
+   * (the input's jumpDist then: below 0 not known, a replica's). Set only while charging; absent: none
+   */
+  jumpAim?: number;
+  jumpTo?: number;
   /** A replica's stillstone priming (jumpFields.ts stepPrime), as replicaStep keeps it: carried, not sent; absent = 0 (sim/step.ts) */
   jumpPrime?: number;
   /** Mass of the cargo in the hold (load.ts): carried, not stepped; absent = 0 */
@@ -140,8 +148,12 @@ export interface FlightResult {
  * for a fixed, short burn (a longer jump just goes faster), then the drive
  * cools down. The charge waits on its last tick until the nose is within
  * JUMP_ALIGN of the aim (jumpAimed), and the burn then goes exactly along the
- * aim. The burn ends at exitSpeed (0: dead still, right where it was aimed;
- * above 0 the ship coasts the rest, jumpCoast). Its whole state is one integer
+ * aim. The aim and distance are the ones the charge started with (FlightBody
+ * jumpAim/jumpTo, locked on its first tick): the ship turns to that heading
+ * while it charges, whatever the cursor (or, at the helm, the turn keys) does
+ * since; letting go (a cancel) and starting again locks anew. The burn ends
+ * at exitSpeed (0: dead still, right where it was aimed; above 0 the ship
+ * coasts the rest, jumpCoast). Its whole state is one integer
  * counter, so it rides in snapshots and prediction replays it exactly.
  *
  * The charge is the same for every jump, however far it is aimed (Kieran,
@@ -313,6 +325,20 @@ export function noseFrame(input: { helm?: boolean; strafeLeft?: boolean; strafeR
 /** Is the ship pointed for a jump: helm (the nose is the aim), or the nose within JUMP_ALIGN of the aim */
 export function jumpAimed(body: { angle: number }, input: { helm?: boolean; targetAngle: number }): boolean {
   return !!input.helm || Math.abs(wrapAngle(input.targetAngle - body.angle)) <= JUMP_ALIGN;
+}
+
+/**
+ * A helm jump's locked heading: its nose, on the aim grid every steering aim is on (sim/input.ts simAim(simAimQ(a)),
+ * written out here: input.ts is in this file's import cycle)
+ */
+export function helmJumpAim(angle: number): number {
+  const q = quantizeCursorAngle(angle);
+  return Math.fround(dequantizeCursorAngle(q === 0 && angle > Math.PI ? 8191 : q));
+}
+
+/** Is the nose within JUMP_ALIGN of a locked jump's heading (FlightBody.jumpAim: helm or not, the ship turns to it) */
+export function jumpAimedAt(body: { angle: number }, aim: number): boolean {
+  return Math.abs(wrapAngle(aim - body.angle)) <= JUMP_ALIGN;
 }
 
 /** Is (x, y) inside a system's charging ring (stars and pulsars; black holes have none) */
@@ -537,28 +563,43 @@ export function stepFlight(
   const prev = body.jump ?? 0;
   const cargo = body.cargo ?? 0;
   const burnAt = jumpBurnAt(jt);
+  // (Charging since an earlier tick, its destination locked as it started (FlightBody.jumpAim/jumpTo): the aim and the
+  // distance now change nothing of it. A charge with no lock (a body from before there were locks) flies the live aim)
+  const wasCharging = prev > 0 && prev < burnAt;
+  const locked = wasCharging && body.jumpAim !== undefined;
   // How far this jump goes (where you aimed, within the drive's reach); every jump charges the same (jumpChargeNeed)
   // (A replica's jumpDist is below 0: where it lands isn't known, so its charge waits for the burn's keyframe)
   let go = 0, need = jt.chargeTicks;
-  if (prev > 0 && prev < burnAt) {
-    go = jumpGoFor(input.jumpDist, jumpReachAt(d, jt, k.jumpBoost, k.hazard), jt);
+  if (wasCharging) {
+    go = jumpGoFor(locked ? body.jumpTo : input.jumpDist, jumpReachAt(d, jt, k.jumpBoost, k.hazard), jt);
     need = jumpChargeNeed(go, jt);
   }
-  const j = stepJump(prev, !!input.jump && d.mass > 0, jt, !jumpAimed(body, input), need);
-  // (The held aim, sim/aimHold.ts: would it do the same? Not at the helm, where the aim steers nothing. Charging, the
-  // drive waits on the nose being aimed: the same only if it is aimed, or not, either way; the burn goes along the aim)
+  const j = stepJump(prev, !!input.jump && d.mass > 0, jt, locked ? !jumpAimedAt(body, body.jumpAim!) : !jumpAimed(body, input), need);
+  // (The held aim, sim/aimHold.ts: would it do the same? Not at the helm, where the aim steers nothing. A charge starting
+  // locks the aim (mouse-steer): it differs. Charging unlocked, the drive waits on the nose being aimed: the same only if
+  // it is aimed, or not, either way; the burn goes along the aim. Locked, the aim does nothing to the jump)
   const held = input.heldAngle;
   let same = true;
   const ask = held !== undefined && held !== input.targetAngle && !input.helm;
-  if (ask && prev > 0 && prev < burnAt && (Math.abs(wrapAngle(held - body.angle)) <= JUMP_ALIGN) !== jumpAimed(body, input)) same = false;
+  if (ask && !locked && prev > 0 && prev < burnAt && (Math.abs(wrapAngle(held - body.angle)) <= JUMP_ALIGN) !== jumpAimed(body, input)) same = false;
   body.jump = j;
-  // The burn starts: fix how far this jump goes, and along the aim itself
-  // (the nose is within JUMP_ALIGN of it: the last of the turn is taken in the launch flash)
-  if (j === burnAt && prev > 0 && prev < burnAt) {
-    if (!input.helm) body.angle = wrapAngle(input.targetAngle);
+  if (prev <= 0 && j > 0) {
+    // The charge starts: lock where it goes (the aim, or at the helm the nose put on the aim grid as an aim is, so a
+    // keyframe carries either as its aim step: replication.ts packKeyframe; and the distance asked)
+    body.jumpAim = input.helm ? helmJumpAim(body.angle) : input.targetAngle;
+    body.jumpTo = input.jumpDist ?? 0;
     if (ask) same = false;
+  }
+  // The burn starts: fix how far this jump goes, and along the aim itself (locked: the heading the charge started with)
+  // (the nose is within JUMP_ALIGN of it: the last of the turn is taken in the launch flash)
+  if (j === burnAt && wasCharging) {
+    if (locked) body.angle = wrapAngle(body.jumpAim!);
+    else if (!input.helm) body.angle = wrapAngle(input.targetAngle);
+    if (ask && !locked) same = false;
     body.jumpScale = jumpScaleFor(go, jt, k.friction);
   }
+  // (The lock lasts the charge: gone once it burns or is let go)
+  if ((j <= 0 || j >= burnAt) && body.jumpAim !== undefined) body.jumpAim = body.jumpTo = undefined;
   const jp = jumpPhase(j, jt).phase;
   if (jp === 'burn') {
     const speed = jumpBurnSpeed(j - burnAt, jt, body.jumpScale ?? 1);
@@ -573,13 +614,19 @@ export function stepFlight(
   const charging = jp === 'charging';
 
   // --- Rotation, angular acceleration capped by torque / inertia.
-  // Mouse-steer: spin towards the aim angle, braking in time (steerSpin). Helm: chase ±maxAngularSpeed (or stop) from the turn keys.
+  // Mouse-steer: spin towards the aim angle (a charging jump, mouse or helm: its locked heading), braking in time (steerSpin). Helm: chase ±maxAngularSpeed (or stop) from the turn keys.
   if (d.inertia > 0) {
     // (The caps, cut by hazards: a positive alpha turns cw)
     const tk = turnScale(d, cargo) * (k.hazard?.control ?? 1);
     const maxCw = d.maxTorque.cw * tk, maxCcw = d.maxTorque.ccw * tk;
     let alpha: number;
-    if (input.helm) {
+    // (A charge's locked heading, FlightBody.jumpAim: turned to as the mouse steers, helm or not; the aim plays no part)
+    const lockAim = charging ? body.jumpAim : undefined;
+    if (lockAim !== undefined) {
+      const err = wrapAngle(lockAim - body.angle);
+      const boss = !!d.turn;
+      alpha = steerSpin(err, err > 0 ? maxCcw : maxCw, boss ? ft.bossMaxAngularSpeed : ft.maxAngularSpeed, boss ? ft.bossTurnGain : ft.turnGain, ft.turnBrakeMargin) - body.angVel;
+    } else if (input.helm) {
       const turn = (input.right ? 1 : 0) - (input.left ? 1 : 0);
       alpha = ft.helmTurnGain * (turn * ft.maxAngularSpeed - body.angVel);
     } else {

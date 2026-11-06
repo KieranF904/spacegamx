@@ -186,6 +186,8 @@ export function ownBodyHash(b: FlightBody, bits: number, aimQ: number): number {
   h = mix(h, q(b.vx, SHIP_PRECISION.vel)); h = mix(h, q(b.vy, SHIP_PRECISION.vel));
   h = mix(h, q(b.angle, SHIP_PRECISION.angle)); h = mix(h, q(b.angVel, SHIP_PRECISION.angVel));
   h = mix(h, b.jump ?? 0); h = mix(h, q(b.jumpScale ?? 1, 4)); h = mix(h, q(b.cargo ?? 0, 2)); h = mix(h, (b.dodge ?? 0) * 16 + (b.dodgeDir ?? 0));
+  // (A charging jump's lock, while it has one: flight.ts FlightBody.jumpAim)
+  if (b.jumpAim !== undefined) { h = mix(h, q(b.jumpAim, SHIP_PRECISION.angle)); h = mix(h, Math.round(b.jumpTo ?? 0)); }
   h = mix(h, bits); h = mix(h, aimQ);
   h ^= h >>> 15;
   h = Math.imul(h, 0x2c1b3c6d);

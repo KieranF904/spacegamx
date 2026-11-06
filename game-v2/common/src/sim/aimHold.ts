@@ -7,7 +7,8 @@
  *   - the flight (ships/flight.ts stepFlight, FlightResult.aimHeld): the same spin out of the turn (steerSpin's ask,
  *     then the torque caps: flat out, or held to the torque either way, a different aim turns the same), the same jump
  *     counter (charging, the drive waits on the nose being aimed: aimed either way, or not), no burn starting along the
- *     aim; at the helm the aim steers nothing;
+ *     aim; at the helm the aim steers nothing. A jump's charge starting takes the aim (it locks it: flight.ts
+ *     FlightBody.jumpAim); from then till the burn the jump flies its lock, so the aim moving is held all through it;
  *   - the guns (ships/guns.ts stepGuns, GunOrders.heldAim, GunStep.aimHeld): every turret's and fixed gun's aim
  *     (its offset and whether it may fire) the same, on any tick the trigger is down, held or let go, a semi-automatic
  *     click is waiting, or anything fires. Idle, a turret's look is drawing only (nothing carries from it to the next

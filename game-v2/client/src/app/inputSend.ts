@@ -135,11 +135,17 @@ export function tickInput(s: InputSendCtx): void {
   // A menu jump: its mark, wherever the cursor is
   const inputEnabled = (s.proto?.inputEnabled?.() ?? true) && !s.shipClient.hangarOpen && !s.menu.isOpen && !s.adminPanel?.capturesFlight;
   const order = inputEnabled ? s.context.flight() : null;
+  // (A charge under way: where it goes was locked as it started (common flight.ts FlightBody.jumpAim/jumpTo), so the
+  // map and the overlay show that, and the cursor is the cursor again: nothing it does moves the jump)
+  const locked = s.loggedIn ? s.shipClient.jumpLocked?.() ?? null : null;
   if (order) {
     rawAngle = order.angle;
     aimDist = order.dist;
     s.shipClient.setJumpAim(aimDist, null);
     s.systemMapUI.jumpAim = { angle: rawAngle, dist: aimDist, label: null };
+  } else if (locked) {
+    s.shipClient.setJumpAim(locked.dist, locked.label);
+    s.systemMapUI.jumpAim = { angle: locked.angle, dist: locked.dist, label: locked.label };
   } else if (s.loggedIn && s.shipClient.jumpAiming()) {
     // Exactly where the cursor is (Kieran, 2026-11-06: no snapping in flight). On the system map, a marker under the map's
     // cursor is the target (jumpLock): just short of it

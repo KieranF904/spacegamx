@@ -81,6 +81,9 @@ export interface InterpolatedEntity {
   jump?: number;
   /** This jump's speed scale (local player; server data[PILOT_ROW.jumpScale] / 1000) */
   jumpScale?: number;
+  /** A charging jump's locked heading and distance (local player, its tick layer's: common flight.ts FlightBody.jumpAim/jumpTo) */
+  jumpAim?: number;
+  jumpTo?: number;
   /** A lodestone's priming left, ticks (local player; server data[PILOT_ROW.prime], then predicted) */
   jumpPrime?: number;
   /** Knocked out by an EMP until this tick (local player; the snapshot's tick + server data[5]): prediction drifts till then */
@@ -673,7 +676,7 @@ export class GameState {
   private takeOwn(player: InterpolatedEntity, st: OwnStepped): void {
     const b = st.body;
     player.x = b.x; player.y = b.y; player.vx = b.vx; player.vy = b.vy; player.angle = b.angle; player.angVel = b.angVel;
-    player.jump = b.jump ?? 0; player.jumpScale = b.jumpScale; player.dodge = b.dodge ?? 0; player.dodgeDir = b.dodgeDir ?? 0;
+    player.jump = b.jump ?? 0; player.jumpScale = b.jumpScale; player.jumpAim = b.jumpAim; player.jumpTo = b.jumpTo; player.dodge = b.dodge ?? 0; player.dodgeDir = b.dodgeDir ?? 0;
     player.jumpPrime = st.jumpPrime;
     if (st.charge) {
       this.charge = st.charge;

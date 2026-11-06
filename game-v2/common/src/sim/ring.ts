@@ -5,7 +5,7 @@
  *
  * ## Hashed (shipHash), exactly: every number's float64 bits (-0 as 0), in this order
  * id, mode, structure.version; body x, y, vx, vy, angle, angVel, jump, jumpScale (absent: 1), cargo, dodge,
- * dodgeDir; ctl.bits, ctl.q; jumpPrime; hazard empUntil, slowUntil, numb; accounted; when accounted the charge
+ * dodgeDir, and while a charge has its lock jumpAim, jumpTo (absent: neither); ctl.bits, ctl.q; jumpPrime; hazard empUntil, slowUntil, numb; accounted; when accounted the charge
  * (g, b[], eng[], gun[], and a ports ship's held/amt/closed/aug/flags/mat/sat, shieldSat, gauge); guns cooldown[],
  * rounds[], reload[], charge[], spin[], aim[], triggerHeld, clickAt, minePaid, mineUntil, mineShare, tow.
  * Not hashed: `structure` itself (only its version), an unaccounted charge (a replica's FULL_CHARGE stand-in).
@@ -51,6 +51,8 @@ export function shipHash(s: Readonly<SimShipState>): number {
   const b = s.body;
   h = num(h, b.x); h = num(h, b.y); h = num(h, b.vx); h = num(h, b.vy); h = num(h, b.angle); h = num(h, b.angVel);
   h = num(h, b.jump ?? 0); h = num(h, b.jumpScale ?? 1); h = num(h, b.cargo ?? 0); h = num(h, b.dodge ?? 0); h = num(h, b.dodgeDir ?? 0);
+  // (A charging jump's locked heading and distance, while it has them: flight.ts FlightBody.jumpAim)
+  if (b.jumpAim !== undefined) { h = num(h, b.jumpAim); h = num(h, b.jumpTo ?? 0); }
   h = num(h, s.ctl.bits); h = num(h, s.ctl.q); h = num(h, s.jumpPrime);
   h = num(h, s.hazard.empUntil); h = num(h, s.hazard.slowUntil); h = num(h, s.hazard.numb);
   h = num(h, s.accounted ? 1 : 0);

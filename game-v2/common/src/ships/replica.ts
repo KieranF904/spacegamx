@@ -85,7 +85,8 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
     jump: (b & CTL.jump) !== 0,
     targetAngle: (b & CTL.hold) !== 0 ? body.angle : c.targetAngle,
     // Where a jump lands isn't replicated: -1, not known, so the charge waits (flight.ts jumpChargeNeed), and the
-    // burn's start brings a keyframe
+    // burn's start brings a keyframe. (The charge's lock, flight.ts FlightBody.jumpAim/jumpTo, is the replica's own,
+    // taken on its first charging tick: its heading as the pilot's, its distance -1; a keyframe mid-charge carries both)
     jumpDist: -1,
   };
   // (Part features' held inputs from their control bits: the Burst Strafer's dodge)
