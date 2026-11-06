@@ -76,7 +76,7 @@ export class BodyRunner {
 
   /**
    * Flown here from its decisions and its hits found here (an AI pilot, a custom enemy: not a boss, whose hits are
-   * told): the client can step it ahead of the last snapshot (the dev prediction modes C1-C3, client dev/predict)
+   * told): the client can step it ahead of the last snapshot (the PT layer's 'ai' kind, client predict/kinds.ts; mode C1)
    */
   ahead(id: number): boolean {
     const run = this.runs.get(id);

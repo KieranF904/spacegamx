@@ -258,7 +258,7 @@ export class GameState {
   public preSnapshot: ((snapshot: ServerSnapshotMessage) => EntityState[]) | null = null;
   /** ...and each frame, every other ship is placed by its replica (true = placed) */
   public replicaPose: ((entity: InterpolatedEntity, renderTick: number) => boolean) | null = null;
-  /** The prediction-mode hook (state/drawMode.ts): null is mode A, today's drawing; only the dev Sim tools set it */
+  /** The prediction-mode hook (state/drawMode.ts): the game's prediction sets C3's (predict/Prediction.ts); null is mode A, the interpolated drawing */
   public drawMode: DrawModeHook | null = null;
   public playerName: string = '';
   public hp: number = PLAYER_MAX_HP;

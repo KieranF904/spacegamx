@@ -48,6 +48,7 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | common/src/ships/contactPass.ts, client/src/ships/causes/ContactWorld.ts | ~70 / ~270 | contacts on the tick layer (CAPS.CONTACTS): the pass's candidate pairs and order (`contactCandidates`, by id), shared with the server's pass; the client's per-tick pairs among the ships it holds in step, merged into each ship's causes by their place in the pass |
 | server/src/net/causes/contactLog.ts, contactsFor.ts | ~60 / ~110 | contacts on the tick layer, the server side: each tick's pass as a client needs it (`ContactLog`, noted by `resolveContacts`), and per client and window which contacts it finds itself and which ships it must leave out (`contactWindow`, Replication `found`) |
 | common/src/ships/debrisLife.ts, client/src/ships/debris/DebrisLives.ts | 45 / 154 | a piece's life after its spawn (CAPS.DEBRIS): crumble ticks fixed at the spawn (`debrisDecay`), each crumble's rebuild (`crumbleRebuild`); the client side runs the pieces it was given (`l`): structures by tick, recentring, crumble effects, splits from the pre-recentre body |
+| client/src/predict/ (ptst.ts, contacts.ts, kinds.ts, world.ts, modes.ts, Prediction.ts) | ~430 / ~170 / ~80 / ~120 / ~130 / ~90 | the prediction of other ships (C3, the default in every build): the PT/ST layer (`PtStLayer`: PT ring, ST check by hash, one re-step per miss, the touch register, the ease, `PtTrack` plug-ins), the PT contact pass (`RealContacts`: the server's pass on predicted ticks; `CircleContacts` for fake tests), the ship kinds and the level of detail (`PT_KINDS`, `registerPtKind`, `PT_TUNING`), the adapter over the tick layer (`ReplicaPtWorld` over a `PtHost`: the game or the crowd probe), the mode registry (A/B/C1/C2/C3, `DEFAULT_MODE`) and the controller Game.ts makes (`Prediction`, installs the mode's `GameState.drawMode` hook) |
 
 ## Public interface
 - Types: `ClientMessage`, `ServerMessage`, `EntityState`, `EntityType`, `ServerSnapshotMessage`, `ClientInputMessage`.
@@ -378,6 +379,57 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
   hits told (`conn.ownWindow`, OwnShells `keyed`). Every client holding its own ship gets a snapshot at least about once
   a second for the head hash, in the HUD numbers' round (`HEAD_HASH_TICKS`). Parity: server/src/golden/parity.test.ts
   (server vs the own step, the correction), common/src/sim/a-callers.test.ts, server/src/net/own/ownSim.test.ts.
+- **Other ships: the PT/ST layer (prediction C3, the default since the C3 rollout)**: every ship the client holds on
+  its tick layer is predicted to your own predicted tick and drawn where your shells meet it. Code: client/src/predict/.
+  - *PT*: each ship stepped once a tick, to `GameState.predictedTick`, in the layer's own StateRing, by its kind
+    (predict/kinds.ts `PT_KINDS`, first claim wins): `ai` (BodyRunner.ahead: AI pilots, custom enemies) read off the
+    replica layer stepped ahead on its decisions, never pushed in PT; `pilot` (replica mode Player) and `rows`
+    (dummies, haulers, anything on control rows) on held last input (common CtlChangeInputs 'assumed', stepped with
+    `ShipReplicaSet.stepAlone` = replicaStep). Then the tick's contact pass over the PT states plus your own ship as a
+    fixed body (it pushes, PT never moves it): predict/contacts.ts `RealContacts`, the server's resolveContacts
+    (contactPairs through a ContactPairCache, pairs in the pass's order, contactPieces/contactPair, big bodies' near
+    pieces, every pushed body rounded): with the same states before it, the same states after
+    (server/src/net/causes/ptContacts.test.ts: perfect inputs, a grinding pack, 0 of 2880 ship-ticks off; 2708 off
+    without the pass). Each tick's pairs are found once; a re-step finds the ticks it steps again (dropFrom).
+  - *ST*: the replica layer at the confirmed tick (`GameState.serverTick`). Confirmed ticks keep their own pairs,
+    found once a tick by ContactWorld (CAPS.CONTACTS); PT never feeds the tick layer. ContactWorld finds no pairs past
+    the newest snapshot (a ship stepped there, an AI stepped ahead for PT, is stepped again from the window at the next
+    snapshot's begin): before the C3 rollout every AI stepped ahead found pairs on unfinished ticks, stepping every
+    held ship there (crowd ball 100: probe tick layer 9.9 -> 2.8 ms a tick, PT 3.4 -> 0.7 ms).
+  - *Check*: each time the confirmed tick C moves, every ship's `shipHash(ST(C))` against the PT(C) it recorded. A
+    match costs nothing. A miss re-steps that ship once from ST(C) to the PT head; the touch register (the PT steps'
+    contact events in (C, head]) adds every ship it touched, and a ship the re-stepped path newly reaches joins at that
+    tick. The drawn pose eases from the old PT to the new over 150 ms (`lerpMs`); a correction of 400 units or more
+    (`PT_SNAP_DIST`: a respawn, a teleport, a blink) snaps.
+  - *Coming and going*: the layer's ship list is re-read on every advance and confirm (`ReplicaPtWorld.ships`: held,
+    flown, with structure, not your own, not a boss whose hits are told). A ship new to it (into view or a focus cell,
+    a late joiner, back from away with its keyframe, a respawn under a new id) starts from its ST at the confirmed tick
+    and is stepped alone to the head; one gone from the list (out of view, removed, docked, debris) drops its PT. A
+    confirmed tick that falls far behind the layer's (a reconnect) starts the layer over.
+  - *Level of detail*: ships further than `PT_TUNING.reach` (6 km) from your ship at the confirmed tick stay on the
+    plain view (interpolated at the render tick, the replica layer's pose); one on PT leaves past 1.15 x that; at most
+    `PT_TUNING.maxShips` (48) on PT, nearest first (one already on PT counts 1.15 x nearer); a ship going onto PT or off
+    it eases between its interpolated and PT poses over 250 ms (modes.ts `PT_SWITCH_MS`). Cost: crowd bench `--pt-reach 1e9` lifts it (numbers in the C3
+    rollout section of the sim-foundation plan; the probe reports "probe PT").
+  - *Drawing*: the hook (`GameState.drawMode`, state/drawMode.ts) is the only thing in the hot paths: `frame` checks
+    and advances the layer before ships are placed, `placed` puts a PT ship at its PT pose (plus the ease) at
+    ownDraw - its kind's `drawBack` (a pilot 0.5 tick behind your shells, anyone else AHEAD_BACK: where the collision
+    step meets it, sim/timeline.ts hitStateTick), and `shot` draws that ship's shells on the same tick (WeaponFx
+    timeline), yours at your own draw tick. Bosses (told hits), debris and ships out of reach keep the render tick.
+  - *Plugging in* (the other tracks: pulls, other ships' shells, mobs and boss attacks, own-shot hit matching): a new
+    kind of ship registers with `registerPtKind` (its claim, step, pushable, drawBack); anything else on the predicted
+    timeline adds a `PtTrack` (`PtStLayer.addTrack`: told `stepped(t, layer, group)` after each tick's ships and
+    contacts, `restepped(c, ids)` after a re-step, `reset()`), and keeps its own state, hash and ease. Contacts stay
+    the world's (`PtStWorld.contacts`).
+  - *Modes*: C3 is `DEFAULT_MODE` (predict/modes.ts), installed by `Prediction` in Game.ts whenever prediction is on
+    (not proto), in dev and production builds. A (interpolated), B (prediction off), C1 (AI ahead) and C2 (no touch
+    register) are dev-only alternatives, switched live from F7 (docs/areas/ops-tools.md "Prediction modes").
+  - *Not predicted (open)*: your own ship's contacts past the newest snapshot (OwnTick finds none there; it pushes PT
+    ships as a fixed body), contact damage and the rebuild it brings (a hard ram is a correction), AI pushed by a
+    contact (its PT is its decided path), pinned structures (no pinned flag on the client: pushed as anything else).
+  - Tests: client/src/predict/ptst.test.ts (fake transport: no re-step when matching; one re-step per mispredict;
+    C3's touched ship re-stepped at the same confirm, C2's a confirm later; the ease; snap; entering, leaving and
+    coming back; tracks), modes.test.ts, server/src/net/causes/ptContacts.test.ts (the pass against the server's).
 - **Your own ship (before Stage 3b)**: predicted from your inputs, resent only when the prediction would be wrong: an input that reached the server after its target tick, a new keyframe version, a status change (shield, EMP, marked, slowed), a state-hash mismatch (server keeps 3 s of per-tick hashes), (no periodic copy: the snapshot's head hash `hh`). Boost regeneration is predicted too. A client that sends hashes then goes quiet for 3 s lets go of its controls.
 - **Messages that repeat are sent once (protocol 26 work)**: `people` once at login (People.shown de-dupes the rest), `items` only when the message changed (`Session.itemsKey`, Pilots.sendItems), `party` only when the JSON changed (Party.sent, members' x and y in 1 km steps, hull in 5% steps; the leave messages clear the key), `ops` only when the view changed (Operations.shown holds the last JSON). All are full-state messages, so skipping an identical copy changes nothing on the client.
 - **View range**: a client holds the ships homed in its focus cells (the focus grid, net/cells/FocusCells.ts; the 40 km circle is gone); the furthest flight zoom shows ~24 km. `FocusCells.view` keeps each client's `shipView`. Outside it: no keyframes, control/status rows, structure or HP; leaving goes in `snapshot.out` (blueprint kept); returning gets its keyframe and status row (plus a `shipSync` without the blueprint if rebuilt meanwhile). Combat effects (`damage`, `projectileHit`, `partDestroyed`, `contact`, and every `LAZY_TYPES` effect broadcast to a system that has a place: `detonation`, `ignite`, `stationFire`) go only to clients within 48 km (`broadcastNear`; damage always reaches whoever dealt it). `damage` is summed per target, source and glancing till the next snapshot and sent to a tenth. Removals go only to clients that were sent the entity (or made it: debris). A plain slug's hit (no splash, EMP, split, pierce, fire, chain, pull, hold or fuse: `Weapons.bursts`) sends no `detonation`: WeaponFx draws its impact from `projectileHit`. A shell striking a rock sends no `effect` (the client draws the rock's sparks where its drawn shell meets the drawn rock: ShipClient `struckFx` from `WeaponFx.onStruck`) and no `projectileHit` either (every client finds its own hits): its drawn shell stops at the rock and the snapshot's `removed` ends it on the tick layer (SelfHits sits that window out; HitLedger tells any hit in it). A stuck mining charge blowing still sends both (GameServer `hurtAsteroid`; docs/audits/rock-bytes-2026-11-05.md).

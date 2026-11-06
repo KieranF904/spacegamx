@@ -6,6 +6,7 @@ import { createDeflateRaw, constants as zc } from 'zlib';
 import { Position, InSystem, DEFAULT_CAPS, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
 import { makeServer, clock, rng, Scene, controlsFor, applyDirect, type Layout } from './world.js';
 import { Probe, PoseRing, classifier } from './probe.js';
+import { PT_TUNING } from '../../../../client/src/predict/kinds.js';
 
 export interface CaseOpts {
   layout: Layout;
@@ -20,6 +21,10 @@ export interface CaseOpts {
   warm: number;
   /** Bulk sockets whose frames are kept to be deflated (the wire figure) */
   sample: number;
+  /** The probes run the game's prediction of other ships (client predict/, C3; default on) */
+  pt?: boolean;
+  /** Its level of detail's reach (client predict/kinds.ts PT_TUNING.reach; default the game's) */
+  ptReach?: number;
 }
 
 const WS_HEADER = 66; // TCP/IP + WebSocket framing per message, as the earlier probes counted it
@@ -56,6 +61,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
+  if (o.ptReach !== undefined) PT_TUNING.reach = o.ptReach;
   // (Every client runs the full caps set; crowd fallbacks only with --crowd)
   const server = makeServer(!!o.crowd);
   const ships = server.getShips() as any, srv = server as any;
@@ -108,7 +114,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const pids: number[] = [];
   for (let i = 0; i < o.n; i++) {
     if (probeIdx.has(i)) {
-      const p = new Probe(server, `probe${i}`, o.lat, ring, klass, 0, sysTick);
+      const p = new Probe(server, `probe${i}`, o.lat, ring, klass, 0, sysTick, o.pt !== false);
       probes.set(i, p);
       pids.push(p.pid);
     } else {
@@ -262,6 +268,22 @@ export async function runCase(o: CaseOpts): Promise<any> {
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
     probeDebrisMsPerTick: r2(mean(probeList.map((p) => p.debrisMs / ticks))),
+    // (The game's prediction of other ships, C3, per probe: client predict/ptst.ts)
+    pt: (() => {
+      const ls = probeList.filter((p) => p.pt && p.ptAt);
+      if (!ls.length) return undefined;
+      const d = (p: Probe, kk: string) => (p.pt!.stats as unknown as Record<string, number>)[kk] - (p.ptAt![kk] ?? 0);
+      const per = (kk: string) => r2(mean(ls.map((p) => d(p, kk) / secs)));
+      const checks = ls.reduce((n, p) => n + d(p, 'checks'), 0), misses = ls.reduce((n, p) => n + d(p, 'misses'), 0);
+      return {
+        msPerTick: r2(mean(ls.map((p) => p.ptMs / ticks))), ships: r2(mean(ls.map((p) => p.pt!.ids().size))), lodOut: r2(mean(ls.map((p) => p.ptWorld!.lodOut))),
+        matchPct: checks ? r2((100 * (checks - misses)) / checks) : 0, missesPerSec: per('misses'), restepShipsPerSec: per('restepShips'), touchShipsPerSec: per('touchShips'),
+        restepTicksPerSec: per('restepTicks'), correctionsPerSec: per('corrections'), contactsPerSec: per('contacts'),
+        correctionMean: r2(ls.reduce((n, p) => n + d(p, 'correctionDist'), 0) / Math.max(1, ls.reduce((n, p) => n + d(p, 'corrections'), 0))),
+        restepMsPerTick: r2(mean(ls.map((p) => d(p, 'restepMs') / ticks))), advanceMsPerTick: r2(mean(ls.map((p) => d(p, 'advanceMs') / ticks))),
+        contactMsPerTick: r2(mean(ls.map((p) => d(p, 'contactMs') / ticks))), syncMsPerTick: r2(mean(ls.map((p) => d(p, 'syncMs') / ticks))),
+      };
+    })(),
     crowd: o.crowd ? {
       bySecond: crowdSecs,
       log: srv.crowd?.log ?? [],

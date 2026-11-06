@@ -1,20 +1,20 @@
 /**
- * The live switch for the dev prediction modes (modes.ts): installs a mode's hook on GameState.drawMode, runs the PT/ST
- * layer for C2/C3 (ptst.ts over replicaWorld.ts), and keeps the hit tally (hitTally.ts, fed by WeaponFx.tally). Dev
- * builds only (app/devTools.ts makes it); mode A (no hook) until switched. `?predict=C2` in the URL starts in a mode.
+ * The dev Sim tools' handle on the game's prediction (client predict/Prediction.ts, C3 by default): the live mode
+ * switch for comparing the alternatives (F7 *Prediction mode* buttons, `?predict=C2`, `window.__simTools.predict.set()`),
+ * plus the dev-only measures: the hit tally (hitTally.ts, fed by WeaponFx.tally via Renderer.shotTally) and where
+ * other ships are drawn against their ST (drawGap). Dev builds only (app/devTools.ts makes it).
  */
 import { EntityType, ReplicaMode } from '@space-game/common';
 import type { GameState } from '../../state/GameState';
 import type { ShipClient } from '../../ships/ShipClient';
 import type { Renderer } from '../../rendering/Renderer';
-import { PtStLayer } from './ptst';
-import { ReplicaPtWorld } from './replicaWorld';
+import type { Prediction } from '../../predict/Prediction';
+import type { PtStLayer } from '../../predict/ptst';
+import type { ModeCtx, ModeId, PredictMode } from '../../predict/modes';
 import { HitTally, StrikeOffsets } from './hitTally';
 import { shieldOf } from '../../ships/drawnHit';
-import { PREDICT_MODES, modeById, type ModeCtx, type ModeId, type PredictMode } from './modes';
 
 export class PredictController {
-  readonly layer: PtStLayer;
   readonly tally: HitTally;
   readonly strikes: StrikeOffsets;
   /**
@@ -23,14 +23,9 @@ export class PredictController {
    * apart for other pilots and for AI ships
    */
   readonly drawGap: { pilot: StrikeOffsets; ai: StrikeOffsets };
-  readonly ctx: ModeCtx;
-  private current: PredictMode = PREDICT_MODES[0];
-  /** When the mode was last switched (the overlay's rates start again from there) */
-  switchedAt = 0;
   onChange: ((m: { id: string; blurb: string }) => void) | null = null;
 
-  constructor(private readonly state: GameState, sc: ShipClient, renderer: Renderer) {
-    this.layer = new PtStLayer(new ReplicaPtWorld(state, sc), { touch: false });
+  constructor(readonly prediction: Prediction, state: GameState, sc: ShipClient, renderer: Renderer) {
     const self = () => state.playerId;
     const ship = (target: number) => { const e = state.entities.get(target); return !!e && (e.type === EntityType.Player || e.type === EntityType.Enemy || e.type === EntityType.NPC || e.type === EntityType.ShipBody); };
     const shielded = (target: number) => { const e = state.entities.get(target); return !!e && shieldOf(e) > 0; };
@@ -58,37 +53,25 @@ export class PredictController {
       const e = state.entities.get(target)!, r = sc.store.get(target)?.derived.radius;
       if (r) this.strikes.strike(target, Math.round(state.ownDrawTick()), sc.replicas.modeOf(target) === ReplicaMode.Player, e.renderX, e.renderY, r);
     };
-    this.ctx = {
-      self,
-      renderTick: () => state.renderTickNow,
-      confirmedTick: () => state.serverTick,
-      predictedTick: () => state.predictedTick,
-      ownDraw: () => state.timelineAt().ownDraw(),
-      ai: (id) => sc.bodies.ahead(id),
-      pilot: (id) => sc.replicas.modeOf(id) === ReplicaMode.Player,
-      layer: this.layer,
+    prediction.onChange = (m) => {
+      this.tally.reset();
+      this.strikes.reset();
+      this.drawGap.pilot.reset();
+      this.drawGap.ai.reset();
+      this.onChange?.(m);
     };
   }
 
-  get mode(): PredictMode { return this.current; }
-  readonly modes = PREDICT_MODES;
+  get layer(): PtStLayer { return this.prediction.layer; }
+  get ctx(): ModeCtx { return this.prediction.ctx; }
+  get mode(): PredictMode { return this.prediction.mode; }
+  get modes(): readonly PredictMode[] { return this.prediction.modes; }
+  get switchedAt(): number { return this.prediction.switchedAt; }
 
   set(id: ModeId | string): boolean {
-    const m = modeById(id);
-    if (!m) return false;
-    this.current = m;
-    this.layer.reset();
-    if (m.ptst) this.layer.set({ touch: m.ptst.touch });
-    this.state.drawMode = m.hook(this.ctx);
-    this.tally.reset();
-    this.strikes.reset();
-    this.drawGap.pilot.reset();
-    this.drawGap.ai.reset();
-    this.switchedAt = performance.now();
-    this.onChange?.(m);
-    return true;
+    return this.prediction.set(id);
   }
 
-  get lerpMs(): number { return this.layer.opts.lerpMs; }
-  set lerpMs(v: number) { this.layer.set({ lerpMs: v }); }
+  get lerpMs(): number { return this.prediction.lerpMs; }
+  set lerpMs(v: number) { this.prediction.lerpMs = v; }
 }
