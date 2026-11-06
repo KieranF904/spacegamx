@@ -17,9 +17,10 @@
  * the switch-over. The power overlay marks generators and batteries and what's
  * left without power; P5 replaces it with the energy overlay.
  *
- * The palette leads with the parts you have (storage and hold, and what this
- * slot already carries), by category; then what you can fabricate here; then
- * what's locked and why (its level), folded away. A weapon's mount
+ * The palette (HangarPalette.ts) is the component guide's model laid out for
+ * building: the part in hand with its shapes, category tabs, and each tab's
+ * list, what you can place first (your spares, then what you can fabricate),
+ * then what's locked and why ("Reach level N"). A weapon's mount
  * is its model's (a badge, not a choice), and so are its mounting rules
  * (common ships/mounting.ts): the part in hand shows the edge it bolts on at,
  * the cells its barrel needs clear and its turret arc, and won't place where it
@@ -28,31 +29,32 @@
  * (rules still apply), and saving takes nothing.
  *
  * Click: place · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
- * Wheel: zoom · arrow keys: pan · Esc / H: close
+ * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
  */
 
 import {
   Blueprint, Catalog, Economy, Bag, partItemId, isWeaponFn, PlacedPart, PlacedGeom, Rot, Side, ShipTuning, ShipDerived, Vec2,
   SIDES, SIDE_NORMAL, placeGeometry, overlapsAny, computeJoins, facingEdges, facingProblem, geomContainsPoint,
-  validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, createShipState, connectorEndpoints, getVariant,
+  validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, createShipState, connectorEndpoints,
   BlueprintError, TurretWindow, computeTurretWindow, ClientMessage, ServerHangarMessage, partDemand, parsePartItemId,
-  isStructural, ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
+  ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
   loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, wireCells, cellKey,
-  type FunctionDef, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem,
+  mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem,
   cellMap, exhaustProblem } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
 import { bankKind, gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
-import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
+import { CONNECTOR_COLOR, numToCss } from './shipColors';
 import { powerReport, pruneWires, DEAD_NET, type PowerReport } from './wireEdit';
 import { portsReport, portsWarnings } from './portsReport';
 import { PortsGrid, portsPanelHtml } from './portsGrid';
+import { HangarPalette } from './HangarPalette';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
-import { familyLabel, familyRank, keyStats, modelLock, mountBadge, mountingText, MOUNT_TEXT, sizeText, sizeWord, weaponMount, type ModelLock } from './modelCards';
+import { modelLock, weaponMount } from './modelCards';
 import { gradeGlow, partColors } from './hullPreview2d';
 import { HangarLitView } from './HangarLitView';
 import { listBlueprints, loadBlueprint, saveBlueprint } from './blueprintApi';
@@ -74,6 +76,8 @@ export interface HangarDeps {
   canMake(id: string): boolean;
   /** The pilot's level (what a locked model waits on) */
   level?(): number;
+  /** Licences and recipes the pilot has learned (profile.recipes: the palette's gates, ui/componentGuide.ts) */
+  learned?(): string[];
   /** Cargo + storage count of an item */
   have(id: string): number;
   /** Mass of what's in the hold now (common/src/ships/load.ts) */
@@ -117,12 +121,10 @@ export class HangarUI {
   private sel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0 as Rot, flip: false, facing: 'auto' as Side | 'auto' };
   /** Placed guns breaking their mounting rules, by part index (refresh) */
   private mountingBroken = new Map<number, MountingProblem[]>();
-  /** The palette's category filter ('all', or a functions.json `category`; the core counts as structure) */
-  private cat = 'all';
-  /** Folded palette sections (locked parts, and with free build on; overlays) */
-  private folded = { locked: true, lockedFree: false, overlays: true };
-  /** Each model's palette line (its size and key numbers), worked out once */
-  private lines = new Map<string, { size: string; stats: string }>();
+  /** The part palette (HangarPalette.ts) */
+  private pal: HangarPalette;
+  /** Folded sections under the palette (overlays) */
+  private folded = { overlays: true };
   private view = { cx: 1, cy: 1, px: 40 };
   /** A middle-button drag in progress: where it started (screen, view, grid), and whether it's moved enough to be a pan */
   private pan: { x: number; y: number; cx: number; cy: number; at: Vec2; moved: boolean } | null = null;
@@ -236,19 +238,26 @@ export class HangarUI {
       background:#0b1220; border:1px solid #2a3a5a; border-radius:0 0 10px 10px; box-shadow:0 14px 40px rgba(0,0,0,0.6); padding:10px; font:12px 'Segoe UI', sans-serif;`;
     this.designPanel.addEventListener('mousedown', (e) => e.stopPropagation());
 
+    // The part palette (HangarPalette.ts: the part in hand, its shapes, the category tabs and lists); its list scrolls, the rest stays
     this.palette = document.createElement('div');
-    // (a dark thin scrollbar, its gutter kept so the rows don't jump as it comes and goes)
-    this.palette.style.cssText = 'overflow-y: auto; min-width: 0; padding: 10px; border-right: 1px solid #1f2a40; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #2a3a5a transparent; color-scheme: dark;';
-    // Parts in the lists (rows, plates, materials, shapes) carry their item id: a click picks it up, hovering shows what it is
-    this.palette.addEventListener('click', (e) => {
-      const id = (e.target as HTMLElement).closest<HTMLElement>('[data-part]')?.dataset.part;
-      if (id) this.pickPart(id);
+    this.palette.style.cssText = 'overflow: hidden; min-width: 0; min-height: 0; padding: 8px 6px 6px 10px; border-right: 1px solid #1f2a40; color-scheme: dark;';
+    this.pal = new HangarPalette({
+      catalog: deps.catalog, tuning: deps.tuning, econ: deps.econ,
+      sel: () => this.sel,
+      changed: () => this.draw(),
+      remaining: (id) => this.remaining(id),
+      canMake: (id) => this.deps.canMake(id),
+      have: (id) => this.deps.have(id),
+      level: () => this.deps.level?.() ?? 1,
+      learned: () => this.deps.learned?.() ?? [],
+      owned: () => this.owned,
+      free: () => this.free,
+      freeBuild: () => this.freeBuild,
+      grantAll: () => this.grantAll,
+      partTip: (id, e) => this.partTip(id, e),
+      hideTip: () => { if (this.tipKey.startsWith('p:')) this.hideTip(); },
     });
-    this.palette.addEventListener('mousemove', (e) => {
-      const el = (e.target as HTMLElement).closest<HTMLElement>('[data-part]');
-      if (el) this.partTip(el.dataset.part!, e); else if (this.tipKey.startsWith('p:')) this.hideTip();
-    });
-    this.palette.addEventListener('mouseleave', () => this.hideTip());
+    this.palette.append(this.pal.root);
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = 'width: 100%; height: 100%; display: block; cursor: crosshair;';
     const canvasWrap = document.createElement('div');
@@ -398,11 +407,14 @@ export class HangarUI {
       const order: (Side | 'auto')[] = ['auto', ...SIDES];
       this.sel.facing = order[(order.indexOf(this.sel.facing) + 1) % order.length];
     } else if (code === 'Escape' || code === 'KeyH') { this.close(null); return true; }
+    // (Tab: keyboard into the palette's tabs; there the palette takes the keys it needs, HangarPalette.ts)
+    else if (code === 'Tab') { this.pal.focusTabs(); return true; }
     else if (code === 'ArrowLeft') this.view.cx -= 1;
     else if (code === 'ArrowRight') this.view.cx += 1;
     else if (code === 'ArrowUp') this.view.cy -= 1;
     else if (code === 'ArrowDown') this.view.cy += 1;
-    this.renderPalette();
+    this.pal.renderHand();
+    this.renderFooter();
     this.draw();
     return true;
   }
@@ -480,14 +492,6 @@ export class HangarUI {
     return this.geoms.length ? partMountingProblems(this.deps.catalog, [...this.geoms, g], this.geoms.length) : [];
   }
 
-  /** The hand card's mount line: its rules in words, and for a side mount which side it's on and how to swap it */
-  private mountLine(f: FunctionDef): string {
-    const words = mountingText(this.deps.catalog, { fn: f.id }, this.deps.tuning);
-    const m = mountingOf(this.deps.catalog, f.id);
-    const side = m?.angle === 'right' ? ` <span style="color:#7dd3fc">(${this.sel.flip ? 'mirrored' : 'as drawn'} · F flips)</span>` : '';
-    return `<div style="font-size:11px; margin-top:4px; color:#8ea0bd">Mount: <b style="color:#e5ecf7; font-weight:600">${esc(words.join(' · ') || MOUNT_TEXT[weaponMount(this.deps.catalog, { fn: f.id })])}</b>${side}</div>`;
-  }
-
   private place(g: Vec2): void {
     const p = this.candidate(g);
     if (!p) return this.status('blueprint is full (255 parts)');
@@ -508,9 +512,8 @@ export class HangarUI {
     if (i < 0) return;
     const p = this.bp.parts[i];
     this.sel = { piece: p.piece, fn: p.fn, material: p.material, rot: p.rot, flip: p.flip, facing: p.facing ? (p.facing as Side) : 'auto' };
-    if (this.cat !== 'all') this.cat = filterCat(this.deps.catalog, p.fn);
     this.status(`picked up: ${this.deps.econ.items.name(partItemId(p))}`);
-    this.renderPalette();
+    this.pal.showInHand();
     this.draw();
   }
 
@@ -839,316 +842,43 @@ export class HangarUI {
   // Panels
   // -------------------------------------------------------------------------
 
-  /** The material a part in hand is made of: a model's own, else the picked one */
-  private handMaterial(fn = this.sel.fn): string {
-    const f = this.deps.catalog.functions.get(fn);
-    return f?.model && f.material ? f.material : this.sel.material;
+  /** The palette (HangarPalette.ts: the part in hand, its shapes, the category tabs and lists) and what's under it */
+  private renderPalette(): void {
+    if (this.tipKey.startsWith('p:')) this.hideTip();
+    this.pal.render();
+    this.renderFooter();
   }
 
-  /**
-   * The palette: the part in hand, a category
-   * filter, then the parts themselves, what you have first: your parts (with
-   * how many), structure (built from materials), what you can fabricate here,
-   * and what's locked and why, folded away. Built as one string (it's redrawn
-   * on every key); the rows carry their item id (data-part) for the palette's
-   * click and tooltip handlers.
-   */
-  private renderPalette(): void {
-    const el = this.palette, scroll = el.scrollTop;
+  /** Under the palette: the mouse and keys in a line, the overlays (folded), and proto's debug switch */
+  private renderFooter(): void {
+    const el = this.pal.foot;
     el.innerHTML = '';
-    if (this.tipKey.startsWith('p:')) this.hideTip();
-
-    el.append(this.handCard());
-    el.append(this.filterRow());
-    const lists = document.createElement('div');
-    lists.innerHTML = this.partListsHtml();
-    lists.querySelectorAll<HTMLElement>('[data-fold]').forEach((h) => h.onclick = () => {
-      const k = h.dataset.fold as 'locked' | 'lockedFree';
-      this.folded[k] = !this.folded[k];
-      this.renderPalette();
-    });
-    el.append(lists);
-
+    const keys = 'Click places · right-click removes · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · Tab: keyboard into the parts list';
     const info = document.createElement('div');
-    info.style.cssText = 'line-height:1.6; color:#6b7a93; margin:10px 0 8px; font-size:11px;';
-    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks a part up</b><br>R turn · F mirror · T facing · E energy overlay · wheel zooms · middle-drag or arrows pan`;
+    info.title = keys;
+    info.style.cssText = 'color:#6b7a93; margin:3px 0 2px; font-size:10.5px; line-height:1.45;';
+    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E energy · Tab list · wheel zoom`;
     el.append(info);
-
-    el.append(foldHeading('Overlays', this.folded.overlays, () => { this.folded.overlays = !this.folded.overlays; this.renderPalette(); }));
+    // Overlays (folded) and proto's debug switch, on one line
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:baseline; gap:10px;';
+    const fold = foldHeading('Overlays', this.folded.overlays, () => { this.folded.overlays = !this.folded.overlays; this.renderFooter(); });
+    fold.style.margin = '2px 0';
+    row.append(fold);
+    if (this.deps.grantAll) {
+      const c = checkbox('grant everything', this.grantAll, (v) => { this.grantAll = v; this.refresh(); this.refreshLoadList(); });
+      c.style.cssText += 'margin:0 0 0 auto; font-size:11px; color:#8ea0bd;';
+      row.append(c);
+    }
+    el.append(row);
     if (!this.folded.overlays) {
       const ov = document.createElement('div');
-      ov.style.cssText = 'display:flex; flex-wrap:wrap; gap:3px; margin-bottom:10px;';
+      ov.style.cssText = 'display:flex; flex-wrap:wrap; gap:3px; margin:2px 0 4px;';
       for (const key of Object.keys(this.overlays) as Overlay[]) {
-        ov.append(chip(key, this.overlays[key], this.overlays[key] ? '#5fd4c4' : '#2a3a5a', () => { this.overlays[key] = !this.overlays[key]; this.renderPalette(); this.draw(); }));
+        ov.append(chip(key, this.overlays[key], this.overlays[key] ? '#5fd4c4' : '#2a3a5a', () => { this.overlays[key] = !this.overlays[key]; this.renderFooter(); this.draw(); }));
       }
       el.append(ov);
     }
-    if (this.deps.grantAll) {
-      el.append(heading('Debug'));
-      el.append(checkbox('grant everything', this.grantAll, (v) => { this.grantAll = v; this.refresh(); this.refreshLoadList(); }));
-    }
-    el.scrollTop = scroll;
-  }
-
-  /** Put a part (by item id) in hand: its function and piece, and for structure its material */
-  private pickPart(id: string): void {
-    const q = this.deps.econ.items.get(id)?.part ?? parsePartItemId(id);
-    const f = q && this.deps.catalog.functions.get(q.fn);
-    if (!q || !f) return;
-    this.sel.fn = q.fn;
-    this.sel.piece = q.piece;
-    if (!f.model) this.sel.material = q.material;
-    this.renderPalette();
-    this.draw();
-  }
-
-  /** What a locked model waits on (its level) */
-  private lockOf(f: FunctionDef): ModelLock {
-    return modelLock(f, false, this.deps.level?.() ?? 1, this.deps.econ.items.all());
-  }
-
-  /** A part's palette line, worked out once: its size, and its key numbers */
-  private line(f: FunctionDef, piece: string, material: string): { size: string; stats: string } {
-    const key = `${f.id}:${piece}:${material}`;
-    let l = this.lines.get(key);
-    if (!l) {
-      // (a model's name is its own; structure's names its piece already)
-      const size = f.model ? sizeText(this.deps.catalog, { ...f, pieces: [piece] }).split(' · ')[0] : sizeWord(this.deps.catalog, piece);
-      l = { size, stats: keyStats(this.deps.catalog, this.deps.tuning, f, piece, material) };
-      this.lines.set(key, l);
-    }
-    return l;
-  }
-
-  /**
-   * The part in hand: what it is and its mount, whether you have it (or can
-   * make it, or what it waits on), what making it takes; structure's material
-   * and shape (and a model that comes in more than one size); which way it
-   * points
-   */
-  private handCard(): HTMLElement {
-    const { catalog, econ } = this.deps;
-    const f = catalog.functions.get(this.sel.fn)!;
-    const material = this.handMaterial();
-    const id = partItemId({ piece: this.sel.piece, fn: this.sel.fn, material });
-    const def = econ.items.get(id);
-    const left = this.remaining(id);
-    const structure = isStructural(this.sel.fn);
-    const can = this.deps.canMake(id);
-    const lock = f.model && !can ? this.lockOf(f) : null;
-    const red = (t: string) => `<span style="color:#f87171">${esc(t)}</span>`;
-    const status = this.freeBuild ? '<span style="color:#fbbf24">Free build: it places, and saving takes nothing</span>'
-      : this.grantAll ? '<span style="color:#6b7a93">Free here</span>'
-      : structure ? (can ? '<span style="color:#7dd3fc">Structure: built from materials as it goes in</span>' : red(`You can't build in ${catalog.materials.get(material)?.name ?? material} yet`))
-      : left > 0 ? `<span style="color:#4ade80">${left} on hand</span>${can ? '' : ` · ${red(lock?.why ? `fits once ${lock.why.charAt(0).toLowerCase()}${lock.why.slice(1)}` : 'not licensed to fit yet')}`}`
-      : can ? '<span style="color:#7dd3fc">None on hand: places as a ghost to fabricate</span>'
-      : red(lock?.why || "You can't make this yet");
-    const r = econ.recipes.recipeFor(id);
-    const { size } = this.line(f, this.sel.piece, material);
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#0d1524; border:1px solid #24324d; border-left:3px solid ' + (f.color ?? numToCss(functionColor(f.id))) + '; border-radius:8px; padding:7px 8px; margin-bottom:8px; line-height:1.4;';
-    card.innerHTML = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><span style="color:#6b7a93; font-size:10px; letter-spacing:1px">IN HAND</span>`
-      + `<span style="margin-left:auto; color:#6b7a93; font-size:10px">R ${this.sel.rot * 90}° · F ${this.sel.flip ? 'mirrored' : 'mirror'}</span></div>`
-      + `<div data-part="${id}" style="display:flex; gap:8px; align-items:center"><img src="${itemIcon(econ, id)}" style="width:36px; height:36px; flex-shrink:0">`
-      + `<div style="min-width:0; flex:1"><div style="display:flex; gap:6px; align-items:center; min-width:0"><b style="color:#e5ecf7; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(f.model ? f.name ?? f.id : def?.name ?? f.name ?? f.id)}</b>`
-      + `<span style="color:#6b7a93; font-size:11px; white-space:nowrap">${esc(size)}</span>${mountBadge(catalog, { fn: f.id })}</div>`
-      + `<div style="font-size:11px">${status}</div></div></div>`
-      + (isWeaponFn(f.id) ? this.mountLine(f) : '')
-      + (!f.model && def ? `<div style="color:#8ea0bd; font-size:11px; margin-top:3px">${esc(def.description)}</div>` : '')
-      + (r && !this.free && (structure || left <= 0) ? `<div style="font-size:11px; margin-top:4px">${costHtml(econ, r.inputs, (k) => this.deps.have(k))}${structure ? '' : r.time > 0 ? ` <span style="color:#fbbf24">⏳ ${r.time}s</span>` : ' <span style="color:#a5f3a1">instant</span>'}</div>` : '');
-
-    // Structure (and the core): built in a material; the grades you can use, and the one in hand
-    if (!f.model) {
-      const mats = document.createElement('div');
-      mats.style.cssText = 'display:flex; flex-wrap:wrap; gap:3px; margin-top:7px;';
-      let hidden = 0;
-      for (const m of catalog.materials.values()) {
-        if (m.exclusive) continue;
-        const sample = partItemId({ material: m.id, fn: this.sel.fn, piece: this.sel.piece });
-        const have = this.free || this.remaining(sample) > 0 || this.deps.canMake(sample);
-        if (!have && this.sel.material !== m.id) { hidden++; continue; }
-        const c = chip(m.name ?? m.id, this.sel.material === m.id, m.color, () => {});
-        c.dataset.part = sample;
-        c.style.opacity = have ? '1' : '0.45';
-        mats.append(c);
-      }
-      if (hidden) mats.insertAdjacentHTML('beforeend', `<span style="color:#4b5870; font-size:11px; align-self:center; margin-left:2px" title="Better materials unlock as you level">+${hidden} locked</span>`);
-      card.append(mats);
-    }
-    // Shapes it comes in (a model with one size has none to pick)
-    const shapes = catalog.pieceIds.filter((pc) => f.pieces === '*' || f.pieces.includes(pc));
-    if (!f.model || shapes.length > 1) {
-      const grid = document.createElement('div');
-      grid.style.cssText = `display:grid; grid-template-columns: repeat(${Math.min(8, Math.max(shapes.length, 4))}, minmax(0, 1fr)); gap:3px; margin-top:7px;`;
-      let html = '';
-      for (const pc of shapes) {
-        const itemId = partItemId({ piece: pc, fn: this.sel.fn, material });
-        const n = this.remaining(itemId);
-        const make = this.free || this.deps.canMake(itemId);
-        const on = this.sel.piece === pc;
-        const tag = n === Infinity || this.free ? '' : structure ? (make ? '' : '🔒') : n > 0 ? `${n}` : make ? '<span style="color:#7dd3fc">+</span>' : '🔒';
-        html += `<button data-part="${itemId}" style="position:relative; background:${on ? '#24406b' : '#0f1626'}; border:1px solid ${on ? '#5fd4c4' : '#2a3a5a'}; border-radius:6px; padding:2px 0 0; cursor:pointer; opacity:${n > 0 || make ? 1 : 0.35}; min-width:0; aspect-ratio:1; display:grid; place-items:center">`
-          + `${pieceIcon(catalog, pc, this.sel.rot, this.sel.flip)}${tag ? `<span style="position:absolute; right:2px; bottom:0; font:700 9px sans-serif; color:#fff; text-shadow:0 0 3px #000">${tag}</span>` : ''}</button>`;
-      }
-      grid.innerHTML = html;
-      card.append(grid);
-    }
-    // Which way it points (guns, engines, mining lasers)
-    if (partNeedsFacing(this.sel.fn)) {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex; gap:3px; margin-top:7px; flex-wrap:wrap; align-items:center;';
-      row.insertAdjacentHTML('beforeend', '<span style="color:#ffb547; font-size:10px; font-weight:bold; letter-spacing:1px; margin-right:2px" title="T cycles it">FACING</span>');
-      const label: Record<Side | 'auto', string> = { auto: 'auto', N: '↑', E: '→', S: '↓', W: '←' };
-      const tip: Record<Side | 'auto', string> = { auto: 'Its usual side, if that edge is free', N: 'Fore', E: 'Starboard', S: 'Aft', W: 'Port' };
-      for (const s of ['auto', ...SIDES] as (Side | 'auto')[]) {
-        const c = chip(label[s], this.sel.facing === s, '#7dd3fc', () => { this.sel.facing = s; this.renderPalette(); this.draw(); });
-        c.title = `${tip[s]} (T)`;
-        row.append(c);
-      }
-      card.append(row);
-    }
-    return card;
-  }
-
-  /** The category filter: All, or one category, each with how many spare parts you have in it */
-  private filterRow(): HTMLElement {
-    const { catalog, econ } = this.deps;
-    const spare = new Map<string, number>();
-    if (!this.grantAll) {
-      for (const id of Object.keys(this.owned)) {
-        const q = econ.items.get(id)?.part, n = this.remaining(id);
-        if (q && n > 0 && catalog.functions.has(q.fn)) spare.set(filterCat(catalog, q.fn), (spare.get(filterCat(catalog, q.fn)) ?? 0) + n);
-      }
-    }
-    const row = document.createElement('div');
-    row.style.cssText = 'display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:3px; margin-bottom:6px;';
-    for (const c of [{ id: 'all', label: 'All', color: '#cfd8e6' }, ...CATEGORIES.filter((k) => k.id !== 'core')]) {
-      const on = this.cat === c.id;
-      const n = c.id === 'all' ? [...spare.values()].reduce((a, k) => a + k, 0) : spare.get(c.id) ?? 0;
-      const b = document.createElement('button');
-      b.innerHTML = `${c.label}${n ? ` <span style="color:#4ade80; font-weight:600">${n}</span>` : ''}`;
-      b.title = c.id === 'all' ? 'Every kind of part' : `${c.label}${n ? `: ${n} spare part${n === 1 ? '' : 's'} of yours` : ''}`;
-      b.style.cssText = `background:${on ? '#24406b' : '#0f1626'}; color:${on ? '#fff' : '#9fb0cc'}; border:1px solid ${on ? '#5fd4c4' : '#2a3a5a'}; border-bottom:2px solid ${c.color};
-        border-radius:4px; padding:3px 4px; cursor:pointer; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;`;
-      b.onclick = () => { this.cat = c.id; this.renderPalette(); };
-      row.append(b);
-    }
-    return row;
-  }
-
-  /**
-   * The parts, as HTML: yours first (by category, with how many), then
-   * structure, then what you can fabricate here, then what's locked (folded
-   * away, each with what it waits on). Free build: the locked ones place too.
-   */
-  private partListsHtml(): string {
-    const { catalog, econ } = this.deps;
-    const show = (fn: string) => this.cat === 'all' || filterCat(catalog, fn) === this.cat;
-    const catRank = (fn: string) => CATEGORIES.findIndex((c) => c.id === filterCat(catalog, fn));
-    const order = (a: FunctionDef, b: FunctionDef) => catRank(a.id) - catRank(b.id) || familyRank(familyLabel(a)) - familyRank(familyLabel(b)) || (a.fabOrder ?? 0) - (b.fabOrder ?? 0);
-    const sel = this.sel;
-    const isOn = (f: FunctionDef, piece: string, material: string) => sel.fn === f.id && sel.piece === piece && (!!f.model || sel.material === material);
-    type Row = { id: string; f: FunctionDef; piece: string; material: string; right: string; dim?: boolean };
-    const rowHtml = ({ id, f, piece, material, right, dim }: Row) => {
-      const on = isOn(f, piece, material);
-      const { size, stats } = this.line(f, piece, material);
-      const name = f.model ? f.name ?? f.id : econ.items.name(id);
-      return `<button data-part="${id}" style="display:flex; gap:8px; align-items:center; width:100%; box-sizing:border-box; min-width:0; text-align:left; background:${on ? '#24406b' : '#0f1626'};
-        border:1px solid ${on ? '#5fd4c4' : '#22304a'}; border-left:3px solid ${f.color ?? numToCss(functionColor(f.id))}; border-radius:6px; color:#cfd8e6; padding:3px 7px 3px 5px; cursor:pointer; margin-bottom:3px; font:12px 'Segoe UI', sans-serif">`
-        + `<img src="${itemIcon(econ, id)}" style="width:32px; height:32px; flex-shrink:0; pointer-events:none; opacity:${dim ? 0.45 : 1}">`
-        + `<div style="min-width:0; flex:1; opacity:${dim ? 0.6 : 1}"><div style="display:flex; gap:5px; align-items:center; min-width:0">`
-        + `<b style="color:#e5ecf7; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0">${esc(name)}</b>`
-        + `<span style="color:#6b7a93; font-size:10px; white-space:nowrap">${esc(size)}</span>${mountBadge(catalog, { fn: f.id })}</div>`
-        + `<div style="font-size:10px; color:#a7b4c8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${esc(stats)}</div></div>`
-        + `<div style="flex-shrink:0; text-align:right; line-height:1.25; font-size:10px">${right}</div></button>`;
-    };
-    const section = (title: string, n: string, hint = '', fold?: { key: string; open: boolean }) =>
-      `<div ${fold ? `data-fold="${fold.key}" ` : ''}style="display:flex; align-items:baseline; gap:6px; margin:10px 0 4px;${fold ? ' cursor:pointer;' : ''}">`
-      + `<span style="color:#ffb547; font-weight:bold; letter-spacing:1px; font-size:11px; white-space:nowrap">${fold ? (fold.open ? '▾ ' : '▸ ') : ''}${title}</span><span style="color:#6b7a93; font-size:11px">${n}</span>`
-      + (hint ? `<span style="margin-left:auto; color:#6b7a93; font-size:10px; text-align:right; min-width:0">${hint}</span>` : '') + `</div>`;
-    // Rows under category headings (when showing all)
-    const grouped = (rows: Row[], count: (r: Row) => number = () => 1) => {
-      if (this.cat !== 'all') return rows.map(rowHtml).join('');
-      let html = '', last = '';
-      for (let i = 0; i < rows.length; i++) {
-        const c = filterCat(catalog, rows[i].f.id);
-        if (c !== last) {
-          last = c;
-          const k = CATEGORIES.find((x) => x.id === c)!;
-          const n = rows.filter((r) => filterCat(catalog, r.f.id) === c).reduce((a, r) => a + count(r), 0);
-          html += `<div style="display:flex; align-items:center; gap:6px; color:#8ea0bd; font-size:10px; letter-spacing:1px; margin:6px 0 3px">`
-            + `<span style="width:8px; height:8px; border-radius:2px; background:${k.color}"></span>${k.label.toUpperCase()} <span style="color:#4b5870">${n}</span></div>`;
-        }
-        html += rowHtml(rows[i]);
-      }
-      return html;
-    };
-    let html = '';
-
-    // Yours: storage, the hold, and what this slot already carries that the design doesn't use
-    const mine: (Row & { n: number })[] = [];
-    if (!this.grantAll) {
-      for (const id of Object.keys(this.owned)) {
-        const q = econ.items.get(id)?.part, n = this.remaining(id), f = q && catalog.functions.get(q.fn);
-        if (!q || !f || n <= 0 || !show(q.fn)) continue;
-        const fits = this.free || this.deps.canMake(id);
-        const why = fits ? '' : f.model ? this.lockOf(f).badge : '';
-        mine.push({ id, f, piece: q.piece, material: q.material, n, right: `<b style="color:#4ade80; font-size:14px">×${n}</b>${fits ? '' : `<br><span style="color:#fca5a5" title="You have it, but fitting it needs its licence">🔒 ${esc(why || 'licence')} to fit</span>`}` });
-      }
-      mine.sort((a, b) => order(a.f, b.f) || (catalog.pieceIds.indexOf(a.piece) - catalog.pieceIds.indexOf(b.piece)));
-      const units = mine.reduce((a, r) => a + r.n, 0);
-      html += section('YOUR PARTS', units ? `${units}` : '', 'storage, hold, and spares off this ship');
-      html += mine.length ? grouped(mine, (r) => (r as Row & { n: number }).n)
-        : `<div style="color:#6b7a93; font-size:11px; line-height:1.45; margin-bottom:4px">${this.cat === 'all' ? 'No spare parts.' : 'None of these spare.'} Anything you can fabricate still places: it goes in as a ghost and fills in once it's made.</div>`;
-    }
-
-    // Structure and the core: plates built from materials as they go in
-    const plates = [...catalog.functions.values()].filter((f) => !f.model && !f.exclusive && (!f.legacy || f.id === sel.fn) && show(f.id)).sort(order);
-    if (plates.length) {
-      html += section('STRUCTURE', '', 'built from materials as it goes in');
-      html += `<div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:3px; margin-bottom:4px">`;
-      for (const f of plates) {
-        const piece = f.pieces === '*' || f.pieces.includes(sel.piece) ? sel.piece : f.pieces[0];
-        const id = partItemId({ fn: f.id, material: sel.material, piece });
-        const can = this.free || this.deps.canMake(id) || this.remaining(id) > 0;
-        const on = sel.fn === f.id;
-        html += `<button data-part="${id}" style="display:flex; flex-direction:column; align-items:center; gap:1px; background:${on ? '#24406b' : '#0f1626'}; border:1px solid ${on ? '#5fd4c4' : '#2a3a5a'};
-          border-radius:6px; color:#cfd8e6; padding:3px 2px; cursor:pointer; min-width:0; opacity:${can ? 1 : 0.45}">`
-          + `<img src="${itemIcon(econ, id)}" style="width:28px; height:28px; pointer-events:none"><span style="font-size:10px; line-height:1.15; text-align:center; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-top:2px solid ${numToCss(functionColor(f.id))}; padding-top:1px">${esc(f.name ?? f.id)}</span></button>`;
-      }
-      html += `</div>`;
-    }
-
-    // Models you don't have spare: what you can fabricate here, and what's locked
-    const have = new Set(mine.map((r) => r.id));
-    const make: Row[] = [], locked: (Row & { lv: number })[] = [];
-    for (const f of catalog.functions.values()) {
-      if (!f.model || f.exclusive || f.legacy || !show(f.id)) continue;
-      const piece = f.pieces === '*' ? 'sq' : sel.fn === f.id && f.pieces.includes(sel.piece) ? sel.piece : f.pieces[0];
-      const material = f.material ?? 'alloy';
-      const id = partItemId({ fn: f.id, material, piece });
-      if (have.has(id)) continue;
-      if (this.grantAll || this.deps.canMake(id)) {
-        const r = econ.recipes.recipeFor(id);
-        make.push({ id, f, piece, material, right: this.grantAll ? '' : `<span style="color:#7dd3fc">fabricate</span><br><span style="color:${r && r.time > 0 ? '#6b7a93' : '#a5f3a1'}">${r && r.time > 0 ? `⏳ ${r.time}s` : 'instant'}</span>` });
-      } else {
-        const lock = this.lockOf(f);
-        locked.push({ id, f, piece, material, lv: f.unlock?.level ?? 999, dim: !this.freeBuild,
-          right: `<span style="color:${this.freeBuild ? '#fbbf24' : '#fca5a5'}" title="${esc(lock.why)}">🔒 ${esc(lock.badge)}</span>${this.freeBuild ? '<br><span style="color:#fbbf24">free build</span>' : ''}` });
-      }
-    }
-    make.sort((a, b) => order(a.f, b.f));
-    if (make.length) {
-      html += section(this.grantAll ? 'EVERY PART' : 'FABRICATE HERE', `${make.length}`, this.grantAll ? 'free here' : 'places as a ghost, then gets made');
-      html += grouped(make);
-    }
-    if (locked.length) {
-      locked.sort((a, b) => catRank(a.f.id) - catRank(b.f.id) || a.lv - b.lv || order(a.f, b.f));
-      const key = this.freeBuild ? 'lockedFree' : 'locked', open = !this.folded[key];
-      html += section('LOCKED', `${locked.length}`, this.freeBuild ? 'free build places these too' : 'each opens at a level (a legendary is made with a rare part from its boss)', { key, open });
-      if (open) html += grouped(locked);
-    }
-    return html;
   }
 
   /** Slot tabs: which ship you're designing */
@@ -1579,7 +1309,7 @@ export class HangarUI {
     const f = q && this.deps.catalog.functions.get(q.fn);
     if (!q || !f) return;
     const left = this.remaining(id);
-    const lock = f.model && !this.free && !this.deps.canMake(id) ? this.lockOf(f).why : '';
+    const lock = f.model && !this.free && !this.deps.canMake(id) ? modelLock(f, false, this.deps.level?.() ?? 1).why : '';
     this.showTip(`p:${this.tipGen}:${id}`, () => partTipHtml(q, { ...this.tipCtx(), state: 'palette', spare: left === Infinity ? 0 : Math.max(0, left), lock }), e.clientX, e.clientY);
   }
 
@@ -2058,11 +1788,6 @@ if (d && this.overlays.com && d.mass > 0) {
 // Little DOM helpers
 // ---------------------------------------------------------------------------
 
-const PIECE_LABEL: Record<string, string> = {
-  sq: 'square', rect2: 'panel', tri: 'wedge', slope2: 'slope', cap: 'nose', round: 'round',
-  fillet: 'fillet', block2: 'block', block3: 'long', round2: 'dome', fillet2: 'wide fillet', nose2: 'wedge nose',
-};
-
 /** A broken mounting rule without its "Pip 3: " (the part is the one in hand or under the mouse) */
 function ruleText(m: MountingProblem): string {
   return m.message.replace(/^[^:]*?\d+: /, '');
@@ -2081,47 +1806,6 @@ function label(text: string): HTMLSpanElement {
   s.textContent = text;
   s.style.color = '#8ea0bd';
   return s;
-}
-
-/** The palette's category tabs, in order (functions.json `category`) */
-const CATEGORIES: { id: string; label: string; color: string }[] = [
-  { id: 'structure', label: 'Structure', color: '#8ea0bd' },
-  { id: 'weapons', label: 'Weapons', color: '#e05a4a' },
-  { id: 'power', label: 'Power', color: '#fbbf24' },
-  { id: 'engines', label: 'Engines', color: '#60a5fa' },
-  { id: 'shields', label: 'Shields', color: '#5fd4c4' },
-  { id: 'utility', label: 'Utility', color: '#a3e635' },
-  { id: 'core', label: 'Core', color: '#f0abfc' },
-];
-
-function categoryOf(catalog: Catalog, fn: string): string {
-  const c = catalog.functions.get(fn)?.category ?? 'structure';
-  return CATEGORIES.some((k) => k.id === c) ? c : 'structure';
-}
-
-/** A function's palette filter: its category (the core goes with structure) */
-function filterCat(catalog: Catalog, fn: string): string {
-  const c = categoryOf(catalog, fn);
-  return c === 'core' ? 'structure' : c;
-}
-
-/** Weapons in families by what they fire (legendaries on their own) */
-const WEAPON_FAMILY: Record<string, string> = {
-  cannon: 'Guns', autocannon: 'Guns', railgun: 'Guns', flak: 'Guns', mortar: 'Guns',
-  laser: 'Beams', pulse: 'Beams', lance: 'Beams', arc: 'Beams',
-  missile: 'Launchers', torpedo: 'Launchers',
-  emp: 'Disruptors',
-};
-const FAMILIES = ['Guns', 'Beams', 'Launchers', 'Disruptors', 'Legendary', 'Other'];
-
-function weaponGroups(catalog: Catalog, ids: string[]): { label: string; ids: string[] }[] {
-  const out = FAMILIES.map((label) => ({ label, ids: [] as string[] }));
-  for (const id of ids) {
-    const f = catalog.functions.get(id);
-    const fam = f?.rarity === 'legendary' ? 'Legendary' : WEAPON_FAMILY[f?.weapon ?? ''] ?? 'Other';
-    out.find((g) => g.label === fam)!.ids.push(id);
-  }
-  return out;
 }
 
 /** A section heading that folds its section away (▸ folded, ▾ open) */
@@ -2177,16 +1861,6 @@ function arrow(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number
   ctx.lineTo(x1 - 5 * Math.cos(a + 0.4), y1 - 5 * Math.sin(a + 0.4));
   ctx.closePath();
   ctx.fill();
-}
-
-/** Small inline SVG of a piece variant for the palette. */
-function pieceIcon(catalog: Catalog, id: string, rot: Rot, flip: boolean): string {
-  const v = getVariant(catalog, id, rot, flip);
-  const xs = v.polygon.map((p) => p[0]), ys = v.polygon.map((p) => p[1]);
-  const minX = Math.min(...xs), minY = Math.min(...ys);
-  const size = Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY);
-  const pts = v.polygon.map(([x, y]) => `${((x - minX) / size) * 26 + 2},${((y - minY) / size) * 26 + 2}`).join(' ');
-  return `<svg width="26" height="26" viewBox="0 0 30 30"><polygon points="${pts}" fill="#24406b" stroke="#9fb3d1" stroke-width="1"/></svg>`;
 }
 
 /**

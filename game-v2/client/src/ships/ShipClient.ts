@@ -244,6 +244,7 @@ export class ShipClient {
       hangarState: () => opts.pilot.hangar,
       canMake: (id) => opts.pilot.canMake(id),
       level: () => opts.pilot.profile?.level ?? 1,
+      learned: () => opts.pilot.profile?.recipes ?? [],
       have: (id) => opts.pilot.count(id),
       cargoMass: () => opts.pilot.econ.items.massOf(opts.pilot.cargo),
       stored: (id) => opts.pilot.storage.reduce((t, x) => t + (x.id === id ? x.n : 0), 0),

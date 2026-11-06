@@ -12,19 +12,17 @@ import {
   CORE_CARGO, markName, partStats, PIECE_NAMES,
   type Bag, type Catalog, type ShipTuning,
 } from '@space-game/common';
-import bossData from '../../../data/bosses.json';
-import systemsData from '../../../data/systems.json';
-import questsData from '../../../data/quests.json';
-import recipesData from '../../../data/recipes.json';
 import type { PilotState } from '../econ/clientEcon';
-import { itemIcon } from './itemIcons';
 import { partSprite, peekSprite, type SpritePart } from './componentSprites';
 import { familyLabel, mountingText, sizeText, tradeOff, keyStats } from '../ships/modelCards';
 import { partTipHtml, resistText } from '../ships/partTip';
 import {
-  bossDrops, COMP_TABS, guideRows, questTeaches, rareParts, requirementLine, rowGates, rowItemId, rowsOf, STRUCTURE_FNS,
+  COMP_TABS, guideRows, rareParts, requirementLine, rowItemId, rowsOf, STRUCTURE_FNS,
   type BossDrop, type CompRow, type CompTab, type Gate, type GateCtx, type PilotView,
 } from './componentGuide';
+import { componentGates, gateCtx, PLATES, rowInputs } from './componentData';
+import { costLines, isOpen, tabCounts } from './componentAvail';
+import { CHECK, CHEVRON, costChipsHtml, esc, LOCK } from './componentKit';
 
 export interface ComponentGuideDeps {
   catalog: Catalog;
@@ -33,14 +31,8 @@ export interface ComponentGuideDeps {
   sound?(id: string, volume?: number): void;
 }
 
-const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
-
-const PLATES = (recipesData as unknown as { parts: { plates: Record<string, string> } }).parts.plates;
-const SYSTEM_NAME = new Map((systemsData as unknown as { systems: { id: string; name: string }[] }).systems.map((s) => [s.id, s.name]));
-const DROPS = bossDrops(bossData as unknown as Parameters<typeof bossDrops>[0], (id) => SYSTEM_NAME.get(id));
-const QUESTS = questTeaches(questsData as unknown as Parameters<typeof questTeaches>[0]);
 
 /** The pictures at this share of the size they're drawn at (the HUD panel is narrow) */
 const SPRITE_SCALE = 0.25;
@@ -108,10 +100,6 @@ const STYLE = `
 .cg-you { display: flex; align-items: center; gap: 6px; margin: 2px 0 3px; font: 700 9px 'Segoe UI', sans-serif; letter-spacing: 1.5px; color: #f0b54a; text-transform: uppercase; }
 .cg-you::before, .cg-you::after { content: ''; flex: 1; height: 1px; background: rgba(240, 181, 74, 0.35); }
 @media (prefers-reduced-motion: reduce) { .cg-x svg { transition: none; } }`;
-
-const LOCK = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm2 0h4V5a2 2 0 1 0-4 0v2Z"/></svg>`;
-const CHECK = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5 6.5 12 13 4.5"/></svg>`;
-const CHEVRON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6 8 10.5 12.5 6"/></svg>`;
 
 let styled = false;
 
@@ -200,24 +188,28 @@ export class ComponentGuideUI {
   }
 
   private inputs(row: CompRow): Bag {
-    return this.deps.pilot.econ.recipes.recipeFor(rowItemId(row))?.inputs ?? {};
+    return rowInputs(this.deps.pilot.econ, row);
   }
 
   private ctx(row: CompRow): GateCtx {
-    return { items: this.deps.pilot.econ.items.all(), quests: QUESTS, drops: DROPS, inputs: this.inputs(row) };
+    return gateCtx(this.deps.pilot.econ, row);
   }
 
   private gates(row: CompRow): Gate[] {
-    return rowGates(row, this.deps.catalog.functions.get(row.fn), this.view(), this.ctx(row));
+    return componentGates(this.deps.catalog, this.deps.pilot.econ, row, this.view());
+  }
+
+  /** Each tab's open and total counts (its badge) */
+  private counts(): Map<CompTab, { open: number; total: number }> {
+    return tabCounts(this.rows, COMP_TABS, (r) => isOpen(this.gates(r)));
   }
 
   private render(): void {
     const me = this.view();
-    const counts = new Map(COMP_TABS.map((t) => [t.id, rowsOf(this.rows, t.id)]));
+    const counts = this.counts();
     this.cats.innerHTML = COMP_TABS.map((t) => {
-      const list = counts.get(t.id)!;
-      const open = list.filter((r) => requirementLine(this.gates(r)).met).length;
-      return `<button class="cg-cat${t.id === this.tab ? ' on' : ''}" data-tab="${t.id}" aria-pressed="${t.id === this.tab}" title="${open} of ${list.length} open to you">${t.label}<span class="badge">${open}/${list.length}</span></button>`;
+      const { open, total } = counts.get(t.id)!;
+      return `<button class="cg-cat${t.id === this.tab ? ' on' : ''}" data-tab="${t.id}" aria-pressed="${t.id === this.tab}" title="${open} of ${total} open to you">${t.label}<span class="badge">${open}/${total}</span></button>`;
     }).join('');
     for (const b of this.cats.querySelectorAll<HTMLElement>('[data-tab]')) {
       b.onclick = () => {
@@ -229,7 +221,7 @@ export class ComponentGuideUI {
         this.cats.querySelector<HTMLElement>('.cg-cat.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       };
     }
-    const list = counts.get(this.tab)!;
+    const list = rowsOf(this.rows, this.tab);
     this.sub.textContent = `Level ${me.level} · ${list.length} components (the badges: open to you of each)`;
     const scroll = this.list.scrollTop;
     // (A rule where the levels pass yours)
@@ -253,14 +245,14 @@ export class ComponentGuideUI {
   private refresh(): void {
     const me = this.view();
     if (this.shownKey !== `${this.tab}|${me.level}`) { this.render(); return; }
-    const counts = new Map(COMP_TABS.map((t) => [t.id, rowsOf(this.rows, t.id)]));
+    const counts = this.counts();
     for (const b of this.cats.querySelectorAll<HTMLElement>('[data-tab]')) {
-      const list = counts.get(b.dataset.tab as CompTab)!;
+      const c = counts.get(b.dataset.tab as CompTab)!;
       const badge = b.querySelector('.badge');
-      const text = `${list.filter((r) => requirementLine(this.gates(r)).met).length}/${list.length}`;
+      const text = `${c.open}/${c.total}`;
       if (badge && badge.textContent !== text) badge.textContent = text;
     }
-    for (const r of counts.get(this.tab)!) {
+    for (const r of rowsOf(this.rows, this.tab)) {
       const inner = this.rowHtml(r);
       if (this.rowMarkup.get(r.id) === inner) continue;
       this.rowMarkup.set(r.id, inner);
@@ -334,10 +326,7 @@ export class ComponentGuideUI {
     const gates = this.gates(r);
     const req = requirementLine(gates);
     const bag = r.kind === 'model' ? this.inputs(r) : econ.recipes.partInputs({ material: r.material, fn: r.fn, piece: r.piece });
-    const mats = Object.entries(bag).map(([id, n]) => {
-      const have = me.have(id);
-      return `<span class="cg-mat${have < n ? ' short' : ''}" title="${esc(econ.items.name(id))}: you have ${have}"><img src="${itemIcon(econ, id)}" alt="">x ${n}</span>`;
-    }).join('') + (r.kind === 'structure' ? '<span class="per">a hull cell</span>' : '');
+    const mats = costChipsHtml(econ, costLines(bag, me.have), 'cg-mat') +(r.kind === 'structure' ? '<span class="per">a hull cell</span>' : '');
     const main = `<div class="cg-main">
       <div class="cg-lv" title="${r.level === null ? 'No level' : `Learned at level ${r.level}`}">${r.level === null ? '<b class="none">—</b>' : `<b>${r.level}</b>`}</div>
       <div class="cg-gfx">${this.sprite(r)}</div>
@@ -405,7 +394,6 @@ export class ComponentGuideUI {
   }
 
   private bagHtml(bag: Bag): string {
-    const { econ } = this.deps.pilot;
-    return Object.entries(bag).map(([id, n]) => `<span class="cg-mat${this.deps.pilot.count(id) < n ? ' short' : ''}" title="${esc(econ.items.name(id))}"><img src="${itemIcon(econ, id)}" alt="">x ${n}</span>`).join(' ');
+    return costChipsHtml(this.deps.pilot.econ, costLines(bag, (id) => this.deps.pilot.count(id)), 'cg-mat');
   }
 }
