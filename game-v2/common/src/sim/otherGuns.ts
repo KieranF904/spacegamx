@@ -348,13 +348,13 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
 }
 
 /**
- * Pilots' gun-control changes in a snapshot's window (a plain message, just before the snapshot at tick `t`): each a
- * packGunRow row
+ * Pilots' gun-control changes in a snapshot's window: the snapshot's `gun` rows (each a packGunRow row) and its tick
+ * `t`, taken before the rest of the snapshot. They ride in the snapshot (each row an encode-once block: network/packed
+ * blocks.ts BlockStore.gunRow), not a message of their own
  */
-export interface ServerGunCtlMessage {
-  type: 'gunCtl';
+export interface GunCtlRows {
   t: number;
-  r: number[][];
+  r: readonly (readonly number[])[];
 }
 
 /**

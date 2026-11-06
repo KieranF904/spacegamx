@@ -167,6 +167,20 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const focus0 = snap(srv.snapshots.focus.stats), away0 = snap(srv.snapshots.away.stats), mem0 = [...probes.values()].map((p) => snap(p.fake.away.stats));
   const held: number[] = [];
   const guns0 = snap(srv.gunNet?.stats ?? {});
+  // (What each joined client's packed frames came to, by message type and the BLOCKS snapshot's parts: the real wire bits)
+  const probePids = new Set([...probes.values()].map((p) => p.pid));
+  const packedOf = (only?: Set<number>) => {
+    const by: Record<string, number> = {};
+    for (const c of srv.clients.values() as Iterable<any>) {
+      if (only && !only.has(c.playerId)) continue;
+      const e = c.packed?.enc;
+      if (!e) continue;
+      for (const [t, b] of Object.entries(e.bitsByType as Record<string, number>)) by[t] = (by[t] ?? 0) + b;
+      for (const [t, b] of Object.entries(e.blockBits as Record<string, number>)) if (!['intros', 'delta', 'abs'].includes(t)) by['snapshot.' + t] = (by['snapshot.' + t] ?? 0) + b;
+    }
+    return by;
+  };
+  const packed0 = packedOf(), packedProbe0 = packedOf(probePids);
   const hits0 = snap(srv.hits.stats), reasons0 = snap(srv.replication.reasons), bodies0 = snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats });
   const m0 = server.getTick();
   const ticks = o.secs * 60;
@@ -273,6 +287,15 @@ export async function runCase(o: CaseOpts): Promise<any> {
     guns: (() => {
       const d = numericDiff(snap(srv.gunNet?.stats ?? {}), guns0) as Record<string, number>, per = (v: number) => r2((v ?? 0) / secs / Math.max(1, o.n));
       return { ...d, idleChangesPerPilotSec: per(d.idleChanges), idleSentPerPilotSec: per(d.idleSent), exactChangesPerPilotSec: per(d.exactChanges), exactSentPerPilotSec: per(d.exactSent) };
+    })(),
+    // (Bytes per client per second by message type, as the packed frames carry them; snapshot.* its BLOCKS parts)
+    // (packedProbeBps: the probes only, which answer as a game client does: the bulk sockets owe nothing back, so they get hitFix corrections)
+    ...(() => {
+      const per = (now: Record<string, number>, was: Record<string, number>, nc: number) => {
+        const d = numericDiff(now, was) as Record<string, number>;
+        return Object.fromEntries(Object.entries(d).filter(([, b]) => b > 0).sort((a, b) => b[1] - a[1]).map(([t, b]) => [t, r2(b / 8 / secs / Math.max(1, nc))]));
+      };
+      return { packedBps: per(packedOf(), packed0, [...srv.clients.values()].filter((c: any) => c.packed).length), packedProbeBps: per(packedOf(probePids), packedProbe0, probePids.size) };
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
     probeDebrisMsPerTick: r2(mean(probeList.map((p) => p.debrisMs / ticks))),

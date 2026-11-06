@@ -15,7 +15,7 @@ import { packHits, unpackHits } from '../hits.js';
 import { PACKED_FRAME, PK, PK_BITS, PACKED_FIELDS, type PackedField } from './tables.js';
 import { PackedIO, isId, type PackedPart } from './packedIO.js';
 import {
-  SNAPSHOT_CODE, snapshotOk, entitiesIO, projectilesIO, removedIO, keyframesIO, controlsIO, outIO, fireIO, ownIO, decisionsIO, causesIO,
+  SNAPSHOT_CODE, snapshotOk, entitiesIO, projectilesIO, removedIO, keyframesIO, controlsIO, outIO, fireIO, ownIO, decisionsIO, causesIO, gunRowsIO,
 } from './snapshotSections.js';
 
 import type { BlockStore } from './blocks.js';
@@ -29,11 +29,11 @@ const HITS_CODE = COMPACT_TYPES.indexOf('hits');
 const HPS_CODE = COMPACT_TYPES.indexOf('shipHps');
 const isArr = Array.isArray;
 
-/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d, x, w, h], trailing nulls dropped) */
+/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d, x, w, h, g], trailing nulls dropped) */
 function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   let mask = 0;
   if (w) for (let i = 1; i < w.length; i++) if (w[i] != null) mask |= 1 << (i - 1);
-  mask = io.u(mask, 14);
+  mask = io.u(mask, 15);
   const out: unknown[] = [SNAPSHOT_CODE];
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
   const at = (i: number) => (w ? w[i] : null) as unknown[][];
@@ -66,6 +66,9 @@ function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   out[13] = has(13) ? decisionsIO(io, at(13)) : null;
   // (the head hash, 24 bits: sim/headHash.ts)
   out[14] = has(14) ? io.u((w?.[14] as number) ?? 0, 24) : null;
+  sec?.('g', io.bitLength);
+  // (other pilots' gun rows: sim/otherGuns.ts packGunRow)
+  out[15] = has(15) ? gunRowsIO(io, at(15)) : null;
   sec?.('end', io.bitLength);
   while (out.length > 1 && out[out.length - 1] === null) out.pop();
   return out;
@@ -146,6 +149,8 @@ export class PackedEncoder {
   private started = false;
   /** Messages by how they went (the netcode probe): packed, or as the base format's bytes; snapshots as blocks */
   readonly stats = { packed: 0, legacy: 0, resets: 0, blocks: 0 };
+  /** Bits by message type (a message that went as the base format's bytes: `type(plain)`), and the frames' own (`(frame)`) */
+  readonly bitsByType: Record<string, number> = {};
   /** What its BLOCKS snapshots came to, by part (blocksSnapshot.ts BlockBits) */
   readonly blockBits: BlockBits = blockBits();
   /** Snapshots planned as blocks (prepare), each when it was queued (null: it goes as PK.SNAPSHOT) */
@@ -180,12 +185,23 @@ export class PackedEncoder {
       this.started = true;
       this.stats.resets++;
     }
+    const by = this.bitsByType;
+    let msgBits = 0;
     for (let s = 0; s < subs.length; s++) {
-      for (const part of subs[s]) this.message(part);
+      for (const part of subs[s]) {
+        const legacy = this.stats.legacy, at = io.bitLength;
+        this.message(part);
+        const k = this.stats.legacy !== legacy ? part.msg.type + '(plain)' : part.msg.type, n = io.bitLength - at;
+        by[k] = (by[k] ?? 0) + n;
+        msgBits += n;
+      }
       io.u(s === subs.length - 1 ? PK.LAST : PK.END, PK_BITS);
     }
     if (!subs.length) io.u(PK.LAST, PK_BITS);
-    return io.take();
+    const out = io.take();
+    // (the frame byte, the reset, the sub-frames' ends, the last byte's padding)
+    by['(frame)'] = (by['(frame)'] ?? 0) + out.length * 8 - msgBits;
+    return out;
   }
 
   private message(part: PackedPart): void {

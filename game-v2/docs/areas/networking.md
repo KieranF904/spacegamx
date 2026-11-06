@@ -49,7 +49,7 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | server/src/net/causes/contactLog.ts, contactsFor.ts | ~60 / ~110 | contacts on the tick layer, the server side: each tick's pass as a client needs it (`ContactLog`, noted by `resolveContacts`), and per client and window which contacts it finds itself and which ships it must leave out (`contactWindow`, Replication `found`) |
 | common/src/ships/debrisLife.ts, client/src/ships/debris/DebrisLives.ts | 45 / 154 | a piece's life after its spawn (CAPS.DEBRIS): crumble ticks fixed at the spawn (`debrisDecay`), each crumble's rebuild (`crumbleRebuild`); the client side runs the pieces it was given (`l`): structures by tick, recentring, crumble effects, splits from the pre-recentre body |
 | client/src/predict/ (ptst.ts, contacts.ts, shipKinds.ts, world.ts, modes.ts, Prediction.ts; ptKinds.ts, worldKinds.ts, aheadReads.ts, late.ts, kinds/ from track C) | ~430 / ~170 / ~80 / ~120 / ~130 / ~90 | the prediction of other ships (C3, the default in every build): the PT/ST layer (`PtStLayer`: PT ring, ST check by hash, one re-step per miss, the touch register, the ease, `PtTrack` plug-ins), the PT contact pass (`RealContacts`: the server's pass on predicted ticks; `CircleContacts` for fake tests), the ship kinds and the level of detail (`PT_KINDS`, `registerPtKind`, `PT_TUNING`), the adapter over the tick layer (`ReplicaPtWorld` over a `PtHost`: the game or the crowd probe), the mode registry (A/B/C1/C2/C3, `DEFAULT_MODE`) and the controller Game.ts makes (`Prediction`, installs the mode's `GameState.drawMode` hook and, in C2/C3, the world's PT kinds: `Prediction.kinds`) |
-| common/src/sim/otherGuns.ts, server/src/net/guns/GunNet.ts, client/src/ships/guns/OtherGuns.ts, client/src/predict/kinds/shellsKind.ts | ~330 / ~330 / ~270 / ~170 | other ships' guns stepped from their inputs: the lane steps (`lanePilot`, `lanePilotless`, `lanePd`, `laneRemap`), the records a fire row carries (`laneRecords`, `firedRec`, `sameRecs`, `laneFireRow`), the shells' names (`otherShotWireOf`), `gunSync` (`packGunSync`: the lane state as one sparse list) and `gunCtl` rows (`packGunRow`); the server's lane per ship (diff against the real ship's records, state hash, versions, which clients step which ships: `forClient`); the client's lanes on the tick layer (ShipReplicaSet side steps) and the fire rows it builds at each snapshot (`confirm`), their shells' expiry; the PT timeline's `shells` kind |
+| common/src/sim/otherGuns.ts, server/src/net/guns/GunNet.ts, client/src/ships/guns/OtherGuns.ts, client/src/predict/kinds/shellsKind.ts | ~330 / ~330 / ~270 / ~170 | other ships' guns stepped from their inputs: the lane steps (`lanePilot`, `lanePilotless`, `lanePd`, `laneRemap`), the records a fire row carries (`laneRecords`, `firedRec`, `sameRecs`, `laneFireRow`), the shells' names (`otherShotWireOf`), `gunSync` (`packGunSync`: the lane state as one sparse list) and gun rows (`packGunRow`, the snapshot's `gun`); the server's lane per ship (diff against the real ship's records, state hash, versions, which clients step which ships: `forClient`); the client's lanes on the tick layer (ShipReplicaSet side steps) and the fire rows it builds at each snapshot (`confirm`), their shells' expiry; the PT timeline's `shells` kind |
 
 ## Public interface
 - Types: `ClientMessage`, `ServerMessage`, `EntityState`, `EntityType`, `ServerSnapshotMessage`, `ClientInputMessage`.
@@ -106,7 +106,8 @@ Every client (`CAPS.HITS` is part of the required set). A shell's hit on a ship 
 its `PackedLink`: the same messages at the same moments, each base frame a sub-frame of a `PACKED_FRAME` message, bit
 packed by a per-connection `PackedEncoder` (slots for entities and shells, steps and guesses from the last values,
 "you" bits, implied removal of hit shells; lossless: it decodes to exactly the base format's messages; what it doesn't
-pack goes as base bytes inside; an encode that fails sends that flush as base frames, `PackedLink.emitBase`, which the client reads as ever). With COALESCE, a sub-frame with nothing urgent waits up to `COALESCE_TICKS` (3) for
+pack goes as base bytes inside (`PackedEncoder.bitsByType` counts the bits by message type, `type(plain)` for those;
+the crowd bench prints them: docs/audits/bitpack-2026-11-06.md); an encode that fails sends that flush as base frames, `PackedLink.emitBase`, which the client reads as ever). With COALESCE, a sub-frame with nothing urgent waits up to `COALESCE_TICKS` (3) for
 the next; the client widens its interpolation delay by `netCaps.hold`. A packed message that doesn't decode stops the
 reader until the server starts afresh (`packedResync`).
 
@@ -349,6 +350,12 @@ docs/audits/sim-foundation-after-2026-11-06.md, "Pull fields".
   The codec's state is per connection on both sides and changes only with what goes through it: a reset (the
   pilot's ship changed, a table full, `packedResync`, a new link) starts both afresh. A packed message must decode to
   exactly what the base format decodes to (packedCodec.test.ts and the server's parity test check it).
+- Protocol 61 (bit-pack audit, docs/audits/bitpack-2026-11-06.md): message codes are 5 bits (`PK_BITS`); the gun rows
+  ride in the snapshot (`gun`, compact field `g`, packed field mask 15 bits, BLOCKS gun blocks); `gunSync` and `pulls`
+  joined `COMPACT` (appended) and, with `mapDots`, `debrisSplit`, `bossBeam`, `bossTelegraph` and `bossBlow`, are
+  packed field by field (`PACKED_FIELDS`; the `r` kind: a flat list in rows, each value stepped from its column's last);
+  `shipSync` gained `maxHp` in `COMPACT` (a fresh sync went plain for it). A message still plain shows as `type(plain)`
+  in the crowd bench's packed table.
 - Protocol 28: client-detected hits (`hitFix` in `COMPACT`, the input's `hitReport` tail before any debris acks, `netCaps`). A rule for what the client finds itself must be the same on both sides (`HitLedger.unfindable` and `SelfHits.detect`), or the chains part and the server corrects.
 - Protocol 26 moved `ignite`, `detonation`, `intercept`, `bossTelegraph`, `pong`, `bossBeam`, `bossCharge`, `bossBlow` into `COMPACT`. `asteroidSeed` sends `ids` and `indices` as `[start, count, ...]` runs (`packRanges`/`unpackRanges`, network/ranges.ts; unpacked in client/src/app/serverMessages.ts).
 - The server never trusts a client message: validate shape, clamp, ignore junk. Before join only `join, ping, authLogin, authRegister` are accepted (`PRE_JOIN` in net/dispatch.ts).
@@ -477,8 +484,12 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
   Code: common/src/sim/otherGuns.ts (the shared lane steps and wire forms), server/src/net/guns/GunNet.ts, client
   src/ships/guns/OtherGuns.ts, client src/predict/kinds/shellsKind.ts.
   - *Controls*: a pilot's held keys and aim are its control rows; its triggers and cursor distance (the input's 4-unit
-    grid) are gun rows, a plain `gunCtl` message just before the snapshot (`packGunRow`: [id, bits × 8 + ago, distance
-    step, ...], a run form like the control rows'). They go when they change, and only to clients stepping that ship.
+    grid) are gun rows, the snapshot's `gun` field (protocol 61; `packGunRow`: [id, bits × 8 + ago, distance step, ...],
+    a run form like the control rows'; until then a plain `gunCtl` message just before the snapshot). The client takes
+    them before the rest of the snapshot (serverMessages `snapshot`, `OtherGuns.onGunCtl`). Each row is made once a
+    round (GunNet) and goes as an encode-once block (`BlockStore.gunRow`, rowsIO `gunRowBody`, `PK_GUN`); a snapshot
+    carrying any is urgent, as the gunCtl message was (PackedLink `urgentFor`: 'gunRows'). They go when they change,
+    and only to clients stepping that ship.
     The distance goes exactly only where a lane needs it (GunNet `ctlTick`): on the tick a trigger changes, while
     one is held, and `SEMI_BUFFER` (5) ticks after a release (a semi-automatic click still fires). Held, "exactly" is
     as the guns stepped on it: a pilot's guns hold their distance (`ShipState.heldDist`, in the gun state, the lane's
@@ -497,6 +508,10 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
     what was sent (held between); what that changes from the real ship, an idle turret's aim, is left out of the lane
     hash (as is the held distance while idle). For drawing, `OtherGuns.distAt` eases between two idle updates
     (ShipClient.placeReplica's cursor distance, in place of the status row's hundreds, for a ship whose lane it steps).
+    The status row's hundreds (the fallback for a client not stepping that lane) move by the idle rule, firing or not
+    (GunNet `GunLane.rough`, SnapshotBuilder `roughCursor`: idle, what the lanes were sent; held, the cursor's when the
+    turn is due), not every time the cursor crosses a hundred (an unarmed pilot, with no lane: the cursor's).
+    Measured in docs/audits/bitpack-2026-11-06.md.
     An AI pilot's trigger, lead and distance are its body's (common bodies/aiPilot.ts: the trigger rule `aiFires` moved
     there from Enemies.ts, its target's size read where each end has its structure, `lobs` in the ENGAGE order's
     hitBy field), so a client flying its body (CAPS.PILOTS) fires it too: nothing goes for them.

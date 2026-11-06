@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, type ServerGunSyncMessage, type ServerGunCtlMessage, type LaneRec, type ReplicaEnv } from '@space-game/common';
+import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, type ServerGunSyncMessage, type GunCtlRows, type LaneRec, type ReplicaEnv } from '@space-game/common';
 import { bossRise, clearBossLives } from './bossLife';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -645,7 +645,7 @@ export class ShipClient {
   }
 
   /** Pilots' gun controls through a snapshot's window (OtherGuns) */
-  onGunCtl(m: ServerGunCtlMessage): void {
+  onGunCtl(m: GunCtlRows): void {
     this.otherGuns.onGunCtl(m);
   }
 

@@ -2,11 +2,12 @@
  * A snapshot in encode-once blocks (CAPS.BLOCKS, PK.BLOCKS; blocks.ts): the same message as PK.SNAPSHOT, decoding to
  * the same compact row, laid out as
  *
- *   field mask (14 bits) | tick, last input (the connection's steps) | intros: a bit (any?), count - 1, then (wid,
+ *   field mask (15 bits) | tick, last input (the connection's steps) | intros: a bit (any?), count - 1, then (wid,
  *   entity id step) each | e: count, the client's own row's place (a bit, then it), the names (count, then place step
  *   and name each), then each row: a block, or at its place the own row the connection's way | p: count, blocks (shell
  *   rows, each from its gun's chain) | r: the connection's way | k: count, blocks | c: count, blocks (in id order) | o: the connection's way
- *   | f: count, blocks (in owner order) | n, d: the connection's way | h: the head hash, 24 bits
+ *   | f: count, blocks (in owner order) | n, d, x, w: the connection's way | h: the head hash, 24 bits | g: count, blocks
+ *   (other pilots' gun rows, in the order sent)
  *
  * after which both ends forget the chains of whatever the removed and out lists named. Blocks are copied bit for bit
  * from the store (`planBlocks`, made when the snapshot was queued); everything else is the connection's own.
@@ -18,6 +19,7 @@ import {
   projectileBody, settleProjectile, gunKey, P_ID,
 } from './blocks.js';
 import { SNAPSHOT_CODE, snapshotOk, entityRowIO, removedIO, outIO, ownIO, decisionsIO, causesIO } from './snapshotSections.js';
+import { gunRowBody } from './rowsIO.js';
 
 /** A snapshot's parts for the blocks form: shared blocks where it can, the rest the connection's way */
 export interface BlocksPlan {
@@ -29,13 +31,15 @@ export interface BlocksPlan {
   k: BlockRec[];
   c: BlockRec[];
   f: BlockRec[];
+  /** Gun rows, in the order sent */
+  g: BlockRec[];
 }
 
 /** The snapshot's blocks from the store (made there once for every client), or null: it goes as PK.SNAPSHOT */
 export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: number): BlocksPlan | null {
   const tick = m.tick;
   if (typeof tick !== 'number' || !Number.isInteger(tick) || tick < 0) return null;
-  const plan: BlocksPlan = { m, mask: 0, e: [], p: [], k: [], c: [], f: [] };
+  const plan: BlocksPlan = { m, mask: 0, e: [], p: [], k: [], c: [], f: [], g: [] };
   const own: unknown[][] = [];
   // (One wid per entity in a snapshot)
   const wids = new Map<number, number>();
@@ -74,19 +78,20 @@ export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: num
     const sorted = [...m.fire].sort((a, b) => a[0] - b[0] || b[1] - a[1]);
     for (const r of sorted) { const rec = store.fire(r, tick); if (!ok(rec)) return null; plan.f.push(rec); }
   }
+  if (m.gun?.length) for (const r of m.gun) { const rec = store.gunRow(r, tick); if (!ok(rec)) return null; plan.g.push(rec); }
   // (What goes the connection's way is checked as a snapshot's is)
   const w = [SNAPSHOT_CODE, tick, m.lastProcessedInput ?? null, own.length ? own : null, null, m.removed.length ? m.removed : null,
     null, null, m.out?.length ? m.out : null, null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null, m.causes?.length ? m.causes : null, m.guides?.length ? m.guides : null, m.hh ?? null];
   if (!snapshotOk(w)) return null;
   const present = [true, m.lastProcessedInput != null, plan.e.length > 0, plan.p.length > 0, m.removed.length > 0, plan.k.length > 0,
-    plan.c.length > 0, !!m.out?.length, plan.f.length > 0, !!m.own?.length, !!m.decisions?.length, !!m.causes?.length, !!m.guides?.length, m.hh != null];
+    plan.c.length > 0, !!m.out?.length, plan.f.length > 0, !!m.own?.length, !!m.decisions?.length, !!m.causes?.length, !!m.guides?.length, m.hh != null, plan.g.length > 0];
   for (let i = 0; i < present.length; i++) if (present[i]) plan.mask |= 1 << i;
   return plan;
 }
 
 /** What a client's BLOCKS snapshots came to: bits by part, intros, and the chained blocks it got in each form */
-export interface BlockBits { head: number; intro: number; e: number; p: number; r: number; k: number; c: number; o: number; f: number; nd: number; intros: number; delta: number; abs: number }
-export const blockBits = (): BlockBits => ({ head: 0, intro: 0, e: 0, p: 0, r: 0, k: 0, c: 0, o: 0, f: 0, nd: 0, intros: 0, delta: 0, abs: 0 });
+export interface BlockBits { head: number; intro: number; e: number; p: number; r: number; k: number; c: number; o: number; f: number; n: number; d: number; x: number; w: number; hh: number; g: number; intros: number; delta: number; abs: number }
+export const blockBits = (): BlockBits => ({ head: 0, intro: 0, e: 0, p: 0, r: 0, k: 0, c: 0, o: 0, f: 0, n: 0, d: 0, x: 0, w: 0, hh: 0, g: 0, intros: 0, delta: 0, abs: 0 });
 
 /** A shell row's block: by its gun chain's generation (no chain: the one form) */
 function copyShell(io: PackedIO, rec: BlockRec, st: BlockBits): void {
@@ -114,7 +119,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   const blk = io.blk;
   let at = io.bitLength;
   const part = (k: keyof BlockBits) => { const now = io.bitLength; st[k] += now - at; at = now; };
-  io.u(mask, 14);
+  io.u(mask, 15);
   io.num(tick, 0, 3, io.head, 0);
   if (has(2)) io.num(m.lastProcessedInput, 0, 2, io.head, 1);
   // Intros: each wid this client doesn't know yet, once
@@ -125,6 +130,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   for (const r of plan.k) note(r);
   for (const r of plan.c) note(r);
   for (const r of plan.f) note(r);
+  for (const r of plan.g) note(r);
   part('head');
   if (io.bit(intro.length > 0)) io.vu(intro.length - 1, 3);
   let prev = 0;
@@ -154,12 +160,12 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   if (has(7)) { io.vu(plan.c.length, 3); for (const r of plan.c) io.copyBits(r.abs.b, r.abs.n); part('c'); }
   if (has(8)) { outIO(io, m.out!); part('o'); }
   if (has(9)) { io.vu(plan.f.length, 2); for (const r of plan.f) io.copyBits(r.abs.b, r.abs.n); part('f'); }
-  if (has(10)) ownIO(io, m.own as unknown[][], tick);
-  if (has(11)) decisionsIO(io, m.decisions as unknown[][]);
-  if (has(12)) causesIO(io, m.causes as unknown[][], tick);
-  if (has(13)) decisionsIO(io, m.guides as unknown[][]);
-  if (has(14)) io.u(m.hh!, 24);
-  part('nd');
+  if (has(10)) { ownIO(io, m.own as unknown[][], tick); part('n'); }
+  if (has(11)) { decisionsIO(io, m.decisions as unknown[][]); part('d'); }
+  if (has(12)) { causesIO(io, m.causes as unknown[][], tick); part('x'); }
+  if (has(13)) { decisionsIO(io, m.guides as unknown[][]); part('w'); }
+  if (has(14)) { io.u(m.hh!, 24); part('hh'); }
+  if (has(15)) { io.vu(plan.g.length, 3); for (const r of plan.g) io.copyBits(r.abs.b, r.abs.n); part('g'); }
   for (const id of m.removed) blk.forget(id);
   if (m.out) for (const id of m.out) blk.forget(id);
   blk.trimGuns();
@@ -168,9 +174,9 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
 /** Reads a BLOCKS snapshot back into the snapshot's compact row (what snapshotIO reads), its blocks by this client's chains */
 export function blocksRead(io: PackedIO): unknown[] {
   const blk = io.blk;
-  const mask = io.u(0, 14);
+  const mask = io.u(0, 15);
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
-  const out: unknown[] = [SNAPSHOT_CODE, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+  const out: unknown[] = [SNAPSHOT_CODE, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
   const tick = io.num(null, 0, 3, io.head, 0) as number;
   out[1] = tick;
   if (has(2)) out[2] = io.num(null, 0, 2, io.head, 1);
@@ -274,6 +280,17 @@ export function blocksRead(io: PackedIO): unknown[] {
   if (has(12)) out[12] = causesIO(io, null, tick);
   if (has(13)) out[13] = decisionsIO(io, null);
   if (has(14)) out[14] = io.u(0, 24);
+  if (has(15)) {
+    const rows: unknown[][] = [];
+    const ng = io.vu(0, 3);
+    for (let i = 0; i < ng; i++) {
+      const eid = who();
+      const { run, o } = gunRowBody(io, undefined);
+      o[0] = run ? -1 - eid : eid;
+      rows.push(o);
+    }
+    out[15] = rows;
+  }
   for (const id of (out[5] as number[] | null) ?? []) blk.forget(id);
   for (const id of (out[8] as number[] | null) ?? []) blk.forget(id);
   blk.trimGuns();

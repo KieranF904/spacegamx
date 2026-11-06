@@ -16,7 +16,7 @@ steady Pip fight 855 -> 390 B/s raw. This builds it into the game, plus coalesci
 
 - `tables.ts`: the constants (no imports; hashed into `wireTables()`), `packedCodec.ts`: the codec.
 - A packed WebSocket message is `PACKED_FRAME` (0x04; base frames start 0x02), then bits: a reset bit (+ the client's
-  player id), then **sub-frames**, each what one base frame would have been, each a run of 4-bit message codes and
+  player id), then **sub-frames**, each what one base frame would have been, each a run of 5-bit message codes (4-bit until protocol 61) and
   bodies, ended by `END` (another follows) or `LAST`.
 - **Lossless.** The codec carries each message's compact row (`serverWire`) and the reader hands back
   `serverFromWire(row)`: what the base format decodes to, bit for bit (-0, NaN as null and all). Every number field has

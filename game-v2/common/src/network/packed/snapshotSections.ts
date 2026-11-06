@@ -8,14 +8,17 @@ import { guideRowOk } from '../../guidance/records.js';
 import { PAIR } from '../causes.js';
 import { PK_PROJECTILE, PK_CONTROL } from './tables.js';
 import { PackedIO, isId, bitsFor, K, K_TICK } from './packedIO.js';
-import { entityFieldsIO, keyframeFieldsIO, ticksSince } from './rowsIO.js';
+import { entityFieldsIO, keyframeFieldsIO, ticksSince, gunRowOk, gunRowBody } from './rowsIO.js';
 
 export const SNAPSHOT_CODE = COMPACT_TYPES.indexOf('snapshot');
 const isArr = Array.isArray;
 
 /** Can the snapshot's row go packed (ids where ids go, rows the shapes the packing expects)? */
 export function snapshotOk(w: unknown[]): boolean {
-  if (w.length > 15) return false;
+  if (w.length > 16) return false;
+  // (Gun rows: sim/otherGuns.ts packGunRow's shape, gunRowsIO)
+  const gr = w[15];
+  if (gr != null && !(isArr(gr) && gr.every(gunRowOk))) return false;
   // (The head hash: 24 bits, sim/headHash.ts)
   const hh = w[14];
   if (hh != null && !(Number.isInteger(hh) && (hh as number) >= 0 && (hh as number) < 1 << 24)) return false;
@@ -284,6 +287,20 @@ export function controlsIO(io: PackedIO, rows: unknown[][] | null): unknown[][] 
     const o: unknown[] = [(id - prev) * 2 + (run ? 1 : 0)];
     for (let i = 1; i < len; i++) o.push(io.num(row?.[i], 0, PK_CONTROL[Math.min(i, PK_CONTROL.length) - 1]));
     prev = id;
+    out.push(o);
+  }
+  return out;
+}
+
+/** Gun rows (sim/otherGuns.ts packGunRow, in the order sent): each pilot by its slot, then the row's body (rowsIO gunRowBody) */
+export function gunRowsIO(io: PackedIO, rows: unknown[][] | null): unknown[][] {
+  const n = io.vu(rows?.length ?? 0, 3);
+  const out: unknown[][] = [];
+  for (let r = 0; r < n; r++) {
+    const row = rows?.[r] as number[] | undefined;
+    const id = io.thing(row ? (row[0] < 0 ? -1 - row[0] : row[0]) : 0);
+    const { run, o } = gunRowBody(io, row);
+    o[0] = run ? -1 - id : id;
     out.push(o);
   }
   return out;

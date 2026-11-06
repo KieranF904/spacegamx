@@ -34,6 +34,8 @@ const CAN_WAIT = new Set([
 export function urgentFor(msg: ServerMessage, pid: number, quietHits = false): string | null {
   if (!CAN_WAIT.has(msg.type)) return msg.type;
   if (msg.type === 'snapshot') {
+    // (Other pilots' gun rows go at once, as they did as a gunCtl message of their own: their lanes step on them)
+    if (msg.gun?.length) return 'gunRows';
     for (const e of msg.entities) if (e.id === pid) return 'ownRow';
     if (msg.ships) for (const k of msg.ships) if (k[0] === pid) return 'ownKeyframe';
     return null;

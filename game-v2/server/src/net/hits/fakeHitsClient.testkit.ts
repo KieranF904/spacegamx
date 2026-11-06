@@ -341,7 +341,6 @@ export class FakeHitsClient {
       case 'welcome': if (this.pid >= 0) this.own.start(); break;
       case 'ownSync': this.own.onOwnSync(m); break;
       case 'gunSync': this.otherGuns.onGunSync(m); break;
-      case 'gunCtl': this.otherGuns.onGunCtl(m); break;
       // (Pull fields its tick layer works out itself, as a client's ShipClient.onPulls)
       case 'pulls': this.pullRecords += m.f.length; if (m.r) this.reps.pulls.clear(); this.reps.notePulls(m.f, this.snapTick); break;
       case 'netCaps':
@@ -387,6 +386,8 @@ export class FakeHitsClient {
   }
 
   private snapshot(s: ServerSnapshotMessage): void {
+    // (its gun rows first, as a client's serverMessages snapshot handler takes them)
+    if (s.gun) this.otherGuns.onGunCtl({ t: s.tick, r: s.gun });
     this.findHits();
     this.snapTick = s.tick;
     this.sawSnapshot = true;

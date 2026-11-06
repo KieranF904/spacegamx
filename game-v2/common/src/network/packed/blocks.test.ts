@@ -9,6 +9,7 @@ import { isDeepStrictEqual } from 'util';
 import { decodeServerFrame, encodeServerMessage, serverFrame, type EntityState, type ServerMessage } from '../protocol.js';
 import { PackedEncoder, PackedDecoder } from './packedCodec.js';
 import { BlockStore, derivedRow } from './blocks.js';
+import { packGunRow, GUN_FIRE, GUN_ALT } from '../../sim/otherGuns.js';
 
 const base = (msgs: ServerMessage[]): ServerMessage[] => decodeServerFrame(serverFrame(msgs.map(encodeServerMessage)));
 
@@ -72,6 +73,31 @@ describe('encode-once blocks', () => {
     expect(store.stats.p).toBe(48);
     expect(a.enc.stats.blocks).toBe(12);
     expect(a.enc.stats.legacy).toBe(0);
+  });
+
+  it('gun rows (other pilots\' gun controls): blocks encoded once, every client decodes what the base format has', () => {
+    const store = new BlockStore(() => 1);
+    const a = client(store, 7001), b = client(store, 7002);
+    for (let k = 0; k < 8; k++) {
+      // (As GunNet makes them, once a round: a run row, events with ticks ago of 7 and more, big and negative steps, both triggers)
+      const gun = [
+        packGunRow(4262, [[3, GUN_FIRE, 180 + k], [2, GUN_FIRE, 181 + k], [1, GUN_FIRE, 183 + k]], 175),
+        packGunRow(4263, [[9, GUN_FIRE | GUN_ALT, 40], [4, 0, 1200 - k * 300], [0, GUN_ALT, -3]], 2000),
+        packGunRow(4264 + k, [[k % 3, 0, 250]], 250),
+      ];
+      const msg = { type: 'snapshot', tick: 600 + 3 * k, lastProcessedInput: 1, entities: [], removed: [], gun } as unknown as ServerMessage;
+      send(a, [msg]);
+      send(b, [msg]);
+      // (the same row object in another client's snapshot of that round: the same block, not encoded again)
+      send(b, [{ ...msg, gun: [gun[1]] } as unknown as ServerMessage]);
+    }
+    expect(store.stats.g).toBe(24);
+    expect(a.enc.stats.blocks).toBe(8);
+    expect(a.enc.stats.legacy + b.enc.stats.legacy).toBe(0);
+    // (Rows that aren't gun rows' shape still decode as the base format has them: the snapshot goes the connection's way, or plain)
+    const odd = client(store, 7004);
+    send(odd, [{ type: 'snapshot', tick: 700, lastProcessedInput: 1, entities: [], removed: [], gun: [[4262, 1.5, 3], [-1 - 4263]] } as unknown as ServerMessage]);
+    expect(odd.enc.stats.blocks).toBe(0);
   });
 
   it('a continuing holder gets the delta form (smaller), the same bits as every other continuing holder', () => {

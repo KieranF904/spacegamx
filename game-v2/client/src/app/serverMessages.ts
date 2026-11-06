@@ -277,7 +277,8 @@ function death(h: MessageHost, msg: Msg<'death'>): void {
 // (Hot ones first. One entry per line: structure.test.ts reads these keys.)
 
 const TABLE: Handlers = {
-  snapshot: (h, msg) => { h.state.applySnapshot(msg); h.shipClient.afterSnapshot(msg); },
+  // (Its gun rows first: the lanes take them before the snapshot's own processing, as when they came apart)
+  snapshot: (h, msg) => { if (msg.gun) h.shipClient.onGunCtl({ t: msg.tick, r: msg.gun }); h.state.applySnapshot(msg); h.shipClient.afterSnapshot(msg); },
   pong,
   playerState,
   welcome,
@@ -393,7 +394,6 @@ const TABLE: Handlers = {
   ownSync: (h, msg) => { h.shipClient.onOwnSync(msg); },
   // (Other ships' gun lanes, and pilots' gun controls: their guns stepped here from their inputs, ships/guns/OtherGuns.ts)
   gunSync: (h, msg) => { h.shipClient.onGunSync(msg); },
-  gunCtl: (h, msg) => { h.shipClient.onGunCtl(msg); },
   // (Pull fields its tick layer works out itself, opened or ended early: before the snapshot they go with)
   pulls: (h, msg) => { h.shipClient.onPulls(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },

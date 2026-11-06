@@ -9,6 +9,7 @@ import { decodeServerFrame, encodeServerMessage, serverFrame, type ServerMessage
 import { packHits, type ShellHitRecord } from '../hits.js';
 import { PackedEncoder, PackedDecoder, ServerFrameReader } from './packedCodec.js';
 import { PACKED_FRAME, PK_TABLE_MAX } from './tables.js';
+import { packGunRow, GUN_FIRE, GUN_ALT } from '../../sim/otherGuns.js';
 
 const YOU = 4241;
 
@@ -63,6 +64,46 @@ describe('packed frames: each message as the base format has it', () => {
     roundTrip(enc, dec, [[busySnapshot(219, 5200, 1), snap(219, { removed: [5100, 5101, 4530, 77777, 5150], out: [4419] } as never)]]);
     // The rows again: steps from their last, the gone ones as new
     roundTrip(enc, dec, [[busySnapshot(222, 5300, 2), ownShells(222, 5400)]]);
+    expect(enc.stats.legacy).toBe(0);
+  });
+
+  it('gun rows in a snapshot (each pilot by its slot, then the row): as the base format has them', () => {
+    const enc = new PackedEncoder(), dec = new PackedDecoder();
+    for (let k = 0; k < 6; k++) {
+      const gun = [
+        packGunRow(4262, [[3, GUN_FIRE, 180 + k], [2, GUN_FIRE, 181 + k], [1, GUN_FIRE, 183 + k]], 175),
+        packGunRow(4263, [[12, GUN_FIRE | GUN_ALT, 40], [4, 0, 1200 - k * 300], [0, GUN_ALT, -3]], 2000),
+        packGunRow(YOU + 1 + k, [[k, 0, 250]], 250),
+      ];
+      roundTrip(enc, dec, [[busySnapshot(300 + 3 * k, 7000 + 10 * k, k), snap(300 + 3 * k, { gun } as never)]]);
+    }
+    expect(enc.stats.legacy).toBe(0);
+    // (Not a gun row's shape: the snapshot goes as the base format's bytes)
+    roundTrip(enc, dec, [[snap(330, { gun: [[4262, 1.5, 3]] } as never)]]);
+    expect(enc.stats.legacy).toBe(1);
+  });
+
+  it('the netcode rounds\' messages field by field (gun lanes, pull fields) and the map, debris splits, boss effects, fresh syncs', () => {
+    const enc = new PackedEncoder(), dec = new PackedDecoder();
+    for (let k = 0; k < 4; k++) {
+      const t = 9000 + 3 * k;
+      const msgs = [
+        // (a lane as packGunSync cuts it: sparse arrays, absent scalars as null, then the controls and the held distance)
+        { type: 'gunSync', id: 4262, t, z: [812, 2, 100, 0, -1, 3, 1, 5, 2, 0, 0, 1, 1, 2, 1, 0, 3, 1, 0, 2, 0, 0.75, 1, 1, t - 40, null, null, null, 4263, 3, 210 + k, 840] },
+        { type: 'gunSync', id: 4263, t, z: [], w: t - 2, keep: 1 },
+        { type: 'gunSync', id: 4264, t, z: [], ...(k % 2 ? { w: t - 1 } : {}) },
+        { type: 'pulls', f: [[17, 4262, 1, t - 30, -1, 4300, 0, 1800, 2.5], [18, 4419, 0, t - 90, t - 4, 0, 1]], ...(k === 2 ? { r: 1 } : {}) },
+        { type: 'mapDots', tick: t, dots: [4262, 6899 + k, 2891, 474, 421, 0, 0, 120, 4263, 7100, -2010, -33, 12, 0, 0, -1], info: [4262, 1, 0, 4263, 3, 7], gone: k ? [4100 + k] : undefined, names: [4263, 'Brood Mother'], ...(k === 0 ? { full: 1 } : {}), routes: [4300, 12, 7000.5, 2900, 1.25, -0.5, 7100, 2950, 7000, 2900, 800, 3.5, 991] , pts: [4301, 700, 290] },
+        { type: 'debrisSplit', id: 4419, tick: t - 1, e: [5000, 1, 1, 2], p: [0, 4, 7, 2], l: 1, s: [106279.68, 23231.01, 0.44444, 1.25, -0.5, 0.0012], h: [12.5, 30, 4.1] },
+        { type: 'bossBeam', bodyId: 4530, x: 120, y: -40, a0: 0.7853981633974483, a1: 0.7853981633974483, ticks: 90, length: 3600, width: 200 },
+        { type: 'bossBeam', bodyId: 4530, x: 0, y: 0, a0: 1, a1: 1.5, ticks: 30, length: 900, width: 40, kind: 'crystal' },
+        { type: 'bossTelegraph', shape: 'line', kind: 'lane', bodyId: 4530, x: 30, y: -10, angle: 0.333, length: 3600, width: 200, ticks: 60 },
+        { type: 'bossTelegraph', shape: 'circle', kind: 'vent', x: 69000, y: 29000, radius: 400, ticks: 600 },
+        { type: 'bossBlow', bodyId: 4530, part: 7 + k },
+        { type: 'shipSync', id: 4253, kind: 'ship', hp: [100, 80.5, 3], maxHp: [100, 90, 3], detached: [], rebuilds: 2, at: t - 1 },
+      ] as unknown as ServerMessage[];
+      roundTrip(enc, dec, [msgs]);
+    }
     expect(enc.stats.legacy).toBe(0);
   });
 

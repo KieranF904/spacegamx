@@ -469,6 +469,17 @@ export class SnapshotBuilder {
    * Projectiles fly in straight lines, so their key leaves out the position:
    * one is sent when it's fired and again only if its course changes (missiles).
    */
+  /**
+   * Another pilot's cursor distance in hundreds, for its status row (the drawing fallback of a client not stepping its
+   * gun lane: ShipClient.placeReplica). An armed pilot's goes by GunNet's idle rule (`rough`: the turn it makes to a
+   * gun's line, at most every IDLE_MIN_GAP ticks), firing or not, so its row isn't sent again to every holder each
+   * time the cursor crosses a hundred; an unarmed one's (no lane, no turrets to draw) is the cursor's
+   */
+  private roughCursor(eid: number): number {
+    const l = this.gunNet?.lanes.get(eid);
+    return Math.round((l && l.kind === 'pilot' ? l.rough : Input.cursorDist[eid]) / 100);
+  }
+
   private systemRows(num: number): SnapRow[] {
     const rows: SnapRow[] = [];
     // (Each key is interned: see internKey. Ships and projectiles are keyed by their values: rowKey)
@@ -533,7 +544,7 @@ export class SnapshotBuilder {
       const status: EntityState = {
         id: eid, type: EntityType.Player, x: row.state.x, y: row.state.y, hp: row.state.hp, maxHp: row.state.maxHp,
         data: [Math.round(this.ships.shieldFraction(eid) * 20) * 5, this.ships.isEmped(eid) ? 1 : 0,
-          Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, Math.round(Input.cursorDist[eid] / 100),
+          Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, this.roughCursor(eid),
           // [6] what its Tow Beam tows (entity id + 1, 0 none: ships/features/tow, features.wire.json status)
           this.features.status('tow', eid),
           // [7] marked and slowed (bits: ships/features/weaponry, features.wire.json status)
@@ -992,11 +1003,9 @@ export class SnapshotBuilder {
 
       // (The ownSync goes first: its client takes it before the snapshot's own processing, OwnTick.onOwnSync)
       if (syncing) { this.send(conn.ws, fullSync ? packOwnSync(this.currentTick, ownNow!.x) : packOwnHazards(this.currentTick, ownNow!.x.hazard)); this.ownSyncs++; }
-      // (Other ships' gun lanes it starts from here, and the pilots' gun controls it steps them on: before the snapshot, as the ownSync)
-      if (guns) {
-        for (const m of guns.syncs) this.send(conn.ws, m);
-        if (guns.rows.length) this.send(conn.ws, { type: 'gunCtl', t: this.currentTick, r: guns.rows });
-      }
+      // (Other ships' gun lanes it starts from here: before the snapshot, as the ownSync. The pilots' gun controls it
+      // steps them on ride in the snapshot, `gun`: each row made once a round, an encode-once block)
+      if (guns) for (const m of guns.syncs) this.send(conn.ws, m);
       if (pullRows || pullReset) { this.send(conn.ws, pullReset ? { type: 'pulls', f: pullRows ?? [], r: 1 } : { type: 'pulls', f: pullRows! }); conn.pullsReset = false; }
       if (ownNow) conn.ownSyncDue = false;
       this.send(conn.ws, {
@@ -1014,6 +1023,7 @@ export class SnapshotBuilder {
         causes: rep.causes,
         guides: guided?.rows.length ? guided.rows : undefined,
         hh: headWord(ownNow ? ownNow.hash : null, keyed.has(conn.playerId) ? HEAD_HASH_ROW : 0),
+        gun: guns?.rows.length ? guns.rows : undefined,
       });
 
       conn.forceSnapshot = false;
