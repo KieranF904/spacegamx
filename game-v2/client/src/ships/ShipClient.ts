@@ -315,7 +315,7 @@ export class ShipClient {
     // (Contact pairs found on the tick layer: ships/causes/ContactWorld.ts)
     this.contacts = new ContactWorld({
       reps: this.replicas, store: this.store, self: () => opts.state.playerId, ownOn: () => this.own.on, tuning: opts.tuning,
-      derivedAt: (id, t) => (id === opts.state.playerId ? this.own.derived(t) : this.causes.derived(id, t) ?? this.store.get(id)?.derived),
+      derivedAt: (id, t) => this.derivedAt(id, t),
       mid: (id, t, place) => (id === opts.state.playerId ? this.own.midAt(t, place) : this.causes.midOf(id, t, place)),
       forget: (t) => { this.causes.cursors.forget(t); this.own.cursors.forget(t); },
     });
@@ -330,6 +330,12 @@ export class ShipClient {
 
   /** Ships out of view it keeps: back, the server sends only what changed */
   readonly away: ShipMemory<InterpolatedEntity>;
+  /** The flight tuning (the PT layer's contact pass reads it: predict/world.ts) */
+  get tuning(): ShipTuning { return this.opts.tuning; }
+  /** The structure a ship flew tick t with (its own: OwnTick's; others: by tick where kept, else its current) */
+  derivedAt(id: number, t: number): ShipDerived | null | undefined {
+    return id === this.opts.state.playerId ? this.own.derived(t) : this.causes.derived(id, t) ?? this.store.get(id)?.derived;
+  }
   /** Other ships' causes */
   private readonly causes: ShipCauses;
   private readonly contacts: ContactWorld;

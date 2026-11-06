@@ -46,6 +46,7 @@ import type { Lazy } from '../lazy';
 import type { AudioManager } from '../audio/AudioManager';
 import type { InputManager } from '../input/InputManager';
 import type { Renderer } from '../rendering/Renderer';
+import type { Prediction } from '../predict/Prediction';
 import type { ShipClient } from '../ships/ShipClient';
 import type { GameState } from '../state/GameState';
 import type { PilotState } from '../econ/clientEcon';
@@ -60,6 +61,8 @@ export interface WindowHost {
   readonly network: ClientTransport;
   readonly audio: AudioManager;
   readonly shipClient: ShipClient;
+  /** Other ships' prediction (predict/Prediction.ts); null in proto */
+  readonly prediction: Prediction | null;
   readonly renderer: Renderer;
   readonly input: InputManager;
   readonly proto: ProtoHooks | null;

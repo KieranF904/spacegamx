@@ -1,25 +1,26 @@
 /**
- * The PT timeline's kinds in the game (modes C2/C3; the registry: client predict/ptKinds.ts), in their order:
+ * The PT timeline's kinds in the game (C3, the default, and C2; the registry: predict/ptKinds.ts), in their order:
  *
- *   ships   the PT/ST layer (ptst.ts over replicaWorld.ts): other pilots and the AI it steps, adapted as a kind
+ *   ships   the PT/ST layer (ptst.ts over world.ts): other pilots and the AI it steps, adapted as a kind
  *   bodies  bosses on the replica layer, drawn at their PT tick (predict/kinds/bodiesKind.ts)
  *   guides  homing shells and mobs stepped ahead of the snapshots (predict/kinds/guidesKind.ts)
  *   moves   bodies' moves (boss attacks): their looks at the body's PT tick, their shells drawn ahead (movesKind.ts)
  *
  * Other ships are read past the confirmed tick through AheadReads (the ships kind's PT where it has one), never by
- * stepping them ahead on the replica layer. Installed while C2/C3 runs (install), taken out after (uninstall): the
+ * stepping them ahead on the replica layer. Prediction.ts installs them while C2/C3 runs (install) and takes them out
+ * for the dev alternatives (uninstall): the
  * snapshots' runners and the drawing are as they were.
  */
 import { AHEAD_BACK, type FlightBody, type ReplicaState } from '@space-game/common';
-import type { GameState } from '../../state/GameState';
-import type { ShipClient } from '../../ships/ShipClient';
-import type { Renderer } from '../../rendering/Renderer';
-import { PtKinds, noPtStats, type PoseXY, type PtKind, type PtKindStats } from '../../predict/ptKinds';
-import { AheadReads } from '../../predict/aheadReads';
-import { BodiesKind } from '../../predict/kinds/bodiesKind';
-import { GuidesKind } from '../../predict/kinds/guidesKind';
-import { MovesKind } from '../../predict/kinds/movesKind';
-import { setLate } from '../../predict/late';
+import type { GameState } from '../state/GameState';
+import type { ShipClient } from '../ships/ShipClient';
+import type { Renderer } from '../rendering/Renderer';
+import { PtKinds, noPtStats, type PoseXY, type PtKind, type PtKindStats } from './ptKinds';
+import { AheadReads } from './aheadReads';
+import { BodiesKind } from './kinds/bodiesKind';
+import { GuidesKind } from './kinds/guidesKind';
+import { MovesKind } from './kinds/movesKind';
+import { setLate } from './late';
 import type { PtStLayer } from './ptst';
 
 /** The PT/ST layer as the registry's first kind (ships): it confirms and advances; the others read its PT */
@@ -49,7 +50,8 @@ export interface WorldKinds {
 }
 
 /** `drawTick(id)`: the tick a thing on PT is drawn at this frame (the mode's: ptDrawTick) */
-export function worldKinds(state: GameState, sc: ShipClient, renderer: Renderer, layer: PtStLayer, drawTick: (id: number) => number): WorldKinds {
+/** `renderer`: the game's, once made (moves' shells are drawn ahead through it; none before it exists) */
+export function worldKinds(state: GameState, sc: ShipClient, renderer: () => Renderer | null, layer: PtStLayer, drawTick: (id: number) => number): WorldKinds {
   const self = () => state.playerId, confirmed = () => state.serverTick;
   const reads = new AheadReads({
     reps: sc.replicas, confirmed, self,
@@ -65,12 +67,14 @@ export function worldKinds(state: GameState, sc: ShipClient, renderer: Renderer,
     show: (m, late) => { setLate(m, late); sc.show(m); },
     shell: (row, until) => {
       const d = row.data!, t = d[3], owner = d[6], body: FlightBody | undefined = sc.replicas.at(owner, t - 1)?.body;
-      return renderer.predictShot({
+      const r = renderer();
+      if (!r) return null;
+      return r.predictShot({
         pose: body ? { x: body.x, y: body.y, angle: body.angle } : { x: d[4], y: d[5], angle: Math.atan2(row.vy ?? 0, row.vx ?? 0) },
         owner, type: d[0], grade: d[1], spawnX: d[4], spawnY: d[5], spawnTick: t, vx: row.vx ?? 0, vy: row.vy ?? 0, size: d[7] || 1, life: Math.max(1, until - t),
       });
     },
-    retract: (h) => renderer.retractShot(h),
+    retract: (h) => { renderer()?.retractShot(h); },
   });
   const kinds = new PtKinds().add(new ShipsKind(layer)).add(bodies).add(guides).add(moves);
   return {

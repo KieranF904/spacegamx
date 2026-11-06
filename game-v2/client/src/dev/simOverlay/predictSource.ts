@@ -13,8 +13,8 @@ import { AHEAD_BACK } from '@space-game/common';
 import type { GameState } from '../../state/GameState';
 import type { ShipClient } from '../../ships/ShipClient';
 import type { PredictController } from '../predict/PredictController';
-import { ptDrawTick } from '../predict/modes';
-import type { PtStStats } from '../predict/ptst';
+import { ptDrawTick } from '../../predict/modes';
+import type { PtStStats } from '../../predict/ptst';
 import type { GameStateSource } from './gameStateSource';
 import type { CorrectionVector, OverlayCounters, OverlayShip, PoseXY, SimOverlaySource } from './types';
 
@@ -96,6 +96,8 @@ export class PredictSource implements SimOverlaySource {
       restepMsPerTick: ticks > 0 ? this.deltas.delta('restepMs').d / ticks : 0,
       advanceMsPerTick: ticks > 0 ? this.deltas.delta('advanceMs').d / ticks : 0,
       contactsPerSec: r('contacts'),
+      snapsPerSec: r('snaps'),
+      ptLodOut: this.pc.prediction.world.lodOut,
       hitAgreementPct: 100 * hits.agreement,
       hitsAgreedPerSec: hits.agreed,
       hitsDrawnOnlyPerSec: hits.drawnOnly,

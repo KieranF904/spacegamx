@@ -8,6 +8,7 @@ const CHAT_TAB_KEY = 'spacegame.chatTab';
 import { buildWindows, type WindowHost, type WindowSet } from './app/windows';
 import { prefetchScreens } from './app/lazyScreens';
 import { installDevTools } from './app/devTools';
+import { Prediction } from './predict/Prediction';
 import { handleKey, type KeyHost } from './app/keys';
 import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
 import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './app/inputSend';
@@ -120,6 +121,8 @@ export class Game {
   /** Every window and HUD component (built in init; see app/windows.ts) */
   private w = {} as WindowSet;
   private shipClient: ShipClient;
+  /** Other ships predicted on the PT layer (predict/Prediction.ts: C3); null in proto */
+  private prediction: Prediction | null = null;
   /** The time-scale badge: the system slowed in a crowd (CAPS.CROWD) */
   private timeBadge: TimeScaleBadge | null = typeof document !== 'undefined' ? new TimeScaleBadge() : null;
   private hazards = new HazardOverlay();
@@ -299,6 +302,8 @@ private xpFillEl: HTMLElement | null;
       this.state.ownStep = (t) => this.shipClient.ownStepTo(t);
       this.state.ownPose = (t) => this.shipClient.ownPose(t);
       this.state.replicaPose = (e, t) => this.shipClient.placeReplica(e, t);
+      // (Every other ship on the PT layer at your tick, drawn by the prediction's hook: C3)
+      this.prediction = new Prediction(this.state, this.shipClient, () => this.renderer ?? null);
     }
     this.audio = new AudioManager();
     
@@ -868,6 +873,7 @@ this.xpFillEl = document.getElementById('xpFill');
       get network() { return g.network; },
       get audio() { return g.audio; },
       get shipClient() { return g.shipClient; },
+      get prediction() { return g.prediction; },
       get renderer() { return g.renderer; },
       get input() { return g.input; },
       get proto() { return g.proto; },

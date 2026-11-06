@@ -8,6 +8,8 @@ import { Position, Velocity, Rotation, InSystem, EntityType, encodeMessage, deco
 import { FakeHitsClient } from '../../net/hits/fakeHitsClient.testkit.js';
 import type { GameServer } from '../../GameServer.js';
 import { controlsFor, inputKey, type Ctl } from './world.js';
+import { PtStLayer } from '../../../../client/src/predict/ptst.js';
+import { ReplicaPtWorld } from '../../../../client/src/predict/world.js';
 
 export type Pose = Float64Array;
 /** The server's ship poses, every tick of the last 32, shared by all probes */
@@ -56,6 +58,17 @@ export class Probe {
   readonly corrections: Partial<Record<Klass, { n: number; same: number }>> = {};
   snapshots = 0;
   clientMs = 0;
+  /**
+   * The game's prediction of other ships (client predict/: C3, the PT/ST layer with the touch register and the real
+   * contact pass) as a game client runs it: each tick, after its frames, the newest confirmed tick checked and PT stepped
+   * to its own predicted tick (the server's tick plus its latency: a client `lat` ticks off each way). Its CPU apart
+   * (ptMs, not in clientMs); null with --pt 0
+   */
+  readonly pt: PtStLayer | null;
+  readonly ptWorld: ReplicaPtWorld | null;
+  ptMs = 0;
+  /** PT stats when measuring began (the case's rates are from there) */
+  ptAt: Record<string, number> | null = null;
   /** Of which its debris world (ShipReplicaSet.stepDebrisTo) */
   debrisMs = 0;
   /** Debris it had off with no keyframe (the first few) */
@@ -74,7 +87,7 @@ export class Probe {
 
   constructor(private server: GameServer, readonly name: string, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
     /** Its system's tick (its own clock once dilated, --crowd: latency is counted in its ticks too) */
-    private tick: () => number = () => server.getTick()) {
+    private tick: () => number = () => server.getTick(), pt = true) {
     const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
     this.fake = new FakeHitsClient(server, {
       name, env,
@@ -87,6 +100,12 @@ export class Probe {
     });
     this.pid = this.fake.pid;
     this.lat = lat;
+    const fk = this.fake;
+    this.ptWorld = pt ? new ReplicaPtWorld({
+      reps: fk.reps, store: fk.store, bodies: fk.bodies, tuning: fk.store.tuning,
+      self: () => this.pid, confirmed: () => fk.snapTick, predicted: () => this.tick() + lat, candidates: () => fk.reps.ids(),
+    }) : null;
+    this.pt = this.ptWorld ? new PtStLayer(this.ptWorld, { touch: true }) : null;
     const f = this.fake as any, oSnap = f.snapshot.bind(f), oHandle = f.handle.bind(f);
     const len = (m: unknown) => { const e = encodeMessage(m as ClientMessage) as string | ArrayBuffer; return typeof e === 'string' ? e.length : e.byteLength; };
     const isShipRow = (e: { type: number }) => e.type === EntityType.Player || e.type === EntityType.ShipBody;
@@ -211,7 +230,14 @@ export class Probe {
     if (bck) this.bckQ.push({ at: now + this.lat, v: bck });
     for (const m of f.outbox.splice(0)) this.up.push({ at: now + this.lat, msg: m });
     while (this.up.length && this.up[0].at <= now) f.link?.receive(this.up.shift()!.msg);
-    if (this.measuring) this.clientMs += performance.now() - t0;
+    const t1 = performance.now();
+    if (this.measuring) this.clientMs += t1 - t0;
+    if (this.pt && f.snapTick > 0) {
+      if (this.measuring && !this.ptAt) this.ptAt = { ...this.pt.stats };
+      this.pt.confirm(f.snapTick);
+      this.pt.advance(now + this.lat);
+      if (this.measuring) this.ptMs += performance.now() - t1;
+    }
   }
 }
 
