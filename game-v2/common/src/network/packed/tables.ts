@@ -25,7 +25,7 @@ export const PK = {
   /** A snapshot in encode-once blocks (CAPS.BLOCKS: blocks.ts, blocksSnapshot.ts) */
   BLOCKS: 15,
   // (Field by field, protocol 61: the plain messages of the netcode rounds and the busiest of the rest)
-  GUN_SYNC: 16, MAP_DOTS: 17, DEBRIS_SPLIT: 18, BOSS_BEAM: 19, BOSS_TELEGRAPH: 20, BOSS_BLOW: 21, PULLS: 22,
+  GUN_SYNC: 16, MAP_DOTS: 17, DEBRIS_SPLIT: 18, BOSS_BEAM: 19, BOSS_TELEGRAPH: 20, BOSS_BLOW: 21, PULLS: 22, PROFILE_DELTA: 23,
 } as const;
 export const PK_BITS = 5;
 
@@ -75,6 +75,8 @@ export const PACKED_FIELDS: Record<string, { code: number; fields: readonly Pack
   bossBlow: { code: PK.BOSS_BLOW, fields: [['w'], ['n', 0, 4]] },
   // (f: the fields as rows, any value; r: start afresh)
   pulls: { code: PK.PULLS, fields: [['a'], ['n', 0, 1]] },
+  // (xp, level, credits, xpLevel, xpNext, skillPoints, debt, o: the other changed fields)
+  profileDelta: { code: PK.PROFILE_DELTA, fields: [['n', 0, 6], ['n', 0, 3], ['n', 0, 6], ['n', 0, 6], ['n', 0, 6], ['n', 0, 3], ['n', 0, 6], ['a']] },
 };
 
 /**

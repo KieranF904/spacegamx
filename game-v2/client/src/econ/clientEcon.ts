@@ -6,7 +6,7 @@
 
 import {
   Economy, Blueprint, Catalog, ItemsFile, RecipesFile, Stack, Bag, ShipTuning,
-  ServerProfileMessage, ServerItemsMessage, ServerRebuildStatusMessage, ServerHangarMessage, countOf, canCraft,
+  ServerProfileMessage, ServerProfileDeltaMessage, applyProfileDelta, ServerItemsMessage, ServerRebuildStatusMessage, ServerHangarMessage, countOf, canCraft,
   OrderPlan, JobView, planOrders, setUnlockTable, UnlockTable, registerAmmo,
 } from '@space-game/common';
 import items from '../../../data/items.json';
@@ -61,6 +61,14 @@ export class PilotState {
     this.profile = m;
     if (m.now) this.clockSkew = m.now - Date.now();
     this.credits = m.credits;
+    this.emit();
+  }
+
+  /** Only what changed: laid over the profile held (the clock's skew stays as the full message set it) */
+  setProfileDelta(d: ServerProfileDeltaMessage): void {
+    if (!this.profile) return;
+    this.profile = applyProfileDelta(this.profile, d);
+    this.credits = this.profile.credits;
     this.emit();
   }
 

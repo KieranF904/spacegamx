@@ -1762,6 +1762,8 @@ const COMPACT: [string, string[]][] = [
   // (Appended, protocol 61: the netcode rounds' plain messages, so they can go bit-packed: sim/otherGuns.ts, sim/pullFields.ts)
   ['gunSync', ['id', 't', 'z', 'w', 'keep']],
   ['pulls', ['f', 'r']],
+  // (The profile's changes: econProtocol.ts ServerProfileDeltaMessage)
+  ['profileDelta', ['xp', 'level', 'credits', 'xpLevel', 'xpNext', 'skillPoints', 'debt', 'o']],
 ];
 
 /**

@@ -47,6 +47,53 @@ export interface ServerProfileMessage {
   now?: number;
 }
 
+/**
+ * The profile again, but only what changed since the last one sent: the numbers that move with play have fields of their
+ * own (XP, level, credits...), every other changed field of the profile is in `o` (whole, by name). Absent: unchanged.
+ * The client lays it over the profile it holds (applyProfileDelta); the full message goes on join and whenever the
+ * server has nothing to diff against.
+ */
+export interface ServerProfileDeltaMessage {
+  type: 'profileDelta';
+  xp?: number;
+  level?: number;
+  credits?: number;
+  xpLevel?: number;
+  xpNext?: number;
+  skillPoints?: number;
+  debt?: number;
+  o?: Partial<Omit<ServerProfileMessage, 'type'>>;
+}
+
+/** The fields that have a slot of their own in a profileDelta (the rest go in `o`) */
+export const PROFILE_DELTA_FIELDS = ['xp', 'level', 'credits', 'xpLevel', 'xpNext', 'skillPoints', 'debt'] as const;
+
+/** The profile with a delta laid over it (a new object; `now` and the rest stay as they were) */
+export function applyProfileDelta(p: ServerProfileMessage, d: ServerProfileDeltaMessage): ServerProfileMessage {
+  const out: ServerProfileMessage = { ...p, ...d.o };
+  for (const k of PROFILE_DELTA_FIELDS) if (d[k] !== undefined) out[k] = d[k] as number;
+  return out;
+}
+
+/** What changed from `prev` to `next` (full messages) as a delta, or null: nothing did. The clock (`now`) is not compared. */
+export function diffProfile(prev: ServerProfileMessage, next: ServerProfileMessage): ServerProfileDeltaMessage | null {
+  const d: ServerProfileDeltaMessage = { type: 'profileDelta' };
+  const own = new Set<string>(PROFILE_DELTA_FIELDS);
+  const o: Record<string, unknown> = {};
+  let any = false;
+  for (const k of Object.keys(next) as (keyof ServerProfileMessage)[]) {
+    if (k === 'type' || k === 'now') continue;
+    const a = prev[k], b = next[k];
+    if (b === undefined || a === b || JSON.stringify(a) === JSON.stringify(b)) continue;
+    any = true;
+    if (own.has(k) && typeof b === 'number') (d as unknown as Record<string, number>)[k] = b;
+    else o[k] = b;
+  }
+  if (!any) return null;
+  if (Object.keys(o).length) d.o = o as ServerProfileDeltaMessage['o'];
+  return d;
+}
+
 /** A repair kit at work on your ship: credits of repairs left (0 = finished) */
 export interface ServerRepairKitMessage {
   type: 'repairKit';
@@ -161,7 +208,7 @@ export interface ClientItemUseMessage {
   id: string;
 }
 
-export type EconServerMessage = ServerProfileMessage | ServerItemsMessage | ServerLootMessage2 | ServerToastMessage | ServerWreckMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
+export type EconServerMessage = ServerProfileMessage | ServerProfileDeltaMessage | ServerItemsMessage | ServerLootMessage2 | ServerToastMessage | ServerWreckMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
   | ServerQuestsMessage | ServerQuestBoardMessage | ServerQuestStepMessage | ServerHangarMessage | ServerRepairKitMessage | ServerTalkMessage | ServerPeopleMessage | ServerCodexMessage;
 export type EconClientMessage = ClientItemMoveMessage | ClientItemStoreMessage | ClientRestockLoadoutMessage | ClientSlotLoadoutMessage | ClientItemJettisonMessage | ClientItemUseMessage
   | ClientStationOpenMessage | ClientRefineMessage | ClientCraftMessage | ClientGemCutMessage | ClientGemSocketMessage | ClientGemUnsocketMessage | ClientAmmoPreferMessage | ClientOutpostCharterMessage | ClientOutpostUpgradeMessage | ClientDesignSaveMessage | ClientDesignDeleteMessage | ClientDevStationMessage | ClientFabOrderMessage | ClientFabOrderCancelMessage | ClientMarketSellMessage | ClientMarketBuyMessage

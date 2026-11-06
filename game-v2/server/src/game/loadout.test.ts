@@ -100,7 +100,8 @@ describe('ammunition loadouts', () => {
   it('the loadout survives refitting the ship and is reported to the client', () => {
     const { t, got, profile } = liveServer();
     t.send({ type: 'slotLoadout', slot: 0, load: { cannon_hv: 2 } } as any);
-    const prof = got.filter((m) => m.type === 'profile').pop() as any;
+    // (A full profile once, then only what changed: the loadout rides in a delta's `o`)
+    const prof = got.filter((m) => m.type === 'profile' || m.type === 'profileDelta').reduce((acc: any, m: any) => (m.type === 'profile' ? m : { ...acc, ...m.o }), {}) as any;
     expect(prof.loadout).toEqual({ cannon_hv: 2 });
     const hangar = got.filter((m) => m.type === 'hangar').pop() as any;
     expect(hangar.slots[0].loadout).toEqual({ cannon_hv: 2 });
