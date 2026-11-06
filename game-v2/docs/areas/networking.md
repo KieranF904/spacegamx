@@ -479,16 +479,23 @@ server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, pre
   - *Controls*: a pilot's held keys and aim are its control rows; its triggers and cursor distance (the input's 4-unit
     grid) are gun rows, a plain `gunCtl` message just before the snapshot (`packGunRow`: [id, bits × 8 + ago, distance
     step, ...], a run form like the control rows'). They go when they change, and only to clients stepping that ship.
-    The distance goes exactly only where a lane needs it (GunNet `ctlTick`): on the tick a trigger changes, every tick
-    one is held, and `SEMI_BUFFER` (5) ticks after a release (a semi-automatic click still fires). With no trigger held
+    The distance goes exactly only where a lane needs it (GunNet `ctlTick`): on the tick a trigger changes, while
+    one is held, and `SEMI_BUFFER` (5) ticks after a release (a semi-automatic click still fires). Held, "exactly" is
+    as the guns stepped on it: a pilot's guns hold their distance (`ShipState.heldDist`, in the gun state, the lane's
+    gunSync and the ownSync) and take the cursor's only on a gun's due ticks, its fire tick (before it steps, so the
+    shot is exact) and halfway to its next (common ships/guns.ts `distDue`, a pure function of the gun state: the
+    server's real ship, its lanes, other clients' lanes and the pilot's own prediction all hold the same one; several
+    guns: the union of their ticks; a beam: every tick). So a held cursor goes about twice a fire interval, only when
+    that changes it (crowd bench: exact updates 7.2 -> 4.3 a pilot a second at ball 20, 13.2 -> 6.8 at ball 50; gunCtl
+    1332 -> 1055 B/s, 5903 -> 3993 B/s). The server's lane steps on the controls as sent, as its clients' do. With no trigger held
     a turret points straight at the aim and carries nothing (the turret rule, docs/areas/weapons.md), so there the
     distance goes roughly (`idleDue`): when the change since the last sent would turn some gun's line to the aim point
     (from a turret's pivot, a fixed gun's muzzle) by `IDLE_TURN` (0.5°) at `IDLE_MIN_GAP` (15 ticks, 250 ms) since,
     proportionally less the longer since (0.5° × 15 / ticks: a small change waits longer, a big one goes at 250 ms),
     and any change at all at `IDLE_MAX_GAP` (180 ticks, 3 s); unchanged, nothing. A pilot holding its cursor on a
-    moving target now sends about 0.25-0.4 idle updates a second instead of 10-16 (crowd bench). The server's lane
-    steps on the exact distance; the clients' on what they were sent (held between); what that changes, an idle
-    turret's aim, is left out of the lane hash. For drawing, `OtherGuns.distAt` eases between two idle updates
+    moving target now sends about 0.25-0.4 idle updates a second instead of 10-16 (crowd bench). Every lane steps on
+    what was sent (held between); what that changes from the real ship, an idle turret's aim, is left out of the lane
+    hash (as is the held distance while idle). For drawing, `OtherGuns.distAt` eases between two idle updates
     (ShipClient.placeReplica's cursor distance, in place of the status row's hundreds, for a ship whose lane it steps).
     An AI pilot's trigger, lead and distance are its body's (common bodies/aiPilot.ts: the trigger rule `aiFires` moved
     there from Enemies.ts, its target's size read where each end has its structure, `lobs` in the ENGAGE order's

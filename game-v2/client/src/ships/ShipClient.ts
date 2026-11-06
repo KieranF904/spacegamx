@@ -1900,7 +1900,7 @@ function mirrorGuns(ship: ShipState, st: Readonly<SimShipState>): void {
   copyInto(ship.cooldown, g.cooldown); copyInto(ship.rounds, g.rounds); copyInto(ship.reload, g.reload);
   copyInto(ship.charge, g.charge); copyInto(ship.spin, g.spin); copyInto(ship.aim, g.aim);
   ship.triggerHeld = g.triggerHeld; ship.clickAt = g.clickAt;
-  ship.minePaid = g.minePaid; ship.mineUntil = g.mineUntil; ship.mineShare = g.mineShare; ship.tow = g.tow;
+  ship.minePaid = g.minePaid; ship.mineUntil = g.mineUntil; ship.mineShare = g.mineShare; ship.tow = g.tow; ship.heldDist = g.heldDist;
 }
 
 function copyInto(to: number[], from: readonly number[]): void {

@@ -62,6 +62,8 @@ export function shipHash(s: Readonly<SimShipState>): number {
   const g = s.guns;
   h = arr(h, g.cooldown); h = arr(h, g.rounds); h = arr(h, g.reload); h = arr(h, g.charge); h = arr(h, g.spin); h = arr(h, g.aim);
   h = num(h, g.triggerHeld ? 1 : 0); h = num(h, g.clickAt); h = num(h, g.minePaid); h = num(h, g.mineUntil); h = num(h, g.mineShare); h = num(h, g.tow);
+  // (A pilot's held aim distance only while its trigger is held: idle, its guns step on the cursor's, guns.ts distDue)
+  if (g.triggerHeld && g.heldDist !== undefined) h = num(h, g.heldDist);
   return fin(h);
 }
 

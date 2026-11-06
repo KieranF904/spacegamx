@@ -268,10 +268,11 @@ export async function runCase(o: CaseOpts): Promise<any> {
         firstStepUsMean: r2((t.firstStepMs / Math.max(1, t.firstSteps)) * 1000), firstStepMsPerProbePerSec: r2(t.firstStepMs / secs / Math.max(1, probeList.length)) };
     })(),
     // (Other ships' guns, server net/guns/GunNet.ts: a pilot's aim distance while no trigger is held, per pilot per
-    // second: the ticks it changed (each one a gun row event before the idle rule) and the updates that went)
+    // second: the ticks it changed (each one a gun row event before the idle rule) and the updates that went; held,
+    // the ticks it changed (each one an exact update before the held-distance rule) and the exact updates that went)
     guns: (() => {
       const d = numericDiff(snap(srv.gunNet?.stats ?? {}), guns0) as Record<string, number>, per = (v: number) => r2((v ?? 0) / secs / Math.max(1, o.n));
-      return { ...d, idleChangesPerPilotSec: per(d.idleChanges), idleSentPerPilotSec: per(d.idleSent), exactSentPerPilotSec: per(d.exactSent) };
+      return { ...d, idleChangesPerPilotSec: per(d.idleChanges), idleSentPerPilotSec: per(d.idleSent), exactChangesPerPilotSec: per(d.exactChanges), exactSentPerPilotSec: per(d.exactSent) };
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
     probeDebrisMsPerTick: r2(mean(probeList.map((p) => p.debrisMs / ticks))),

@@ -60,6 +60,8 @@ interface Run {
   /** A's lanes held to the server's at the same tick (hash), and those that were off */
   laneChecks: number;
   laneOff: string[];
+  /** The gunner's own layer (its own ship, held distance and all, stepped on its client: client ships/own/OwnTick.ts) */
+  ownB: Record<string, number>;
 }
 
 export function otherGunsFight(opts: { pairs?: [string, string][]; pirates?: boolean; ticksPer?: number; pd?: boolean; bursts?: boolean } = {}): Run {
@@ -200,13 +202,13 @@ export function otherGunsFight(opts: { pairs?: [string, string][]; pirates?: boo
     }
   }
   for (let t = 0; t < 200; t++) step(-1);
-  return { server, A, truth, exact, inexact, derivedShells, stats: { ...server.gunNet.stats }, laneStats: { ...A.otherGuns.stats }, toldB, toldAi, laneChecks, laneOff };
+  return { server, A, truth, exact, inexact, derivedShells, stats: { ...server.gunNet.stats }, laneStats: { ...A.otherGuns.stats }, toldB, toldAi, laneChecks, laneOff, ownB: { ...B.own.stats } };
 }
 
 describe('other ships\' guns stepped from their inputs', () => {
   it('another pilot, every firing model: each shell the watcher built is the server\'s exactly, and its fire records are not sent', () => {
     const r = otherGunsFight();
-    if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ exact: r.exact, inexact: r.inexact.slice(0, 10), n: r.inexact.length, derived: r.derivedShells, stats: r.stats, lane: r.laneStats, toldB: r.toldB }));
+    if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ exact: r.exact, inexact: r.inexact.slice(0, 10), n: r.inexact.length, derived: r.derivedShells, stats: r.stats, lane: r.laneStats, toldB: r.toldB, ownB: r.ownB }));
     expect(r.derivedShells).toBeGreaterThan(200);
     expect(r.inexact).toEqual([]);
     // (every told hit named a shell it had; no HP put right)
@@ -218,11 +220,17 @@ describe('other ships\' guns stepped from their inputs', () => {
     expect(r.exact).toBe(r.derivedShells);
     // (records it was told of B: only where the server's state alone decided)
     expect(r.stats.derivedRecs).toBeGreaterThan(20 * r.stats.toldTicks);
+    // (held, its distance went as its guns stepped on it, about twice a fire interval, not every tick it moved; a beam's every tick)
+    expect(r.stats.exactChanges).toBeGreaterThan(1000);
+    expect(r.stats.exactSent).toBeLessThan(r.stats.exactChanges / 3);
+    // (the gunner's own client held the same distance: its head hashes all agreed)
+    expect(r.ownB.heads).toBeGreaterThan(20);
+    expect(r.ownB.headMisses).toBe(0);
   }, 300_000);
 
   it("another pilot in short bursts and taps, its idle distance sent only roughly: every shell still the server's exactly", () => {
     const r = otherGunsFight({ bursts: true });
-    if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ exact: r.exact, inexact: r.inexact.slice(0, 10), n: r.inexact.length, derived: r.derivedShells, stats: r.stats, lane: r.laneStats, toldB: r.toldB }));
+    if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ exact: r.exact, inexact: r.inexact.slice(0, 10), n: r.inexact.length, derived: r.derivedShells, stats: r.stats, lane: r.laneStats, toldB: r.toldB, ownB: r.ownB }));
     expect(r.derivedShells).toBeGreaterThan(60);
     expect(r.inexact).toEqual([]);
     expect(r.exact).toBe(r.derivedShells);
@@ -234,6 +242,7 @@ describe('other ships\' guns stepped from their inputs', () => {
     // (the idle distance changed nearly every idle tick; a small share of those went)
     expect(r.stats.idleChanges).toBeGreaterThan(500);
     expect(r.stats.idleSent).toBeLessThan(r.stats.idleChanges / 4);
+    expect(r.ownB.headMisses).toBe(0);
   }, 300_000);
 
   it("point defence (server-only threats): its shots told as TELL_PD, put into the lane, which stays exactly the server's", () => {

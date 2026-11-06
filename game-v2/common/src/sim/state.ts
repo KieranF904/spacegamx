@@ -44,6 +44,8 @@ export interface GunState {
   mineShare?: number;
   /** Tow Beam: the entity towed (gunLoad draws for it) */
   tow?: number;
+  /** A pilot's aim distance as its guns last stepped on it (ships/guns.ts distDue) */
+  heldDist?: number;
 }
 
 /**
@@ -94,10 +96,10 @@ export function newGunState(parts = 0): GunState {
 }
 
 /** A gun state copied out of a common ShipState (the adapter's way in, until Stage 1B owns guns) */
-export function gunStateOf(s: Pick<ShipState, 'cooldown' | 'rounds' | 'reload' | 'charge' | 'spin' | 'aim' | 'triggerHeld' | 'clickAt' | 'minePaid' | 'mineUntil' | 'mineShare' | 'tow'>): GunState {
+export function gunStateOf(s: Pick<ShipState, 'cooldown' | 'rounds' | 'reload' | 'charge' | 'spin' | 'aim' | 'triggerHeld' | 'clickAt' | 'minePaid' | 'mineUntil' | 'mineShare' | 'tow' | 'heldDist'>): GunState {
   return {
     cooldown: [...s.cooldown], rounds: [...s.rounds], reload: [...s.reload], charge: [...s.charge], spin: [...s.spin], aim: [...s.aim],
-    triggerHeld: s.triggerHeld, clickAt: s.clickAt, minePaid: s.minePaid, mineUntil: s.mineUntil, mineShare: s.mineShare, tow: s.tow,
+    triggerHeld: s.triggerHeld, clickAt: s.clickAt, minePaid: s.minePaid, mineUntil: s.mineUntil, mineShare: s.mineShare, tow: s.tow, heldDist: s.heldDist,
   };
 }
 
@@ -123,7 +125,7 @@ export function cloneSimShip(s: Readonly<SimShipState>): SimShipState {
     hazard: { empUntil: s.hazard.empUntil, slowUntil: s.hazard.slowUntil, numb: s.hazard.numb },
     guns: {
       cooldown: [...g.cooldown], rounds: [...g.rounds], reload: [...g.reload], charge: [...g.charge], spin: [...g.spin], aim: [...g.aim],
-      triggerHeld: g.triggerHeld, clickAt: g.clickAt, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow,
+      triggerHeld: g.triggerHeld, clickAt: g.clickAt, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
     },
     structure: s.structure,
   };

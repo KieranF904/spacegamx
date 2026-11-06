@@ -79,6 +79,11 @@ export interface ShipState {
   triggerHeld: boolean;
   clickAt: number;
   /**
+   * A pilot's aim distance as its guns last stepped on it (guns.ts distDue: while the trigger is held it takes the
+   * cursor's only on a gun's fire tick and halfway to its next); unset for a ship whose guns aim on the raw distance (AI)
+   */
+  heldDist?: number;
+  /**
    * What its last rebuild kept for the next one (rebuild.ts RebuildMemo): only saves work, never changes a result. Not
    * state: not enumerable, so never copied, sent, hashed or compared
    */

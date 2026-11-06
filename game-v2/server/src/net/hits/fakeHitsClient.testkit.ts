@@ -200,12 +200,12 @@ export class FakeHitsClient {
 
   /** The server's records of its own ship's shots, by tick, and their wire names (its fireWeapons, wrapped) */
   private watchServerShots(): void {
-    const ships = this.server.getShips() as unknown as { fireWeapons: (eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist?: number, target?: number, energy?: { charge: Charge }) => void; fired: FireRecord[] };
+    const ships = this.server.getShips() as unknown as { fireWeapons: (eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist?: number, target?: number, energy?: { charge: Charge }, hold?: boolean) => void; fired: FireRecord[] };
     const orig = ships.fireWeapons.bind(ships);
-    ships.fireWeapons = (eid, ship, firing, aimWorld, aimDist = 0, target = -1, energy) => {
-      if (eid !== this.pid) return orig(eid, ship, firing, aimWorld, aimDist, target, energy);
+    ships.fireWeapons = (eid, ship, firing, aimWorld, aimDist = 0, target = -1, energy, hold) => {
+      if (eid !== this.pid) return orig(eid, ship, firing, aimWorld, aimDist, target, energy, hold);
       const tick = this.server.getTick(), n0 = ships.fired.length;
-      orig(eid, ship, firing, aimWorld, aimDist, target, energy);
+      orig(eid, ship, firing, aimWorld, aimDist, target, energy, hold);
       for (let i = n0; i < ships.fired.length; i++) {
         const f = ships.fired[i];
         if (f.owner !== eid || !f.shots) continue;

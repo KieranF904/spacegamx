@@ -35,6 +35,12 @@ export interface GunOrders {
   /** How far away the aim point is (0: aim along aimWorld from anywhere) */
   aimDist: number;
   /**
+   * A pilot's guns (its cursor distance, which other ends get only as it's applied): while the trigger is held they
+   * step on a held distance that takes aimDist only on its due ticks (distDue). Absent (an AI ship's, whose aim
+   * every end works out): aimDist every tick
+   */
+  hold?: boolean;
+  /**
    * The charge after this tick's power step (energy.ts powerTick): each gun
    * draws on the ship as its model says (gunLoad: its banks first), and reloads,
    * regrows or charges at the share of that it got (a brownout: slower); a beam
@@ -71,6 +77,8 @@ export interface GunStep {
   pulses: GunPulse[];
   /** Charge starts and early releases (empty on most ticks: a shared empty list) */
   tells: readonly GunTell[];
+  /** The aim distance the guns stepped on (a pilot's held one: distDue; else orders.aimDist) */
+  dist: number;
 }
 
 /** Ticks a click waits for a semi-automatic gun to be ready (a click just before the gun is) */
@@ -221,6 +229,59 @@ const letGo = new Set<number>();
 /** A loaded gun counts on below 0 while it waits (how long it has: see stepGuns), down to this */
 const MAX_WAIT = 600;
 
+/**
+ * The held-distance rule (a pilot's guns, GunOrders.hold): while the trigger is held through from the tick before, a
+ * pilot's guns step on an aim distance held from earlier ticks (ShipState.heldDist), which takes the cursor's afresh
+ * only on a tick some gun is due: twice per its fire interval, on the tick it fires (before it steps, so the shot flies
+ * at the cursor exactly) and halfway to its next (so a turret's slew between shots heads for about the right point).
+ * Idle, and on the tick the trigger goes down, the guns step on the cursor's. A pure function of the gun state as the
+ * tick begins (its cooldowns, reloads and charges, stepped as stepGuns steps them), so every end that steps the guns
+ * (the server's real ship, its lanes, other clients' lanes, the pilot's own prediction) holds the same distance, and
+ * other ends need it only as it's applied (server GunNet: a gun row only when it changes).
+ *
+ * Due this tick, by model (`share`: each gun's share of its power, as stepGuns has it; `ports`: a ports ship, whose
+ * guns charge and reload at a tick a tick here):
+ *  - beam: every tick (it fires every tick it burns)
+ *  - semi-automatic: a click waiting and the gun loaded (held, it fires only on a click)
+ *  - charge: the tick its charge fills (it fires) or crosses half; cooling down, never
+ *  - clip, reloading: the tick the reload ends or crosses half
+ *  - any other (cycle, ammo, a clip's beat; spinning and staggered guns by their cooldown): the tick its cooldown
+ *    reaches 0 (it fires, unless held back: off its aim, short of power), the tick it crosses half its interval, and
+ *    while it waits loaded, every half interval (by the tick)
+ * Point defence aims on its own: never due.
+ */
+export function distDue(ship: ShipState, tick: number, tuning: ShipTuning, share: (w: WeaponInfo) => number, ports: boolean): boolean {
+  const weapons = tuning.weapons ?? {};
+  const clicked = tick - ship.clickAt <= SEMI_BUFFER;
+  for (const w of ship.derived.weapons) {
+    const f = w.fire, p = w.part;
+    if (f.model === 'auto' || weapons[w.kind]?.pointDefence) continue;
+    if (f.model === 'beam') return true;
+    // (its cooldown after this tick's step, as stepGuns steps it)
+    const cd0 = ship.cooldown[p];
+    const cd = cd0 > 0 && f.model === 'cycle' ? cd0 - share(w) : cd0 - 1;
+    if (f.semi) { if (clicked && cd <= 0) return true; continue; }
+    if (f.model === 'charge') {
+      if (cd > 0) continue;
+      const c = Math.max(0, ship.charge[p]), full = f.charge ?? 60, c1 = c + (ports ? 1 : share(w));
+      if (c1 >= full - 1e-9 || (c < full / 2 && c1 >= full / 2)) return true;
+      continue;
+    }
+    if (f.model === 'clip' && !f.regrow && ship.reload[p] > 0) {
+      const r0 = ship.reload[p], r = r0 - (ports ? 1 : share(w)), len = f.reload ?? 60;
+      if (r <= 1e-9 || (r0 > len / 2 && r <= len / 2)) return true;
+      continue;
+    }
+    const half = gunInterval(ship, w) / 2;
+    if (cd <= 0) {
+      if (cd0 > 0 || tick % Math.max(1, Math.round(half)) === 0) return true;
+      continue;
+    }
+    if (cd0 > half && cd <= half) return true;
+  }
+  return false;
+}
+
 /** A clip gun's reload (or regrowth) for one tick, at its share of the power it asked for */
 function stepClip(ship: ShipState, w: WeaponInfo, share: number): void {
   const f = w.fire, p = w.part, clip = f.clip ?? 1;
@@ -277,7 +338,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const pulses: GunPulse[] = [];
   let tells = NO_TELLS as GunTell[];
   const weapons = tuning.weapons ?? {};
-  const { aimWorld, aimDist } = orders;
+  const { aimWorld } = orders;
   // A ports ship (power/ports.ts): each gun fires from its own buffer, a shot's worth at a time, and a beam lights while its buffer
   // can feed it; nothing is shared. (Unaccounted without the state, as the old one is without a charge)
   const pz: PortsLayout | undefined = ship.derived.ports && orders.energy?.charge.e ? ship.derived.ports : undefined, E = orders.energy?.charge.e as PortsState;
@@ -290,14 +351,20 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (tells === NO_TELLS) tells = [];
     tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });
   };
-  const aimX = aimWorld === undefined ? 0 : pose.x + dcos(aimWorld) * aimDist;
-  const aimY = aimWorld === undefined ? 0 : pose.y + dsin(aimWorld) * aimDist;
-  const ready: WeaponInfo[] = [];
-  letGo.clear();
   // Turrets slew (their turn rate) only while the trigger is held through from the tick before; not firing, or on the
   // tick it goes down, a turret points straight at the aim (pointTurretAim): no slew state is carried while idle, so
   // what fires on a trigger-down depends only on that tick's aim (other pilots' idle aim distance isn't sent exactly)
   const slewing = orders.firing && ship.triggerHeld;
+  // (A pilot's guns, held through: on the distance held from earlier ticks, taken afresh on a due tick: distDue)
+  let aimDist = orders.aimDist;
+  if (orders.hold) {
+    if (slewing && ship.heldDist !== undefined && ship.heldDist !== aimDist && !distDue(ship, tick, tuning, share, !!pz)) aimDist = ship.heldDist;
+    ship.heldDist = aimDist;
+  } else if (ship.heldDist !== undefined) ship.heldDist = undefined;
+  const aimX = aimWorld === undefined ? 0 : pose.x + dcos(aimWorld) * aimDist;
+  const aimY = aimWorld === undefined ? 0 : pose.y + dsin(aimWorld) * aimDist;
+  const ready: WeaponInfo[] = [];
+  letGo.clear();
   // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
   if (orders.firing && !ship.triggerHeld) ship.clickAt = tick;
   ship.triggerHeld = orders.firing;
@@ -415,5 +482,5 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (f.model === 'clip') ship.rounds[p] -= f.rounds ?? 1;
     if ((f.model === 'cycle' || f.model === 'ammo') && weapons[w.kind]?.stagger) stagger(ship, w);
   }
-  return { shots, beams, pulses, tells };
+  return { shots, beams, pulses, tells, dist: aimDist };
 }
