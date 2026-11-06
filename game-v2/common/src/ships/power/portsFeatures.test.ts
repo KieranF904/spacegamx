@@ -84,6 +84,13 @@ describe('ports: Burst Strafers, Gyros and shields draw power', () => {
     expect(shieldShare(derived(), FULL_CHARGE)).toBe(1);
   });
 
+  it('a shield power cannot reach adds nothing (as a cut-off jump coil: power/ports.ts portsFed); one reached counts whole', () => {
+    expect(derived(true).shieldMax).toBe(40);
+    expect(derived(true).shieldRegen).toBe(8);
+    expect(derived(false).shieldMax).toBe(0);
+    expect(derived(false).shieldRegen).toBe(0);
+  });
+
   // (No movement key held: the dodge goes sideways, the one way this strafer pushes, and the core's maneuvering adds nothing)
   it('a dodge burns the strafer\'s buffer; the next one straight after is short or refused; its line refills it', () => {
     const d = derived(), L = d.ports!, s = idx(d, 'engine_burst_strafer');
