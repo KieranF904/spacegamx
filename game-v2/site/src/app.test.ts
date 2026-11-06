@@ -107,7 +107,7 @@ class FakeActivity implements ActivityClient {
     const u = token ? await lobby.validate(token) : null;
     if (!u) return { state: 'signin' };
     if (!u.isAdmin) return { state: 'forbidden', error: 'Only an admin can do that' };
-    return { state: 'ok', events: this.local.filter((e) => e.id > (q.after ?? 0)).reverse(), servers: ['Local dev'], types: ['death', 'join'], live: ['Local dev'] };
+    return { state: 'ok', events: this.local.filter((e) => e.id > (q.after ?? 0)).reverse(), servers: ['Local dev'], types: ['chat', 'death', 'join'], live: ['Local dev'] };
   }
   async login(l: ActivityLobby, username: string, password: string) {
     this.logins.push(`${l.id}:${username}`);
@@ -448,6 +448,7 @@ describe('site routes', () => {
     expect(page.text).toContain('Production feed not available yet');
     expect(page.text).toContain('Destroyed by &lt;script&gt;alert(1)&lt;/script&gt;');
     expect(page.text).not.toContain('<script>alert(1)');
+    expect(page.text).toContain('<option value="chat">Chat</option>');
     // (The local lobby gets the site session's token and the filters)
     const local = activity.asked.find((a) => a.lobby === 'local')!;
     expect(local.token).toBeTruthy();

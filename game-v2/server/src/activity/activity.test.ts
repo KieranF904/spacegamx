@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { ActivityFeed, GLOBAL_PER_MIN, PER_KEY_PER_MIN, TALLY_MS, type FeedEvent } from './ActivityFeed.js';
-import { Activity, BIG_SALE, activity, sessionLength } from './index.js';
+import { Activity, BIG_SALE, CHAT_MAX, activity, enabledTypes, sessionLength } from './index.js';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -109,11 +109,11 @@ describe('ActivityFeed (batching, limits, a lobby that is down)', () => {
 });
 
 describe('the activity facade', () => {
-  function started() {
+  function started(types = 'all') {
     let t = 5_000_000;
     const sent: FeedEvent[] = [];
     const a = new Activity();
-    a.start({ url: 'http://lobby', secret: 's', server: 'Test', timer: false, now: () => t, send: async (b) => { sent.push(...b); return true; } });
+    a.start({ url: 'http://lobby', secret: 's', server: 'Test', timer: false, types, now: () => t, send: async (b) => { sent.push(...b); return true; } });
     return { a, sent, advance: (ms: number) => { t += ms; }, flush: async () => { a.feed!.flushTallies(undefined, true); while (a.feed!.pending) await a.feed!.pump(); } };
   }
 
@@ -178,6 +178,48 @@ describe('the activity facade', () => {
   });
 });
 
+describe('which event types go out (ACTIVITY_TYPES)', () => {
+  it('by default: sign-ins, sessions, public chat and the operational ones; the rest only when switched on', () => {
+    const on = enabledTypes();
+    for (const t of ['join', 'leave', 'chat', 'admin', 'kick', 'refused', 'protocol', 'error', 'server', 'dropped']) expect(on.has(t), t).toBe(true);
+    for (const t of ['death', 'pvp', 'kills', 'mined', 'sale', 'sales', 'trade', 'craft', 'dock', 'level', 'quest', 'ship', 'build', 'refit', 'boss_kill', 'social']) expect(on.has(t), t).toBe(false);
+    expect(enabledTypes('+death, +boss_kill, -chat').has('death')).toBe(true);
+    expect(enabledTypes('+death, +boss_kill, -chat').has('chat')).toBe(false);
+    expect([...enabledTypes('join,leave,nonsense')].sort()).toEqual(['dropped', 'join', 'leave']);
+    expect(enabledTypes('all').has('dock')).toBe(true);
+  });
+
+  it('types that are off send nothing, tallies included', async () => {
+    const sent: FeedEvent[] = [];
+    const a = new Activity();
+    a.start({ url: 'x', secret: 's', server: 'T', timer: false, send: async (b) => { sent.push(...b); return true; } });
+    const p = { username: 'alice', userId: 1 };
+    a.death(p, { by: 'Mite' });
+    a.dock(p, 'Sol Central');
+    a.sale(p, 'ore', 99_999, 'Sol');
+    a.social(p, 'private messages');
+    a.chat(p, 'hello all');
+    a.feed!.flushTallies(undefined, true);
+    while (a.feed!.pending) await a.feed!.pump();
+    expect(sent.filter((e) => e.type !== 'server').map((e) => [e.type, e.detail])).toEqual([['chat', 'hello all']]);
+    await a.stop(0);
+  });
+
+  it('public chat is cleaned and capped', async () => {
+    const sent: FeedEvent[] = [];
+    const a = new Activity();
+    a.start({ url: 'x', secret: 's', server: 'T', timer: false, send: async (b) => { sent.push(...b); return true; } });
+    a.chat({ username: 'bob', userId: null }, `hi\u0000\nthere ${'x'.repeat(400)}`);
+    a.chat({ username: 'bob', userId: null }, '   ');
+    while (a.feed!.pending) await a.feed!.pump();
+    const chat = sent.filter((e) => e.type === 'chat');
+    expect(chat).toHaveLength(1);
+    expect(chat[0].detail.startsWith('hi there x')).toBe(true);
+    expect(chat[0].detail).toHaveLength(CHAT_MAX);
+    await a.stop(0);
+  });
+});
+
 describe('the game server sends its pilots\' sessions (fake client)', () => {
   afterEach(async () => { await activity.stop(0); });
 
@@ -195,10 +237,14 @@ describe('the game server sends its pilots\' sessions (fake client)', () => {
     t.onMessage = () => {};
     t.connect();
     t.send({ type: 'join', username: 'visitor' } as any);
+    t.send({ type: 'chat', text: 'anyone mining in the Rockery?' } as any);
+    // (Party chat and commands aren't public chat)
+    t.send({ type: 'chat', text: '/p party only' } as any);
     t.disconnect();
     while (activity.feed!.pending) await activity.feed!.pump();
     const events = batches.flatMap((b) => b.events).filter((e) => e.type !== 'server');
-    expect(events.map((e) => [e.type, e.player])).toEqual([['join', 'visitor'], ['leave', 'visitor']]);
-    expect(events[1].detail).toMatch(/^Left after \d+ s$/);
+    expect(events.map((e) => [e.type, e.player])).toEqual([['join', 'visitor'], ['chat', 'visitor'], ['leave', 'visitor']]);
+    expect(events[1].detail).toBe('anyone mining in the Rockery?');
+    expect(events[2].detail).toMatch(/^Left after \d+ s$/);
   });
 });

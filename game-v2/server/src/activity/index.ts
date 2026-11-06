@@ -6,7 +6,8 @@
  * lobby's address, LOBBY_ADMIN_SECRET and this server's name (SERVER_NAME), so tests, benches and the browser proto
  * never send anything. Hook points call it with one line each; each method here says what goes out.
  *
- * Never chat or private-message contents, passwords or tokens: private messages and friend actions are counts.
+ * Public chat lines go out with their text; never private messages, party chat, passwords or tokens (private messages
+ * and friend actions are counts, and off by default). Which types go out at all: ACTIVITY_TYPES below.
  * Frequent things (PvE kills, ore, crafting, small sales, ship edits) are summed per pilot (ActivityFeed.tally).
  */
 
@@ -21,6 +22,40 @@ interface PilotsLike {
   connOf(eid: number): Who | undefined;
   econ: { items: { name(id: string): string } };
 }
+
+/**
+ * The event types, and which are on by default (Kieran: "mainly log-ins, account creations, public chat", plus the
+ * operational ones). The rest keep their emitters and hooks but send nothing until switched on: ACTIVITY_TYPES in the
+ * game server's environment, "+death,+boss_kill" (add to the defaults), "-chat" (take away), "all", or a plain list.
+ */
+export const ACTIVITY_TYPES: Record<string, boolean> = {
+  // On
+  join: true, leave: true, chat: true, admin: true, kick: true, refused: true, protocol: true, error: true, server: true, dropped: true,
+  // Off (switch on with ACTIVITY_TYPES)
+  death: false, pvp: false, kills: false, mined: false, salvage: false, craft: false, refit: false, sale: false, sales: false,
+  trade: false, quest: false, dock: false, ship: false, build: false, level: false, boss_start: false, boss_kill: false, boss_fail: false,
+  social: false,
+};
+
+/** The types on, from ACTIVITY_TYPES (undefined: the defaults); unknown names are ignored */
+export function enabledTypes(spec?: string): Set<string> {
+  const on = new Set(Object.keys(ACTIVITY_TYPES).filter((t) => ACTIVITY_TYPES[t]));
+  const parts = (spec ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!parts.length) return on;
+  if (parts.includes('all')) return new Set(Object.keys(ACTIVITY_TYPES));
+  // A plain list replaces the defaults; +x / -x change them
+  if (parts.every((p) => !p.startsWith('+') && !p.startsWith('-'))) on.clear();
+  for (const p of parts) {
+    const name = p.replace(/^[+-]/, '');
+    if (!(name in ACTIVITY_TYPES)) continue;
+    if (p.startsWith('-')) on.delete(name); else on.add(name);
+  }
+  on.add('dropped');
+  return on;
+}
+
+/** Most characters of a public chat line kept */
+export const CHAT_MAX = 200;
 
 /** A sale at least this big is its own line; smaller ones are summed */
 export const BIG_SALE = 5000;
@@ -59,6 +94,8 @@ export interface StartOptions {
   /** (Tests) */
   send?: (events: FeedEvent[]) => Promise<boolean>;
   now?: () => number;
+  /** Which types go out (ACTIVITY_TYPES' syntax; default: the defaults) */
+  types?: string;
   /** Run pump() on a timer (default true) */
   timer?: boolean;
 }
@@ -79,7 +116,8 @@ export class Activity {
     this.stopTimer();
     this.now = o.now ?? Date.now;
     const send = o.send ?? lobbySender(o.url, o.secret, o.server);
-    this.feed = new ActivityFeed({ send, now: this.now });
+    const on = enabledTypes(o.types);
+    this.feed = new ActivityFeed({ send, now: this.now, enabled: (t) => on.has(t) });
     if (o.timer !== false) {
       this.timer = setInterval(() => void this.feed?.pump(), FLUSH_MS);
       (this.timer as { unref?: () => void }).unref?.();
@@ -219,6 +257,13 @@ export class Activity {
   }
 
   // ------------------------------------------------------------------ social, admin, errors
+
+  /** A public chat line (never a private one, a party one or a command): its text, cleaned and cut to CHAT_MAX */
+  chat(conn: Who, text: string): void {
+    if (!this.feed) return;
+    const line = text.replace(/[\u0000-\u001f\u007f‧-‮]+/g, ' ').trim().slice(0, CHAT_MAX);
+    if (line) this.feed.emit('chat', conn.username, line);
+  }
 
   /** A private message or friend action: counted only (never who to, never the text) */
   social(conn: Who, what: 'private messages' | 'friend requests' | 'friends accepted' | 'requests declined' | 'friends removed'): void {

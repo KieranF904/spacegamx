@@ -25,6 +25,8 @@ export interface FeedOptions {
   /** Hand a batch to the lobby: true when it was taken */
   send(events: FeedEvent[]): Promise<boolean>;
   now?: () => number;
+  /** Which event types go out at all (index.ts: the ACTIVITY_TYPES registry); the rest are dropped silently. Default: all */
+  enabled?: (type: string) => boolean;
   maxBatch?: number;
   maxQueue?: number;
   perKeyPerMin?: number;
@@ -55,7 +57,7 @@ export class ActivityFeed {
   private nextTry = 0;
   private sending = false;
   private now: () => number;
-  private o: Required<Omit<FeedOptions, 'send' | 'now'>>;
+  private o: Required<Omit<FeedOptions, 'send' | 'now' | 'enabled'>>;
 
   constructor(private opts: FeedOptions) {
     this.now = opts.now ?? Date.now;
@@ -72,6 +74,7 @@ export class ActivityFeed {
 
   /** One event; `quiet`: none of the same key again within that many ms. False if it was held back */
   emit(type: string, player: string, detail: string, other = '', quiet?: { key: string; ms: number }): boolean {
+    if (this.opts.enabled && !this.opts.enabled(type)) return false;
     const t = this.now();
     if (quiet) {
       const k = `${type}|${player}|${quiet.key}`;
@@ -86,7 +89,7 @@ export class ActivityFeed {
 
   /** Add `n` of `what` to this pilot's running count for `type`, sent as one line (`format`) every TALLY_MS */
   tally(type: string, player: string, what: string, n: number, format: (counts: Map<string, number>) => string): void {
-    if (!(n > 0)) return;
+    if (!(n > 0) || (this.opts.enabled && !this.opts.enabled(type))) return;
     const key = `${type}|${player}`;
     let t = this.tallies.get(key);
     if (!t) {
