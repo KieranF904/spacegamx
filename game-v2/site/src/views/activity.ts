@@ -7,7 +7,7 @@ import { csrfField, empty, type PageCtx } from './layout.js';
 
 /** What each event type is called in the filter (an unknown one shows as it is) */
 export const EVENT_TYPES: Record<string, string> = {
-  join: 'Joined', leave: 'Left', signin: 'Signed in', signout: 'Signed out', register: 'New account', account: 'Account change',
+  join: 'Joined', leave: 'Left', chat: 'Chat', signin: 'Signed in', signout: 'Signed out', register: 'New account', account: 'Account change',
   death: 'Death', pvp: 'PvP kill', kills: 'PvE kills', boss_start: 'Boss fight', boss_kill: 'Boss killed', boss_fail: 'Boss fight lost',
   sale: 'Big sale', sales: 'Sales', trade: 'Trade', craft: 'Crafting', mined: 'Mining', salvage: 'Salvage', level: 'Level up',
   quest: 'Quest', dock: 'Docked', ship: 'Ship change', refit: 'Ship edits', build: 'Ship built', social: 'Messages & friends',
@@ -117,5 +117,5 @@ export function activityPage(ctx: PageCtx, d: {
     </table>
     ${d.rows.length ? '' : html`<div data-activity-empty>${empty('Nothing yet', 'Events show up here as pilots play. They arrive every few seconds.')}</div>`}
   </div>
-  <p class="dim small">Newest first, the latest 100. Lobbies keep 5,000 events per server. No chat or message contents are kept.</p>`);
+  <p class="dim small">Newest first, the latest 100. Lobbies keep 5,000 events per server. Public chat lines are kept; private messages never are.</p>`);
 }

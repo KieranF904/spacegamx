@@ -111,9 +111,10 @@ if (DEV_MODE) {
   }
 }
 // Player activity for the website's admin panel, sent to the lobby in batches under SERVER_NAME (server/src/activity);
-// it needs the lobby's admin secret, and ACTIVITY_FEED=0 turns it off
+// it needs the lobby's admin secret, and ACTIVITY_FEED=0 turns it off. ACTIVITY_TYPES picks the event types
+// (default: sign-ins, joins/leaves, public chat and the operational ones; e.g. "+death,+boss_kill" or "all")
 if (LOBBY_ADMIN_SECRET && process.env.ACTIVITY_FEED !== '0') {
-  activity.start({ url: BROWSER_URL, secret: LOBBY_ADMIN_SECRET, server: SERVER_NAME });
+  activity.start({ url: BROWSER_URL, secret: LOBBY_ADMIN_SECRET, server: SERVER_NAME, types: process.env.ACTIVITY_TYPES });
   activity.watch(gameServer.pilots);
 }
 const transport = new SocketTransport(gameServer, PORT, HOST);

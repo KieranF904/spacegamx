@@ -3358,7 +3358,7 @@ this.devTeleport = opts.devTeleport ?? false;
           return;
       }
     }
-    
+    activity.chat(conn, text);
     for (const client of this.clients.values()) {
       this.send(client.ws, {
         type: 'chat',
