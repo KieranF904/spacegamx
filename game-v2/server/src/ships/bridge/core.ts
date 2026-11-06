@@ -13,6 +13,7 @@ import {
   type GravityWell, type FlightConstants, type HitInfo, type FieldEnv, type WeaponMods, type ShipDerived, type Terrain,
 } from '@space-game/common';
 import type { ShipBridge } from '../ShipBridge.js';
+import type { AimHoldStats } from '@space-game/common';
 
 /** What the bridge needs from the engine. GameServer provides it. */
 export interface ShipHost {
@@ -202,6 +203,8 @@ export interface ShipBridgeStats {
   lastRebuildMs: number;
   rebuildCount: number;
   debrisCount: number;
+  /** How often pilots' aims were held (common sim/aimHold.ts: counted by weapons.ts stepWeapons) */
+  aimHold: AimHoldStats;
 }
 
 export const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };

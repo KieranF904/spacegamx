@@ -183,15 +183,21 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   const tick = b.host.getTick();
   const s = MOVE_VIEW.load(eid, ReplicaMode.Player, body, ship.derived, ship, b.chargeOf(eid), true, ship.jumpPrime ?? 0);
   pilotHazards(b, eid, tick, s.hazard);
-  // (Its inputs from its source: bridge/inputs.ts, the pilot's held keys off the Input component)
-  const { isBoosting } = stepShip(s, readPilotInput(eid, MOVE_IN), moveEnv(b, eid, tick), s, MOVE_EVENTS);
+  // (Its inputs from its source: bridge/inputs.ts, the pilot's held keys off the Input component; with the aim it was
+  // applied at last tick, so the step says whether that would have flown it the same: common sim/aimHold.ts)
+  readPilotInput(eid, MOVE_IN);
+  MOVE_IN.heldQ = ship.aimQ;
+  const { isBoosting } = stepShip(s, MOVE_IN, moveEnv(b, eid, tick), s, MOVE_EVENTS);
   // (Its pulls this tick, the pull fields' (bridge/pullFields.ts), in its step after the motion: noted as its causes,
   // derived, so its shadows have them and a client that can't work one out is told it, net/Replication.ts)
   for (const e of MOVE_EVENTS) if (e.k === 'pull') { b.ownCauses.add(eid, { kind: 0, dvx: e.dvx, dvy: e.dvy, from: e.from, derived: true }); b.pulls.stats.pulls++; }
   ship.jumpPrime = s.jumpPrime;
   b.setCharge(eid, s.charge);
-  // (What it flew: its keys, its hazards' bits, the engines' power and a boost the stores refused: replicas have no charge)
-  b.replicaCtl.set(eid, { mode: ReplicaMode.Player, q: s.ctl.q, derived: ship.derived, bits: s.ctl.bits });
+  // (What it flew: its keys, its hazards' bits, the engines' power and a boost the stores refused: replicas have no charge.
+  // Its aim as applied (the held one where its flight would have gone the same on it; its guns weigh it next, stepWeapons)
+  // and the raw one its client's inputs say)
+  b.replicaCtl.set(eid, { mode: ReplicaMode.Player, q: s.ctl.q, derived: ship.derived, bits: s.ctl.bits, rawQ: MOVE_IN.q, heldQ: MOVE_IN.heldQ });
+  ship.aimQ = s.ctl.q;
   b.writeBody(eid, ship, body);
   MOVE_EVENTS.length = 0;
   if (isBoosting) Boost.lastUseTick[eid] = tick;

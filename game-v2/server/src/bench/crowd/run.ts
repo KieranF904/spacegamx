@@ -167,6 +167,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const focus0 = snap(srv.snapshots.focus.stats), away0 = snap(srv.snapshots.away.stats), mem0 = [...probes.values()].map((p) => snap(p.fake.away.stats));
   const held: number[] = [];
   const guns0 = snap(srv.gunNet?.stats ?? {});
+  const aim0 = snap(ships.stats?.aimHold ?? {});
   // (What each joined client's packed frames came to, by message type and the BLOCKS snapshot's parts: the real wire bits)
   const probePids = new Set([...probes.values()].map((p) => p.pid));
   const packedOf = (only?: Set<number>) => {
@@ -287,6 +288,12 @@ export async function runCase(o: CaseOpts): Promise<any> {
     guns: (() => {
       const d = numericDiff(snap(srv.gunNet?.stats ?? {}), guns0) as Record<string, number>, per = (v: number) => r2((v ?? 0) / secs / Math.max(1, o.n));
       return { ...d, idleChangesPerPilotSec: per(d.idleChanges), idleSentPerPilotSec: per(d.idleSent), exactChangesPerPilotSec: per(d.exactChanges), exactSentPerPilotSec: per(d.exactSent) };
+    })(),
+    // (Pilots' aims, common sim/aimHold.ts: pilot ticks, those whose raw aim had moved off the held one, of those held
+    // (nothing to send), taken for the flight or for the guns; heldShare: held / moved)
+    aimHold: (() => {
+      const d = numericDiff(snap(ships.stats?.aimHold ?? {}), aim0) as Record<string, number>;
+      return { ...d, heldShare: r2((d.held ?? 0) / Math.max(1, d.moved ?? 0)) };
     })(),
     // (Bytes per client per second by message type, as the packed frames carry them; snapshot.* its BLOCKS parts)
     // (packedProbeBps: the probes only, which answer as a game client does: the bulk sockets owe nothing back, so they get hitFix corrections)

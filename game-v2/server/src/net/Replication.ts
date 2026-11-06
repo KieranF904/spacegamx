@@ -68,6 +68,13 @@ interface OwnShadow {
   excLast: boolean;
   /** The controls on the window's first tick (an exceptions row starts from them) */
   first: [number, number, number] | null;
+  /**
+   * The window's controls as its client flies them (tick, bits, aim: its raw aim, which its own step weighs as the
+   * server's does, common sim/aimHold.ts; the shadow's events carry the applied one), as they changed after `first`,
+   * and the last tick's (they change against it)
+   */
+  ctl: number[];
+  last?: [number, number];
   /** Something its client can't work out moved it this window: a keyframe of its own ship goes */
   hard: boolean;
   /** Why (the stats) */
@@ -264,7 +271,7 @@ export class Replication {
       if (rec?.body && mode === ReplicaMode.Pilotless) this.stepBodied(eid, s, rec.body, rec.derived ?? ship.derived, tick, worked);
       else if (s.bodied) s.bodied.diverged = true;
       // A pilot whose client steps its own ship: its shadow is that, whatever the others need (stepOwn)
-      if (ship.kind === 'ship' && this.host.ownSim?.(eid)) { this.stepOwn(eid, s, mode, bits, q, rec?.derived ?? ship.derived, tick, worked); continue; }
+      if (ship.kind === 'ship' && this.host.ownSim?.(eid)) { this.stepOwn(eid, s, mode, bits, q, rec?.derived ?? ship.derived, tick, worked, dock ? q : rec?.rawQ ?? q); continue; }
       if (s.own) s.own = undefined;
       if (s.diverged || mode === ReplicaMode.Docked) continue;
       if (occupied && !occupied.has(InSystem.systemId[eid])) { s.diverged = true; continue; }
@@ -361,16 +368,20 @@ export class Replication {
    * client can't work out (`hard`): a keyframe of its own ship. The others get a keyframe as before whenever anything
    * but its controls moved it.
    */
-  private stepOwn(eid: number, s: Shadow, mode: ReplicaMode, bits: number, q: number, derived: ShipState['derived'], tick: number, worked: WorkedCauses | null): void {
-    const o = s.own ??= { version: -1, events: [], exc: false, excLast: false, first: null, hard: true, why: 'start' };
-    o.first ??= [tick, bits, q];
+  private stepOwn(eid: number, s: Shadow, mode: ReplicaMode, bits: number, q: number, derived: ShipState['derived'], tick: number, worked: WorkedCauses | null, rawQ = q): void {
+    const o = s.own ??= { version: -1, events: [], exc: false, excLast: false, first: null, ctl: [], hard: true, why: 'start' };
+    if (!o.first) o.first = [tick, bits, rawQ];
+    else if (!o.last || o.last[0] !== bits || o.last[1] !== rawQ) o.ctl.push(tick, bits, rawQ);
+    if (o.last) { o.last[0] = bits; o.last[1] = rawQ; } else o.last = [bits, rawQ];
     const hard = (why: string) => { if (!o.hard) o.why = why; o.hard = true; s.diverged = true; s.body = this.real(eid); };
     // Its controls: what its inputs say, or (the engines short of power, an EMP, the cold, an override) the window's
     // real controls go to it (ownFor)
     // (Its engines' power, share and a refused boost it works out itself, its own step being the whole one, stores and
     // all (common sim/ownStep.ts): no row for those; the held controls, aim and hazard bits it can't)
+    // (Its aim: the raw one its step flew, which its inputs say. The applied one, `q`, its client works out from it alike:
+    // common sim/aimHold.ts)
     const want = this.host.ownControls?.(eid);
-    o.excLast = !want || want.bits !== (bits & ~OWN_DERIVED_BITS) || want.q !== q;
+    o.excLast = !want || want.bits !== (bits & ~OWN_DERIVED_BITS) || want.q !== rawQ;
     if (o.excLast) o.exc = true;
     if (this.host.ownLate?.(eid)) return hard('late input');
     // (Not flown by its pilot: its client has it from its last keyframe, so another only when that's out of date. Docked,
@@ -565,6 +576,7 @@ export class Replication {
         // (The next window starts from this one's last controls: still exceptional, they go again)
         s.own.exc = s.own.excLast;
         s.own.first = null;
+        s.own.ctl = [];
       }
     }
   }
@@ -911,7 +923,7 @@ export class Replication {
     if (o.exc && o.first) {
       // The window's real controls from its first tick (the client puts them in place of its inputs'), from aim 0
       const ev: [number, number, number][] = [[snapshotTick - o.first[0], o.first[1], o.first[2]]];
-      for (let i = 0; i < s.events.length; i += 3) if (s.events[i] > o.first[0]) ev.push([snapshotTick - s.events[i], s.events[i + 1], s.events[i + 2]]);
+      for (let i = 0; i < o.ctl.length; i += 3) ev.push([snapshotTick - o.ctl[i], o.ctl[i + 1], o.ctl[i + 2]]);
       ctl.push(packControlRow(eid, ev, 0));
       this.ownStats.exc++;
     }

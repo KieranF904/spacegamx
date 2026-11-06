@@ -84,6 +84,12 @@ export interface ShipState {
    */
   heldDist?: number;
   /**
+   * A pilot's aim as it was last applied (sim/aimHold.ts: the q its control row carries, the held aim its next step
+   * weighs its raw one against): set by the server's pilot step (bridge/flight.ts stepMovement, weapons.ts stepWeapons).
+   * Unset: none yet (its first step takes the raw aim)
+   */
+  aimQ?: number;
+  /**
    * What its last rebuild kept for the next one (rebuild.ts RebuildMemo): only saves work, never changes a result. Not
    * state: not enumerable, so never copied, sent, hashed or compared
    */

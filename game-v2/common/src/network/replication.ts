@@ -13,9 +13,11 @@
  *          used them; one of 7 or more goes as tb = bits × 8 + 7, then ticksAgo)
  *          or, for the common case of the aim moving tick after tick with the
  *          same buttons held, [-1 - id, tb, dq, dq, dq, ...]: one change per tick
- *          from ticksAgo on (packControlRow). Each aim goes as the step
- *          from the one before, the first from the aim the client already has
- *          (its keyframe's or last change's: both ends keep it), wrapped to ±4096.
+ *          from ticksAgo on (packControlRow). The first aim goes as the step
+ *          from the aim the client already has (its keyframe's or last change's:
+ *          both ends keep it), each later one as the change in that step from
+ *          the one before (a smooth sweep's steps are nearly equal), each
+ *          wrapped to ±4096.
  *
  * q is the aim angle in the 13-bit cursor quantization; a pilot's arrives as a
  * float32 (the input encoding), so it's rounded the same way here.
@@ -110,7 +112,9 @@ const addQ = (q: number, d: number) => ((q + d) % AIM_Q + AIM_Q) % AIM_Q;
  * first, `base` the aim the client has for it already.
  */
 export function packControlRow(id: number, events: [number, number, number][], base: number): ControlRow {
-  const dq = events.map(([, , q], i) => stepQ(i ? events[i - 1][2] : base, q));
+  const steps = events.map(([, , q], i) => stepQ(i ? events[i - 1][2] : base, q));
+  // (each step after the first as its change from the one before)
+  const dq = steps.map((d, i) => (i ? stepQ(steps[i - 1], d) : d));
   const tb = (t: number, b: number) => (t < 7 ? [b * 8 + t] : [b * 8 + 7, t]);
   const run = events.length > 1 && events.every(([t, b], i) => i === 0 || (t === events[i - 1][0] - 1 && b === events[0][1]));
   if (run) return [-1 - id, ...tb(events[0][0], events[0][1]), ...dq];
@@ -125,20 +129,22 @@ export function controlRowId(row: ControlRow): number {
 /** The other way: the events, from the aim the client had */
 export function unpackControlRow(row: ControlRow, base: number): [number, number, number][] {
   const events: [number, number, number][] = [];
-  let q = base;
+  let q = base, step = 0, n = 0;
   let i = 1;
+  // (the first step as it is, each later one as the change from the one before: packControlRow)
+  const next = (v: number) => { step = n++ ? addQ(step + AIM_Q / 2, v) - AIM_Q / 2 : v; return step; };
   const tb = (): [number, number] => {
     const v = row[i++];
     return [v % 8 === 7 ? row[i++] : v % 8, Math.floor(v / 8)];
   };
   if (row[0] < 0) {
     const [t, b] = tb();
-    for (let k = 0; i < row.length; k++) { q = addQ(q, row[i++]); events.push([t - k, b, q]); }
+    for (let k = 0; i < row.length; k++) { q = addQ(q, next(row[i++])); events.push([t - k, b, q]); }
     return events;
   }
   while (i < row.length) {
     const [t, b] = tb();
-    q = addQ(q, row[i++]);
+    q = addQ(q, next(row[i++]));
     events.push([t, b, q]);
   }
   return events;
@@ -237,10 +243,11 @@ export interface OwnTimeline {
   /**
    * Its whole step at tick t, flown (a pilot's): the one stepper on its full state (stores, guns, hazards, priming:
    * the source keeps those by tick), `body` stepped in place from its state at t - 1, with the controls the timeline
-   * says (`bits`, `q`). Returns the CTL bits it flew (its power and hazard bits the step's own). Absent (or null back):
-   * stepped as any replica is (replicaStep, its power from the bits)
+   * says (`bits`, `q`), and `heldQ` the aim it was applied at on t - 1 (sim/aimHold.ts). Returns the controls it flew: the
+   * CTL bits (its power and hazard bits the step's own) and its applied aim. Absent (or null back): stepped as any
+   * replica is (replicaStep, its power from the bits, on `q`)
    */
-  step?(t: number, body: FlightBody, bits: number, q: number, derived: ShipDerived, env: ReplicaEnv): number | null;
+  step?(t: number, body: FlightBody, bits: number, q: number, derived: ShipDerived, env: ReplicaEnv, heldQ: number): Readonly<{ bits: number; q: number }> | null;
 }
 
 /**
@@ -633,9 +640,10 @@ export class ShipReplicaSet {
     const dt = (own ? own.derived(t) : cs?.derived(id, t)) || d;
     // (Its own ship, flown: its whole step, once, by its own timeline (OwnTimeline.step); anything else its replica's)
     const env = this.stepEnv();
-    const flown = own && r.mode === ReplicaMode.Player && own.step ? own.step(t, body, bits, q, dt, env) : null;
+    // (Its applied aim as the server works it out from the same inputs: the held one where it flew the same, sim/aimHold.ts)
+    const flown = own && r.mode === ReplicaMode.Player && own.step ? own.step(t, body, bits, q, dt, env, prev.q) : null;
     if (flown === null) replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, dt, this.tuning, env, t, id);
-    const st = new ReplicaState(id, r.mode, body, flown ?? bits, q);
+    const st = flown ? new ReplicaState(id, r.mode, body, flown.bits, flown.q) : new ReplicaState(id, r.mode, body, bits, q);
     this.ahead.keep(t, st);
     if (!own && this.sides) this.sides.stepped(id, t, r.mode, prev, st, input, dt, this.env());
     return st;

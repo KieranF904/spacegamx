@@ -7,6 +7,8 @@
  */
 export * from './state.js';
 export * from './input.js';
+// The held aim angle: a pilot's aim applied only where it changes what the ship does
+export * from './aimHold.js';
 export * from './events.js';
 export * from './env.js';
 export * from './phases.js';

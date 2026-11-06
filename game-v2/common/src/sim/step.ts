@@ -61,6 +61,8 @@ export interface MotionOut {
   /** The CTL power bits it flew with (0 for anything but a pilot) */
   ctlPower: number;
   isBoosting: boolean;
+  /** Its held aim (input.heldQ) would have flown it exactly the same (sim/aimHold.ts; true when none was given) */
+  aimHeld: boolean;
 }
 
 function copyInto(out: SimShipState, from: SimShipState): void {
@@ -92,25 +94,29 @@ export function stepShip(prev: SimShipState, input: Readonly<SimInput>, env: Rea
   const hz = stepHazards(s, input, env.tick, HZ);
   const m = stepShipMotion(s, input, env, hz, MOTION);
   const ctlPower = m.ctlPower, isBoosting = m.isBoosting;
-  // 4. Guns (Stage 1B), unless the host runs them
-  if (!env.gunsByHost) stepShipGuns(s, input, env, events);
+  // 4. Guns (Stage 1B), unless the host runs them (a held aim the flight kept, weighed by the guns too: sim/aimHold.ts)
+  const held = input.heldQ !== undefined && input.heldQ !== input.q ? input.heldQ : undefined;
+  let aimHeld = held !== undefined && m.aimHeld;
+  if (!env.gunsByHost) { const g = stepShipGuns(s, input, env, events, aimHeld ? held : undefined); aimHeld &&= g; }
   // 5. Pulls (Stage 1C), then back on the snapshot grid
   if (env.pulls) { applyPulls(s, env, events); quantizeShipBody(s.body); }
   // 6. What it flew with (an EMP'd drive starts no jump: the bit goes as the step read it)
   const hazBits = (hz.emp ? BIT_EMP : 0) | (hz.numb < 1 ? BIT_NUMB : 0) | (hz.slowed ? BIT_SLOWED : 0);
   s.ctl.bits = (input.bits & ~CTL_STATE_BITS & ~(hz.emp ? BIT_JUMP : 0)) | hazBits | ctlPower;
-  s.ctl.q = input.q;
+  // (Its applied aim: the held one where that did exactly what the raw one did. The host running the guns weighs them
+  // itself before it takes this as the tick's: server bridge/weapons.ts stepWeapons)
+  s.ctl.q = aimHeld ? held! : input.q;
   return { state: s, events, isBoosting };
 }
 
-const MOTION: MotionOut = { ctlPower: 0, isBoosting: false };
+const MOTION: MotionOut = { ctlPower: 0, isBoosting: false, aimHeld: true };
 
 /**
  * Phases 1-3 of the step, in place on `s`: the impulse and the motion of whatever mode it is in. Writes the CTL power
  * bits it flew with and whether it boosted into `out` (returned). replicaStep is this, on a replica's view.
  */
 export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: Readonly<SimEnv>, hz: Readonly<StepHazards>, out: MotionOut = MOTION): MotionOut {
-  out.ctlPower = 0; out.isBoosting = false;
+  out.ctlPower = 0; out.isBoosting = false; out.aimHeld = true;
   const t = env.tick, body = s.body, d = s.structure.derived;
   switch (s.mode) {
     case ReplicaMode.Player:
@@ -134,6 +140,7 @@ export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: 
         const res = stepShipPhysics(body, controls, d, env.tuning, energy, env.gravity, rangeBoost, hazard, env.terrain);
         if (accounted) { s.charge = res.charge; out.ctlPower = res.ctlPower; } else if (pilot) out.ctlPower = input.bits & CTL_REPLAY_BITS;
         out.isBoosting = res.isBoosting;
+        out.aimHeld = res.aimHeld;
       });
       return out;
     }

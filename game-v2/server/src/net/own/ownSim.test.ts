@@ -41,6 +41,9 @@ interface Opts {
   ship?: string;
   /** An observer near it: its replica of A checked at each snapshot, and A's keyframes to it counted */
   watch?: boolean;
+  /** Its aim and keys on tick t, if not the default sweep (the held aim angle: common sim/aimHold.ts) */
+  aim?: (t: number) => number;
+  keys?: (t: number) => Record<string, boolean>;
 }
 interface World { server: GameServer; A: FakeHitsClient; target: number; x0: number; y0: number }
 
@@ -106,7 +109,8 @@ function fly(o: Opts = {}) {
     const msg = {
       type: 'input', seq: seq++, tick: 0, targetTick,
       forward: phase === 0, backward: phase === 2, left: phase === 1, right: phase === 3, boost: false,
-      fireLeft: t % 50 < 30, fireRight: false, targetAngle: Math.sin(t / 30) * 1.2, cursorDist: 700,
+      fireLeft: t % 50 < 30, fireRight: false, targetAngle: o.aim ? o.aim(t) : Math.sin(t / 30) * 1.2, cursorDist: 700,
+      ...(o.keys?.(t) ?? {}),
       ...(chk ? { ownCheck: chk } : {}),
     } as unknown as ClientMessage;
     chk = undefined;
@@ -196,6 +200,28 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.w.A.own.stats.headMisses).toBe(0);
     expect(r.journal.disagreed).toBe(0);
   }, 120_000);
+
+  it('its aim held where it changes nothing (common sim/aimHold.ts): flat-out swings, the helm, firing: no rows, keyframes or misses', () => {
+    for (const [aim, keys] of [
+      [(t: number) => t * 0.17, undefined],
+      [(t: number) => t * 0.05, (t: number) => ({ helm: true, right: t % 80 < 40, forward: t % 80 >= 40 })],
+      [(t: number) => [0.3, 2.4, -1.2, 1.0, -2.8][Math.floor(t / 90) % 5] + 0.004 * Math.sin(t * 1.7), undefined],
+    ] as [(t: number) => number, ((t: number) => Record<string, boolean>) | undefined][]) {
+      const r = fly({ watch: true, aim, keys });
+      const st = r.w.server.getShips().stats.aimHold;
+      if (process.env.OWN_DEBUG) console.log('AIM', JSON.stringify({ got: r.got, checks: r.checks, seen: r.seen, st, client: r.w.A.own.stats }));
+      expect(st.held).toBeGreaterThan(50);
+      expect(r.got.keyframes).toBe(0);
+      expect(r.got.ctlRows).toBe(0);
+      expect(r.got.off).toBe(0);
+      expect(r.got.headMisses).toBe(0);
+      expect(r.checks.agreed).toBe(r.checks.checks - r.checks.stale);
+      expect(r.seen.checked).toBeGreaterThan(50);
+      expect(r.seen.off).toBe(0);
+      expect(r.seen.keyframes).toBe(0);
+      expect(r.journal.disagreed).toBe(0);
+    }
+  }, 240_000);
 
   it('pulled (TEMPORARY: a boss\'s magnet, sent as its push) and shoved by a ship it touches: causes, worked out exactly', () => {
     const r = fly({

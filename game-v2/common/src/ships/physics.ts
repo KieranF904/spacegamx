@@ -51,12 +51,12 @@ export function stepShipPhysics(
   jumpBoost = 1,
   hazard?: FlightConstants['hazard'],
   terrain?: Terrain | null,
-): { charge: Charge; isBoosting: boolean; power: number; ctlPower: number } {
+): { charge: Charge; isBoosting: boolean; power: number; ctlPower: number; aimHeld: boolean } {
   const k = gravity || jumpBoost !== 1 || hazard ? { ...SHIP_FLIGHT_CONSTANTS, gravity, jumpBoost, hazard } : SHIP_FLIGHT_CONSTANTS;
   const res = stepFlight(body, input, derived, tuning, boost, k);
   // A surface's rock: pushed out of it, alike on every side (terrain.ts)
   if (terrain) collideTerrain(body, terrainRadius(derived.radius), terrain);
   quantizeShipBody(body);
   // (The charge comes back rounded alike on server and client: energy.ts)
-  return { charge: res.charge, isBoosting: res.isBoosting, power: res.power, ctlPower: res.ctlPower };
+  return { charge: res.charge, isBoosting: res.isBoosting, power: res.power, ctlPower: res.ctlPower, aimHeld: res.aimHeld };
 }

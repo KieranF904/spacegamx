@@ -135,11 +135,13 @@ function gunView(state: SimShipState): ShipState {
 /**
  * The step's gun phase: stepGuns on `state.guns` + `structure` at the moved pose, the mining lasers' payment, and the
  * events. An unaccounted state (a replica's view) runs its guns free (no energy) and pays no mining. A pilot's (mode
- * Player, aimed by its input: no gunAim) holds its aim distance while the trigger is held (ships/guns.ts distDue). No calls out
+ * Player, aimed by its input: no gunAim) holds its aim distance while the trigger is held (ships/guns.ts distDue). No calls out.
+ * Given a pilot's held aim (`heldQ`, sim/aimHold.ts), returns whether it would have aimed the guns exactly the same (true
+ * when none was given)
  */
-export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env: Readonly<SimEnv>, events: SimEvent[]): void {
+export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env: Readonly<SimEnv>, events: SimEvent[], heldQ?: number): boolean {
   const d = state.structure.derived;
-  if (!d.weapons.length && !d.miners.length) return;
+  if (!d.weapons.length && !d.miners.length) return true;
   const t = env.tick, body = state.body;
   const emp = t < state.hazard.empUntil || (input.bits & BIT_EMP) !== 0;
   const burning = jumpPhase(body.jump ?? 0, jumpTuning(env.tuning)).phase === 'burn';
@@ -148,7 +150,9 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   const pose: GunPose = { x: body.x, y: body.y, angle: body.angle };
   const energy = state.accounted ? { charge: state.charge } : undefined;
   if (energy) ensurePortsCharge(d, energy.charge);
-  gunsTick(view, state.id, pose, { firing: c.firing, aimWorld: input.gunAim === undefined ? simAim(input.q) : input.gunAim ?? undefined, aimDist: input.aimDist, energy, hold: state.mode === 0 /* ReplicaMode.Player */ && input.gunAim === undefined }, t, env.tuning, events);
+  // (A pilot's held aim, where its flight kept it: weighed by the guns too, sim/aimHold.ts)
+  const pilot = state.mode === 0 /* ReplicaMode.Player */ && input.gunAim === undefined;
+  const step = gunsTick(view, state.id, pose, { firing: c.firing, aimWorld: input.gunAim === undefined ? simAim(input.q) : input.gunAim ?? undefined, aimDist: input.aimDist, energy, hold: pilot, heldAim: pilot && heldQ !== undefined ? simAim(heldQ) : undefined }, t, env.tuning, events);
   if (energy) {
     miningTick(view, state.id, pose, c, t, energy, events);
     state.charge = energy.charge;
@@ -160,4 +164,6 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   g.mineUntil = view.mineUntil;
   g.mineShare = view.mineShare;
   g.heldDist = view.heldDist;
+  // (Mining, its lasers' beams are drawn along the aim elsewhere (the cursor state replicas rebuild): the raw one goes)
+  return step.aimHeld && !c.mining;
 }

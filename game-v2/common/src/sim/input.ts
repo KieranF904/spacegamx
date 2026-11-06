@@ -51,6 +51,12 @@ export interface SimInput {
   gunAim?: number | null;
   /** A decided source's push this tick (an AI order's impulse), applied before the motion unless EMP'd */
   impulse?: readonly [number, number];
+  /**
+   * A pilot's held aim (sim/aimHold.ts: the aim it was applied at last tick), where the raw aim `q` is known (its own
+   * ship, on the server and its client). Set, the step still flies `q`, and its ctl.q is the applied aim: this one where
+   * flying it would have done exactly the same. Absent: ctl.q is `q`
+   */
+  heldQ?: number;
 }
 
 export const NO_INPUT: Readonly<SimInput> = Object.freeze({ bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 });
@@ -77,8 +83,13 @@ export function simAimQ(angle: number): number {
 export function simControls(input: Readonly<SimInput>, body: { angle: number }): FlightControls {
   const c = flightControls({ bits: input.bits, targetAngle: simAim(input.q) }, body as never);
   c.jumpDist = input.jumpDist;
+  // (The held aim to weigh against it, sim/aimHold.ts; holding the heading (CTL.hold), the aim is the heading either way)
+  if (input.heldQ !== undefined) c.heldAngle = (input.bits & BIT_HOLD) !== 0 ? c.targetAngle : simAim(input.heldQ);
   return c;
 }
+
+/** (CTL.hold as a number: replica.ts is in this file's import cycle) */
+const BIT_HOLD = 1024;
 
 export type InputKnowledge = 'known' | 'decided' | 'assumed' | 'confirmed';
 

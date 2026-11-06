@@ -97,6 +97,13 @@ export class OwnTick implements OwnTimeline {
   /** Its inputs' fire, jump and aim distance from their target ticks (held between): parallel, by tick */
   private readonly inTicks: number[] = [];
   private readonly inVals: OwnInputExtras[] = [];
+  /**
+   * Its raw aim from each tick it changed (its inputs by target tick, and the server's exception rows where it said):
+   * parallel, by tick. Between changes the replica set holds the controls the ship flew, whose aim is the applied one
+   * (common sim/aimHold.ts), not what its inputs say, so the step takes its raw aim from here (aimAt)
+   */
+  private readonly aimTicks: number[] = [];
+  private readonly aimQs: number[] = [];
   /** Its full state after each tick's step, before that tick's causes (where its guns fired, what they did) */
   private readonly stepped = new Map<number, SimShipState>();
   /** Its stores, guns, hazards and priming as each tick ended (after its causes: a rebuild's stores remapped) */
@@ -140,7 +147,9 @@ export class OwnTick implements OwnTimeline {
     const t = msg.targetTick;
     if (t === undefined) return;
     // (The aim as the server's step flies it (pilotAimQ): what its control rows say and its head hash hashes)
-    this.ctls.set(t, [controlBits(buildFlightInputs(msg, false)), pilotAimQ(Number(msg.targetAngle) || 0)]);
+    const q = pilotAimQ(Number(msg.targetAngle) || 0);
+    this.ctls.set(t, [controlBits(buildFlightInputs(msg, false)), q]);
+    this.setAim(t, q);
     const dist = Number(msg.cursorDist) || 0;
     this.noteExtras(t, { fire: !!msg.fireLeft, fireAlt: !!msg.fireRight, jumpDist: dist, aimDist: dist });
     this.stats.inputs++;
@@ -155,6 +164,24 @@ export class OwnTick implements OwnTimeline {
     if (i > 0 && ts[i - 1] === t) this.inVals[i - 1] = v;
     else { ts.splice(i, 0, t); this.inVals.splice(i, 0, v); }
     if (ts.length > 256) { const cut = ts.findIndex((k) => k >= t - KEEP_TICKS); if (cut > 0) { ts.splice(0, cut); this.inVals.splice(0, cut); } }
+  }
+
+  private setAim(t: number, q: number): void {
+    const ts = this.aimTicks;
+    let i = ts.length;
+    while (i > 0 && ts[i - 1] > t) i--;
+    if (i > 0 && ts[i - 1] === t) this.aimQs[i - 1] = q;
+    else { ts.splice(i, 0, t); this.aimQs.splice(i, 0, q); }
+    // (the newest change before the oldest tick kept stays: it is the aim from there on)
+    if (ts.length > 256) { const cut = ts.findIndex((k) => k >= t - KEEP_TICKS); if (cut > 1) { ts.splice(0, cut - 1); this.aimQs.splice(0, cut - 1); } }
+  }
+
+  /** Its raw aim on tick t (the newest change at or before it; undefined: none known) */
+  aimAt(t: number): number | undefined {
+    const ts = this.aimTicks;
+    let lo = 0, hi = ts.length - 1, at = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (ts[m] <= t) { at = m; lo = m + 1; } else hi = m - 1; }
+    return at >= 0 ? this.aimQs[at] : undefined;
   }
 
   /** Its input's fire, jump and aim distance on tick t (the newest with a target tick at or before it) */
@@ -188,7 +215,7 @@ export class OwnTick implements OwnTimeline {
    * Tick t's whole step (OwnTimeline.step: the replica set asks, for every tick it steps its own ship flown): the one
    * stepper on its full state from what tick t - 1 ended with, its guns' events kept for the drawing side (takeEvents)
    */
-  step(t: number, body: FlightBody, bits: number, q: number, derived: ShipDerived, env: ReplicaEnv): number | null {
+  step(t: number, body: FlightBody, bits: number, q: number, derived: ShipDerived, env: ReplicaEnv, heldQ: number): Readonly<{ bits: number; q: number }> | null {
     const self = this.host.self(), ship = this.host.store.get(self);
     if (!this.on || !ship || ship.kind !== 'ship') return null;
     const prev = this.extrasBefore(t) ?? (this.seed ??= seedOwnExtras(ship));
@@ -197,11 +224,14 @@ export class OwnTick implements OwnTimeline {
     OWN_ENV.pulls = env.pulls;
     OWN_FIELDS.central = env.central; OWN_FIELDS.lodestones = env.lodestones;
     const events: SimEvent[] = [];
-    const s = stepOwnShip(self, prev, body, bits, q, this.inputAt(t), ownStructure(derived, ship), OWN_ENV, events);
+    // (On its raw aim (its inputs': `q`, held between changes, is the applied one) and the one it was applied at last tick:
+    // its state's applied aim, as the server works it out, sim/aimHold.ts)
+    const raw = this.aimAt(t) ?? q;
+    const s = stepOwnShip(self, prev, body, bits, raw, this.inputAt(t), ownStructure(derived, ship), OWN_ENV, events, heldQ);
     this.stepped.set(t, s);
     this.evs.set(t, events);
     if (this.stepped.size > KEEP_STATES + 64) for (const mp of [this.stepped, this.full, this.evs] as Map<number, unknown>[]) for (const k of [...mp.keys()]) if (k < t - KEEP_STATES) mp.delete(k);
-    return s.ctl.bits;
+    return s.ctl;
   }
 
   /** Tick t's step done and its causes worked out: what it ended the tick with (a rebuild's stores remapped) */
@@ -309,6 +339,9 @@ export class OwnTick implements OwnTimeline {
       const lo = m.tick - (ev[0]?.[0] ?? 0);
       for (const t of [...this.ctls.keys()]) if (t >= lo && t <= m.tick) this.ctls.delete(t);
       for (const [ago, bits, q] of ev) this.ctls.set(m.tick - ago, [bits, q]);
+      // (Its aims there are the server's too: its raw ones, Replication's exception row)
+      for (let i = this.aimTicks.length - 1; i >= 0; i--) if (this.aimTicks[i] >= lo && this.aimTicks[i] <= m.tick) { this.aimTicks.splice(i, 1); this.aimQs.splice(i, 1); }
+      for (const [ago, , q] of ev) this.setAim(m.tick - ago, q);
       earliest = Math.min(earliest, lo);
       this.stats.exc++;
     }
