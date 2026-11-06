@@ -287,6 +287,10 @@ const TABLE: Handlers = {
     if (h.pilot.profile && msg.level > h.pilot.profile.level) h.audio.playUI('level_up');
     h.pilot.setProfile(msg);
   },
+  profileDelta: (h, msg) => {
+    if (msg.level !== undefined && h.pilot.profile && msg.level > h.pilot.profile.level) h.audio.playUI('level_up');
+    h.pilot.setProfileDelta(msg);
+  },
   items: (h, msg) => { h.pilot.setItems(msg); },
   gained,
   wreck: (h, msg) => {

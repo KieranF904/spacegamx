@@ -19,7 +19,7 @@ import { hasComponent, entityExists, IWorld } from 'bitecs';
 import {
   xpToReach, LEVEL_CAP, FULL_CHARGE, unlocks, levelUnlockNames, nextUnlockHint, giveSkillPoints, addStanding,
   Player, Position, Velocity, Rotation, Health, InSystem, Dead, Boost,
-  Economy, PlayerProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint,
+  Economy, PlayerProfile, ServerProfileMessage, diffProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint,
   newProfile, migrateProfile, setActiveShip, holdClass, sweeps, STORE_SWEEPS, type StoreSweep, secureHold, SECURE_HOLD, countOf, addTo, removeFrom, hasAll, removeAll, partItemId, buyPrice,
   BOOST_FUEL_DEFAULT, ShipRecord, SALVAGE, skillValue, refundRetiredSkills, salvageOf, salvageParts, isStructuralItem, parsePartItemId, licenceName, DOCK_FEE_LEVEL, dcos, dsin,
 } from '@space-game/common';
@@ -103,8 +103,8 @@ interface Session {
   rebuildKey: string;
   /** The last `items` message sent, as JSON (an unchanged one is not sent again) */
   itemsKey?: string;
-  /** The last `profile` message sent, as JSON without its clock (an unchanged one is not sent again) */
-  profileKey?: string;
+  /** The last full `profile` the client holds (what a `profileDelta` is cut from; an unchanged one is not sent again) */
+  profileSent?: ServerProfileMessage;
   /** Last time we told them the station covered a rebuild (wall ms) */
   lastCreditNote: number;
   /** Station repair owed in fractions of a credit (charged a whole credit at a time) */
@@ -1123,10 +1123,13 @@ export class Pilots {
     };
     // (A full state, and its clock only seeds the client's skew: a copy of what they hold is not sent again; mining and
     // ammo used to resend it every second or so)
-    const key = JSON.stringify({ ...msg, now: 0 });
-    if (s.profileKey === key) return;
-    s.profileKey = key;
-    this.host.send(conn, msg);
+    // The first goes whole; after that only the fields that changed (XP and credits are most of them)
+    const prev = s.profileSent;
+    const sent = JSON.parse(JSON.stringify(msg)) as ServerProfileMessage;
+    s.profileSent = sent;
+    if (!prev) { this.host.send(conn, msg); return; }
+    const delta = diffProfile(prev, sent);
+    if (delta) this.host.send(conn, delta);
   }
 
   sendItems(conn: PilotConn): void {
