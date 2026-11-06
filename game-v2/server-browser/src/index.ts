@@ -15,6 +15,7 @@ import crypto from 'crypto';
 import { AccountRoutes, DATA_DIR } from './accounts/routes.js';
 import { InboxRoutes } from './inbox/routes.js';
 import { ActivityRoutes } from './activity/routes.js';
+import { FriendRoutes } from './friends/routes.js';
 import { BodyError, clientIp, readJson } from './accounts/request.js';
 import { MAX_SERVERS, listing, parseHeartbeat, type ServerEntry } from './servers.js';
 
@@ -531,7 +532,9 @@ function escapeHtml(str: string): string {
 const accounts = await AccountRoutes.create(sendJson, parseJson, getClientIp);
 // The player inbox: messages from admins to accounts, kept beside them (see inbox/routes.ts)
 const inbox = await InboxRoutes.create(accounts.users, sendJson, parseJson, getClientIp, { adminSecret: accounts.secret, dataDir: DATA_DIR });
-accounts.onAccountDeleted = (id) => inbox.forgetUser(id);
+// Friends, friend requests and the saved status, per account: the game servers read and change them (see friends/routes.ts)
+const friends = await FriendRoutes.create(accounts.users, sendJson, parseJson, { adminSecret: accounts.secret, dataDir: DATA_DIR });
+accounts.onAccountDeleted = (id) => { inbox.forgetUser(id); void friends.forgetUser(id); };
 // The player activity feed: game servers send it, the website's admin panel reads it (see activity/routes.ts)
 const activity = await ActivityRoutes.create(accounts.users, sendJson, parseJson, getClientIp, {
   adminSecret: accounts.secret, dataDir: DATA_DIR, live: () => [...new Set([...servers.values()].map((s) => s.name))],
@@ -552,9 +555,10 @@ const server = http.createServer(async (req, res) => {
   const url = req.url?.split('?')[0] || '/';
   
   try {
-    // (The inbox and the feed first: their /admin/ calls would otherwise be the accounts')
+    // (The inbox, the feed and friends first: their /admin/ calls would otherwise be the accounts')
     if (await activity.handle(req, res, url)) return;
     if (await inbox.handle(req, res, url)) return;
+    if (await friends.handle(req, res, url)) return;
     if (await accounts.handle(req, res, url)) return;
 
     // Server registration (from game servers)
@@ -640,6 +644,7 @@ server.listen({ port: PORT, host: process.env.BROWSER_HOST || undefined }, () =>
   console.log(`     POST /auth/*     - Accounts: login, register, validate, logout, account, change-password/email, logout-all, delete-account`);
   console.log(`     POST /inbox/*    - Player inbox: list, read, delete; admins: send, sent`);
   console.log(`     POST /activity/read - Activity feed (an admin's session); game servers send to /admin/activity/ingest`);
+  console.log(`     POST /admin/friends/* - Friends and status per account (game servers, behind LOBBY_ADMIN_SECRET)`);
 });
 
 // Periodic cleanup
@@ -654,6 +659,8 @@ function stop(code: number): void {
     .catch((err) => console.error('[browser] closing the activity feed failed:', err))
     .then(() => inbox.close())
     .catch((err) => console.error('[browser] closing the inbox failed:', err))
+    .then(() => friends.close())
+    .catch((err) => console.error('[browser] closing the friends lists failed:', err))
     .then(() => accounts.close())
     .catch((err) => console.error('[browser] closing the accounts failed:', err))
     .finally(() => process.exit(code));
