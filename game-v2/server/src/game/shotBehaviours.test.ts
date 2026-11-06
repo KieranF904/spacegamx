@@ -8,7 +8,7 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
   Input, InSystem, Position, Velocity, Projectile, OwnedBy, isWeaponFn, ServerMessage, replicaAngle, quantizeReplicaAngle, ReplicaMode,
-  CTL, MARK_TAKEN, STATUS_MARKED, STATUS_SLOWED, EntityType, WEAPON_KIND_TYPE, pilotExtras,
+  CTL, MARK_TAKEN, STATUS_MARKED, STATUS_SLOWED, EntityType, WEAPON_KIND_TYPE, pilotExtras, unpackHits,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -293,6 +293,13 @@ describe('ordnance: the Swarm ripples, the Leviathan arms late', () => {
     const q = bitecs.defineQuery([Projectile]);
     const [skiff] = w.server.enemies.spawnPack(InSystem.systemId[w.pid], { faction: 'pirates', ships: ['pirate_skiff'] }, X + 2000, Y);
     let torp = -1, born = 0, early = 0;
+    // Its detonation as its client has it: told as one (the old way), or worked out from the hit record that spends it
+    // (the hit that breaks one of the skiff's parts is a record since the hit is worked out on the skiff as it was
+    // before that rebuild, HitLedger.before: the client makes the burst itself, ConfirmedHits hitEndFx)
+    const boomsOf = () => [
+      ...w.detonations('torpedo'),
+      ...w.got.filter((g) => g.m.type === 'hits').flatMap((g) => unpackHits((g.m as { h: number[] }).h).filter((r) => r.shell === torp && r.gone).map((r) => ({ tick: g.tick - r.ago }))),
+    ];
     // (the skiff sits right on the torpedo's nose every tick)
     const onNose = () => {
       const sp = Math.hypot(Velocity.x[torp], Velocity.y[torp]) || 1;
@@ -305,11 +312,11 @@ describe('ordnance: the Swarm ripples, the Leviathan arms late', () => {
       if (torp >= 0 && bitecs.entityExists(w.server.world, torp)) onNose();
       w.server.step();
       if (torp < 0) for (const e of q(w.server.world)) if (OwnedBy.ownerId[e] === w.pid && Projectile.weaponType[e] === WEAPON_KIND_TYPE.torpedo) { torp = e; born = w.server.getTick(); }
-      if (torp >= 0 && w.server.getTick() - born < 25) early += w.detonations('torpedo').length;
+      if (torp >= 0 && w.server.getTick() - born < 25) early += boomsOf().length;
     }
     expect(torp).toBeGreaterThanOrEqual(0);
     expect(early).toBe(0);
-    const booms = w.detonations('torpedo');
+    const booms = boomsOf();
     expect(booms.length).toBeGreaterThan(0);
     expect(booms[0].tick - born).toBeGreaterThanOrEqual(28);
   });

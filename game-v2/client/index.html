@@ -259,7 +259,7 @@
     }
 
     #chatTabs button {
-      padding: 3px 10px;
+      padding: 3px 8px;
       background: rgba(6, 10, 24, 0.55);
       border: 1px solid rgba(120, 160, 220, 0.25);
       border-bottom: none;
@@ -267,6 +267,7 @@
       color: rgba(220, 230, 255, 0.6);
       font-size: 11px;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     #chatTabs button:hover {
@@ -347,6 +348,60 @@
     .chat-message.system {
       color: rgba(255, 200, 100, 0.9);
       font-style: italic;
+    }
+
+    /* Private messages: cyan, the name clickable to reply */
+    .chat-message.private .player-name,
+    .chat-message.private .message-text {
+      color: #5ee7f7;
+    }
+
+    .chat-message.private .player-name {
+      cursor: pointer;
+    }
+
+    .chat-message.private .player-name:hover {
+      text-decoration: underline;
+    }
+
+    #chatTabs .chat-friends {
+      margin-left: auto;
+      color: rgba(94, 231, 247, 0.85);
+    }
+
+    #chatTabs .chat-friends + #chatHideBtn {
+      margin-left: 0;
+    }
+
+    /* "Reply to <name>:" before the input while writing a private message */
+    #chatPrefix {
+      display: flex;
+      align-items: center;
+      padding: 0 4px 0 12px;
+      background: rgba(10, 16, 36, 0.95);
+      border: 1px solid rgba(94, 231, 247, 0.45);
+      border-top: none;
+      border-right: none;
+      border-radius: 0 0 0 10px;
+      color: #5ee7f7;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    #chatInput {
+      min-width: 0;
+    }
+
+    #chatPrefix[hidden] {
+      display: none;
+    }
+
+    #chatPrefix:not([hidden]) + #chatInput {
+      border-radius: 0;
+      border-left: none;
+      border-color: rgba(94, 231, 247, 0.45);
+      color: #c9f7fd;
     }
 
     #chatInputContainer {
@@ -444,9 +499,7 @@
       <!-- Chat Box -->
       <div id="chatBox" class="ui-element">
         <div id="chatTabs">
-          <button type="button" data-tab="all" class="active">All</button>
-          <button type="button" data-tab="chat">Chat</button>
-          <button type="button" data-tab="game">Game</button>
+          <!-- The channel toggles (All, Public, Private, Game) and Friends go here: ui/ChatPanel.ts -->
           <button type="button" id="chatHideBtn" title="Hide the chat (Settings > Chat box; Enter brings it back)">Hide</button>
         </div>
         <button type="button" id="chatShowBtn" title="Show the chat">Show chat</button>

@@ -15,12 +15,14 @@
  *
  * Assumptions that make a bot faster or slower than a person: it knows every rock's place and ore at once (no scanning,
  * no hunting for the right rock), aims exactly, flies straight lines with no detours or misclicks, never pauses to look at a
- * screen, and acts one tick after it sees. It always takes the nearest rock, not the richest. A person would be slower
+ * screen, and acts one tick after it sees. Which rock it takes is the `strategy` option (rockStrategies.ts; default the nearest). A person would be slower
  * on all of these; it is the upper edge of what the loop yields.
  */
 import { flyTo, hold, speedOf } from '../core/steering.js';
-import { idle, type Controls, type DepositMode, type Phase } from '../core/types.js';
+import { idle, type Bag, type Controls, type DepositMode, type Phase } from '../core/types.js';
 import type { RockView } from '../core/world.js';
+import { strategies, strategyOpts, type StrategyOpts } from './rockStrategies.js';
+import { targetsFor } from '../stats/targets.js';
 import { num, str, type BotTask, type TaskCtx, type TaskDef, type TaskOpts } from './types.js';
 
 type State = 'toStation' | 'docked' | 'out' | 'mining' | 'collecting' | 'back';
@@ -37,6 +39,10 @@ export interface MineOpts {
   /** The hold counts as full with this much room left (the biggest chunk is 10 units) */
   fullFree: number;
   mode: DepositMode;
+  /** Which rock to take next (rockStrategies.ts), and how many of the nearest to skip at the first pick of a trip */
+  strategy: string;
+  skip: number;
+  pick: StrategyOpts;
 }
 
 export const mineOpts = (o: TaskOpts): MineOpts => ({
@@ -48,6 +54,9 @@ export const mineOpts = (o: TaskOpts): MineOpts => ({
   collectWait: num(o, 'collectWait', 6),
   fullFree: num(o, 'fullFree', 10),
   mode: str(o, 'mode', 'store') === 'sell' ? 'sell' : 'store',
+  strategy: str(o, 'strategy', 'nearest'),
+  skip: num(o, 'skip', 0),
+  pick: strategyOpts(o),
 });
 
 export class MineAndDeposit implements BotTask {
@@ -67,15 +76,35 @@ export class MineAndDeposit implements BotTask {
   private go(state: State, tick: number): void { this.state = state; this.since = tick; }
 
   /** The nearest rock this bot can work, to where it is */
-  private pick(c: TaskCtx): RockView | null {
+  private pick(c: TaskCtx, first = false): RockView | null {
     const p = c.driver.pose();
-    const rocks = c.world.rocksNear(c.system, p.x, p.y, (r) => r.hardness <= this.o.maxHardness && r.left >= this.o.minUnits && !c.world.server.mining.table.types[r.type]?.gas);
-    const r = rocks[0] ?? null;
+    const skip = first ? this.o.skip : 0;
+    const all = c.world.rocksNear(c.system, p.x, p.y, (r) => r.hardness <= this.o.maxHardness && r.left >= this.o.minUnits && !c.world.server.mining.table.types[r.type]?.gas, this.o.strategy === 'nearest' ? 1 + skip : 400);
+    const rocks = all.slice(skip);
+    const strat = strategies[this.o.strategy] ?? strategies.nearest;
+    const r = rocks.length ? strat({
+      rocks, opts: this.o.pick,
+      gap: (k) => Math.hypot(k.x - p.x, k.y - p.y) - k.size,
+      short: () => this.short(c),
+      price: (ore) => c.world.price(this.o.station, ore),
+    }) : null;
     this.rock = r;
     this.rockAt = null;
     this.rockVel = { x: 0, y: 0 };
     if (r) c.stats.rock();
     return r;
+  }
+
+  private goal: Bag | null = null;
+  /** What a whole Prospector still needs in ore (units), less what has been deposited */
+  private short(c: TaskCtx): Bag {
+    if (!this.goal) {
+      const ship = c.world.server.getShips().library.get('prospector');
+      this.goal = ship ? Object.fromEntries(targetsFor(c.world.server.econ, ship).slice(1).flatMap((t) => Object.entries(t.raw))) : {};
+    }
+    const got = c.stats.summary().deposited, out: Bag = {};
+    for (const [ore, n] of Object.entries(this.goal)) out[ore] = Math.max(0, n - (got[ore] ?? 0));
+    return out;
   }
 
   /** Refresh the target (its place now, its drift); null when it is gone or spent */
@@ -115,7 +144,7 @@ export class MineAndDeposit implements BotTask {
       case 'docked': {
         this.phase = 'docked';
         d.set(idle(p.angle));
-        if (secs >= this.o.dockWait) { d.undock(); this.pick(c); this.go('out', c.tick); }
+        if (secs >= this.o.dockWait) { d.undock(); this.pick(c, true); this.go('out', c.tick); }
         break;
       }
       case 'out': {

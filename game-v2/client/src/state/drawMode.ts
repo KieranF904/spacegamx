@@ -1,8 +1,9 @@
 /**
  * The prediction-mode hook (GameState.drawMode): which tick things are drawn at, and a last say on where another ship
- * is drawn. Null (the default, and always in a production build) leaves today's behaviour exactly as it is: mode A.
- * Only the dev Sim tools set it (client dev/predict: modes B, C1, C2, C3, switched live from the F7 panel). Every
- * member is optional; the server and the tick layer (hits, checks, the own ship's step) never read it: drawing only.
+ * is drawn. The game's prediction sets it (client predict/Prediction.ts: mode C3, every other ship at your tick on
+ * the PT layer, in every build); the dev Sim tools switch it live to the alternatives (predict/modes.ts: A, which is
+ * null, the interpolated drawing; B, C1, C2). Null too in proto. Every member is optional; the server and the tick
+ * layer (hits, checks, the own ship's step) never read it: drawing only.
  */
 import type { InterpolatedEntity } from './GameState';
 
@@ -17,4 +18,11 @@ export interface DrawModeHook {
   placed?(e: InterpolatedEntity): void;
   /** The tick a shell is drawn at, given its owner and the frame's own-shell (present) and render ticks */
   shot?(owner: number, present: number, render: number): number;
+  /**
+   * Any other entity (a homing shell, a mob: the PT timeline's guides kind), before it is interpolated: true when the
+   * mode placed it itself (its x, y, angle and render pose set)
+   */
+  entity?(e: InterpolatedEntity, renderTick: number): boolean;
+  /** The tick things decided ahead are drawn at (a boss's looks: its window's timing), given the render tick */
+  ahead?(renderTick: number): number;
 }

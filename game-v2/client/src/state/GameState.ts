@@ -258,7 +258,7 @@ export class GameState {
   public preSnapshot: ((snapshot: ServerSnapshotMessage) => EntityState[]) | null = null;
   /** ...and each frame, every other ship is placed by its replica (true = placed) */
   public replicaPose: ((entity: InterpolatedEntity, renderTick: number) => boolean) | null = null;
-  /** The prediction-mode hook (state/drawMode.ts): null is mode A, today's drawing; only the dev Sim tools set it */
+  /** The prediction-mode hook (state/drawMode.ts): the game's prediction sets C3's (predict/Prediction.ts); null is mode A, the interpolated drawing */
   public drawMode: DrawModeHook | null = null;
   public playerName: string = '';
   public hp: number = PLAYER_MAX_HP;
@@ -1141,6 +1141,8 @@ export class GameState {
       // (A dev prediction mode may place it at another tick, and move it after: state/drawMode.ts)
       const dm = this.drawMode;
       if (this.replicaPose?.(entity, dm?.ship ? dm.ship(entity, renderTick) : renderTick)) { dm?.placed?.(entity); continue; }
+      // (Or another thing a dev prediction mode steps ahead itself: a homing shell, a mob)
+      if (dm?.entity?.(entity, renderTick)) continue;
 
       // Loot pods drifting from their anchor (data[3] its tick: see podDrift)
       if (entity.type === EntityType.DroppedItem && entity.data && entity.data.length >= 4 && entity.hist?.length) {

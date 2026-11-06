@@ -2,10 +2,10 @@
   "_comment": "Mining. Every asteroid type has an ore mix and a hardness; the system's danger tier boosts rarer ores and makes gem seams more common. A shot or beam extracts ore in proportion to damage × the tool's yield, provided the tool is hard enough. Asteroids respawn after respawnSeconds.",
   "respawnSeconds": 300,
   "unitsPerSize": 0.15,
-  "damagePerUnit": 96,
+  "damagePerUnit": 74,
   "chunkUnits": [
-    5,
-    10
+    4,
+    9
   ],
   "breakFraction": 0.3,
   "xpPerUnit": 0.35,
@@ -250,6 +250,23 @@
       "size": [
         30,
         80
+      ],
+      "like": "asteroid_metal"
+    },
+    "rock_taenite": {
+      "_comment": "Small, dense nickel-iron: density 1.5 = half again the ore of a same-size rock (asteroidComposition). Pale brassy metal to look at (AsteroidLook TYPE_COLOR).",
+      "name": "Taenite",
+      "hardness": 1,
+      "density": 1.5,
+      "ores": {
+        "nickel_ore": 45,
+        "iron_ore": 30,
+        "copper_ore": 20,
+        "silicate": 5
+      },
+      "size": [
+        25,
+        45
       ],
       "like": "asteroid_metal"
     },
@@ -620,7 +637,8 @@
       "asteroid_ice": 30,
       "asteroid_fuel": 25,
       "asteroid_crystal": 10,
-      "comet": 4
+      "comet": 4,
+      "rock_taenite": 5
     },
     "borealis_belt": {
       "asteroid_ice": 55,

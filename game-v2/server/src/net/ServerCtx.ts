@@ -27,6 +27,7 @@ import type { ContributorNotes } from '../game/ContributorNotes.js';
 import type { Sieges } from '../game/Sieges.js';
 import type { Hangar } from '../game/Hangar.js';
 import type { Party } from '../game/Party.js';
+import type { Social } from '../game/social/Social.js';
 import type { Trade } from '../game/Trade.js';
 import type { Market } from '../game/Market.js';
 import type { Achievements } from '../game/Achievements.js';
@@ -102,6 +103,7 @@ export interface ServerCtx {
   readonly trade: Trade;
   readonly market: Market;
   readonly achievements: Achievements;
+  readonly social: Social;
 
   // ---- flight messages (net/handlers/flight.ts) ----
   /** Inputs received since the last tick boundary (GameServer.drainInputQueue applies them right before the tick) */

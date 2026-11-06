@@ -37,6 +37,7 @@ import type { Tutorial } from '../ui/Tutorial';
 import type { QuestClient } from '../ui/QuestUI';
 import type { BuildSites } from '../rendering/BuildSites';
 import type { SocialUI } from '../ui/SocialUI';
+import type { ChatPanel } from '../ui/ChatPanel';
 import type { TradeWindow } from '../ui/TradeWindow';
 import type { InfoPanel } from '../ui/InfoPanel';
 import type { OpsUI } from '../ui/OpsUI';
@@ -49,6 +50,7 @@ import type { SiegePanel } from '../ui/SiegePanel';
 import type { BossUI } from '../ui/BossUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ContributorPanel } from '../ui/ContributorPanel';
+import type { ChatBubbles } from '../ui/bubbles/ChatBubbles';
 import type { ProtoHooks } from '../Game';
 
 /** What the message handlers read and write on the game (Game supplies it as getters/setters) */
@@ -73,6 +75,8 @@ export interface MessageHost {
   readonly quests: QuestClient;
   readonly buildSites: BuildSites | null;
   readonly social: SocialUI;
+  /** The chat box (private messages go straight to it) */
+  readonly chat: Pick<ChatPanel, 'addPrivate'>;
   readonly tradeWindow: TradeWindow;
   readonly infoPanel: InfoPanel;
   readonly opsUI: OpsUI;
@@ -87,6 +91,7 @@ export interface MessageHost {
   readonly worldEvents: Map<number, { name: string; x: number; y: number; system: string }>;
   readonly adminPanel: AdminPanel | null;
   readonly contribPanel: ContributorPanel | null;
+  readonly chatBubbles?: ChatBubbles;
   loggedIn: boolean;
   localDead: boolean;
   statsPrimed: boolean;
@@ -304,6 +309,9 @@ const TABLE: Handlers = {
   party: (h, msg) => { h.social.setParty(msg); },
   partyInvite: (h, msg) => { h.social.onInvite(msg); },
   tradeRequest: (h, msg) => { h.social.onTradeRequest(msg); },
+  friends: (h, msg) => { h.social.setFriends(msg); },
+  friendRequest: (h, msg) => { h.social.onFriendRequest(msg); },
+  whisper: (h, msg) => { h.chat.addPrivate(msg); },
   trade: (h, msg) => { h.tradeWindow.onTrade(msg); },
   pilotInfo: (h, msg) => { h.infoPanel.onInfo(msg); },
   ops: (h, msg) => { h.opsUI.setOps(msg); },
@@ -403,7 +411,11 @@ const TABLE: Handlers = {
   // (dev weapons range readout: nobody listens outside a dev build)
   rangeHead: (_h, msg) => { rangeHead(msg); },
   rangeRow: (_h, msg) => { rangeRow(msg); },
-  chat: (h, msg) => { h.addChatMessage(msg.playerName, msg.text); },
+  chat: (h, msg) => {
+    h.addChatMessage(msg.playerName, msg.text);
+    // (Public chat only: party lines come as playerId 0, not a ship)
+    if (msg.playerId > 0) h.chatBubbles?.say(msg.playerId, msg.playerName, msg.text);
+  },
   authResult: (h, msg) => { h.handleAuthResult(msg); },
   adminStats: (h, msg) => { h.adminPanel?.onStats(msg); },
   adminInfo: (h, msg) => { h.adminPanel?.onInfo(msg); },

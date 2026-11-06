@@ -282,3 +282,70 @@ Every other count is the same or within a fight's drift: keyframes, head misses 
 These scenes pull for under 2 s in 20, so the saving is 2-3%. A fight spent in a magnet saves about 5 B per pulled
 tick per pilot. It also stops the snapshot a round that each pull forced, and the PT layer's misprediction of every
 pulled ship.
+
+## Track D: own-shell hits matched and told by one name (2026-11-06)
+
+The Stage 4 overlay's *hit agreement* (drawn strikes of your shells against told hits for them, client
+dev/predict/hitTally.ts) read 10-35 % in every mode and about 45 % on a still dummy. It was measuring the telling, not
+the prediction. Causes found (reproduction: `server/src/net/hits/rebuiltHits.test.ts` on the hitsFight testkit, now with
+a `pack` scenario):
+
+1. **Hits told the old way went under the wrong name.** HitLedger.write named a projectileHit with `nameFor` after the
+   snapshot's removals had let a spent own shell's shot-id name go (OwnShotLog.removed), so it went under the server's
+   entity id. The client has the shell only by shot id: its drawn shell never heard of the hit (WeaponFx orphan), and
+   its tick layer flew the shell on. Of the shooter's own hits: freighter shot apart 22 of 78, Helios drones 61 of 85.
+   Fix: the name is taken as the hit is planned (`legacyNames`). After: 0.
+2. **Every hit on a ship that rebuilt in the window was told.** Hits up to the rebuild went the old way ('rebuilt'),
+   hits after were told records ('synced': the ship was synced this window; 'keyframed': its REBUILD cause). Drones
+   lose a part most windows. Fix: a rebuild sync of a ship the client had, stamped with its tick (CAPS.STRUCTS), keeps
+   the ship as it was before it on both sides (client `ShipStore.asOf`; server `conn.hpBefore` with StructLog's
+   `derived`, `HitLedger.before`). A hit up to the rebuild is worked out on that structure and HP copy, and the sync's
+   HP stands; the client finds the window's hits on each structure by tick. A REBUILD cause no longer makes a ship
+   that isn't a pilot told (`net/hits/toldShips.ts`, client SelfHits.onCaused): it is hit-tested at its pose from the
+   tick before, exact either side of the rebuild. Pilots keep the old rule (their pose on the rebuild's tick is
+   already recentred).
+3. **The breaking hit needed its number.** It deals what the part had left, which the client's tenth-rounded HP copy
+   gets a hair wrong, so every one carried a d10. A record whose number rounds to the same tenth needs none now.
+4. **The overlay dropped the hit point.** PredictController forwarded tally events without x, y, so a told hit with no
+   shell ("orphan") could never be matched to the drawn strike nearest it.
+
+Hit ledger counters (hitsFight testkit, both clients; `legacy` = told the old way, `told why` = reasons records were
+sent instead of found):
+
+| scenario | own hits (shooter) | found by the shooter before → after | legacy before → after | told why before → after |
+|---|---:|---:|---|---|
+| still freighter, 600 ticks | 80 | 78 → 78 | 0 → 0 | oldWay 4 (start-up) → same |
+| freighter at 10 % HP (shot apart), 900 | 78 | 37 → 52 | rebuilt 40, view 4 → rebuilt 10 (as it died), view 4 | keyframed 30, debris 48 → debris 48 |
+| freighter coasting across the fire, 600 | 80 | 56 → 76 | rebuilt 40 → 0 | synced 28, keyframed 16 → 0 |
+| 3 Helios drones, 900 | 85 | 20 → 75 | rebuilt 122 → 4 (debris) | synced 94, keyframed 32 → 0 |
+
+0 corrections (hitFix) and 0 HP mismatches in every run, before and after. What's left told on drones is the quiet
+rule (a key's sum of the client's numbers rounds otherwise than the server's: its records go with d10 0) and hits on
+debris.
+
+**Overlay check** (one run, worktree dev stack, `predict-demo-steps.mjs` with TARGETS=dummy (a Halberd), netSim
+100 ms + 10 ms jitter, 15 s a mode; the headless browser measured 150-250 ms pings):
+
+| mode | agreed | drawn only | told only | on shields (left out) | agreement (totals) |
+|---|---:|---:|---:|---:|---:|
+| A | 90 | 1 | 1 | 4 | 98 % (was ~45 %) |
+| B | 2 | 0 | 4 | 0 | too few strikes to read |
+| C3 | 74 | 6 | 0 | 11 | 92.5 % (window 100 %) |
+
+Mode B drew only 2 strikes in its 15 s, so this run doesn't settle B. Its 4 told-only fit the ordering noted at Stage 4:
+the hit is told before the shell is drawn that far.
+
+Bytes (`cd server && npm run bench:table`, before = refactor/split c2ce196, after = this track):
+
+| scenario | before payload | **after payload** | before wire | **after wire** |
+|---|---:|---:|---:|---:|
+| mother | 1653 | **1612** | 2653 | **2616** |
+| pirates | 639 | **619** | 1184 | **1164** |
+| custom | 1190 | **1179** | 1910 | **1898** |
+
+Every other row is the same to the byte. A record is about 3 B, against a projectileHit + damage + effects told the
+old way; most derived hits now send nothing at all.
+
+Open: crowd dilation. The server's tick and a system's tick differ there, and a rebuild sync's `at` is the system's,
+so a hit's tick and `at` would be compared across clocks. Both sides make the same comparison, so it's safe, but it
+may fall back to told. Mode B ordering is open too.

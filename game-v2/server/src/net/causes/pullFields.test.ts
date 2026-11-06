@@ -6,13 +6,16 @@
  * where a client can't work them out: a puller it doesn't hold as the server had it (a keyframe of the puller due).
  */
 import { describe, it, expect } from 'vitest';
-import { Position, Velocity, Rotation, InSystem, PULL_FIELD } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, PULL_FIELD, ReplicaMode, replicaStep, replicaAngle, type ReplicaEnv } from '@space-game/common';
 import type { GameServer } from '../../GameServer.js';
 import type { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { fight, type Opts } from '../../testkits/decisionFight.testkit.js';
 import type { StagedBrain } from '../../game/brains/staged.js';
 
 type State = [number, number, number, number, number, number];
+
+/** The world a ship flies in, as the server's replication host gives it (gravity, fields, rock: no pulls) */
+const envOf = (server: GameServer, id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
 
 /** A fight with both pilots checked at every snapshot's tick: A's own ship (its tick layer), A's replica of B, B's of A */
 function pulledFight(o: Opts & { setup?: (t: number, server: GameServer, c: { A: FakeHitsClient; B: FakeHitsClient }) => void }) {
@@ -144,14 +147,30 @@ describe('pull fields: pulls on pilots worked out in their steps on every end', 
     expect(r.stats.off).toBe(0);
   }, 300_000);
 
-  it('a collapsing star parked by the watcher: the pilot drawn in on every end, its field one record', () => {
+  it('a collapsing star parked by the watcher: the pilot drawn in on every end, its field one record; the PT layer step pulls it too', () => {
+    // (The PT layer's step of another pilot (ShipReplicaSet.stepAlone, client predict/shipKinds.ts and aheadReads.ts) from
+    // the watcher's confirmed state of the pilot at T - 1, with the controls it flew T: the watcher's confirmed state at T,
+    // pull and all; and not what the step without the pulls gives)
+    const pt = { same: 0, off: 0, pulled: 0, seen: -1 };
     const r = pulledFight({
       ticks: 600, packs: [],
       setup: (t, server, cl) => {
         const s = server as unknown as { weapons: { spawn(...a: unknown[]): number } };
+        const B = cl.B, a = cl.A.pid, T = B.snapTick;
+        if (T > pt.seen && t > 100) {
+          pt.seen = T;
+          const s0 = B.reps.at(a, T - 1), s1 = B.reps.at(a, T), d = B.store.get(a)?.derived;
+          if (s0 && s1 && d && !B.causes.has(a, T)) {
+            const p = B.reps.stepAlone(a, s0, T, s1.bits, s1.q);
+            if (p && p.body.x === s1.body.x && p.body.y === s1.body.y && p.body.vx === s1.body.vx && p.body.vy === s1.body.vy) pt.same++; else pt.off++;
+            const bare = { ...s0.body };
+            replicaStep(ReplicaMode.Player, bare, { bits: s1.bits, targetAngle: replicaAngle(ReplicaMode.Player, s1.q) }, d, server.getShips().tuning, envOf(server, a), T);
+            if (bare.vx !== s1.body.vx || bare.vy !== s1.body.vy) pt.pulled++;
+          }
+        }
         if (t !== 100) return;
         // (from beside the watcher, aimed to park 500 off the pilot)
-        const a = cl.A.pid, b = cl.B.pid, x = Position.x[b], y = Position.y[b], tx = Position.x[a] + 500, ty = Position.y[a];
+        const b = cl.B.pid, x = Position.x[b], y = Position.y[b], tx = Position.x[a] + 500, ty = Position.y[a];
         s.weapons.spawn(b, 'singularity', x, y, Math.atan2(ty - y, tx - x), 1, { speedScale: 1, sizeScale: 1, turret: false, reach: Math.hypot(tx - x, ty - y) });
       },
     });
@@ -166,5 +185,9 @@ describe('pull fields: pulls on pilots worked out in their steps on every end', 
     // (a star reads nothing but its record: never told)
     expect(c.ownTold).toBe(0);
     expect(c.ownDerived).toBeGreaterThan(50);
+    if (process.env.PULL_DEBUG) console.log('STAR PT', JSON.stringify(pt));
+    expect(pt.pulled).toBeGreaterThan(20);
+    expect(pt.off).toBe(0);
+    expect(pt.same).toBeGreaterThan(pt.pulled);
   }, 300_000);
 });

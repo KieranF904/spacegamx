@@ -83,6 +83,12 @@ interface Plan {
   keys: string[];
   /** Hits it gets the old way */
   legacy: Hit[];
+  /**
+   * ...and each one's shell as this client names it (CAPS.SHOT_IDS: its own by shot id), worked out as it's planned: by
+   * `write` the snapshot's removals have let go of a spent shell's name (OwnShotLog.removed), and the hit would go under
+   * the server's entity id, which names nothing it has
+   */
+  legacyNames: number[];
   /** Shells the records end (left out of its removed list) */
   gone: Set<number>;
   /** Damage the records cover, by sum */
@@ -132,6 +138,8 @@ export class HitLedger {
   readonly stats = {
     hits: 0, records: 0, legacy: 0, d: 0, s: 0, i: 0, checks: 0, why: {} as Record<string, number>,
     own: 0, told: 0, reports: 0, fixes: 0, fixHits: 0, toldWhy: {} as Record<string, number>,
+    /** Records of hits on a ship rebuilt since, worked out on the structure before (before) */
+    rebuiltDerived: 0,
     /** Confirmation level changes, by the level changed to (part E) */
     levels: [0, 0, 0],
   };
@@ -196,7 +204,7 @@ export class HitLedger {
    * (left out of its removed list).
    */
   plan(conn: ClientConnection, known: (id: number) => boolean, keyframed?: ReadonlySet<number>): ReadonlySet<number> {
-    const plan: Plan = { recs: [], keys: [], legacy: [], gone: new Set(), covered: new Map(), shown: new Map(), own: [], hits: [] };
+    const plan: Plan = { recs: [], keys: [], legacy: [], legacyNames: [], gone: new Set(), covered: new Map(), shown: new Map(), own: [], hits: [] };
     this.plans.set(conn, plan);
     if (!this.hits.length) return plan.gone;
     let passes = this.passes.get(conn);
@@ -222,6 +230,7 @@ export class HitLedger {
       if (why) {
         if (finds) this.oldWayOf(conn).add(h.proj);
         plan.legacy.push(h);
+        plan.legacyNames.push(this.nameFor(conn, h.proj));
         this.stats.legacy++;
         this.stats.why[why] = (this.stats.why[why] ?? 0) + 1;
         continue;
@@ -260,8 +269,11 @@ export class HitLedger {
     const target = ships.get(h.target);
     if (!target || target.kind === 'debris') return 'debris';
     // (synced since its last snapshot: a sync can go in a frame with no snapshot, and the client holds it till the next)
+    // (not where every sync this window was a rebuild of a ship it had, stamped with its tick: it keeps the structure
+    // before each, and finds the hits on each structure by tick, client ShipStore.asOf. A pilot's still: it moves before
+    // the collision step, so on the rebuild's tick its replica's pose is already recentred, client SelfHits.onSync)
     const at = conn.shipSynced.get(h.target)?.at;
-    if (at !== undefined && at > conn.lastSnapshotSentTick) return 'synced';
+    if (at !== undefined && at > conn.lastSnapshotSentTick && (!conn.hpBefore?.get(h.target) || hasComponent(world, Player, h.target))) return 'synced';
     if (this.removing(h.proj)) return 'removed';
     if (Radius.value[h.proj] >= 19.95) return 'orb';
     const owner = ships.get(h.owner), sh = owner ? gunShell(ships.tuning, owner, h.gun) : null;
@@ -334,9 +346,12 @@ export class HitLedger {
 
   /** One hit for one client: a record (null), or why it goes the old way */
   private derive(conn: ClientConnection, h: Hit, ships: ShipBridge, known: (id: number) => boolean, passes: Map<number, number>, plan: Plan, tick: number): string | null {
-    // The target as the client has it: in view, synced, not rebuilt since the hit (a rebuild's sync carries its HP)
+    // The target as the client has it: in view, synced, and either not rebuilt since the hit, or rebuilt by a sync this
+    // window it has the structure before of (the hit is worked out on that, and its HP copy before the sync: before)
     const ship = ships.get(h.target);
-    if (!ship || ship !== h.state || ship.rebuilds !== h.rebuilds) return 'rebuilt';
+    if (!ship || ship !== h.state) return 'rebuilt';
+    const pre = ship.rebuilds !== h.rebuilds ? this.before(conn, h, ship, ships) : null;
+    if (ship.rebuilds !== h.rebuilds && !pre) return 'rebuilt';
     if (!conn.shipView.has(h.target) || conn.debrisHeld.has(h.target)) return 'view';
     const synced = conn.shipSynced.get(h.target), sent = conn.shipHpSent.get(h.target);
     if (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds || !sent || sent.length !== ship.hp.length) return 'sync';
@@ -354,13 +369,18 @@ export class HitLedger {
     const fx = hitEndFx(sh.kind, sh.def, h.gone);
     if (fx ? !h.end || h.end.kind !== fx.kind || h.end.radius !== fx.radius : !!h.end) return 'fx';
     if (h.ignite >= 0 && h.igniteTicks !== sh.def.ignite?.ticks) return 'fire';
-    // Its copy of the target: the HP it has, no shield (it doesn't know it)
-    const view = Object.create(ship) as ShipState;
-    view.hp = sent;
-    view.shield = 0;
+    // Its copy of the target: the HP it has, no shield (it doesn't know it); for a hit before a rebuild this window, the
+    // structure and HP it had before that rebuild's sync (it works the hit out on those, and the sync's HP stands)
+    let view: ShipState;
+    if (pre) { view = pre; this.stats.rebuiltDerived++; }
+    else {
+      view = Object.create(ship) as ShipState;
+      view.hp = sent;
+      view.shield = 0;
+    }
     const p = passes.get(h.proj) ?? 0;
     const rec: ShellHitRecord = { shell: this.nameFor(conn, h.proj), ago: tick - h.tick, target: h.target, part: h.part, gone: h.gone, glancing: h.glancing };
-    let ignite: number;
+    let ignite: number, shown = h.dealt;
     if (h.soak > 0) {
       // (A shield took some: it leaves the HP to the shipHps after)
       rec.shield = true;
@@ -369,7 +389,10 @@ export class HitLedger {
       this.stats.s++;
     } else {
       const out = deriveShellHit({ ctx: ships, ship: view, struck: h.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes: p });
-      if (!(Math.abs(out.dealt - h.dealt) <= 1e-3)) { rec.d10 = Math.round(h.dealt * 10); this.stats.d++; }
+      // (Its number, as it works it out: within what its tenth shows of the server's, it needs none. A part's last HP
+      // differs by its rounding (its copy is to a tenth, hpWire): the hit that breaks it deals what the part had left)
+      if (Math.round(out.dealt * 10) !== Math.round(h.dealt * 10)) { rec.d10 = Math.round(h.dealt * 10); this.stats.d++; }
+      else shown = out.dealt;
       ignite = out.ignite;
       this.viewSaid.glancing = out.glancing;
       this.viewSaid.gone = out.gone;
@@ -382,9 +405,41 @@ export class HitLedger {
     plan.recs.push(rec);
     plan.keys.push(key);
     plan.covered.set(key, (plan.covered.get(key) ?? 0) + h.dealt);
-    plan.shown.set(key, (plan.shown.get(key) ?? 0) + (rec.d10 !== undefined ? rec.d10 / 10 : h.dealt));
+    plan.shown.set(key, (plan.shown.get(key) ?? 0) + (rec.d10 !== undefined ? rec.d10 / 10 : shown));
     this.stats.records++;
     return null;
+  }
+
+  /** Views of ships before a rebuild sync, one a sync (`before`) */
+  private beforeViews = new WeakMap<object, ShipState>();
+
+  /**
+   * A hit on a ship rebuilt since, for this client: the ship as it had it when the hit struck (client ShipStore.asOf),
+   * or null if it hasn't that. It has it when a sync this window took it from the hit's structure to the next (one
+   * stamped with its rebuild's tick, of a ship it had), the hit's tick is that sync's span (after the one before it,
+   * up to its rebuild: the client picks the structure by tick), and the server still keeps that structure (StructLog).
+   * Its HP is the client's copy just before the sync (the window's hits on it in order mutate it, as on the client)
+   */
+  private before(conn: ClientConnection, h: Hit, ship: ShipState, ships: ShipBridge): ShipState | null {
+    const list = conn.hpBefore?.get(h.target);
+    if (!list) return null;
+    const i = list.findIndex((e) => e.rebuilds > h.rebuilds);
+    const e = list[i];
+    if (!e || e.from !== h.rebuilds || h.tick > e.at || (i > 0 && list[i - 1].at >= h.tick)) return null;
+    let view = this.beforeViews.get(e);
+    if (!view) {
+      const st = ships.structLog.at(h.target, ship, h.rebuilds);
+      if (!st || st.derived.alive.length !== ship.hp.length || e.hp.length !== ship.hp.length) return null;
+      view = Object.create(ship) as ShipState;
+      view.hp = e.hp;
+      view.shield = 0;
+      view.derived = st.derived;
+      const off = new Set(st.detached), ghosts = new Set(st.ghosts ?? []);
+      view.detached = ship.hp.map((_, j) => off.has(j));
+      view.ghost = ship.hp.map((_, j) => ghosts.has(j));
+      this.beforeViews.set(e, view);
+    }
+    return view;
   }
 
   /** Does this client get records this snapshot (it must get the snapshot they count from)? */
@@ -419,8 +474,9 @@ export class HitLedger {
       }
       if (recs.length) net.send(conn.ws, { type: 'hits', h: packHits(recs) });
     }
-    for (const h of plan.legacy) {
-      if (net.nearClient(conn, h.sys, h.x, h.y)) net.send(conn.ws, projectileHitMessage(this.nameFor(conn, h.proj), h.x, h.y));
+    for (let i = 0; i < plan.legacy.length; i++) {
+      const h = plan.legacy[i];
+      if (net.nearClient(conn, h.sys, h.x, h.y)) net.send(conn.ws, projectileHitMessage(plan.legacyNames[i], h.x, h.y));
       for (const m of h.fx) net.sendAsSystem(conn, h.sys, m);
     }
     // (A told shell spent by its record never comes in a removed list: it goes from the told set here, so a reused id is new)

@@ -14,12 +14,13 @@ import { PredictSource } from '../dev/simOverlay/predictSource';
 import { PredictController } from '../dev/predict/PredictController';
 import type { GameState } from '../state/GameState';
 import type { ShipClient } from '../ships/ShipClient';
+import type { Prediction } from '../predict/Prediction';
 import { devFeeds } from './devFeeds';
 import shipModels from '../../../data/ships/models.json';
 import type { Renderer } from '../rendering/Renderer';
 import type { ClientTransport } from '@space-game/common';
 
-export function installDevTools(host: { readonly renderer: Renderer; readonly network: ClientTransport; readonly state?: GameState; readonly shipClient?: ShipClient }): void {
+export function installDevTools(host: { readonly renderer: Renderer; readonly network: ClientTransport; readonly state?: GameState; readonly shipClient?: ShipClient; readonly prediction?: Prediction | null }): void {
   if (import.meta.env.DEV) {
       const simTools = installSimTools(host);
       new RenderTuningPanel({ zoom: () => host.renderer.getZoom(), warp: (systemId, x, y) => host.network.send({ type: 'devTeleport', systemId, x, y }), openSim: () => simTools?.toggle() });
@@ -45,21 +46,21 @@ export function installDevTools(host: { readonly renderer: Renderer; readonly ne
  * The sim tools (F7 panel, Shift+F7 overlay): a network simulator on the browser transport and the overlay over GameState / ShipClient.
  * Dev builds only (the caller is under import.meta.env.DEV); both start off.
  */
-function installSimTools(host: { readonly renderer: Renderer; readonly network: ClientTransport; readonly state?: GameState; readonly shipClient?: ShipClient }): DevSimPanel | null {
+function installSimTools(host: { readonly renderer: Renderer; readonly network: ClientTransport; readonly state?: GameState; readonly shipClient?: ShipClient; readonly prediction?: Prediction | null }): DevSimPanel | null {
   const transport = host.network as ClientTransport & { netSim?: NetSim | null };
   let net: NetSim | null = null;
   if ('netSim' in transport) { net = new NetSim(); transport.netSim = net; }
   if (!host.state || !host.shipClient) return null;
   const base = new GameStateSource({ state: host.state, shipClient: host.shipClient, renderer: host.renderer });
-  // (The prediction modes: mode A until switched; `?predict=C2` starts in one, `?simOverlay=1` with the overlay on)
-  const predict = new PredictController(host.state, host.shipClient, host.renderer);
-  const source = new PredictSource(base, predict, { state: host.state, shipClient: host.shipClient });
-  const overlay = new SimOverlay(source, { attach: () => base.attach(), detach: () => base.detach() });
+  // (The game's prediction, C3, switched live to the other modes for comparison; `?predict=C2` starts in one, `?simOverlay=1` with the overlay on)
+  const predict = host.prediction ? new PredictController(host.prediction, host.state, host.shipClient, host.renderer) : null;
+  const pSource = predict ? new PredictSource(base, predict, { state: host.state, shipClient: host.shipClient }) : null;
+  const overlay = new SimOverlay(pSource ?? base, { attach: () => base.attach(), detach: () => base.detach() });
   const q = new URLSearchParams(location.search);
-  if (q.get('predict')) predict.set(q.get('predict')!);
+  if (q.get('predict')) predict?.set(q.get('predict')!);
   if (q.get('simOverlay') === '1') overlay.setOn(true);
   // (For the demo scripts and the console: switch, read the numbers)
-  (window as unknown as { __simTools?: unknown }).__simTools = { predict, overlay, net, read: () => ({ mode: predict.mode.id, ...source.read(), ...source.counters() }) };
+  (window as unknown as { __simTools?: unknown }).__simTools = { predict, overlay, net, read: () => ({ mode: predict?.mode.id ?? 'off', ...pSource?.read(), ...(pSource ?? base).counters() }) };
   return new DevSimPanel({
     net, overlay, predict,
     say: (text) => host.network.send({ type: 'chat', text } as never),

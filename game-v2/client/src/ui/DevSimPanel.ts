@@ -4,8 +4,8 @@
  *   Network simulator   ping, jitter and loss added on this client's connection, both ways (client dev/netSim.ts). Off until
  *                       "Enabled" is ticked; the sliders do nothing while it is off. Loss drops inputs going out and snapshots
  *                       coming in, nothing else.
- *   Prediction mode     how other ships (and yours) are drawn, switched live (dev/predict/modes.ts): A today, B prediction
- *                       off, C1 AI ahead, C2 PT/ST rubber band, C3 C2 + touch register; the ease time for C2/C3.
+ *   Prediction mode     how other ships (and yours) are drawn, switched live (predict/modes.ts): C3 the game's (C2 + touch
+ *                       register), A interpolated, B prediction off, C1 AI ahead, C2 PT/ST rubber band; the ease time for C2/C3.
  *   Overlay             the ST ghost, PT pose, correction vectors and counters (dev/simOverlay); also Shift+F7.
  *   Rockery             warp there, and spawn test traffic beside you: a Helios drone pack, a still dummy, 1-4 bot players
  *                       on random flight (calm to twitchy, optionally shooting back at you). These send `/rockery ...` chat

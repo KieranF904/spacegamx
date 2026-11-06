@@ -1662,6 +1662,13 @@ export class Renderer {
     return worldToScreen(worldX, worldY, this.pose(), this.app.screen.width, this.app.screen.height);
   }
 
+  /** worldToScreen into `out` (per-frame overlays: nothing allocated) */
+  worldToScreenInto(worldX: number, worldY: number, out: { x: number; y: number }): void {
+    const c = Math.cos(this.cameraAngle), s = Math.sin(this.cameraAngle), dx = worldX - this.cameraX, dy = worldY - this.cameraY;
+    out.x = this.app.screen.width / 2 + (c * dx + s * dy) * this.cameraZoom;
+    out.y = this.app.screen.height / 2 + (-s * dx + c * dy) * this.cameraZoom;
+  }
+
   private pose(): { x: number; y: number; zoom: number; angle: number } {
     return { x: this.cameraX, y: this.cameraY, zoom: this.cameraZoom, angle: this.cameraAngle };
   }
@@ -1731,8 +1738,13 @@ export class Renderer {
   }
 
   /** A shell your client fired ahead of the server (WeaponFx.predict) */
-  predictShot(p: PredictedShell): void {
-    this.weaponFx.predict(p);
+  predictShot(p: PredictedShell): number {
+    return this.weaponFx.predict(p);
+  }
+
+  /** A shell drawn ahead taken back (WeaponFx.retract) */
+  retractShot(id: number): void {
+    this.weaponFx.retract(id);
   }
 
   /** Called when a shot is seen leaving its gun (owner, muzzle point) */

@@ -13,8 +13,10 @@ Dev-only bots that fly a task on the real server and keep stats: a framework to 
 | `server/src/bots/drivers/npcDriver.ts` | the server NPC: `ShipBridge.spawnDummy` + `setController`; laser through `stepWeapons`, LootPods' tractor numbers, `Market.sell` |
 | `server/src/bots/tasks/` | `types.ts` (`BotTask`, `TaskDef`), `registry.ts` (by name), `mineAndDeposit.ts`, `randomFlight.ts` (netcode test traffic: sharp turns, boosts, stops, optional shoot-back) |
 | `server/src/bots/rockeryTools.ts` | the `/rockery` chat command behind the client's Sim tools panel (F7): drones, a still dummy, 1-4 random-flight bot players. How to use: ops-tools.md, "Sim tools" |
+| `server/src/bots/tasks/rockStrategies.ts` | the rock-picking strategies for mine-and-deposit (`strategy=nearest|metal|taenite-on-sight|needs|value`, `skip=k`): pure functions, one line to register a new one |
 | `server/src/bots/stats/BotStats.ts`, `targets.ts` | trips, phases, rates, JSON lines and the table; ore cost of a target in minutes of the loop |
 | `server/src/bench/playerBot.ts` | the accelerated bench (no real time) |
+| `server/src/bench/miningSims.ts` | strategy x Taenite on/off x starting-variation runs on the bench; writes the table for docs/audits/mining-sims-*.md |
 
 Seams used in the rest of the server: `GameServer.afterTick` (hooks run at the end of each main tick), `AdminTools.extensions` (the `/bot` command), `GameServer.pods` and `.mining` made public.
 
@@ -30,6 +32,9 @@ Seams used in the rest of the server: `GameServer.afterTick` (hooks run at the e
 
 ## Mine-and-deposit
 Starts docked at Sol Central Station, waits 10 s, undocks, flies to the nearest rock of hardness 1 (not a gas pocket, 8 or more ore units left; the Mk I laser works it at full yield), stands off at 0.55 of the laser's range, mines, and the tractor pulls the chunks in. With the hold within 10 volume of full it waits up to 6 s for the last chunks, flies home, docks, deposits (`store`: the quick-store "ores" sweep, the way ore goes to the refinery; `sell`: Sell All, then the gems and volatiles one stack at a time, the rest stored) and repeats. A trip runs from the dock (so it includes the wait) to the next dock; the first approach is `setup` and not in a trip.
+
+## Rock strategies and the mining sims
+`OPTS="strategy=metal skip=3"` (or `/bot spawn mine-and-deposit 1 client strategy=needs`): `nearest` (default), `metal` (nearest Chondrite or Taenite), `taenite-on-sight` (nearest, but a Taenite within `sight`=3000 units wins), `needs` (best fit to what a Prospector is still short of), `value` (richest by base sale value within `radius`=4000). `skip=k` drops the k nearest rocks at the first pick of each trip (a starting variation: the world is deterministic, so without it every run is identical). `FIELDS="sol_belt.rock_taenite=0"` overrides a belt weight for a bench run (Taenite off) without touching the data. The bench also reports the time the deposits first covered the Prospector and the Mk I laser (`GoalResult.actualMinutes`), next to the usual by-rate figure. `src/bench/miningSims.ts run <strategy> <on|off> [client|npc]` runs every variation of one cell; `report` prints the tables. Last results: docs/audits/mining-sims-2026-11-06.md. Several NPC-driver bots at one station block each other at the dock; use the client driver for competing bots.
 
 ## Assumptions (faster or slower than a person)
 - Perfect knowledge: it knows every rock's place, type and ore at once, no scanning or hunting; takes the nearest suitable rock, not the richest; no gem-seam hunting.

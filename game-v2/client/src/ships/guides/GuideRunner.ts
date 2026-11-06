@@ -15,7 +15,7 @@
  * hash as of the snapshot's tick, on its own check (OwnTick extraHash).
  */
 import {
-  EntityType, GUIDE, MODE_SENT, ReplicaMode, applyGuideRec, launchOfArgs, guideFirst, guideAdvance, guideHash, guideOfSync, guidePlan, guideRowOk, guideSteer, replicasByte,
+  EntityType, GUIDE, MODE_SENT, ReplicaMode, applyGuideRec, cloneGuide, launchOfArgs, guideFirst, guideAdvance, guideHash, guideOfSync, guidePlan, guideRowOk, guideSteer, replicasByte,
   type EntityState, type Guide, type GuideBody, type ShipReplicaSet,
 } from '@space-game/common';
 
@@ -29,6 +29,12 @@ export interface GuideRunnerHost {
   /** A shell stepped to tick t (tests: compared with the server's, tick by tick) */
   onStep?(id: number, t: number, m: Readonly<GuideBody>): void;
 }
+
+/** How a ship is read: as the server's step reads it at t (`now`), as it ended t (`at`) */
+export interface TargetReads { now(id: number, t: number): GuideBody | null; at(id: number, t: number): GuideBody | null }
+
+/** A shell's run copied to step on its own past the snapshots (the PT timeline: client predict/kinds/guidesKind.ts) */
+export interface GuideFork { m: GuideBody; g: Guide; last: number; mode: number }
 
 interface Run {
   m: GuideBody;
@@ -148,6 +154,30 @@ export class GuideRunner {
     return replicasByte(sum);
   }
 
+  /** A copy of a shell's run as its last stepped tick ended (null: not run here) */
+  fork(id: number): GuideFork | null {
+    const r = this.runs.get(id);
+    return r ? { m: { ...r.m }, g: cloneGuide(r.g), last: r.last, mode: this.modeAt(r, r.last + 1) } : null;
+  }
+
+  /**
+   * One tick of a fork, as step does it with no records (none are known past the snapshot): its waypoint advanced,
+   * planned from its target's replica if its ticks are derived (sent ones hold their waypoint), steered, moved. `read`:
+   * how its target is read past the snapshots (predict/aheadReads.ts; the replica layer if none)
+   */
+  stepFork(id: number, f: GuideFork, t: number, read?: TargetReads): void {
+    const { m, g } = f;
+    guideAdvance(g, t);
+    if (f.mode !== MODE_SENT) {
+      const tg = g.target >= 0 ? this.targetAt(g.target, t, read) : null;
+      guidePlan(g, id, m, tg, t);
+    }
+    guideSteer(g, m, t);
+    m.x += m.vx;
+    m.y += m.vy;
+    f.last = t;
+  }
+
   private modeAt(run: Run, t: number): number {
     let mode = 0;
     for (const [from, m] of run.modes) { if (from > t) break; mode = m; }
@@ -155,9 +185,10 @@ export class GuideRunner {
   }
 
   /** The target as the server's planner read it at tick t (null: not held) */
-  private targetAt(id: number, t: number): GuideBody | null {
+  private targetAt(id: number, t: number, read?: TargetReads): GuideBody | null {
     const reps = this.host.reps, mode = reps.modeOf(id);
     if (mode === undefined) return null;
+    if (read) return (mode === ReplicaMode.Player ? read.now(id, t) : read.at(id, t - 1)) ?? null;
     return (mode === ReplicaMode.Player ? reps.preAt(id, t) : reps.at(id, t - 1)?.body) ?? null;
   }
 

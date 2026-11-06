@@ -31,6 +31,12 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // Popups on other people's screens
   partyInvite: { per: 20, burst: 6 },
   tradeRequest: { per: 20, burst: 6 },
+  // Friends and private messages (game/social/Social.ts has its own, tighter windows that answer the sender)
+  whisper: { per: 60, burst: 12 },
+  friendRequest: { per: 20, burst: 6 },
+  friendRespond: { per: 60, burst: 20 },
+  friendRemove: { per: 30, burst: 10 },
+  setStatus: { per: 20, burst: 6 },
   // The whole map sent again
   mapView: { per: 60, burst: 10 },
   // A loot pod each

@@ -317,7 +317,7 @@ export class FakeHitsClient {
 
   private handle(m: ServerMessage): void {
     switch (m.type) {
-      case 'shipSync': this.debris.onSync(m); this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.causes?.beforeSync(m.id); this.store.onSync(m); break;
+      case 'shipSync': this.debris.onSync(m); this.selfHits?.onSync(m.id, this.store.keepsBefore(m)); this.own?.beforeSync(m.id); this.causes?.beforeSync(m.id); this.store.onSync(m); break;
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
       case 'welcome': if (this.pid >= 0) this.own.start(); break;
       case 'ownSync': this.own.onOwnSync(m); break;

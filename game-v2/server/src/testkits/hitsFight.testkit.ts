@@ -48,6 +48,10 @@ export interface FightScenario {
   drop?: (h: OwnHit) => boolean;
   /** The target is pushed across the line of fire once and coasts (a moving target) */
   drift?: number;
+  /** A pack of AI ships (by enemy id, the pirates' faction) instead of a parked ship: the shooter fires at the nearest */
+  pack?: string[];
+  /** Called once the server and its clients are made (probes wrap the server here) */
+  onServer?: (server: GameServer, shooter: FakeHitsClient) => void;
 }
 
 export function runFight(sc: FightScenario) {
@@ -66,6 +70,7 @@ export function runFight(sc: FightScenario) {
   const C = new FakeHitsClient(server, { name: 'observer', env });
   const fakes = [A, C];
   const truth = serverTruth(server);
+  sc.onServer?.(server, A);
   // The shooter flies by input messages, as a real client: it steps its own ship from them (CAPS.OWN_SIM), so the server
   // must have its controls from them too (not set on the side: that is a late input, a keyframe of its own ship). Its
   // checks ride each one; its hit report goes straight to the ledger (riding an input that goes on time anyway)
@@ -108,13 +113,15 @@ export function runFight(sc: FightScenario) {
   place(A.pid, x0, y0);
   place(C.pid, x0 - 300, y0 - 400);
   const kind = sc.hauler ? ships.library.get('hauler')! : ships.devDesigns['target-freighter'];
-  const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : ships.spawnDummy(kind, x0 + 700, y0, 0, num);
+  const packIds = sc.pack ? server.enemies.spawnPack(num, { faction: 'pirates', ships: sc.pack }, x0 + 900, y0) : [];
+  const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : sc.pack ? packIds[0] : ships.spawnDummy(kind, x0 + 700, y0, 0, num);
   if (sc.behind) ships.spawnDummy(kind, x0 + 1300, y0, 0, num);
   for (const st of sc.stack ?? []) {
     const s = ships.get(ships.spawnDummy(kind, x0 + 700 + st.dx, y0, 0, num))!;
     for (let i = 0; i < s.hp.length; i++) s.hp[i] *= st.hpScale;
   }
   const ship = ships.get(target)!;
+  let aimAt = target;
   if (sc.hpScale) for (let i = 0; i < ship.hp.length; i++) ship.hp[i] *= sc.hpScale;
   const ticks = sc.ticks ?? 600;
   const name = (f: FakeHitsClient) => (f === A ? 'A' : 'C');
@@ -134,7 +141,13 @@ export function runFight(sc: FightScenario) {
   let compared = 0, offSnapshots = 0;
   for (let t = 0; t < ticks; t++) {
     aim.fire = false;
-    if (ships.has(target)) {
+    // (a pack: the nearest of it still flying)
+    if (sc.pack) {
+      let bd = Infinity;
+      for (const id of packIds) if (ships.has(id)) { const d = Math.hypot(Position.x[id] - Position.x[A.pid], Position.y[id] - Position.y[A.pid]); if (d < bd) { bd = d; aimAt = id; } }
+    }
+    if (ships.has(aimAt)) {
+      const target = aimAt;
       // (one push across the line of fire: it coasts, as its replica does)
       if (sc.drift && !sc.boss && t === 0) Velocity.y[target] = sc.drift;
       const dx = Position.x[target] - Position.x[A.pid], dy = Position.y[target] - Position.y[A.pid];
@@ -153,7 +166,10 @@ export function runFight(sc: FightScenario) {
   }
   // Let the last reports and any correction land
   aim.fire = false;
-  for (let t = 0; t < 90; t++) step();
+  // (a pack still flying stops shooting back: its last hits land before the end, as the shooter's do)
+  if (sc.pack) server.admin.run(server.pilots.connOf(A.pid)! as never, 'clear', { radius: 12000, quiet: true });
+  // (shells that missed a pack fly out their life: long enough for the last of them to end)
+  for (let t = 0; t < (sc.pack ? 300 : 90); t++) step();
   // (...and end on a snapshot: a part still burning loses HP between them, and its HP goes with the next one)
   for (let t = 0; t < 6; t++) { for (const f of fakes) f.sawSnapshot = false; step(); if (fakes.every((f) => f.sawSnapshot)) break; }
   const finalOff = fakes.flatMap((f) => hpOff(f, false));

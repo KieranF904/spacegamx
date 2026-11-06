@@ -25,6 +25,11 @@ const KEEP_TICKS = 600;
 
 export interface BodyRunnerHost {
   reps: ShipReplicaSet;
+  /**
+   * How a body stepped past the last snapshot reads other ships (the PT timeline: client predict/aheadReads.ts, so a
+   * read ahead never steps another ship ahead on the replica layer); the replica layer if none
+   */
+  ahead?: { now(id: number, t: number): FlightBody | null; at(id: number, t: number): FlightBody | null } | null;
 }
 
 interface Run {
@@ -76,7 +81,7 @@ export class BodyRunner {
 
   /**
    * Flown here from its decisions and its hits found here (an AI pilot, a custom enemy: not a boss, whose hits are
-   * told): the client can step it ahead of the last snapshot (the dev prediction modes C1-C3, client dev/predict)
+   * told): the client can step it ahead of the last snapshot (the PT layer's 'ai' kind, client predict/shipKinds.ts; mode C1)
    */
   ahead(id: number): boolean {
     const run = this.runs.get(id);
@@ -164,7 +169,10 @@ export class BodyRunner {
         const kind = s?.on ? BODY_KINDS[s.kind] : undefined;
         if (!s || !kind) return null;
         // (its target as the server's step reads it; the rest as they ended the tick before)
-        const read: BodyReads = { now: (o) => this.host.reps.preAt(o, t), before: (o) => this.host.reps.at(o, t - 1)?.body ?? null };
+        const ah = t > this.snapTick ? this.host.ahead : null;
+        const read: BodyReads = ah
+          ? { now: (o) => ah.now(o, t), before: (o) => ah.at(o, t - 1) }
+          : { now: (o) => this.host.reps.preAt(o, t), before: (o) => this.host.reps.at(o, t - 1)?.body ?? null };
         const out = kind.step(id, s, prev, read, t, prevQ, prevBits);
         if (!out) this.stats.blind++;
         return out;

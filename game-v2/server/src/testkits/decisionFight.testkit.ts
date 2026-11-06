@@ -42,6 +42,10 @@ export interface Opts {
   hurt?: number;
   /** Before each tick (between ticks, as a message is): `foes` the hostiles now, `clients` the pilot and the watcher */
   each?: (t: number, server: GameServer, foes: number[], clients: { A: FakeHitsClient; B: FakeHitsClient }) => void;
+  /** The pilot's frames handed in this many ticks late (its downlink's latency; its inputs still on time) */
+  lag?: number;
+  /** After each tick, once the pilot's due frames are in (the PT timeline's tests step their kinds here) */
+  after?: (t: number, server: GameServer, A: FakeHitsClient) => void;
 }
 
 export function fight(o: Opts = {}) {
@@ -59,8 +63,10 @@ export function fight(o: Opts = {}) {
   /** Every mob's state at each tick's end, and A's mobs (CAPS.WAYPOINTS) against it on every tick it steps them */
   const mobTruth = new Map<string, number[]>();
   const mobs = { checked: 0, off: 0, firstOff: '' };
+  const late: { at: number; data: Uint8Array }[] = [];
   const A = new FakeHitsClient(server, {
     name: 'pilots_a', env,
+    ...(o.lag ? { defer: (data: Uint8Array) => late.push({ at: server.getTick() + o.lag!, data }) } : {}),
     onGuideStep: (id, t, m) => {
       const s = mobTruth.get(`${id}:${t}`);
       if (!s) return;
@@ -139,11 +145,13 @@ export function fight(o: Opts = {}) {
     truth.delete(server.getTick() - 120);
     for (const [eid] of server.mobs.guided()) mobTruth.set(`${eid}:${server.getTick()}`, [Position.x[eid], Position.y[eid], Velocity.x[eid], Velocity.y[eid], Rotation.angle[eid]]);
     clock.t += 1000 / 60;
+    while (late.length && late[0].at <= server.getTick()) A.frame(late.shift()!.data);
     chk = A.own?.takeCheck(true, server.getTick());
     const rep = A.selfHits?.takeReport(true);
     if (rep) server.hits.report(server.pilots.connOf(A.pid)! as never, rep);
     for (const m of A.outbox.splice(0)) A.link?.receive(m);
     B.flushUp();
+    if (t >= 0) o.after?.(t, server, A);
   };
   for (let i = 0; i < 20; i++) step(-1);
   const god = (f: FakeHitsClient) => { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); c.isAdmin = false; };

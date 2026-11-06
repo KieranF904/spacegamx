@@ -160,6 +160,7 @@ import { Surfaces, type SurfaceHost } from './game/Surfaces.js';
 import { Sieges, type SiegeHost } from './game/Sieges.js';
 import { Hangar } from './game/Hangar.js';
 import { Party } from './game/Party.js';
+import { Social } from './game/social/Social.js';
 import type { Support } from './ships/features/support/Support.js';
 import { Trade } from './game/Trade.js';
 import { Operations } from './game/Operations.js';
@@ -182,6 +183,7 @@ import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
 import { HandlerRegistry, dispatch, registerHandlers, type Handler, type HandlerTable } from './net/dispatch.js';
 import * as flight from './net/handlers/flight.js';
 import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
+import { registerSocialHandlers } from './net/handlers/social.js';
 import { Outbox } from './net/snapshot/Outbox.js';
 import { HitLedger } from './net/hits/HitLedger.js';
 import { OwnChecks } from './net/own/OwnChecks.js';
@@ -675,6 +677,8 @@ export class GameServer implements ServerCtx {
   /** A system nobody's in is put away whole and brought back as it was, through restarts too (game/SystemMemory.ts) */
   readonly memory: SystemMemory;
   readonly achievements: Achievements;
+  /** Friends, status and private messages (game/social/Social.ts) */
+  readonly social: Social;
   /** Pilotless ships players protect (escorted freighters, outposts): their names */
   private wards = new Map<number, string>();
   /** People's ships, parked where they live (people.json craft): untouchable, by name. The same Map as derelictsMod.personCraft */
@@ -996,6 +1000,14 @@ export class GameServer implements ServerCtx {
       broadcast: (msg) => { for (const c of this.clients.values()) this.send(c.ws, msg); },
       now: this.clock,
     }, this.pilots, this.gameData.achievementsFile as RibbonsFile, profileStore);
+    this.social = new Social({
+      send: (conn, msg) => this.send((conn as ClientConnection).ws, msg),
+      toast: (conn, text, kind) => this.pilots.toast(conn as ClientConnection, text, kind),
+      note: (conn, text, color) => this.send((conn as ClientConnection).ws, { type: 'systemMessage', text, color }),
+      conns: () => this.clients.values(),
+      now: this.clock,
+    }, profileStore);
+    this.pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.social.join(conn); });
     // New arrivals hear about this week's hunt
     this.pilots.onEvent((conn, ev) => {
       if (ev.type !== 'login') return;
@@ -2427,6 +2439,7 @@ this.devTeleport = opts.devTeleport ?? false;
       try {
         for (const conn of await this.pilots.forgetAccount(id)) this.rejectAuth(conn as ClientConnection, 'This account has been deleted.');
         this.achievements.forget(id);
+        this.social.forget(id);
         this.forgotten.add(id);
       } catch (e) {
         console.error(`[Accounts] could not delete the profile of account ${id}:`, e);
@@ -2442,6 +2455,7 @@ this.devTeleport = opts.devTeleport ?? false;
       () => this.pilots.saveAll(),
       () => this.contrib.flush(),
       () => this.achievements.save(true),
+      () => this.social.save(),
       () => this.memory.save(),
     ].map(async (save) => save()));
     const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
@@ -2964,6 +2978,7 @@ this.devTeleport = opts.devTeleport ?? false;
         this.net.outbox.delete(ws);
         this.net.lazy.delete(ws);
         this.guard('close', () => this.party.remove(conn));
+        this.guard('close', () => this.social.leave(conn));
         this.guard('close', () => this.trade.remove(conn));
         this.guard('close', () => this.admin.forget(conn));
         this.guard('close', () => this.contrib.forget(conn));
@@ -3057,6 +3072,7 @@ this.devTeleport = opts.devTeleport ?? false;
     registerHandlers(t, registerAuthHandlers);
     registerHandlers(t, registerShipEditHandlers);
     registerHandlers(t, registerFlightHandlers);
+    registerHandlers(t, registerSocialHandlers);
     t.on('chat', (_ctx, conn, msg) => {
       this.handleChat(conn, msg);
     });
@@ -3306,6 +3322,8 @@ this.devTeleport = opts.devTeleport ?? false;
     const cmd = /^\/(\w+)\s*(.*)$/.exec(text);
     if (cmd) {
       const [, c, arg] = cmd;
+      // Private messages and friends (/w name message, /friend name)
+      if (this.social.chatCommand(conn, c.toLowerCase(), arg)) return;
       switch (c.toLowerCase()) {
         case 'p': case 'party': if (arg) this.party.chat(conn, arg); return;
         case 'invite': this.party.invite(conn, { name: arg }); return;
@@ -3313,7 +3331,7 @@ this.devTeleport = opts.devTeleport ?? false;
         case 'kick': this.party.kick(conn, arg); return;
         case 'promote': this.party.promote(conn, arg); return;
         case 'help':
-          this.send(conn.ws, { type: 'systemMessage', text: 'Chat commands: /p message (party chat) · /invite name · /leave · /kick name · /promote name', color: '#7dd3fc' });
+          this.send(conn.ws, { type: 'systemMessage', text: 'Chat commands: /p message (party chat) · /w name message (private) · /friend name · /invite name · /leave · /kick name · /promote name', color: '#7dd3fc' });
           return;
       }
     }
