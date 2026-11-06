@@ -2498,7 +2498,7 @@ this.devTeleport = opts.devTeleport ?? false;
       partLost: (eid, uid) => { const pc = this.pilots.connOf(eid); if (pc) this.hangar.gemsLost(pc, uid); },
       spendAmmo: (eid, kind, free) => { const pc = this.pilots.connOf(eid); return pc ? this.ammo.spend(pc, kind, free) : { scale: 1, dry: false }; },
       beamAsteroid: (eid, x, y, angle, range, damage, kind) => this.beamAsteroid(eid, x, y, angle, range, damage, kind),
-      notifyDamage: (targetEid, amount, sourceEid, glancing) => {
+      notifyDamage: (targetEid, amount, sourceEid, glancing, shown) => {
         this.combat.note(targetEid, sourceEid, this.currentTick);
         this.bossDev?.onDamage(targetEid, amount, sourceEid);
         this.recovery?.hurt(targetEid, sourceEid);
@@ -2506,7 +2506,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.dens?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
-        this.net.addDamage(InSystem.systemId[targetEid], targetEid, amount, sourceEid, !!glancing);
+        // (a shell hit's sum is of its numbers, as a client works them out: tuning.ts damageUnits)
+        this.net.addDamage(InSystem.systemId[targetEid], targetEid, shown ?? amount, sourceEid, !!glancing);
       },
       // (A shell's hit on a ship: confirmed hits tell clients their own way, net/hits/HitLedger.ts)
       notifyProjectileHit: (proj, x, y, hit) => this.hits.shellHit(proj, x, y, hit),

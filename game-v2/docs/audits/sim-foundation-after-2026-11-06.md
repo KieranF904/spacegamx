@@ -232,3 +232,55 @@ old way; most derived hits now send nothing at all.
 Open: crowd dilation. The server's tick and a system's tick differ there, and a rebuild sync's `at` is the system's,
 so a hit's tick and `at` would be compared across clocks. Both sides make the same comparison, so it's safe, but it
 may fall back to told. Mode B ordering is open too.
+
+## Hit numbers: one rounding on both ends (2026-11-06)
+
+What was left told on drones after Track D was the quiet rule: a key's sum (target, source, glancing) of the client's
+hit numbers rounded to another tenth than the server's, so its records went with d10 0 and the server's damage
+message carried the number.
+
+**Cause.** The hit that breaks a part deals what the part had left. The server knows that exactly (say 1.84). The
+client's copy of the HP is to the wire's tenth (hpWire: 1.8). Each record's own number was in the same tenth, so it
+carried no d10, but the sums drifted apart. In the pack run one key summed to 3.565 on the server (3.6) and 3.525 on
+the client (3.5).
+On top of that both ends summed floats, so the order the hits were added in could also move a sum that sat on a .x5.
+
+**Fix.** One scheme, the same on both ends:
+
+1. A hit's number (common `hitRules.ts` partHit `shown`) is what the shield took, plus what got through to the hull,
+   capped at the HP the part *showed* (hpWire of its HP, above its ruin floor). It depends only on the shell's amount
+   and the part's HP to the tenth, and a client in step has exactly that, so both ends get the same float. The hit that
+   breaks a 1.84 part shows 1.8, the HP the player saw it had. deriveShellHit returns this number. The server's HP
+   maths is untouched: the part still loses its exact HP and dies, and bosses and arenas still count the exact damage.
+2. Numbers are summed in fixed point (`tuning.ts` damageUnits: 1/65536ths, so the sum is an integer and the order
+   doesn't matter). The sum is rounded once, to the tenth, when it's shown (damageTenths). This happens on the server
+   (Outbox.addDamage / flushDamage, using a shell hit's `shown` passed through notifyDamage) and on the client
+   (ConfirmedHits.messages). HitLedger compares the two sums in the same units.
+
+The quiet rule stays as a safety net for real differences: other damage in the same sum (a blast, a burn, a hit told
+the old way), a shield's records (they carry their tenths), or a client whose HP copy is off. Per-tick damage
+(burns, beams, mining lasers, contact) is still summed exactly. Only its addition is fixed point.
+
+I didn't make the HP itself whole tenths. That would round every per-tick hurt (a burn's 0.03 a tick) to nothing.
+
+World and frame hashes, the hit-rules golden and parity tests are unchanged: no damage maths changed, only the numbers
+shown. hitRules.test.ts has a new case: a view with HP to the tenth shows the server's number, breaking hits included.
+rebuiltHits.test.ts now pins `quiet` at 0 on the drone pack.
+
+Hit ledger counters (hitsFight testkit, both clients; `quiet` = records sent with d10 0):
+
+| scenario | records | found (own) before → after | told before → after | quiet before → after |
+|---|---:|---:|---:|---:|
+| still freighter, 600 ticks | 160 | 156 → 156 | 4 → 4 (start-up) | 0 → 0 |
+| freighter shot apart, 900 | 142 | 104 → 104 | 38 → 38 (debris) | 0 → 0 |
+| freighter coasting, 600 | 160 | 156 → 156 | 4 → 4 | 0 → 0 |
+| **3 Helios drones, 600** | 112 | **104 → 112** | **8 → 0** | **8 → 0** |
+| **3 Helios drones, 900** | 162 | **146 → 162** | **16 → 0** | **16 → 0** |
+| shielded freighter, 600 | 160 | 0 → 0 | 160 → 160 (the shield's) | 0 → 0 |
+
+0 corrections and 0 HP mismatches throughout.
+
+Bytes (`npm run bench:table`, before = refactor/split f242485, both run alone): mother wire 2616 → **2615**, custom
+payload 1179 → **1178**. Every other row is the same to the byte. crowd-100 moves between runs with machine load
+(1071-1223 on the same code), so it isn't a result. The drone fights in the benches are few, so the saving there is
+small. Each quiet record was a told record (about 3 B) plus a damage message.

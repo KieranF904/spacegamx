@@ -205,7 +205,7 @@ describe('hitRules: deriveShellHit (the client view)', () => {
           const want = partHit(ctx, truth, part, shellAmount(def, 1.25, passes), { ...shellVs(kind, def, 2), at }, { tick: 0 });
           const got = deriveShellHit({ ctx, ship: view, struck: part, kind, def, grade: 2, strength: 1.25, passes, at });
           expect(got.part).toBe(want.part);
-          expect(got.dealt).toBe(want.dealt);
+          expect(got.dealt).toBe(want.shown);
           expect(got.glancing).toBe(want.glancing);
           if (want.part >= 0) {
             expect(got.hpAfter).toBe(hpWire(truth.hp[want.part]));
@@ -217,6 +217,30 @@ describe('hitRules: deriveShellHit (the client view)', () => {
         }
       }
     }
+  });
+
+  it("shows the server's number from HP to the wire's tenth: every hit, the one that breaks a part too", () => {
+    let broke = 0, hits = 0;
+    for (const [kind, name] of [['cannon', 'enemy/pirate_gunship'], ['railgun', 'enemy/pirate_gunship'], ['magma', 'enemy/redtooth_brawler']] as const) {
+      const def = weaponDef(tuning, kind);
+      for (let part = 0; part < 12; part++) {
+        // (the server's HP in hundredths and finer, the view's to the tenth it was told)
+        for (const f of [0.013, 0.047, 0.2, 0.333, 0.61, 0.97]) {
+          const truth = ship(name), view = ship(name);
+          truth.hp[part] = truth.hp[part] * f + 0.0137;
+          view.hp[part] = hpWire(truth.hp[part]);
+          const at = ctx.geometry(truth)[part].centroid;
+          const want = partHit(ctx, truth, part, shellAmount(def, 1.25, 0), { ...shellVs(kind, def, 2), at }, { tick: 0 });
+          const got = deriveShellHit({ ctx, ship: view, struck: part, kind, def, grade: 2, strength: 1.25, passes: 0, at });
+          if (want.part < 0) continue;
+          hits++;
+          if (truth.hp[want.part] <= 0) broke++;
+          expect(got.dealt).toBe(want.shown);
+        }
+      }
+    }
+    expect(hits).toBeGreaterThan(50);
+    expect(broke).toBeGreaterThan(10);
   });
 
   it('leaves the shield alone (the view never knows it) and does not soak with it', () => {

@@ -242,6 +242,11 @@ export function lastHurtSoak(): number {
   return hurtOut.soak;
 }
 
+/** ...and its number (common hitRules.ts PartHitResult.shown: what a client works it out to show) */
+export function lastHurtShown(): number {
+  return hurtOut.shown;
+}
+
 /**
  * All weapon and impact damage to a ship part goes through here: the shield
  * soaks it first (and stops recharging for a while), the part takes the rest,

@@ -12,7 +12,7 @@
  * (PackedLink.ts). Base-format frames are only for a connection that hasn't joined yet (sign-in answers).
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { BlockStore, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot } from '@space-game/common';
+import { BlockStore, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot, damageUnits, damageTenths } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TYPES, LAZY_TICKS, FX_RANGE, COALESCE_TICKS } from './constants.js';
 import { PackedLink } from './PackedLink.js';
@@ -188,28 +188,31 @@ export class Outbox {
 
   /**
    * Damage dealt since the last snapshot, summed per target, source and glancing (one number for a burst of hits, not
-   * one each), handed on when the next snapshot goes (flushDamage) for each client's share (HitLedger.write), to a tenth
+   * one each), handed on when the next snapshot goes (flushDamage) for each client's share (HitLedger.write), to a tenth.
+   * Summed in fixed point (common tuning.ts damageUnits), as a client sums the hits it works out: the same sum both ends
    */
-  private readonly damageSums = new Map<string, { sys: number; target: number; source: number; glancing: boolean; amount: number }>();
+  private readonly damageSums = new Map<string, DamageSum>();
 
   addDamage(systemId: number, target: number, amount: number, source: number, glancing: boolean): void {
     this.hitPilots.set(target, this.currentTick);
     this.hitPilots.set(source, this.currentTick);
     const key = `${target},${source},${glancing ? 1 : 0}`;
     const e = this.damageSums.get(key);
-    if (e) e.amount += amount;
-    else this.damageSums.set(key, { sys: systemId, target, source, glancing, amount });
+    const units = damageUnits(amount);
+    if (e) e.units += units;
+    else this.damageSums.set(key, { sys: systemId, target, source, glancing, units, amount: 0 });
   }
 
   /**
    * The sums the last flushDamage handed on: each client's share, less what its hit records cover, goes after its
    * snapshot (net/hits/HitLedger.ts write), until the next flush
    */
-  heldDamage: { sys: number; target: number; source: number; glancing: boolean; amount: number }[] = [];
+  heldDamage: DamageSum[] = [];
 
   /** The damage summed since the last snapshot, handed on for the clients' shares (just before the snapshot) */
   flushDamage(): void {
     this.heldDamage = [...this.damageSums.values()];
+    for (const e of this.heldDamage) e.amount = damageTenths(e.units) / 10;
     this.damageSums.clear();
   }
 
@@ -251,6 +254,9 @@ export class Outbox {
     if (at ? this.nearClient(client, systemId, at[0], at[1]) : InSystem.systemId[client.playerId] === systemId && client.ws.isOpen() && hasComponent(this.world, Player, client.playerId)) this.send(client.ws, msg);
   }
 }
+
+/** One snapshot's damage to a target from a source: `units` summed (damageUnits), `amount` the tenths it shows (from flushDamage) */
+export interface DamageSum { sys: number; target: number; source: number; glancing: boolean; units: number; amount: number }
 
 /** A damage sum's message, as flushDamage sends it */
 export function damageMessage(e: { target: number; source: number; glancing: boolean }, amount: number): ServerMessage {
