@@ -102,7 +102,8 @@ export function stepWeapons(b: BridgeCtx, eid: number): boolean {
   const c = gunControls(ship, Input.fireLeft[eid] === 1, Input.fireRight[eid] === 1, jumping);
   // Shots spend stored energy (energy.ts); then the mining lasers pay for their segment from what's left
   const energy = { charge: b.chargeOf(eid) };
-  b.fireWeapons(eid, ship, c.firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy);
+  // (a pilot's guns: their aim distance held while the trigger is, common ships/guns.ts distDue)
+  b.fireWeapons(eid, ship, c.firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy, true);
   const tick = b.host.getTick();
   GUN_EVENTS.length = 0;
   const mining = miningTick(ship, eid, b.pose(eid), c, tick, energy, GUN_EVENTS);
@@ -182,7 +183,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
  * out; turrets only fire when on target and pointing through an open part
  * of their window.
  */
-export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void {
+export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: boolean, aimWorld?: number, cursorDist = 0, target = -1, energy?: { charge: Charge }, hold = false): void {
   const tick = b.host.getTick();
   const pose = b.pose(eid);
   const def = (w: WeaponInfo) => partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w);
@@ -190,9 +191,11 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   // The guns' tick (the step's gun phase, shared with the pilot's client, which fires its own shells on the same tick
   // with the same shot ids: common sim/guns.ts gunsTick). Its fire events name each shell by its shot id
   GUN_EVENTS.length = 0;
-  const { shots, beams, pulses, tells } = gunsTick(ship, eid, pose, { firing, aimWorld, aimDist, energy }, tick, b.tuning, GUN_EVENTS);
+  const { shots, beams, pulses, tells, dist: aimDist } = gunsTick(ship, eid, pose, { firing, aimWorld, aimDist: cursorDist, energy, hold }, tick, b.tuning, GUN_EVENTS);
+  // (the shells fly the distance the guns stepped on, `aimDist`: a pilot's held one, as every end has it; a guided
+  // shell steers to the cursor's, which only the server reads)
   // Where the guns aim this tick and whether the trigger is held: a guided shell steers to it (features/weaponry guided; Weapons.guide)
-  noteGuide(b, eid, tick, firing, pose, aimWorld, aimDist);
+  noteGuide(b, eid, tick, firing, pose, aimWorld, cursorDist);
   // A walking salvo's later shells, on their ticks (features/weaponry walk)
   const pending = b.salvos.get(eid);
   if (pending) stepSalvos(b, eid, ship, pose, tick, pending);

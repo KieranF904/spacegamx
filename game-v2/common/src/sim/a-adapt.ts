@@ -69,7 +69,7 @@ export class SimShipView {
 function gunsOf(ship: ShipState, out: GunState): GunState {
   out.cooldown = ship.cooldown; out.rounds = ship.rounds; out.reload = ship.reload; out.charge = ship.charge;
   out.spin = ship.spin; out.aim = ship.aim; out.triggerHeld = ship.triggerHeld; out.clickAt = ship.clickAt;
-  out.minePaid = ship.minePaid; out.mineUntil = ship.mineUntil; out.mineShare = ship.mineShare; out.tow = ship.tow;
+  out.minePaid = ship.minePaid; out.mineUntil = ship.mineUntil; out.mineShare = ship.mineShare; out.tow = ship.tow; out.heldDist = ship.heldDist;
   return out;
 }
 

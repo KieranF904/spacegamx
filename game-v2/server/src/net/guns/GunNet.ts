@@ -14,12 +14,16 @@
  *            it gets a gunSync), at most once per FIX_GAP ticks a ship
  *   rows     a pilot's gun controls (its triggers, its cursor distance on the input's 4-unit grid) as they change:
  *            gun rows (gunCtl), packed once a round for every client. The distance goes exactly only where the lanes
- *            need it: on a tick a trigger changes, every tick one is held, and SEMI_BUFFER ticks after (a semi-automatic
- *            gun's click still fires). Not firing, a turret points straight at the aim and carries nothing (ships/guns.ts
+ *            need it: on a tick a trigger changes, while one is held, and SEMI_BUFFER ticks after (a semi-automatic
+ *            gun's click still fires). Held, exactly is as the guns stepped on it: a pilot's guns hold their distance
+ *            and take the cursor's only on a gun's due ticks, its fire tick and halfway to its next (common ships/guns.ts
+ *            distDue, ShipState.heldDist: the same on every end), so it goes about twice a fire interval, only when
+ *            that changes it. Not firing, a turret points straight at the aim and carries nothing (ships/guns.ts
  *            stepGuns), so there it goes roughly (idleDue: when the change would turn a gun's line to the aim by
  *            IDLE_TURN, sooner the bigger it is, at most every IDLE_MIN_GAP ticks, at least every IDLE_MAX_GAP if it
  *            moved at all): its clients' turrets look right (OtherGuns.distAt eases between). The server's lane steps
- *            on the exact distance; what differs (idle aim) is left out of the hash (laneHash)
+ *            on the controls as sent, as its clients' lanes do; what differs from the real ship (idle aim) is left out
+ *            of the hash (laneHash)
  *   clients  a client steps a ship's lane only while it's worth it (forClient): the ship held, near its own (GUN_REACH,
  *            kept to GUN_KEEP), and lately firing or its trigger held (GUN_ACTIVE). Until then its fire records go as
  *            before; the first volley after a quiet spell goes told, with the gunSync. A lane it no longer should step
@@ -75,11 +79,11 @@ export interface GunLane {
   told: Set<number>;
   none: Set<number>;
   /**
-   * A pilot's gun controls now as its clients' lanes have them (gun rows step from it: the distance exact while a
-   * trigger is held, rough while not), and their changes since the last round: [tick, bits, dist/4]
+   * A pilot's gun controls now as its clients' lanes have them (gun rows step from it: the distance its guns stepped on
+   * while a trigger is held, rough while not), and their changes since the last round: [tick, bits, dist/4]
    */
   ctl: GunCtl;
-  /** The pilot's exact distance last tick, the tick the distance last went, and the last tick it must go exactly */
+  /** The pilot's cursor distance last tick, the tick the distance last went, and the last tick it must go exactly */
   exactDist: number;
   distAt: number;
   exactTo: number;
@@ -115,9 +119,10 @@ export class GunNet {
   private verSeq = 0;
   /**
    * idleChanges: ticks a pilot's exact distance changed with no trigger held (what went before the idle rule);
-   * idleSent: those that went (idleDue); exactSent: distance changes that went exactly (a trigger held or changing)
+   * idleSent: those that went (idleDue); exactChanges: ticks it changed with a trigger held or changing (what went
+   * before the held-distance rule); exactSent: distance changes that went exactly (as the guns stepped on it)
    */
-  readonly stats = { steps: 0, toldTicks: 0, noneTicks: 0, fixes: 0, syncs: 0, derivedRecs: 0, toldRecs: 0, pdRecs: 0, idleChanges: 0, idleSent: 0, exactSent: 0 };
+  readonly stats = { steps: 0, toldTicks: 0, noneTicks: 0, fixes: 0, syncs: 0, derivedRecs: 0, toldRecs: 0, pdRecs: 0, idleChanges: 0, idleSent: 0, exactChanges: 0, exactSent: 0 };
 
   /** gunSyncs by why (a lane new to the client, a new version, its ship keyframed) */
   readonly why: Record<string, number> = {};
@@ -173,7 +178,8 @@ export class GunNet {
     this.track(l, ship);
     const env = this.simEnv(eid, t);
     EVENTS.length = 0;
-    const x = lanePilot(eid, l.x, before, bodyOf(eid, ship), rc.bits, rc.q, g, ownStructure(ship.derived, ship), env, EVENTS);
+    // (on its controls as its clients' lanes have them)
+    const x = lanePilot(eid, l.x, before, bodyOf(eid, ship), rc.bits, rc.q, l.ctl, ownStructure(ship.derived, ship), env, EVENTS);
     this.settle(eid, l, x, ship, t, from);
   }
 
@@ -198,16 +204,19 @@ export class GunNet {
 
   /**
    * A pilot's gun controls on tick t into what its clients' lanes get (a gun row event when they change): the triggers
-   * always, the distance exactly while they need it (a trigger held or changing, SEMI_BUFFER ticks after), else idleDue
+   * always, the distance exactly while they need it (a trigger held or changing, SEMI_BUFFER ticks after), else idleDue.
+   * Exactly is as the real ship's guns stepped on it (ShipState.heldDist): held through, a pilot's guns take the
+   * cursor's distance only on a gun's due ticks (common ships/guns.ts distDue), so it goes only as it's applied
    */
   private ctlTick(eid: number, l: GunLane, ship: ShipState, g: GunCtl, t: number): void {
     if (g.bits) l.exactTo = t + SEMI_BUFFER;
     const exact = g.bits !== 0 || g.bits !== l.ctl.bits || t <= l.exactTo;
-    if (!exact && g.dist !== l.exactDist) this.stats.idleChanges++;
+    if (g.dist !== l.exactDist) { if (exact) this.stats.exactChanges++; else this.stats.idleChanges++; }
     l.exactDist = g.dist;
+    const want = exact && ship.heldDist !== undefined ? quantizeCursorDist(ship.heldDist) * 4 : g.dist;
     let dist = l.ctl.dist;
-    if (g.dist !== dist && (exact || this.idleDue(eid, ship, l.ctl.dist, g.dist, t - l.distAt))) {
-      dist = g.dist;
+    if (want !== dist && (exact || this.idleDue(eid, ship, l.ctl.dist, want, t - l.distAt))) {
+      dist = want;
       l.distAt = t;
       if (exact) this.stats.exactSent++; else this.stats.idleSent++;
     }

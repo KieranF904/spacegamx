@@ -166,6 +166,57 @@ describe('turret slew only while firing (stepGuns)', () => {
   });
 });
 
+describe('a pilot\'s held aim distance (stepGuns hold, distDue)', () => {
+  const pose = { x: 0, y: 0, angle: 0 };
+  const aimWorld = -Math.PI / 2 + 0.2;
+  // (the cursor's distance moving every tick)
+  const cursor = (t: number) => 600 + 4 * ((t * 7) % 50);
+
+  it('held, the guns step on a distance that takes the cursor\'s only on a gun\'s fire tick and halfway to its next', () => {
+    const s = createShipState(catalog, tuning, 1, corsair(), 0);
+    const guns = s.derived.weapons.filter((x) => x.fire.model === 'cycle' && !x.fire.semi && !tuning.weapons?.[x.kind]?.pointDefence);
+    expect(guns.length).toBeGreaterThan(0);
+    let takes = 0, prev = -1;
+    for (let t = 1; t <= 240; t++) {
+      // (each gun's cooldown as the tick begins: due on reaching 0 or crossing half its interval)
+      const due = t === 1 || guns.some((w) => { const cd0 = s.cooldown[w.part], cd = cd0 - 1; const half = w.interval / 2; return (cd <= 0 && (cd0 > 0 || t % Math.max(1, Math.round(half)) === 0)) || (cd0 > half && cd <= half); });
+      const st = stepGuns(s, pose, { firing: true, aimWorld, aimDist: cursor(t), hold: true }, t, tuning);
+      if (due) expect(st.dist).toBe(cursor(t));
+      else expect(st.dist).toBe(prev);
+      expect(s.heldDist).toBe(st.dist);
+      // (every shot fires on its gun's due tick: at the cursor's distance exactly)
+      if (st.shots.length) expect(st.dist).toBe(cursor(t));
+      if (st.dist !== prev) takes++;
+      prev = st.dist;
+    }
+    // (far fewer than one a tick)
+    expect(takes).toBeLessThan(240 / 2);
+    expect(takes).toBeGreaterThan(5);
+  });
+
+  it('idle, at a trigger-down and for a ship not holding (an AI\'s), the guns step on the cursor\'s distance', () => {
+    const s = createShipState(catalog, tuning, 1, corsair(), 0);
+    expect(stepGuns(s, pose, { firing: false, aimWorld, aimDist: 640, hold: true }, 1, tuning).dist).toBe(640);
+    expect(stepGuns(s, pose, { firing: true, aimWorld, aimDist: 700, hold: true }, 2, tuning).dist).toBe(700);
+    const ai = createShipState(catalog, tuning, 2, corsair(), 0);
+    for (let t = 1; t < 60; t++) expect(stepGuns(ai, pose, { firing: true, aimWorld, aimDist: cursor(t) }, t, tuning).dist).toBe(cursor(t));
+    expect(ai.heldDist).toBeUndefined();
+  });
+
+  it('the same gun state and cursor give the same held distances and shots (a pure rule: every end agrees)', () => {
+    const run = () => {
+      const s = createShipState(catalog, tuning, 1, corsair(), 0);
+      const out: number[] = [];
+      for (let t = 1; t < 200; t++) {
+        const st = stepGuns(s, pose, { firing: t % 70 < 50, aimWorld: aimWorld + 0.2 * Math.sin(t / 9), aimDist: cursor(t), hold: true }, t, tuning);
+        out.push(st.dist, ...st.shots.map((x) => x.aimQ), ...s.aim);
+      }
+      return out;
+    };
+    expect(run()).toEqual(run());
+  });
+});
+
 describe('helm controls', () => {
   const d = createShipState(catalog, tuning, 1, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8')), 0).derived;
   const idle = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0, helm: true };

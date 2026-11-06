@@ -349,7 +349,7 @@ export class ShipBridge {
 
   private stepMiners(eid: number, ship: ShipState, on: boolean, aimWorld: number, aimDist: number): void { return wpn.stepMiners(this.ctx, eid, ship, on, aimWorld, aimDist); }
 
-  private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void { return wpn.fireWeapons(this.ctx, eid, ship, firing, aimWorld, aimDist, target, energy); }
+  private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }, hold = false): void { return wpn.fireWeapons(this.ctx, eid, ship, firing, aimWorld, aimDist, target, energy, hold); }
 
   /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
   private stepPulses(eid: number, ship: ShipState, tick: number): void { return wpn.stepPulses(this.ctx, eid, ship, tick); }
