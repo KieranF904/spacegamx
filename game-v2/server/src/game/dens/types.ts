@@ -5,6 +5,7 @@
 
 import type { Bag, DenFeatureData, ServerMessage, Terrain } from '@space-game/common';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
+import type { PayoutDice } from '../payoutDice.js';
 
 export interface DenHost {
   tick(): number;
@@ -20,6 +21,8 @@ export interface DenHost {
   /** Items to a pilot's station storage, and told so */
   reward(eid: number, items: Bag, text: string): void;
   toast(eid: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad'): void;
+  /** The server's payout dice (payoutDice.ts): what a den pays rolls from these (none: a secret of the den's own) */
+  readonly payout?: PayoutDice;
 }
 
 export interface DenFeature {

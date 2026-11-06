@@ -7,6 +7,9 @@
  * asteroid/generation.ts). A decision only the server makes (where a pack spawns, a siege's next wave, a boss's next
  * attack) may use a long-lived server generator (`mulberry32(seed)` kept by its system): clients get the outcome, or
  * (lockstep, next stage) a small decision input both sides then act on at the same tick.
+ *
+ * Not for payouts: a roll that decides what a pilot gets (mining's dice, loot, salvage, pods, caches, gem cuts) is the
+ * server's, keyed by a secret no client has (server/src/game/payoutDice.ts). These seeds are all things a client knows.
  */
 
 /** 32-bit FNV-1a over integers (each as 4 bytes) */

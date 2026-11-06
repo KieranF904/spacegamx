@@ -349,3 +349,121 @@ old way; most derived hits now send nothing at all.
 Open: crowd dilation. The server's tick and a system's tick differ there, and a rebuild sync's `at` is the system's,
 so a hit's tick and `at` would be compared across clocks. Both sides make the same comparison, so it's safe, but it
 may fall back to told. Mode B ordering is open too.
+
+## Hit numbers: one rounding on both ends (2026-11-06)
+
+What was left told on drones after Track D was the quiet rule: a key's sum (target, source, glancing) of the client's
+hit numbers rounded to another tenth than the server's, so its records went with d10 0 and the server's damage
+message carried the number.
+
+**Cause.** The hit that breaks a part deals what the part had left. The server knows that exactly (say 1.84). The
+client's copy of the HP is to the wire's tenth (hpWire: 1.8). Each record's own number was in the same tenth, so it
+carried no d10, but the sums drifted apart. In the pack run one key summed to 3.565 on the server (3.6) and 3.525 on
+the client (3.5).
+On top of that both ends summed floats, so the order the hits were added in could also move a sum that sat on a .x5.
+
+**Fix.** One scheme, the same on both ends:
+
+1. A hit's number (common `hitRules.ts` partHit `shown`) is what the shield took, plus what got through to the hull,
+   capped at the HP the part *showed* (hpWire of its HP, above its ruin floor). It depends only on the shell's amount
+   and the part's HP to the tenth, and a client in step has exactly that, so both ends get the same float. The hit that
+   breaks a 1.84 part shows 1.8, the HP the player saw it had. deriveShellHit returns this number. The server's HP
+   maths is untouched: the part still loses its exact HP and dies, and bosses and arenas still count the exact damage.
+2. Numbers are summed in fixed point (`tuning.ts` damageUnits: 1/65536ths, so the sum is an integer and the order
+   doesn't matter). The sum is rounded once, to the tenth, when it's shown (damageTenths). This happens on the server
+   (Outbox.addDamage / flushDamage, using a shell hit's `shown` passed through notifyDamage) and on the client
+   (ConfirmedHits.messages). HitLedger compares the two sums in the same units.
+
+The quiet rule stays as a safety net for real differences: other damage in the same sum (a blast, a burn, a hit told
+the old way), a shield's records (they carry their tenths), or a client whose HP copy is off. Per-tick damage
+(burns, beams, mining lasers, contact) is still summed exactly. Only its addition is fixed point.
+
+I didn't make the HP itself whole tenths. That would round every per-tick hurt (a burn's 0.03 a tick) to nothing.
+
+World and frame hashes, the hit-rules golden and parity tests are unchanged: no damage maths changed, only the numbers
+shown. hitRules.test.ts has a new case: a view with HP to the tenth shows the server's number, breaking hits included.
+rebuiltHits.test.ts now pins `quiet` at 0 on the drone pack.
+
+Hit ledger counters (hitsFight testkit, both clients; `quiet` = records sent with d10 0):
+
+| scenario | records | found (own) before → after | told before → after | quiet before → after |
+|---|---:|---:|---:|---:|
+| still freighter, 600 ticks | 160 | 156 → 156 | 4 → 4 (start-up) | 0 → 0 |
+| freighter shot apart, 900 | 142 | 104 → 104 | 38 → 38 (debris) | 0 → 0 |
+| freighter coasting, 600 | 160 | 156 → 156 | 4 → 4 | 0 → 0 |
+| **3 Helios drones, 600** | 112 | **104 → 112** | **8 → 0** | **8 → 0** |
+| **3 Helios drones, 900** | 162 | **146 → 162** | **16 → 0** | **16 → 0** |
+| shielded freighter, 600 | 160 | 0 → 0 | 160 → 160 (the shield's) | 0 → 0 |
+
+0 corrections and 0 HP mismatches throughout.
+
+Bytes (`npm run bench:table`, before = refactor/split f242485, both run alone): mother wire 2616 → **2615**, custom
+payload 1179 → **1178**. Every other row is the same to the byte. crowd-100 moves between runs with machine load
+(1071-1223 on the same code), so it isn't a result. The drone fights in the benches are few, so the saving there is
+small. Each quiet record was a told record (about 3 B) plus a damage message.
+
+## Payout dice on a server-only secret (2026-11-06)
+
+Kieran: clients may only work out the *odds*, which the game will show anyway. The rolls themselves come from a seed
+only the server has.
+
+**Before.** Mining's dice were seeded from the rock's entity id (`(eid * 2654435761) >>> 0`), which every client
+knows. The other payout rolls drew from `mulberry32` of a constant written in the source, and kill loot shared its
+generator with the AI's strafe, aim and elite rolls. A den cache's roll was seeded from `id:who:tick`.
+
+**Now.** `server/src/game/payoutDice.ts` holds a 256-bit secret: random each boot (`crypto.getRandomValues`), or
+fixed by `GameServerOptions.payoutSecret` or `PAYOUT_SECRET`. It is never sent anywhere. Each stream runs SHA-256's
+compression function over the secret, the stream's name and numbers, and a counter, giving eight draws a block. The
+code is plain JS because the server also runs in the browser (proto mode); a test checks it against node:crypto on
+FIPS 180-4's 'abc' block. The rolls can't be worked back to the secret, and one stream's rolls say nothing of
+another's. `GameServer.payout` owns it and hands it to each system.
+
+Payout rolls moved onto it:
+
+| where | rolls | stream |
+|---|---|---|
+| Mining.ts | the seam gem roll, the ore pick, the keep roll, the skill bonus roll, each chunk's size (units worked) and throw, the spill when a rock breaks | `rock`, id, registration count: each rock its own, a rock come back under the same id too |
+| Enemies.ts | a kill's faction loot (chance and count, twice for elites) and each salvaged part's roll | `kill loot` |
+| Bosses.ts | a boss's loot table | `boss loot` |
+| Events.ts | a salvage field's pod count, goods, counts and rare find; a signal peak's pod goods and counts (their scatter stays on the events' own generator) | `event pods` |
+| dens/crustCache.ts | a cracked cache's loot (its seed) | `den cache`, cache, pilot, tick |
+| StationServices.ts | whether a gem cut fails | `gem cuts` |
+
+Left as they are: rock composition and looks (`asteroidComposition`, computed on the client for looks and odds),
+quest and bounty generation (offers shown before they're taken, not dice), derelict wreck shapes (seen), elite
+spawns (seen, and they shape combat), loot pod scatter, and every movement or combat seed.
+
+The rule is written in docs/areas/economy-quests.md (Invariants, "Two kinds of seed") and in common math/rng.ts. Seeds
+both sides know are for anything that shapes movement, combat or visuals. The server's secret is for anything that
+pays out.
+
+Tests and benches fix the secret: vitest.config.ts sets `PAYOUT_SECRET=tests`, and netTable, customFight and
+playerBot set `bench`. payoutDice.test.ts checks the SHA-256 block, that a fixed secret repeats and another differs,
+that streams are independent, that no secret means a fresh one each boot, that the draws are even, and that the same
+rock under another secret pays otherwise.
+
+The world and frame hashes, parity and golden tests are unchanged, and so are the mining, bosses, dens, economy,
+outliers, quests, enemies, gems, econ and bots tests (28 files).
+
+Bytes (`npm run bench:table`, after the hit-number fix → after this): every row is the same to the byte except
+these:
+
+| scenario | payload | wire | up | why |
+|---|---:|---:|---:|---|
+| pirates | 619 → 1102 | 1164 → 1739 | 686 → 687 | a different fight, not more bytes per thing |
+| custom | 1178 → 1154 | 1898 → 1870 | 561 → 574 | the same |
+| reentry | 104 → 107 | 217 → 221 | 1 → 1 | the same |
+
+Kill loot no longer draws from the AI's generator, so after the first kill every strafe flip and aim seed rolls
+differently and the fight plays out another way. Putting the loot rolls back on `Enemies.rng` alone gives 619 / 1164
+exactly. Compare pirates against this new baseline from here on.
+
+**Found on the way (not fixed, pre-existing).** The new pirates fight produces an HP mismatch. At tick ~783 a
+FakeHitsClient's copy of a Pirate Skiff's *debris* piece reads [54.6, 0, 60, 30.5] against the server's
+[18.6, 0, 27.7, 30.5]: two hits on the debris never reached it. The hpCheck / hpResync safety net puts it right.
+The same happens on the tree before the hit-number fix (f242485 with only the dice change), so the cause is the debris
+hit path, not either change here. To reproduce: `npx tsx --tsconfig ../scripts/net/tsconfig.json
+src/bench/netTable.ts --case pirates` and log ConfirmedHits.check mismatches.
+
+That mismatch also exposed a bench bug: the up-bytes count took `.byteLength` of an hpResync, which encodes as JSON (a
+string), so `up B/s` printed null. netTable counts strings by their UTF-8 length now.

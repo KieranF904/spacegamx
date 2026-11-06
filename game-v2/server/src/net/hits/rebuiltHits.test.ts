@@ -79,5 +79,8 @@ describe('own-shell hits on ships rebuilt in the window', () => {
     expect(x.found).toBeGreaterThanOrEqual(0.8 * x.own);
     expect(x.r.stats.toldWhy.synced ?? 0).toBe(0);
     expect(x.r.stats.toldWhy.keyframed ?? 0).toBe(0);
+    // (and none told for its number: a hit's number is worked out from the HP to the wire's tenth on both ends, and
+    // summed in fixed point, so the shooter's sums are the server's: hitRules.ts partHit `shown`, tuning.ts damageUnits)
+    expect(x.r.stats.quiet).toBe(0);
   }, 120_000);
 });

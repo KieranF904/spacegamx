@@ -31,7 +31,7 @@
 import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   Position, Projectile, InSystem, Player, Radius, Dead, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
-  firesStraight, unwrapTick14, CONFIRM, confirmRules,
+  firesStraight, unwrapTick14, CONFIRM, confirmRules, damageUnits, damageTenths,
   type ClientSocket, type ServerMessage, type ShellHitRecord, type ShipState, type HitReport,
 } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -52,8 +52,8 @@ export interface HitLedgerHost {
   readonly bodies?: { toldHits(conn: object, eid: number): boolean };
 }
 
-/** What bridge hitProjectile says of a shell's hit on a ship */
-export interface ShellHitInfo { target: number; part: number; dealt: number; glancing: boolean; soak: number; rebuilds: number }
+/** What bridge hitProjectile says of a shell's hit on a ship (`shown`: its number, common hitRules.ts PartHitResult.shown) */
+export interface ShellHitInfo { target: number; part: number; dealt: number; shown: number; glancing: boolean; soak: number; rebuilds: number }
 
 /** One shell's hit on a ship this snapshot */
 interface Hit extends ShellHitInfo {
@@ -91,7 +91,7 @@ interface Plan {
   legacyNames: number[];
   /** Shells the records end (left out of its removed list) */
   gone: Set<number>;
-  /** Damage the records cover, by sum */
+  /** The numbers the records cover, by sum, in fixed point (damageUnits, as Outbox sums them) */
   covered: Map<string, number>;
   /** The same sums as the client works them out from the records: a record's tenths where it carries them, else its own hit's */
   shown: Map<string, number>;
@@ -142,6 +142,8 @@ export class HitLedger {
     rebuiltDerived: 0,
     /** Confirmation level changes, by the level changed to (part E) */
     levels: [0, 0, 0],
+    /** Records sent with no number (d10 0): their key's sum went as a damage message (`write`) */
+    quiet: 0,
   };
 
   /**
@@ -305,7 +307,7 @@ export class HitLedger {
         plan.own[i] = false;
         this.stats.toldWhy.oldWay = (this.stats.toldWhy.oldWay ?? 0) + 1;
       }
-      jh.push({ rec: r, tick: h.tick, dealt: h.dealt });
+      jh.push({ rec: r, tick: h.tick, dealt: h.shown });
     }
     this.journalOf(conn).close(tick, jh);
   }
@@ -380,18 +382,18 @@ export class HitLedger {
     }
     const p = passes.get(h.proj) ?? 0;
     const rec: ShellHitRecord = { shell: this.nameFor(conn, h.proj), ago: tick - h.tick, target: h.target, part: h.part, gone: h.gone, glancing: h.glancing };
-    let ignite: number, shown = h.dealt;
+    let ignite: number, shown = h.shown;
     if (h.soak > 0) {
       // (A shield took some: it leaves the HP to the shipHps after)
       rec.shield = true;
-      rec.d10 = Math.round(h.dealt * 10);
+      rec.d10 = Math.round(h.shown * 10);
       ignite = igniteRule(view, h.part, sh.def);
       this.stats.s++;
     } else {
       const out = deriveShellHit({ ctx: ships, ship: view, struck: h.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes: p });
-      // (Its number, as it works it out: within what its tenth shows of the server's, it needs none. A part's last HP
-      // differs by its rounding (its copy is to a tenth, hpWire): the hit that breaks it deals what the part had left)
-      if (Math.round(out.dealt * 10) !== Math.round(h.dealt * 10)) { rec.d10 = Math.round(h.dealt * 10); this.stats.d++; }
+      // (Its number, as it works it out: within what its tenth shows of the server's, it needs none. Both ends work it out
+      // from the part's HP to the wire's tenth (hitRules.ts partHit `shown`), so they're the same unless its copy is off)
+      if (Math.round(out.dealt * 10) !== Math.round(h.shown * 10)) { rec.d10 = Math.round(h.shown * 10); this.stats.d++; }
       else shown = out.dealt;
       ignite = out.ignite;
       this.viewSaid.glancing = out.glancing;
@@ -404,8 +406,8 @@ export class HitLedger {
     const key = keyOf(h.target, h.owner, h.glancing);
     plan.recs.push(rec);
     plan.keys.push(key);
-    plan.covered.set(key, (plan.covered.get(key) ?? 0) + h.dealt);
-    plan.shown.set(key, (plan.shown.get(key) ?? 0) + (rec.d10 !== undefined ? rec.d10 / 10 : shown));
+    plan.covered.set(key, (plan.covered.get(key) ?? 0) + damageUnits(h.shown));
+    plan.shown.set(key, (plan.shown.get(key) ?? 0) + damageUnits(rec.d10 !== undefined ? rec.d10 / 10 : shown));
     this.stats.records++;
     return null;
   }
@@ -456,17 +458,16 @@ export class HitLedger {
     for (const e of net.heldDamage) {
       if (!net.nearClient(conn, e.sys, Position.x[e.target], Position.y[e.target], e.source)) continue;
       const key = keyOf(e.target, e.source, e.glancing), cov = plan.covered.get(key) ?? 0;
-      const amount = Math.round(e.amount * 10) / 10;
-      // (The records say it all: it sums them itself. Something else too, a blast: the sum goes as ever, the records show no number.
-      // So too where its sum of the records would round otherwise than the server's (a shield's records carry their tenths,
-      // rounded one by one): the number it shows is the server's sum)
-      if (cov > 0 && e.amount - cov <= 0.05 && Math.round((plan.shown.get(key) ?? 0) * 10) / 10 === amount) continue;
+      // (The records say it all: it sums them itself, in the same fixed point (tuning.ts damageUnits), to the same tenth.
+      // Something else in the sum too (a blast, a hit gone the old way), or a record it works out otherwise than the
+      // server (its HP copy off, a shield's records carrying their tenths): the sum goes as ever, the records show no number)
+      if (cov > 0 && damageTenths(plan.shown.get(key) ?? 0) === damageTenths(e.units)) continue;
       if (cov > 0) (quiet ??= new Set()).add(key);
-      if (amount > 0) net.send(conn.ws, damageMessage(e, amount));
+      if (e.amount > 0) net.send(conn.ws, damageMessage(e, e.amount));
     }
     if (plan.recs.length) {
       // (A record whose number shows in a sum sent anyway says so: sent even to a client that found it)
-      if (quiet) for (let i = 0; i < plan.recs.length; i++) if (quiet.has(plan.keys[i])) { plan.recs[i].d10 = 0; if (plan.own.length) plan.own[i] = false; }
+      if (quiet) for (let i = 0; i < plan.recs.length; i++) if (quiet.has(plan.keys[i])) { plan.recs[i].d10 = 0; this.stats.quiet++; if (plan.own.length) plan.own[i] = false; }
       let recs = plan.recs;
       if (plan.own.length) {
         recs = [];

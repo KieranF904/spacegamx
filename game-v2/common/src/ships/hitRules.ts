@@ -96,6 +96,13 @@ export interface PartHitResult {
   part: number;
   /** Shield plus hull damage */
   dealt: number;
+  /**
+   * The hit's number (what it shows: a damage message's share): the shield's take, and the hull's as a client with the
+   * part's HP to the wire's tenth (hpWire) works it out: what got through, but no more than the HP the part showed
+   * (above its ruin floor). The same on both ends however the HP's hundredths lie (a hit that breaks a part
+   * shows what it showed it had left): so a client's sum of its hits' numbers is the server's (tuning.ts damageUnits)
+   */
+  shown: number;
   /** What the shield took */
   soak: number;
   /** The shield broke on this hit (it held something, and holds nothing now) */
@@ -109,7 +116,7 @@ export interface PartHitResult {
 }
 
 export function newPartHit(): PartHitResult {
-  return { part: -1, dealt: 0, soak: 0, broke: false, through: 1, share: 1, glancing: false };
+  return { part: -1, dealt: 0, shown: 0, soak: 0, broke: false, through: 1, share: 1, glancing: false };
 }
 
 /** (Part HP on the wire: tuning.ts, beside the health it decides) */
@@ -200,7 +207,7 @@ function underCover(ctx: HitCtx, ship: ShipState, part: number, at?: Vec2): numb
  * `ship.hp`; the result goes in `out`. Who's told (a broken shield, the last hitter) is the caller's.
  */
 export function partHit(ctx: HitCtx, ship: ShipState, part: number, amount: number, vs: HitVs | undefined, mods: HitMods, out: PartHitResult = newPartHit()): PartHitResult {
-  out.part = -1; out.dealt = 0; out.soak = 0; out.broke = false; out.through = 1; out.share = 1; out.glancing = false;
+  out.part = -1; out.dealt = 0; out.shown = 0; out.soak = 0; out.broke = false; out.through = 1; out.share = 1; out.glancing = false;
   if (amount <= 0) return out;
   const catalog = ctx.catalog;
   const struck = part;
@@ -235,8 +242,14 @@ export function partHit(ctx: HitCtx, ship: ShipState, part: number, amount: numb
   out.glancing = out.share < GLANCING;
   // (a piece that ruins never breaks: it's left wrecked, RUIN_HP to it)
   const floor = catalog.pieces.get(ship.blueprint.parts[part]?.piece)?.ruin ? RUIN_HP : 0;
-  if (amount > 0) dealt += damagePart(ship, part, Math.min(amount * (vs?.hull ?? 1) * through, Math.max(0, ship.hp[part] - floor)), ctx.tuning);
+  let shown = dealt;
+  if (amount > 0) {
+    const req = amount * (vs?.hull ?? 1) * through;
+    if (ship.hp[part] > 0 && !ship.detached[part]) shown += Math.min(req, Math.max(0, hpWire(ship.hp[part]) - floor));
+    dealt += damagePart(ship, part, Math.min(req, Math.max(0, ship.hp[part] - floor)), ctx.tuning);
+  }
   out.dealt = dealt;
+  out.shown = shown;
   return out;
 }
 
@@ -286,7 +299,7 @@ export interface ShellHitView {
 export interface ShellHitOutcome {
   /** The part that took it (-1: none) */
   part: number;
-  /** Damage dealt (hull: a view has no shield) */
+  /** The hit's number (hull: a view has no shield): PartHitResult.shown, the server's own for the hit */
   dealt: number;
   /** The part's HP after, as the wire carries it (-1: no part took it) */
   hpAfter: number;
@@ -318,7 +331,7 @@ export function deriveShellHit(view: ShellHitView): ShellHitOutcome {
   const hpAfter = r.part >= 0 ? hpWire(ship.hp[r.part]) : -1;
   if (r.part >= 0) ship.hp[r.part] = hpAfter;
   const gone = shellGone(def, view.passes);
-  return { part: r.part, dealt: r.dealt, hpAfter, glancing: r.glancing, ignite: igniteRule(ship, view.struck, def), gone, fx: hitEndFx(view.kind, def, gone) };
+  return { part: r.part, dealt: r.shown, hpAfter, glancing: r.glancing, ignite: igniteRule(ship, view.struck, def), gone, fx: hitEndFx(view.kind, def, gone) };
 }
 
 /** A gun's shell as a client knows it: its kind, the tuning it flies and hits with, its gun's grade and strength */
