@@ -221,6 +221,11 @@ export function lastDamagedTick(b: BridgeCtx, eid: number): number {
   return b.lastDamaged.get(eid) ?? -Infinity;
 }
 
+/** Last tick this body was hurt by someone (`lastHitter`'s tick; -Infinity if never): damage with no source leaves it */
+export function lastHitTick(b: BridgeCtx, eid: number): number {
+  return b.lastHitAt.get(eid) ?? -Infinity;
+}
+
 /**
  * What hurt tells the shared rules about the ship being hit (common hitRules.ts HitMods), asked only when a rule
  * needs it: one, reused (partHit never calls back into hurt)
@@ -269,7 +274,7 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
   if (broke) b.host.shieldBroken?.(eid);
   if (dealt > 0) {
     b.lastDamaged.set(eid, tick);
-    if (source >= 0 && source !== eid) b.lastHitBy.set(eid, source);
+    if (source >= 0 && source !== eid) { b.lastHitBy.set(eid, source); b.lastHitAt.set(eid, tick); }
     // (A piece of debris hurt: its clients are told it from now on, bridge/debrisNet.ts)
     if (ship.kind === 'debris') b.debrisNet.told.add(eid);
   }
@@ -544,7 +549,7 @@ export function applyBlast(bridge: BridgeCtx, b: PendingBlast): void {
     bridge.lastDamaged.set(eid, tick);
     // Whoever set off the chain gets the credit
     const by = bridge.lastHitBy.get(b.source);
-    if (by !== undefined && eid !== by) bridge.lastHitBy.set(eid, by);
+    if (by !== undefined && eid !== by) { bridge.lastHitBy.set(eid, by); bridge.lastHitAt.set(eid, tick); }
     bridge.host.notifyDamage(eid, dealt, b.source);
   }
 }

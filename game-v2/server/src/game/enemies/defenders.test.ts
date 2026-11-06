@@ -128,6 +128,28 @@ describe('freighters shoot back (defenders)', () => {
     for (const s of after) { expect(s.offB).toBeLessThan(0.8); expect(s.offA).toBeGreaterThan(1.5); }
   }, 240_000);
 
+  it("damage with no source (a hazard's) doesn't refresh the lock: its quiet runs from the attacker's own last hit", () => {
+    const HIT = 30;
+    const r = haul(300, (t, A) => (t === HIT ? A : -1));
+    const d = (r.server.enemies.defenders as unknown as { list: Map<number, { attacker: number; lastHit: number }> }).list.get(r.f)!;
+    expect(d.attacker).toBe(r.A);
+    const hitAt = d.lastHit;
+    expect(hitAt).toBeGreaterThan(0);
+    // (hurt with no source: the bridge's last hitter is still A, but this wasn't A)
+    const tick = r.server.getTick();
+    expect(r.ships.damagePartBy(r.f, r.ships.get(r.f)!.derived.weapons.length ? 1 : 0, 4, -1)).toBeGreaterThan(0);
+    expect(r.ships.lastHitter(r.f)).toBe(r.A);
+    expect(r.ships.lastDamagedTick(r.f)).toBe(tick);
+    for (let t = 0; t < 5; t++) r.server.step();
+    expect(d.attacker).toBe(r.A);
+    expect(d.lastHit).toBe(hitAt);
+    // (A hitting it again does refresh it)
+    r.ships.damagePartBy(r.f, r.ships.get(r.f)!.derived.weapons.length ? 1 : 0, 4, r.A);
+    const again = r.server.getTick();
+    r.server.step();
+    expect(d.lastHit).toBe(again);
+  }, 240_000);
+
   it('an attacker gone (another system) ends it at once', () => {
     const r = haul(300, (t, A) => (t === 30 ? A : -1));
     expect(r.trail[100].attacker).toBe(r.A);

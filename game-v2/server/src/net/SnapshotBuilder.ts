@@ -1113,9 +1113,10 @@ export class SnapshotBuilder {
 
   /**
    * Debris confirmations: right, wrong (sent in full instead), never (sent in full when its time ran out), and rebuilt
-   * (crumbled before it was confirmed, for a client not running it: sent in full)
+   * (crumbled before it was confirmed, for a client not running it: sent in full), and told (touched by something else
+   * before it was confirmed: sent in full)
    */
-  readonly debrisAcks = { ok: 0, wrong: 0, late: 0, gone: 0, rebuilt: 0 };
+  readonly debrisAcks = { ok: 0, wrong: 0, late: 0, gone: 0, rebuilt: 0, told: 0 };
 
   /**
    * Splits this client can work out itself (common ships/debris.ts deriveSplit): it has the ship as it was (its last
@@ -1135,6 +1136,10 @@ export class SnapshotBuilder {
       else if (h.until < now - 600) conn.debrisHeld.delete(id);
       // (...crumbled in its hold: it goes in full now, as any ship does, its structure from a sync and its place a keyframe)
       else if (!h.live && rebuilt(id)) { conn.debrisHeld.delete(id); this.debrisAcks.rebuilt++; }
+      // (...touched by something else in its hold (a shot, a blast: DebrisNet.told): its HP, and its place once a part
+      // that took breaks off (what's left recentred), are no longer what it worked out, and nothing of it goes while
+      // held: it goes in full now, run by it or not)
+      else if (net.told.has(id) && this.ships.has(id)) { conn.debrisHeld.delete(id); this.debrisAcks.told++; }
     }
     for (const [parent, splits] of net.splits) {
       // (Its own ship's too: the split says where it was)
@@ -1156,7 +1161,10 @@ export class SnapshotBuilder {
         if (synced.ship !== sp.ship) continue;
         // (Not the structure it has (rebuilt again in the window, say): the split says all it needs, the centre of mass it
         // started from, where it was and the pieces' HP; it has the design)
-        const whole = !runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1]);
+        // (Nor the HP it has of the parts that left: they took damage it wasn't told before the split (a part's blast on
+        // the split's tick, the ship gone before its HP could go): the split gives the pieces' HP as the server split them)
+        const stale = !runs && !!sp.hp && sp.groups.some((g, k) => g.some((i, j) => had[i] !== sp.hp![k][j]));
+        const whole = (!runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1])) || stale;
         if (whole && (!sp.pose || !sp.hp)) continue;
         const told = sp.gone || own || whole;
         if (unsure && !told) continue;
@@ -1166,6 +1174,8 @@ export class SnapshotBuilder {
         // (A piece crumbled already, before the split is told: one not run there would be worked out as it was spawned,
         // and its sync, before the snapshot, would come ahead of it: the split goes in full)
         if (!l && sp.ids.some(rebuilt)) continue;
+        // (...nor one touched by something else already (shot, blasted): what it would work out is off, so in full)
+        if (sp.ids.some((id) => net.told.has(id))) continue;
         sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: whole ? [...sp.hp![k]] : sp.groups[k].map((i) => had[i] ?? 0), live: l }));
         // (A ship destroyed, or its own: where it was, for what it has of it then isn't sure to be the server's)
         const at = told && sp.pose ? [sp.pose.x, sp.pose.y, sp.pose.angle, sp.pose.vx, sp.pose.vy, sp.pose.angVel] : undefined;
