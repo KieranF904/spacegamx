@@ -62,12 +62,10 @@ function fight(dropAt = -1, hurtEvery = 45) {
   clearAbout();
   // The server's ships every tick (what each held replica must be)
   const truth = new Map<number, Map<number, number[]>>();
-  // (Debris isn't held to it: a piece remembered as debris after it's gone, merged or broken up before the snapshot that
-  // would be checked, still held by the client until that snapshot drops it)
-  const debris = new Set<number>();
+  // (Debris still here isn't held to it (its own tests: net/debris); a piece gone by the snapshot is, for the ticks it
+  // was here: one shot before its confirmation used to be off by its recentre to the end, debrisHeld.test.ts)
   const record = () => {
     const m = new Map<number, number[]>();
-    for (const [eid, s] of ships.bodies) if (s.kind === 'debris') debris.add(eid);
     for (const [eid] of ships.bodies) m.set(eid, [Position.x[eid], Position.y[eid], Velocity.x[eid], Velocity.y[eid], Rotation.angle[eid]]);
     truth.set(server.getTick(), m);
     truth.delete(server.getTick() - 64);
@@ -80,13 +78,14 @@ function fight(dropAt = -1, hurtEvery = 45) {
       // (The forced miss: this client loses one snapshot's causes)
       if (f === A && dropAt >= 0 && s.tick >= dropAt && s.causes?.length) { s = { ...s, causes: undefined }; dropAt = -1; }
       const held = new Set<number>(f.reps.ids());
-      if (on()) for (const k of s.ships ?? []) if (k[0] !== f.pid) { if (held.has(k[0])) seen.keyframes++; else seen.entries++; }
+      // (Ships' keyframes: a piece of debris shot or blasted before its confirmation goes in full, keyframe and all)
+      if (on()) for (const k of s.ships ?? []) if (k[0] !== f.pid && ships.get(k[0])?.kind !== 'debris') { if (held.has(k[0])) seen.keyframes++; else seen.entries++; }
       if (on()) seen.records += s.causes?.length ?? 0;
       o(s);
       if (!on()) { last = s.tick; return; }
       const keyed = new Set((s.ships ?? []).map((k) => k[0]));
       for (const id of f.reps.ids()) {
-        if (id === f.pid || ships.get(id)?.kind === 'debris' || debris.has(id) || keyed.has(id)) continue;
+        if (id === f.pid || ships.get(id)?.kind === 'debris' || keyed.has(id)) continue;
         seen.held++;
         for (let t = Math.max(last + 1, s.tick - 8); t <= s.tick; t++) {
           const st = f.reps.at(id, t)?.body, r = truth.get(t)?.get(id);
