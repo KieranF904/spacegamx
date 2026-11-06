@@ -1,6 +1,7 @@
 /**
- * Friends, status and private messages (game/social/Social.ts) through a real server: requests, persistence across
- * servers, private routing, offline and Appear offline, rate limits, what friends see, and a party invite from the list.
+ * Friends, status and private messages (game/social/Social.ts) through a real server, with MemoryFriends as the stand-in
+ * lobby: requests, friends following the account to another server, the lobby being down, moving an old per-server
+ * document, private routing, offline and Appear offline, rate limits, what friends see, and a party invite from the list.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { join } from 'path';
@@ -14,7 +15,11 @@ import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
 import { SOCIAL_DOC, emptyDoc, touch, request, respond, unfriend, forget, parseDoc, findByName, MAX_PENDING } from './friendsDoc.js';
-import { WHISPER_BURST, WHISPER_WINDOW, REQUEST_BURST } from './Social.js';
+import { WHISPER_BURST, WHISPER_WINDOW, REQUEST_BURST, UNAVAILABLE, LIST_UNAVAILABLE, STATUS_UNSAVED } from './Social.js';
+import { MemoryFriends } from './MemoryFriends.js';
+import { migrateFriends } from './friendsMigration.js';
+import { LobbyFriends } from './LobbyFriends.js';
+import { FriendsUnavailable } from './FriendsBackend.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -27,7 +32,7 @@ vi.setConfig({ testTimeout: 60_000 });
 const ACCOUNTS = ['Ash', 'Bree', 'Cole', 'Dax'];
 
 /** A server whose lobby signs in "tok:<name>" as that account (ids 1..) */
-function world(store = new MemoryProfileStore(), clock = { t: 1_000_000 }) {
+function world(store = new MemoryProfileStore(), clock = { t: 1_000_000 }, friends = new MemoryFriends()) {
   resetGlobals();
   const user = (t: string) => {
     const i = ACCOUNTS.findIndex((n) => n.toLowerCase() === t.split(':')[1]?.toLowerCase());
@@ -36,7 +41,7 @@ function world(store = new MemoryProfileStore(), clock = { t: 1_000_000 }) {
   const server = new GameServer({
     gameData: new GameData(files),
     userDB: { checkSession: async (t: string) => ({ user: user(t) }), validateSession: async (t: string) => user(t), cleanupExpiredSessions: async () => {}, admin: null } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(shipConfig), profileStore: store, clock: () => clock.t,
+    scene: 'sectors', autoStart: false, ships: createShipBridge(shipConfig), profileStore: store, clock: () => clock.t, friends,
   });
   const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
   const join = async (name: string, guest = false) => {
@@ -55,7 +60,7 @@ function world(store = new MemoryProfileStore(), clock = { t: 1_000_000 }) {
     const notes = () => all('systemMessage').map((m) => m.text);
     return { t, got, conn, send, all, last, toasts, notes, close: async () => { t.disconnect(); await flush(); } };
   };
-  return { server, join, flush, store, clock };
+  return { server, join, flush, store, clock, friends };
 }
 
 const friendNames = (m: Extract<ServerMessage, { type: 'friends' }> | undefined) => m?.friends.map((f) => `${f.name}:${f.presence}`);
@@ -132,31 +137,34 @@ describe('friends (server)', () => {
     await ash.send({ type: 'friendRequest', name: 'Guest_12' });
     await ash.send({ type: 'friendRequest', name: 'Nobody' });
     await ash.send({ type: 'friendRequest', name: 42 });
-    expect(ash.toasts()).toEqual(expect.arrayContaining(["You can't add yourself", "Guests can't be added as friends", 'No pilot called Nobody has flown here']));
+    expect(ash.toasts()).toEqual(expect.arrayContaining(["You can't add yourself", "Guests can't be added as friends", 'No pilot called Nobody']));
     await guest.send({ type: 'friendRequest', name: 'Ash' });
     expect(guest.toasts()).toContain('Sign in to add friends');
     expect(guest.last('friends')).toMatchObject({ account: false, friends: [] });
     expect(ash.last('friends')!.incoming).toEqual([]);
   });
 
-  it('a request reaches an account that is offline, and friends last into the next server (the store)', async () => {
-    const store = new MemoryProfileStore();
-    const w = world(store);
+  it('a request reaches an account that is offline, and friends follow the account to another server (the lobby)', async () => {
+    const w = world();
     const ash = await w.join('Ash'), bree = await w.join('Bree');
     await bree.close();
-    // Bree has flown here, so she can be asked while offline
     await ash.send({ type: 'friendRequest', name: 'Bree' });
     expect(ash.last('friends')!.outgoing).toEqual(['Bree']);
-    await w.server.social.save();
-    expect((await store.loadDoc(SOCIAL_DOC) as any).accounts[2].in).toEqual([1]);
+    expect(w.friends.doc.accounts[2].in).toEqual([1]);
 
-    // A new server on the same store: Bree signs in, sees the request, accepts
-    const w2 = world(store);
+    // Another server on the same lobby (and a store of its own): Bree signs in there, sees the request, accepts
+    const w2 = world(new MemoryProfileStore(), undefined, w.friends);
     await w2.server.social.ready;
     const bree2 = await w2.join('Bree');
     expect(bree2.last('friends')!.incoming).toEqual(['Ash']);
     await bree2.send({ type: 'friendRespond', name: 'Ash', accept: true });
+    // (Ash is online on the first server: only this server's pilots count as online for now)
     expect(friendNames(bree2.last('friends'))).toEqual(['Ash:offline']);
+    // Ash's list on the first server catches up at its next refresh
+    w.server.social.refresh();
+    await w.flush();
+    expect(friendNames(ash.last('friends'))).toEqual(['Bree:offline']);
+    await ash.close();
     const ash2 = await w2.join('Ash');
     expect(friendNames(ash2.last('friends'))).toEqual(['Bree:online']);
     // ...and Bree heard Ash come on
@@ -180,13 +188,81 @@ describe('friends (server)', () => {
     await bree.send({ type: 'setStatus', status: 'gone fishing' });
     expect(bree.last('friends')!.status).toBe('invisible');
     await w.server.social.save();
-    // Next session, Bree still appears offline
-    const w2 = world(store);
+    expect(w.friends.doc.accounts[2].status).toBe('invisible');
+    // Next session (another server, the same lobby), Bree still appears offline
+    await ash.close(); await bree.close();
+    const w2 = world(store, undefined, w.friends);
     await w2.server.social.ready;
     const ash2 = await w2.join('Ash');
     const bree2 = await w2.join('Bree');
     expect(bree2.last('friends')!.status).toBe('invisible');
     expect(friendNames(ash2.last('friends'))).toEqual(['Bree:offline']);
+  });
+});
+
+describe('the lobby being down', () => {
+  it('a list that cannot load says so and loads once the lobby is back; changes say friends are unavailable; a status waits to be saved', async () => {
+    const w = world();
+    const ash = await w.join('Ash'), bree = await w.join('Bree');
+    await befriend(ash, bree, 'Bree', 'Ash');
+    await ash.close(); await bree.close();
+    w.friends.down = true;
+    const ash2 = await w.join('Ash');
+    expect(ash2.notes()).toContain(LIST_UNAVAILABLE);
+    expect(ash2.last('friends')).toMatchObject({ account: true, friends: [] });
+    await ash2.send({ type: 'friendRequest', name: 'Cole' });
+    expect(ash2.toasts().at(-1)).toBe(UNAVAILABLE);
+    await ash2.send({ type: 'setStatus', status: 'busy' });
+    expect(ash2.toasts().at(-1)).toBe(STATUS_UNSAVED);
+    expect(ash2.last('friends')!.status).toBe('busy');
+    // Whispers don't need the lobby
+    const cole = await w.join('Guest_3', true);
+    await cole.send({ type: 'whisper', to: 'Ash', text: 'still here?' });
+    expect(ash2.last('whisper')).toMatchObject({ from: 'Guest_3', text: 'still here?' });
+    w.friends.down = false;
+    await w.server.social.retry();
+    await w.flush();
+    expect(friendNames(ash2.last('friends'))).toEqual(['Bree:offline']);
+    expect(ash2.last('friends')!.status).toBe('busy');
+    expect(w.friends.doc.accounts[1].status).toBe('busy');
+  });
+});
+
+describe('moving the old per-server friends document', () => {
+  const oldDoc = { v: 1, accounts: { 1: { name: 'Ash', status: 'away', friends: [2], in: [], out: [] }, 2: { name: 'Bree', status: 'online', friends: [1], in: [], out: [] } } };
+
+  it('goes to the lobby at start, is marked moved, and is never sent again', async () => {
+    const store = new MemoryProfileStore();
+    await store.saveDoc(SOCIAL_DOC, oldDoc);
+    const w = world(store);
+    await w.server.social.ready;
+    expect(w.friends.doc.accounts[1]).toMatchObject({ status: 'away', friends: [2] });
+    expect((await store.loadDoc(SOCIAL_DOC) as any).movedToLobby).toBeGreaterThan(0);
+    const ash = await w.join('Ash');
+    expect(friendNames(ash.last('friends'))).toEqual(['Bree:offline']);
+    expect(ash.last('friends')!.status).toBe('away');
+    // A second start on the same store sends nothing
+    const calls: unknown[] = [];
+    const spy = new MemoryFriends();
+    spy.importDoc = async (a) => { calls.push(a); return { friends: 0, requests: 0, skipped: 0 }; };
+    expect(await migrateFriends(store, spy)).toBe('already');
+    expect(calls).toEqual([]);
+  });
+
+  it('waits for the lobby when it is down (nothing marked), then moves it', async () => {
+    const store = new MemoryProfileStore();
+    await store.saveDoc(SOCIAL_DOC, oldDoc);
+    const friends = new MemoryFriends();
+    friends.down = true;
+    const w = world(store, undefined, friends);
+    await w.server.social.ready;
+    expect((await store.loadDoc(SOCIAL_DOC) as any).movedToLobby).toBeUndefined();
+    friends.down = false;
+    await w.server.social.retry();
+    expect(friends.doc.accounts[2]).toMatchObject({ friends: [1] });
+    expect((await store.loadDoc(SOCIAL_DOC) as any).movedToLobby).toBeGreaterThan(0);
+    // No document: nothing to do
+    expect(await migrateFriends(new MemoryProfileStore(), friends)).toBe('none');
   });
 });
 
@@ -222,7 +298,7 @@ describe('private messages', () => {
     const ash = await w.join('Ash'), bree = await w.join('Bree'), cole = await w.join('Cole');
     await cole.close();
     await ash.send({ type: 'whisper', to: 'cole', text: 'you there?' });
-    expect(ash.notes().at(-1)).toBe('Cole is offline. Private messages only reach pilots who are online.');
+    expect(ash.notes().at(-1)).toBe('cole is offline. Private messages only reach pilots who are online.');
     await ash.send({ type: 'whisper', to: 'Zed', text: 'hm' });
     expect(ash.notes().at(-1)).toBe('Zed is offline. Private messages only reach pilots who are online.');
     await bree.send({ type: 'setStatus', status: 'invisible' });
@@ -251,7 +327,7 @@ describe('private messages', () => {
     // Requests: each try counts (names probed too). (Straight to the module: dispatch's own flood limit runs on the wall clock)
     for (let i = 0; i < REQUEST_BURST; i++) { w.server.social.request(ash.conn(), `nobody${i}`); clock.t += 20_000; }
     await ash.send({ type: 'friendRequest', name: 'Bree' });
-    expect(ash.toasts().at(-1)).toBe('Too many friend requests: try again later');
+    expect(ash.toasts()).toContain('Too many friend requests: try again later');
     expect(bree.all('friendRequest')).toEqual([]);
   });
 });
@@ -275,5 +351,31 @@ describe('the friends list and the party', () => {
     await w.server.forgetAccounts([2]);
     await w.flush();
     expect(friendNames(ash.last('friends'))).toEqual([]);
+  });
+});
+
+describe('LobbyFriends (the lobby client)', () => {
+  it('sends the admin secret, and a lobby that is down, refuses or says slow down is FriendsUnavailable', async () => {
+    const seen: { url: string; auth: string; body: any }[] = [];
+    let answer: () => Response = () => new Response(JSON.stringify({ success: true, status: 'away', friends: [{ id: 2, name: 'Bree' }], incoming: [], outgoing: [] }));
+    vi.stubGlobal('fetch', async (url: string, init: any) => {
+      seen.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+      return answer();
+    });
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const lobby = new LobbyFriends('http://lobby', 'sssh');
+      expect(await lobby.get(1)).toEqual({ status: 'away', friends: [{ id: 2, name: 'Bree' }], incoming: [], outgoing: [] });
+      expect(seen[0]).toEqual({ url: 'http://lobby/admin/friends/get', auth: 'Bearer sssh', body: { userId: 1 } });
+      answer = () => new Response(JSON.stringify({ success: false, limited: true }), { status: 429 });
+      await expect(lobby.request(1, 'Bree')).rejects.toMatchObject({ limited: true });
+      answer = () => new Response('{}', { status: 403 });
+      await expect(lobby.setStatus(1, 'busy')).rejects.toBeInstanceOf(FriendsUnavailable);
+      answer = () => { throw new Error('ECONNREFUSED'); };
+      await expect(lobby.remove(1, 'Bree')).rejects.toMatchObject({ limited: false });
+    } finally {
+      vi.unstubAllGlobals();
+      quiet.mockRestore();
+    }
   });
 });

@@ -1,11 +1,13 @@
 /**
- * The friends document: every signed-in account's friends, friend requests and chosen status, kept as one
- * game-wide document in the profile store (ProfileStore.saveDoc 'social', beside the rankings). One document,
- * not a field in each profile, because a request or a removal changes an account that is not online, and a
- * profile is only loaded while its pilot is.
+ * The old per-server friends document, and the rules the in-memory stand-in (MemoryFriends.ts) keeps friends by.
+ *
+ * Friends used to live here: one game-wide document in each game server's profile store (ProfileStore.saveDoc
+ * 'social': data/profiles/_social.json in dev, the game_docs row in production), so each server had its own. They now
+ * live per account in the lobby (server-browser/src/friends, whose lists.ts has the same rules); friendsMigration.ts
+ * moves an old document there once. MemoryFriends keeps one of these documents in memory when there is no lobby.
  *
  * Pure: no I/O, no clock. Accounts are keyed by lobby account id (ids are never reused); the name is the
- * account's username as last seen signing in here, for lookups by name.
+ * account's username as last seen signing in, for lookups by name.
  */
 import { isSocialStatus, type SocialStatus } from '@space-game/common';
 

@@ -21,6 +21,7 @@ import { worldFileStore } from './game/SystemMemory.js';
 import { BotManager } from './bots/index.js';
 import { installRockeryTools } from './bots/rockeryTools.js';
 import { activity } from './activity/index.js';
+import { LobbyFriends } from './game/social/LobbyFriends.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -54,7 +55,7 @@ if (ADMIN_PASSWORD) {
 
 // Accounts: the lobby keeps them (one account for every server); we ask it
 const userStore = createUserStore(BROWSER_URL, LOBBY_ADMIN_SECRET);
-if (!LOBBY_ADMIN_SECRET) console.log("LOBBY_ADMIN_SECRET isn't set: the admin tools can't change admin ranks or ban players");
+if (!LOBBY_ADMIN_SECRET) console.log("LOBBY_ADMIN_SECRET isn't set: the admin tools can't change admin ranks or ban players, and friends are kept in memory only");
 // Pilots' progress: same backend switch (data/profiles/ by default)
 const profileStore = await createProfileStore(dataPath);
 
@@ -79,6 +80,9 @@ const gameServer = new GameServer({
   adminServer,
   ships: createShipBridge(shipConfig),
   profileStore,
+  // Friends and status live per account in the lobby, so they follow the account to every server (game/social).
+  // Without the lobby's secret they're kept in memory only (lost at restart)
+  friends: LOBBY_ADMIN_SECRET ? new LobbyFriends(BROWSER_URL, LOBBY_ADMIN_SECRET) : undefined,
   devTeleport: DEV_MODE,
   // The dev weapons range (data/dev/range.json; never in production: GameServer refuses it there too)
   devRange: DEV_MODE ? loadRangeConfig(dataPath) : undefined,
