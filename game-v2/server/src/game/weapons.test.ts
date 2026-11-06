@@ -106,9 +106,9 @@ describe('weapons', () => {
 
   it('shields soak damage first and recharge after a pause', () => {
     const { bridge, step, pid } = setup();
-    const bp = JSON.parse(JSON.stringify(sparrow));
-    const cap = bp.parts.find((p: any) => p.fn === 'hull' && p.piece === 'tri');
-    Object.assign(cap, { piece: 'sq', fn: 'shield' });
+    // (The library Halberd: its shields are wired to power on the ports core, so they refill; a hull swapped for a shield
+    // on the starter would have no line and, unfed, never refill)
+    const bp = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/halberd.json'), 'utf-8'));
     bridge.respawnInPlace(pid, bp);
     const ship = bridge.get(pid)!;
     expect(ship.derived.shieldMax).toBeGreaterThan(0);
@@ -118,7 +118,7 @@ describe('weapons', () => {
     bridge.hurt(pid, ship, core, 10, -1);
     expect(ship.hp[core]).toBe(coreHp);
     expect(ship.shield).toBeCloseTo(ship.derived.shieldMax - 10, 5);
-    bridge.hurt(pid, ship, core, 70, -1);
+    bridge.hurt(pid, ship, core, ship.derived.shieldMax + 60, -1);
     expect(ship.shield).toBe(0);
     expect(ship.hp[core]).toBeLessThan(coreHp);
     step(bridge.tuning.shield!.regenDelayTicks + 120);

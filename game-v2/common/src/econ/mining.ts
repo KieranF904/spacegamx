@@ -7,6 +7,7 @@
 
 import type { Bag } from './stacks.js';
 import type { TraceDef } from './traces.js';
+import { dpow } from '../math/detTrig.js';
 
 export interface MiningTable {
   respawnSeconds: number;
@@ -203,6 +204,6 @@ export function unitsPerDrop(table: MiningTable, keep: number): number {
   if (keep <= 0) return Infinity;
   const [lo, hi] = table.chunkUnits;
   let sum = 0;
-  for (let w = lo; w <= hi; w++) sum += keep >= 1 ? w : w + Math.pow(1 - keep, w) / keep;
+  for (let w = lo; w <= hi; w++) sum += keep >= 1 ? w : w + dpow(1 - keep, w) / keep;
   return sum / (hi - lo + 1);
 }
