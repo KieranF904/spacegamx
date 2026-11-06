@@ -7,6 +7,7 @@
 
 import { circuitTuning, coilCapacity, jumpTuning, partDischarge, partGrade, isWeaponFn, mountingOf, mountingWords, partMount, partStats, describeFn, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
 import { chips } from './describe';
+import { sizeWordOf } from '../ui/componentShapes';
 
 /** Families by name, in the palette's order within their category (legendaries share one group) */
 export const FAMILY_LABEL: Record<string, string> = {
@@ -155,8 +156,7 @@ export function tradeOff(fn: FunctionDef): string {
 
 /** Its size, by its piece: Small (a square, wedge or round), Medium (a panel), Large (a block) */
 export function sizeWord(catalog: Catalog, piece: string): string {
-  const a = catalog.variants.get(piece)?.[0]?.area ?? 1;
-  return a < 1.5 ? 'Small' : a < 3 ? 'Medium' : a < 7 ? 'Large' : 'Heavy';
+  return sizeWordOf(catalog.variants.get(piece)?.[0]?.area ?? 1);
 }
 
 /** "Small · square" */

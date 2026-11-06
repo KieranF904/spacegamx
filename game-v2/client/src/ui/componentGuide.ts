@@ -11,17 +11,18 @@ import {
   JOB_MATERIALS, MATERIAL_LEVEL, partItemId, STARTER_MATERIALS,
   type Bag, type Catalog, type FunctionDef, type ItemDef,
 } from '@space-game/common';
+import { defaultShape, shapesOf } from './componentShapes';
 
 export type CompTab = 'structure' | 'weapons' | 'engines' | 'power' | 'shields' | 'utility';
 
 /** The tabs: functions.json / models.json `category` (the core goes with structure) */
-export const COMP_TABS: { id: CompTab; label: string }[] = [
-  { id: 'structure', label: 'Structure' },
-  { id: 'weapons', label: 'Weapons' },
-  { id: 'engines', label: 'Engines & jump' },
-  { id: 'power', label: 'Power' },
-  { id: 'shields', label: 'Shields & plating' },
-  { id: 'utility', label: 'Utility' },
+export const COMP_TABS: { id: CompTab; label: string; short: string }[] = [
+  { id: 'structure', label: 'Structure', short: 'Structure' },
+  { id: 'weapons', label: 'Weapons', short: 'Weapons' },
+  { id: 'engines', label: 'Engines & jump', short: 'Engines' },
+  { id: 'power', label: 'Power', short: 'Power' },
+  { id: 'shields', label: 'Shields & plating', short: 'Shields' },
+  { id: 'utility', label: 'Utility', short: 'Utility' },
 ];
 
 const TAB_IDS = new Set<string>(COMP_TABS.map((t) => t.id));
@@ -62,8 +63,7 @@ export function guideRows(catalog: Catalog, plates: Record<string, string>): Com
     if (!fn.model) continue;
     const tab = tabOf(fn);
     if (!tab) continue;
-    const pieces = fn.pieces === '*' ? ['sq'] : fn.pieces;
-    rows.push({ id: fn.id, tab, name: fn.name ?? fn.id, level: fn.unlock?.level ?? null, order: fn.fabOrder ?? 0, fn: fn.id, material: fn.material ?? 'alloy', piece: pieces[0], kind: 'model' });
+    rows.push({ id: fn.id, tab, name: fn.name ?? fn.id, level: fn.unlock?.level ?? null, order: fn.fabOrder ?? 0, fn: fn.id, material: fn.material ?? 'alloy', piece: defaultShape(shapesOf(catalog, fn)), kind: 'model' });
   }
   for (const m of catalog.materials.values()) {
     if (m.exclusive || !plates[m.id]) continue;
