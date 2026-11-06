@@ -467,3 +467,56 @@ src/bench/netTable.ts --case pirates` and log ConfirmedHits.check mismatches.
 
 That mismatch also exposed a bench bug: the up-bytes count took `.byteLength` of an hpResync, which encodes as JSON (a
 string), so `up B/s` printed null. netTable counts strings by their UTF-8 length now.
+
+## Other ships' guns stepped from their inputs (2026-11-06)
+
+Another pilot's or an AI pilot's gunfire is now worked out on each client from the controls it holds (a pilot's control
+rows plus new gun rows: triggers and cursor distance; an AI pilot's body, whose trigger rule `aiFires` moved into the
+shared body). Each armed ship a client steps has a gun lane (stores and gun state) stepped beside its replica; the
+server runs the same lane, tells only ticks where it differs from the real ship (fire records as before, TELL_NONE),
+puts a drifted lane back (gunSync, at most once per 60 ticks), and tells point-defence shots (TELL_PD). Design and
+rules: docs/areas/networking.md "Other ships' guns, stepped from their inputs".
+
+Proof (server/src/net/guns): another pilot through every firing model (cycle cannon and pulsed laser, spinning
+minigun and flak, clip turret and rail clip, charge gun and regrowing nest, coilgun cone and pulse bolts): 206 shells
+built from its lane, every one the server's spawn and velocity exactly, 0 told ticks, 0 lane fixes, each lane's hash
+the server lane's at the same tick (≥ 200 checks, 0 off), no told hit naming a shell the client lacked. An AI pack:
+211 shells, all exact. Point defence: 41 shots told and put into the lane, 0 fixes, every lane check equal. On the PT
+timeline (fake transport, 4 ticks each way): the other pilot's shells drawn on their fire tick ahead of the snapshot
+for 152 of 163 (the rest a burst's first shells, which held input can't foresee), every one where the server's is;
+the AI's 86 % ahead (a decision not yet told makes the rest late), none drawn wrongly left standing. World hashes are
+unchanged (frameHash: streams and message counts re-pinned: gunCtl, gunSync, +1 snapshot a pilot).
+
+Bytes (`npm run bench:table`, refactor/split 3a71b49 → after; every other row is the same to the byte):
+
+| scenario | payload | msgs/s | wire | other ships' fire rows sent |
+|---|---:|---:|---:|---:|
+| pirates | 1089 → **1086** | 9.45 → **9.00** | 1713 → **1680** | 97 → **5** |
+
+mother, custom and the crowd rows send no other ship's fire records at all at baseline (their attacks are bosses'
+and custom enemies' moves, already worked out on the client; the crowd's pirates fight bots out of the measured
+pilots' reach), so nothing there could drop. Before the refactor/split merge (f242485, the older pirates fight) the
+same change took pirates 619 → 549 B/s and 8.25 → 7.40 msgs/s.
+
+Crowd (`crowdBench.ts --layouts ball,cruise`, refactor/split 3a71b49 → after):
+
+| layout | n | server tick ms mean / p95 | probe client ms/tick | capable raw B/s | bulk raw B/s |
+|---|---:|---|---|---|---|
+| ball | 20 | 2.34 / 6.06 → **3.46 / 8.11** | 0.838 → **1.214** | 3007 → **7749** | 3428 → **8018** |
+| ball | 50 | 9.12 / 24.8 → **10.73 / 27.2** | 2.328 → **3.443** | 11917 → **26375** | 13434 → **28463** |
+| cruise | 20 | 1.69 / 3.76 → **2.20 / 4.70** | 0.161 → **0.169** | 1013 → **1013** | 1966 → **1966** |
+| cruise | 50 | 3.74 / 8.98 → **5.15 / 11.5** | 0.256 → **0.261** | 1663 → **1649** | 1800 → **1800** |
+
+**The ball is a regression, and open.** Every bot there fires at a ship inside 2 km, so every client steps every
+lane. In ball 20 the new bytes are gunSync 6.7 KB/s and gunCtl 3.5 KB/s (summed over the probes). Two causes:
+- the bench bots write a raw cursor distance (not on the input's 4-unit grid, as a real client's is): the lane, on
+  the grid, aims its turrets a hair otherwise, its hash goes off and it's put back about once a second a ship, a
+  gunSync to every client. With the bots on the grid, ball 20 bulk is 5064 B/s (+48 % rather than +134 %), probe
+  client 1.03 ms, server tick 2.75 ms;
+- a pilot holding its cursor on a moving target changes its cursor distance every tick: a gun row event a tick a
+  pilot; and every keyframe of a stepped ship costs a gunSync.
+
+Options (Kieran's call): a coarser replicated aim distance for convergence (gameplay-visible: world hashes move), rows
+that extrapolate the distance and send only misses, the distance only while a trigger is held (a burst's start told),
+or keyframes not resyncing lanes. Cruise is unchanged in bytes; its server tick is +30 % from the lanes (one lane step
+a pilot a tick, a second flight step for an armed pilot's stores).
