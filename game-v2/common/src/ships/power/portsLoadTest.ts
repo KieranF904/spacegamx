@@ -2,6 +2,8 @@
  * The hangar's load test for a ports design (docs/design/energy-ports-2026-11.md §5; energy.ts `loadTest` is the pool
  * ships'): a few seconds of the ship's own power tick (portsTick, and the guns' gates portsGunReady / portsSpendShot /
  * portsBeamStep / portsMineStep) with the guns firing flat out, the engines boosting, or both, from every store full.
+ * Boosting is combat flying: the Gyros turn flat out the whole time and the Burst Strafers dodge as often as they can,
+ * weaving (each burst back the other way from the last: strafer.ts), each burning the share of its burn the way takes.
  *
  * Each consumer's share is measured against the same ship run beside it with unlimited power at its in ports (every
  * store kept full, every line carrying what the part taking from it is rated for): the shots fired, the ticks a beam
@@ -16,8 +18,10 @@ import type { ShipDerived } from '../rebuild.js';
 import { averageInterval } from '../guns.js';
 import { BROWNOUT } from '../energy.js';
 import { EU, perTick } from './units.js';
+import { dhypot } from '../../math/detTrig.js';
+import { bestDodge, dodgeCooldown, dodgeVec, oppositeDir } from '../features/strafer/strafer.js';
 import {
-  P_RELAY, P_THRUSTER, P_TOOL, P_WEAPON, createPortsState, portsBeamStep, portsGauge, portsGunReady, portsLinkSend,
+  P_RELAY, P_THRUSTER, P_TOOL, P_WEAPON, TK_ENGINE, TK_GYRO, TK_STRAFER, createPortsState, portsBeamStep, portsGauge, portsGunReady, portsLinkSend,
   portsMineStep, portsSpace, portsSpendShot, portsThrustFrac, portsThrustMul, portsTick, type PortsControls, type PortsLayout, type PortsState,
 } from './ports.js';
 
@@ -25,6 +29,7 @@ export type PortsScenario = 'fire' | 'boost' | 'both';
 export const PORTS_SCENARIOS: readonly PortsScenario[] = ['fire', 'boost', 'both'];
 /** What each scenario does: guns firing flat out, the forward engines cruising or boosting */
 export const PORTS_SCENARIO_USE: Record<PortsScenario, { fire: boolean; boost: boolean }> = {
+  // (boost: the Gyros and Burst Strafers work too, the file's comment)
   fire: { fire: true, boost: false },
   boost: { fire: false, boost: true },
   both: { fire: true, boost: true },
@@ -48,9 +53,10 @@ export interface PortsLoadResult {
   /** The ship's first brownout (s, -1 none) and the part */
   firstBrown: number;
   firstPart: number;
-  /** The lowest settled share among the guns, the engines and the tools in use (1: none short, or none in use) */
+  /** The lowest settled share among the guns, the engines, the Burst Strafers and Gyros (`moves`) and the tools in use (1: none short, or none in use) */
   guns: number;
   engines: number;
+  moves: number;
   tools: number;
   /** The stores (the core and every store, as the gauge): % at the end, the lowest %, when they fell under 5% (s, -1 never) */
   storeEnd: number;
@@ -145,13 +151,29 @@ export function portsLoadTest(d: ShipDerived, scenario: PortsScenario, seconds =
   const { L: LI, extra } = idealLayout(L);
   const ideal: Run = { L: LI, e: createPortsState(LI), cd: new Float64Array(n), chg: new Int32Array(n), ideal: true };
   // (The forward engines push in every scenario: cruising while firing, boosting otherwise)
-  const active = new Uint8Array(n);
+  const active = new Uint8Array(n), scale = new Float64Array(n);
   for (const t of d.thrusters) if (t.force[1] < -1e-9 && L.role[t.part] === P_THRUSTER) active[t.part] = 1;
-  const ctl: PortsControls = { active, boosting: use.boost, toolWant: null, reload: false };
+  const ctl: PortsControls = { active, scale, boosting: use.boost, toolWant: null, reload: false };
+  // (Combat flying: the Gyros turning flat out; the strafers weaving, a burst every cooldown, each burning by its share of the way)
+  const moving = new Uint8Array(n), st = d.fx?.strafe;
+  if (use.boost) for (const p of L.thrusters) if (L.thrustKind[p] === TK_GYRO) { moving[p] = 1; active[p] = 1; }
+  const way = st ? bestDodge(st).dir : 0, period = st ? dodgeCooldown(st) + 1 : 1;
+  const strafeShares: Float64Array[] = [];
+  if (use.boost && st && way) for (const dir of [way, oppositeDir(way)]) {
+    const u = dodgeVec(dir), k = new Float64Array(n);
+    for (const q of st.parts) { const f = dhypot(q.push[0], q.push[1]); if (f > 1e-9 && L.thrustKind[q.part] === TK_STRAFER) k[q.part] = Math.max(0, (q.push[0] * u[0] + q.push[1] * u[1]) / f); }
+    strafeShares.push(k);
+  }
+  for (const k of strafeShares) for (let p = 0; p < n; p++) if (k[p] > 0) moving[p] = 1;
+  const strafeAt = (t: number): void => {
+    if (!strafeShares.length) return;
+    const k = strafeShares[Math.floor(t / period) % strafeShares.length], on = t % period < st!.ticks;
+    for (let p = 0; p < n; p++) if (L.thrustKind[p] === TK_STRAFER && L.role[p] === P_THRUSTER) { active[p] = on && k[p] > 0 ? 1 : 0; scale[p] = k[p]; }
+  };
 
   const used = new Uint8Array(n);
   for (let p = 0; p < n; p++) {
-    if (L.role[p] === P_THRUSTER) used[p] = active[p];
+    if (L.role[p] === P_THRUSTER) used[p] = L.thrustKind[p] === TK_ENGINE ? active[p] : moving[p];
     else if (L.role[p] === P_TOOL) used[p] = L.miner[p] ? (use.fire ? 1 : 0) : 1;
     else if (L.role[p] === P_WEAPON) used[p] = use.fire && (L.shot[p] > 0) ? 1 : 0;
   }
@@ -169,6 +191,7 @@ export function portsLoadTest(d: ShipDerived, scenario: PortsScenario, seconds =
   const pct = (e: PortsState) => (L.gaugeMax > 0 ? (100 * e.gauge) / L.gaugeMax : 100);
 
   for (let t = 0; t < ticks; t++) {
+    strafeAt(t);
     for (const r of LI.relays) ideal.e.held[r] = LI.cap[r];
     topUp(LI, ideal.e, extra);
     for (const run of [real, ideal]) {
@@ -196,13 +219,14 @@ export function portsLoadTest(d: ShipDerived, scenario: PortsScenario, seconds =
   }
 
   const end = new Float64Array(n).fill(1);
-  let firstBrown = -1, firstPart = -1, guns = 1, engines = 1, tools = 1;
+  let firstBrown = -1, firstPart = -1, guns = 1, engines = 1, moves = 1, tools = 1;
   for (let p = 0; p < n; p++) {
     if (!used[p]) continue;
     end[p] = endI[p] > 1e-9 ? Math.min(1, endR[p] / endI[p]) : 1;
     if (brownAt[p] >= 0 && (firstBrown < 0 || brownAt[p] < firstBrown)) { firstBrown = brownAt[p]; firstPart = p; }
     const r = L.role[p];
     if (r === P_WEAPON || (r === P_TOOL && L.miner[p])) guns = Math.min(guns, end[p]);
+    else if (r === P_THRUSTER && L.thrustKind[p] !== TK_ENGINE) moves = Math.min(moves, end[p]);
     else if (r === P_THRUSTER) engines = Math.min(engines, end[p]);
     else tools = Math.min(tools, end[p]);
   }
@@ -210,7 +234,7 @@ export function portsLoadTest(d: ShipDerived, scenario: PortsScenario, seconds =
   for (const r of L.relays) fill[r] = L.cap[r] > 0 ? real.e.held[r] / L.cap[r] : 0;
   const flow = Float64Array.from(flowSum, (v) => (v * TPS) / EU / ticks);
   real.e.gauge = portsGauge(L, real.e);
-  return { scenario, seconds, used, low, end, brownAt, firstBrown, firstPart, guns, engines, tools, storeEnd: pct(real.e), storeLow, storeEmptyAt, fill, flow };
+  return { scenario, seconds, used, low, end, brownAt, firstBrown, firstPart, guns, engines, moves, tools, storeEnd: pct(real.e), storeLow, storeEmptyAt, fill, flow };
 }
 
 const cache = new WeakMap<PortsLayout, Partial<Record<PortsScenario, PortsLoadResult>>>();
@@ -224,5 +248,5 @@ export function portsLoadTestCached(d: ShipDerived, scenario: PortsScenario): Po
 }
 
 /** A part's role for the panel's words */
-export const portsRoleOf = (L: PortsLayout, p: number): 'gun' | 'engine' | 'tool' | 'store' | 'other' =>
-  L.role[p] === P_WEAPON || (L.role[p] === P_TOOL && L.miner[p]) ? 'gun' : L.role[p] === P_THRUSTER ? 'engine' : L.role[p] === P_TOOL ? 'tool' : L.role[p] === P_RELAY ? 'store' : 'other';
+export const portsRoleOf = (L: PortsLayout, p: number): 'gun' | 'engine' | 'strafer' | 'gyro' | 'tool' | 'store' | 'other' =>
+  L.role[p] === P_WEAPON || (L.role[p] === P_TOOL && L.miner[p]) ? 'gun' : L.role[p] === P_THRUSTER ? (L.thrustKind[p] === TK_STRAFER ? 'strafer' : L.thrustKind[p] === TK_GYRO ? 'gyro' : 'engine') : L.role[p] === P_TOOL ? 'tool' : L.role[p] === P_RELAY ? 'store' : 'other';

@@ -70,7 +70,15 @@ export function buildFacts(catalog: Catalog, tuning: ShipTuning | undefined, fn:
 
   // Power: makes, draws, holds; and its ports
   if (st.supply) add('Power', 'Generates', `+${n0(st.supply)}/s`);
-  if (st.draw) add('Power', 'Draws', `${n0(st.draw)}/s`);
+  // (When it draws: a Burst Strafer only bursting, a Gyro only turning (in proportion), a shield all the time, refilling only as it is fed)
+  const when = fn.strafe ? ' during a burst' : (fn.gyro ?? 0) > 0 ? ' turning flat out' : (fn.shield ?? 0) > 0 && !fn.flash ? ' always; refills only as fed' : '';
+  if (st.draw) add('Power', 'Draws', `${n0(st.draw)}/s${when}`);
+  // (Its own buffer, filled over its in ports: what a burst or a turn runs on)
+  if ((fn.strafe || (fn.gyro ?? 0) > 0) && fn.buffer !== undefined && st.draw && fn.demand) {
+    const buf = fn.buffer * st.area * (st.draw / (fn.demand * st.area)), secs = buf / st.draw;
+    const bursts = fn.strafe ? Math.floor((secs * 60) / Math.max(1, fn.strafe.ticks) + 1e-9) : 0;
+    add('Power', 'Buffer', `${n0(buf)} · ${fn.strafe ? `${bursts} burst${bursts === 1 ? '' : 's'}` : `${secs.toFixed(1)} s turning`} held`);
+  }
   if ((fn.store ?? 0) > 0) add('Power', 'Holds', n0(fn.store! * st.area));
   if ((fn.dynamo ?? 0) > 0) add('Power', 'Charges banks', `${n0(fn.dynamo!)}/s each`);
   const ports = portsText(fn);

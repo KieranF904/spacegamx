@@ -18,6 +18,8 @@ import { fnOutput, isEngine, partDemand, partSupply } from '../grades.js';
 import { EU, perTick, perTickUp, toEu } from './units.js';
 
 // ---- Roles
+/** Thruster kinds (PortsLayout.thrustKind) */
+export const TK_ENGINE = 0, TK_STRAFER = 1, TK_GYRO = 2;
 export const P_INERT = 0, P_GEN = 1, P_RELAY = 2, P_THRUSTER = 3, P_TOOL = 4, P_WEAPON = 5, P_TANK = 6, P_SELECTOR = 7, P_PIPE = 8;
 // ---- Flags (PortsState.flags; three bits on the wire)
 /** A clip reloading, or a burst beam resting */
@@ -81,7 +83,9 @@ export interface PortsLayout {
   rate: Int32Array;
   /** eu a tick: a consumer's own intake before its lines cap it (rate is the lower of the two): the hangar's load test */
   intake: Int32Array;
-  /** Thrusters: burn a tick, boosted burn, boost multiplier */
+  /** Thrusters: what kind (TK_ENGINE, TK_STRAFER a Burst Strafer, TK_GYRO a Gyro: these two burn only while their part
+   * feature asks, PortsControls.scale its share of the burn), burn a tick, boosted burn, boost multiplier */
+  thrustKind: Uint8Array;
   burn: Int32Array;
   bBurn: Int32Array;
   boostMul: Float64Array;
@@ -199,6 +203,10 @@ export interface PortsLayout {
   supply: number;
   engineDraw: number;
   weaponDraw: number;
+  /** E a second the Burst Strafers burn during a burst, the Gyros turning flat out, the shields (always: a steady load) */
+  strafeDraw: number;
+  gyroDraw: number;
+  shieldDraw: number;
 }
 
 export interface PortsState {
@@ -260,6 +268,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const weaponOf = new Map<number, PortsWeaponInput>();
   for (const w of input.weapons ?? []) weaponOf.set(w.part, w);
   const Z = () => new Int32Array(n);
+  const thrustKind = new Uint8Array(n);
   const role = new Uint8Array(n), cap = Z(), rate = Z(), burn = Z(), bBurn = Z(), boostMul = new Float64Array(n).fill(1);
   const gun = new Uint8Array(n), shot = Z(), rounds = Z(), relight = Z(), passive = Z(), discharge = Z(), rest = Z(), burst = new Uint8Array(n), steady = Z();
   const pieces = new Uint8Array(n), pieceE = Z(), pieceT = Z(), spikeLo = Z(), spikeHi = Z(), spikeIn = new Float64Array(n).fill(1), spikeOut = new Float64Array(n).fill(1);
@@ -269,7 +278,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
   const mul = () => new Float64Array(n * W).fill(1);
   const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
-  let supply = 0, engineDraw = 0, weaponDraw = 0;
+  let supply = 0, engineDraw = 0, weaponDraw = 0, strafeDraw = 0, gyroDraw = 0, shieldDraw = 0;
 
   for (let i = 0; i < n; i++) {
     if (!alive[i]) continue;
@@ -340,13 +349,27 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       burn[i] = perTick(burnE); bBurn[i] = mulB > 1 ? Math.max(burn[i], perTick(bBurnE)) : burn[i]; boostMul[i] = mulB;
       rate[i] = perTick(fn.intake !== undefined ? fn.intake * a * k : burnE); cap[i] = toEu(fn.buffer !== undefined ? fn.buffer * a * k : burnE);
       engineDraw += burnE;
+    } else if (fn.strafe || (fn.gyro ?? 0) > 0) {
+      // (A Burst Strafer or a Gyro is a thruster too (Kieran, 2026-11-06: "the strafe thruster should require power like all
+      // other thrusters, as should shields and gyros"): its `demand` is its burn while it works (a strafer bursting, a gyro
+      // turning flat out), from its own buffer filled over its ports. It burns only while its part feature asks (energy.ts
+      // portsPowerTick: PowerUse.extra), a gyro by the share of its torque the turn used; no boost)
+      role[i] = P_THRUSTER;
+      thrustKind[i] = fn.strafe ? TK_STRAFER : TK_GYRO;
+      const burnE = partDemand(fn, a, m), k = (fn.demand ?? 0) > 0 ? burnE / (fn.demand! * a) : 1;
+      burn[i] = perTick(burnE); bBurn[i] = burn[i];
+      rate[i] = perTick(fn.intake !== undefined ? fn.intake * a * k : burnE);
+      cap[i] = Math.max(burn[i], toEu(fn.buffer !== undefined ? fn.buffer * a * k : burnE));
+      if (fn.strafe) strafeDraw += burnE; else gyroDraw += burnE;
     } else if ((fn.produce ?? 0) > 0) {
       role[i] = P_GEN;
       supply += partSupply(fn, a, m);
     } else if ((fn.demand ?? 0) > 0) {
       role[i] = P_TOOL;
       rate[i] = perTick(partDemand(fn, a, m)); cap[i] = rate[i] * TPS;
-      if ((fn.shield ?? 0) > 0) shield[i] = 1;
+      // (A shield's fulfilment is EnergyState.shieldSat, its regen's share (energy.ts shieldShare). A Flash Screen has no
+      // slow refill, so it is left out of it, though it draws as a tool)
+      if ((fn.shield ?? 0) > 0 && !fn.flash) { shield[i] = 1; shieldDraw += partDemand(fn, a, m); }
       if (fn.mining) { miner[i] = 1; minePulse[i] = Math.max(1, Math.round((fn.minePulse ?? 0.9) * TPS)); }
     }
     // Feed: what it takes, its buffer, and its stats under each material
@@ -568,7 +591,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, intake, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
@@ -576,7 +599,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
     netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
     gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
-    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw,
+    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw,
   };
   L.sig = portsSig(L);
   return L;
@@ -587,7 +610,7 @@ export function portsSig(L: PortsLayout): number {
   let h = 0x811c9dc5 | 0;
   const mix = (v: number) => { h = Math.imul(h ^ (v | 0), 0x01000193); };
   const all = (a: ArrayLike<number>) => { mix(a.length); for (let i = 0; i < a.length; i++) mix(a[i]); };
-  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.pieces); all(L.pieceE); all(L.pieceT); all(L.miner); all(L.minePulse); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
+  mix(L.n); all(L.role); all(L.thrustKind); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.pieces); all(L.pieceE); all(L.pieceT); all(L.miner); all(L.minePulse); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
   all(L.matCap); all(L.takes); all(L.tankFeed); all(L.linkFrom); all(L.linkTo); all(L.netOf); all(L.selOut);
   const s = ((h >>> 16) ^ (h & 0xffff)) & 0xffff;
   return s === 0 ? 1 : s;
@@ -645,6 +668,9 @@ export function effThrust(L: PortsLayout, e: PortsState, p: number): number { co
 export interface PortsControls {
   /** By part: 1 for a thruster pushing this tick; null: none */
   active: Uint8Array | null;
+  /** By part: the share of its burn an active thruster wants this tick (0..1; a Gyro's by how much of its torque the turn
+   * used, a Burst Strafer's by how much of its push goes the dodge's way). Null, or 0 for a part: its whole burn */
+  scale?: Float64Array | null;
   boosting: boolean;
   /** By part: eu each tool wants this tick; null: its full rate */
   toolWant: Int32Array | null;
@@ -788,13 +814,15 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
     if (e.amt[a] <= 0) { e.amt[a] = 0; e.mat[a] = 0; }
   }
   // 5. Consumers act. Thrusters burn (boost as P1: it boosts only when that gives more thrust than cruising)
-  const active = ctl.active;
+  const active = ctl.active, scale = ctl.scale ?? null;
   for (const p of L.thrusters) {
     const on = active !== null && active[p] !== 0;
     if (!on) { sFrac[p] = 1; sMul[p] = 1; sBurnNow[p] = 0; continue; }
     const f = matOf(L, e, p), at = p * L.feeds.length + f;
-    const bm = f ? L.mBurn[at] : 1, tm = f ? L.mThrust[at] : 1, bo = f ? L.boostMul[p] * L.mBoost[at] : L.boostMul[p];
-    const b = Math.max(1, Math.round(L.burn[p] * bm)), bb = Math.max(b, Math.round(L.bBurn[p] * bm * (f ? L.mBoostDrain[at] : 1)));
+    const sc = scale !== null && scale[p] > 0 && scale[p] < 1 ? scale[p] : 1;
+    const bm = (f ? L.mBurn[at] : 1) * sc, tm = f ? L.mThrust[at] : 1, bo = f ? L.boostMul[p] * L.mBoost[at] : L.boostMul[p];
+    // (a feature's thruster asked for a sliver of its burn (a gyro's tiny correction) may burn nothing: it's met)
+    const b = Math.max(sc < 1 ? 0 : 1, Math.round(L.burn[p] * bm)), bb = Math.max(b, Math.round(L.bBurn[p] * bm * (f ? L.mBoostDrain[at] : 1)));
     const h = held[p];
     let use = h < b ? h : b, frac = b > 0 ? use / b : 1, mulT = tm;
     if (ctl.boosting && bo > 1 && bb > b) {
