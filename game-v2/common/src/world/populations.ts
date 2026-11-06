@@ -23,7 +23,15 @@ export const GHOST_STEP = 300;
 /** A spawner's group as in factions.json (only what a population needs) */
 export interface PopGroup { faction: string; ships: string[]; weight: number; passive?: boolean; limit?: number; style?: RoamStyle }
 /** A nest or zone as in factions.json (only what a population needs) */
-export interface PopSpawnerDef { id: string; packs: number; roam?: number; style?: RoamStyle; groups: PopGroup[]; inner?: number; outer?: number; x?: number; y?: number }
+export interface PopSpawnerDef { id: string; packs: number; roam?: number; style?: RoamStyle; groups: PopGroup[]; inner?: number; outer?: number; x?: number; y?: number; post?: XY }
+
+/**
+ * Where a nest's packs keep round (all but nomads): its `post` if it has one (a den's heap is piled against its
+ * chamber's wall, so its packs keep to the chamber's open middle, not the heap), else the nest itself
+ */
+export function nestPost(def: { post?: XY }, place: NestData, planets: readonly PlanetData[] | undefined, tick: number): XY {
+  return def.post ? { x: def.post.x, y: def.post.y } : nestPosition(place, planets, tick);
+}
 
 /** One of a system's populations, in a fixed order both ends work out alike: its nests, then its zones */
 export interface Spawner {
@@ -146,8 +154,8 @@ export function ghostCentre(sys: StarSystemData | undefined, sysId: string, sp: 
     const a = lure ? lured(a0, lure, t) : a0;
     return clampBand({ x: dcos(a) * r, y: dsin(a) * r }, band);
   }
-  // Round the nest as it goes round its orbit: guards close, loose packs wider
-  const at = nestPosition(n, planets, t);
+  // Round the nest (or its post) as it goes round its orbit: guards close, loose packs wider
+  const at = nestPost(sp.def, n, planets, t);
   const r = style === 'anchored' ? roam * (0.3 + 0.45 * h1) : roam * (0.6 + 1.2 * h1);
   const a = h4 * Math.PI * 2 + (dir * Math.PI * 2 * t) / (60 * (240 + 300 * h2));
   return clampBand({ x: at.x + dcos(a) * r, y: at.y + dsin(a) * r }, band);

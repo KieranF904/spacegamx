@@ -384,7 +384,7 @@ const SHAPES: Record<string, Spec> = {
       spawns: rec(strict({
         'grade?': 'number', packs: 'number', groups: arr(group),
         'zones?': arr(obj({ id: 'string', inner: 'number', outer: 'number', 'x?': 'number', 'y?': 'number', packs: 'number', 'respawnSeconds?': 'number', groups: arr(group) })),
-        'nests?': arr(obj({ id: 'string', packs: 'number', 'respawnSeconds?': 'number', 'leash?': 'number', 'aggro?': 'number', 'roam?': 'number', 'style?': oneOf('anchored', 'loose', 'nomad'), 'bias?': 'number', groups: arr(group) })),
+        'nests?': arr(obj({ id: 'string', packs: 'number', 'respawnSeconds?': 'number', 'leash?': 'number', 'aggro?': 'number', 'roam?': 'number', 'style?': oneOf('anchored', 'loose', 'nomad'), 'bias?': 'number', 'post?': 'xy', groups: arr(group) })),
         'events?': strict({
           'raidStations?': 'string[]', 'raidZone?': 'string', 'salvageZone?': 'string', 'salvageBelt?': 'number',
           'warband?': obj({ zone: 'string', share: 'number', groups: arr(group) }),

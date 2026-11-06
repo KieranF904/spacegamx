@@ -1964,6 +1964,7 @@ this.devTeleport = opts.devTeleport ?? false;
       effect: (num: number, x: number, y: number, kind: 'warning' | 'warpIn' | 'launch') => this.arrivalEffect(num, x, y, kind),
       gates: (num: number) => [...portalQuery(this.world)].filter((g) => InSystem.systemId[g] === num && Portal.kind[g] === 0).map((g) => ({ x: Position.x[g], y: Position.y[g] })),
       safeAt: (num: number, x: number, y: number) => inSafeSpace(this.gameData.getSystemByNum(num), x, y),
+      terrain: (num: number) => this.terrainOf(num),
       // (the enemy AI's pilots' decisions, CAPS.PILOTS: net/decisions/BodyNet.ts)
       decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
       // (custom enemies' moves: game/custom; their shots go as a boss's do)

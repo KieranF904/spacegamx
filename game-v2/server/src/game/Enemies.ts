@@ -35,7 +35,7 @@ import {
   Position, Velocity, Rotation, InSystem, Player, Dead, Radius,
   Blueprint, Bag, ShipState, partItemId, mulberry32,
   MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
-  nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
+  nestPosition, nestPost, NEST_RADIUS, insideTerrain, rayTerrain, terrainRadius, type Terrain, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
   orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec,
   spawnersOf, seedGroups, pickGroup, ghostCentre, ghostShip, slotStyle, packPopSlot, lureSector, packLure, LIFE_ASLEEP_RESET, FOCUS_RANGE, GHOST_STEP,
   type Spawner, type Lure } from '@space-game/common';
@@ -44,7 +44,7 @@ import { Defenders } from './enemies/defenders.js';
 import { CustomEnemies } from './custom/CustomEnemies.js';
 import type { CustomTable } from './custom/types.js';
 import type { Mobs } from './Mobs.js';
-import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, LOOSE_REACH, type RoamStyle, type Band, type XY } from './Roaming.js';
+import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, anchoredWaypoint, LOOSE_REACH, PATROL_STALL, type ClearRun, type RoamStyle, type Band, type XY } from './Roaming.js';
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
 import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
 import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
@@ -91,6 +91,8 @@ export interface SpawnNest {
   /** How its packs get about (default loose: Roaming.ts), and how strongly loose ones are drawn back to it (0..1, default 0.5) */
   style?: RoamStyle;
   bias?: number;
+  /** Where its packs keep round, if not the nest (a den heap against a wall: its chamber's open middle; common nestPost) */
+  post?: XY;
   groups: SpawnGroup[];
   /** Filled in from systems.json (withNests): the nest, its system (planets, belts), and the band of it its packs keep to */
   place?: NestData;
@@ -256,6 +258,8 @@ export interface EnemyHost {
   gates?(num: number): { x: number; y: number }[];
   /** In the system's safe space (inner Sol): hostiles leave pilots there alone */
   safeAt?(num: number, x: number, y: number): boolean;
+  /** A system's rock (a den's walls; none in open space): patrols keep off it */
+  terrain?(num: number): Terrain | null | undefined;
   /** A pilot's decision, for the clients that run its body (CAPS.PILOTS: net/decisions/BodyNet.ts) */
   decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
   /** Custom enemies' moves (custom/): a shot from a ship (tuning.json weapons kind), a message to a system */
@@ -309,6 +313,10 @@ interface Enemy {
   preyOnly?: boolean;
   /** One of a population's ships (its slot's ship k): its death is remembered there */
   pop?: { p: Population; slot: number; k: number };
+  /** On patrol: the nearest it has come to its waypoint, and when it last got nearer (it picks another once it stalls) */
+  wpBest?: number;
+  wpSince?: number;
+  wpRef?: XY;
 }
 
 /**
@@ -630,9 +638,7 @@ export class Enemies {
       // Round a home that stays put: a patrol worked out by its own dice (the map's told it once: SimLod, common farRoute.ts)
       return { kind: 'patrol', x: home.x, y: home.y, roam: pack?.roam ?? 2400, pace: pack?.pace ?? 0.58, wp: e.waypoint };
     } else if (dhypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
-      const roam = pack?.roam ?? 2400;
-      const a = at.rng() * Math.PI * 2, r = 600 + at.rng() * (roam - 600);
-      e.waypoint = { x: home.x + dcos(a) * r, y: home.y + dsin(a) * r };
+      e.waypoint = anchoredWaypoint({ x, y }, home, pack?.roam ?? 2400, at.rng, this.clearRun(eid));
     }
     // (Packs cruise in pulses at their own pace, and a loose one stops a while now and then)
     const paused = now < (pack?.pauseUntil ?? 0);
@@ -640,10 +646,45 @@ export class Enemies {
     return { kind: 'goto', x: e.waypoint.x, y: e.waypoint.y, arrive: 300, pace: pack?.pace ?? 0.58, until };
   }
 
+  /**
+   * Whether a ship can fly straight from one place to another in its system without touching rock: its centre's line
+   * and both its sides', and room for it where it ends up (undefined: its system has none, any run is clear)
+   */
+  private clearRun(eid: number): ClearRun | undefined {
+    const rock = this.host.terrain?.(InSystem.systemId[eid]);
+    if (!rock?.pieces.length) return undefined;
+    const r = terrainRadius(this.ships.get(eid)?.derived.radius ?? Radius.value[eid] ?? 40) + 150;
+    return (a, b) => {
+      if (insideTerrain(rock, b.x, b.y, r)) return false;
+      const d = dhypot(b.x - a.x, b.y - a.y) || 1, nx = (-(b.y - a.y) / d) * r, ny = ((b.x - a.x) / d) * r;
+      return rayTerrain(rock, a.x, a.y, b.x, b.y) >= 1 && rayTerrain(rock, a.x + nx, a.y + ny, b.x + nx, b.y + ny) >= 1 && rayTerrain(rock, a.x - nx, a.y - ny, b.x - nx, b.y - ny) >= 1;
+    };
+  }
+
+  /** Which way a nest's ships come out of it: anywhere, or (one with a post, a heap against a den's wall) out towards its post */
+  private launchAngle(n: SpawnNest | undefined, at: XY | undefined): number {
+    const roll = this.rng();
+    if (!n?.post || !at) return roll * Math.PI * 2;
+    return datan2(n.post.y - at.y, n.post.x - at.x) + (roll - 0.5) * 1.2;
+  }
+
+  /**
+   * A patrolling ship among rock that hasn't got any nearer its waypoint for PATROL_STALL (holding still doesn't count):
+   * held up on a wall (or a boulder its straight run didn't see). In open space nothing holds a patrol up for good
+   */
+  private stalled(e: Enemy, x: number, y: number, now: number, pauseUntil: number): boolean {
+    const d = dhypot(x - e.waypoint.x, y - e.waypoint.y);
+    if (now < pauseUntil || e.wpRef !== e.waypoint || e.wpBest === undefined || d < e.wpBest - 150) {
+      e.wpRef = e.waypoint; e.wpBest = d; e.wpSince = now;
+      return false;
+    }
+    return now - (e.wpSince ?? now) >= PATROL_STALL;
+  }
+
   /** Where a pack's home is at tick t: a nest's goes round with it (tendNest keeps it so while it's watched), a nomad's is where it's got to */
   private homeAt(p: Pack, t: number): XY {
     const n = p.nestDef;
-    return n?.place && p.style !== 'nomad' ? nestPosition(n.place, n.planets, t) : p.home;
+    return n?.place && p.style !== 'nomad' ? nestPost(n, n.place, n.planets, t) : p.home;
   }
 
   /** Take a ship out of the world quietly (an event's leftovers leaving) */
@@ -836,7 +877,7 @@ export class Enemies {
   private tendNest(num: number, n: SpawnNest, players: number[], all: Pack[], now: number): void {
     if (!n.place) return;
     const key = `${num}:${n.id}`;
-    const at = nestPosition(n.place, n.planets, now);
+    const at = nestPost(n, n.place, n.planets, now);
     const wake = this.loadRange();
     for (const p of all) {
       if (p.nest !== key) continue;
@@ -973,15 +1014,17 @@ export class Enemies {
 
   /** A ship back while its pack's loaded: out of the nest's hull, seen launching (a zone's: where its pack's ghost would be) */
   private launchInto(pop: Population, i: number, pack: Pack, k: number, now: number): void {
-    const n = pop.nest, a = this.rng() * Math.PI * 2, c = dcos(a), s = dsin(a);
+    const n = pop.nest;
     const at = n?.place ? nestPosition(n.place, n.planets, now) : ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, pop.slots[i].group), now, pop.lure);
+    const a = this.launchAngle(n, at), c = dcos(a), s = dsin(a);
     const from = n?.place ? NEST_RADIUS : 0, x = at.x + c * from, y = at.y + s * from;
     if (n?.place && !n.place.hidden) this.host.effect?.(pop.num, x, y, 'launch');
     const eid = this.spawnPopShip(pop, i, pack, k, x, y, a);
     if (eid < 0) { pop.slots[i].alive &= ~(1 << k); return; }
     Velocity.x[eid] = c * LAUNCH_SPEED; Velocity.y[eid] = s * LAUNCH_SPEED;
     const roam = pack.roam ?? 2400;
-    this.enemies.get(eid)!.waypoint = { x: at.x + c * roam * 0.6, y: at.y + s * roam * 0.6 };
+    // (A posted nest's ships go out to patrol round its post, by a way clear of rock)
+    this.enemies.get(eid)!.waypoint = n?.post ? anchoredWaypoint({ x, y }, this.homeAt(pack, now), roam, this.rng, this.clearRun(eid)) : { x: at.x + c * roam * 0.6, y: at.y + s * roam * 0.6 };
     pack.size0 = Math.max(pack.size0 ?? 0, pack.members.size);
   }
 
@@ -997,7 +1040,7 @@ export class Enemies {
     const nestAt = n?.place ? nestPosition(n.place, n.planets, now) : undefined;
     const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, style, now, pop.lure);
     const pack: Pack = {
-      id: this.nextPack++, systemNum: pop.num, home: nestAt && style !== 'nomad' ? { ...nestAt } : { ...c }, members: new Set(), lastSeen: now,
+      id: this.nextPack++, systemNum: pop.num, home: n?.place && style !== 'nomad' ? nestPost(n, n.place, n.planets, now) : { ...c }, members: new Set(), lastSeen: now,
       passive: g.passive, origin: n ? 'nest' : 'zone', pop: { p: pop, slot: i }, roam, pace: 0.4 + this.rng() * 0.45,
       ...(pop.zone ? { zone: pop.zone.id } : {}),
       ...(n ? { nest: pop.key, nestDef: n, group: slot.group, style } : {}),
@@ -1005,7 +1048,7 @@ export class Enemies {
     this.packs.set(pack.id, pack);
     const away = now - (slot.leftAt ?? now);
     const heal = away >= LIFE_ASLEEP_RESET ? 1 : (away / 3600) * this.mendPerMinute;
-    const a0 = this.rng() * Math.PI * 2;
+    const a0 = this.launchAngle(n, nestAt);
     for (let k = 0; k < g.ships.length; k++) {
       if (!(slot.alive & (1 << k))) continue;
       const out = launch && nestAt;
@@ -1534,15 +1577,16 @@ export class Enemies {
         else if (e.state === 'engage' || e.state === 'flee') { e.state = 'patrol'; e.target = -1; }
         else if (e.state === 'return' && fromHome < b.leash * 0.5) e.state = 'patrol';
       }
+      // (Among rock (a den), a patrol is kept clear of it, and one held up on it is given up: clearRun, stalled)
+      const clear = e.state === 'patrol' ? this.clearRun(eid) : undefined;
       if (e.state === 'patrol' && pack?.nestDef && pack.style !== 'anchored') {
         // Loose and nomad packs wander as one: each to its own spot round the pack's waypoint
         const lead = pack.members.values().next().value ?? eid;
         const wp = this.wander(pack, lead, now), k = [...pack.members].indexOf(eid);
         e.waypoint = k <= 0 ? wp : { x: wp.x + dcos(k * 2.4) * 380, y: wp.y + dsin(k * 2.4) * 380 };
-      } else if (e.state === 'patrol' && dhypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
-        const roam = pack?.roam ?? 2400;
-        const a = this.rng() * Math.PI * 2, r = 600 + this.rng() * (roam - 600);
-        e.waypoint = { x: home.x + dcos(a) * r, y: home.y + dsin(a) * r };
+      } else if (e.state === 'patrol' && (dhypot(x - e.waypoint.x, y - e.waypoint.y) < 300 || (clear && this.stalled(e, x, y, now, pack?.pauseUntil ?? 0)))) {
+        e.waypoint = anchoredWaypoint({ x, y }, home, pack?.roam ?? 2400, this.rng, clear);
+        e.wpBest = undefined;
       }
       if (this.rng() < 0.04) e.strafe = -e.strafe;
       // Nobody shoots perfectly: its aim's off by up to this much either way, re-rolled as it goes from a seed it rolled
