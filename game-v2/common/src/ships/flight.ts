@@ -188,8 +188,6 @@ export interface JumpTuning {
   underRangeFloor: number;
   underCooldown: number;
   underCooldownCap: number;
-  /** Shortest jump (including the coast) */
-  minRange: number;
   /** Near a star (within this far of its surface) the drive charges faster and reaches further */
   solarRing: number;
   solarRangeBoost: number;
@@ -214,7 +212,7 @@ export interface JumpTuning {
 export const DEFAULT_JUMP: JumpTuning = {
   chargeTicks: 180, burnTicks: 90, cooldownTicks: 900,
   speed: 340, exitSpeed: 0, rampTicks: 5, slowTicks: 16, chargeDamping: 0.96,
-  baseRange: 50000, minRange: 5000,
+  baseRange: 50000,
   coreCapacity: 40, gradeCapacity: 0.1, gradeRange: 0.05, gradeCooldown: 0.0625,
   overRange: 0.18, overRangeExp: 0.7, overCooldown: 0.2, cooldownFloor: 0.7, minCooldownTicks: 600,
   underRange: 0.6, underRangeFloor: 0.6, underCooldown: 0.7, underCooldownCap: 1.6667,
@@ -279,12 +277,13 @@ export function jumpReachAt(d: { jumpRange?: number }, t: JumpTuning, fieldBoost
 }
 
 /**
- * How far a jump aimed `dist` away goes (0 or none: as far as it reaches `reach`; never short of minRange). Below 0:
- * not known (a replica's controls: flightControls), -1
+ * How far a jump aimed `dist` away goes: exactly that, within the drive's reach `reach`, however short (Kieran, 2026-11-06:
+ * no shortest jump; a client aims one at its own ship a distance step, CURSOR_DIST_STEP, app/inputSend.ts). 0 or none:
+ * as far as it reaches (the default controls' distance). Below 0: not known (a replica's controls: flightControls), -1
  */
-export function jumpGoFor(dist: number | undefined, reach: number, t: JumpTuning): number {
+export function jumpGoFor(dist: number | undefined, reach: number, _t?: JumpTuning): number {
   if (dist !== undefined && dist < 0) return -1;
-  return Math.max(t.minRange, Math.min(reach, dist && dist > 0 ? dist : reach));
+  return Math.min(reach, dist && dist > 0 ? dist : reach);
 }
 
 /** The charge waits on its last tick until the nose is this close to the aim (radians); the burn then goes along the aim itself */

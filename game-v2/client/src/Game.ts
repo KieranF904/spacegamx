@@ -1212,7 +1212,6 @@ this.xpFillEl = document.getElementById('xpFill');
       get context() { return g.w.context; },
       get playerStatsUI() { return g.w.playerStatsUI; },
       get systemMapUI() { return g.w.systemMapUI; },
-      get navMarkers() { return g.w.navMarkers; },
       get audio() { return g.audio; },
       get network() { return g.network; },
       get input() { return g.input; },

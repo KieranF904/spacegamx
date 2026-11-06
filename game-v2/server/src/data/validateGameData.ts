@@ -542,7 +542,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
     flight: obj({ coreManeuverForce: 'number', gyroTorque: 'number', thrusterTorqueGain: 'number', '_comment?': 'string', turnGain: 'number', turnBrakeMargin: 'number', maxAngularSpeed: 'number', bossMaxAngularSpeed: 'number', bossTurnGain: 'number', helmTurnGain: 'number' }),
     'jump?': strict({
       'chargeTicks?': 'number', 'burnTicks?': 'number', 'cooldownTicks?': 'number', 'speed?': 'number', 'exitSpeed?': 'number', 'rampTicks?': 'number',
-      'slowTicks?': 'number', 'chargeDamping?': 'number', 'baseRange?': 'number', 'minRange?': 'number', 'solarRing?': 'number', 'solarRangeBoost?': 'number',
+      'slowTicks?': 'number', 'chargeDamping?': 'number', 'baseRange?': 'number', 'solarRing?': 'number', 'solarRangeBoost?': 'number',
       'solarCharge?': 'number', 'lodestoneName?': 'string', 'lodestoneShort?': 'string', 'lodestoneField?': 'number', 'lodestoneCharge?': 'number',
       'lodestoneRangeBoost?': 'number', 'lodestonePrimeTicks?': 'number', 'lodestoneSize?': 'number', 'lodestoneScarredCharge?': 'number',
       'lodestoneScarredBoost?': 'number', '_comment?': 'string', '_short?': 'string',

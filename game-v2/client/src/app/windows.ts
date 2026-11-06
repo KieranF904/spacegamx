@@ -231,7 +231,6 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       locked: (id) => w.systemMapUI.locked?.(id) ?? null,
       jumpPhase: () => host.shipClient.localJump().phase,
       jumpReach: () => host.shipClient.jumpReach(),
-      jumpMinRange: jumpTuning(shipTuning as ShipTuning).minRange,
       jumpCool: () => {
         const ship = host.shipClient.myShip(), j = host.shipClient.localJump();
         if (j.phase !== 'cooldown') return 0;

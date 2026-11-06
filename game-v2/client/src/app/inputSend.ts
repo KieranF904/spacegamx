@@ -29,7 +29,6 @@ import { compactSend } from './inputCompactSend';
 import type { GameMenuUI } from '../ui/GameMenuUI';
 import type { PlayerStatsUI } from '../ui/PlayerStatsUI';
 import type { SystemMapUI } from '../ui/SystemMapUI';
-import type { NavMarkersUI } from '../ui/NavMarkersUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { AudioManager } from '../audio/AudioManager';
 import type { InputManager } from '../input/InputManager';
@@ -61,7 +60,6 @@ export interface InputSendHost {
   readonly context: ContextActions;
   readonly playerStatsUI: PlayerStatsUI;
   readonly systemMapUI: SystemMapUI;
-  readonly navMarkers: NavMarkersUI | null;
   readonly audio: AudioManager;
   readonly network: ClientTransport;
   readonly input: InputManager;
@@ -143,22 +141,9 @@ export function tickInput(s: InputSendCtx): void {
     s.shipClient.setJumpAim(aimDist, null);
     s.systemMapUI.jumpAim = { angle: rawAngle, dist: aimDist, label: null };
   } else if (s.loggedIn && s.shipClient.jumpAiming()) {
-    // Cursor right on a destination, or pointing straight at one (off-screen ones too: aim at its edge marker)
-    // (On the map, whatever's under its cursor wins)
-    let best: { name: string; x: number; y: number; stop?: number } | null = s.systemMapUI.jumpLock(), bd = best ? -Infinity : Infinity;
-    const aimA = Math.atan2(mouseWorld.y - playerPos.y, mouseWorld.x - playerPos.x);
-    for (const t of s.navMarkers?.snapTargets() ?? []) {
-      const far = Math.hypot(t.x - playerPos.x, t.y - playerPos.y);
-      if (far < 2500) continue;
-      const near = Math.hypot(t.x - mouseWorld.x, t.y - mouseWorld.y);
-      let da = Math.abs(Math.atan2(t.y - playerPos.y, t.x - playerPos.x) - aimA);
-      if (da > Math.PI) da = 2 * Math.PI - da;
-      const onPoint = near < Math.max(1500, far * 0.12);
-      const onLine = da < Math.max(0.05, Math.atan2(1200, far));
-      if (!onPoint && !onLine) continue;
-      const score = onPoint ? near / far : da;
-      if (score < bd) { bd = score; best = t; }
-    }
+    // Exactly where the cursor is (Kieran, 2026-11-06: no snapping in flight). On the system map, a marker under the map's
+    // cursor is the target (jumpLock): just short of it
+    const best: { name: string; x: number; y: number; stop?: number } | null = s.systemMapUI.jumpLock();
     if (best) {
       const far = Math.hypot(best.x - playerPos.x, best.y - playerPos.y);
       rawAngle = Math.atan2(best.y - playerPos.y, best.x - playerPos.x);
@@ -207,6 +192,8 @@ export function tickInput(s: InputSendCtx): void {
   let dodge = inputEnabled && s.shipClient.dodgeControl();
   // (The angle is quantized to 13 bits, so client and server use the same value for hitscan: see CURSOR_STATE.md)
   let quantized = quantizeCursorAngle(rawAngle);
+  // (A jump aimed at the ship itself goes one distance step, a hop: 0 on the wire means as far as the drive goes, flightInputs.ts)
+  if (jump && aimDist < CURSOR_DIST_STEP) aimDist = CURSOR_DIST_STEP;
   let cursorDistQ = quantizeCursorDist(aimDist);
   // A menu jump has the controls as the autopilot does: no thrust, mouse-steer, the drive as it says
   if (order) {

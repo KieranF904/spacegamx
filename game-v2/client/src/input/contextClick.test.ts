@@ -132,7 +132,7 @@ describe('options per kind', () => {
 });
 
 describe('open space', () => {
-  const drive: DriveFacts = { phase: 'ready', reach: 50000, minRange: 5000, cool: 0 };
+  const drive: DriveFacts = { phase: 'ready', reach: 50000, cool: 0 };
   const jump = (dist: number, d: DriveFacts | null = drive) => openSpaceOptions(dist, d).find((o) => o.id === 'jumpHere');
 
   it('fly here, jump here, mark here; fly here is the default', () => {
@@ -158,7 +158,10 @@ describe('open space', () => {
     expect(jumpBlocked(20000, { ...drive, phase: 'cooldown', cool: 7.2 })).toBe('Cooling down · 8 s');
     expect(jump(20000, { ...drive, phase: 'cooldown', cool: 7.2 })!.hint).toMatch(/cooling 8 s/);
     expect(jumpBlocked(20000, { ...drive, phase: 'charging' })).toMatch(/already charging/);
-    expect(jumpBlocked(5200, drive)).toMatch(/^Too close/); // (just over minRange: the coast would overshoot)
+    // (No shortest jump, Kieran 2026-11-06: only right by the ship is there nowhere to go)
+    expect(jumpBlocked(5200, drive)).toBeNull();
+    expect(jumpBlocked(1000, drive)).toBeNull();
+    expect(jumpBlocked(MIN_FLY - 1, drive)).toMatch(/already here/);
     expect(jumpBlocked(80000, drive)).toBe('Out of range: the drive reaches 50 km from here');
     expect(jump(80000)!.disabled).toMatch(/Out of range/);
     expect(jumpBlocked(20000, drive)).toBeNull();

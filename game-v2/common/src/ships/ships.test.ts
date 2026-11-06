@@ -673,13 +673,13 @@ describe('jump drive', () => {
   });
 
   it('a jump is a short burn whatever its length: a longer one just goes faster', () => {
-    for (const d of [jt.minRange, 10000, R, 80000]) {
+    for (const d of [500, 5000, 10000, R, 80000]) {
       expect(jumpDistance(jt, jumpScaleFor(d, jt, FRICTION)) + jumpCoast(jt, FRICTION)).toBeCloseTo(d, -2);
     }
     expect(jt.burnTicks).toBeLessThanOrEqual(90);
   });
 
-  it('jumps as far as you aim (the cursor distance), within the shortest and longest the drive allows', () => {
+  it('jumps as far as you aim (the cursor distance), however short, up to the longest the drive allows', () => {
     // (Where the ship comes to rest: after the burn, the coast)
     // (Held for as long as the jump charges: the same for every jump, jumpChargeNeed)
     const go = (dist: number, boost = 1) => {
@@ -689,7 +689,8 @@ describe('jump drive', () => {
     };
     expect(go(8000)).toBeGreaterThan(7950);
     expect(go(8000)).toBeLessThan(8050);
-    expect(go(500)).toBeGreaterThan(jt.minRange * 0.95); // too short: the minimum
+    // (No shortest jump, Kieran 2026-11-06: a hop goes a hop, to the burn scale's step, 0.001, about 27 units)
+    for (const d of [4, 500, 2000]) expect(Math.abs(go(d) - d), String(d)).toBeLessThan(30);
     expect(go(500000)).toBeLessThan(R * 1.05); // too far: the drive's reach
     // A star's charging ring stretches the reach
     expect(go(500000, jt.solarRangeBoost)).toBeGreaterThan(R * jt.solarRangeBoost * 0.97);
@@ -719,7 +720,8 @@ describe('jump drive', () => {
       const left = dist - body.x;
       if (left <= 300) return t / 60;
       const ph = jumpPhase(body.jump ?? 0, { ...jt, cooldownTicks: cool }).phase;
-      const spool = jump && (ph === 'charging' || (ph === 'ready' && left > jt.minRange));
+      // (The pilot's choice: jump what's left past 5k, fly the rest)
+      const spool = jump && (ph === 'charging' || (ph === 'ready' && left > 5000));
       prime = pilotJumpStep(body, prime, NO_FIELDS, t, cool, jt, (rangeBoost) => {
         charge = stepShipPhysics(body, { forward: !spool, backward: false, left: false, right: false, boost: !spool, targetAngle: 0, helm: true, jump: spool, jumpDist: left },
           d, tuning, { charge, drainRate: 1 }, null, rangeBoost).charge;
@@ -745,7 +747,7 @@ describe('jump drive', () => {
   it('every jump charges the same 3 s, however far it is aimed (and whatever coils or fields it has): the reach decides how far, never how long', () => {
     // (Kieran, 2026-11-06: "the jump should just take about 3 seconds to charge, for any distance")
     expect(jt.chargeTicks).toBe(180);
-    for (const d of [0, 500, jt.minRange, 6000, 8000, 12000, 20000, 25000, R, 80000, 200000]) expect(jumpChargeNeed(d, jt), String(d)).toBe(jt.chargeTicks);
+    for (const d of [0, 4, 500, 5000, 6000, 8000, 12000, 20000, 25000, R, 80000, 200000]) expect(jumpChargeNeed(d, jt), String(d)).toBe(jt.chargeTicks);
     expect(jumpBurnAt(jt)).toBe(jt.chargeTicks);
     // Not known (a replica's): it never starts the burn itself
     expect(jumpChargeNeed(-1, jt)).toBe(Infinity);
