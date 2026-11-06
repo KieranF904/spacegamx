@@ -12,6 +12,9 @@ type PortsLayout = NonNullable<ShipDerived['ports']>;
 export interface PortsReport {
   /** E/s the generators make, E the stores and the core hold, links in the ship */
   supply: number;
+  /** E/s each kind of consumer draws working flat out: guns firing, engines cruising, Burst Strafers bursting, Gyros
+   * turning, shields (always) */
+  draws: { guns: number; engines: number; strafers: number; gyros: number; shields: number };
   store: number;
   links: number;
   /** Consumers with no line in at all (they get no power) */
@@ -35,7 +38,19 @@ export function portsReport(L: PortsLayout): PortsReport {
   for (const g of L.gens) if (L.openOut[g]) wasting.push(g);
   const clashing: [number, number, 0 | 1][] = [];
   for (const p of portsView(L).ports) if (p.state === PS_CLASH && p.part < p.to) clashing.push([p.part, p.to, p.dir]);
-  return { supply: L.supply, store: L.gaugeMax / 256, links: L.links, unfed, partly, wasting, clashing };
+  const draws = { guns: L.weaponDraw, engines: L.engineDraw, strafers: L.strafeDraw, gyros: L.gyroDraw, shields: L.shieldDraw };
+  return { supply: L.supply, store: L.gaugeMax / 256, draws, links: L.links, unfed, partly, wasting, clashing };
+}
+
+/** What the ship's consumers draw flat out, in a few words ("guns 40/s · engines 24/s · strafers 700/s a burst · ..."); '' for none */
+export function drawsText(r: PortsReport): string {
+  const n0 = (v: number) => Math.round(v).toLocaleString('en-GB'), d = r.draws, out: string[] = [];
+  if (d.guns > 0) out.push(`guns ${n0(d.guns)}/s`);
+  if (d.engines > 0) out.push(`engines ${n0(d.engines)}/s`);
+  if (d.strafers > 0) out.push(`strafers ${n0(d.strafers)}/s a burst`);
+  if (d.gyros > 0) out.push(`gyros ${n0(d.gyros)}/s turning`);
+  if (d.shields > 0) out.push(`shields ${n0(d.shields)}/s`);
+  return out.join(' · ');
 }
 
 /** The report's warnings, in plain words (name: a part's display name by index) */
@@ -50,8 +65,8 @@ export function portsWarnings(r: PortsReport, name: (i: number) => string): stri
 
 // ---- The ports load test and the port tooltip, in words (common power/portsLoadTest.ts, power/portStates.ts)
 
-/** The load test's scenarios as the POWER panel names them */
-export const SCENARIO_LABEL: Record<PortsScenario, string> = { fire: 'Firing, cruising', boost: 'Boosting', both: 'Boosting and firing' };
+/** The load test's scenarios as the POWER panel names them (boosting is combat flying: the gyros turning and the strafers dodging too, common power/portsLoadTest.ts) */
+export const SCENARIO_LABEL: Record<PortsScenario, string> = { fire: 'Firing, cruising', boost: 'Boosting, dodging', both: 'Boosting, dodging, firing' };
 
 export interface LoadRow {
   scenario: PortsScenario;
@@ -76,8 +91,9 @@ export function loadRow(r: PortsLoadResult, name: (i: number) => string): LoadRo
   const kinds: string[] = [];
   if (r.guns < 0.995) kinds.push(`guns ${pctText(r.guns)}`);
   if (r.engines < 0.995) kinds.push(`engines ${pctText(r.engines)}`);
+  if (r.moves < 0.995) kinds.push(`dodge/turn ${pctText(r.moves)}`);
   if (r.tools < 0.995) kinds.push(`tools ${pctText(r.tools)}`);
-  const worst = Math.min(r.guns, r.engines, r.tools);
+  const worst = Math.min(r.guns, r.engines, r.moves, r.tools);
   const lead = r.firstBrown < 0.05 ? `${name(r.firstPart)} short from the start` : `full power ${secs(r.firstBrown)}, ${name(r.firstPart)} short first`;
   return { scenario: r.scenario, label, text: kinds.length ? `${lead}; then ${kinds.join(' · ')}` : `${lead}; it catches up`, tone: worst < 0.5 ? 'bad' : 'warn', stores };
 }

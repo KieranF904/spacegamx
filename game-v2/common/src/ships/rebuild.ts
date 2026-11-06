@@ -573,7 +573,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
   // (A ports design's coils count once the layout says power reaches them: portsCoils, below)
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
-  const portsCoils: number[] = [];
+  const portsCoils: number[] = [], portsShields: number[] = [];
   const onPorts = blueprint.power === 'ports';
   const miners: MinerInfo[] = [];
   const launchers: LauncherInfo[] = [];
@@ -591,7 +591,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
     if ((fns[i].capacity ?? 0) > 0) cargoCapacity += fns[i].capacity! * area[i];
     if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
-    if ((fns[i].shield ?? 0) > 0) {
+    if ((fns[i].shield ?? 0) > 0 && onPorts && !fns[i].flash) portsShields.push(i);
+    else if ((fns[i].shield ?? 0) > 0) {
       const cap = fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
       shieldMax += cap;
       // (its own refill, per cell; else the ship-wide tuning's share of what it holds)
@@ -667,6 +668,19 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       jumpCap += coilCapacity(coil, grade, jt);
       jumpGradeSum += coil * grade;
       if ((fns[i].jumpCooldown ?? 1) < coilCool) coilCool = fns[i].jumpCooldown!;
+    }
+  }
+  // (And its shields, by the same rule: one power can't reach adds nothing; one reached refills as it is fed, energy.ts shieldShare)
+  if (ports && portsShields.length) {
+    const fed = portsFed(ports);
+    for (const i of portsShields) {
+      if (!fed[i]) continue;
+      const cap = fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]);
+      shieldMax += cap;
+      const sr = fns[i].shieldRegen, sd = fns[i].shieldDelay ?? tuning.shield?.regenDelayTicks ?? 0;
+      const rate = sr !== undefined ? sr * area[i] * fnOutput(fns[i], mats[i]) : cap * (tuning.shield?.regenPerSecond ?? 0);
+      shieldRegen += rate;
+      shieldDelayW += rate * sd;
     }
   }
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);

@@ -48,7 +48,7 @@ import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, numToCss } from './shipColors';
 import { powerReport, pruneWires, DEAD_NET, type PowerReport } from './wireEdit';
-import { portsReport, portsWarnings } from './portsReport';
+import { drawsText, portsReport, portsWarnings } from './portsReport';
 import { PortsGrid, portsPanelHtml } from './portsGrid';
 import { HangarPalette } from './HangarPalette';
 
@@ -1118,6 +1118,8 @@ export class HangarUI {
     const warn = portsWarnings(r, name);
     let html = '<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>';
     html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="Power moves only out of an out port into an in port across a shared edge: generators give at their front, stores take at the back and give at the front, guns and engines take at their back, the core takes at its sides">Generation ${n0(r.supply)}/s · stores hold ${n0(r.store)} · ${r.links} link${r.links === 1 ? '' : 's'}</div>`;
+    const draws = drawsText(r);
+    if (draws) html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="What each kind of part draws working flat out. Strafers burn only during a burst, gyros only while the ship turns (in proportion), shields all the time; each takes it from its own buffer, filled over its in ports, and works only as well as it is fed">Draws ${esc(draws)}</div>`;
     if (warn.length) html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${warn.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w)}</div>`).join('')}${warn.length > 6 ? `<div style="color:#6b7a93">and ${warn.length - 6} more</div>` : ''}</div>`;
     else html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Every gun, engine and tool is fed.</div>';
     if (this.derived) html += portsPanelHtml(this.derived, this.ports.scenario, this.overlays.energy, name);

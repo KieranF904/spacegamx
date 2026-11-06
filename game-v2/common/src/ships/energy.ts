@@ -36,7 +36,7 @@ import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
 import { getPlan } from './features/plan.js';
 import {
-  type PortsControls, type PortsState, createPortsState, portsMineStep, portsMineStop, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
+  type PortsControls, type PortsState, P_THRUSTER, TK_ENGINE, createPortsState, portsMineStep, portsMineStop, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
 } from './power/ports.js';
 import { dhypot } from '../math/detTrig.js';
 
@@ -192,7 +192,8 @@ export interface PowerUse {
   /**
    * Part features' burst draws this tick, by feature number (features/plan.ts), each per feed group (per second): each
    * takes from the banks feeding it first, then shares the Output with the guns (a Burst Strafer's dodge: features/strafer).
-   * In feature order; undefined entries ask nothing.
+   * In feature order; undefined entries ask nothing. A ports ship's are by part instead: the share (0..1) of each of its
+   * thrusters' burn the feature wants this tick (a Burst Strafer bursting, a Gyro turning: power/ports.ts TK_STRAFER, TK_GYRO)
    */
   extra?: readonly (ArrayLike<number> | undefined)[];
 }
@@ -452,27 +453,54 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
 }
 
 // ---- The ports core (power/ports.ts), in the same places
-let sActive = new Uint8Array(0);
-const PORTS_CTL: PortsControls = { active: null, boosting: false, toolWant: null, reload: false };
+let sActive = new Uint8Array(0), sScale = new Float64Array(0);
+const PORTS_CTL: PortsControls = { active: null, scale: null, boosting: false, toolWant: null, reload: false };
 /** A ports ship's tick: the thrusters pushing the way asked (every one, with no way given) burn; the tools draw; the guns' timers run */
 function portsPowerTick(d: ShipDerived, c: Charge, use: PowerUse): PowerResult {
   const L = d.ports!;
   if (!c.e || c.e.held.length !== L.n) c = { g: 100, b: [], e: c.e && c.e.held.length === L.n ? c.e : createPortsState(L) };
-  if (sActive.length < L.n) sActive = new Uint8Array(L.n);
-  sActive.fill(0, 0, L.n);
+  if (sActive.length < L.n) { sActive = new Uint8Array(L.n); sScale = new Float64Array(L.n); }
+  sActive.fill(0, 0, L.n); sScale.fill(0, 0, L.n);
   if (use.thrusting) for (const t of d.thrusters) {
     if (!t.force[0] && !t.force[1]) continue;
     if (use.dir && t.force[0] * use.dir[0] + t.force[1] * use.dir[1] <= 1e-9) continue;
     sActive[t.part] = 1;
   }
-  PORTS_CTL.active = sActive; PORTS_CTL.boosting = use.boosting && use.thrusting;
+  // (Part features' thrusters (Burst Strafers, Gyros) burn the share of their burn their feature asks, by part)
+  const X = use.extra;
+  if (X) for (let x = 0; x < X.length; x++) {
+    const ask = X[x];
+    if (!ask) continue;
+    const m = ask.length < L.n ? ask.length : L.n;
+    for (let p = 0; p < m; p++) { const k = ask[p]; if (k > 0 && L.role[p] === P_THRUSTER && L.thrustKind[p] !== TK_ENGINE) { sActive[p] = 1; sScale[p] = k < 1 ? k : 1; } }
+  }
+  PORTS_CTL.active = sActive; PORTS_CTL.scale = sScale; PORTS_CTL.boosting = use.boosting && use.thrusting;
   portsTick(L, c.e!, PORTS_CTL);
-  PORTS_CTL.active = null;
+  PORTS_CTL.active = null; PORTS_CTL.scale = null;
   // (The engines' share all together; whether a boost is possible is each engine's own, folded into thrustShare)
   const frac = portsThrustFrac();
   let want = 0, got = 0;
   if (use.thrusting) for (const t of d.thrusters) { if (!sActive[t.part]) continue; const v = dhypot(t.force[0], t.force[1]); want += v; got += v * frac[t.part]; }
-  return { charge: c, power: want > 1e-15 ? Math.min(1, got / want) : 1, boost: use.boosting && use.thrusting };
+  // (Each feature's share: what its parts got of the burn it asked, weighted by that burn)
+  let extra: (number | undefined)[] | undefined;
+  if (X) for (let x = 0; x < X.length; x++) {
+    const ask = X[x];
+    if (!ask) continue;
+    let w = 0, g = 0;
+    const m = ask.length < L.n ? ask.length : L.n;
+    for (let p = 0; p < m; p++) { if (!(ask[p] > 0) || !sActive[p] || L.thrustKind[p] === TK_ENGINE) continue; const b = L.burn[p] * sScale[p]; w += b; g += b * frac[p]; }
+    if (w > 0) (extra ??= [])[x] = Math.min(1, g / w);
+  }
+  return { charge: c, power: want > 1e-15 ? Math.min(1, got / want) : 1, boost: use.boosting && use.thrusting, ...(extra ? { extra } : {}) };
+}
+/**
+ * The share of their regen a ship's shields get (0..1): a ports ship's shields draw as tools, and refill only as fast as
+ * they are fed (Kieran, 2026-11-06); an unfed shield doesn't refill. 1 for a pool ship (its steady loads are settled at
+ * the rebuild: satisfaction) and for a ship whose power isn't accounted
+ */
+export function shieldShare(d: ShipDerived, c: Charge | undefined): number {
+  if (!d.ports || !c?.e || c.e.held.length !== d.ports.n) return 1;
+  return c.e.shieldSat / 255;
 }
 /** A client's charge for a ports ship: its state made (once a layout) and the row it was sent read into it */
 const clientStates = new WeakMap<object, PortsState>();

@@ -622,8 +622,9 @@ export function stepFlight(
     // A hazard that saps the batteries: they hold only so much
     const cap = k.hazard ? Math.round(100 * k.hazard.cap * 1000) / 1000 : 100;
     const dir = thrusting ? worldToLocalDir([ix / mag, iy / mag], body.angle) : undefined;
-    // (A ports ship's engines burn only pushing the way asked)
-    const pt = powerTick(d, capCharge(d, boost.charge, cap), d.ports ? { thrusting, boosting: !!input.boost, dir, load: boost.load } : { thrusting, boosting: !!input.boost, load: boost.load, extra: c.loads ? c.load : undefined }, tuning);
+    // (A ports ship's engines burn only pushing the way asked; its features' thrusters by part: energy.ts PowerUse.extra)
+    const extra = c.loads ? c.load : undefined;
+    const pt = powerTick(d, capCharge(d, boost.charge, cap), d.ports ? { thrusting, boosting: !!input.boost, dir, load: boost.load, extra } : { thrusting, boosting: !!input.boost, load: boost.load, extra }, tuning);
     charge = pt.charge;
     // (Part features' shares on the replicated grid's steps, as the engines' power below: replicas are told it, ctlOfShare)
     const sh = pt.extra;

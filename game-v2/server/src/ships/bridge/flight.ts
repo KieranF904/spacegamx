@@ -13,7 +13,7 @@ import {
   Position, Velocity, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  chargeTotal, contactPieces, contactPair, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
+  chargeTotal, shieldShare, contactPieces, contactPair, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
   ContactPairCache, contactPairs, cloneCharge, gunStateOf, type ContactPair, type HazardState, type OwnExtras,
   type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
@@ -96,7 +96,8 @@ export function wake(b: BridgeCtx, eid: number): void {
     if (w.fire.model === 'clip' && dt > 0) { ship.rounds[w.part] = w.fire.clip ?? 0; ship.reload[w.part] = 0; }
     if (dt > 0) { ship.charge[w.part] = 0; ship.spin[w.part] = 0; }
   }
-  const max = ship.derived.shieldMax, rate = ship.derived.shieldRegen;
+  // (At the fulfilment its shields had when it fell asleep: energy.ts shieldShare)
+  const max = ship.derived.shieldMax, rate = ship.derived.shieldRegen * shieldShare(ship.derived, b.charge.get(eid));
   if (rate > 0 && max > 0 && ship.shield < max) {
     const regen = Math.max(0, now - Math.max(since, ship.shieldHitTick + ship.derived.shieldDelay));
     ship.shield = Math.min(max, ship.shield + (rate / 60) * regen);
@@ -317,7 +318,8 @@ export function tick(ctx: BridgeCtx): void {
       const max = ship.derived.shieldMax;
       if (max <= 0) { ship.shield = 0; continue; }
       if (ship.shield > max) ship.shield = max;
-      const rate = ship.derived.shieldRegen;
+      // (A ports ship's shields refill only as fast as they are fed: energy.ts shieldShare, this tick's fulfilment)
+      const rate = ship.derived.shieldRegen * shieldShare(ship.derived, ctx.charge.get(ship.id));
       if (rate > 0 && ship.shield < max && tick - ship.shieldHitTick > ship.derived.shieldDelay) ship.shield = Math.min(max, ship.shield + (rate / 60) * (ctx.host.hazardScale?.(ship.id, 'shield') ?? 1));
     }
   }
