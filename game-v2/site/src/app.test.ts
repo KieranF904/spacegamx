@@ -10,6 +10,8 @@ import { join } from 'path';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import type { AdminUser, Lobby, LobbyUser } from './lobby.js';
+import type { ActivityClient, ActivityEvent, ActivityQuery, SourceRead } from './activity.js';
+import type { ActivityLobby } from './config.js';
 import type { PilotSource } from './pilots.js';
 import { JsonSiteStore } from './store/JsonSiteStore.js';
 import { Uploads } from './uploads.js';
@@ -85,6 +87,38 @@ const pilots: PilotSource = {
   async live() { return { players: 2, ships: 10, at: Date.now(), fresh: true }; },
 };
 
+/** Two lobbies' activity feeds (the dev default: Local, the site's own, and Production): what they were asked */
+class FakeActivity implements ActivityClient {
+  asked: { lobby: string; token: string | null; q: ActivityQuery }[] = [];
+  /** Production's state: no feed there yet, or a feed that wants its own session */
+  production: 'none' | 'feed' = 'none';
+  logins: string[] = [];
+  local: ActivityEvent[] = [
+    { id: 1, at: Date.parse('2026-11-06T10:00:00Z'), server: 'Local dev', type: 'join', player: 'vega', other: '', detail: 'Joined as a guest' },
+    { id: 2, at: Date.parse('2026-11-06T10:01:00Z'), server: 'Local dev', type: 'death', player: 'vega', other: '', detail: 'Destroyed by <script>alert(1)</script>' },
+  ];
+  async read(l: ActivityLobby, token: string | null, q: ActivityQuery): Promise<SourceRead> {
+    this.asked.push({ lobby: l.id, token, q });
+    if (!l.own) {
+      if (this.production === 'none') return { state: 'unavailable', error: 'This lobby has no activity feed yet' };
+      if (token !== 'prod-session-token-xxxxxxxx') return { state: 'signin' };
+      return { state: 'ok', events: [{ id: 9, at: Date.parse('2026-11-06T10:02:00Z'), server: 'AUS Main', type: 'boss_kill', player: 'orion', other: '', detail: 'The Maw killed' }], servers: ['AUS Main'], types: ['boss_kill'], live: ['AUS Main'] };
+    }
+    const u = token ? await lobby.validate(token) : null;
+    if (!u) return { state: 'signin' };
+    if (!u.isAdmin) return { state: 'forbidden', error: 'Only an admin can do that' };
+    return { state: 'ok', events: this.local.filter((e) => e.id > (q.after ?? 0)).reverse(), servers: ['Local dev'], types: ['death', 'join'], live: ['Local dev'] };
+  }
+  async login(l: ActivityLobby, username: string, password: string) {
+    this.logins.push(`${l.id}:${username}`);
+    return password === 'right' ? { ok: true as const, token: 'prod-session-token-xxxxxxxx' } : { ok: false as const, error: 'Invalid username or password' };
+  }
+  async logout() {}
+}
+const activity = new FakeActivity();
+/** (The rate limiter's clock, moved on by a test that signs in again after the others' sign-ins) */
+let limiterSkew = 0;
+
 let server: http.Server;
 let base = '';
 let dir = '';
@@ -116,7 +150,7 @@ beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'site-'));
   store = new JsonSiteStore(join(dir, 'site.json'));
   const cfg = { ...loadConfig({ SITE_SECRET: 'test-secret', SITE_DATA_DIR: dir, GAME_MODE: 'link', GAME_URL: 'http://game.example' } as NodeJS.ProcessEnv) };
-  const app = createApp({ cfg, store, lobby, pilots, uploads: new Uploads(dir), limiter: new RateLimiter() });
+  const app = createApp({ cfg, store, lobby, pilots, uploads: new Uploads(dir), limiter: new RateLimiter(() => Date.now() + limiterSkew), activity });
   server = http.createServer((q, s) => void app.handle(q, s));
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -390,6 +424,61 @@ describe('site routes', () => {
     expect(lobby.users.some((u) => u.username === 'target')).toBe(false);
     // And the account page says owner
     expect((await owner.page('/account')).text).toContain('<span class="gold">owner</span>');
+  });
+
+  it('Activity: admins only (page and feed); both lobbies merged, escaped; production says when it has no feed yet', async () => {
+    // Signed out: to sign in; a pilot: not found (page and feed alike), and no lobby is asked for them
+    limiterSkew += 10 * 60_000;
+    const anon = new Browser();
+    expect((await anon.page('/admin/activity')).location).toMatch(/^\/signin/);
+    expect((await anon.page('/admin/activity/feed')).location).toMatch(/^\/signin/);
+    lobby.users.push({ id: 950, username: 'pilotonly', email: 'p@x.io', password: 'pw', isAdmin: false });
+    const pilot = new Browser();
+    await pilot.signin('pilotonly', 'pw');
+    activity.asked = [];
+    expect((await pilot.page('/admin/activity')).status).toBe(404);
+    expect((await pilot.page('/admin/activity/feed')).status).toBe(404);
+    expect(activity.asked).toEqual([]);
+
+    const admin = new Browser();
+    await admin.signin('admin', 'admin');
+    const page = await admin.page('/admin/activity?player=vega&type=death');
+    expect(page.status).toBe(200);
+    expect(page.text).toContain('Activity: vega');
+    expect(page.text).toContain('Production feed not available yet');
+    expect(page.text).toContain('Destroyed by &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(page.text).not.toContain('<script>alert(1)');
+    // (The local lobby gets the site session's token and the filters)
+    const local = activity.asked.find((a) => a.lobby === 'local')!;
+    expect(local.token).toBeTruthy();
+    expect(local.q).toMatchObject({ player: 'vega', type: 'death', limit: 100 });
+
+    // The live feed: only what's newer than each source's cursor
+    const feed = JSON.parse((await admin.req('/admin/activity/feed?after.local=1', { headers: { accept: 'application/json' } })).text);
+    expect(feed.cursors).toEqual({ local: 2 });
+    expect(feed.rows).toHaveLength(1);
+    expect(feed.rows[0].html).toContain('&lt;script&gt;');
+    expect(feed.sources.map((s: any) => [s.id, s.state])).toEqual([['local', 'ok'], ['production', 'unavailable']]);
+
+    // Production with a feed: sign in to it on the page (a wrong password says so), then its events merge in, newest first
+    activity.production = 'feed';
+    expect((await admin.page('/admin/activity')).text).toContain('Sign in to Production to read it');
+    const wrong = await admin.req('/admin/activity/connect', { method: 'POST', form: { source: 'production', username: 'kieran', password: 'nope' } });
+    expect(wrong.status).toBe(400);
+    expect(wrong.text).toContain('Production: Invalid username or password');
+    const ok = await admin.req('/admin/activity/connect', { method: 'POST', form: { source: 'production', username: 'kieran', password: 'right' } });
+    expect(ok.status).toBe(303);
+    expect(admin.jar.get('sg_act_production')).toBe('prod-session-token-xxxxxxxx');
+    const merged = await admin.page('/admin/activity');
+    expect(merged.text.indexOf('The Maw killed')).toBeLessThan(merged.text.indexOf('Destroyed by'));
+    expect(merged.text).toContain('Live: AUS Main');
+    expect(merged.text).toContain('Sign out of Production');
+    // (A pilot can't use a production session cookie to read through the site either)
+    pilot.jar.set('sg_act_production', 'prod-session-token-xxxxxxxx');
+    expect((await pilot.page('/admin/activity/feed')).status).toBe(404);
+    await admin.req('/admin/activity/disconnect', { method: 'POST', form: { source: 'production' } });
+    expect(admin.jar.has('sg_act_production')).toBe(false);
+    activity.production = 'none';
   });
 
   it('pilot pages and Play (link mode redirects; no token in the URL)', async () => {

@@ -178,6 +178,7 @@ import type { ClientConnection } from './net/ClientConnection.js';
 import type { ServerCtx } from './net/ServerCtx.js';
 import { registerModuleHandlers } from './net/handlers/modules.js';
 import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js';
+import { activity } from './activity/index.js';
 import { registerShipEditHandlers } from './net/handlers/shipEdit.js';
 import { Docking, stationQuery } from './game/Docking.js';
 import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
@@ -2990,6 +2991,7 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       close: () => {
         console.log('Client disconnected');
+        this.guard('close', () => activity.leave(conn));
         // Off a siege moon first (paid what they're owed, back in orbit), so that's where they're saved
         // (Each step on its own: one that throws mustn't stop the rest, or the save, from happening)
         this.guard('close', () => this.sieges.leave(conn));
@@ -3609,6 +3611,7 @@ this.devTeleport = opts.devTeleport ?? false;
     let f = this.faults.get(where);
     if (!f) { f = { count: 0, unlogged: 0, loggedAt: 0 }; this.faults.set(where, f); }
     f.count++;
+    activity.error(where, e);
     if (now - f.loggedAt < 10_000) { f.unlogged++; return; }
     const more = f.unlogged ? ` (and ${f.unlogged} more since the last report)` : '';
     f.loggedAt = now;
@@ -4138,6 +4141,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const systemId = InSystem.systemId[player];
         const pc = this.lingering.get(player)?.conn ?? this.pilots.connOf(player);
         if (pc) this.pilots.onDestroyed(pc, systemId, Position.x[player], Position.y[player], Velocity.x[player], Velocity.y[player], this.deathCause(player));
+        if (pc && activity.on) activity.death(pc, this.deathCause(player), this.pilots.connOf(this.ships.lastHitter(player))?.username);
 
         this.broadcastToSystem(systemId, {
           type: 'death',

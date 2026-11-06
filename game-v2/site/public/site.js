@@ -451,4 +451,58 @@
     const change = () => { if (mq.matches) all(); else $$('.pic-wide').forEach((p) => p.classList.remove('pic-wide')); };
     if (mq.addEventListener) mq.addEventListener('change', change);
   })();
+
+  // ---------------------------------------------------------------- admin activity: live, with pause
+  // (The rows come from the site already rendered and escaped, like a posted comment's; at most KEEP are kept)
+  const act = $('[data-activity]');
+  if (act) {
+    const KEEP = 300;
+    const rows = $('[data-activity-rows]', act);
+    const state = $('[data-activity-state]');
+    const pause = $('[data-activity-pause]');
+    let cursors = {};
+    try { cursors = JSON.parse(act.dataset.cursors || '{}'); } catch { /* none yet */ }
+    let paused = false, busy = false;
+    const clock = (root) => $$('time[data-clock]', root).forEach((t) => {
+      t.textContent = new Date(t.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    });
+    clock(act);
+    const say = (text) => { if (state) state.textContent = text; };
+    const poll = async () => {
+      if (paused || busy || document.hidden) return;
+      busy = true;
+      try {
+        const u = new URL(act.dataset.feed, location.href);
+        for (const [k, v] of Object.entries(cursors)) u.searchParams.set(`after.${k}`, String(v));
+        const r = await fetch(u, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error(String(r.status));
+        const d = await r.json();
+        cursors = { ...cursors, ...(d.cursors || {}) };
+        if (!paused && Array.isArray(d.rows) && d.rows.length) {
+          $('[data-activity-empty]', act)?.remove();
+          const tpl = document.createElement('template');
+          tpl.innerHTML = `<table><tbody>${d.rows.map((x) => x.html).join('')}</tbody></table>`;
+          const fresh = $$('tr', tpl.content);
+          clock(tpl.content);
+          fresh.forEach((tr) => tr.classList.add('act-new'));
+          rows.prepend(...fresh);
+          while (rows.children.length > KEEP) rows.lastElementChild.remove();
+        }
+        say(paused ? 'Paused' : 'Live');
+      } catch {
+        say('Reconnecting...');
+      } finally {
+        busy = false;
+      }
+    };
+    setInterval(poll, 4000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+    pause?.addEventListener('click', () => {
+      paused = !paused;
+      pause.textContent = paused ? 'Resume' : 'Pause';
+      pause.setAttribute('aria-pressed', paused ? 'true' : 'false');
+      say(paused ? 'Paused' : 'Live');
+      if (!paused) poll();
+    });
+  }
 })();

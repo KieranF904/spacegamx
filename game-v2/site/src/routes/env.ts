@@ -4,6 +4,7 @@
  */
 
 import type { Ctx } from '../app.js';
+import type { ActivityClient } from '../activity.js';
 import type { CatalogBook } from '../catalog/book.js';
 import type { SiteConfig } from '../config.js';
 import type { SafeHtml } from '../html.js';
@@ -24,6 +25,10 @@ export interface RouteEnv {
   limited(ctx: Ctx, key: string, rule: { limit: number; windowMs: number }): boolean;
   requireAdmin(ctx: Ctx): LobbyUser | null;
   fields(ctx: Ctx, max?: number): Promise<Record<string, any>>;
+  /** The lobbies' activity feeds (routes/activity.ts) */
+  activity: ActivityClient;
+  /** Add a Set-Cookie (security.ts cookie()) */
+  setCookie(ctx: Ctx, cookie: string): void;
 }
 
 /** Headers for the public read-only JSON (any site may read it; short cache) */

@@ -8,9 +8,9 @@ import type { ApiToken, Comment, Post, SharedShip, Shout, Suggestion, Suggestion
 import { SUGGESTION_STATUSES } from '../store/types.js';
 import { csrfField, empty, fmtDate, layout, STATUS_LABEL, statusBadge, when, type PageCtx } from './layout.js';
 
-type Tab = 'overview' | 'posts' | 'comments' | 'suggestions' | 'shoutbox' | 'ships' | 'pilots' | 'tokens';
+export type Tab = 'overview' | 'activity' | 'posts' | 'comments' | 'suggestions' | 'shoutbox' | 'ships' | 'pilots' | 'tokens';
 const TABS: [Tab, string, string][] = [
-  ['overview', 'Overview', '/admin'], ['posts', 'Posts', '/admin/posts'], ['comments', 'Comments', '/admin/comments'],
+  ['overview', 'Overview', '/admin'], ['activity', 'Activity', '/admin/activity'], ['posts', 'Posts', '/admin/posts'], ['comments', 'Comments', '/admin/comments'],
   ['suggestions', 'Suggestions', '/admin/suggestions'], ['shoutbox', 'Shoutbox', '/admin/shoutbox'], ['ships', 'Shared ships', '/admin/ships'],
   ['pilots', 'Pilots & bans', '/admin/pilots'], ['tokens', 'API tokens', '/admin/tokens'],
 ];
@@ -24,7 +24,8 @@ export function rankPill(u: { isAdmin: boolean; isOwner?: boolean }): SafeHtml |
   return u.isOwner ? html` <span class="pill pill-admin">owner</span>` : u.isAdmin ? html` <span class="pill pill-admin">admin</span>` : '';
 }
 
-function shell(ctx: PageCtx, tab: Tab, title: string, content: SafeHtml, notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {
+/** An admin page: the tabs, then its content (views/activity.ts uses it too) */
+export function shell(ctx: PageCtx, tab: Tab, title: string, content: SafeHtml, notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {
   const body = html`
 <section class="admin wrap">
   <nav class="admin-nav" aria-label="Admin">

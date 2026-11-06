@@ -35,6 +35,7 @@ import {
 import type { Pilots, PilotConn, PilotEvent } from './Pilots.js';
 import type { People } from './People.js';
 import type { Codex } from './Codex.js';
+import { activity } from '../activity/index.js';
 
 /** Leads you can't take yet show only this many levels ahead of you */
 const LEAD_LEVELS_AHEAD = 3;
@@ -688,6 +689,7 @@ export class Quests {
     if (q.steps.some((s) => s.type === 'escort')) this.pilots.bumpStat(conn, 'escorts');
     if (q.steps.some((s) => s.type === 'defend')) this.pilots.bumpStat(conn, 'defences');
     this.host.completed?.(conn, q);
+    activity.quest(conn, q.name);
     this.pilots.saveNow(conn);
   }
 

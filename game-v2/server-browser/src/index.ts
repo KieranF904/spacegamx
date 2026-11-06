@@ -14,6 +14,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'crypto';
 import { AccountRoutes, DATA_DIR } from './accounts/routes.js';
 import { InboxRoutes } from './inbox/routes.js';
+import { ActivityRoutes } from './activity/routes.js';
 import { BodyError, clientIp, readJson } from './accounts/request.js';
 import { MAX_SERVERS, listing, parseHeartbeat, type ServerEntry } from './servers.js';
 
@@ -531,9 +532,16 @@ const accounts = await AccountRoutes.create(sendJson, parseJson, getClientIp);
 // The player inbox: messages from admins to accounts, kept beside them (see inbox/routes.ts)
 const inbox = await InboxRoutes.create(accounts.users, sendJson, parseJson, getClientIp, { adminSecret: accounts.secret, dataDir: DATA_DIR });
 accounts.onAccountDeleted = (id) => inbox.forgetUser(id);
+// The player activity feed: game servers send it, the website's admin panel reads it (see activity/routes.ts)
+const activity = await ActivityRoutes.create(accounts.users, sendJson, parseJson, getClientIp, {
+  adminSecret: accounts.secret, dataDir: DATA_DIR, live: () => [...new Set([...servers.values()].map((s) => s.name))],
+});
+accounts.onActivity = (type, player, detail, other) => activity.record(type, player, detail, other);
 
 const server = http.createServer(async (req, res) => {
   setCors(res);
+  // (The activity feed's answers go only to the origins it allows)
+  activity.cors(req, res, req.url?.split('?')[0] || '/');
   
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -544,7 +552,8 @@ const server = http.createServer(async (req, res) => {
   const url = req.url?.split('?')[0] || '/';
   
   try {
-    // (The inbox first: its /admin/mail would otherwise be one of the accounts' /admin/ calls)
+    // (The inbox and the feed first: their /admin/ calls would otherwise be the accounts')
+    if (await activity.handle(req, res, url)) return;
     if (await inbox.handle(req, res, url)) return;
     if (await accounts.handle(req, res, url)) return;
 
@@ -630,6 +639,7 @@ server.listen({ port: PORT, host: process.env.BROWSER_HOST || undefined }, () =>
   console.log(`     GET  /health     - Health check`);
   console.log(`     POST /auth/*     - Accounts: login, register, validate, logout, account, change-password/email, logout-all, delete-account`);
   console.log(`     POST /inbox/*    - Player inbox: list, read, delete; admins: send, sent`);
+  console.log(`     POST /activity/read - Activity feed (an admin's session); game servers send to /admin/activity/ingest`);
 });
 
 // Periodic cleanup
@@ -640,7 +650,9 @@ let stopping = false;
 function stop(code: number): void {
   if (stopping) return;
   stopping = true;
-  inbox.close()
+  activity.close()
+    .catch((err) => console.error('[browser] closing the activity feed failed:', err))
+    .then(() => inbox.close())
     .catch((err) => console.error('[browser] closing the inbox failed:', err))
     .then(() => accounts.close())
     .catch((err) => console.error('[browser] closing the accounts failed:', err))

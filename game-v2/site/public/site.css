@@ -547,6 +547,33 @@ details[open] > summary { margin-bottom: 12px; }
 .pill-draft { color: var(--gold); }
 .pill-admin { color: var(--gold); }
 .pill-banned { color: #fca5a5; }
+/* admin activity */
+.act-controls { display: flex; align-items: center; gap: 12px; }
+.act-state { font-family: var(--mono); color: var(--green); }
+.act-state::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+.act-sources { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.act-source { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 10px 14px; border: 1px solid var(--line); background: var(--panel); }
+.act-source-ok { border-left: 2px solid var(--green); }
+.act-source-unavailable, .act-source-signin { border-left: 2px solid var(--gold); }
+.act-source-forbidden { border-left: 2px solid var(--red); }
+.act-source .inline-form { margin: 0; }
+.act-source .inline-form input { width: 150px; padding: 6px 10px; }
+.act-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.act-filters .field { width: 160px; }
+.act-filters .field.grow { flex: 1; min-width: 180px; }
+.act-filters .field > span { font: 600 0.68rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.act-filters input, .act-filters select { padding: 7px 10px; }
+.act-filter-buttons { display: flex; align-items: center; gap: 12px; padding-bottom: 4px; }
+.act-table td { padding: 8px 12px; }
+.act-time { white-space: nowrap; color: var(--muted); }
+.act-type { white-space: nowrap; color: var(--text-hi); }
+.act-player { white-space: nowrap; }
+.act-detail { width: 60%; }
+.act-bad .act-type { color: #fca5a5; }
+.act-good .act-type { color: var(--green); }
+.act-h0 { color: var(--sky); } .act-h1 { color: var(--teal); } .act-h2 { color: var(--gold); } .act-h3 { color: #c4b5fd; } .act-h4 { color: #f9a8d4; }
+.act-new { animation: act-in 1.6s var(--ease); }
+@keyframes act-in { from { background: rgba(125, 211, 252, 0.14); } to { background: transparent; } }
 .editor { display: flex; flex-direction: column; gap: 18px; }
 .editor-meta { display: grid; grid-template-columns: 2fr 1fr; gap: 12px 16px; }
 .field { display: flex; flex-direction: column; gap: 6px; }

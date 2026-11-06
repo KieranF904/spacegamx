@@ -17,6 +17,7 @@ import type { ServerMessage, SocialStatus, FriendPresence, FriendView } from '@s
 import { isSocialStatus } from '@space-game/common';
 import type { PilotConn } from '../Pilots.js';
 import type { ProfileStore } from '../../profile/ProfileStore.js';
+import { activity } from '../../activity/index.js';
 import { SOCIAL_DOC, emptyDoc, parseDoc, touch, findByName, request, respond, unfriend, forget, type SocialDoc } from './friendsDoc.js';
 
 export const MESSAGE_MAX = 200;
@@ -176,6 +177,7 @@ export class Social {
       switch (r) {
         case 'sent': {
           this.dirty();
+          activity.social(conn, 'friend requests');
           this.host.toast(conn, `Friend request sent to ${them}`, 'info');
           const other = this.byUser.get(to);
           if (other) { this.host.send(other, { type: 'friendRequest', from: conn.username }); this.sendList(other); }
@@ -184,6 +186,7 @@ export class Social {
         }
         case 'accepted':
           this.dirty();
+          activity.social(conn, 'friends accepted');
           this.befriended(me, to);
           return;
         case 'already': return this.host.toast(conn, `${them} is already your friend`, 'info');
@@ -205,6 +208,7 @@ export class Social {
       if (me === null || from === undefined || !this.doc.accounts[me]?.in.includes(from)) return this.host.toast(conn, 'That request has gone', 'warn');
       const ok = respond(this.doc, me, from, accept === true);
       this.dirty();
+      activity.social(conn, ok ? 'friends accepted' : 'requests declined');
       if (ok) return this.befriended(me, from);
       if (accept === true) this.host.toast(conn, 'A friends list is full', 'warn');
       this.sendList(conn);
@@ -224,6 +228,7 @@ export class Social {
       const wasFriend = !!this.doc.accounts[me]?.friends.includes(other);
       if (!unfriend(this.doc, me, other)) return;
       this.dirty();
+      if (wasFriend) activity.social(conn, 'friends removed');
       if (wasFriend) this.host.toast(conn, `${this.doc.accounts[other]?.name ?? n} is no longer on your friends list`, 'info');
       this.sendList(conn);
       const oc = this.byUser.get(other);
@@ -283,6 +288,7 @@ export class Social {
     }
     this.host.send(target, { type: 'whisper', from: conn.username, to: target.username, text: body });
     this.host.send(conn, { type: 'whisper', from: conn.username, to: target.username, text: body, out: true });
+    activity.social(conn, 'private messages');
     const s = this.shown(target);
     if (s === 'busy' || s === 'away') this.host.note(conn, `${target.username} is ${s} and may not answer right away.`, NOTE);
   }

@@ -172,6 +172,8 @@ export class AccountRoutes {
 
   /** An account was deleted (by its pilot or an admin): the lobby's other stores forget it (the inbox) */
   onAccountDeleted: ((userId: number) => void) | null = null;
+  /** Sign-ins, sign-outs and account changes, for the activity feed (../activity): never passwords, emails or tokens */
+  onActivity: ((type: string, player: string, detail: string, other?: string) => void) | null = null;
 
   private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string, private deleted: DeletedAccounts) {}
 
@@ -227,6 +229,7 @@ export class AccountRoutes {
       }
       if (!result.success) { this.sendJson(res, action === 'login' ? 401 : 400, { success: false, error: result.error }); return true; }
       if (action === 'register') notifier.registered(result.user.username);
+      this.onActivity?.(action === 'login' ? 'signin' : 'register', result.user.username, action === 'login' ? 'Signed in' : 'New account');
       this.sendJson(res, 200, { success: true, username: result.user.username, token: result.token, ...ranks(result.user) });
       return true;
     }
@@ -240,7 +243,11 @@ export class AccountRoutes {
     }
     if (ACCOUNT_ACTIONS.includes(action)) { await this.handleAccount(req, res, action, body); return true; }
     if (action === 'logout') {
-      if (str(body.token)) await this.store.logout(str(body.token));
+      if (str(body.token)) {
+        const who = this.onActivity ? await this.store.validateSession(str(body.token)) : null;
+        await this.store.logout(str(body.token));
+        if (who) this.onActivity?.('signout', who.username, 'Signed out');
+      }
       this.sendJson(res, 200, { success: true });
       return true;
     }
@@ -264,6 +271,7 @@ export class AccountRoutes {
     if (action === 'logout-all') {
       const ended = await this.store.endSessions(user.id);
       console.log(`[Accounts] ${user.username} signed out everywhere (${ended})`);
+      this.onActivity?.('signout', user.username, `Signed out everywhere (${ended} ${ended === 1 ? 'session' : 'sessions'})`);
       this.sendJson(res, 200, { success: true, ended });
       return;
     }
@@ -284,12 +292,14 @@ export class AccountRoutes {
       await this.store.setPassword(user.id, next);
       await this.store.endSessions(user.id, token);
       console.log(`[Accounts] ${user.username} changed their password`);
+      this.onActivity?.('account', user.username, 'Changed their password');
       this.sendJson(res, 200, { success: true });
       return;
     }
     if (action === 'change-email') {
       const error = await this.store.setEmail(user.id, str(body.email));
       if (error) { this.sendJson(res, 400, { success: false, error }); return; }
+      this.onActivity?.('account', user.username, 'Changed their email');
       this.sendJson(res, 200, { success: true, email: (await this.store.getUserById(user.id))?.email ?? '' });
       return;
     }
@@ -298,6 +308,7 @@ export class AccountRoutes {
     this.deleted.add(user.id);
     this.onAccountDeleted?.(user.id);
     console.log(`[Accounts] ${user.username} (id ${user.id}) deleted their account`);
+    this.onActivity?.('account', user.username, 'Deleted their account');
     this.sendJson(res, 200, { success: true, id: user.id });
   }
 
@@ -335,6 +346,7 @@ export class AccountRoutes {
       this.deleted.add(found.id);
       this.onAccountDeleted?.(found.id);
       console.log(`[Accounts] ${found.username} (id ${found.id}) deleted${actor ? ` by ${actor.username}` : ' (server side)'}`);
+      this.onActivity?.('admin', actor?.username ?? 'server', `Deleted the account ${found.username}`, found.username);
       this.sendJson(res, 200, { success: true, id: found.id, username: found.username });
       return;
     }
@@ -350,6 +362,7 @@ export class AccountRoutes {
     if (action !== 'user') {
       const what = action === 'ban' ? ` by ${str(body.by)}` : action === 'set-admin' ? `: ${user.is_admin}` : action === 'set-owner' ? `: ${user.is_owner}` : '';
       console.log(`[Accounts] ${action} ${user.username}${what}${actor ? ` (${actor.username})` : ''}`);
+      this.onActivity?.('admin', actor?.username ?? 'server', `${action} ${user.username}${what}`, user.username);
     }
     this.sendJson(res, 200, { success: true, user: adminUser(user) });
   }

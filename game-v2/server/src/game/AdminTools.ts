@@ -21,6 +21,7 @@
 
 import type { AdminAccountInfo, Bag } from '@space-game/common';
 import type { AccountAdmin, AccountInfo } from '../auth/types.js';
+import { activity } from '../activity/index.js';
 
 export interface AdminConn {
   playerId: number;
@@ -221,6 +222,7 @@ export class AdminTools {
     const done = (r: Result): Result => {
       if (r.quiet && r.ok) return r;
       console.log(`[admin] ${c.username}: ${cmd} ${JSON.stringify(args)} -> ${r.ok ? 'ok' : 'refused'}: ${r.text}`);
+      activity.admin(c.username, cmd, args, r);
       this.host.reply(c, { type: 'adminResult', ok: r.ok, text: r.text });
       return r;
     };

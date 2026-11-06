@@ -24,6 +24,7 @@ import {
 import type { Pilots, PilotConn } from './Pilots.js';
 import { PayoutDice, type Dice } from './payoutDice.js';
 import type { Market } from './Market.js';
+import { activity } from '../activity/index.js';
 
 export interface StationHost {
   /** The station (data and display name) this pilot is at, or null */
@@ -443,6 +444,7 @@ export class StationServices {
     this.pilots.addCredits(conn, total);
     this.pilots.bumpStat(conn, 'earned', total);
     this.pilots.toast(conn, `Sold ${count} ore for ${total.toLocaleString()} cr`, 'good');
+    activity.sale(conn, `${count} ore`, total, st.name);
     this.pilots.sendItems(conn);
     this.pilots.saveNow(conn);
     this.sendStation(conn, st);
@@ -469,6 +471,7 @@ export class StationServices {
     this.pilots.addCredits(conn, total);
     this.pilots.bumpStat(conn, 'earned', total);
     this.pilots.toast(conn, `Sold ${n} × ${def.name} for ${total.toLocaleString()} cr`, 'good');
+    activity.sale(conn, `${n} × ${def.name}`, total, st.name);
     this.pilots.saveNow(conn);
     this.sendStation(conn, st);
   }
