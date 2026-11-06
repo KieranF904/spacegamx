@@ -14,7 +14,8 @@
  *       checked against ST each snapshot, re-stepped once on a miss and eased from old PT to new
  *   C3  C2 plus the touch register: what a missed ship touched is re-stepped with it (the default: DEFAULT_MODE)
  */
-import { AHEAD_BACK } from '@space-game/common';
+import { AHEAD_BACK, EntityType } from '@space-game/common';
+import type { PtKinds } from './ptKinds';
 import type { DrawModeHook } from '../state/drawMode';
 import type { InterpolatedEntity } from '../state/GameState';
 import type { PtStLayer } from './ptst';
@@ -34,10 +35,15 @@ export interface ModeCtx {
   ownDraw(): number;
   /** Flown here from its decisions, hits found here (BodyRunner.ahead): can be stepped ahead */
   ai(id: number): boolean;
-  /** Ticks behind your shells' draw tick a PT ship is drawn at (its kind's, predict/kinds.ts: a pilot 0.5, others AHEAD_BACK) */
+  /** Ticks behind your shells' draw tick a PT ship is drawn at (its kind's, predict/shipKinds.ts: a pilot 0.5, others AHEAD_BACK) */
   drawBack(id: number): number;
   /** The PT/ST layer (C2/C3) */
   layer: PtStLayer;
+  /**
+   * The PT timeline's kinds (C2/C3; predict/ptKinds.ts): the ships layer first, then bodies (bosses), guides (homing
+   * shells, mobs) and moves (boss attacks), all stepped to your tick and drawn there. Absent: the ships layer alone
+   */
+  kinds?: PtKinds;
 }
 
 export interface PredictMode {
@@ -70,50 +76,72 @@ const wrapA = (d: number) => { while (d > Math.PI) d -= 2 * Math.PI; while (d < 
 
 function ptstHook(ctx: ModeCtx): DrawModeHook {
   let od = 0, frame = 0, now = 0;
+  const k = ctx.kinds, bodies = k?.get('bodies'), guides = k?.get('guides');
+  const set = (e: InterpolatedEntity, p: { x: number; y: number; angle: number }) => {
+    e.x = e.renderX = p.x;
+    e.y = e.renderY = p.y;
+    e.angle = e.renderAngle = p.angle;
+  };
   /** Ships drawn last frame (the frame), and where if from PT */
   const drawn = new Map<number, number>();
   const ptLast = new Map<number, { x: number; y: number; angle: number }>();
-  /** A ship going onto PT or off it: what's left of the gap between the two poses */
+  /** A ship going onto PT or off it (the level of detail's edge, coming into view): what's left of the gap between the two poses */
   const eases = new Map<number, Ease>();
-  const ease = (e: InterpolatedEntity, x: number, y: number, a: number) => {
+  const ease = (e: InterpolatedEntity, p: { x: number; y: number; angle: number }) => {
     const o = eases.get(e.id);
     if (o) {
       const u = (now - o.at) / PT_SWITCH_MS, w = u >= 1 ? 0 : 1 - u * u * (3 - 2 * u);
       if (w <= 0) eases.delete(e.id);
-      else { x += o.dx * w; y += o.dy * w; a += o.da * w; }
+      else { p.x += o.dx * w; p.y += o.dy * w; p.angle += o.da * w; }
     }
-    e.x = e.renderX = x;
-    e.y = e.renderY = y;
-    e.angle = e.renderAngle = a;
+    set(e, p);
   };
   const place = (e: InterpolatedEntity) => {
     const was = drawn.get(e.id) === frame - 1;
     drawn.set(e.id, frame);
-    const p = ctx.layer.pose(e.id, ptDrawTick(ctx, e.id, od));
+    const t = ptDrawTick(ctx, e.id, od);
+    const p = k ? k.pose(e.id, t) : ctx.layer.pose(e.id, t);
     if (!p) {
+      // (a boss: placed by the replica layer at its PT tick, whose pose already eases a rewrite of its path (a decision
+      // landing, ShipReplicaSet.pose) and blends a keyframe in. The bodies kind's own ease on top doubled the
+      // correction, so it isn't added: that kind checks and counts, the replica layer draws)
+      if (bodies?.has?.(e.id)) return;
       // (Off PT now (out of reach, left the layer): eased from where PT drew it onto its interpolated pose)
       const l = ptLast.get(e.id);
       if (l) { ptLast.delete(e.id); if (was) eases.set(e.id, { dx: l.x - e.x, dy: l.y - e.y, da: wrapA(l.angle - e.angle), at: now }); }
-      if (eases.has(e.id)) ease(e, e.x, e.y, e.angle);
+      if (eases.has(e.id)) ease(e, { x: e.x, y: e.y, angle: e.angle });
       return;
     }
     // (Onto PT now: eased from its interpolated pose (where it was placed this frame) onto its PT one)
     if (!ptLast.has(e.id) && was) eases.set(e.id, { dx: e.x - p.x, dy: e.y - p.y, da: wrapA(e.angle - p.angle), at: now });
-    ptLast.set(e.id, p);
-    ease(e, p.x, p.y, p.angle);
+    ptLast.set(e.id, { x: p.x, y: p.y, angle: p.angle });
+    ease(e, p);
   };
   return {
     frame(t) {
       now = t;
       frame++;
       if (frame % 600 === 0) for (const [id, f] of drawn) if (f < frame - 2) { drawn.delete(id); ptLast.delete(id); eases.delete(id); }
-      // (Check what's newly confirmed first, then step on to the own tick: a miss is re-stepped once, to the head as it stood)
-      ctx.layer.confirm(ctx.confirmedTick());
-      ctx.layer.advance(ctx.predictedTick());
       od = ctx.ownDraw();
+      // (Check what's newly confirmed first, then step on to the own tick: a miss is re-stepped once, to the head as it
+      // stood. With the world's kinds: every kind's confirm, then every kind's advance, ships first)
+      if (k) k.frame(ctx.confirmedTick(), ctx.predictedTick());
+      else {
+        ctx.layer.confirm(ctx.confirmedTick());
+        ctx.layer.advance(ctx.predictedTick());
+      }
     },
+    ship: (e, rt) => (bodies?.has?.(e.id) ? ptDrawTick(ctx, e.id, od) : rt),
     placed: place,
-    shot: (owner, present, render) => (owner === ctx.self() ? present : ctx.layer.has(owner) ? ptDrawTick(ctx, owner, od) : render),
+    shot: (owner, present, render) => (owner === ctx.self() ? present : (k ? k.has(owner) : ctx.layer.has(owner)) ? ptDrawTick(ctx, owner, od) : render),
+    entity: (e) => {
+      if (!guides || (e.type !== EntityType.Projectile && e.type !== EntityType.Enemy) || !guides.has?.(e.id)) return false;
+      const p = guides.pose?.(e.id, ptDrawTick(ctx, e.id, od));
+      if (!p) return false;
+      set(e, p);
+      return true;
+    },
+    ahead: (rt) => Math.max(rt, od - AHEAD_BACK),
   };
 }
 

@@ -18,4 +18,11 @@ export interface DrawModeHook {
   placed?(e: InterpolatedEntity): void;
   /** The tick a shell is drawn at, given its owner and the frame's own-shell (present) and render ticks */
   shot?(owner: number, present: number, render: number): number;
+  /**
+   * Any other entity (a homing shell, a mob: the PT timeline's guides kind), before it is interpolated: true when the
+   * mode placed it itself (its x, y, angle and render pose set)
+   */
+  entity?(e: InterpolatedEntity, renderTick: number): boolean;
+  /** The tick things decided ahead are drawn at (a boss's looks: its window's timing), given the render tick */
+  ahead?(renderTick: number): number;
 }

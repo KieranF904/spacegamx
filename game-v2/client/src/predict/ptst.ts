@@ -4,7 +4,7 @@
  * crowd-bench probes (server bench/crowd/probe.ts).
  *
  *   PT  every other ship stepped by the client to the own predicted tick, once per tick, in its own StateRing: each
- *       ship's input from its kind (predict/kinds.ts: other pilots on held last input, AI on its decisions), then that
+ *       ship's input from its kind (predict/shipKinds.ts: other pilots on held last input, AI on its decisions), then that
  *       tick's contact pass over the PT states (the world's `contacts`: predict/contacts.ts RealContacts, the server's
  *       pass on predicted ticks)
  *   ST  the confirmed state, from the world (the replica layer at a tick the snapshots have told)
@@ -19,7 +19,7 @@
  *
  * Ships come and go with the world's list (`ships()`): one new to the layer (into view, a focus cell, a late joiner,
  * a respawn under a new id, a ship split off) starts from its ST at the confirmed tick, stepped alone to the head; one
- * gone from the list (out of view, removed, too far for the level of detail: kinds.ts PT_TUNING) drops its PT.
+ * gone from the list (out of view, removed, too far for the level of detail: shipKinds.ts PT_TUNING) drops its PT.
  *
  * Bodies the world calls `fixed` (the own ship, stepped on its own layer) push in the contact pass but are never moved
  * or re-stepped here; ships that aren't `pushable` (AI flown from its decisions: its path is its body's) likewise.

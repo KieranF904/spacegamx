@@ -1731,8 +1731,13 @@ export class Renderer {
   }
 
   /** A shell your client fired ahead of the server (WeaponFx.predict) */
-  predictShot(p: PredictedShell): void {
-    this.weaponFx.predict(p);
+  predictShot(p: PredictedShell): number {
+    return this.weaponFx.predict(p);
+  }
+
+  /** A shell drawn ahead taken back (WeaponFx.retract) */
+  retractShot(id: number): void {
+    this.weaponFx.retract(id);
   }
 
   /** Called when a shot is seen leaving its gun (owner, muzzle point) */

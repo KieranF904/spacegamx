@@ -13,6 +13,7 @@ import type { PtStLayer } from '../../predict/ptst';
 import type { ModeCtx, ModeId, PredictMode } from '../../predict/modes';
 import { HitTally, StrikeOffsets } from './hitTally';
 import { shieldOf } from '../../ships/drawnHit';
+import type { WorldKinds } from '../../predict/worldKinds';
 
 export class PredictController {
   readonly tally: HitTally;
@@ -22,7 +23,7 @@ export class PredictController {
    * drawn place and the tick your shells are drawn at, against its ST there once confirmed (StrikeOffsets' gap),
    * apart for other pilots and for AI ships
    */
-  readonly drawGap: { pilot: StrikeOffsets; ai: StrikeOffsets };
+  readonly drawGap: { pilot: StrikeOffsets; ai: StrikeOffsets; boss: StrikeOffsets };
   onChange: ((m: { id: string; blurb: string }) => void) | null = null;
 
   constructor(readonly prediction: Prediction, state: GameState, sc: ShipClient, renderer: Renderer) {
@@ -33,17 +34,17 @@ export class PredictController {
     this.strikes = new StrikeOffsets((id, t) => sc.replicas.at(id, t)?.body ?? null, () => state.serverTick);
     const tally = this.tally.tally;
     const st = (id: number, t: number) => sc.replicas.at(id, t)?.body ?? null, conf = () => state.serverTick;
-    this.drawGap = { pilot: new StrikeOffsets(st, conf), ai: new StrikeOffsets(st, conf) };
+    this.drawGap = { pilot: new StrikeOffsets(st, conf), ai: new StrikeOffsets(st, conf), boss: new StrikeOffsets(st, conf) };
     window.setInterval(() => {
       const me = state.entities.get(state.playerId);
       if (!me || state.predictedTick <= 0) return;
-      const k = Math.round(state.ownDrawTick());
+      const k = Math.round(state.ownDrawTick()), bosses = new Set(sc.bodies.told());
       for (const [id, e] of state.entities) {
         if (id === state.playerId || !ship(id) || Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) > 2500) continue;
         const m = sc.replicas.modeOf(id), r = sc.store.get(id)?.derived.radius;
         if (m === undefined || m === ReplicaMode.Drift || m === ReplicaMode.Docked || !r) continue;
         const pilot = m === ReplicaMode.Player;
-        (pilot ? this.drawGap.pilot : this.drawGap.ai).strike(id, k, pilot, e.renderX, e.renderY, r);
+        (pilot ? this.drawGap.pilot : bosses.has(id) ? this.drawGap.boss : this.drawGap.ai).strike(id, k, pilot, e.renderX, e.renderY, r);
       }
     }, 250);
     renderer.shotTally = (what, shot, owner, target) => {
@@ -58,9 +59,13 @@ export class PredictController {
       this.strikes.reset();
       this.drawGap.pilot.reset();
       this.drawGap.ai.reset();
+      this.drawGap.boss.reset();
       this.onChange?.(m);
     };
   }
+
+  /** The rest of the world on the PT timeline with the ships (C2/C3): bosses, homing shells and mobs, boss attacks */
+  get world(): WorldKinds { return this.prediction.kinds; }
 
   get layer(): PtStLayer { return this.prediction.layer; }
   get ctx(): ModeCtx { return this.prediction.ctx; }

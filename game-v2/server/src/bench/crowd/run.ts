@@ -6,7 +6,7 @@ import { createDeflateRaw, constants as zc } from 'zlib';
 import { Position, InSystem, DEFAULT_CAPS, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
 import { makeServer, clock, rng, Scene, controlsFor, applyDirect, type Layout } from './world.js';
 import { Probe, PoseRing, classifier } from './probe.js';
-import { PT_TUNING } from '../../../../client/src/predict/kinds.js';
+import { PT_TUNING } from '../../../../client/src/predict/shipKinds.js';
 
 export interface CaseOpts {
   layout: Layout;
@@ -23,7 +23,7 @@ export interface CaseOpts {
   sample: number;
   /** The probes run the game's prediction of other ships (client predict/, C3; default on) */
   pt?: boolean;
-  /** Its level of detail's reach (client predict/kinds.ts PT_TUNING.reach; default the game's) */
+  /** Its level of detail's reach (client predict/shipKinds.ts PT_TUNING.reach; default the game's) */
   ptReach?: number;
 }
 

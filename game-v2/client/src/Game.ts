@@ -303,7 +303,7 @@ private xpFillEl: HTMLElement | null;
       this.state.ownPose = (t) => this.shipClient.ownPose(t);
       this.state.replicaPose = (e, t) => this.shipClient.placeReplica(e, t);
       // (Every other ship on the PT layer at your tick, drawn by the prediction's hook: C3)
-      this.prediction = new Prediction(this.state, this.shipClient);
+      this.prediction = new Prediction(this.state, this.shipClient, () => this.renderer ?? null);
     }
     this.audio = new AudioManager();
     

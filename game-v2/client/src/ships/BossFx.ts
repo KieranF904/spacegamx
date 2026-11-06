@@ -19,6 +19,7 @@
  * Lines and beams ride the boss's body (its drawn pose), so they turn with it.
  */
 
+import { lateOf } from '../predict/late';
 import { Container, Graphics } from 'pixi.js';
 import { rayTerrain, type ServerBossBeamMessage, type ServerBossTelegraphMessage, type ServerBossWindowMessage } from '@space-game/common';
 import { terrainFor } from '../rendering/terrainData';
@@ -87,7 +88,8 @@ export class BossFx {
     nameOf: (id) => this.state.entities.get(id)?.name ?? null,
     partsAt: (id, byStage) => this.partsAt(id, byStage),
     centre: (id) => { const e = this.state.entities.get(id); return e ? { x: e.renderX, y: e.renderY } : null; },
-    tick: () => this.state.renderTickNow,
+    // (a dev prediction mode draws decided things ahead: their windows with them, state/drawMode.ts)
+    tick: () => this.state.drawMode?.ahead?.(this.state.renderTickNow) ?? this.state.renderTickNow,
   });
 
   constructor(layer: Container, private state: GameState, private sound: (id: string, at?: { x: number; y: number }, volume?: number, pitch?: number) => (() => void) | null) {
@@ -97,7 +99,8 @@ export class BossFx {
   }
 
   onTelegraph(m: ServerBossTelegraphMessage): void {
-    this.warns.push({ m, age: 0, life: m.ticks * TICK });
+    // (drawn late by the PT timeline: that far into its run already, predict/late.ts)
+    this.warns.push({ m, age: lateOf(m) * TICK, life: m.ticks * TICK });
     const at = this.where(m);
     if (!at) return;
     // (light tells and their sounds: bossTells.ts)
@@ -127,7 +130,7 @@ export class BossFx {
     const e = this.state.entities.get(m.bodyId), me = this.state.entities.get(this.state.playerId);
     const d = e && me ? Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) : Infinity;
     const stop = d < BEAM_HEARD ? this.sound('boss_beam', undefined, 0.9 * (1 - d / BEAM_HEARD) ** 1.5) : null;
-    this.beams.push({ m, age: 0, life: m.ticks * TICK, ring: 0, scorch: 0, shake: 0, stop });
+    this.beams.push({ m, age: lateOf(m) * TICK, life: m.ticks * TICK, ring: 0, scorch: 0, shake: 0, stop });
   }
 
   /** A body-riding warning's world origin (or the spot itself) */
