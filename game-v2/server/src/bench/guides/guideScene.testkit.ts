@@ -37,6 +37,10 @@ export interface Opts {
   each?: (t: number, w: World) => void;
   /** Mobs of this kind launched instead (their brain picks who they hunt) */
   mob?: string;
+  /** A's frames handed in this many ticks late (its downlink's latency; its inputs still on time) */
+  lag?: number;
+  /** After each tick of the run, once A's due frames are in (the PT timeline's tests step their kinds here) */
+  after?: (t: number, w: World) => void;
 }
 export interface World { server: GameServer; A: FakeHitsClient; B: FakeHitsClient; P: FakeHitsClient; D: number; H: number }
 
@@ -62,7 +66,8 @@ export function run(o: Opts) {
     g.checked++;
     if (s.x !== m.x || s.y !== m.y || s.vx !== m.vx || s.vy !== m.vy || (s.a ?? 0) !== (m.a ?? 0)) { g.off++; if (!g.firstOff) g.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${JSON.stringify(s)}`; }
   };
-  const A = new FakeHitsClient(server, { name: 'guided', env, onGuideStep: against(got) });
+  const late: { at: number; data: Uint8Array }[] = [];
+  const A = new FakeHitsClient(server, { name: 'guided', env, onGuideStep: against(got), ...(o.lag ? { defer: (data: Uint8Array) => late.push({ at: server.getTick() + o.lag!, data }) } : {}) });
   const B = new FakeHitsClient(server, { name: 'watcher_b', env, onGuideStep: against(gotB) });
   const P = new FakeHitsClient(server, { name: 'runner', env });
   // What A and B were sent of the shells: rows, and rows of a shell each runs after its first
@@ -102,6 +107,7 @@ export function run(o: Opts) {
     for (const [eid] of weapons.guided()) truth.set(`${eid}:${tick}`, { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid] });
     for (const [eid] of server.mobs.guided()) truth.set(`${eid}:${tick}`, { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], a: Rotation.angle[eid] });
     clock.t += 1000 / 60;
+    while (late.length && late[0].at <= tick) A.frame(late.shift()!.data);
     chk = A.own?.takeCheck(true, tick);
     const rep = A.selfHits?.takeReport(true);
     if (rep) server.hits.report(server.pilots.connOf(A.pid)! as never, rep);
@@ -132,6 +138,7 @@ export function run(o: Opts) {
       else weapons.spawn(D, 'missile', Position.x[D], Position.y[D], ang, 1, { speedScale: 1, sizeScale: 1, turret: false, target: tg });
     }
     step();
+    o.after?.(t, w);
   }
   const d = (a: Record<string, number>, b: Record<string, number>) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] - (b[k] ?? 0)]));
   return { w, got, gotB, rows, bytes: { A: A.bytes - a0, B: B.bytes - b0, secs: (o.ticks ?? 500) / 60 }, checks: d(server.ownChecks.stats as never, chk0 as never), net: d(server.guides.stats as never, net0 as never), runner: A.guides?.stats };
