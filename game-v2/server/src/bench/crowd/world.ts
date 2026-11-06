@@ -79,7 +79,8 @@ export function controlsFor(p: number, t: number, has: (t: number) => boolean): 
 export function applyDirect(p: number, c: Ctl): void {
   for (const k of ['forward', 'backward', 'left', 'right', 'fireLeft', 'fireRight', 'boost'] as const) Input[k][p] = c[k] ? 1 : 0;
   Input.targetAngle[p] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(c.targetAngle));
-  Input.cursorDist[p] = c.cursorDist;
+  // (on the 4-unit grid a client's input puts it on, protocol.ts quantizeCursorDist: what its gun lane steps with too)
+  Input.cursorDist[p] = Math.round(c.cursorDist / 4) * 4;
 }
 export const inputKey = (c: Ctl) => JSON.stringify([c.forward, c.backward, c.left, c.right, c.boost, c.fireLeft, c.fireRight, quantizeCursorAngle(c.targetAngle), Math.round(c.cursorDist / 4)]);
 

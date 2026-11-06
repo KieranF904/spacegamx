@@ -520,3 +520,31 @@ Options (Kieran's call): a coarser replicated aim distance for convergence (game
 that extrapolate the distance and send only misses, the distance only while a trigger is held (a burst's start told),
 or keyframes not resyncing lanes. Cruise is unchanged in bytes; its server tick is +30 % from the lanes (one lane step
 a pilot a tick, a second flight step for an armed pilot's stores).
+
+### Follow-up: the ball regression (Kieran's two fixes)
+
+1. The bench bots aim on the 4-unit cursor-distance grid real clients' inputs use (crowd/world.ts, netTable.ts bulk
+   bots): bench only.
+2. No gunSync on a keyframe. A ship's lane is resent only when its hash drifts (a new version), or at first sight or a
+   lane start. A keyframed ship gets an empty `keep` gunSync with the start of that round's told span (`w`), and its
+   client steps on from the lane state it had at the keyframe's tick.
+
+Not chosen: the distance sent only while firing, a coarser aim distance.
+
+Exactness tests (otherGuns, otherGunsPt) and the goldens all pass unchanged. The frameHash streams didn't move; its
+pilots aren't keyframed while armed. No lane gaps. The AI on PT drew 238 of 257 ahead (was 222).
+
+Crowd (`crowdBench.ts --layouts ball,cruise`). Before is refactor/split 3a71b49 with fix 1 applied, so the bots are the
+same in both. After is ea815b8 with both fixes. The ea815b8 column is as merged, before either fix (earlier table):
+
+| layout | n | server tick ms mean / p95 | probe client ms/tick | capable raw B/s | bulk raw B/s | bulk at ea815b8 |
+|---|---:|---|---|---|---|---:|
+| ball | 20 | 2.19 / 5.28 → **2.76 / 6.81** | 0.776 → **0.987** | 2988 → **4329** | 3412 → **4753** | 8018 |
+| ball | 50 | 8.74 / 22.7 → **10.52 / 26.0** | 2.181 → **2.998** | 12528 → **18657** | 14251 → **20618** | 28463 |
+| cruise | 20 | 1.75 / 3.84 → **2.30 / 5.27** | 0.164 → **0.167** | 1013 → **1013** | 1966 → **1966** | 1966 |
+| cruise | 50 | 3.61 / 8.52 → **4.98 / 11.4** | 0.240 → **0.280** | 1663 → **1649** | 1800 → **1799** | 1800 |
+
+gunSync is gone from the ball's byte breakdown. What's left is gunCtl: 3.6 KB/s in ball 20 and 12.9 KB/s in ball 50,
+summed over the 4 probes. Every bot keeps its cursor on a moving target, so its distance changes every tick.
+
+pirates (bench:table): 1089 → **1080** B/s, 9.45 → **9.00** msgs/s, wire 1713 → **1674**.

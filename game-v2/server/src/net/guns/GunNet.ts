@@ -264,8 +264,8 @@ export class GunNet {
 
   /**
    * One client's share of the round (SnapshotBuilder): the gunSyncs it's owed (a lane it holds a ship of and should
-   * step but hasn't got, or has an old version of, or whose ship it's sent a keyframe of now: what its replica had of
-   * the window wasn't the server's), the gun rows of the lanes it steps, the TELL_NONE records of its window, and which
+   * step but hasn't got, or has an old version of: its hash drifted; a ship keyframed now keeps its lane, and gets an
+   * empty `keep` one telling where this round's told span starts), the gun rows of the lanes it steps, the TELL_NONE records of its window, and which
    * fire records it works out itself (`derives`). `holds`: it holds the ship (a keyframe of it is known); `runs`: it
    * flies that AI's body; `keyed`: the ships keyframed in this snapshot; `since`: its last snapshot's tick
    */
@@ -273,7 +273,7 @@ export class GunNet {
     const now = this.host.tick();
     let known = this.known.get(conn);
     if (!known) this.known.set(conn, (known = new Map()));
-    const out: GunClient = { syncs: [], rows: [], none: [], derives: () => false, steps: () => false };
+    const out: GunClient = { syncs: [], rows: [], none: [], keyedFrom: new Map(), derives: () => false, steps: () => false };
     const sx = Position.x[self], sy = Position.y[self];
     for (const [eid, l] of this.lanes) {
       if (eid === self) continue;
@@ -288,8 +288,17 @@ export class GunNet {
       const dx = Position.x[eid] - sx, dy = Position.y[eid] - sy, d2 = dx * dx + dy * dy;
       if (k && d2 > GUN_KEEP * GUN_KEEP) { out.syncs.push(this.dropOf(eid, l)); known.delete(eid); k = undefined; continue; }
       if (!k && (d2 > GUN_REACH * GUN_REACH || now - l.active > GUN_ACTIVE)) continue;
-      if (!k || k.ver !== l.ver || keyed.has(eid)) {
-        this.whyNow = !k ? 'new' : k.ver !== l.ver ? 'ver' : 'keyed';
+      // (Keyframed, the lane in step: no gunSync, its lane's state stands; this round's span is told, as rows, and its
+      // client is told where that span starts)
+      if (k && k.ver === l.ver && keyed.has(eid)) {
+        const from = l.round === now && l.roundFrom <= now ? l.roundFrom : now;
+        out.keyedFrom.set(eid, from);
+        out.syncs.push({ type: 'gunSync', id: eid, t: now, z: [], w: from, keep: 1 });
+        this.why.keyed = (this.why.keyed ?? 0) + 1;
+        continue;
+      }
+      if (!k || k.ver !== l.ver) {
+        this.whyNow = !k ? 'new' : 'ver';
         const m = this.syncOf(eid);
         if (m) { out.syncs.push(m); known.set(eid, { ver: l.ver, from: now }); }
         else known.delete(eid);
@@ -301,7 +310,7 @@ export class GunNet {
     const kn = known, lanes = this.lanes;
     // (Its lane of the owner, in step since before tick t)
     out.steps = (owner, t) => { const k = kn.get(owner), l = lanes.get(owner); return !!k && !!l && k.ver === l.ver && t > k.from; };
-    out.derives = (owner, t) => out.steps(owner, t) && !lanes.get(owner)!.told.has(t);
+    out.derives = (owner, t) => out.steps(owner, t) && !lanes.get(owner)!.told.has(t) && !((out.keyedFrom.get(owner) ?? Infinity) <= t);
     return out;
   }
 
@@ -332,6 +341,8 @@ export interface GunClient {
   rows: number[][];
   /** TELL_NONE fire records */
   none: number[][];
+  /** Ships keyframed in this snapshot with their lanes standing: the first tick whose records are told (as rows) */
+  keyedFrom: Map<number, number>;
   /** Does it work out this ship's fire records of tick t itself (no record goes) */
   derives(owner: number, t: number): boolean;
   /** Does it step this ship's guns through tick t (a told point-defence shot goes to it) */

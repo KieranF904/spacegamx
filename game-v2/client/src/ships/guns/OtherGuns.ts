@@ -46,6 +46,13 @@ interface Lane {
   carry: Map<number, readonly SimEvent[]>;
   /** Dropped (an empty gunSync): gone once its carry is confirmed */
   drop?: boolean;
+  /** This snapshot's told span (its ship keyframed with its lane standing): ticks from it come as rows */
+  toldFrom?: number;
+  /**
+   * The state it had at the first tick a rewind dropped: a keyframe at that tick isn't stepped again, so the lane steps
+   * on from what it had there (its ship's gun state stands through a keyframe: no gunSync)
+   */
+  stash?: { t: number; x: OwnExtras; d?: ShipDerived };
 }
 
 const SIM_FIELDS: FieldEnv = { central: null };
@@ -112,6 +119,8 @@ export class OtherGuns implements ReplicaSideSteps {
    * then the new lane starts at m.t, stepped again from the next tick
    */
   private install(m: ServerGunSyncMessage): void {
+    // (Its ship keyframed, its lane standing: this snapshot's told span starts at m.w; it steps on from what it has)
+    if (m.keep) { const l = this.lanes.get(m.id); if (l) l.toldFrom = m.w ?? m.t + 1; return; }
     const d = this.host.ship(m.id)?.derived;
     const old = this.lanes.get(m.id), carry = new Map<number, readonly SimEvent[]>();
     if (old && m.w !== undefined && m.w - 1 > this.confirmedTo) {
@@ -151,6 +160,7 @@ export class OtherGuns implements ReplicaSideSteps {
     const l = this.lanes.get(id);
     if (!l || l.drop || t <= l.from) return;
     let px = l.states.get(t - 1);
+    if (!px && l.stash?.t === t - 1) { px = l.stash.x; if (l.stash.d) l.dv.set(t - 1, l.stash.d); }
     const ship = this.host.ship(id);
     if (!px || !ship || ship.kind !== 'ship') { this.stats.gaps++; return; }
     // (Rebuilt between the two ticks: its stores onto the new structure, as the server's rebuild moves the real ship's)
@@ -180,6 +190,8 @@ export class OtherGuns implements ReplicaSideSteps {
     const l = this.lanes.get(id);
     if (!l) return;
     if (t === -Infinity) { this.lanes.delete(id); return; }
+    const x = l.states.get(t);
+    if (x && t > l.from) l.stash = { t, x, d: l.dv.get(t) };
     for (const k of [...l.states.keys()]) if (k >= t && k > l.from) { l.states.delete(k); l.events.delete(k); l.dv.delete(k); }
   }
 
@@ -213,16 +225,17 @@ export class OtherGuns implements ReplicaSideSteps {
     for (const [id, l] of this.lanes) {
       const ship = this.host.ship(id);
       // (keyframed with no gunSync: the server tells that ship's window)
-      if (id === self || !ship || (keyed.has(id) && l.from !== m.tick)) continue;
+      if (id === self || !ship || (keyed.has(id) && l.from !== m.tick && l.toldFrom === undefined)) continue;
       // (Stepped to the snapshot's tick, as it stands now; a ship keyframed in it has a gunSync with it, from its tick)
       if (l.drop || this.host.reps.at(id, m.tick)) for (let t = from + 1; t <= m.tick; t++) {
-        if (told.has(`${id}:${t}`)) { this.stats.told++; continue; }
+        if (told.has(`${id}:${t}`) || (l.toldFrom !== undefined && t >= l.toldFrom)) { this.stats.told++; continue; }
         const evs = t > l.from ? this.eventsAt(id, t) : l.carry.get(t);
         if (!evs?.length) continue;
         laneRecords(evs, ship, this.host.tuning, RECS);
         for (const r of RECS) { (m.fire ??= []).push(laneFireRow(id, m.tick, r)); this.stats.derived++; }
       }
       l.carry.clear();
+      l.toldFrom = undefined;
       if (l.drop) { this.lanes.delete(id); continue; }
       for (const k of l.pd.keys()) if (k < m.tick - KEEP) l.pd.delete(k);
       for (const k of l.blind) if (k < m.tick - KEEP) l.blind.delete(k);
