@@ -427,6 +427,12 @@ export class Enemies {
   readonly defenders: Defenders;
   /** What mines are laid as (set once mobs exist) */
   mobs: Mobs | undefined;
+  /**
+   * Ships shot down since the last tick (onDestroyed: out of `enemies` at once, so the dead the tick forgets never had
+   * them): their pilots' bodies and custom moves forgotten as the tick's dead are, so a client running one is told its
+   * OFF at the first tick its moves weren't run (net/decisions/BodyNet.ts ended)
+   */
+  private readonly destroyed = new Set<number>();
 
   /** A kill's loot and salvaged parts: payout dice, from the server's secret (payoutDice.ts) */
   private readonly lootDice: Dice;
@@ -754,6 +760,9 @@ export class Enemies {
         this.popLost(e, now);
       }
     }
+    // (its id another enemy's already, spawned since: what custom holds is the new one's; no tick has flown it yet)
+    for (const eid of this.destroyed) { this.pilots.forget(eid); if (!this.enemies.has(eid)) this.custom.forget(eid); }
+    this.destroyed.clear();
     for (const [id, p] of this.packs) {
       // (Where its fighters spread round from: its ships as they ended the last tick, summed in id order, as a client
       // running their pilots sums its replicas: common bodies/aiPilot.ts)
@@ -1655,6 +1664,7 @@ export class Enemies {
     const e = this.enemies.get(eid);
     if (!e) return;
     this.enemies.delete(eid);
+    this.destroyed.add(eid);
     this.packs.get(e.pack)?.members.delete(eid);
     this.popLost(e, this.host.tick());
     // A range target pays nothing, drops nothing, counts for nothing

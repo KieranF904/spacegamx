@@ -8,7 +8,9 @@
  *
  *   SYNC    [kind, homeX, homeY, stage, side, target + 1, ...want]: the whole body state as of the snapshot's tick
  *           (sent with a keyframe of the boss: a client starting to run it, or put right after its check was off)
- *   OFF     []: the body stops flying it (no target: the enemy AI flies it); its rows come the old way again
+ *   OFF     []: the body stops flying it (no target: the enemy AI flies it); its rows come the old way again.
+ *           [ENDED_OFF]: its ship is gone; from this tick its body (and its moves) no longer run. A plain OFF at dt 0 is
+ *           the server stopping this client's run at the snapshot instead
  *   TARGET  [target + 1]: who it flies at (0: nobody)
  *   SIDE    [side]: which way round it circles (1: clockwise as the brain counts it, 0 the other)
  *   STAGE   [stage]: the stage it fights in (its range, circle and drive)
@@ -44,6 +46,8 @@ import { CTL } from '../ships/replica.js';
 export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6, STATUS: 7, MOVE: 8, HARASS: 9, CAP: 10, WINDOW: 11, HOLD: 12, PART: 13, GONE: 14 } as const;
 /** Ops there are (a row whose op is past this is dropped) */
 export const DECISION_OPS = 15;
+/** An OFF's arg: its ship gone, the body's stop a decision at its tick (not a client's run stopped at the snapshot) */
+export const ENDED_OFF = 1;
 /** HOLD's modes */
 export const MOVES_HOLD = { RUN: 0, PAUSE: 1, STOP: 2 } as const;
 

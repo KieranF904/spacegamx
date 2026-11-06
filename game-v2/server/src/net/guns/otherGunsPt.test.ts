@@ -133,7 +133,10 @@ function ptFight(who: 'pilot' | 'ai') {
     for (let t = 0; t < 1200; t++) step(t);
   } else {
     place(B.pid, x0 - 20000, y0);
-    server.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'] }, x0 + 1400, y0 - 600);
+    // (it hunts A: out here is safe space, where a pack spares a pilot that hasn't hurt it, so a fight would hang on a
+    // ship of it happening to bump into A first, as testkits/decisionFight.testkit.ts `prey`)
+    const pack = server.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'] }, x0 + 1400, y0 - 600);
+    for (const id of pack) server.enemies.setPrey(id, A.pid, true);
     for (let t = 0; t < 1200; t++) {
       for (const [eid] of ships.bodies) if (server.enemies.factionOf(eid)) watched.add(eid);
       step(-1);

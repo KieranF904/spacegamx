@@ -5,7 +5,8 @@
  * same controls and drive push the server's step had, from the same decisions and the same replicas.
  *
  *   SYNC   the whole body state at a tick, with a keyframe of the boss: it runs from there
- *   OFF    it stops (the rows fly it again: the server sends them)
+ *   OFF    it stops (the rows fly it again: the server sends them); [ENDED_OFF], its ship gone: folded in at its tick
+ *          as any other (its moves stepped up to it), the ship's removal ending the run
  *   other  folded in at their tick (bodies/decisions.ts applyDecision); a tick already stepped is stepped again
  *
  * Its target is read as the server's step reads it: after the target's own step, before that tick's pulls and contacts
@@ -14,7 +15,7 @@
  * hash at the last snapshot's tick, on an input that goes anyway, every CHECK_EVERY ticks at most.
  */
 import {
-  DECISION, BODY_KINDS, applyDecision, bodyStateOfSync, cloneBodyState, bodyHash, bodyCheckByte,
+  DECISION, ENDED_OFF, BODY_KINDS, applyDecision, bodyStateOfSync, cloneBodyState, bodyHash, bodyCheckByte,
   type BodyState, type BodyDriver, type BodyReads, type ShipReplicaSet, type FlightBody,
 } from '@space-game/common';
 
@@ -109,8 +110,8 @@ export class BodyRunner {
       // (its moves held, or a custom enemy's pieces gone, as it was synced, CAPS.MOVES: part of its state at the SYNC)
       if (run && (op === DECISION.HOLD || op === DECISION.GONE) && t === run.syncTick) { const s0 = run.states.get(t); if (s0) applyDecision(s0, op, args, t); continue; }
       if (!run || t <= run.syncTick) continue;
-      // (Its OFF for this client: the rows fly it from here)
-      if (op === DECISION.OFF && dt === 0 && t === tick) { this.stop(id); this.stats.offs++; continue; }
+      // (Its OFF for this client: the rows fly it from here. Its ship gone (ENDED_OFF): a decision at its tick, below)
+      if (op === DECISION.OFF && dt === 0 && t === tick && args[0] !== ENDED_OFF) { this.stop(id); this.stats.offs++; continue; }
       let at = run.log.get(t);
       if (!at) run.log.set(t, (at = []));
       at.push([op, ...args]);

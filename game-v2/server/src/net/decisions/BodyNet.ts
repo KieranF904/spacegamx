@@ -16,7 +16,7 @@
  * A body is only as exact as what it reads: a target whose replica was off on a client this window (it gets a
  * keyframe of it) costs that client a keyframe of the boss too.
  */
-import { DECISION, BODY_KINDS, MOVES_HOLD, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody, type MoveOrigin } from '@space-game/common';
+import { DECISION, ENDED_OFF, BODY_KINDS, MOVES_HOLD, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody, type MoveOrigin } from '@space-game/common';
 
 /** Decisions kept a boss (ticks): longer than any client's snapshots are apart */
 const KEEP_TICKS = 600;
@@ -60,6 +60,12 @@ interface Client {
 export class BodyNet {
   readonly stats = { decisions: 0, rows: 0, syncs: 0, offs: 0, targetKeyed: 0, checks: 0, agreed: 0, off: 0, stale: 0, unknown: 0, moveShells: 0, shellsDerived: 0 };
   private readonly bosses = new Map<number, Boss>();
+  /**
+   * Bodies whose ship is gone (out of `bosses`): their decisions' log while it was there, the tick it went (`gone`), and
+   * the tick their OFF took effect (`at`: the first its moves weren't run; undefined till its brain lets go), for each
+   * client still running them (forClient: what it hasn't had of the log, then the OFF)
+   */
+  private readonly ended = new Map<number, { gone: number; at?: number; log: number[][] }>();
   /** Move shells alive (CAPS.MOVES): whose, and the decision they came of */
   private readonly shells = new Map<number, { owner: number; origin: MoveOrigin }>();
   private readonly clients = new WeakMap<object, Client>();
@@ -74,9 +80,19 @@ export class BodyNet {
     for (const r of b.reads) if (!reads.includes(r)) b.dropped.push([this.host.tick(), r]);
     while (b.dropped.length && b.dropped[0][0] < this.host.tick() - KEEP_TICKS) b.dropped.shift();
     b.reads = reads;
-    // (Its body off and its ship gone (despawned, blown apart: its brain let go): nothing more to send of it. Its id may
-    // be another ship's later (entity ids are reused), so it's forgotten now, not when some client's snapshot notices)
-    if (op === DECISION.OFF && !this.host.has(eid)) { this.bosses.delete(eid); return; }
+    // (Its body off and its ship gone (despawned, blown apart: its brain let go): nothing more to send of it but that
+    // OFF, the first tick its moves weren't run (`ended`: a client running it steps it to just before, not on to its
+    // next snapshot). Its id may be another ship's later (entity ids are reused), so it's forgotten now, not when some
+    // client's snapshot notices)
+    if (op === DECISION.OFF && !this.host.has(eid)) {
+      this.bosses.delete(eid);
+      const now = this.host.tick(), was = this.ended.get(eid);
+      // (its log moved here already if a snapshot found its ship gone first)
+      if (was) { was.log.push(...b.log); was.at ??= now; } else this.ended.set(eid, { gone: now, at: now, log: b.log });
+      return;
+    }
+    // (its id another ship's now: what the old one left is done with)
+    if (this.host.has(eid)) this.ended.delete(eid);
     b.log.push([this.host.tick(), op, ...args]);
     this.stats.decisions++;
     const old = this.host.tick() - KEEP_TICKS;
@@ -153,7 +169,15 @@ export class BodyNet {
     // body reading it would fly blind from this tick: off now, with a keyframe, not a keyframe every snapshot it stays out)
     const holds = (id: number) => id === self || view(id);
     for (const [eid, b] of this.bosses) {
-      if (!this.host.has(eid)) { this.bosses.delete(eid); c.runs.delete(eid); continue; }
+      if (!this.host.has(eid)) {
+        this.bosses.delete(eid);
+        // (its ship gone before its brain let go (that comes next tick: its moves ran this one), or its body put off while
+        // its ship was still there: its OFF then)
+        const at = b.state.on ? undefined : lastOff(b.log);
+        const log = at === undefined ? b.log : b.log.filter((d) => d[0] < at), was = this.ended.get(eid);
+        if (was) { was.log.push(...log); was.at ??= at; } else this.ended.set(eid, { gone: this.host.tick(), at, log });
+        continue;
+      }
       const s = b.state, kind = BODY_KINDS[s.kind];
       const runs = c.runs.has(eid);
       if (!runs && (!s.on || systemOf(eid) !== systemId)) continue;
@@ -189,6 +213,18 @@ export class BodyNet {
         c.runs.delete(eid);
         this.stats.offs++;
       }
+    }
+    // (A body it runs whose ship is gone: what it decided since this client's last snapshot, its ship there still; then
+    // its OFF at its tick, ENDED_OFF so it's that decision, not this client's OFF at the snapshot (the window's ticks
+    // before it are still stepped: the server ran its moves on those). Not let go yet: its moves ran through this tick,
+    // and the ship's removal in this snapshot ends the run)
+    for (const [eid, { gone, at, log }] of this.ended) {
+      // (its id another ship's already: nothing of the old body goes to anyone, as if forgotten at once)
+      if (gone < tick - KEEP_TICKS || this.host.has(eid)) { this.ended.delete(eid); continue; }
+      if (!c.runs.has(eid)) continue;
+      for (const d of log) if (d[0] > c.through && d[0] <= tick) rows.push([eid, d[0] - tick, ...d.slice(1)]);
+      if (at !== undefined && at > c.through && at <= tick) { rows.push([eid, at - tick, DECISION.OFF, ENDED_OFF]); this.stats.offs++; }
+      c.runs.delete(eid);
     }
     for (const eid of c.runs) if (!this.bosses.has(eid)) c.runs.delete(eid);
     c.from = c.through;
@@ -245,6 +281,12 @@ export class BodyNet {
     this.clients.get(conn)?.runs.clear();
   }
 
+}
+
+/** The tick of the newest OFF in a body's log (undefined: none kept) */
+function lastOff(log: readonly (readonly number[])[]): number | undefined {
+  for (let i = log.length - 1; i >= 0; i--) if (log[i][1] === DECISION.OFF) return log[i][0];
+  return undefined;
 }
 
 /**

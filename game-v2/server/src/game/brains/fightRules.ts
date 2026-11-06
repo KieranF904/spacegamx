@@ -135,8 +135,13 @@ export class FightRules {
       const held = (inSignature && !this.tables.exposure) || restBeat(this.window, now) || staggered(this.window, now);
       const pool = rules.pool[Math.max(0, Math.min(rules.pool.length - 1, stage - 1))] ?? [];
       for (const d of rollPersonal(rules, stage, this.seed ^ eid, now, present.length, running, held)) {
-        const target = present[d.slot], name = pool[d.attack];
-        if (this.start(name, target, d.seed, now, moves)) decide(DECISION.PERSONAL, [d.slot, d.attack, d.seed, target + 1, names.indexOf(name)]);
+        const target = present[d.slot];
+        // (A broken limb takes its attack out of the pool (docs/bosses/rework-2026-11.md): a roll that lands on one goes to
+        // the next in the pool it can still make on that pilot, not to nothing)
+        for (let k = 0; k < pool.length; k++) {
+          const attack = (d.attack + k) % pool.length, name = pool[attack];
+          if (this.start(name, target, d.seed, now, moves)) { decide(DECISION.PERSONAL, [d.slot, attack, d.seed, target + 1, names.indexOf(name)]); break; }
+        }
       }
     }
     const main = this.cause;

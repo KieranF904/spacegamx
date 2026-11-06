@@ -178,9 +178,12 @@ export class FakeHitsClient {
       send: (data) => {
         const bytes = data as Uint8Array;
         // (frames go at the step's end: its ship is where this tick left it, and the controls it flew are on its layer
-        // before the frame's own rows say otherwise)
-        this.noteSelf();
-        this.noteFlown(false);
+        // before the frame's own rows say otherwise. A reply sent between steps (a dockResult, after the dock released
+        // its controls) is not that tick's: what the server's Input holds then is for the next tick, not the one flown)
+        if (this.stepping) {
+          this.noteSelf();
+          this.noteFlown(false);
+        }
         if (opts.defer) opts.defer(Uint8Array.from(bytes)); else this.frame(bytes);
       },
     };
@@ -191,8 +194,16 @@ export class FakeHitsClient {
     this.own.start();
     // (its own ship's pose every tick, not only those a frame went on, and the controls it flew: the server's step, wrapped)
     const step = server.step.bind(server);
-    server.step = () => { step(); this.noteSelf(); this.noteFlown(true); };
+    server.step = () => {
+      this.stepping = true;
+      try { step(); } finally { this.stepping = false; }
+      this.noteSelf();
+      this.noteFlown(true);
+    };
   }
+
+  /** Inside the server's step (its frames go at the step's end; a reply between steps belongs to no tick flown) */
+  private stepping = false;
 
   /** The server's own-shot ids by the tick it fired them (watchServerShots), to pair with its own layer's (shotPairs) */
   private readonly serverShots = new Map<number, number[]>();
