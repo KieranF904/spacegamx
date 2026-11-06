@@ -67,3 +67,9 @@ game-v2/docs/ux/polish-*/
 # Dev-update before/after images stay local (the index is tracked)
 game-v2/docs/panels/**/*.png
 game-v2/docs/panels/**/*.wav
+
+# Sound review tool (scripts/sound-review): generated candidate audio stays local; review.json and the sidecar .json files are trackable
+game-v2/review/sounds/**/*.mp3
+game-v2/review/sounds/**/*.wav
+game-v2/review/sounds/**/*.ogg
+game-v2/review/sounds/review.json.tmp

@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sound review</title>
+<style>
+  :root {
+    --hull-top: #1d2635; --hull-mid: #141b27; --hull-low: #0e131c; --rim: #2c3a50; --edge-hi: rgba(160, 190, 230, 0.12);
+    --ink: #e4ebf5; --ink-2: #b4c2d4; --ink-3: #8b9cb3; --port: #6cc8ff; --amber: #ffbe55; --good: #7dff9a; --bad: #ff9a9a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 22px 16px 60px; background: radial-gradient(ellipse at 50% 0%, #0a1222 0%, #04060c 70%) fixed; color: var(--ink);
+    font: 14px/1.45 system-ui, 'Segoe UI', sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 20px; letter-spacing: 1.5px; text-transform: uppercase; margin: 0 0 4px; color: #fff4ea; }
+  .sub { color: var(--ink-3); margin: 0 0 14px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; position: sticky; top: 0; z-index: 5; padding: 8px 0;
+    background: linear-gradient(#05080de0 70%, transparent); }
+  .tab, button { font: inherit; color: var(--ink-2); padding: 6px 12px; border-radius: 4px; cursor: pointer; border: 1px solid #05080d;
+    background: linear-gradient(180deg, var(--hull-top), var(--hull-low)); box-shadow: inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--rim); }
+  .tab:hover, button:hover:not(:disabled) { color: #fff; box-shadow: inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--port); }
+  .tab.on { color: #fff; box-shadow: inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--port), 0 0 8px rgba(90, 190, 255, 0.35); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.go { color: #fff; border-color: #3a1402; background: linear-gradient(180deg, #f2802f 0%, #e8661b 44%, #d4580f 56%, #a8400a 100%); box-shadow: none; font-weight: 600; }
+  button.go:disabled { filter: saturate(0.4); }
+  button.ok { color: var(--good); } button.no { color: var(--bad); }
+  input[type=search] { flex: 1; min-width: 160px; }
+  input, textarea { font: inherit; color: var(--ink); background: #0a0f17; border: 1px solid #05080d; border-radius: 4px; padding: 6px 8px; box-shadow: 0 0 0 1px var(--rim); }
+  input:focus, textarea:focus { outline: none; box-shadow: 0 0 0 1px var(--port); }
+  textarea { width: 100%; resize: vertical; display: block; }
+  .banner { padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; background: #2a1a12; color: #ffd98a; box-shadow: 0 0 0 1px #6b4416; }
+  .banner.fake { background: #102a1a; color: #a8f0bc; box-shadow: 0 0 0 1px #2b6b43; }
+  .card { margin-bottom: 14px; border-radius: 5px; border: 1px solid #05080d; padding: 14px 16px; position: relative;
+    background: linear-gradient(180deg, var(--hull-top), var(--hull-mid) 40%, var(--hull-low)); box-shadow: inset 0 1px 0 var(--edge-hi), 0 0 0 1px var(--rim), 0 6px 14px rgba(0,0,0,.5); }
+  .head { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .icons { display: flex; gap: 6px; flex-wrap: wrap; max-width: 210px; }
+  .icon { width: 64px; height: 64px; border-radius: 4px; background: #070b12; box-shadow: 0 0 0 1px var(--rim); display: flex; align-items: center; justify-content: center; position: relative; }
+  .icon img, .icon svg { max-width: 100%; max-height: 100%; }
+  .icon span { position: absolute; bottom: 1px; left: 0; right: 0; text-align: center; font-size: 9px; color: var(--ink-2); text-shadow: 0 0 3px #000, 0 0 3px #000; }
+  .meta { flex: 1; min-width: 240px; }
+  .name { font-size: 17px; font-weight: 600; color: #fff; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 3px; color: var(--ink-3); box-shadow: 0 0 0 1px var(--rim); text-transform: uppercase; letter-spacing: .5px; }
+  .tag.chosen { color: var(--good); box-shadow: 0 0 0 1px #2b6b43; }
+  .users { color: var(--ink-2); margin-top: 3px; } .users i { color: var(--ink-3); font-style: normal; }
+  .desc { color: var(--ink-3); margin-top: 3px; }
+  h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-3); margin: 14px 0 6px; display: flex; align-items: center; gap: 8px; }
+  h3::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(140,170,210,.35), transparent); }
+  .clip { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+  .clip .play { width: 34px; flex: none; padding: 6px 0; text-align: center; }
+  .wave { position: relative; flex: 1; height: 44px; min-width: 120px; border-radius: 3px; background: #070b12; box-shadow: 0 0 0 1px var(--rim); cursor: pointer; }
+  .wave canvas { width: 100%; height: 100%; display: block; }
+  .wave .head-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--amber); left: 0; display: none; }
+  .clipname { width: 150px; flex: none; font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere; }
+  .gen { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; color: var(--ink-2); }
+  .row label { display: flex; gap: 6px; align-items: center; } .row input[type=number] { width: 72px; }
+  .status { color: var(--ink-3); } .status.err { color: var(--bad); } .status.busy { color: var(--amber); }
+  .cand { border-top: 1px solid #1c2636; padding: 8px 0; }
+  .cand.discarded { opacity: .55; } .cand.chosen { box-shadow: -3px 0 0 var(--good); padding-left: 10px; }
+  .cprompt { color: var(--ink-3); font-size: 12px; margin: 2px 0 4px; white-space: pre-wrap; }
+  .cbtns { display: flex; gap: 6px; flex: none; }
+  .foot { color: var(--ink-3); font-size: 12px; margin-top: 24px; }
+  code { color: var(--ink-2); background: #0a0f17; padding: 0 4px; border-radius: 3px; }
+  .lowprio { display: none; } .hidden { display: none !important; }
+  @media (max-width: 560px) { .clipname { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sound review</h1>
+  <p class="sub">Listen, write notes, generate new takes with fal.ai. Nothing here changes the game: confirmed takes are saved in <code>review/sounds/review.json</code> for Claude to integrate.</p>
+  <div id="banner"></div>
+  <div class="bar" id="bar"></div>
+  <div id="list"><p class="sub">Loading...</p></div>
+  <p class="foot">Candidates: <code>review/sounds/&lt;sound-id&gt;/&lt;time&gt;.mp3</code> with a <code>.json</code> beside it (prompt, settings, endpoint). The game's current sounds are <code>client/public/sfx/</code>; to use a chosen take, copy it over <code>&lt;sound-id&gt;.mp3</code> (that is Claude's job; ask it to "integrate the chosen sounds").</p>
+</div>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const h = (tag, props = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v !== undefined && v !== null && v !== false) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+};
+const api = async (path, body) => {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
+  return j;
+};
+
+let state = null, tab = 'weapon', query = '', showDiscarded = false;
+const cards = new Map();
+
+// ---- audio: one clip plays at a time; waveforms decoded lazily
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+const waves = new Map();
+let playing = null; // { audio, btn, line, stop() }
+function stopPlaying() { if (playing) { playing.stop(); playing = null; } }
+function clip(url, label) {
+  const canvas = h('canvas', { width: 600, height: 88 });
+  const line = h('div', { class: 'head-line' });
+  const wave = h('div', { class: 'wave', title: 'Click to play from here' }, canvas, line);
+  const btn = h('button', { class: 'play', title: 'Play / stop' }, '▶');
+  const audio = new Audio(url);
+  let raf = 0;
+  const stop = () => { audio.pause(); audio.currentTime = 0; btn.textContent = '▶'; line.style.display = 'none'; cancelAnimationFrame(raf); };
+  const tick = () => { if (audio.duration) line.style.left = (audio.currentTime / audio.duration * 100) + '%'; raf = requestAnimationFrame(tick); };
+  const start = (frac = 0) => {
+    stopPlaying();
+    audio.currentTime = frac * (audio.duration || 0);
+    audio.play().catch((e) => alert('Cannot play: ' + e.message));
+    btn.textContent = '■'; line.style.display = 'block'; tick();
+    playing = { stop };
+  };
+  audio.addEventListener('ended', () => { stop(); if (playing && playing.stop === stop) playing = null; });
+  btn.onclick = () => (playing && playing.stop === stop ? stopPlaying() : start());
+  wave.onclick = (ev) => { const r = wave.getBoundingClientRect(); start((ev.clientX - r.left) / r.width); };
+  draw(canvas, url);
+  return h('div', { class: 'clip' }, btn, wave, label ? h('div', { class: 'clipname' }, label) : null);
+}
+async function draw(canvas, url) {
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#070b12'; g.fillRect(0, 0, canvas.width, canvas.height);
+  try {
+    let p = waves.get(url);
+    if (!p) { p = fetch(url).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)); waves.set(url, p); }
+    const buf = await p, data = buf.getChannelData(0), W = canvas.width, H = canvas.height, step = Math.max(1, Math.floor(data.length / W));
+    g.fillStyle = '#6cc8ff'; g.clearRect(0, 0, W, H);
+    for (let x = 0; x < W; x++) {
+      let mn = 0, mx = 0;
+      for (let i = x * step, e = Math.min(data.length, i + step); i < e; i++) { const v = data[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      const y1 = H / 2 - mx * H / 2 * 0.95, y2 = H / 2 - mn * H / 2 * 0.95;
+      g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+    }
+    canvas.parentElement.title = `${buf.duration.toFixed(2)} s. Click to play from here`;
+  } catch { g.fillStyle = '#8b9cb3'; g.font = '20px sans-serif'; g.fillText('no waveform', 10, 50); }
+}
+
+// ---- icons
+const GLYPH = {
+  beam: '<path d="M6 32h52M6 26h40M6 38h40" stroke="#6cc8ff" stroke-width="3" stroke-linecap="round" fill="none"/>',
+  shot: '<circle cx="18" cy="32" r="6" fill="#ffbe55"/><path d="M26 32h30M26 27h22M26 37h22" stroke="#ffbe55" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>',
+  missile: '<path d="M10 32h30l10-6v12l-10-6" fill="#e05a4a" stroke="#e05a4a" stroke-width="2" stroke-linejoin="round"/><path d="M4 28l6 4-6 4" stroke="#ffbe55" stroke-width="2.5" fill="none"/>',
+  sound: '<path d="M10 26h8l10-8v28l-10-8h-8z" fill="#8b9cb3"/><path d="M36 24c5 5 5 11 0 16M43 19c9 9 9 17 0 26" stroke="#8b9cb3" stroke-width="3" fill="none" stroke-linecap="round"/>',
+};
+function iconFor(u) {
+  if (u.image) return h('div', { class: 'icon', title: u.name }, h('img', { src: u.image, alt: u.name, loading: 'lazy' }), h('span', {}, u.name));
+  const g = /laser|lance|frost|repair|beam|arc/i.test(u.role + u.family) && /loop/.test(u.role) ? GLYPH.beam : /missile|torpedo|seek|hive|swarm|charge/i.test(u.name + u.family) ? GLYPH.missile : GLYPH.shot;
+  const d = h('div', { class: 'icon', title: u.name });
+  d.innerHTML = `<svg viewBox="0 0 64 64" width="64" height="64">${g}</svg>`;
+  d.append(h('span', {}, u.name));
+  return d;
+}
+function soundIcon() { const d = h('div', { class: 'icon' }); d.innerHTML = `<svg viewBox="0 0 64 64" width="64" height="64">${GLYPH.sound}</svg>`; return d; }
+
+// ---- cards
+function usersText(s) {
+  const by = new Map();
+  for (const u of s.usedBy) { const k = u.role; (by.get(k) ?? by.set(k, []).get(k)).push(u.name); }
+  return [...by].map(([role, names]) => h('div', {}, h('i', {}, role + ': '), [...new Set(names)].join(', ')));
+}
+
+function buildCard(s) {
+  const dr = s.review.draft ?? {};
+  const o = s.original;
+  const orig = { prompt: o.prompt, duration: o.duration, influence: o.influence, loop: o.loop };
+  const promptBox = h('textarea', { rows: 3, spellcheck: 'false' });
+  promptBox.value = dr.prompt ?? o.prompt;
+  const dur = h('input', { type: 'number', min: 0.5, max: 22, step: 0.1, value: dr.duration || o.duration });
+  const inf = h('input', { type: 'number', min: 0, max: 1, step: 0.05, value: dr.influence ?? o.influence });
+  const loop = h('input', { type: 'checkbox' }); loop.checked = dr.loop ?? o.loop;
+  const note = h('textarea', { rows: 2, placeholder: 'Note for Claude: what is wrong or right with this sound, what you want instead...' });
+  note.value = s.review.note;
+  const status = h('span', { class: 'status' });
+  const gen = h('button', { class: 'go' }, 'Generate');
+  const candBox = h('div');
+  const saved = h('span', { class: 'status' });
+
+  const draft = () => ({ prompt: promptBox.value, duration: Number(dur.value), influence: Number(inf.value), loop: loop.checked });
+  let t;
+  const save = () => { clearTimeout(t); t = setTimeout(async () => {
+    try { await api(`/api/note/${s.id}`, { note: note.value, draft: draft() }); saved.textContent = 'saved'; setTimeout(() => (saved.textContent = ''), 1500); }
+    catch (e) { saved.textContent = 'not saved: ' + e.message; }
+  }, 600); };
+  for (const el of [promptBox, dur, inf, note]) el.addEventListener('input', save);
+  loop.addEventListener('change', save);
+
+  const isOrig = () => JSON.stringify(draft()) === JSON.stringify(orig);
+  const reset = h('button', { title: 'Back to the original prompt and settings' }, 'Reset to original');
+  reset.onclick = () => { promptBox.value = orig.prompt; dur.value = orig.duration; inf.value = orig.influence; loop.checked = orig.loop; save(); };
+
+  gen.onclick = async () => {
+    gen.disabled = true; status.className = 'status busy'; status.textContent = 'Generating... (a few seconds)';
+    const t0 = Date.now(), iv = setInterval(() => (status.textContent = `Generating... ${Math.round((Date.now() - t0) / 1000)}s`), 500);
+    try {
+      await api(`/api/generate/${s.id}`, draft());
+      status.className = 'status'; status.textContent = 'Done: new candidate below';
+      await api(`/api/note/${s.id}`, { note: note.value, draft: draft() });
+      await refresh();
+    } catch (e) { status.className = 'status err'; status.textContent = e.message; }
+    clearInterval(iv); gen.disabled = false;
+  };
+
+  const act = async (c, action) => { try { await api(`/api/candidate/${s.id}`, { file: c.file, action }); await refresh(); } catch (e) { status.className = 'status err'; status.textContent = e.message; } };
+  function renderCands(s2) {
+    candBox.replaceChildren();
+    const list = s2.candidates.filter((c) => showDiscarded || c.status !== 'discarded');
+    if (!list.length) candBox.append(h('div', { class: 'status' }, s2.candidates.length ? 'All candidates discarded (tick "show discarded" at the top).' : 'No generated candidates yet.'));
+    for (const c of list) {
+      const when = c.time ? new Date(c.time).toLocaleString() : c.file;
+      const st = c.settings ?? {};
+      const row = clip(`/cand/${s2.id}/${c.file}`, null);
+      row.append(h('div', { class: 'cbtns' },
+        c.status === 'discarded' ? h('button', { onclick: () => act(c, 'restore') }, 'Restore')
+          : [h('button', { class: 'ok', onclick: () => act(c, 'confirm') }, c.chosen ? 'Chosen ✓ (undo)' : 'Confirm'), h('button', { class: 'no', onclick: () => act(c, 'discard') }, 'Discard')]));
+      candBox.append(h('div', { class: `cand ${c.status}` }, row,
+        h('div', { class: 'cprompt' }, `${when}${c.fake ? ' (fake)' : ''}  |  ${st.duration_seconds ?? '?'} s, influence ${st.prompt_influence ?? '?'}${st.loop ? ', loop' : ''}  |  ${c.endpoint ?? ''}\n${c.prompt ?? '(no sidecar)'}`)));
+    }
+  }
+  renderCands(s);
+
+  const cur = h('div');
+  s.files.forEach((f, i) => cur.append(clip(`/sfx/${f}`, s.files.length > 1 ? `${f} (take ${i + 1}; the game uses one)` : f)));
+  if (!s.files.length) cur.append(h('div', { class: 'status' }, 'No current file (the game falls back to a synthesised sound).'));
+
+  const icons = h('div', { class: 'icons' });
+  const seenImg = new Set();
+  for (const u of s.usedBy) { const k = u.image ?? u.name; if (seenImg.has(k)) continue; seenImg.add(k); if (icons.children.length < 6) icons.append(iconFor(u)); }
+  if (!icons.children.length) icons.append(soundIcon());
+
+  const tags = h('span', {});
+  const el = h('section', { class: 'card', 'data-id': s.id },
+    h('div', { class: 'head' }, icons,
+      h('div', { class: 'meta' },
+        h('div', { class: 'name' }, s.id, tags),
+        s.description ? h('div', { class: 'desc' }, s.description) : null,
+        h('div', { class: 'users' }, s.usedBy.length ? usersText(s) : h('i', {}, s.category === 'other' ? 'Not a weapon sound (interface, damage, travel...)' : ''))),
+    ),
+    h('h3', {}, 'Current sound'), cur,
+    h('h3', {}, 'Generate'),
+    h('div', { class: 'gen' },
+      promptBox,
+      h('div', { class: 'row' },
+        h('label', {}, 'Duration (s)', dur), h('label', {}, 'Prompt influence', inf), h('label', {}, loop, 'Loop'),
+        gen, reset, status, saved),
+      h('div', { class: 'status', 'data-orig': '' })),
+    h('h3', {}, 'Note for Claude'), note,
+    h('h3', {}, 'Candidates'), candBox);
+  const origNote = $('[data-orig]', el);
+  const tagUpdate = (s2) => {
+    tags.replaceChildren();
+    if (s2.review.chosen) tags.append(h('span', { class: 'tag chosen' }, 'take chosen'));
+    if (s2.review.note) tags.append(h('span', { class: 'tag' }, 'has note'));
+  };
+  tagUpdate(s);
+  const upd = () => { origNote.textContent = isOrig() ? 'Prompt and settings: the original ones.' : 'Edited from the original.'; };
+  for (const x of [promptBox, dur, inf, loop]) x.addEventListener('input', upd); upd();
+  return { el, renderCands, tagUpdate, gen, status };
+}
+
+function visible(s) {
+  if (tab !== 'all' && s.category !== tab) return false;
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return s.id.includes(q) || s.usedBy.some((u) => u.name.toLowerCase().includes(q) || u.id.includes(q)) || s.original.prompt.toLowerCase().includes(q) || (s.description ?? '').toLowerCase().includes(q);
+}
+function layout() {
+  const list = $('#list');
+  const shown = state.sounds.filter(visible);
+  list.replaceChildren(...shown.map((s) => cards.get(s.id).el));
+  if (!shown.length) list.append(h('p', { class: 'sub' }, 'Nothing matches.'));
+  for (const b of $('#bar').querySelectorAll('.tab')) b.classList.toggle('on', b.dataset.tab === tab);
+}
+
+async function refresh() {
+  state = await api('/api/state');
+  for (const s of state.sounds) {
+    if (!cards.has(s.id)) cards.set(s.id, buildCard(s));
+    else { const c = cards.get(s.id); c.renderCands(s); c.tagUpdate(s); }
+  }
+  layout();
+}
+
+async function init() {
+  state = await api('/api/state');
+  const b = $('#banner');
+  if (state.fake) b.append(h('div', { class: 'banner fake' }, 'Test mode: no fal calls are made. Generate copies the current sound as a fake candidate.'));
+  else if (!state.hasKey) b.append(h('div', { class: 'banner' }, 'No fal key found (FAL_KEY in game-v2/.env). You can listen and write notes, but Generate will fail until it is set and the tool restarted.'));
+  const bar = $('#bar');
+  const n = (c) => state.sounds.filter((s) => c === 'all' || s.category === c).length;
+  for (const [k, label] of [['weapon', 'Weapons'], ['special', 'Targeting and suck'], ['other', 'Other sounds'], ['all', 'All']])
+    bar.append(h('button', { class: 'tab', 'data-tab': k, onclick: () => { tab = k; layout(); } }, `${label} (${n(k)})`));
+  const q = h('input', { type: 'search', placeholder: 'Search weapon, model or sound...' });
+  q.addEventListener('input', () => { query = q.value.trim(); layout(); });
+  const sd = h('input', { type: 'checkbox' });
+  sd.addEventListener('change', () => { showDiscarded = sd.checked; refresh(); });
+  bar.append(q, h('label', { class: 'status' }, sd, ' show discarded'));
+  await refresh();
+}
+init().catch((e) => { $('#list').textContent = 'Failed to load: ' + e.message; });
+</script>
+</body>
+</html>
