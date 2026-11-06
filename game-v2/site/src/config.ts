@@ -10,6 +10,7 @@
  *   SITE_PROFILES_DIR    ../data/profiles  (read-only)
  *   SITE_STATUS_FILE     ../data/status/live.json  (read-only)
  *   SITE_GUIDES_DIR      ./guides  (the guides: Markdown files)
+ *   SITE_GUIDES          0 (the guides are hidden: no nav link, their pages 404; 1 shows them again)
  *   SITE_CATALOG_FILE    ../data/catalog/catalog.json  (the game's own catalog, if it writes one; else site/catalog/catalog.json)
  *   SITE_AUTHORS         admin=Kieran  (the name shown on a post by an account: account=Name, comma separated)
  *   SITE_GAME_KEY        (a long secret the game server sends to share ships: Authorization: Bearer; unset = sharing is off)
@@ -52,6 +53,8 @@ export interface SiteConfig {
   publicDir: string;
   /** The guides: Markdown files (src/guides.ts) */
   guidesDir: string;
+  /** The guides are on show (off: hidden from the nav and the home page, and their pages are a 404) */
+  guides: boolean;
   /** The site's catalog snapshot, and the game's own catalog file (used instead when it exists and is valid) */
   catalogFile: string;
   catalogGameFile: string;
@@ -128,6 +131,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
     statusFile: path.resolve(env.SITE_STATUS_FILE || path.join(root, 'data/status/live.json')),
     publicDir: path.resolve(here, '../public'),
     guidesDir: path.resolve(env.SITE_GUIDES_DIR || path.join(here, '../guides')),
+    guides: env.SITE_GUIDES === '1',
     catalogFile: path.resolve(here, '../catalog/catalog.json'),
     catalogGameFile: path.resolve(env.SITE_CATALOG_FILE || path.join(root, 'data/catalog/catalog.json')),
     authors: parseAuthors(env.SITE_AUTHORS ?? 'admin=Kieran'),

@@ -4,13 +4,14 @@ import type { Catalog } from '../catalog/book.js';
 import { KIND_LABEL } from '../catalog/book.js';
 import { drawPlan } from '../catalog/draw.js';
 import {
-  counts, distinct, filterBosses, filterItems, filterParts, filterShips, filterStations, PART_CATEGORIES, RARITIES, type Query,
+  counts, distinct, filterBosses, filterItems, filterParts, filterShips, filterStations, RARITIES, type Query,
 } from '../catalog/query.js';
 import {
   bossText, duration, hazardLabel, itemText, label, num, partText, SERVICE_LABEL, shipText, stationName, stationText, systemName,
 } from '../catalog/text.js';
 import { CATALOG_KINDS, type CatalogBoss, type CatalogItem, type CatalogKind, type CatalogPart, type CatalogShip, type CatalogStation } from '../catalog/types.js';
 import { html, raw, SafeHtml } from '../html.js';
+import { componentGuide, guideCount } from './components.js';
 import { empty, fmtDate, layout, type PageCtx } from './layout.js';
 
 const href = (kind: CatalogKind, id: string) => `/database/${kind}/${encodeURIComponent(id)}`;
@@ -96,34 +97,21 @@ const KIND_BLURB: Record<CatalogKind, string> = {
 
 // ---------------------------------------------------------------- lists
 
-function keyStat(p: CatalogPart): string {
-  if (p.weapon) return p.weapon.dps > 0 ? `${num(p.weapon.dps)} dmg/s, ${num(p.weapon.range)} reach` : `${num(p.weapon.range)} reach`;
-  if (p.thrust) return `thrust ${num(p.thrust, 2)}`;
-  if (p.supply) return `${num(p.supply, 1)} E/s made`;
-  if (p.store) return `holds ${num(p.store)} E`;
-  if (p.shield) return `shield ${num(p.shield)}`;
-  if (p.cargo) return `${num(p.cargo)} hold space`;
-  return '';
-}
-
+/** Parts: the game's component guide, for the web (views/components.ts) */
 export function partsList(ctx: PageCtx, c: Catalog | null, q: Query): SafeHtml {
   if (!c) return noData(ctx, 'parts');
-  const list = filterParts(c.parts, q);
+  const n = guideCount(c, q);
+  const rarities = RARITIES.filter((r) => c.parts.some((p) => p.rarity === r)).map((r): [string, string] => [r, r]);
   const body = html`
-${head(c, 'parts', 'Parts', 'Everything a ship is built from. Numbers are for the part at full power in its own material.')}
+${head(c, 'parts', 'Parts', 'Everything a ship is built from, by the level it opens at. Open a row for its numbers.')}
 <section class="wrap block-tight">
-  ${searchBox('/database/parts', q, html`${select('category', q.category, PART_CATEGORIES.filter((k) => c.parts.some((p) => p.category === k)).map((k) => [k, label(k)]), 'Any type')}${select('rarity', q.rarity, RARITIES.filter((r) => c.parts.some((p) => p.rarity === r)).map((r) => [r, r]), 'Any rarity')}`)}
-  ${list.length ? html`<div class="table-scroll"><table class="db-table">
-    <thead><tr><th>Name</th><th>Type</th><th>Mark</th><th class="num">Cells</th><th class="num">HP</th><th class="num">Mass</th><th>Main number</th><th class="num">Opens</th></tr></thead>
-    <tbody>${list.map((p) => html`<tr>
-      <td><a href="${href('parts', p.id)}">${p.name}</a>${p.family && p.category !== 'structure' ? html` <small class="dim">${p.family.replace(/_/g, ' ')}</small>` : ''}</td>
-      <td class="nw">${label(p.category)}</td><td class="nw">${p.mark}</td><td class="num">${p.cells}</td><td class="num">${num(p.hp)}</td><td class="num">${num(p.mass, 1)}</td>
-      <td>${keyStat(p)}</td><td class="num">${p.unlock ? `Lv ${p.unlock}` : 'Start'}</td></tr>`)}</tbody></table></div>`
-    : empty('Nothing found', 'No part matches.')}
-  <p class="dim small">${list.length} of ${c.parts.length} parts.</p>
+  ${searchBox('/database/parts', q, html`${q.category ? html`<input type="hidden" name="category" value="${q.category}">` : ''}${select('rarity', q.rarity, rarities, 'Any rarity')}`)}
+  ${componentGuide(c, q)}
+  ${n.shown ? '' : empty('Nothing found', 'No part matches.')}
+  <p class="dim small">${n.shown} of ${n.total} components.</p>
   ${dataLine(c)}
 </section>`;
-  return layout(ctx, { title: 'Parts', body, description: 'Every ship part in the game: HP, mass, power, damage and cost.' });
+  return layout(ctx, { title: 'Parts', body, description: 'Every ship part in the game: the level it opens at, what it takes to make, and its numbers.' });
 }
 
 export function itemsList(ctx: PageCtx, c: Catalog | null, q: Query): SafeHtml {
@@ -136,7 +124,7 @@ ${head(c, 'items', 'Items', 'Ores, materials, components, ammunition and loot. V
   ${searchBox('/database/items', q, html`${select('category', q.category, cats.map((k) => [k, label(k)]), 'Any type')}${select('rarity', q.rarity, RARITIES.filter((r) => c.items.some((i) => i.rarity === r)).map((r) => [r, r]), 'Any rarity')}${select('sort', q.sort, [['name', 'Name'], ['value', 'Value, high first']], 'Default order')}`)}
   ${list.length ? html`<div class="table-scroll"><table class="db-table">
     <thead><tr><th>Name</th><th>Type</th><th>Rarity</th><th class="num">Value</th><th class="num">Tier</th></tr></thead>
-    <tbody>${list.map((i) => html`<tr><td><a href="${href('items', i.id)}">${i.name}</a></td><td>${label(i.category)}</td><td>${rarityChip(i.rarity)}</td><td class="num">${num(i.value)} cr</td><td class="num">${i.tier ?? ''}</td></tr>`)}</tbody></table></div>`
+    <tbody>${list.map((i) => html`<tr><td><a class="db-ico" href="${href('items', i.id)}">${i.icon ? html`<img src="${i.icon}" width="20" height="20" alt="" loading="lazy">` : ''}${i.name}</a></td><td>${label(i.category)}</td><td>${rarityChip(i.rarity)}</td><td class="num">${num(i.value)} cr</td><td class="num">${i.tier ?? ''}</td></tr>`)}</tbody></table></div>`
     : empty('Nothing found', 'No item matches.')}
   <p class="dim small">${list.length} of ${c.items.length} items.</p>
   ${dataLine(c)}
@@ -170,7 +158,7 @@ export function bossesList(ctx: PageCtx, c: Catalog | null, q: Query): SafeHtml 
   if (!c) return noData(ctx, 'bosses');
   const list = filterBosses(c.bosses, q).slice().sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   const body = html`
-${head(c, 'bosses', 'Bosses', 'Level, rewards and respawn time. See the Bosses guide for how the fights work.')}
+${head(c, 'bosses', 'Bosses', 'Level, rewards and respawn time.')}
 <section class="wrap block-tight">
   ${searchBox('/database/bosses', q)}
   ${list.length ? html`<div class="table-scroll"><table class="db-table">
@@ -204,11 +192,11 @@ function facts(rows: [string, string | number | SafeHtml | null | undefined | fa
   return html`<dl class="facts">${rows.filter(([, v]) => v !== null && v !== undefined && v !== false && v !== '').map(([k, v]) => html`<div><dt>${k}</dt><dd>${v}</dd></div>`)}</dl>`;
 }
 
-function entry(ctx: PageCtx, c: Catalog, kind: CatalogKind, title: string, eyebrow: string, lead: string, inner: SafeHtml): SafeHtml {
+function entry(ctx: PageCtx, c: Catalog, kind: CatalogKind, title: string, eyebrow: string, lead: string, inner: SafeHtml, art?: SafeHtml): SafeHtml {
   const body = html`
 <article class="wrap db-entry">
   <p class="meta"><a href="/database">Database</a> <span class="sep">/</span> <a href="/database/${kind}">${KIND_LABEL[kind]}</a></p>
-  <header class="db-entry-head"><p class="eyebrow">${eyebrow}</p><h1>${title}</h1><p class="lede">${lead}</p></header>
+  <header class="db-entry-head${art ? ' has-art' : ''}">${art ? html`<div class="db-art">${art}</div>` : ''}<div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1><p class="lede">${lead}</p></div></header>
   ${inner}
   ${dataLine(c)}
 </article>`;
@@ -233,18 +221,19 @@ export function partPage(ctx: PageCtx, c: Catalog, p: CatalogPart): SafeHtml {
     ${facts([
       ['Type', label(p.category)], ['Family', p.family?.replace(/_/g, ' ')], ['Mark', `${p.mark} ${p.material}`], ['Size', p.size], ['Rarity', rarityChip(p.rarity)],
       ['Cells', p.cells], ['HP', num(p.hp)], ['Mass', num(p.mass, 1)],
-      ['Mount', p.weapon?.mount === 'turret' ? 'Turret' : p.weapon ? 'Fixed' : ''],
+      ['Mount', p.weapon?.mount === 'turret' ? 'Turret' : p.weapon ? 'Fixed' : ''], ['Mounting', p.guide?.mounting?.join(' · ')],
       ['Damage a second', p.weapon && p.weapon.dps > 0 ? num(p.weapon.dps) : ''], ['Reach', p.weapon ? `${num(p.weapon.range)} units` : ''],
       ['Damage type', p.weapon?.damageType ? label(p.weapon.damageType) : ''],
       ['Thrust', p.thrust ? num(p.thrust, 2) : ''], ['Boost', p.boost ? `x${num(p.boost, 2)}` : ''],
       ['Makes', p.supply ? `${num(p.supply, 1)} E/s` : ''], ['Holds', p.store ? `${num(p.store)} E` : ''], ['Shield', p.shield ? num(p.shield) : ''], ['Hold space', p.cargo ? num(p.cargo) : ''],
       ['Uses', p.draw ? `${num(p.draw, 1)} E/s` : ''],
-      ['Opens at', p.unlock ? `Level ${p.unlock}` : 'Start'],
+      ['Opens at', p.unlock ? `Level ${p.unlock}` : 'Start'], ['Licence', p.guide?.licence ? 'Needs a licence from a job' : ''],
     ])}
   </section>
   <section class="panel">
     <div class="panel-head"><h2>Shapes</h2></div>
     <div class="shape-row">${p.shapes.slice(0, 12).map((id) => html`<figure class="shape">${drawPlan([{ fn: p.id, piece: id, x: 0, y: 0, rot: 0 }], c.render, { label: `${id} shape` })}<figcaption>${id}</figcaption></figure>`)}</div>
+    ${p.guide?.tradeOff ? html`<p class="mt trade">${p.guide.tradeOff.replace(/^./, (x) => x.toUpperCase())}.</p>` : ''}
     ${p.craft ? html`<p class="mt">Fabricated from ${costLinks(c, p.craft.inputs)} (${duration(p.craft.seconds)}).</p>` : html`<p class="mt dim">Not fabricated: it is paid for in materials when placed.</p>`}
   </section>
 </div>
@@ -252,7 +241,8 @@ ${p.ports?.length ? html`<section class="panel mt"><div class="panel-head"><h2>P
   <div class="table-scroll"><table class="db-table"><thead><tr><th>Direction</th><th>Side</th><th class="num">Cell</th><th class="num">Rate</th></tr></thead>
   <tbody>${p.ports.map((x) => html`<tr><td>${x.dir === 'in' ? 'In' : 'Out'}</td><td>${x.side}</td><td class="num">${(x.cell ?? 0) + 1}</td><td class="num">${num(x.rate)} E/s</td></tr>`)}</tbody></table></div></section>` : ''}
 ${usedBy.length ? html`<section class="panel mt"><div class="panel-head"><h2>Used in</h2></div><p>${join(usedBy.map((s) => html`<a href="${href('ships', s.id)}">${s.name}</a>`))}</p></section>` : ''}`;
-  return entry(ctx, c, 'parts', p.name, `${label(p.category)}${p.family && p.category !== 'structure' ? `, ${p.family.replace(/_/g, ' ')}` : ''}`, partText(c, p), inner);
+  const art = p.guide?.art ? html`<img src="${p.guide.art.src}" width="${p.guide.art.w}" height="${p.guide.art.h}" alt="${p.name}, as the game draws it">` : undefined;
+  return entry(ctx, c, 'parts', p.name, `${label(p.category)}${p.family && p.category !== 'structure' ? `, ${p.family.replace(/_/g, ' ')}` : ''}`, partText(c, p), inner, art);
 }
 
 export function itemPage(ctx: PageCtx, c: Catalog, i: CatalogItem): SafeHtml {
@@ -282,7 +272,7 @@ export function itemPage(ctx: PageCtx, c: Catalog, i: CatalogItem): SafeHtml {
     ${i.usedIn.length ? html`<ul class="plain cols">${i.usedIn.slice(0, MORE).map((u) => html`<li><a href="${href(u.kind === 'part' ? 'parts' : 'items', u.id)}">${u.name}</a></li>`)}</ul>${i.usedIn.length > MORE ? html`<p class="dim small">and ${i.usedIn.length - MORE} more.</p>` : ''}` : html`<p class="dim">Not used in any recipe.</p>`}
   </section>
 </div>`;
-  return entry(ctx, c, 'items', i.name, label(i.category), itemText(c, i), inner);
+  return entry(ctx, c, 'items', i.name, label(i.category), itemText(c, i), inner, i.icon ? html`<img src="${i.icon}" width="64" height="64" alt="">` : undefined);
 }
 
 export function shipPage(ctx: PageCtx, c: Catalog, s: CatalogShip): SafeHtml {

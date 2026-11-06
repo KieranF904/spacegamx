@@ -14,6 +14,8 @@ export interface PageCtx {
   origin: string;
   /** Account name (lower-case) -> the name shown on its posts */
   authors?: Record<string, string>;
+  /** The guides are on show (SITE_GUIDES=1): else nothing links to them */
+  guides?: boolean;
   /** A fixed note after a redirect (?ok=...) */
   notice?: { kind: 'ok' | 'error'; text: string } | null;
 }
@@ -49,7 +51,7 @@ export function livePill(live: PageCtx['live'], big = false): SafeHtml {
 export function layout(ctx: PageCtx, p: PageOpts): SafeHtml {
   const title = p.title ? `${p.title} · ${ctx.siteName}` : ctx.siteName;
   const here = (href: string) => ctx.path === href || ctx.path.startsWith(href + '/');
-  const nav = [...NAV, ...(ctx.user?.isAdmin ? [['/admin', 'Admin'] as [string, string]] : [])];
+  const nav = [...NAV.filter(([href]) => ctx.guides || href !== '/guides'), ...(ctx.user?.isAdmin ? [['/admin', 'Admin'] as [string, string]] : [])];
   const next = encodeURIComponent(ctx.path);
   const notice = p.notice ?? ctx.notice;
   return html`<!doctype html>
@@ -70,8 +72,8 @@ ${p.image ? html`<meta property="og:image" content="${p.image.startsWith('/') ? 
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/site.css?v=7">
-<link rel="stylesheet" href="/static/features.css?v=3">
-<script src="/static/site.js?v=5" defer></script>
+<link rel="stylesheet" href="/static/features.css?v=4">
+<script src="/static/site.js?v=6" defer></script>
 </head>
 <body class="${p.bodyClass ?? ''}">
 <a class="skip" href="#main">Skip to content</a>
@@ -100,7 +102,7 @@ ${p.body}
   <div class="wrap foot-in">
     <div class="foot-brand">${MARK}<span>${ctx.siteName}</span><span class="dim">in development</span></div>
     <nav class="foot-nav" aria-label="Footer">
-      <a href="/updates">Updates</a><a href="/guides">Guides</a><a href="/database">Database</a><a href="/ships">Ships</a><a href="/pilots">Pilots</a><a href="/suggestions">Suggestions</a><a href="/status">Status</a><a href="/rss.xml">RSS</a>
+      <a href="/updates">Updates</a>${ctx.guides ? raw('<a href="/guides">Guides</a>') : ''}<a href="/database">Database</a><a href="/ships">Ships</a><a href="/pilots">Pilots</a><a href="/suggestions">Suggestions</a><a href="/status">Status</a><a href="/rss.xml">RSS</a>
       ${ctx.user ? html`<a href="/account">Account</a>` : html`<a href="/register">Create an account</a>`}
     </nav>
   </div>

@@ -20,7 +20,7 @@ import { loadCatalog } from '../../common/src/ships/catalog.js';
 import { partMount } from '../../common/src/ships/blueprint.js';
 import { partStats } from '../../common/src/ships/partStats.js';
 import type {
-  CatalogBoss, CatalogFile, CatalogItem, CatalogPart, CatalogRibbon, CatalogShip, CatalogStation, CatalogSystem, PartCategory, PlanPart, RecipeInfo, ShipStats,
+  CatalogBoss, CatalogFile, CatalogItem, CatalogPart, CatalogRibbon, CatalogShip, CatalogStation, CatalogStructure, CatalogSystem, PartCategory, PartGuide, PlanPart, RecipeInfo, ShipStats,
 } from '../src/catalog/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -236,6 +236,34 @@ for (const id of [...usedShapes].sort()) {
 const colors: Record<string, string> = {};
 for (const [id, f] of catalog.functions) if (typeof f.color === 'string') colors[id] = f.color;
 
+// ---------------------------------------------------------------- the component guide's view (pictures and short lines)
+
+// (scripts/build-part-images.mjs draws them with the game client's own code; without its file the site draws outlines)
+const guideFile = path.join(siteDir, 'catalog/guide.json');
+let structure: CatalogStructure[] | undefined;
+if (fs.existsSync(guideFile)) {
+  const guide = JSON.parse(fs.readFileSync(guideFile, 'utf8')) as { rows: any[]; items: Record<string, string> };
+  const byId = new Map(parts.map((p) => [p.id, p]));
+  for (const r of guide.rows) {
+    if (r.kind === 'structure') continue;
+    const p = byId.get(r.id);
+    if (!p) continue;
+    const g: PartGuide = { tab: r.tab, level: r.level, order: r.order, art: r.art, cost: r.cost ?? {} };
+    if (r.licence) g.licence = true;
+    for (const k of ['tradeOff', 'family', 'size', 'keyNumbers', 'mounting', 'seconds'] as const) if (r[k] !== undefined && r[k] !== '') (g as any)[k] = r[k];
+    p.guide = g;
+  }
+  structure = guide.rows.filter((r) => r.kind === 'structure').map((r) => ({
+    id: r.material, name: String(r.name), level: r.level, order: r.order, ...(r.licence ? { licence: true } : {}), art: r.art,
+    material: {
+      name: r.structure.materialName, mark: r.structure.mark, grade: r.structure.grade, toughness: r.structure.toughness, density: r.structure.density,
+      traits: r.structure.traits, insulation: r.structure.insulation,
+    },
+    parts: r.structure.parts,
+  }));
+  for (const i of items) if (guide.items[i.id]) i.icon = guide.items[i.id];
+} else console.warn('catalog: no catalog/guide.json (npm run build-part-images first): parts go without their pictures');
+
 // ---------------------------------------------------------------- write
 
 function sourceInfo(): CatalogFile['source'] {
@@ -248,7 +276,7 @@ function sourceInfo(): CatalogFile['source'] {
 
 const file: CatalogFile = {
   version: 1, builtAt: new Date().toISOString(), source: sourceInfo(),
-  parts, items, ships, bosses, stations, systems, ribbons, render: { shapes, colors },
+  parts, items, ships, bosses, stations, systems, ribbons, ...(structure ? { structure } : {}), render: { shapes, colors },
 };
 
 /** One entry per line, so a changed part shows as one changed line in a diff */

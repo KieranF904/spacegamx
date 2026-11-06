@@ -9,7 +9,8 @@
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit -p .",
     "post-update": "tsx scripts/post-update.ts",
-    "build-catalog": "tsx scripts/build-catalog.ts"
+    "build-catalog": "tsx scripts/build-catalog.ts",
+    "build-part-images": "node scripts/build-part-images.mjs"
   },
   "dependencies": {
     "marked": "^12.0.2",

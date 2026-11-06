@@ -48,6 +48,8 @@ export interface CatalogPart {
   craft?: { inputs: Record<string, number>; seconds: number };
   /** Plain chart text from the game, if it ever supplies one (the site writes its own otherwise) */
   blurb?: string;
+  /** How the in-game component guide shows it (scripts/build-part-images.mjs; absent from a game-written file) */
+  guide?: PartGuide;
 }
 
 export interface RecipeInfo {
@@ -82,6 +84,49 @@ export interface CatalogItem {
   /** Bosses that can drop it (chance 0..1) */
   droppedBy: { boss: string; chance: number }[];
   blurb?: string;
+  /** Its icon as the game draws it (a site path) */
+  icon?: string;
+}
+
+/** The guide's tabs (the game's component guide: client/src/ui/componentGuide.ts COMP_TABS) */
+export type GuideTab = 'structure' | 'weapons' | 'engines' | 'power' | 'shields' | 'utility';
+
+/** A picture the game drew (a site path, and its size in CSS pixels at full size) */
+export interface Art { src: string; w: number; h: number }
+
+/** What the in-game component guide shows for a part, beyond its numbers: short mechanical lines, never its description */
+export interface PartGuide {
+  tab: GuideTab;
+  /** The level it's learned at (0: every pilot) */
+  level: number | null;
+  /** Tie-break within a level (the fabricator's order) */
+  order: number;
+  art: Art;
+  /** Needs a licence from a job on top of its level */
+  licence?: boolean;
+  /** Its trade-off in a few words */
+  tradeOff?: string;
+  family?: string;
+  size?: string;
+  keyNumbers?: string;
+  mounting?: string[];
+  /** What making one takes (item id -> count), and how long */
+  cost: Record<string, number>;
+  seconds?: number;
+}
+
+/** A structure row: hull, armour and cargo in one material */
+export interface CatalogStructure {
+  /** The material's id */
+  id: string;
+  name: string;
+  level: number | null;
+  order: number;
+  licence?: boolean;
+  art: Art;
+  material: { name: string; mark: string; grade: number; toughness: number; density: number; traits: string[]; insulation: number };
+  /** Each structure part in a square of it (and the core) */
+  parts: { fn: string; name: string; hp: number; armour: number; mass: number; cost: Record<string, number> }[];
 }
 
 /** A part as placed in a plan: what the drawing needs */
@@ -164,6 +209,8 @@ export interface CatalogFile {
   systems: CatalogSystem[];
   /** Optional: ribbon names by id (a game-written file may leave it out) */
   ribbons?: CatalogRibbon[];
+  /** Optional: the component guide's structure rows, one per material a pilot builds in */
+  structure?: CatalogStructure[];
   render: RenderData;
 }
 

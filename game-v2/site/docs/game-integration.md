@@ -31,7 +31,13 @@ Rules that hold for all four:
 `game-v2/data` and the game's shared ship code (`common/src/ships`) and writes nothing else. It is committed, with the
 data folder's last commit and date in `source`. The pages show "Data as of <date>".
 
-Run it again whenever parts, items, ships, bosses or stations change in the data. `catalog.test.ts` fails if any of the
+The Parts tab is laid out like the game's component guide, with the game's own pictures. `npm run build-part-images`
+(run it first) draws every component and item icon with the client's drawing code (`client/src/ui/componentSprites.ts`,
+`itemIcons.ts`) in one headless Chrome, into `site/public/img/parts/` and `site/public/img/items/` (WebP), and writes
+`site/catalog/guide.json` (each component's tab, level, picture, cost, trade-off and mounting lines; never its
+description). `build-catalog` folds that file into the snapshot. Commit all of it.
+
+Run both again whenever parts, items, ships, bosses or stations change in the data. `catalog.test.ts` fails if any of the
 game's prose (descriptions, intros, titles, factions, market notes, codex, people, factions, strings) reaches the
 snapshot or a rendered page.
 
@@ -237,4 +243,4 @@ A plain public API; nothing is needed from the game for it to work.
 2. **Status fields** in `live.json` (a few lines where the file is written).
 3. **Shared ships** (a Share button in the hangar, the server call, the key in both environments).
 4. **Catalog file** last, or never: the snapshot is enough while the data changes rarely. Rebuild it by hand
-   (`npm run build-catalog`, then commit) when parts, items or ships change.
+   (`npm run build-part-images`, `npm run build-catalog`, then commit) when parts, items or ships change.
