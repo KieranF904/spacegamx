@@ -19,9 +19,9 @@ export interface MiningTable {
    * traceMul: this type's rocks carry their traces at that many times the rate
    * (the mega rocks); traceBoost: one trace more so (gem seams' voidglass).
    * name and size [min, max]: a rock type of its own (econ/rocks.ts), moving
-   * and spawning `like` another type.
+   * and spawning `like` another type. density: ore units per size, times this (default 1).
    */
-  types: Record<string, { hardness: number; ores: Bag; traceMul?: number; traceBoost?: Record<string, number>; name?: string; size?: [number, number]; like?: string; gas?: boolean }>;
+  types: Record<string, { hardness: number; ores: Bag; traceMul?: number; traceBoost?: Record<string, number>; name?: string; size?: [number, number]; like?: string; gas?: boolean; density?: number }>;
   /** The comet's passes (server/src/GameServer.ts) */
   comet?: { days: number; hours: number; systems: string[]; traceTier: number };
   /** Each belt's mix of rock types by weight (econ/rocks.ts) */
@@ -166,7 +166,7 @@ export function asteroidComposition(table: MiningTable, type: string, key: strin
       if (roll <= 0) { seam = { gem: s.gem, hardness: s.hardness }; break; }
     }
   }
-  return { type, ores, primary, hardness: t.hardness, seam, units: Math.max(3, Math.round(size * table.unitsPerSize)), ...(o ? { stage: { at: stage!, of: o.stages.length } } : {}) };
+  return { type, ores, primary, hardness: t.hardness, seam, units: Math.max(3, Math.round(size * table.unitsPerSize * (t.density ?? 1))), ...(o ? { stage: { at: stage!, of: o.stages.length } } : {}) };
 }
 
 /** Pick one ore from a composition's weights */

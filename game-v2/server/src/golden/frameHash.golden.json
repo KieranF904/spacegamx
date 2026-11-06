@@ -3,7 +3,7 @@
   "checkpoints": [
     {
       "tick": 100,
-      "world": "61578964087b9e442e5581c8491dd68f226e31a90fe1e5f2355ba54ea257a6cf",
+      "world": "953147da125955e7f8318158ef81cbaab7ab4683e7dea26b8dd03d211f1b0911",
       "pilots": {
         "strafer": {
           "frames": 28,
@@ -25,7 +25,7 @@
     },
     {
       "tick": 200,
-      "world": "afee0060aad1176ba5240623110322012c27489b84a117fb7f9d19e471dc6fd0",
+      "world": "cc72bb52f2dc1a57c1bdb8b658f2af70c4a0d602263b9107738b324ea7e41a56",
       "pilots": {
         "strafer": {
           "frames": 45,
@@ -47,7 +47,7 @@
     },
     {
       "tick": 300,
-      "world": "6424a2cac22dbfbe03b2ed2c3a662c754899937b425daea5b01aee427f623e3a",
+      "world": "9cbaac436ea3d317223691d156abe53e81dca02de302f8a2fd0224ba3eecf0c4",
       "pilots": {
         "strafer": {
           "frames": 62,
@@ -69,7 +69,7 @@
     },
     {
       "tick": 400,
-      "world": "067c3c34b61ea73ec8960bf161925a3aeac3d09afb8befb8f783689446296ac9",
+      "world": "9b26562fa5deee7f626c0e0b823759664286543f78c2a7d38918ed84621e7729",
       "pilots": {
         "strafer": {
           "frames": 78,
@@ -91,7 +91,7 @@
     },
     {
       "tick": 500,
-      "world": "76893e2531f93fe252819261fcdc24511363850b45032f9f3038482438ad596b",
+      "world": "7768ab57cfb9130cad10b9149bbb9a7c6f9f9ae162962db2411f957c8e801033",
       "pilots": {
         "strafer": {
           "frames": 95,
@@ -113,7 +113,7 @@
     },
     {
       "tick": 600,
-      "world": "db7a3213cd95e02facd9c1a898e2f85370177050a20d62a8de5a51d28eb1fc1d",
+      "world": "88788271d9df1b03544146828900f8f364e0af5035fd2de8c6d27afec2ab331c",
       "pilots": {
         "strafer": {
           "frames": 112,
@@ -135,7 +135,7 @@
     },
     {
       "tick": 700,
-      "world": "0ed2b8fc97779a5787acabea4fe046367d20776b17c828d408c26febe220f341",
+      "world": "04579950516635dc17d03aa2ad2439266d6f708b574a9409e24550e26912f35b",
       "pilots": {
         "strafer": {
           "frames": 129,
@@ -157,7 +157,7 @@
     },
     {
       "tick": 800,
-      "world": "241dd81ba42aedfb34d343b0f05cd07b5724ea048c0101480bfc883fd55abc3f",
+      "world": "134b369a44d159158b2c2a77ca076408857771ad730abfb46d34f11467211501",
       "pilots": {
         "strafer": {
           "frames": 145,
@@ -179,7 +179,7 @@
     },
     {
       "tick": 900,
-      "world": "9df1a0c9a8ad6ece80439d94dfd501e2e7e41b29cba933daa17130d24421bd2d",
+      "world": "25ce59d300142792fc5dfc4d10ce8928cbdc86c89f18382353aa0a5505a85112",
       "pilots": {
         "strafer": {
           "frames": 162,

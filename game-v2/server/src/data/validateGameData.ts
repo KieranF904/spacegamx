@@ -343,7 +343,7 @@ const SHAPES: Record<string, Spec> = {
   }),
   'mining.json': strict({
     respawnSeconds: 'number', unitsPerSize: 'number', damagePerUnit: 'number', chunkUnits: 'number[]', breakFraction: 'number', xpPerUnit: 'number',
-    types: rec(obj({ hardness: 'number', ores: rec('number'), 'traceMul?': 'number', 'traceBoost?': rec('number'), 'name?': 'string', 'size?': 'number[]', 'like?': 'string', 'gas?': 'boolean' })),
+    types: rec(obj({ hardness: 'number', ores: rec('number'), 'traceMul?': 'number', 'traceBoost?': rec('number'), 'name?': 'string', 'size?': 'number[]', 'like?': 'string', 'gas?': 'boolean', 'density?': 'number' })),
     'fields?': rec(rec('number')),
     'comet?': obj({ days: 'number', hours: 'number', systems: 'string[]', traceTier: 'number' }),
     oreHardness: rec('number'),

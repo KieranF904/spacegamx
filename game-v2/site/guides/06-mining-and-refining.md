@@ -74,11 +74,12 @@ Each laser mines on its own, so two lasers mine twice as fast, as long as your s
 
 ## Rock types
 
-There are 19 rock types. Every rock has a hardness (1 to 3) and a mix of ores. The tool must be at least as hard as the rock, and ore harder than the tool is left behind.
+There are 20 rock types. Every rock has a hardness (1 to 3) and a mix of ores. The tool must be at least as hard as the rock, and ore harder than the tool is left behind.
 
 | Rock | Hardness | Ore mix (relative weights) |
 |---|---|---|
 | Chondrite | 1 | Iron 60, nickel 25, silicate 15, copper 10 |
+| Taenite | 1 | Nickel 45, iron 30, copper 20, silicate 5 (small, and holds half again the ore for its size) |
 | Ice Body | 1 | Ice 65, hydrazine slush 20, silicate 15 |
 | Carbonaceous Rock | 1 | Ice 40, iron 35, silicate 20, helium-3 5 |
 | Comet | 1 | Ice 80, helium-3 15 |
@@ -117,7 +118,7 @@ Neutronium ore, the stuff of Mk V plate, only drops in danger 4 and above.
 
 | Belt | Main rocks |
 |---|---|
-| Sol | Chondrite, ice, carbonaceous, a few crystal geodes and comets |
+| Sol | Chondrite, ice, carbonaceous, a few crystal geodes, comets and Taenite |
 | Ashfall Drift | Chondrite, ice, carbonaceous, Ashback boulders, cuprite |
 | Borealis | Ice, carbonaceous, comets, gas pockets, Aurora floes |
 | Glasswater | Crystal, ice, cuprite, comets, gem seams |
