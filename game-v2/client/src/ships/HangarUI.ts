@@ -1172,7 +1172,7 @@ export class HangarUI {
       }
       if (now.cargo > 0) html += row('Full of ore', `<span style="color:#fbbf24">${pct(full.thrustLoss)} thrust, ${pct(full.turnLoss)} turn</span>`, undefined, tip);
     }
-    html += row('Jump drive', `${now.jump.toFixed(1)} km · ${Math.round(now.jumpCooldown)} s`, 'jump', 'Reach, and recharge time: from the jump coils (the core has one) against the size of the hull');
+    html += row('Jump drive', `${now.jump.toFixed(1)} km · ${Math.round(now.jumpCooldown)} s`, 'jump', 'Reach, and recharge time: from the jump coils (the core has one; on a ports design only coils power reaches count) against the size of the hull. Every jump charges 3 s');
     {
       const note = jumpRatioNote(now.jumpRatio);
       html += row('Jump coils', `${now.jumpRatio.toFixed(2)}× the hull's need · <span style="color:${note.color}">${note.word}</span>`, 'jumpRatio', note.hint);

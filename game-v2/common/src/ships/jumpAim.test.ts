@@ -23,7 +23,7 @@ const jt = jumpTuning(tuning);
 const ship = (file: string) => createShipState(catalog, tuning, 1, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints', file), 'utf-8')), 0).derived;
 
 interface Case {
-  ship?: string; x?: number; y?: number; vx?: number; vy?: number; angle?: number;
+  ship?: string; x?: number; y?: number; vx?: number; vy?: number; angle?: number; angVel?: number;
   /** The cursor's bearing and distance (0: full reach) */
   aim: number; dist: number;
   /** A charging field's range boost (a star's ring), a hazard, a well */
@@ -35,7 +35,7 @@ interface Case {
 
 function jump(c: Case) {
   const d = ship(c.ship ?? 'sparrow-t.json');
-  const body = { x: c.x ?? 0, y: c.y ?? 0, vx: c.vx ?? 0, vy: c.vy ?? 0, angle: c.angle ?? 0, angVel: 0, jump: 0, jumpScale: 1 };
+  const body = { x: c.x ?? 0, y: c.y ?? 0, vx: c.vx ?? 0, vy: c.vy ?? 0, angle: c.angle ?? 0, angVel: c.angVel ?? 0, jump: 0, jumpScale: 1 };
   let charge: Charge = structuredClone(FULL_CHARGE);
   const boost = c.boost ?? 1;
   const reach = jumpReachAt(d, jt, boost, c.hazard);
@@ -45,7 +45,7 @@ function jump(c: Case) {
   const k = { friction: FRICTION, gravity: c.gravity ?? null, hazard: c.hazard };
   const predicted: [number, number][] = [];
   let held = 0;
-  // (A short jump charges longer: jumpChargeNeed)
+  // (Every jump charges the same: jumpChargeNeed)
   const need = jumpChargeNeed(jumpGo(jumpDist, reach, jt), jt), burnAt = jumpBurnAt(jt);
   for (let t = 0; t < 4000; t++) {
     const ph = jumpPhase(body.jump, jt).phase;
@@ -79,8 +79,8 @@ describe('the jump overlay is where the jump lands', () => {
     ['odd angles', { angle: 1.234, aim: -2.7, dist: 27777, vx: 13, vy: -21 }],
     ['past its reach (max range)', { aim: 0.2, dist: 150000 }],
     ['the shortest jump', { aim: -1, dist: 100 }],
-    ['a short jump, sliding (a longer charge)', { aim: 0.3, dist: 8000, vx: 25, vy: -10 }],
-    ['a jump in the taper', { aim: -0.4, dist: 17000, vy: 18 }],
+    ['a short jump, sliding', { aim: 0.3, dist: 8000, vx: 25, vy: -10 }],
+    ['a middling jump, sliding', { aim: -0.4, dist: 17000, vy: 18 }],
     ['a star\'s ring, 80k', { aim: 0, dist: 80000, boost: 1.6 }],
     ['a gravity hazard', { x: 30000, y: 8000, vx: -6, aim: 2.5, dist: 40000, hazard: { control: 0.7, driftAccel: 0.007, jump: 0.55, cap: 1 } }],
     ['a black hole\'s well', { x: 20000, y: -15000, aim: 1, dist: 30000, gravity: { strength: 2e6, minRadius: 3000 } }],
@@ -105,7 +105,8 @@ describe('the jump overlay is where the jump lands', () => {
   });
 
   it('a charge waits on its last tick for a slow ship to come round, and never burns off the aim', () => {
-    const r = jump({ ship: 'fixtures/bastion.json', aim: 3.1, dist: 30000 });
+    // (Its turning cut by a hazard: more than the 3 s charge to come right round)
+    const r = jump({ ship: 'fixtures/bastion.json', aim: 3.1, dist: 30000, hazard: { control: 0.1, driftAccel: 0, jump: 1, cap: 1 } });
     expect(r.held).toBeGreaterThan(1);
     expect(Math.abs(wrapAngle(r.angle - 3.1))).toBeLessThan(JUMP_ALIGN);
   });

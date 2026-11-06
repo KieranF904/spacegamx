@@ -30,7 +30,7 @@ export function jumpLanding(
   const p = { x: body.x, y: body.y, vx: body.vx, vy: body.vy };
   const damp = k.friction * t.chargeDamping;
   const drift = k.hazard?.driftAccel ?? 0;
-  // (The charge left: a short jump's is longer, jumpChargeNeed)
+  // (The charge left: the same for every jump, jumpChargeNeed)
   const go = jumpGo(dist, reach, t);
   for (let n = jumpChargeNeed(go, t) - 1 - Math.max(0, jump); n > 0; n--) {
     applyGravity(p, k.gravity);

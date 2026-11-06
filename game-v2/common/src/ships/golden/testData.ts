@@ -165,8 +165,8 @@ const driveBankScript = (): ScriptTick[] => script(
 /** A jump charged to the full, the burn (aim held, 20000 out), and the cooldown's start */
 const jumpScript = (): ScriptTick[] => script(
   [20, { forward: true }, UP],
-  // (30k: past a short jump's longer charge, flight.ts jumpChargeNeed, so it burns at the plain charge)
-  [100, { jump: true }, UP + 0.3, 30000],
+  // (Held past the charge, flight.ts jumpChargeNeed: the same for every jump, so it burns 10 ticks in)
+  [190, { jump: true }, UP + 0.3, 30000],
   [100, { forward: true }, UP + 0.3],
 );
 

@@ -133,28 +133,22 @@ export interface FlightResult {
  * above 0 the ship coasts the rest, jumpCoast). Its whole state is one integer
  * counter, so it rides in snapshots and prediction replays it exactly.
  *
- * A short jump charges longer (Kieran, 2026-11-05: "Short jumps are allowed,
- * just add more charge time"): up to shortRange the charge adds the time it
- * would take to fly there at shortCruise, so a short jump is never quicker
- * than flying it; past shortRange that extra tapers off, gone by shortTaper
- * (jumpChargeNeed). The counter counts the ticks charged, so the burn starts
- * at a fixed count past the longest charge (jumpBurnAt):
+ * The charge is the same for every jump, however far it is aimed (Kieran,
+ * 2026-11-06: "the jump should just take about 3 seconds to charge, for any
+ * distance"; it replaced a short jump's longer charge). How far it goes is the
+ * aim within the drive's reach (coils, fields, hazards: jumpReachAt), never how
+ * long it charges. The counter counts the ticks charged:
  *
  *   0                                  ready
  *   1 .. burnAt-1                      charging (counts the ticks charged while the jump control is held; the burn
- *                                      starts once it has charged jumpChargeNeed for the jump aimed, and the nose is
- *                                      aimed; till then it waits, at burnAt-1 at most)
+ *                                      starts once it has charged chargeTicks and the nose is aimed; till then it
+ *                                      waits, at burnAt-1 at most)
  *   burnAt .. +burnTicks-1             burn (the jump itself)
  *   .. +cooldownTicks-1                cooling down, then back to 0
  */
 export interface JumpTuning {
-  /** The charge for a long jump (ticks); a short one adds to it (jumpChargeNeed) */
+  /** The charge (ticks), the same for every jump */
   chargeTicks: number;
-  /** Short jumps: a reference cruise speed (world units a tick); up to shortRange the charge adds the time to fly the jump at it */
-  shortCruise: number;
-  shortRange: number;
-  /** ...and past shortRange that extra tapers off, gone by here (world units) */
-  shortTaper: number;
   burnTicks: number;
   /** Cooldown at the sweet spot (coils just right for the hull, Mk I: jumpDriveStats) */
   cooldownTicks: number;
@@ -179,9 +173,13 @@ export interface JumpTuning {
   /** At the sweet spot, better coils reach this fraction further and cool this fraction faster per grade */
   gradeRange: number;
   gradeCooldown: number;
-  /** Over-coiled: range × (1 + overRange·log2 ratio) up to +overRangeMax; cooldown ÷ (1 + overCooldown·log2 ratio), never under cooldownFloor of the sweet spot's nor minCooldownTicks */
+  /**
+   * Over-coiled: range × (1 + overRange·(log2 ratio)^overRangeExp): overRange more at twice the hull's need, and every
+   * coil past that still reaching further, each less than the one before (no cap). Cooldown ÷ (1 + overCooldown·log2
+   * ratio), never under cooldownFloor of the sweet spot's nor minCooldownTicks
+   */
   overRange: number;
-  overRangeMax: number;
+  overRangeExp: number;
   overCooldown: number;
   cooldownFloor: number;
   minCooldownTicks: number;
@@ -214,12 +212,11 @@ export interface JumpTuning {
 }
 
 export const DEFAULT_JUMP: JumpTuning = {
-  chargeTicks: 90, burnTicks: 90, cooldownTicks: 900,
-  shortCruise: 20, shortRange: 12000, shortTaper: 25000,
+  chargeTicks: 180, burnTicks: 90, cooldownTicks: 900,
   speed: 340, exitSpeed: 0, rampTicks: 5, slowTicks: 16, chargeDamping: 0.96,
   baseRange: 50000, minRange: 5000,
   coreCapacity: 40, gradeCapacity: 0.1, gradeRange: 0.05, gradeCooldown: 0.0625,
-  overRange: 0.15, overRangeMax: 0.35, overCooldown: 0.2, cooldownFloor: 0.7, minCooldownTicks: 600,
+  overRange: 0.18, overRangeExp: 0.7, overCooldown: 0.2, cooldownFloor: 0.7, minCooldownTicks: 600,
   underRange: 0.6, underRangeFloor: 0.6, underCooldown: 0.7, underCooldownCap: 1.6667,
   solarRing: 9000, solarRangeBoost: 1.25, solarCharge: 1,
   lodestoneName: 'Stillstone', lodestoneShort: 'Stillstone', lodestoneSize: 900,
@@ -258,7 +255,7 @@ export function jumpDriveStats(capacity: number, demand: number, grade: number, 
   let range: number, cool: number;
   if (ratio >= 1) {
     const doublings = dlog2(ratio);
-    range = sweetRange * (1 + Math.min(t.overRangeMax, t.overRange * doublings));
+    range = sweetRange * (1 + t.overRange * dpow(doublings, t.overRangeExp));
     cool = Math.max(sweetCool * t.cooldownFloor, t.minCooldownTicks, sweetCool / (1 + t.overCooldown * doublings));
   } else {
     range = sweetRange * Math.max(t.underRangeFloor, dpow(ratio, t.underRange));
@@ -330,28 +327,24 @@ export function jumpTuning(t: ShipTuning): JumpTuning {
 }
 const jumpCache = new WeakMap<object, JumpTuning>();
 
-/** The extra charge a jump of `dist` (world units, as it goes: jumpGo) needs: the time to fly it at shortCruise up to shortRange, tapering to none by shortTaper */
-export function jumpExtraCharge(dist: number, t: JumpTuning): number {
-  if (!(t.shortCruise > 0) || dist >= t.shortTaper) return 0;
-  if (dist <= t.shortRange) return Math.ceil(Math.max(0, dist) / t.shortCruise);
-  return Math.ceil((t.shortRange / t.shortCruise) * ((t.shortTaper - dist) / (t.shortTaper - t.shortRange)));
-}
-
-/** Ticks a jump of `dist` charges for (the counter's count when the burn can start). Negative `dist`: not known (a replica's: it waits for the burn's keyframe) */
+/**
+ * Ticks a jump charges for before its burn can start: chargeTicks, whatever its distance. Negative `dist`: where it
+ * goes isn't known (a replica's controls carry no distance), so the burn can't be stepped: it waits for the burn's keyframe
+ */
 export function jumpChargeNeed(dist: number, t: JumpTuning): number {
-  return dist >= 0 ? t.chargeTicks + jumpExtraCharge(dist, t) : Infinity;
+  return dist >= 0 ? t.chargeTicks : Infinity;
 }
 
-/** The counter's value as the burn starts: past the longest charge any jump needs */
+/** The counter's value as the burn starts */
 export function jumpBurnAt(t: JumpTuning): number {
-  return t.chargeTicks + (t.shortCruise > 0 ? Math.ceil(t.shortRange / t.shortCruise) : 0);
+  return t.chargeTicks;
 }
 
-/** Phase of a jump counter, and progress through that phase in [0, 1]. `need`: the charge the jump aimed needs (jumpChargeNeed; a long jump's by default) */
-export function jumpPhase(j: number, t: JumpTuning, need = t.chargeTicks): { phase: JumpPhase; progress: number } {
+/** Phase of a jump counter, and progress through that phase in [0, 1] */
+export function jumpPhase(j: number, t: JumpTuning): { phase: JumpPhase; progress: number } {
   if (j <= 0) return { phase: 'ready', progress: 1 };
   const at = jumpBurnAt(t);
-  if (j < at) return { phase: 'charging', progress: Math.min(1, j / Math.min(need, at)) };
+  if (j < at) return { phase: 'charging', progress: Math.min(1, j / at) };
   const b = j - at;
   if (b < t.burnTicks) return { phase: 'burn', progress: b / t.burnTicks };
   return { phase: 'cooldown', progress: (b - t.burnTicks) / t.cooldownTicks };
@@ -534,7 +527,7 @@ export function stepFlight(
   const prev = body.jump ?? 0;
   const cargo = body.cargo ?? 0;
   const burnAt = jumpBurnAt(jt);
-  // How far this jump goes (where you aimed, within the drive's reach), and so how long it charges (a short one longer)
+  // How far this jump goes (where you aimed, within the drive's reach); every jump charges the same (jumpChargeNeed)
   // (A replica's jumpDist is below 0: where it lands isn't known, so its charge waits for the burn's keyframe)
   let go = 0, need = jt.chargeTicks;
   if (prev > 0 && prev < burnAt) {

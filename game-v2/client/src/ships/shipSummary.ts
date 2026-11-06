@@ -118,7 +118,7 @@ export function designFields(catalog: Catalog, tuning: ShipTuning, bp: Blueprint
 
 /** What the coils against the hull mean (flight.ts jumpDriveStats): a word, its colour and a hint */
 export function jumpRatioNote(ratio: number): { word: string; color: string; hint: string } {
-  if (ratio < 0.9) return { word: 'under-coiled', color: '#fbbf24', hint: 'Too much hull for its coils: less range and a slower recharge. Add jump coils (powered) to fix it' };
-  if (ratio <= 1.5) return { word: 'just right', color: '#86efac', hint: "The coils suit the hull: the drive's sweet spot" };
-  return { word: 'over-coiled', color: '#7dd3fc', hint: 'More coil than the hull needs: each extra one adds less and less, and the recharge has a floor' };
+  if (ratio < 0.9) return { word: 'under-coiled', color: '#fbbf24', hint: 'Too much hull for its coils: less range and a slower recharge. Each jump coil you add (powered; on a ports design, fed through its in port) wins range back, up to full range at 1x' };
+  if (ratio <= 1.5) return { word: 'just right', color: '#86efac', hint: "The coils suit the hull: full range. More still reaches further, each coil adding less than the last" };
+  return { word: 'over-coiled', color: '#7dd3fc', hint: 'More coil than the hull needs: still more range (about +18% at 2x, +29% at 4x, +39% at 8x), each coil adding less than the last; the recharge has a floor. The charge is always 3 s' };
 }
