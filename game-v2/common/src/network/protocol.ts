@@ -15,7 +15,7 @@ import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import type { HitReport } from './hits.js';
 import type { OwnCheck } from './ownTick.js';
 import type { ServerOwnSyncMessage } from '../sim/ownStep.js';
-import type { ServerGunSyncMessage, ServerGunCtlMessage } from '../sim/otherGuns.js';
+import type { ServerGunSyncMessage } from '../sim/otherGuns.js';
 import type { ServerPullsMessage } from '../sim/pullFields.js';
 import { CI_FLAG, compactInputTables } from './inputCompactTables.js';
 /**
@@ -473,6 +473,12 @@ export interface ServerSnapshotMessage {
    * (HEAD_HASH_HELD, HEAD_HASH_ROW): own | flags << 16, 24 bits. In place of its own row's safety copy every 2 s
    */
   hh?: number;
+  /**
+   * Other pilots' gun-control changes in this snapshot's window, for the gun lanes it steps (sim/otherGuns.ts
+   * packGunRow rows, in the server's lane order): taken before the rest of the snapshot (OtherGuns.onGunCtl). Each
+   * row is made once a round for every client (GunNet), so it goes as an encode-once block
+   */
+  gun?: number[][];
 }
 
 export interface ServerPlayerStateMessage {
@@ -903,7 +909,6 @@ export type ServerMessage =
   | ServerNetCapsMessage
   | ServerOwnSyncMessage
   | ServerGunSyncMessage
-  | ServerGunCtlMessage
   | ServerPullsMessage
   | ServerDockResultMessage
   | ServerPartDestroyedMessage
@@ -1724,13 +1729,13 @@ const COMPACT: [string, string[]][] = [
   ['contact', ['x', 'y', 'nx', 'ny', 'speed']],
   ['shipHps', ['ships']],
   ['debrisSplit', ['id', 'tick', 'e', 'p', 'l', 'g', 's', 'c', 'h']],
-  ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts', 'at', 'born', 'aloof', 'dmg']],
+  ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts', 'at', 'born', 'aloof', 'dmg', 'maxHp']],
   ['effect', ['effectType', 'x', 'y', 'targetX', 'targetY', 'entityId', 'data']],
   ['death', ['entityId', 'entityType', 'killerId']],
   ['stationFire', ['station', 'target', 'turret']],
   ['playerState', ['hp', 'maxHp', 'boostFuel', 'maxBoostFuel', 'xp', 'level', 'credits', 'systemId']],
   // (Packed first: see packSnapshot)
-  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd', 'x', 'w', 'h']],
+  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd', 'x', 'w', 'h', 'g']],
   ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full', 'pts']],
   // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
   ['ignite', ['bodyId', 'part', 'ticks']],
@@ -1754,6 +1759,9 @@ const COMPACT: [string, string[]][] = [
   ['crowd', ['tick', 'lv', 'f', 'w', 'r']],
   // (Appended, protocol 51: hostile populations, populations.ts; mapDots' pts follow its other fields)
   ['pops', ['p', 'full', 'n']],
+  // (Appended, protocol 61: the netcode rounds' plain messages, so they can go bit-packed: sim/otherGuns.ts, sim/pullFields.ts)
+  ['gunSync', ['id', 't', 'z', 'w', 'keep']],
+  ['pulls', ['f', 'r']],
 ];
 
 /**
@@ -1843,7 +1851,7 @@ export function wireTables(): Record<string, unknown> {
   };
 }
 
-interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][]; d?: number[][]; x?: number[][]; w?: number[][]; h?: number }
+interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][]; d?: number[][]; x?: number[][]; w?: number[][]; h?: number; g?: number[][] }
 
 /**
  * Projectiles have rows of their own (they're most of a fight's rows):
@@ -1905,6 +1913,7 @@ export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
   if (m.causes?.length) out.x = m.causes;
   if (m.guides?.length) out.w = m.guides;
   if (m.hh !== undefined) out.h = m.hh;
+  if (m.gun?.length) out.g = m.gun;
   return out;
 }
 
@@ -1960,7 +1969,7 @@ export function unpackSnapshot(p: PackedSnapshot): ServerSnapshotMessage {
     return s as unknown as EntityState;
   });
   for (const r of p.p ?? []) entities.push(unpackProjectile(r, p.t));
-  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}), ...(p.d ? { decisions: p.d } : {}), ...(p.x ? { causes: p.x } : {}), ...(p.w ? { guides: p.w } : {}), ...(p.h !== undefined ? { hh: p.h } : {}) };
+  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}), ...(p.d ? { decisions: p.d } : {}), ...(p.x ? { causes: p.x } : {}), ...(p.w ? { guides: p.w } : {}), ...(p.h !== undefined ? { hh: p.h } : {}), ...(p.g ? { gun: p.g } : {}) };
 }
 
 /**
@@ -2018,10 +2027,10 @@ function rowBytes(cache: WeakMap<readonly number[], Uint8Array>, row: readonly n
 
 function encodeSnapshot(m: ServerSnapshotMessage): Uint8Array {
   const { e, p } = packEntities(m);
-  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n, d, x, w, h], absent ones null and trailing nulls dropped)
+  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n, d, x, w, h, g], absent ones null and trailing nulls dropped)
   const row: unknown[] = [SNAPSHOT_CODE, m.tick ?? null, m.lastProcessedInput ?? null, e.length ? e : null, p.length ? p : null,
     m.removed.length ? m.removed : null, m.ships?.length ? m.ships : null, m.ctl?.length ? m.ctl : null,
-    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null, m.causes?.length ? m.causes : null, m.guides?.length ? m.guides : null, m.hh ?? null];
+    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null, m.causes?.length ? m.causes : null, m.guides?.length ? m.guides : null, m.hh ?? null, m.gun?.length ? m.gun : null];
   while (row.length > 1 && row[row.length - 1] === null) row.pop();
   const w = snapWriter;
   w.arrayHeader(row.length);

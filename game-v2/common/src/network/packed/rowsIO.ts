@@ -4,8 +4,8 @@
  * (blocks.ts) both use them, each with its own base: the connection's last values of that entity, or the entity's
  * chain shared by every holder.
  */
-import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_DATA_CHUNK, PK_KEYFRAME, PK_KEYFRAME_TAIL, PK_GUESS_TICKS } from './tables.js';
-import { nullish, E_X, E_Y, E_ANGLE, E_VX, E_VY, E_AV, E_HP, E_MAXHP, E_TICK, type PackedIO } from './packedIO.js';
+import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_DATA_CHUNK, PK_KEYFRAME, PK_KEYFRAME_TAIL, PK_GUESS_TICKS, PK_GUN } from './tables.js';
+import { isId, nullish, E_X, E_Y, E_ANGLE, E_VX, E_VY, E_AV, E_HP, E_MAXHP, E_TICK, type PackedIO } from './packedIO.js';
 
 /** The ticks since an entity's last row (for the guesses), and that row's tick noted */
 export function ticksSince(pv: number[], at: number, tick: number): number {
@@ -72,4 +72,53 @@ export function keyframeFieldsIO(io: PackedIO, row: unknown[] | undefined, len: 
     if (by) io.guess(pv, at + i - 1, at + by - 1, d, PK_KEYFRAME[by - 1][0], dt);
     o.push(io.num(v, d, c, pv, at + i - 1));
   }
+}
+
+/**
+ * Can a gun row go packed (sim/otherGuns.ts packGunRow: [id, tb, dd, tb, dd, ...], or a run [-1 - id, tb, dd, dd, ...];
+ * tb = bits × 8 + ticksAgo, 7 and more: bits × 8 + 7, then ticksAgo): whole numbers in that shape
+ */
+export function gunRowOk(row: unknown): boolean {
+  if (!Array.isArray(row) || row.length < 2 || !row.every((v) => Number.isSafeInteger(v) && Math.abs(v as number) < 2 ** 40)) return false;
+  const r = row as number[], run = r[0] < 0;
+  if (!isId(run ? -1 - r[0] : r[0])) return false;
+  let i = 1;
+  const tb = (): boolean => {
+    const v = r[i++];
+    if (v === undefined || v < 0) return false;
+    if (v % 8 === 7) { const a = r[i++]; if (a === undefined || a < 0) return false; }
+    return true;
+  };
+  if (run) return tb() && i < r.length;
+  while (i < r.length) { if (!tb() || i >= r.length) return false; i++; }
+  return true;
+}
+
+/**
+ * A gun row's body after its id (gunRowOk's shape): the run flag, the count of events, then each event's trigger bits
+ * (a varint), its ticks ago (3 bits; 7: a varint more) and the distance's step; a run row's bits and ticks ago once.
+ * Returns the run flag and the row with the id slot 0
+ */
+export function gunRowBody(io: PackedIO, row: readonly number[] | undefined): { run: boolean; o: number[] } {
+  const run = io.bit(!!row && row[0] < 0);
+  // (the events, one or more: a run row's are its steps; any other's, its (tb, dd) pairs)
+  let k = 0;
+  if (row) {
+    let j = 1;
+    const skip = () => { if (row[j++] % 8 === 7) j++; };
+    if (run) { skip(); k = row.length - j; } else while (j < row.length) { skip(); j++; k++; }
+  }
+  k = io.vu(k - 1, 1) + 1;
+  const o: number[] = [0];
+  let i = 1;
+  const tb = () => {
+    const v = row?.[i++] ?? 0;
+    const bits = io.vu(Math.floor(v / 8), PK_GUN[0]), low = io.u(v % 8, 3);
+    o.push(bits * 8 + low);
+    if (low === 7) o.push(io.vu(row?.[i++] ?? 0, PK_GUN[1]));
+  };
+  const dd = () => { o.push(io.vs(row?.[i++] ?? 0, PK_GUN[2])); };
+  if (run) { tb(); for (let e = 0; e < k; e++) dd(); }
+  else for (let e = 0; e < k; e++) { tb(); dd(); }
+  return { run, o };
 }

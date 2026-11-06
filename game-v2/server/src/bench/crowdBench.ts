@@ -85,6 +85,10 @@ for (const r of results) {
   console.log(`${r.layout} ${r.n}: idle ${g.idleChangesPerPilotSec}/s -> ${g.idleSentPerPilotSec}/s, exact ${g.exactChangesPerPilotSec ?? '?'}/s -> ${g.exactSentPerPilotSec}/s, gunCtl ${r.bytes.capable.subTypesBps?.gunCtl ?? 0} B/s`);
 }
 
+console.log('\npacked bytes per client per second by message type (the real wire bits; snapshot.* its BLOCKS parts: e status rows, p shells, r removed, k keyframes, c control rows, g gun rows, o out, f fire, n own, d decisions, x causes, w guides, hh head hash)');
+const kinds = (o: Record<string, number>) => Object.entries(o).map(([t, b]) => `${t} ${Math.round(b)}`).join(', ');
+for (const r of results) if (r.packedBps) console.log(`${r.layout} ${r.n}: every client: ${kinds(r.packedBps)}\n  probes: ${kinds(r.packedProbeBps ?? {})}`);
+
 console.log('\nprobe PT (the game\'s prediction of other ships, C3, per probe): ms/tick (advance + re-step), ships on PT, left out by LOD, ST match %, misses/s, re-stepped ships/s (touched), re-step ticks/s, corrections/s, mean correction, PT contacts/s');
 for (const r of results) {
   const p = r.pt;

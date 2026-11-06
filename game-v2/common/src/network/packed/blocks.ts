@@ -20,7 +20,7 @@
 import { EntityType, SNAP_FIELDS, packProjectile, type EntityState } from '../protocol.js';
 import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_KEYFRAME, PK_CONTROL, PK_PROJECTILE } from './tables.js';
 import { PackedIO, POW10, isId, E_X, E_Y, E_ANGLE, E_VX, E_VY, E_AV, E_HP, E_MAXHP, E_TICK } from './packedIO.js';
-import { entityFieldsIO, keyframeFieldsIO } from './rowsIO.js';
+import { entityFieldsIO, keyframeFieldsIO, gunRowOk, gunRowBody } from './rowsIO.js';
 
 /** A block's bits */
 export interface Bits { b: Uint8Array; n: number }
@@ -219,9 +219,10 @@ export class BlockStore {
   private readonly recK = new WeakMap<object, BlockRec | null>();
   private readonly recC = new WeakMap<object, BlockRec | null>();
   private readonly recF = new WeakMap<object, BlockRec | null>();
+  private readonly recG = new WeakMap<object, BlockRec | null>();
   private sweptAt = 0;
   /** Blocks encoded (each once, whoever gets it), by kind; and the bits each form came to */
-  readonly stats = { e: 0, k: 0, c: 0, f: 0, p: 0, delta: 0, abs: 0, bits: 0 };
+  readonly stats = { e: 0, k: 0, c: 0, f: 0, g: 0, p: 0, delta: 0, abs: 0, bits: 0 };
 
   /** `systemOf`: the system an entity is in now (ids are per system) */
   constructor(private readonly systemOf: (eid: number) => number) {}
@@ -335,6 +336,19 @@ export class BlockStore {
     const wid = this.ent(id, tick).wid;
     const rec: BlockRec = { eid: id, wid, tick, abs: this.bits((io) => { io.wid(wid); controlBody(io, row); }), before: -1, after: -1 };
     this.recC.set(row, rec);
+    return rec;
+  }
+
+  /** A gun row's block (sim/otherGuns.ts packGunRow: [id, ...], or [-1 - id, ...] for a run row; GunNet makes each once a round) */
+  gunRow(row: number[], tick: number): BlockRec | null {
+    const had = this.recG.get(row);
+    if (had !== undefined && (had === null || had.tick === tick)) return had;
+    if (!gunRowOk(row)) { this.recG.set(row, null); return null; }
+    this.stats.g++;
+    const id = row[0] < 0 ? -1 - row[0] : row[0];
+    const wid = this.ent(id, tick).wid;
+    const rec: BlockRec = { eid: id, wid, tick, abs: this.bits((io) => { io.wid(wid); gunRowBody(io, row); }), before: -1, after: -1 };
+    this.recG.set(row, rec);
     return rec;
   }
 

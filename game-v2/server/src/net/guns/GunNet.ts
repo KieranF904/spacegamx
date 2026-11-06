@@ -86,6 +86,12 @@ export interface GunLane {
   /** The pilot's cursor distance last tick, the tick the distance last went, and the last tick it must go exactly */
   exactDist: number;
   distAt: number;
+  /**
+   * Its cursor distance for drawing where its lane isn't stepped (the status row's hundreds: SnapshotBuilder
+   * roughCursor): the idle rule's, firing or not (idle, what its lanes got), and the tick it last moved
+   */
+  rough: number;
+  roughAt: number;
   exactTo: number;
   sent: GunCtl;
   events: [number, number, number][];
@@ -143,7 +149,7 @@ export class GunNet {
     const ctl = kind === 'pilot' ? pilotCtl(eid) : { bits: 0, dist: 0 };
     l = {
       kind, x: laneOf(gunStateOf(ship), b.chargeOf(eid)), ver: ++this.verSeq, fixAt: -Infinity, pd: pdParts(ship, b.tuning), at: now,
-      told: new Set(), none: new Set(), ctl, sent: { ...ctl }, events: [], exactDist: ctl.dist, distAt: now, exactTo: -Infinity, ship, derived: ship.derived, round: now, roundFrom: now, active: -Infinity,
+      told: new Set(), none: new Set(), ctl, sent: { ...ctl }, events: [], exactDist: ctl.dist, distAt: now, rough: ctl.dist, roughAt: now, exactTo: -Infinity, ship, derived: ship.derived, round: now, roundFrom: now, active: -Infinity,
     };
     this.lanes.set(eid, l);
     return null;
@@ -220,6 +226,9 @@ export class GunNet {
       l.distAt = t;
       if (exact) this.stats.exactSent++; else this.stats.idleSent++;
     }
+    // (Drawing elsewhere: what its lanes got while idle; while firing, the cursor's by the idle rule, not every held step)
+    if (!exact) { if (dist !== l.rough) { l.rough = dist; l.roughAt = t; } }
+    else if (g.dist !== l.rough && this.idleDue(eid, ship, l.rough, g.dist, t - l.roughAt)) { l.rough = g.dist; l.roughAt = t; }
     if (l.ctl.bits !== g.bits || l.ctl.dist !== dist) { l.ctl = { bits: g.bits, dist }; l.events.push([t, g.bits, dist / 4]); }
   }
 

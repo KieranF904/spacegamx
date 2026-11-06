@@ -11,7 +11,7 @@
 import {
   ReplicaMode, laneRecords, laneFireRow, lanePilot, lanePilotless, lanePd, laneRemap, laneHash, unpackGunSync, unpackGunRow, gunRowId, ownStructure,
   isOtherShotWire, TELL_NONE, TELL_PD,
-  type FlightBody, type GunCtl, type LaneRec, type OwnExtras, type ReplicaEnv, type ReplicaSideSteps, type ServerGunCtlMessage,
+  type FlightBody, type GunCtl, type LaneRec, type OwnExtras, type ReplicaEnv, type ReplicaSideSteps, type GunCtlRows,
   type ServerGunSyncMessage, type ServerSnapshotMessage, type ShipDerived, type ShipReplicaSet, type ShipState, type ShipTuning, type SimEnv,
   type SimEvent, type SimInput, type Step, type FieldEnv,
 } from '@space-game/common';
@@ -148,7 +148,7 @@ export class OtherGuns implements ReplicaSideSteps {
   }
 
   /** Pilots' gun-control changes (gunCtl, before its snapshot): each from the tick it took effect; ticks stepped already, again */
-  onGunCtl(m: ServerGunCtlMessage): void {
+  onGunCtl(m: GunCtlRows): void {
     for (const row of m.r) {
       const id = gunRowId(row), l = this.lanes.get(id);
       if (!l) continue;

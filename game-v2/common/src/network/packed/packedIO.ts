@@ -511,6 +511,7 @@ export class PackedIO {
       case 'f': return this.flag(v);
       case 'p': return this.pairs(v, ship);
       case 'l': return this.list(v, f[1], f[2]);
+      case 'r': return this.rows(v, f[1], f[2], f[3]);
       case 's': return this.shellField(v);
       default: return this.any(v);
     }
@@ -570,6 +571,27 @@ export class PackedIO {
     const t = this.scratch;
     t[0] = 0;
     for (let i = 0; i < n; i++) out[i] = this.num(a?.[i], d, c, t, 0);
+    return out;
+  }
+
+  /**
+   * A flat list in rows of `n` numbers: '0' null, '10' the list (each at d decimals, the step from the same column of
+   * the row before), '11' any other value
+   */
+  rows(v: unknown, n: number, d: number, c: number): unknown {
+    if (this.reading) {
+      if (this.get(1) === 0) return null;
+      if (this.get(1) === 1) return this.any(null);
+    } else {
+      if (nullish(v)) { this.put(0, 1); return null; }
+      if (!Array.isArray(v)) { this.put(3, 2); this.any(v); return v; }
+      this.put(2, 2);
+    }
+    const a = v as unknown[] | null;
+    const len = this.vu(a?.length ?? 0, 6);
+    const out: unknown[] = new Array(len);
+    const cols = new Array<number>(n).fill(0);
+    for (let i = 0; i < len; i++) out[i] = this.num(a?.[i], d, c, cols, i % n);
     return out;
   }
 
