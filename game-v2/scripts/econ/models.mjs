@@ -961,7 +961,7 @@ for (const m of models) {
 // ---------------------------------------------------------------------------
 
 const MODEL_SOUND = {
-  cannon_pip: { sfx: 'pip_shot' },
+  // (The Pip keeps the cannon kind's original shot sound, by Kieran's choice: pip_shot.mp3 stays in sfx, unused)
   cannon_hammer: { sfx: 'hammer_shot' },
   cannon_twinlink: { sfx: 'twinlink_shot' },
   cannon_longbarrel: { sfx: 'longbarrel_shot' },
