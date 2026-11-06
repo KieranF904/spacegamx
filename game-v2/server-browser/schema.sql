@@ -95,3 +95,17 @@ CREATE TABLE IF NOT EXISTS activity (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_server ON activity(server, id DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_player ON activity(lower(player), id DESC);
+
+-- Friends, friend requests and the saved status (server-browser/src/friends): one row per account, the lists as account
+-- ids. The game servers read and change them through the lobby's /admin/friends/*, so friends follow the account to
+-- every server. PostgresFriendStore makes this at start too when it is missing. The JSON store (JsonFriendStore,
+-- data/lobby/friends.json) holds the same records. A deleted account's row goes by cascade; the store takes its id
+-- out of everyone else's lists.
+CREATE TABLE IF NOT EXISTS friend_lists (
+    user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    status     TEXT NOT NULL DEFAULT 'online',   -- online, away, busy, invisible ("Appear offline")
+    friends    BIGINT[] NOT NULL DEFAULT '{}',
+    incoming   BIGINT[] NOT NULL DEFAULT '{}',   -- requests to this account
+    outgoing   BIGINT[] NOT NULL DEFAULT '{}',   -- requests it sent
+    updated_at BIGINT NOT NULL                   -- epoch ms
+);

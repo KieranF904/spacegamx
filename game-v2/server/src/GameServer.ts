@@ -162,6 +162,8 @@ import { Sieges, type SiegeHost } from './game/Sieges.js';
 import { Hangar } from './game/Hangar.js';
 import { Party } from './game/Party.js';
 import { Social } from './game/social/Social.js';
+import { MemoryFriends } from './game/social/MemoryFriends.js';
+import type { FriendsBackend } from './game/social/FriendsBackend.js';
 import type { Support } from './ships/features/support/Support.js';
 import { Trade } from './game/Trade.js';
 import { Operations } from './game/Operations.js';
@@ -512,6 +514,8 @@ export interface GameServerOptions {
   shipEditAnywhere?: boolean;
   /** Keeps logged-in players' progress between sessions (default: in memory only) */
   profileStore?: ProfileStore;
+  /** Where friends and status are kept, per account (index.ts: the lobby, LobbyFriends; default: in memory, MemoryFriends) */
+  friends?: FriendsBackend;
   /** Wall clock (ms) for autosave and fabricator jobs; tests pass a fake one */
   clock?: () => number;
   /** Allow the map's click-to-warp for everyone (dev servers, proto). Admins can always use it. */
@@ -1022,7 +1026,7 @@ export class GameServer implements ServerCtx {
       note: (conn, text, color) => this.send((conn as ClientConnection).ws, { type: 'systemMessage', text, color }),
       conns: () => this.clients.values(),
       now: this.clock,
-    }, profileStore);
+    }, profileStore, opts.friends ?? new MemoryFriends());
     this.pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.social.join(conn); });
     // New arrivals hear about this week's hunt
     this.pilots.onEvent((conn, ev) => {
