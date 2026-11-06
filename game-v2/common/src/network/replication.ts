@@ -29,6 +29,8 @@ import { StateRing } from '../sim/ring.js';
 import { ReplicaState } from '../sim/c-replicaState.js';
 import { CtlChangeInputs, DriverInputs } from '../sim/d-sources.js';
 import type { InputSource } from '../sim/input.js';
+import type { PullSource } from '../sim/env.js';
+import { PullBook, fieldPulls, unpackPullField, type PullerPose, type PullFieldRow } from '../sim/pullFields.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
@@ -176,6 +178,7 @@ interface Rep {
 }
 
 const HISTORY = 240;
+const NO_PULLS: readonly (readonly [number, number, number])[] = [];
 /** A keyframe's correction is bent in over up to this many ticks before it (drawing only: `at` is always exact) */
 const BEND_TICKS = 8;
 /** ...or, when it came too late for that, eased out over this many after */
@@ -229,6 +232,8 @@ export interface OwnTimeline {
   after(t: number, body: FlightBody): void;
   /** Before its step at tick t: what goes in first (a CARGO cause: the hold's mass it flies the step with) */
   preStep?(t: number, body: FlightBody): void;
+  /** Its pulls on tick t as the server told them (PULL rows, [kind, dvx, dvy]): its step takes them. Undefined: none told */
+  pulls?(t: number): readonly (readonly number[])[] | undefined;
   /**
    * Its whole step at tick t, flown (a pilot's): the one stepper on its full state (stores, guns, hazards, priming:
    * the source keeps those by tick), `body` stepped in place from its state at t - 1, with the controls the timeline
@@ -264,6 +269,8 @@ export interface ReplicaCauses {
   after(id: number, t: number, body: FlightBody): void;
   /** Before its step at tick t (only asked when it has causes then): a CARGO cause, the hold's mass it flies the step with */
   preStep?(id: number, t: number, body: FlightBody): void;
+  /** Its pulls on tick t as the server told them (PULL rows, [kind, dvx, dvy]): its step takes them. Undefined: none told */
+  pulls?(id: number, t: number): readonly (readonly number[])[] | undefined;
 }
 
 /**
@@ -302,6 +309,95 @@ export class ShipReplicaSet {
    * there, before that tick's causes): the step then takes it as it is. Was pend
    */
   private readonly ahead = new StateRing(HISTORY + 1);
+
+  /**
+   * The pull fields of this client's system (sim/pullFields.ts, the server's `pulls` records): every pilot's step here
+   * (its replica's, its own) takes their pulls after its motion, each puller as this set has it at the tick before
+   */
+  readonly pulls = new PullBook();
+  /**
+   * The step's pull source (sim/pulls.ts, through replicaStep and the own step): the pulls the server told for the ship
+   * on that tick, where it did (its PULL cause rows: its own timeline's, OwnTimeline.pulls, or its causes',
+   * ReplicaCauses.pulls), in place of the fields' (network/ownTick.ts PULL); else the fields' pulls
+   */
+  private readonly pullSource: PullSource = {
+    on: (id, t, at) => {
+      const told = this.own?.id === id ? this.own.src.pulls?.(t) : this.causes?.pulls?.(id, t);
+      if (told) {
+        const out: [number, number, number][] = [];
+        for (const r of told) if (r[0] === 0 /* OWN_CAUSE.PULL */) out.push([-1, r[1], r[2]]);
+        return out;
+      }
+      if (!this.pulls.size) return NO_PULLS;
+      return fieldPulls(this.pulls.all(), id, t, at, this.pullerAt, this.env().terrain);
+    },
+  };
+
+  /**
+   * A puller as it ended tick t (what a field reads of it on tick t + 1): its state there exactly, stepped to it if need
+   * be; null when this set doesn't hold it there (not had yet, or only from a keyframe after t). Kept as read
+   * (`pullerPoses`) until the puller is stepped again from t or before: a puller removed (a boss destroyed) still pulled
+   * on the ticks before it went, when a pilot is stepped again over them
+   */
+  private readonly pullerAt = (id: number, t: number): PullerPose | null => {
+    const kept = this.pullerPoses.get(id)?.get(t);
+    if (kept) return kept;
+    const r = this.reps.get(id);
+    const first = this.ring.first(id);
+    if (!r || first === undefined || first > t || r.mode === ReplicaMode.Drift || r.mode === ReplicaMode.Docked) return null;
+    const st = this.ring.get(id, t) ?? (t > this.lastT(id) ? this.at(id, t) : null);
+    if (!st || this.ring.get(id, t) !== st) return null;
+    const b = st.body, p = { x: b.x, y: b.y, angle: b.angle, vx: b.vx, vy: b.vy };
+    let m = this.pullerPoses.get(id);
+    if (!m) this.pullerPoses.set(id, (m = new Map()));
+    m.set(t, p);
+    if (m.size > HISTORY + 60) for (const k of m.keys()) if (k < t - HISTORY) m.delete(k);
+    return p;
+  };
+  private readonly pullerPoses = new Map<number, Map<number, PullerPose>>();
+
+  /** The env a step here flies in: the world's, with the pulls (a copy: the host's may be shared) */
+  private stepEnv(): ReplicaEnv {
+    return { ...this.env(), pulls: this.pullSource };
+  }
+
+  /**
+   * The server's pull field records (a `pulls` message): each ship a changed field acts on is stepped again from the
+   * first tick it changes
+   */
+  notePulls(rows: readonly PullFieldRow[], now?: number): void {
+    for (const row of rows) {
+      const rec = unpackPullField(row);
+      const from = this.pulls.put(rec);
+      if (from !== null) this.rewindPulled(rec.target, from);
+    }
+    if (now !== undefined) this.pulls.prune(now - HISTORY - 60);
+  }
+
+  /** Ships a field acts on stepped again from tick t (-1: every pilot held) */
+  private rewindPulled(target: number, t: number): void {
+    if (this.stepping > 0) { this.pullRewinds.push([target, t]); return; }
+    if (target >= 0) { this.rewindHeld(target, t); return; }
+    for (const [id, r] of this.reps) if (r.mode === ReplicaMode.Player) this.rewindHeld(id, t);
+  }
+
+  /**
+   * A ship stepped again from tick t, but never from before the oldest state it holds (a field that began long ago, a
+   * puller set going again from its keyframe: what came before that is gone, and a path steps on only from a state)
+   */
+  private rewindHeld(id: number, t: number): void {
+    const first = this.ring.first(id);
+    if (first === undefined || t > this.lastT(id) + 1) { this.rewind(id, t); return; }
+    this.rewind(id, Math.max(t, first + 1));
+  }
+  /** Rewinds a puller's being stepped again asked for while a step was under way (done before the next read: at) */
+  private pullRewinds: [number, number][] = [];
+  /**
+   * Pulls on ticks up to this one are final (the window of the snapshot before the newest: its causes and keyframes are
+   * all in), and the newest snapshot's tick
+   */
+  private pullsFinal = -Infinity;
+  private snapSeen = -Infinity;
 
   /** The last tick ship `id` is stepped to (-Infinity: none held) */
   private lastT(id: number): number {
@@ -424,11 +520,23 @@ export class ShipReplicaSet {
     this.hook = h;
   }
 
-  /** A ship's stepped states from tick t on are gone: what was worked out ahead of them goes too */
-  private dropped(id: number, t: number): void {
+  /**
+   * A ship's stepped states from tick t on are gone: what was worked out ahead of them goes too. `gone`: it was removed
+   * (what it was on those ticks stands, kept for its pulls: pullerAt)
+   */
+  private dropped(id: number, t: number, gone = false): void {
     this.ahead.dropFrom(id, t);
     this.pre.dropFrom(id, t);
     this.hook?.rewound(id, t);
+    if (gone) return;
+    // (A puller: the ships its fields pull from t + 1 read it at t, so they are stepped again from there too)
+    // (Not the pulls of a window a snapshot has closed (pullsFinal): those the server judged with the puller as this set had
+    // it then, and told where this set couldn't work them out. A puller stepped again over them later (a keyframe, its body
+    // stopped and its rows flying it from an old keyframe) changes nothing that was pulled then)
+    const from = Math.max(t, this.pullsFinal);
+    const poses = this.pullerPoses.get(id);
+    if (poses) for (const k of poses.keys()) if (k >= from) poses.delete(k);
+    if (this.pulls.size) for (const f of this.pulls.all()) if (f.from === id && f.t1 > from + 1) this.rewindPulled(f.target, Math.max(from + 1, f.t0));
   }
 
   /** Its latest keyframe's tick (its path before it is the one it was drawn on; undefined: not held) */
@@ -503,8 +611,9 @@ export class ShipReplicaSet {
     else cs?.preStep?.(id, t, body);
     const dt = (own ? own.derived(t) : cs?.derived(id, t)) || d;
     // (Its own ship, flown: its whole step, once, by its own timeline (OwnTimeline.step); anything else its replica's)
-    const flown = own && r.mode === ReplicaMode.Player && own.step ? own.step(t, body, bits, q, dt, this.env()) : null;
-    if (flown === null) replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, dt, this.tuning, this.env(), t);
+    const env = this.stepEnv();
+    const flown = own && r.mode === ReplicaMode.Player && own.step ? own.step(t, body, bits, q, dt, env) : null;
+    if (flown === null) replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, dt, this.tuning, env, t, id);
     const st = new ReplicaState(id, r.mode, body, flown ?? bits, q);
     this.ahead.keep(t, st);
     return st;
@@ -520,7 +629,8 @@ export class ShipReplicaSet {
     const r = this.reps.get(id), d = this.derived(id);
     if (!r || !d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift) return null;
     const body = cloneBody(prev.body);
-    replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, d, this.tuning, this.env(), t);
+    // (Its pulls too, the fields' (and what was told for the tick), each puller as this set has it: the PT layer's step is this)
+    replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, d, this.tuning, this.stepEnv(), t, id);
     return new ReplicaState(id, r.mode, body, bits, q);
   }
 
@@ -572,7 +682,7 @@ export class ShipReplicaSet {
    */
   remove(id: number, tick?: number): void {
     if (tick !== undefined && this.reps.get(id)?.mode === ReplicaMode.Drift && this.debris?.runs?.(id)) this.at(id, tick);
-    if (this.reps.delete(id)) this.dropped(id, -Infinity);
+    if (this.reps.delete(id)) this.dropped(id, -Infinity, true);
     this.ring.remove(id);
     this.pre.remove(id);
     this.ahead.remove(id);
@@ -583,6 +693,10 @@ export class ShipReplicaSet {
     this.ring.clear();
     this.pre.clear();
     this.ahead.clear();
+    this.pulls.clear();
+    this.pullRewinds.length = 0;
+    this.pullerPoses.clear();
+    this.pullsFinal = this.snapSeen = -Infinity;
   }
 
   ids(): IterableIterator<number> {
@@ -591,6 +705,8 @@ export class ShipReplicaSet {
 
   /** A snapshot's keyframes and control changes */
   apply(tick: number, ships?: KeyframeRow[], ctl?: ControlRow[]): void {
+    // (The window before this snapshot's is closed: its pulls stand as they were worked out, `pullsFinal`)
+    if (tick > this.snapSeen) { this.pullsFinal = this.snapSeen; this.snapSeen = tick; }
     // (Steps worked out ahead, preAt, read what came before this snapshot and its frame's structures: worked out afresh)
     this.ahead.clear();
     for (const row of ships ?? []) {
@@ -663,6 +779,8 @@ export class ShipReplicaSet {
   at(id: number, tick: number): Step | null {
     // (What the contact pass left waiting, worked out before anything is read: never part way through a step)
     if (this.stepping === 0 && this.hook?.unsettled) this.hook.settle?.();
+    // (...and ships a puller's re-step reaches, asked for part way through one)
+    if (this.stepping === 0 && this.pullRewinds.length) for (const [target, t] of this.pullRewinds.splice(0)) this.rewindPulled(target, t);
     const r = this.reps.get(id);
     const ring = this.ring;
     if (!r || !ring.size(id)) return null;

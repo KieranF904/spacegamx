@@ -19,6 +19,11 @@ export interface CauseEvent {
   /** A rebuild: its centres of mass either side (a client works it out from the structures it has before and after its sync) */
   rebuild?: { from: readonly number[]; to: readonly number[] };
   /**
+   * A pull field's pull (common sim/pullFields.ts), by puller `from`: a client that holds that puller as the server had
+   * it works it out itself, so it isn't sent (Replication.forClient, untoldPulls). Absent on a pull only the server has
+   */
+  pull?: { from: number };
+  /**
    * A contact: whether a replica of the other before that tick's causes is the pass's (then the row may go without the
    * state), the other's versions then (a keyframe of it since: the client's replica moved), and its rebuilds then
    */
@@ -32,18 +37,19 @@ export interface CauseEvent {
 }
 
 /** A tick's causes as rows (a contact with the other's state), with what applying them needs */
-export interface WorkedCauses { rows: number[][]; seqs: number[]; env: OwnCauseEnv; contacts: Map<number, OwnContact>; rebuilt: { from: [number, number]; to: [number, number] } | null }
+export interface WorkedCauses { rows: number[][]; seqs: number[]; env: OwnCauseEnv; contacts: Map<number, OwnContact>; rebuilt: { from: [number, number]; to: [number, number] } | null; pulls?: (number | undefined)[] }
 
 /**
  * A ship's causes on one tick, made into rows; a string instead when a client couldn't work them out from rows (why:
  * the ship gets a keyframe). `window`: its causes earlier in the snapshot window
  */
 export function workCauses(causes: readonly OwnCause[], window: readonly CauseEvent[], cellSize: number, restitution: number): WorkedCauses | string {
-  const rows: number[][] = [], seqs: number[] = [];
+  const rows: number[][] = [], seqs: number[] = [], pulls: (number | undefined)[] = [];
   const contacts = new Map<number, OwnContact>();
   let rebuilt: { from: [number, number]; to: [number, number] } | null = null, self: OwnContact['self'] | null = null;
   for (const c of causes) {
     seqs.push(c.seq ?? 0);
+    pulls.push(c.kind === 0 && c.derived ? c.from ?? -1 : undefined);
     if (c.kind === 0) rows.push([OWN_CAUSE.PULL, c.dvx, c.dvy]);
     else if (c.kind === 3) rows.push([OWN_CAUSE.CARGO, c.cargo]);
     else if (c.kind === 1) {
@@ -63,7 +69,7 @@ export function workCauses(causes: readonly OwnCause[], window: readonly CauseEv
     other: (id) => { const c = contacts.get(id); return c ? { shape: c.otherShape, body: { ...c.pre } } : null; },
     rebuilt: () => rebuilt,
   };
-  return { rows, seqs, env, contacts, rebuilt };
+  return { rows, seqs, env, contacts, rebuilt, pulls };
 }
 
 /** The worked rows as this window's events (a contact's other settled later: settleContacts) */
@@ -71,7 +77,8 @@ export function recordCauses(list: CauseEvent[], w: WorkedCauses, tick: number):
   for (let i = 0; i < w.rows.length; i++) {
     const r = w.rows[i];
     const c = r[0] === OWN_CAUSE.CONTACT ? w.contacts.get(r[1])! : null;
-    list.push({ tick, seq: w.seqs[i], row: r, rebuild: r[0] === OWN_CAUSE.REBUILD && w.rebuilt ? w.rebuilt : undefined, contact: c ? { other: c.other, inStep: false, version: -1, cver: -1, rebuilds: c.otherRebuilds } : undefined });
+    const from = w.pulls?.[i];
+    list.push({ tick, seq: w.seqs[i], row: r, rebuild: r[0] === OWN_CAUSE.REBUILD && w.rebuilt ? w.rebuilt : undefined, contact: c ? { other: c.other, inStep: false, version: -1, cver: -1, rebuilds: c.otherRebuilds } : undefined, pull: from !== undefined ? { from } : undefined });
   }
 }
 
@@ -161,4 +168,29 @@ export function causeRecords(caused: readonly (readonly [number, readonly CauseE
   recs.sort((x, y) => x.tick - y.tick || x.seq - y.seq);
   const rows = recs.map((p) => (p.a === undefined ? p.row : [snapshotTick - p.tick, OWN_CAUSE.CONTACT, p.a, p.b!, p.f!, ...(p.sa ?? []), ...(p.sb ?? [])]));
   return { rows, stateless: free };
+}
+
+/**
+ * Which of a ship's pull events (in tick order) one client is not sent, working them out itself (common
+ * sim/pullFields.ts): a tick's pulls go untold only when every one of them is a field's and `derivable(from, tick)`
+ * says this client holds that puller as the server had it at the tick before, and `whole(tick)` doesn't say another
+ * field could have acted on the ship then from a puller it doesn't hold so. Otherwise all of that tick's pulls are told
+ * (a client told one takes them all in its step in place of working any out: common network/ownTick.ts PULL). Null:
+ * none to leave out
+ */
+export function untoldPulls(events: readonly CauseEvent[], derivable: (from: number, tick: number) => boolean, whole?: (tick: number) => boolean): Set<CauseEvent> | null {
+  let out: Set<CauseEvent> | null = null;
+  for (let i = 0; i < events.length;) {
+    const t = events[i].tick;
+    let j = i, any = false, ok = !whole?.(t);
+    for (; j < events.length && events[j].tick === t; j++) {
+      const e = events[j];
+      if (e.row[0] !== OWN_CAUSE.PULL) continue;
+      any = true;
+      if (!e.pull || !derivable(e.pull.from, t)) ok = false;
+    }
+    if (any && ok) for (let k = i; k < j; k++) if (events[k].row[0] === OWN_CAUSE.PULL) (out ??= new Set()).add(events[k]);
+    i = j;
+  }
+  return out;
 }

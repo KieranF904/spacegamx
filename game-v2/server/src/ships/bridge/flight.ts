@@ -13,7 +13,7 @@ import {
   Position, Velocity, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  chargeTotal, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactFxDue,
+  chargeTotal, contactPieces, contactPair, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
   ContactPairCache, contactPairs, cloneCharge, gunStateOf, type ContactPair, type HazardState, type OwnExtras,
   type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
@@ -138,8 +138,9 @@ export function pin(b: BridgeCtx, eid: number, on = true): void {
 }
 
 /**
- * A pull on a body's velocity (a boss's magnet, a collapsing star). A pilot's is put on the PULL grid and noted as its
- * client's cause (TEMPORARY, network/ownTick.ts PULL: until boss decisions are inputs). Debris isn't pulled.
+ * A pull on a body's velocity that no pull field says (bridge/pullFields.ts: a Grapple gem's shell, a pull on an AI
+ * ship). A pilot's is put on the PULL grid, its velocity back on its own (addPull, as every pull on a pilot is) and
+ * noted as its clients' cause: they can't work it out (network/ownTick.ts PULL). Debris isn't pulled.
  */
 export function push(b: BridgeCtx, eid: number, ax: number, ay: number): void {
   const ship = b.bodies.get(eid);
@@ -148,12 +149,19 @@ export function push(b: BridgeCtx, eid: number, ax: number, ay: number): void {
     // (While the pilotless ships step: once they all have, so none reads this tick's pull: tick)
     if (b.pushQueue) { b.pushQueue.push([eid, ax, ay]); return; }
     const dvx = quantizePull(ax), dvy = quantizePull(ay);
-    Velocity.x[eid] += dvx; Velocity.y[eid] += dvy;
+    PUSHED.vx = Velocity.x[eid]; PUSHED.vy = Velocity.y[eid];
+    addPull(PUSHED, dvx, dvy);
+    Velocity.x[eid] = PUSHED.vx; Velocity.y[eid] = PUSHED.vy;
     b.ownCauses.add(eid, { kind: 0, dvx, dvy });
     return;
   }
   Velocity.x[eid] += ax;
   Velocity.y[eid] += ay;
+}
+
+/** Is this a pilot's ship (ShipBridge.isPilot) */
+export function isPilot(b: BridgeCtx, eid: number): boolean {
+  return b.bodies.has(eid) && hasComponent(b.host.world, Player, eid);
 }
 
 /** Player movement. Returns false for non-ship entities so the legacy path runs. */
@@ -176,6 +184,9 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   pilotHazards(b, eid, tick, s.hazard);
   // (Its inputs from its source: bridge/inputs.ts, the pilot's held keys off the Input component)
   const { isBoosting } = stepShip(s, readPilotInput(eid, MOVE_IN), moveEnv(b, eid, tick), s, MOVE_EVENTS);
+  // (Its pulls this tick, the pull fields' (bridge/pullFields.ts), in its step after the motion: noted as its causes,
+  // derived, so its shadows have them and a client that can't work one out is told it, net/Replication.ts)
+  for (const e of MOVE_EVENTS) if (e.k === 'pull') { b.ownCauses.add(eid, { kind: 0, dvx: e.dvx, dvy: e.dvy, from: e.from, derived: true }); b.pulls.stats.pulls++; }
   ship.jumpPrime = s.jumpPrime;
   b.setCharge(eid, s.charge);
   // (What it flew: its keys, its hazards' bits, the engines' power and a boost the stores refused: replicas have no charge)
@@ -213,8 +224,10 @@ export function ownExtras(b: BridgeCtx, eid: number, tick: number): OwnExtras | 
 /** stepMovement's scratch: the view, its input and env (reused every call; the step keeps none of them) */
 const MOVE_VIEW = new SimShipView();
 const MOVE_IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
-/** (Empty: its guns are fireWeapons', env.gunsByHost; the step emits nothing else for a pilot yet) */
+/** (Its pulls' events: its guns are fireWeapons', env.gunsByHost) */
 const MOVE_EVENTS: SimEvent[] = [];
+/** (push's scratch) */
+const PUSHED = { vx: 0, vy: 0 };
 const MOVE_FIELDS: FieldEnv = { central: null };
 const MOVE_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: MOVE_FIELDS, terrain: null, gunsByHost: true };
 let moveEid = 0, moveB: BridgeCtx | undefined;
@@ -225,6 +238,7 @@ function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {
   moveB = b; moveEid = eid;
   MOVE_ENV.tick = tick; MOVE_ENV.tuning = b.tuning; MOVE_ENV.gravity = b.host.gravityAt(eid); MOVE_ENV.terrain = b.host.terrainAt?.(eid) ?? null;
   MOVE_ENV.hazard = b.host.hazardFlight ? moveHazard : undefined;
+  MOVE_ENV.pulls = b.pulls?.any ? b.pulls.source : undefined;
   return MOVE_ENV;
 }
 

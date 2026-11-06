@@ -24,6 +24,7 @@ import {
   ShipTuning, WeaponTuning, WEAPON_KIND_TYPE, ServerMessage, interceptHits, mulberry32, hashString, weaponDef, gunDef, launchShot, volleyAngles, weaponHit, type WeaponMods, type HitInfo,
   endsAtAim, lifeToReach, steerToward, bursts, hitEndFx, pierceKeepOf, shellAmount, shellVs,
   GUIDE, PLAN_NONE, PLAN_WP, guideKind, guideLost, guideTick, newGuide, qGuide, wpArgs, type Guide, type GuideBody,
+  Player, PULL_FIELD,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
@@ -229,8 +230,13 @@ export class Weapons {
       if (x.def.pull && (!x.def.hold || parked)) {
         // A collapsing star: everything nearby is dragged in, harder the closer it is
         const px = Position.x[eid], py = Position.y[eid], r = x.def.pull.radius;
+        // (Parked, it pulls from a fixed point: on pilots a field their steps work out from the next tick, as their
+        // clients' do (common sim/pullFields.ts STAR). A shell on the move (a Grapple gem's) is pushed: the server's alone)
+        const field = !!x.def.hold;
+        if (field) this.ships.pulls.declare(eid, 'star', { kind: PULL_FIELD.STAR, target: -1, skip: x.owner, a: [px, py, r, x.def.pull.strength], until: this.host.tick() + Lifetime.remaining[eid] }, this.host.tick());
         for (const [other, s] of this.ships.bodies) {
           if (other === x.owner || InSystem.systemId[other] !== InSystem.systemId[eid] || s.kind === 'debris') continue;
+          if (field && hasComponent(w, Player, other)) continue;
           const dx = px - Position.x[other], dy = py - Position.y[other];
           const d = dhypot(dx, dy);
           if (d > r || d < 1) continue;

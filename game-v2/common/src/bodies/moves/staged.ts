@@ -18,6 +18,7 @@ import { EffectType } from '../../network/protocol.js';
 import { wantAim, wantDrive, wantFly, wantHold, type WantRec } from '../decisions.js';
 import type { StagedFlightTables } from '../stagedFlight.js';
 import { moveRng, PART_STATE, type MoveHost, type MovePose, type MoveHurt } from './host.js';
+import type { PullDecl } from '../../sim/pullFields.js';
 
 export type Move = Generator<void, void, void>;
 
@@ -268,12 +269,12 @@ export abstract class StagedMoves {
     return !!t && rayTerrain(t, x, y, p.x, p.y) < 1;
   }
 
-  /** A pull on one pilot towards a point (`k` a tick at its middle, none at `r`), not through rock (the server's) */
-  protected pullOne(q: number, x: number, y: number, r: number, k: number): void {
-    const p = this.at(q), dx = x - p.x, dy = y - p.y, d = dhypot(dx, dy);
-    if (d > r || d < 1 || this.walled(x, y, q)) return;
-    const f = k * (1 - d / r);
-    this.h.work?.push(q, (dx / d) * f, (dy / d) * f);
+  /**
+   * A pull field on the next tick (common sim/pullFields.ts; the server's to declare, MoveWork.pull): every pilot's step
+   * works its pull out itself, from where this body ended this tick and where the pilot is after its motion
+   */
+  protected pullNext(key: string, d: PullDecl): void {
+    this.h.work?.pull?.(key, d);
   }
 
   // ---- Shared moves ----

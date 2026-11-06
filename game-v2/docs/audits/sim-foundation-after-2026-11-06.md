@@ -165,3 +165,120 @@ All other rows (idle, cruise, crowd-20/50/100, rock-starter, rock-gale, map, ree
 - **custom: back to pre-3b.** The +10 B/s left is the head-hash floor.
 - **pyreclast and pirates** move by a few bytes because the fights play out a little differently. Those pilots' rebuilt
   generators now make what the wire's tenths say.
+
+## Pull fields (game-wide C3, track B)
+
+Every pull on a pilot's ship is now part of that ship's step, on every end. A Scrap Mother's haul and intake, a Scrap
+Crawler's magnet, a Hookboat's reel and a parked collapsing star are no longer sent tick by tick as `PULL` causes.
+
+### Why the first attempt was blocked
+
+The attempt in stage 1C had the client run the boss's move (MoveRunner) and log each pull it made, then feed those to
+the pilots' steps. It hit three walls:
+
+- **Order.** A move's pull on tick t reads the pilot after its step on t. The client runs moves on their own timeline,
+  so a move could run before or after the pilot it pulls had been stepped. The two needed stepping in turn, tick by
+  tick.
+- **The tether.** A Hookboat's reel starts when its harpoon hits. Only the server finds that hit.
+- **The star.** A collapsing star pulls from where its orb is held, and the client didn't know that point exactly.
+
+### What was done instead
+
+The decision and the force are now separate things.
+
+- **The decision is a field, sent once.** A move says "I pull on the next tick", every tick it pulls
+  (`MoveWork.pull` / `CustomWork.pull`, through `PullDeclarer`, common sim/pullFields.ts). A declaration that stays the
+  same keeps the field open. The server sends the record when the field opens, and again only if it ends early
+  (`pulls` message: `[id, from, kind, t0, t1, target, skip, ...args]`). Five shapes cover every pull: CONE (haul), LANE
+  (intake), POINT (crawler), REEL (hookboat, where the tether is a field with its target) and STAR (a fixed point and
+  its owner skipped).
+- **The force is a pure function of state both ends hold** (`fieldPull`). It reads the puller as it ended tick t - 1
+  and the pilot after its motion on tick t. That is what the server's move read before, so the arithmetic is
+  unchanged. On the server, `stepMovement` passes `env.pulls`. On a client, `ShipReplicaSet` passes it into every
+  pilot's step: replicas (`replicaStep`, now with the pilot's id), the own ship (`OwnTick.step`) and the dev PT layer
+  (`stepAlone`). The puller comes from the replica ring at t - 1, stepped there if need be. That reading in turn is
+  what lets each tick go in order without a separate scheduler.
+- **Order solved by dependency, not by scheduling.** When a puller is stepped again from a tick, the ships its fields
+  act on are stepped again from the next tick (`dropped` cascade). Puller poses are kept as read, so a puller that
+  is removed still pulled on the ticks before it went. Pulls in a window an earlier snapshot has closed are final
+  (`pullsFinal`). Without this, a boss's body stopping and its rows taking over from an old keyframe re-stepped the
+  own ship 240 ticks back.
+- **One arithmetic everywhere.** Every pull on a pilot is `addPull`: put on the PULL grid, then the velocity back on its
+  own grid at once. It is applied after the motion and before every cause. A told `PULL` row is taken by the step's
+  pull phase in place of the fields' pulls (it is a no-op among the causes after the step). The server's shadows apply
+  pull rows straight after their replica step, before `pre`.
+
+### When a pull is still told
+
+A pull is still told as a `PULL` row in these cases. Each tick is told whole or not at all.
+
+- **The pull is the server's alone.** A Grapple gem's moving shell, or a pull on an AI ship (that is a push, as before).
+- **The client can't have the puller as the server had it.** `Replication.forClient` decides this per client:
+  - the client didn't hold the puller before this snapshot, or the puller is out of its view;
+  - a shadow of the puller differs from the pose the pulls read (`notePullers`, against `ServerPulls.usedAt`);
+  - the puller has causes the client can't work out;
+  - the puller is keyframed now, on this round's ticks.
+- **A zero row.** On a tick where such a field could have pulled the ship but the server's step had no pull, a zero
+  row (`[ago, 0, 0, 0]`) goes. This stops the client from working one out from the wrong place.
+- **Each tick is judged once**, in the first round that covers it (`pullsJudged`). A round that sends nothing has left
+  its ticks' pulls to be worked out.
+
+### Behaviour changes (intentional)
+
+These are why world hashes in a pull fight differ from before. The frameHash golden has no pulls, and its world
+hashes are unchanged.
+
+- A pull acts on the tick after the move decides it. The haul, intake and crawler are declared a tick early, so they
+  keep their ticks. The reel starts one tick after the harpoon strikes, and a star one tick after its orb parks.
+- A pull's end, when its source is lost (magnets or throat shot off, the boss gone), takes effect one tick later.
+- Several pulls on one ship in a tick go in puller-id order, each rounded. A pull and a contact on the same tick now
+  have the velocity rounded between them.
+- An admin hidden from bosses is pulled like any pilot.
+
+### Proof
+
+`server/src/net/causes/pullFields.test.ts` (real GameServer, two full-caps fake clients) checks four cases. In each,
+both pilots (A's own layer, A's replica of B, B's of A) and every body A runs are the server's state bit for bit at
+every snapshot tick:
+
+| case | pulls applied | told to the pilot | worked out | records |
+|---|---:|---:|---:|---:|
+| Mother haul + intake | 226 | 0 | 226 | 4 |
+| Hookboat reel + Crawler magnet | 948 | 0 | 948 | 88 (29 fields) |
+| Pullers shoved on the server alone, mid-pull | 941 | 124 | 817 | 22 |
+| Collapsing star | 172 | 0 | 172 | 2 |
+
+The shoved case drives the told path: those ticks' pulls go told and nothing goes off.
+
+Tests re-pinned or changed:
+
+- `structure.test`: `ShipBridge` `isPilot` and `pulls`, and the `pulls` server message.
+- `scrapDarter.test`: body checks > 400 becomes > 250. The crawler's magnet no longer forces a snapshot every round:
+  137 snapshots, 232 before.
+
+The wire tables are unchanged (`wire:bump` found nothing): protocol 57. A cached 57 client would not know the `pulls`
+message. Nothing is deployed (deploy freeze), so no bump was made.
+
+### Bytes
+
+`cd game-v2/server && npm run bench:table -- --only mother,custom,pirates,crowd-20`. Before is refactor/split c2ce196.
+B/s except msgs/s:
+
+| scenario | before payload | **after payload** | before msgs/s | **after msgs/s** | before wire | **after wire** | up (before / after) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| mother | 1653 | **1623** | 15.15 | **15.05** | 2653 | **2616** | 580 / 580 |
+| custom | 1190 | **1164** | 10.90 | **10.75** | 1910 | **1874** | 561 / 564 |
+| pirates | 639 | **621** | 8.25 | **8.45** | 1184 | **1179** | 685 / 687 |
+| crowd-20 | 980 | **980** | 8.57 | **8.57** | 1545 | **1545** | 137 / 137 |
+
+The measured pilot's own `PULL` rows over the 20 s:
+
+- **mother:** 90 → 0, plus one record (43 B). Snapshots 307 → 297.
+- **custom:** 102 → 0, plus one record (34 B). Snapshots 234 → 221.
+- **pirates:** 23 → 0.
+
+Every other count is the same or within a fight's drift: keyframes, head misses (0), fixes, hits.
+
+These scenes pull for under 2 s in 20, so the saving is 2-3%. A fight spent in a magnet saves about 5 B per pulled
+tick per pilot. It also stops the snapshot a round that each pull forced, and the PT layer's misprediction of every
+pulled ship.

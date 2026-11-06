@@ -16,7 +16,7 @@ import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { cloneCharge, type SimShipState, type ServerOwnSyncMessage } from '@space-game/common';
+import { cloneCharge, type SimShipState, type ServerOwnSyncMessage, type ServerPullsMessage } from '@space-game/common';
 import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
@@ -465,6 +465,8 @@ export class ShipClient {
     this.causes.clear();
     this.contacts.clear();
     this.debris.reset();
+    // (The server's pull fields come again, every one: its ids may start over)
+    this.replicas.pulls.clear();
   }
 
   /** Its pilot is known (welcome, a respawn's too): its own ship is stepped on its tick layer from its own inputs */
@@ -552,6 +554,15 @@ export class ShipClient {
   /** Its own ship's stores, guns, hazards and priming as the server has them at a snapshot's tick (OwnTick.onOwnSync) */
   onOwnSync(m: ServerOwnSyncMessage): void {
     this.own.onOwnSync(m);
+  }
+
+  /**
+   * Pull fields opened or ended early (common sim/pullFields.ts; just before the snapshot they go with): every pilot's
+   * step on its tick layer (its own, the replicas', the dev PT layer's) works their pulls out itself
+   */
+  onPulls(m: ServerPullsMessage): void {
+    if (m.r) this.replicas.pulls.clear();
+    this.replicas.notePulls(m.f, this.opts.state.serverTick);
   }
 
   /** An input it sent: its own ship's controls on the tick-aligned layer from its target tick (OwnTick) */

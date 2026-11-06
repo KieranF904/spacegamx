@@ -291,6 +291,8 @@ export abstract class StagedBrain implements BossBrain {
         damage: (id, part, amount, how) => host.ships.damagePartBy(id, part, amount, b.view.eid, how),
         splash: (x, y, r, amount) => strike(host, b.view.systemNum, x, y, r, amount, b.view.eid),
         push: (id, dx, dy) => host.ships.push(id, dx, dy),
+        // (A pull field on the pilots, from the next tick: their steps work it out, as their clients' do: ships/bridge/pullFields.ts)
+        pull: (key, d) => host.ships.pulls.declare(b.view.eid, key, d, host.tick()),
         homing: (kind, x, y, a, scale, target) => host.fire(b.view.eid, kind, x, y, a, scale, { target }),
         mob: (kind, x, y, a, speed, scale, target) => {
           const d = host.mobs?.spawn(kind, b.view.systemNum, x, y, a, speed, b.view.eid, scale, target) ?? -1;
