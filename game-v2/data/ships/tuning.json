@@ -35,7 +35,6 @@
     "slowTicks": 16,
     "chargeDamping": 0.96,
     "baseRange": 50000,
-    "minRange": 5000,
     "coreCapacity": 40,
     "gradeCapacity": 0.1,
     "gradeRange": 0.05,

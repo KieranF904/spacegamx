@@ -76,7 +76,6 @@ export interface ContextHost {
   locked(system: string): { name: string; hint: string } | null;
   jumpPhase(): JumpPhase;
   jumpReach(): number;
-  jumpMinRange: number;
   /** Seconds left on the drive's cooldown */
   jumpCool(): number;
   /** What's wrong with where the jump drops you (ShipClient.jumpDanger), while it charges */
@@ -351,7 +350,7 @@ export class ContextActions {
     if (!m.targets.length) {
       const dist = from(m.world.x, m.world.y);
       const reach = this.host.jumpReach();
-      const drive: DriveFacts | null = reach > 0 ? { phase: this.host.jumpPhase(), reach, minRange: this.host.jumpMinRange, cool: this.host.jumpCool() } : null;
+      const drive: DriveFacts | null = reach > 0 ? { phase: this.host.jumpPhase(), reach, cool: this.host.jumpCool() } : null;
       sections.push({ title: 'Open space', kind: '', dist: me ? km(dist) : '', color: '#7dd3fc', options: openSpaceOptions(dist, drive) });
       m.refs.push('space');
     }
@@ -492,7 +491,7 @@ export class ContextActions {
     if (!o || !me) { this.ui.jump(null, null, '', '', false); return; }
     const reach = this.host.jumpReach();
     const want = Math.hypot(o.x - me.renderX, o.y - me.renderY);
-    const go = Math.max(this.host.jumpMinRange, Math.min(want, reach));
+    const go = Math.min(want, reach);
     const a = Math.atan2(o.y - me.renderY, o.x - me.renderX);
     const short = want > reach + 1;
     const land = short ? this.host.worldToScreen(me.renderX + Math.cos(a) * go, me.renderY + Math.sin(a) * go) : null;

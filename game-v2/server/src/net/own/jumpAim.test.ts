@@ -165,10 +165,20 @@ describe('a pilot\'s jump lands where it was aimed, charging the same 3 s whatev
     expect(Math.abs(Math.hypot(r.at.x - r.start.x, r.at.y - r.start.y) - r.burnDist)).toBeLessThan(20);
   }, 240_000);
 
-  it('aimed nearer than the drive\'s shortest jump: it goes that far (minRange), as the overlay says', () => {
-    const r = jumpWithMouse(() => 2000);
-    const landed = Math.hypot(r.at.x - r.start.x, r.at.y - r.start.y);
-    expect(Math.abs(landed - r.jt.minRange)).toBeLessThan(10);
-    expect(Math.hypot(r.overlay![0] - r.at.x, r.overlay![1] - r.at.y)).toBeLessThan(30);
+  it('no shortest jump (Kieran, 2026-11-06): a 2k hop goes 2k, a 500 one 500, as the overlay says', () => {
+    for (const D of [2000, 500]) {
+      const r = jumpWithMouse(() => D);
+      const landed = Math.hypot(r.at.x - r.start.x, r.at.y - r.start.y);
+      expect(Math.abs(landed - D), String(D)).toBeLessThan(30);
+      expect(Math.hypot(r.overlay![0] - r.at.x, r.overlay![1] - r.at.y)).toBeLessThan(30);
+      expect(r.charged).toBe(r.jt.chargeTicks);
+    }
+  }, 240_000);
+
+  it('aimed right at the ship itself: a hop of one distance step, never a full-range jump (0 on the wire means as far as the drive goes)', () => {
+    const r = jumpWithMouse(() => 0);
+    expect(r.burnDist).toBe(4);
+    expect(Math.hypot(r.at.x - r.start.x, r.at.y - r.start.y)).toBeLessThan(40);
+    expect(r.offTicks).toBe(0);
   }, 120_000);
 });

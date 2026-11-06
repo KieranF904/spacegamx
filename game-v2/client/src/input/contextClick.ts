@@ -193,21 +193,18 @@ export interface DriveFacts {
   phase: 'ready' | 'charging' | 'burn' | 'cooldown';
   /** How far it reaches here (0: no drive) */
   reach: number;
-  minRange: number;
   /** Seconds left cooling down */
   cool: number;
 }
 
 /** Closer than this, flying there is nothing to do (the autopilot's own arrival radius) */
 export const MIN_FLY = 350;
-/** The jump drive goes no shorter than its minRange; a little over it, the coast at the end eats some */
-const JUMP_MIN_SLACK = 1.1;
 
 /** Why the drive can't jump `dist` now, or null */
 export function jumpBlocked(dist: number, d: DriveFacts): string | null {
   if (d.phase === 'cooldown') return `Cooling down · ${Math.max(1, Math.ceil(d.cool))} s`;
   if (d.phase !== 'ready') return 'The drive is already charging';
-  if (dist < d.minRange * JUMP_MIN_SLACK) return `Too close: the drive jumps ${km(d.minRange * JUMP_MIN_SLACK)} or more`;
+  if (dist < MIN_FLY) return "You're already here";
   if (dist > d.reach) return `Out of range: the drive reaches ${km(d.reach)} from here`;
   return null;
 }

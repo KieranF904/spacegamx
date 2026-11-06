@@ -168,7 +168,8 @@ export function jumpTicks(jt: JumpTuning): number {
 /** Is it worth jumping `left` along a leg now (the drive ready), rather than flying it? */
 export function jumpPays(left: number, ship: PlanShip): boolean {
   const d = ship.drive;
-  return !!d && left >= d.jt.minRange && jumpTicks(d.jt) < left / Math.max(1, ship.vFly);
+  // (Any distance can be jumped; it pays only once flying it would take longer than the charge and burn)
+  return !!d && jumpTicks(d.jt) < left / Math.max(1, ship.vFly);
 }
 
 /**
@@ -205,7 +206,7 @@ export function routeTime(
       }
       // Fly: the rest of the leg, or until the drive's ready when a jump would pay then
       let k = left;
-      if (d && cool > 0 && left >= d.jt.minRange) {
+      if (d && cool > 0 && jumpTicks(d.jt) < left / v) {
         const rate = 1 + (inSolarRing(here.x, here.y, sys?.centralBody, d.jt) ? d.jt.solarCharge : 0);
         k = Math.min(left, (cool / rate) * v);
       }

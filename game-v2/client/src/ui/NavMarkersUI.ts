@@ -75,13 +75,6 @@ export class NavMarkersUI {
     setStyle(this.root, 'display', hidden ? 'none' : 'block');
   }
 
-  /** Places a jump can lock on to in this system (name and position; `stop`: how far short to land, a stillstone's inside its field, off the stone) */
-  snapTargets(): { name: string; x: number; y: number; stop?: number }[] {
-    const obj = this.objectiveTarget();
-    return [...(obj ? [obj] : []), ...this.ops(), ...this.events(), ...this.party(),
-      ...this.targets().filter((t) => t.kind !== 'planet' && t.kind !== 'comet')];
-  }
-
   /** Where the followed job wants you: here, or the way on (a gate, a rift, a planet) */
   objectiveTarget(): Target | null {
     const t = this.objective();

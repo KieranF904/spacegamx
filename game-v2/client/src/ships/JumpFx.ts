@@ -304,7 +304,7 @@ export class JumpFx {
         else text = text.replace('SPOOLING', `SPOOLING · ${chargeSecs((1 - ph.progress) * need)}`);
         {
           const reach = opts.reach ?? 0, want = opts.aimDist || reach;
-          const go = fmtK(Math.max(this.tuning.minRange, Math.min(reach, want)));
+          const go = fmtK(Math.min(reach, want));
           text += opts.aimLabel
             ? (want > reach ? ` · ${go} towards ${opts.aimLabel} <span style="color:#fca5a5">(${fmtK(want)}: out of reach)</span>` : ` · → ${opts.aimLabel}`)
             : ` · ${go}`;

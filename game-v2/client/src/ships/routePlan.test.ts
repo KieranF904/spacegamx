@@ -150,6 +150,5 @@ describe('route planning', () => {
   it("knows the star's berth: heat for suns, the pull for black holes", () => {
     expect(starBerth(SOL)).toBeGreaterThan(SOL.centralBody!.radius! + 1500);
     expect(starBerth({ centralBody: { type: 'none' } } as StarSystemData)).toBe(0);
-    expect(DEFAULT_JUMP.minRange).toBeGreaterThan(0);
   });
 });
