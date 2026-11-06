@@ -49,6 +49,7 @@ import type { SiegePanel } from '../ui/SiegePanel';
 import type { BossUI } from '../ui/BossUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ContributorPanel } from '../ui/ContributorPanel';
+import type { ChatBubbles } from '../ui/bubbles/ChatBubbles';
 import type { ProtoHooks } from '../Game';
 
 /** What the message handlers read and write on the game (Game supplies it as getters/setters) */
@@ -87,6 +88,7 @@ export interface MessageHost {
   readonly worldEvents: Map<number, { name: string; x: number; y: number; system: string }>;
   readonly adminPanel: AdminPanel | null;
   readonly contribPanel: ContributorPanel | null;
+  readonly chatBubbles?: ChatBubbles;
   loggedIn: boolean;
   localDead: boolean;
   statsPrimed: boolean;
@@ -401,7 +403,11 @@ const TABLE: Handlers = {
   // (dev weapons range readout: nobody listens outside a dev build)
   rangeHead: (_h, msg) => { rangeHead(msg); },
   rangeRow: (_h, msg) => { rangeRow(msg); },
-  chat: (h, msg) => { h.addChatMessage(msg.playerName, msg.text); },
+  chat: (h, msg) => {
+    h.addChatMessage(msg.playerName, msg.text);
+    // (Public chat only: party lines come as playerId 0, not a ship)
+    if (msg.playerId > 0) h.chatBubbles?.say(msg.playerId, msg.playerName, msg.text);
+  },
   authResult: (h, msg) => { h.handleAuthResult(msg); },
   adminStats: (h, msg) => { h.adminPanel?.onStats(msg); },
   adminInfo: (h, msg) => { h.adminPanel?.onInfo(msg); },
