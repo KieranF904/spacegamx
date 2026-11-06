@@ -60,7 +60,7 @@ export class Defenders {
   /** Make a pilotless ship a defender (it keeps whatever autopilot it has) */
   add(eid: number): void {
     if (!this.ships.has(eid)) return;
-    this.list.set(eid, { ship: this.ships.get(eid), attacker: -1, lastHit: -Infinity, seen: this.ships.lastDamagedTick(eid), course: null, seed: (eid * 97 + 31) & 255, bodyAt: -Infinity, auto: false });
+    this.list.set(eid, { ship: this.ships.get(eid), attacker: -1, lastHit: -Infinity, seen: this.ships.lastHitTick(eid), course: null, seed: (eid * 97 + 31) & 255, bodyAt: -Infinity, auto: false });
     this.ships.setController(eid, (id, ship) => this.fly(id, ship));
   }
 
@@ -94,8 +94,9 @@ export class Defenders {
     const d = this.list.get(eid);
     if (!d || d.ship !== ship) return null;
     const now = this.host.tick();
-    // Hurt since it last looked: whoever did it has its guns now
-    const at = this.ships.lastDamagedTick(eid);
+    // Hurt by someone since it last looked: whoever did it has its guns now (by the tick of the last hit with a source:
+    // a hazard's hurt, with none, leaves the hitter as the older attacker and must not refresh its lock)
+    const at = this.ships.lastHitTick(eid);
     if (at > d.seen) {
       d.seen = at;
       const h = this.ships.lastHitter(eid);

@@ -110,6 +110,7 @@ export function removeShip(b: BridgeCtx, eid: number): void {
  */
 export function forget(b: BridgeCtx, eid: number): void {
   b.lastHitBy.delete(eid);
+  b.lastHitAt.delete(eid);
   b.intangible.delete(eid);
   b.anchored.delete(eid);
   b.pinned.delete(eid);

@@ -72,6 +72,8 @@ export class ShipBridge {
   private geomCache = new WeakMap<Blueprint, PlacedGeom[]>();
   /** Who last landed a shot on each body */
   private lastHitBy = new Map<number, number>();
+  /** The tick of each body's last hit with a source (lastHitBy's tick: a sourceless hurt, a hazard's, leaves it) */
+  private lastHitAt = new Map<number, number>();
   /** Wrecks: they drift (no gravity, no helm) instead of holding station like dummies */
   private anchored = new Set<number>();
   /** Structures fixed to the ground (a siege's bastion and turrets): nothing shoves them; they only turn */
@@ -444,6 +446,8 @@ export class ShipBridge {
   lastHitter(eid: number): number { return dmg.lastHitter(this.ctx, eid); }
 
   lastDamagedTick(eid: number): number { return dmg.lastDamagedTick(this.ctx, eid); }
+
+  lastHitTick(eid: number): number { return dmg.lastHitTick(this.ctx, eid); }
 
   hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
 
