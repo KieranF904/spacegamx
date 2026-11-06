@@ -37,6 +37,7 @@ import type { Tutorial } from '../ui/Tutorial';
 import type { QuestClient } from '../ui/QuestUI';
 import type { BuildSites } from '../rendering/BuildSites';
 import type { SocialUI } from '../ui/SocialUI';
+import type { ChatPanel } from '../ui/ChatPanel';
 import type { TradeWindow } from '../ui/TradeWindow';
 import type { InfoPanel } from '../ui/InfoPanel';
 import type { OpsUI } from '../ui/OpsUI';
@@ -73,6 +74,8 @@ export interface MessageHost {
   readonly quests: QuestClient;
   readonly buildSites: BuildSites | null;
   readonly social: SocialUI;
+  /** The chat box (private messages go straight to it) */
+  readonly chat: Pick<ChatPanel, 'addPrivate'>;
   readonly tradeWindow: TradeWindow;
   readonly infoPanel: InfoPanel;
   readonly opsUI: OpsUI;
@@ -304,6 +307,9 @@ const TABLE: Handlers = {
   party: (h, msg) => { h.social.setParty(msg); },
   partyInvite: (h, msg) => { h.social.onInvite(msg); },
   tradeRequest: (h, msg) => { h.social.onTradeRequest(msg); },
+  friends: (h, msg) => { h.social.setFriends(msg); },
+  friendRequest: (h, msg) => { h.social.onFriendRequest(msg); },
+  whisper: (h, msg) => { h.chat.addPrivate(msg); },
   trade: (h, msg) => { h.tradeWindow.onTrade(msg); },
   pilotInfo: (h, msg) => { h.infoPanel.onInfo(msg); },
   ops: (h, msg) => { h.opsUI.setOps(msg); },

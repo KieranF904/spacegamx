@@ -1,19 +1,22 @@
 /**
  * Playing together on the client: your party (a compact panel on the left and
- * the party window, P), invitations and trade requests, and the rally buttons
- * when you're destroyed.
+ * the Social window, P, with its Party and Friends tabs), invitations, friend
+ * and trade requests, and the rally buttons when you're destroyed.
  *
- *   P            party window (hovering over another pilot: invite them)
+ *   P            Social window (hovering over another pilot: invite them)
  *   /p message   party chat; /invite name, /leave, /kick name, /promote name
  */
 
 import {
   ServerPartyMessage, ServerPartyInviteMessage, ServerTradeRequestMessage, PartyMemberView, ClientMessage, EntityType, StarSystemData,
+  ServerFriendsMessage, ServerFriendRequestMessage,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { AutoDest } from '../ships/Autopilot';
 import { GameWindow, injectWindowStyles, openMenu } from './windowKit';
 import { boundKeyName } from '../input/keybindings';
+import { FriendsPanel } from './social/FriendsPanel';
+import { onlineCount } from './social/friendsView';
 import { settings } from '../settings/Settings';
 import systemsData from '../../../data/systems.json';
 
@@ -30,7 +33,14 @@ export interface SocialDeps {
   sound(id: string, v?: number): void;
   flyTo(dest: AutoDest): void;
   message(text: string, color?: string): void;
+  /** Start a private message to this pilot in the chat box */
+  chatTo(name: string): void;
+  /** Friends online changed */
+  friendsOnline(n: number): void;
 }
+
+/** The Social window's tabs */
+export type SocialTab = 'party' | 'friends';
 
 export class SocialUI {
   party: ServerPartyMessage = { type: 'party', id: 0, leader: '', members: [] };
@@ -40,6 +50,10 @@ export class SocialUI {
   readonly window: GameWindow;
   private visible = false;
   private listeners = new Set<() => void>();
+  readonly friends: FriendsPanel;
+  private tab: SocialTab = 'party';
+  /** The window's tabs: each draws into the body */
+  private readonly tabDefs: { id: SocialTab; label: string; render: (body: HTMLElement) => void; badge?: () => number }[];
 
   constructor(private d: SocialDeps) {
     injectWindowStyles();
@@ -81,8 +95,33 @@ export class SocialUI {
     this.rally = document.createElement('div');
     this.rally.className = 'sp-rally';
     document.body.append(this.hud, this.prompts, this.rally);
-    this.window = new GameWindow('Party');
+    this.window = new GameWindow('Social');
     this.window.root.style.width = 'min(860px, calc(100vw - 32px))';
+    this.friends = new FriendsPanel({
+      send: (m) => this.d.send(m),
+      chatTo: (n) => this.d.chatTo(n),
+      inParty: (n) => this.party.members.some((m) => m.name.toLowerCase() === n.toLowerCase()),
+      canInvite: () => !this.inParty() || this.amLeader(),
+      close: () => this.window.close(),
+    });
+    this.tabDefs = [
+      { id: 'party', label: 'Party', render: (b) => this.renderParty(b) },
+      { id: 'friends', label: 'Friends', render: (b) => { this.window.sub.textContent = this.friends.data.account ? `${onlineCount(this.friends.data)} of ${this.friends.data.friends.length} friends online` : 'Signed out'; this.friends.render(b); }, badge: () => this.friends.data.incoming.length },
+    ];
+    this.window.tabs.style.display = 'flex';
+  }
+
+  private renderTabs(): void {
+    const t = this.window.tabs;
+    t.replaceChildren();
+    for (const def of this.tabDefs) {
+      const b = document.createElement('button');
+      b.className = `sgw-tab${def.id === this.tab ? ' on' : ''}`;
+      const n = def.badge?.() ?? 0;
+      b.innerHTML = `${def.label}${n ? `<span class="badge">${n}</span>` : ''}`;
+      b.onclick = () => { this.tab = def.id; this.renderWindow(); };
+      t.appendChild(b);
+    }
   }
 
   onChange(fn: () => void): () => void {
@@ -134,6 +173,19 @@ export class SocialUI {
 
   onInvite(m: ServerPartyInviteMessage): void {
     this.prompt(`<span><b>${esc(m.from)}</b> invites you to ${m.size > 1 ? `their party (${m.size}/4)` : 'form a party'}</span>`, 'Join', (ok) => this.d.send({ type: 'partyRespond', accept: ok }));
+  }
+
+  onFriendRequest(m: ServerFriendRequestMessage): void {
+    this.prompt(`<span><b>${esc(m.from)}</b> wants to be friends</span>`, 'Accept', (ok) => this.d.send({ type: 'friendRespond', name: m.from, accept: ok }));
+  }
+
+  /** Your friends list, requests and status (the server's) */
+  setFriends(m: ServerFriendsMessage): void {
+    const first = !this.friends.data.account && m.account;
+    this.friends.data = m;
+    this.d.friendsOnline(onlineCount(m));
+    if (first && m.incoming.length) this.d.message(`${m.incoming.length} friend request${m.incoming.length > 1 ? 's' : ''} waiting: Social window (${boundKeyName('party', settings.data.bindings)}), Friends`, '#7dd3fc');
+    if (this.window.isOpen) this.renderWindow();
   }
 
   onTradeRequest(m: ServerTradeRequestMessage): void {
@@ -216,7 +268,7 @@ export class SocialUI {
       items.push({ label: 'Remove from party', bad: true, run: () => this.d.send({ type: 'partyKick', name: m.name }) });
     }
     if (self) items.push({ label: 'Leave party', bad: true, run: () => this.d.send({ type: 'partyLeave' }) });
-    items.push({ label: `Party window (${boundKeyName('party', settings.data.bindings)})`, run: () => this.openWindow() });
+    items.push({ label: `Social window (${boundKeyName('party', settings.data.bindings)})`, run: () => this.openWindow('party') });
     openMenu(x, y, items);
   }
 
@@ -224,9 +276,10 @@ export class SocialUI {
   // Party window
   // ---------------------------------------------------------------------------
 
-  openWindow(): void {
-    this.window.open();
+  openWindow(tab?: SocialTab): void {
+    if (tab) this.tab = tab;
     this.renderWindow();
+    this.window.open();
   }
 
   toggleWindow(): void {
@@ -234,7 +287,11 @@ export class SocialUI {
   }
 
   renderWindow(): void {
-    const b = this.window.body;
+    this.renderTabs();
+    this.tabDefs.find((t) => t.id === this.tab)!.render(this.window.body);
+  }
+
+  private renderParty(b: HTMLElement): void {
     b.replaceChildren();
     this.window.sub.textContent = this.inParty() ? `${this.party.members.length} of 4 pilots · led by ${this.party.leader}` : 'Flying solo';
     const grid = document.createElement('div');

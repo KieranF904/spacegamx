@@ -83,6 +83,10 @@ export interface WindowHost {
   /** A moon siege's fronts on their way (edge arrows with a countdown) */
   siegeMarkers(): { name: string; x: number; y: number; system: string }[];
   toggleAutopilotToObjective(): void;
+  /** Start a private message to this pilot in the chat box */
+  chatTo(name: string): void;
+  /** Friends online changed (the chat box's Friends button) */
+  friendsOnline(n: number): void;
 }
 
 export interface WindowSet {
@@ -233,6 +237,8 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       sound: (id, v) => host.audio.playUI(id, v ?? 0.6),
       flyTo: (d) => host.flyTo(d),
       message: (t, c) => host.showSystemMessage(t, c),
+      chatTo: (name) => host.chatTo(name),
+      friendsOnline: (n) => host.friendsOnline(n),
     });
     // (With the system map open, the cursor is the map's)
     const cursorWorld = () => w.systemMapUI?.aimWorld() ?? host.renderer.screenToWorld(host.input.mouseX, host.input.mouseY);

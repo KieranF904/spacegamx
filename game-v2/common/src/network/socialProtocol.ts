@@ -5,6 +5,9 @@
  */
 
 import type { Bag } from '../econ/stacks.js';
+import type { FriendsServerMessage, FriendsClientMessage } from './friendsProtocol.js';
+
+export * from './friendsProtocol.js';
 
 // ---------------------------------------------------------------------------
 // Targets and info cards
@@ -218,9 +221,9 @@ export interface ClientShareDesignMessage { type: 'shareDesign'; blueprint: impo
 export interface ServerSharedDesignMessage { type: 'sharedDesign'; from: string; blueprint: import('../ships/types.js').Blueprint }
 
 export type SocialServerMessage = ServerRibbonMessage | ServerRibbonsMessage | ServerRankingsMessage | ServerNewsMessage | ServerSharedDesignMessage | ServerMapPingMessage | ServerPilotInfoMessage | ServerPartyMessage | ServerPartyInviteMessage
-  | ServerTradeRequestMessage | ServerTradeMessage | ServerOpsMessage | ServerVendorsMessage | ServerMarketScanMessage;
+  | ServerTradeRequestMessage | ServerTradeMessage | ServerOpsMessage | ServerVendorsMessage | ServerMarketScanMessage | FriendsServerMessage;
 
 export type SocialClientMessage = ClientRibbonsMessage | ClientRankingsMessage | ClientShareDesignMessage | ClientMapPingMessage | ClientTargetMessage | ClientPilotInfoMessage
   | ClientPartyInviteMessage | ClientPartyRespondMessage | ClientPartyLeaveMessage | ClientPartyKickMessage | ClientPartyPromoteMessage
   | ClientTradeRequestMessage | ClientTradeRespondMessage | ClientTradeOfferMessage | ClientTradeAcceptMessage | ClientTradeCancelMessage
-  | ClientVendorOpenMessage | ClientVendorBuyMessage | ClientMarketScanMessage;
+  | ClientVendorOpenMessage | ClientVendorBuyMessage | ClientMarketScanMessage | FriendsClientMessage;

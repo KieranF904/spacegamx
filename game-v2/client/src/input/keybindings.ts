@@ -59,7 +59,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'skills', label: 'Skills', category: 'Interface', key: 'KeyK' },
   { id: 'nav', label: 'Toggle nav markers', category: 'Interface', key: 'KeyN' },
   { id: 'stats', label: 'Session stats panel', category: 'Interface', key: 'KeyO' },
-  { id: 'party', label: 'Party window (hovering a pilot: invite them)', category: 'Interface', key: 'KeyP' },
+  { id: 'party', label: 'Social window: party and friends (hovering a pilot: invite them)', category: 'Interface', key: 'KeyP' },
   { id: 'chat', label: 'Chat', category: 'Interface', key: 'Enter', rebindable: false },
   { id: 'zoom', label: 'Zoom', category: 'Interface', key: 'Wheel', rebindable: false },
   { id: 'resetZoom', label: 'Reset zoom', category: 'Interface', key: 'Home' },

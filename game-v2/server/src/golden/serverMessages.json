@@ -24,6 +24,8 @@
   "damage",
   "death",
   "effect",
+  "friendRequest",
+  "friends",
   "gained",
   "hangar",
   "hitFix",
@@ -70,6 +72,7 @@
   "tradeRequest",
   "vendors",
   "welcome",
+  "whisper",
   "worldEvent",
   "worldEventEnd",
   "wreck"
