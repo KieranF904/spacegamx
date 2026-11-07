@@ -398,8 +398,8 @@ export class ShipReplicaSet {
     (id, t) => { const st = this.at(id, t); return st ? { body: st.body, bits: st.bits } : null; });
 
   /** A lock or a swap (clampLink): both ships are stepped again from its tick */
-  noteClampLink(m: Pick<ServerClampLinkMessage, 'tick' | 'leader' | 'follower' | 'lc' | 'fc' | 'offset'>): void {
-    const from = this.clamps.link({ tick: m.tick, leader: m.leader, follower: m.follower, lc: m.lc, fc: m.fc, offset: m.offset });
+  noteClampLink(m: Pick<ServerClampLinkMessage, 'tick' | 'leader' | 'follower' | 'lc' | 'fc' | 'offset' | 'fcargo'>): void {
+    const from = this.clamps.link({ tick: m.tick, leader: m.leader, follower: m.follower, lc: m.lc, fc: m.fc, offset: m.offset, fcargo: m.fcargo });
     if (from !== Infinity) { this.rewindHeld(m.leader, from); this.rewindHeld(m.follower, from); }
   }
 

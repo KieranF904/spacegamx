@@ -29,6 +29,8 @@ export interface ServerClampLink {
   lc: number;
   fc: number;
   offset: ClampOffset;
+  /** The follower's load the pair carries (its cargo as the link was made: common sim/clampPair.ts ClampLinkRec.fcargo); 0: none */
+  fcargo: number;
   /** First tick flown as one, and the first flown apart again (Infinity: still locked) */
   from: number;
   until: number;
@@ -84,9 +86,9 @@ export class ClampTable {
   }
 
   /** A lock (or a swap, or a fresh offset: the pair's new link) from tick `from`; ends either ship's open link there */
-  lock(leader: number, follower: number, lc: number, fc: number, offset: ClampOffset, from: number): ServerClampLink {
+  lock(leader: number, follower: number, lc: number, fc: number, offset: ClampOffset, from: number, fcargo = 0): ServerClampLink {
     for (const k of this.links) if (k.until === Infinity && (k.leader === leader || k.follower === leader || k.leader === follower || k.follower === follower)) k.until = from;
-    const k: ServerClampLink = { leader, follower, lc, fc, offset: { ...offset }, from, until: Infinity, limited: -1, waiting: -1, led: -1 };
+    const k: ServerClampLink = { leader, follower, lc, fc, offset: { ...offset }, fcargo, from, until: Infinity, limited: -1, waiting: -1, led: -1 };
     this.links.push(k);
     return k;
   }
@@ -116,7 +118,7 @@ export class ClampTable {
       }
       const L = this.ctx.bodies.get(k.leader), F = this.ctx.bodies.get(k.follower);
       if (!L || !F) return null;
-      if (k.leader === id) return { kind: 'lead', joined: joinDerived(L.derived, F.derived, k.offset), share: k.fshare };
+      if (k.leader === id) return { kind: 'lead', joined: joinDerived(L.derived, F.derived, k.offset), share: k.fshare, fcargo: k.fcargo || undefined };
       return { kind: 'follow', leader: readBody(k.leader, L), offset: k.offset, leaderBits: this.ctx.replicaCtl.get(k.leader)?.bits ?? 0 };
     },
   };

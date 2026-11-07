@@ -41,6 +41,11 @@ export interface ServerClampLinkMessage {
   lc: number;
   fc: number;
   offset: ClampOffset;
+  /**
+   * The follower's load the pair carries from `tick` (its cargo mass: the hold, a Tow Beam's tow; sim/clampPair.ts
+   * ClampLinkRec.fcargo). A changed load is a fresh record. Absent: 0
+   */
+  fcargo?: number;
 }
 
 /** Why a link broke */

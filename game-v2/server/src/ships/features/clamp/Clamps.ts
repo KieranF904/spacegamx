@@ -138,12 +138,13 @@ export class Clamps implements FeatureInstance {
     const old = this.table.open(leader) ?? this.table.open(follower);
     if (old) this.told.delete(old);
     const offset = clampOffset(L.c, L.ship.derived.com, F.c, F.ship.derived.com, this.host.tuning.cellSize);
-    const k = this.table.lock(leader, follower, lc, fc, offset, from);
+    // (The follower's load as its last step carried it: the pair carries it too, common sim/clampPair.ts)
+    const k = this.table.lock(leader, follower, lc, fc, offset, from, F.ship.cargo ?? 0);
     this.tellLink(k, true);
   }
 
   private linkMsg(k: ServerClampLink) {
-    return { type: 'clampLink' as const, tick: k.from, leader: k.leader, follower: k.follower, lc: k.lc, fc: k.fc, offset: { ...k.offset } };
+    return { type: 'clampLink' as const, tick: k.from, leader: k.leader, follower: k.follower, lc: k.lc, fc: k.fc, offset: { ...k.offset }, ...(k.fcargo ? { fcargo: k.fcargo } : {}) };
   }
 
   /** The link to every pilot in the pair's system (all: a new record; else only those not told it yet) */
@@ -197,6 +198,8 @@ export class Clamps implements FeatureInstance {
       if (k.until !== Infinity) continue;
       const why = this.broken(k);
       if (why) { this.breakLink(k, why); continue; }
+      // (The follower's load changed (a pickup, a sale, a tow): the pair carries the new one from the next tick, a fresh record)
+      if ((this.host.ships.get(k.follower)?.cargo ?? 0) !== k.fcargo) { this.lock(k.leader, k.lc, k.follower, k.fc, Math.max(k.from, now + 1)); continue; }
       if (now % RETELL_TICKS === 0) this.tellLink(k, false);
     }
     // (The events heard since the last tick are spent: one on a pilot in no link meant nothing)

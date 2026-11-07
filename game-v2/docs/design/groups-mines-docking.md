@@ -200,12 +200,13 @@ the steering pilot's own tick layer, the other pilot's tick layer and every repl
 - **Contacts**: the two linked ships never collide with each other (skipped in `contactCandidates`). A contact on
   either is applied to the pair body (impulse at the contact point, about the joined centre of mass).
 - **Jump, dodge, tow**: no jump while docked (it breaks the link). A Burst Strafer dodge on either ship is refused
-  while docked (first cut). Each ship's tow beam works as now; its cargo mass adds to the pair.
+  while docked (first cut). Each ship's tow beam works as now; its cargo mass adds to the pair (the leader's from its
+  own body, the follower's as the link's `fcargo`: a changed follower load is a fresh `clampLink` from the next tick).
 
 ### 3.4 Messages (`common/src/network/clampProtocol.ts`, foundation)
 
 - Up: `clampDock {with, clamp, theirs}`, `clampSwap`, `clampUndock`. Rate-limit (about 4 a second).
-- Down: `clampAsk {from, what, until}` to the other pilot; `clampLink {tick, leader, follower, lc, fc, offset}` to every
+- Down: `clampAsk {from, what, until}` to the other pilot; `clampLink {tick, leader, follower, lc, fc, offset, fcargo?}` to every
   client holding either ship (also on a swap, and again to a client that comes to hold them); `clampBreak {tick, a, b,
   why}`.
 

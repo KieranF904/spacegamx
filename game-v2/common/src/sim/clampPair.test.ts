@@ -162,4 +162,24 @@ describe('docking clamps: the joined flight', () => {
     for (let t = 101; t <= 140; t++) for (let k = 0; k < 2; k++) replicaStep(ReplicaMode.Player, b[k], { bits: CTL.hold, targetAngle: 0 }, derivedOf(k === 0 ? LEAD : FOL), tuning, renv(src), t, k === 0 ? LEAD : FOL);
     expect(Math.hypot(b[1].x - b[0].x, b[1].y - b[0].y)).toBeGreaterThan(gap0 + 20);
   });
+
+  it('the follower\'s load rides the link: the lead step carries it, and a record at the same tick with another load is a change', () => {
+    const links = new ClampLinks();
+    links.link({ leader: LEAD, follower: FOL, lc: ca.uid, fc: cb.uid, offset: OFFSET, tick: 1 });
+    const src = linksSource(links, derivedOf, () => null);
+    const at = src.at(LEAD, 5);
+    expect(at?.kind === 'lead' && at.fcargo).toBeFalsy();
+    // (The same record with a load: a change from its tick)
+    expect(links.link({ leader: LEAD, follower: FOL, lc: ca.uid, fc: cb.uid, offset: OFFSET, tick: 1, fcargo: 250 })).toBe(1);
+    const loaded = src.at(LEAD, 5);
+    expect(loaded?.kind === 'lead' ? loaded.fcargo : undefined).toBe(250);
+    // The pair's step with the load: slower off the line than without it
+    const j = joinDerived(A.derived, B.derived, OFFSET);
+    const run = (fcargo: number) => {
+      const body: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: UP, angVel: 0 };
+      for (let t = 0; t < 30; t++) stepPairBody(body, j, (jb) => { replicaStep(ReplicaMode.Player, jb, { bits: controlBits({ forward: true }), targetAngle: UP }, j.derived, tuning, renv(), t, -1); }, fcargo);
+      return Math.hypot(body.vx, body.vy);
+    };
+    expect(run(250)).toBeLessThan(run(0));
+  });
 });
