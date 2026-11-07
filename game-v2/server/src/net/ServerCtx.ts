@@ -36,6 +36,7 @@ import type { Enemies } from '../game/Enemies.js';
 import type { Surfaces } from '../game/Surfaces.js';
 import type { HomeStations } from '../game/HomeStations.js';
 import type { SnapshotBuilder } from './SnapshotBuilder.js';
+import type { ServerFeatures } from '../ships/features/host.js';
 
 export interface ServerCtx {
   // ---- state (read only to handlers) ----
@@ -88,6 +89,8 @@ export interface ServerCtx {
   readonly ammo: Ammo;
   readonly outpost?: Outpost;
   readonly docking: Docking;
+  /** The part features' events a handler is where they happen (the jump key: flight.ts) */
+  readonly features?: Pick<ServerFeatures, 'onJumpKey'>;
   readonly services: StationServices;
   readonly quests: Quests;
   readonly people: People;

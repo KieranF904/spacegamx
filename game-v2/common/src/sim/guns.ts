@@ -28,7 +28,7 @@ import { gunDef, shotAimQ } from '../ships/launch.js';
 import { ensurePortsCharge, payMining, type Charge } from '../ships/energy.js';
 import { portsMinePhase, portsPiecePhase, type PortsState } from '../ships/power/ports.js';
 import { jumpPhase, jumpTuning } from '../ships/flight.js';
-import type { SimShipState } from './state.js';
+import { copyGunScalars, gunScalarsOntoRecord, type SimShipState } from './state.js';
 import { simAim, type SimInput } from './input.js';
 import type { SimEnv } from './env.js';
 import { SHOT_ID_BARRELS, SHOT_ID_OWNERS, SHOT_ID_SLOTS, shotId, type SimEvent } from './events.js';
@@ -131,8 +131,7 @@ function gunView(state: SimShipState): ShipState {
   v.id = state.id;
   v.derived = state.structure.derived;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin; v.aim = g.aim;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.clickMasks = g.clickMasks; v.trig = g.trig ?? 0;
-  v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
+  gunScalarsOntoRecord(g, v);
   return v;
 }
 
@@ -161,14 +160,8 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
     miningTick(view, state.id, pose, c, t, energy, events);
     state.charge = energy.charge;
   }
-  const g = state.guns;
-  g.triggerHeld = view.triggerHeld;
-  g.clickAt = view.clickAt; g.clickMasks = view.clickMasks;
-  g.trig = view.trig;
-  g.minePaid = view.minePaid;
-  g.mineUntil = view.mineUntil;
-  g.mineShare = view.mineShare;
-  g.heldDist = view.heldDist;
+  // (Every scalar back; one the firing models don't write (the Tow Beam's tow) comes back as it went in)
+  copyGunScalars(view, state.guns);
   // (Mining, its lasers' beams are drawn along the aim elsewhere (the cursor state replicas rebuild): the raw one goes)
   return step.aimHeld && !c.mining;
 }

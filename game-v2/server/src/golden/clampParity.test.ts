@@ -17,7 +17,7 @@ import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, Input, Dead, InSystem, ReplicaMode, CTL, replicaStep, controlBits, buildFlightInputs, simAimQ, stepOwnShip, ownStructure,
+  Position, Velocity, Rotation, Input, Health, InSystem, ReplicaMode, CTL, replicaStep, controlBits, buildFlightInputs, simAimQ, stepOwnShip, ownStructure,
   quantizeCursorAngle, dequantizeCursorAngle, replicaAngle, followerPose, clampOffset, ClampLinks, linksSource, CLAMP,
   type ServerMessage, type FlightBody, type OwnExtras, type SimEnv, type ReplicaEnv, type Blueprint, type ShipState, type ClientInputMessage,
 } from '@space-game/common';
@@ -30,6 +30,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { Clamps } from '../ships/features/clamp/Clamps.js';
+import { stationQuery } from '../game/Docking.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -194,6 +195,64 @@ describe('docking clamps on the server', () => {
     expect(ownFired).toBe(fired);
   });
 
+  it('the pair carries the follower\'s load: alike on the server, the steering pilot and a third client; a changed load is a fresh record', () => {
+    const fly = (load: (i: number) => number) => {
+      const w = world();
+      // (The follower's hold, as the bridge asks it: Pilots.cargoMass)
+      let held = load(-1);
+      const pilots = (w.server as any).pilots, own = pilots.cargoMass.bind(pilots);
+      pilots.cargoMass = (eid: number) => (eid === w.b.id ? held : own(eid));
+      w.lineUp();
+      for (let i = 0; i < 4; i++) w.server.step();
+      w.dock();
+      const k = w.clamps.linkOf(w.a.id)!;
+      expect(k.fcargo).toBe(w.B.cargo ?? 0);
+      let bits = 0, q = 0;
+      const ctl = w.ships.replicaCtl, setCtl = ctl.set.bind(ctl);
+      ctl.set = (id, v) => { if (id === w.a.id) { bits = v.bits; q = v.q; } return setCtl(id, v); };
+      const renv: ReplicaEnv = (w.server as any).replicaEnv(InSystem.systemId[w.a.id]);
+      // (The links as the steering pilot's client holds them: from its clampLink messages)
+      const links = new ClampLinks();
+      let seen = 0;
+      const note = () => { for (; seen < w.a.got.length; seen++) { const m = w.a.got[seen] as any; if (m.type === 'clampLink') links.link({ tick: m.tick, leader: m.leader, follower: m.follower, lc: m.lc, fc: m.fc, offset: m.offset, fcargo: m.fcargo }); } };
+      note();
+      const derivedOf = (id: number) => w.ships.get(id)!.derived;
+      const ownHist = new Map<number, { body: FlightBody; bits: number }>(), repHist = new Map<number, { body: FlightBody; bits: number }>();
+      const ownSrc = linksSource(links, derivedOf, (id, t) => ownHist.get(t) ?? null);
+      const repSrc = linksSource(links, derivedOf, (id, t) => repHist.get(t) ?? null);
+      const simEnv = (t: number): SimEnv => ({ tick: t, tuning: w.ships.tuning, gravity: renv.gravity, fields: { central: renv.central, lodestones: renv.lodestones ?? [] }, terrain: renv.terrain ?? null, hazard: renv.hazard, clamp: ownSrc });
+      const lead = real(w.a.id, w.A), rLead = { ...lead };
+      let lx: OwnExtras = w.ships.ownExtras(w.a.id, w.tick())!;
+      const start = { x: lead.x, y: lead.y };
+      for (let i = 0; i < 160; i++) {
+        held = load(i);
+        const keys = { forward: true, left: i % 40 < 10 };
+        w.a.t.send(input(i + 1, keys, UP));
+        w.server.step();
+        note();
+        const t = w.tick(), sLead = real(w.a.id, w.A);
+        const inA = input(i + 1, keys, UP);
+        const sl = stepOwnShip(w.a.id, lx, lead, controlBits(buildFlightInputs(inA, false)), simAimQ(inA.targetAngle), { fire: false, fireAlt: false, jumpDist: 0, aimDist: 0 }, ownStructure(w.A.derived, w.A), simEnv(t), []);
+        lx = { charge: sl.charge, guns: sl.guns, hazard: sl.hazard, jumpPrime: sl.jumpPrime };
+        ownHist.set(t, { body: { ...lead }, bits: sl.ctl.bits });
+        expect(row(lead), `steering pilot, tick ${i}`).toEqual(row(sLead));
+        replicaStep(ReplicaMode.Player, rLead, { bits, targetAngle: replicaAngle(ReplicaMode.Player, q) }, w.A.derived, w.ships.tuning, { ...renv, clamp: repSrc }, t, w.a.id);
+        repHist.set(t, { body: { ...rLead }, bits });
+        expect(row(rLead), `leader's replica, tick ${i}`).toEqual(row(sLead));
+      }
+      expect(w.clamps.linkOf(w.a.id), 'still linked').toBeDefined();
+      const loads = w.c.got.filter((m: any) => m.type === 'clampLink').map((m: any) => m.fcargo ?? 0);
+      return { dist: Math.hypot(lead.x - start.x, lead.y - start.y), loads };
+    };
+    const light = fly(() => 0), heavy = fly((i) => (i < 80 ? 400 : 900));
+    expect(light.loads).toEqual([0]);
+    // (Locked with its load, then a fresh record when it grew)
+    expect(heavy.loads.length).toBe(2);
+    expect(heavy.loads[0]).toBeGreaterThan(0);
+    expect(heavy.loads[1]).toBeGreaterThan(heavy.loads[0]);
+    expect(heavy.dist).toBeLessThan(light.dist * 0.95);
+  });
+
   it('a swap keeps the pose; undock pushes apart and the pair waits to relock', () => {
     const w = world();
     w.lineUp();
@@ -228,9 +287,18 @@ describe('docking clamps on the server', () => {
 
   it('breaks: a jump key, a destroyed ship, a station berth, a clamp lost, a pilot gone', () => {
     const cases: [string, (w: ReturnType<typeof world>) => void][] = [
-      ['jump', (w) => { Input.jump[w.b.id] = 1; }],
-      ['death', (w) => { bitecs.addComponent((w.server as any).world, Dead, w.a.id); }],
-      ['station', (w) => { (w.server as any).dockedShips.add(w.b.id); }],
+      // (Each through the game's own path: an input holding the jump key, health run out, a berth at a station)
+      ['jump', (w) => { w.b.t.send(input(900, { jump: true }, UP)); }],
+      ['death', (w) => { Health.current[w.a.id] = 0; }],
+      ['station', (w) => {
+        const s = (w.server as any), sys = InSystem.systemId[w.b.id];
+        const st = stationQuery(s.world).find((e: number) => InSystem.systemId[e] === sys);
+        expect(st, 'a station in the pair\'s system').toBeDefined();
+        Position.x[st!] = Position.x[w.b.id]; Position.y[st!] = Position.y[w.b.id];
+        const conn = [...s.clients.values()].find((c: any) => c.playerId === w.b.id);
+        s.docking.handleDock(conn);
+        expect(s.dockedShips.has(w.b.id), 'berthed').toBe(true);
+      }],
       ['part', (w) => { const s = w.ships.get(w.a.id)!; const i = s.blueprint.parts.findIndex((p) => p.uid === w.ca.uid); w.ships.damagePartBy(w.a.id, i, 1e9, -1); }],
       ['gone', (w) => { w.b.t.disconnect(); }],
     ];

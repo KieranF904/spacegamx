@@ -948,6 +948,7 @@ export class GameServer implements ServerCtx {
       send: (ws, msg) => this.send(ws, msg),
       clock: this.clock,
       releaseControls: (eid) => this.releaseControls(eid),
+      berthed: (eid) => this.features.onBerthed(eid),
     });
     this.dockedShips = this.docking.dockedShips;
     this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns, this.payout);
@@ -4152,6 +4153,7 @@ this.devTeleport = opts.devTeleport ?? false;
     for (const player of players) {
       if (Health.current[player] <= 0 && !hasComponent(this.world, Dead, player)) {
         addComponent(this.world, Dead, player);
+        this.features.onDied(player);
 
         const systemId = InSystem.systemId[player];
         const pc = this.lingering.get(player)?.conn ?? this.pilots.connOf(player);

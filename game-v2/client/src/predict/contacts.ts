@@ -44,6 +44,8 @@ export class RealContacts implements PtContacts {
     /** A ship's structure as it flew tick t (null: takes no contacts) */
     private readonly shape: (id: number, t: number) => PtShape | null,
     private readonly tuning: ShipTuning,
+    /** The ship it is clamped to on tick t (Docking Clamps: the pair takes no contact with itself, as the server's pass) */
+    private readonly partner: (id: number, t: number) => number | undefined = () => undefined,
   ) {}
 
   private entries(t: number, bodies: readonly PtBody[]): { entries: ContactEntry[]; shapes: Map<number, PtShape>; by: Map<number, PtBody> } {
@@ -51,7 +53,7 @@ export class RealContacts implements PtContacts {
     for (const b of bodies) {
       const sh = this.shape(b.s.id, t);
       if (!sh || !(sh.mass > 0) || contactJumping(b.s.body.jump, this.tuning)) continue;
-      entries.push({ id: b.s.id, x: b.s.body.x, y: b.s.body.y, r: sh.radius });
+      entries.push({ id: b.s.id, x: b.s.body.x, y: b.s.body.y, r: sh.radius, link: this.partner(b.s.id, t) });
       shapes.set(b.s.id, sh);
       by.set(b.s.id, b);
     }

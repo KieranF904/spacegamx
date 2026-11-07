@@ -14,6 +14,9 @@ export class ServerFeatures {
   private readonly rebuilt: ((eid: number) => void)[] = [];
   private readonly breaks: ((eid: number) => void)[] = [];
   private readonly leaves: ((eid: number) => void)[] = [];
+  private readonly died: ((eid: number) => void)[] = [];
+  private readonly berthed: ((eid: number) => void)[] = [];
+  private readonly jumpKeys: ((eid: number) => void)[] = [];
   private readonly byId = new Map<string, FeatureInstance>();
 
   /** `taken`: message types the game already handles (a feature may not shadow them) */
@@ -30,6 +33,9 @@ export class ServerFeatures {
       if (inst.onShipRebuilt) this.rebuilt.push(inst.onShipRebuilt.bind(inst));
       if (inst.onShieldBreak) this.breaks.push(inst.onShieldBreak.bind(inst));
       if (inst.onLeave) this.leaves.push(inst.onLeave.bind(inst));
+      if (inst.onDied) this.died.push(inst.onDied.bind(inst));
+      if (inst.onBerthed) this.berthed.push(inst.onBerthed.bind(inst));
+      if (inst.onJumpKey) this.jumpKeys.push(inst.onJumpKey.bind(inst));
       for (const [type, fn] of Object.entries(inst.messages ?? {})) {
         if (taken.has(type)) throw new Error(`server feature ${f.id}: message ${type} is already handled by the game`);
         if (messages.has(type)) throw new Error(`server feature ${f.id}: message ${type} has two handlers`);
@@ -81,5 +87,17 @@ export class ServerFeatures {
 
   onLeave(eid: number): void {
     for (let i = 0; i < this.leaves.length; i++) this.leaves[i](eid);
+  }
+
+  onDied(eid: number): void {
+    for (let i = 0; i < this.died.length; i++) this.died[i](eid);
+  }
+
+  onBerthed(eid: number): void {
+    for (let i = 0; i < this.berthed.length; i++) this.berthed[i](eid);
+  }
+
+  onJumpKey(eid: number): void {
+    for (let i = 0; i < this.jumpKeys.length; i++) this.jumpKeys[i](eid);
   }
 }

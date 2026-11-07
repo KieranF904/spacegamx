@@ -7,7 +7,7 @@
  *     bits in the status row others get (status "statuses"); replicas fly a slowed ship by CTL.slowed (bridge flight)
  *   - endAtAim, walk and guided are shot options the projectile code reads (game/Weapons.ts, bridge/weapons.ts): no hooks
  */
-import type { FeatureHost, FeatureInstance, ServerFeature, ServerWeaponHooks } from '../types.js';
+import type { FeatureInstance, ServerFeature, ServerWeaponHooks, ShipsOf } from '../types.js';
 import { ROLE_MARK, ROLE_SLOW, statusBits, type ShipState, type WeaponInfo, type WeaponTuning } from '@space-game/common';
 import type { WeaponBridge } from '../../bridge/core.js';
 
@@ -25,8 +25,11 @@ function slowBeam(b: WeaponBridge, eid: number, ship: ShipState, w: WeaponInfo, 
   return t;
 }
 
+/** What the statuses ask of the game: the ticks left marked and slowed */
+type WeaponryHost = ShipsOf<'markedTicksLeft' | 'slowedTicksLeft'>;
+
 class Weaponry implements FeatureInstance {
-  constructor(private host: FeatureHost) {}
+  constructor(private host: WeaponryHost) {}
 
   /** The pilot row's values (features.wire.json pilotExtra order): ticks left marked, then slowed */
   wire(eid: number, out: number[]): number {

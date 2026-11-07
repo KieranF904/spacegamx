@@ -85,7 +85,10 @@ in its folder and the shared files (`rebuild.ts`, `energy.ts`, `flight.ts`, `rep
 A feature's world side and UI side live next to the shared part, as plain folders the same generator lists:
 
 - `server/src/ships/features/<id>/index.ts` exports `serverFeature` (`ServerFeature`: `create(host)` returns a
-  `FeatureInstance` with optional `tick`, `messages`, `cargoMass`, `wire`, `status`, `onShipRebuilt`, `onLeave`).
+  `FeatureInstance` with optional `tick`, `messages`, `cargoMass`, `wire`, `status`, `onShipRebuilt`, `onShieldBreak`,
+  `onLeave`, and the game's events `onDied`, `onBerthed`, `onJumpKey`: use these, don't poll `Dead`, `Input` or the dock).
+  Its constructor takes only the host capabilities it uses (server features/types.ts: `WorldCap`, `TellCap`,
+  `StationCap`, `HoldCap`, `BankCap`, `RulesCap`, and `ShipsOf<'get' | ...>` for the bridge calls), e.g. Clamps.ts `ClampHost`.
   `ServerFeatures` (host.ts) flattens them once; GameServer ticks them inside the `towing` tick entry (same slot, so
   Tow keeps its place), adds their messages to the dispatch table (a type the game handles, or two features claim,
   throws), and ShipBridge asks `featureCargo`, `shipRebuilt`, `shipForgotten` through its host.

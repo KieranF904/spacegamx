@@ -177,6 +177,8 @@ export function applyInputToEntity(ctx: ServerCtx, conn: ClientConnection, msg: 
   conn.lastInputSeq = seq;
   // What its client steps its own ship with from this tick (CAPS.OWN_SIM: Replication compares the controls flown)
   conn.ownCtl = ownControlsOf(msg);
+  // (The jump key held: the part features hear it here, a Docking Clamp's link lets go)
+  if (Input.jump[eid]) ctx.features?.onJumpKey(eid);
 }
 
 /**

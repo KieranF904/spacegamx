@@ -15,20 +15,23 @@
 
 import { hasComponent } from 'bitecs';
 import { Position, Velocity, InSystem, Dead, Input, canTow, feedShare, towLoad, towPull, towTuning, type ShipTuning, type TowKind, dcos, dhypot, dsin } from '@space-game/common';
-import type { ShipBridge } from '../../ShipBridge.js';
 import type { LootPods } from '../../../game/LootPods.js';
-import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
+import type { FeatureInstance, FeatureMessageHandler, ShipsOf, StationCap, TellCap, WorldCap } from '../types.js';
 import { SimPass } from '../../../sim/SystemClocks.js';
 
 interface Tow { target: number; kind: TowKind }
 
+/** What Tow Beams ask of the game: the towables and the towing ship's stores, toasts, the stations and the pods */
+export type TowHost = WorldCap & ShipsOf<TowShipCalls> & Pick<TellCap, 'tell'> & StationCap;
+type TowShipCalls = 'get' | 'isJumping' | 'towable' | 'towablesNear' | 'chargeOf' | 'holdTowed';
+
 export class Towing implements FeatureInstance {
   private tows = new Map<number, Tow>();
-  private readonly ships: ShipBridge;
+  private readonly ships: TowHost['ships'];
   private readonly pods: LootPods;
   private readonly tuning: ShipTuning;
 
-  constructor(private host: FeatureHost) {
+  constructor(private host: TowHost) {
     this.ships = host.ships;
     this.pods = host.pods;
     this.tuning = host.tuning;

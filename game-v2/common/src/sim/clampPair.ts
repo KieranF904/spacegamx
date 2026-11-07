@@ -117,6 +117,11 @@ export interface ClampLinkRec {
   lc: number;
   fc: number;
   offset: ClampOffset;
+  /**
+   * The follower's load the pair carries (its body's cargo: the hold and its features' load, a Tow Beam's tow), fixed
+   * for the record: a change is a fresh record. Absent: 0
+   */
+  fcargo?: number;
   /** The first tick the pair is flown as one */
   tick: number;
   /** The first tick each flies alone again */
@@ -125,9 +130,9 @@ export interface ClampLinkRec {
   push?: readonly [number, number];
 }
 
-/** What a ship is on tick t under the clamps (the step's clamp source) */
+/** What a ship is on tick t under the clamps (the step's clamp source). `fcargo`: the link's (ClampLinkRec.fcargo) */
 export type ClampAt =
-  | { kind: 'lead'; joined: JoinedView; share?: number }
+  | { kind: 'lead'; joined: JoinedView; share?: number; fcargo?: number }
   | { kind: 'follow'; leader: Readonly<ClampBody>; offset: Readonly<ClampOffset>; leaderBits: number }
   | { kind: 'push'; ix: number; iy: number };
 
@@ -166,7 +171,12 @@ export class ClampLinks {
     }
     // (The same record again, a late joiner's copy: nothing changes)
     const same = this.recs.find((x) => x.tick === r.tick && x.leader === r.leader && x.follower === r.follower);
-    if (same) { if (same.until !== Infinity || same.offset.ox !== r.offset.ox || same.offset.oy !== r.offset.oy || same.offset.oa !== r.offset.oa) { same.until = Infinity; same.offset = { ...r.offset }; } else from = Infinity; return from; }
+    if (same) {
+      if (same.until !== Infinity || same.offset.ox !== r.offset.ox || same.offset.oy !== r.offset.oy || same.offset.oa !== r.offset.oa || (same.fcargo ?? 0) !== (r.fcargo ?? 0)) {
+        same.until = Infinity; same.offset = { ...r.offset }; same.fcargo = r.fcargo;
+      } else from = Infinity;
+      return from;
+    }
     this.recs.push({ ...r, offset: { ...r.offset }, until: Infinity });
     this.recs.sort((a, b) => a.tick - b.tick);
     return from;
@@ -253,7 +263,7 @@ export function linksSource(
       if (x.leader === id) {
         const L = derived(x.leader, t), F = derived(x.follower, t);
         if (!L || !F) return null;
-        return { kind: 'lead', joined: joinDerived(L, F, x.offset) };
+        return { kind: 'lead', joined: joinDerived(L, F, x.offset), fcargo: x.fcargo };
       }
       const l = leaderAt(x.leader, t);
       return l ? { kind: 'follow', leader: l.body, offset: x.offset, leaderBits: l.bits } : null;
@@ -296,16 +306,17 @@ const R: [number, number] = [0, 0];
 /**
  * The pair's step on the leader's body (its centre of mass): to the joined centre, `run` steps that (the flight step on
  * the joined structure), and back to the leader's centre, rounded as ships are. The leader's jump state rides along
- * unchanged by the move (no jump while docked)
+ * unchanged by the move (no jump while docked). The pair carries both loads: the leader's body's cargo and the
+ * follower's (`fcargo`, the link's)
  */
-export function stepPairBody(body: FlightBody, j: JoinedView, run: (jb: FlightBody) => void): void {
+export function stepPairBody(body: FlightBody, j: JoinedView, run: (jb: FlightBody) => void, fcargo = 0): void {
   toWorld(j.cx, j.cy, body.angle, R);
   const w = body.angVel;
   JB.x = body.x + R[0]; JB.y = body.y + R[1];
   JB.vx = body.vx - w * R[1]; JB.vy = body.vy + w * R[0];
   JB.angle = body.angle; JB.angVel = w;
   JB.jump = body.jump; JB.jumpScale = body.jumpScale; JB.jumpAim = body.jumpAim; JB.jumpTo = body.jumpTo;
-  JB.cargo = body.cargo; JB.dodge = undefined; JB.dodgeDir = undefined;
+  JB.cargo = fcargo ? (body.cargo ?? 0) + fcargo : body.cargo; JB.dodge = undefined; JB.dodgeDir = undefined;
   run(JB);
   toWorld(j.cx, j.cy, JB.angle, R);
   const w2 = JB.angVel;
@@ -375,7 +386,7 @@ export function stepClamped(
     stepPairBody(body, c.joined, (jb) => {
       const r = stepShipPhysics(jb, controls, c.joined.derived, env.tuning, { charge: energy.charge, drainRate: 0, replay }, env.gravity, rangeBoost, hazard, env.terrain);
       boosting = r.isBoosting; held = r.aimHeld;
-    });
+    }, c.fcargo);
     out.ctlPower = replay; out.isBoosting = boosting; out.aimHeld = held;
     return;
   }
