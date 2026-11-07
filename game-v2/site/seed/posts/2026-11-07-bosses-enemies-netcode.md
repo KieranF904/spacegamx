@@ -44,20 +44,6 @@ Ten enemies now have their own designs instead of being built from player parts,
 
 Enemies also stay put in the world now, and show on the map before you get there.
 
-## Hits and engines
-
-Hits scale with the gun, from a flick of sparks to a proper blast. Original on top, now on the bottom:
-
-![Impacts by gun tier](../../../docs/panels/site-posts/2026-11-07-impacts-by-tier.jpg)
-
-![A heavy hit](../../../docs/panels/site-posts/2026-11-07-big-hit-now.jpg)
-
-![Hits on a pirate gunship](../../../docs/panels/site-posts/2026-11-07-surface-impacts.jpg)
-
-Every engine has its own flame.
-
-![Engine looks](../../../docs/panels/site-posts/2026-11-07-engine-looks.jpg)
-
 ## Ships and the world
 
 I was going to wipe everyone's ships for the new power system, but since there are only a handful of players with a handful of custom ships, I've had them remade on the new system instead. They'll be swapped in when the update goes live.
@@ -70,9 +56,7 @@ The Helios Array is rebuilt as a proper megastructure.
 
 ![The Helios Array, old (left) and new (right)](../../../docs/panels/site-posts/2026-11-07-helios-array-before-after.jpg)
 
-Terra Nova and the asteroids got reworked too.
-
-![Terra Nova, old (left) and new (right)](../../../docs/panels/site-posts/2026-11-07-terra-nova-2026-11-before-after.jpg)
+The asteroids got reworked too.
 
 ![Asteroids](../../../docs/panels/site-posts/2026-11-07-asteroids-glasswater.jpg)
 
