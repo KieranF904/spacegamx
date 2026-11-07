@@ -10,7 +10,7 @@ import type { IWorld } from 'bitecs';
 import {
   FRICTION, BOOST_FACTOR, WORLD_SIZE, CONTACT_BIG_BODY,
   type Blueprint, type Catalog, type ShipState, type ShipTuning, type PlacedPart, type Vec2, type InventoryStub,
-  type GravityWell, type FlightConstants, type HitInfo, type FieldEnv, type WeaponMods, type ShipDerived, type Terrain,
+  type GravityWell, type FlightConstants, type HitInfo, type FieldEnv, type WeaponMods, type ShipDerived, type Terrain, type DesignUpdate,
 } from '@space-game/common';
 import type { ShipBridge } from '../ShipBridge.js';
 import type { AimHoldStats } from '@space-game/common';
@@ -195,6 +195,8 @@ export interface ShipBridgeConfig {
   enemies?: Record<string, Blueprint>;
   /** Dev test ships by file name (the F9 ship swap only) */
   dev?: Record<string, Blueprint>;
+  /** The design update mapping (data/ships/designUpdate.json, its blueprints found): Pilots swaps saves below v5 with it */
+  designUpdate?: DesignUpdate;
   /** Wall-clock source for the admin panel's rebuild timer only (never used by ship logic) */
   now?: () => number;
 }

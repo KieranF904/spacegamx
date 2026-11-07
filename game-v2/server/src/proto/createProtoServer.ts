@@ -7,7 +7,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData, GameDataFiles } from '../data/GameData.js';
 import type { UserStore } from '../auth/types.js';
 import { ShipBridge } from '../ships/ShipBridge.js';
-import { Blueprint, CatalogFiles, ShipTuning, InventoryStub, loadCatalog } from '@space-game/common';
+import { Blueprint, CatalogFiles, ShipTuning, InventoryStub, loadCatalog, type DesignUpdate } from '@space-game/common';
 
 /** Accounts don't exist in proto mode; every join is a guest. */
 const noAccounts: UserStore = {
@@ -40,6 +40,8 @@ export interface ShipConfig {
   enemies?: Record<string, Blueprint>;
   /** Dev test ships by file name (the F9 ship swap only: never sold, learned or spawned) */
   dev?: Record<string, Blueprint>;
+  /** The design update mapping, its blueprints found (loadShipConfig: data/ships/designUpdate.json and blueprints/remakes) */
+  designUpdate?: DesignUpdate;
 }
 
 export function createShipBridge(cfg: ShipConfig): ShipBridge {
@@ -51,6 +53,7 @@ export function createShipBridge(cfg: ShipConfig): ShipBridge {
     library: cfg.library,
     enemies: cfg.enemies,
     dev: cfg.dev,
+    designUpdate: cfg.designUpdate,
     now: () => performance.now(),
   });
 }

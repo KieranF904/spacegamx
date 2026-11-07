@@ -44,7 +44,7 @@ cat "$WORK/REVISION"
 
 # Runtime data (accounts, players' ships, profiles, telemetry, contributor notes, status, the website's data, the
 # world's memory, backups) never ships; nor do the dev-only data files (the dev systems and dev test ships: the
-# production server doesn't read them)
+# production server doesn't read them). blueprints/remakes does ship: the design update swaps players' saves for them
 tar -czf "$TGZ" --exclude=node_modules --exclude=dist \
   --exclude='data/users.json' --exclude='data/users.json.tmp' --exclude='data/users.db*' --exclude='data/lobby' \
   --exclude='data/ships/players' --exclude='data/profiles' --exclude='data/telemetry' --exclude='data/contributor' \

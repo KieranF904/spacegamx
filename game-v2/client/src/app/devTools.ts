@@ -26,8 +26,8 @@ export function installDevTools(host: { readonly renderer: Renderer; readonly ne
       new RenderTuningPanel({ zoom: () => host.renderer.getZoom(), warp: (systemId, x, y) => host.network.send({ type: 'devTeleport', systemId, x, y }), openSim: () => simTools?.toggle() });
       // Ship swap (F9): the plan library's ships and the dev test ships, flown at once
       // (Grouped: a ports design (`power: 'ports'`) first, then the library, then the dev test ships; one marked `retired` isn't listed)
-      const library = import.meta.glob(['../../../data/ships/blueprints/*.json', '../../../data/ships/blueprints/dev/*.json'], { eager: true, import: 'default' }) as Record<string, { name: string; parts: { fn: string }[]; power?: string; retired?: unknown }>;
-      const groupOf = (path: string, bp: { power?: string }) => (bp.power === 'ports' ? 'Ports energy' : path.includes('/dev/') ? 'Dev test ships' : 'Library');
+      const library = import.meta.glob(['../../../data/ships/blueprints/*.json', '../../../data/ships/blueprints/dev/*.json', '../../../data/ships/blueprints/remakes/*.json'], { eager: true, import: 'default' }) as Record<string, { name: string; parts: { fn: string }[]; power?: string; retired?: unknown }>;
+      const groupOf = (path: string, bp: { power?: string }) => (bp.power === 'ports' ? 'Ports energy' : path.includes('/dev/') || path.includes('/remakes/') ? 'Dev test ships' : 'Library');
       // The boss tools (Shift+F9): its state comes back as bossDev (app/devFeeds.ts)
       const bossTools = new DevBossPanel((m) => host.network.send({ type: 'bossDevTool', ...m }));
       devFeeds.bossDev = (msg) => bossTools.update(msg);

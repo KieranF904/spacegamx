@@ -865,7 +865,7 @@ describe('quests: the v5 ship wipe', () => {
       expect(profile().quests.active.main_02.stage).toBe(0);
       expect(profile().plans).toContain('prospector');
       // The refund notice, once, and gone from the save
-      expect(got.some((m) => m.type === 'toast' && /new power core/.test((m as any).text))).toBe(true);
+      expect(got.some((m) => m.type === 'toast' && /new power system/.test((m as any).text))).toBe(true);
       expect(profile().notices).toBeUndefined();
       // Start it again: on to the build step
       t.send({ type: 'slotSave', slot: 1, blueprint: server.getShips().library.get('prospector')!, plan: 'prospector' } as any);
