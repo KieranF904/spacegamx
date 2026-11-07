@@ -60,7 +60,8 @@ export class StationWindow {
   private win = new GameWindow('Station');
   private tabEls = new Map<Tab, HTMLButtonElement>();
   private tab: Tab = 'overview';
-  private st: ServerStationMessage | null = null;
+  private renderedTab: Tab | null = null;
+  private st:ServerStationMessage | null = null;
   private clockSkew = 0;
   private credits: HTMLSpanElement;
   private timer: number | null = null;
@@ -402,6 +403,9 @@ export class StationWindow {
     this.badges();
     this.win.sub.textContent = this.st?.note ?? '';
     const b = this.win.body;
+    // A re-render (cargo, credits or the station changing) keeps each scrolling list where it was on the same tab
+    const keep = this.renderedTab === this.tab ? scrollsOf(b).map((el) => el.scrollTop) : [];
+    this.renderedTab = this.tab;
     b.replaceChildren();
     if (!this.st) { b.innerHTML = '<div class="sgw-empty">Contacting the station…</div>'; return; }
     if (this.tab === 'overview') this.renderOverview(b);
@@ -412,6 +416,7 @@ export class StationWindow {
     else if (this.tab === 'refinery') this.renderRefinery(b);
     else if (this.tab === 'outpost') this.renderOutpost(b);
     else this.renderFabricator(b);
+    scrollsOf(b).forEach((el, i) => { if (keep[i]) el.scrollTop = keep[i]; });
   }
 
   // ---------------------------------------------------------------------------
@@ -1433,6 +1438,11 @@ function lineStatus(l: OrderLine): string {
   if (l.waiting) bits.push(`<span style="color:#fbbf24" title="${l.blocked === 'queue' ? 'Next, when a queue slot frees' : 'Waiting for what it is made from'}">◷ ${l.waiting}</span>`);
   if (l.short) bits.push(`<span style="color:#fca5a5" title="${l.blocked === 'schematic' ? 'It opens at a later level' : 'Gather or buy it'}">${l.blocked === 'schematic' ? '🔒' : '✕'} ${l.short}</span>`);
   return bits.join(' ');
+}
+
+/** The window's scrolling lists, in page order (a re-render builds the same ones in the same order) */
+function scrollsOf(b: HTMLElement): HTMLElement[] {
+  return [b, ...[...b.querySelectorAll<HTMLElement>('*')].filter((el) => /auto|scroll/.test(el.style.overflowY))];
 }
 
 function fmt(s: number): string {
