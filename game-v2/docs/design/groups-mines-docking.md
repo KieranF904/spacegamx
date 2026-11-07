@@ -120,19 +120,41 @@ model's (`mineBay` in `scripts/econ/models.mjs`). Default key: `Digit0` ("Drop m
 
 - Up: `mineDrop` (no fields: the server picks bay and tick). Rate-limit it (`MessageLimits`, about 4 a second).
 - Down: `minesLaid` (a `MineDrop`) to every client holding the owner, and each live drop again to a client that comes
-  to hold the field (first sight, entering the system). `minesGone {tick, ids, how, by?}` for a blast, a cap fizzle or a
-  clear (a life's end is derived, never sent). `mineBay {loaded, readyAt}` to the owner when a magazine or the cooldown
-  changes.
+  to hold the field (first sight, entering the system; mines of it already gone follow as a quiet `minesGone fizzle`).
+  `minesGone {tick, ids, how, by?}` for a cap fizzle or a clear (at once) and a blast the client can't find itself (M2:
+  just before the snapshot that closes the window it went off in); a life's end is derived, never sent. `minesKept
+  {tick, ids}` (M2): mines the client's search would find going off that didn't (taken back; their ends are told from
+  then on). `mineBay {loaded, readyAt}` to the owner when a magazine or the cooldown changes.
 
 ### 2.4 Determinism
 
 A drop is one decision record. From it every end works out each mine's path, rest point, arming and expiry with exact
 arithmetic and the deterministic trig (`minePos` uses `dsincos`, rounds to 2 decimals). Nothing about a mine is
-streamed. **Detonations** (stage M1, required): the server decides them (it knows parties and the true positions) and
-tells each as a rare event (`minesGone how 'blast'`, a few bytes), with the damage going the usual way. The client draws
-the blast at the derived position on the told tick. Stage M2 (optional, only after M1 works): clients derive
-detonations on their tick layer from replicas and the server tells only those it judges a client could not find (the
-HitLedger `unfindable` pattern). Kieran to decide whether M1's told detonations meet the bar (notes).
+streamed. **Detonations** (stage M1): the server decides them (it knows parties and the true positions) and deals the
+damage the usual way. **Stage M2 (done, 2026-11-07)**: clients work detonations out themselves, the shared rules in
+`common/src/ships/features/minebay/blasts.ts`:
+
+- *Who a client may find*: a ship a pilot may hurt that isn't a pilot (`mineFindable`: `sidesHurt(PILOT, side) === 1`).
+  A pilot setting a mine off (PvP zones, parties) stays the server's to tell, as two pilots' shell hits do.
+- *Where*: armed mines at rest, a ship's bounding circle within `triggerReach` (`MineBuckets`, the geometry the server's
+  pass uses too), the ship where the pass has it (a pilotless ship at the end of the tick before); on one tick a mine is
+  set off by the lowest id touching it.
+- *Found* (`findMineBlasts`): as each snapshot window is searched on the tick-faithful layer (client SelfHits.window),
+  against the same exact ships the hit search uses. The server mirrors that set (`HitLedger.poseExact`: held, not
+  keyframed, moved by a cause, synced or debris; the window searched at all: `searches`, at most `SEARCH_WINDOW_MAX`
+  ticks) and sends nothing for what the client finds.
+- *Told*: every other blast, as `minesGone`, just before the snapshot that closes its window (server Minefield
+  `onSnapshot`, a feature hook the SnapshotBuilder calls), or at once to a pilot that gets no snapshots (dead, gone).
+- *Kept*: a findable ship touching a mine that only the server knows can't set it off (dormant, jumping, a berthed
+  owner) would be found as a blast that never was: `minesKept` takes it back, and that mine's end is told to that
+  client from then on.
+- *Predicted* (drawn at once): each frame an armed mine is checked against the ships as drawn (same rule). A
+  prediction is confirmed by the found or told end (one blast drawn, never two), or undone once the windows
+  `PREDICT_SLACK` ticks past it settle without one (the mine comes back, its blast is cut; held `PREDICT_HOLD` ticks
+  so it doesn't flicker). Client `ships/features/minebay/mines.ts` reconciles the three.
+
+The three open decisions stay as they were: magazines on death, triggers by pilots only where they may hurt each other
+(`canDamage`), and blast damage to the owner's party (`splashAt` as any blast).
 
 The owner's own drop is predicted: the client draws the batch at once from its own pose and tick (same `MineDrop`
 fields from its prediction) and adopts the server's `minesLaid` when it comes (same owner, bay and tick: replace the

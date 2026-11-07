@@ -268,20 +268,41 @@ export class HitLedger {
     // until its body has its hit rules too: decision inputs build stage 4)
     if (this.host.bodies?.toldHits(conn, h.target)) return 'body';
     if (this.oldWayShells.get(conn)?.has(h.proj)) return 'oldWay';
-    const target = ships.get(h.target);
-    if (!target || target.kind === 'debris') return 'debris';
-    // (synced since its last snapshot: a sync can go in a frame with no snapshot, and the client holds it till the next)
-    // (not where every sync this window was a rebuild of a ship it had, stamped with its tick: it keeps the structure
-    // before each, and finds the hits on each structure by tick, client ShipStore.asOf. A pilot's still: it moves before
-    // the collision step, so on the rebuild's tick its replica's pose is already recentred, client SelfHits.onSync)
-    const at = conn.shipSynced.get(h.target)?.at;
-    if (at !== undefined && at > conn.lastSnapshotSentTick && (!conn.hpBefore?.get(h.target) || hasComponent(world, Player, h.target))) return 'synced';
+    const why = this.poseWhy(conn, h.target, ships);
+    if (why) return why;
     if (this.removing(h.proj)) return 'removed';
     if (Radius.value[h.proj] >= 19.95) return 'orb';
     const owner = ships.get(h.owner), sh = owner ? gunShell(ships.tuning, owner, h.gun) : null;
     if (!sh || !firesStraight(sh.def) || sh.def.lob || sh.def.arm) return 'curve';
     if (hasComponent(world, Player, h.owner) && hasComponent(world, Player, h.target)) return 'pvp';
     return null;
+  }
+
+  /** Why a ship's pose isn't exact on this client's tick layer this window (null: it is, bar a keyframe or a body) */
+  private poseWhy(conn: ClientConnection, target: number, ships: ShipBridge): 'debris' | 'synced' | null {
+    const t = ships.get(target);
+    if (!t || t.kind === 'debris') return 'debris';
+    // (synced since its last snapshot: a sync can go in a frame with no snapshot, and the client holds it till the next)
+    // (not where every sync this window was a rebuild of a ship it had, stamped with its tick: it keeps the structure
+    // before each, and finds the hits on each structure by tick, client ShipStore.asOf. A pilot's still: it moves before
+    // the collision step, so on the rebuild's tick its replica's pose is already recentred, client SelfHits.onSync)
+    const at = conn.shipSynced.get(target)?.at;
+    if (at !== undefined && at > conn.lastSnapshotSentTick && (!conn.hpBefore?.get(target) || hasComponent(this.host.world, Player, target))) return 'synced';
+    return null;
+  }
+
+  /**
+   * Is a ship's pose exact on this client's tick layer this window, as its own search has it (client SelfHits'
+   * targets: not debris, a boss its body flies there, one keyframed or moved by a cause, or synced this window)? What
+   * a Mine Bay's blasts are found against (ships/features/minebay). `keyframed`: the window's told ships (toldShips)
+   */
+  poseExact(conn: ClientConnection, id: number, keyframed?: ReadonlySet<number>): boolean {
+    return !keyframed?.has(id) && !this.host.bodies?.toldHits(conn, id) && !this.poseWhy(conn, id, this.host.getShips());
+  }
+
+  /** Does this client search its windows itself now (finding its own hits, and not held to STRICT: SelfHits.detect)? */
+  searches(conn: ClientConnection): boolean {
+    return this.finds(conn) && !this.levels.get(conn)?.rules.strict;
   }
 
   /** Will this snapshot remove the shell (dead, and not spent by a ship hit)? */

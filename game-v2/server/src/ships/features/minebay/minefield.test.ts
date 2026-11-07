@@ -1,5 +1,5 @@
 /**
- * The Mine Bay in the full server (docs/design/groups-mines-docking.md section 2, stage M1): magazines and the cooldown,
+ * The Mine Bay in the full server (docs/design/groups-mines-docking.md section 2): magazines and the cooldown,
  * drops told to holders and resent to a late joiner, owner and party never set a mine off, an armed mine in reach goes
  * off once through the damage funnel (shields first), the cap fizzles the oldest, a field is cleared when its owner
  * goes, and the field fabricator's rearm job comes after repairs and fills the magazine at the placeholder cost.
@@ -194,16 +194,19 @@ describe('mine bay: who sets a mine off', () => {
     expect(of(a.got, 'minesGone')).toHaveLength(0);
     pin(dummy, rest[0], rest[1] + ship.derived.radius + MINES.triggerReach - 2);
     w.run(1);
-    const gone = of(a.got, 'minesGone');
-    expect(gone.length).toBeGreaterThanOrEqual(1);
-    expect(gone[0]).toMatchObject({ how: 'blast', by: dummy, ids: [mineId(a.pid, d.tick, 0)] });
+    const tick = w.server.currentTick;
+    expect(w.field().liveMines(a.pid).some((m) => m.id === mineId(a.pid, d.tick, 0))).toBe(false);
     // (The shield took it first)
     expect(ship.shield).toBeLessThan(shield0);
     expect(ship.hp.reduce((s, v) => s + v, 0)).toBeLessThanOrEqual(hp0);
-    // Once: mine 0 is gone for good
-    const n = gone.filter((g) => g.ids.includes(mineId(a.pid, d.tick, 0))).length;
+    // Told with the snapshot that closes its window (a ship placed by hand is keyframed: no client finds it on its
+    // tick layer, blasts.test.ts), and once: mine 0 is gone for good
     w.run(5);
-    expect(of(a.got, 'minesGone').filter((g) => g.ids.includes(mineId(a.pid, d.tick, 0))).length).toBe(n);
+    const gone = of(a.got, 'minesGone').filter((g) => g.ids.includes(mineId(a.pid, d.tick, 0)));
+    expect(gone).toHaveLength(1);
+    expect(gone[0]).toMatchObject({ how: 'blast', by: dummy, tick });
+    w.run(5);
+    expect(of(a.got, 'minesGone').filter((g) => g.ids.includes(mineId(a.pid, d.tick, 0)))).toHaveLength(1);
     expect(w.field().liveMines(a.pid).some((m) => m.id === mineId(a.pid, d.tick, 0))).toBe(false);
   }, 60_000);
 

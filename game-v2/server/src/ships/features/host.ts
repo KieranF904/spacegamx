@@ -2,7 +2,7 @@
  * ServerFeatures: the server features built once (GameServer's constructor) and flattened so the per-tick calls walk
  * plain arrays and allocate nothing. With no feature every call is an empty loop.
  */
-import type { FeatureHost, FeatureInstance, FeatureMessageHandler, ServerFeature } from './types.js';
+import type { FeatureHost, FeatureInstance, FeatureMessageHandler, ServerFeature, SnapshotWindow } from './types.js';
 
 export class ServerFeatures {
   /** Message handlers by type (net/dispatch.ts gets one entry per type) */
@@ -17,6 +17,7 @@ export class ServerFeatures {
   private readonly died: ((eid: number) => void)[] = [];
   private readonly berthed: ((eid: number) => void)[] = [];
   private readonly jumpKeys: ((eid: number) => void)[] = [];
+  private readonly snapshots: ((pilot: number, win: SnapshotWindow) => void)[] = [];
   private readonly byId = new Map<string, FeatureInstance>();
 
   /** `taken`: message types the game already handles (a feature may not shadow them) */
@@ -36,6 +37,7 @@ export class ServerFeatures {
       if (inst.onDied) this.died.push(inst.onDied.bind(inst));
       if (inst.onBerthed) this.berthed.push(inst.onBerthed.bind(inst));
       if (inst.onJumpKey) this.jumpKeys.push(inst.onJumpKey.bind(inst));
+      if (inst.onSnapshot) this.snapshots.push(inst.onSnapshot.bind(inst));
       for (const [type, fn] of Object.entries(inst.messages ?? {})) {
         if (taken.has(type)) throw new Error(`server feature ${f.id}: message ${type} is already handled by the game`);
         if (messages.has(type)) throw new Error(`server feature ${f.id}: message ${type} has two handlers`);
@@ -99,5 +101,12 @@ export class ServerFeatures {
 
   onJumpKey(eid: number): void {
     for (let i = 0; i < this.jumpKeys.length; i++) this.jumpKeys[i](eid);
+  }
+
+  /** Does any feature want snapshot windows (onSnapshot)? The builder makes none otherwise */
+  get wantsSnapshots(): boolean { return this.snapshots.length > 0; }
+
+  onSnapshot(pilot: number, win: SnapshotWindow): void {
+    for (let i = 0; i < this.snapshots.length; i++) this.snapshots[i](pilot, win);
   }
 }

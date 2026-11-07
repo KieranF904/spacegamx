@@ -5,7 +5,7 @@
  *
  * TYPE-ONLY imports here: the feature folders may import anything, this file must not make a cycle.
  */
-import type { ClientMessage, ShipState, Catalog, PlacedGeom, Charge } from '@space-game/common';
+import type { ClientMessage, ShipState, Catalog, PlacedGeom, Charge, SearchShips } from '@space-game/common';
 import type { Container } from 'pixi.js';
 import type { ActionDef } from '../../input/keybindings';
 import type { InterpolatedEntity } from '../../state/GameState';
@@ -38,7 +38,19 @@ export interface ClientFeatureHost {
   readonly tick?: (own: boolean) => number;
   /** The system the client is in */
   readonly systemId?: () => string;
+  /** A ship's side as this client knows it (hitRules.ts SIDE bits) */
+  readonly side?: (id: number) => number;
+  /** A ship's exact pose at the end of a tick on the tick-faithful layer (its replica); null: none */
+  readonly exactAt?: (id: number, tick: number) => { x: number; y: number } | null;
+  /** A ship's structure as it was on a tick (ShipStore.asOf: before a rebuild in the window, the one before) */
+  readonly shipAt?: (id: number, tick: number) => ShipState | undefined;
 }
+
+/**
+ * A snapshot window as it is searched on the tick-faithful layer (ships/hits/SelfHits.detect): the ticks after
+ * `from` up to `to`, and the ships whose poses are exact in it (null: not searched here; the server tells all of it)
+ */
+export interface TickWindow { from: number; to: number; ships: SearchShips | null }
 
 /** Per-frame drawing of one ship (ShipRenderer calls every feature's drawShip for each body, in id order) */
 export interface ShipDrawCtx {
@@ -79,6 +91,8 @@ export interface ClientFeature {
   beginFrame?(shared: Container, host: ClientFeatureHost): void;
   drawShip?(ctx: ShipDrawCtx, host: ClientFeatureHost): void;
   indicator?: IndicatorDef;
+  /** A snapshot window searched (once its told records are in): what this feature works out on the tick layer */
+  onWindow?(win: TickWindow, host: ClientFeatureHost): void;
   /** Its line on the ship status panel (ui/shipStatus: a Burst Strafer's dodge, ready or cooling); null: none now */
   status?(host: ClientFeatureHost): FeatureStatusLine | null;
 }

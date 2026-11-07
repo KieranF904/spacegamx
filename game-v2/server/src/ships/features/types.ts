@@ -95,6 +95,22 @@ export interface RulesCap {
   sameParty?(a: number, b: number): boolean;
   /** The ships this pilot's client holds (its connection's ship view); undefined: no client */
   shipView?(pilot: number): ReadonlySet<number> | undefined;
+  /** A ship's side as clients know it (hitRules.ts SIDE bits: pilot, ward, berthed, a person's craft) */
+  sideOf?(eid: number): number;
+}
+
+/**
+ * A pilot's snapshot window closing: the ticks after its last snapshot (`from`) up to this one's (`to`), just before
+ * the snapshot goes (net/SnapshotBuilder.ts). Its client searches the window on its tick-faithful layer once the
+ * snapshot is in (client ships/hits/SelfHits.ts), so what a feature tells it now arrives first
+ */
+export interface SnapshotWindow {
+  readonly from: number;
+  readonly to: number;
+  /** Its client searches this window itself (finding its own hits, not held to STRICT, a window it searches: SelfHits.detect) */
+  readonly finds: boolean;
+  /** Is this ship's pose exact on that client's tick layer this window (held; not keyframed, moved by a cause, synced or debris)? */
+  exact(id: number): boolean;
 }
 
 /** Everything a feature may be given: what GameServer builds (each feature takes only its own sets of it) */
@@ -129,6 +145,8 @@ export interface FeatureInstance {
   onBerthed?(eid: number): void;
   /** An input that holds the jump key was applied to a pilot (net/handlers/flight.ts applyInputToEntity): it asks its drive to jump */
   onJumpKey?(eid: number): void;
+  /** A pilot's snapshot window closes (just before its snapshot goes): what its client can't work out itself, told now */
+  onSnapshot?(pilot: number, win: SnapshotWindow): void;
 }
 
 /**

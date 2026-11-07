@@ -1,15 +1,27 @@
 /**
- * The Mine Bay's world half (shared rules: common/src/ships/features/minebay/minebay.ts; docs/design/groups-mines-docking.md
- * section 2). Every pilot's magazines, their drops and the live mines, the trigger pass, blasts, expiry and the cap.
+ * The Mine Bay's world half (shared rules: common/src/ships/features/minebay/minebay.ts and blasts.ts;
+ * docs/design/groups-mines-docking.md section 2). Every pilot's magazines, their drops and the live mines, the trigger
+ * pass, blasts, expiry and the cap.
  *
- * Netcode (stage M1): a drop is one decision record (`minesLaid`, a MineDrop) that every end derives the mines from:
- * where each slides to and rests, when it arms and when it fizzles out. Nothing about a mine is streamed. The server
- * decides detonations (it knows parties and true positions) and tells each as a rare event (`minesGone`); the damage
- * goes the usual way (ShipBridge.splashAt -> hurt). A life's end is derived on both ends and never sent.
+ * Netcode: a drop is one decision record (`minesLaid`, a MineDrop) that every end derives the mines from: where each
+ * slides to and rests, when it arms and when it fizzles out. Nothing about a mine is streamed. The server decides
+ * detonations and deals the damage the usual way (ShipBridge.splashAt -> hurt). A life's end is derived on both ends and
+ * never sent; the cap's and a clear's fizzles are told at once.
+ *
+ * Blasts (stage M2, common blasts.ts): a client searching its own windows finds the blasts set off by ships whose poses
+ * it has exactly (`mineFindable` ships, the same ones its hit search uses), so the server tells it only the rest. Each
+ * tick's pass keeps what any client's search could find (a `Touch`: the mine, the tick, the findable ships touching it,
+ * and who really set it off, if anyone); as each pilot's snapshot window closes (`onSnapshot`) its touches are settled
+ * for it, in tick order:
+ *   a blast   its search finds it on that tick (a findable ship exact on its layer touched it): nothing; else `minesGone`
+ *   no blast  but its search may find one (a findable ship touched it that only the server knows can't set it off:
+ *             dormant, jumping, a berthed owner): `minesKept`, and from then on that mine's end is told to it (`Drop.kept`)
+ * A pilot that is dead (no snapshots till it flies again) is told its blasts at once; one whose windows leave touches
+ * unsettled past any window it searches (no snapshots that long) is told their blasts when they are let go.
  *
  * Who is told a drop: the owner, and every pilot in the system whose client holds the owner or who is within
  * TELL_REACH of the drop; a pilot who comes to hold it later (first sight, entering the system, joining) is told every
- * live drop then. `minesGone` goes to the pilots told of the drop.
+ * live drop then (and, quietly, which of its mines are already gone). Everything else goes to the pilots told of it.
  *
  * Magazines live in the pilot's ship record (`FieldRecord.mines`, uid -> loaded): the field fabricator's rearm job
  * (game/field/FieldShips.ts) fills them there, a drop takes from them, a bay lost empties its own. The pilot's client
@@ -18,10 +30,10 @@
 
 import { defineQuery, hasComponent } from 'bitecs';
 import {
-  Player, Dead, InSystem, Position, Velocity, Rotation, MINES, makeDrop, mineArmed, mineExpired, mineId, minePos, mineTouches,
-  nextReady, pickBay, type MineDrop, type MineEnd, type ShipState,
+  Player, Dead, InSystem, Position, Velocity, Rotation, MINES, MineBuckets, makeDrop, mineArmed, mineExpired, mineFindable, mineId,
+  minePos, mineRest, nextReady, pickBay, SEARCH_WINDOW_MAX, type MineDrop, type MineEnd, type ShipState,
 } from '@space-game/common';
-import type { FeatureInstance, FeatureMessageHandler, HoldCap, RulesCap, ShipsOf, StationCap, TellCap, WorldCap } from '../types.js';
+import type { FeatureInstance, FeatureMessageHandler, HoldCap, RulesCap, ShipsOf, SnapshotWindow, StationCap, TellCap, WorldCap } from '../types.js';
 
 /** What the Mine Bay asks of the game: the ships it may set off and splash, who may hurt whom, telling pilots, the profile (laid mines) */
 export type MineHost = WorldCap & ShipsOf<'bodies' | 'get' | 'isDormant' | 'isJumping' | 'splashAt'> & Pick<TellCap, 'send'>
@@ -37,19 +49,29 @@ const TELL_EVERY = 15;
 const MAX_PRESS_LEAD = 64;
 /** Presses waiting for their tick, per pilot, at most */
 const MAX_PENDING = 4;
-/** The trigger pass's buckets (world units): an armed mine is found from the ships near its cell */
-const CELL = 256;
+/** Touches a pilot's windows haven't settled are let go after this long (their blasts told then): past any window it searches */
+const TOUCH_KEEP = SEARCH_WINDOW_MAX * 2;
 
 interface Drop {
   d: MineDrop;
   sys: number;
   /** Where each mine rests (armed mines are always at rest: armTicks > slideTicks) */
   rest: [number, number][];
+  /** Each mine's key in the pass's tables, [this drop, its index]: made once */
+  refs: [Drop, number][];
   /** Mines gone (bit i: mine i) */
   gone: number;
   /** Pilots told of it */
   told: Set<number>;
+  /** Mines whose ends are told to a pilot whatever it could find (a minesKept went), by pilot: bit i mine i */
+  kept?: Map<number, number>;
 }
+
+/**
+ * One mine on one tick's pass that a client's search could find going off, or that went off: the findable ships
+ * touching it, and who really set it off (-1: no one)
+ */
+interface Touch { dr: Drop; i: number; tick: number; by: number; findable: number[] }
 
 interface Pilot {
   eid: number;
@@ -66,15 +88,23 @@ interface Pilot {
   sent: number;
   /** The system the pilot was in last tick (a pilot that moves on hears of none of the old system's mines) */
   sys: number;
+  /** The tick its snapshot windows have settled touches up to (-1: none yet) */
+  settled: number;
 }
 
 const bitsOf = (n: number) => (n >= 31 ? -1 : (1 << n) - 1);
+const NONE: number[] = [];
 
 export class Minefield implements FeatureInstance {
   private readonly pilots = new Map<number, Pilot>();
-  /** The trigger pass's buckets, by system then cell key: [drop, mine index] pairs */
-  private readonly grid = new Map<number, Map<number, [Drop, number][]>>();
-  private readonly blasts: [Drop, number, number][] = [];
+  /** The trigger pass's armed mines, by system (common blasts.ts MineBuckets: the geometry a client's search uses) */
+  private readonly grid = new Map<number, MineBuckets<[Drop, number]>>();
+  private readonly spareGrids: MineBuckets<[Drop, number]>[] = [];
+  /** This pass: who sets each mine off (the lowest id the rules let), and the findable ships touching it */
+  private readonly passBy = new Map<[Drop, number], number>();
+  private readonly passFindable = new Map<[Drop, number], number[]>();
+  /** Touches not yet settled for every pilot told of them, in tick order */
+  private touches: Touch[] = [];
 
   constructor(private readonly host: MineHost) {}
 
@@ -91,9 +121,9 @@ export class Minefield implements FeatureInstance {
 
   onLeave(eid: number): void {
     const p = this.pilots.get(eid);
-    if (p) this.clear(p, 'clear');
+    if (p) { this.settleNow(p, this.host.getTick()); this.clear(p, 'clear'); }
     this.pilots.delete(eid);
-    for (const q of this.pilots.values()) for (const dr of q.drops) dr.told.delete(eid);
+    this.forget(eid);
   }
 
   tick(): void {
@@ -109,7 +139,7 @@ export class Minefield implements FeatureInstance {
       if (p.sys !== sys) {
         // (Moved on: its own field is cleared, and it hears again of whatever the new system has)
         if (p.drops.length) this.clear(p, 'clear');
-        for (const q of this.pilots.values()) for (const dr of q.drops) dr.told.delete(eid);
+        this.forget(eid);
         p.sys = sys;
       }
       this.syncMagazines(p);
@@ -118,12 +148,40 @@ export class Minefield implements FeatureInstance {
     }
     this.expire(now);
     this.triggers(now);
+    this.letGo(now);
     if (now % TELL_EVERY === 0) this.tellAll();
+  }
+
+  /**
+   * A pilot's snapshot window closes (just before its snapshot goes): the touches in it settled for that pilot, in tick
+   * order. What its client finds itself goes unsaid; a blast it can't find is told, and a blast it may find that never
+   * happened is taken back (minesKept)
+   */
+  onSnapshot(pilot: number, win: SnapshotWindow): void {
+    const p = this.pilots.get(pilot);
+    if (!p) return;
+    // (touches up to `done` were settled already: by an earlier window, or told while it got no snapshots: deadSettle)
+    const done = Math.max(p.settled, win.from);
+    p.settled = Math.max(p.settled, win.to);
+    for (const t of this.touches) {
+      if (t.tick <= done || t.tick > win.to || !t.dr.told.has(pilot)) continue;
+      const id = mineId(t.dr.d.owner, t.dr.d.tick, t.i), kept = ((t.dr.kept?.get(pilot) ?? 0) >> t.i) & 1;
+      if (t.by >= 0) {
+        // (its search finds it on this tick if a findable ship exact on its layer touched it then)
+        const finds = win.finds && !kept && t.findable.some((s) => win.exact(s));
+        if (!finds) this.host.send(pilot, { type: 'minesGone', tick: t.tick, ids: [id], how: 'blast', by: t.by });
+      } else if (win.finds && !kept && t.findable.length) {
+        // (Any findable ship, exact on its layer or not: one it holds only roughly may be searched all the same. From
+        // now on this mine's end is told to it, and its search leaves the mine alone)
+        this.host.send(pilot, { type: 'minesKept', tick: t.tick, ids: [id] });
+        (t.dr.kept ??= new Map()).set(pilot, (t.dr.kept.get(pilot) ?? 0) | (1 << t.i));
+      }
+    }
   }
 
   // ===================================================================== for tests and the integrator
 
-  /** A pilot's live mines now: [id, x, y, armed] (tests; M2's replicas would derive the same) */
+  /** A pilot's live mines now: [id, x, y, armed] (tests) */
   liveMines(owner: number): { id: number; x: number; y: number; armed: boolean }[] {
     const p = this.pilots.get(owner), now = this.host.getTick(), out: { id: number; x: number; y: number; armed: boolean }[] = [];
     for (const dr of p?.drops ?? []) {
@@ -141,15 +199,24 @@ export class Minefield implements FeatureInstance {
     return (this.pilots.get(owner)?.drops ?? []).map((dr) => dr.d);
   }
 
+  /** Touches not yet let go (tests) */
+  get pendingTouches(): number { return this.touches.length; }
+
   // ===================================================================== pilots and magazines
 
   private pilot(eid: number): Pilot {
     let p = this.pilots.get(eid);
     if (!p) {
-      p = { eid, drops: [], readyBy: {}, pending: [], rebuilds: -1, sent: -1, sys: InSystem.systemId[eid] };
+      p = { eid, drops: [], readyBy: {}, pending: [], rebuilds: -1, sent: -1, sys: InSystem.systemId[eid], settled: -1 };
       this.pilots.set(eid, p);
     }
     return p;
+  }
+
+  /** A pilot hears no more of the drops it was told (it left, or moved to another system) */
+  private forget(eid: number): void {
+    for (const q of this.pilots.values()) for (const dr of q.drops) { dr.told.delete(eid); dr.kept?.delete(eid); }
+    for (const t of this.touches) t.dr.told.delete(eid);
   }
 
   private magazines(eid: number): Record<number, number> | undefined {
@@ -236,8 +303,9 @@ export class Minefield implements FeatureInstance {
     // The cap: the oldest mines fizzle first to make room
     this.makeRoom(p, n, now);
     const rest: [number, number][] = [];
-    for (let i = 0; i < n; i++) rest.push(minePos(d, i, d.tick + MINES.slideTicks));
-    const dr: Drop = { d, sys: InSystem.systemId[eid], rest, gone: 0, told: new Set() };
+    for (let i = 0; i < n; i++) rest.push(mineRest(d, i));
+    const dr: Drop = { d, sys: InSystem.systemId[eid], rest, refs: [], gone: 0, told: new Set() };
+    for (let i = 0; i < n; i++) dr.refs.push([dr, i]);
     p.drops.push(dr);
     this.tellDrop(dr, this.views());
     this.sendBay(p, false);
@@ -287,50 +355,74 @@ export class Minefield implements FeatureInstance {
   // ===================================================================== the trigger pass
 
   private triggers(now: number): void {
-    // Armed mines into buckets (none armed: nothing to do)
+    // Armed mines into each system's buckets (none armed: nothing to do)
+    for (const g of this.grid.values()) { g.clear(); this.spareGrids.push(g); }
     this.grid.clear();
     let any = false;
     for (const p of this.pilots.values()) {
       for (const dr of p.drops) {
         if (!mineArmed(dr.d, now)) continue;
         let g = this.grid.get(dr.sys);
-        if (!g) this.grid.set(dr.sys, (g = new Map()));
+        if (!g) this.grid.set(dr.sys, (g = this.spareGrids.pop() ?? new MineBuckets()));
         for (let i = 0; i < dr.d.n; i++) {
           if (dr.gone & (1 << i)) continue;
-          const key = cellKey(Math.floor(dr.rest[i][0] / CELL), Math.floor(dr.rest[i][1] / CELL));
-          const b = g.get(key);
-          if (b) b.push([dr, i]); else g.set(key, [[dr, i]]);
+          g.add(dr.refs[i], dr.rest[i][0], dr.rest[i][1]);
           any = true;
         }
       }
     }
     if (!any) return;
-    const ships = this.host.ships;
+    // Each ship against the mines it touches: who sets each off (the lowest id the rules let), and which findable ships
+    // touch it (where a client's search could find it going off: common blasts.ts, the same geometry and rule)
+    const ships = this.host.ships, by = this.passBy, findable = this.passFindable;
+    by.clear();
+    findable.clear();
     for (const [eid, ship] of ships.bodies) {
       if (ship.kind !== 'ship') continue;
       const g = this.grid.get(InSystem.systemId[eid]);
       if (!g) continue;
-      const x = Position.x[eid], y = Position.y[eid], reach = ship.derived.radius + MINES.triggerReach;
-      const c0 = Math.floor((x - reach) / CELL), c1 = Math.floor((x + reach) / CELL);
-      const r0 = Math.floor((y - reach) / CELL), r1 = Math.floor((y + reach) / CELL);
-      for (let cx = c0; cx <= c1; cx++) {
-        for (let cy = r0; cy <= r1; cy++) {
-          const b = g.get(cellKey(cx, cy));
-          if (!b) continue;
-          for (const [dr, i] of b) {
-            if (dr.gone & (1 << i)) continue;
-            const [mx, my] = dr.rest[i];
-            if (!mineTouches(mx, my, x, y, ship.derived.radius) || !this.setsOff(dr.d.owner, eid, ship)) continue;
-            dr.gone |= 1 << i;
-            this.blasts.push([dr, i, eid]);
-          }
-        }
-      }
+      const canFind = !hasComponent(this.host.world, Player, eid) && mineFindable(this.host.sideOf?.(eid) ?? 0);
+      g.touching(Position.x[eid], Position.y[eid], ship.derived.radius, (ref) => {
+        const owner = ref[0].d.owner;
+        if (eid === owner) return;
+        if (canFind) { const f = findable.get(ref); if (f) f.push(eid); else findable.set(ref, [eid]); }
+        const was = by.get(ref);
+        if ((was === undefined || eid < was) && this.setsOff(owner, eid, ship)) by.set(ref, eid);
+      });
     }
-    // (Set off after the pass: a blast may break ships up, and the pass walks the bodies)
-    for (let k = 0; k < this.blasts.length; k++) { const [dr, i, by] = this.blasts[k]; this.blast(dr, i, by, now); }
-    this.blasts.length = 0;
+    if (!by.size && !findable.size) return;
+    // (Kept for the pilots' windows: every blast and every findable touch. Set off after the pass: a blast may break
+    // ships up, and the pass walks the bodies)
+    const blasts: Touch[] = [];
+    for (const ref of new Set([...by.keys(), ...findable.keys()])) {
+      const t: Touch = { dr: ref[0], i: ref[1], tick: now, by: by.get(ref) ?? -1, findable: findable.get(ref) ?? NONE };
+      this.touches.push(t);
+      if (t.by >= 0) { t.dr.gone |= 1 << t.i; blasts.push(t); }
+    }
+    for (const t of blasts) this.blast(t);
     for (const p of this.pilots.values()) if (p.drops.some((dr) => (dr.gone & bitsOf(dr.d.n)) === bitsOf(dr.d.n))) p.drops = p.drops.filter((dr) => (dr.gone & bitsOf(dr.d.n)) !== bitsOf(dr.d.n));
+  }
+
+  /**
+   * Touches every pilot told of them has settled, or older than any window a client searches: let go. A pilot whose
+   * windows never settled them (no snapshot all that while) is told their blasts now
+   */
+  private letGo(now: number): void {
+    if (!this.touches.length) return;
+    // (A pilot dead now gets no snapshots till it flies again: its blasts are told at once, the mine that killed it too)
+    for (const p of this.pilots.values()) if (p.settled < now && hasComponent(this.host.world, Dead, p.eid)) this.settleNow(p, now);
+    let k = 0;
+    for (; k < this.touches.length; k++) {
+      const t = this.touches[k];
+      let open = false;
+      for (const v of t.dr.told) if ((this.pilots.get(v)?.settled ?? -1) < t.tick) { open = true; break; }
+      if (!open) continue;
+      if (now - t.tick <= TOUCH_KEEP) break;
+      if (t.by < 0) continue;
+      const id = mineId(t.dr.d.owner, t.dr.d.tick, t.i);
+      for (const v of t.dr.told) if ((this.pilots.get(v)?.settled ?? -1) < t.tick) this.host.send(v, { type: 'minesGone', tick: t.tick, ids: [id], how: 'blast', by: t.by });
+    }
+    if (k) this.touches.splice(0, k);
   }
 
   /** Does this ship set off the owner's mine? Never the owner or the owner's party; never a berthed or warded ship, nor one the owner may not hurt */
@@ -341,11 +433,23 @@ export class Minefield implements FeatureInstance {
     return !this.host.sameParty?.(owner, eid);
   }
 
-  private blast(dr: Drop, i: number, by: number, now: number): void {
-    const [x, y] = dr.rest[i];
-    this.gone(dr, now, [mineId(dr.d.owner, dr.d.tick, i)], 'blast', by);
+  /** A mine goes off (told to each pilot as its window settles: onSnapshot) */
+  private blast(t: Touch): void {
+    const { dr, i } = t, [x, y] = dr.rest[i];
     // (Through the normal damage funnel: falloff, shields, armour, PvP rules; the kill is the owner's)
     this.host.ships.splashAt(dr.sys, x, y, MINES.blastRadius, MINES.blastDamage, dr.d.owner);
+  }
+
+  /**
+   * A pilot that will get no snapshot of its open touches (dead, or gone from the world: the mine that got it, too):
+   * their blasts told now, and it is settled up to now
+   */
+  private settleNow(p: Pilot, now: number): void {
+    for (const t of this.touches) {
+      if (t.tick <= p.settled || t.by < 0 || !t.dr.told.has(p.eid)) continue;
+      this.host.send(p.eid, { type: 'minesGone', tick: t.tick, ids: [mineId(t.dr.d.owner, t.dr.d.tick, t.i)], how: 'blast', by: t.by });
+    }
+    p.settled = Math.max(p.settled, now);
   }
 
   // ===================================================================== telling
@@ -370,6 +474,12 @@ export class Minefield implements FeatureInstance {
       if (v !== d.owner && !near && !view?.has(d.owner)) continue;
       dr.told.add(v);
       this.host.send(v, { type: 'minesLaid', ...d });
+      // (Told late, after some of its mines went: those are gone for it too, quietly)
+      if (dr.gone) {
+        const ids: number[] = [];
+        for (let i = 0; i < d.n; i++) if (dr.gone & (1 << i)) ids.push(mineId(d.owner, d.tick, i));
+        this.host.send(v, { type: 'minesGone', tick: this.host.getTick(), ids, how: 'fizzle' });
+      }
     }
   }
 
@@ -382,6 +492,3 @@ export class Minefield implements FeatureInstance {
     for (const p of this.pilots.values()) for (const dr of p.drops) this.tellDrop(dr, views);
   }
 }
-
-/** A bucket's key from its cell coordinates (each within +-2^20 cells) */
-const cellKey = (cx: number, cy: number) => (cx + 0x100000) * 0x200000 + (cy + 0x100000);

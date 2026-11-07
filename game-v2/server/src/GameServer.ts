@@ -806,6 +806,7 @@ export class GameServer implements ServerCtx {
       canDamage: (a, b) => this.canDamage(a, b),
       sameParty: (a, b) => { const ca = this.pilots.connOf(a), cb = ca && this.pilots.connOf(b); return !!ca && !!cb && this.party.same(ca, cb); },
       shipView: (pilot) => (this.pilots.connOf(pilot) as ClientConnection | undefined)?.shipView,
+      sideOf: (eid) => this.sideOf(eid),
     }, new Set(this.handlers.keys()));
     // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
     for (const [type, fn] of this.features.messages) {

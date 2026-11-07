@@ -51,6 +51,7 @@ import type { Replication } from './Replication.js';
 import type { Mobs } from '../game/Mobs.js';
 import type { LootPods } from '../game/LootPods.js';
 import type { ServerFeatures } from '../ships/features/host.js';
+import type { SnapshotWindow } from '../ships/features/types.js';
 import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
 import { SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS, HEAD_HASH_TICKS, FX_RANGE as FX_NEAR } from './snapshot/constants.js';
@@ -68,7 +69,7 @@ import type { BodyNet } from './decisions/BodyNet.js';
 import type { GuideNet } from './guides/GuideNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
 import type { GunNet, GunClient } from './guns/GunNet.js';
-import { otherShotWire, TELL_PD } from '@space-game/common';
+import { otherShotWire, TELL_PD, SEARCH_WINDOW_MAX } from '@space-game/common';
 
 /** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
 const DEBRIS_ROW_KEY = DEBRIS_STATUS.join(',');
@@ -294,6 +295,17 @@ export class SnapshotBuilder {
   private slowEnd(eid: number): number {
     const left = this.ships.slowedTicksLeft(eid);
     return left > 0 ? this.currentTick + left : 0;
+  }
+
+  /**
+   * A client's snapshot window as the part features see it (onSnapshot): from its last snapshot to now, whether its
+   * client searches it itself (as SelfHits.detect gates it: finding its own hits, not STRICT, a window at most
+   * SEARCH_WINDOW_MAX long), and which ships' poses are exact there (held, and HitLedger.poseExact with the told ships)
+   */
+  private windowOf(conn: ClientConnection, told: ReadonlySet<number>): SnapshotWindow {
+    const from = conn.lastSnapshotSentTick, to = this.currentTick, hits = this.hits;
+    const finds = !!hits && hits.searches(conn) && from >= 0 && to > from && to - from <= SEARCH_WINDOW_MAX;
+    return { from, to, finds, exact: (id) => finds && conn.shipView.has(id) && hits!.poseExact(conn, id, told) };
   }
 
   /** The part features' values for the pilot's own row (fills the scratch array; spread it at once) */
@@ -926,7 +938,8 @@ export class SnapshotBuilder {
       const hitsOn = !!this.hits;
       this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
       // (Hits on a ship its causes moved this window are told, as on one keyframed: its client leaves them, SelfHits.onCaused)
-      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id) || this.otherShotLog.has(conn, id), rep.caused ? toldShips(keyed, rep.causes, rep.found?.touched, (id) => hasComponent(this.world, Player, id)) : keyed) : null;
+      const told = rep.caused ? toldShips(keyed, rep.causes, rep.found?.touched, (id) => hasComponent(this.world, Player, id)) : keyed;
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id) || this.ownShotLog.has(conn, id) || this.otherShotLog.has(conn, id), told) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {
@@ -1008,6 +1021,8 @@ export class SnapshotBuilder {
       if (guns) for (const m of guns.syncs) this.send(conn.ws, m);
       if (pullRows || pullReset) { this.send(conn.ws, pullReset ? { type: 'pulls', f: pullRows ?? [], r: 1 } : { type: 'pulls', f: pullRows! }); conn.pullsReset = false; }
       if (ownNow) conn.ownSyncDue = false;
+      // (Its window closes: what the part features tell of it goes first, the Mine Bay's blasts it can't find itself)
+      if (this.features.wantsSnapshots) this.features.onSnapshot(conn.playerId, this.windowOf(conn, told));
       this.send(conn.ws, {
         type: 'snapshot',
         tick: this.currentTick,

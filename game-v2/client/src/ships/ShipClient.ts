@@ -221,6 +221,7 @@ export class ShipClient {
       entities: () => opts.state.entities, cellSize: opts.tuning.cellSize,
       tick: (own) => (own ? opts.state.ownDrawTick() : opts.state.renderTickNow),
       systemId: () => opts.state.systemId,
+      side: (id) => this.sideOf(id), exactAt: (id, t) => this.replicas.at(id, t)?.body ?? null, shipAt: (id, t) => this.store.asOf(id, t),
     });
     this.dodgeCtl = this.features.controlFor('dodge');
     // The field machines' HUD and build overlay (ships/field): they read the game through this
@@ -335,6 +336,7 @@ export class ShipClient {
       side: (id) => this.sideOf(id),
       passes: (shell) => this.hits.passesOf(shell),
       ownExact: () => this.own.on,
+      window: (from, to, ids) => this.features.onWindow(from, to, ids),
     });
     this.ownShells = new OwnShells({ self: () => opts.state.playerId, ship: (id) => { const s = this.store.get(id); return s && s.kind === 'ship' ? s : undefined; }, tuning: opts.tuning, firePose: (t) => this.own.firePose(t) });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),

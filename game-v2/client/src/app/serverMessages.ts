@@ -356,6 +356,7 @@ const TABLE: Handlers = {
   repairBank: (_h, msg) => { setBank(msg); },
   minesLaid: (h, msg) => { mineClient.laid(msg, h.state.playerId); },
   minesGone: (_h, msg) => { mineClient.gone(msg); },
+  minesKept: (_h, msg) => { mineClient.kept(msg); },
   mineBay: (_h, msg) => { mineClient.bayState(msg); },
   questBoard: (h, msg) => { h.quests.setBoard(msg); },
   talk: (h, msg) => { h.dialogue.set(msg.view); },
