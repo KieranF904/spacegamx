@@ -42,7 +42,7 @@ export class ReplicaPtWorld implements PtStWorld {
   lodOut = 0;
 
   constructor(private readonly host: PtHost) {
-    this.contacts = new RealContacts((id, t) => this.shape(id, t), host.tuning);
+    this.contacts = new RealContacts((id, t) => this.shape(id, t), host.tuning, (id, t) => host.reps.clampPartner(id, t));
   }
 
   ships(): readonly number[] {
