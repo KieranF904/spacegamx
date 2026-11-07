@@ -4,8 +4,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Round Lab: new looks for shots in flight. One viewport (new round above, the game's current round below, same shots),
-   a control bar, knobs, a style picker, then a 1:1 lineup of every style. Single dark theme: it matches the space view. */
+/* Round Lab: how shots behave in flight. One viewport (new round above against a real hull, the game's current round
+   below, same shots), a control bar, knobs, a style picker, then a 1:1 lineup of every style. Single dark theme: it
+   matches the space view. */
 :root {
   color-scheme: dark;
   --void: #06080c;
@@ -33,7 +34,7 @@ body { background: var(--void); color: var(--text); font: 15px/1.5 var(--body); 
 header { display: grid; gap: 4px; }
 h1 { margin: 0; font: 600 34px/1.05 var(--display); letter-spacing: 0.03em; text-transform: uppercase; }
 h1 span { color: var(--amber); }
-header p { margin: 0; color: var(--muted); max-width: 70ch; }
+header p { margin: 0; color: var(--muted); max-width: 72ch; }
 h2 { margin: 0; font: 600 15px/1.2 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 
 .pane { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -44,12 +45,14 @@ h2 { margin: 0; font: 600 15px/1.2 var(--display); letter-spacing: 0.1em; text-t
 .pane figcaption b { font: 600 19px/1.2 var(--display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--amber-hot); }
 .pane figcaption p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: 14px; }
 .tag { font: 600 12px/1.4 var(--display); letter-spacing: 0.12em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.tag.hit { color: var(--cyan); border-color: #24485a; }
 .ro { margin-left: auto; font: 400 12px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.ro.hitro { margin-left: 0; flex-basis: 100%; color: #6f7a89; }
 canvas { display: block; width: 100%; max-width: 100%; background: var(--void); touch-action: manipulation; }
-#main { aspect-ratio: 16 / 8; min-height: 230px; }
+#main { aspect-ratio: 16 / 9; min-height: 260px; }
 
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 0; }
 .seg button, .btn {
   font: 500 14px/1 var(--body); color: var(--text); background: var(--raise); border: 1px solid var(--line);
@@ -67,6 +70,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .tog input:checked { background: #3a2a12; border-color: var(--amber); }
 .tog input:checked::after { transform: translateX(14px); background: var(--amber); }
 @media (prefers-reduced-motion: reduce) { .tog input::after { transition: none; } }
+.sel { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; max-width: 100%; }
+.sel select {
+  font: 500 14px/1.2 var(--body); color: var(--text); background: var(--raise); border: 1px solid var(--line);
+  border-radius: 4px; padding: 8px 10px; max-width: 100%; min-width: 0; cursor: pointer;
+}
+.sel select:hover { border-color: #3a4554; }
 
 .knobs { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 14px 22px; grid-template-columns: 1fr; }
 @media (min-width: 760px) { .knobs { grid-template-columns: 1fr 1fr 1fr; } }
@@ -81,13 +90,14 @@ input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
 
 .picker { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
 .pick {
-  display: grid; gap: 2px; text-align: left; font: inherit; color: var(--text);
+  display: grid; gap: 3px; align-content: start; text-align: left; font: inherit; color: var(--text);
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 13px; cursor: pointer;
 }
 .pick:hover { border-color: #3a4554; }
 .pick .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .pick b { font: 600 18px/1.2 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .pick span.d { color: var(--muted); font-size: 14px; }
+.pick span.h { font: 400 12px/1.3 var(--mono); color: var(--cyan); }
 .pick[aria-checked="true"] { background: var(--raise); border-color: var(--amber); }
 .pick[aria-checked="true"] b { color: var(--amber-hot); }
 .pick[aria-checked="true"] .tag { color: #1a1206; background: var(--amber); border-color: var(--amber); }
@@ -99,15 +109,16 @@ input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
 <div class="wrap">
   <header>
     <h1>Round <span>Lab</span></h1>
-    <p>Eleven new looks for shots in flight, one per weapon family, so heavier and slower rounds read by role at a glance. Each grows with damage per round and stretches with round speed. The lower lane fires the game's current round on the same shots.</p>
+    <p>Ten new ways for a shot to behave in flight, one per weapon family: rounds that braid, skip, split, chain, bend light, sag, unfurl, swell, phase and swarm. Each lands with a matched hit from the Impact Lab that reads the hull's surface where it strikes. The lower lane fires the game's current round on the same shots.</p>
   </header>
 
   <figure class="pane">
     <figcaption>
-      <b id="sName">Style</b><span class="tag" id="sFam">family</span><span class="ro" id="roMain"></span>
+      <b id="sName">Style</b><span class="tag" id="sFam">family</span><span class="tag hit" id="sHit">Hits with</span><span class="ro" id="roMain"></span>
       <p id="sDesc"></p>
+      <span class="ro hitro" id="roHit">No hits yet</span>
     </figcaption>
-    <canvas id="main" aria-label="Selected round in flight"></canvas>
+    <canvas id="main" aria-label="Selected round in flight and hitting a hull"></canvas>
   </figure>
 
   <div class="bar">
@@ -118,6 +129,7 @@ input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
     </div>
     <label class="tog"><input type="checkbox" id="slow"> Slow motion</label>
     <label class="tog"><input type="checkbox" id="now" checked> Current round</label>
+    <label class="sel">Impact <select id="impact" aria-label="Impact effect"></select></label>
   </div>
 
   <section class="knobs" aria-label="Round">
@@ -145,42 +157,1096 @@ input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
   <section style="display:grid;gap:10px">
     <h2>Styles</h2>
     <div class="picker" id="picker" role="radiogroup" aria-label="Round style"></div>
-    <p class="note">Keys: [ and ] step through styles, Space pauses, S slows, Z switches zoom, N shows the current round.</p>
+    <p class="note">Keys: [ and ] step through styles, I steps through impacts, Space pauses, S slows, Z switches zoom, N shows the current round.</p>
   </section>
 
   <section style="display:grid;gap:10px">
     <h2>All styles at game scale</h2>
-    <p class="note">1:1 with the game at zoom 1, each at its suggested speed and damage (fire rate at least 1.5 a second, so every row stays busy). Top line new, bottom line current. Tap a row to pick it.</p>
+    <p class="note">1:1 with the game at zoom 1, each at its suggested speed and damage (fire rate at least 1.5 a second, so every row stays busy). Top line new, firing at a plate, bottom line current. Tap a row to pick it.</p>
     <canvas id="lineup" aria-label="Every style at game scale"></canvas>
   </section>
 
-  <p class="note">Sizes are world units (a hull cell is 24), speeds in units a tick (60 ticks a second). Size × = (damage / 18)^0.33, stretch × = (speed / 54)^0.6. Current rounds only grow with shell size, not damage, so the lower lane stays the same size.</p>
+  <p class="note">Sizes are world units (a hull cell is 24), speeds in units a tick (60 ticks a second). Round size × = (damage / 18)^0.33, stretch × = (speed / 54)^0.6. Hit size k = (damage / 14)^0.42, as in the Impact Lab. Current rounds only grow with shell size, not damage, so the lower lane stays the same size.</p>
 </div>
 
 <script>
 'use strict';
 // ===================================================================================================================
-// Round Lab. Every style below is one self-contained object: name, family, desc, suggested values (def), its
-// parameters P, and spawn/update/draw. Sizes are world units, times 60 Hz ticks. Drawing helpers (glow, disc, seg,
-// toWorld, toLocal, ADD, NORM) map one to one onto sprite and line draws in the client's WeaponFx.
+// Round Lab. Every style is one self-contained object: name, family, desc, impact (the Impact Lab effect its hits use),
+// suggested values (def), its parameters P, and spawn/update/onHit/after/draw. Sizes are world units, times 60 Hz ticks.
 // k (per lane): m = size from damage, s = stretch from speed, spd = speed (u/tick), dmg, rate.
-// r (a round): x, y, hd (heading), t (ticks alive), dist (travelled), v (speed now), state 1 flying / 2 spent
-// (trails fading at the impact point, `dead` ticks), n (shot number), seed (0..1), sx/sy (spawn), range, tr (trail).
+// r (a round): x, y, vx, vy, v, hd (heading), t (ticks alive), dist (travelled), state 1 flying / 2 spent (lingering,
+// `dead` ticks), n (shot number), seed (0..1), sub (index in a volley, -1 alone), dm (damage share), tr (trail).
+// The main lane's target is the Impact Lab's kind of hull (steps, a chamfer, a curved bow, a sloped deck) held in its
+// own frame ("fx units", a cell is 16) that is turned to face the guns; a hit there runs the matched effect with the
+// real surface normal and incoming angle. The lineup and the current-round lanes hit flat plates.
 // ===================================================================================================================
 const TAU = Math.PI * 2;
 const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
-let REDUCE = reduceMQ.matches;
+let REDUCE = reduceMQ.matches, REDUCED = REDUCE;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
 
-// ---- Drawing helpers (current context and view) ----
-const V = { a: 1, e: 0, f: 0 };
-let ctx = null;
-function toWorld() { ctx.setTransform(V.a, 0, 0, V.a, V.e, V.f); }
-function toLocal(x, y, ang, sc) {
-  const c = Math.cos(ang) * V.a * sc, s = Math.sin(ang) * V.a * sc;
-  ctx.setTransform(c, s, -s, c, V.a * x + V.e, V.a * y + V.f);
+/* =====================================================================================
+   The hull, in fx units (after the Impact Lab): x runs along the hull's face, y is depth into it (the hull lies at
+   larger y). Drawn turned a quarter so the face looks at the guns: world x = Ox + y * S, world y = Oy - x * S.
+   From the bottom of the screen up: a recessed face, a step, a face, a chamfer, a curved bow plate, then a deck
+   sloping steeply away (a shallow round skims it).
+   ===================================================================================== */
+const CELL = 16, DEEP = 300;
+const XMIN = -104, XMAX = 44;
+const ARC = { x: 0, y: 52, r: Math.hypot(22, 34) };
+const verts = [[XMIN, 64], [-74, 64], [-74, 46], [-48, 46], [-22, 18]];
+const arcFrom = verts.length - 1;
+{
+  const yEnd = ARC.y - Math.sqrt(ARC.r * ARC.r - 24 * 24);
+  const a0 = Math.atan2(18 - ARC.y, -22 - ARC.x), a1 = Math.atan2(yEnd - ARC.y, 24 - ARC.x), N = 18;
+  for (let i = 1; i <= N; i++) { const a = a0 + (a1 - a0) * i / N; verts.push([ARC.x + Math.cos(a) * ARC.r, ARC.y + Math.sin(a) * ARC.r]); }
 }
+const arcTo = verts.length - 1;
+verts.push([XMAX, 84]);
+const NS = verts.length - 1;
+const SX0 = new Float32Array(NS), SY0 = new Float32Array(NS), SX1 = new Float32Array(NS), SY1 = new Float32Array(NS);
+const SNX = new Float32Array(NS), SNY = new Float32Array(NS), SDX = new Float32Array(NS), SDY = new Float32Array(NS);
+const SLEN = new Float32Array(NS), SS0 = new Float32Array(NS), SSM = new Uint8Array(NS);
+let SL = 0;
+for (let i = 0; i < NS; i++) {
+  const [ax, ay] = verts[i], [bx, by] = verts[i + 1];
+  const ex = bx - ax, ey = by - ay, len = Math.hypot(ex, ey);
+  SX0[i] = ax; SY0[i] = ay; SX1[i] = bx; SY1[i] = by; SDX[i] = ex / len; SDY[i] = ey / len;
+  SNX[i] = ey / len; SNY[i] = -ex / len; // outward (out of the hull)
+  SLEN[i] = len; SS0[i] = SL; SL += len; SSM[i] = i >= arcFrom && i < arcTo ? 1 : 0;
+}
+const HULL = new Path2D();
+HULL.moveTo(verts[0][0], verts[0][1]);
+for (let i = 1; i < verts.length; i++) HULL.lineTo(verts[i][0], verts[i][1]);
+HULL.lineTo(XMAX, DEEP); HULL.lineTo(XMIN, DEEP); HULL.closePath();
+
+// Height-field lookup (every half unit): the topmost surface's y and normal at an x
+const LUT_N = Math.ceil((XMAX - XMIN) * 2) + 2;
+const LY = new Float32Array(LUT_N), LNX = new Float32Array(LUT_N), LNY = new Float32Array(LUT_N);
+for (let j = 0; j < LUT_N; j++) {
+  const x = XMIN + j / 2;
+  LY[j] = 1e9;
+  for (let i = 0; i < NS; i++) {
+    if (Math.abs(SDX[i]) < 1e-6) continue;
+    if (x < SX0[i] - 1e-4 || x > SX1[i] + 1e-4) continue;
+    const y = SY0[i] + (x - SX0[i]) / (SX1[i] - SX0[i]) * (SY1[i] - SY0[i]);
+    if (y < LY[j]) {
+      LY[j] = y;
+      if (SSM[i]) { const nx = x - ARC.x, ny = y - ARC.y, l = Math.hypot(nx, ny); LNX[j] = nx / l; LNY[j] = ny / l; }
+      else { LNX[j] = SNX[i]; LNY[j] = SNY[i]; }
+    }
+  }
+}
+const SN = { x: 0, y: -1 };
+/** The hull's surface depth at x (and its normal into SN); 1e9 off the ends */
+function surfY(x) {
+  if (x < XMIN || x > XMAX) return 1e9;
+  const j = ((x - XMIN) * 2 + 0.5) | 0;
+  SN.x = LNX[j]; SN.y = LNY[j];
+  return LY[j];
+}
+/** First surface a ray crosses from outside within maxT; fills h.x, h.y, h.nx, h.ny, h.s. False on a miss */
+function raycast(ox, oy, dx, dy, h, maxT) {
+  let best = Infinity, bi = -1, bu = 0;
+  for (let i = 0; i < NS; i++) {
+    if (SNX[i] * dx + SNY[i] * dy >= 0) continue;
+    const ex = SX1[i] - SX0[i], ey = SY1[i] - SY0[i], den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const qx = SX0[i] - ox, qy = SY0[i] - oy;
+    const t = (qx * ey - qy * ex) / den, u = (qx * dy - qy * dx) / den;
+    if (t > 0 && t <= maxT && u >= 0 && u <= 1 && t < best) { best = t; bi = i; bu = u; }
+  }
+  if (bi < 0) return false;
+  h.x = ox + dx * best; h.y = oy + dy * best; h.s = SS0[bi] + bu * SLEN[bi];
+  if (SSM[bi]) { const nx = h.x - ARC.x, ny = h.y - ARC.y, l = Math.hypot(nx, ny); h.nx = nx / l; h.ny = ny / l; }
+  else { h.nx = SNX[bi]; h.ny = SNY[bi]; }
+  return true;
+}
+const Q = { x: 0, y: 0, nx: 0, ny: 0, s: 0, d: 0 };
+/** A point along the outline by arc length (into Q) */
+function pointAt(s) {
+  let i = 0;
+  while (i < NS - 1 && s > SS0[i] + SLEN[i]) i++;
+  const u = Math.max(0, Math.min(1, (s - SS0[i]) / SLEN[i]));
+  Q.x = SX0[i] + (SX1[i] - SX0[i]) * u; Q.y = SY0[i] + (SY1[i] - SY0[i]) * u;
+  if (SSM[i]) { const nx = Q.x - ARC.x, ny = Q.y - ARC.y, l = Math.hypot(nx, ny); Q.nx = nx / l; Q.ny = ny / l; }
+  else { Q.nx = SNX[i]; Q.ny = SNY[i]; }
+  return Q;
+}
+/** The nearest outline point to (px, py) (into Q, with its arc length and distance) */
+function nearest(px, py) {
+  let bd = Infinity;
+  for (let i = 0; i < NS; i++) {
+    const ex = SX1[i] - SX0[i], ey = SY1[i] - SY0[i];
+    const w = Math.max(0, Math.min(1, ((px - SX0[i]) * ex + (py - SY0[i]) * ey) / (SLEN[i] * SLEN[i])));
+    const x = SX0[i] + ex * w, y = SY0[i] + ey * w, d = Math.hypot(px - x, py - y);
+    if (d < bd) { bd = d; Q.x = x; Q.y = y; Q.s = SS0[i] + w * SLEN[i]; Q.d = d; }
+  }
+  return Q;
+}
+// Armour cells (16 units) on one grid: the hull drawing and the ripple's flash share it
+const GX0 = XMIN, GY0 = 0;
+const EDGE_CELLS = [], CGX = [], CGY = [], CCOL = [];
+{
+  let seed = 7; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let gx = GX0; gx < XMAX; gx += CELL) for (let gy = GY0; gy < DEEP; gy += CELL) {
+    const sy = Math.min(surfY(gx + 2), surfY(gx + CELL - 2), surfY(gx + 8));
+    if (gy + CELL < sy - 1) continue;
+    const v = (r() - 0.5) * 14;
+    CGX.push(gx); CGY.push(gy); CCOL.push(`rgb(${70 + v | 0},${77 + v | 0},${88 + v | 0})`);
+    const n = nearest(gx + 8, gy + 8);
+    if (n.d < 22 && gy + CELL > surfY(gx + 8) - 2) EDGE_CELLS.push(gx, gy, n.s);
+  }
+}
+/** The hull in the fx frame (the transform already set), to depth dmax */
+function drawFxHull(c, dmax) {
+  c.save(); c.clip(HULL);
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  c.fillStyle = '#15181d'; c.fillRect(XMIN, -4, XMAX - XMIN, dmax + 4);
+  for (let i = 0; i < CGX.length; i++) { if (CGY[i] > dmax) continue; c.fillStyle = CCOL[i]; c.fillRect(CGX[i] + 0.6, CGY[i] + 0.6, CELL - 1.2, CELL - 1.2); }
+  c.beginPath();
+  for (let i = 0; i < CGX.length; i++) { if (CGY[i] > dmax) continue; c.rect(CGX[i] + 0.6, CGY[i] + 0.6, CELL - 1.2, 1.1); c.rect(CGX[i] + 0.6, CGY[i] + 0.6, 1.1, CELL - 1.2); }
+  c.fillStyle = 'rgba(255,255,255,0.09)'; c.fill();
+  c.beginPath();
+  for (let i = 0; i < CGX.length; i++) { if (CGY[i] > dmax) continue; c.rect(CGX[i] + 0.6, CGY[i] + CELL - 1.7, CELL - 1.2, 1.1); c.rect(CGX[i] + CELL - 1.7, CGY[i] + 0.6, 1.1, CELL - 1.2); }
+  c.fillStyle = 'rgba(0,0,0,0.32)'; c.fill();
+  const g = c.createLinearGradient(0, 10, 0, 190); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+  c.fillStyle = g; c.fillRect(XMIN, -4, XMAX - XMIN, dmax + 4);
+  c.restore();
+  c.lineJoin = 'round'; c.globalAlpha = 1; c.strokeStyle = 'rgba(170,180,195,0.6)'; c.lineWidth = 0.9; c.stroke(HULL);
+}
+
+// ---- Ported from the Impact Lab (prototypes/impact-fx/index.html), unchanged: ramps, particle pool, body slots,
+// ---- vector helpers and the twelve effects with their parameter blocks.
+/* =====================================================================================
+   Palettes. Stops run white-hot to cool. The armour set uses the game's kinetic colours
+   (core 0xfff7e6, glow 0xffb04a, spray 0xffc070); the shield set the deflector's
+   (tint 0x7fd6fa, hit 0xc8f4ff); rock the terrain's warm browns.
+   ===================================================================================== */
+const MATS = {
+  armour: { ramp: ['#ffffff', '#fff7e6', '#ffd28a', '#ffb04a', '#e0782a', '#8a3a14', '#2a1208'], dust: [154, 148, 140], chunk: '#23272e', chunkHi: '#6b7280' },
+  shield: { ramp: ['#ffffff', '#f0ffff', '#c8f4ff', '#7fd6fa', '#3a9ad8', '#1a4a8a', '#081830'], dust: [110, 180, 210], chunk: '#17202e', chunkHi: '#4f7fa8' },
+  rock:   { ramp: ['#fff6e6', '#ffe0b0', '#ffc080', '#d98a4a', '#9a5a30', '#4a2c1c', '#1c1210'], dust: [138, 122, 102], chunk: '#2a2224', chunkHi: '#5a4a48' },
+};
+const CURRENT_RAMP = ['#ffffff', '#fff0d8', '#ffd9a0', '#ffc070', '#ffb04a', '#a0501e', '#3a2010'];
+const RAMP_N = 32;
+const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function buildRamp(stops) {
+  const rgb = stops.map(hexRgb), css = [], spr = [];
+  for (let i = 0; i < RAMP_N; i++) {
+    const f = i / (RAMP_N - 1) * (rgb.length - 1), a = Math.floor(f), b = Math.min(rgb.length - 1, a + 1), t = f - a;
+    const c = [0, 1, 2].map((k) => Math.round(rgb[a][k] + (rgb[b][k] - rgb[a][k]) * t));
+    css.push(`rgb(${c[0]},${c[1]},${c[2]})`);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},1)`); gr.addColorStop(0.28, `rgba(${c[0]},${c[1]},${c[2]},0.5)`);
+    gr.addColorStop(0.6, `rgba(${c[0]},${c[1]},${c[2]},0.14)`); gr.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); spr.push(cv);
+  }
+  return { css, spr };
+}
+function smokeSprite(c) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},0.55)`); gr.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},0.22)`); gr.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return cv;
+}
+const ri = (h) => (h <= 0 ? 0 : h >= 1 ? RAMP_N - 1 : (h * (RAMP_N - 1)) | 0);
+
+/* =====================================================================================
+   Particle pool: structure of arrays, fixed capacity, swap-remove. No allocation per frame.
+   Moving kinds first; kinds from RING on sit still and are drawn from their age alone.
+   ===================================================================================== */
+const SPARK = 0, DROP = 1, GLOW = 2, SMOKE = 3, PETAL = 4, RING = 5, STREAK = 6, STAR = 7, WAVE = 8, SCORCH = 9, LIGHT = 10, SMEAR = 11;
+const F_COLLIDE = 1, F_LAND = 2, F_STARHEAD = 4, F_EMBERS = 8, F_SMEARLAND = 16;
+/** The outline segment an arc length falls on */
+function segAt(s) { let i = 0; while (i < NS - 1 && s > SS0[i] + SLEN[i]) i++; return i; }
+// Smear outline scratch (no allocation per frame)
+const SM_N = 14, SOX = new Float32Array(SM_N + 1), SOY = new Float32Array(SM_N + 1), SIX = new Float32Array(SM_N + 1), SIY = new Float32Array(SM_N + 1);
+class Pool {
+  constructor(cap) {
+    this.cap = cap; this.n = 0; this.lifeScale = 1;
+    this.type = new Uint8Array(cap); this.flag = new Uint8Array(cap);
+    const f = () => new Float32Array(cap);
+    this.x = f(); this.y = f(); this.vx = f(); this.vy = f(); this.age = f(); this.life = f();
+    this.size = f(); this.grow = f(); this.len = f(); this.w = f(); this.drag = f(); this.heat = f(); this.cool = f();
+    this.rot = f(); this.vr = f(); this.a0 = f(); this.a1 = f(); this.pnx = f(); this.pny = f(); this.pull = f(); this.bounce = f(); this.alpha = f();
+    this.fields = [this.type, this.flag, this.x, this.y, this.vx, this.vy, this.age, this.life, this.size, this.grow, this.len, this.w, this.drag,
+      this.heat, this.cool, this.rot, this.vr, this.a0, this.a1, this.pnx, this.pny, this.pull, this.bounce, this.alpha];
+  }
+  add(type, x, y, vx, vy, life, size, heat, cool) {
+    const i = this.n < this.cap ? this.n++ : (Math.random() * this.cap) | 0;
+    this.type[i] = type; this.flag[i] = 0; this.x[i] = x; this.y[i] = y; this.vx[i] = vx; this.vy[i] = vy;
+    this.age[i] = 0; this.life[i] = Math.max(1, life * this.lifeScale); this.size[i] = size; this.heat[i] = heat; this.cool[i] = cool;
+    this.grow[i] = 0; this.len[i] = 0; this.w[i] = 1; this.drag[i] = 1; this.rot[i] = 0; this.vr[i] = 0; this.a0[i] = 0; this.a1[i] = 0;
+    this.pnx[i] = 0; this.pny[i] = 0; this.pull[i] = 0; this.bounce[i] = 0; this.alpha[i] = 1;
+    return i;
+  }
+  kill(i) { const j = --this.n; if (i !== j) for (const a of this.fields) a[i] = a[j]; }
+}
+
+/* Small vector helpers writing into V (no allocation) */
+const V = { x: 0, y: 0 };
+const D2R = Math.PI / 180;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+/** Unit direction between the normal (bias 0) and the reflection (bias 1) */
+function axisOf(h, bias) { const x = h.nx * (1 - bias) + h.rx * bias, y = h.ny * (1 - bias) + h.ry * bias, l = Math.hypot(x, y) || 1; V.x = x / l; V.y = y / l; return V; }
+/** (ax, ay) turned by `ang` radians, then lifted out of the surface to at least `minOut` along the normal */
+function turnOut(h, ax, ay, ang, minOut) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  let x = ax * c - ay * s, y = ax * s + ay * c;
+  const dn = x * h.nx + y * h.ny;
+  if (dn < minOut) { x += h.nx * (minOut - dn); y += h.ny * (minOut - dn); const l = Math.hypot(x, y); x /= l; y /= l; }
+  V.x = x; V.y = y; return V;
+}
+
+/* =====================================================================================
+   Unified bodies: one shape per hit, held in a preallocated slot with its own small fixed point
+   arrays (pu, pv, qu, qv) and a few scalars (q0..q3). The effect that spawned a body steps it
+   (fx.step) and draws it (fx.draw) in two passes: solid (normal blend) and light (additive).
+   Local frame: u runs along the slide tangent (toward the rebound side), v out along the normal.
+   ===================================================================================== */
+const BODY_N = 32, MAX_BODIES = 16;
+const newBody = () => ({
+  on: false, fx: null, x: 0, y: 0, nx: 0, ny: -1, tx: 1, ty: 0, rx: 0, ry: -1, sl: 0, cs: 1, k: 1, age: 0, life: 1, seed: 0, ev: 0, n: 0,
+  q0: 0, q1: 0, q2: 0, q3: 0,
+  pu: new Float32Array(BODY_N), pv: new Float32Array(BODY_N), qu: new Float32Array(BODY_N), qv: new Float32Array(BODY_N),
+});
+// Outline scratch and per-lobe scratch (no allocation per frame)
+const BX = new Float32Array(BODY_N * 3), BY = new Float32Array(BODY_N * 3), BA = new Float32Array(BODY_N), BT = new Float32Array(BODY_N), BL = new Float32Array(BODY_N);
+const CG = { t: 0, H: 0, Hm: 0, hr: 0, R0: 0, Rr: 0, ry: 0, Bw: 0, sh: 0, heat: 0, fade: 0, cs: 0, sn: 0, bu: 0, bv: 0, du: 0, dv: 0, L: 0,
+  Hc: 0, Rc: 0, cu: 0, tilt: 0, Ws: 0, rv: 0, Lmax: 0 };
+// Local (u, v) to world, with an optional shear `sh` that leans height toward +u
+const lx = (b, u, v, sh) => b.x + b.tx * (u + v * sh) + b.nx * v;
+const ly = (b, u, v, sh) => b.y + b.ty * (u + v * sh) + b.ny * v;
+const mt = (c, b, sh, u, v) => c.moveTo(lx(b, u, v, sh), ly(b, u, v, sh));
+const lt = (c, b, sh, u, v) => c.lineTo(lx(b, u, v, sh), ly(b, u, v, sh));
+const qd = (c, b, sh, u1, v1, u2, v2) => c.quadraticCurveTo(lx(b, u1, v1, sh), ly(b, u1, v1, sh), lx(b, u2, v2, sh), ly(b, u2, v2, sh));
+const bz = (c, b, sh, u1, v1, u2, v2, u3, v3) => c.bezierCurveTo(lx(b, u1, v1, sh), ly(b, u1, v1, sh), lx(b, u2, v2, sh), ly(b, u2, v2, sh), lx(b, u3, v3, sh), ly(b, u3, v3, sh));
+function bpt(b, j, u, v, sh) { BX[j] = lx(b, u, v, sh); BY[j] = ly(b, u, v, sh); }
+/** A smooth closed curve through BX/BY[0..n) (midpoint quadratics); `fresh` false adds it as another subpath */
+function traceSmooth(c, n, fresh = true) {
+  if (fresh) c.beginPath();
+  c.moveTo((BX[n - 1] + BX[0]) * 0.5, (BY[n - 1] + BY[0]) * 0.5);
+  for (let j = 0; j < n; j++) { const q = j + 1 === n ? 0 : j + 1; c.quadraticCurveTo(BX[j], BY[j], (BX[j] + BX[q]) * 0.5, (BY[j] + BY[q]) * 0.5); }
+  c.closePath();
+}
+function glowAt(c, f, heat, x, y, r, a) { if (r <= 0 || a <= 0) return; c.globalAlpha = Math.min(1, a); c.drawImage(f.spr[ri(heat)], x - r, y - r, r * 2, r * 2); }
+const clampFan = (a) => Math.max(-0.05, Math.min(Math.PI + 0.05, a));
+const sstep = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+
+/* =====================================================================================
+   THE TWELVE EFFECTS. Each is self-contained: name, one-line description, parameters P at the
+   top, and spawn(f, h) that emits into the pane's pool through f's helpers.
+   The hit h carries: x, y (point), dx, dy (incoming unit dir), nx, ny (surface normal, out),
+   rx, ry (reflection), tx, ty (surface tangent the round was sliding along),
+   cos (1 head-on .. 0 grazing), graze (1 - cos), k (damage scale), dmg, s (arc length), sdir.
+   ===================================================================================== */
+const EFFECTS = [
+{
+  id: 'crown', name: 'Crown splash',
+  desc: 'Molten drops thrown up in a ring around the rebound, falling back onto the hull.',
+  P: { crown: 16, jet: 5, speed: 3.6, jetSpeed: 6.5, cone: 64, jetCone: 9, bias: 0.45, pull: 0.15, drop: 1.3, rim: 12, rimLife: 15, flash: 7, light: 46 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), c = Math.min(2.6, Math.pow(k, 0.85));
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.glow(h.x, h.y, P.flash * 1.6 * k, 0.9 * k, 14, 0.3, 0.6);
+    f.light(h.x, h.y, P.light * sk, 22, 0.55);
+    f.ring(h, h.x, h.y, P.rim * Math.pow(k, 0.75), 0.5, 1.4 * sk, P.rimLife + 4 * k, 0.15, 0.35);
+    const ax = axisOf(h, P.bias), axx = ax.x, axy = ax.y;
+    const n = Math.round(P.crown * c);
+    for (let i = 0; i < n; i++) {
+      const spread = ((i + 0.5) / n - 0.5) * P.cone * D2R + gauss() * 0.08;
+      const d = turnOut(h, axx, axy, spread, 0.25), v = P.speed * sk * rnd(0.75, 1.2) * (1 - 0.35 * Math.abs(spread));
+      f.drop(h, h.x + d.x, h.y + d.y, d.x * v, d.y * v, rnd(34, 50), P.drop * Math.pow(k, 0.4) * rnd(0.7, 1.2), rnd(0, 0.15), 0.6, P.pull * rnd(0.8, 1.2));
+    }
+    const nj = Math.round(P.jet * Math.min(2, k));
+    for (let i = 0; i < nj; i++) {
+      const d = turnOut(h, h.rx, h.ry, gauss() * P.jetCone * D2R, 0.15), v = P.jetSpeed * sk * rnd(0.7, 1.25);
+      f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(30, 44), P.drop * 0.8 * Math.pow(k, 0.4), 0, 0.65, P.pull * 0.6);
+    }
+    for (let i = 0; i < 3 + k; i++) { const d = turnOut(h, axx, axy, gauss() * 0.9, 0.3); f.glow(h.x, h.y, rnd(2, 4) * sk, 0.25, rnd(10, 18), 0.25, 0.35, d.x * 0.8, d.y * 0.8); }
+    f.scorch(h.x, h.y, 3.5 * sk, 160);
+    if (k > 1.6) f.kick(0.6 * (k - 1.4));
+  },
+},
+{
+  id: 'skid', name: 'Skid sheet',
+  desc: 'A flat fan of sparks along the surface, mostly the way the round was sliding, skipping as they go.',
+  P: { count: 26, speed: 6.5, elev: 16, fwd: 0.88, bounce: 0.45, pull: 0.05, drag: 0.955, sheet: 30, rooster: 5, flash: 5, light: 40 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    const share = 0.5 + (P.fwd - 0.5) * Math.min(1, g * 1.4); // head-on hits spray both ways evenly
+    f.glow(h.x, h.y, P.flash * k, 0.3 * k, 5, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 18, 0.5);
+    const ta = Math.atan2(h.ty, h.tx);
+    f.streak(h.x, h.y, ta, P.sheet * k * share * (0.7 + 0.6 * g), 2.4 * sk, 11, 0.1);
+    f.streak(h.x, h.y, ta + Math.PI, P.sheet * k * (1 - share) * (0.7 + 0.6 * g), 2.0 * sk, 9, 0.15);
+    const n = Math.round(P.count * Math.min(2.6, k));
+    for (let i = 0; i < n; i++) {
+      const side = Math.random() < share ? 1 : -1, e = Math.pow(Math.random(), 1.8) * P.elev * D2R;
+      const ce = Math.cos(e), se = Math.sin(e);
+      const dx = h.tx * side * ce + h.nx * se, dy = h.ty * side * ce + h.ny * se;
+      const v = P.speed * sk * rnd(0.45, 1.25) * (side > 0 ? 1 : 0.7);
+      const j = f.spark(h.x + h.nx * 0.5, h.y + h.ny * 0.5, dx * v, dy * v, rnd(16, 32) * (0.8 + 0.2 * k), 0.8 + 0.35 * sk, 1.7, rnd(0, 0.2), 0.75, P.drag);
+      f.collide(j, h, P.bounce, P.pull);
+    }
+    if (k > 1) {
+      const nr = Math.round(P.rooster * (k - 0.8));
+      for (let i = 0; i < nr; i++) {
+        const d = turnOut(h, h.rx, h.ry, gauss() * 0.25, 0.2), v = P.speed * sk * rnd(0.6, 1.1);
+        f.spark(h.x, h.y, d.x * v, d.y * v, rnd(14, 24), 1.1 * sk, 2.2, 0, 0.8, 0.96);
+      }
+    }
+    if (f.mat === 'rock') for (let i = 0; i < 2 + k * 2; i++) { const s = Math.random() < share ? 1 : -1; f.smoke(h.x, h.y, h.tx * s * rnd(0.3, 1) + h.nx * 0.3, h.ty * s * rnd(0.3, 1) + h.ny * 0.3, rnd(4, 7) * sk, 0.25, rnd(40, 60), 0.5); }
+    f.scorch(h.x, h.y, 3 * sk, 140);
+    if (k > 1.8) f.kick(0.5 * (k - 1.6));
+  },
+},
+{
+  id: 'glint', name: 'Ricochet glint',
+  desc: 'The round glances off along the rebound as a bright glint. Head-on hits flash instead.',
+  P: { speed: 13, tail: 3.2, fan: 5, star: 15, starLife: 11, flare: 44, spray: 7, sprayCone: 8, flash: 6, light: 42 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze, e = 0.25 + 0.75 * g; // the rebound keeps more energy the shallower the hit
+    f.glow(h.x, h.y, P.flash * k * (1.6 - 0.8 * g), 0.3 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 18, 0.5);
+    f.star(h.x, h.y, Math.atan2(h.ny, h.nx), P.star * k * (1.35 - 0.6 * g), 1.2 * sk, P.starLife + 2 * k);
+    const ra = Math.atan2(h.ry, h.rx);
+    f.streak(h.x, h.y, ra, P.flare * k * e, 1.8 * sk, 9 + 2 * k, 0.05);
+    const frags = Math.max(1, Math.min(4, 1 + Math.floor((k - 0.9) * 1.3)));
+    for (let i = 0; i < frags; i++) {
+      const off = (i - (frags - 1) / 2) * P.fan * D2R + gauss() * 0.03;
+      const d = turnOut(h, h.rx, h.ry, off, 0.06), v = P.speed * e * rnd(0.85, 1.1) * (i === 0 ? 1 : 0.8);
+      const j = f.spark(h.x, h.y, d.x * v, d.y * v, 22 + 12 * e, (i === 0 ? 1.7 : 1.1) * sk, P.tail * (0.6 + e), 0, 0.45, 0.985);
+      f.pool.flag[j] |= F_STARHEAD;
+    }
+    const n = Math.round(P.spray * Math.min(2.2, k));
+    for (let i = 0; i < n; i++) {
+      const d = turnOut(h, h.rx, h.ry, gauss() * P.sprayCone * D2R * (1.6 - g), 0.08), v = P.speed * 0.6 * e * rnd(0.4, 1);
+      f.spark(h.x, h.y, d.x * v, d.y * v, rnd(10, 18), 0.7, 1.6, 0.1, 0.8, 0.94);
+    }
+    f.scorch(h.x, h.y, 2.6 * sk, 130);
+    if (k > 2) f.kick(0.4 * (k - 1.8));
+  },
+},
+{
+  id: 'ripple', name: 'Surface ripple',
+  desc: 'A bright wave runs along the hull both ways from the hit, throwing spray off its crest.',
+  P: { speed: 2.3, amp: 4, width: 12, life: 30, fwdBoost: 0.8, shock: 22, shockLife: 12, drops: 8, lean: 35, pull: 0.12, flash: 6, light: 44 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 24, 0.5);
+    // Forward wave (the way the round slid) runs faster and taller; the back wave weaker
+    f.wave(h.s, h.sdir, P.speed * sk * (1 + 0.4 * g), P.amp * sk * (1 + P.fwdBoost * g), P.width * Math.pow(k, 0.5), P.life + 6 * k);
+    f.wave(h.s, -h.sdir, P.speed * sk * (1 - 0.3 * g), P.amp * sk * (1 - 0.55 * g), P.width * Math.pow(k, 0.5) * 0.85, P.life + 4 * k);
+    f.ring(h, h.x, h.y, P.shock * Math.pow(k, 0.6), 1, 1.1 * sk, P.shockLife + 2 * k, 0.2, 0.5);
+    for (let side = -1; side <= 1; side += 2) {
+      const fw = side === 1 ? 1 + P.fwdBoost * g : 1 - 0.55 * g;
+      const n = Math.round(P.drops * Math.min(2.2, k) * fw);
+      for (let i = 0; i < n; i++) {
+        const off = rnd(1, 7) * sk, lean = rnd(0.4, 1) * P.lean * D2R;
+        const dx = h.nx * Math.cos(lean) + h.tx * side * Math.sin(lean), dy = h.ny * Math.cos(lean) + h.ty * side * Math.sin(lean);
+        const v = rnd(1.6, 3.2) * sk * (0.7 + 0.3 * fw);
+        f.drop(h, h.x + h.tx * side * off + h.nx, h.y + h.ty * side * off + h.ny, dx * v, dy * v, rnd(26, 40), rnd(0.9, 1.4) * Math.pow(k, 0.35), rnd(0.05, 0.2), 0.6, P.pull);
+      }
+    }
+    for (let i = 0; i < 2 + Math.round(k); i++) { const d = turnOut(h, h.rx, h.ry, gauss() * 0.15, 0.2), v = rnd(3, 5) * sk; f.drop(h, h.x, h.y, d.x * v, d.y * v, 30, 1.1 * Math.pow(k, 0.35), 0, 0.6, P.pull * 0.7); }
+    f.scorch(h.x, h.y, 3 * sk, 150);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+},
+{
+  id: 'petal', name: 'Petal burst',
+  desc: 'The plating tears into hot petals that peel back off the hit, leaving a glowing crater.',
+  P: { petals: 3, speed: 2.8, size: 3.4, spin: 0.22, bias: 0.35, cone: 90, drops: 8, pull: 0.14, fire: 9, crater: 6.5, smoke: 3, light: 56 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, 8 * k, 0.5 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 30, 0.6);
+    const ax = axisOf(h, P.bias), axx = ax.x, axy = ax.y;
+    f.glow(h.x + axx * 2, h.y + axy * 2, P.fire * k, 0.35 * k, 24, 0.3, 0.75, axx * 0.35, axy * 0.35);
+    const n = Math.min(9, P.petals + Math.round(1.5 * k));
+    for (let i = 0; i < n; i++) {
+      const spread = ((i + 0.5) / n - 0.5) * P.cone * D2R + gauss() * 0.12;
+      const d = turnOut(h, axx, axy, spread, 0.2), v = P.speed * sk * rnd(0.6, 1.2);
+      f.petal(h, h.x, h.y, d.x * v, d.y * v, P.size * Math.pow(k, 0.6) * rnd(0.7, 1.2), (Math.random() < 0.5 ? -1 : 1) * P.spin * rnd(0.5, 1.2), rnd(40, 64));
+    }
+    const nd = Math.round(P.drops * Math.min(2.4, k));
+    for (let i = 0; i < nd; i++) {
+      const d = turnOut(h, axx, axy, gauss() * 0.8, 0.3), v = rnd(2, 4.5) * sk;
+      f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(26, 42), rnd(0.8, 1.2) * Math.pow(k, 0.35), 0.05, 0.65, P.pull);
+    }
+    if (k > 1.2) for (let i = 0; i < P.smoke * (k - 0.8); i++) f.smoke(h.x, h.y, axx * rnd(0.2, 0.6) + gauss() * 0.15, axy * rnd(0.2, 0.6) + gauss() * 0.15, rnd(5, 8) * sk, 0.3, rnd(60, 90), 0.55);
+    f.scorch(h.x, h.y, P.crater * sk, 240);
+    if (k > 1.3) f.kick(0.7 * (k - 1.1));
+  },
+},
+{
+  id: 'smear', name: 'Flat smear',
+  desc: 'The round flattens on the hull into a hot streak smeared the way it was sliding, cooling to a dark stain.',
+  P: { len: 26, back: 6, thick: 2.6, grow: 5, life: 90, drops: 6, dropPull: 0.18, flash: 6, light: 44 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    f.glow(h.x, h.y, P.flash * k, 0.3 * k, 5, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 20, 0.5);
+    // Shallow hits smear long down the slide; head-on hits pancake short and fat
+    f.smear(h.s, h.sdir, P.len * k * (0.35 + 1.1 * g), P.back * sk * (1.4 - g), P.thick * Math.pow(k, 0.6) * (1.3 - 0.5 * g), P.life + 20 * k, 0, P.grow, 0);
+    f.streak(h.x, h.y, Math.atan2(h.ty, h.tx), P.len * 0.6 * k * g, 1.6 * sk, 8, 0.05);
+    const n = Math.round(P.drops * Math.min(2, k));
+    for (let i = 0; i < n; i++) {
+      const side = Math.random() < 0.5 + 0.4 * g ? 1 : -1, e = rnd(8, 24) * D2R;
+      const dx = h.tx * side * Math.cos(e) + h.nx * Math.sin(e), dy = h.ty * side * Math.cos(e) + h.ny * Math.sin(e), v = rnd(1.5, 3.5) * sk;
+      const j = f.drop(h, h.x, h.y, dx * v, dy * v, rnd(30, 44), rnd(0.8, 1.3) * Math.pow(k, 0.4), 0.1, 0.6, P.dropPull);
+      f.pool.flag[j] |= F_SMEARLAND;
+    }
+    f.scorch(h.x, h.y, 2.4 * sk, 150);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+},
+{
+  id: 'liquid', name: 'Liquid splash',
+  desc: 'Heavy, syrupy blobs splash up and fall back, and the hit pools into a film that creeps along the hull.',
+  P: { blobs: 7, speed: 2.6, size: 2.2, cone: 70, bias: 0.35, pull: 0.2, film: 18, flow: 0.35, thick: 3, life: 110, jet: 3, flash: 6, light: 46 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    f.glow(h.x, h.y, P.flash * k, 0.35 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 24, 0.55);
+    // The pool: mostly creeping the way the round slid, a little back the other way
+    f.smear(h.s, h.sdir, P.film * sk * (0.6 + 0.8 * g), P.film * 0.4 * sk * (1.2 - g), P.thick * Math.pow(k, 0.6), P.life + 25 * k, 0.05, 4, P.flow * sk * (0.3 + g));
+    if (g < 0.7) f.smear(h.s, -h.sdir, P.film * 0.4 * sk, 2, P.thick * 0.7 * Math.pow(k, 0.6), P.life * 0.8, 0.1, 5, P.flow * 0.4 * sk * (1 - g));
+    const ax = axisOf(h, P.bias), axx = ax.x, axy = ax.y, n = Math.round(P.blobs * Math.min(2.2, k));
+    for (let i = 0; i < n; i++) {
+      const spread = ((i + 0.5) / n - 0.5) * P.cone * D2R + gauss() * 0.1;
+      const d = turnOut(h, axx, axy, spread, 0.3), v = P.speed * sk * rnd(0.6, 1.1);
+      const j = f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(40, 60), P.size * Math.pow(k, 0.45) * rnd(0.8, 1.3), 0.05, 0.6, P.pull * rnd(0.8, 1.2));
+      f.pool.flag[j] |= F_SMEARLAND; f.pool.drag[j] = 0.99; f.pool.len[j] = 2.2; // stretched by its speed: reads as a thick liquid
+    }
+    for (let i = 0; i < Math.round(P.jet * Math.min(2, k)); i++) {
+      const d = turnOut(h, h.rx, h.ry, gauss() * 0.12, 0.2), v = rnd(3, 4.5) * sk;
+      const j = f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(36, 50), P.size * 0.7 * Math.pow(k, 0.4), 0, 0.65, P.pull * 0.8);
+      f.pool.flag[j] |= F_SMEARLAND; f.pool.len[j] = 2.6;
+    }
+    f.scorch(h.x, h.y, 2.8 * sk, 170);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+},
+
+/* ---- Unified bodies: each hit makes ONE shape that forms, deforms and settles (spawn, step, draw) ---- */
+{
+  id: 'sheet', name: 'Crown sheet', group: 1,
+  desc: 'One liquid sheet rises out of the hit as a crown leaning toward the rebound; its scalloped rim beads, then the sheet slumps back.',
+  P: { radius: 9, height: 12, spikes: 12, spike: 4.2, lean: 0.55, tall: 0.35, rise: 0.42, stiff: 0.06, damp: 0.87, bead: 0.95, life: 72, flash: 6, light: 46 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 28, 0.55);
+    const b = f.body(this, h, P.life + 10 * k);
+    b.n = Math.min(BODY_N, Math.round(P.spikes * Math.pow(k, 0.3)));
+    b.q1 = P.height * Math.pow(k, 0.6) * 0.3; // thrown up: an upward kick on the height spring
+    for (let j = 0; j < b.n; j++) { b.pu[j] = rnd(0.55, 1.3); b.pv[j] = rnd(-0.2, 0.2); }
+    f.scorch(h.x, h.y, 3.4 * sk, 170);
+    if (k > 1.6) f.kick(0.6 * (k - 1.4));
+  },
+  geo(b) {
+    const P = this.P, G = CG, t = b.age / b.life;
+    G.t = t; G.Hm = P.height * Math.pow(b.k, 0.6); G.H = Math.max(0, b.q0); G.hr = Math.min(1, G.H / G.Hm);
+    const slump = t > P.rise ? 1 - G.hr : 0; // as the sheet falls it spreads outward
+    G.R0 = P.radius * Math.pow(b.k, 0.55); G.Rr = G.R0 * (0.55 + 0.55 * Math.sqrt(t) + 0.5 * slump);
+    G.ry = G.Rr * 0.3; G.Bw = G.R0 * 0.45; G.sh = P.lean * b.sl; G.heat = 0.06 + 0.75 * t; G.fade = 1 - sstep((t - 0.72) / 0.28);
+  },
+  /** Height of the rim at an angle round it (the rebound side stands taller; the back of the ring sits higher on screen) */
+  rimV(b, cs, sn) { return CG.H * (1 + this.P.tall * b.sl * cs) + CG.ry * sn; },
+  /** Spike j: base on the rim (bu, bv), flaring direction (du, dv) and length L */
+  tip(b, j) {
+    const P = this.P, G = CG, a = 6.2832 * (j + 0.5) / b.n + b.pv[j], cs = Math.cos(a), sn = Math.sin(a);
+    G.cs = cs; G.sn = sn; G.bu = G.Rr * cs; G.bv = this.rimV(b, cs, sn);
+    const l = Math.hypot(cs * 0.5, 1); G.du = cs * 0.5 / l; G.dv = 1 / l;
+    G.L = P.spike * Math.sqrt(b.k) * b.pu[j] * G.hr * (1 + P.tall * b.sl * cs);
+  },
+  step(b, f) {
+    const P = this.P, t = b.age / b.life, Hm = P.height * Math.pow(b.k, 0.6);
+    b.q1 += ((t < P.rise ? Hm : -0.3 * Hm) - b.q0) * P.stiff * (t < P.rise ? 1 : 0.45); // (it falls slower than it rises)
+    b.q1 *= P.damp; b.q0 += b.q1;
+    if (!(b.ev & 1) && t > P.rise + 0.06) { // the rim's beads let go as the sheet starts to fall
+      b.ev |= 1; this.geo(b);
+      const G = CG, sk = Math.sqrt(b.k);
+      for (let j = 0; j < b.n; j += 2) {
+        this.tip(b, j);
+        const u = G.bu + G.du * G.L, v = G.bv + G.dv * G.L, x = lx(b, u, v, G.sh), y = ly(b, u, v, G.sh);
+        const wx = b.tx * (G.du + G.dv * G.sh) + b.nx * G.dv, wy = b.ty * (G.du + G.dv * G.sh) + b.ny * G.dv, sp = rnd(0.5, 1) * sk;
+        f.drop(b, x, y, wx * sp + b.rx * 0.5 * b.sl, wy * sp + b.ry * 0.5 * b.sl, rnd(24, 36), P.bead * Math.pow(b.k, 0.4) * 0.75, G.heat, 0.6, 0.16);
+      }
+    }
+  },
+  spikes(c, b, back, col) {
+    const P = this.P, G = CG, w = Math.PI * G.Rr / b.n * 0.55, br = P.bead * Math.pow(b.k, 0.4);
+    c.fillStyle = col; c.globalAlpha = 0.95 * G.fade;
+    c.beginPath();
+    for (let j = 0; j < b.n; j++) {
+      this.tip(b, j); if ((G.sn > 0) !== back || G.L < 0.2) continue;
+      const tu = G.bu + G.du * G.L, tv = G.bv + G.dv * G.L;
+      mt(c, b, G.sh, G.bu - w, G.bv - 0.5);
+      qd(c, b, G.sh, G.bu - w * 0.2, G.bv + G.L * 0.55, tu, tv);
+      qd(c, b, G.sh, G.bu + w * 0.2, G.bv + G.L * 0.55, G.bu + w, G.bv - 0.5);
+      c.closePath();
+    }
+    c.fill();
+    if (b.ev & 1) return;
+    c.beginPath();
+    for (let j = 0; j < b.n; j++) {
+      this.tip(b, j); if ((G.sn > 0) !== back || G.L < 0.2) continue;
+      const x = lx(b, G.bu + G.du * G.L, G.bv + G.dv * G.L, G.sh), y = ly(b, G.bu + G.du * G.L, G.bv + G.dv * G.L, G.sh), r = br * (0.55 + 0.45 * b.pu[j]) * G.hr;
+      c.moveTo(x + r, y); c.arc(x, y, r, 0, 6.2832);
+    }
+    c.fill();
+  },
+  draw(c, b, f, add) {
+    const P = this.P, G = CG, R = f.ramp, M = 14; this.geo(b);
+    if (G.H < 0.35 && G.t > P.rise) return; // fully slumped back
+    const H = G.H, Rr = G.Rr, Bw = G.Bw, sh = G.sh, heat = G.heat, fade = G.fade, Hl = this.rimV(b, -1, 0), Hr = this.rimV(b, 1, 0);
+    if (!add) {
+      // the inside face of the sheet, seen over the front of the rim
+      for (let j = 0; j < M; j++) { const a = 6.2832 * j / M; bpt(b, j, Rr * Math.cos(a), this.rimV(b, Math.cos(a), Math.sin(a)), sh); }
+      traceSmooth(c, M); c.globalAlpha = 0.9 * fade; c.fillStyle = R[ri(heat + 0.34)]; c.fill();
+      this.spikes(c, b, true, R[ri(heat + 0.2)]);
+      // the sheet itself: walls flaring up from the hit to the rim, across the front of the rim
+      c.beginPath(); mt(c, b, sh, -Bw, -0.6);
+      bz(c, b, sh, -Bw * 1.1, Hl * 0.45, -Rr * 0.9, Hl * 0.8, -Rr, Hl);
+      for (let j = 1; j <= M; j++) { const a = Math.PI + Math.PI * j / M; lt(c, b, sh, Rr * Math.cos(a), this.rimV(b, Math.cos(a), Math.sin(a))); }
+      bz(c, b, sh, Rr * 0.9, Hr * 0.8, Bw * 1.1, Hr * 0.45, Bw, -0.6); c.closePath();
+      const g = c.createLinearGradient(lx(b, 0, 0, sh), ly(b, 0, 0, sh), lx(b, 0, H, sh), ly(b, 0, H, sh));
+      g.addColorStop(0, R[ri(heat + 0.3)]); g.addColorStop(1, R[ri(heat + 0.02)]);
+      c.globalAlpha = 0.95 * fade; c.fillStyle = g; c.fill();
+      this.spikes(c, b, false, R[ri(heat)]);
+      return;
+    }
+    // light: the hot lip of the front rim, the beads, a glow in the cup
+    c.beginPath();
+    for (let j = 0; j <= M; j++) { const a = Math.PI + Math.PI * j / M; (j ? lt : mt)(c, b, sh, Rr * Math.cos(a), this.rimV(b, Math.cos(a), Math.sin(a))); }
+    c.globalAlpha = 0.75 * fade; c.strokeStyle = R[ri(heat * 0.5)]; c.lineWidth = 0.6 + 0.35 * Math.sqrt(b.k); c.stroke();
+    glowAt(c, f, heat + 0.1, lx(b, 0, H * 0.35, sh), ly(b, 0, H * 0.35, sh), G.R0 * 2.2, 0.45 * (1 - G.t));
+    if (!(b.ev & 1)) for (let j = 0; j < b.n; j++) {
+      this.tip(b, j); if (G.L < 0.2) continue;
+      const u = G.bu + G.du * G.L, v = G.bv + G.dv * G.L;
+      glowAt(c, f, heat * 0.6, lx(b, u, v, sh), ly(b, u, v, sh), P.bead * Math.pow(b.k, 0.4) * 3, (G.sn > 0 ? 0.3 : 0.6) * fade);
+    }
+  },
+},
+{
+  id: 'tongue', name: 'Plasma tongue', group: 1,
+  desc: 'A single flame tongue licks out along the rebound, curling away from the hull and flickering as one body, then draws back in.',
+  P: { len: 26, width: 5, curl: 1.3, lick: 0.32, flicker: 0.1, stiff: 0.2, damp: 0.72, minOut: 0.3, out: 0.2, hold: 0.45, life: 52, flash: 6, light: 50 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 30, 0.6);
+    const b = f.body(this, h, P.life + 8 * k); b.n = 16;
+    b.q0 = Math.atan2(Math.max(P.minOut, b.cs), b.sl); // the rebound in the local frame, lifted off the hull
+    b.q1 = b.sl > 0.18 ? 1 : (Math.random() < 0.5 ? -1 : 1); // curl: up off the hull on an angled hit, either way head-on
+    for (let i = 0; i < b.n; i++) b.pv[i] = 0.3;
+    f.scorch(h.x, h.y, 3 * sk, 160);
+    if (k > 1.8) f.kick(0.5 * (k - 1.6));
+  },
+  step(b, f) {
+    const P = this.P, t = b.age / b.life, n = b.n, age = b.age;
+    const ext = t < P.out ? 1 - Math.pow(1 - t / P.out, 3) : t < P.hold ? 1 : 1 - sstep((t - P.hold) / (1 - P.hold));
+    b.q2 = ext;
+    const seg = P.len * Math.pow(b.k, 0.6) * (0.75 + 0.5 * b.sl) * ext / (n - 1);
+    // the spine's rest shape: along the rebound, curling more toward the tip, a lick running out along it; points chase it on springs
+    let tu = 0, tv = 0.3;
+    for (let i = 1; i < n; i++) {
+      const s = i / (n - 1);
+      const th = b.q0 + b.q1 * P.curl * s * s * (0.35 + 0.65 * Math.min(1, t * 2.2)) + P.lick * s * Math.sin(age * 0.24 - s * 5 + b.seed) + P.flicker * s * Math.sin(age * 0.9 + s * 11 + b.seed * 3);
+      tu += Math.cos(th) * seg; tv += Math.sin(th) * seg;
+      b.qu[i] = (b.qu[i] + (tu - b.pu[i]) * P.stiff) * P.damp; b.qv[i] = (b.qv[i] + (tv - b.pv[i]) * P.stiff) * P.damp;
+      b.pu[i] += b.qu[i]; b.pv[i] += b.qv[i];
+      if (b.pv[i] < 0.3) { b.pv[i] = 0.3; if (b.qv[i] < 0) b.qv[i] *= -0.3; }
+    }
+    if (ext > 0.6 && (age | 0) % 4 === 0) { // the odd ember shed off the tip
+      const u = b.pu[n - 1], v = b.pv[n - 1], du = u - b.pu[n - 3], dv = v - b.pv[n - 3];
+      f.spark(lx(b, u, v, 0), ly(b, u, v, 0), (b.tx * du + b.nx * dv) * 0.25 + gauss() * 0.3, (b.ty * du + b.ny * dv) * 0.25 + gauss() * 0.3, rnd(8, 14), 0.6, 1.6, 0.2 + t * 0.4, 0.5, 0.93);
+    }
+  },
+  /** The tongue's outline at width scale m into BX/BY: one side root to tip, the tip, the other side back */
+  outline(b, m) {
+    const P = this.P, n = b.n, W = P.width * Math.sqrt(b.k) * Math.sqrt(b.q2) * m, age = b.age;
+    for (let i = 0; i < n; i++) {
+      const s = i / (n - 1), i0 = i > 0 ? i - 1 : 0, i1 = i < n - 1 ? i + 1 : n - 1;
+      let du = b.pu[i1] - b.pu[i0], dv = b.pv[i1] - b.pv[i0]; const l = Math.hypot(du, dv);
+      if (l < 1e-4) { du = Math.cos(b.q0); dv = Math.sin(b.q0); } else { du /= l; dv /= l; }
+      const w = W * Math.pow(1 - s, 0.75) * (0.5 + 1.8 * s * (1 - s)) * (1 + 0.15 * Math.sin(age * 0.6 + s * 9 + b.seed));
+      bpt(b, i, b.pu[i] - dv * w, b.pv[i] + du * w, 0);
+      bpt(b, 2 * n - i, b.pu[i] + dv * w, b.pv[i] - du * w, 0);
+      if (i === n - 1) bpt(b, n, b.pu[i] + du * W * 0.5, b.pv[i] + dv * W * 0.5, 0);
+    }
+    return 2 * n + 1;
+  },
+  draw(c, b, f, add) {
+    const P = this.P, R = f.ramp, t = b.age / b.life, ext = b.q2, n = b.n;
+    if (!add || ext < 0.02) return; // all light: the tongue is plasma
+    const heat = 0.04 + 0.5 * t, fade = Math.min(1, ext * 1.6) * (1 - t * t);
+    const x0 = lx(b, 0, 0.3, 0), y0 = ly(b, 0, 0.3, 0), x1 = lx(b, b.pu[n - 1], b.pv[n - 1], 0), y1 = ly(b, b.pu[n - 1], b.pv[n - 1], 0);
+    traceSmooth(c, this.outline(b, 2.3)); c.globalAlpha = 0.22 * fade; c.fillStyle = R[ri(heat + 0.3)]; c.fill();
+    traceSmooth(c, this.outline(b, 1));
+    const g = c.createLinearGradient(x0, y0, x1 + 0.01, y1);
+    g.addColorStop(0, R[ri(heat)]); g.addColorStop(0.6, R[ri(heat + 0.25)]); g.addColorStop(1, R[ri(heat + 0.5)]);
+    c.globalAlpha = 0.85 * fade; c.fillStyle = g; c.fill();
+    traceSmooth(c, this.outline(b, 0.4)); c.globalAlpha = 0.9 * fade; c.fillStyle = R[ri(heat * 0.2)]; c.fill();
+    glowAt(c, f, heat + 0.1, x0, y0, P.width * Math.sqrt(b.k) * 3, 0.6 * fade);
+  },
+},
+{
+  id: 'dome', name: 'Pressure dome', group: 1,
+  desc: 'A half bubble swells out of the hull along the normal, skewed toward the rebound, its skin wobbling until it pops into a ring.',
+  P: { radius: 9.5, stiff: 0.05, damp: 0.92, couple: 0.3, kick: 0.6, skew: 0.55, pop: 0.6, ring: 22, life: 80, flash: 5, light: 44 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.3 * k, 5, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 24, 0.5);
+    const b = f.body(this, h, P.life + 10 * k), n = (b.n = 25), Rm = (b.q0 = P.radius * Math.pow(k, 0.55)), thr = Math.atan2(b.cs, b.sl);
+    // the skin is kicked out hardest along the rebound, a little unevenly, so it wobbles as it inflates
+    for (let j = 0; j < n; j++) { const a = Math.PI * j / (n - 1), d = Math.max(0, Math.cos(a - thr)); b.qu[j] = Rm * (0.09 + 0.1 * P.kick * d * d * (0.4 + b.sl) + rnd(-0.015, 0.015)); }
+    f.scorch(h.x, h.y, 3 * sk, 160);
+  },
+  step(b, f) {
+    const P = this.P, t = b.age / b.life, n = b.n, Rt = b.q0 * (1 + 0.08 * t);
+    if (t < P.pop) { // each rim point springs to the dome's radius and is coupled to its neighbours: ripples run round the skin
+      for (let j = 0; j < n; j++) { const l = b.pu[j > 0 ? j - 1 : 1], r = b.pu[j < n - 1 ? j + 1 : n - 2]; b.pv[j] = (Rt - b.pu[j]) * P.stiff + P.couple * (l + r - 2 * b.pu[j]); }
+      for (let j = 0; j < n; j++) { b.qu[j] = (b.qu[j] + b.pv[j]) * P.damp; b.pu[j] += b.qu[j]; }
+    } else if (!(b.ev & 1)) { // pop
+      b.ev |= 1; const k = b.k, sk = Math.sqrt(k), Rm = b.q0;
+      f.ring(b, b.x, b.y, P.ring * Math.pow(k, 0.6), 0.5, 1.2 * sk, 16 + 3 * k, 0.1, 0.5);
+      f.glow(b.x + b.nx * Rm * 0.5, b.y + b.ny * Rm * 0.5, Rm * 1.5, 0.3, 8, 0.1, 0.7);
+      for (let i = 0; i < 3 + Math.round(k); i++) {
+        const ax = axisOf(b, 0.4), d = turnOut(b, ax.x, ax.y, gauss() * 0.6, 0.3), v = rnd(1.5, 3) * sk;
+        f.drop(b, b.x + d.x * Rm, b.y + d.y * Rm, d.x * v, d.y * v, rnd(22, 34), 0.8 * Math.pow(k, 0.35), 0.15, 0.6, 0.12);
+      }
+    }
+  },
+  rim(b, grow, squash, upto) { // rim points into BX/BY (j from the +u side round to the -u side)
+    const P = this.P, n = b.n, su = P.skew * b.sl * b.q0 * 0.6, sv = (1 - 0.15 * b.sl) * squash;
+    for (let j = 0; j < n; j++) { const a = Math.PI * j / (n - 1), r = Math.max(0.2, b.pu[j]) * grow; bpt(b, j, r * Math.cos(a) + su * Math.sin(a), r * Math.sin(a) * sv, 0); }
+  },
+  draw(c, b, f, add) {
+    const P = this.P, R = f.ramp, t = b.age / b.life, n = b.n, Rm = b.q0, heat = 0.12 + 0.5 * t;
+    if (t < P.pop) {
+      this.rim(b, 1, 1);
+      c.beginPath(); c.moveTo(BX[0], BY[0]); for (let j = 1; j < n; j++) c.lineTo(BX[j], BY[j]); c.closePath();
+      if (!add) { c.globalAlpha = 0.35; c.fillStyle = '#06080c'; c.fill(); return; } // the gas dims what is behind it: reads as a volume
+      c.globalAlpha = 0.2; c.fillStyle = R[ri(heat + 0.25)]; c.fill();
+      glowAt(c, f, heat, b.x + b.nx * Rm * 0.25, b.y + b.ny * Rm * 0.25, Rm * 1.1, 0.55 * (1 - t));
+      // the skin, thinning as it stretches
+      c.beginPath(); c.moveTo(BX[0], BY[0]); for (let j = 1; j < n; j++) c.lineTo(BX[j], BY[j]);
+      const lw = (1.5 - 0.7 * t / P.pop) * Math.pow(b.k, 0.4);
+      c.globalAlpha = 0.9; c.strokeStyle = R[ri(heat)]; c.lineWidth = lw; c.stroke();
+      c.globalAlpha = 0.5; c.strokeStyle = R[0]; c.lineWidth = lw * 0.35; c.stroke();
+      // a highlight just inside the skin, on the side away from the rebound
+      const cx = b.x + b.nx * Rm * 0.3, cy = b.y + b.ny * Rm * 0.3, j0 = Math.round(n * 0.55), j1 = Math.round(n * 0.8);
+      c.beginPath(); for (let j = j0; j <= j1; j++) { const x = cx + (BX[j] - cx) * 0.8, y = cy + (BY[j] - cy) * 0.8; j === j0 ? c.moveTo(x, y) : c.lineTo(x, y); }
+      c.globalAlpha = 0.55; c.strokeStyle = R[0]; c.lineWidth = 0.7; c.stroke();
+      if (t > P.pop - 0.1) glowAt(c, f, 0.05, b.x + b.nx * Rm * 0.5, b.y + b.ny * Rm * 0.5, Rm * 1.2, (t - P.pop + 0.1) * 6); // pressure peaking
+      return;
+    }
+    if (!add) return;
+    // popped: the torn skin snaps back toward the hull as two shreds
+    const tp = (t - P.pop) / (1 - P.pop), cut = Math.max(1, Math.round((n - 1) * 0.5 * Math.pow(1 - tp, 1.4)));
+    this.rim(b, 1 + 0.6 * tp, 1 - 0.5 * tp);
+    c.beginPath();
+    c.moveTo(BX[0], BY[0]); for (let j = 1; j <= cut; j++) c.lineTo(BX[j], BY[j]);
+    c.moveTo(BX[n - 1], BY[n - 1]); for (let j = n - 2; j >= n - 1 - cut; j--) c.lineTo(BX[j], BY[j]);
+    c.globalAlpha = 0.8 * Math.pow(1 - tp, 1.5); c.strokeStyle = R[ri(heat + 0.15)]; c.lineWidth = Math.pow(b.k, 0.4) * (1 - tp * 0.6); c.stroke();
+  },
+},
+{
+  id: 'plume', name: 'Mushroom plume', group: 1,
+  desc: 'A cohesive plume climbs out along the normal and rolls over into a turning cap, sheared the way the round slid, cooling to smoke.',
+  P: { height: 30, cap: 8, stem: 3.6, shear: 0.75, tilt: 0.45, rise: 0.055, roll: 0.07, life: 120, flash: 7, light: 56 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 7, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 36, 0.6);
+    f.body(this, h, P.life + 15 * k);
+    f.scorch(h.x, h.y, 4 * sk, 240);
+    if (k > 1.3) f.kick(0.7 * (k - 1.1));
+  },
+  step() {},
+  geo(b) {
+    const P = this.P, G = CG, age = b.age, t = age / b.life;
+    G.t = t; G.Hc = P.height * Math.pow(b.k, 0.6) * (1 - Math.exp(-age * P.rise));
+    G.Rc = P.cap * Math.pow(b.k, 0.55) * (0.3 + 0.7 * (1 - Math.exp(-age * 0.05))) * (1 + 0.25 * t);
+    G.cu = P.shear * b.sl * G.Hc * 0.6 + Math.sin(age * 0.05 + b.seed) * 0.6; // sheared downstream of the slide, swaying a little
+    G.tilt = -P.tilt * b.sl; G.Ws = P.stem * Math.sqrt(b.k) * (1 - 0.45 * t);
+    G.heat = 0.2 + 1.1 * t; G.fade = 1 - sstep((t - 0.65) / 0.35);
+  },
+  /** Stem and cap as one path (both traced the same way round, so the fill is their union) */
+  trace(c, b) {
+    const P = this.P, G = CG, age = b.age, Hc = G.Hc, Rc = G.Rc, cu = G.cu, ct = Math.cos(G.tilt), st = Math.sin(G.tilt), vt = Hc - 0.15 * Rc, S = 8;
+    c.beginPath();
+    for (let i = 0; i <= S; i++) { const s = i / S, sp = cu * Math.pow(s, 1.6) + 0.5 * Math.sin(age * 0.09 + s * 3 + b.seed) * s, w = G.Ws * (0.6 + 1.1 * Math.pow(1 - s, 4)); (i ? lt : mt)(c, b, 0, sp + w, s ? vt * s : -0.6); }
+    for (let i = S; i >= 0; i--) { const s = i / S, sp = cu * Math.pow(s, 1.6) + 0.5 * Math.sin(age * 0.09 + s * 3 + b.seed) * s, w = G.Ws * (0.6 + 1.1 * Math.pow(1 - s, 4)); lt(c, b, 0, sp - w, s ? vt * s : -0.6); }
+    c.closePath();
+    const m = 22;
+    for (let j = 0; j < m; j++) {
+      const a = 6.2832 * j / m, ca = Math.cos(a), sa = Math.sin(a);
+      let beta = Math.abs(a - Math.PI / 2); if (beta > Math.PI) beta = 6.2832 - beta; // angle from the top: billows roll out from the crown and under
+      const bill = 1 + 0.08 * Math.sin(4 * beta - age * P.roll * 1.6 + b.seed) + 0.04 * Math.sin(7 * beta - age * 0.05);
+      const eu = 1.3 * Rc * ca * bill, ev = (sa >= 0 ? 1.0 * sa : 0.85 * sa * (0.28 + 0.72 * Math.pow(Math.abs(ca), 1.3))) * Rc * bill;
+      bpt(b, j, cu + eu * ct - ev * st, Hc + eu * st + ev * ct, 0);
+    }
+    traceSmooth(c, m, false);
+  },
+  draw(c, b, f, add) {
+    const P = this.P, G = CG, R = f.ramp; this.geo(b);
+    const t = G.t, heat = G.heat, fade = G.fade, Rc = G.Rc, Hc = G.Hc, cu = G.cu, ct = Math.cos(G.tilt), st = Math.sin(G.tilt);
+    if (Hc < 0.5) return;
+    this.trace(c, b);
+    if (!add) {
+      // volume: hottest in the core under the cap, cooler toward the cap's edge and down the stem
+      const gx = lx(b, cu, Hc - 0.2 * Rc, 0), gy = ly(b, cu, Hc - 0.2 * Rc, 0), g = c.createRadialGradient(gx, gy, 0, gx, gy, Math.max(Rc * 1.7, Hc));
+      g.addColorStop(0, R[ri(heat - 0.12)]); g.addColorStop(0.45, R[ri(heat + 0.1)]); g.addColorStop(1, R[ri(heat + 0.4)]);
+      c.globalAlpha = 0.92 * fade; c.fillStyle = g; c.fill();
+      return;
+    }
+    // light: fire inside the body while it is hot, the cap's crown edge, the two rolling curls, glow under the cap
+    c.globalAlpha = 0.28 * (1 - t) * (1 - t); c.fillStyle = R[ri(heat * 0.6)]; c.fill();
+    c.beginPath(); c.moveTo(BX[0], BY[0]); for (let j = 1; j <= 11; j++) c.lineTo(BX[j], BY[j]);
+    c.globalAlpha = 0.6 * (1 - t) * fade; c.strokeStyle = R[ri(heat * 0.6)]; c.lineWidth = 0.8; c.stroke();
+    c.beginPath();
+    for (let side = -1; side <= 1; side += 2) {
+      for (let i = 0; i <= 9; i++) {
+        const s = i / 9, a = -b.age * P.roll + s * 4.2, r = 0.42 * Rc * (1 - 0.55 * s);
+        const lu = side * (0.7 * 1.3 * Rc + r * Math.cos(a)), lv = -0.05 * Rc + r * Math.sin(a);
+        (i ? lt : mt)(c, b, 0, cu + lu * ct - lv * st, Hc + lu * st + lv * ct);
+      }
+    }
+    c.globalAlpha = 0.5 * fade * (1 - t * 0.6); c.strokeStyle = R[ri(heat * 0.7 + 0.1)]; c.lineWidth = 0.7 + 0.2 * Math.sqrt(b.k); c.stroke();
+    glowAt(c, f, heat * 0.5, lx(b, cu, Hc - 0.3 * Rc, 0), ly(b, cu, Hc - 0.3 * Rc, 0), Rc * 1.8, 0.6 * (1 - t) * (1 - t));
+    glowAt(c, f, heat * 0.4, b.x, b.y, G.Ws * 4, 0.6 * Math.pow(1 - t, 3));
+  },
+},
+{
+  id: 'blossom', name: 'Blossom', group: 1,
+  desc: 'One connected flower of molten plating unfolds from the hit, lobes fanned about the normal and reaching toward the rebound, then wilts and folds back.',
+  P: { lobes: 5, len: 13, spread: 150, inner: 0.45, width: 0.78, stagger: 3, stiff: 0.11, damp: 0.8, lean: 0.45, curl: 0.45, wilt: 0.55, life: 86, flash: 6, light: 48 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 30, 0.55);
+    const b = f.body(this, h, P.life + 10 * k), n = (b.n = Math.max(3, Math.min(9, P.lobes + Math.round((k - 1) * 1.5))));
+    // the fan's axis sits between the normal and the rebound; it is squeezed to stay off the hull
+    const thr = Math.atan2(b.cs, b.sl), tha = Math.PI / 2 - (Math.PI / 2 - thr) * P.lean, hs = P.spread * D2R / 2;
+    const lo = Math.max(0.16, tha - hs), hi = Math.min(Math.PI - 0.16, tha + hs);
+    b.q0 = (hi - lo) / n * P.width; // lobe half width (radians)
+    for (let j = 0; j < n; j++) {
+      const a = lo + (hi - lo) * (j + 0.5) / n + gauss() * 0.04;
+      b.qv[j] = a; b.pv[j] = P.len * Math.pow(k, 0.6) * (0.75 + 0.6 * b.sl * Math.max(0, Math.cos(a - thr))) * rnd(0.85, 1.15);
+    }
+    f.scorch(h.x, h.y, 3.6 * sk, 190);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+  step(b) {
+    const P = this.P, t = b.age / b.life, n = b.n, wil = t > P.wilt;
+    for (let j = 0; j < n; j++) { // each lobe unfolds on its own spring, the middle ones first
+      if (b.age < Math.abs(j - (n - 1) / 2) * P.stagger) continue;
+      const st = wil ? P.stiff * 0.35 : P.stiff;
+      b.qu[j] = (b.qu[j] + ((wil ? 0.04 : 1) - b.pu[j]) * st) * P.damp; b.pu[j] += b.qu[j];
+    }
+  },
+  /** Lobe angles (drooping as they wilt), tip angles (curled) and lengths into BA/BT/BL; the bud radius and reach into CG */
+  prep(b) {
+    const P = this.P, G = CG, n = b.n, t = b.age / b.life, dr = sstep((t - P.wilt) / (1 - P.wilt));
+    let full = 0; for (let j = 0; j < n; j++) full += b.pv[j];
+    G.rv = P.inner * full / n * (0.4 + 0.6 * sstep(b.age / 6)) * (1 - 0.4 * dr) + 0.4; G.Lmax = G.rv;
+    for (let j = 0; j < n; j++) {
+      const p = Math.max(0, b.pu[j]), a0 = b.qv[j], side = a0 < Math.PI / 2 ? -1 : 1, room = Math.min(a0, Math.PI - a0) - 0.08;
+      BA[j] = a0 + side * dr * room * 0.75; // wilting lobes droop toward the hull
+      BT[j] = BA[j] - P.curl * 0.5 * b.sl * Math.min(1, p) + side * P.curl * dr * 0.6; // tips curl toward the rebound, then fold over
+      BL[j] = G.rv + (b.pv[j] - G.rv) * p; if (BL[j] > G.Lmax) G.Lmax = BL[j];
+    }
+    G.t = t; G.heat = 0.06 + 0.6 * t; G.fade = 1 - sstep((t - 0.82) / 0.18); G.sh = dr;
+  },
+  trace(c, b) {
+    const G = CG, n = b.n, hw = b.q0, rv = G.rv, cl = clampFan;
+    c.beginPath(); mt(c, b, 0, rv * 1.1, -0.6);
+    let va = Math.max(0.03, BA[0] - hw * 1.3); lt(c, b, 0, rv * Math.cos(va), rv * Math.sin(va));
+    for (let j = 0; j < n; j++) {
+      const a = BA[j], ta = BT[j], L = BL[j], a1 = cl(a - hw * 1.25), a2 = ta - hw * 0.6, a3 = ta + hw * 0.6, a4 = cl(a + hw * 1.25);
+      bz(c, b, 0, 0.6 * L * Math.cos(a1), 0.6 * L * Math.sin(a1), L * Math.cos(a2), L * Math.sin(a2), L * Math.cos(ta), L * Math.sin(ta));
+      va = j < n - 1 ? (a + BA[j + 1]) * 0.5 : Math.min(Math.PI - 0.03, a + hw * 1.3);
+      bz(c, b, 0, L * Math.cos(a3), L * Math.sin(a3), 0.6 * L * Math.cos(a4), 0.6 * L * Math.sin(a4), rv * Math.cos(va), rv * Math.sin(va));
+    }
+    lt(c, b, 0, -rv * 1.1, -0.6); c.closePath();
+  },
+  draw(c, b, f, add) {
+    const G = CG, R = f.ramp, n = b.n; this.prep(b);
+    const heat = G.heat, fade = G.fade, dr = G.sh;
+    this.trace(c, b);
+    if (!add) {
+      const g = c.createRadialGradient(b.x, b.y, 0, b.x, b.y, G.Lmax);
+      g.addColorStop(0, R[ri(heat * 0.25)]); g.addColorStop(0.3, R[ri(heat + 0.12)]); g.addColorStop(1, R[ri(heat + 0.42)]);
+      c.globalAlpha = 0.95 * fade; c.fillStyle = g; c.fill();
+      return;
+    }
+    c.globalAlpha = 0.7 * fade; c.strokeStyle = R[ri(heat * 0.6)]; c.lineWidth = 0.7; c.stroke();
+    c.beginPath(); // veins out to each tip
+    for (let j = 0; j < n; j++) {
+      const a = BA[j], ta = BT[j], L = BL[j];
+      mt(c, b, 0, 0, 0); qd(c, b, 0, 0.5 * L * Math.cos(a), 0.5 * L * Math.sin(a), 0.85 * L * Math.cos(ta), 0.85 * L * Math.sin(ta));
+    }
+    c.globalAlpha = 0.6 * fade * (1 - dr); c.strokeStyle = R[ri(heat * 0.4)]; c.lineWidth = 0.6; c.stroke();
+    glowAt(c, f, heat * 0.5, b.x, b.y, G.rv * 2.5, 0.7 * (1 - G.t));
+  },
+},
+];
+
+/* =====================================================================================
+   An impact field: the Impact Lab's Pane without its own canvas, shots or static layer. It holds the pool and
+   body slots for one hull and draws in the hull's fx frame (the caller sets the transform).
+   ===================================================================================== */
+class Field {
+  constructor() {
+    this.pool = new Pool(2600); this.mat = 'armour';
+    const M = MATS.armour, rp = buildRamp(M.ramp); this.ramp = rp.css; this.spr = rp.spr;
+    this.smokeSpr = smokeSprite(M.dust); this.chunk = M.chunk;
+    this.bodies = Array.from({ length: MAX_BODIES }, newBody);
+    this.shake = 0; this.sx = 0; this.sy = 0;
+  }
+  clear() { this.pool.n = 0; for (let i = 0; i < this.bodies.length; i++) this.bodies[i].on = false; this.shake = 0; this.sx = this.sy = 0; }
+  // ---- emit helpers used by the effects ----
+  glow(x, y, size, grow, life, heat, alpha, vx = 0, vy = 0) { const p = this.pool, i = p.add(GLOW, x, y, vx, vy, life, size, heat, 0.7); p.grow[i] = grow; p.alpha[i] = alpha; p.drag[i] = 0.94; return i; }
+  spark(x, y, vx, vy, life, w, len, heat, cool, drag) { const p = this.pool, i = p.add(SPARK, x, y, vx, vy, life, 0, heat, cool); p.w[i] = w; p.len[i] = len; p.drag[i] = drag; return i; }
+  collide(i, h, bounce, pull) { const p = this.pool; p.flag[i] |= F_COLLIDE; p.x[i] += h.nx * 1.2; p.y[i] += h.ny * 1.2; p.bounce[i] = bounce; p.pull[i] = pull; p.pnx[i] = h.nx; p.pny[i] = h.ny; }
+  drop(h, x, y, vx, vy, life, size, heat, cool, pull) {
+    const p = this.pool, i = p.add(DROP, x + h.nx * 1.2, y + h.ny * 1.2, vx, vy, life, size, heat, cool);
+    p.flag[i] = F_LAND; p.pull[i] = pull; p.pnx[i] = h.nx; p.pny[i] = h.ny; p.drag[i] = 0.985; p.len[i] = 1.3; return i;
+  }
+  ring(h, x, y, radius, squash, w, life, heat, cool) {
+    const p = this.pool, i = p.add(RING, x, y, 0, 0, life, radius, heat, cool), rot = Math.atan2(h.ty, h.tx);
+    p.rot[i] = rot; p.len[i] = squash; p.w[i] = w;
+    const up = -Math.sin(rot) * h.nx + Math.cos(rot) * h.ny > 0; p.a0[i] = up ? 0 : Math.PI; p.a1[i] = up ? Math.PI : Math.PI * 2;
+    const sh = (h.rx * h.tx + h.ry * h.ty) * 0.3 * radius; p.vx[i] = h.tx * sh; p.vy[i] = h.ty * sh; // skewed toward the rebound
+    return i;
+  }
+  streak(x, y, ang, len, w, life, heat) { const p = this.pool, i = p.add(STREAK, x, y, 0, 0, life, len, heat, 0.6); p.rot[i] = ang; p.w[i] = w; return i; }
+  star(x, y, rot, size, w, life) { const p = this.pool, i = p.add(STAR, x, y, 0, 0, life, size, 0, 0.4); p.rot[i] = rot; p.w[i] = w; return i; }
+  wave(s0, dir, speed, amp, width, life) { const p = this.pool, i = p.add(WAVE, s0, 0, speed, 0, life, amp, 0.1, 0.6); p.a0[i] = dir; p.w[i] = width; return i; }
+  petal(h, x, y, vx, vy, size, vr, life) { const p = this.pool, i = p.add(PETAL, x, y, vx, vy, life, size, 0.22, 0.75); p.vr[i] = vr; p.rot[i] = Math.random() * 6.28; p.drag[i] = 0.965; this.collide(i, h, 0.3, 0.02); p.flag[i] |= F_EMBERS; return i; }
+  smoke(x, y, vx, vy, size, grow, life, alpha) { const p = this.pool, i = p.add(SMOKE, x, y, vx, vy, life, size, 0, 0); p.grow[i] = grow; p.alpha[i] = alpha; p.drag[i] = 0.97; return i; }
+  scorch(x, y, size, life) { this.pool.add(SCORCH, x, y, 0, 0, life, size, 0, 1); }
+  light(x, y, radius, life, alpha) { const p = this.pool, i = p.add(LIGHT, x, y, 0, 0, life, radius, 0.3, 0.5); p.alpha[i] = alpha; }
+  /** A film lying on the hull from arc length s0: `fwd` ahead along `dir`, `back` behind, spreading over `grow` ticks and creeping at `flow` */
+  smear(s0, dir, fwd, back, thick, life, heat, grow, flow) {
+    const p = this.pool, i = p.add(SMEAR, s0, 0, flow, 0, life, fwd, heat, 0.85);
+    p.a0[i] = dir; p.len[i] = back; p.w[i] = thick; p.grow[i] = grow; return i;
+  }
+  drawSmear(c, i, hot) {
+    const p = this.pool, t = p.age[i] / p.life[i], age = p.age[i], dir = p.a0[i], flow = p.vx[i];
+    const reach = Math.min(1, age / Math.max(1, p.grow[i])), e = 1 - (1 - reach) * (1 - reach);
+    const s0 = p.x[i] + dir * flow * age * (1 - 0.5 * t), fwd = p.size[i] * e + flow * age * 0.4, back = p.len[i] * e;
+    const th = p.w[i] * (1 - 0.55 * t) * (hot ? 1 : 0.85);
+    for (let j = 0; j <= SM_N; j++) {
+      const u = j / SM_N, q = pointAt(s0 + dir * (-back + (fwd + back) * u));
+      const prof = Math.sqrt(Math.max(0, 1 - (2 * u - 1) * (2 * u - 1))) * (flow > 0 ? 1 + 0.6 * Math.exp(-(1 - u) * (1 - u) * 30) : 1);
+      const tt = th * prof;
+      SOX[j] = q.x + q.nx * tt; SOY[j] = q.y + q.ny * tt; SIX[j] = q.x - q.nx * tt * 0.3; SIY[j] = q.y - q.ny * tt * 0.3;
+    }
+    c.beginPath(); c.moveTo(SOX[0], SOY[0]);
+    for (let j = 1; j <= SM_N; j++) c.lineTo(SOX[j], SOY[j]);
+    for (let j = SM_N; j >= 0; j--) c.lineTo(SIX[j], SIY[j]);
+    c.closePath();
+    if (!hot) { c.globalAlpha = 0.5 * (1 - t * t * t); c.fillStyle = '#0b0807'; c.fill(); return; }
+    c.globalAlpha = 0.85 * Math.pow(1 - t, 1.6); c.fillStyle = this.ramp[ri(p.heat[i] + p.cool[i] * t)]; c.fill();
+    c.globalAlpha = 0.7 * (1 - t) * (1 - t); c.strokeStyle = this.ramp[ri(p.heat[i] * 0.6)]; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(SOX[0], SOY[0]); for (let j = 1; j <= SM_N; j++) c.lineTo(SOX[j], SOY[j]); c.stroke();
+  }
+  /** A unified body for effect `fx` at hit h: a free slot (or the oldest), its arrays cleared, its frame taken from h */
+  body(fx, h, life) {
+    let b = null;
+    for (const o of this.bodies) if (!o.on) { b = o; break; }
+    if (!b) { b = this.bodies[0]; for (const o of this.bodies) if (o.age / o.life > b.age / b.life) b = o; }
+    b.on = true; b.fx = fx; b.x = h.x; b.y = h.y; b.nx = h.nx; b.ny = h.ny; b.tx = h.tx; b.ty = h.ty; b.rx = h.rx; b.ry = h.ry;
+    b.cs = h.cos; b.sl = Math.max(0, Math.min(1, h.rx * h.tx + h.ry * h.ty)); b.k = h.k;
+    b.age = 0; b.life = Math.max(1, life * this.pool.lifeScale); b.seed = Math.random() * 100; b.ev = 0; b.n = 0; b.q0 = b.q1 = b.q2 = b.q3 = 0;
+    b.pu.fill(0); b.pv.fill(0); b.qu.fill(0); b.qv.fill(0);
+    return b;
+  }
+  kick(a) { if (!REDUCED) this.shake = Math.min(3, Math.max(this.shake, a)); }
+  step() {
+    const p = this.pool;
+    for (let i = 0; i < p.n; i++) {
+      if (++p.age[i] >= p.life[i]) { p.kill(i); i--; continue; }
+      const ty = p.type[i];
+      if (ty >= RING) continue;
+      if (p.pull[i]) { p.vx[i] -= p.pnx[i] * p.pull[i]; p.vy[i] -= p.pny[i] * p.pull[i]; }
+      const d = p.drag[i]; p.vx[i] *= d; p.vy[i] *= d;
+      const ox = p.x[i], oy = p.y[i];
+      p.x[i] += p.vx[i]; p.y[i] += p.vy[i]; p.rot[i] += p.vr[i]; p.size[i] += p.grow[i];
+      const fl = p.flag[i];
+      if (fl & F_EMBERS && (p.age[i] | 0) % 3 === 0 && p.age[i] < p.life[i] * 0.55) {
+        this.spark(p.x[i], p.y[i], p.vx[i] * 0.2 + gauss() * 0.4, p.vy[i] * 0.2 + gauss() * 0.4, rnd(8, 14), 0.6, 1.5, 0.15 + p.age[i] / p.life[i] * 0.5, 0.5, 0.93);
+      }
+      if (fl & (F_COLLIDE | F_LAND)) {
+        const hy = surfY(p.x[i]);
+        if (p.y[i] > hy) {
+          let nx = SN.x, ny = SN.y;
+          const hyo = surfY(ox);
+          if (oy <= hyo && oy > hy + 0.5) { nx = ox < p.x[i] ? -1 : 1; ny = 0; } // ran into a step's wall
+          if (fl & F_LAND) { // a drop lands: a little splat where it touched
+            const h = p.heat[i] + p.cool[i] * p.age[i] / p.life[i];
+            this.glow(ox, oy, p.size[i] * 2.4, 0.2, 9, h, 0.7);
+            if (fl & F_SMEARLAND) { // it sticks: a small smear the way it was moving along the hull
+              const s = nearest(ox, oy).s, sg = segAt(s), vt = p.vx[i] * SDX[sg] + p.vy[i] * SDY[sg], av = Math.abs(vt);
+              this.smear(s, vt >= 0 ? 1 : -1, 2 + av * 3, 1 + p.size[i], p.size[i] * 0.8, 70, h, 6, av * 0.12);
+            }
+            p.kill(i); i--; continue;
+          }
+          const vn = p.vx[i] * nx + p.vy[i] * ny;
+          if (vn < 0) { const b = 1 + p.bounce[i]; p.vx[i] -= b * vn * nx; p.vy[i] -= b * vn * ny; p.vx[i] *= 0.88; p.vy[i] *= 0.88; }
+          p.x[i] = ox; p.y[i] = oy;
+        }
+      }
+    }
+    for (const b of this.bodies) { if (!b.on) continue; if (++b.age >= b.life) { b.on = false; continue; } b.fx.step(b, this); }
+    this.shake *= 0.86; if (this.shake < 0.02) this.shake = 0;
+    this.sx = (Math.random() - 0.5) * 2 * this.shake; this.sy = (Math.random() - 0.5) * 2 * this.shake;
+  }
+  draw(c) {
+    const p = this.pool, R = this.ramp, S = this.spr;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    // Pass 1: on the hull (clipped): scorch marks, hit light, the ripple's cell flash
+    c.save(); c.clip(HULL);
+    for (let i = 0; i < p.n; i++) {
+      if (p.type[i] !== SCORCH) continue;
+      const t = p.age[i] / p.life[i]; c.globalAlpha = 0.6 * (1 - t); c.fillStyle = '#0b0807';
+      c.beginPath(); c.arc(p.x[i], p.y[i], p.size[i], 0, 6.2832); c.fill();
+    }
+    c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < p.n; i++) {
+      const ty = p.type[i], t = p.age[i] / p.life[i];
+      if (ty === SCORCH) {
+        if (t > 0.45) continue; const r = p.size[i] * 1.6; c.globalAlpha = 1 - t / 0.45;
+        c.drawImage(S[ri(0.2 + t * 1.6)], p.x[i] - r, p.y[i] - r, r * 2, r * 2);
+      } else if (ty === LIGHT) {
+        const r = p.size[i]; c.globalAlpha = Math.min(1, p.alpha[i] * 1.5) * (1 - t) * (1 - t);
+        c.drawImage(S[ri(0.3)], p.x[i] - r, p.y[i] - r, r * 2, r * 2);
+      } else if (ty === WAVE) {
+        const amp = p.size[i] * Math.pow(1 - t, 1.3), sf = p.x[i] + p.a0[i] * p.vx[i] * p.age[i], w = p.w[i], dir = p.a0[i];
+        c.fillStyle = c.strokeStyle = R[ri(0.3 + 0.4 * t)]; c.lineWidth = 0.8;
+        for (let j = 0; j < EDGE_CELLS.length; j += 3) {
+          const d = (EDGE_CELLS[j + 2] - sf) * dir + w * 0.5, a = Math.exp(-(d * d) / (w * w * 0.35)) * amp / (p.size[i] + 0.001) * 0.42;
+          if (a < 0.02) continue;
+          c.globalAlpha = a * 0.3; c.fillRect(EDGE_CELLS[j] + 0.6, EDGE_CELLS[j + 1] + 0.6, CELL - 1.2, CELL - 1.2);
+          c.globalAlpha = a; c.strokeRect(EDGE_CELLS[j] + 1, EDGE_CELLS[j + 1] + 1, CELL - 2, CELL - 2);
+        }
+      }
+    }
+    c.restore();
+    // Pass 2: normal blend: smoke and the petals' dark bodies
+    c.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < p.n; i++) {
+      const ty = p.type[i]; if (ty === SMEAR) { this.drawSmear(c, i, false); continue; }
+      if (ty !== SMOKE && ty !== PETAL) continue;
+      const t = p.age[i] / p.life[i];
+      if (ty === SMOKE) { const r = p.size[i]; c.globalAlpha = p.alpha[i] * (1 - t) * Math.min(1, t * 6); c.drawImage(this.smokeSpr, p.x[i] - r, p.y[i] - r, r * 2, r * 2); }
+      else { c.globalAlpha = t > 0.8 ? (1 - t) * 5 : 1; c.fillStyle = this.chunk; this.petalPath(c, i); c.fill(); }
+    }
+    for (const b of this.bodies) if (b.on) b.fx.draw(c, b, this, false); // unified bodies: their solid pass
+    // Pass 3: light (additive)
+    c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < p.n; i++) {
+      const ty = p.type[i], t = p.age[i] / p.life[i], x = p.x[i], y = p.y[i];
+      switch (ty) {
+        case SPARK: case DROP: {
+          const col = R[ri(p.heat[i] + p.cool[i] * t)], L = p.len[i];
+          c.globalAlpha = 1 - t * t; c.strokeStyle = col;
+          c.lineWidth = ty === DROP ? p.size[i] * (1 - 0.4 * t) : p.w[i] * 1.25 * (1 - 0.5 * t);
+          c.beginPath(); c.moveTo(x, y); c.lineTo(x - p.vx[i] * L, y - p.vy[i] * L); c.stroke();
+          const hr = ty === DROP ? p.size[i] * 2.8 : p.w[i] * 3.2; // a soft halo on the head (stands in for bloom)
+          c.globalAlpha = 0.4 * (1 - t); c.drawImage(S[ri(p.heat[i] + 0.15 + p.cool[i] * t)], x - hr, y - hr, hr * 2, hr * 2);
+          if (p.flag[i] & F_STARHEAD) {
+            const z = p.w[i] * 3.2 * (1 - t), a = p.age[i] * 0.3, ca = Math.cos(a) * z, sa = Math.sin(a) * z;
+            c.lineWidth = p.w[i] * 0.5; c.strokeStyle = R[0];
+            c.beginPath(); c.moveTo(x - ca, y - sa); c.lineTo(x + ca, y + sa); c.moveTo(x + sa, y - ca); c.lineTo(x - sa, y + ca); c.stroke();
+            const r = z * 1.4; c.drawImage(S[ri(0.15)], x - r, y - r, r * 2, r * 2);
+          }
+          break;
+        }
+        case GLOW: { const r = p.size[i]; if (r <= 0) break; c.globalAlpha = p.alpha[i] * Math.pow(1 - t, 1.5); c.drawImage(S[ri(p.heat[i] + p.cool[i] * t)], x - r, y - r, r * 2, r * 2); break; }
+        case LIGHT: { const r = p.size[i] * 0.8; c.globalAlpha = p.alpha[i] * 0.3 * (1 - t) * (1 - t); c.drawImage(S[ri(0.4)], x - r, y - r, r * 2, r * 2); break; }
+        case SMEAR: this.drawSmear(c, i, true); break;
+        case PETAL: { c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = 0.9; this.petalPath(c, i); c.stroke(); break; }
+        case RING: {
+          const e = 1 - (1 - t) * (1 - t), r = Math.max(0.01, p.size[i] * e);
+          c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = p.w[i] * (1 - t) + 0.25;
+          c.beginPath(); c.ellipse(x + p.vx[i] * e, y + p.vy[i] * e, r, r * p.len[i], p.rot[i], p.a0[i], p.a1[i]); c.stroke();
+          break;
+        }
+        case STREAK: {
+          const ux = Math.cos(p.rot[i]), uy = Math.sin(p.rot[i]), reach = p.size[i] * Math.min(1, t * 3 + 0.25), a = reach * t * 0.6;
+          c.globalAlpha = 0.4 * (1 - t); c.strokeStyle = R[ri(p.heat[i] + 0.3 + p.cool[i] * t)]; c.lineWidth = p.w[i] * 2.6 * (1 - t);
+          c.beginPath(); c.moveTo(x + ux * a, y + uy * a); c.lineTo(x + ux * reach, y + uy * reach); c.stroke();
+          c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = p.w[i] * (1 - t);
+          c.stroke();
+          break;
+        }
+        case STAR: {
+          const L = p.size[i] * Math.pow(1 - t, 0.6), ux = Math.cos(p.rot[i]) * L, uy = Math.sin(p.rot[i]) * L;
+          c.globalAlpha = 1 - t; c.strokeStyle = R[ri(0.05 + 0.3 * t)]; c.lineWidth = p.w[i] * (1 - t) + 0.2;
+          c.beginPath(); c.moveTo(x - ux * 0.35, y - uy * 0.35); c.lineTo(x + ux, y + uy); c.moveTo(x + uy * 0.6, y - ux * 0.6); c.lineTo(x - uy * 0.6, y + ux * 0.6); c.stroke();
+          const r = L * 0.45; c.drawImage(S[0], x - r, y - r, r * 2, r * 2);
+          break;
+        }
+        case WAVE: {
+          const amp = p.size[i] * Math.pow(1 - t, 1.3), dir = p.a0[i], sf = x + dir * p.vx[i] * p.age[i], w = p.w[i];
+          if (sf < 0 || sf > SL) break;
+          c.globalAlpha = 0.9 * (1 - t); c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = 1.2 + amp * 0.35;
+          c.beginPath();
+          for (let j = 0; j <= 10; j++) {
+            const u = j / 10, q = pointAt(sf - dir * u * w), b = amp * Math.sin(Math.PI * u) * (1 - 0.35 * u);
+            if (j === 0) c.moveTo(q.x + q.nx * b, q.y + q.ny * b); else c.lineTo(q.x + q.nx * b, q.y + q.ny * b);
+          }
+          c.stroke();
+          const q = pointAt(sf - dir * w * 0.45), r = 2 + amp * 1.8;
+          c.globalAlpha = 0.55 * (1 - t); c.drawImage(S[ri(0.2 + 0.4 * t)], q.x + q.nx * amp - r, q.y + q.ny * amp - r, r * 2, r * 2);
+          break;
+        }
+      }
+    }
+    for (const b of this.bodies) if (b.on) b.fx.draw(c, b, this, true); // unified bodies: their light pass
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  }
+  petalPath(c, i) {
+    const p = this.pool, z = p.size[i], cr = Math.cos(p.rot[i]) * z, sr = Math.sin(p.rot[i]) * z, x = p.x[i], y = p.y[i];
+    // a torn, slightly curled plate: four corners in its own frame
+    c.beginPath();
+    c.moveTo(x + (-1 * cr - -0.5 * sr), y + (-1 * sr + -0.5 * cr));
+    c.lineTo(x + (1 * cr - -0.25 * sr), y + (1 * sr + -0.25 * cr));
+    c.lineTo(x + (0.7 * cr - 0.6 * sr), y + (0.7 * sr + 0.6 * cr));
+    c.lineTo(x + (-0.6 * cr - 0.35 * sr), y + (-0.6 * sr + 0.35 * cr));
+    c.closePath();
+  }
+}
+const kOf = (dmg) => Math.max(0.55, Math.min(3.6, Math.pow(dmg / 14, 0.42)));
+const FX_BY_ID = {};
+for (let i = 0; i < EFFECTS.length; i++) FX_BY_ID[EFFECTS[i].id] = i;
+
+// ===================================================================================================================
+// World drawing helpers (current context and view). VW maps world units to device pixels.
+// ===================================================================================================================
+const VW = { a: 1, e: 0, f: 0 };
+let ctx = null;
+function toWorld() { ctx.setTransform(VW.a, 0, 0, VW.a, VW.e, VW.f); }
+function toLocal(x, y, ang, sc) {
+  const c = Math.cos(ang) * VW.a * sc, s = Math.sin(ang) * VW.a * sc;
+  ctx.setTransform(c, s, -s, c, VW.a * x + VW.e, VW.a * y + VW.f);
+}
+/** The hull's fx frame for lane L: world x = Ox + fy * S, world y = Oy - fx * S */
+function toFx(L) { const q = L.S * VW.a; ctx.setTransform(0, -q, q, 0, VW.a * L.Ox + VW.e, VW.a * L.Oy + VW.f); }
 function ADD() { ctx.globalCompositeOperation = 'lighter'; }
 function NORM() { ctx.globalCompositeOperation = 'source-over'; }
 const SPR = new Map();
@@ -206,407 +1272,503 @@ function seg(x0, y0, x1, y1, w, col, a) {
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
 }
 function fillPath(col, a) { ctx.globalAlpha = a > 1 ? 1 : a; ctx.fillStyle = col; ctx.fill(); }
-const NO_DASH = [], DASH = [0, 0];
-
-/** A teardrop: round head of radius R at the origin, tail tip at (-L, wob) */
-function tearPath(R, L, wob) {
-  const h = Math.PI / 2 + 0.2;
-  ctx.beginPath();
-  ctx.moveTo(-L, wob);
-  ctx.quadraticCurveTo(-L * 0.4, wob * 0.5 - R * 0.95, Math.cos(-h) * R, Math.sin(-h) * R);
-  ctx.arc(0, 0, R, -h, h, false);
-  ctx.quadraticCurveTo(-L * 0.4, wob * 0.5 + R * 0.95, -L, wob);
-  ctx.closePath();
+function strokePath(col, a, w) { ctx.globalAlpha = a > 1 ? 1 : a; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke(); }
+/** An oval slug in its own frame at (x, y) along hd: glow, body, hot core (additive) */
+function slug(x, y, hd, L, W, body, core, gcol, gr, ga) {
+  toLocal(x, y, hd, 1); ADD();
+  glow(gcol, 0, 0, gr, ga);
+  ctx.beginPath(); ctx.ellipse(0, 0, L * 0.5, W * 0.5, 0, 0, TAU); fillPath(body, 0.9);
+  ctx.beginPath(); ctx.ellipse(L * 0.12, 0, L * 0.3, W * 0.26, 0, 0, TAU); fillPath(core, 1);
 }
-/** A crescent opening backwards: outer arc radius R across +-half, the inner arc's centre `d` behind */
-function crescentPath(R, half, d, ox) {
-  const ex = R * Math.cos(half), ey = R * Math.sin(half);
-  const ri = Math.hypot(ex + d, ey), hi = Math.atan2(ey, ex + d);
-  ctx.beginPath();
-  ctx.arc(ox, 0, R, -half, half, false);
-  ctx.arc(ox - d, 0, ri, hi, -hi, true);
-  ctx.closePath();
+/** A jagged bolt path from (x0, y0) to (x1, y1), its kinks set by `seed` (same seed, same shape) */
+function boltPath(x0, y0, x1, y1, seed, amp) {
+  const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l, N = 8;
+  ctx.beginPath(); ctx.moveTo(x0, y0);
+  for (let i = 1; i < N; i++) { const f = i / N, o = (hash(seed + i * 1.73) - 0.5) * 2 * amp * Math.sin(Math.PI * f); ctx.lineTo(x0 + dx * f + nx * o, y0 + dy * f + ny * o); }
+  ctx.lineTo(x1, y1);
 }
+/** A pointed lens (two arcs), length L, half width W, offset oy across */
+function lensPath(L, W, oy) {
+  ctx.beginPath(); ctx.moveTo(-L / 2, oy);
+  ctx.quadraticCurveTo(0, oy - W * 2, L / 2, oy); ctx.quadraticCurveTo(0, oy + W * 2, -L / 2, oy); ctx.closePath();
+}
+const LP = new Float32Array(72 * 3); // scratch: a round's path points, newest first
 
 // ===================================================================================================================
-// STYLES
+// STYLES. Hooks (all optional): spawn(r, k, L) after launch; update(r, k, L, dt) before the move (may steer, or
+// spend the round); onHit(r, k, L, hw) on touching a surface: return 0 for the usual hit and stop, 1 to keep flying
+// (it handled the contact), 2 if it already spent itself; after(r, k, L, dt) while spent; linger (ticks, or a
+// function) keeps a spent round drawing; fuse + burst(r, k, L) for a timed break-up; draw(r, k, L).
+// Lane helpers a style may read: L.y, L.vspace (room either side), L.vs (lane scale, 1 at game scale), L.aimX,
+// L.deckDY (the main hull's sloped deck), L.tX/tY/nT (dummy targets), L.reach.
 // ===================================================================================================================
 const STYLES = [
   {
-    id: 'corkscrew', name: 'Corkscrew Slug', family: 'Cannon', now: 'cannon',
-    desc: 'A pointed brass slug that spins in flight; two tracer strands wind round its path.',
-    def: { spd: 54, dmg: 18, rate: 3 },
-    P: { len: 10, wid: 3.6, amp: 3.2, pitch: 34, trailTicks: 3.4, segs: 90, body: '#f2c27a', rim: '#a8682a', shine: '#fff4dc', hot: '#ffb04a', strand: '#ffd08a' },
-    hitCol: '#ffc070', linger: 10,
-    draw(r, k) {
-      const P = this.P, m = k.m, s = k.s;
-      const fade = r.state === 2 ? 1 - r.dead / this.linger : 1;
+    id: 'braid', name: 'Braided Pair', family: 'Cannon', now: 'cannon', impact: 'sheet',
+    desc: 'Two rounds spiral round each other, then close in and fuse into one heavy slug for the last stretch.',
+    def: { spd: 46, dmg: 70, rate: 1.2 },
+    P: { amp: 7, pitch: 40, merge: 150, mergeLen: 70, trailTicks: 5, segs: 64, a: '#ffc46a', b: '#ffe9b8', slug: '#fff4dc', hot: '#ffb04a' },
+    linger: 12,
+    spawn(r, k, L) {
+      r.y = L.y + (hash(r.n * 2.3) - 0.5) * 2 * L.jit;
+      r.a = Math.max(r.range * 0.45, r.range - this.P.merge * Math.sqrt(k.m) - this.P.mergeLen); // where the strands start to close
+    },
+    amp(k, L) { return Math.min(this.P.amp * Math.sqrt(k.m), L.vspace * 0.8); },
+    env(s, r) { return Math.min(1, s / 40) * (1 - sstep((s - r.a) / this.P.mergeLen)); },
+    update(r, k, L) {
+      if (r.ev & 1 || r.dist < r.a + this.P.mergeLen) return;
+      r.ev |= 1; const m = k.m; // fused: a flash and a pair of sparks thrown sideways
+      emit(L, 3, r.x, r.y, 0, 0, 6, 5 * m, 0, '#ffffff', 1);
+      emit(L, 2, r.x, r.y, 0, 0, 14, 18 * m, 0, this.P.hot, 0.8);
+      for (let i = -1; i <= 1; i += 2) emit(L, 1, r.x, r.y, r.vx * 0.2, i * 2.4 * Math.sqrt(m), 10, 1, 0, '#ffd9a0', 0.9);
+    },
+    draw(r, k, L) {
+      const P = this.P, m = k.m, A = this.amp(k, L), pitch = P.pitch * k.s * (0.8 + 0.2 * m);
+      const fade = r.state === 2 ? Math.max(0, 1 - r.dead / 12) : 1;
       const T = Math.min(r.dist, k.spd * P.trailTicks * (0.7 + 0.3 * m)) * fade;
-      const pitch = P.pitch * s * (0.8 + 0.2 * m), amp = P.amp * Math.pow(m, 0.8);
+      const ux = Math.cos(r.hd), uy = Math.sin(r.hd), w = 1.2 * Math.sqrt(m);
       toWorld(); ADD();
-      seg(r.x - T * 0.6, r.y, r.x, r.y, 4 * m, P.hot, 0.1 * fade);
-      const N = Math.max(8, Math.min(P.segs, Math.ceil(T / (pitch / 9)))), w = 1.1 * Math.sqrt(m);
-      let px = r.x, pa = r.y, pb = r.y;
-      for (let i = 1; i <= N; i++) {
-        const d = T * i / N, ph = (r.dist - d) / pitch * TAU;
-        const a = amp * Math.min(1, 0.25 + d / (amp * 5)), sv = Math.sin(ph) * a;
-        const x = r.x - d, ya = r.y + sv, yb = r.y - sv, f = (1 - i / N) * fade, front = Math.cos(ph) > 0;
-        seg(px, pa, x, ya, w, P.strand, f * (front ? 0.85 : 0.3));
-        seg(px, pb, x, yb, w, P.strand, f * (front ? 0.3 : 0.85));
-        px = x; pa = ya; pb = yb;
+      const N = clamp(Math.ceil(T / (pitch / 10)), 8, P.segs);
+      let pax = 0, pay = 0, pbx = 0, pby = 0;
+      for (let i = 0; i <= N; i++) {
+        const d = T * i / N, s = r.dist - d, e = this.env(s, r), ph = s / pitch * TAU + r.seed * TAU, o = A * e * Math.sin(ph);
+        const cx = r.x - ux * d, cy = r.y - uy * d, ax = cx - uy * o, ay = cy + ux * o, bx = cx + uy * o, by = cy - ux * o;
+        if (i > 0) {
+          const f = (1 - i / N) * fade, front = Math.cos(ph) > 0;
+          seg(pax, pay, ax, ay, w, P.a, f * (front ? 0.9 : 0.35));
+          seg(pbx, pby, bx, by, w, P.b, f * (front ? 0.35 : 0.9));
+          if (e < 0.3) seg(pax, pay, ax, ay, w * 2.8, P.hot, f * 0.3 * (1 - e / 0.3));
+        }
+        pax = ax; pay = ay; pbx = bx; pby = by;
       }
       if (r.state !== 1) return;
-      const L = P.len * m * (0.85 + 0.2 * s), W = P.wid * m;
-      glow(P.hot, r.x, r.y, 11 * m, 0.4);
-      toLocal(r.x, r.y, r.hd, 1); NORM();
+      const s = r.dist, e = this.env(s, r), ph = s / pitch * TAU + r.seed * TAU, o = A * e * Math.sin(ph);
+      if (!(r.ev & 1)) {
+        const sz = 0.72 * Math.pow(m, 0.7), heat = 1 - e, frontA = Math.cos(ph) > 0;
+        for (let q = 0; q < 2; q++) { // the round behind first
+          const isA = (q === 0) !== frontA, sg = isA ? 1 : -1;
+          slug(r.x - uy * o * sg, r.y + ux * o * sg, r.hd, 9 * sz * (0.85 + 0.2 * k.s), 3.6 * sz, isA ? P.a : P.b, P.slug, P.hot, (8 + 9 * heat) * sz, 0.3 + 0.45 * heat);
+        }
+      } else {
+        const L2 = 13 * Math.pow(m, 0.75) * (0.85 + 0.2 * k.s), W2 = 5.4 * Math.pow(m, 0.75);
+        toWorld(); seg(r.x - ux * L2 * 2.2, r.y - uy * L2 * 2.2, r.x, r.y, W2 * 0.9, P.hot, 0.35);
+        slug(r.x, r.y, r.hd, L2, W2, P.a, P.slug, P.hot, 17 * Math.pow(m, 0.75), 0.6);
+      }
+    },
+  },
+  {
+    id: 'skip', name: 'Skipping Round', family: 'Autocannon', now: 'autocannon', impact: 'glint',
+    desc: 'A hard slug that glances off a surface it meets at a shallow angle and flies on, tumbling. Head-on, it stops.',
+    def: { spd: 62, dmg: 24, rate: 2.5 },
+    P: { len: 9, wid: 3.4, skipCos: 0.62, keep: 0.8, share: 0.5, tracer: 2.4, spin: 0.45, body: '#f0d6a6', rim: '#a8682a', hot: '#ffb04a', core: '#fff4e0' },
+    lineWall: 1.0, // the lineup's plate is tilted so this row's rounds skim it
+    aimDY(L) { return L.deckDY; },
+    spawn(r, k, L) { r.y = L.y + L.deckDY + (hash(r.n * 1.9) - 0.5) * 0.8 * L.jit; },
+    onHit(r, k, L, hw) {
+      const P = this.P;
+      if (r.ev & 1 || hw.cos >= P.skipCos) return 0;
+      impact(L, r, hw, k.dmg * P.share);
+      const dn = hw.dx * hw.nx + hw.dy * hw.ny, rx = hw.dx - 2 * dn * hw.nx, ry = hw.dy - 2 * dn * hw.ny;
+      r.ev |= 1; r.a = r.dist; r.b = r.hd; r.kx = hw.x; r.ky = hw.y; r.dm = 1 - P.share;
+      r.x = hw.x + hw.nx * 0.6; r.y = hw.y + hw.ny * 0.6;
+      setVel(r, Math.atan2(ry, rx), r.v * P.keep * (0.75 + 0.25 * (1 - hw.cos)));
+      for (let i = 0; i < 5; i++) { const a = Math.atan2(ry, rx) + (hash(r.n + i * 3.3) - 0.5) * 0.8, v = 2 + 3 * hash(r.n * 2 + i); emit(L, 1, hw.x, hw.y, Math.cos(a) * v, Math.sin(a) * v, 9 + 5 * hash(i), 1, 0, '#ffe0b0', 0.9); }
+      return 1;
+    },
+    update(r, k, L, dt) { // after a skip it sheds sparks for a moment
+      if (!(r.ev & 1) || r.dist - r.a > 420) return;
+      r.acc += dt;
+      if (r.acc >= 2) { r.acc = 0; emit(L, 1, r.x, r.y, -r.vx * 0.08 + (hash(r.t) - 0.5) * 1.5, -r.vy * 0.08 + (hash(r.t + 3) - 0.5) * 1.5, 10, 1, 0, '#ffd9a0', 0.9); }
+    },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.85), Ltr = k.spd * P.tracer * (0.6 + 0.4 * k.s), skipped = r.ev & 1;
+      const leg = skipped ? r.dist - r.a : r.dist, l1 = Math.min(leg, Ltr), ux = Math.cos(r.hd), uy = Math.sin(r.hd);
+      toWorld(); ADD();
+      seg(r.x - ux * l1, r.y - uy * l1, r.x, r.y, 5 * m, P.hot, 0.28);
+      seg(r.x - ux * l1, r.y - uy * l1, r.x, r.y, 1.6 * Math.sqrt(m), P.core, 0.85);
+      if (skipped) { // the bent tracer: what's left of it still runs back along the way in
+        if (leg < Ltr) {
+          const l2 = Math.min(Ltr - leg, r.a), bx = Math.cos(r.b), by = Math.sin(r.b), f = 1 - leg / Ltr;
+          seg(r.kx - bx * l2, r.ky - by * l2, r.kx, r.ky, 5 * m, P.hot, 0.28 * f);
+          seg(r.kx - bx * l2, r.ky - by * l2, r.kx, r.ky, 1.6 * Math.sqrt(m), P.core, 0.85 * f);
+        }
+        glow(P.hot, r.kx, r.ky, 10 * m, 0.6 * Math.max(0, 1 - leg / Math.max(1, r.v) / 14));
+      }
+      const L0 = P.len * m * (0.85 + 0.2 * k.s), W = P.wid * m, ang = skipped ? r.b + r.t * P.spin * (REDUCE ? 0.3 : 1) : r.hd;
+      glow(P.hot, r.x, r.y, (skipped ? 12 : 9) * m, 0.4);
+      toLocal(r.x, r.y, ang, 1); NORM();
       ctx.beginPath();
-      ctx.moveTo(L * 0.5, 0);
-      ctx.quadraticCurveTo(L * 0.22, -W * 0.5, -L * 0.1, -W * 0.5);
-      ctx.lineTo(-L * 0.5, -W * 0.45); ctx.lineTo(-L * 0.5, W * 0.45); ctx.lineTo(-L * 0.1, W * 0.5);
-      ctx.quadraticCurveTo(L * 0.22, W * 0.5, L * 0.5, 0);
+      ctx.moveTo(L0 * 0.5, 0);
+      ctx.quadraticCurveTo(L0 * 0.22, -W * 0.5, -L0 * 0.1, -W * 0.5);
+      ctx.lineTo(-L0 * 0.5, -W * 0.45); ctx.lineTo(-L0 * 0.5, W * 0.45); ctx.lineTo(-L0 * 0.1, W * 0.5);
+      ctx.quadraticCurveTo(L0 * 0.22, W * 0.5, L0 * 0.5, 0);
       ctx.closePath();
       fillPath(P.rim, 1);
-      // (the spin: a shine band rolling across the body, and a rifling band round its waist)
-      const spin = r.dist / pitch * TAU, hv = Math.sin(spin) * W * 0.28;
-      seg(-L * 0.45, hv, L * 0.28, hv * 0.5, W * 0.32, P.body, 0.75);
-      seg(-L * 0.4, hv, L * 0.2, hv * 0.5, W * 0.12, P.shine, 0.5 + 0.5 * Math.cos(spin));
-      seg(-L * 0.22, -W * 0.48, -L * 0.22, W * 0.48, Math.max(0.6, L * 0.07), P.rim, 1);
-      ADD(); glow(P.shine, -L * 0.5, 0, W * 0.9, 0.6);
+      seg(-L0 * 0.42, 0, L0 * 0.3, 0, W * 0.35, skipped ? '#ffd28a' : P.body, 0.9);
+      ADD(); glow(P.core, L0 * 0.3, 0, W * 0.8, skipped ? 0.9 : 0.5);
     },
   },
   {
-    id: 'chevron', name: 'Chevron Bolts', family: 'Autocannon', now: 'autocannon',
-    desc: 'Small arrowheads with two ghost copies; every third is a bright tracer. Narrows as it gets faster.',
-    def: { spd: 62, dmg: 11, rate: 4 },
-    P: { size: 5.5, ghosts: 2, gapTicks: 0.35, spread: 0.022, accent: 3, col: '#ffd9a0', glowC: '#ffa040', core: '#fff4e0' },
-    hitCol: '#ffd9a0', linger: 0,
-    spawn(r) { r.hd = (hash(r.n * 1.7 + 3) - 0.5) * 2 * this.P.spread; },
-    draw(r, k) {
-      if (r.state !== 1) return;
-      const P = this.P, m = Math.pow(k.m, 0.85), S = P.size * m, wing = S * 0.75 / (0.6 + 0.4 * k.s);
-      const bright = r.n % P.accent === 0, w = (bright ? 1.9 : 1.4) * Math.pow(m, 0.6);
-      toLocal(r.x, r.y, r.hd, 1); ADD();
-      const back = Math.min(r.dist, k.spd * P.gapTicks);
-      for (let g = P.ghosts; g >= 0; g--) {
-        const ox = -back * g, sc = Math.pow(0.82, g), a = (g === 0 ? 1 : 0.38 / g) * (bright ? 1 : 0.7);
-        ctx.beginPath();
-        ctx.moveTo(ox - S * 0.6 * sc, -wing * sc); ctx.lineTo(ox + S * 0.4 * sc, 0); ctx.lineTo(ox - S * 0.6 * sc, wing * sc);
-        ctx.globalAlpha = a * 0.35; ctx.strokeStyle = P.glowC; ctx.lineWidth = w * 3; ctx.stroke();
-        ctx.globalAlpha = a; ctx.strokeStyle = g === 0 ? P.core : P.col; ctx.lineWidth = w; ctx.stroke();
-      }
-      glow(P.glowC, S * 0.1, 0, S * (bright ? 2.4 : 1.6), bright ? 0.5 : 0.3);
-    },
-  },
-  {
-    id: 'teardrop', name: 'Plasma Teardrop', family: 'Pulse laser', now: 'pulse',
-    desc: 'A bright plasma drop with a tail that wobbles and pulls longer the faster it flies.',
-    def: { spd: 84, dmg: 14, rate: 4 },
-    P: { r: 3.4, tail: 3.2, wob: 0.6, wobRate: 0.45, throb: 0.08, outer: '#ff4fa3', mid: '#ff8cc6', core: '#fff0f8' },
-    hitCol: '#ffb0d8', linger: 0,
-    draw(r, k) {
-      if (r.state !== 1) return;
-      const P = this.P, R = P.r * Math.pow(k.m, 0.8), Lt = Math.min(R * (1.6 + P.tail * k.s), r.dist + R);
-      const wob = Math.sin(r.t * P.wobRate * (REDUCE ? 0.3 : 1) + r.seed * TAU) * R * P.wob;
-      const th = 1 + P.throb * Math.sin(r.t * 0.9);
-      toLocal(r.x, r.y, r.hd, 1); ADD();
-      glow(P.outer, 0, 0, R * 4.5, 0.32);
-      tearPath(R * 1.55, Lt * 1.15, wob * 1.25); fillPath(P.outer, 0.32);
-      tearPath(R * th, Lt, wob); fillPath(P.mid, 0.7);
-      tearPath(R * 0.55, Lt * 0.55, wob * 0.5); fillPath(P.core, 0.95);
-    },
-  },
-  {
-    id: 'needle', name: 'Rail Needle', family: 'Railgun', now: 'railgun',
-    desc: 'A hairline needle with a star at its tip, leaving a shimmering heat wake and sparkles that hang behind.',
-    def: { spd: 150, dmg: 60, rate: 1.2 },
-    P: { len: 16, w: 1.3, wakeTicks: 4, sparkGap: 34, sparkLife: 28, core: '#ffffff', glowC: '#8fd0ff', haze: '#bfe6ff', spark: '#e8f8ff' },
-    hitCol: '#d8f6ff', linger: 34,
-    draw(r, k) {
-      const P = this.P, m = k.m, fs = r.state === 2 ? Math.max(0, 1 - r.dead / 22) : 1;
-      toWorld(); ADD();
-      // Heat shimmer: three wavy lines widening behind, drawn in four chunks fading back
-      const Tw = Math.min(r.dist, k.spd * P.wakeTicks * (0.6 + 0.4 * m));
-      if (fs > 0) for (let j = 0; j < 3; j++) {
-        for (let c = 0; c < 4; c++) {
-          ctx.beginPath();
-          for (let i = 0; i <= 12; i++) {
-            const d = Tw * (c * 12 + i) / 48, dc = Math.min(d, 260);
-            const y = r.y + (j - 1) * (0.6 + dc * 0.022) * m + Math.sin(d * 0.07 - r.t * (REDUCE ? 0.1 : 0.55) + j * 2.1) * (0.4 + dc * 0.009) * m;
-            if (i === 0) ctx.moveTo(r.x - d, y); else ctx.lineTo(r.x - d, y);
-          }
-          ctx.globalAlpha = 0.16 * fs * (1 - c / 4); ctx.strokeStyle = j === 1 ? P.haze : P.glowC; ctx.lineWidth = (j === 1 ? 1.6 : 0.9) * Math.sqrt(m); ctx.stroke();
-        }
-      }
-      // Sparkles: fixed points along the track that flare as the needle passes and fade after
-      const gap = P.sparkGap, last = Math.floor(r.dist / gap), first = Math.max(0, last - 14);
-      for (let q = first; q <= last; q++) {
-        const h1 = hash(q * 3.1 + r.n * 17.3), h2 = hash(q * 7.7 + r.n * 5.9);
-        const dk = (q + h1) * gap;
-        if (dk > r.dist) continue;
-        const age = r.t - dk / Math.max(1, k.spd);
-        const f = age / P.sparkLife;
-        if (f < 0 || f >= 1) continue;
-        const sz = (1 - f) * (1.8 + h2 * 2.2) * Math.sqrt(m), x = r.sx + dk, y = r.sy + (h2 - 0.5) * 6 * m + (h2 - 0.5) * f * 4;
-        const tw = REDUCE ? 1 : 0.7 + 0.3 * Math.sin(age * 0.9 + q);
-        seg(x - sz * 1.6, y, x + sz * 1.6, y, 0.7, P.spark, (1 - f) * tw);
-        seg(x, y - sz, x, y + sz, 0.7, P.spark, (1 - f) * tw * 0.8);
-        glow(P.glowC, x, y, sz * 2.4, 0.35 * (1 - f));
-      }
-      if (r.state !== 1) return;
-      const L = Math.min(P.len * Math.sqrt(m) * k.s, r.dist + 2);
-      seg(r.x - L * 2.2, r.y, r.x, r.y, P.w * m * 1.2, P.glowC, 0.25);
-      toLocal(r.x, r.y, r.hd, 1);
-      seg(-L, 0, 2, 0, P.w * m * 2.8, P.glowC, 0.45);
-      seg(-L, 0, 2, 0, P.w * Math.sqrt(m), P.core, 1);
-      const st = 4.5 * Math.sqrt(m), sp = REDUCE ? 0.7 : r.t * 0.35;
-      toLocal(r.x + 2, r.y, sp, 1);
-      seg(-st, 0, st, 0, 0.9, P.core, 0.9); seg(0, -st * 0.6, 0, st * 0.6, 0.9, P.core, 0.9);
-      glow(P.core, 0, 0, st * 1.3, 0.7);
-    },
-  },
-  {
-    id: 'canister', name: 'Tumbling Canister', family: 'Flak', now: 'flak',
-    desc: 'A banded canister tumbling end over end; its lamp blinks faster until it bursts short of the target.',
-    def: { spd: 34, dmg: 16, rate: 1.8 },
-    P: { len: 9, wid: 5.4, tumble: 0.2, fuse: 70, body: '#5d6352', cap: '#3d4237', band: '#ff8a3c', lamp: '#ff5a2a', trail: '#ff8a3c', frags: 12 },
-    hitCol: '#ffb070', linger: 0,
-    fuse(r, k) { return Math.max(r.range * 0.45, r.range - this.P.fuse * Math.sqrt(k.m)); },
+    id: 'split', name: 'Splitting Shell', family: 'Flak', now: 'flak', impact: 'crown',
+    desc: 'A shell with a fuse ring that runs down in flight. When it empties, the shell breaks into a fan of sub-rounds that hit across a wide patch.',
+    def: { spd: 34, dmg: 120, rate: 0.8 },
+    P: { fuse: 0.5, subs: 7, fan: 22, gain: 1, subSpd: 1.2, len: 10, wid: 6.5, ring: 10, ticks: 4, body: '#5d6352', cap: '#3d4237', band: '#ff8a3c', lamp: '#ff5a2a', timer: '#ffc080', sub: '#ffd0a0', subGlow: '#ff9a4a' },
+    fuse: true,
+    spawn(r, k, L) { r.y = L.y + (hash(r.n * 1.3) - 0.5) * 0.6 * L.jit; r.fuseAt = r.range * this.P.fuse; },
     burst(r, k, L) {
-      const m = k.m;
-      emit(L, 3, r.x, r.y, 0, 0, 5, 5 * m, 0, '#ffffff', 1);
+      const P = this.P, m = k.m, n = P.subs;
+      emit(L, 3, r.x, r.y, 0, 0, 5, 6 * m, 0, '#ffffff', 1);
       emit(L, 2, r.x, r.y, 0, 0, 12, 22 * m, 0, '#ff9a4a', 0.8);
-      for (let i = 0; i < this.P.frags; i++) {
-        const a = (i / this.P.frags) * TAU + hash(r.n + i) * 0.5, v = (2.5 + hash(i * 3 + r.n) * 3) * Math.sqrt(m);
-        emit(L, 1, r.x, r.y, Math.cos(a) * v, Math.sin(a) * v, 12 + 6 * hash(i), 3, 0, '#ffc080', 0.9);
-      }
       for (let i = 0; i < 3; i++) emit(L, 0, r.x, r.y, (hash(i + r.n) - 0.5) * 0.6, (hash(i * 2 + r.n) - 0.5) * 0.6, 50, 6 * m, 0.15 * m, '#5a5650', 0.35);
-    },
-    draw(r, k) {
-      if (r.state !== 1) return;
-      const P = this.P, m = k.m, L = P.len * Math.pow(m, 0.75), W = P.wid * Math.pow(m, 0.75);
-      toWorld(); ADD();
-      seg(r.x - Math.min(r.dist, k.spd * 1.2), r.y, r.x, r.y, 2 * m, P.trail, 0.22);
-      glow(P.trail, r.x, r.y, 9 * m, 0.2);
-      const ang = r.t * P.tumble / Math.sqrt(m) * (REDUCE ? 0.4 : 1) + r.seed * TAU;
-      toLocal(r.x, r.y, ang, 1); NORM();
-      ctx.globalAlpha = 1; ctx.fillStyle = P.body; ctx.fillRect(-L / 2, -W / 2, L, W);
-      ctx.fillStyle = P.cap; ctx.fillRect(-L / 2, -W / 2, L * 0.14, W); ctx.fillRect(L / 2 - L * 0.14, -W / 2, L * 0.14, W);
-      ctx.fillStyle = P.band; ctx.fillRect(-L * 0.12, -W / 2, L * 0.1, W); ctx.fillRect(L * 0.08, -W / 2, L * 0.1, W);
-      ctx.strokeStyle = '#a3a991'; ctx.lineWidth = 0.6; ctx.strokeRect(-L / 2, -W / 2, L, W);
-      const f = clamp(r.dist / r.fuseAt, 0, 1), period = 22 - 18 * f;
-      const on = REDUCE ? true : (r.t % period) < period * 0.4;
-      ADD();
-      glow(P.lamp, L * 0.42, 0, (on ? 6 : 2) * Math.sqrt(m) * (REDUCE ? 0.5 + f : 1), on ? 0.95 : 0.25);
-      disc('#ffe0c0', L * 0.42, 0, 0.9 * Math.sqrt(m), on ? 1 : 0.3);
-    },
-  },
-  {
-    id: 'shell', name: 'Lobbed Shell', family: 'Mortar', now: 'mortar',
-    desc: 'A fat shell that swells at the top of its arc over its own shadow, trailing a curling smoke ribbon.',
-    def: { spd: 22, dmg: 70, rate: 0.7 },
-    P: { len: 11, wid: 6.5, lob: 0.75, shadow: 14, every: 5, ribbonLife: 90, body: '#c7cc84', band: '#6e7136', nose: '#e6ee9c', fuse: '#ffd070', smoke: '#9a9686' },
-    hitCol: '#f0e0a0', linger: 90, trail: true,
-    update(r) { if (r.dist - r.lastTr >= this.P.every) { pushTrail(r); r.lastTr = r.dist; } },
-    draw(r, k) {
-      const P = this.P, m = k.m;
-      toWorld(); NORM();
-      // Smoke ribbon (oldest first)
-      const n = r.tn;
-      ctx.lineCap = 'butt';
-      for (let i = n - 1; i > 0; i--) {
-        const a = trailAt(r, i), b = trailAt(r, i - 1);
-        const ax = r.tr[a], ay = r.tr[a + 1], at = r.tr[a + 2], bx = r.tr[b], by = r.tr[b + 1], bt = r.tr[b + 2];
-        const age = r.t - at; if (age > P.ribbonLife) continue;
-        const f = 1 - age / P.ribbonLife, ageB = r.t - bt;
-        const dA = Math.sin(at * 0.06 + r.seed * 6) * age * 0.07 * m, dB = Math.sin(bt * 0.06 + r.seed * 6) * ageB * 0.07 * m;
-        seg(ax, ay + dA, bx, by + dB, (2 + age * 0.09) * m, P.smoke, 0.32 * f * f);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + hash(r.n + i); emit(L, 1, r.x, r.y, Math.cos(a) * 2.5, Math.sin(a) * 2.5, 10, 1, 0, '#ffc080', 0.8); }
+      const rem = Math.max(60, L.aimX - r.x), half = Math.min(P.fan * 0.5 * D2R, Math.atan(L.vspace * 1.1 / rem));
+      for (let i = 0; i < n; i++) {
+        const u = n > 1 ? i / (n - 1) - 0.5 : 0;
+        const c = child(L, r, r.hd + u * 2 * half + (hash(r.n * 3 + i) - 0.5) * 0.02, k.spd * P.subSpd * (0.92 + 0.16 * hash(r.n + i * 7)));
+        if (c) { c.sub = i; c.dm = P.gain / n; }
       }
-      ctx.lineCap = 'round';
+    },
+    draw(r, k) {
       if (r.state !== 1) return;
-      const fr = clamp(r.dist / r.range, 0, 1), h = Math.sin(Math.PI * fr), z = 1 + P.lob * h;
-      const L = P.len * Math.pow(m, 0.7) * z, W = P.wid * Math.pow(m, 0.7) * z;
-      disc('#1d232c', r.x + h * P.shadow * m, r.y + h * P.shadow * m * 0.8, W * (0.55 + h * 0.25), 0.9 * (1 - h * 0.35));
-      toLocal(r.x, r.y, r.hd, 1);
-      ctx.beginPath(); ctx.ellipse(0, 0, L / 2, W / 2, 0, 0, TAU); fillPath(P.body, 1);
-      ctx.globalAlpha = 1; ctx.fillStyle = P.band; ctx.fillRect(-L * 0.18, -W * 0.44, L * 0.12, W * 0.88);
-      ctx.beginPath(); ctx.ellipse(L * 0.18, -W * 0.14, L * 0.18, W * 0.14, 0, 0, TAU); fillPath(P.nose, 0.8);
-      ADD(); glow(P.fuse, -L * 0.48, 0, 4 * Math.sqrt(m), 0.55);
+      const P = this.P;
+      if (r.sub >= 0) { // a sub-round: a hot pellet with a short tracer
+        const ms = clamp(Math.pow(k.dmg * r.dm / 18, 0.33), 0.6, 3), back = Math.min(r.dist, r.v * 1.4), ux = Math.cos(r.hd), uy = Math.sin(r.hd);
+        toWorld(); ADD();
+        seg(r.x - ux * back, r.y - uy * back, r.x, r.y, 3.2 * ms, P.subGlow, 0.35);
+        seg(r.x - ux * back, r.y - uy * back, r.x, r.y, 1.3 * ms, P.sub, 0.9);
+        glow(P.subGlow, r.x, r.y, 6 * ms, 0.4); disc('#ffffff', r.x, r.y, 1.3 * ms, 1);
+        return;
+      }
+      const m = k.m, Ls = P.len * Math.pow(m, 0.7), Ws = P.wid * Math.pow(m, 0.7), f = clamp(r.dist / r.fuseAt, 0, 1);
+      const ux = Math.cos(r.hd), uy = Math.sin(r.hd), Rr = P.ring * Math.pow(m, 0.6);
+      toWorld(); ADD();
+      seg(r.x - ux * Math.min(r.dist, k.spd * 1.2), r.y - uy * Math.min(r.dist, k.spd * 1.2), r.x, r.y, 2 * m, P.band, 0.22);
+      // the fuse: a ring that runs down, with tick marks; the shell heats as it nears zero
+      ctx.beginPath(); ctx.arc(r.x, r.y, Rr, 0, TAU); strokePath(P.timer, 0.16, 1);
+      ctx.beginPath(); ctx.arc(r.x, r.y, Rr, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - f), false); strokePath(f > 0.8 ? '#ffffff' : P.timer, 0.9, 1.6 * Math.sqrt(m));
+      for (let q = 0; q < P.ticks; q++) { const a = -Math.PI / 2 + TAU * q / P.ticks, c = Math.cos(a), s = Math.sin(a); seg(r.x + c * Rr * 0.8, r.y + s * Rr * 0.8, r.x + c * Rr * 1.2, r.y + s * Rr * 1.2, 0.8, P.timer, 0.6); }
+      if (f > 0.75) glow(P.band, r.x, r.y, Ws * 3, (f - 0.75) * 2.4);
+      toLocal(r.x, r.y, r.hd, 1); NORM();
+      ctx.beginPath(); ctx.ellipse(0, 0, Ls / 2, Ws / 2, 0, 0, TAU); fillPath(P.body, 1);
+      ctx.globalAlpha = 1; ctx.fillStyle = P.cap; ctx.fillRect(-Ls / 2, -Ws * 0.3, Ls * 0.16, Ws * 0.6);
+      ctx.fillStyle = P.band; ctx.fillRect(-Ls * 0.12, -Ws * 0.46, Ls * 0.1, Ws * 0.92); ctx.fillRect(Ls * 0.08, -Ws * 0.46, Ls * 0.1, Ws * 0.92);
+      const period = 20 - 16 * f, on = REDUCE || (r.t % period) < period * 0.45;
+      ADD(); glow(P.lamp, Ls * 0.4, 0, (on ? 6 : 2) * Math.sqrt(m), on ? 0.95 : 0.25);
     },
   },
   {
-    id: 'dart', name: 'Finned Dart', family: 'Missile', now: 'missile',
-    desc: 'A slim body with tail fins and a flickering exhaust; it ramps up to speed and weaves a little as it steers.',
-    def: { spd: 44, dmg: 30, rate: 0.6 },
-    P: { len: 15, wid: 2.8, fin: 3.8, ramp: 28, start: 0.3, flame: 9, weave: 0.05, puffEvery: 2, body: '#dfe6ee', finC: '#8e98a3', nose: '#ff5a3c', flameC: '#ffb060', flameCore: '#fff2d0', smoke: '#8c8780' },
-    hitCol: '#ffc070', linger: 0,
-    speed(r, k) { return k.spd * (this.P.start + (1 - this.P.start) * Math.min(1, r.t / this.P.ramp)); },
+    id: 'chain', name: 'Chain Bolt', family: 'Arc projector', now: 'arc', impact: 'ripple',
+    desc: 'A crackling bolt. On a hit it jumps as an arc to up to three nearby targets, weaker with each jump.',
+    def: { spd: 90, dmg: 40, rate: 1 },
+    P: { r: 3, jumps: 3, delay: 5, life: 13, falloff: 0.6, jag: 7, forks: 3, core: '#f0fbff', glowC: '#6ac8ff', arc: '#cfeeff' },
+    targets: true,
+    linger(r) { return r.nj * this.P.delay + this.P.life + 2; },
+    spawn(r, k, L) { r.y = L.y + (hash(r.n * 3.7) - 0.5) * 2 * L.jit; },
+    onHit(r, k, L, hw) { // pick the jumps now: nearest target not yet struck, each in reach of the last
+      let px = hw.x, py = hw.y, used = 0; r.nj = 0;
+      for (let j = 0; j < this.P.jumps; j++) {
+        let best = -1, bd = L.reach * L.reach;
+        for (let q = 0; q < L.nT; q++) { if (used & (1 << q)) continue; const dx = L.tX[q] - px, dy = L.tY[q] - py, d2 = dx * dx + dy * dy; if (d2 < bd) { bd = d2; best = q; } }
+        if (best < 0) break;
+        used |= 1 << best; r.jx[r.nj++] = best; px = L.tX[best]; py = L.tY[best];
+      }
+      r.kx = hw.x; r.ky = hw.y;
+      return 0;
+    },
+    after(r, k, L) {
+      const P = this.P;
+      for (let j = 0; j < r.nj; j++) {
+        if (r.ev & (1 << j) || r.dead < j * P.delay + 1) continue;
+        r.ev |= 1 << j;
+        const q = r.jx[j], s = Math.pow(P.falloff, j + 1) * Math.sqrt(k.m), x = L.tX[q], y = L.tY[q];
+        L.tF[q] = 1;
+        emit(L, 3, x, y, 0, 0, 5, 4 * s, 0, '#ffffff', 1);
+        emit(L, 2, x, y, 0, 0, 12, 16 * s, 0, P.glowC, 0.8);
+        for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + hash(r.n + j * 5 + i); emit(L, 1, x, y, Math.cos(a) * 2.2 * s, Math.sin(a) * 2.2 * s, 9, 1, 0, P.arc, 0.9); }
+      }
+    },
+    draw(r, k) {
+      const P = this.P, m = Math.sqrt(k.m);
+      toWorld(); ADD();
+      if (r.state === 2) {
+        let px = r.kx, py = r.ky;
+        for (let j = 0; j < r.nj; j++) {
+          const q = r.jx[j], x = r.lane.tX[q], y = r.lane.tY[q], a = r.dead - j * P.delay;
+          if (a >= 0 && a < P.life) {
+            const f = 1 - a / P.life, fl = REDUCE ? 1 : 0.7 + 0.3 * hash(Math.floor(r.dead / 2) + j * 5 + r.n), fo = Math.pow(P.falloff, j);
+            boltPath(px, py, x, y, r.n * 13 + j * 7 + (REDUCE ? 0 : Math.floor(r.dead / 2)), P.jag * m * (0.6 + 0.4 * fo));
+            strokePath(P.glowC, 0.3 * f * fl, 5 * m * fo); strokePath(P.arc, 0.95 * f * fl, 1.3 * m * (0.5 + 0.5 * fo));
+          }
+          px = x; py = y;
+        }
+        return;
+      }
+      const back = Math.min(r.dist, r.v * 1.6), ux = Math.cos(r.hd), uy = Math.sin(r.hd);
+      seg(r.x - ux * back, r.y - uy * back, r.x, r.y, 4 * m, P.glowC, 0.3);
+      seg(r.x - ux * back * 0.6, r.y - uy * back * 0.6, r.x, r.y, 1.4 * m, P.core, 0.9);
+      glow(P.glowC, r.x, r.y, 12 * m, 0.45);
+      const zt = REDUCE ? 0 : Math.floor(r.t / 3);
+      for (let i = 0; i < P.forks; i++) { // short forks reaching out from the bolt, re-struck every few ticks
+        const a = r.hd + Math.PI * (0.35 + 1.3 * hash(zt * 3.1 + i + r.n)), l = (6 + 7 * hash(zt + i * 9 + r.n)) * m;
+        boltPath(r.x, r.y, r.x + Math.cos(a) * l, r.y + Math.sin(a) * l, zt * 11 + i + r.n, 2 * m);
+        strokePath(P.arc, 0.75, 0.7);
+      }
+      disc(P.core, r.x, r.y, P.r * m, 1);
+    },
+  },
+  {
+    id: 'grav', name: 'Gravity Slug', family: 'Singularity', now: 'emp', impact: 'dome',
+    desc: 'A slow, dense slug. It bends the starlight around it and drags loose debris into its wake as it passes.',
+    def: { spd: 14, dmg: 240, rate: 0.3 },
+    P: { r: 5, disk: 13, lens: 16, reach: 95, pull: 0.6, wake: 0.035, core: '#020306', ring: '#e9e2ff', disk1: '#ffcf9a', disk2: '#b9a6ff', glowC: '#7a5cff' },
+    dust: true,
+    spawn(r, k, L) { r.y = L.y + (hash(r.n * 1.1) - 0.5) * 0.6 * L.jit; },
+    disk(r, D, sp, front, k) {
+      const P = this.P;
+      for (let j = 0; j < 14; j++) {
+        const inner = j >= 8, Dj = inner ? D * 0.62 : D, a0 = r.t * sp * (inner ? 1.7 : 1) + j * TAU / (inner ? 6 : 8), a1 = a0 + 0.42, mid = (a0 + a1) / 2;
+        if ((Math.sin(mid) > 0) !== front) continue;
+        seg(r.x + Math.cos(a0) * Dj, r.y + Math.sin(a0) * Dj * 0.32, r.x + Math.cos(a1) * Dj, r.y + Math.sin(a1) * Dj * 0.32, 1.3 * Math.sqrt(k.m), j % 2 ? P.disk1 : P.disk2, front ? 0.9 : 0.45);
+      }
+    },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.6), R = P.r * m, D = P.disk * m, sp = REDUCE ? 0.03 : 0.11;
+      toWorld(); ADD();
+      seg(r.x - Math.min(r.dist, 70 * m), r.y, r.x, r.y, R * 2.4, P.glowC, 0.1);
+      glow(P.glowC, r.x, r.y, D * 2.4, 0.3);
+      this.disk(r, D, sp, false, k);
+      NORM(); disc(P.core, r.x, r.y, R * 1.25, 1);
+      ADD(); ctx.beginPath(); ctx.arc(r.x, r.y, R * 1.3, 0, TAU); strokePath(P.ring, 0.85, 0.9);
+      ctx.beginPath(); ctx.arc(r.x, r.y, P.lens * Math.sqrt(k.m), 0, TAU); strokePath(P.disk2, 0.12, 1); // where the starlight bends most
+      this.disk(r, D, sp, true, k);
+    },
+  },
+  {
+    id: 'glob', name: 'Molten Glob', family: 'Mortar', now: 'mortar', impact: 'liquid',
+    desc: 'A heavy glob of slag that sags into a shallow arc under its own weight, dripping as it goes, and splashes on the hull.',
+    def: { spd: 20, dmg: 90, rate: 0.7 },
+    P: { r: 6.4, sag: 0.07, drip: 5, wob: 0.16, crust: '#4a1e0c', mid: '#ff8a2a', hot: '#ffd070', core: '#fff3c8' },
+    spawn(r, k, L) { // pick the sag so the arc still lands on the aim point
+      const T = r.range / k.spd, H = Math.min(this.P.sag * r.range, L.vspace * 0.75);
+      r.y = L.y + (hash(r.n * 2.9) - 0.5) * 0.8 * L.jit;
+      r.g = 8 * H / (T * T); r.vx = k.spd; r.vy = -r.g * T / 2;
+    },
     update(r, k, L, dt) {
-      r.hd = Math.sin(r.t * 0.12 + r.seed * TAU) * this.P.weave;
+      r.vy += r.g * dt;
       r.acc += dt;
-      if (r.acc >= this.P.puffEvery) {
-        r.acc = 0;
-        const m = k.m, back = this.P.len * Math.pow(m, 0.7) * 0.55;
-        emit(L, 0, r.x - Math.cos(r.hd) * back, r.y - Math.sin(r.hd) * back, (hash(r.t) - 0.5) * 0.3, (hash(r.t + 9) - 0.5) * 0.3, 44 * (0.7 + 0.3 * m), 2.6 * m, 0.11 * m, this.P.smoke, 0.32);
+      if (r.acc >= this.P.drip) {
+        r.acc = 0; const m = Math.pow(k.m, 0.75);
+        const p = emit(L, 4, r.x - r.vx * 0.5, r.y + this.P.r * m * 1.5, r.vx * 0.25, r.vy * 0.25 + 0.15, 44, 1.3 * Math.sqrt(m), 0, this.P.mid, 0.95);
+        p.g = 0.04 + r.g;
       }
+    },
+    /** Body, hanging belly and the forming drip (fills each), in the round's frame; (gx, gy) is world down */
+    body(R, wob, gx, gy, ph, col, a) {
+      ctx.beginPath(); ctx.ellipse(0, 0, R * (1 + wob), R * (1 - wob), 0, 0, TAU); fillPath(col, a);
+      ctx.beginPath(); ctx.ellipse(gx * R * 0.42, gy * R * 0.42, R * 0.88, R * 0.88 * (1 + wob * 0.5), 0, 0, TAU); fillPath(col, a);
+      const bx = gx * R * 1.1, by = gy * R * 1.1, L = R * (0.25 + 0.9 * ph), w = R * 0.34 * (1 - 0.4 * ph), px = -gy * w, py = gx * w;
+      ctx.beginPath();
+      ctx.moveTo(bx + px - gx * R * 0.35, by + py - gy * R * 0.35);
+      ctx.quadraticCurveTo(bx + px * 0.5, by + py * 0.5, bx + gx * L, by + gy * L);
+      ctx.quadraticCurveTo(bx - px * 0.5, by - py * 0.5, bx - px - gx * R * 0.35, by - py - gy * R * 0.35);
+      ctx.closePath(); fillPath(col, a);
     },
     draw(r, k) {
       if (r.state !== 1) return;
-      const P = this.P, m = Math.pow(k.m, 0.7), L = P.len * m, W = P.wid * m, F = P.fin * m;
-      const fl = P.flame * m * (0.7 + 0.6 * (REDUCE ? 0.5 : hash(Math.floor(r.t * 1.5) + r.n * 13))) * (0.6 + 0.4 * r.v / k.spd);
-      toLocal(r.x, r.y, r.hd, 1); ADD();
-      ctx.beginPath(); ctx.moveTo(-L / 2, -W * 0.42); ctx.lineTo(-L / 2 - fl, 0); ctx.lineTo(-L / 2, W * 0.42); ctx.closePath(); fillPath(P.flameC, 0.75);
-      ctx.beginPath(); ctx.moveTo(-L / 2, -W * 0.22); ctx.lineTo(-L / 2 - fl * 0.55, 0); ctx.lineTo(-L / 2, W * 0.22); ctx.closePath(); fillPath(P.flameCore, 0.95);
-      glow(P.flameC, -L / 2 - fl * 0.3, 0, 7 * m, 0.5);
-      NORM();
-      ctx.beginPath();
-      ctx.moveTo(-L * 0.28, -W / 2); ctx.lineTo(-L * 0.5, -W / 2 - F); ctx.lineTo(-L * 0.5, -W / 2); ctx.closePath();
-      ctx.moveTo(-L * 0.28, W / 2); ctx.lineTo(-L * 0.5, W / 2 + F); ctx.lineTo(-L * 0.5, W / 2); ctx.closePath();
-      ctx.moveTo(L * 0.12, -W / 2); ctx.lineTo(L * 0.02, -W / 2 - F * 0.4); ctx.lineTo(-L * 0.04, -W / 2); ctx.closePath();
-      ctx.moveTo(L * 0.12, W / 2); ctx.lineTo(L * 0.02, W / 2 + F * 0.4); ctx.lineTo(-L * 0.04, W / 2); ctx.closePath();
-      fillPath(P.finC, 1);
-      ctx.beginPath(); ctx.moveTo(-L / 2, -W / 2); ctx.lineTo(L * 0.3, -W / 2); ctx.lineTo(L / 2, 0); ctx.lineTo(L * 0.3, W / 2); ctx.lineTo(-L / 2, W / 2); ctx.closePath();
-      fillPath(P.body, 1);
-      ctx.globalAlpha = 1; ctx.fillStyle = P.nose; ctx.fillRect(L * 0.2, -W / 2, L * 0.08, W);
-    },
-  },
-  {
-    id: 'torpedo', name: 'Wake Torpedo', family: 'Torpedo', now: 'torpedo',
-    desc: 'A long dark hull with glowing seams and a pulsing nose lamp, opening a V-shaped wake behind it.',
-    def: { spd: 10, dmg: 560, rate: 0.33 },
-    P: { len: 28, wid: 7, wakeAng: 0.24, wakeTicks: 16, dots: 22, hull: '#363b42', seam: '#ffa040', lamp: '#ffe0a0', wake: '#ffcf8a', engine: '#ff8a2a' },
-    hitCol: '#ffd08a', linger: 40,
-    draw(r, k) {
-      const P = this.P, m = Math.pow(k.m, 0.7), L = P.len * m, W = P.wid * m;
-      const fs = r.state === 2 ? Math.max(0, 1 - r.dead / this.linger) : 1;
-      const tail = r.state === 1 ? L / 2 : 0;
-      const T = Math.min(Math.max(0, r.dist - tail), Math.max(90, k.spd * P.wakeTicks) * Math.pow(k.m, 0.3));
+      const P = this.P, m = Math.pow(k.m, 0.75), R = P.r * m, wob = REDUCE ? 0 : Math.sin(r.t * 0.35 + r.seed * 6) * P.wob, ph = clamp(r.acc / P.drip, 0, 1);
       toWorld(); ADD();
-      const N = P.dots, tn = Math.tan(P.wakeAng), x0 = r.x - tail;
-      for (let i = 1; i <= N; i++) {
-        const d = T * i / N, sp = W * 0.45 + d * tn, f = (1 - i / N) * fs;
-        const sh = REDUCE ? 0.8 : 0.6 + 0.4 * Math.sin(r.t * 0.25 - i * 0.9), dl = T / N * 0.6, w = (0.8 + d * 0.012) * Math.sqrt(m);
-        seg(x0 - d, r.y - sp, x0 - d - dl, r.y - sp - dl * tn, w, P.wake, 0.5 * f * sh);
-        seg(x0 - d, r.y + sp, x0 - d - dl, r.y + sp + dl * tn, w, P.wake, 0.5 * f * sh);
-        glow(P.wake, x0 - d, r.y + Math.sin(i * 1.3 + r.t * 0.2) * 1.5 * m, 2 + d * 0.06, 0.18 * f);
-      }
-      if (r.state !== 1) return;
-      toLocal(r.x, r.y, r.hd, 1); ADD();
-      glow(P.engine, -L / 2, 0, 11 * m, 0.55);
-      NORM();
-      ctx.beginPath();
-      ctx.moveTo(-L / 2 - W * 0.4, -W * 0.75); ctx.lineTo(-L * 0.32, -W * 0.45); ctx.lineTo(-L * 0.32, W * 0.45); ctx.lineTo(-L / 2 - W * 0.4, W * 0.75); ctx.closePath();
-      fillPath('#262a30', 1);
-      ctx.beginPath();
-      ctx.moveTo(-L / 2, -W / 2); ctx.lineTo(L / 2 - W / 2, -W / 2); ctx.arc(L / 2 - W / 2, 0, W / 2, -Math.PI / 2, Math.PI / 2, false);
-      ctx.lineTo(-L / 2, W / 2); ctx.closePath();
-      fillPath(P.hull, 1);
-      ADD();
-      seg(-L * 0.38, -W * 0.28, L * 0.3, -W * 0.28, 0.7 * m, P.seam, 0.55);
-      seg(-L * 0.38, W * 0.28, L * 0.3, W * 0.28, 0.7 * m, P.seam, 0.55);
-      seg(-L * 0.1, -W * 0.48, -L * 0.1, W * 0.48, 0.8 * m, P.seam, 0.8);
-      seg(L * 0.16, -W * 0.48, L * 0.16, W * 0.48, 0.8 * m, P.seam, 0.8);
-      const pl = REDUCE ? 0.8 : 0.6 + 0.4 * Math.sin(r.t * 0.15);
-      glow(P.lamp, L / 2 - W * 0.3, 0, 5 * m * pl, 0.8);
-      disc('#ffffff', L / 2 - W * 0.3, 0, 1 * m, 0.9);
+      glow(P.mid, r.x, r.y, R * 3.4, 0.35);
+      seg(r.x - r.vx * 2, r.y - r.vy * 2, r.x, r.y, R * 0.9, P.mid, 0.1);
+      toLocal(r.x, r.y, r.hd, 1);
+      const gx = Math.sin(r.hd), gy = Math.cos(r.hd);
+      NORM(); this.body(R * 1.12, wob, gx, gy, ph, P.crust, 1);
+      ADD(); this.body(R * 0.88, wob, gx, gy, ph, P.mid, 0.85);
+      ctx.beginPath(); ctx.ellipse(R * 0.15 - gx * R * 0.12, -gy * R * 0.16, R * 0.45, R * 0.36, 0, 0, TAU); fillPath(P.hot, 0.9);
+      glow(P.core, R * 0.1, -gy * R * 0.1, R * 0.9, 0.7);
     },
   },
   {
-    id: 'halo', name: 'Halo Ring', family: 'EMP', now: 'emp',
-    desc: 'A hollow ring of charge with turning dashes and fading echo rings; the middle is empty.',
-    def: { spd: 30, dmg: 24, rate: 0.5 },
-    P: { r: 8, w: 1.5, dashes: 6, spin: 0.12, ghosts: 3, ghostTicks: 1.4, ring: '#4fc3f7', core: '#e8f7ff', inner: '#9fe0ff' },
-    hitCol: '#d8f4ff', linger: 0,
-    draw(r, k) {
-      if (r.state !== 1) return;
-      const P = this.P, m = Math.pow(k.m, 0.8), R = P.r * m * (REDUCE ? 1 : 1 + 0.07 * Math.sin(r.t * 0.2));
-      const sx = clamp(1 + 0.35 * (k.s - 1), 0.85, 1.8);
-      toLocal(r.x, r.y, r.hd, 1); ADD();
-      for (let g = P.ghosts; g >= 1; g--) {
-        const off = Math.min(r.dist, k.spd * P.ghostTicks * g * 0.6), gr = 1 + 0.14 * g;
-        ctx.beginPath(); ctx.ellipse(-off, 0, R * sx * gr, R * gr, 0, 0, TAU);
-        ctx.globalAlpha = 0.28 / g; ctx.strokeStyle = P.ring; ctx.lineWidth = P.w * m * 0.8; ctx.stroke();
-      }
-      glow(P.ring, 0, 0, R * 2.1, 0.22);
-      ctx.beginPath(); ctx.ellipse(0, 0, R * sx, R, 0, 0, TAU);
-      ctx.globalAlpha = 0.3; ctx.strokeStyle = P.ring; ctx.lineWidth = P.w * m * 3.2; ctx.stroke();
-      ctx.globalAlpha = 0.95; ctx.strokeStyle = P.core; ctx.lineWidth = P.w * m; ctx.stroke();
-      const Rd = R * 1.32, circ = TAU * Rd;
-      DASH[0] = circ / P.dashes * 0.32; DASH[1] = circ / P.dashes * 0.68;
-      toLocal(r.x, r.y, (REDUCE ? 0.2 : 1) * r.t * P.spin + r.seed * TAU, 1);
-      ctx.setLineDash(DASH);
-      ctx.beginPath(); ctx.arc(0, 0, Rd, 0, TAU);
-      ctx.globalAlpha = 0.7; ctx.strokeStyle = P.inner; ctx.lineWidth = P.w * m * 0.9; ctx.stroke();
-      ctx.setLineDash(NO_DASH);
-      disc(P.core, 0, 0, 0.9 * m, 0.6);
+    id: 'lash', name: 'Burning Lash', family: 'Pulse laser', now: 'pulse', impact: 'tongue',
+    desc: 'A bolt that unfurls a burning ribbon behind it. The ribbon hangs in the lane for a moment as a hazard line, then burns out.',
+    def: { spd: 70, dmg: 30, rate: 1.4 },
+    P: { r: 3, width: 3.2, amp: 5, wave: 0.045, unfurl: 7, life: 46, gap: 0.7, sub: 4, core: '#fff0f8', hot: '#ff8cc6', outer: '#ff4fa3', ember: '#ffb0d8' },
+    trail: true,
+    linger() { return this.P.life; },
+    spawn(r, k, L) { r.y = L.y + (hash(r.n * 4.1) - 0.5) * 2 * L.jit; pushTrail(r); r.lastTr = 0; },
+    embers(r, L) { // the odd ember off a point of the ribbon that's still burning
+      if (!r.tn) return;
+      const q = trailAt(r, Math.floor(hash(r.t * 7.1 + r.n) * r.tn)), age = r.t - r.tr[q + 2];
+      if (age > this.P.life * 0.8) return;
+      emit(L, 1, r.tr[q], r.tr[q + 1], (hash(r.t) - 0.5) * 0.8, -0.3 - 0.5 * hash(r.t + 1), 14, 1, 0, this.P.ember, 0.8);
     },
-  },
-  {
-    id: 'motes', name: 'Mote Orb', family: 'Arc projector', now: 'arc',
-    desc: 'A small charged core with motes on tilted orbits; sparks jump from core to mote. Motes stream back when fast.',
-    def: { spd: 110, dmg: 24, rate: 1.3 },
-    P: { r: 3.4, motes: 3, orbit: 8.5, tilt: 0.38, rate: 0.32, tail: 5, zapEvery: 5, core: '#f0fbff', glowC: '#6ac8ff', mote: '#bfe8ff', zap: '#d8f2ff' },
-    hitCol: '#d8f2ff', linger: 0,
+    update(r, k, L, dt) {
+      if (r.dist - r.lastTr >= Math.max(6, k.spd * this.P.gap)) { pushTrail(r); r.lastTr = r.dist; }
+      r.acc += dt; if (r.acc >= 3) { r.acc = 0; this.embers(r, L); }
+    },
+    after(r, k, L, dt) { r.acc += dt; if (r.acc >= 3) { r.acc = 0; this.embers(r, L); } },
     draw(r, k) {
-      if (r.state !== 1) return;
-      const P = this.P, m = Math.pow(k.m, 0.7), R = P.r * m, nm = P.motes + Math.min(3, Math.floor(k.m));
-      const lag = R * 2.2 * Math.max(0, k.s - 0.9), O = P.orbit * Math.pow(k.m, 0.6), rt = REDUCE ? 0.3 : 1;
-      toLocal(r.x, r.y, r.hd, 1); ADD();
-      seg(-Math.min(r.dist, k.spd * 0.8), 0, 0, 0, R * 1.2, P.glowC, 0.18);
-      glow(P.glowC, 0, 0, R * 5, 0.35);
-      for (let j = 0; j < nm; j++) {
-        const pa = j * Math.PI / nm + 0.3, ca = Math.cos(pa), sa = Math.sin(pa), oj = O * (j % 2 ? 1.12 : 0.92);
-        const ph0 = r.t * P.rate * rt * (1 + 0.15 * j) + j * TAU / nm;
-        for (let q = P.tail; q >= 0; q--) {
-          const ph = ph0 - q * 0.2, ex = Math.cos(ph) * oj, ey = Math.sin(ph) * oj * P.tilt;
-          const mx = ex * ca - ey * sa - lag * (0.4 + 0.12 * q), my = ex * sa + ey * ca;
-          const dep = Math.sin(ph) < 0 ? 0.45 : 1, sz = 1.3 * Math.sqrt(m) * (1 - q / (P.tail + 1));
-          disc(P.mote, mx, my, sz, dep * (q === 0 ? 1 : 0.5));
-          if (q === 0) glow(P.glowC, mx, my, sz * 3, 0.4 * dep);
+      const P = this.P, m = Math.pow(k.m, 0.7), nx = -Math.sin(r.hd), ny = Math.cos(r.hd);
+      let c = 0;
+      if (r.state === 1) { LP[0] = r.x; LP[1] = r.y; LP[2] = r.t; c = 1; }
+      for (let i = 0; i < r.tn && c < 72; i++) { const q = trailAt(r, i); LP[c * 3] = r.tr[q]; LP[c * 3 + 1] = r.tr[q + 1]; LP[c * 3 + 2] = r.tr[q + 2]; c++; }
+      toWorld(); ADD();
+      let px = 0, py = 0, ok = false;
+      done: for (let i = 0; i < c - 1; i++) {
+        for (let s = i === 0 ? 0 : 1; s <= P.sub; s++) {
+          const f = s / P.sub, x = LP[i * 3] + (LP[i * 3 + 3] - LP[i * 3]) * f, y = LP[i * 3 + 1] + (LP[i * 3 + 4] - LP[i * 3 + 1]) * f, t = LP[i * 3 + 2] + (LP[i * 3 + 5] - LP[i * 3 + 2]) * f;
+          const age = r.t - t;
+          if (age > P.life) break done;
+          const u = Math.min(1, age / P.unfurl), along = Math.hypot(x - r.sx, y - r.sy), life = 1 - age / P.life;
+          const o = P.amp * m * u * Math.sin(along * P.wave - age * (REDUCE ? 0.05 : 0.2) + r.seed * 6);
+          const qx = x + nx * o, qy = y + ny * o;
+          if (ok) {
+            const tw = 0.35 + 0.65 * Math.abs(Math.cos(along * 0.021 + age * 0.07)), w = P.width * m * u * tw * Math.sqrt(life);
+            const fl = (REDUCE ? 1 : 0.82 + 0.18 * Math.sin(age * 0.9 + along * 0.1)) * life;
+            seg(px, py, qx, qy, w * 3.2 + 1, P.outer, 0.2 * fl);
+            seg(px, py, qx, qy, w + 0.4, P.hot, 0.75 * fl);
+            seg(px, py, qx, qy, w * 0.35 + 0.3, P.core, 0.9 * fl);
+          }
+          px = qx; py = qy; ok = true;
         }
       }
-      disc(P.core, 0, 0, R, 1);
-      glow(P.core, 0, 0, R * 2, 0.6);
-      // A spark to one mote now and then (always the same for a given tick, so it doesn't flicker frame to frame)
-      const zt = Math.floor(r.t / P.zapEvery);
-      if (!REDUCE && hash(zt + r.n * 7) > 0.35) {
-        const j = Math.floor(hash(zt * 3 + r.n) * nm), pa = j * Math.PI / nm + 0.3, oj = O * (j % 2 ? 1.12 : 0.92);
-        const ph = r.t * P.rate * (1 + 0.15 * j) + j * TAU / nm, ex = Math.cos(ph) * oj, ey = Math.sin(ph) * oj * P.tilt;
-        const mx = ex * Math.cos(pa) - ey * Math.sin(pa) - lag * 0.4, my = ex * Math.sin(pa) + ey * Math.cos(pa);
-        ctx.beginPath(); ctx.moveTo(0, 0);
-        for (let i = 1; i < 4; i++) { const f = i / 4, jit = (hash(zt * 11 + i + r.n) - 0.5) * 3 * m; ctx.lineTo(mx * f - my * jit * 0.1, my * f + jit); }
-        ctx.lineTo(mx, my);
-        ctx.globalAlpha = 0.8; ctx.strokeStyle = P.zap; ctx.lineWidth = 0.7; ctx.stroke();
+      if (r.state !== 1) return;
+      glow(P.outer, r.x, r.y, 9 * m, 0.5);
+      seg(r.x - r.vx * 0.8, r.y - r.vy * 0.8, r.x, r.y, 2 * m, P.core, 0.9);
+      disc(P.core, r.x, r.y, P.r * m * 0.8, 1);
+    },
+  },
+  {
+    id: 'swell', name: 'Swelling Charge', family: 'Railgun', now: 'railgun', impact: 'plume',
+    desc: 'Leaves the barrel as a spark and swells as it flies, gathering charge. A long shot hits up to twice as hard as a close one.',
+    def: { spd: 110, dmg: 60, rate: 0.6 },
+    P: { r0: 1.8, grow: 2.2, full: 800, bonus: 1, motes: 9, core: '#ffffff', glowC: '#8fd0ff', ring: '#bfe6ff', mote: '#e8f8ff' },
+    spawn(r, k, L) { r.y = L.y + (hash(r.n * 5.3) - 0.5) * 2 * L.jit; },
+    charge(r) { return Math.min(1, r.dist / this.P.full); },
+    onHit(r) { r.dm = 1 + this.P.bonus * this.charge(r); return 0; },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.sqrt(k.m), f = this.charge(r), R = P.r0 * m * (1 + P.grow * f), st = clamp(1 + 0.35 * (k.s - 1), 0.85, 2);
+      const back = Math.min(r.dist, r.v * 1.5), ux = Math.cos(r.hd), uy = Math.sin(r.hd);
+      toWorld(); ADD();
+      seg(r.x - ux * back, r.y - uy * back, r.x, r.y, R * 1.4, P.glowC, 0.25 + 0.2 * f);
+      seg(r.x - ux * back, r.y - uy * back, r.x, r.y, R * 0.45, P.core, 0.7);
+      toLocal(r.x, r.y, r.hd, 1);
+      glow(P.glowC, 0, 0, R * (4 + 2 * f), 0.35 + 0.25 * f);
+      const shells = 1 + Math.floor(f * 2.99);
+      for (let q = 0; q < shells; q++) {
+        const rr = R * (1.35 + 0.45 * q) * (REDUCE ? 1 : 1 + 0.05 * Math.sin(r.t * 0.4 + q));
+        ctx.beginPath(); ctx.ellipse(-R * 0.2 * q, 0, rr * st, rr, 0, 0, TAU); strokePath(P.ring, 0.5 / (q + 1), 0.8);
+      }
+      for (let j = 0; j < P.motes; j++) { // charge streaming in from round about
+        const ph = (r.t * (REDUCE ? 0.015 : 0.05) + j / P.motes) % 1, rad = R * (1.2 + 3.4 * (1 - ph)), a = j * 2.399 + r.t * 0.07;
+        const x = Math.cos(a) * rad * st - (1 - ph) * R * 1.5 * (st - 0.8), y = Math.sin(a) * rad;
+        seg(x, y, x * 0.8, y * 0.8, 0.8, P.mote, ph * (0.3 + 0.7 * f));
+      }
+      disc(P.glowC, 0, 0, R, 0.9); disc(P.core, 0, 0, R * 0.6, 1);
+    },
+  },
+  {
+    id: 'phase', name: 'Phase Round', family: 'Phase cannon (legendary)', now: 'phase', impact: 'smear',
+    desc: 'Blinks between solid and ghost every few ticks. A ghost slips into the plating and lands a beat later, from inside.',
+    def: { spd: 60, dmg: 90, rate: 0.6 },
+    P: { half: 6, len: 13, wid: 4.2, echo: 6, sink: 0.45, body: '#8b5cf6', edge: '#f5f3ff', glowC: '#a78bfa', ghostA: '#c4b5fd', ghostB: '#7fd6fa' },
+    spawn(r, k, L) { r.y = L.y + (hash(r.n * 6.7) - 0.5) * 2 * L.jit; },
+    solid(r, t) { return (Math.floor(t / this.P.half + r.seed * 2) & 1) === 0; },
+    onHit(r, k, L, hw) {
+      if (this.solid(r, r.t)) return 0;
+      copyHW(r.hw, hw); r.inside = 1; r.c = r.t; // a ghost: through the skin, it lands when it turns solid
+      return 1;
+    },
+    update(r, k, L, dt) {
+      if (!r.inside) return;
+      const d = Math.pow(this.P.sink, dt); r.vx *= d; r.vy *= d;
+      if (this.solid(r, r.t) || r.t - r.c > this.P.half * 2) {
+        impact(L, r, r.hw, k.dmg * r.dm);
+        emit(L, 2, r.x, r.y, 0, 0, 12, 12 * Math.sqrt(k.m), 0, this.P.glowC, 0.8);
+        emit(L, 3, r.x, r.y, 0, 0, 6, 4 * Math.sqrt(k.m), 0, '#ffffff', 0.9);
+        spend(r);
+      }
+    },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.75), Ls = P.len * m * (0.8 + 0.25 * k.s), W = P.wid * m, ux = Math.cos(r.hd), uy = Math.sin(r.hd);
+      const sol = this.solid(r, r.t), into = (r.t / P.half + r.seed * 2) % 1, fl = sol && into < 0.25 ? 1 - into / 0.25 : 0;
+      toWorld(); ADD();
+      if (!r.inside) for (let j = 1; j <= P.echo * 2; j++) { // the trail, solid where it was solid and dotted where it was a ghost
+        const t0 = r.t - j * 1.5, d0 = (r.t - t0) * r.v, d1 = d0 - 1.5 * r.v;
+        if (t0 < 0 || d0 > r.dist) break;
+        const fa = 1 - j / (P.echo * 2 + 1), s = this.solid(r, t0 + 0.75);
+        if (s) seg(r.x - ux * d0, r.y - uy * d0, r.x - ux * d1, r.y - uy * d1, 2.2 * m, P.body, fa * 0.7);
+        else disc(P.ghostA, r.x - ux * (d0 + d1) / 2, r.y - uy * (d0 + d1) / 2, 1.1 * m, fa * 0.5);
+      }
+      toLocal(r.x, r.y, r.hd, 1);
+      if (sol && !r.inside) {
+        glow(P.glowC, 0, 0, Ls * 1.6, 0.4 + 0.4 * fl);
+        lensPath(Ls, W, 0); fillPath(P.body, 0.95); strokePath(P.edge, 1, 1.1 * Math.sqrt(k.m));
+        glow(P.edge, Ls * 0.3, 0, W * 1.2, 0.5 + 0.5 * fl);
+      } else {
+        const j = REDUCE ? 0.8 : 1.6 * Math.sqrt(m);
+        lensPath(Ls, W, j); strokePath(P.ghostA, r.inside ? 0.3 : 0.5, 0.8);
+        lensPath(Ls, W, -j); strokePath(P.ghostB, r.inside ? 0.25 : 0.4, 0.8);
+        lensPath(Ls, W, 0); fillPath(P.body, 0.14);
+        if (r.inside) glow(P.edge, 0, 0, W * 3, 0.25 + 0.5 * clamp((r.t - r.c) / P.half, 0, 1));
       }
     },
   },
   {
-    id: 'crescent', name: 'Crescent Blade', family: 'Phase cannon (legendary)', now: 'phase',
-    desc: 'A violet crescent edge-first, with echo crescents behind; it sweeps back narrower when fast.',
-    def: { spd: 60, dmg: 90, rate: 0.5 },
-    P: { r: 9, thick: 0.42, arc: 1.25, echoes: 3, echoTicks: 0.7, edge: '#f5f3ff', body: '#8b5cf6', glowC: '#a78bfa' },
-    hitCol: '#ddd6fe', linger: 0,
+    id: 'swarm', name: 'Seeker Swarm', family: 'Missile', now: 'missile', impact: 'petal',
+    desc: 'A volley of six small darts that fan out, weave, and close on the target together, landing in a tight cluster.',
+    def: { spd: 30, dmg: 16, rate: 0.5 },
+    P: { darts: 6, fan: 110, ramp: 20, start: 0.35, turn: 0.06, weave: 0.6, weaveRate: 0.2, spread: 6, len: 8, wid: 2, fin: 2.4, flame: 6, puff: 3, body: '#dfe6ee', finC: '#8e98a3', nose: '#ff5a3c', flameC: '#ffb060', flameCore: '#fff2d0', smoke: '#8c8780' },
+    group: true,
+    spawn(r, k, L) {
+      const n = this.P.darts;
+      r.grp = r.n; this.arm(r, 0, k, L);
+      for (let i = 1; i < n; i++) { const c = child(L, r, 0, 0); if (c) { c.grp = r.n; this.arm(c, i, k, L); } }
+    },
+    arm(r, i, k, L) {
+      const P = this.P, u = i / (P.darts - 1) - 0.5;
+      r.sub = i; r.b = u * 2 * P.spread * L.vs; // aim offset: they land in a tight cluster
+      setVel(r, u * P.fan * D2R * Math.min(1, L.vspace / 60), k.spd * P.start);
+    },
+    update(r, k, L, dt) {
+      const P = this.P, tx = L.aimX, ty = L.y + r.b, dx = tx - r.x, dy = ty - r.y, d = r.a;
+      let diff = Math.atan2(dy, dx) - r.hd;
+      diff -= TAU * Math.round(diff / TAU);
+      const turn = P.turn * (0.5 + 1.5 * Math.min(1, r.t / 30)) * dt;
+      let hd = r.hd + clamp(diff, -turn, turn);
+      hd += Math.cos(r.t * P.weaveRate + r.sub * 1.7) * P.weave * P.weaveRate * dt * Math.min(1, d / (r.range * 0.5)) * Math.min(1, L.vspace / 40);
+      const g = r.grp & 31, mean = GC[g] ? GS[g] / GC[g] : d; // the ones further out fly faster, so they arrive together
+      const v = k.spd * (P.start + (1 - P.start) * Math.min(1, r.t / P.ramp)) * clamp(d / Math.max(1, mean), 0.75, 1.3);
+      setVel(r, hd, v);
+      r.acc += dt;
+      if (r.acc >= P.puff) { r.acc = 0; const m = Math.pow(k.m, 0.7); emit(L, 0, r.x - Math.cos(hd) * 5 * m, r.y - Math.sin(hd) * 5 * m, (hash(r.t) - 0.5) * 0.3, (hash(r.t + 9) - 0.5) * 0.3, 40, 2.2 * m, 0.1 * m, P.smoke, 0.3); }
+    },
     draw(r, k) {
       if (r.state !== 1) return;
-      const P = this.P, R = P.r * Math.pow(k.m, 0.75), half = P.arc / (0.75 + 0.25 * k.s), d = R * P.thick;
-      const ang = r.hd + (REDUCE ? 0 : Math.sin(r.t * 0.2 + r.seed * 6) * 0.06);
-      toLocal(r.x, r.y, ang, 1); ADD();
-      for (let e = P.echoes; e >= 1; e--) {
-        const off = Math.min(r.dist, k.spd * P.echoTicks * e * 0.55);
-        crescentPath(R * (1 + 0.08 * e), half, d, -off - R * 0.55);
-        fillPath(P.body, 0.32 / e);
-      }
-      glow(P.glowC, 0, 0, R * 2.3, 0.32);
-      crescentPath(R, half, d, -R * 0.55); fillPath(P.body, 0.9);
-      ctx.beginPath(); ctx.arc(-R * 0.55, 0, R, -half, half, false);
-      ctx.globalAlpha = 1; ctx.strokeStyle = P.edge; ctx.lineWidth = 1.3 * Math.sqrt(k.m); ctx.stroke();
-      glow(P.edge, R * 0.45, 0, R * 0.7, 0.5);
+      const P = this.P, m = Math.pow(k.m, 0.7), Ld = P.len * m, W = P.wid * m, F = P.fin * m;
+      const fl = P.flame * m * (0.7 + 0.6 * (REDUCE ? 0.5 : hash(Math.floor(r.t * 1.5) + r.n * 13))) * (0.5 + 0.5 * r.v / k.spd);
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      ctx.beginPath(); ctx.moveTo(-Ld / 2, -W * 0.42); ctx.lineTo(-Ld / 2 - fl, 0); ctx.lineTo(-Ld / 2, W * 0.42); ctx.closePath(); fillPath(P.flameC, 0.75);
+      ctx.beginPath(); ctx.moveTo(-Ld / 2, -W * 0.22); ctx.lineTo(-Ld / 2 - fl * 0.55, 0); ctx.lineTo(-Ld / 2, W * 0.22); ctx.closePath(); fillPath(P.flameCore, 0.95);
+      glow(P.flameC, -Ld / 2 - fl * 0.3, 0, 6 * m, 0.5);
+      NORM();
+      ctx.beginPath();
+      ctx.moveTo(-Ld * 0.2, -W / 2); ctx.lineTo(-Ld * 0.5, -W / 2 - F); ctx.lineTo(-Ld * 0.5, -W / 2); ctx.closePath();
+      ctx.moveTo(-Ld * 0.2, W / 2); ctx.lineTo(-Ld * 0.5, W / 2 + F); ctx.lineTo(-Ld * 0.5, W / 2); ctx.closePath();
+      fillPath(P.finC, 1);
+      ctx.beginPath(); ctx.moveTo(-Ld / 2, -W / 2); ctx.lineTo(Ld * 0.25, -W / 2); ctx.lineTo(Ld / 2, 0); ctx.lineTo(Ld * 0.25, W / 2); ctx.lineTo(-Ld / 2, W / 2); ctx.closePath();
+      fillPath(P.body, 1);
+      ctx.globalAlpha = 1; ctx.fillStyle = P.nose; ctx.fillRect(Ld * 0.18, -W / 2, Ld * 0.1, W);
     },
   },
 ];
 
 // ---- The game's current rounds (WEAPON_STYLES in client/src/rendering/weapons/weaponStyles.ts, at shell size 1). ----
 // Drawn as WeaponFx does: a glow line and a core line from the tail (speed × tracerTicks back) to the head, two halo
-// discs in the glow colour and a white head disc, all additive.
+// discs in the glow colour and a white head disc, all additive. They fly straight and hit a plate.
 const NOW = {
   cannon:     { name: 'Cannon',     tracerTicks: 2.2, coreWidth: 2.4, glowWidth: 7,  core: '#fff7e6', glow: '#ffb04a', glowAlpha: 0.34, head: 3,   halo: 10 },
   autocannon: { name: 'Autocannon', tracerTicks: 0.9, coreWidth: 1.6, glowWidth: 5,  core: '#ffe8c0', glow: '#ffa040', glowAlpha: 0.35, head: 3,   halo: 10 },
@@ -615,7 +1777,6 @@ const NOW = {
   flak:       { name: 'Flak',       tracerTicks: 1.2, coreWidth: 3,   glowWidth: 8,  core: '#ffe0b0', glow: '#ff8a3c', glowAlpha: 0.38, head: 3.5, halo: 10 },
   mortar:     { name: 'Mortar',     tracerTicks: 1,   coreWidth: 4,   glowWidth: 9,  core: '#e6ee9c', glow: '#9e9d24', glowAlpha: 0.4,  head: 3,   halo: 10 },
   missile:    { name: 'Missile',    tracerTicks: 0.8, coreWidth: 4,   glowWidth: 10, core: '#dfe6ee', glow: '#ff9a3c', glowAlpha: 0.5,  head: 3,   halo: 12, smoke: '#8c8780' },
-  torpedo:    { name: 'Torpedo',    tracerTicks: 1.2, coreWidth: 6,   glowWidth: 18, core: '#fff3d6', glow: '#ffa040', glowAlpha: 0.5,  head: 3,   halo: 10 },
   emp:        { name: 'EMP',        tracerTicks: 1.5, coreWidth: 0,   glowWidth: 14, core: '#e8f7ff', glow: '#4fc3f7', glowAlpha: 0.3,  head: 6,   halo: 22 },
   arc:        { name: 'Arc',        tracerTicks: 2.8, coreWidth: 2.2, glowWidth: 14, core: '#f0fbff', glow: '#6ac8ff', glowAlpha: 0.6,  head: 3,   halo: 10 },
   phase:      { name: 'Phase',      tracerTicks: 2.6, coreWidth: 4,   glowWidth: 16, core: '#f5f3ff', glow: '#8b5cf6', glowAlpha: 0.5,  head: 6,   halo: 24 },
@@ -624,7 +1785,6 @@ function nowStyle(pair) {
   const c = NOW[pair.now];
   return {
     cur: true, name: c.name, hitCol: c.glow, linger: 0,
-    speed: pair.speed ? pair.speed.bind(pair) : undefined, spawn: pair.spawn ? pair.spawn.bind(pair) : undefined,
     update(r, k, L, dt) {
       if (!c.smoke) return;
       r.acc += dt;
@@ -643,31 +1803,42 @@ function nowStyle(pair) {
     },
   };
 }
-for (const s of STYLES) s.nowStyle = nowStyle(s);
+for (const s of STYLES) { s.nowStyle = nowStyle(s); s.hitCol = s.hitCol || '#ffd9a0'; }
 
 // ===================================================================================================================
 // Simulation: lanes of pooled rounds and particles. Nothing below allocates once running.
 // ===================================================================================================================
-const TRAIL = 48;
+const TRAIL = 64;
+/** A contact with a surface: world point, normal, incoming direction, cos (1 head-on); and the same in the fx frame */
+function HitW() { this.x = 0; this.y = 0; this.nx = -1; this.ny = 0; this.dx = 1; this.dy = 0; this.cos = 1; this.fx = 0; this.fy = 0; this.fnx = 0; this.fny = -1; this.fs = 0; this.fdx = 0; this.fdy = 1; }
+function copyHW(a, b) { a.x = b.x; a.y = b.y; a.nx = b.nx; a.ny = b.ny; a.dx = b.dx; a.dy = b.dy; a.cos = b.cos; a.fx = b.fx; a.fy = b.fy; a.fnx = b.fnx; a.fny = b.fny; a.fs = b.fs; a.fdx = b.fdx; a.fdy = b.fdy; }
 function Round() {
-  this.state = 0; this.x = 0; this.y = 0; this.hd = 0; this.t = 0; this.dist = 0; this.v = 0; this.dead = 0;
-  this.n = 0; this.seed = 0; this.sx = 0; this.sy = 0; this.range = 1; this.fuseAt = 1; this.acc = 0;
+  this.state = 0; this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.v = 0; this.hd = 0; this.t = 0; this.dist = 0; this.dead = 0;
+  this.n = 0; this.seed = 0; this.sx = 0; this.sy = 0; this.range = 1; this.fuseAt = 1e9; this.maxDist = 1e9; this.acc = 0;
+  this.sub = -1; this.grp = 0; this.ev = 0; this.a = 0; this.b = 0; this.c = 0; this.g = 0; this.dm = 1; this.inside = 0; this.kx = 0; this.ky = 0;
+  this.jx = new Int8Array(4); this.nj = 0; this.hw = new HitW(); this.lane = null;
   this.tr = new Float32Array(TRAIL * 3); this.ti = 0; this.tn = 0; this.lastTr = 0;
 }
 function pushTrail(r) { const i = r.ti * 3; r.tr[i] = r.x; r.tr[i + 1] = r.y; r.tr[i + 2] = r.t; r.ti = (r.ti + 1) % TRAIL; if (r.tn < TRAIL) r.tn++; }
 /** Index into r.tr of the i-th newest trail point (0 = newest) */
 function trailAt(r, i) { return ((r.ti - 1 - i + TRAIL * 2) % TRAIL) * 3; }
-function Part() { this.on = false; this.kind = 0; this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.t = 0; this.life = 1; this.size = 1; this.grow = 0; this.col = '#ffffff'; this.a = 1; }
-function Lane(nRounds, nParts) {
-  this.rounds = []; for (let i = 0; i < nRounds; i++) this.rounds.push(new Round());
+function Part() { this.on = false; this.kind = 0; this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.t = 0; this.life = 1; this.size = 1; this.grow = 0; this.g = 0; this.col = '#ffffff'; this.a = 1; }
+const DUST_MAIN = 170, DUST_ROW = 50;
+function Lane(nRounds, nParts, nDust) {
+  this.rounds = []; for (let i = 0; i < nRounds; i++) { const r = new Round(); r.lane = this; this.rounds.push(r); }
   this.parts = []; for (let i = 0; i < nParts; i++) this.parts.push(new Part());
-  this.pi = 0; this.style = null; this.y = 0; this.x0 = 0; this.hullX = 0; this.hullR = 60; this.front = 0;
-  this.hasHull = true; this.cool = 0; this.flash = 0; this.count = 0;
+  this.pi = 0; this.style = null; this.y = 0; this.x0 = 0; this.front = 0; this.aimX = 0; this.hullX = 0; this.hullR = 60;
+  this.hasHull = false; this.fxHull = false; this.fx = null; this.fxAcc = 0; this.plate = false;
+  this.S = 1.5; this.vs = 1; this.Ox = 0; this.Oy = 0; this.jit = 0; this.deckDY = 0; this.vspace = 20; this.wnx = -1; this.wny = 0;
+  this.tX = new Float32Array(3); this.tY = new Float32Array(3); this.tF = new Float32Array(3); this.nT = 0; this.reach = 100; this.droneR = 8;
+  this.dust = new Float32Array(nDust * 6); this.nd = nDust;
+  this.cool = 0; this.flash = 0; this.count = 0;
   this.k = { m: 1, s: 1, spd: 54, dmg: 18, rate: 3 };
 }
 function emit(L, kind, x, y, vx, vy, life, size, grow, col, a) {
   const p = L.parts[L.pi]; L.pi = (L.pi + 1) % L.parts.length;
-  p.on = true; p.kind = kind; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.t = 0; p.life = life; p.size = size; p.grow = grow; p.col = col; p.a = a;
+  p.on = true; p.kind = kind; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.t = 0; p.life = life; p.size = size; p.grow = grow; p.g = 0; p.col = col; p.a = a;
+  return p;
 }
 function setK(k, spd, dmg, rate) {
   k.spd = spd; k.dmg = dmg; k.rate = rate;
@@ -677,70 +1848,175 @@ function setK(k, spd, dmg, rate) {
 function clearLane(L) {
   for (let i = 0; i < L.rounds.length; i++) L.rounds[i].state = 0;
   for (let i = 0; i < L.parts.length; i++) L.parts[i].on = false;
-  L.cool = 0; L.flash = 0; L.count = 0;
+  L.cool = 0; L.flash = 0; L.count = 0; L.tF.fill(0);
+  if (L.fx) L.fx.clear();
 }
-function spawn(L) {
+function setVel(r, hd, v) { r.hd = hd; r.v = v; r.vx = Math.cos(hd) * v; r.vy = Math.sin(hd) * v; }
+/** A free round, or the oldest one (never `keep`) */
+function alloc(L, keep) {
   const R = L.rounds;
-  let r = null, oldest = null;
-  for (let i = 0; i < R.length; i++) { if (R[i].state === 0) { r = R[i]; break; } if (!oldest || R[i].n < oldest.n) oldest = R[i]; }
-  if (!r) r = oldest;
-  const st = L.style;
-  r.state = 1; r.x = L.x0; r.y = L.y; r.sx = r.x; r.sy = r.y; r.hd = 0; r.t = 0; r.dist = 0; r.dead = 0; r.acc = 0;
-  r.n = ++L.count; r.seed = (r.n * 0.618034) % 1; r.ti = 0; r.tn = 0; r.lastTr = -1e9;
-  r.range = Math.max(40, L.front - L.x0); r.fuseAt = r.range;
-  if (st.spawn) st.spawn(r, L.k, L);
-  if (st.fuse) r.fuseAt = st.fuse(r, L.k);
-  r.v = st.speed ? st.speed(r, L.k) : L.k.spd;
-  emit(L, 2, L.x0 + 4, L.y, 0, 0, 5, 7 * Math.sqrt(L.k.m), 0, '#ffd28a', 0.7);
+  let oldest = null;
+  for (let i = 0; i < R.length; i++) { if (R[i].state === 0) return R[i]; if (R[i] !== keep && (!oldest || R[i].n < oldest.n)) oldest = R[i]; }
+  return oldest;
 }
-function hitAt(L, r) {
+function launch(L, r, x, y, hd, v) {
+  r.state = 1; r.x = x; r.y = y; r.sx = x; r.sy = y; setVel(r, hd, v); r.t = 0; r.dist = 0; r.dead = 0; r.acc = 0;
+  r.n = ++L.count; r.seed = (r.n * 0.618034) % 1; r.ti = 0; r.tn = 0; r.lastTr = -1e9;
+  r.range = Math.max(40, L.aimX - x); r.maxDist = r.range * 1.6 + 500; r.fuseAt = 1e9;
+  r.sub = -1; r.grp = 0; r.ev = 0; r.a = r.b = r.c = 0; r.g = 0; r.dm = 1; r.inside = 0; r.nj = 0;
+}
+/** A round launched from parent p's spot (a sub-round, a dart of a volley) */
+function child(L, p, hd, v) {
+  const r = alloc(L, p);
+  if (!r || r === p) return null;
+  launch(L, r, p.x, p.y, hd, v);
+  r.grp = p.grp; r.dm = p.dm;
+  return r;
+}
+function fireLane(L) {
+  const st = L.style, r = alloc(L, null);
+  launch(L, r, L.x0, L.y, 0, L.k.spd);
+  if (st.spawn) { st.spawn(r, L.k, L); r.sy = r.y; r.v = Math.hypot(r.vx, r.vy); r.hd = Math.atan2(r.vy, r.vx); }
+  emit(L, 2, L.x0 + 4, r.y, 0, 0, 5, 7 * Math.sqrt(L.k.m), 0, '#ffd28a', 0.7);
+}
+function spend(r) { r.state = 2; r.dead = 0; }
+const lingerOf = (st, r) => (typeof st.linger === 'function' ? st.linger(r) : st.linger || 0);
+
+// ---- Contact: a lane's surface is the fx hull (main lane) or a flat plate through (front, y) ----
+const RH = { x: 0, y: 0, nx: 0, ny: 0, s: 0 };
+const HWT = new HitW();
+function cast(L, x0, y0, x1, y1, o) {
+  const ex = x1 - x0, ey = y1 - y0, len = Math.hypot(ex, ey);
+  if (len < 1e-6) return false;
+  const dx = ex / len, dy = ey / len;
+  if (L.fxHull) {
+    const S = L.S, fdx = -dy, fdy = dx;
+    if (!raycast(-(y0 - L.Oy) / S, (x0 - L.Ox) / S, fdx, fdy, RH, len / S)) return false;
+    o.fx = RH.x; o.fy = RH.y; o.fnx = RH.nx; o.fny = RH.ny; o.fs = RH.s; o.fdx = fdx; o.fdy = fdy;
+    o.x = L.Ox + RH.y * S; o.y = L.Oy - RH.x * S; o.nx = RH.ny; o.ny = -RH.nx;
+  } else {
+    const nx = L.wnx, ny = L.wny, s0 = (x0 - L.front) * nx + (y0 - L.y) * ny, s1 = (x1 - L.front) * nx + (y1 - L.y) * ny;
+    if (!(s0 > 0 && s1 <= 0)) return false;
+    const u = s0 / (s0 - s1); o.x = x0 + ex * u; o.y = y0 + ey * u; o.nx = nx; o.ny = ny;
+  }
+  o.dx = dx; o.dy = dy; o.cos = Math.max(0, -(dx * o.nx + dy * o.ny));
+  return true;
+}
+// The hit handed to an effect, in the fx frame (as the Impact Lab's fireAt builds it)
+const HH = { x: 0, y: 0, dx: 0, dy: 0, nx: 0, ny: 0, rx: 0, ry: 0, tx: 0, ty: 0, cos: 1, graze: 0, k: 1, dmg: 14, s: 0, sdir: 1 };
+const last = { name: '', dmg: 0, off: 0, dirty: false };
+function impact(L, r, hw, dmg) {
+  if (!L.fx) { hitAt(L, hw.x, hw.y); return; }
+  const h = HH, dx = hw.fdx, dy = hw.fdy;
+  h.x = hw.fx; h.y = hw.fy; h.nx = hw.fnx; h.ny = hw.fny; h.s = hw.fs; h.dx = dx; h.dy = dy;
+  const dn = dx * h.nx + dy * h.ny;
+  h.cos = Math.min(1, Math.max(0, -dn)); h.graze = 1 - h.cos;
+  h.rx = dx - 2 * dn * h.nx; h.ry = dy - 2 * dn * h.ny;
+  let tx = dx - dn * h.nx, ty = dy - dn * h.ny, tl = Math.hypot(tx, ty);
+  if (tl < 1e-3) { tx = -h.ny; ty = h.nx; tl = 1; }
+  h.tx = tx / tl; h.ty = ty / tl;
+  const i = segAt(h.s); h.sdir = (h.tx * SDX[i] + h.ty * SDY[i]) >= 0 ? 1 : -1;
+  h.dmg = dmg; h.k = kOf(dmg);
+  const e = effectFor(L.style), f = L.fx;
+  f.pool.lifeScale = 0.8 + 0.22 * h.k; e.spawn(f, h); f.pool.lifeScale = 1;
+  last.name = e.name; last.dmg = dmg; last.off = Math.round(Math.acos(h.cos) * 180 / Math.PI); last.dirty = true;
+}
+function hitAt(L, x, y) {
   const m = L.style.cur ? 1 : L.k.m, col = L.style.hitCol;
-  emit(L, 3, r.x, r.y, 0, 0, 5, 4 * m, 0, '#ffffff', 1);
-  emit(L, 2, r.x, r.y, 0, 0, 10, 14 * m, 0, col, 0.7);
+  emit(L, 3, x, y, 0, 0, 5, 4 * m, 0, '#ffffff', 1);
+  emit(L, 2, x, y, 0, 0, 10, 14 * m, 0, col, 0.7);
   if (L.hasHull) L.flash = Math.min(1, L.flash + 0.5 + 0.2 * m);
 }
+
+// ---- Loose debris (the gravity slug's lanes): specks on springs to their home spots ----
+function scatterDust(L) {
+  const D = L.dust, w = Math.max(40, L.aimX - L.x0 - 60);
+  for (let i = 0; i < L.nd; i++) {
+    const hx = L.x0 + 40 + hash(i * 3.1 + 1) * w, hy = L.y + (hash(i * 7.3 + 2) - 0.5) * 2.4 * L.vspace, j = i * 6;
+    D[j] = hx; D[j + 1] = hy; D[j + 2] = 0; D[j + 3] = 0; D[j + 4] = hx; D[j + 5] = hy;
+  }
+}
+const GRV = new Float32Array(8 * 4);
+function stepDust(L, dt) {
+  const st = L.style, P = st.P, R = L.rounds, k = L.k;
+  let ng = 0;
+  for (let i = 0; i < R.length && ng < 8; i++) { const r = R[i]; if (r.state !== 1) continue; GRV[ng * 4] = r.x; GRV[ng * 4 + 1] = r.y; GRV[ng * 4 + 2] = r.vx; GRV[ng * 4 + 3] = r.vy; ng++; }
+  const D = L.dust, damp = Math.pow(0.97, dt), reach = P.reach * L.vs * Math.sqrt(k.m), r2 = reach * reach, pull = P.pull * k.m * 60 * L.vs, vmax = k.spd * 1.6 + 2;
+  for (let i = 0; i < L.nd; i++) {
+    const j = i * 6, x = D[j], y = D[j + 1];
+    let vx = D[j + 2], vy = D[j + 3], ax = (D[j + 4] - x) * 0.0012, ay = (D[j + 5] - y) * 0.0012;
+    for (let g = 0; g < ng; g++) {
+      const dx = GRV[g * 4] - x, dy = GRV[g * 4 + 1] - y, d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      const d = Math.sqrt(d2) + 0.01, a = Math.min(1.2, pull / (d2 + 60)), ent = P.wake * (1 - d / reach);
+      ax += dx / d * a + (GRV[g * 4 + 2] - vx) * ent; ay += dy / d * a + (GRV[g * 4 + 3] - vy) * ent;
+    }
+    vx = (vx + ax * dt) * damp; vy = (vy + ay * dt) * damp;
+    const sp = Math.hypot(vx, vy); if (sp > vmax) { vx *= vmax / sp; vy *= vmax / sp; }
+    D[j] = x + vx * dt; D[j + 1] = y + vy * dt; D[j + 2] = vx; D[j + 3] = vy;
+  }
+}
+
+const GS = new Float32Array(32), GC = new Float32Array(32);
 function stepLane(L, dt, fire) {
   const k = L.k, st = L.style;
   if (fire && dt > 0) {
     L.cool -= dt;
     let guard = 0;
-    while (L.cool <= 0 && guard++ < 6) { L.cool += 60 / k.rate; spawn(L); }
+    while (L.cool <= 0 && guard++ < 6) { L.cool += 60 / k.rate; fireLane(L); }
   }
   const R = L.rounds;
+  if (st.group) { // a volley's mean distance to go, so its darts can pace each other
+    GS.fill(0); GC.fill(0);
+    for (let i = 0; i < R.length; i++) {
+      const r = R[i]; if (r.state !== 1) continue;
+      r.a = Math.hypot(L.aimX - r.x, L.y + r.b - r.y); GS[r.grp & 31] += r.a; GC[r.grp & 31]++;
+    }
+  }
   for (let i = 0; i < R.length; i++) {
     const r = R[i];
     if (r.state === 0) continue;
     r.t += dt;
-    if (r.state === 2) { r.dead += dt; if (r.dead > (st.linger || 0)) r.state = 0; continue; }
-    r.v = st.speed ? st.speed(r, k) : k.spd;
-    r.x += Math.cos(r.hd) * r.v * dt; r.y += Math.sin(r.hd) * r.v * dt; r.dist += r.v * dt;
+    if (r.state === 2) { r.dead += dt; if (st.after) st.after(r, k, L, dt); if (r.dead > lingerOf(st, r)) r.state = 0; continue; }
     if (st.update) st.update(r, k, L, dt);
-    if (st.fuse && r.dist >= r.fuseAt) {
-      st.burst(r, k, L); r.state = 2; r.dead = 0;
-      if (L.hasHull && r.x > L.front - 90 * k.m) L.flash = Math.min(1, L.flash + 0.4);
-    } else if (r.x >= L.front) {
-      r.x = L.front; if (st.trail) pushTrail(r);
-      r.state = 2; r.dead = 0; hitAt(L, r);
-    }
+    if (r.state !== 1) continue;
+    const px = r.x, py = r.y;
+    r.x += r.vx * dt; r.y += r.vy * dt;
+    r.v = Math.hypot(r.vx, r.vy); r.dist += r.v * dt;
+    if (r.v > 1e-4) r.hd = Math.atan2(r.vy, r.vx);
+    if (st.fuse && r.sub < 0 && r.dist >= r.fuseAt) { st.burst(r, k, L); spend(r); continue; }
+    if (!r.inside && cast(L, px, py, r.x, r.y, HWT)) {
+      r.x = HWT.x; r.y = HWT.y;
+      const res = st.onHit ? st.onHit(r, k, L, HWT) : 0;
+      if (res === 1) continue;
+      if (res === 0) impact(L, r, HWT, k.dmg * r.dm);
+      if (st.trail) pushTrail(r);
+      spend(r);
+    } else if (r.dist > r.maxDist || Math.abs(r.y - L.y) > 900) r.state = 0;
   }
+  if (st.dust) stepDust(L, dt);
   const Pp = L.parts;
   for (let i = 0; i < Pp.length; i++) {
     const p = Pp[i];
     if (!p.on) continue;
     p.t += dt; if (p.t >= p.life) { p.on = false; continue; }
+    if (p.kind === 4) p.vy += p.g * dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.size += p.grow * dt;
     if (p.kind === 1) { p.vx *= Math.pow(0.9, dt); p.vy *= Math.pow(0.9, dt); }
   }
   L.flash = Math.max(0, L.flash - dt * 0.07);
+  for (let q = 0; q < L.nT; q++) L.tF[q] = Math.max(0, L.tF[q] - dt * 0.06);
+  if (L.fx) { L.fxAcc += dt; let n = 0; while (L.fxAcc >= 1 && n++ < 8) { L.fx.step(); L.fxAcc -= 1; } if (n >= 8) L.fxAcc = 0; }
 }
 
 // ---- Drawing a lane ----
-const HULL = [-1, 0, -0.62, -0.4, 0.05, -0.48, 0.3, -0.92, 0.72, -0.92, 0.62, -0.42, 1, -0.3, 1, 0.3, 0.62, 0.42, 0.72, 0.92, 0.3, 0.92, 0.05, 0.48, -0.62, 0.4];
+const SHIP = [-1, 0, -0.62, -0.4, 0.05, -0.48, 0.3, -0.92, 0.72, -0.92, 0.62, -0.42, 1, -0.3, 1, 0.3, 0.62, 0.42, 0.72, 0.92, 0.3, 0.92, 0.05, 0.48, -0.62, 0.4];
+/** The current-round lane's target (as before) */
 function drawHull(L) {
   const R = L.hullR, x = L.hullX, y = L.y;
   toWorld(); NORM();
   ctx.beginPath();
-  for (let i = 0; i < HULL.length; i += 2) { const px = x + HULL[i] * R, py = y + HULL[i + 1] * R * 0.8; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+  for (let i = 0; i < SHIP.length; i += 2) { const px = x + SHIP[i] * R, py = y + SHIP[i + 1] * R * 0.8; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
   ctx.closePath();
   fillPath('#232a33', 1);
   ctx.globalAlpha = 1; ctx.strokeStyle = '#4a5563'; ctx.lineWidth = 1.4; ctx.stroke();
@@ -749,10 +2025,39 @@ function drawHull(L) {
   seg(x + R * 0.2, y - R * 0.38, x + R * 0.2, y + R * 0.38, 1, '#36404c', 1);
   ADD(); glow('#7fd6fa', x - R * 0.3, y, R * 0.12, 0.6);
 }
-function drawGun(L) {
+function drawGun(L, y) {
   toWorld(); NORM();
-  ctx.globalAlpha = 1; ctx.fillStyle = '#2b333e'; ctx.fillRect(L.x0 - 22, L.y - 8, 18, 16);
-  ctx.fillStyle = '#3b4552'; ctx.fillRect(L.x0 - 6, L.y - 3, 10, 6);
+  ctx.globalAlpha = 1; ctx.fillStyle = '#2b333e'; ctx.fillRect(L.x0 - 22, y - 8, 18, 16);
+  ctx.fillStyle = '#3b4552'; ctx.fillRect(L.x0 - 6, y - 3, 10, 6);
+}
+/** A lineup lane's plate: a short bar through (front, y), across its normal */
+function drawPlate(L) {
+  const h = 13, tx = -L.wny * h, ty = L.wnx * h;
+  toWorld(); NORM();
+  seg(L.front - tx, L.y - ty, L.front + tx, L.y + ty, 2.4, '#3a4452', 1);
+  seg(L.front - tx + L.wnx * 0.8, L.y - ty + L.wny * 0.8, L.front + tx + L.wnx * 0.8, L.y + ty + L.wny * 0.8, 0.8, '#7d8898', 0.9);
+}
+function drawDrones(L) {
+  const R = L.droneR;
+  for (let q = 0; q < L.nT; q++) {
+    const x = L.tX[q], y = L.tY[q], f = L.tF[q];
+    toWorld(); NORM();
+    ctx.beginPath(); ctx.moveTo(x - R, y); ctx.lineTo(x, y - R * 0.7); ctx.lineTo(x + R, y); ctx.lineTo(x, y + R * 0.7); ctx.closePath();
+    fillPath('#262d37', 1); strokePath('#59667a', 1, 1);
+    ADD();
+    if (f > 0.01) { ctx.beginPath(); ctx.moveTo(x - R, y); ctx.lineTo(x, y - R * 0.7); ctx.lineTo(x + R, y); ctx.lineTo(x, y + R * 0.7); ctx.closePath(); fillPath('#cfeeff', f * 0.5); glow('#6ac8ff', x, y, R * 3, f * 0.7); }
+    disc('#7fd6fa', x, y, R * 0.18, 0.9);
+  }
+}
+function drawDust(L) {
+  const D = L.dust;
+  toWorld(); ADD();
+  ctx.fillStyle = '#a4aebd';
+  for (let i = 0; i < L.nd; i++) {
+    const j = i * 6, x = D[j], y = D[j + 1], vx = D[j + 2], vy = D[j + 3], sp = Math.abs(vx) + Math.abs(vy);
+    if (sp > 0.5) seg(x - vx * 2, y - vy * 2, x, y, 1, '#a4aebd', Math.min(0.7, 0.3 + sp * 0.05));
+    else { ctx.globalAlpha = 0.35 + 0.25 * hash(i); ctx.fillRect(x - 0.6, y - 0.6, 1.2, 1.2); }
+  }
 }
 function drawParts(L, add) {
   const Pp = L.parts;
@@ -764,28 +2069,49 @@ function drawParts(L, add) {
     else if (!add) continue;
     else if (p.kind === 1) seg(p.x - p.vx * 1.8, p.y - p.vy * 1.8, p.x, p.y, 1.1, p.col, p.a * (1 - f));
     else if (p.kind === 2) glow(p.col, p.x, p.y, p.size * (0.6 + 0.6 * f), p.a * (1 - f) * (1 - f));
+    else if (p.kind === 4) { seg(p.x - p.vx * 2.2, p.y - p.vy * 2.2, p.x, p.y, p.size, p.col, p.a * (1 - f)); disc('#ffd070', p.x, p.y, p.size * 0.6, p.a * (1 - f)); }
     else disc(p.col, p.x, p.y, p.size * (1 - 0.5 * f), p.a * (1 - f));
   }
 }
-function drawLane(L) {
-  if (L.hasHull) { drawHull(L); drawGun(L); }
+function drawLane(L, rightX) {
+  const st = L.style;
+  if (L.fxHull) {
+    toFx(L); drawFxHull(ctx, clamp((rightX - L.Ox) / L.S + 16, 40, DEEP));
+    toFx(L); L.fx.draw(ctx);
+    drawGun(L, L.y + (st.aimDY ? st.aimDY(L) : 0));
+  } else if (L.hasHull) { drawHull(L); drawGun(L, L.y); }
+  if (L.plate) drawPlate(L);
+  if (st.targets) drawDrones(L);
+  if (st.dust) drawDust(L);
   toWorld(); NORM(); drawParts(L, false);
   const R = L.rounds;
-  for (let i = 0; i < R.length; i++) if (R[i].state !== 0) L.style.draw(R[i], L.k, L);
+  for (let i = 0; i < R.length; i++) if (R[i].state !== 0) st.draw(R[i], L.k, L);
   toWorld(); ADD(); drawParts(L, true);
   NORM(); ctx.globalAlpha = 1;
 }
 
-// ---- Stars (screen space, parallax) ----
-const STARS = new Float32Array(240 * 3);
-for (let i = 0; i < 240; i++) { STARS[i * 3] = hash(i * 1.3) * 2400; STARS[i * 3 + 1] = hash(i * 2.9 + 4) * 1600; STARS[i * 3 + 2] = hash(i * 5.1 + 9); }
+// ---- Stars (screen space, parallax), bent round any gravity slug in the main lane ----
+const NSTAR = 900, STARS = new Float32Array(NSTAR * 3);
+for (let i = 0; i < NSTAR; i++) { STARS[i * 3] = hash(i * 1.3) * 2400; STARS[i * 3 + 1] = hash(i * 2.9 + 4) * 1600; STARS[i * 3 + 2] = hash(i * 5.1 + 9); }
+const LENS = new Float32Array(4 * 3); let nLens = 0;
 function drawStars(cssW, cssH, camX, dpr, zoom) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); NORM(); ctx.fillStyle = '#c8d4e6';
   const off = camX * zoom * 0.25;
-  for (let i = 0; i < 240; i++) {
-    const b = STARS[i * 3 + 2], x = ((STARS[i * 3] - off * (0.4 + b)) % 2400 + 2400) % 2400, y = STARS[i * 3 + 1];
-    if (x > cssW || y > cssH) continue;
-    ctx.globalAlpha = 0.15 + b * 0.45; const s = b > 0.85 ? 1.6 : 1; ctx.fillRect(x, y, s, s);
+  for (let i = 0; i < NSTAR; i++) {
+    const b = STARS[i * 3 + 2];
+    let x = ((STARS[i * 3] - off * (0.4 + b)) % 2400 + 2400) % 2400, y = STARS[i * 3 + 1];
+    if (x > cssW + 60 || y > cssH + 60) continue;
+    let a = (0.08 + b * 0.4) * (b > 0.55 ? 1 : 0.7), s = b > 0.88 ? 1.6 : 1;
+    for (let l = 0; l < nLens; l++) { // a point lens: the star's image is pushed out, brightened, with a faint twin inside
+      const lx = LENS[l * 3], ly = LENS[l * 3 + 1], rE = LENS[l * 3 + 2], dx = x - lx, dy = y - ly, d2 = dx * dx + dy * dy;
+      if (d2 > rE * rE * 49) continue;
+      const d = Math.sqrt(d2) + 0.01, q = Math.sqrt(d2 + 4 * rE * rE), r1 = (d + q) / 2, r2 = (q - d) / 2, mg = Math.min(3, 1 + rE * rE / (d2 + 1));
+      ctx.globalAlpha = Math.min(1, a * mg * 0.6 * (r2 / r1)); ctx.fillRect(lx - dx / d * r2, ly - dy / d * r2, s, s);
+      x = lx + dx / d * r1; y = ly + dy / d * r1; a = Math.min(1, a * mg); s *= 1 + 0.3 * (mg - 1);
+      break;
+    }
+    if (x > cssW || y > cssH || x < 0) continue;
+    ctx.globalAlpha = a; ctx.fillRect(x, y, s, s);
   }
 }
 
@@ -793,19 +2119,22 @@ function drawStars(cssW, cssH, camX, dpr, zoom) {
 // Page state and views
 // ===================================================================================================================
 const $ = (id) => document.getElementById(id);
-const state = { sel: 0, close: false, slow: REDUCE, showNow: true, paused: false, spd: 54, dmg: 18, rate: 3 };
-const mainLanes = [new Lane(64, 260), new Lane(64, 200)];
+const state = { sel: 0, close: false, slow: REDUCE, showNow: true, paused: false, spd: 54, dmg: 18, rate: 3, fxPick: -1 };
+const mainLanes = [new Lane(120, 320, DUST_MAIN), new Lane(64, 200, 0)];
+mainLanes[0].fxHull = true; mainLanes[0].fx = new Field(); mainLanes[1].hasHull = true;
+const effectFor = (st) => EFFECTS[state.fxPick >= 0 ? state.fxPick : FX_BY_ID[st.impact]];
 const LINEUP_MIN_RATE = 1.5;
 const lineup = STYLES.map((s) => {
-  const a = new Lane(24, 120), b = new Lane(24, 80);
-  a.style = s; b.style = s.nowStyle; a.hasHull = b.hasHull = false;
+  const a = new Lane(48, 140, DUST_ROW), b = new Lane(24, 80, 0);
+  a.style = s; b.style = s.nowStyle; a.plate = b.plate = true;
+  if (s.lineWall) { a.wnx = -Math.cos(s.lineWall); a.wny = -Math.sin(s.lineWall); }
   const lr = Math.max(s.def.rate, LINEUP_MIN_RATE);
   setK(a.k, s.def.spd, s.def.dmg, lr); setK(b.k, s.def.spd, s.def.dmg, lr);
   a.cool = b.cool = hash(STYLES.indexOf(s) * 4.7) * 30;
   return [a, b];
 });
 let zoomText = 'GAME SCALE 1:1';
-const view = { cssW: 0, cssH: 0, dpr: 1, zoom: 1, camX: 0, follow: -1, easing: false };
+const view = { cssW: 0, cssH: 0, dpr: 1, zoom: 1, camX: 0, camY: 0, follow: -1, easing: false };
 const lv = { cssW: 0, cssH: 0, dpr: 1, rowH: 46, labelW: 120 };
 const mainC = $('main'), mainX = mainC.getContext('2d');
 const lineC = $('lineup'), lineX = lineC.getContext('2d');
@@ -821,62 +2150,91 @@ function resize() {
   lineC.style.height = lv.cssH + 'px';
   lineC.width = Math.round(lv.cssW * dpr); lineC.height = Math.round(lv.cssH * dpr);
   for (let i = 0; i < lineup.length; i++) {
-    const y0 = 4 + i * lv.rowH;
-    const a = lineup[i][0], b = lineup[i][1];
+    const y0 = 4 + i * lv.rowH, a = lineup[i][0], b = lineup[i][1];
     a.y = y0 + lv.rowH * 0.32; b.y = y0 + lv.rowH * 0.74;
-    a.x0 = b.x0 = lv.labelW + 14; a.front = b.front = lv.cssW - 10;
+    a.x0 = b.x0 = lv.labelW + 14; a.front = b.front = a.aimX = b.aimX = lv.cssW - 14;
+    a.vspace = b.vspace = lv.rowH * 0.2; a.vs = b.vs = 0.25; a.jit = 0;
+    if (a.style.targets) { a.nT = 2; a.tX[0] = a.front - 52; a.tY[0] = a.y - 8; a.tX[1] = a.front - 104; a.tY[1] = a.y + 6; a.reach = 70; a.droneR = 3.5; }
+    if (a.style.dust) scatterDust(a);
   }
+  // (the main lane's world is laid out from the canvas size: start it afresh, and draw now so a resize never shows a blank frame)
+  if (!mainLanes[0].style) { layoutMain(); return; }
+  resetLanes(); if (state.paused) prewarm(60);
+  renderMain(0, 1); renderLineup();
 }
 
+/** Main view layout. The world is laid out at game scale (1 unit = 1 css px); close-up only moves and zooms the camera. */
 function layoutMain() {
-  const cw = view.cssW, ch = view.cssH;
-  const zoom = state.close ? clamp(cw / 320, 2.2, 4) : 1;
-  const vw = cw / zoom, vh = ch / zoom, two = state.showNow;
+  const cw = view.cssW, ch = view.cssH, close = state.close, two = state.showNow;
+  const zoom = close ? clamp(cw / 320, 2.2, 4) : 1, vw = cw / zoom, vh = ch / zoom;
   const A = mainLanes[0], B = mainLanes[1];
-  A.y = two ? -vh * 0.24 : 0; B.y = vh * 0.24;
-  const hullR = Math.min(64, (two ? vh * 0.5 : vh) * 0.36);
-  A.hullR = B.hullR = hullR;
-  A.x0 = B.x0 = 0;
-  const hx = state.close ? 900 : Math.max(220, vw - 60) - 26 - hullR;
-  A.hullX = B.hullX = hx; A.front = B.front = hx - hullR * 0.98;
-  if (zoom !== view.zoom) zoomText = state.close ? 'CLOSE-UP ×' + (Math.round(zoom * 10) / 10) : 'GAME SCALE 1:1';
+  const top = -ch / 2 + 10, bot = two ? ch / 2 - Math.max(70, ch * 0.24) : ch / 2 - 10, bandH = bot - top;
+  const S = clamp(Math.min(bandH / 165, cw * 0.4 / 150), 0.45, 1.5);
+  A.S = S; A.vs = S / 1.5;
+  A.y = A.Oy = top + (bandH - (XMAX - XMIN) * S) / 2 + XMAX * S;
+  A.vspace = Math.max(12, Math.min(A.y - top - 6, 80 * S));
+  A.x0 = 0;
+  A.Ox = close ? 900 : cw - 70 - 130 * S;
+  A.aimX = A.front = A.Ox + surfY(0) * S;
+  A.jit = 14 * S; A.deckDY = -34 * S;
+  // dummy targets for the chain bolt: off the bow, above, and below by the chamfer (in fx units, turned to world)
+  A.nT = 3; A.reach = 125 * S; A.droneR = 7 * S;
+  A.tX[0] = A.Ox - 40 * S; A.tY[0] = A.Oy - 60 * S;
+  A.tX[1] = A.Ox - 54 * S; A.tY[1] = A.Oy + 42 * S;
+  A.tX[2] = A.Ox - 6 * S; A.tY[2] = A.Oy + 92 * S;
+  B.x0 = 0;
+  if (!close) { B.y = (bot + ch / 2) / 2; B.hullR = clamp((ch / 2 - bot) * 0.36, 10, 40); B.hullX = A.aimX + B.hullR * 0.98; }
+  else {
+    B.y = A.y + vh * 0.34; B.hullR = clamp(vh * 0.09, 8, 22);
+    const d = surfY(-(B.y - A.Oy) / S), right = d < 1e8 ? A.Ox + d * S - 8 : A.aimX + 3 * B.hullR;
+    B.hullX = Math.min(A.aimX + B.hullR * 0.98, right - B.hullR);
+  }
+  B.front = B.aimX = B.hullX - B.hullR * 0.98;
+  B.vspace = 20; B.vs = 1;
+  view.camY = close ? (two ? (A.y + B.y) / 2 : A.y) : 0;
+  if (zoom !== view.zoom) zoomText = close ? 'CLOSE-UP ×' + (Math.round(zoom * 10) / 10) : 'GAME SCALE 1:1';
   view.zoom = zoom;
-  return { vw, vh };
+  return vw;
 }
 
 function updateCamera(vw, dtSim, frames) {
   if (!state.close) { view.camX = vw / 2 - 40; view.follow = -1; return; }
-  const R = mainLanes[0].rounds;
+  const A = mainLanes[0], R = A.rounds;
   let tgt = null;
   for (let i = 0; i < R.length; i++) if (R[i].state === 1 && (!tgt || R[i].n < tgt.n)) tgt = R[i];
-  const lo = vw / 2 - 44, hi = mainLanes[0].hullX + mainLanes[0].hullR + 24 - vw / 2;
+  const lo = vw / 2 - 44, hi = A.Ox + 110 * A.S - vw / 2;
   if (!tgt) { if (view.follow === -1) view.camX = lo; return; }
   const want = clamp(tgt.x - vw * 0.16, lo, Math.max(lo, hi));
   if (tgt.n !== view.follow) { view.follow = tgt.n; view.easing = !REDUCE; }
   if (view.easing) {
-    view.camX += (want < hi && want > lo ? tgt.v * dtSim : 0) + (want - view.camX) * Math.min(1, 0.22 * frames);
+    view.camX += (want < hi && want > lo ? tgt.vx * dtSim : 0) + (want - view.camX) * Math.min(1, 0.22 * frames);
     if (Math.abs(want - view.camX) < 1) view.easing = false;
   } else view.camX = want;
 }
 
-function drawLabel(text, x, y, col) {
-  ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.fillText(text, x, y);
-}
+function drawLabel(text, x, y, col) { ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.fillText(text, x, y); }
 function renderMain(dtSim, frames) {
   ctx = mainX;
-  const { vw } = layoutMain();
+  const vw = layoutMain();
   updateCamera(vw, dtSim, frames);
-  const dpr = view.dpr, z = view.zoom;
+  const dpr = view.dpr, z = view.zoom, A = mainLanes[0], f = A.fx;
+  const shx = REDUCE ? 0 : f.sy * A.S, shy = REDUCE ? 0 : -f.sx * A.S;
+  VW.a = z * dpr; VW.e = (view.cssW / 2 + (shx - view.camX) * z) * dpr; VW.f = (view.cssH / 2 + (shy - view.camY) * z) * dpr;
   ctx.setTransform(1, 0, 0, 1, 0, 0); NORM(); ctx.globalAlpha = 1;
   ctx.fillStyle = '#06080c'; ctx.fillRect(0, 0, mainC.width, mainC.height);
+  nLens = 0;
+  if (A.style.dust) for (let i = 0; i < A.rounds.length && nLens < 4; i++) {
+    const r = A.rounds[i]; if (r.state !== 1) continue;
+    LENS[nLens * 3] = (VW.a * r.x + VW.e) / dpr; LENS[nLens * 3 + 1] = (VW.a * r.y + VW.f) / dpr; LENS[nLens * 3 + 2] = A.style.P.lens * Math.sqrt(A.k.m) * z; nLens++;
+  }
   drawStars(view.cssW, view.cssH, view.camX, dpr, z);
-  V.a = z * dpr; V.e = (view.cssW / 2 - view.camX * z) * dpr; V.f = (view.cssH / 2) * dpr;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  drawLane(mainLanes[0]);
-  if (state.showNow) drawLane(mainLanes[1]);
+  const rightX = view.camX + vw / 2;
+  drawLane(A, rightX);
+  if (state.showNow) drawLane(mainLanes[1], rightX);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); NORM();
   ctx.font = '600 12px "Barlow Condensed", "Arial Narrow", sans-serif'; ctx.textBaseline = 'middle';
-  const yA = view.cssH / 2 + mainLanes[0].y * z, yB = view.cssH / 2 + mainLanes[1].y * z;
+  const yA = view.cssH / 2 + (A.y - view.camY) * z, yB = view.cssH / 2 + (mainLanes[1].y - view.camY) * z;
   drawLabel('NEW', 10, yA - 16, '#ffb04a');
   if (state.showNow) drawLabel('NOW', 10, yB - 16, '#8a94a3');
   drawLabel(zoomText, view.cssW - 110, 14, '#56606e');
@@ -896,14 +2254,13 @@ function renderLineup() {
     drawLabel(LABELS[i], 10, y0 + lv.rowH * 0.32, i === state.sel ? '#ffd9a0' : '#d9dee6');
     ctx.font = '400 11px "Barlow", "Segoe UI", sans-serif';
     drawLabel(FAMS[i], 10, y0 + lv.rowH * 0.72, '#8a94a3');
-    ctx.globalAlpha = 1; ctx.fillStyle = '#1b222c'; ctx.fillRect(lv.cssW - 10, y0 + 4, 2, lv.rowH - 10);
   }
-  V.a = dpr; V.e = 0; V.f = 0;
+  VW.a = dpr; VW.e = 0; VW.f = 0;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (let i = 0; i < lineup.length; i++) {
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.beginPath(); ctx.rect(lv.labelW * dpr, (4 + i * lv.rowH) * dpr, lineC.width, (lv.rowH - 2) * dpr); ctx.clip();
-    drawLane(lineup[i][0]); drawLane(lineup[i][1]);
+    drawLane(lineup[i][0], lv.cssW); drawLane(lineup[i][1], lv.cssW);
     ctx.restore();
   }
 }
@@ -922,25 +2279,36 @@ function applyK() {
   $('spdVal').textContent = state.spd + ' u/tick';
   $('dmgVal').textContent = fmtDmg(state.dmg);
   $('rateVal').textContent = (state.rate < 1 ? state.rate.toFixed(2) : state.rate.toFixed(1)) + ' / s';
-  $('roScale').textContent = 'size ×' + k.m.toFixed(2) + ' · stretch ×' + k.s.toFixed(2) + ' · ' + (state.spd * 60).toLocaleString() + ' u/s';
+  $('roScale').textContent = 'size ×' + k.m.toFixed(2) + ' · stretch ×' + k.s.toFixed(2) + ' · hit k ' + kOf(state.dmg).toFixed(2) + ' · ' + (state.spd * 60).toLocaleString() + ' u/s';
   $('roMain').textContent = state.spd + ' u/tick · ' + fmtDmg(state.dmg) + ' dmg · ' + state.rate.toFixed(state.rate < 1 ? 2 : 1) + '/s';
 }
 function resetLanes() {
   clearLane(mainLanes[0]); clearLane(mainLanes[1]);
   mainLanes[0].cool = mainLanes[1].cool = 6;
   view.follow = -1;
+  layoutMain(); scatterDust(mainLanes[0]);
+  $('roHit').textContent = 'No hits yet';
 }
 function setValues(spd, dmg, rate) {
   state.spd = spd; state.dmg = dmg; state.rate = rate;
   $('spd').value = spd; $('dmg').value = dmgTo(dmg); $('rate').value = rateTo(rate);
   applyK();
 }
+const impactSel = $('impact');
+function impactLabel() {
+  const s = STYLES[state.sel], e = effectFor(s);
+  $('sHit').textContent = 'Hits with: ' + e.name + (state.fxPick >= 0 && EFFECTS[state.fxPick].id !== s.impact ? ' (swapped)' : '');
+  impactSel.options[0].textContent = 'Matched: ' + EFFECTS[FX_BY_ID[s.impact]].name;
+  impactSel.value = String(state.fxPick);
+}
+function setImpact(i) { state.fxPick = i; impactLabel(); }
 function select(i) {
   state.sel = (i + STYLES.length) % STYLES.length;
   const s = STYLES[state.sel];
   mainLanes[0].style = s; mainLanes[1].style = s.nowStyle;
   $('sName').textContent = s.name; $('sFam').textContent = s.family; $('sDesc').textContent = s.desc;
   document.querySelectorAll('.pick').forEach((b, j) => b.setAttribute('aria-checked', String(j === state.sel)));
+  impactLabel();
   setValues(s.def.spd, s.def.dmg, s.def.rate);
   resetLanes();
   if (state.paused) prewarm(60);
@@ -950,14 +2318,20 @@ function prewarm(ticks) {
   for (let t = 0; t < ticks; t++) { stepLane(mainLanes[0], 1, true); stepLane(mainLanes[1], 1, true); }
   view.easing = false;
 }
+{
+  const o = document.createElement('option'); o.value = '-1'; impactSel.appendChild(o);
+  EFFECTS.forEach((e, i) => { const op = document.createElement('option'); op.value = String(i); op.textContent = e.name; impactSel.appendChild(op); });
+}
+impactSel.addEventListener('change', (e) => setImpact(+e.target.value));
 const picker = $('picker');
 STYLES.forEach((s, i) => {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'pick'; b.setAttribute('role', 'radio');
-  b.innerHTML = '<span class="top"><b></b><span class="tag"></span></span><span class="d"></span>';
+  b.innerHTML = '<span class="top"><b></b><span class="tag"></span></span><span class="d"></span><span class="h"></span>';
   b.querySelector('b').textContent = s.name;
   b.querySelector('.tag').textContent = s.family;
   b.querySelector('.d').textContent = s.desc;
+  b.querySelector('.h').textContent = 'Hits with: ' + EFFECTS[FX_BY_ID[s.impact]].name;
   b.addEventListener('click', () => select(i));
   picker.appendChild(b);
 });
@@ -970,11 +2344,12 @@ function setZoom(close) {
   $('zGame').setAttribute('aria-pressed', String(!close)); $('zClose').setAttribute('aria-pressed', String(close));
   resetLanes(); if (state.paused) prewarm(60);
 }
+function setNow(on) { state.showNow = on; $('now').checked = on; resetLanes(); if (state.paused) prewarm(60); }
 $('zGame').addEventListener('click', () => setZoom(false));
 $('zClose').addEventListener('click', () => setZoom(true));
 $('slow').checked = state.slow;
 $('slow').addEventListener('change', (e) => { state.slow = e.target.checked; });
-$('now').addEventListener('change', (e) => { state.showNow = e.target.checked; });
+$('now').addEventListener('change', (e) => setNow(e.target.checked));
 function setPaused(p) { state.paused = p; $('play').textContent = p ? 'Play' : 'Pause'; }
 $('play').addEventListener('click', () => setPaused(!state.paused));
 lineC.addEventListener('click', (e) => {
@@ -983,14 +2358,17 @@ lineC.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement && e.target.type === 'range' && e.key !== ' ') return;
+  if (e.target instanceof HTMLSelectElement) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === ']') select(state.sel + 1);
   else if (e.key === '[') select(state.sel - 1);
   else if (e.key === ' ') { e.preventDefault(); setPaused(!state.paused); }
   else if (e.key === 's' || e.key === 'S') { state.slow = !state.slow; $('slow').checked = state.slow; }
   else if (e.key === 'z' || e.key === 'Z') setZoom(!state.close);
-  else if (e.key === 'n' || e.key === 'N') { state.showNow = !state.showNow; $('now').checked = state.showNow; }
+  else if (e.key === 'n' || e.key === 'N') setNow(!state.showNow);
+  else if (e.key === 'i' || e.key === 'I') setImpact(state.fxPick + 1 >= EFFECTS.length ? -1 : state.fxPick + 1);
 });
-reduceMQ.addEventListener?.('change', (e) => { REDUCE = e.matches; });
+reduceMQ.addEventListener?.('change', (e) => { REDUCE = REDUCED = e.matches; });
 new ResizeObserver(resize).observe(document.querySelector('.wrap'));
 
 // ---- Loop ----
@@ -1002,6 +2380,7 @@ function frame(now) {
   stepLane(mainLanes[0], dt, true);
   stepLane(mainLanes[1], dt, true);
   for (let i = 0; i < lineup.length; i++) { stepLane(lineup[i][0], dt, true); stepLane(lineup[i][1], dt, true); }
+  if (last.dirty) { last.dirty = false; $('roHit').textContent = 'Last hit: ' + last.name + ', ' + Math.round(last.dmg) + ' dmg, ' + last.off + '° from the normal'; }
   renderMain(dt, frames);
   renderLineup();
   requestAnimationFrame(frame);
@@ -1012,9 +2391,12 @@ if (REDUCE) setPaused(true);
 prewarm(40);
 for (let t = 0; t < 120; t++) for (let i = 0; i < lineup.length; i++) { stepLane(lineup[i][0], 0.5, true); stepLane(lineup[i][1], 0.5, true); }
 requestAnimationFrame(frame);
-// For screenshots and quick checks: window.lab.select(3), lab.zoom(true), lab.freeze(ticks)
+// For screenshots and quick checks: lab.select(3), lab.zoom(true), lab.impact(5), lab.set(spd, dmg, rate), lab.freeze(ticks)
 window.lab = {
-  select, zoom: setZoom, styles: STYLES.map((s) => s.id),
-  freeze(ticks) { resetLanes(); prewarm(ticks || 30); setPaused(true); },
+  select, zoom: setZoom, now: setNow, styles: STYLES.map((s) => s.id), effects: EFFECTS.map((e) => e.id),
+  impact: setImpact,
+  info() { const A = mainLanes[0]; return { range: A.aimX - A.x0, sel: STYLES[state.sel].id, S: A.S }; },
+  set(spd, dmg, rate) { setValues(spd ?? state.spd, dmg ?? state.dmg, rate ?? state.rate); resetLanes(); },
+  freeze(ticks) { resetLanes(); prewarm(ticks || 30); setPaused(true); renderMain(0, 1); renderLineup(); return last.name + ' ' + Math.round(last.dmg) + ' ' + last.off; },
 };
 </script>
