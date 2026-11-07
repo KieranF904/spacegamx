@@ -984,48 +984,6 @@
       "description": "A small sealed case. Sells to collectors and fabricators."
     },
     {
-      "id": "repair_kit",
-      "name": "Basic Repair Kit",
-      "category": "consumable",
-      "rarity": "common",
-      "value": 30,
-      "color": "#66bb6a",
-      "description": "Slowly patches your ship: damaged parts first, then missing ones, up to 150 cr of repairs. Hold still: moving or taking a hit wastes what's left.",
-      "repair": {
-        "budget": 150,
-        "hpPerSec": 0.03,
-        "restoreSec": 6
-      }
-    },
-    {
-      "id": "field_repair_kit",
-      "name": "Field Repair Kit",
-      "category": "consumable",
-      "rarity": "uncommon",
-      "value": 110,
-      "color": "#26a69a",
-      "description": "A crate of plate and servo arms: repairs damaged parts, then rebuilds missing ones, up to 500 cr of repairs. Hold still: moving or taking a hit wastes what's left.",
-      "repair": {
-        "budget": 500,
-        "hpPerSec": 0.05,
-        "restoreSec": 4
-      }
-    },
-    {
-      "id": "nanite_repair_kit",
-      "name": "Nanite Repair Kit",
-      "category": "consumable",
-      "rarity": "rare",
-      "value": 380,
-      "color": "#80deea",
-      "description": "A swarm of repair nanites: heals and regrows your ship fast, up to 1,600 cr of repairs. Hold still: moving or taking a hit wastes what's left.",
-      "repair": {
-        "budget": 1600,
-        "hpPerSec": 0.08,
-        "restoreSec": 2.5
-      }
-    },
-    {
       "id": "pack_hull",
       "name": "Hull Pack",
       "category": "consumable",
@@ -1116,15 +1074,6 @@
       "value": 15,
       "color": "#42a5f5",
       "description": "Refills your boost tank."
-    },
-    {
-      "id": "insurance_bond",
-      "name": "Insurance Bond",
-      "category": "consumable",
-      "rarity": "uncommon",
-      "value": 150,
-      "color": "#26a69a",
-      "description": "Pays the rebuild bill once after your ship is destroyed."
     },
     {
       "id": "scanner_charge",

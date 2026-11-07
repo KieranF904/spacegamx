@@ -140,7 +140,7 @@ export function reportSummary(plan: UpdatePlan): string {
     lines.push(`${who}: ${prog}`);
     if (sw.length) lines.push(`  swapped: ${sw.join('; ')}`);
     if (wp.length) lines.push(`  wiped: ${wp.join('; ')}`);
-    lines.push(`  flies slot ${r.activeSlot + 1}${r.freshStarter ? ' (fresh starter)' : ''}${r.loaner ? ' (loaner)' : ''}${refund ? `; refund: ${refund}` : ''}`);
+    lines.push(`  flies slot ${r.activeSlot + 1}${r.freshStarter ? ' (fresh starter)' : ''}${refund ? `; refund: ${refund}` : ''}`);
   }
   for (const s of plan.skipped) lines.push(`${s.username ?? '(no name)'} #${s.userId}: already v${s.version}, skipped`);
   return lines.join('\n');

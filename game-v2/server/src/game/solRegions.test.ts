@@ -100,26 +100,25 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(w.server.threats().sol).toBeLessThan(10);
   });
 
-  it('dying in safe space costs little: the hold stays and the ship comes back whole', () => {
+  it('dying in safe space costs little: the hold stays and the repair bank puts the starter back whole', () => {
     const w = world();
     const { pid, conn, profile } = w.pilots[0];
     w.server.pilots.give(conn, { iron_ore: 12, copper_ore: 4 });
-    const bonds = countOf(profile().storage, 'insurance_bond');
+    const storage = JSON.stringify(profile().storage);
     hold(pid, 50000, 0);
     w.server.pilots.onDestroyed(conn, InSystem.systemId[pid], 50000, 0, 0, 0);
     expect(countOf(profile().cargo, 'iron_ore')).toBe(12);
     expect(countOf(profile().cargo, 'copper_ore')).toBe(4);
-    expect(profile().wreck).toBeUndefined();
-    // (no bond spent on it)
-    expect(countOf(profile().storage, 'insurance_bond')).toBe(bonds);
+    // (A starter's worth in the free part pays for the whole ship; nothing goes to storage)
+    expect(profile().ship.ghosts).toEqual([]);
+    expect(profile().ship.owed).toBeUndefined();
+    expect(JSON.stringify(profile().storage)).toBe(storage);
   });
 
   it('out on the Reaches the hold goes with the wreck (bar its secure stacks), kept for its pilot', () => {
     const w = world(['lost', 'looter']);
     const [me, them] = w.pilots;
     const num = InSystem.systemId[me.pid];
-    // No bonds, so the loss isn't made whole
-    me.profile().storage = me.profile().storage.filter((s: any) => s.id !== 'insurance_bond');
     me.profile().cargo = [{ id: 'iron_ore', n: 40 }, { id: 'nickel_ore', n: 10 }, { id: 'silicate', n: 10 }, { id: 'copper_ore', n: 10 }, { id: 'ice', n: 10 }];
     const at = { x: 0, y: 170000 };
     w.server.pilots.onDestroyed(me.conn, num, at.x, at.y, 0, 0);
@@ -147,17 +146,18 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(me.profile().wreck).toBeUndefined();
   });
 
-  it('every pilot gets three insurance bonds once, and a bond makes a loss whole', () => {
+  it('there is no insurance: a pilot has a full repair bank instead, and a loss takes from its free part', () => {
     const w = world();
     const { conn, pid, profile } = w.pilots[0];
     const p = profile();
-    p.quests.flags = p.quests.flags.filter((f: string) => f !== 'starter_bonds');
-    p.storage = p.storage.filter((s: any) => s.id !== 'insurance_bond');
-    expect((w.server.pilots as any).grantStarterBonds(p)).toBe(true);
-    expect((w.server.pilots as any).grantStarterBonds(p)).toBe(false);
-    expect(countOf(p.storage, 'insurance_bond')).toBe(3);
+    expect(p.storage.some((s: any) => s.id === 'insurance_bond')).toBe(false);
+    expect((w.server.pilots as any).grantStarterBonds).toBeUndefined();
+    const full = (w.server.pilots as any).bank.cap;
+    expect(p.bank.free).toEqual(full);
     w.server.pilots.onDestroyed(conn, InSystem.systemId[pid], 0, 170000, 0, 0);
-    expect(countOf(profile().storage, 'insurance_bond')).toBe(2);
+    expect(profile().storage.some((s: any) => s.id === 'insurance_bond')).toBe(false);
+    // The starter cost the whole free part
+    expect(Math.round(Object.values(profile().bank.free as Record<string, number>).reduce((a, b) => a + b, 0))).toBe(0);
   });
 
   it('a warband camps on the rim; breaking it pays everyone who fought', () => {

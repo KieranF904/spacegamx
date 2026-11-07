@@ -92,7 +92,8 @@ describe('recipes and costs', () => {
     expect(econ.recipes.recipeFor('part:alloy:hull:sq')!.time).toBe(0);
     expect(econ.recipes.recipeFor('part:alloy:hull:block3')!.time).toBeGreaterThan(0);
     expect(econ.recipes.recipeFor('part:alloy:core:rect2')!.time).toBeGreaterThan(econ.recipes.recipeFor('part:alloy:hull:rect2')!.time);
-    expect(econ.recipes.recipeFor('repair_kit')!.time).toBe(0);
+    expect(econ.recipes.recipeFor('pack_hull')!.time).toBeGreaterThan(0);
+    expect(econ.recipes.recipeFor('repair_kit')).toBeNull();
     expect(econ.recipes.recipeFor('nonsense')).toBeNull();
   });
 

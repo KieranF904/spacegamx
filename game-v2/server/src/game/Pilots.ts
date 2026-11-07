@@ -8,8 +8,8 @@
  * and handles every item action the client asks for:
  *   - cargo ↔ storage (only near a station), jettison, consumables
  *   - hangar refits, which may only use parts the pilot owns
- *   - the rebuild bill when a station regrows lost parts (lent, if they can't pay)
- *   - death: cargo dropped as a pod, the ship wrecked down to its core
+ *   - the repair bank (RepairBank.ts): deposits, the free part, station repair from deposits
+ *   - death: cargo dropped as a wreck, the ship back in the same design with the bank paying for it
  *
  * Guests get a fresh profile that is never saved.
  */
@@ -21,10 +21,11 @@ import {
   Player, Position, Velocity, Rotation, Health, InSystem, Dead, Boost,
   Economy, PlayerProfile, ServerProfileMessage, diffProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint,
   newProfile, migrateProfile, setActiveShip, holdClass, sweeps, STORE_SWEEPS, type StoreSweep, secureHold, SECURE_HOLD, countOf, addTo, removeFrom, hasAll, removeAll, partItemId, buyPrice,
-  BOOST_FUEL_DEFAULT, ShipRecord, SALVAGE, skillValue, refundRetiredSkills, salvageOf, salvageParts, isStructuralItem, parsePartItemId, licenceName, DOCK_FEE_LEVEL, dcos, dsin,
+  BOOST_FUEL_DEFAULT, ShipRecord, SALVAGE, skillValue, type PlacedPart, refundRetiredSkills, salvageOf, salvageParts, isStructuralItem, parsePartItemId, licenceName, DOCK_FEE_LEVEL, dcos, dsin,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { ProfileStore } from '../profile/ProfileStore.js';
+import { RepairBanks } from './RepairBank.js';
 
 /** What Pilots needs to know about a connection */
 export interface PilotConn {
@@ -59,20 +60,18 @@ export interface PilotHost {
 
 /**
  * What dying costs (and what it doesn't):
- *   in safe space   the ship comes back whole (all its materials) and the hold's kept
- *   anywhere else   the hold's lost but for its secure stacks; what isn't salvaged
- *                   into storage stays in the wreck with the cargo, kept for its
- *                   pilot for `wreckMinutes`
- * Every pilot gets `starterBonds` insurance bonds once (each makes one loss whole).
+ *   in safe space   the hold's kept; the wreck holds the machines' contents and all of the ship's minerals
+ *   anywhere else   the hold's lost but for its secure stacks; the wreck holds it, the machines' contents and
+ *                   SALVAGE of the ship's minerals, kept for its pilot for `wreckMinutes`
+ * The ship comes back in the same design, paid for by the repair bank (RepairBank.ts); nothing goes to storage.
  */
 export interface DeathRules {
   secureStacks: number;
   secureUnits: number;
   wreckMinutes: number;
-  starterBonds: number;
 }
 
-export const DEFAULT_DEATH_RULES: DeathRules = { secureStacks: SECURE_HOLD.stacks, secureUnits: SECURE_HOLD.units, wreckMinutes: 15, starterBonds: 3 };
+export const DEFAULT_DEATH_RULES: DeathRules = { secureStacks: SECURE_HOLD.stacks, secureUnits: SECURE_HOLD.units, wreckMinutes: 15 };
 
 export interface PilotsOptions {
   starter: StarterKit;
@@ -80,17 +79,13 @@ export interface PilotsOptions {
   guestShips?: Blueprint[];
   /** Where every pilot appears, joining and respawning, whatever their profile says (the dev server's Rockery); none: where they left off, or home */
   spawn?: (eid: number) => { system: number; x: number; y: number };
-  /** Pilots below this level rebuild lost parts for free */
-  freeRebuildBelowLevel: number;
   death?: Partial<DeathRules>;
   autosaveMs: number;
   /** Clock for autosave and craft jobs (wall time) */
   now?: () => number;
 }
 
-/** Station repair still goes ahead at this share for a pilot who can't pay */
-const FREE_PATCH = 0.25;
-/** A rebuild loan is repaid from this share of every credit earned until it's cleared */
+/** A station loan is repaid from this share of every credit earned until it's cleared */
 export const LOAN_REPAY_SHARE = 0.25;
 
 interface Session {
@@ -99,16 +94,14 @@ interface Session {
   dirty: boolean;
   lastSave: number;
   atStation: boolean;
-  /** Last rebuild status sent (to avoid repeats) */
-  rebuildKey: string;
   /** The last `items` message sent, as JSON (an unchanged one is not sent again) */
   itemsKey?: string;
   /** The last full `profile` the client holds (what a `profileDelta` is cut from; an unchanged one is not sent again) */
   profileSent?: ServerProfileMessage;
-  /** Last time we told them the station covered a rebuild (wall ms) */
-  lastCreditNote: number;
-  /** Station repair owed in fractions of a credit (charged a whole credit at a time) */
-  repairOwed: number;
+  /** The last `repairBank` message sent: when (wall ms) and what (JSON) */
+  bankSent?: { at: number; key: string };
+  /** The bank changed since it was last sent (a station repair paid from it): sent on the next tick, at most once a second */
+  bankDirty?: boolean;
   /** Their saved profile is still loading: the one in hand isn't theirs, so it's never saved */
   loading?: boolean;
   /** Where they last paid a docking fee, and when (a berth is paid once per visit) */
@@ -138,8 +131,20 @@ export class Pilots {
   /** The ship you fly's ammunition loadout, and each gun's first crate (Ammo sets it) */
   loadout?: (p: PlayerProfile) => { load: Bag; first: Record<string, string> };
 
+  /** The repair bank's rules on a profile (RepairBank.ts) */
+  readonly bank: RepairBanks;
+
+  /** What the field machines (feature `machines`) tell the bank: wired by the game once they exist */
+  fieldHooks: {
+    /** A part (uid) of this pilot's ship that a machine is building, repairing or recycling */
+    isClaimed?: (eid: number, uid: number) => boolean;
+    /** Everything inside the ship's machines (job inputs, finished output), for the wreck */
+    machineContents?: (eid: number) => Bag;
+  } = {};
+
   constructor(private host: PilotHost, readonly econ: Economy, private ships: ShipBridge, private store: ProfileStore, private opts: PilotsOptions) {
     this.now = opts.now ?? (() => Date.now());
+    this.bank = new RepairBanks(econ, opts.starter.blueprint);
   }
 
   onEvent(fn: (conn: PilotConn, ev: PilotEvent) => void): void {
@@ -191,13 +196,15 @@ export class Pilots {
 
   /** A new connection plays as a guest until it logs in */
   attach(conn: PilotConn): void {
-    const s: Session = { conn, profile: newProfile(this.opts.starter), dirty: false, lastSave: this.now(), atStation: false, rebuildKey: '', lastCreditNote: 0, repairOwed: 0 };
+    const s: Session = { conn, profile: newProfile(this.opts.starter), dirty: false, lastSave: this.now(), atStation: false };
     for (const bp of this.opts.guestShips ?? []) {
       const slot = s.profile.hangar.indexOf(null);
       if (slot >= 0) s.profile.hangar[slot] = { blueprint: JSON.parse(JSON.stringify(bp)), hp: {}, ghosts: [] };
     }
     this.sessions.set(conn, s);
+    this.bank.ensure(s.profile, this.now());
     this.applyProfile(s, false);
+    this.sendBank(s, true);
     this.emit(conn, { type: 'login' });
   }
 
@@ -237,9 +244,13 @@ export class Pilots {
     // (An upgraded save is written back at once: a migration never runs twice)
     s.dirty = !raw || (raw as { version?: unknown }).version !== profile.version;
     if (this.structureToMaterials(s.profile)) s.dirty = true;
-    if (this.grantStarterBonds(s.profile)) s.dirty = true;
     if (refundRetiredSkills(s.profile)) s.dirty = true;
+    // The repair bank: made full at a first login, refilled to now; the free part pays for what a lost ship is owed
+    if (!s.profile.bank) s.dirty = true;
+    this.bank.ensure(s.profile, this.now());
+    this.payOwedFree(s);
     this.applyProfile(s, true);
+    this.sendBank(s, true);
     this.sendWreck(s);
     if (!raw) this.toast(conn, 'Welcome, pilot. Your Sparrow is fuelled and ready at Sol Central.', 'good');
     this.showNotices(s);
@@ -336,6 +347,7 @@ export class Pilots {
         void this.save(s);
       }
     }
+    this.bankTick(now);
   }
 
   private async save(s: Session): Promise<void> {
@@ -379,6 +391,14 @@ export class Pilots {
       // Same record object as the hangar slot: update it in place
       s.profile.ship.blueprint = ship.blueprint;
       s.profile.ship.hp = hp;
+      // The ghosts as the live ship has them (a part built or planned since, by a machine or the bank), the record's order kept
+      const live = new Set<number>();
+      ship.blueprint.parts.forEach((p, i) => { if (this.ships.isGhost(eid, i)) live.add(p.uid); });
+      const rec = s.profile.ship;
+      const known = (rec.ghosts ?? []).filter((u) => live.has(u));
+      const seen = new Set(known);
+      rec.ghosts = [...known, ...ship.blueprint.parts.filter((p) => live.has(p.uid) && !seen.has(p.uid)).map((p) => p.uid)];
+      if (rec.owed) { rec.owed = rec.owed.filter((u) => live.has(u)); if (!rec.owed.length) delete rec.owed; }
     }
     const system = this.host.systemId(InSystem.systemId[eid]);
     if (system) s.profile.position = { system, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]) };
@@ -414,6 +434,9 @@ export class Pilots {
       setActiveShip(s.profile, { blueprint: JSON.parse(JSON.stringify(this.opts.starter.blueprint)), hp: {}, ghosts: [], plan: this.opts.starter.planFile });
     }
     const rec = s.profile.ship;
+    // (The core always comes back, free)
+    const core = rec.blueprint.parts.find((q) => q.fn === 'core');
+    if (core && rec.ghosts?.includes(core.uid)) rec.ghosts = rec.ghosts.filter((u) => u !== core.uid);
     const ghosts = new Set(rec.ghosts ?? []);
     this.ships.respawnInPlace(eid, rec.blueprint);
     this.ships.setPartHp(eid, (uid) => (ghosts.has(uid) ? 0 : rec.hp[uid] ?? 1));
@@ -426,7 +449,6 @@ export class Pilots {
     if (!s) return;
     this.applyShip(s);
     this.mirror(s);
-    this.sendRebuildStatus(s, true);
     // Its guns may take other crates now
     this.sendProfile(conn);
   }
@@ -459,7 +481,7 @@ export class Pilots {
     this.applyShip(s);
     const at = this.homePoint(s);
     if (at) this.host.place(conn, at.system, at.x, at.y);
-    this.sendRebuildStatus(s, true);
+    this.sendBank(s, true);
   }
 
   // ---------------------------------------------------------------------------
@@ -568,14 +590,6 @@ export class Pilots {
   cargoCapacity(conn: PilotConn): number {
     const nav = this.sessions.get(conn)?.profile.skills.navigation ?? 0;
     return Math.floor((this.ships.get(conn.playerId)?.derived.cargoCapacity ?? 0) * (1 + skillValue('navigation', nav)));
-  }
-
-  /** The rebuild bill for some parts, less the engineering discount */
-  private bill(s: Session, parts: Parameters<Economy['rebuildBill']>[0]): Bag {
-    const f = Math.max(0.4, 1 - skillValue('engineering', s.profile.skills.engineering ?? 0));
-    const out: Bag = {};
-    for (const [id, n] of Object.entries(this.econ.rebuildBill(parts))) out[id] = Math.max(1, Math.ceil(n * f));
-    return out;
   }
 
   cargoUsed(profile: PlayerProfile): number {
@@ -741,14 +755,6 @@ export class Pilots {
     if (!def || this.available(conn, msg.id) <= 0) return;
     const alive = hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid);
     if (!alive) return;
-    if (def.repair) {
-      if (!this.ships.needsRepair(eid)) return this.toast(conn, 'Your ship is already in one piece', 'info');
-      if (!this.ships.isStill(eid)) return this.toast(conn, 'Come to a stop first: repair kits only work on a ship holding still', 'warn');
-      this.take(conn, { [msg.id]: 1 });
-      this.ships.startRepairKit(eid, def.repair);
-      this.toast(conn, `${def.name}: repairing (up to ${def.repair.budget} cr). Hold still: moving or taking a hit wastes the rest`, 'good');
-      return;
-    }
     switch (msg.id) {
       case 'scanner_charge':
         this.take(conn, { scanner_charge: 1 });
@@ -772,37 +778,6 @@ export class Pilots {
   /** Can this pilot use this ship plan in the hangar? */
   knowsPlan(conn: PilotConn, file: string): boolean {
     return !!this.sessions.get(conn)?.profile.plans.includes(file);
-  }
-
-  /**
-   * Station repair wants to regrow a lost part: charge the rebuild bill from
-   * storage (free for new pilots). Returns whether it was paid.
-   */
-  /**
-   * Station repair: `hp` mended at `rate` credits each. Returns the share that
-   * goes ahead: all of it when paid (or free: pilotless ships, low levels);
-   * what the pilot can afford, and never less than a slow free patch.
-   */
-  payRepair(eid: number, hp: number, rate: number): number {
-    const conn = this.connOf(eid);
-    if (!conn || rate <= 0) return 1;
-    const s = this.sessions.get(conn)!;
-    if (s.profile.level < this.opts.freeRebuildBelowLevel) return 1;
-    const cost = hp * rate + s.repairOwed;
-    const whole = Math.floor(cost);
-    if (s.profile.credits >= whole) {
-      s.repairOwed = cost - whole;
-      if (whole > 0) { s.profile.credits -= whole; s.dirty = true; this.mirror(s); }
-      return 1;
-    }
-    const paid = Math.max(0, s.profile.credits);
-    if (paid > 0) { s.profile.credits -= paid; s.dirty = true; this.mirror(s); }
-    s.repairOwed = 0;
-    if (this.now() - s.lastCreditNote > 15_000) {
-      s.lastCreditNote = this.now();
-      this.toast(conn, "You can't cover the repairs, so the crews are patching you up slowly for free", 'info');
-    }
-    return Math.max(FREE_PATCH, paid / cost);
   }
 
   /**
@@ -831,83 +806,11 @@ export class Pilots {
     return { fee, lent };
   }
 
-  payRebuild(eid: number, partIndex: number): boolean {
-    const conn = this.connOf(eid);
-    if (!conn) return true; // pilotless ships rebuild free
-    const s = this.sessions.get(conn)!;
-    const ship = this.ships.get(eid);
-    if (!ship) return false;
-    if (s.profile.level < this.opts.freeRebuildBelowLevel) return true;
-    const q = this.quote(s, this.bill(s, [ship.blueprint.parts[partIndex]]));
-    // Minerals from storage, then cargo; whatever's short the station sells; broke pilots pay what they can and owe the rest
-    for (const [id, n] of Object.entries(q.fromStorage)) removeFrom(s.profile.storage, id, n);
-    for (const [id, n] of Object.entries(q.fromCargo)) removeFrom(s.profile.cargo, id, n);
-    if (q.credits > 0) {
-      const paid = Math.min(q.credits, s.profile.credits);
-      const lent = q.credits - paid;
-      s.profile.credits -= paid;
-      if (lent > 0) s.profile.debt = (s.profile.debt ?? 0) + lent;
-      this.mirror(s);
-      if (lent > 0) this.sendProfile(conn);
-      if (this.now() - s.lastCreditNote > 15_000) {
-        s.lastCreditNote = this.now();
-        this.toast(conn, lent > 0
-          ? `You can't cover the rebuild: the station lent you ${lent} cr (you owe ${s.profile.debt} cr, repaid from ${LOAN_REPAY_SHARE * 100}% of what you earn)`
-          : `Short of minerals: the station supplied them for ${q.credits} cr`, 'info');
-      }
-    }
-    s.dirty = true;
-    this.sendItems(conn);
-    this.sendRebuildStatus(s);
-    return true;
-  }
-
   /**
-   * How a rebuild bill gets paid: minerals from storage then cargo, the rest
-   * bought from the station at market price. If the pilot can't afford that
-   * either, the station lends it (`aid`: a loan, repaid from future earnings),
-   * so nobody is ever stuck with a broken ship.
-   */
-  private quote(s: Session, bill: Bag): { fromStorage: Bag; fromCargo: Bag; short: Bag; credits: number; aid: boolean } {
-    const fromStorage: Bag = {}, fromCargo: Bag = {}, short: Bag = {};
-    let credits = 0;
-    for (const [id, n] of Object.entries(bill)) {
-      const st = Math.min(n, countOf(s.profile.storage, id));
-      const cg = Math.min(n - st, countOf(s.profile.cargo, id));
-      if (st > 0) fromStorage[id] = st;
-      if (cg > 0) fromCargo[id] = cg;
-      const left = n - st - cg;
-      if (left > 0) { short[id] = left; credits += left * buyPrice(this.econ.items, id); }
-    }
-    return { fromStorage, fromCargo, short, credits, aid: credits > s.profile.credits };
-  }
-
-  /** Tell the client what the next rebuild needs (and what's short) */
-  sendRebuildStatus(s: Session, force = false): void {
-    const ship = this.ships.get(s.conn.playerId);
-    if (!ship || ship.kind !== 'ship') return;
-    const lost = ship.blueprint.parts.filter((_, i) => !ship.derived.alive[i] && !this.ships.isGhost(s.conn.playerId, i));
-    const next = lost.length ? this.bill(s, [lost[0]]) : {};
-    const free = s.profile.level < this.opts.freeRebuildBelowLevel;
-    const q = free ? { short: {}, credits: 0, aid: false } : this.quote(s, next);
-    const key = `${lost.length}|${JSON.stringify(q.short)}|${q.credits}|${q.aid}`;
-    if (!force && key === s.rebuildKey) return;
-    s.rebuildKey = key;
-    this.host.send(s.conn, { type: 'rebuild', missing: lost.length, next: free ? {} : next, short: q.short, credits: q.credits, aid: q.aid, debt: s.profile.debt ?? 0, freeBelowLevel: this.opts.freeRebuildBelowLevel });
-  }
-
-  rebuildStatus(conn: PilotConn): void {
-    const s = this.sessions.get(conn);
-    if (s) this.sendRebuildStatus(s, true);
-  }
-
-  /**
-   * The pilot's ship was destroyed. Their cargo drops where they died. The
-   * ship is lost: SALVAGE of its minerals comes back to storage as ore (all of
-   * them with an insurance bond), and its components in full, and it goes
-   * back to its hangar slot as a design on order, rebuilt as the refinery and
-   * fabricator get through it (Hangar.tick); it can't be flown until it's
-   * whole. Meanwhile they fly a loaner: a free starter ship, good as new.
+   * The pilot's ship was destroyed. Their cargo drops where they died, in a wreck kept for them, with what was inside the
+   * ship's machines and SALVAGE of its minerals (all of them in safe space); nothing goes to storage. There is no loaner
+   * and no insurance: they respawn at home in the same design, the core free, and the repair bank pays for the rest
+   * (RepairBank.ts respawn): the free part at once, core outward, then the deposits over time. An empty bank means a bare core.
    */
   onDestroyed(conn: PilotConn, systemNum: number, x: number, y: number, vx: number, vy: number, cause: Record<string, unknown> = {}): void {
     const s = this.sessions.get(conn);
@@ -924,7 +827,7 @@ export class Pilots {
     }
     const D = this.death;
     const safe = !!this.host.safeAt?.(systemNum, x, y);
-    this.track(conn, 'death', { system: this.host.systemId(systemNum), x: Math.round(x), y: Math.round(y), safe, ship: p.ship.blueprint.name, loaner: !!p.ship.loaner, parts: p.ship.blueprint.parts.length, cargo: p.cargo.reduce((n, st) => n + st.n, 0), deaths: (p.stats.deaths ?? 0) + 1, ...cause });
+    this.track(conn, 'death', { system: this.host.systemId(systemNum), x: Math.round(x), y: Math.round(y), safe, ship: p.ship.blueprint.name, parts: p.ship.blueprint.parts.length, cargo: p.cargo.reduce((n, st) => n + st.n, 0), deaths: (p.stats.deaths ?? 0) + 1, ...cause });
     // The hold: kept whole in safe space; elsewhere its secure stacks stay (its most valuable few), the rest goes with the wreck
     const cargo: Bag = {};
     if (!safe) {
@@ -938,37 +841,23 @@ export class Pilots {
       p.cargo = kept;
     }
     const rec = p.ship;
-    let note = '';
-    if (!rec.loaner) {
-      const ghosts = new Set(rec.ghosts ?? []);
-      const built = rec.blueprint.parts.filter((q) => !ghosts.has(q.uid));
-      const insured = !safe && countOf(p.storage, 'insurance_bond') > 0;
-      if (insured) removeFrom(p.storage, 'insurance_bond', 1);
-      const whole = safe || insured;
-      const salvage = salvageParts(this.econ, built, whole ? 1 : SALVAGE);
-      for (const [id, n] of Object.entries(salvage)) addTo(p.storage, id, n);
-      // What wasn't salvaged stays in the wreck, with the hold
-      if (!whole) {
-        const all = salvageParts(this.econ, built, 1);
-        for (const [id, n] of Object.entries(all)) { const left = n - (salvage[id] ?? 0); if (left > 0) cargo[id] = (cargo[id] ?? 0) + left; }
-      }
-      // Back to the hangar as a design on order, core first
-      const core = rec.blueprint.parts.find((q) => q.fn === 'core');
-      rec.ghosts = [...(core ? [core.uid] : []), ...rec.blueprint.parts.filter((q) => q !== core).map((q) => q.uid)];
-      rec.hp = {};
-      rec.lost = true;
-      rec.auto = true;
-      const loaner = this.loaner();
-      let slot = p.hangar.findIndex((r) => r === null);
-      if (slot < 0) { p.hangar.push(loaner); slot = p.hangar.length - 1; } else p.hangar[slot] = loaner;
-      setActiveShip(p, loaner, slot);
-      note = safe ? `Your ${rec.blueprint.name} was destroyed in safe space: all of it is salvaged and your hold is untouched. It's being rebuilt in your hangar; fly the loaner meanwhile`
-        : insured ? `Your ${rec.blueprint.name} was destroyed. An insurance bond covered all of its materials (${countOf(p.storage, 'insurance_bond')} left); it's being rebuilt in your hangar. Fly the loaner meanwhile`
-        : `Your ${rec.blueprint.name} was destroyed. ${Math.round(SALVAGE * 100)}% of its materials and every component are salvaged: it's being rebuilt in your hangar. Fly the loaner meanwhile`;
-    } else {
-      // A lost loaner: another one
-      setActiveShip(p, this.loaner(), p.activeSlot);
-    }
+    const standing = new Set(rec.ghosts ?? []);
+    const built = rec.blueprint.parts.filter((q) => !standing.has(q.uid));
+    // The wreck also holds the machines' contents (or what was saved of them) and the built parts' minerals
+    const inMachines = this.fieldHooks.machineContents?.(conn.playerId) ?? rec.field?.held ?? {};
+    for (const [id, n] of Object.entries(inMachines)) if (n > 0) cargo[id] = (cargo[id] ?? 0) + n;
+    for (const [id, n] of Object.entries(salvageParts(this.econ, built, safe ? 1 : SALVAGE))) cargo[id] = (cargo[id] ?? 0) + n;
+    // (Nothing is inside the machines now, and a recycling queue means nothing on a ship that is all ghosts)
+    if (rec.field) { delete rec.field.held; delete rec.field.recycle; if (!Object.keys(rec.field).length) delete rec.field; }
+    // Back in the same design: the core free, the free part pays core outward, the rest is owed
+    this.bank.ensure(p, this.now());
+    const back = this.bank.respawn(p, rec, (uid) => this.isClaimed(conn.playerId, uid));
+    const deposits = Object.keys(p.bank?.deposits ?? {}).length > 0;
+    let note = `Your ${rec.blueprint.name} was destroyed. ` + (back.owed <= 0
+      ? 'Your repair bank rebuilt all of it'
+      : back.paid > 0
+        ? `Your repair bank rebuilt ${back.paid} part${back.paid > 1 ? 's' : ''}; ${back.owed} more come back ${deposits ? 'from your deposits and ' : ''}as the bank refills`
+        : `You are back as a bare core: ${back.owed} part${back.owed > 1 ? 's' : ''} come back ${deposits ? 'from your deposits and ' : ''}as your repair bank refills`);
     // The wreck: kept for its pilot a while, marked on their map
     const sysId = this.host.systemId(systemNum);
     const key = this.keyOf(conn);
@@ -977,16 +866,168 @@ export class Pilots {
       const eid = kept ? this.host.spawnWreck!(systemNum, x, y, vx * 0.3, vy * 0.3, cargo, key!, D.wreckMinutes * 60) : this.host.spawnPod(systemNum, x, y, vx * 0.5, vy * 0.5, cargo);
       if (kept && eid >= 0) {
         p.wreck = { system: sysId!, x: Math.round(x), y: Math.round(y), until: this.now() + D.wreckMinutes * 60_000 };
-        note += `${note ? '. ' : ''}Your wreck holds your cargo${rec.loaner ? '' : ' and the rest of its materials'}: it's marked on your map and kept for you for ${D.wreckMinutes} minutes`;
+        note += `. Your wreck holds your cargo and the rest of its materials: it's marked on your map and kept for you for ${D.wreckMinutes} minutes`;
       }
     }
-    if (!safe && p.cargo.length) note += `${note ? '. ' : ''}Your secure hold kept ${p.cargo.length} stack${p.cargo.length > 1 ? 's' : ''}`;
-    if (note) this.toast(conn, note, 'warn');
+    if (!safe && p.cargo.length) note += `. Your secure hold kept ${p.cargo.length} stack${p.cargo.length > 1 ? 's' : ''}`;
+    this.toast(conn, note, 'warn');
     p.stats.deaths = (p.stats.deaths ?? 0) + 1;
     s.dirty = true;
     this.sendItems(conn);
     this.sendWreck(s);
+    this.sendBank(s, true);
     void this.save(s);
+  }
+
+  // ---------------------------------------------------------------------------
+  // The repair bank (RepairBank.ts holds the rules; this is the sessions, the live ship and the messages)
+  // ---------------------------------------------------------------------------
+
+  /** A machine of the pilot's ship is working on this part (uid): the bank leaves it alone */
+  isClaimed(eid: number, uid: number): boolean {
+    return this.fieldHooks.isClaimed?.(eid, uid) ?? false;
+  }
+
+  /** The free part's spare (the top of it), what a field machine may use for repairs of the ship's own design */
+  bankSpare(eid: number): Bag {
+    const conn = this.connOf(eid);
+    const s = conn && this.sessions.get(conn);
+    return s ? this.bank.spare(s.profile) : {};
+  }
+
+  /** Take a bill from the spare (all or nothing) */
+  spendBankSpare(eid: number, bill: Bag): boolean {
+    const conn = this.connOf(eid);
+    const s = conn && this.sessions.get(conn);
+    if (!s || !this.bank.spendSpare(s.profile, bill)) return false;
+    this.bankChanged(s);
+    return true;
+  }
+
+  /** Passing a station (bridge/rebuild.ts repairStep): the deposits pay to mend a damaged part. A pilotless ship is mended free */
+  bankRepair(eid: number, part: PlacedPart, missing: number): boolean {
+    const conn = this.connOf(eid);
+    const s = conn && this.sessions.get(conn);
+    if (!s) return true;
+    if (!this.bank.payRepair(s.profile, part, missing)) return false;
+    this.bankChanged(s);
+    return true;
+  }
+
+  /** Passing a station: the deposits pay to regrow a missing part */
+  bankRebuild(eid: number, part: PlacedPart): boolean {
+    const conn = this.connOf(eid);
+    const s = conn && this.sessions.get(conn);
+    if (!s) return true;
+    if (!this.bank.payRebuild(s.profile, part)) return false;
+    this.bankChanged(s);
+    return true;
+  }
+
+  /** The bank changed in passing (a repair paid): saved with the profile, sent within a second */
+  private bankChanged(s: Session): void {
+    s.dirty = true;
+    s.bankDirty = true;
+  }
+
+  /** `bankDeposit`: items from the hold or storage into the deposits, at a station, only what a bank takes */
+  bankDeposit(conn: PilotConn, items: Bag, from?: 'cargo' | 'storage'): void {
+    const s = this.sessions.get(conn);
+    if (!s || s.loading || !items || typeof items !== 'object') return;
+    if (!this.atStation(conn)) return this.toast(conn, 'Put things in your repair bank at a station', 'warn');
+    const asked: Bag = {};
+    for (const [id, n] of Object.entries(items).slice(0, 64)) if (typeof id === 'string' && Number.isFinite(Number(n)) && Number(n) >= 1) asked[id] = Math.floor(Number(n));
+    this.bank.ensure(s.profile, this.now());
+    const moved: Bag = {}, refused = new Set<string>();
+    for (const where of from ? [from] : (['cargo', 'storage'] as const)) {
+      const want: Bag = {};
+      for (const [id, n] of Object.entries(asked)) { const left = n - (moved[id] ?? 0); if (left > 0) want[id] = left; }
+      const r = this.bank.deposit(s.profile, want, where);
+      for (const [id, n] of Object.entries(r.moved)) moved[id] = (moved[id] ?? 0) + n;
+      for (const id of r.refused) refused.add(id);
+    }
+    const total = Object.values(moved).reduce((a, n) => a + n, 0);
+    if (refused.size) this.toast(conn, `${[...refused].map((id) => this.econ.items.get(id)?.name ?? id).join(', ')} can't go in the repair bank: it takes packs, refined materials and components`, 'warn');
+    if (!total) { if (!refused.size) this.toast(conn, 'Nothing to put in the repair bank', 'info'); return; }
+    s.dirty = true;
+    this.toast(conn, `Put ${total} item${total > 1 ? 's' : ''} in your repair bank`, 'good');
+    this.sendItems(conn);
+    this.payOwedFree(s);
+    this.sendBank(s, true);
+    this.saveNow(conn);
+  }
+
+  /** `devBank` (net/handlers/bank.ts has checked this is a dev server): fill or empty the free part, clear or grant deposits */
+  devBank(conn: PilotConn, action: string, items?: Bag): void {
+    const s = this.sessions.get(conn);
+    if (!s || s.loading) return;
+    if (!this.bank.dev(s.profile, action, items, this.now())) return this.toast(conn, 'Nothing to do', 'info');
+    s.dirty = true;
+    this.payOwedFree(s);
+    this.sendBank(s, true);
+    this.toast(conn, `Repair bank (dev): ${action}`, 'info');
+  }
+
+  /** The free part pays the owed parts of the ship it can, core outward, building them on the live ship */
+  private payOwedFree(s: Session): void {
+    const eid = s.conn.playerId;
+    const rec = s.profile.ship;
+    if (!rec.owed?.length) return;
+    const uids = this.bank.payFree(s.profile, rec, (uid) => this.isClaimed(eid, uid));
+    this.installOwed(s, uids);
+  }
+
+  /** Parts the bank has just built are installed on the live ship (if it is flying), at full HP */
+  private installOwed(s: Session, uids: number[]): void {
+    if (!uids.length) return;
+    const eid = s.conn.playerId;
+    if (entityExists(this.host.world, eid) && hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid)) {
+      for (const uid of uids) this.ships.installGhost(eid, uid);
+    }
+    s.dirty = true;
+    if (!s.profile.ship.owed?.length) this.toast(s.conn, 'Your repair bank has rebuilt your ship', 'good');
+  }
+
+  /** Once a tick: refill the free part by the clock, rebuild what is owed (free part as it refills, deposits at a fabricator's pace), send changes */
+  private bankTick(now: number): void {
+    const n = ++this.bankTicks;
+    if (n % 15 !== 0) return;
+    for (const s of this.sessions.values()) {
+      if (s.loading) continue;
+      const p = s.profile;
+      this.bank.ensure(p, now);
+      const eid = s.conn.playerId;
+      const alive = entityExists(this.host.world, eid) && hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid);
+      if (alive && p.ship.owed?.length) {
+        this.payOwedFree(s);
+        const uid = this.bank.stepDeposits(p, p.ship, 15, (u) => this.isClaimed(eid, u));
+        if (uid !== null) { this.installOwed(s, [uid]); s.bankDirty = true; }
+      }
+      this.sendBank(s, false, now);
+    }
+  }
+
+  private bankTicks = 0;
+
+  /**
+   * Tell the client its bank: at once when `force` (login, a deposit, a death), else when it changed (at most once a
+   * second) or, while the free part refills, once a minute
+   */
+  sendBank(s: Session, force = false, now = this.now()): void {
+    const owed = this.bank.owedUids(s.profile.ship).length;
+    const msg = this.bank.view(s.profile, owed);
+    const key = JSON.stringify([msg.free, msg.deposits, msg.rebuilding ?? 0]);
+    const last = s.bankSent;
+    const filling = msg.fullIn > 0;
+    if (!force) {
+      if (!last) { /* never sent: send */ }
+      else if (s.bankDirty && key !== last.key && now - last.at >= 1000) { /* changed */ }
+      else if (filling && now - last.at >= 60_000) { /* refilling */ }
+      else return;
+    }
+    s.bankDirty = false;
+    s.bankSent = { at: now, key };
+    this.host.send(s.conn, msg);
   }
 
   private get death(): DeathRules {
@@ -1021,15 +1062,6 @@ export class Pilots {
     this.host.send(s.conn, { type: 'wreck', system: w.system, x: w.x, y: w.y, seconds: Math.round((w.until - this.now()) / 1000) });
   }
 
-  /** Every pilot gets a few insurance bonds, once (old saves included) */
-  private grantStarterBonds(p: PlayerProfile): boolean {
-    if (p.quests.flags.includes('starter_bonds')) return false;
-    p.quests.flags.push('starter_bonds');
-    const n = this.death.starterBonds;
-    if (n > 0) addTo(p.storage, 'insurance_bond', n);
-    return true;
-  }
-
   /** One-time messages left on the profile (a migration's: the v5 ship wipe's refund), shown once and cleared */
   private showNotices(s: Session): void {
     const list = s.profile.notices;
@@ -1042,11 +1074,6 @@ export class Pilots {
     }
     delete s.profile.notices;
     s.dirty = true;
-  }
-
-  /** A free starter ship, lent while your own is rebuilt */
-  private loaner(): ShipRecord {
-    return { blueprint: JSON.parse(JSON.stringify(this.opts.starter.blueprint)), hp: {}, ghosts: [], plan: this.opts.starter.planFile, loaner: true };
   }
 
   /** Scrap modules from storage (or the hold) at a station: SALVAGE of their minerals as ore, their components in full */

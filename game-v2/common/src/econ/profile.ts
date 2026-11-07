@@ -18,6 +18,7 @@ import type { TraceLedger } from './traces.js';
 import type { Outpost } from './outpost.js';
 import type { ShipLoadout } from './loadout.js';
 import type { Economy } from './economy.js';
+import { fieldUpdate } from './fieldUpdate.js';
 import { designUpdateShips, fingerprint, type DesignUpdate, type DesignUpdateReport } from './designUpdate.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import { cleanBank, type RepairBank } from './field/bank.js';
@@ -88,7 +89,7 @@ function cleanCodex(v: unknown): PlayerProfile['codex'] {
 
 export const QUICKBAR_SLOTS = 5;
 
-export const PROFILE_VERSION = 5;
+export const PROFILE_VERSION = 6;
 
 /** A ship as saved: its design and each part's HP fraction by uid (absent = full, 0 = destroyed) */
 export interface ShipRecord {
@@ -106,8 +107,10 @@ export interface ShipRecord {
   paused?: boolean;
   /** Order priority: lower goes first (econ/orders.ts) */
   rank?: number;
-  /** The free starter ship you're lent while yours is rebuilt (it isn't yours to refit or scrap) */
+  /** Old saves only (loaners are gone, v6): nothing writes it, and the field update drops such records */
   loaner?: boolean;
+  /** Ghosts owed to a death (uids): parts of its own design the repair bank rebuilds, apart from planned (field plan) ones it never pays (server/src/game/RepairBank.ts) */
+  owed?: number[];
   /** Its ammunition loadout (econ/loadout.ts): crates to carry, topped up from storage at a station, and which each gun opens first */
   ammo?: ShipLoadout;
   /** Field work kept between sessions: machine switches, the recycling queue, planned parts waiting, what the machines hold (econ/field/record.ts) */
@@ -227,7 +230,7 @@ export function starterKit(blueprint: Blueprint): StarterKit {
     credits: 300,
     storage: {
       iron_ore: 40, nickel_ore: 20, silicate: 20, copper_ore: 10,
-      alloy_plate: 14, copper_wire: 6, repair_kit: 2, boost_cell: 2,
+      alloy_plate: 14, copper_wire: 6, pack_hull: 2, boost_cell: 2,
     },
     home: 'sol_station_central',
     // (Inside the star, so never "where they left off": a new pilot appears at their home station, Pilots.homePoint)
@@ -249,7 +252,7 @@ export function newProfile(kit: StarterKit, now = new Date().toISOString()): Pla
     hangar: [],
     activeSlot: 0,
     roster: [],
-    quickbar: ['repair_kit', 'boost_cell', 'scanner_charge', null, null],
+    quickbar: ['boost_cell', 'scanner_charge', null, null, null],
     plans: [kit.planFile],
     recipes: [],
     jobs: [],
@@ -288,6 +291,7 @@ function cleanRecord(s: ShipRecord): ShipRecord {
     ...(s.paused ? { paused: true } : {}),
     ...(Number.isFinite(s.rank) ? { rank: s.rank } : {}),
     ...(s.loaner ? { loaner: true } : {}),
+    ...(Array.isArray(s.owed) && s.owed.some(Number.isInteger) ? { owed: s.owed.filter((u) => Number.isInteger(u)) } : {}),
     ...cleanLoadout(s.ammo),
     ...cleanFieldRecord(s.field),
   };
@@ -363,6 +367,8 @@ export interface MigrateOptions {
   tuning?: ShipTuning;
   /** Told what the design update did, when it runs */
   onDesignUpdate?: (r: DesignUpdateReport) => void;
+  /** The wall clock (ms) the v6 field update starts the repair bank at (default: now) */
+  now?: number;
 }
 
 /**
@@ -447,6 +453,11 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     const account = opts.username !== undefined ? opts.designUpdate?.accounts[opts.username] : undefined;
     const r = designUpdateShips(out, { econ: opts.econ, kit, account, blueprints: opts.designUpdate?.blueprints, was: saved!, tuning: opts.tuning });
     opts.onDesignUpdate?.(r);
+  }
+  // The field update (v6): kits and bonds become bank deposits, loaners go (econ/fieldUpdate.ts)
+  if (was < 6) {
+    if (!opts.econ) { out.version = 5; return out; }
+    fieldUpdate(out, opts.econ, kit, opts.now);
   }
   return out;
 }

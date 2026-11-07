@@ -81,7 +81,7 @@
           "max": 8
         },
         {
-          "item": "repair_kit",
+          "item": "pack_hull",
           "chance": 0.6,
           "min": 1,
           "max": 2
@@ -814,7 +814,7 @@
           "max": 1
         },
         {
-          "item": "repair_kit",
+          "item": "pack_hull",
           "chance": 0.6,
           "min": 1,
           "max": 2
@@ -896,7 +896,7 @@
           "max": 1
         },
         {
-          "item": "repair_kit",
+          "item": "pack_hull",
           "chance": 0.6,
           "min": 1,
           "max": 2
@@ -1135,7 +1135,7 @@
           "max": 2
         },
         {
-          "item": "repair_kit",
+          "item": "pack_hull",
           "chance": 0.6,
           "min": 1,
           "max": 3
@@ -1215,7 +1215,7 @@
           "max": 1
         },
         {
-          "item": "field_repair_kit",
+          "item": "pack_wiring",
           "chance": 0.4,
           "min": 1,
           "max": 1
@@ -1375,7 +1375,7 @@
           "max": 1
         },
         {
-          "item": "field_repair_kit",
+          "item": "pack_wiring",
           "chance": 0.5,
           "min": 1,
           "max": 1
@@ -1461,7 +1461,7 @@
           "max": 1
         },
         {
-          "item": "insurance_bond",
+          "item": "pack_mechanism",
           "chance": 0.3,
           "min": 1,
           "max": 1
@@ -1541,7 +1541,7 @@
           "max": 2
         },
         {
-          "item": "field_repair_kit",
+          "item": "pack_wiring",
           "chance": 0.6,
           "min": 1,
           "max": 2
@@ -1621,7 +1621,7 @@
           "max": 1
         },
         {
-          "item": "nanite_repair_kit",
+          "item": "pack_optics",
           "chance": 0.4,
           "min": 1,
           "max": 1

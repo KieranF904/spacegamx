@@ -112,8 +112,6 @@ export interface DesignUpdateReport {
   planItemsDropped: Bag;
   /** No ship left: a fresh starter in slot 1 */
   freshStarter: boolean;
-  /** Ships left, none of them flyable yet: a loaner to fly meanwhile */
-  loaner: boolean;
   /** The slot flown afterwards (0-based) */
   activeSlot: number;
 }
@@ -135,7 +133,7 @@ const addBag = (bag: Bag, id: string, n: number) => { if (n > 0) bag[id] = (bag[
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const sameSave = (a: SaveFingerprint | null | undefined, b: SaveFingerprint) => !!a && a.name === b.name && a.parts === b.parts;
 
-/** A record's built parts (not ghosts, not at 0 HP) as materials in full, plus its socketed gems; a loaner gives nothing */
+/** A record's built parts (not ghosts, not at 0 HP) as materials in full, plus its socketed gems; an old save's loaner gives nothing */
 function breakDown(econ: Economy, rec: ShipRecord, refund: Bag, stock: Bag | null): void {
   if (rec.loaner) return;
   const ghosts = new Set(rec.ghosts ?? []);
@@ -212,7 +210,7 @@ export function designUpdateShips(p: PlayerProfile, input: DesignUpdateInput): D
   const acc = input.account && input.account !== 'wipe' ? input.account : undefined;
   const report: DesignUpdateReport = {
     mode: acc ? 'swap' : 'wipe', swapped: [], wiped: [], slotsDeleted: 0, designsDeleted: 0, refund: {}, cargoMoved: {},
-    jobsDetached: 0, debtForgiven: 0, planItemsDropped: {}, freshStarter: false, loaner: false, activeSlot: 0,
+    jobsDetached: 0, debtForgiven: 0, planItemsDropped: {}, freshStarter: false, activeSlot: 0,
   };
   const refund = report.refund;
   const noRemake: WipeReason = input.account === 'wipe' ? 'account wiped' : 'not mapped';
@@ -282,24 +280,28 @@ export function designUpdateShips(p: PlayerProfile, input: DesignUpdateInput): D
   p.roster = [];
 
   // What's flown
-  const starter = (loaner: boolean): ShipRecord => ({ blueprint: clone(kit.blueprint), hp: {}, ghosts: [], plan: kit.planFile, ...(loaner ? { loaner: true } : {}) });
+  const starter = (): ShipRecord => ({ blueprint: clone(kit.blueprint), hp: {}, ghosts: [], plan: kit.planFile });
   if (!left) {
     report.freshStarter = true;
     report.debtForgiven = p.debt ?? 0;
     delete p.debt;
     p.hangar = Array.from({ length: Math.max(1, unlocks(p).hangarSlots) }, () => null);
-    p.hangar[0] = starter(false);
+    p.hangar[0] = starter();
     p.activeSlot = 0;
   } else {
     while (hangar.length < unlocks(p).hangarSlots) hangar.push(null);
     p.hangar = hangar;
     let slot = flyable(hangar[p.activeSlot]) ? p.activeSlot : hangar.findIndex(flyable);
     if (slot < 0) {
-      // (Every ship left is still being built: a loaner meanwhile, as when a ship is lost)
-      report.loaner = true;
-      slot = hangar.indexOf(null);
-      if (slot < 0) { hangar.push(null); slot = hangar.length - 1; }
-      hangar[slot] = starter(true);
+      // (Every ship left is still being built: the first is flown as it is, its unbuilt parts owed to the repair bank, as
+      // when a ship is lost; no loaner any more, v6)
+      slot = hangar.findIndex(Boolean);
+      const r = hangar[slot]!;
+      const core = r.blueprint.parts.find((q) => q.fn === 'core');
+      delete r.lost; delete r.auto; delete r.paused; delete r.rank;
+      r.ghosts = (r.ghosts ?? []).filter((u) => u !== core?.uid);
+      r.owed = [...r.ghosts];
+      r.hp = {};
     }
     p.activeSlot = slot;
   }
@@ -327,7 +329,6 @@ export function designUpdateNotice(r: DesignUpdateReport, kit: StarterKit): { te
   else if (gone.length) parts.push(`${listed(gone.map((w) => `the ${w.from.name}`)).replace(/^t/, 'T')} could not be rebuilt, so ${gone.length > 1 ? 'they were' : 'it was'} broken down into storage.`);
   const lostDesigns = r.wiped.filter((w) => w.design !== undefined);
   if (lostDesigns.length) parts.push(`Your saved design${lostDesigns.length > 1 ? 's' : ''} ${listed(lostDesigns.map((w) => w.from.name))} could not be remade and ${lostDesigns.length > 1 ? 'were' : 'was'} removed.`);
-  if (r.loaner) parts.push('You have a loaner to fly while they are built.');
   parts.push("You're docked at home.");
   if (r.debtForgiven) parts.push(`Your rebuild loan (${r.debtForgiven} credits) is forgiven.`);
   if (Object.keys(r.cargoMoved).length) parts.push('Your hold was moved to storage.');

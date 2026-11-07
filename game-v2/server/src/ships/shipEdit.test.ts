@@ -128,7 +128,7 @@ describe('hangar refits in the live game', () => {
 });
 
 describe('death and rebuilding', () => {
-  it('a destroyed ship drops its cargo, goes back to the hangar to be rebuilt from its salvage, and you fly a loaner', () => {
+  it('a destroyed ship drops its cargo and comes back in the same design, paid for by the repair bank: no loaner, nothing to storage', () => {
     const { server, t, pid } = liveServer();
     (server as any).shipEditAnywhere = true;
     grantParts(server, pid, arrow);
@@ -136,7 +136,8 @@ describe('death and rebuilding', () => {
     server.pilots.give(connOf(server, pid), { iron_ore: 10 });
     expect(countOf(profileOf(server, pid).cargo, 'iron_ore')).toBe(10);
     const slot = profileOf(server, pid).activeSlot;
-    const ironBefore = countOf(profileOf(server, pid).storage, 'iron_ore');
+    const storage = JSON.stringify(profileOf(server, pid).storage);
+    const bankBefore = Object.values(profileOf(server, pid).bank!.free).reduce((a, b) => a + b, 0);
 
     // Out past the safe space of inner Sol, where a loss costs something
     Position.x[pid] = 90000; Position.y[pid] = 90000;
@@ -144,83 +145,48 @@ describe('death and rebuilding', () => {
     for (let i = 0; i < 3; i++) server.step();
     // One stack: the secure hold keeps it
     expect(profileOf(server, pid).cargo).toEqual([{ id: 'iron_ore', n: 10 }]);
-    // What wasn't salvaged is in the wreck where the ship died, kept for its pilot and marked for them
+    // The wreck is where the ship died, kept for its pilot and marked for them
     const world = server.getWorld();
     const pods = [...Array(5000).keys()].filter((e) => bitecs.entityExists(world, e) && (server as any).pods.get(e) && Math.hypot(Position.x[e] - 90000, Position.y[e] - 90000) < 600);
     expect(pods.length).toBe(1);
     expect(profileOf(server, pid).wreck?.system).toBe('sol');
+    // (It holds 70% of the ship's minerals, in the wreck: none went to storage)
+    const wreck = (server as any).pods.get(pods[0]) as Record<string, number>;
+    expect(Object.values(wreck).reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+    expect(JSON.stringify(profileOf(server, pid).storage)).toBe(storage);
 
-    // The Arrow is back in its slot as a design on order, every part to rebuild, and can't be flown yet
+    // The Arrow is the active ship still: no loaner, no lost flag, no order in the hangar. The free part paid what it could
     const p = profileOf(server, pid);
-    const lost = p.hangar[slot]!;
-    expect(lost.blueprint.name).toBe('Arrow');
-    expect(lost.lost).toBe(true);
-    expect(lost.auto).toBe(true);
-    expect(lost.ghosts!.length).toBe(arrow.parts.length);
-    // Its salvage is in storage: ore, not plate
-    expect(countOf(p.storage, 'iron_ore')).toBeGreaterThan(ironBefore);
+    expect(p.activeSlot).toBe(slot);
+    const rec = p.hangar[slot]!;
+    expect(rec).toBe(p.ship);
+    expect(rec.blueprint.name).toBe('Arrow');
+    expect(rec.loaner).toBeUndefined();
+    expect(rec.lost).toBeUndefined();
+    expect(rec.auto).toBeUndefined();
+    expect(p.hangar.some((r) => r?.loaner)).toBe(false);
+    const core = arrow.parts.find((q) => q.fn === 'core')!;
+    expect(rec.ghosts).not.toContain(core.uid);
+    expect(Object.values(p.bank!.free).reduce((a, b) => a + b, 0)).toBeLessThan(bankBefore);
+    // Whatever it couldn't pay is owed, and is exactly the ghosts
+    expect(new Set(rec.owed ?? [])).toEqual(new Set(rec.ghosts));
 
     t.send({ type: 'respawn' } as any);
     const again = t.getPlayerId();
     expect(Health.current[again]).toBeGreaterThan(0);
-    // A loaner starter, whole
     const ship = server.getShips().get(again)!;
-    expect(ship.blueprint.name).toBe('Sparrow T');
-    expect(ship.derived.alive.every(Boolean)).toBe(true);
-    expect(profileOf(server, again).ship.loaner).toBe(true);
-    t.send({ type: 'slotFly', slot } as any);
-    expect(profileOf(server, again).ship.loaner).toBe(true);
+    expect(ship.blueprint.name).toBe('Arrow');
+    expect(profileOf(server, again).ship.loaner).toBeUndefined();
+    // Built parts are the ones the bank paid for
+    const built = ship.blueprint.parts.filter((_, i) => !server.getShips().isGhost(again, i)).length;
+    expect(built).toBe(arrow.parts.length - (rec.ghosts ?? []).length);
   });
 
-  it('regrowing lost parts costs common minerals, or credits for what you lack, and is never out of reach', () => {
+  it('a station loan is repaid from a quarter of what comes in (docking fees still lend)', () => {
     const { server, pid } = liveServer();
-    const ships = server.getShips();
-    (ships as any).host.nearRepairSite = () => true;
-    // Out in empty space, so nothing else knocks parts off meanwhile
-    const park = () => { Position.x[pid] = 40000; Position.y[pid] = 40000; };
     const conn = connOf(server, pid);
     const profile = profileOf(server, pid);
-    // The left wing tip hangs off the hull beside it alone, so losing it orphans nothing else
-    const hullIdx = ships.get(pid)!.blueprint.parts.findIndex((p) => p.fn === 'hull' && p.piece === 'tri');
-    const restoreTicks = ships.tuning.repair!.restoreTicks + ships.tuning.repair!.intervalTicks * 2;
-    const missing = () => ships.get(pid)!.derived.alive.filter((a) => !a).length;
-
-    // Level 1: free
-    ships.damagePartFraction(pid, hullIdx, 1);
-    server.step();
-    expect(missing()).toBeGreaterThan(0);
-    const iron = countOf(profile.storage, 'iron_ore');
-    for (let i = 0; i < restoreTicks * 3 && missing() > 0; i++) { park(); server.step(); }
-    expect(missing()).toBe(0);
-    expect(countOf(profile.storage, 'iron_ore')).toBe(iron);
-
-    // Level 5 with no minerals: the station sells them, for credits
-    server.pilots.addXp(conn, 5000);
-    expect(profile.level).toBeGreaterThanOrEqual(3);
-    profile.storage = profile.storage.filter((s) => server.econ.items.get(s.id)?.category !== 'mineral');
-    profile.cargo = [];
-    const bill = server.econ.rebuildBill([ships.get(pid)!.blueprint.parts[hullIdx]]);
-    expect(Object.keys(bill).length).toBeGreaterThan(0);
-    for (const id of Object.keys(bill)) expect(server.econ.items.get(id)!.category).toBe('mineral');
-    const price = Object.entries(bill).reduce((t, [id, n]) => t + n * buyPrice(server.econ.items, id), 0);
-    profile.credits = 1000;
-    ships.damagePartFraction(pid, hullIdx, 1);
-    park(); server.step();
-    expect(missing()).toBeGreaterThan(0);
-    for (let i = 0; i < restoreTicks * 3 && missing() > 0; i++) { park(); server.step(); }
-    expect(missing()).toBe(0);
-    expect(profile.credits).toBe(1000 - price);
-
-    // Broke and no minerals: never stuck, the station lends what they can't pay
-    profile.credits = Math.floor(price / 2);
-    ships.damagePartFraction(pid, hullIdx, 1);
-    park(); server.step();
-    expect(missing()).toBeGreaterThan(0);
-    for (let i = 0; i < restoreTicks * 3 && missing() > 0; i++) { park(); server.step(); }
-    expect(missing()).toBe(0);
-    expect(profile.credits).toBe(0);
-    expect(profile.debt).toBe(price - Math.floor(price / 2));
-    // A quarter of what comes in goes to the loan until it's clear
+    profile.credits = 0;
     profile.debt = 1000;
     server.pilots.addCredits(conn, 100);
     expect(profile.credits).toBe(75);
@@ -230,18 +196,6 @@ describe('death and rebuilding', () => {
     server.pilots.addCredits(conn, 10_000);
     expect(profile.debt).toBeUndefined();
     expect(profile.credits).toBe(25 + 10_000 - 975);
-    profile.credits = 0;
-
-    // With the minerals in storage it uses them first
-    profile.credits = 1000;
-    server.pilots.give(conn, { iron_ore: 50, nickel_ore: 50 }, { toStorage: true, quiet: true });
-    ships.damagePartFraction(pid, hullIdx, 1);
-    park(); server.step();
-    expect(missing()).toBeGreaterThan(0);
-    for (let i = 0; i < restoreTicks * 3 && missing() > 0; i++) { park(); server.step(); }
-    expect(missing()).toBe(0);
-    for (const [id, n] of Object.entries(bill)) expect(countOf(profile.storage, id)).toBe(50 - n);
-    expect(profile.credits).toBe(1000);
   });
 });
 

@@ -112,7 +112,6 @@ export class Hangar {
     if (!p) return ['no pilot'];
     if (!Number.isInteger(slot) || slot < 0 || slot >= p.hangar.length) return ['no such hangar slot'];
     if (!bp.parts.some((q) => q.fn === 'core')) return ['a ship needs a core'];
-    if (p.hangar[slot]?.loaner && !opts.grantAll) return ['this is a loaner: refit a ship of your own (or design one in an empty slot)'];
     // Everything you can't build from what you have must be something you can make
     const old = p.hangar[slot];
     const prior = this.states(conn, p, slot);
@@ -252,10 +251,7 @@ export class Hangar {
     }
     if (!core || (rec.ghosts ?? []).includes(core.uid)) return this.pilots.toast(conn, `The ${rec.blueprint.name} needs its core built first`, 'warn');
     this.pilots.captureNow(conn);
-    const was = p.activeSlot;
     setActiveShip(p, rec, slot);
-    // The loaner goes back
-    if (p.hangar[was]?.loaner) this.dropSlot(p, was);
     this.pilots.reapplyShip(conn);
     this.pilots.emitRefit(conn);
     this.pilots.toast(conn, `Now flying the ${rec.blueprint.name}`, 'good');
@@ -268,19 +264,17 @@ export class Hangar {
 
   /**
    * Scrap a slot you're not flying: its built parts break down to salvage
-   * (ore and components: econ/salvage.ts). A loaner just goes back.
+   * (ore and components: econ/salvage.ts).
    */
   scrap(conn: PilotConn, slot: number): void {
     const p = this.pilots.get(conn);
     const rec = p?.hangar[slot];
     if (!p || !rec || slot === p.activeSlot) return;
-    if (!rec.loaner) {
-      const ghosts = new Set(rec.ghosts ?? []);
-      const salvage = salvageParts(this.econ, rec.blueprint.parts.filter((q) => !ghosts.has(q.uid) && (rec.hp[q.uid] ?? 1) > 0));
-      for (const [id, n] of Object.entries(salvage)) addTo(p.storage, id, n);
-      const n = Object.values(salvage).reduce((t, k) => t + k, 0);
-      this.pilots.toast(conn, `Scrapped the ${rec.blueprint.name}: ${n} items of salvage in storage`, 'info');
-    }
+    const ghosts = new Set(rec.ghosts ?? []);
+    const salvage = salvageParts(this.econ, rec.blueprint.parts.filter((q) => !ghosts.has(q.uid) && (rec.hp[q.uid] ?? 1) > 0));
+    for (const [id, n] of Object.entries(salvage)) addTo(p.storage, id, n);
+    const n = Object.values(salvage).reduce((t, k) => t + k, 0);
+    this.pilots.toast(conn, `Scrapped the ${rec.blueprint.name}: ${n} items of salvage in storage`, 'info');
     this.dropSlot(p, slot);
     this.pilots.markDirty(conn);
     this.pilots.sendItems(conn);
@@ -363,7 +357,7 @@ export class Hangar {
     this.pilots.toast(conn, `Lost with the part: ${names.join(', ')}`, 'bad');
   }
 
-  /** Empty a slot (a loaner's slot past the pilot's bays goes altogether) */
+  /** Empty a slot (a slot past the pilot's bays goes altogether) */
   private dropSlot(p: PlayerProfile, slot: number): void {
     const bays = unlocks(p).hangarSlots;
     if (slot >= bays && p.hangar.length > bays) {
@@ -717,7 +711,7 @@ export class Hangar {
         return {
           blueprint: rec.blueprint, plan: rec.plan, ghosts: rec.ghosts ?? [],
           wrecked: [...states].filter(([, s]) => s === 'wrecked').map(([u]) => u),
-          lost: rec.lost, auto: rec.auto, loaner: rec.loaner, paused: rec.paused, rank: rec.rank,
+          lost: rec.lost, auto: rec.auto, paused: rec.paused, rank: rec.rank,
           loadout: shipLoadout(this.catalog, this.ships.tuning, rec.blueprint, rec.ammo),
           first: slot === p.activeSlot ? { ...p.ammo?.prefer, ...rec.ammo?.first } : rec.ammo?.first,
         };

@@ -349,106 +349,26 @@ describe('hangar slots', () => {
   it('Sell all ore empties the hold of raw minerals', () => {
     const { server, t, pid, profile, conn } = world();
     dock(server, pid);
-    server.pilots.give(conn, { iron_ore: 10, crystal: 2, repair_kit: 1 }, { quiet: true });
+    server.pilots.give(conn, { iron_ore: 10, crystal: 2, pack_hull: 1 }, { quiet: true });
     const credits = profile().credits;
     t.send({ type: 'marketSellAll' } as any);
     expect(countOf(profile().cargo, 'iron_ore')).toBe(0);
-    expect(countOf(profile().cargo, 'repair_kit')).toBe(1);
+    expect(countOf(profile().cargo, 'pack_hull')).toBe(1);
     expect(profile().credits).toBeGreaterThan(credits);
   });
 });
 
-describe('repair kits and the quick bar', () => {
-  const park = (pid: number) => { Position.x[pid] = 40000; Position.y[pid] = 40000; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
-
-  it('a kit heals damaged parts first, slowly, then rebuilds missing ones until its budget runs out', () => {
-    const { server, t, pid, conn, ships, profile, got } = world();
-    park(pid);
-    const ship = ships.get(pid)!;
-    const hull = ship.blueprint.parts.findIndex((p) => p.fn === 'hull' && p.piece === 'tri');
-    const gun = ship.blueprint.parts.findIndex((p) => p.fn === 'cannon_pip');
-    ships.damagePartFraction(pid, gun, 0.5); // damaged
-    ships.damagePartFraction(pid, hull, 1); // lost
-    server.step();
-    expect(ships.get(pid)!.derived.alive[hull]).toBe(false);
-    server.pilots.give(conn, { repair_kit: 1 }, { quiet: true });
-    for (let i = 0; i < 200; i++) { park(pid); server.step(); } // let the hits' pause run out
-    t.send({ type: 'itemUse', id: 'repair_kit' } as any);
-    expect(countOf(profile().cargo, 'repair_kit')).toBe(0);
-    // Slow: not done straight away
-    for (let i = 0; i < 30; i++) { park(pid); server.step(); }
-    const s = ships.get(pid)!;
-    expect(s.hp[gun]).toBeLessThan(s.maxHp[gun]);
-    // In time: the gun is mended, then the lost wing tip comes back
-    for (let i = 0; i < 60 * 40 && !ships.get(pid)!.derived.alive[hull]; i++) { park(pid); server.step(); }
-    expect(ships.get(pid)!.hp[gun]).toBeCloseTo(ships.get(pid)!.maxHp[gun], 3);
-    expect(ships.get(pid)!.derived.alive[hull]).toBe(true);
-    expect(got.some((m) => m.type === 'repairKit')).toBe(true);
-  });
-
-  it("a kit stops at its budget: a big wreck isn't rebuilt by one basic kit", () => {
-    const { server, t, pid, conn, ships } = world();
-    park(pid);
-    const s0 = ships.get(pid)!;
-    s0.blueprint.parts.forEach((p, i) => { if (p.fn !== 'core') ships.damagePartFraction(pid, i, 1); });
-    server.step();
-    const lost = () => ships.get(pid)!.derived.alive.filter((a) => !a).length;
-    const before = lost();
-    server.pilots.give(conn, { repair_kit: 1 }, { quiet: true });
-    for (let i = 0; i < 200; i++) { park(pid); server.step(); }
-    t.send({ type: 'itemUse', id: 'repair_kit' } as any);
-    for (let i = 0; i < 60 * 120; i++) { park(pid); server.step(); }
-    expect(lost()).toBeLessThan(before);
-    expect(lost()).toBeGreaterThan(0);
-    expect(ships.repairKitLeft(pid)).toBe(0);
-  });
-
-  it('taking a hit or moving off breaks the repair and wastes the rest of the kit; it only starts on a ship holding still', () => {
-    const { server, t, pid, conn, ships, profile, got } = world();
-    const gun = () => ships.get(pid)!.blueprint.parts.findIndex((p) => p.fn === 'cannon_pip');
-    const hurt = () => { ships.damagePartFraction(pid, gun(), 0.6); for (let i = 0; i < 10; i++) { park(pid); server.step(); } };
-    // Moving: refused, the kit is kept
-    park(pid); hurt();
-    server.pilots.give(conn, { repair_kit: 3 }, { quiet: true });
-    Velocity.x[pid] = 5;
-    t.send({ type: 'itemUse', id: 'repair_kit' } as any);
-    expect(countOf(profile().cargo, 'repair_kit')).toBe(3);
-    // Still: it starts; a hit ends it
-    park(pid);
-    t.send({ type: 'itemUse', id: 'repair_kit' } as any);
-    expect(ships.repairKitLeft(pid)).toBeGreaterThan(0);
-    for (let i = 0; i < 30; i++) { park(pid); server.step(); }
-    const ship = ships.get(pid)!;
-    ships.hurt(pid, ship, gun(), 1, -1);
-    for (let i = 0; i < 16; i++) { park(pid); server.step(); }
-    expect(ships.repairKitLeft(pid)).toBe(0);
-    expect(got.some((m) => m.type === 'toast' && /took a hit/.test((m as any).text))).toBe(true);
-    // Moving off ends it too
-    t.send({ type: 'itemUse', id: 'repair_kit' } as any);
-    expect(ships.repairKitLeft(pid)).toBeGreaterThan(0);
-    for (let i = 0; i < 20; i++) { Velocity.x[pid] = 4; Velocity.y[pid] = 0; server.step(); }
-    expect(ships.repairKitLeft(pid)).toBe(0);
-    expect(got.some((m) => m.type === 'toast' && /you moved/.test((m as any).text))).toBe(true);
-    expect(countOf(profile().cargo, 'repair_kit')).toBe(1);
-  });
-
-  it("a sound ship doesn't waste a kit", () => {
-    const { server, t, pid, conn, profile } = world();
-    park(pid);
-    server.pilots.give(conn, { repair_kit: 1 }, { quiet: true });
-    t.send({ type: 'itemUse', id: 'repair_kit' } as any);
-    expect(countOf(profile().cargo, 'repair_kit')).toBe(1);
-  });
-
-  it('the quick bar remembers items per slot (one slot per item)', () => {
+describe('the quick bar', () => {
+  it('has no repair kits any more, and remembers items per slot (one slot per item)', () => {
     const { t, profile, last } = world();
-    expect(profile().quickbar[0]).toBe('repair_kit');
-    t.send({ type: 'quickbarSet', slot: 3, id: 'repair_kit' } as any);
-    expect(profile().quickbar[3]).toBe('repair_kit');
+    expect(profile().quickbar).not.toContain('repair_kit');
+    expect(profile().quickbar[0]).toBe('boost_cell');
+    t.send({ type: 'quickbarSet', slot: 3, id: 'boost_cell' } as any);
+    expect(profile().quickbar[3]).toBe('boost_cell');
     expect(profile().quickbar[0]).toBeNull();
     t.send({ type: 'quickbarSet', slot: 3, id: null } as any);
     expect(profile().quickbar[3]).toBeNull();
     expect(last('profile')!.quickbar.length).toBe(5);
   });
-});
 
+});

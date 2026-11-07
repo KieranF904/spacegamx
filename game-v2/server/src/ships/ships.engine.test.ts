@@ -5,7 +5,7 @@ import * as bitecs from 'bitecs';
 import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Dead, Projectile, ServerMessage, Radius, Lifetime, ShipState,
-  BULLET_SPEED, BLASTER_LIFE_TICKS,
+  BULLET_SPEED, BLASTER_LIFE_TICKS, BANK,
   parseBlueprint, ShipTuning, CatalogFiles, Blueprint,
 } from '@space-game/common';
 import { createProtoServer } from '../proto/createProtoServer.js';
@@ -263,11 +263,13 @@ describe('destroyed parts, decay and station repair', () => {
     expect(destroyed(received).find((m) => m.part === hull)?.how).toBe('break');
   });
 
-  it('near a station a ship heals, and regrows lost parts from the core outwards', () => {
+  it('near a station a ship is mended from the repair bank (never free), regrowing lost parts from the core outwards', () => {
     const { server, bridge, pid, run } = setup();
-    const host = (bridge as unknown as { host: { nearRepairSite?: (eid: number) => boolean } }).host;
-    let near = false;
+    const host = (bridge as unknown as { host: { nearRepairSite?: (eid: number) => boolean; payBankRepair?: () => boolean; payBankRebuild?: () => boolean } }).host;
+    let near = false, bankPays = false, paid = 0;
     host.nearRepairSite = () => near;
+    host.payBankRepair = () => { if (bankPays) paid++; return bankPays; };
+    host.payBankRebuild = () => { if (bankPays) paid++; return bankPays; };
     const ship = bridge!.get(pid)!;
     // Shoot off the left weapon (part 2): hull 7 and the tris behind it may fall away with it
     bridge!.damagePartFraction(pid, 2, 1);
@@ -279,19 +281,28 @@ describe('destroyed parts, decay and station repair', () => {
     run(300);
     expect(missing()).toBeGreaterThan(0);
     expect(ship.hp[4]).toBeLessThan(ship.maxHp[4]);
-    // Near one, everything comes back and heals to full
+    // Near one with nothing in the bank: nothing is mended (no free station repair)
     near = true;
-    const rp = tuning.repair!;
-    run(rp.restoreTicks * (missing() + 1) + Math.ceil(60 / rp.healPerSecond) + 60);
+    const hurt = missing();
+    run(600);
+    expect(missing()).toBe(hurt);
+    expect(ship.hp[4]).toBeLessThan(ship.maxHp[4]);
+    expect(paid).toBe(0);
+    // With the bank paying, everything comes back and heals to full
+    bankPays = true;
+    run(BANK.stationPartSeconds * 60 * (missing() + 1) + Math.ceil(60 / BANK.stationHealPerSecond) + 120);
     expect(missing()).toBe(0);
     expect(ship.hp.every((h, i) => h >= ship.maxHp[i] - 1e-9)).toBe(true);
+    expect(paid).toBeGreaterThan(0);
     void server;
   });
 
   it('repairs wait a while after taking damage', () => {
     const { bridge, pid, run } = setup();
-    const host = (bridge as unknown as { host: { nearRepairSite?: (eid: number) => boolean } }).host;
+    const host = (bridge as unknown as { host: { nearRepairSite?: (eid: number) => boolean; payBankRepair?: () => boolean; payBankRebuild?: () => boolean } }).host;
     host.nearRepairSite = () => true;
+    host.payBankRepair = () => true;
+    host.payBankRebuild = () => true;
     const ship = bridge!.get(pid)!;
     // Ram damage counts as being in combat
     const dummy = bridge!.spawnDummy(sparrow, 0, -3 * tuning.cellSize * 3, Math.PI / 2);
