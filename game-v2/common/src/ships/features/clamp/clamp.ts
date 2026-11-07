@@ -131,6 +131,13 @@ export function followerPose(leader: Readonly<ClampBody>, o: Readonly<ClampOffse
   return out;
 }
 
+/** The leader's place from the follower's (followerPose turned round; drawing only: not rounded, no velocities) */
+export function leaderPlace(follower: { x: number; y: number; angle: number }, o: Readonly<ClampOffset>, out: { x: number; y: number; angle: number }): void {
+  const a = wrap(follower.angle - o.oa);
+  rotate(o.ox, o.oy, a, V);
+  out.x = follower.x - V[0]; out.y = follower.y - V[1]; out.angle = a;
+}
+
 /** (Rounded as ships are: no -0, physics.ts quantizeShipBody) */
 const noNegZero = (v: number): number => (v === 0 ? 0 : v);
 

@@ -77,6 +77,7 @@ import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
+import { dockedPlace, type Place } from './features/clamp/dockedDraw';
 import { mountField } from './field/mount';
 import type { QualityProfile } from '../settings/quality';
 import { ShipMemory } from './cells/ShipMemory';
@@ -938,7 +939,17 @@ export class ShipClient {
     return this.own.on ? this.replicas.pose(this.opts.state.playerId, t) : null;
   }
 
-  /** Place a replicated ship for this frame (false: not one, or not ready yet) */  /** Place a replicated ship for this frame (false: not one, or not ready yet) */
+  private readonly dockedAt: Place = { x: 0, y: 0, angle: 0 };
+  /** A ship docked to yours, drawn on your ship as drawn (features/clamp dockedDraw) */
+  private placeDocked(e: InterpolatedEntity): void {
+    const self = this.opts.state.playerId, t = this.opts.state.ownDrawTick(), own = this.ownPose(t);
+    if (!own || !dockedPlace(this.replicas.clamps.recAt(self, Math.floor(t)), self, e.id, own, this.dockedAt)) return;
+    e.renderX = e.x = this.dockedAt.x;
+    e.renderY = e.y = this.dockedAt.y;
+    e.renderAngle = e.angle = this.dockedAt.angle;
+  }
+
+  /** Place a replicated ship for this frame (false: not one, or not ready yet) */
   placeReplica(e: InterpolatedEntity, renderTick: number): boolean {
     const p = this.replicas.pose(e.id, renderTick);
     if (!p) return false;
@@ -948,6 +959,8 @@ export class ShipClient {
     e.renderX = p.x;
     e.renderY = p.y;
     e.renderAngle = p.angle;
+    // (Docked to you: drawn on your ship as drawn, at your tick, not trailing it at the render tick)
+    if (this.replicas.clamps.size && this.own.on) this.placeDocked(e);
     e.angVel = 0;
     // (Its Burst Strafer's dodge: the jets, ShipRenderer)
     e.dodge = p.dodge;
