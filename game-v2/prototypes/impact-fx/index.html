@@ -108,7 +108,7 @@ pre { margin: 0; font: 400 12px/1.55 var(--mono); color: var(--muted); backgroun
 <div class="wrap">
   <header>
     <h1>Impact <span>Lab</span></h1>
-    <p>Five new hit effects for heavier shots. Each one reads the hull's surface normal and the round's rebound at the point of impact, and grows with damage per shot. The second view runs the game's current hit on the same shots.</p>
+    <p>Seven new hit effects for heavier shots. Each one reads the hull's surface normal and the round's rebound at the point of impact, and grows with damage per shot. The second view runs the game's current hit on the same shots.</p>
   </header>
 
   <section class="stage" aria-label="Viewports">
@@ -135,7 +135,7 @@ pre { margin: 0; font: 400 12px/1.55 var(--mono); color: var(--muted); backgroun
     <span><i style="background:var(--amber)"></i>reflection</span>
     <span><i style="background:var(--green)"></i>tangent (slide)</span>
   </div>
-  <p class="hint">Tap or click the hull to fire at that spot. Keys: 1 to 5 pick an effect, F fires, S slows time, V shows vectors.</p>
+  <p class="hint">Tap or click the hull to fire at that spot. Keys: 1 to 7 pick an effect, F fires, S slows time, V shows vectors.</p>
 
   <section class="deck">
     <div class="col">
@@ -329,8 +329,12 @@ const ri = (h) => (h <= 0 ? 0 : h >= 1 ? RAMP_N - 1 : (h * (RAMP_N - 1)) | 0);
    Particle pool: structure of arrays, fixed capacity, swap-remove. No allocation per frame.
    Moving kinds first; kinds from RING on sit still and are drawn from their age alone.
    ===================================================================================== */
-const SPARK = 0, DROP = 1, GLOW = 2, SMOKE = 3, PETAL = 4, RING = 5, STREAK = 6, STAR = 7, WAVE = 8, SCORCH = 9, LIGHT = 10;
-const F_COLLIDE = 1, F_LAND = 2, F_STARHEAD = 4, F_EMBERS = 8;
+const SPARK = 0, DROP = 1, GLOW = 2, SMOKE = 3, PETAL = 4, RING = 5, STREAK = 6, STAR = 7, WAVE = 8, SCORCH = 9, LIGHT = 10, SMEAR = 11;
+const F_COLLIDE = 1, F_LAND = 2, F_STARHEAD = 4, F_EMBERS = 8, F_SMEARLAND = 16;
+/** The outline segment an arc length falls on */
+function segAt(s) { let i = 0; while (i < NS - 1 && s > SS0[i] + SLEN[i]) i++; return i; }
+// Smear outline scratch (no allocation per frame)
+const SM_N = 14, SOX = new Float32Array(SM_N + 1), SOY = new Float32Array(SM_N + 1), SIX = new Float32Array(SM_N + 1), SIY = new Float32Array(SM_N + 1);
 class Pool {
   constructor(cap) {
     this.cap = cap; this.n = 0; this.lifeScale = 1;
@@ -517,6 +521,55 @@ const EFFECTS = [
     if (k > 1.3) f.kick(0.7 * (k - 1.1));
   },
 },
+{
+  id: 'smear', name: 'Flat smear',
+  desc: 'The round flattens on the hull into a hot streak smeared the way it was sliding, cooling to a dark stain.',
+  P: { len: 26, back: 6, thick: 2.6, grow: 5, life: 90, drops: 6, dropPull: 0.18, flash: 6, light: 44 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    f.glow(h.x, h.y, P.flash * k, 0.3 * k, 5, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 20, 0.5);
+    // Shallow hits smear long down the slide; head-on hits pancake short and fat
+    f.smear(h.s, h.sdir, P.len * k * (0.35 + 1.1 * g), P.back * sk * (1.4 - g), P.thick * Math.pow(k, 0.6) * (1.3 - 0.5 * g), P.life + 20 * k, 0, P.grow, 0);
+    f.streak(h.x, h.y, Math.atan2(h.ty, h.tx), P.len * 0.6 * k * g, 1.6 * sk, 8, 0.05);
+    const n = Math.round(P.drops * Math.min(2, k));
+    for (let i = 0; i < n; i++) {
+      const side = Math.random() < 0.5 + 0.4 * g ? 1 : -1, e = rnd(8, 24) * D2R;
+      const dx = h.tx * side * Math.cos(e) + h.nx * Math.sin(e), dy = h.ty * side * Math.cos(e) + h.ny * Math.sin(e), v = rnd(1.5, 3.5) * sk;
+      const j = f.drop(h, h.x, h.y, dx * v, dy * v, rnd(30, 44), rnd(0.8, 1.3) * Math.pow(k, 0.4), 0.1, 0.6, P.dropPull);
+      f.pool.flag[j] |= F_SMEARLAND;
+    }
+    f.scorch(h.x, h.y, 2.4 * sk, 150);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+},
+{
+  id: 'liquid', name: 'Liquid splash',
+  desc: 'Heavy, syrupy blobs splash up and fall back, and the hit pools into a film that creeps along the hull.',
+  P: { blobs: 7, speed: 2.6, size: 2.2, cone: 70, bias: 0.35, pull: 0.2, film: 18, flow: 0.35, thick: 3, life: 110, jet: 3, flash: 6, light: 46 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    f.glow(h.x, h.y, P.flash * k, 0.35 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 24, 0.55);
+    // The pool: mostly creeping the way the round slid, a little back the other way
+    f.smear(h.s, h.sdir, P.film * sk * (0.6 + 0.8 * g), P.film * 0.4 * sk * (1.2 - g), P.thick * Math.pow(k, 0.6), P.life + 25 * k, 0.05, 4, P.flow * sk * (0.3 + g));
+    if (g < 0.7) f.smear(h.s, -h.sdir, P.film * 0.4 * sk, 2, P.thick * 0.7 * Math.pow(k, 0.6), P.life * 0.8, 0.1, 5, P.flow * 0.4 * sk * (1 - g));
+    const ax = axisOf(h, P.bias), axx = ax.x, axy = ax.y, n = Math.round(P.blobs * Math.min(2.2, k));
+    for (let i = 0; i < n; i++) {
+      const spread = ((i + 0.5) / n - 0.5) * P.cone * D2R + gauss() * 0.1;
+      const d = turnOut(h, axx, axy, spread, 0.3), v = P.speed * sk * rnd(0.6, 1.1);
+      const j = f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(40, 60), P.size * Math.pow(k, 0.45) * rnd(0.8, 1.3), 0.05, 0.6, P.pull * rnd(0.8, 1.2));
+      f.pool.flag[j] |= F_SMEARLAND; f.pool.drag[j] = 0.99; f.pool.len[j] = 2.2; // stretched by its speed: reads as a thick liquid
+    }
+    for (let i = 0; i < Math.round(P.jet * Math.min(2, k)); i++) {
+      const d = turnOut(h, h.rx, h.ry, gauss() * 0.12, 0.2), v = rnd(3, 4.5) * sk;
+      const j = f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(36, 50), P.size * 0.7 * Math.pow(k, 0.4), 0, 0.65, P.pull * 0.8);
+      f.pool.flag[j] |= F_SMEARLAND; f.pool.len[j] = 2.6;
+    }
+    f.scorch(h.x, h.y, 2.8 * sk, 170);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+},
 ];
 
 /* The game's current hit, approximated: DIRECTED_HIT(0xffc070, 1) from weaponStyles.ts (the cannon), sized by
@@ -632,6 +685,31 @@ class Pane {
   smoke(x, y, vx, vy, size, grow, life, alpha) { const p = this.pool, i = p.add(SMOKE, x, y, vx, vy, life, size, 0, 0); p.grow[i] = grow; p.alpha[i] = alpha; p.drag[i] = 0.97; return i; }
   scorch(x, y, size, life) { this.pool.add(SCORCH, x, y, 0, 0, life, size, 0, 1); }
   light(x, y, radius, life, alpha) { const p = this.pool, i = p.add(LIGHT, x, y, 0, 0, life, radius, 0.3, 0.5); p.alpha[i] = alpha; }
+  /** A film lying on the hull from arc length s0: `fwd` ahead along `dir`, `back` behind, spreading over `grow` ticks and creeping at `flow` */
+  smear(s0, dir, fwd, back, thick, life, heat, grow, flow) {
+    const p = this.pool, i = p.add(SMEAR, s0, 0, flow, 0, life, fwd, heat, 0.85);
+    p.a0[i] = dir; p.len[i] = back; p.w[i] = thick; p.grow[i] = grow; return i;
+  }
+  drawSmear(c, i, hot) {
+    const p = this.pool, t = p.age[i] / p.life[i], age = p.age[i], dir = p.a0[i], flow = p.vx[i];
+    const reach = Math.min(1, age / Math.max(1, p.grow[i])), e = 1 - (1 - reach) * (1 - reach);
+    const s0 = p.x[i] + dir * flow * age * (1 - 0.5 * t), fwd = p.size[i] * e + flow * age * 0.4, back = p.len[i] * e;
+    const th = p.w[i] * (1 - 0.55 * t) * (hot ? 1 : 0.85);
+    for (let j = 0; j <= SM_N; j++) {
+      const u = j / SM_N, q = pointAt(s0 + dir * (-back + (fwd + back) * u));
+      const prof = Math.sqrt(Math.max(0, 1 - (2 * u - 1) * (2 * u - 1))) * (flow > 0 ? 1 + 0.6 * Math.exp(-(1 - u) * (1 - u) * 30) : 1);
+      const tt = th * prof;
+      SOX[j] = q.x + q.nx * tt; SOY[j] = q.y + q.ny * tt; SIX[j] = q.x - q.nx * tt * 0.3; SIY[j] = q.y - q.ny * tt * 0.3;
+    }
+    c.beginPath(); c.moveTo(SOX[0], SOY[0]);
+    for (let j = 1; j <= SM_N; j++) c.lineTo(SOX[j], SOY[j]);
+    for (let j = SM_N; j >= 0; j--) c.lineTo(SIX[j], SIY[j]);
+    c.closePath();
+    if (!hot) { c.globalAlpha = 0.5 * (1 - t * t * t); c.fillStyle = '#0b0807'; c.fill(); return; }
+    c.globalAlpha = 0.85 * Math.pow(1 - t, 1.6); c.fillStyle = this.ramp[ri(p.heat[i] + p.cool[i] * t)]; c.fill();
+    c.globalAlpha = 0.7 * (1 - t) * (1 - t); c.strokeStyle = this.ramp[ri(p.heat[i] * 0.6)]; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(SOX[0], SOY[0]); for (let j = 1; j <= SM_N; j++) c.lineTo(SOX[j], SOY[j]); c.stroke();
+  }
   kick(a) { if (!REDUCED) this.shake = Math.min(3, Math.max(this.shake, a)); }
 
   fire(src, k, speed) {
@@ -675,6 +753,10 @@ class Pane {
           if (fl & F_LAND) { // a drop lands: a little splat where it touched
             const h = p.heat[i] + p.cool[i] * p.age[i] / p.life[i];
             this.glow(ox, oy, p.size[i] * 2.4, 0.2, 9, h, 0.7);
+            if (fl & F_SMEARLAND) { // it sticks: a small smear the way it was moving along the hull
+              const s = nearest(ox, oy).s, sg = segAt(s), vt = p.vx[i] * SDX[sg] + p.vy[i] * SDY[sg], av = Math.abs(vt);
+              this.smear(s, vt >= 0 ? 1 : -1, 2 + av * 3, 1 + p.size[i], p.size[i] * 0.8, 70, h, 6, av * 0.12);
+            }
             p.kill(i); i--; continue;
           }
           const vn = p.vx[i] * nx + p.vy[i] * ny;
@@ -725,7 +807,8 @@ class Pane {
     // Pass 2: normal blend: smoke and the petals' dark bodies
     c.globalCompositeOperation = 'source-over';
     for (let i = 0; i < p.n; i++) {
-      const ty = p.type[i]; if (ty !== SMOKE && ty !== PETAL) continue;
+      const ty = p.type[i]; if (ty === SMEAR) { this.drawSmear(c, i, false); continue; }
+      if (ty !== SMOKE && ty !== PETAL) continue;
       const t = p.age[i] / p.life[i];
       if (ty === SMOKE) { const r = p.size[i]; c.globalAlpha = p.alpha[i] * (1 - t) * Math.min(1, t * 6); c.drawImage(this.smokeSpr, p.x[i] - r, p.y[i] - r, r * 2, r * 2); }
       else { c.globalAlpha = t > 0.8 ? (1 - t) * 5 : 1; c.fillStyle = this.chunk; this.petalPath(c, i); c.fill(); }
@@ -752,6 +835,7 @@ class Pane {
         }
         case GLOW: { const r = p.size[i]; if (r <= 0) break; c.globalAlpha = p.alpha[i] * Math.pow(1 - t, 1.5); c.drawImage(S[ri(p.heat[i] + p.cool[i] * t)], x - r, y - r, r * 2, r * 2); break; }
         case LIGHT: { const r = p.size[i] * 0.8; c.globalAlpha = p.alpha[i] * 0.3 * (1 - t) * (1 - t); c.drawImage(S[ri(0.4)], x - r, y - r, r * 2, r * 2); break; }
+        case SMEAR: this.drawSmear(c, i, true); break;
         case PETAL: { c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = 0.9; this.petalPath(c, i); c.stroke(); break; }
         case RING: {
           const e = 1 - (1 - t) * (1 - t), r = Math.max(0.01, p.size[i] * e);
@@ -917,7 +1001,7 @@ document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement && e.target.type === 'range') return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
-  if (k >= '1' && k <= '5') selectFx(+k - 1);
+  if (k >= '1' && k <= String(EFFECTS.length)) selectFx(+k - 1);
   else if (k === 'f') fireAuto();
   else if (k === 's') { $('slow').checked = state.slow = !state.slow; }
   else if (k === 'v') { $('vectors').checked = state.vectors = !state.vectors; $('legend').hidden = !state.vectors; }
