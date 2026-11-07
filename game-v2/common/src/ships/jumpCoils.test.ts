@@ -52,7 +52,7 @@ describe('jump coils against the hull', () => {
   });
 
   it('on the ports core a coil counts once power reaches it: fed, it extends the range; cut off, it does nothing', () => {
-    const b = load('dev/player-xire-sparrow');
+    const b = load('remakes/player-xire-sparrow');
     expect(b.power).toBe('ports');
     const coils = b.parts.map((p, i) => (/coil/.test(p.fn) ? i : -1)).filter((i) => i >= 0);
     expect(coils.length).toBeGreaterThan(0);
@@ -60,7 +60,7 @@ describe('jump coils against the hull', () => {
     const f = portsFed(fed.ports!);
     for (const i of coils) expect(f[i], `coil ${i}`).toBe(1);
     // The same hull with its coils turned round, their in ports facing nothing: cut off
-    const cut = load('dev/player-xire-sparrow');
+    const cut = load('remakes/player-xire-sparrow');
     for (const i of coils) cut.parts[i].rot = (((cut.parts[i].rot ?? 0) + 2) % 4) as Rot;
     const off = derive(cut);
     const f2 = portsFed(off.ports!);
@@ -68,7 +68,7 @@ describe('jump coils against the hull', () => {
     expect(off.jumpRatio).toBeLessThan(fed.jumpRatio);
     expect(off.jumpRange).toBeLessThan(fed.jumpRange);
     // ...and with no coils at all it is the cut-off one's drive (the unfed ones count for nothing)
-    const none = load('dev/player-xire-sparrow');
+    const none = load('remakes/player-xire-sparrow');
     const unfed = coils.filter((i) => !f2[i]);
     for (const i of unfed) none.parts[i].fn = 'hull';
     const bare = derive(none);
