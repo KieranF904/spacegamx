@@ -25,6 +25,7 @@ import * as wpn from './bridge/weapons.js';
 import * as dmg from './bridge/damage.js';
 import * as flt from './bridge/flight.js';
 import * as plt from './bridge/pilotless.js';
+import * as fld from './bridge/field.js';
 import { DebrisNet } from './bridge/debrisNet.js';
 import { StructLog } from './bridge/structLog.js';
 import { OwnCauses } from './bridge/ownCauses.js';
@@ -543,6 +544,9 @@ export class ShipBridge {
 
   /** Hangar save: swap the ship's blueprint and respawn in place at full HP. */
   respawnInPlace(eid: number, bp: Blueprint): void { return rbd.respawnInPlace(this.ctx, eid, bp); }
+
+  /** A field plan or recycle: a new design while it flies, every kept part as it was (bridge/field.ts) */
+  refitInFlight(eid: number, bp: Blueprint, ghosts: readonly number[]): boolean { return fld.refitInFlight(this.ctx, eid, bp, ghosts); }
 
   /** Proto debug key U. */
   repair(eid: number): void { return rbd.repair(this.ctx, eid); }

@@ -12,7 +12,7 @@ import { fullPortsCharge, remapCharge, type Charge } from '../energy.js';
 import type { FlightBody, FlightControls } from '../flight.js';
 import { readShipJson, testCatalog } from '../testData.js';
 import type { ShipTuning } from '../tuning.js';
-import { MACHINE_FAB, MACHINE_REF, P_TOOL, portsMachineEu, portsMachinePart, setPortsMachine } from './ports.js';
+import { MACHINE_FAB, MACHINE_REF, P_TOOL, portsGauge, portsMachineEu, portsMachinePart, remapPortsByIndex, setPortsMachine } from './ports.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -82,5 +82,35 @@ describe('field machines on the ports core', () => {
     expect(c2.e!.held.length).toBe(d2.ports!.n);
     expect(c2.e!.mach).toBe(c.e!.mach);
     expect(portsMachineEu(c2.e!, MACHINE_REF)).toBe(eu);
+  });
+
+  it('carry over by part index into a design with parts added or taken away: never a free refill (a plan save)', () => {
+    let c = fullPortsCharge(d);
+    setPortsMachine(c.e!, MACHINE_FAB, true);
+    c = fly(d, c, 300);
+    const e = c.e!;
+    const eu = portsMachineEu(e, MACHINE_FAB);
+    // (Drain the stores to something known, below full)
+    for (let i = 0; i < L.n; i++) e.held[i] = Math.floor(L.cap[i] / 3);
+    // A part appended (a planned part): the old ones keep what they held, the new one starts empty
+    const bigger = design();
+    bigger.parts.push(p(6, 'sq', 'power_cell_reactor', 3, 0));
+    const L2 = createShipState(catalog, tuning, 1, bigger, 0).derived.ports!;
+    const keep = bigger.parts.map((_, i) => (i < design().parts.length ? i : -1));
+    const e2 = remapPortsByIndex(e, L2, keep);
+    expect(e2.held.length).toBe(L2.n);
+    for (let i = 0; i < L.n; i++) expect(e2.held[i]).toBe(Math.min(L2.cap[i], e.held[i]));
+    expect(e2.held[6]).toBe(0);
+    expect(e2.mach).toBe(e.mach);
+    expect(portsMachineEu(e2, MACHINE_FAB)).toBe(eu);
+    expect(e2.gauge).toBe(portsGauge(L2, e2));
+    // A part taken away (recycled): the rest move down by index and keep theirs
+    const smaller = design();
+    smaller.parts.splice(5, 1);
+    const L3 = createShipState(catalog, tuning, 1, smaller, 0).derived.ports!;
+    const e3 = remapPortsByIndex(e, L3, [0, 1, 2, 3, 4]);
+    for (let i = 0; i < 5; i++) expect(e3.held[i]).toBe(Math.min(L3.cap[i], e.held[i]));
+    const total = (s: { held: Int32Array }) => s.held.reduce((a, b) => a + b, 0);
+    expect(total(e3)).toBeLessThanOrEqual(total(e));
   });
 });
