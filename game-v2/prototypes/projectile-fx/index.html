@@ -1593,7 +1593,9 @@ const STYLES = [
     id: 'lash', name: 'Burning Lash', family: 'Pulse laser', now: 'pulse', impact: 'tongue',
     desc: 'A bolt that unfurls a burning ribbon behind it. The ribbon hangs in the lane for a moment as a hazard line, then burns out.',
     def: { spd: 70, dmg: 30, rate: 1.4 },
-    P: { r: 3, width: 3.2, amp: 5, wave: 0.045, unfurl: 7, life: 46, gap: 0.7, sub: 4, core: '#fff0f8', hot: '#ff8cc6', outer: '#ff4fa3', ember: '#ffb0d8' },
+    // (The ribbon is laid straight; each point then drifts on a slowly turning flow field, `flow` its speed, `scale`
+    // how wide its swirls are, further the older it is: drift × (age / life)^agePow)
+    P: { r: 3, width: 3.2, drift: 22, agePow: 1.6, flow: 0.035, scale: 0.018, unfurl: 7, life: 46, gap: 0.7, sub: 4, core: '#fff0f8', hot: '#ff8cc6', outer: '#ff4fa3', ember: '#ffb0d8' },
     trail: true,
     linger() { return this.P.life; },
     spawn(r, k, L) { r.y = L.y + (hash(r.n * 4.1) - 0.5) * 2 * L.jit; pushTrail(r); r.lastTr = 0; },
@@ -1621,8 +1623,10 @@ const STYLES = [
           const age = r.t - t;
           if (age > P.life) break done;
           const u = Math.min(1, age / P.unfurl), along = Math.hypot(x - r.sx, y - r.sy), life = 1 - age / P.life;
-          const o = P.amp * m * u * Math.sin(along * P.wave - age * (REDUCE ? 0.05 : 0.2) + r.seed * 6);
-          const qx = x + nx * o, qy = y + ny * o;
+          // straight where it was just laid; drifting along the flow field the longer it has hung there
+          const T = r.t * (REDUCE ? 0.25 : 1) + r.n * 37, amt = P.drift * m * Math.pow(age / P.life, P.agePow);
+          const ang = 1.7 * (Math.sin(x * P.scale + T * P.flow + r.seed * 6) + Math.sin(y * P.scale * 1.7 - T * P.flow * 0.8 + along * 0.004));
+          const qx = x + Math.cos(ang) * amt, qy = y + Math.sin(ang) * amt;
           if (ok) {
             const tw = 0.35 + 0.65 * Math.abs(Math.cos(along * 0.021 + age * 0.07)), w = P.width * m * u * tw * Math.sqrt(life);
             const fl = (REDUCE ? 1 : 0.82 + 0.18 * Math.sin(age * 0.9 + along * 0.1)) * life;
