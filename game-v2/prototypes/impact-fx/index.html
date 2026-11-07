@@ -643,7 +643,8 @@ const EFFECTS = [
   },
   step(b, f) {
     const P = this.P, t = b.age / b.life, Hm = P.height * Math.pow(b.k, 0.6);
-    b.q1 += ((t < P.rise ? Hm : -0.3 * Hm) - b.q0) * P.stiff * (t < P.rise ? 1 : 0.45); // (it falls slower than it rises) b.q1 *= P.damp; b.q0 += b.q1;
+    b.q1 += ((t < P.rise ? Hm : -0.3 * Hm) - b.q0) * P.stiff * (t < P.rise ? 1 : 0.45); // (it falls slower than it rises)
+    b.q1 *= P.damp; b.q0 += b.q1;
     if (!(b.ev & 1) && t > P.rise + 0.06) { // the rim's beads let go as the sheet starts to fall
       b.ev |= 1; this.geo(b);
       const G = CG, sk = Math.sqrt(b.k);
