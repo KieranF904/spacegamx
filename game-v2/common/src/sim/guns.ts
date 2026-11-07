@@ -131,7 +131,7 @@ function gunView(state: SimShipState): ShipState {
   v.id = state.id;
   v.derived = state.structure.derived;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin; v.aim = g.aim;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.trig = g.trig ?? 0;
+  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.clickMasks = g.clickMasks; v.trig = g.trig ?? 0;
   v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
   return v;
 }
@@ -163,7 +163,7 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   }
   const g = state.guns;
   g.triggerHeld = view.triggerHeld;
-  g.clickAt = view.clickAt;
+  g.clickAt = view.clickAt; g.clickMasks = view.clickMasks;
   g.trig = view.trig;
   g.minePaid = view.minePaid;
   g.mineUntil = view.mineUntil;

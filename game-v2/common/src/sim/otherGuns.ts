@@ -180,7 +180,7 @@ export function lanePilot(id: number, prev: Readonly<OwnExtras>, before: Readonl
 function laneView(ship: ShipState, g: GunState): ShipState {
   const v = Object.create(ship) as ShipState;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin; v.aim = g.aim;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.trig = g.trig ?? 0;
+  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.clickMasks = g.clickMasks; v.trig = g.trig ?? 0;
   v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
   return v;
 }
@@ -204,7 +204,7 @@ export function lanePilotless(id: number, prev: Readonly<OwnExtras>, after: Read
   const firing = fire && (bits & BIT_EMP) === 0 && !burning;
   gunsTick(view, id, after, { firing, aimWorld: aim, aimDist, energy }, tick, tuning, events);
   const g = x.guns;
-  g.triggerHeld = view.triggerHeld; g.clickAt = view.clickAt; g.trig = view.trig; g.heldDist = view.heldDist;
+  g.triggerHeld = view.triggerHeld; g.clickAt = view.clickAt; g.clickMasks = view.clickMasks; g.trig = view.trig; g.heldDist = view.heldDist;
   x.charge = energy.charge;
   return x;
 }
@@ -254,7 +254,7 @@ export function laneHash(id: number, x: Readonly<OwnExtras>, pd: readonly number
   let aim = g.aim;
   if (!g.triggerHeld) aim = g.aim.length ? new Array<number>(g.aim.length).fill(0) : g.aim;
   else if (pd.length) { aim = [...g.aim]; for (const p of pd) aim[p] = 0; }
-  s.guns = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim, triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, heldDist: g.heldDist };
+  s.guns = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim, triggerHeld: g.triggerHeld, clickAt: g.clickAt, clickMasks: g.clickMasks, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, heldDist: g.heldDist };
   return shipHash(s);
 }
 
@@ -271,7 +271,8 @@ export function laneOf(guns: GunState, charge: Charge): OwnExtras {
  * through t are told. `z` is the whole state as one list of numbers (packGunSync: each array sparse, packArr):
  *   [pool, ...banks, ...eng, ...gun, ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
  *    ...sat), ...cooldown, ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, minePaid, mineUntil,
- *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord)]
+ *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord),
+ *    the masks a waiting click is for (ShipState.clickMasks)]
  * (each `...x` an array as its packArr's length, then the packArr; absent: -1; an absent scalar: null)
  */
 export interface ServerGunSyncMessage {
@@ -323,7 +324,7 @@ export function packGunSync(id: number, t: number, x: Readonly<OwnExtras>, k: Re
   // (mach: which field machines draw, so another ship's guns get the power its own do; their energy counters aren't needed here)
   if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge, c.e.mach ?? 0); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
   for (const a of GUN_ARRAYS) putArr(z, g[a]);
-  z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist), g.trig ?? 0);
+  z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist), g.trig ?? 0, opt(g.clickMasks));
   return { type: 'gunSync', id, t, z };
 }
 
@@ -347,6 +348,7 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
   const bits = num(), dist = num() * 4;
   if (i < z.length) guns.heldDist = val();
   if (i < z.length) guns.trig = num();
+  if (i < z.length) { const v = val(); if (v !== undefined) guns.clickMasks = v; }
   return { x: { charge, guns, hazard: { ...NO_HAZARD }, jumpPrime: 0 }, k: { bits, dist } };
 }
 

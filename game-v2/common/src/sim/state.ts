@@ -39,6 +39,8 @@ export interface GunState {
   aim: number[];
   triggerHeld: boolean;
   clickAt: number;
+  /** The group masks the waiting click is for (ships/guns.ts, weaponGroups.ts freshMasks); absent: every gun's */
+  clickMasks?: number;
   /** The trigger word the guns stepped on last tick (ships/weaponGroups.ts trigWord); absent: 0 */
   trig?: number;
   minePaid?: number;
@@ -98,10 +100,10 @@ export function newGunState(parts = 0): GunState {
 }
 
 /** A gun state copied out of a common ShipState (the adapter's way in, until Stage 1B owns guns) */
-export function gunStateOf(s: Pick<ShipState, 'cooldown' | 'rounds' | 'reload' | 'charge' | 'spin' | 'aim' | 'triggerHeld' | 'clickAt' | 'trig' | 'minePaid' | 'mineUntil' | 'mineShare' | 'tow' | 'heldDist'>): GunState {
+export function gunStateOf(s: Pick<ShipState, 'cooldown' | 'rounds' | 'reload' | 'charge' | 'spin' | 'aim' | 'triggerHeld' | 'clickAt' | 'clickMasks' | 'trig' | 'minePaid' | 'mineUntil' | 'mineShare' | 'tow' | 'heldDist'>): GunState {
   return {
     cooldown: [...s.cooldown], rounds: [...s.rounds], reload: [...s.reload], charge: [...s.charge], spin: [...s.spin], aim: [...s.aim],
-    triggerHeld: s.triggerHeld, clickAt: s.clickAt, trig: s.trig, minePaid: s.minePaid, mineUntil: s.mineUntil, mineShare: s.mineShare, tow: s.tow, heldDist: s.heldDist,
+    triggerHeld: s.triggerHeld, clickAt: s.clickAt, clickMasks: s.clickMasks, trig: s.trig, minePaid: s.minePaid, mineUntil: s.mineUntil, mineShare: s.mineShare, tow: s.tow, heldDist: s.heldDist,
   };
 }
 
@@ -127,7 +129,7 @@ export function cloneSimShip(s: Readonly<SimShipState>): SimShipState {
     hazard: { empUntil: s.hazard.empUntil, slowUntil: s.hazard.slowUntil, numb: s.hazard.numb },
     guns: {
       cooldown: [...g.cooldown], rounds: [...g.rounds], reload: [...g.reload], charge: [...g.charge], spin: [...g.spin], aim: [...g.aim],
-      triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
+      triggerHeld: g.triggerHeld, clickAt: g.clickAt, clickMasks: g.clickMasks, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
     },
     structure: s.structure,
   };

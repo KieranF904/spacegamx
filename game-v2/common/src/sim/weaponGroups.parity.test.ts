@@ -109,3 +109,71 @@ describe('a selection change mid-burst: server, own prediction and another clien
     expect(back.k.bits & (TRIG_LEFT | TRIG_RIGHT)).toBe(TRIG_LEFT);
   });
 });
+
+describe('semi-automatic clicks across group changes: server, own prediction and another client\'s lane agree', () => {
+  const pose = { x: 0, y: 0, angle: UP };
+  const body = () => ({ x: 0, y: 0, vx: 0, vy: 0, angle: UP, angVel: 0, jump: 0, cargo: 0 });
+  /** Two Rail Drivers: the first in group 2, the second in groups 1 and 2 (a click is only for the guns whose trigger it made) */
+  const semiRig = (): ShipState => {
+    const bp = parseBlueprint(sparrowText);
+    const pips = bp.parts.filter((q) => q.fn === 'cannon_pip');
+    pips[0].fn = 'railgun_rail_driver'; pips[1].fn = 'railgun_rail_driver';
+    pips[0].wg = 0b010; pips[1].wg = 0b011;
+    return createShipState(catalog, tuning, 7, bp, 0);
+  };
+  // (held with group dips (the second while the gun it clicks is busy: the click waits), the right button pressed
+  // mid-hold on group 2, then short clicks through a reload)
+  const semi = (t: number) => ({
+    left: t < 120 || (t >= 160 && t % 9 < 2),
+    right: t >= 60 && t < 100,
+    sel: t < 40 ? packGroupSel(2, 0) : t < 44 ? packGroupSel(1, 0) : t < 46 ? packGroupSel(2, 0) : t < 48 ? packGroupSel(1, 0) : t < 60 ? packGroupSel(2, 0) : t < 120 ? packGroupSel(1, 2) : packGroupSel(0, 0),
+    q: simAimQ(UP + 0.004 * Math.sin(t / 25)),
+    dist: 500 + ((t * 13) % 300),
+  });
+  const N = 300;
+  const server: SimEvent[] = [], own: SimEvent[] = [], lane: SimEvent[] = [];
+  const srv = semiRig();
+  const masksSeen = new Set<number | undefined>();
+  for (let t = 1; t <= N; t++) {
+    const i = semi(t), c = gunControls(srv, i.left, i.right, false, i.sel);
+    gunsTick(srv, 7, pose, { firing: c.firing, word: c.word, aimWorld: simAim(i.q), aimDist: i.dist, hold: true }, t, tuning, server);
+    masksSeen.add(srv.clickMasks);
+  }
+  const ship = semiRig();
+  const st = newSimShip({ id: 7, derived: ship.derived, ship, body: body(), charge: FULL_CHARGE, accounted: false });
+  for (let t = 1; t <= N; t++) {
+    const i = semi(t);
+    stepShipGuns(st, { ...NO_INPUT, q: i.q, fire: i.left, fireAlt: i.right, aimDist: i.dist, sel: i.sel }, envAt(t), own);
+  }
+  const lship = semiRig();
+  const structure = ownStructure(lship.derived, lship);
+  let x = seedOwnExtras(lship);
+  for (let t = 1; t <= N; t++) {
+    const i = semi(t);
+    x = lanePilot(7, x, body(), body(), 0, i.q, { bits: trigWord(i.left, i.right, i.sel), dist: i.dist }, structure, envAt(t), lane);
+  }
+
+  it('the same shots on the same ticks', () => {
+    // (each shot's tick, gun, shell and aim; a lane runs its energy, so a shot may carry its augment flag besides)
+    const shots = (evs: SimEvent[], before = Infinity) => evs.filter((e) => e.k === 'fire' && e.tick < before).map((e) => { const f = e as { tick: number; slot: number; shot: number; aimQ: number }; return [f.tick, f.slot, f.shot, f.aimQ].join(' '); });
+    expect(shots(own)).toEqual(shots(server));
+    // (the lane through the group changes and the right button; after them its clip reloads on the power it has, which
+    // this test's server step doesn't account, so the later clicks are the own prediction's to agree on)
+    expect(shots(lane, 150)).toEqual(shots(server, 150));
+    expect(shots(server, 150).length).toBeGreaterThan(1);
+    expect(shots(server).length).toBeGreaterThan(3);
+    // (a click for some guns only was really kept on the way)
+    expect([...masksSeen].some((m) => m !== undefined)).toBe(true);
+  });
+
+  it('the same click state at the end, and a gunSync carries a waiting click\'s masks', () => {
+    expect(st.guns.clickMasks).toBe(srv.clickMasks);
+    expect(x.guns.clickMasks).toBe(srv.clickMasks);
+    const mid = semiRig();
+    const ex = laneOf({ cooldown: [...mid.cooldown], rounds: [...mid.rounds], reload: [...mid.reload], charge: [...mid.charge], spin: [...mid.spin], aim: [...mid.aim], triggerHeld: true, clickAt: 98, clickMasks: 0b100, trig: trigWord(true, false, packGroupSel(2, 0)) }, FULL_CHARGE);
+    const back = unpackGunSync(packGunSync(7, 100, ex, { bits: trigWord(true, false, packGroupSel(2, 0)), dist: 600 }));
+    expect(back.x.guns.clickMasks).toBe(0b100);
+    const none = unpackGunSync(packGunSync(7, 100, laneOf({ ...ex.guns, clickMasks: undefined }, FULL_CHARGE), { bits: 1, dist: 600 }));
+    expect(none.x.guns.clickMasks).toBeUndefined();
+  });
+});
