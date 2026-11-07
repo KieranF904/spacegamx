@@ -449,6 +449,83 @@
       "starter": true
     },
     {
+      "id": "pack_hull",
+      "out": {
+        "pack_hull": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "composite_sheet": 2,
+        "steel_plate": 2
+      },
+      "time": 20,
+      "starter": true
+    },
+    {
+      "id": "pack_wiring",
+      "out": {
+        "pack_wiring": 1
+      },
+      "inputs": {
+        "copper_wire": 4,
+        "insulated_polymer": 2
+      },
+      "time": 20,
+      "level": 6
+    },
+    {
+      "id": "pack_optics",
+      "out": {
+        "pack_optics": 1
+      },
+      "inputs": {
+        "crystal_lens": 2,
+        "capacitor_cell": 2,
+        "power_coupling": 2
+      },
+      "time": 20,
+      "level": 10
+    },
+    {
+      "id": "pack_mechanism",
+      "out": {
+        "pack_mechanism": 1
+      },
+      "inputs": {
+        "servo_motor": 2,
+        "barrel_assembly": 2,
+        "targeting_chip": 2
+      },
+      "time": 20,
+      "level": 12
+    },
+    {
+      "id": "pack_heavy",
+      "out": {
+        "pack_heavy": 1
+      },
+      "inputs": {
+        "titanium_plate": 2,
+        "cobalt_alloy": 2,
+        "hardened_steel": 2
+      },
+      "time": 20,
+      "level": 15
+    },
+    {
+      "id": "pack_drive",
+      "out": {
+        "pack_drive": 1
+      },
+      "inputs": {
+        "fuel_injector": 2,
+        "thrust_nozzle": 2,
+        "coil_winding": 2
+      },
+      "time": 20,
+      "level": 15
+    },
+    {
       "id": "boost_cell",
       "out": {
         "boost_cell": 2
@@ -1680,6 +1757,57 @@
         "servo_motor": 1
       },
       "time": 100
+    },
+    "fabricator_field": {
+      "inputs": {
+        "alloy_plate": 4,
+        "copper_wire": 4
+      },
+      "time": 40
+    },
+    "fabricator_bay": {
+      "inputs": {
+        "steel_plate": 4,
+        "copper_wire": 6,
+        "servo_motor": 2,
+        "power_coupling": 1
+      },
+      "time": 120
+    },
+    "fabricator_forge": {
+      "inputs": {
+        "titanium_plate": 6,
+        "servo_motor": 3,
+        "power_coupling": 2,
+        "targeting_chip": 1
+      },
+      "time": 200
+    },
+    "refiner_field": {
+      "inputs": {
+        "alloy_plate": 3,
+        "copper_wire": 2,
+        "coolant": 1
+      },
+      "time": 0
+    },
+    "refiner_bay": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 4,
+        "crystal_lens": 1,
+        "coolant": 2
+      },
+      "time": 60
+    },
+    "refiner_forge": {
+      "inputs": {
+        "titanium_plate": 4,
+        "copper_wire": 4,
+        "reactor_core": 1,
+        "coolant": 2
+      },
+      "time": 200
     }
   }
 }

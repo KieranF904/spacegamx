@@ -20,6 +20,8 @@ import type { ShipLoadout } from './loadout.js';
 import type { Economy } from './economy.js';
 import { designUpdateShips, fingerprint, type DesignUpdate, type DesignUpdateReport } from './designUpdate.js';
 import type { ShipTuning } from '../ships/tuning.js';
+import { cleanBank, type RepairBank } from './field/bank.js';
+import { cleanFieldRecord, type FieldRecord } from './field/record.js';
 
 /** An order at the fabricator: `n` of `item`, `made` so far */
 export interface FabOrder { id: number; item: string; n: number; made: number }
@@ -108,6 +110,8 @@ export interface ShipRecord {
   loaner?: boolean;
   /** Its ammunition loadout (econ/loadout.ts): crates to carry, topped up from storage at a station, and which each gun opens first */
   ammo?: ShipLoadout;
+  /** Field work kept between sessions: machine switches, the recycling queue, planned parts waiting, what the machines hold (econ/field/record.ts) */
+  field?: FieldRecord;
 }
 
 /**
@@ -197,6 +201,8 @@ export interface PlayerProfile {
   codex: { found: string[]; fresh: string[] };
   /** One-time messages for the next login (Pilots.login shows them, then clears them); absent when none */
   notices?: ProfileNotice[];
+  /** The repair bank (econ/field/bank.ts; docs/design/field-fabrication.md): absent until the server first fills it */
+  bank?: RepairBank;
   createdAt: string;
   updatedAt: string;
 }
@@ -283,6 +289,7 @@ function cleanRecord(s: ShipRecord): ShipRecord {
     ...(Number.isFinite(s.rank) ? { rank: s.rank } : {}),
     ...(s.loaner ? { loaner: true } : {}),
     ...cleanLoadout(s.ammo),
+    ...cleanFieldRecord(s.field),
   };
 }
 
@@ -408,6 +415,7 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     ...cleanOutpost(r.outpost),
     codex: cleanCodex(r.codex),
     ...cleanNotices(r.notices),
+    ...((b) => (b ? { bank: b } : {}))(cleanBank(r.bank)),
     ...(Array.isArray(r.fabOrders) ? { fabOrders: (r.fabOrders as FabOrder[]).filter((o) => o && typeof o.item === 'string' && typeof o.n === 'number').map((o) => ({ id: num(o.id, 0), item: o.item, n: Math.floor(o.n), made: Math.floor(num(o.made, 0)) })) } : {}),
     ...(Array.isArray(r.designs) ? { designs: (r.designs as unknown[]).map((b) => (b && typeof b === 'object' && Array.isArray((b as Blueprint).parts) && typeof (b as Blueprint).name === 'string' ? (b as Blueprint) : null)) } : {}),
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : base.createdAt,

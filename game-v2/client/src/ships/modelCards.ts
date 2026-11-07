@@ -28,6 +28,8 @@ export const FAMILY_LABEL: Record<string, string> = {
   gyro: 'Gyros',
   // (The feed layer's tanks, pipes and Selectors: common/src/ships/power/ports.ts)
   feed: 'Feed',
+  // (Field machines: common/src/ships/features/machines)
+  fabricator: 'Fabricators', refiner: 'Refiners',
 };
 export const LEGENDARY = 'Legendary';
 const FAMILY_ORDER = Object.keys(FAMILY_LABEL);

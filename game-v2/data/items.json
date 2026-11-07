@@ -1026,6 +1026,89 @@
       }
     },
     {
+      "id": "pack_hull",
+      "name": "Hull Pack",
+      "category": "consumable",
+      "rarity": "common",
+      "value": 40,
+      "color": "#9fb3c8",
+      "description": "A crate of 2 alloy plate, 2 composite sheet and 2 steel plate, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "pack": {
+        "alloy_plate": 2,
+        "composite_sheet": 2,
+        "steel_plate": 2
+      }
+    },
+    {
+      "id": "pack_wiring",
+      "name": "Wiring Pack",
+      "category": "consumable",
+      "rarity": "common",
+      "value": 35,
+      "color": "#e0a458",
+      "description": "A crate of 4 copper wire and 2 insulated polymer, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "pack": {
+        "copper_wire": 4,
+        "insulated_polymer": 2
+      }
+    },
+    {
+      "id": "pack_optics",
+      "name": "Optics Pack",
+      "category": "consumable",
+      "rarity": "uncommon",
+      "value": 150,
+      "color": "#7dd3fc",
+      "description": "A crate of 2 crystal lens, 2 capacitor cell and 2 power coupling, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "pack": {
+        "crystal_lens": 2,
+        "capacitor_cell": 2,
+        "power_coupling": 2
+      }
+    },
+    {
+      "id": "pack_mechanism",
+      "name": "Mechanism Pack",
+      "category": "consumable",
+      "rarity": "uncommon",
+      "value": 260,
+      "color": "#fcd34d",
+      "description": "A crate of 2 servo motor, 2 barrel assembly and 2 targeting chip, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "pack": {
+        "servo_motor": 2,
+        "barrel_assembly": 2,
+        "targeting_chip": 2
+      }
+    },
+    {
+      "id": "pack_heavy",
+      "name": "Heavy Plate Pack",
+      "category": "consumable",
+      "rarity": "rare",
+      "value": 260,
+      "color": "#94a3b8",
+      "description": "A crate of 2 titanium plate, 2 cobalt alloy and 2 hardened steel, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "pack": {
+        "titanium_plate": 2,
+        "cobalt_alloy": 2,
+        "hardened_steel": 2
+      }
+    },
+    {
+      "id": "pack_drive",
+      "name": "Drive Pack",
+      "category": "consumable",
+      "rarity": "rare",
+      "value": 300,
+      "color": "#fb923c",
+      "description": "A crate of 2 fuel injector, 2 thrust nozzle and 2 coil winding, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "pack": {
+        "fuel_injector": 2,
+        "thrust_nozzle": 2,
+        "coil_winding": 2
+      }
+    },
+    {
       "id": "boost_cell",
       "name": "Boost Cell",
       "category": "consumable",

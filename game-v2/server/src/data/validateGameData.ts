@@ -297,6 +297,8 @@ const SHAPES: Record<string, Spec> = {
       id: 'string', name: 'string', category: oneOf(...ITEM_CATEGORIES), rarity: oneOf(...RARITIES), value: 'number', color: 'string', description: 'string',
       'volume?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'quest?': 'string',
       'repair?': obj({ budget: 'number', hpPerSec: 'number', restoreSec: 'number' }),
+      // (Material packs: what one is made of, docs/design/field-fabrication.md)
+      'pack?': 'bag',
       'family?': oneOf(...MINERAL_FAMILIES), 'tier?': 'number', 'trace?': 'boolean', 'short?': 'string', 'socket?': obj({ type: 'string', level: 'number' }),
       'ammoFor?': obj({ weapon: 'string', rounds: 'number', 'mods?': 'any' }), 'codex?': 'string',
     })),
@@ -507,6 +509,8 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number',
       'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'dynamo?': 'number', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
       'intake?': 'number', 'buffer?': 'number', 'oneWay?': 'boolean', 'relayOnly?': 'boolean',
+      // (Field machines: docs/design/field-fabrication.md)
+      'machine?': strict({ kind: oneOf('fabricator', 'refiner'), tier: oneOf(1, 2, 3) }),
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
       'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
       'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number' }),

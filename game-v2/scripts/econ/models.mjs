@@ -818,6 +818,43 @@ for (const m of models) m.carriesFlow = true;
   }
 }
 // ---- (end ports energy core)
+// ---- Field machines (docs/design/field-fabrication.md; common/src/ships/features/machines, common/src/econ/field): the
+// fabricator builds, repairs, attaches and recycles parts from the hold, the refiner refines the hold's ore, each while the
+// ship flies. `machine.tier` sets its speed and grade cap (econ/field/rules.ts, the one place those numbers live). Each
+// draws its `demand` per cell a second only while it works (power/ports.ts: a tool whose draw PortsState.mach turns on),
+// the fabricator the most of any part, the refiner less, so it can run while mining. One of each a ship. Ports: in at the
+// back, as any tool (1.5 x its draw over its back cells). Appended after the ports block, so no other model's order moves.
+{
+  const MACHINE_LOOK = { fabricator: { color: '#c08a3e', decor: 'battery', glow: '#fbbf24' }, refiner: { color: '#7a8f5a', decor: 'none', glow: '#a3e635' } };
+  const MACHINES = [
+    ['fabricator_field', 'Field Fabricator', 'fabricator', ['rect2'], 0, 'alloy', { machine: { kind: 'fabricator', tier: 1 }, demand: 20 },
+      'Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a second while it works. One per ship.'],
+    ['fabricator_bay', 'Fabrication Bay', 'fabricator', ['block2'], 12, 'steel', { machine: { kind: 'fabricator', tier: 2 }, demand: 17.5, massScale: 1.4 },
+      'Builds and repairs parts from your hold 1.6 times as fast as a Field Fabricator, up to Mk III, drawing 70 a second while it works. One per ship.'],
+    ['fabricator_forge', 'Assembly Forge', 'fabricator', ['block2'], 24, 'titanium', { machine: { kind: 'fabricator', tier: 3 }, demand: 27.5, massScale: 1.6 },
+      'Builds and repairs any part from your hold 2.5 times as fast as a Field Fabricator, drawing 110 a second while it works. One per ship.'],
+    ['refiner_field', 'Field Refiner', 'refiner', ['sq'], 3, 'alloy', { machine: { kind: 'refiner', tier: 1 }, demand: 20 },
+      'Refines ore in your hold while you fly, up to Mk II materials, at 0.4 of a station\'s pace, drawing 20 a second while it works. One per ship.'],
+    ['refiner_bay', 'Refinery Bay', 'refiner', ['rect2'], 12, 'steel', { machine: { kind: 'refiner', tier: 2 }, demand: 17.5 },
+      'Refines ore in your hold up to Mk III materials, at 0.7 of a station\'s pace, drawing 35 a second while it works. One per ship.'],
+    ['refiner_forge', 'Smelter Forge', 'refiner', ['block2'], 24, 'titanium', { machine: { kind: 'refiner', tier: 3 }, demand: 13.75, massScale: 1.4 },
+      'Refines any ore in your hold at a station\'s pace, drawing 55 a second while it works. One per ship.'],
+  ];
+  const portsOf = (piece, demand) => {
+    const cells = PIECE_AREA[piece] >= 2 ? [0, 1] : [0];
+    const rate = Math.max(4, Math.ceil((demand * PIECE_AREA[piece] * 1.5) / cells.length));
+    return cells.map((cell) => ({ dir: 'in', side: 'S', cell, rate }));
+  };
+  for (const [id, name, family, pieces, level, material, fields, description] of MACHINES) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, {}), ...fields, priority: 3, hpScale: 0.8, description,
+      ports: portsOf(pieces[0], fields.demand),
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category: 'utility', fabOrder: next('utility'), ...MACHINE_LOOK[family],
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end field machines)
 
 const COMPONENTS = [
   ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount: cannons, autocannons, flak and mortars.'],
@@ -937,6 +974,15 @@ Object.assign(RECIPES, {
   cannon_slurry: { titanium_plate: 3, barrel_assembly: 2, insulated_polymer: 2, servo_motor: 1 },
 });
 for (const feed of ['overcharge', 'coolant', 'damping', 'flux', 'accelerant', 'lens', 'catalyst', 'reaction', 'burstgel']) RECIPES[`feed_tank_${feed}`] = { steel_plate: 2, insulated_polymer: 1 };
+// (Field machines: the Field Fabricator is starter materials only, so a bare core can build it; docs/design/field-fabrication.md)
+Object.assign(RECIPES, {
+  fabricator_field: { alloy_plate: 4, copper_wire: 4 },
+  fabricator_bay: { steel_plate: 4, copper_wire: 6, servo_motor: 2, power_coupling: 1 },
+  fabricator_forge: { titanium_plate: 6, servo_motor: 3, power_coupling: 2, targeting_chip: 1 },
+  refiner_field: { alloy_plate: 3, copper_wire: 2, coolant: 1 },
+  refiner_bay: { steel_plate: 3, copper_wire: 4, crystal_lens: 1, coolant: 2 },
+  refiner_forge: { titanium_plate: 4, copper_wire: 4, reactor_core: 1, coolant: 2 },
+});
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);
 const KNOWN = new Set([...read('items.json').items.map((d) => d.id), ...read('recipes.json').refining.map((r) => r.id), ...COMPONENTS.map((c) => c[0])]);

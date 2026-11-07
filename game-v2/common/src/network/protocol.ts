@@ -2,10 +2,12 @@ import type { EconClientMessage, EconServerMessage } from './econProtocol.js';
 import type { SocialClientMessage, SocialServerMessage } from './socialProtocol.js';
 import type { ClientContribMessage, ContribServerMessage } from './contributorProtocol.js';
 import type { ClientBossDevMessage, BossServerMessage } from './bossProtocol.js';
+import type { FieldClientMessage, FieldServerMessage } from './fieldProtocol.js';
 export * from './econProtocol.js';
 export * from './socialProtocol.js';
 export * from './contributorProtocol.js';
 export * from './bossProtocol.js';
+export * from './fieldProtocol.js';
 export * from './replication.js';
 export * from './binaryCodec.js';
 import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
@@ -38,9 +40,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 62;
+export const PROTOCOL_VERSION = 63;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'e50df147';
+export const PROTOCOL_WIRE_HASH = 'fa7db3f7';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -260,7 +262,8 @@ export type ClientMessage =
   | EconClientMessage
   | SocialClientMessage
   | ClientContribMessage
-  | ClientBossDevMessage;
+  | ClientBossDevMessage
+  | FieldClientMessage;
 
 /**
  * Dev tool (map click): jump to a system, optionally to a spot in it. Only
@@ -934,7 +937,8 @@ export type ServerMessage =
   | EconServerMessage
   | SocialServerMessage
   | ContribServerMessage
-  | BossServerMessage;
+  | BossServerMessage
+  | FieldServerMessage;
 
 /**
  * The ships of a client's system it doesn't have in view (further than the

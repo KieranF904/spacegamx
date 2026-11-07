@@ -46,6 +46,8 @@ export interface ItemDef {
   quest?: string;
   /** Repair kits: credits of repairs, HP healed per second (fraction of each part's max), seconds per missing part rebuilt */
   repair?: { budget: number; hpPerSec: number; restoreSec: number };
+  /** Material packs (econ/field/packs.ts): what one is made of. In the field a fabricator takes one unit of any one of these a pack; in the repair bank a pack gives up to all of them to one part */
+  pack?: Record<string, number>;
   /** Minerals: which family of rock carries it, and the tier it first turns up in useful amounts */
   family?: MineralFamily;
   tier?: number;

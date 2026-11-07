@@ -268,7 +268,7 @@ export function laneOf(guns: GunState, charge: Charge): OwnExtras {
  * `gunSync` (a plain message, server to a client, just before a snapshot): ship `id`'s gun lane as tick `t` ended,
  * exact, and its gun controls then (which that ship's gun rows step from). Its lane starts here; its fire records
  * through t are told. `z` is the whole state as one list of numbers (packGunSync: each array sparse, packArr):
- *   [pool, ...banks, ...eng, ...gun, ports?, (sig, shieldSat, gauge, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
+ *   [pool, ...banks, ...eng, ...gun, ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
  *    ...sat), ...cooldown, ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, minePaid, mineUntil,
  *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue)]
  * (each `...x` an array as its packArr's length, then the packArr; absent: -1; an absent scalar: null)
@@ -319,7 +319,8 @@ const opt = (v: number | undefined) => (v === undefined ? null : v);
 export function packGunSync(id: number, t: number, x: Readonly<OwnExtras>, k: Readonly<GunCtl>): ServerGunSyncMessage {
   const c = x.charge, g = x.guns, z: (number | null)[] = [c.g];
   putArr(z, c.b); putArr(z, c.eng); putArr(z, c.gun);
-  if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
+  // (mach: which field machines draw, so another ship's guns get the power its own do; their energy counters aren't needed here)
+  if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge, c.e.mach ?? 0); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
   for (const a of GUN_ARRAYS) putArr(z, g[a]);
   z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist));
   return { type: 'gunSync', id, t, z };
@@ -336,9 +337,9 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
   if (eng) charge.eng = eng;
   if (gun) charge.gun = gun;
   if (num() === 1) {
-    const sig = num(), shieldSat = num(), gauge = num();
+    const sig = num(), shieldSat = num(), gauge = num(), mach = num();
     const [held, flags, amt, mat, closed, aug, sat] = PORT_ARRAYS.map(() => arr() ?? []);
-    charge.e = { sig, shieldSat, gauge, held: Int32Array.from(held), flags: Uint8Array.from(flags), amt: Int32Array.from(amt), mat: Uint8Array.from(mat), closed: Int16Array.from(closed), aug: Int32Array.from(aug), sat: Uint8Array.from(sat) };
+    charge.e = { sig, shieldSat, gauge, held: Int32Array.from(held), flags: Uint8Array.from(flags), amt: Int32Array.from(amt), mat: Uint8Array.from(mat), closed: Int16Array.from(closed), aug: Int32Array.from(aug), sat: Uint8Array.from(sat), mach, machEu: new Float64Array(3) };
   }
   const [cooldown, rounds, reload, gcharge, spin, aim] = GUN_ARRAYS.map(() => arr() ?? []);
   const guns: GunState = { cooldown, rounds, reload, charge: gcharge, spin, aim, triggerHeld: num() === 1, clickAt: num(), minePaid: val(), mineUntil: val(), mineShare: val(), tow: val() };

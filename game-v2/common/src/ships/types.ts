@@ -219,6 +219,13 @@ export interface FunctionDef {
   tow?: boolean;
   /** Gyro (ships/features/gyro/gyro.ts): turning torque per unit of area, both ways, wherever it sits; draws its `demand` per cell a second turning flat out, less turning gently */
   gyro?: number;
+  /**
+   * Field machines (ships/features/machines; docs/design/field-fabrication.md): a fabricator builds, repairs, attaches and
+   * recycles parts from the hold, a refiner refines ore in the hold; `tier` 1..3 sets its speed and grade cap
+   * (econ/field/rules.ts). At most one of each kind a ship. It draws its `demand` per cell a second only while it works
+   * (power/ports.ts PortsState.mach)
+   */
+  machine?: { kind: 'fabricator' | 'refiner'; tier: number };
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */
   weapon?: string;
   /**

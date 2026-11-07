@@ -104,7 +104,7 @@ export function gunStateOf(s: Pick<ShipState, 'cooldown' | 'rounds' | 'reload' |
 }
 
 function clonePorts(e: PortsState): PortsState {
-  return { ...e, held: e.held.slice(), flags: e.flags.slice(), amt: e.amt.slice(), mat: e.mat.slice(), closed: e.closed.slice(), aug: e.aug.slice(), sat: e.sat.slice() };
+  return { ...e, held: e.held.slice(), flags: e.flags.slice(), amt: e.amt.slice(), mat: e.mat.slice(), closed: e.closed.slice(), aug: e.aug.slice(), sat: e.sat.slice(), machEu: e.machEu.slice() };
 }
 
 export function cloneCharge(c: Charge): Charge {

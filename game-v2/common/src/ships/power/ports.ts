@@ -20,6 +20,14 @@ import { EU, perTick, perTickUp, toEu } from './units.js';
 // ---- Roles
 /** Thruster kinds (PortsLayout.thrustKind) */
 export const TK_ENGINE = 0, TK_STRAFER = 1, TK_GYRO = 2;
+/**
+ * Field machines (FunctionDef.machine; docs/design/field-fabrication.md): PortsLayout.machine's kinds, and the bit of
+ * PortsState.mach that lets each draw. A machine is a tool that draws its full rate only while its bit is set (the server
+ * sets it while the machine is switched on and has work it can do, and tells the pilot: a decision, never a stream), and
+ * nothing otherwise; what it got is summed into PortsState.machEu[kind], the energy its jobs progress by
+ */
+export const MACHINE_FAB = 1, MACHINE_REF = 2;
+export const machineBit = (kind: number): number => 1 << (kind - 1);
 export const P_INERT = 0, P_GEN = 1, P_RELAY = 2, P_THRUSTER = 3, P_TOOL = 4, P_WEAPON = 5, P_TANK = 6, P_SELECTOR = 7, P_PIPE = 8;
 // ---- Flags (PortsState.flags; three bits on the wire)
 /** A clip reloading, or a burst beam resting */
@@ -127,6 +135,8 @@ export interface PortsLayout {
   shield: Uint8Array;
   /** Tools: 1 for a mining laser (portsMineStep draws it, by the pulse), and its pulse's length in ticks */
   miner: Uint8Array;
+  /** Tools: a field machine's kind (MACHINE_FAB, MACHINE_REF; 0 none): it draws only while PortsState.mach has its bit */
+  machine: Uint8Array;
   minePulse: Int32Array;
   /** Lines (conduit-like stores: they carry material too) */
   carrier: Uint8Array;
@@ -207,6 +217,8 @@ export interface PortsLayout {
   strafeDraw: number;
   gyroDraw: number;
   shieldDraw: number;
+  /** E a second the field machines draw while they work (fabricator and refiner together) */
+  machineDraw: number;
 }
 
 export interface PortsState {
@@ -225,6 +237,10 @@ export interface PortsState {
   sat: Uint8Array;
   shieldSat: number;
   gauge: number;
+  /** Field machines: which may draw this tick (bits machineBit(kind)); 0: none. A control the server sets, kept by remaps */
+  mach: number;
+  /** Field machines: eu each kind has taken in all (index = kind): its jobs' progress (econ/field/jobs.ts). Kept by remaps */
+  machEu: Float64Array;
 }
 
 const SIDE_ORDER: readonly Side[] = ['N', 'E', 'S', 'W'];
@@ -274,11 +290,11 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const pieces = new Uint8Array(n), pieceE = Z(), pieceT = Z(), spikeLo = Z(), spikeHi = Z(), spikeIn = new Float64Array(n).fill(1), spikeOut = new Float64Array(n).fill(1);
   const augCap = Z(), augCost = Z(), augRate = Z(), augSteady = Z(), augDps = new Float64Array(n).fill(1), augMods: (WeaponMods | undefined)[] = new Array(n).fill(undefined), augName: (string | undefined)[] = new Array(n).fill(undefined);
   const tierDmg = new Float64Array(n).fill(1);
-  const miner = new Uint8Array(n), minePulse = Z();
+  const miner = new Uint8Array(n), minePulse = Z(), machine = new Uint8Array(n);
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
   const mul = () => new Float64Array(n * W).fill(1);
   const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
-  let supply = 0, engineDraw = 0, weaponDraw = 0, strafeDraw = 0, gyroDraw = 0, shieldDraw = 0;
+  let supply = 0, engineDraw = 0, weaponDraw = 0, strafeDraw = 0, gyroDraw = 0, shieldDraw = 0, machineDraw = 0;
 
   for (let i = 0; i < n; i++) {
     if (!alive[i]) continue;
@@ -371,6 +387,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       // slow refill, so it is left out of it, though it draws as a tool)
       if ((fn.shield ?? 0) > 0 && !fn.flash) { shield[i] = 1; shieldDraw += partDemand(fn, a, m); }
       if (fn.mining) { miner[i] = 1; minePulse[i] = Math.max(1, Math.round((fn.minePulse ?? 0.9) * TPS)); }
+      if (fn.machine) { machine[i] = fn.machine.kind === 'fabricator' ? MACHINE_FAB : MACHINE_REF; machineDraw += partDemand(fn, a, m); }
     }
     // Feed: what it takes, its buffer, and its stats under each material
     if (fn.takes?.length && (role[i] === P_WEAPON || role[i] === P_THRUSTER)) {
@@ -591,7 +608,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, machine, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
@@ -599,7 +616,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
     netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
     gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
-    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw,
+    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw, machineDraw,
   };
   L.sig = portsSig(L);
   return L;
@@ -636,7 +653,7 @@ export function portsSig(L: PortsLayout): number {
 
 // ================================================================ state
 export function createPortsState(L: PortsLayout): PortsState {
-  return fullPorts(L, { sig: L.sig, held: new Int32Array(L.n), flags: new Uint8Array(L.n), amt: new Int32Array(L.n), mat: new Uint8Array(L.n), closed: new Int16Array(L.n), aug: new Int32Array(L.n), sat: new Uint8Array(L.n), shieldSat: 255, gauge: 0 });
+  return fullPorts(L, { sig: L.sig, held: new Int32Array(L.n), flags: new Uint8Array(L.n), amt: new Int32Array(L.n), mat: new Uint8Array(L.n), closed: new Int16Array(L.n), aug: new Int32Array(L.n), sat: new Uint8Array(L.n), shieldSat: 255, gauge: 0, mach: 0, machEu: new Float64Array(3) });
 }
 /** Everything full: stores, buffers and tanks; no material in the guns, lines or engines */
 export function fullPorts(L: PortsLayout, out?: PortsState): PortsState {
@@ -648,7 +665,12 @@ export function fullPorts(L: PortsLayout, out?: PortsState): PortsState {
 }
 /** After a rebuild: the same design keeps what each part held (clamped); a new one starts full */
 export function remapPorts(e: PortsState, after: PortsLayout, sameDesign: boolean): PortsState {
-  if (!sameDesign || e.held.length !== after.n) return fullPorts(after, e.held.length === after.n ? e : undefined);
+  if (!sameDesign || e.held.length !== after.n) {
+    // (The field machines' switches and their energy counters go with the ship, whatever its design: jobs progress by them)
+    const f = fullPorts(after, e.held.length === after.n ? e : undefined);
+    if (f !== e) { f.mach = e.mach; f.machEu.set(e.machEu); }
+    return f;
+  }
   for (let i = 0; i < after.n; i++) {
     if (e.held[i] > after.cap[i]) e.held[i] = after.cap[i];
     if (e.held[i] < 0) e.held[i] = 0;
@@ -662,6 +684,18 @@ export function remapPorts(e: PortsState, after: PortsLayout, sameDesign: boolea
 }
 export function portsGauge(L: PortsLayout, e: PortsState): number { let g = 0; for (const r of L.relays) g += e.held[r]; return g; }
 export function portsGaugePct(L: PortsLayout, e: PortsState): number { return L.gaugeMax > 0 ? Math.round((10000 * e.gauge) / L.gaugeMax) / 100 : 100; }
+/** The live part that is this kind of field machine (MACHINE_FAB, MACHINE_REF), or -1 */
+export function portsMachinePart(L: PortsLayout, kind: number): number {
+  for (const p of L.tools) if (L.machine[p] === kind) return p;
+  return -1;
+}
+/** Let a field machine draw (on) or not: the server's decision, applied on the tick it is made on both sides */
+export function setPortsMachine(e: PortsState, kind: number, on: boolean): void {
+  const b = machineBit(kind);
+  e.mach = on ? e.mach | b : e.mach & ~b;
+}
+/** eu a field machine kind has taken in all (its jobs progress by the difference between two reads) */
+export function portsMachineEu(e: PortsState, kind: number): number { return e.machEu[kind] ?? 0; }
 
 // ================================================================ effective stats (a part's material)
 /** The feed index a part's stats are shaped by now: its material, if it holds enough for its next use and takes it */
@@ -856,9 +890,12 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
   for (const p of L.tools) {
     // (A mining laser draws by its pulse: portsMineStep)
     if (L.miner[p]) continue;
-    const w = tw ? tw[p] : L.rate[p], want = w > 0 ? w : 0, got = held[p] < want ? held[p] : want;
+    // (A field machine draws its rate only while its bit is on: PortsState.mach)
+    const mk = L.machine[p];
+    const w = mk ? ((e.mach & (1 << (mk - 1))) !== 0 ? L.rate[p] : 0) : tw ? tw[p] : L.rate[p], want = w > 0 ? w : 0, got = held[p] < want ? held[p] : want;
     held[p] -= got;
     e.sat[p] = want > 0 ? Math.round((255 * got) / want) : 255;
+    if (mk) e.machEu[mk] += got;
     if (L.shield[p]) { shW += want; shG += got; }
   }
   e.shieldSat = shW > 0 ? Math.round((255 * shG) / shW) : 255;

@@ -1,0 +1,49 @@
+== partTip (tooltip) ==
+Assembly Forge
+Mk III · Block · 4 cells
+Hull · mass358 hp · 6.4
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw110/s
+Speedbuilds and repairs parts from the hold while you fly, at 2.5 times a Field Fabricator's pace; draws power only while it works
+Buildsparts any grade; one per ship
+
+== partStats (stats rows) ==
+GradeMk III
+Power draw110
+Speedbuilds and repairs parts from the hold, 2.5 times a Field Fabricator's pace
+Buildsany grade
+Hull · mass358 hp · 6.4
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 358
+
+== familyLabel ==
+Fabricators
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+Builds and repairs any part from your hold 2
+
+== keyStats ==
+2.5x speed · any grade · draws 110 working
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 24","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":4,"hp":358.40000000000003,"mass":6.4,"firepower":0,"toughness":358.40000000000003,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":110}

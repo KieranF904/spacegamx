@@ -16,7 +16,7 @@ export type BlueprintErrorCode =
   | 'catalogVersion' | 'unknownPiece' | 'unknownFunction' | 'unknownMaterial' | 'functionNotAllowed'
   | 'badUid' | 'duplicateUid' | 'tooManyParts' | 'coreCount' | 'overlap' | 'unreachable'
   | 'facingMissing' | 'facingBlocked' | 'facingNotJoined' | 'notOwned' | 'materialNotOwned' | 'badPlacement' | 'badMount' | 'exclusive'
-  | 'badMounting';
+  | 'badMounting' | 'machineCount';
 
 export interface BlueprintError {
   code: BlueprintErrorCode;
@@ -211,6 +211,11 @@ export function validateBlueprint(
 
   const cores = bp.parts.filter((p) => p.fn === 'core');
   if (cores.length !== 1) err('coreCount', cores.map((p) => p.uid), `needs exactly one core (has ${cores.length})`);
+  // Field machines: at most one of each kind a ship (docs/design/field-fabrication.md)
+  for (const kind of ['fabricator', 'refiner'] as const) {
+    const m = bp.parts.filter((p) => catalog.functions.get(p.fn)?.machine?.kind === kind);
+    if (m.length > 1) err('machineCount', m.map((p) => p.uid), `only one ${kind} a ship (has ${m.length})`);
+  }
 
   const geoms = usable.map((p) => placeGeometry(catalog, p));
   for (const [i, j] of findOverlaps(geoms)) {

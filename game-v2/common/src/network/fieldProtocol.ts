@@ -1,0 +1,115 @@
+/**
+ * Field fabrication and the repair bank on the wire (docs/design/field-fabrication.md, "Protocol"). JSON messages, all
+ * of them decisions or rare events: a plan saved, a machine switched, a job started or finished, the bank changed. A
+ * job's progress is never sent: both sides step it by the machine's own clock (econ/field/jobs.ts jobAt; a powered
+ * machine's clock is PortsState.machEu, which the own-ship sync already carries).
+ */
+
+import type { Blueprint } from '../ships/types.js';
+import type { Bag } from '../econ/stacks.js';
+import type { FieldJob } from '../econ/field/jobs.js';
+import type { MachineKind } from '../econ/field/rules.js';
+import type { PackMode } from '../econ/field/packs.js';
+
+// ============================================ client -> server
+
+/**
+ * Save the field plan: `blueprint` is the design the pilot wants (validated as any design). Parts standing now that keep
+ * their uid and placement stay; standing parts left out are queued for recycling; new parts become planned parts
+ * (ghosts) the fabricator fills in. Free: only building costs
+ */
+export interface ClientFieldPlanMessage { type: 'fieldPlan'; blueprint: Blueprint }
+
+/** Drop the plan: every planned part not built yet goes, the recycling queue empties (the ship as it stands) */
+export interface ClientFieldPlanClearMessage { type: 'fieldPlanClear' }
+
+/**
+ * A machine's switches (the ship's fabricator or refiner: its part's, or the core's own when it has none): on/off (any time, mid-fight too), how the fabricator may use packs from the hold, and what the
+ * refiner refines (`recipe`: a refining recipe id, or null: what the plan is short of, from the hold's ore)
+ */
+export interface ClientMachineMessage { type: 'machine'; kind: MachineKind; on?: boolean; packs?: PackMode; recipe?: string | null }
+
+/** Call off a machine's job under way (its inputs go back to the hold, or wait in the machine while the hold is full) */
+export interface ClientFieldCancelMessage { type: 'fieldCancel'; kind: MachineKind; job: number }
+
+/** Recycle standing parts (or, `cancel`, take them off the queue): the same as leaving them out of a saved plan */
+export interface ClientFieldRecycleMessage { type: 'fieldRecycle'; uids: number[]; cancel?: boolean }
+
+/** At a station: put packs and refined materials from the hold or storage into the repair bank (never withdrawn) */
+export interface ClientBankDepositMessage { type: 'bankDeposit'; items: Bag; from?: 'cargo' | 'storage' }
+
+/** Dev servers only (never production; the server refuses it elsewhere): fill or empty the bank's free part, clear or grant deposits */
+export interface ClientDevBankMessage { type: 'devBank'; action: 'fill' | 'empty' | 'clearDeposits' | 'grant'; items?: Bag }
+
+export type FieldClientMessage = ClientFieldPlanMessage | ClientFieldPlanClearMessage | ClientMachineMessage | ClientFieldCancelMessage
+  | ClientFieldRecycleMessage | ClientBankDepositMessage | ClientDevBankMessage;
+
+// ============================================ server -> client
+
+/** Why a machine is idle with its switch on */
+export type MachineBlock =
+  /** A finished item waits inside it for room in the hold (cargo full): nothing is lost */
+  | 'cargo'
+  /** The next job's materials aren't in the hold */
+  | 'materials'
+  /** Everything left needs a better machine (grade cap) */
+  | 'grade'
+  /** Nothing to do */
+  | 'idle';
+
+/**
+ * One of the ship's two machines. A ship without a working fabricator (refiner) part has the core's own (tier 0: slow,
+ * starter grade, no power drawn) in its place, so `kind` is always one of each
+ */
+export interface MachineView {
+  kind: MachineKind;
+  /** Its tier (0: the core's own) and the part's blueprint uid (-1: the core's own) */
+  tier: number;
+  uid: number;
+  on: boolean;
+  /** Drawing power this tick (on, and a job it can run): PortsState.mach's bit */
+  drawing: boolean;
+  packs?: PackMode;
+  /** The refiner's chosen recipe (absent: auto) */
+  recipe?: string;
+  job?: FieldJob;
+  /** Its clock when `job` was copied: machEu (a powered machine) or the tick (the core) */
+  at?: number;
+  /** Finished output waiting inside it (cargo full) */
+  holding?: Bag;
+  blocked?: MachineBlock;
+}
+
+/**
+ * The ship's field state, sent when it changes (a decision applied, a job started, finished or called off, a part
+ * placed): every machine, the plan's recycling queue and what the plan still needs. `tick`: the server tick it holds at
+ */
+export interface ServerFieldStateMessage {
+  type: 'fieldState';
+  tick: number;
+  machines: MachineView[];
+  /** Standing parts queued for recycling (uids) */
+  recycle: number[];
+  /** What the planned and missing parts still need, all told (what the hold is short of: the HUD's list) */
+  short?: Bag;
+}
+
+/** A part finished: placed on the ship (its uid), or put in the hold (another spot didn't want it), or kept in the machine (hold full) */
+export interface ServerFieldDoneMessage { type: 'fieldDone'; kind: MachineKind; job: number; item: string; to: 'ship' | 'cargo' | 'machine'; uid?: number }
+
+/** The repair bank: sent at login, on a change and while it refills (at most once a minute) */
+export interface ServerRepairBankMessage {
+  type: 'repairBank';
+  /** The free part (whole units) and its cap (a starter ship's worth) */
+  free: Bag;
+  cap: Bag;
+  /** Seconds until the free part is full (0: full) */
+  fullIn: number;
+  /** What the free part may give repairs now (freeSpare) */
+  spare: Bag;
+  deposits: Bag;
+  /** Rebuilding from deposits after a respawn (parts left) */
+  rebuilding?: number;
+}
+
+export type FieldServerMessage = ServerFieldStateMessage | ServerFieldDoneMessage | ServerRepairBankMessage;

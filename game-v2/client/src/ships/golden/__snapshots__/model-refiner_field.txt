@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Field Refiner
+Mk I · Square · 1 cell
+Hull · mass60 hp · 1.0
+Armour · build1 · 1 pts
+Power draw20/s
+Speedrefines ore in the hold while you fly, at 0.4 of a station's pace; draws power only while it works
+Refinesmaterials up to Mk II; one per ship
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw20
+Speedrefines ore in the hold, 0.4 of a station's pace
+Refinesup to Mk II
+Hull · mass60 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 60
+
+== familyLabel ==
+Refiners
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Refines ore in your hold while you fly, up to Mk II materials, at 0
+
+== keyStats ==
+0.4x speed · up to Mk II · draws 20 working
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 3","why":"Learned at level 3 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 3","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":60,"mass":1,"firepower":0,"toughness":60,"armour":1,"draw":20}

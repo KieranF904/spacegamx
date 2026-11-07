@@ -1,0 +1,49 @@
+== partTip (tooltip) ==
+Fabrication Bay
+Mk II · Block · 4 cells
+Hull · mass301 hp · 7.8
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw70/s
+Speedbuilds and repairs parts from the hold while you fly, at 1.6 times a Field Fabricator's pace; draws power only while it works
+Buildsparts up to Mk III; one per ship
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw70
+Speedbuilds and repairs parts from the hold, 1.6 times a Field Fabricator's pace
+Buildsup to Mk III
+Hull · mass301 hp · 7.8
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 301
+
+== familyLabel ==
+Fabricators
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+Builds and repairs parts from your hold 1
+
+== keyStats ==
+1.6x speed · up to Mk III · draws 70 working
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":4,"hp":300.8,"mass":7.839999999999999,"firepower":0,"toughness":300.8,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":70}

@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Field Fabricator
+Mk I · Panel · 2 cells
+Hull · mass120 hp · 2.0
+Armour · build1 · 2 pts
+Power draw40/s
+Speedbuilds and repairs parts from the hold while you fly, at a Field Fabricator's pace; draws power only while it works
+Buildsparts up to Mk II; one per ship
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw40
+Speedbuilds and repairs parts from the hold, a Field Fabricator's pace
+Buildsup to Mk II
+Hull · mass120 hp · 2.0
+Armour · build1 · 2 pts
+Rating scoretoughness 120
+
+== familyLabel ==
+Fabricators
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a second while it works
+
+== keyStats ==
+1x speed · up to Mk II · draws 40 working
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 0","why":"Learned at level 0 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 0","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":2,"hp":120,"mass":2,"firepower":0,"toughness":120,"armour":1,"draw":40}

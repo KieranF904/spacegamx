@@ -96,7 +96,13 @@
   "maw_slate",
   "maw_glass",
   "pirate_plate",
-  "pirate_paint"
+  "pirate_paint",
+  "fabricator_field",
+  "fabricator_bay",
+  "fabricator_forge",
+  "refiner_field",
+  "refiner_bay",
+  "refiner_forge"
  ],
  "skip": [
   "power_pulse_dynamo",

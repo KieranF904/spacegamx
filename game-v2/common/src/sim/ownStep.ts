@@ -126,7 +126,7 @@ export interface ServerOwnSyncMessage {
 }
 
 /** A ports ship's stores' typed arrays as plain ones (the wire carries arrays), and back */
-const PORTS_ARRAYS = [['held', Int32Array], ['flags', Uint8Array], ['amt', Int32Array], ['mat', Uint8Array], ['closed', Int16Array], ['aug', Int32Array], ['sat', Uint8Array]] as const;
+const PORTS_ARRAYS = [['held', Int32Array], ['flags', Uint8Array], ['amt', Int32Array], ['mat', Uint8Array], ['closed', Int16Array], ['aug', Int32Array], ['sat', Uint8Array], ['machEu', Float64Array]] as const;
 function portsOut(e: PortsState): PortsState {
   const out = { ...e } as unknown as Record<string, unknown>;
   for (const [k] of PORTS_ARRAYS) out[k] = Array.from(e[k]);
@@ -135,6 +135,9 @@ function portsOut(e: PortsState): PortsState {
 function portsIn(e: PortsState): PortsState {
   const out = { ...e } as unknown as Record<string, unknown>;
   for (const [k, T] of PORTS_ARRAYS) out[k] = T.from((e as unknown as Record<string, ArrayLike<number>>)[k] ?? []);
+  // (Field machines' counters, one a kind: a sync from before them has none)
+  if ((out.machEu as Float64Array).length < 3) { const m = new Float64Array(3); m.set(out.machEu as Float64Array); out.machEu = m; }
+  if (typeof out.mach !== 'number') out.mach = 0;
   return out as unknown as PortsState;
 }
 

@@ -1,0 +1,49 @@
+== partTip (tooltip) ==
+Smelter Forge
+Mk III · Block · 4 cells
+Hull · mass358 hp · 5.6
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw55/s
+Speedrefines ore in the hold while you fly, at a station's pace; draws power only while it works
+Refinesmaterials any grade; one per ship
+
+== partStats (stats rows) ==
+GradeMk III
+Power draw55
+Speedrefines ore in the hold, a station's pace
+Refinesany grade
+Hull · mass358 hp · 5.6
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 358
+
+== familyLabel ==
+Refiners
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+Refines any ore in your hold at a station's pace, drawing 55 a second while it works
+
+== keyStats ==
+1x speed · any grade · draws 55 working
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 24","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":4,"hp":358.40000000000003,"mass":5.6,"firepower":0,"toughness":358.40000000000003,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":55}
