@@ -10,9 +10,10 @@ import {
   CORE_TIER, FIELD, canFabricate, canRefine, fabWork, attachWork, jobTicks, jobEu, recycleReturn, repairBill, scaleBill, refineGrade, tierRule,
 } from './rules.js';
 import { bankPay, fieldPay, packDefs, packShare } from './packs.js';
-import { nextFieldTarget, payCoreOutward, placeFinished, recycleCandidates, joinDepths, type FieldPartView } from './order.js';
+import { nextFieldTarget, nextRearm, payCoreOutward, placeFinished, recycleCandidates, joinDepths, type FieldPartView } from './order.js';
 import { BANK, bankCap, bankFill, bankFullIn, cleanBank, depositable, freeSpare, freeWhole, newBank, refillBank, spendDeposits, spendFree } from './bank.js';
 import { jobAt, jobFraction, stepJob, type FieldJob } from './jobs.js';
+import { cleanFieldRecord } from './record.js';
 
 const data = join(__dirname, '../../../../data');
 const json = (p: string) => JSON.parse(readFileSync(join(data, p), 'utf-8'));
@@ -278,5 +279,20 @@ describe('saved field state', () => {
     const back = migrateProfile(JSON.parse(JSON.stringify(p)), kit, ships, { econ });
     expect(back.ship.field).toEqual({ refOn: true, packs: 'fill', recipe: 'alloy_plate' });
     expect(back.bank).toEqual({ free: { alloy_plate: 3.5 }, deposits: { pack_hull: 1 }, at: 7 });
+  });
+});
+
+describe('field fabrication: rearming Mine Bays', () => {
+  const bays = [{ uid: 5, capacity: 12 }, { uid: 9, capacity: 12 }];
+  it('picks the bay that lacks the most (ties: part order), a job of at most perJob', () => {
+    expect(nextRearm(bays, undefined, 4)).toEqual({ uid: 5, count: 4 });
+    expect(nextRearm(bays, { 5: 10, 9: 4 }, 4)).toEqual({ uid: 9, count: 4 });
+    expect(nextRearm(bays, { 5: 11, 9: 12 }, 4)).toEqual({ uid: 5, count: 1 });
+    expect(nextRearm(bays, { 5: 12, 9: 99 }, 4)).toBeNull();
+    expect(nextRearm([], undefined, 4)).toBeNull();
+  });
+  it('magazines are saved with the record, cleaned', () => {
+    expect(cleanFieldRecord({ mines: { 5: 8, 9: 0, x: 3, 7: 2.7, 8: 'a', 11: 500 } })).toEqual({ field: { mines: { 5: 8, 7: 2, 11: 64 } } });
+    expect(cleanFieldRecord({ mines: [] })).toEqual({});
   });
 });

@@ -800,6 +800,10 @@ export class GameServer implements ServerCtx {
       freeBuild: (pilot) => { const c = this.pilots.connOf(pilot); return !!c && this.freeBuild(c as ClientConnection); },
       bankSpare: (pilot) => this.pilots.bankSpare(pilot),
       spendBankSpare: (pilot, bill) => this.pilots.spendBankSpare(pilot, bill),
+      // (The Mine Bay: features/minebay)
+      canDamage: (a, b) => this.canDamage(a, b),
+      sameParty: (a, b) => { const ca = this.pilots.connOf(a), cb = ca && this.pilots.connOf(b); return !!ca && !!cb && this.party.same(ca, cb); },
+      shipView: (pilot) => (this.pilots.connOf(pilot) as ClientConnection | undefined)?.shipView,
     }, new Set(this.handlers.keys()));
     // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
     for (const [type, fn] of this.features.messages) {

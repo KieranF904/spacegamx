@@ -55,6 +55,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // Every part's HP of a few ships resent (confirmed hits: a client whose copy is off)
   hpResync: { per: 600, burst: 20 },
   packedResync: { per: 60, burst: 3 },
+  // A Mine Bay's drop (each a decision every holder is told: about 4 a second)
+  mineDrop: { per: 240, burst: 4 },
   // What it kept of cells it dropped (CAPS.FOCUS: one a few seconds at a cruise, a burst after a jump)
 };
 

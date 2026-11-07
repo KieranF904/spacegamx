@@ -30,6 +30,12 @@ export interface ClientFeatureHost {
   readonly helm: () => boolean;
   /** The pilot's charge as predicted (energy.ts) */
   readonly charge: () => Charge;
+  /** World units a grid unit (tuning.cellSize) */
+  readonly cellSize?: number;
+  /** The drawing tick: the own ship's timeline (`own`) or the other ships' (their replicas') */
+  readonly tick?: (own: boolean) => number;
+  /** The system the client is in */
+  readonly systemId?: () => string;
 }
 
 /** Per-frame drawing of one ship (ShipRenderer calls every feature's drawShip for each body, in id order) */

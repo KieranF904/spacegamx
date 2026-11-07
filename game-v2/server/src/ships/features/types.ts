@@ -54,6 +54,14 @@ export interface FeatureHost {
   /** The repair bank's free spare the pilot's repairs may use (bank.ts freeSpare), and spending from it (package B) */
   bankSpare?(pilot: number): Bag;
   spendBankSpare?(pilot: number, bill: Bag): boolean;
+
+  // ---- The Mine Bay (features/minebay): who sets mines off, and who is told of them
+  /** May `attacker` hurt `target` (GameServer.canDamage: PvP zones; berthed ships, wards and people's craft are out of it) */
+  canDamage?(attacker: number, target: number): boolean;
+  /** Two pilots fly in one party */
+  sameParty?(a: number, b: number): boolean;
+  /** The ships this pilot's client holds (its connection's ship view); undefined: no client */
+  shipView?(pilot: number): ReadonlySet<number> | undefined;
 }
 
 /** One message handler: the pilot's entity and the message (already past the drops and limits of net/dispatch.ts) */

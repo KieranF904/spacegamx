@@ -80,6 +80,25 @@ export function nextFieldTarget(n: number, root: number, joins: readonly (readon
 }
 
 /**
+ * Rearming (docs/design/groups-mines-docking.md, "Field fabrication hook"): what the fabricator does once no repair,
+ * recycle or build is left for it to start. The Mine Bay that lacks the most mines (ties: the first in part order) gets
+ * a job of up to `perJob` mines (rules.ts REARM.perJob). `bays`: the ship's working bays (fx.minebay.bays), `loaded`
+ * their magazines by uid (FieldRecord.mines). Null: every magazine is full
+ */
+export function nextRearm(
+  bays: readonly { uid: number; capacity: number }[], loaded: Readonly<Record<number, number>> | undefined, perJob: number,
+): { uid: number; count: number } | null {
+  let pick: { uid: number; count: number } | null = null, most = 0;
+  for (const b of bays) {
+    const v = loaded?.[b.uid] ?? 0, have = Math.max(0, Math.min(b.capacity, Number.isFinite(v) ? Math.floor(v) : 0));
+    const lack = b.capacity - have;
+    if (lack > most) { most = lack; pick = { uid: b.uid, count: lack }; }
+  }
+  if (pick) pick.count = Math.max(1, Math.min(pick.count, Math.floor(perJob)));
+  return pick;
+}
+
+/**
  * Parts queued for recycling that can go now: removing one leaves every standing part that isn't queued still joined to
  * the core. Deepest first (leaves go before what they hang on), ties by index. The core never goes
  */

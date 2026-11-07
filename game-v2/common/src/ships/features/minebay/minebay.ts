@@ -131,6 +131,80 @@ export function mineTouches(mx: number, my: number, x: number, y: number, radius
   return dx * dx + dy * dy <= r * r;
 }
 
+// ============================================ the drop (server decides it; the dropping pilot's client predicts it the same way)
+
+/** A ship's pose and velocity at a drop: its centre of mass in the world (as Position is), heading and velocity a tick */
+export interface DropPose { x: number; y: number; angle: number; vx: number; vy: number }
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+const r5 = (v: number) => Math.round(v * 1e5) / 1e5;
+const SC2: [number, number] = [0, 0];
+
+/** A grid-frame direction's angle from the ship's forward (grid -y): exact for the four facings, atan2 otherwise */
+function localAngle(dx: number, dy: number): number {
+  if (dx === 0) return dy < 0 ? 0 : Math.PI;
+  if (dy === 0) return dx > 0 ? Math.PI / 2 : -Math.PI / 2;
+  return Math.atan2(dx, -dy);
+}
+
+function wrapPi(a: number): number {
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a < -Math.PI) a += 2 * Math.PI;
+  return a;
+}
+
+/**
+ * The drop record for a batch of `n` from `bay` (one of fx.minebay.bays) of a ship at `pose`, on `tick`. `com`: the
+ * ship's centre of mass in grid units (derived.com), `cellSize` the world units a grid unit. The same arithmetic as the
+ * ship's grid-to-world (flight.ts localToWorldDir), rounded as the record carries it
+ */
+export function makeDrop(
+  owner: number, bay: Readonly<MineBayInfo['bays'][number]>, tick: number, n: number,
+  com: readonly [number, number] | readonly number[], cellSize: number, pose: Readonly<DropPose>,
+): MineDrop {
+  const lx = (bay.mouth[0] - com[0]) * cellSize, ly = (bay.mouth[1] - com[1]) * cellSize;
+  dsincos(pose.angle + Math.PI / 2, SC2);
+  const s = SC2[0], c = SC2[1];
+  return {
+    owner, bay: bay.uid, tick, n,
+    x: r2(pose.x + lx * c - ly * s), y: r2(pose.y + lx * s + ly * c),
+    angle: r5(wrapPi(pose.angle + localAngle(bay.dir[0], bay.dir[1]))),
+    vx: r2(pose.vx), vy: r2(pose.vy),
+    seed: dropSeed(owner, bay.uid, tick),
+  };
+}
+
+/** A bay's loaded mines from the magazine table (by uid), whole and within its capacity */
+export function bayLoaded(bay: Readonly<{ uid: number; capacity: number }>, loaded: Readonly<Record<number, number>> | undefined): number {
+  const v = loaded?.[bay.uid] ?? 0;
+  return Math.max(0, Math.min(bay.capacity, Number.isFinite(v) ? Math.floor(v) : 0));
+}
+
+/**
+ * Which bay a press drops from on `tick` (its index in info.bays; -1: none can): the fullest one that has mines and
+ * whose cooldown is over (`readyBy`: the tick each bay may drop again, by uid), ties to the first in part order
+ */
+export function pickBay(
+  info: Readonly<MineBayInfo> | undefined, loaded: Readonly<Record<number, number>> | undefined,
+  readyBy: Readonly<Record<number, number>> | undefined, tick: number,
+): number {
+  if (!info) return -1;
+  let best = -1, most = 0;
+  for (let i = 0; i < info.bays.length; i++) {
+    const b = info.bays[i], n = bayLoaded(b, loaded);
+    if (n <= 0 || tick < (readyBy?.[b.uid] ?? -Infinity)) continue;
+    if (n > most) { most = n; best = i; }
+  }
+  return best;
+}
+
+/** The earliest tick any loaded bay can drop (Infinity: none has mines) */
+export function nextReady(info: Readonly<MineBayInfo> | undefined, loaded: Readonly<Record<number, number>> | undefined, readyBy: Readonly<Record<number, number>> | undefined): number {
+  let at = Infinity;
+  for (const b of info?.bays ?? []) if (bayLoaded(b, loaded) > 0) at = Math.min(at, readyBy?.[b.uid] ?? 0);
+  return at;
+}
+
 /** Magazine refills (econ/field/rules.ts REARM): how many mines the bays of a ship still lack, from each bay's loaded count */
 export function minesMissing(info: Readonly<MineBayInfo> | undefined, loaded: Readonly<Record<number, number>> | undefined): number {
   if (!info) return 0;

@@ -8,8 +8,12 @@ import type { MineDrop } from '../ships/features/minebay/minebay.js';
 
 // ============================================ client -> server
 
-/** Drop a batch from the ship's Mine Bays (the key press). The server picks the bay (the fullest ready one) and the tick */
-export interface ClientMineDropMessage { type: 'mineDrop' }
+/**
+ * Drop a batch from the ship's Mine Bays (the key press). The server picks the bay (the fullest ready one). `tick`: the
+ * input tick the pilot pressed on (its own predicted tick, as inputs carry); the server drops on that tick when it is
+ * still ahead (no more than an input's lead), else at once. Absent: at once
+ */
+export interface ClientMineDropMessage { type: 'mineDrop'; tick?: number }
 
 export type MinesClientMessage = ClientMineDropMessage;
 
@@ -30,7 +34,11 @@ export type MineEnd = 'blast' | 'fizzle' | 'clear';
  */
 export interface ServerMinesGoneMessage { type: 'minesGone'; tick: number; ids: number[]; how: MineEnd; by?: number }
 
-/** The pilot's own magazines (each Mine Bay's loaded mines by blueprint uid) and when the next drop is ready: sent when they change */
-export interface ServerMineBayMessage { type: 'mineBay'; loaded: Record<number, number>; readyAt: number }
+/**
+ * The pilot's own magazines (each Mine Bay's loaded mines by blueprint uid) and when the next drop is ready: sent when
+ * they change, and as the answer to a press the server could not drop (`refused`: the client's predicted drop goes).
+ * `readyBy`: each bay's own cooldown end (the tick it may drop again), while any is still cooling
+ */
+export interface ServerMineBayMessage { type: 'mineBay'; loaded: Record<number, number>; readyAt: number; readyBy?: Record<number, number>; refused?: boolean }
 
 export type MinesServerMessage = ServerMinesLaidMessage | ServerMinesGoneMessage | ServerMineBayMessage;
