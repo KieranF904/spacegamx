@@ -216,6 +216,9 @@ export class ShipClient {
       inputEnabled: () => opts.inputEnabled?.() ?? true,
       helm: () => this.helm,
       charge: () => opts.state.charge,
+      cellSize: opts.tuning.cellSize,
+      tick: (own) => (own ? opts.state.ownDrawTick() : opts.state.renderTickNow),
+      systemId: () => opts.state.systemId,
     });
     this.dodgeCtl = this.features.controlFor('dodge');
     // The field machines' HUD and build overlay (ships/field): they read the game through this

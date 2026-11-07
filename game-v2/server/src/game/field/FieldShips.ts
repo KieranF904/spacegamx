@@ -23,6 +23,7 @@ import {
   Player, Dead, InSystem, MACHINE_FAB, MACHINE_REF, PACK_MODES, attachWork, buildPoints, canFabricate, canRefine, fabWork,
   fieldBuildInputs, fieldPay, fixModelMaterials, healPart, isStructural, jobEu, jobTicks, nextFieldTarget, packDefs, packShare,
   parseBlueprint, partItemId, partLicensed, placeFinished, portsMachineEu, recycleCandidates, recycleReturn, recycleWork,
+  REARM, nextRearm, rearmBill, rearmWork,
   refineWork, repairBill, repairWork, restorePart, setPortsMachine, specOf, stepJob, tierRule, unlocks, joinDepths, adjacency,
   type Bag, type Blueprint, type FieldJob, type FieldJobKind, type FieldPartView, type FieldRecord, type MachineBlock,
   type MachineKind, type MachineView, type PackDef, type PackMode, type PlacedPart, type ServerFieldStateMessage,
@@ -103,10 +104,10 @@ export class FieldShips implements FeatureInstance {
 
   // ===================================================================== for package B and the integrator
 
-  /** A part (uid) on this pilot's ship that a machine is building, repairing or recycling now (one builder a part) */
+  /** A part (uid) on this pilot's ship that a machine is building, repairing or recycling now (one builder a part; a rearm fills a bay's magazine, not the part) */
   isClaimed(eid: number, uid: number): boolean {
     const j = this.byEid.get(eid)?.fab.job;
-    return !!j && j.uid === uid && j.kind !== 'refine';
+    return !!j && j.uid === uid && j.kind !== 'refine' && j.kind !== 'rearm';
   }
 
   /**
@@ -250,7 +251,7 @@ export class FieldShips implements FeatureInstance {
 
   private canDo(fs: FieldShip, m: Machine, j: FieldJob): boolean {
     if (j.kind === 'refine') return canRefine(this.host.econ, m.tier, j.recipe ?? '');
-    if (j.kind === 'recycle') return true;
+    if (j.kind === 'recycle' || j.kind === 'rearm') return true;
     const i = j.uid !== undefined ? this.indexOf(fs, j.uid) : -1;
     const spec = i >= 0 ? fs.ship.blueprint.parts[i] : j.item ? this.specOfItem(j.item) : null;
     return !!spec && canFabricate(this.host.ships.catalog, m.tier, spec);
@@ -356,7 +357,10 @@ export class FieldShips implements FeatureInstance {
       if (this.startFab(fs, m, t.kind, t.part, view[t.part].missing, short, tick)) { this.setBlocked(fs, m, undefined); return; }
       skip.add(t.part);
     }
-    if (skip.size) { this.setBlocked(fs, m, 'materials'); return; }
+    // (Then the Mine Bays' magazines, once nothing above could start)
+    const rearm = this.startRearm(fs, m, short, tick);
+    if (rearm === 'started') { this.setBlocked(fs, m, undefined); return; }
+    if (skip.size || rearm === 'short') { this.setBlocked(fs, m, 'materials'); return; }
     // (Nothing it can make: would a better machine find work?)
     const better = nextFieldTarget(n, root, joins, view.map((v) => ({ ...v, makeable: true })));
     this.setBlocked(fs, m, better ? 'grade' : 'idle');
@@ -381,6 +385,8 @@ export class FieldShips implements FeatureInstance {
         addBag(need, fieldBuildInputs(econ, p));
       }
     });
+    const rearm = m.job?.kind === 'rearm' ? null : this.rearmWanted(fs);
+    if (rearm) addBag(need, rearmBill(rearm.count));
     if (isEmpty(need)) return {};
     const mode: PackMode = fs.rec.field?.packs ?? 'off';
     return fieldPay(need, (id) => this.host.holdCount(fs.eid, id), this.packs, mode).short;
@@ -431,6 +437,32 @@ export class FieldShips implements FeatureInstance {
       return null;
     }
     return { held: addBag({ ...fromHold }, bank), share: packShare(r), bank };
+  }
+
+  /** The Mine Bay rearm the fabricator would take next (order.ts nextRearm), or null: every magazine is full */
+  private rearmWanted(fs: FieldShip): { uid: number; count: number } | null {
+    const bays = fs.ship.derived.fx?.minebay?.bays;
+    return bays?.length ? nextRearm(bays, fs.rec.field?.mines, REARM.perJob) : null;
+  }
+
+  /** Start a rearm job (rules.ts REARM: placeholder cost), paid from the hold all or nothing (never the bank: it pays parts) */
+  private startRearm(fs: FieldShip, m: Machine, short: Bag, tick: number): 'started' | 'short' | 'none' {
+    const r = this.rearmWanted(fs);
+    if (!r) return 'none';
+    const pay = this.pay(fs, m, rearmBill(r.count), false, short);
+    if (!pay) return 'short';
+    this.begin(fs, m, 'rearm', { uid: r.uid, held: pay.held, make: rearmWork(r.count), attach: 0, share: pay.share, bank: pay.bank }, tick);
+    m.job!.count = r.count;
+    return 'started';
+  }
+
+  /** A rearm done: its mines into the bay's magazine (the record's: the mine bay feature reads it), up to its capacity; a bay lost meanwhile gets its inputs back */
+  private rearmed(fs: FieldShip, m: Machine, j: FieldJob, meta: JobMeta): void {
+    const bay = fs.ship.derived.fx?.minebay?.bays.find((b) => b.uid === j.uid);
+    if (!bay) { this.giveBack(fs, m, minus(j.held, meta.bank)); return; }
+    const mines = (this.field(fs).mines ??= {});
+    mines[bay.uid] = Math.min(bay.capacity, Math.max(0, Math.floor(mines[bay.uid] ?? 0)) + Math.max(0, Math.floor(j.count ?? 0)));
+    this.host.markDirty(fs.eid);
   }
 
   private begin(fs: FieldShip, m: Machine, kind: FieldJobKind, o: { uid?: number; item?: string; recipe?: string; held: Bag; make: number; attach: number; share: number; bank: Bag; out?: Bag }, _tick: number): boolean {
@@ -487,6 +519,7 @@ export class FieldShips implements FeatureInstance {
     const done = (item: string, to: 'ship' | 'cargo' | 'machine', uid?: number) =>
       this.host.send(fs.eid, { type: 'fieldDone', kind: m.kind, job: j.id, item, to, uid });
     if (j.kind === 'refine') { done(j.item!, this.toHold(fs, m, meta.out ?? {})); return; }
+    if (j.kind === 'rearm') { this.rearmed(fs, m, j, meta); return; }
     if (j.kind === 'build') {
       const own = j.uid !== undefined ? this.indexOf(fs, j.uid) : -1;
       const at = placeFinished(j.item!, own, this.spots(fs));

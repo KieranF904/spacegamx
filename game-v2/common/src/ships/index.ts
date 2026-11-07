@@ -54,6 +54,7 @@ export * from './features/tow/tow.js';
 export * from './features/flash/flash.js';
 export * from './features/weaponry/weaponry.js';
 export * from './features/machines/machines.js';
+export * from './features/minebay/minebay.js';
 export * from './load.js';
 export * from './flightInputs.js';
 export * from './features/index.js';

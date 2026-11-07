@@ -10,6 +10,9 @@ import type { PlacedPart } from '../../ships/types.js';
 import type { Bag } from '../stacks.js';
 import { PACK_MODES, type PackMode } from './packs.js';
 
+/** No bay holds more (minebay.ts mineBayOf caps a model's magazine here too) */
+const MAX_MAGAZINE = 64;
+
 export interface FieldRecord {
   /** Switches (absent: off) */
   fabOn?: boolean;
@@ -27,6 +30,8 @@ export interface FieldRecord {
   waiting?: PlacedPart[];
   /** Items inside the machines: inputs of a job called off and finished output, waiting for room in the hold */
   held?: Bag;
+  /** Each Mine Bay's loaded mines, by the bay's uid (docs/design/groups-mines-docking.md; absent or no entry: empty) */
+  mines?: Record<number, number>;
 }
 
 const isPart = (p: unknown): p is PlacedPart => {
@@ -53,5 +58,13 @@ export function cleanFieldRecord(v: unknown): { field?: FieldRecord } {
     for (const [id, n] of Object.entries(r.held as Record<string, unknown>)) if (typeof n === 'number' && Number.isFinite(n) && n >= 1) held[id] = Math.floor(n);
   }
   if (Object.keys(held).length) out.held = held;
+  const mines: Record<number, number> = {};
+  if (r.mines && typeof r.mines === 'object' && !Array.isArray(r.mines)) {
+    for (const [k, n] of Object.entries(r.mines as Record<string, unknown>)) {
+      const uid = Number(k);
+      if (Number.isInteger(uid) && typeof n === 'number' && Number.isFinite(n) && n >= 1) mines[uid] = Math.min(MAX_MAGAZINE, Math.floor(n));
+    }
+  }
+  if (Object.keys(mines).length) out.mines = mines;
   return Object.keys(out).length ? { field: out } : {};
 }

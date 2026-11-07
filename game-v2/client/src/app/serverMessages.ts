@@ -12,6 +12,7 @@
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { noteBossLife } from '../ships/bossLife';
 import { fieldClient } from '../ships/field/fieldState';
+import { mineClient } from '../ships/features/minebay/mines';
 import { devFeeds } from './devFeeds';
 import { setBank } from '../ui/station/bankStore';
 import { showHitTick } from '../ui/HitTick';
@@ -352,6 +353,9 @@ const TABLE: Handlers = {
     h.audio.playUI('craft_done', 0.5);
   },
   repairBank: (_h, msg) => { setBank(msg); },
+  minesLaid: (h, msg) => { mineClient.laid(msg, h.state.playerId); },
+  minesGone: (_h, msg) => { mineClient.gone(msg); },
+  mineBay: (_h, msg) => { mineClient.bayState(msg); },
   questBoard: (h, msg) => { h.quests.setBoard(msg); },
   talk: (h, msg) => { h.dialogue.set(msg.view); },
   people: (h, msg) => { h.quests.setPeople(msg.people); },
