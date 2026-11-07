@@ -9,6 +9,7 @@ export * from './stacks.js';
 export * from './recipes.js';
 export * from './profile.js';
 export * from './designUpdate.js';
+export * from './fieldUpdate.js';
 export * from './retired.js';
 export * from './economy.js';
 export * from './mining.js';

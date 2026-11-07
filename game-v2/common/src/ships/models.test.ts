@@ -497,7 +497,7 @@ describe('migration: legacy parts become models', () => {
 
   it('a version 3 save comes up to version 4 with its ships, designs, items and jobs as models; nothing lost, dead licences dropped', () => {
     const out = migrateProfile(v3(), kit, catalog);
-    expect(PROFILE_VERSION).toBe(5);
+    expect(PROFILE_VERSION).toBe(6);
     expect(out.version).toBe(4);
     expect(out.ship).toBe(out.hangar[0]);
     for (const b of [out.ship.blueprint, out.designs![0]!]) {
@@ -555,6 +555,6 @@ describe('migration: legacy parts become models', () => {
     const waiting = migrateProfile(v3(), kit);
     expect(waiting.version).toBe(3);
     expect(waiting.ship.blueprint.parts.find((q) => q.uid === 4)!.fn).toBe('generator');
-    expect(newProfile(kit).version).toBe(5);
+    expect(newProfile(kit).version).toBe(6);
   });
 });

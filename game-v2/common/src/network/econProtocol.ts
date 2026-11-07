@@ -94,13 +94,6 @@ export function diffProfile(prev: ServerProfileMessage, next: ServerProfileMessa
   return d;
 }
 
-/** A repair kit at work on your ship: credits of repairs left (0 = finished) */
-export interface ServerRepairKitMessage {
-  type: 'repairKit';
-  left: number;
-  total: number;
-}
-
 /** Cargo and storage (storage is shared between stations, reachable while docked) */
 export interface ServerItemsMessage {
   type: 'items';
@@ -209,7 +202,7 @@ export interface ClientItemUseMessage {
 }
 
 export type EconServerMessage = ServerProfileMessage | ServerProfileDeltaMessage | ServerItemsMessage | ServerLootMessage2 | ServerToastMessage | ServerWreckMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
-  | ServerQuestsMessage | ServerQuestBoardMessage | ServerQuestStepMessage | ServerHangarMessage | ServerRepairKitMessage | ServerTalkMessage | ServerPeopleMessage | ServerCodexMessage;
+  | ServerQuestsMessage | ServerQuestBoardMessage | ServerQuestStepMessage | ServerHangarMessage | ServerTalkMessage | ServerPeopleMessage | ServerCodexMessage;
 export type EconClientMessage = ClientItemMoveMessage | ClientItemStoreMessage | ClientRestockLoadoutMessage | ClientSlotLoadoutMessage | ClientItemJettisonMessage | ClientItemUseMessage
   | ClientStationOpenMessage | ClientRefineMessage | ClientCraftMessage | ClientGemCutMessage | ClientGemSocketMessage | ClientGemUnsocketMessage | ClientAmmoPreferMessage | ClientOutpostCharterMessage | ClientOutpostUpgradeMessage | ClientDesignSaveMessage | ClientDesignDeleteMessage | ClientDevStationMessage | ClientFabOrderMessage | ClientFabOrderCancelMessage | ClientMarketSellMessage | ClientMarketBuyMessage
   | ClientQuestBoardMessage | ClientQuestAcceptMessage | ClientQuestAbandonMessage | ClientQuestSeenMessage | ClientCodexReadMessage | ClientSkillUpMessage | ClientTalkMessage
@@ -234,8 +227,6 @@ export interface HangarSlotView {
   lost?: boolean;
   /** On order: the hangar refines, fabricates and fits what it needs */
   auto?: boolean;
-  /** The free starter you're lent while your ship is rebuilt */
-  loaner?: boolean;
   /** On order but held */
   paused?: boolean;
   /** Order priority (lower first) */

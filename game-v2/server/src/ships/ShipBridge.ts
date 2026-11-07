@@ -148,8 +148,8 @@ export class ShipBridge {
   private wing = new Map<number, number>();
   /** The target each player has selected (missiles lock on to it) */
   private targets = new Map<number, number>();
-  /** Repair kits: a budget of credits spent slowly on the ship, damaged parts first, then missing ones */
-  private kits = new Map<number, { left: number; total: number; hpPerSec: number; restoreTicks: number; progress: number; since: number }>();
+  /** Station repair: the damaged parts (uids) the bank has paid to mend, by ship; they heal on, free, until whole (bridge/rebuild.ts repairStep) */
+  private healPaid = new Map<number, Set<number>>();
   /** Parts designed but not built yet, by ship (part indices): absent, and never regrown by station repair */
   private ghosts = new Map<number, Set<number>>();
   /** Ships marked for a rebuild whose pieces breaking off aren't for clients to work out (shed whole): bridge/rebuild.ts markRebuild */
@@ -506,7 +506,7 @@ export class ShipBridge {
   private applyBlast(b: PendingBlast): void { return dmg.applyBlast(this.ctx, b); }
 
   // -------------------------------------------------------------------------
-  // Rebuild (bridge/rebuild.ts): geometry, spawning, removal, rebuilds, debris, repair kits and station repair
+  // Rebuild (bridge/rebuild.ts): geometry, spawning, removal, rebuilds, debris, station repair from the repair bank
   // -------------------------------------------------------------------------
 
   geometry(ship: ShipState): PlacedGeom[] { return rbd.geometry(this.ctx, ship); }
@@ -525,16 +525,6 @@ export class ShipBridge {
   removeShip(eid: number): void { return rbd.removeShip(this.ctx, eid); }
 
   private forget(eid: number): void { return rbd.forget(this.ctx, eid); }
-
-  /** Is there anything a repair kit could do for this ship? */
-  needsRepair(eid: number): boolean { return rbd.needsRepair(this.ctx, eid); }
-
-  /** Start a kit (another one adds to the budget and keeps the faster rate) */
-  startRepairKit(eid: number, kit: { budget: number; hpPerSec: number; restoreSec: number }): void { return rbd.startRepairKit(this.ctx, eid, kit); }
-
-  repairKitLeft(eid: number): number { return rbd.repairKitLeft(this.ctx, eid); }
-
-  private stepRepairKits(tick: number): void { return rbd.stepRepairKits(this.ctx, tick); }
 
   /** The missing part (not a ghost) that joins the structure, nearest the core */
   private nextMissing(eid: number, ship: ShipState): number { return rbd.nextMissing(this.ctx, eid, ship); }

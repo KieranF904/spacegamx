@@ -77,10 +77,8 @@ export interface ShipHost {
   shipForgotten?(eid: number): void;
   /** The jump drive's charging fields in this ship's system (a star's ring, lodestones: common/src/ships/jumpFields.ts) */
   jumpFields?(eid: number): FieldEnv;
-  /** What a part is worth in credits (repair kits charge their budget by it) */
+  /** What a part is worth in credits */
   partValue?(part: PlacedPart): number;
-  /** A repair kit's progress changed (budget left, or 0 when it's done; `broken` says why it stopped early) */
-  onRepairKit?(eid: number, left: number, total: number, broken?: 'hit' | 'moved'): void;
   /** A pilotless ship lost its core (it is removed right after). `lastHitBy` is the last entity whose shot hit it. */
   onShipDestroyed?(eid: number, lastHitBy: number | undefined, ship?: ShipState): void;
   /** A part was destroyed (shot, rammed, blown up or crumbled away), for effects */
@@ -89,10 +87,12 @@ export interface ShipHost {
   notifyContact?(e: { systemId: number; x: number; y: number; nx: number; ny: number; speed: number; a: number; b: number; tick: number }): void;
   /** Whether a ship is close enough to a station to be repaired */
   nearRepairSite?(eid: number): boolean;
-  /** Station repair is about to regrow a lost part: charge for it. False = can't pay (try again later). */
-  payRebuild?(eid: number, part: number): boolean;
-  /** Pay for `hp` of station repair: the share (0..1) of it that goes ahead (absent: free) */
-  payRepair?(eid: number, hp: number): number;
+  /** Passing a station, the repair bank's deposits pay to mend a damaged part (`missing`: the share of its HP gone). False: can't pay. Absent: no repair */
+  payBankRepair?(eid: number, part: PlacedPart, missing: number): boolean;
+  /** Passing a station, the repair bank's deposits pay to regrow a missing part. False: can't pay. Absent: no repair */
+  payBankRebuild?(eid: number, part: PlacedPart): boolean;
+  /** Is a field machine building, repairing or recycling this part (uid)? The bank leaves it to the machine */
+  isClaimed?(eid: number, uid: number): boolean;
   /** May `attacker` hurt `target`? (Players can't hurt each other outside PvP zones.) Default: yes. */
   canDamage?(attacker: number, target: number): boolean;
   /** Does a collision between these two hurt them (common hitRules.ts contactHurts)? Default: yes. They're pushed apart either way */
@@ -245,7 +245,7 @@ export interface BridgeInternals {
   burns: ShipBridge['burns']; weaponBeams: ShipBridge['weaponBeams']; pulsing: ShipBridge['pulsing'];
   pulseHit: ShipBridge['pulseHit']; apHeading: ShipBridge['apHeading']; controllers: ShipBridge['controllers'];
   dormant: ShipBridge['dormant']; lastFired: ShipBridge['lastFired']; damageMuls: ShipBridge['damageMuls'];
-  wing: ShipBridge['wing']; targets: ShipBridge['targets']; kits: ShipBridge['kits'];
+  wing: ShipBridge['wing']; targets: ShipBridge['targets']; healPaid: ShipBridge['healPaid'];
   ghosts: ShipBridge['ghosts']; underivable: ShipBridge['underivable']; pushQueue: ShipBridge['pushQueue']; lastThrough: ShipBridge['lastThrough']; coverMemo: ShipBridge['coverMemo'];
   beams: ShipBridge['beams']; pdList: ShipBridge['pdList']; pdOn: ShipBridge['pdOn'];
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
@@ -267,7 +267,7 @@ export interface BridgeInternals {
   readBody: ShipBridge['readBody']; writeBody: ShipBridge['writeBody']; bodiesNow: ShipBridge['bodiesNow'];
   withGravity: ShipBridge['withGravity']; worldPieces: ShipBridge['worldPieces']; resolveContacts: ShipBridge['resolveContacts'];
   damageContact: ShipBridge['damageContact']; contactScale: ShipBridge['contactScale']; stepBurns: ShipBridge['stepBurns'];
-  stepRepairKits: ShipBridge['stepRepairKits']; decay: ShipBridge['decay']; repairStep: ShipBridge['repairStep'];
+  decay: ShipBridge['decay']; repairStep: ShipBridge['repairStep'];
   partDeaths: ShipBridge['partDeaths']; applyBlast: ShipBridge['applyBlast']; autopilotControls: ShipBridge['autopilotControls'];
   stepPilotless: ShipBridge['stepPilotless'];
 }

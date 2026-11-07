@@ -70,8 +70,8 @@ describe('v5 design update: the wipe (an account to wipe, or not in the mapping)
   it('a built ship comes back as its materials in full; the pilot gets a fresh starter in slot 1, at home', () => {
     const prospector = rec('prospector');
     const { p, r } = wipe(v4([rec('sparrow-t'), prospector], { position: { system: 'borealis', x: 5000, y: 0 } }));
-    expect(PROFILE_VERSION).toBe(5);
-    expect(p.version).toBe(5);
+    expect(PROFILE_VERSION).toBe(6);
+    expect(p.version).toBe(6);
     expect(r!.mode).toBe('wipe');
     expect(r!.slotsDeleted).toBe(2);
     expect(r!.wiped.map((w) => w.why)).toEqual(['not mapped', 'not mapped']);
@@ -92,7 +92,9 @@ describe('v5 design update: the wipe (an account to wipe, or not in the mapping)
     expect(p.xp).toBe(5000);
     expect(p.level).toBeGreaterThan(1);
     // The one-time notice lists the refund, in the wipe's words
-    expect(p.notices).toHaveLength(1);
+    // (The design update's notice, then the v6 field update's)
+    expect(p.notices).toHaveLength(2);
+    expect(p.notices![1].text).toMatch(/Repair kits and insurance are gone/);
     expect(p.notices![0].items).toEqual(r!.refund);
     expect(p.notices![0].text).toMatch(/hangar has been reset: you have a fresh Sparrow T in slot 1/);
     expect(p.notices![0].text).not.toMatch(/rebuilt for the new power system:/);
@@ -189,7 +191,8 @@ describe('v5 design update: the wipe (an account to wipe, or not in the mapping)
     expect(p.debt).toBeUndefined();
     expect(r!.planItemsDropped).toEqual({ 'plan:arrow': 1, 'plan:lancer': 2 });
     expect([...p.cargo, ...p.storage].some((s) => s.id.startsWith('plan:'))).toBe(false);
-    expect(p.quickbar).toEqual(['repair_kit', null, null, null, null]);
+    // (The v6 field update clears the retired repair kits from the quick bar too)
+    expect(p.quickbar).toEqual([null, null, null, null, null]);
     expect(p.plans).toEqual(['sparrow-t', 'prospector', 'drum', 'arrow']);
     expect(p.notices![0].text).toMatch(/450 credits/);
   });
@@ -216,8 +219,8 @@ describe('v5 design update: the wipe (an account to wipe, or not in the mapping)
     expect(waiting.version).toBe(4);
     expect(waiting.ship.plan).toBe('prospector');
     expect(waiting.notices).toBeUndefined();
-    // A new pilot starts at v5: nothing to update
-    expect(newProfile(kit).version).toBe(5);
+    // A new pilot starts at the current version: nothing to update
+    expect(newProfile(kit).version).toBe(PROFILE_VERSION);
   });
 });
 
@@ -248,7 +251,7 @@ describe('v5 design update: the swap', () => {
     sparrow.hp = { [sparrow.blueprint.parts[1].uid]: 0.2 };
     const raw = v4([sparrow, custom('Prospector', 40)], { activeSlot: 1, cargo: [{ id: 'iron_ore', n: 2 }], position: { system: 'borealis', x: 1, y: 2 } });
     const { p, r } = update(raw, { map, user: 'pilotA' });
-    expect(r).toMatchObject({ mode: 'swap', wiped: [], refund: {}, freshStarter: false, loaner: false, activeSlot: 1 });
+    expect(r).toMatchObject({ mode: 'swap', wiped: [], refund: {}, freshStarter: false, activeSlot: 1 });
     expect(r!.swapped).toEqual([
       { slot: 0, from: { name: 'Sparrow T', parts: 30 }, to: 'remakes/player-xire-sparrow', name: remakes['player-xire-sparrow'].name },
       { slot: 1, from: { name: 'Prospector', parts: 40 }, to: 'remakes/player-xire-prospector', name: remakes['player-xire-prospector'].name },
@@ -264,7 +267,7 @@ describe('v5 design update: the swap', () => {
     expect(p.position).toEqual(kit.position);
     expect(p.cargo).toEqual([]);
     expect(countOf(p.storage, 'iron_ore')).toBe(5);
-    expect(p.notices).toHaveLength(1);
+    expect(p.notices).toHaveLength(2);
     expect(p.notices![0].text).toMatch(/^Your ships have been rebuilt for the new power system: your Sparrow T in slot 1 is now the .+ and your Prospector in slot 2 is now the .+\./);
     expect(p.notices![0].text).not.toMatch(/reset|broken down/);
     expect(p.notices![0].items).toBeUndefined();
@@ -307,7 +310,7 @@ describe('v5 design update: the swap', () => {
   it('checks `was` against the save as written, before older saves are migrated (a v2 save)', () => {
     const raw = save(2, [custom('Sparrow T', 14, 'sparrow-t')]);
     const { p, r } = update(raw, { map, user: 'pilotC' });
-    expect(p.version).toBe(5);
+    expect(p.version).toBe(6);
     expect(r!.swapped).toHaveLength(1);
     expect(p.ship.blueprint).toEqual(plans['sparrow-t']);
     expect(p.ship.plan).toBe('sparrow-t');
@@ -326,8 +329,8 @@ describe('v5 design update: the swap', () => {
     expect(swapped.lost).toBeUndefined();
     expect(swapped.ghosts).toEqual([]);
     expect(swapped.blueprint.parts).toHaveLength(bp.parts.length);
-    // Whole now: it's the ship flown, no loaner
-    expect(r!.loaner).toBeFalsy();
+    // Whole now: it's the ship flown (no loaners any more)
+    expect(r).not.toHaveProperty('loaner');
     expect(p.ship).toBe(swapped);
     expect(p.activeSlot).toBe(0);
     expect(p.notices![0].text).not.toMatch(/still being built/);

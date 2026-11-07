@@ -152,17 +152,6 @@ export interface ClientRefuelMessage {
   stationId: string;
 }
 
-export interface ClientBankDepositMessage {
-  type: 'bankDeposit';
-  inventorySlot: number;
-  count: number;
-}
-
-export interface ClientBankWithdrawMessage {
-  type: 'bankWithdraw';
-  bankSlot: number;
-  count: number;
-}
 
 export interface ClientWarpMessage {
   type: 'warp';
@@ -237,8 +226,6 @@ export type ClientMessage =
   | ClientSellMessage
   | ClientRepairMessage
   | ClientRefuelMessage
-  | ClientBankDepositMessage
-  | ClientBankWithdrawMessage
   | ClientWarpMessage
   | ClientRespawnMessage
   | ClientJoinMessage

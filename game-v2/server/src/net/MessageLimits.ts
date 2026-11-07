@@ -28,6 +28,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   slotSave: { per: 60, burst: 10 },
   designSave: { per: 60, burst: 10 },
   designDelete: { per: 60, burst: 10 },
+  // Items moved into the repair bank and the profile saved
+  bankDeposit: { per: 120, burst: 20 },
   // Popups on other people's screens
   partyInvite: { per: 20, burst: 6 },
   tradeRequest: { per: 20, burst: 6 },

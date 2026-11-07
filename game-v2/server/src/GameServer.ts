@@ -182,6 +182,7 @@ import { registerModuleHandlers } from './net/handlers/modules.js';
 import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js';
 import { activity } from './activity/index.js';
 import { registerShipEditHandlers } from './net/handlers/shipEdit.js';
+import { registerBankHandlers } from './net/handlers/bank.js';
 import { Docking, stationQuery } from './game/Docking.js';
 import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
 import { HandlerRegistry, dispatch, registerHandlers, type Handler, type HandlerTable } from './net/dispatch.js';
@@ -818,7 +819,6 @@ export class GameServer implements ServerCtx {
       starter: this.starterKit(),
       guestShips: process.env.NODE_ENV !== 'production' ? opts.guestShips : undefined,
       spawn: this.devStartNum >= 0 ? (eid) => this.devStartSpot(eid) : undefined,
-      freeRebuildBelowLevel: 3,
       autosaveMs: 30_000,
       now: opts.clock,
     });
@@ -2206,18 +2206,6 @@ this.devTeleport = opts.devTeleport ?? false;
     return sys ? { system: sys.id, x: Position.x[eid], y: Position.y[eid] } : null;
   }
 
-  /** What the station a ship is repairing at charges per HP (the cheapest in range) */
-  private repairRate(eid: number): number {
-    const range = this.ships.tuning.repair?.range ?? 0;
-    let rate = Infinity;
-    for (const st of stationQuery(this.world)) {
-      if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-      if (dhypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]) >= Radius.value[st] + range) continue;
-      rate = Math.min(rate, this.gameData.getStationByNum(Station.stationId[st])?.repairCostPerHp ?? 0);
-    }
-    return rate === Infinity ? 0 : rate * this.hazards.repairScale(eid);
-  }
-
   private createPeopleHost(): PeopleHost {
     const quests = this.createQuestHost();
     return {
@@ -2572,8 +2560,9 @@ this.devTeleport = opts.devTeleport ?? false;
         // (Every client finds contact pairs itself and draws those sparks itself: it's handed the rest with its snapshot)
         this.replication.noteContactFx(e.tick, e.systemId, e.a, e.b, msg);
       },
-      payRebuild: (eid, part) => this.pilots.payRebuild(eid, part),
-      payRepair: (eid, hp) => this.pilots.payRepair(eid, hp, this.repairRate(eid)),
+      payBankRebuild: (eid, part) => this.pilots.bankRebuild(eid, part),
+      payBankRepair: (eid, part, missing) => this.pilots.bankRepair(eid, part, missing),
+      isClaimed: (eid, uid) => this.pilots.isClaimed(eid, uid),
       canDamage: (a, b) => this.canDamage(a, b),
       contactHurts: (a, b) => contactHurts(this.enemies.factionOf(a), this.enemies.factionOf(b)),
       // --- Support weapons (common/src/ships/features/support/support.ts) ---
@@ -2615,14 +2604,6 @@ this.devTeleport = opts.devTeleport ?? false;
       shipRebuilt: (eid) => this.features?.onShipRebuilt(eid),
       shieldBroken: (eid) => this.features?.onShieldBreak(eid),
       shipForgotten: (eid) => this.features?.onLeave(eid),
-      onRepairKit: (eid, left, total, broken) => {
-        const pc = this.pilots.connOf(eid) as ClientConnection | undefined;
-        if (!pc) return;
-        this.send(pc.ws, { type: 'repairKit', left: Math.round(left), total: Math.round(total) });
-        if (broken === 'hit') this.pilots.toast(pc, 'Repair interrupted: you took a hit. The rest of the kit is wasted', 'bad');
-        else if (broken === 'moved') this.pilots.toast(pc, 'Repair interrupted: you moved. The rest of the kit is wasted', 'bad');
-        else if (left <= 0) this.pilots.toast(pc, 'Repair kit used up', 'info');
-      },
       jumpFields: (eid) => this.replicaEnv(InSystem.systemId[eid]),
     };
   }
@@ -3102,6 +3083,7 @@ this.devTeleport = opts.devTeleport ?? false;
     registerHandlers(t, registerModuleHandlers);
     registerHandlers(t, registerAuthHandlers);
     registerHandlers(t, registerShipEditHandlers);
+    registerHandlers(t, registerBankHandlers);
     registerHandlers(t, registerFlightHandlers);
     registerHandlers(t, registerSocialHandlers);
     t.on('chat', (_ctx, conn, msg) => {

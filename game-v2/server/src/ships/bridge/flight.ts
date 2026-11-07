@@ -57,7 +57,6 @@ export function sleepBlocker(ctx: BridgeCtx, eid: number, recentTicks: { damaged
   if (ctx.pulsing.has(eid) || ctx.weaponBeams.has(eid) || ctx.beams.has(eid)) return 'firing';
   if (ctx.isEmped(eid) || ctx.warmth.has(eid)) return 'emp';
   if (ctx.isJumping(ship)) return 'jumping';
-  if (ctx.kits.has(eid)) return 'repairing';
   if (ctx.host.sheltered?.(eid)) return 'docked';
   for (const b of ctx.burns) if (b.eid === eid) return 'burning';
   for (const b of ctx.blasts) if (b.source === eid) return 'blast';
@@ -275,7 +274,6 @@ export function tick(ctx: BridgeCtx): void {
   const world = ctx.host.world;
   const tick = ctx.host.getTick();
   if (tick % 10 === 0 && ctx.burns.length) ctx.stepBurns(tick);
-  if (tick % 15 === 0 && ctx.kits.size) ctx.stepRepairKits(tick);
 
   // 1. Prune and move everything nobody pilots (debris after, all together: ships/debris.ts)
   const debrisNow: number[] = [];

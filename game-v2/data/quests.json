@@ -12,7 +12,7 @@
         ],
         "stock": [
           {
-            "item": "repair_kit",
+            "item": "pack_hull",
             "rank": 0
           },
           {
@@ -20,7 +20,7 @@
             "rank": 0
           },
           {
-            "item": "field_repair_kit",
+            "item": "pack_wiring",
             "rank": 1
           },
           {
@@ -28,7 +28,7 @@
             "rank": 1
           },
           {
-            "item": "nanite_repair_kit",
+            "item": "pack_optics",
             "rank": 3
           }
         ]
@@ -49,7 +49,7 @@
             "rank": 0
           },
           {
-            "item": "repair_kit",
+            "item": "pack_hull",
             "rank": 0
           },
           {
@@ -65,7 +65,7 @@
             "rank": 3
           },
           {
-            "item": "field_repair_kit",
+            "item": "pack_wiring",
             "rank": 3
           },
           {
@@ -95,7 +95,7 @@
             "rank": 0
           },
           {
-            "item": "insurance_bond",
+            "item": "pack_mechanism",
             "rank": 1
           },
           {
@@ -107,7 +107,7 @@
             "rank": 3
           },
           {
-            "item": "field_repair_kit",
+            "item": "pack_wiring",
             "rank": 2
           },
           {
@@ -115,7 +115,7 @@
             "rank": 4
           },
           {
-            "item": "nanite_repair_kit",
+            "item": "pack_optics",
             "rank": 4
           },
           {
@@ -156,15 +156,15 @@
         "stations": ["sol_station_ark"],
         "stock": [
           {
-            "item": "repair_kit",
+            "item": "pack_hull",
             "rank": 0
           },
           {
-            "item": "insurance_bond",
+            "item": "pack_mechanism",
             "rank": 0
           },
           {
-            "item": "field_repair_kit",
+            "item": "pack_wiring",
             "rank": 1
           },
           {
@@ -207,7 +207,7 @@
             "rank": 0
           },
           {
-            "item": "field_repair_kit",
+            "item": "pack_wiring",
             "rank": 1
           },
           {
@@ -295,7 +295,7 @@
         "xp": 220,
         "credits": 40,
         "items": {
-          "repair_kit": 2
+          "pack_hull": 2
         },
         "reputation": {
           "sol_patrol": 3
@@ -362,7 +362,7 @@
       "requires": [
         "drift_02"
       ],
-      "intro": "Every drone out there comes from one place, the old hands say: a nest the size of a station, welded together out of everything that ever drifted past Nereid, round the richest greyseam in the Drift. We call her the Scrap Mother, and nobody has ever brought her core home in one piece. She's slow, but she isn't alone. Bring a friend if you can, and bring repair kits either way.",
+      "intro": "Every drone out there comes from one place, the old hands say: a nest the size of a station, welded together out of everything that ever drifted past Nereid, round the richest greyseam in the Drift. We call her the Scrap Mother, and nobody has ever brought her core home in one piece. She's slow, but she isn't alone. Bring a friend if you can, and bring spare materials for your repair bank either way.",
       "steps": [
         {
           "type": "boss",
@@ -376,7 +376,7 @@
         "credits": 150,
         "items": {
           "servo_motor": 1,
-          "repair_kit": 3
+          "pack_hull": 3
         },
         "reputation": {
           "sol_patrol": 6
@@ -425,7 +425,7 @@
           "power_coupling": 1,
           "copper_ore": 8,
           "iron_ore": 12,
-          "repair_kit": 2
+          "pack_hull": 2
         },
         "reputation": {
           "sol_patrol": 3
@@ -1204,12 +1204,12 @@
           "credits": 500
         }
       ],
-      "outro": "See? Buy low, haul, sell high. Here's an insurance bond. Carry it and losing your ship won't hurt so much.",
+      "outro": "See? Buy low, haul, sell high. Here is a Mechanism Pack. Put it in your repair bank and losing your ship won't hurt so much.",
       "rewards": {
         "xp": 250,
         "credits": 30,
         "items": {
-          "insurance_bond": 1
+          "pack_mechanism": 1
         },
         "reputation": {
           "traders": 8
@@ -2141,7 +2141,7 @@
         "credits": 70,
         "items": {
           "scanner_charge": 4,
-          "repair_kit": 2
+          "pack_hull": 2
         },
         "reputation": {
           "traders": 3
@@ -2201,7 +2201,7 @@
         "xp": 600,
         "credits": 120,
         "items": {
-          "repair_kit": 2,
+          "pack_hull": 2,
           "boost_cell": 2
         },
         "reputation": {
@@ -2284,7 +2284,7 @@
         "credits": 220,
         "items": {
           "servo_motor": 1,
-          "repair_kit": 2
+          "pack_hull": 2
         },
         "reputation": {
           "sol_patrol": 6
@@ -2315,7 +2315,7 @@
         "credits": 300,
         "items": {
           "targeting_chip": 2,
-          "field_repair_kit": 1
+          "pack_wiring": 1
         },
         "reputation": {
           "sol_patrol": 6
@@ -2420,7 +2420,7 @@
         "xp": 800,
         "credits": 140,
         "items": {
-          "field_repair_kit": 1,
+          "pack_wiring": 1,
           "crystal_lens": 1
         },
         "reputation": {
@@ -2477,7 +2477,7 @@
         "xp": 600,
         "credits": 120,
         "items": {
-          "repair_kit": 2
+          "pack_hull": 2
         },
         "reputation": {
           "sol_patrol": 3
@@ -2523,7 +2523,7 @@
         "xp": 1000,
         "credits": 160,
         "items": {
-          "field_repair_kit": 1,
+          "pack_wiring": 1,
           "coolant": 4
         },
         "reputation": {
@@ -2811,7 +2811,7 @@
         "credits": 380,
         "items": {
           "hush_pane": 4,
-          "field_repair_kit": 2
+          "pack_wiring": 2
         },
         "reputation": {
           "miners": 12
@@ -2827,23 +2827,23 @@
       "giver": "sol_station_ark",
       "level": 3,
       "requires": ["main_01"],
-      "intro": "The Hall keeps go-bags for anyone in the inner system who wants one, and the shelf is short. Bring me two repair kits and some copper wire. Small job. Most of the Ark's jobs are small.",
+      "intro": "The Hall keeps go-bags for anyone in the inner system who wants one, and the shelf is short. Bring me two Hull Packs and some copper wire. Small job. Most of the Ark's jobs are small.",
       "steps": [
         {
           "type": "deliver",
           "items": {
-            "repair_kit": 2,
+            "pack_hull": 2,
             "copper_wire": 6
           },
-          "text": "Bring 2 repair kits and 6 copper wire to the Ark Hall for its go-bags"
+          "text": "Bring 2 Hull Packs and 6 copper wire to the Ark Hall for its go-bags"
         }
       ],
-      "outro": "Signed for. Now, the one rule everyone keeps, from the barely observant on up. Keep a bag packed by the door, and when a herald says leave, you leave. You don't wait to be told why, because you won't be. Take this bond. For a pilot, it's the nearest thing to a bag by the door.",
+      "outro": "Signed for. Now, the one rule everyone keeps, from the barely observant on up. Keep a bag packed by the door, and when a herald says leave, you leave. You don't wait to be told why, because you won't be. Take this pack. For a pilot, it's the nearest thing to a bag by the door.",
       "rewards": {
         "xp": 500,
         "credits": 60,
         "items": {
-          "insurance_bond": 1
+          "pack_mechanism": 1
         },
         "reputation": {
           "ark": 6
@@ -2884,7 +2884,7 @@
         "xp": 800,
         "credits": 90,
         "items": {
-          "field_repair_kit": 1
+          "pack_wiring": 1
         },
         "reputation": {
           "ark": 6
@@ -2929,7 +2929,7 @@
         "xp": 1200,
         "credits": 180,
         "items": {
-          "repair_kit": 2
+          "pack_hull": 2
         },
         "reputation": {
           "ark": 8
@@ -3010,7 +3010,7 @@
         "xp": 1800,
         "credits": 260,
         "items": {
-          "field_repair_kit": 1
+          "pack_wiring": 1
         },
         "reputation": {
           "ark": 10

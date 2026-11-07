@@ -446,7 +446,7 @@
               "say": "Keep moving. Everything out there hits harder than it looks, and nothing hits a moving target well."
             },
             {
-              "say": "If it goes wrong, run for a station: nothing follows you inside. And keep repair kits on your quick bar."
+              "say": "If it goes wrong, run for a station: nothing follows you inside. And keep a few packs in your repair bank."
             }
           ]
         },
@@ -1329,7 +1329,7 @@
           "label": "What do you sell?",
           "lines": [
             {
-              "say": "Kits, bonds, plain plate, to anyone. Leestone plate to those the Hall knows."
+              "say": "Packs, plain plate, to anyone. Leestone plate to those the Hall knows."
             },
             {
               "say": "Prices are fair and they don't move. We buy leestone ore, too, better than anyone. Not hard. Nobody else buys it at all."

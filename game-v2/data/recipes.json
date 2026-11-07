@@ -410,45 +410,6 @@
   },
   "craft": [
     {
-      "id": "repair_kit",
-      "out": {
-        "repair_kit": 1
-      },
-      "inputs": {
-        "alloy_plate": 2,
-        "copper_wire": 2
-      },
-      "time": 0,
-      "starter": true
-    },
-    {
-      "id": "field_repair_kit",
-      "out": {
-        "field_repair_kit": 1
-      },
-      "inputs": {
-        "steel_plate": 3,
-        "copper_wire": 4,
-        "servo_motor": 1
-      },
-      "time": 30,
-      "starter": true
-    },
-    {
-      "id": "nanite_repair_kit",
-      "out": {
-        "nanite_repair_kit": 1
-      },
-      "inputs": {
-        "titanium_plate": 2,
-        "crystal_lens": 1,
-        "power_coupling": 1,
-        "servo_motor": 1
-      },
-      "time": 90,
-      "starter": true
-    },
-    {
       "id": "pack_hull",
       "out": {
         "pack_hull": 1
@@ -548,18 +509,6 @@
       },
       "time": 0,
       "starter": true
-    },
-    {
-      "id": "insurance_bond",
-      "out": {
-        "insurance_bond": 1
-      },
-      "inputs": {
-        "steel_plate": 6,
-        "scrap_electronics": 4
-      },
-      "time": 120,
-      "level": 15
     },
     {
       "id": "power_coupling",

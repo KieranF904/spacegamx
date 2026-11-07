@@ -1,7 +1,7 @@
 /**
  * ShipBridge rebuild: a ship's body coming and going. Its geometry (cached per blueprint), spawning (spawnOn,
  * dummies, wrecks, players), removal (removeShip, forget, removeBody), the rebuild after parts are lost (markRebuild,
- * rebuildMarked, rebuildNow, shed, spawnDebris, decay), and repair (kits, station repair, respawnInPlace). ShipBridge keeps one-line delegators with the same names.
+ * rebuildMarked, rebuildNow, shed, spawnDebris, decay), and repair (station repair from the repair bank, respawnInPlace). ShipBridge keeps one-line delegators with the same names.
  *
  * Modules reach each other through the bridge (b.hurt, b.rebuildNow), never by import, so they can't form a cycle.
  *
@@ -18,11 +18,10 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, splitRebuild, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, seededRng, hashInts, hpWire, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
+  computeJoins, BANK, seededRng, hashInts, hpWire, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
-import { SimPass } from '../../sim/SystemClocks.js';
 
 /** A blueprint's placed geometry, built once per blueprint (geomCache) */
 export function geometry(b: BridgeCtx, ship: ShipState): PlacedGeom[] {
@@ -135,7 +134,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.damageMuls.delete(eid);
   b.wing.delete(eid);
   b.targets.delete(eid);
-  b.kits.delete(eid);
+  b.healPaid.delete(eid);
   b.ghosts.delete(eid);
   b.underivable.delete(eid);
   b.beams.delete(eid);
@@ -148,84 +147,6 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.pulls?.drop(eid, b.host.getTick());
   b.host.shipForgotten?.(eid);
   for (const [k, v] of b.targets) if (v === eid) b.targets.delete(k);
-}
-
-/** Is there anything a repair kit could do for this ship? */
-export function needsRepair(b: BridgeCtx, eid: number): boolean {
-  const ship = b.bodies.get(eid);
-  if (!ship || ship.kind !== 'ship') return false;
-  return ship.hp.some((h, i) => (ship.derived.alive[i] && h < ship.maxHp[i] - 1e-6) || (!ship.derived.alive[i] && !b.isGhost(eid, i)));
-}
-
-/** Start a kit (another one adds to the budget and keeps the faster rate) */
-export function startRepairKit(b: BridgeCtx, eid: number, kit: { budget: number; hpPerSec: number; restoreSec: number }): void {
-  const cur = b.kits.get(eid);
-  const restoreTicks = Math.max(30, Math.round(kit.restoreSec * 60));
-  if (cur) {
-    cur.left += kit.budget;
-    cur.total += kit.budget;
-    cur.hpPerSec = Math.max(cur.hpPerSec, kit.hpPerSec);
-    cur.restoreTicks = Math.min(cur.restoreTicks, restoreTicks);
-  } else {
-    b.kits.set(eid, { left: kit.budget, total: kit.budget, hpPerSec: kit.hpPerSec, restoreTicks, progress: 0, since: b.host.getTick() });
-  }
-  const k = b.kits.get(eid)!;
-  b.host.onRepairKit?.(eid, k.left, k.total);
-}
-
-export function repairKitLeft(b: BridgeCtx, eid: number): number {
-  return b.kits.get(eid)?.left ?? 0;
-}
-
-export function stepRepairKits(b: BridgeCtx, tick: number): void {
-  const step = 15;
-  for (const [eid, kit] of b.kits) {
-    // (Another pass's: crowd dilation, sim/SystemClocks.ts)
-    if (!SimPass.on(InSystem.systemId[eid])) continue;
-    const ship = b.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship' || ship.derived.root < 0) { b.kits.delete(eid); continue; }
-    // A hit or moving off breaks the repair: whatever was left of the kit is wasted
-    const broken = (b.lastDamaged.get(eid) ?? -1e9) > kit.since ? 'hit' : !b.isStill(eid) ? 'moved' : null;
-    if (broken) {
-      b.kits.delete(eid);
-      b.host.onRepairKit?.(eid, 0, kit.total, broken);
-      continue;
-    }
-    const value = (i: number) => Math.max(1, b.host.partValue?.(ship.blueprint.parts[i]) ?? 20);
-    const alive = ship.derived.alive;
-    let healed = false;
-    // 1. Damaged parts: heal each a little, paying for the HP restored
-    for (let i = 0; i < ship.hp.length && kit.left > 0; i++) {
-      if (!alive[i] || ship.hp[i] >= ship.maxHp[i] - 1e-6) continue;
-      const want = Math.min(ship.maxHp[i] - ship.hp[i], ship.maxHp[i] * kit.hpPerSec * step / 60);
-      const cost = (value(i) * want) / ship.maxHp[i];
-      const frac = Math.min(1, kit.left / Math.max(1e-6, cost));
-      const got = healPart(ship, i, want * frac, b.tuning);
-      kit.left -= (value(i) * got) / ship.maxHp[i];
-      healed = true;
-    }
-    // 2. All sound: rebuild missing parts (not ghosts) one at a time, nearest the core first
-    if (!healed && kit.left > 0) {
-      const pick = b.nextMissing(eid, ship);
-      if (pick < 0) { kit.left = 0; }
-      else if (value(pick) > kit.left) { kit.left = 0; }
-      else {
-        kit.progress += step;
-        if (kit.progress >= kit.restoreTicks) {
-          kit.progress = 0;
-          kit.left -= value(pick);
-          restorePart(ship, pick, 1);
-          ship.rebuildHp[pick] = 0;
-        }
-      }
-    }
-    if (kit.left <= 0.5) {
-      b.kits.delete(eid);
-      b.host.onRepairKit?.(eid, 0, kit.total);
-    } else if (tick % 60 === 0) {
-      b.host.onRepairKit?.(eid, kit.left, kit.total);
-    }
-  }
 }
 
 /** The missing part (not a ghost) that joins the structure, nearest the core */
@@ -304,27 +225,39 @@ export function decay(b: BridgeCtx, eid: number, ship: ShipState, tick: number):
 }
 
 /**
- * Near a station (and not hit recently): heal every damaged part a little, and
- * regrow missing parts one at a time, nearest the core first. A part can only
- * come back where it joins something still attached, so ships rebuild from
- * the core outwards.
+ * Near a station (within BANK.stationRange, and not hit recently) the repair bank's deposits mend the ship: each damaged
+ * part is paid for (repairBill, host.payBankRepair) when it starts to heal and then heals BANK.stationHealPerSecond of its
+ * HP a second until whole; a missing part is regrown (partInputs, host.payBankRebuild) every BANK.stationPartSeconds,
+ * nearest the core first. A part can only come back where it joins something still attached, so ships rebuild from the
+ * core outwards. Nothing is free: with no host to pay, nothing is mended. A part a field machine has claimed is left to it.
  */
 export function repairStep(b: BridgeCtx, eid: number, ship: ShipState, tick: number): void {
-  const rp = b.tuning.repair!;
-  if (ship.kind !== 'ship' || ship.derived.root < 0) return;
-  if (tick - (b.lastDamaged.get(eid) ?? -1e9) < rp.combatPauseTicks) return;
-  if (!b.host.nearRepairSite?.(eid)) { b.restoreProgress.delete(eid); return; }
+  const rp = b.tuning.repair;
+  if (!rp || ship.kind !== 'ship' || ship.derived.root < 0) return;
+  if (tick - (b.lastDamaged.get(eid) ?? -1e9) < rp.combatPauseTicks) { b.healPaid.delete(eid); return; }
+  if (!b.host.nearRepairSite?.(eid)) { b.restoreProgress.delete(eid); b.healPaid.delete(eid); return; }
   const alive = ship.derived.alive;
-  let heal = rp.healPerSecond * rp.intervalTicks / 60;
-  // The owner pays for what the crews mend
-  if (b.host.payRepair) {
-    let want = 0;
-    ship.hp.forEach((hp, i) => { if (alive[i] && hp > 0 && !ship.detached[i]) want += Math.min(ship.maxHp[i] * heal, ship.maxHp[i] - hp); });
-    if (want > 0) heal *= b.host.payRepair(eid, want);
+  const parts = ship.blueprint.parts;
+  const claimed = (i: number) => !!b.host.isClaimed?.(eid, parts[i].uid);
+  // 1. Damaged parts: paid for when they start, then healed on
+  if (b.host.payBankRepair) {
+    const heal = BANK.stationHealPerSecond * rp.intervalTicks / 60;
+    let paid = b.healPaid.get(eid);
+    ship.hp.forEach((hp, i) => {
+      if (!alive[i] || hp <= 0 || ship.detached[i] || ship.ghost[i]) return;
+      const max = ship.maxHp[i];
+      if (hp >= max - 1e-6) { paid?.delete(parts[i].uid); return; }
+      if (claimed(i)) return;
+      if (!paid?.has(parts[i].uid)) {
+        if (!b.host.payBankRepair!(eid, parts[i], (max - hp) / max)) return;
+        if (!paid) b.healPaid.set(eid, (paid = new Set()));
+        paid.add(parts[i].uid);
+      }
+      healPart(ship, i, max * heal, b.tuning);
+    });
   }
-  if (heal > 0) ship.hp.forEach((_, i) => { if (alive[i]) healPart(ship, i, ship.maxHp[i] * heal, b.tuning); });
 
-  // Missing parts that join the attached structure, by distance (in joins) from the core
+  // 2. Missing parts that join the attached structure, by distance (in joins) from the core
   const n = ship.hp.length;
   const adj: number[][] = Array.from({ length: n }, () => []);
   for (const [a, c] of b.joinsOf(ship)) { adj[a].push(c); adj[c].push(a); }
@@ -337,16 +270,16 @@ export function repairStep(b: BridgeCtx, eid: number, ship: ShipState, tick: num
   }
   let pick = -1;
   for (let i = 0; i < n; i++) {
-    if (alive[i] || !adj[i].some((j) => alive[j]) || b.isGhost(eid, i)) continue;
+    if (alive[i] || !adj[i].some((j) => alive[j]) || b.isGhost(eid, i) || claimed(i)) continue;
     if (pick < 0 || depth[i] < depth[pick]) pick = i;
   }
-  if (pick < 0) { b.restoreProgress.delete(eid); return; }
+  if (pick < 0 || !b.host.payBankRebuild) { b.restoreProgress.delete(eid); return; }
   const progress = (b.restoreProgress.get(eid) ?? 0) + rp.intervalTicks;
-  if (progress < rp.restoreTicks) { b.restoreProgress.set(eid, progress); return; }
-  // Ready: the owner pays the rebuild bill (or it waits, ready, until they can)
-  if (b.host.payRebuild && !b.host.payRebuild(eid, pick)) { b.restoreProgress.set(eid, progress); return; }
+  if (progress < BANK.stationPartSeconds * 60) { b.restoreProgress.set(eid, progress); return; }
+  // Ready: the deposits pay the part's inputs (or it waits, ready, until they can)
+  if (!b.host.payBankRebuild(eid, parts[pick])) { b.restoreProgress.set(eid, progress); return; }
   b.restoreProgress.set(eid, 0);
-  restorePart(ship, pick, rp.restoreHp);
+  restorePart(ship, pick, 1);
   // Not "freshly destroyed" if it is lost again before the rebuild
   ship.rebuildHp[pick] = 0;
 }

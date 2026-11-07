@@ -67,7 +67,7 @@ describe('design update tool: offline parts', () => {
     const plan = planDesignUpdate(input, ctx);
     expect(JSON.stringify(input)).toBe(before);
     expect(plan.rows.map((r) => r.userId)).toEqual([1, 2, 3]);
-    expect(plan.skipped).toEqual([{ userId: 4, username: 'newbie', version: 5 }]);
+    expect(plan.skipped).toEqual([{ userId: 4, username: 'newbie', version: 6 }]);
     const [ra, rs, rb] = plan.rows;
     expect(ra).toMatchObject({ userId: 1, username: 'owner', from: 4, mode: 'wipe', freshStarter: true, slotsDeleted: 2, designsDeleted: 1, jobsDetached: 1, debtForgiven: 120, cargoMoved: { iron_ore: 4 }, planItemsDropped: { 'plan:arrow': 1 } });
     expect(ra.refund).toEqual(salvageParts(real.econ, prospector.blueprint.parts, 1));
@@ -82,7 +82,7 @@ describe('design update tool: offline parts', () => {
     expect(rb).toMatchObject({ userId: 3, mode: 'wipe', slotsDeleted: 2, refund: {}, debtForgiven: 0 });
     expect(plan.totals).toMatchObject({ players: 3, skipped: 1, swapped: 1, wiped: 6, freshStarters: 2, jobsDetached: 1, debtForgiven: 120, cargoMoved: { iron_ore: 4 }, planItemsDropped: { 'plan:arrow': 1 } });
     // What would be written: v5, the fresh starter or the remake flown, the refund in storage
-    expect(plan.write.get(1)!.version).toBe(5);
+    expect(plan.write.get(1)!.version).toBe(6);
     expect(plan.write.get(1)!.ship.blueprint).toEqual(real.kit.blueprint);
     expect(plan.write.get(2)!.ship.blueprint).toEqual(remake('remakes/player-xire-prospector'));
     expect(plan.write.has(4)).toBe(false);
@@ -95,7 +95,7 @@ describe('design update tool: offline parts', () => {
     expect(summary).toMatch(/^owner #1 v4 wipe: xp \d+->\d+, level 24->24, credits 4321->4321, skill points 5->5$/m);
     expect(summary).toMatch(/swapped: slot 2 Prospector \(17\) -> remakes\/player-xire-prospector/);
     expect(summary).toMatch(/wiped: slot 1 Sparrow T \(\d+\): not mapped/);
-    expect(summary).toMatch(/newbie #4: already v5, skipped/);
+    expect(summary).toMatch(/newbie #4: already v6, skipped/);
   });
 
   it('a pilot with no username (no account row) is wiped, never swapped by mistake', () => {

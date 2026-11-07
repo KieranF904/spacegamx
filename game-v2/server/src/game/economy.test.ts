@@ -284,8 +284,8 @@ describe('station services', () => {
     expect(profile().credits).toBe(credits + saleTotal(server.econ.items, 'ruby', 2, demand, 0));
     expect(sellPrice(server.econ.items, 'ruby', (station as any).market.demand)).toBeGreaterThan(sellPrice(server.econ.items, 'ruby'));
     const c2 = profile().credits;
-    t.send({ type: 'marketBuy', id: 'repair_kit', n: 1 });
-    expect(profile().credits).toBe(c2 - buyPrice(server.econ.items, 'repair_kit'));
+    t.send({ type: 'marketBuy', id: 'pack_hull', n: 1 });
+    expect(profile().credits).toBe(c2 - buyPrice(server.econ.items, 'pack_hull'));
     t.send({ type: 'marketBuy', id: 'quantum_core', n: 1 });
     expect(countOf(profile().storage, 'quantum_core')).toBe(0);
   });
@@ -343,14 +343,14 @@ describe('moving markets', () => {
     const v = [...got].reverse().find((m: any) => m.type === 'vendors').vendors.find((x: any) => x.faction === 'sol_patrol');
     // (No schematics on sale any more: nothing opens early)
     expect(v.stock.some((s: any) => s.item.startsWith('schematic_'))).toBe(false);
-    expect(v.stock.find((s: any) => s.item === 'nanite_repair_kit').locked).toBe(true);
-    t.send({ type: 'vendorBuy', faction: 'sol_patrol', item: 'nanite_repair_kit', n: 1 });
-    expect(countOf(profile().storage, 'nanite_repair_kit')).toBe(0);
+    expect(v.stock.find((s: any) => s.item === 'pack_optics').locked).toBe(true);
+    t.send({ type: 'vendorBuy', faction: 'sol_patrol', item: 'pack_optics', n: 1 });
+    expect(countOf(profile().storage, 'pack_optics')).toBe(0);
     profile().reputation.sol_patrol = 40; // Trusted
     const c = profile().credits;
-    t.send({ type: 'vendorBuy', faction: 'sol_patrol', item: 'nanite_repair_kit', n: 1 });
-    expect(countOf(profile().storage, 'nanite_repair_kit')).toBe(1);
-    expect(c - profile().credits).toBe(vendorPrice(server.econ.items, 'nanite_repair_kit', 3));
-    expect(vendorPrice(server.econ.items, 'nanite_repair_kit', 3)).toBeLessThan(buyPrice(server.econ.items, 'nanite_repair_kit'));
+    t.send({ type: 'vendorBuy', faction: 'sol_patrol', item: 'pack_optics', n: 1 });
+    expect(countOf(profile().storage, 'pack_optics')).toBe(1);
+    expect(c - profile().credits).toBe(vendorPrice(server.econ.items, 'pack_optics', 3));
+    expect(vendorPrice(server.econ.items, 'pack_optics', 3)).toBeLessThan(buyPrice(server.econ.items, 'pack_optics'));
   });
 });

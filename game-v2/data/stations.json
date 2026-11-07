@@ -32,14 +32,14 @@
       "refuelCostPerUnit": 1,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "scanner_charge",
           "alloy_plate",
           "copper_wire",
           "composite_sheet",
-          "insurance_bond"
+          "pack_mechanism"
         ],
         "demand": {},
         "note": "Hub prices: fair on everything."
@@ -69,7 +69,7 @@
       "refuelCostPerUnit": 0.5,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
           "alloy_plate",
@@ -106,7 +106,7 @@
       "refuelCostPerUnit": 2,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
           "alloy_plate",
@@ -117,7 +117,7 @@
           "crystal_lens",
           "servo_motor",
           "power_coupling",
-          "insurance_bond"
+          "pack_mechanism"
         ],
         "demand": {
           "ruby": 1.25,
@@ -154,8 +154,8 @@
       "refuelCostPerUnit": 2,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "scanner_charge",
           "composite_sheet",
@@ -199,8 +199,8 @@
       "dockingFee": 40,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "scanner_charge",
           "crystal_lens",
@@ -243,8 +243,8 @@
       "dockingFee": 100,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "scanner_charge",
           "steel_plate",
@@ -281,7 +281,7 @@
       "refuelCostPerUnit": 0.7,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
           "crystal_lens"
@@ -322,8 +322,8 @@
       "dockingFee": 250,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "scanner_charge",
           "cobalt_alloy",
@@ -365,10 +365,10 @@
       "dockingFee": 400,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
-          "insurance_bond",
+          "pack_mechanism",
           "shield_emitter"
         ],
         "demand": {
@@ -403,7 +403,7 @@
       "refuelCostPerUnit": 0.8,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
           "alloy_plate",
@@ -480,10 +480,10 @@
       "refuelCostPerUnit": 1,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
-          "insurance_bond",
+          "pack_mechanism",
           "steel_plate"
         ],
         "demand": {
@@ -517,7 +517,7 @@
       "refuelCostPerUnit": 1,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge"
         ],
@@ -549,7 +549,7 @@
       "refuelCostPerUnit": 0.5,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "scanner_charge",
           "alloy_plate",
@@ -589,8 +589,8 @@
       "refuelCostPerUnit": 1.5,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "coolant",
           "part:alloy:utility_mining_laser:sq"
@@ -632,11 +632,11 @@
       "refuelCostPerUnit": 1,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
           "scanner_charge",
-          "insurance_bond",
+          "pack_mechanism",
           "steel_plate"
         ],
         "demand": {
@@ -669,10 +669,10 @@
       "refuelCostPerUnit": 1,
       "market": {
         "sells": [
-          "repair_kit",
-          "field_repair_kit",
+          "pack_hull",
+          "pack_wiring",
           "boost_cell",
-          "insurance_bond",
+          "pack_mechanism",
           "steel_plate",
           "copper_wire"
         ],
@@ -706,7 +706,7 @@
       "refuelCostPerUnit": 1,
       "market": {
         "sells": [
-          "repair_kit",
+          "pack_hull",
           "boost_cell",
           "power_coupling",
           "copper_wire",
