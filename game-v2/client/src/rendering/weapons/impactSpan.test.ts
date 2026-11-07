@@ -84,11 +84,17 @@ describe('impacts scale with what a gun can do', () => {
     expect(lev).toBeLessThan(1.6 * bastion);
   });
 
-  it('held beams burn in step with their weight: the Cutter throws fragments, the Searchlight only a sizzle', () => {
+  it('held beams burn in step with their weight: the Cutter runs the heaviest molten splash, the Searchlight only a sizzle', () => {
     const burn = (id: string) => { const b = beamLook(id)!.burn!; return impactSpan({ ...weaponStyle(WeaponType.Cannon), hit: b.hit }, 1); };
-    expect(burn('laser_cutter').fragments).toBeGreaterThan(0);
+    const liquid = (id: string) => beamLook(id)!.burn!.hit.liquid!;
+    // (the lasers' burns lead with a liquid splash: ImpactLayers.liquid)
+    for (const id of ['laser_glint', 'laser_cutter', 'laser_searchlight']) expect(liquid(id), id).toBeDefined();
+    expect(liquid('laser_cutter').blobs.count).toBeGreaterThan(liquid('laser_glint').blobs.count);
+    expect(liquid('laser_glint').blobs.count).toBeGreaterThan(liquid('laser_searchlight').blobs.count);
+    expect(liquid('laser_cutter').blobs.size).toBeGreaterThan(liquid('laser_glint').blobs.size);
+    expect(burn('laser_cutter').frames).toBeGreaterThan(burn('laser_glint').frames);
+    expect(burn('laser_glint').frames).toBeGreaterThan(burn('laser_searchlight').frames);
     expect(burn('laser_cutter').frames).toBeGreaterThan(burn('arc_tesla').frames);
-    expect(burn('arc_tesla').frames).toBeGreaterThan(burn('laser_searchlight').frames);
     expect(burn('laser_searchlight').fragments).toBe(0);
   });
 });

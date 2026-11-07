@@ -46,5 +46,11 @@ export function impactSpan(style: WeaponStyle, size: number): ImpactSpan {
   if (L.fireball) at(L.fireball.size * k * 1.6, L.fireball.life * 1.2 + (L.fireball.count ?? 3));
   if (L.embers) burst(L.embers, 0.94);
   if (L.debris) burst(L.debris, L.debris.drag ?? 0.95);
+  const lq = L.liquid;
+  if (lq) {
+    // (a liquid splash: its blobs' highest arc or the film's creep, whichever reaches further; the film, or a late blob's smear, lasting longest)
+    const v = lq.blobs.speed * Math.sqrt(k) * 1.1, F = lq.film;
+    at(Math.max((v * v) / (2 * Math.max(0.01, lq.blobs.pull)), F.length * k * 1.4 + F.creep * F.life * 0.6), Math.max(F.life, lq.blobs.life * 1.2 + F.life * 0.6));
+  }
   return { size: reach, frames, tailSize: tReach, tailFrames: tFrames, fragments: L.debris ? Math.round(L.debris.count * Math.min(1.5, k)) : 0 };
 }

@@ -28,7 +28,7 @@
  */
 
 import { Container, Graphics, Texture } from 'pixi.js';
-import { disc, softDot, streak, streakScale, petal, petalScale, ring, puff, glowBall, DOT_SIZE } from '../fxTextures';
+import { disc, softDot, streak, petal, petalScale, ring, puff, glowBall, DOT_SIZE } from '../fxTextures';
 import { ParticlePool } from '../particlePool';
 import { EntityType, WeaponType } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
@@ -38,9 +38,11 @@ import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanc
 import { BURST, burstLife, burstSpeed, hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
 import { AnchorList, rideStep, type ImpactAnchor } from './impactAnchor';
 import type { CombatSoundFeed } from '../../audio/CombatSounds';
+import { LiquidFx, type LiquidSink } from './liquidSplash';
 
 /** Which way a hit throws (impactAim): the angle its directional parts leave at, and the struck surface's normal if one was found */
-interface Aim { a: number; nx: number; ny: number; surface: boolean }
+/** `dx, dy`: the shot's (or beam's) direction, 0 0 when unknown (a liquid splash creeps the way it slid along the surface) */
+interface Aim { a: number; nx: number; ny: number; surface: boolean; dx: number; dy: number }
 
 interface Shot {
   id: number;
@@ -313,6 +315,13 @@ export class WeaponFx {
   private anchors = new AnchorList();
   /** What the impact being made hit (an entity id, -1: nothing known): its group rides it */
   private hitTarget = -1;
+  /** Layered impacts' liquid splashes (ImpactLayers.liquid), drawn into the glow pool through `liquidSink` */
+  private liquid = new LiquidFx();
+  private readonly liquidSink: LiquidSink = {
+    line: (x0, y0, x1, y1, w, color, alpha) => this.line(x0, y0, x1, y1, w, color, alpha),
+    dot: (x, y, r, color, alpha) => this.circle(this.glow, TEX.dot, x, y, r, color, alpha),
+    disc: (x, y, r, color, alpha) => this.circle(this.glow, TEX.disc, x, y, r, color, alpha),
+  };
   private clock = 0;
   private crackle = new Graphics();
   /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
@@ -370,7 +379,7 @@ export class WeaponFx {
    */
   tally: ((what: 'struck' | 'confirmed' | 'landed' | 'renamed' | 'orphan', shot: number, owner: number, target: number, x?: number, y?: number) => void) | null = null;
   private readonly normalScratch: SurfaceNormal = { nx: 0, ny: 0 };
-  private readonly aim: Aim = { a: 0, nx: 0, ny: 0, surface: false };
+  private readonly aim: Aim = { a: 0, nx: 0, ny: 0, surface: false, dx: 0, dy: 0 };
   /** Hits reported for shells not yet seen (the hit's message comes ahead of the snapshot that brings its shell): matched up on the next update */
   private early: { id: number; x: number; y: number }[] = [];
   /**
@@ -399,8 +408,8 @@ export class WeaponFx {
   /** A line from (x0, y0) to (x1, y1), `width` thick with soft round ends */
   private line(x0: number, y0: number, x1: number, y1: number, width: number, color: number, alpha: number): void {
     const len = Math.hypot(x1 - x0, y1 - y0);
-    const k = streakScale(len, width);
-    this.glow.take(TEX.streak, (x0 + x1) / 2, (y0 + y1) / 2, 0.5, 0.5, color, alpha, Math.atan2(y1 - y0, x1 - x0), k.x, k.y);
+    // (streakScale's numbers, inline: no object a call)
+    this.glow.take(TEX.streak, (x0 + x1) / 2, (y0 + y1) / 2, 0.5, 0.5, color, alpha, Math.atan2(y1 - y0, x1 - x0), (len + width) / 128, width / 32);
   }
 
   /** A filled circle (smooth-edged) */
@@ -532,7 +541,7 @@ export class WeaponFx {
       this.burnStyles.set(burn, style);
     }
     const aim = this.aim;
-    aim.nx = -dx; aim.ny = -dy; aim.surface = false;
+    aim.nx = -dx; aim.ny = -dy; aim.surface = false; aim.dx = dx; aim.dy = dy;
     this.normalScratch.target = -1;
     const n = this.surfaceAt?.(x, y, dx, dy, owner, this.normalScratch);
     if (n) { aim.nx = n.nx; aim.ny = n.ny; aim.surface = true; }
@@ -682,7 +691,7 @@ export class WeaponFx {
    */
   private aimOf(style: WeaponStyle, shot: Shot | undefined, x: number, y: number): Aim {
     const aim = this.aim;
-    aim.surface = false;
+    aim.surface = false; aim.dx = 0; aim.dy = 0;
     this.normalScratch.target = -1;
     const sp = shot ? Math.hypot(shot.vx, shot.vy) : 0;
     if (!shot || sp < 1e-6) {
@@ -693,7 +702,7 @@ export class WeaponFx {
       return aim;
     }
     const dx = shot.vx / sp, dy = shot.vy / sp, mode = style.hitThrow ?? 'back';
-    aim.nx = -dx; aim.ny = -dy;
+    aim.nx = -dx; aim.ny = -dy; aim.dx = dx; aim.dy = dy;
     // (asked for every hit: what it struck, for its group to ride; its normal only where the style throws off it)
     const n = this.surfaceAt?.(x, y, dx, dy, shot.owner, this.normalScratch);
     this.hitTarget = this.normalScratch.target ?? -1;
@@ -723,10 +732,11 @@ export class WeaponFx {
    */
   private grouped(target: number, x: number, y: number, spawn: () => void): void {
     const n0 = this.hitGlows.length, n1 = this.shocks.length, n2 = this.scorches.length, n3 = this.hitLights.length, n4 = this.flares.length, n5 = this.rings.length;
-    const n6 = this.sparks.length, n7 = this.smoke.length, f0 = this.fragsMade;
+    const n6 = this.sparks.length, n7 = this.smoke.length, f0 = this.fragsMade, l0 = this.liquid.n;
     spawn();
     const anc = this.anchors.open(this.state?.entities, target, x, y);
     if (!anc) return;
+    this.liquid.bind(l0, anc);
     const bind = (arr: { anc?: ImpactAnchor; life: number; max: number }[], from: number): void => {
       for (let i = from; i < arr.length; i++) { arr[i].anc = anc; anc.hold(arr[i].max - arr[i].life + 2); }
     };
@@ -862,6 +872,8 @@ export class WeaponFx {
         this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: em.life * burstLife(em.outliers ?? BURST.outliers, em.outLife ?? BURST.outLife), color: em.hot, cool: em.cool, width: 2.4 + Math.random() * 1.4, drag: 0.94 });
       }
     }
+    // A liquid splash: syrupy blobs falling back to the surface and a film creeping along it (liquidSplash.ts)
+    if (L.liquid) { this.liquid.keep = this.particleKeep; this.liquid.spawn(L.liquid, x, y, aim, k); }
     if (L.scorch && this.scorches.length < HIT_CAP) {
       // (on what it struck: it rides with it, its group's anchor)
       this.scorches.push({ x, y, life: 0, max: L.scorch.life, size: L.scorch.size * k, color: L.scorch.color });
@@ -1538,6 +1550,8 @@ export class WeaponFx {
       this.circle(g, TEX.disc, r.x, r.y, r.size * (0.3 + 0.7 * n), r.color, 0.35 * (1 - n));
       this.circle(g, TEX.disc, r.x, r.y, r.size * 0.25 * (1 - n) + 0.5, 0xffffff, 0.8 * (1 - n));
     }
+    this.liquid.keep = this.particleKeep;
+    if (this.liquid.n) this.liquid.update(frames, this.liquidSink);
     this.drawHits(frames);
     g.end();
     this.smokeG.end();

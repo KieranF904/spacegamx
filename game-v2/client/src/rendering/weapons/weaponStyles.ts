@@ -151,6 +151,32 @@ export interface ImpactLayers {
   shake?: { strength: number; radius: number; time?: number };
   /** How far the hit lights its surroundings (world units, scaled as the layers are) and how brightly (default: from the bloom) */
   light?: { radius: number; power: number };
+  /** A liquid splash (a laser's molten hull, liquidSplash.ts): see LiquidLayer */
+  liquid?: LiquidLayer;
+}
+
+/**
+ * A liquid splash (ImpactLayers.liquid; the Impact Lab's "Liquid splash", drawn by liquidSplash.ts): heavy, syrupy blobs
+ * thrown up and falling back, and a film pooling at the hit. Sizes and lengths are world units, scaled as the layers are.
+ */
+export interface LiquidLayer {
+  /**
+   * `count` blobs `size` across thrown at about `speed` (world units a frame) in a fan `cone` degrees across, round an
+   * axis between the surface's normal and the beam's rebound (`bias` of the way to the rebound, default 0.35). Each is
+   * pulled back toward the surface by `pull` a frame (opposite the normal), drawn stretched along its velocity with a soft
+   * glow on its head, and lives at most `life` frames; one that falls back past the plane it left from sticks there as a
+   * short smear along the surface, the way it was moving
+   */
+  blobs: { count: number; size: number; speed: number; cone: number; pull: number; life: number; bias?: number };
+  /**
+   * The film pooling at the hit, along the surface (perpendicular to its normal): reaching `length` (mostly the way the
+   * beam was sliding: its direction projected on the surface, a little back the other way), `thickness` thick, creeping
+   * on the way it slid at up to `creep` a frame (more the more it grazed) and thinning as it cools over `life` frames
+   */
+  film: { length: number; thickness: number; creep: number; life: number };
+  /** The molten colour it leaves at, and the crust it cools to */
+  hot: number;
+  cool: number;
 }
 
 /**
@@ -186,7 +212,8 @@ export interface BeamLook {
   frost?: number;
   /**
    * What a held beam's burn throws off the surface it lights, every `every` frames while it burns (WeaponFx.beamBurn):
-   * an impact like a shot's (ImpactLayers), splashing straight out of the surface; `color` its sparks' default
+   * an impact like a shot's (ImpactLayers), splashing straight out of the surface; `color` its sparks' default (the
+   * lasers' lead with a liquid splash: ImpactLayers.liquid)
    */
   burn?: { every: number; color: number; hit: ImpactLayers };
 }

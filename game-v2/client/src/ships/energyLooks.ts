@@ -8,28 +8,56 @@
  *   Strobe       spaced hot-pink bolts     Overpulse    a magenta ribbon with ripple heads
  *   Blackout     blast radius ring in flight           Spark        a jagged bolt     Tesla  flickering lightning
  *   Repair Beam  braided teal strands, '+' motes
+ *
+ * The three lasers' burns are a liquid splash (ImpactLayers.liquid, rendering/weapons/liquidSplash.ts).
  */
 
 import { BEAM_LOOKS, MODEL_STYLES, DIRECTED_HIT } from '../rendering/weapons/weaponStyles';
 
 Object.assign(BEAM_LOOKS, {
-  // Always red, whatever the grade
-  laser_glint: { outer: 0xdc2626, mid: 0xff5a5a, core: 0xfff0f0 },
+  // (The lasers' burns lead with a liquid splash, the Impact Lab's: the hull they light runs molten, throwing heavy blobs
+  // that fall back and stick, and pooling into a film that creeps the way the beam slides and cools to a crust;
+  // ImpactLayers.liquid. A few sparks are kept under it.)
+  // Always red, whatever the grade: a light splash, quick to cool
+  laser_glint: {
+    outer: 0xdc2626, mid: 0xff5a5a, core: 0xfff0f0,
+    burn: {
+      every: 9, color: 0xff8a7a, hit: {
+        liquid: {
+          blobs: { count: 2, size: 2.2, speed: 3.6, cone: 55, pull: 0.22, life: 40 },
+          film: { length: 16, thickness: 3, creep: 0.25, life: 60 }, hot: 0xffb09a, cool: 0x4a0a0a,
+        },
+        spray: { count: 2, speed: 6, cone: 30, life: 10, color: 0xffc8c0 }, scatter: 30, light: { radius: 45, power: 0.35 },
+      },
+    },
+  },
   laser_cutter: {
     width: 1.9, outer: 0xea580c, mid: 0xff9a3c, core: 0xfff3dc, pool: 0xff6a14,
-    // (a heavy burn: every few frames sparks splash out of the hull and glowing chips tear off, trailing smoke, for a second or so)
+    // (a heavy burn: thick molten blobs thrown well clear of the pool, long films that crust over slowly, an ember or two)
     burn: {
       every: 7, color: 0xffb060, hit: {
-        spray: { count: 8, speed: 7.5, cone: 34, life: 16, color: 0xffc890, width: 1.9 }, flare: { size: 34, width: 2.6, life: 10 }, scatter: 34,
-        embers: { count: 2, speed: 3.5, life: 30, hot: 0xffd080, cool: 0x7a2a08 },
-        debris: { count: 2, speed: 11, size: 2.6, life: 41, hot: 0xffc070, cool: 0x3a1408, trail: 0xff7a2a, cone: 50, drag: 0.92 },
+        liquid: {
+          blobs: { count: 3, size: 3.4, speed: 5, cone: 60, pull: 0.25, life: 56 },
+          film: { length: 30, thickness: 5, creep: 0.32, life: 100 }, hot: 0xffd27a, cool: 0x5a1606,
+        },
+        spray: { count: 3, speed: 6.5, cone: 34, life: 12, color: 0xffc890, width: 1.6 }, scatter: 34,
+        embers: { count: 1, speed: 3, life: 30, hot: 0xffd080, cool: 0x7a2a08 },
         light: { radius: 70, power: 0.5 },
       },
     },
   },
+  // A thin spill of gold: the faintest splash
   laser_searchlight: {
     width: 0.45, outer: 0xb8860b, mid: 0xfde68a, core: 0xfffbeb, cone: 5, coneLen: 1100,
-    burn: { every: 10, color: 0xfde68a, hit: { spray: { count: 3, speed: 6, cone: 30, life: 10, color: 0xfff4c0 }, flare: { size: 16, width: 1.4, life: 6 }, scatter: 30 } },
+    burn: {
+      every: 12, color: 0xfde68a, hit: {
+        liquid: {
+          blobs: { count: 1, size: 1.6, speed: 2.8, cone: 40, pull: 0.2, life: 34 },
+          film: { length: 10, thickness: 2, creep: 0.18, life: 48 }, hot: 0xfff0b8, cool: 0x5a4210,
+        },
+        spray: { count: 1, speed: 5, cone: 30, life: 8, color: 0xfff4c0 }, scatter: 30,
+      },
+    },
   },
   lance_lance: { outer: 0x7c3aed, mid: 0xc084fc, core: 0xffffff, braid: { color: 0xf5e8ff, strands: 3 }, sputter: 1 },
   arc_tesla: {
