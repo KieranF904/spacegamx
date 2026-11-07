@@ -20,8 +20,11 @@ import {
   Position, Velocity, Rotation, InSystem, Dead, Player, CLAMP, clampWorld, clampFit, clampLinedUp, clampOffset, pairKey,
   type ClampInfo, type ClampBody, type ShipState, type ClampBreak,
 } from '@space-game/common';
-import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
+import type { FeatureInstance, FeatureMessageHandler, ShipsOf, StationCap, TellCap, WorldCap } from '../types.js';
 import type { ServerClampLink } from '../../bridge/clamp.js';
+
+/** What Docking Clamps ask of the game: the links' table and the ships' records, telling pilots, the berth (presses) */
+export type ClampHost = WorldCap & ShipsOf<'clamps' | 'get' | 'has'> & Pick<TellCap, 'tell' | 'send' | 'pilotsIn'> & Pick<StationCap, 'isDocked'>;
 
 type Clamp = ClampInfo['clamps'][number];
 
@@ -44,7 +47,7 @@ export class Clamps implements FeatureInstance {
   private readonly heard = new Map<number, number>();
   readonly messages: Readonly<Record<string, FeatureMessageHandler>>;
 
-  constructor(private readonly host: FeatureHost) {
+  constructor(private readonly host: ClampHost) {
     this.messages = {
       clampDock: (eid, msg) => this.dock(eid, msg),
       clampSwap: (eid) => this.swap(eid),

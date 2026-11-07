@@ -29,7 +29,11 @@ import {
   type MachineKind, type MachineView, type PackDef, type PackMode, type PlacedPart, type ServerFieldStateMessage,
   type ShipRecord, type ShipState, type ValidationResult, type PlanSpot,
 } from '@space-game/common';
-import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../../ships/features/types.js';
+import type { BankCap, FeatureInstance, FeatureMessageHandler, HoldCap, ShipsOf, TellCap, WorldCap } from '../../ships/features/types.js';
+
+/** What field machines ask of the game: the ships' records, stores and refits, the hold, profile and bank, telling pilots */
+export type FieldHost = WorldCap & ShipsOf<'catalog' | 'chargeOf' | 'get' | 'installGhost' | 'refitInFlight' | 'validate'>
+  & Pick<TellCap, 'tell' | 'send'> & HoldCap & BankCap;
 import { SimPass } from '../../sim/SystemClocks.js';
 import { joinsOf, planDiff, promoteWaiting, removeParts, type Validate } from './plan.js';
 import { pickRefine } from './refine.js';
@@ -97,7 +101,7 @@ export class FieldShips implements FeatureInstance {
   private readonly packs: PackDef[];
   private readonly validateLoose: Validate;
 
-  constructor(private readonly host: FeatureHost) {
+  constructor(private readonly host: FieldHost) {
     this.packs = packDefs(host.econ.items);
     this.validateLoose = (bp) => host.ships.validate(bp, { mounting: false });
   }

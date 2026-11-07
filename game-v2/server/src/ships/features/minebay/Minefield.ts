@@ -21,7 +21,11 @@ import {
   Player, Dead, InSystem, Position, Velocity, Rotation, MINES, makeDrop, mineArmed, mineExpired, mineId, minePos, mineTouches,
   nextReady, pickBay, type MineDrop, type MineEnd, type ShipState,
 } from '@space-game/common';
-import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
+import type { FeatureInstance, FeatureMessageHandler, HoldCap, RulesCap, ShipsOf, StationCap, TellCap, WorldCap } from '../types.js';
+
+/** What the Mine Bay asks of the game: the ships it may set off and splash, who may hurt whom, telling pilots, the profile (laid mines) */
+export type MineHost = WorldCap & ShipsOf<'bodies' | 'get' | 'isDormant' | 'isJumping' | 'splashAt'> & Pick<TellCap, 'send'>
+  & Pick<StationCap, 'isDocked'> & Pick<HoldCap, 'profile' | 'markDirty'> & RulesCap;
 
 const playerQuery = defineQuery([Player]);
 
@@ -72,7 +76,7 @@ export class Minefield implements FeatureInstance {
   private readonly grid = new Map<number, Map<number, [Drop, number][]>>();
   private readonly blasts: [Drop, number, number][] = [];
 
-  constructor(private readonly host: FeatureHost) {}
+  constructor(private readonly host: MineHost) {}
 
   readonly messages: Readonly<Record<string, FeatureMessageHandler>> = {
     mineDrop: (eid, msg) => this.onPress(eid, msg?.tick),

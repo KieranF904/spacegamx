@@ -11,34 +11,54 @@ import type { WeaponBridge } from '../bridge/core.js';
 import type { ShipBridge } from '../ShipBridge.js';
 import type { LootPods } from '../../game/LootPods.js';
 
-/**
- * The narrow object a feature is given at construction (what Towing's constructor args were, lifted): the world, the
- * ships, and the few things it may ask of the game. A feature that needs more gets it added here, not by importing
- * GameServer.
- */
-export interface FeatureHost {
+// ------------------------------------------------------------------------------------------------ capabilities
+// What a feature may ask of the game, in small sets. A feature names the ones it needs as its host type (ClampHost =
+// WorldCap & TellCap & ...; its constructor takes that), so its whole dependency surface is one line and tsc holds it
+// to it. GameServer builds one object with all of them (FeatureHost). A feature that needs more adds a member to the
+// set it belongs in (or a new set), never by importing GameServer. Where a feature reads the ships, it names the
+// bridge calls it uses (ShipsOf<'get' | ...>), not the whole ShipBridge.
+
+/** The world, the tuning and the clock */
+export interface WorldCap {
   readonly world: IWorld;
-  readonly ships: ShipBridge;
-  readonly pods: LootPods;
   readonly tuning: ShipTuning;
   getTick(): number;
+}
+
+/** The ships: the whole bridge (GameServer's side). A feature names the calls it uses instead: ShipsOf<'get' | 'has'> */
+export interface ShipsCap {
+  readonly ships: ShipBridge;
+}
+export interface ShipsOf<K extends keyof ShipBridge> {
+  readonly ships: Pick<ShipBridge, K>;
+}
+
+/** Telling pilots: a toast, a message, an effect everyone near sees, and who is in a system */
+export interface TellCap {
   /** A toast for one pilot */
   tell(pilot: number, text: string, color?: string): void;
+  /** A message to one pilot's client */
+  send(pilot: number, msg: ServerMessage): void;
+  /** An effect everyone in the entity's system sees, at the entity (a Flash Screen's bloom) */
+  effect(eid: number, type: number): void;
+  /** The pilots in the entity's system now (whoever may hold it: Docking Clamps' link records go to them) */
+  pilotsIn?(eid: number): number[];
+}
+
+/** Stations and salvage */
+export interface StationCap {
+  readonly pods: LootPods;
   /** The station a pilot is within reach of (-1: none) */
   stationInRange(pilot: number): number;
   /** Berthed at a station */
   isDocked(pilot: number): boolean;
   /** Towed into a station's reach: salvage it for the pilot (and take it away): the Tow Beam's */
   deliver(pilot: number, target: number, kind: TowKind): void;
-  /** An effect everyone in the entity's system sees, at the entity (a Flash Screen's bloom) */
-  effect(eid: number, type: number): void;
-  /** The pilots in the entity's system now (whoever may hold it: Docking Clamps' link records go to them) */
-  pilotsIn?(eid: number): number[];
+}
 
-  // ---- Field machines (features/machines, docs/design/field-fabrication.md): the pilot's hold, profile and bank
+/** The pilot's hold and profile (field machines: features/machines, docs/design/field-fabrication.md) */
+export interface HoldCap {
   readonly econ: Economy;
-  /** A message to one pilot's client */
-  send(pilot: number, msg: ServerMessage): void;
   /** The pilot's profile (its `ship` is the live ship's record: blueprint, ghosts, field); undefined: no pilot there */
   profile(pilot: number): PlayerProfile | undefined;
   /** The profile changed: save it in time */
@@ -51,13 +71,19 @@ export interface FeatureHost {
   holdGive(pilot: number, items: Bag): Bag;
   /** Room left in the hold, in volume units */
   holdRoom(pilot: number): number;
+}
+
+/** The repair bank and free building */
+export interface BankCap {
   /** Dev servers: this pilot builds without licences or build points (Hangar's freeBuild) */
   freeBuild?(pilot: number): boolean;
   /** The repair bank's free spare the pilot's repairs may use (bank.ts freeSpare), and spending from it (package B) */
   bankSpare?(pilot: number): Bag;
   spendBankSpare?(pilot: number, bill: Bag): boolean;
+}
 
-  // ---- The Mine Bay (features/minebay): who sets mines off, and who is told of them
+/** Who may hurt whom, parties, and what a pilot's client holds (the Mine Bay: who sets mines off, who is told) */
+export interface RulesCap {
   /** May `attacker` hurt `target` (GameServer.canDamage: PvP zones; berthed ships, wards and people's craft are out of it) */
   canDamage?(attacker: number, target: number): boolean;
   /** Two pilots fly in one party */
@@ -65,6 +91,9 @@ export interface FeatureHost {
   /** The ships this pilot's client holds (its connection's ship view); undefined: no client */
   shipView?(pilot: number): ReadonlySet<number> | undefined;
 }
+
+/** Everything a feature may be given: what GameServer builds (each feature takes only its own sets of it) */
+export interface FeatureHost extends WorldCap, ShipsCap, TellCap, StationCap, HoldCap, BankCap, RulesCap {}
 
 /** One message handler: the pilot's entity and the message (already past the drops and limits of net/dispatch.ts) */
 export type FeatureMessageHandler = (eid: number, msg: any) => void;
