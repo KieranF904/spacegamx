@@ -5,7 +5,7 @@
  */
 import type { Catalog, ShipTuning, Economy, ClientMessage, ShipState } from '@space-game/common';
 import type { InterpolatedEntity } from '../../state/GameState';
-import type { FieldClocks } from './fieldState';
+import { fieldClient, machineProgress, type FieldClocks } from './fieldState';
 import type { FieldHud } from './FieldHud';
 import type { FieldOverlay } from './FieldOverlay';
 
@@ -44,3 +44,27 @@ export const fieldBridge: { deps: FieldDeps | null; hud: FieldHud | null; overla
   hud: null,
   overlay: null,
 };
+
+/** What the HUD's schematic shows of field work on your ship: the part being built or repaired, and parts being recycled */
+export interface FieldHudMarks { build: number; k: number; repair: boolean; recycle: ReadonlySet<number> }
+
+const MARKS: FieldHudMarks & { recycle: Set<number> } = { build: -1, k: 0, repair: false, recycle: new Set() };
+
+/** Field work on `ship` for the schematic (indices into its parts); null when there is none */
+export function fieldHudMarks(ship: ShipState): FieldHudMarks | null {
+  const st = fieldClient.state, clocks = fieldBridge.deps?.clocks();
+  if (!st || !clocks) return null;
+  const parts = ship.blueprint.parts;
+  MARKS.build = -1; MARKS.recycle.clear();
+  for (const m of st.machines) {
+    const uid = m.job?.uid;
+    if (uid === undefined || m.job!.kind === 'refine') continue;
+    const i = parts.findIndex((p) => p.uid === uid);
+    if (i < 0) continue;
+    if (m.job!.kind === 'recycle') { MARKS.recycle.add(i); continue; }
+    MARKS.build = i; MARKS.k = machineProgress(m, clocks); MARKS.repair = m.job!.kind === 'repair';
+  }
+  const rec = fieldClient.recycleUids();
+  if (rec.size) parts.forEach((p, i) => { if (rec.has(p.uid)) MARKS.recycle.add(i); });
+  return MARKS.build >= 0 || MARKS.recycle.size ? MARKS : null;
+}

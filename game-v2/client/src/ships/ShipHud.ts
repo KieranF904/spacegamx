@@ -9,6 +9,7 @@ import { hpColor, numToCss } from './shipColors';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { Schematic } from '../ui/shipStatus/Schematic';
+import { fieldHudMarks } from './field/bridge';
 import { readStatus, newMemory, emptyStatus, type StatusInput, type Tone } from '../ui/shipStatus/source';
 import { energyLine } from '../ui/shipStatus/energyLine';
 
@@ -100,7 +101,7 @@ const ship = this.bridge.get(this.getPlayerId());
       const inp = this.statusInput();
       if (inp) readStatus(inp, this.statusMem, this.statusRec);
       else this.statusRec.has = false;
-      this.schem.draw(ship, this.bridge.geometry(ship), this.statusRec, now);
+      this.schem.draw(ship, this.bridge.geometry(ship), this.statusRec, now, fieldHudMarks(ship));
       if (this.statusRec.has) {
         const l = energyLine(this.statusRec.energy, this.energyLine);
         setHtml(this.energy, `<div style="display:flex; justify-content:space-between"><b style="color:${TONE[l.headTone]}">${l.head}</b><span style="color:${TONE[l.rateTone]}">${l.rate}</span></div>`

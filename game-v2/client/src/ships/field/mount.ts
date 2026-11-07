@@ -12,5 +12,5 @@ export function mountField(deps: FieldDeps): void {
   fieldBridge.deps = deps;
   const overlay = new FieldOverlay(deps);
   fieldBridge.overlay = overlay;
-  fieldBridge.hud = new FieldHud(deps, () => overlay.isOpen);
+  fieldBridge.hud = new FieldHud(deps);
 }

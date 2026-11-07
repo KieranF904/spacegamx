@@ -1,8 +1,8 @@
 /**
  * The field machines' HUD: for the ship's fabricator and refiner, a switch, its tier, the job it is on and how far along
  * (from the machine's own predicted clock, never sent), why it is idle, and its two pickers (the fabricator's pack mode,
- * the refiner's recipe). Shown while a machine is fitted, a job runs, or the build overlay is open. Its element is made
- * on first use, so importing the feature touches no DOM.
+ * the refiner's recipe). It lives in the side panel's Fab tab (ui/hub/tabs/fabTab.ts), drawn while that tab is on show;
+ * it never floats over the other panels. Its element is made on first use, so importing the feature touches no DOM.
  */
 import { canRefine, jobFraction } from '@space-game/common';
 import type { Bag, ClientMessage, MachineKind, MachineView, PackMode } from '@space-game/common';
@@ -11,8 +11,8 @@ import { machineName, machineStatus, packModeOf, PACK_MODE_LIST, PACK_MODE_TEXT 
 import type { FieldDeps } from './bridge';
 
 const CSS = `
-.fh { position: fixed; left: 12px; bottom: 236px; z-index: 860; width: 236px; display: none; padding: 7px 9px 8px; border-radius: 8px;
-  background: rgba(8, 14, 26, 0.84); border: 1px solid rgba(125, 211, 252, 0.28); color: #cfe0f5; font: 12px 'Segoe UI', system-ui, sans-serif; }
+.fh { padding: 6px 4px 8px; color: #cfe0f5; font: 12px 'Segoe UI', system-ui, sans-serif; }
+.fh-none { color: #8ea0bd; line-height: 1.45; }
 .fh-row + .fh-row { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(125, 211, 252, 0.14); }
 .fh-top { display: flex; align-items: center; gap: 6px; }
 .fh-name { flex: 1; min-width: 0; font-weight: 600; letter-spacing: 0.3px; color: #e5ecf7; }
@@ -46,9 +46,11 @@ export class FieldHud {
   private rows: Row[] = [];
   private shortEl?: HTMLElement;
   private shortText = '';
-  private visible = false;
+  private noneEl?: HTMLElement;
+  /** The tab's body it is drawn in while the tab is on show (null: not on show: nothing is drawn) */
+  private host: HTMLElement | null = null;
 
-  constructor(private deps: FieldDeps, private overlayOpen: () => boolean = () => false) {}
+  constructor(private deps: FieldDeps) {}
 
   private make(): HTMLDivElement {
     if (!document.getElementById('fh-style')) {
@@ -66,7 +68,9 @@ export class FieldHud {
     this.shortEl = document.createElement('div');
     this.shortEl.className = 'fh-short';
     root.appendChild(this.shortEl);
-    document.body.appendChild(root);
+    this.noneEl = document.createElement('div');
+    this.noneEl.className = 'fh-none';
+    root.appendChild(this.noneEl);
     return (this.root = root);
   }
 
@@ -108,16 +112,27 @@ export class FieldHud {
 
   private name = (item: string): string => this.deps.econ.items.name(item);
 
-  /** Once a frame */
+  /** The Fab tab came on show: draw into its body */
+  mountIn(body: HTMLElement): void {
+    const root = this.root ?? this.make();
+    this.host = body;
+    body.appendChild(root);
+    this.update();
+  }
+
+  /** The Fab tab left the screen */
+  unmount(): void {
+    this.host = null;
+    this.root?.remove();
+  }
+
+  /** Once a frame (nothing to do unless the Fab tab is on show) */
   update(clocks: FieldClocks = this.deps.clocks()): void {
+    if (!this.host || !this.root) return;
     const st = fieldClient.state;
-    const show = !!st && (this.overlayOpen() || st.machines.some((m) => m.tier > 0 || m.job) || st.recycle.length > 0 || !!(st.short && Object.keys(st.short).length));
-    if (show !== this.visible) {
-      this.visible = show;
-      if (show && !this.root) this.make();
-      if (this.root) this.root.style.display = show ? 'block' : 'none';
-    }
-    if (!show || !st || !this.root) return;
+    const none = !st ? 'No ship to show.' : '';
+    if (this.noneEl!.textContent !== none) { this.noneEl!.textContent = none; this.noneEl!.style.display = none ? 'block' : 'none'; }
+    if (!st) { for (const row of this.rows) row.root.style.display = 'none'; return; }
     for (const row of this.rows) this.updateRow(row, fieldClient.machine(row.kind), clocks);
     const need = shortLine(st.short, this.name);
     if (need !== this.shortText) {
@@ -173,7 +188,7 @@ export class FieldHud {
     this.root?.remove();
     this.root = undefined;
     this.rows = [];
-    this.visible = false;
+    this.host = null;
   }
 }
 

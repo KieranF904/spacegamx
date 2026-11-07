@@ -18,7 +18,11 @@ export const LEGEND =
   'Tint: part health (green to red, dashed: lost).\n' +
   'Fill: stored charge, or a gun reloading / charging (full: ready).\n' +
   'Ticks: rounds in the clip.   Flash: a shot.   Glow: thrusting, a lit beam, a generator.\n' +
-  'Red pulsing outline: short of power.   Dim: out of ammo or shield down.';
+  'Red pulsing outline: short of power.   Dim: out of ammo or shield down.\n' +
+  'Blue filling: the part your fabricator is building (amber: repairing).   Orange dashed: being recycled.';
+
+/** Field work to show (client/src/ships/field/bridge.ts fieldHudMarks): the part being built or repaired (-1: none), how far, and parts being recycled */
+export interface SchematicMarks { build: number; k: number; repair: boolean; recycle: ReadonlySet<number> }
 
 const PAD = 5;
 const PANEL = 0x0b101b;
@@ -80,7 +84,7 @@ export class Schematic {
     ctx.closePath();
   }
 
-  draw(ship: ShipState, geoms: PlacedGeom[], st: ShipStatus, nowMs: number): void {
+  draw(ship: ShipState, geoms: PlacedGeom[], st: ShipStatus, nowMs: number, marks: SchematicMarks | null = null): void {
     this.resize();
     if (this.geoms !== geoms || this.rebuilds !== ship.rebuilds) this.layout(ship, geoms);
     const { ctx } = this;
@@ -95,6 +99,7 @@ export class Schematic {
       if (gone) {
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
         ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+        if (marks?.build === i) this.building(i, marks);
         continue;
       }
       const hpc = hpColor(ship.hp[i] / ship.maxHp[i]);
@@ -115,7 +120,26 @@ export class Schematic {
         ctx.strokeStyle = `rgba(255, 70, 70, ${0.55 + 0.45 * Math.sin(t * 9)})`;
         ctx.lineWidth = 1.8; ctx.stroke();
       }
+      if (marks?.build === i) this.building(i, marks);
+      if (marks?.recycle.has(i)) {
+        this.path(i);
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.95)';
+        ctx.setLineDash([2, 2]); ctx.lineWidth = 1.4; ctx.stroke(); ctx.setLineDash([]);
+      }
     }
+  }
+
+  /** The part being built (or repaired) fills from the bottom as the job goes */
+  private building(i: number, m: SchematicMarks): void {
+    const { ctx } = this, lvl = Math.max(0, Math.min(1, m.k)), y = this.bot[i] - lvl * (this.bot[i] - this.top[i]);
+    ctx.save();
+    this.path(i); ctx.clip();
+    ctx.fillStyle = m.repair ? 'rgba(251, 191, 36, 0.7)' : 'rgba(56, 189, 248, 0.75)';
+    ctx.fillRect(0, y, this.w, this.bot[i] - y + 1);
+    ctx.restore();
+    this.path(i);
+    ctx.strokeStyle = m.repair ? 'rgba(253, 230, 138, 0.95)' : 'rgba(186, 230, 253, 0.95)';
+    ctx.lineWidth = 1.2; ctx.stroke();
   }
 
   private overlay(i: number, ps: PartStatus, t: number): void {

@@ -44,6 +44,7 @@ import { socialTab } from '../ui/hub/tabs/socialTab';
 import { partyTab } from '../ui/hub/tabs/partyTab';
 import { pilotTab } from '../ui/hub/tabs/pilotTab';
 import { componentsTab } from '../ui/hub/tabs/componentsTab';
+import { fabTab } from '../ui/hub/tabs/fabTab';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
 import type { GameMenuUI, MenuPilotInfo } from '../ui/GameMenuUI';
@@ -283,6 +284,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       keyName: (a) => boundKeyName(a, settings.data.bindings),
     }));
     w.hub.register(componentsTab(w.componentGuide));
+    w.hub.register(fabTab());
     // (With the system map open, the cursor is the map's)
     const cursorWorld = () => w.systemMapUI?.aimWorld() ?? host.renderer.screenToWorld(host.input.mouseX, host.input.mouseY);
     const shipRadius = (id: number) => host.shipClient.store.get(id)?.derived.radius ?? 60;
