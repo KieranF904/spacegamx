@@ -80,6 +80,8 @@ interface FieldShip {
   nextJob: number;
   /** Something the pilot should be told happened: send fieldState at the end of the tick */
   changed: boolean;
+  /** The record's design or planned parts changed (a part built in, a refit): its hangar view goes again at the flush */
+  record?: boolean;
   /** Look for work this tick */
   wake: boolean;
   /** What the fabricator's jobs were short of when it last looked (the HUD's list; the refiner's auto choice) */
@@ -560,6 +562,7 @@ export class FieldShips implements FeatureInstance {
     if (ship.ghost[i]) {
       this.host.ships.installGhost(fs.eid, uid);
       if (fs.rec.ghosts) fs.rec.ghosts = fs.rec.ghosts.filter((u) => u !== uid);
+      fs.record = true;
       // (A part the bank owed since a death, built by the machine instead: the bank owes it no longer)
       if (fs.rec.owed) { fs.rec.owed = fs.rec.owed.filter((u) => u !== uid); if (!fs.rec.owed.length) delete fs.rec.owed; }
     } else {
@@ -632,6 +635,7 @@ export class FieldShips implements FeatureInstance {
     fs.rec.blueprint = bp;
     const g = new Set(ghosts);
     fs.rec.ghosts = bp.parts.filter((p) => g.has(p.uid)).map((p) => p.uid);
+    fs.record = true;
     if (fs.rec.hp) for (const k of Object.keys(fs.rec.hp)) if (!bp.parts.some((p) => p.uid === Number(k))) delete fs.rec.hp[Number(k)];
     this.syncMachines(fs);
     this.host.markDirty(fs.eid);
@@ -842,6 +846,8 @@ export class FieldShips implements FeatureInstance {
       short: isEmpty(fs.short) ? undefined : { ...fs.short },
     };
     this.host.send(fs.eid, msg);
+    // (The hangar and station windows read the record, not the ship: a part built in stays planned there until told)
+    if (fs.record) { fs.record = false; this.host.recordChanged?.(fs.eid); }
   }
 
   private view(fs: FieldShip, m: Machine): MachineView {

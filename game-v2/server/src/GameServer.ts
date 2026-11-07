@@ -794,6 +794,7 @@ export class GameServer implements ServerCtx {
       send: (pilot, msg) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, msg); },
       profile: (pilot) => { const c = this.pilots.connOf(pilot); return c && this.pilots.get(c); },
       markDirty: (pilot) => { const c = this.pilots.connOf(pilot); if (c) this.pilots.markDirty(c); },
+      recordChanged: (pilot) => { const c = this.pilots.connOf(pilot); if (c) this.hangar.send(c); },
       holdCount: (pilot, id) => { const c = this.pilots.connOf(pilot); return c ? countOf(this.pilots.get(c)?.cargo ?? [], id) : 0; },
       holdTake: (pilot, items) => { const c = this.pilots.connOf(pilot); return !!c && this.pilots.take(c, items, 'cargo'); },
       holdGive: (pilot, items) => { const c = this.pilots.connOf(pilot); return c ? this.pilots.give(c, items, { quiet: true }) : items; },

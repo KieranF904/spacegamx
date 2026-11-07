@@ -19,6 +19,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import type { FieldShips } from './FieldShips.js';
+import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -554,5 +555,49 @@ describe('field refiner', () => {
     expect(w.lastState().machines.find((m) => m.kind === 'refiner')?.job?.recipe).toBe('alloy_plate');
     expect(until(w, () => w.alive(1), 6000)).toBeGreaterThan(0);
     expect(w.hold('iron_ore')).toBeLessThan(12);
+  });
+});
+
+describe('field fabricator: a planned part built in', () => {
+  it('leaves no ghost: the ship sync clears it on the pilot\'s client and a watcher\'s, and the pilot\'s hangar is sent again', () => {
+    const w = world(design());
+    const e = (w.server as any).econ;
+    // (another pilot near by, holding the ship)
+    const t2 = new LocalTransport(w.server);
+    const got2: ServerMessage[] = [];
+    t2.onMessage = (m) => got2.push(m);
+    t2.connect();
+    t2.send({ type: 'join', username: 'watcher' } as any);
+    const p2 = t2.getPlayerId();
+    Position.x[p2] = Position.x[w.pid] + 300; Position.y[p2] = Position.y[w.pid];
+    const live = w.ship().blueprint;
+    w.send({ type: 'fieldPlan', blueprint: { ...live, parts: [...live.parts, part(10, 'sq', 'hull', 2, 0)] } });
+    w.run(40);
+    const i10 = w.idx(10);
+    expect(w.ship().ghost[i10]).toBe(true);
+    const planned = () => {
+      const h = w.got.filter((m) => m.type === 'hangar').at(-1) as Extract<ServerMessage, { type: 'hangar' }> | undefined;
+      return h?.slots[w.prof.activeSlot]?.ghosts;
+    };
+    // (the plan's save is told to the hangar view too)
+    expect(planned()).toEqual([10]);
+    w.give(e.recipes.partInputs({ fn: 'hull', material: 'alloy', piece: 'sq' }));
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    expect(until(w, () => w.alive(10), 5000)).toBeGreaterThan(0);
+    // (frames coalesce: time for the syncs to go)
+    w.run(40);
+    expect(w.ship().ghost[i10]).toBe(false);
+    expect(w.prof.ship.ghosts).toEqual([]);
+    // Both clients' ship stores, fed every ship sync they were sent, have the part built and standing
+    for (const list of [w.got, got2]) {
+      const store = new ShipStore(w.ships.catalog, w.ships.tuning);
+      for (const m of list) if (m.type === 'shipSync') store.onSync(m);
+      const cs = store.get(w.pid)!;
+      expect(cs.rebuilds).toBe(w.ship().rebuilds);
+      expect(cs.ghost[i10]).toBe(false);
+      expect(cs.derived.alive[i10]).toBe(true);
+    }
+    // And the hangar view (the station and hangar windows read the record, not the ship): built, not planned
+    expect(planned()).toEqual([]);
   });
 });
