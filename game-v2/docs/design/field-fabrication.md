@@ -204,6 +204,10 @@ the core. It also holds the claimed uids (a part being built, repaired or recycl
 The client keeps a copy of the last `fieldState`. Progress shown is `jobAt(job, at, nowClock)`, where `nowClock` is the
 own-ship prediction's `machEu[kind]`, or the predicted tick for the core. The planned parts come from the ship's blueprint
 ghosts (the replicated `ghost` flags already reach every client through the ship sync) and from `fieldState`.
+The hangar and station windows read the pilot's record instead (the `hangar` message: its design and `ghosts`), so
+FieldShips sends it again (`FeatureHost.recordChanged`, once at the tick's flush) whenever a planned part is built in or a
+refit changes the design (fixed 2026-11-07: a built part stayed planned there until some other hangar change). The
+repair bank's deposits building owed ghosts while flying (Pilots.installOwed) still don't resend it.
 
 ---
 

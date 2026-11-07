@@ -43,6 +43,11 @@ export interface FeatureHost {
   profile(pilot: number): PlayerProfile | undefined;
   /** The profile changed: save it in time */
   markDirty(pilot: number): void;
+  /**
+   * The live ship's record changed what the pilot's hangar view shows (its design, its planned parts): send the pilot its
+   * hangar again (the ship itself goes by its sync; the hangar and station windows read the record)
+   */
+  recordChanged?(pilot: number): void;
   /** How many of an item the hold has */
   holdCount(pilot: number, id: string): number;
   /** Take items from the hold, all or nothing */

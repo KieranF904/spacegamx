@@ -82,6 +82,11 @@ export interface ShipState {
   triggerHeld: boolean;
   clickAt: number;
   /**
+   * The group masks that click is for (weaponGroups.ts freshMasks, bit m: a gun of mask m): a semi-automatic gun
+   * answers only a click its own trigger made. Absent: every gun's (a trigger-down with both selections "all")
+   */
+  clickMasks?: number;
+  /**
    * The trigger word the guns stepped on last tick (weaponGroups.ts trigWord: buttons and selection): each gun's own
    * trigger last tick is gunTriggeredBy on it (turret slew and semi-automatic clicks are per gun). 0: none
    */

@@ -111,6 +111,64 @@ describe('weapon groups: per-gun semi-automatic clicks', () => {
     expect(by(p1)[0]).toBeLessThan(50);
   });
 
+  it('a gun held through a group change that adds another gun is not clicked again (no extra shot)', () => {
+    // (the first gun in groups 1 and 2, the second in group 2: held on 1, then on 2, which only the second's trigger goes down for)
+    const s = pair('railgun_rail_driver', 0b011, 0b010);
+    const [p0, p1] = s.derived.weapons.map((w) => w.part);
+    const fired = run(s, 120, (t) => ({ left: true, right: false, sel: packGroupSel(t < 40 ? 1 : 2, 0) }));
+    const by = (p: number) => [...fired.entries()].filter(([, ps]) => ps.includes(p)).map(([t]) => t);
+    expect(by(p0)).toHaveLength(1);
+    expect(by(p0)[0]).toBeLessThan(10);
+    expect(by(p1)).toHaveLength(1);
+    expect(by(p1)[0]).toBeGreaterThanOrEqual(40);
+    expect(s.clickMasks).toBeUndefined();
+  });
+
+  it('a group change back and forth while held fires no extra shot from a gun held through it', () => {
+    // (the first gun in group 2, the second in groups 1 and 2. Held on 2: the first takes the click (the pair takes turns).
+    // A dip to group 1 and back: only the first's trigger goes down again, and it is still busy; the second, held all
+    // along and ready, must not fire for it)
+    const s = pair('railgun_rail_driver', 0b010, 0b011);
+    const [p0, p1] = s.derived.weapons.map((w) => w.part);
+    const fired = run(s, 40, (t) => ({ left: true, right: false, sel: packGroupSel(t === 5 || t === 6 ? 1 : 2, 0) }));
+    const by = (p: number) => [...fired.entries()].filter(([, ps]) => ps.includes(p)).map(([t]) => t);
+    expect(by(p0)).toEqual([1]);
+    expect(by(p1)).toEqual([]);
+  });
+
+  it('the other button pressed while one is held clicks only its own group\'s guns', () => {
+    // (left on group 1 fires the first gun; the right button on group 2 pressed later: only the second answers)
+    const s = pair('railgun_rail_driver', 0b011, 0b010);
+    const [p0, p1] = s.derived.weapons.map((w) => w.part);
+    const fired = run(s, 120, (t) => ({ left: true, right: t >= 40, sel: packGroupSel(1, 2) }));
+    const by = (p: number) => [...fired.entries()].filter(([, ps]) => ps.includes(p)).map(([t]) => t);
+    expect(by(p0)).toHaveLength(1);
+    expect(by(p1)).toHaveLength(1);
+    expect(by(p1)[0]).toBeGreaterThanOrEqual(40);
+  });
+
+  it('a left click is not answered by a gun only in the right button\'s group', () => {
+    const s = pair('railgun_rail_driver', 0b001, 0b010);
+    const [p0, p1] = s.derived.weapons.map((w) => w.part);
+    const fired = run(s, 60, (t) => ({ left: t % 20 < 3, right: false, sel: packGroupSel(1, 2) }));
+    expect(firedParts(fired).has(p0)).toBe(true);
+    expect(firedParts(fired).has(p1)).toBe(false);
+  });
+
+  it('a click waiting on a reloading gun is still answered when it is ready; a gun not clicked is not', () => {
+    // (the first gun's click comes while it is mid-cycle: it fires once ready, within the click's few ticks)
+    const s = pair('railgun_rail_driver', 0b011, 0b010);
+    const [p0, p1] = s.derived.weapons.map((w) => w.part);
+    // (fire the first, release, then press again 2 ticks before its next shot is ready: interval from the gun)
+    const w0 = s.derived.weapons[0];
+    const again = 1 + Math.ceil(w0.interval) - 2;
+    const fired = run(s, 60, (t) => ({ left: t === 1 || (t >= again && t < again + 1), right: false, sel: packGroupSel(1, 0) }));
+    const by = (p: number) => [...fired.entries()].filter(([, ps]) => ps.includes(p)).map(([t]) => t);
+    expect(by(p0)).toHaveLength(2);
+    expect(by(p0)[1]).toBeGreaterThan(again);
+    expect(by(p1)).toHaveLength(0);
+  });
+
   it('with the default selection a held trigger fires one shot a click for a pair of semi-automatic guns, as before groups', () => {
     const s = pair('railgun_rail_driver', 1, 1);
     const fired = run(s, 120, () => ({ left: true, right: false, sel: 0 }));

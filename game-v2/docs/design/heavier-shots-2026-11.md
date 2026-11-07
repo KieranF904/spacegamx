@@ -280,12 +280,15 @@ Swarm pair is caught by one, as now.
 1. **The Leviathan never accelerates** (above). Either the proposal's speed 10, or give non-homing torpedoes their
    `accel`/`maxSpeed` in Weapons.tick (that changes the kind for the enemy `torpedo` function too, and point defence
    would then need more turrets).
-2. **Semi-automatic aim distance through a reload**: `distDue` (common/src/ships/guns.ts) returns true for a semi gun
+2. **Semi-automatic aim distance through a reload** (FIXED 2026-11-07: `distDue` asks `semiLoaded`; the bench's Rail
+   Driver went from 38.7 to 1.9 dist upd/s, 124 to 6 B/s): `distDue` (common/src/ships/guns.ts) returns true for a semi gun
    whenever a click waits and the cooldown is spent, without checking a clip reload, so a player clicking through the
    Rail Driver's 1.5 s reload sends the aim distance every tick (35-39 updates/s in the bench, about 120 B/s to each
    watcher). Treating a reloading semi clip like any clip (due at the reload's end and half) would bring that to about
    4. It is shared deterministic code (server, own prediction, lanes), so the parity tests go with it.
-3. **The AI leads every gun as if its rounds flew 45 u/tick.** With rounds spread from 10 to 150 it over-leads fast
+3. **The AI leads every gun as if its rounds flew 45 u/tick.** (FIXED 2026-11-07: it leads by its main gun's round,
+   common bodies/aiLead.ts; the bench's `--enemy` AI aim uses it. Railgun hit rate 63/82/56 % -> 92/100/100 %,
+   the slow guns a little up, the 45-ish guns unchanged; enemy balance is up to Kieran.) With rounds spread from 10 to 150 it over-leads fast
    rounds and under-leads slow ones; reading the gun's own speed would be cheap. Enemy balance today is tuned around
    the current misses, so it's left alone here.
 

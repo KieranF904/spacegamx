@@ -77,7 +77,7 @@ export function ownStateHash(id: number, body: FlightBody, bits: number, q: numb
   // doesn't know. The rest of the gun state is its own guns' doing, stepped alike on both ends)
   const g = x.guns, v = GUNS;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.trig = g.trig; v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
+  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.clickMasks = g.clickMasks; v.trig = g.trig; v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
   s.guns = v;
   s.hazard.empUntil = Math.max(0, x.hazard.empUntil - next);
   s.hazard.slowUntil = Math.max(0, x.hazard.slowUntil - next);

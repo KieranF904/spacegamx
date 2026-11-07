@@ -68,6 +68,8 @@ export function shipHash(s: Readonly<SimShipState>): number {
   if (g.triggerHeld && g.heldDist !== undefined) h = num(h, g.heldDist);
   // (The trigger word, once a group is selected: with "all" on both it is the buttons, which triggerHeld has)
   if (g.trig !== undefined && g.trig > 3) h = num(h, g.trig);
+  // (Who a waiting click is for, once it is not every gun: a group change or the other button pressed while held)
+  if (g.clickMasks !== undefined) h = num(h, g.clickMasks);
   return fin(h);
 }
 

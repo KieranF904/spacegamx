@@ -217,7 +217,10 @@ aim-error seed); the rest of its flight is common bodies/aiPilot.ts, run for eve
 SIDE, SYNC and OFF through BodyNet, as the staged bosses' do; a running client gets no control rows of the ship. Aim
 error is re-rolled every 12 + id % 7 ticks from the order's seed; a pack's side is its centroid as it ended the last
 tick, summed in id order (the client reads its replicas at t - 1); the heading is held against the last tick's
-quantised aim. Its body is off while its target is a pilotless ship (wards, siege prey: rows). Bosses without a brain
+quantised aim. It leads by its main gun's real round (2026-11-07, common bodies/aiLead.ts: the commander's
+`aiLoadout` picks the gun with the most damage a second, its launch speed, and a homing or guided shell's acceleration
+to its top speed; three whole numbers in an ENGAGE or HAUL order at places 8-10, mates from 11; an order without them
+leads as if at 45 u/tick, at most 40 ticks either way). Its body is off while its target is a pilotless ship (wards, siege prey: rows). Bosses without a brain
 (Rustjaw, Hushwing, the giants...) fly on it too. A body whose read (target or pack mate) was keyframed late, or a
 pack mate it stopped reading this window that's gone, is keyed too (BodyNet `readersOf`, `dropped`).
 Tests: server/src/net/decisions/pilots.test.ts, common/src/bodies/bodies.test.ts. Measured: docs/audits/decisions-2026-11-04.md.

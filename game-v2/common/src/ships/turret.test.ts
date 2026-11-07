@@ -194,6 +194,34 @@ describe('a pilot\'s held aim distance (stepGuns hold, distDue)', () => {
     expect(takes).toBeGreaterThan(5);
   });
 
+  it('a semi-automatic clip clicked through its reload takes the cursor\'s distance only when it can fire again', () => {
+    // (a Sparrow whose Pips are Rail Drivers, clicked as fast as a pilot spams it: down two ticks, up one)
+    const sp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
+    for (const q of sp.parts) if (q.fn === 'cannon_pip') q.fn = 'railgun_rail_driver';
+    const s = createShipState(catalog, tuning, 1, sp, 0);
+    const rail = s.derived.weapons.filter((w) => w.fire.semi);
+    expect(rail.length).toBe(2);
+    const up = { x: 0, y: 0, angle: -Math.PI / 2 };
+    let takes = 0, shots = 0, reloadTicks = 0, reloadTakes = 0, prev = -1;
+    for (let t = 1; t <= 600; t++) {
+      const held = t % 3 !== 0;
+      const reloading = rail.every((w) => s.reload[w.part] > 1);
+      const st = stepGuns(s, up, { firing: held, aimWorld: -Math.PI / 2, aimDist: cursor(t), hold: true }, t, tuning);
+      // (every shot flies at the cursor's distance exactly)
+      for (const _ of st.shots) { shots++; expect(st.dist).toBe(cursor(t)); }
+      // (a held tick on a distance newly taken: what a gun row would carry)
+      const take = held && s.triggerHeld && st.dist !== prev && t % 3 !== 1;
+      if (take) takes++;
+      if (reloading && held) { reloadTicks++; if (take) reloadTakes++; }
+      prev = st.dist;
+    }
+    expect(shots).toBeGreaterThan(8);
+    expect(reloadTicks).toBeGreaterThan(60);
+    // (through the reloads, both guns empty: at most the reload's end, not every held tick)
+    expect(reloadTakes).toBeLessThanOrEqual(4);
+    expect(takes).toBeLessThan(shots * 2);
+  });
+
   it('idle, at a trigger-down and for a ship not holding (an AI\'s), the guns step on the cursor\'s distance', () => {
     const s = createShipState(catalog, tuning, 1, corsair(), 0);
     expect(stepGuns(s, pose, { firing: false, aimWorld, aimDist: 640, hold: true }, 1, tuning).dist).toBe(640);

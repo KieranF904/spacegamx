@@ -27,7 +27,7 @@ import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
 import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 import { datan2, dcos, dsin } from '../math/detTrig.js';
-import { TRIG_LEFT, gunSelected, gunTriggeredBy, partWeaponGroups, trigSel } from './weaponGroups.js';
+import { EVERY_MASK, TRIG_LEFT, clickCalls, freshMasks, gunSelected, gunTriggeredBy, partWeaponGroups, trigSel } from './weaponGroups.js';
 
 export interface GunOrders {
   /** Some gun's button is down (ship-wide: the held aim distance, the aim reads); each gun's own trigger is `word` */
@@ -260,7 +260,8 @@ const MAX_WAIT = 600;
  * Due this tick, by model (`share`: each gun's share of its power, as stepGuns has it; `ports`: a ports ship, whose
  * guns charge and reload at a tick a tick here):
  *  - beam: every tick (it fires every tick it burns)
- *  - semi-automatic: a click waiting and the gun loaded (held, it fires only on a click)
+ *  - semi-automatic: a click waiting for it and the gun loaded after this tick's step (held, it fires only on a click;
+ *    clicked through a clip's reload, only the tick the reload ends: semiLoaded)
  *  - charge: the tick its charge fills (it fires) or crosses half; cooling down, never
  *  - clip, reloading: the tick the reload ends or crosses half
  *  - any other (cycle, ammo, a clip's beat; spinning and staggered guns by their cooldown): the tick its cooldown
@@ -278,7 +279,7 @@ export function distDue(ship: ShipState, tick: number, tuning: ShipTuning, share
     // (its cooldown after this tick's step, as stepGuns steps it)
     const cd0 = ship.cooldown[p];
     const cd = cd0 > 0 && f.model === 'cycle' ? cd0 - share(w) : cd0 - 1;
-    if (f.semi) { if (clicked && cd <= 0) return true; continue; }
+    if (f.semi) { if (clicked && cd <= 0 && clickCalls(ship.clickMasks, partWeaponGroups(ship.blueprint.parts[p])) && (ports || semiLoaded(ship, w, cd, share(w)))) return true; continue; }
     if (f.model === 'charge') {
       if (cd > 0) continue;
       const c = Math.max(0, ship.charge[p]), full = f.charge ?? 60, c1 = c + (ports ? 1 : share(w));
@@ -298,6 +299,21 @@ export function distDue(ship: ShipState, tick: number, tuning: ShipTuning, share
     if (cd0 > half && cd <= half) return true;
   }
   return false;
+}
+
+/**
+ * Will a semi-automatic gun hold a shot once this tick's clip step is done (stepClip, at `share`; `cd` its cooldown
+ * after the step)? Not a clip: yes. A clip reloading holds one only on the tick its reload ends; a loaded clip not on the
+ * tick it starts reloading (empty, or partly spent and idle); a regrowing clip once it has a shot's rounds.
+ * (distDue's: a click waiting through a reload is not due. A ports ship's clip is its buffer: distDue doesn't ask.)
+ */
+function semiLoaded(ship: ShipState, w: WeaponInfo, cd: number, share: number): boolean {
+  const f = w.fire, p = w.part;
+  if (f.model !== 'clip') return true;
+  const need = f.rounds ?? 1, clip = f.clip ?? 1, rounds = ship.rounds[p];
+  if (f.regrow) return rounds >= need || (rounds < clip && rounds + 1 >= need && ship.reload[p] + share >= f.regrow);
+  if (ship.reload[p] > 0) return ship.reload[p] - share <= 1e-9;
+  return rounds >= need && !(rounds < clip && cd <= w.interval - CLIP_IDLE);
 }
 
 /** A clip gun's reload (or regrowth) for one tick, at its share of the power it asked for */
@@ -376,6 +392,18 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   // (Per gun, from this tick's trigger word and last tick's: with the selection on "all" every gun reads what the ship does)
   const word = orders.word ?? (orders.firing ? TRIG_LEFT : 0), prevWord = ship.trig ?? 0;
   const hasMiners = ship.derived.miners.length > 0, sel = trigSel(word);
+  // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready.
+  // A click: some gun's trigger goes down; it is for those guns only (clickMasks: their group masks, absent every gun's),
+  // so a gun held through a group change or the other button's press needs a fresh click of its own. A click that comes
+  // while another waits adds its guns to it. (Before the held distance: a click's tick may be due, distDue)
+  let click = orders.firing && !ship.triggerHeld;
+  if (!click && word !== prevWord) for (const w of ship.derived.weapons) { const m = partWeaponGroups(ship.blueprint.parts[w.part]); if (gunTriggeredBy(m, word, hasMiners) && !gunTriggeredBy(m, prevWord, hasMiners)) { click = true; break; } }
+  if (click) {
+    const waiting = tick - ship.clickAt <= SEMI_BUFFER ? ship.clickMasks ?? EVERY_MASK : 0;
+    const masks = waiting | freshMasks(word, prevWord, hasMiners);
+    ship.clickMasks = masks === EVERY_MASK ? undefined : masks;
+    ship.clickAt = tick;
+  }
   // (A pilot's guns, held through: on the distance held from earlier ticks, taken afresh on a due tick: distDue)
   let aimDist = orders.aimDist;
   if (orders.hold) {
@@ -393,11 +421,6 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const reads = orders.firing || ship.triggerHeld;
   const ready: WeaponInfo[] = [];
   letGo.clear();
-  // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
-  // (A click: some gun's trigger goes down. A semi-automatic gun answers a click while its groups are selected)
-  let click = orders.firing && !ship.triggerHeld;
-  if (!click && word !== prevWord) for (const w of ship.derived.weapons) { const m = partWeaponGroups(ship.blueprint.parts[w.part]); if (gunTriggeredBy(m, word, hasMiners) && !gunTriggeredBy(m, prevWord, hasMiners)) { click = true; break; } }
-  if (click) ship.clickAt = tick;
   ship.triggerHeld = orders.firing;
   ship.trig = word;
   const semiReady: WeaponInfo[] = [];
@@ -420,8 +443,9 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     let canFire = true;
     const mask = partWeaponGroups(ship.blueprint.parts[p]), trigNow = gunTriggeredBy(mask, word, hasMiners);
     const slewGun = trigNow && gunTriggeredBy(mask, prevWord, hasMiners);
-    const selected = gunSelected(mask, sel, hasMiners);
-    if (f.semi && clicked && selected) semiWaits = true;
+    // (A semi-automatic gun answers a waiting click its own trigger made, while its groups are selected)
+    const answers = f.semi === true && clicked && clickCalls(ship.clickMasks, mask) && gunSelected(mask, sel, hasMiners);
+    if (answers) semiWaits = true;
     if (w.window) {
       let desired = w.window.center + ship.aim[p];
       let px = 0, py = 0;
@@ -465,7 +489,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     const want = trigNow && canFire;
     if (f.semi) {
       // (Held or not, it needs a fresh click; a reloading or busy gun is skipped, so the next of its kind takes the shot)
-      if (clicked && selected && canFire && ship.cooldown[p] <= 0 && ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)) semiReady.push(w);
+      if (answers && canFire && ship.cooldown[p] <= 0 && ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)) semiReady.push(w);
       continue;
     }
     // A spinning gun spins up while it's fired, and down when it isn't
@@ -493,7 +517,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     const taken = new Set<string>();
     semiReady.sort((a, b) => ship.cooldown[a.part] - ship.cooldown[b.part] || a.part - b.part);
     for (const w of semiReady) if (!taken.has(w.kind)) { taken.add(w.kind); ready.push(w); }
-    ship.clickAt = -1e9;
+    ship.clickAt = -1e9; ship.clickMasks = undefined;
   }
   if (orders.energy && ready.length > 1) ready.sort((a, b) => ship.cooldown[a.part] - ship.cooldown[b.part] || a.part - b.part);
   for (const w of ready) {

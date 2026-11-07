@@ -57,7 +57,7 @@ export function cloneOwnExtras(x: Readonly<OwnExtras>): OwnExtras {
     hazard: { empUntil: x.hazard.empUntil, slowUntil: x.hazard.slowUntil, numb: x.hazard.numb },
     guns: {
       cooldown: [...g.cooldown], rounds: [...g.rounds], reload: [...g.reload], charge: [...g.charge], spin: [...g.spin], aim: [...g.aim],
-      triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
+      triggerHeld: g.triggerHeld, clickAt: g.clickAt, clickMasks: g.clickMasks, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
     },
   };
 }
@@ -174,7 +174,7 @@ export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
   // (Absent scalars come back undefined, as they went)
   const guns: GunState = {
     cooldown: [...(g.cooldown ?? [])], rounds: [...(g.rounds ?? [])], reload: [...(g.reload ?? [])], charge: [...(g.charge ?? [])], spin: [...(g.spin ?? [])], aim: [...(g.aim ?? [])],
-    triggerHeld: !!g.triggerHeld, clickAt: g.clickAt ?? -1, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
+    triggerHeld: !!g.triggerHeld, clickAt: g.clickAt ?? -1, clickMasks: g.clickMasks, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
   };
   const charge: Charge = { ...m.c, b: [...(m.c.b ?? [])] };
   if (m.c.e) charge.e = portsIn(m.c.e);

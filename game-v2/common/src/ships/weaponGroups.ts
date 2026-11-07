@@ -104,3 +104,20 @@ export function gunSelected(mask: number, sel: number, hasMiners: boolean): bool
   const r = selRight(sel);
   return rightFiresGuns(sel, hasMiners) && (r === GROUP_ALL || inGroup(mask, r));
 }
+
+/** Every group mask (0..15) as one bit each: the masks a click is for (`ShipState.clickMasks`) */
+export const EVERY_MASK = (1 << (ALL_GROUP_BITS + 1)) - 1;
+
+/**
+ * The group masks whose guns' trigger goes down from `prev` to `word` (bit m: a gun with mask m): who a click is for.
+ * A semi-automatic gun answers only a click its own trigger made, so changing the group (or pressing the other button)
+ * while held clicks the newly triggered guns, never one held through
+ */
+export function freshMasks(word: number, prev: number, hasMiners: boolean): number {
+  let out = 0;
+  for (let m = 0; m <= ALL_GROUP_BITS; m++) if (gunTriggeredBy(m, word, hasMiners) && !gunTriggeredBy(m, prev, hasMiners)) out |= 1 << m;
+  return out;
+}
+
+/** Does a click (its masks, `ShipState.clickMasks`: absent, every gun's) call on a gun with this group mask? */
+export const clickCalls = (clickMasks: number | undefined, mask: number): boolean => clickMasks === undefined || ((clickMasks >> mask) & 1) !== 0;

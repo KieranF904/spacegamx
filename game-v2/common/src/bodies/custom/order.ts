@@ -10,6 +10,7 @@
  */
 
 import type { WantRec } from '../decisions.js';
+import { ENGAGE_MATES } from '../aiLead.js';
 
 /** The order's places */
 export const CO = { RANGE: 1, REACH: 2, HIT_BY: 3, ERR: 4, SEED: 5, STRAFE: 6, FLANK: 7, DESIGN: 8, GONE: 9, MOVE: 10, ARG: 11, MSEED: 12, MSTART: 13, MATES: 14 } as const;
@@ -17,10 +18,10 @@ export const CO = { RANGE: 1, REACH: 2, HIT_BY: 3, ERR: 4, SEED: 5, STRAFE: 6, F
 /** A move under way: its index in its design's moves, its argument, seed and start tick */
 export interface MoveOrder { move: number; arg: number; seed: number; start: number }
 
-/** An enemy AI ENGAGE order ([2, ...8 places, ...mates]) as a custom one: its design, pieces gone and move put in */
+/** An enemy AI ENGAGE order ([2, ...7 places, lead (3), ...mates]) as a custom one: its design, pieces gone and move put in (no lead: it fires no part guns) */
 export function customOrder(engage: WantRec, kind: number, design: number, gone: number, m: MoveOrder | null): WantRec {
   const out = [kind, ...engage.slice(1, 8), design, gone & 255, m ? m.move + 1 : 0, m ? m.arg : 0, m ? m.seed & 255 : 0, m ? Math.max(0, m.start) : 0];
-  for (let i = 8; i < engage.length; i++) out.push(engage[i]);
+  for (let i = ENGAGE_MATES; i < engage.length; i++) out.push(engage[i]);
   return out;
 }
 

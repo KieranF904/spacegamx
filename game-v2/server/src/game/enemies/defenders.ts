@@ -13,7 +13,7 @@
  */
 
 import { hasComponent, type IWorld } from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Player, Dead, Radius, partWeaponDef, endsAtAim, orderHaul, simAimQ, dhypot, type ShipState, type WantRec } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Player, Dead, Radius, aiLoadout, AI_BEAM_REACH, orderHaul, simAimQ, dhypot, type ShipState, type WantRec, type AiLead } from '@space-game/common';
 import type { ShipBridge, PilotOrders } from '../../ships/ShipBridge.js';
 import type { AiPilots } from '../brains/aiPilot.js';
 
@@ -23,8 +23,6 @@ export const DEFEND_QUIET_TICKS = 60 * 30;
 const AIM_ERR = (1 - 0.85) * 0.45;
 /** Its course's point is sent again only once its autopilot's has moved this far (a station orbits: not a decision a tick) */
 const COURSE_SLACK = 150;
-/** Beams open up from no further than this (Enemies' NPC_BEAM_REACH) */
-const BEAM_REACH = 1600;
 
 export interface DefenderHost {
   readonly world: IWorld;
@@ -41,9 +39,10 @@ interface Defender {
   lastHit: number;
   /** The last damage tick it has looked at */
   seen: number;
-  /** Its guns' real reach and whether one lobs (learnt once) */
+  /** Its guns' real reach, whether one lobs and its main gun's round (learnt once: common bodies/aiLead.ts aiLoadout) */
   reach?: number;
   lobs?: boolean;
+  lead?: AiLead;
   /** Its course's point as its order carries it */
   course: { x: number; y: number; arrive: number } | null;
   seed: number;
@@ -112,7 +111,7 @@ export class Defenders {
     const ap = this.ships.autopilotOf(eid);
     if (!ap) d.course = null;
     else if (!d.course || d.course.arrive !== ap.arriveRadius || dhypot(ap.x - d.course.x, ap.y - d.course.y) > COURSE_SLACK) d.course = { x: ap.x, y: ap.y, arrive: ap.arriveRadius };
-    const want: WantRec = orderHaul(d.course, d.reach ?? 0, AIM_ERR, d.seed, d.lobs);
+    const want: WantRec = orderHaul(d.course, d.reach ?? 0, AIM_ERR, d.seed, d.lobs, d.lead);
     const pose = (id: number) => ({ x: Position.x[id], y: Position.y[id], angle: Rotation.angle[id], vx: Velocity.x[id], vy: Velocity.y[id] });
     const tpose = { ...pose(t), r: this.ships.get(t)?.derived.radius ?? Radius.value[t] ?? 60 };
     // (Its body on while it shoots at a pilot, as a pack's is: brains/aiPilot.ts)
@@ -126,16 +125,11 @@ export class Defenders {
     return this.pilots.orders(eid, out, out.fire, t);
   }
 
-  /** Its guns' real reach (the longest) and whether any lob, as Enemies' learnLoadout has a hostile's */
+  /** Its guns' real reach (the longest), whether any lob and its lead, as Enemies' learnLoadout has a hostile's */
   private learn(d: Defender, ship: ShipState): void {
-    let reach = 0, lobs = false;
-    for (const w of ship.derived.weapons) {
-      const def = partWeaponDef(this.ships.tuning, w.kind, ship.blueprint.parts[w.part], { model: w.model });
-      const r = def.type === 'beam' ? Math.min(def.range ?? 800, BEAM_REACH) : (def.maxSpeed ?? def.speed ?? 30) * (def.life ?? 60);
-      if (endsAtAim(def)) lobs = true;
-      reach = Math.max(reach, r);
-    }
-    d.reach = reach;
-    d.lobs = lobs;
+    const l = aiLoadout(this.ships.tuning, ship, AI_BEAM_REACH);
+    d.reach = l.reach;
+    d.lobs = l.lobs;
+    d.lead = l.lead;
   }
 }
