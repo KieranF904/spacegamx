@@ -176,6 +176,28 @@ export function refineWork(econ: Economy, recipeId: string): number {
   return econ.recipes.refining.get(recipeId)?.time ?? 2;
 }
 
+/**
+ * Refilling a Mine Bay's magazine (docs/design/groups-mines-docking.md, "Mine bay"): a fabricator job (`rearm`) that
+ * makes up to `batch` mines at a time for one bay. PLACEHOLDER numbers (Kieran 2026-11-07: "a placeholder cost for now,
+ * we can adjust it later"): work seconds and hold materials per mine. Any fabricator tier, the core's own too
+ */
+export const REARM = Object.freeze({
+  /** Work seconds a mine */
+  secondsPerMine: 3,
+  /** Hold materials a mine (whole units) */
+  costPerMine: Object.freeze({ alloy_plate: 1, copper_wire: 1 }) as Readonly<Bag>,
+  /** Mines one job makes at most (the rest wait for the next job) */
+  perJob: 4,
+});
+
+/** What a rearm job of `n` mines takes from the hold, and its work seconds */
+export function rearmBill(n: number): Bag {
+  const k = Math.max(0, Math.floor(n)), out: Bag = {};
+  for (const [id, u] of Object.entries(REARM.costPerMine)) if (u * k > 0) out[id] = u * k;
+  return out;
+}
+export const rearmWork = (n: number): number => REARM.secondsPerMine * Math.max(0, Math.floor(n));
+
 function clamp01(v: number): number {
   return v > 0 ? (v < 1 ? v : 1) : 0;
 }

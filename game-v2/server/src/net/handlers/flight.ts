@@ -11,7 +11,7 @@ import { hasComponent, entityExists, removeEntity, defineQuery } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Player, Input, Boost, Portal, InSystem, Dead,
   TICK_RATE, inSafeSpace, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
-  replicaAngle, quantizeReplicaAngle, pilotAimQ, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit, CURSOR_DIST_MAX,
+  replicaAngle, quantizeReplicaAngle, pilotAimQ, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit, CURSOR_DIST_MAX, cleanGroupSel,
 } from '@space-game/common';
 import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -122,6 +122,7 @@ export function handleInput(ctx: ServerCtx, conn: ClientConnection, msg: any): v
   if (conn.docked) {
     const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
     Input.sequence[eid] = seq;
+    keepGroups(eid, msg);
     conn.lastInputSeq = seq;
     conn.liveTick = ctx.currentTick;
     return;
@@ -133,9 +134,9 @@ export function handleInput(ctx: ServerCtx, conn: ClientConnection, msg: any): v
   conn.liveTick = ctx.currentTick;
   if (targetTick !== undefined && targetTick > ctx.currentTick) {
     // Schedule for future tick (no further ahead than a client could predict, and only so many)
-    if (targetTick > ctx.currentTick + MAX_INPUT_LEAD) { conn.ownLate = true; return; }
+    if (targetTick > ctx.currentTick + MAX_INPUT_LEAD) { conn.ownLate = true; keepGroups(eid, msg); return; }
     conn.scheduledInputs.push({ targetTick, msg });
-    if (conn.scheduledInputs.length > MAX_SCHEDULED_INPUTS) { conn.scheduledInputs.shift(); conn.ownLate = true; }
+    if (conn.scheduledInputs.length > MAX_SCHEDULED_INPUTS) { keepGroups(eid, conn.scheduledInputs.shift()!.msg); conn.ownLate = true; }
   } else {
     // No targetTick (old client) or late arrival — apply immediately. The client
     // predicted it on an earlier tick, so its ship needs correcting, unless its controls are the ones the ship flew
@@ -145,6 +146,14 @@ export function handleInput(ctx: ServerCtx, conn: ClientConnection, msg: any): v
     conn.selfLate = true;
     if (targetTick === undefined || !held || held.bits !== now.bits || held.q !== now.q) conn.ownLate = true;
   }
+}
+
+/**
+ * A dropped input's weapon groups selection still counts (it is sent only on the input it changes on, so dropping it
+ * would lose it for good): applied now, and the client corrected as for any dropped input
+ */
+function keepGroups(eid: number, msg: any): void {
+  if (msg?.weaponGroups !== undefined) Input.weaponGroups[eid] = cleanGroupSel(msg.weaponGroups);
 }
 
 /** Write input state to ECS components for a player entity. */
@@ -162,6 +171,8 @@ export function applyInputToEntity(ctx: ServerCtx, conn: ClientConnection, msg: 
   Input.targetAngle[eid] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Number(msg.targetAngle) || 0));
   const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
   Input.sequence[eid] = seq;
+  // (Weapon groups: only an input that carries a selection changes it: ships/weaponGroups.ts)
+  if (msg.weaponGroups !== undefined) Input.weaponGroups[eid] = cleanGroupSel(msg.weaponGroups);
   
   conn.lastInputSeq = seq;
   // What its client steps its own ship with from this tick (CAPS.OWN_SIM: Replication compares the controls flown)

@@ -29,7 +29,8 @@ export type InputBool = typeof INPUT_BOOLS[number];
 export const INPUT_HELD: readonly InputBool[] = INPUT_BOOLS.filter((k) => k !== 'helm');
 
 /** The number fields (each with its own hand-written coercion: see above) */
-export const INPUT_NUMBERS = ['cursorDist', 'targetAngle', 'sequence'] as const;
+/** (`weaponGroups` is state, not a held key: an input sets it only when it carries one, ClientInputMessage.weaponGroups) */
+export const INPUT_NUMBERS = ['cursorDist', 'targetAngle', 'sequence', 'weaponGroups'] as const;
 
 export type InputNumber = typeof INPUT_NUMBERS[number];
 

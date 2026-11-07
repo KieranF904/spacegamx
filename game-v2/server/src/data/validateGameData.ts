@@ -511,6 +511,9 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'intake?': 'number', 'buffer?': 'number', 'oneWay?': 'boolean', 'relayOnly?': 'boolean',
       // (Field machines: docs/design/field-fabrication.md)
       'machine?': strict({ kind: oneOf('fabricator', 'refiner'), tier: oneOf(1, 2, 3) }),
+      // (Mine Bay and Docking Clamp: docs/design/groups-mines-docking.md)
+      'mineBay?': strict({ batch: 'number', capacity: 'number', cooldown: 'number' }),
+      'clamp?': strict({ size: 'number' }),
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
       'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
       'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number' }),

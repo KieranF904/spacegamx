@@ -11,7 +11,8 @@
 
 import type { Bag } from '../stacks.js';
 
-export type FieldJobKind = 'build' | 'repair' | 'recycle' | 'refine';
+/** (`rearm`: refill a Mine Bay's magazine, `uid` the bay, `count` the mines: rules.ts REARM) */
+export type FieldJobKind = 'build' | 'repair' | 'recycle' | 'refine' | 'rearm';
 export type FieldJobPhase = 'make' | 'attach' | 'done';
 
 export interface FieldJob {
@@ -24,6 +25,8 @@ export interface FieldJob {
   item?: string;
   /** A refine's recipe id, and batches */
   recipe?: string;
+  /** A rearm's mines */
+  count?: number;
   /** Inputs taken from the hold at its start and held in the machine (given back, or kept in it, if called off) */
   held: Bag;
   /** MAKE: units needed and done */

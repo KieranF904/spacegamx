@@ -102,7 +102,10 @@
   "fabricator_forge",
   "refiner_field",
   "refiner_bay",
-  "refiner_forge"
+  "refiner_forge",
+  "mine_bay",
+  "docking_clamp",
+  "docking_clamp_heavy"
  ],
  "skip": [
   "power_pulse_dynamo",

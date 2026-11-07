@@ -226,6 +226,17 @@ export interface FunctionDef {
    * (power/ports.ts PortsState.mach)
    */
   machine?: { kind: 'fabricator' | 'refiner'; tier: number };
+  /**
+   * Mine Bay (ships/features/minebay; docs/design/groups-mines-docking.md): not an aimed weapon. A key press drops `batch`
+   * proximity mines behind the ship from a magazine of `capacity` (the field fabricator refills it), at most one drop
+   * every `cooldown` ticks. The mines' own numbers (arming, reach, damage, life, cap) are minebay.ts MINES
+   */
+  mineBay?: { batch: number; capacity: number; cooldown: number };
+  /**
+   * Docking Clamp (ships/features/clamp; docs/design/groups-mines-docking.md): its facing edge is a clamp mouth `size`
+   * cells wide. Two ships whose clamps of the same size face each other, lined up, can lock together (both pilots agree)
+   */
+  clamp?: { size: number };
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */
   weapon?: string;
   /**
@@ -460,6 +471,11 @@ export interface PlacedPart {
    * arm, palm and finger) breaks as one, and which pieces are gone fits in one byte
    */
   group?: number;
+  /**
+   * weapons: the weapon groups it is in (ships/weaponGroups.ts), a mask: bit 0 group 1 .. bit 3 group 4. Absent: group 1
+   * only. The pilot's own choice, from the hangar or the field build overlay
+   */
+  wg?: number;
 }
 
 /**

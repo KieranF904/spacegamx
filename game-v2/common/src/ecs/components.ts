@@ -83,6 +83,8 @@ export const Input = defineComponent({
   targetAngle: Types.f64,
   // Sequence number for networking
   sequence: Types.ui32,
+  /** Weapon groups selection (ships/weaponGroups.ts packGroupSel: left button's group low nibble, right's high; 0 all). Kept until an input changes it */
+  weaponGroups: Types.ui8,
 });
 
 /** Boost fuel state */

@@ -21,7 +21,7 @@ export function machineName(m: Pick<MachineView, 'kind' | 'tier'>): string {
   return m.tier > 0 ? `${KIND_WORD[m.kind]} T${m.tier}` : `Core ${m.kind}`;
 }
 
-const JOB_VERB: Record<FieldJobKind, string> = { build: 'Building', repair: 'Repairing', recycle: 'Recycling', refine: 'Refining' };
+const JOB_VERB: Record<FieldJobKind, string> = { build: 'Building', repair: 'Repairing', recycle: 'Recycling', refine: 'Refining', rearm: 'Making mines' };
 
 /** "Building Pip 45%" */
 export function jobText(job: Readonly<FieldJob>, name: (item: string) => string): string {

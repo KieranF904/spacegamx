@@ -19,6 +19,8 @@ export * from './state.js';
 export * from './stages.js';
 // A custom enemy's destroyable pieces (blueprint part `group`)
 export * from './groups.js';
+// Weapon groups (blueprint part `wg`, the pilot's selection byte): docs/design/groups-mines-docking.md
+export * from './weaponGroups.js';
 export * from './flight.js';
 export * from './jumpAim.js';
 export * from './farRoute.js';

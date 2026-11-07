@@ -11,6 +11,7 @@ import { partMaterial } from './grades.js';
 import { cleanWires } from './wires.js';
 import { checkMounting } from './mounting.js';
 import { MAX_GROUPS } from './groups.js';
+import { cleanWeaponGroups } from './weaponGroups.js';
 
 export type BlueprintErrorCode =
   | 'catalogVersion' | 'unknownPiece' | 'unknownFunction' | 'unknownMaterial' | 'functionNotAllowed'
@@ -278,6 +279,9 @@ function canonicalPart(p: PlacedPart): PlacedPart {
   if (mods) out.mods = mods;
   if (Array.isArray(p.gems) && p.gems.length) out.gems = p.gems.filter((g) => typeof g === 'string').slice(0, 4);
   if (Number.isInteger(p.group) && p.group! >= 0 && p.group! < MAX_GROUPS) out.group = p.group;
+  // (Weapon groups: weapons only (any part before a catalog is loaded), and only when not the default)
+  const wg = !FN_DEFS.size || WEAPON_FNS.has(p.fn) ? cleanWeaponGroups(p.wg) : undefined;
+  if (wg !== undefined) out.wg = wg;
   return out;
 }
 
@@ -325,7 +329,7 @@ export function parseBlueprint(json: string): Blueprint {
     ...(raw.power === 'ports' ? { power: 'ports' as const } : {}),
     parts: raw.parts.map((p: any) => canonicalPart({
       uid: p.uid, piece: p.piece, fn: p.fn, material: p.material,
-      x: p.x, y: p.y, rot: p.rot as Rot, flip: !!p.flip, facing: p.facing, mount: p.mount, mods: p.mods, gems: p.gems, group: p.group,
+      x: p.x, y: p.y, rot: p.rot as Rot, flip: !!p.flip, facing: p.facing, mount: p.mount, mods: p.mods, gems: p.gems, group: p.group, wg: p.wg,
     })),
   };
 }

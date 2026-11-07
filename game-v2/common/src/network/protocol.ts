@@ -3,11 +3,18 @@ import type { SocialClientMessage, SocialServerMessage } from './socialProtocol.
 import type { ClientContribMessage, ContribServerMessage } from './contributorProtocol.js';
 import type { ClientBossDevMessage, BossServerMessage } from './bossProtocol.js';
 import type { FieldClientMessage, FieldServerMessage } from './fieldProtocol.js';
+import type { WeaponGroupsClientMessage } from './weaponGroupsProtocol.js';
+import type { MinesClientMessage, MinesServerMessage } from './minesProtocol.js';
+import type { ClampClientMessage, ClampServerMessage } from './clampProtocol.js';
 export * from './econProtocol.js';
 export * from './socialProtocol.js';
 export * from './contributorProtocol.js';
 export * from './bossProtocol.js';
 export * from './fieldProtocol.js';
+// (Weapon groups, the Mine Bay, Docking Clamps: docs/design/groups-mines-docking.md)
+export * from './weaponGroupsProtocol.js';
+export * from './minesProtocol.js';
+export * from './clampProtocol.js';
 export * from './replication.js';
 export * from './binaryCodec.js';
 import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
@@ -40,9 +47,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 63;
+export const PROTOCOL_VERSION = 64;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'fa7db3f7';
+export const PROTOCOL_WIRE_HASH = '528a8660';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -83,6 +90,12 @@ export interface ClientInputMessage {
   ownCheck?: OwnCheck;
   /** The bosses' bodies it runs (CAPS.BODIES, common bodies/hash.ts): their hashes' sum's low byte as of a snapshot's tick (12 bits) */
   bodyCheck?: BodyCheck;
+  /**
+   * Weapon groups (ships/weaponGroups.ts packGroupSel): the group the left button fires (low nibble) and the right
+   * button (high nibble), 0 = all. Sent only on the input whose tick it changes on (and the first after a join or a
+   * respawn); absent: as it was. Rides both layouts (the base layout's type 0x04, the compact one's EXTRA GROUPS)
+   */
+  weaponGroups?: number;
 }
 
 /** A body check as it rides an input (CAPS.BODIES) */
@@ -250,7 +263,10 @@ export type ClientMessage =
   | SocialClientMessage
   | ClientContribMessage
   | ClientBossDevMessage
-  | FieldClientMessage;
+  | FieldClientMessage
+  | WeaponGroupsClientMessage
+  | MinesClientMessage
+  | ClampClientMessage;
 
 /**
  * Dev tool (map click): jump to a system, optionally to a spot in it. Only
@@ -925,7 +941,9 @@ export type ServerMessage =
   | SocialServerMessage
   | ContribServerMessage
   | BossServerMessage
-  | FieldServerMessage;
+  | FieldServerMessage
+  | MinesServerMessage
+  | ClampServerMessage;
 
 /**
  * The ships of a client's system it doesn't have in view (further than the
@@ -1487,6 +1505,8 @@ export interface ServerShipEditResultMessage {
 // Binary message type IDs (first byte)
 const BINARY_MSG_INPUT_V1 = 0x01;
 const BINARY_MSG_INPUT = 0x03;
+/** (The base layout with the weapon groups byte at [11], before the riders: ClientInputMessage.weaponGroups) */
+const BINARY_MSG_INPUT_G = 0x04;
 
 // Input message binary format (11 bytes):
 // [0]    : BINARY_MSG_INPUT
@@ -1497,6 +1517,7 @@ const BINARY_MSG_INPUT = 0x03;
 // [8-9]  : cursorDist / CURSOR_DIST_STEP (16 bits)
 // [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, hit report, dodge, own check)
 // The tick the client was at isn't sent: nothing reads it.
+// (Type 0x04: the same, then [11] the weapon groups selection (ClientInputMessage.weaponGroups); the riders follow it.)
 // (The old 17-byte form, type 0x01, still decodes.)
 // (Protocol 35, CAPS.INPUTS: the compact form, first byte 0x80 | the groups that changed: inputCompactTables.ts. It needs
 // the last input on the socket to read, so it decodes only through an InputDecoder, never decodeInputBinary.)
@@ -1577,14 +1598,16 @@ export function readOwnCheck(view: DataView, at: number): OwnCheck {
 }
 
 export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
-  const tail = inputAckTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, bck = msg.bodyCheck, at0 = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0), at1 = at0 + (chk ? OWN_CHECK_BYTES : 0), at = at1 + (bck ? BODY_CHECK_BYTES : 0);
+  const g = msg.weaponGroups, head = INPUT_BYTES + (g !== undefined ? 1 : 0);
+  const tail = inputAckTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, bck = msg.bodyCheck, at0 = head + (rep ? HIT_REPORT_BYTES : 0), at1 = at0 + (chk ? OWN_CHECK_BYTES : 0), at = at1 + (bck ? BODY_CHECK_BYTES : 0);
   const buffer = new ArrayBuffer(at + tail.length);
   const view = new DataView(buffer);
   for (let i = 0; i < tail.length; i++) view.setUint8(at + i, tail[i]);
-  if (rep) writeHitReport(view, INPUT_BYTES, rep);
+  if (g !== undefined) view.setUint8(INPUT_BYTES, g & 0xff);
+  if (rep) writeHitReport(view, head, rep);
   if (chk) writeOwnCheck(view, at0, chk);
   if (bck) writeBodyCheck(view, at1, bck);
-  view.setUint8(0, BINARY_MSG_INPUT);
+  view.setUint8(0, g !== undefined ? BINARY_MSG_INPUT_G : BINARY_MSG_INPUT);
   view.setUint16(1, msg.seq & 0xFFFF, true);
   view.setUint16(3, (msg.targetTick ?? 0) & 0xFFFF, true);
   view.setUint8(5,
@@ -1617,8 +1640,9 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
   if (view.getUint8(0) & CI_FLAG) throw new Error('a compact input decodes only through an InputDecoder');
   const flags = view.getUint8(5);
   const flags2 = view.getUint8(10);
-  const rep = flags2 & HIT_REPORT && view.byteLength >= INPUT_BYTES + HIT_REPORT_BYTES;
-  const at0 = rep ? INPUT_BYTES + HIT_REPORT_BYTES : INPUT_BYTES;
+  const grouped = view.getUint8(0) === BINARY_MSG_INPUT_G && view.byteLength > INPUT_BYTES, head = grouped ? INPUT_BYTES + 1 : INPUT_BYTES;
+  const rep = flags2 & HIT_REPORT && view.byteLength >= head + HIT_REPORT_BYTES;
+  const at0 = rep ? head + HIT_REPORT_BYTES : head;
   const chk = flags2 & OWN_CHECK && view.byteLength >= at0 + OWN_CHECK_BYTES;
   const at1 = chk ? at0 + OWN_CHECK_BYTES : at0;
   const bck = flags & BODY_CHECK && view.byteLength >= at1 + BODY_CHECK_BYTES;
@@ -1643,9 +1667,10 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
     acks: readInputAcks(view, bck ? at1 + BODY_CHECK_BYTES : at1),
-    ...(rep ? { hitReport: readHitReport(view, INPUT_BYTES) } : {}),
+    ...(rep ? { hitReport: readHitReport(view, head) } : {}),
     ...(chk ? { ownCheck: readOwnCheck(view, at0) } : {}),
     ...(bck ? { bodyCheck: readBodyCheck(view, at1) } : {}),
+    ...(grouped ? { weaponGroups: view.getUint8(INPUT_BYTES) } : {}),
   };
 }
 
@@ -1686,7 +1711,7 @@ export function isBinaryMessage(data: ArrayBuffer | Uint8Array | string): boolea
     view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   }
   const firstByte = view.getUint8(0);
-  return firstByte === BINARY_MSG_INPUT || firstByte === BINARY_MSG_INPUT_V1 || (firstByte & CI_FLAG) !== 0;
+  return firstByte === BINARY_MSG_INPUT || firstByte === BINARY_MSG_INPUT_G || firstByte === BINARY_MSG_INPUT_V1 || (firstByte & CI_FLAG) !== 0;
 }
 
 // ============================================
@@ -1835,7 +1860,7 @@ export function wireTables(): Record<string, unknown> {
     fxKinds: FX_KINDS,
     snapFields: SNAP_FIELDS,
     dictionary: DICTIONARY,
-    binaryInput: [BINARY_MSG_INPUT_V1, BINARY_MSG_INPUT],
+    binaryInput: [BINARY_MSG_INPUT_V1, BINARY_MSG_INPUT, BINARY_MSG_INPUT_G],
     // (Protocol 35: the compact inputs, CAPS.INPUTS)
     compactInput: compactInputTables(),
     serverFrame: SERVER_FRAME,

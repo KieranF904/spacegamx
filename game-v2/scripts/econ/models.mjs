@@ -855,6 +855,32 @@ for (const m of models) m.carriesFlow = true;
   }
 }
 // ---- (end field machines)
+// ---- Mine Bay and Docking Clamps (docs/design/groups-mines-docking.md; common/src/ships/features/minebay, features/clamp) ----
+// The Mine Bay is not an aimed weapon: a key press drops a batch of proximity mines out of its facing edge from its
+// magazine (`mineBay`: batch, capacity, cooldown ticks); the field fabricator refills the magazine (econ/field/rules.ts
+// REARM, a placeholder cost). The mines' own numbers live in features/minebay/minebay.ts MINES. A Docking Clamp's facing
+// edge is a clamp mouth `clamp.size` cells wide: two ships whose clamps of the same size face each other, lined up, lock
+// together as one body when both pilots agree. Neither draws power. Appended after the field machines, so no other
+// model's order moves. (Kieran 2026-11-07: numbers and costs are placeholders to tune.)
+{
+  const LINK_LOOK = { minebay: { color: '#6b6f4a', decor: 'battery', glow: '#ef4444' }, clamp: { color: '#7d8794', decor: 'none', glow: '#60a5fa' } };
+  const LINK = [
+    ['mine_bay', 'Mine Bay', 'minebay', ['rect2'], 8, 'steel', { mineBay: { batch: 4, capacity: 12, cooldown: 120 }, facing: true, hpScale: 0.8, massScale: 1.2 },
+      'Drops a batch of 4 proximity mines out of its open edge on a key press, from a magazine of 12 the fabricator refills. Mines arm after a second and never go off for you or your party.'],
+    ['docking_clamp', 'Docking Clamp', 'clamp', ['sq'], 4, 'alloy', { clamp: { size: 1 }, facing: true, hpScale: 1.2 },
+      'A clamp on its open edge: line it up with the Docking Clamp of another ship and both pilots agree to lock the two ships together, one steering.'],
+    ['docking_clamp_heavy', 'Heavy Docking Clamp', 'clamp', ['rect2'], 16, 'steel', { clamp: { size: 2 }, facing: true, hpScale: 1.4, massScale: 1.3 },
+      'A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ships: line them up and both pilots agree to lock together.'],
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description] of LINK) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, {}), ...fields, description,
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category: 'utility', fabOrder: next('utility'), ...LINK_LOOK[family],
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end Mine Bay and Docking Clamps)
 
 const COMPONENTS = [
   ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount: cannons, autocannons, flak and mortars.'],
@@ -982,6 +1008,12 @@ Object.assign(RECIPES, {
   refiner_field: { alloy_plate: 3, copper_wire: 2, coolant: 1 },
   refiner_bay: { steel_plate: 3, copper_wire: 4, crystal_lens: 1, coolant: 2 },
   refiner_forge: { titanium_plate: 4, copper_wire: 4, reactor_core: 1, coolant: 2 },
+});
+// (Mine Bay and Docking Clamps: placeholder costs, to tune; docs/design/groups-mines-docking.md)
+Object.assign(RECIPES, {
+  mine_bay: { steel_plate: 2, copper_wire: 2, servo_motor: 1 },
+  docking_clamp: { alloy_plate: 2, servo_motor: 1 },
+  docking_clamp_heavy: { steel_plate: 4, servo_motor: 2, power_coupling: 1 },
 });
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);

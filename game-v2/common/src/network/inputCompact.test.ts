@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { InputEncoder, InputDecoder, planAim, aimStep, cursorDistIndex, cursorDistOnGrid, CURSOR_DIST_GRID } from './inputCompact.js';
-import { CI_FLAG, CI } from './inputCompactTables.js';
+import { CI_FLAG, CI, CI_EXTRA } from './inputCompactTables.js';
 import { encodeInputBinary, decodeInputBinary, isBinaryMessage, decodeMessage, type ClientInputMessage } from './protocol.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 
@@ -170,6 +170,38 @@ describe('compact inputs: the client\'s grids', () => {
       // a flick split over ticks lands in two
       expect(Math.abs(aimStep(planAim(got, w), w))).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('weapon groups ride only the input that carries them, in both layouts, before the other riders', () => {
+    const { send } = pair();
+    send(base());
+    // compact: one EXTRA byte and the selection
+    const c = send(base({ seq: 2, targetTick: 1001, weaponGroups: 0x21 }));
+    expect([...c.data]).toEqual([CI_FLAG | CI.EXTRA, CI_EXTRA.GROUPS, 0x21]);
+    expect(c.got.weaponGroups).toBe(0x21);
+    // the next input says nothing of it (the server keeps the last)
+    expect(send(base({ seq: 3, targetTick: 1002 })).got.weaponGroups).toBeUndefined();
+    // with a hit report and an own check after it
+    const r = send(base({ seq: 4, targetTick: 1003, weaponGroups: 0, hitReport: { hash: 9, tick: 77, epoch: 1 }, ownCheck: { body: 3, hp: 2, tick: 11 } }));
+    expect(r.got.weaponGroups).toBe(0);
+    expect(r.got.hitReport).toEqual({ hash: 9, tick: 77, epoch: 1 });
+    expect(r.got.ownCheck).toEqual({ body: 3, hp: 2, tick: 11 });
+    // the base layout: type 0x04, the byte at [11], riders and acks after it
+    const b = send(base({ seq: 5, targetTick: 1004, cursorDist: 12345, weaponGroups: 0x43, hitReport: { hash: 1, tick: 2, epoch: 3 }, acks: [70000, 5] }), false);
+    expect(b.data[0]).toBe(0x04);
+    expect(b.data[11]).toBe(0x43);
+    expect(b.got.weaponGroups).toBe(0x43);
+    expect(b.got.hitReport).toEqual({ hash: 1, tick: 2, epoch: 3 });
+    expect(b.got.acks).toEqual([70000, 5]);
+    expect(isBinaryMessage(b.data)).toBe(true);
+    const plain = decodeInputBinary(encodeInputBinary(base({ weaponGroups: 0x10 })));
+    expect(plain.weaponGroups).toBe(0x10);
+    expect(decodeInputBinary(encodeInputBinary(base())).weaponGroups).toBeUndefined();
+    expect(new Uint8Array(encodeInputBinary(base()))[0]).toBe(0x03);
+    // and the compact one steps on from a base 0x04 input
+    const after = send(base({ seq: 6, targetTick: 1005, cursorDist: 12344 }));
+    expect(after.data[0] & CI_FLAG).toBeTruthy();
+    expect(after.got.targetTick).toBe(1005);
   });
 
   it('the distance grid: whole units, 4-unit steps then 1/256 of the distance, up to the max; nearest index', () => {

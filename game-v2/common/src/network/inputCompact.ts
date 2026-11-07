@@ -102,7 +102,7 @@ export class InputDecoder {
     const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
     if (!(buf[0] & CI_FLAG)) {
       const m = decodeInputBinary(buf);
-      const q = buf[0] === 0x03 ? view.getUint16(6, true) & 0x1fff : quantizeCursorAngle(m.targetAngle);
+      const q = buf[0] === 0x03 || buf[0] === 0x04 ? view.getUint16(6, true) & 0x1fff : quantizeCursorAngle(m.targetAngle);
       const dist = m.cursorDist ?? 0;
       this.ref = { tick: m.targetTick === undefined ? -1 : m.targetTick & 0xffff, seq: m.seq & 0xffff, keys: bitsOf(m, CI_KEYS), modes: bitsOf(m, CI_MODES), q, dist, distIdx: GRID_INDEX.get(dist) ?? -1 };
       return m;
@@ -136,6 +136,7 @@ export class InputDecoder {
       dist = CURSOR_DIST_GRID[distIdx];
     }
     const seq = extra & CI_EXTRA.SEQ ? u16() : (r.seq + 1) & 0xffff;
+    const weaponGroups = extra & CI_EXTRA.GROUPS ? u8() : undefined;
     let hitReport, ownCheck, bodyCheck, acks;
     if (extra & CI_EXTRA.HIT_REPORT) { need(3); hitReport = readHitReport(view, at); at += 3; }
     if (extra & CI_EXTRA.OWN_CHECK) { need(3); ownCheck = readOwnCheck(view, at); at += 3; }
@@ -155,12 +156,13 @@ export class InputDecoder {
     if (hitReport) msg.hitReport = hitReport;
     if (ownCheck) msg.ownCheck = ownCheck;
     if (bodyCheck) msg.bodyCheck = bodyCheck;
+    if (weaponGroups !== undefined) msg.weaponGroups = weaponGroups;
     return msg;
   }
 }
 
 /** The input's fields the compact layout carries (anything else set: the base layout) */
-const CARRIED = new Set<string>(['type', 'seq', 'tick', 'targetTick', 'targetAngle', 'cursorDist', 'acks', 'hitReport', 'ownCheck', 'bodyCheck', ...CI_KEYS, ...CI_MODES]);
+const CARRIED = new Set<string>(['type', 'seq', 'tick', 'targetTick', 'targetAngle', 'cursorDist', 'acks', 'hitReport', 'ownCheck', 'bodyCheck', 'weaponGroups', ...CI_KEYS, ...CI_MODES]);
 
 /** The client's side: one per socket (a new socket starts afresh on both ends) */
 export class InputEncoder {
@@ -217,6 +219,7 @@ export class InputEncoder {
     const tail: number[] = [];
     const seq = msg.seq & 0xffff;
     if (seq !== ((r.seq + 1) & 0xffff)) { extra |= CI_EXTRA.SEQ; tail.push(seq & 0xff, seq >> 8); }
+    if (msg.weaponGroups !== undefined) { extra |= CI_EXTRA.GROUPS; tail.push(msg.weaponGroups & 0xff); }
     const riders = (msg.hitReport ? 3 : 0) + (msg.ownCheck ? 3 : 0) + (msg.bodyCheck ? 3 : 0);
     const at = tail.length;
     for (let i = 0; i < riders; i++) tail.push(0);
