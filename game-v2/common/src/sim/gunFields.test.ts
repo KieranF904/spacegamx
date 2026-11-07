@@ -13,7 +13,7 @@ import type { ShipState } from '../ships/state.js';
 /** Every field set, each to its own value (trig above 3 and the trigger held: the hash's conditions on them met) */
 function full(): GunState {
   const g = { cooldown: [1, 2], rounds: [3, 4], reload: [5, 6], charge: [7, 8], spin: [0.5, 0.25], aim: [0.1, -0.2] } as GunState;
-  const vals: Record<string, unknown> = { triggerHeld: true, clickAt: 41, trig: 9, minePaid: 11, mineUntil: 13, mineShare: 0.75, tow: 17, heldDist: 240 };
+  const vals: Record<string, unknown> = { triggerHeld: true, clickAt: 41, trig: 9, minePaid: 11, mineUntil: 13, mineShare: 0.75, tow: 17, heldDist: 240, clickMasks: 6 };
   for (const k of GUN_SCALARS) {
     expect(k in vals, `a test value for ${k}`).toBe(true);
     (g as unknown as Record<string, unknown>)[k] = vals[k];
