@@ -17,7 +17,7 @@ import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { groupSelection } from './weaponGroups/selection';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { cloneCharge, gradeOf, type MiningTable, type SimShipState, type ServerOwnSyncMessage, type ServerPullsMessage } from '@space-game/common';
+import { cloneCharge, gradeOf, GUN_ARRAYS, gunScalarsOntoRecord, type MiningTable, type SimShipState, type ServerOwnSyncMessage, type ServerPullsMessage } from '@space-game/common';
 import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
@@ -1957,10 +1957,8 @@ function straightLife(def: { stick?: unknown } & Parameters<typeof endsAtAim>[0]
 /** A step's gun state onto your ship's record (what the HUD, turrets and gun sounds read), its arrays kept */
 function mirrorGuns(ship: ShipState, st: Readonly<SimShipState>): void {
   const g = st.guns;
-  copyInto(ship.cooldown, g.cooldown); copyInto(ship.rounds, g.rounds); copyInto(ship.reload, g.reload);
-  copyInto(ship.charge, g.charge); copyInto(ship.spin, g.spin); copyInto(ship.aim, g.aim);
-  ship.triggerHeld = g.triggerHeld; ship.clickAt = g.clickAt; ship.trig = g.trig ?? 0;
-  ship.minePaid = g.minePaid; ship.mineUntil = g.mineUntil; ship.mineShare = g.mineShare; ship.tow = g.tow; ship.heldDist = g.heldDist;
+  for (const k of GUN_ARRAYS) copyInto(ship[k], g[k]);
+  gunScalarsOntoRecord(g, ship);
 }
 
 function copyInto(to: number[], from: readonly number[]): void {

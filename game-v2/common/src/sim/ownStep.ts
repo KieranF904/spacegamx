@@ -14,7 +14,7 @@ import type { ShipState } from '../ships/state.js';
 import type { ShipDerived } from '../ships/rebuild.js';
 import { ensurePortsCharge, type Charge } from '../ships/energy.js';
 import type { PortsState } from '../ships/power/ports.js';
-import { cloneCharge, newGunState, NO_HAZARD, type GunState, type HazardState, type SimShipState, type SimStructure } from './state.js';
+import { cloneCharge, cloneGunState, copyGunScalars, newGunState, NO_HAZARD, type GunState, type HazardState, type SimShipState, type SimStructure } from './state.js';
 import { simAimQ, type SimInput } from './input.js';
 import { replicaAngle, quantizeReplicaAngle } from '../network/replication.js';
 import type { SimEnv } from './env.js';
@@ -51,14 +51,10 @@ export const NO_OWN_INPUT: Readonly<OwnInputExtras> = Object.freeze({ fire: fals
 
 /** A copy of the extras (every array its own) */
 export function cloneOwnExtras(x: Readonly<OwnExtras>): OwnExtras {
-  const g = x.guns;
   return {
     charge: cloneCharge(x.charge), jumpPrime: x.jumpPrime,
     hazard: { empUntil: x.hazard.empUntil, slowUntil: x.hazard.slowUntil, numb: x.hazard.numb },
-    guns: {
-      cooldown: [...g.cooldown], rounds: [...g.rounds], reload: [...g.reload], charge: [...g.charge], spin: [...g.spin], aim: [...g.aim],
-      triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
-    },
+    guns: cloneGunState(x.guns),
   };
 }
 
@@ -172,10 +168,11 @@ export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
   const g = m.g ?? {} as Partial<GunState>;
   if (!m.c) throw new Error('ownSync: hazards only');
   // (Absent scalars come back undefined, as they went)
-  const guns: GunState = {
+  const guns = {
     cooldown: [...(g.cooldown ?? [])], rounds: [...(g.rounds ?? [])], reload: [...(g.reload ?? [])], charge: [...(g.charge ?? [])], spin: [...(g.spin ?? [])], aim: [...(g.aim ?? [])],
-    triggerHeld: !!g.triggerHeld, clickAt: g.clickAt ?? -1, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
-  };
+  } as GunState;
+  copyGunScalars(g as GunState, guns);
+  guns.triggerHeld = !!g.triggerHeld; guns.clickAt = g.clickAt ?? -1;
   const charge: Charge = { ...m.c, b: [...(m.c.b ?? [])] };
   if (m.c.e) charge.e = portsIn(m.c.e);
   return {

@@ -17,7 +17,7 @@ import { buildFlightInputs, newFlightControls } from '../ships/flightInputs.js';
 import { controlBits, ReplicaMode } from '../ships/replica.js';
 import { FULL_CHARGE } from '../ships/energy.js';
 import { dequantizeCursorAngle } from '../network/cursorState.js';
-import { newGunState, type GunState, type SimShipState, type SimStructure } from './state.js';
+import { copyGunScalars, newGunState, type GunState, type SimShipState, type SimStructure } from './state.js';
 import { simAimQ, type SimInput } from './input.js';
 
 /** An angle onto the aim grid (input.ts simAimQ, canonical at the top step; the name callers had in Stage 1A) */
@@ -68,8 +68,8 @@ export class SimShipView {
 /** A ShipState's gun state as a GunState, by reference (its arrays, its scalars copied in) */
 function gunsOf(ship: ShipState, out: GunState): GunState {
   out.cooldown = ship.cooldown; out.rounds = ship.rounds; out.reload = ship.reload; out.charge = ship.charge;
-  out.spin = ship.spin; out.aim = ship.aim; out.triggerHeld = ship.triggerHeld; out.clickAt = ship.clickAt; out.trig = ship.trig;
-  out.minePaid = ship.minePaid; out.mineUntil = ship.mineUntil; out.mineShare = ship.mineShare; out.tow = ship.tow; out.heldDist = ship.heldDist;
+  out.spin = ship.spin; out.aim = ship.aim;
+  copyGunScalars(ship, out);
   return out;
 }
 

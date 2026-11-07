@@ -7,7 +7,8 @@
  * id, mode, structure.version; body x, y, vx, vy, angle, angVel, jump, jumpScale (absent: 1), cargo, dodge,
  * dodgeDir, and while a charge has its lock jumpAim, jumpTo (absent: neither); ctl.bits, ctl.q; jumpPrime; hazard empUntil, slowUntil, numb; accounted; when accounted the charge
  * (g, b[], eng[], gun[], and a ports ship's held/amt/closed/aug/flags/mat/sat, shieldSat, gauge); guns cooldown[],
- * rounds[], reload[], charge[], spin[], aim[], triggerHeld, clickAt, minePaid, mineUntil, mineShare, tow.
+ * rounds[], reload[], charge[], spin[], aim[], triggerHeld, clickAt, minePaid, mineUntil, mineShare, tow, heldDist (while
+ * the trigger is held), trig (above 3), then each later gun scalar while set (state.ts GUN_SCALARS).
  * Not hashed: `structure` itself (only its version), an unaccounted charge (a replica's FULL_CHARGE stand-in).
  *
  * The tick hash folds the ship hashes in ascending id order.
@@ -18,7 +19,7 @@
  */
 
 import type { SimShipState } from './state.js';
-import { cloneSimShip } from './state.js';
+import { cloneSimShip, GUN_ARRAYS, GUN_SCALARS, GUN_SCALARS_HASHED } from './state.js';
 
 const f64 = new Float64Array(1);
 const u32 = new Uint32Array(f64.buffer);
@@ -62,12 +63,18 @@ export function shipHash(s: Readonly<SimShipState>): number {
     if (c.e) { h = arr(h, c.e.held); h = arr(h, c.e.amt); h = arr(h, c.e.closed); h = arr(h, c.e.aug); h = arr(h, c.e.flags); h = arr(h, c.e.mat); h = arr(h, c.e.sat); h = num(h, c.e.shieldSat); h = num(h, c.e.gauge); }
   }
   const g = s.guns;
-  h = arr(h, g.cooldown); h = arr(h, g.rounds); h = arr(h, g.reload); h = arr(h, g.charge); h = arr(h, g.spin); h = arr(h, g.aim);
+  for (let i = 0; i < GUN_ARRAYS.length; i++) h = arr(h, g[GUN_ARRAYS[i]]);
   h = num(h, g.triggerHeld ? 1 : 0); h = num(h, g.clickAt); h = num(h, g.minePaid); h = num(h, g.mineUntil); h = num(h, g.mineShare); h = num(h, g.tow);
   // (A pilot's held aim distance only while its trigger is held: idle, its guns step on the cursor's, guns.ts distDue)
   if (g.triggerHeld && g.heldDist !== undefined) h = num(h, g.heldDist);
   // (The trigger word, once a group is selected: with "all" on both it is the buttons, which triggerHeld has)
   if (g.trig !== undefined && g.trig > 3) h = num(h, g.trig);
+  // (Gun scalars past the hand-ruled ones above (state.ts GUN_SCALARS_HASHED): each while set, with its place, so an
+  // unset one moves no hash)
+  for (let i = GUN_SCALARS_HASHED; i < GUN_SCALARS.length; i++) {
+    const v = g[GUN_SCALARS[i]] as number | undefined;
+    if (v !== undefined) { h = mix(h, i); h = num(h, v); }
+  }
   return fin(h);
 }
 

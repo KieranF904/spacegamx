@@ -39,7 +39,7 @@ import { firesStraight } from '../ships/launch.js';
 import { gunShell } from '../ships/hitRules.js';
 import { TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '../ships/guns.js';
 import { TRIG_LEFT, TRIG_RIGHT, trigSel } from '../ships/weaponGroups.js';
-import { NO_HAZARD, cloneCharge, type GunState, type SimShipState, type SimStructure } from './state.js';
+import { NO_HAZARD, cloneCharge, copyGunScalars, gunScalarsOntoRecord, GUN_SCALARS, GUN_SCALARS_HASHED, type GunScalarField, type GunState, type SimShipState, type SimStructure } from './state.js';
 import type { SimInput } from './input.js';
 import type { SimEnv } from './env.js';
 import { SHOT_ID_BARRELS, SHOT_ID_SLOTS, shotIdParts, type SimEvent } from './events.js';
@@ -180,8 +180,7 @@ export function lanePilot(id: number, prev: Readonly<OwnExtras>, before: Readonl
 function laneView(ship: ShipState, g: GunState): ShipState {
   const v = Object.create(ship) as ShipState;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin; v.aim = g.aim;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.trig = g.trig ?? 0;
-  v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
+  gunScalarsOntoRecord(g, v);
   return v;
 }
 
@@ -203,8 +202,8 @@ export function lanePilotless(id: number, prev: Readonly<OwnExtras>, after: Read
   const burning = jumpPhase(after.jump ?? 0, jumpTuning(tuning)).phase === 'burn';
   const firing = fire && (bits & BIT_EMP) === 0 && !burning;
   gunsTick(view, id, after, { firing, aimWorld: aim, aimDist, energy }, tick, tuning, events);
-  const g = x.guns;
-  g.triggerHeld = view.triggerHeld; g.clickAt = view.clickAt; g.trig = view.trig; g.heldDist = view.heldDist;
+  // (Every scalar back: the mining ones and the tow come back as they went in, no mining runs here)
+  copyGunScalars(view, x.guns);
   x.charge = energy.charge;
   return x;
 }
@@ -254,7 +253,10 @@ export function laneHash(id: number, x: Readonly<OwnExtras>, pd: readonly number
   let aim = g.aim;
   if (!g.triggerHeld) aim = g.aim.length ? new Array<number>(g.aim.length).fill(0) : g.aim;
   else if (pd.length) { aim = [...g.aim]; for (const p of pd) aim[p] = 0; }
-  s.guns = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim, triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, heldDist: g.heldDist };
+  const v = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim } as GunState;
+  copyGunScalars(g, v);
+  v.tow = undefined;
+  s.guns = v;
   return shipHash(s);
 }
 
@@ -271,7 +273,8 @@ export function laneOf(guns: GunState, charge: Charge): OwnExtras {
  * through t are told. `z` is the whole state as one list of numbers (packGunSync: each array sparse, packArr):
  *   [pool, ...banks, ...eng, ...gun, ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
  *    ...sat), ...cooldown, ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, minePaid, mineUntil,
- *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord)]
+ *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord), then any later
+ *    gun scalars (sim/state.ts GUN_SCALARS past GUN_SCALARS_HASHED, trailing absent ones left off)]
  * (each `...x` an array as its packArr's length, then the packArr; absent: -1; an absent scalar: null)
  */
 export interface ServerGunSyncMessage {
@@ -324,6 +327,10 @@ export function packGunSync(id: number, t: number, x: Readonly<OwnExtras>, k: Re
   if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge, c.e.mach ?? 0); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
   for (const a of GUN_ARRAYS) putArr(z, g[a]);
   z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist), g.trig ?? 0);
+  // (Scalars past the hand-ruled ones (state.ts GUN_SCALARS_HASHED), in order, absent as null, the trailing absent ones left off)
+  const end = z.length;
+  for (let n = GUN_SCALARS_HASHED; n < GUN_SCALARS.length; n++) z.push(opt(g[GUN_SCALARS[n]] as number | undefined));
+  while (z.length > end && z[z.length - 1] === null) z.pop();
   return { type: 'gunSync', id, t, z };
 }
 
@@ -347,6 +354,7 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
   const bits = num(), dist = num() * 4;
   if (i < z.length) guns.heldDist = val();
   if (i < z.length) guns.trig = num();
+  for (let n = GUN_SCALARS_HASHED; n < GUN_SCALARS.length && i < z.length; n++) (guns as Record<GunScalarField, unknown>)[GUN_SCALARS[n]] = val();
   return { x: { charge, guns, hazard: { ...NO_HAZARD }, jumpPrime: 0 }, k: { bits, dist } };
 }
 

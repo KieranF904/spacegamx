@@ -51,6 +51,56 @@ export interface GunState {
 }
 
 /**
+ * GUN_FIELDS: the gun state's fields, once. Every site that copies a gun state (the clones, the step's views, the own
+ * client's mirror, the head hash's scratch) iterates these, so a new per-gun field is one line here plus its
+ * declaration (GunState and the common ShipState; tsc fails until the two lists and the type agree).
+ * - GUN_ARRAYS: by part index (copied element-wise or lent by reference).
+ * - GUN_SCALARS: one value each, in this order (the order JSON messages carry them in). The first GUN_SCALARS_HASHED
+ *   are hashed and sent in gunSync by hand (sim/ring.ts shipHash, sim/otherGuns.ts packGunSync: each has its own rule);
+ *   any after them are numbers, hashed and sent only while set, generically, so adding one moves no hash or byte of a
+ *   state that doesn't have it.
+ */
+export const GUN_ARRAYS = ['cooldown', 'rounds', 'reload', 'charge', 'spin', 'aim'] as const;
+export const GUN_SCALARS = ['triggerHeld', 'clickAt', 'trig', 'minePaid', 'mineUntil', 'mineShare', 'tow', 'heldDist'] as const;
+/** The scalars with their own hash and gunSync rules (all of today's); later ones go generic */
+export const GUN_SCALARS_HASHED = 8;
+export type GunArrayField = typeof GUN_ARRAYS[number];
+export type GunScalarField = typeof GUN_SCALARS[number];
+
+// (Checks: every GunState field is in exactly one list, and every listed field is a ShipState field of a compatible type)
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const GUN_FIELDS_COVER: Same<keyof GunState, GunArrayField | GunScalarField> = true;
+type OnRecord = { [K in GunArrayField | GunScalarField]: ShipState[K] extends GunState[K] ? (Exclude<GunState[K], undefined> extends ShipState[K] ? true : false) : false }[GunArrayField | GunScalarField];
+const GUN_FIELDS_ON_RECORD: Same<OnRecord, true> = true;
+void GUN_FIELDS_COVER; void GUN_FIELDS_ON_RECORD;
+
+type GunScalars = Pick<GunState, GunScalarField>;
+
+/** Every gun scalar from `from` onto `to` (absent ones too: a copy is the same shape whatever is set) */
+export function copyGunScalars(from: Readonly<GunScalars>, to: GunScalars): void {
+  const f = from as unknown as Record<string, unknown>, t = to as unknown as Record<string, unknown>;
+  for (let i = 0; i < GUN_SCALARS.length; i++) { const k = GUN_SCALARS[i]; t[k] = f[k]; }
+}
+
+/**
+ * A gun state's scalars onto a ShipState-shaped record (a firing model's view, the own client's mirror): as copyGunScalars,
+ * with the record's own defaults for what the gun state may leave absent (trig: 0)
+ */
+export function gunScalarsOntoRecord(from: Readonly<GunScalars>, to: Pick<ShipState, GunScalarField>): void {
+  copyGunScalars(from, to as unknown as GunScalars);
+  to.trig = from.trig ?? 0;
+}
+
+/** A gun state with its own arrays (`from`: a GunState or a ShipState's gun fields) */
+export function cloneGunState(from: Readonly<Pick<GunState, GunArrayField | GunScalarField>>): GunState {
+  const out = {
+    cooldown: [...from.cooldown], rounds: [...from.rounds], reload: [...from.reload], charge: [...from.charge], spin: [...from.spin], aim: [...from.aim],
+  } as GunState;
+  copyGunScalars(from, out);
+  return out;
+}
+
+/**
  * Hazard state the step derives its hazard chain from (step.ts: numb, then slowed, then EMP). Ticks, not flags, so a
  * re-step of an older tick reads the hazard as it was then.
  */
@@ -98,11 +148,8 @@ export function newGunState(parts = 0): GunState {
 }
 
 /** A gun state copied out of a common ShipState (the adapter's way in, until Stage 1B owns guns) */
-export function gunStateOf(s: Pick<ShipState, 'cooldown' | 'rounds' | 'reload' | 'charge' | 'spin' | 'aim' | 'triggerHeld' | 'clickAt' | 'trig' | 'minePaid' | 'mineUntil' | 'mineShare' | 'tow' | 'heldDist'>): GunState {
-  return {
-    cooldown: [...s.cooldown], rounds: [...s.rounds], reload: [...s.reload], charge: [...s.charge], spin: [...s.spin], aim: [...s.aim],
-    triggerHeld: s.triggerHeld, clickAt: s.clickAt, trig: s.trig, minePaid: s.minePaid, mineUntil: s.mineUntil, mineShare: s.mineShare, tow: s.tow, heldDist: s.heldDist,
-  };
+export function gunStateOf(s: Pick<ShipState, GunArrayField | GunScalarField>): GunState {
+  return cloneGunState(s);
 }
 
 function clonePorts(e: PortsState): PortsState {
@@ -125,10 +172,7 @@ export function cloneSimShip(s: Readonly<SimShipState>): SimShipState {
     id: s.id, mode: s.mode, body: { ...s.body }, ctl: { bits: s.ctl.bits, q: s.ctl.q },
     charge: cloneCharge(s.charge), accounted: s.accounted, jumpPrime: s.jumpPrime,
     hazard: { empUntil: s.hazard.empUntil, slowUntil: s.hazard.slowUntil, numb: s.hazard.numb },
-    guns: {
-      cooldown: [...g.cooldown], rounds: [...g.rounds], reload: [...g.reload], charge: [...g.charge], spin: [...g.spin], aim: [...g.aim],
-      triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
-    },
+    guns: cloneGunState(g),
     structure: s.structure,
   };
 }
