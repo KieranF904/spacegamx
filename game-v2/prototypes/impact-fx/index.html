@@ -1,0 +1,952 @@
+<title>Impact Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. Two live viewports side by side (new effect | current game), a fire bar under them,
+   then a deck: effect picker on the left, knobs on the right. Everything stacks to one column on a phone.
+   Single dark theme on purpose: it matches the game's space view. */
+:root {
+  color-scheme: dark;
+  --void: #06080c;
+  --panel: #0c1016;
+  --raise: #131922;
+  --line: #222a35;
+  --text: #d9dee6;
+  --muted: #8a94a3;
+  --amber: #ffb04a;
+  --amber-hot: #ffd9a0;
+  --cyan: #7fd6fa;
+  --green: #8fe388;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--void); color: var(--text); font: 15px/1.5 var(--body); }
+.wrap {
+  max-width: 1200px; margin: 0 auto;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 14px;
+}
+header { display: grid; gap: 4px; }
+h1 { margin: 0; font: 600 34px/1.05 var(--display); letter-spacing: 0.03em; text-transform: uppercase; text-wrap: balance; }
+h1 span { color: var(--amber); }
+header p { margin: 0; color: var(--muted); max-width: 68ch; }
+h2 { margin: 0; font: 600 15px/1.2 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.stage { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .stage { grid-template-columns: 1fr 1fr; } }
+.pane { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.pane figcaption {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 12px;
+  font: 600 16px/1.2 var(--display); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--line);
+}
+.tag { font-size: 12px; letter-spacing: 0.12em; padding: 2px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.tag.new { color: #1a1206; background: var(--amber); border-color: var(--amber); }
+.pane .ro { margin-left: auto; font: 400 12px/1.2 var(--mono); letter-spacing: 0; text-transform: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+canvas { display: block; width: 100%; aspect-ratio: 16 / 10; max-width: 100%; touch-action: manipulation; cursor: crosshair; background: var(--void); }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.fire {
+  font: 600 18px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase;
+  color: #1a1206; background: var(--amber); border: 0; border-radius: 4px; padding: 11px 26px; cursor: pointer;
+}
+.fire:hover { background: var(--amber-hot); }
+.fire:active { transform: translateY(1px); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.tog { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-weight: 500; }
+.tog input { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); position: relative; margin: 0; cursor: pointer; transition: background .15s; }
+.tog input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+.tog input:checked { background: #3a2a12; border-color: var(--amber); }
+.tog input:checked::after { transform: translateX(14px); background: var(--amber); }
+.last { margin-left: auto; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.hint { margin: -4px 0 0; color: var(--muted); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 400 12px/1.3 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; }
+
+.deck { display: grid; gap: 16px; grid-template-columns: 1fr; margin-top: 4px; }
+@media (min-width: 860px) { .deck { grid-template-columns: 1.15fr 1fr; } }
+.col { display: grid; gap: 10px; align-content: start; }
+.picker { display: grid; gap: 8px; }
+.pick {
+  display: grid; grid-template-columns: 26px 1fr; gap: 2px 12px; align-items: baseline; text-align: left;
+  font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  padding: 11px 14px; cursor: pointer;
+}
+.pick:hover { border-color: #3a4554; }
+.pick kbd { grid-row: span 2; font: 500 13px/1.6 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; text-align: center; }
+.pick b { font: 600 19px/1.2 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.pick span { color: var(--muted); font-size: 14px; }
+.pick[aria-checked="true"] { background: var(--raise); border-color: var(--amber); }
+.pick[aria-checked="true"] kbd { color: #1a1206; background: var(--amber); border-color: var(--amber); }
+.pick[aria-checked="true"] b { color: var(--amber-hot); }
+
+.knobs { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 16px; }
+.knob { display: grid; gap: 6px; }
+.knob .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.knob label, .knob .lab { font-weight: 600; }
+.val { font: 500 13px/1 var(--mono); color: var(--amber-hot); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
+.scale { display: flex; justify-content: space-between; font: 400 11px/1 var(--mono); color: var(--muted); }
+.chips, .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button, .seg button {
+  font: 500 13px/1 var(--body); color: var(--text); background: var(--raise); border: 1px solid var(--line);
+  border-radius: 4px; padding: 7px 10px; cursor: pointer;
+}
+.chips button:hover, .seg button:hover { border-color: #3a4554; }
+.seg button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber-hot); }
+pre { margin: 0; font: 400 12px/1.55 var(--mono); color: var(--muted); background: var(--void); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.note { margin: 0; color: var(--muted); font-size: 13px; max-width: 68ch; }
+@media (max-width: 480px) { h1 { font-size: 28px; } .last { margin-left: 0; width: 100%; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Impact <span>Lab</span></h1>
+    <p>Five new hit effects for heavier shots. Each one reads the hull's surface normal and the round's rebound at the point of impact, and grows with damage per shot. The second view runs the game's current hit on the same shots.</p>
+  </header>
+
+  <section class="stage" aria-label="Viewports">
+    <figure class="pane">
+      <figcaption><span class="tag new">New</span><span id="newName">Crown splash</span><span class="ro" id="roNew"></span></figcaption>
+      <canvas id="cvNew" aria-label="New impact effect"></canvas>
+    </figure>
+    <figure class="pane">
+      <figcaption><span class="tag">Now</span><span>Current game hit</span><span class="ro" id="roOld"></span></figcaption>
+      <canvas id="cvOld" aria-label="Current game impact"></canvas>
+    </figure>
+  </section>
+
+  <div class="bar">
+    <button class="fire" id="fire" type="button">Fire</button>
+    <label class="tog"><input type="checkbox" id="auto" checked> Auto-fire</label>
+    <label class="tog"><input type="checkbox" id="slow"> Slow motion</label>
+    <label class="tog"><input type="checkbox" id="vectors"> Show vectors</label>
+    <span class="last" id="last">No hits yet</span>
+  </div>
+  <div class="legend" id="legend" hidden>
+    <span><i style="background:#ffffff"></i>incoming</span>
+    <span><i style="background:var(--cyan)"></i>surface normal</span>
+    <span><i style="background:var(--amber)"></i>reflection</span>
+    <span><i style="background:var(--green)"></i>tangent (slide)</span>
+  </div>
+  <p class="hint">Tap or click the hull to fire at that spot. Keys: 1 to 5 pick an effect, F fires, S slows time, V shows vectors.</p>
+
+  <section class="deck">
+    <div class="col">
+      <h2>Effect</h2>
+      <div class="picker" id="picker" role="radiogroup" aria-label="Effect"></div>
+    </div>
+    <div class="col">
+      <h2>Shot and surface</h2>
+      <div class="knobs">
+        <div class="knob">
+          <div class="row"><label for="angle">Incoming angle</label><span class="val" id="angleVal">35°</span></div>
+          <input type="range" id="angle" min="-70" max="70" step="1" value="35">
+          <div class="scale"><span>from right</span><span>straight down</span><span>from left</span></div>
+        </div>
+        <div class="knob">
+          <div class="row"><label for="dmg">Damage per shot</label><span class="val" id="dmgVal">60 · heavy</span></div>
+          <input type="range" id="dmg" min="0" max="1000" step="1" value="0">
+          <div class="chips" aria-label="Damage presets">
+            <button type="button" data-dmg="6">Light 6</button>
+            <button type="button" data-dmg="14">Standard 14</button>
+            <button type="button" data-dmg="60">Heavy 60</button>
+            <button type="button" data-dmg="220">Siege 220</button>
+          </div>
+        </div>
+        <div class="knob">
+          <span class="lab" id="matLab">Surface</span>
+          <div class="seg" id="mat" role="group" aria-labelledby="matLab">
+            <button type="button" data-mat="armour" aria-pressed="true">Armour</button>
+            <button type="button" data-mat="shield" aria-pressed="false">Shield</button>
+            <button type="button" data-mat="rock" aria-pressed="false">Rock</button>
+          </div>
+        </div>
+        <div class="knob">
+          <span class="lab">Parameters</span>
+          <pre id="params"></pre>
+          <p class="note">Sizes are world units (a hull cell is 16), times in 60 Hz ticks, angles in degrees. The damage scale is k = (damage / 14)^0.42.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================================
+   World, hull outline and surface queries
+   The view is 320 x 200 world units. The hull is 16-unit square armour cells with a step,
+   a 45-ish degree chamfer and a curved bow plate, so the normal varies along it.
+   ===================================================================================== */
+const WW = 320, WH = 200, CELL = 16, TICK = 1 / 60;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ARC = { x: 215, y: 250, r: Math.hypot(176 - 215, 104 - 250) };
+const XMIN = -12, XMAX = 334;
+
+// Segments along the top surface, left to right (y grows down; hull below)
+const verts = [[XMIN, 128], [40, 128], [40, 112], [88, 112], [88, 128], [136, 128], [176, 104]];
+const smoothFrom = verts.length - 1;
+{
+  const a0 = Math.atan2(104 - ARC.y, 176 - ARC.x), a1 = -Math.acos((XMAX - ARC.x) / ARC.r), N = 22;
+  for (let i = 1; i <= N; i++) { const a = a0 + (a1 - a0) * i / N; verts.push([ARC.x + Math.cos(a) * ARC.r, ARC.y + Math.sin(a) * ARC.r]); }
+}
+const NS = verts.length - 1;
+const SX0 = new Float32Array(NS), SY0 = new Float32Array(NS), SX1 = new Float32Array(NS), SY1 = new Float32Array(NS);
+const SNX = new Float32Array(NS), SNY = new Float32Array(NS), SDX = new Float32Array(NS), SDY = new Float32Array(NS);
+const SLEN = new Float32Array(NS), SS0 = new Float32Array(NS), SSM = new Uint8Array(NS);
+let SL = 0;
+for (let i = 0; i < NS; i++) {
+  const [ax, ay] = verts[i], [bx, by] = verts[i + 1];
+  const ex = bx - ax, ey = by - ay, len = Math.hypot(ex, ey);
+  SX0[i] = ax; SY0[i] = ay; SX1[i] = bx; SY1[i] = by; SDX[i] = ex / len; SDY[i] = ey / len;
+  SNX[i] = ey / len; SNY[i] = -ex / len; // outward (out of the hull)
+  SLEN[i] = len; SS0[i] = SL; SL += len; SSM[i] = i >= smoothFrom ? 1 : 0;
+}
+const HULL = new Path2D();
+HULL.moveTo(verts[0][0], verts[0][1]);
+for (let i = 1; i < verts.length; i++) HULL.lineTo(verts[i][0], verts[i][1]);
+HULL.lineTo(XMAX, WH + 12); HULL.lineTo(XMIN, WH + 12); HULL.closePath();
+const RIM = new Path2D();
+RIM.moveTo(verts[0][0], verts[0][1]);
+for (let i = 1; i < verts.length; i++) RIM.lineTo(verts[i][0], verts[i][1]);
+
+// Height-field lookup (every half unit): the topmost surface's y and normal at an x
+const LUT_N = Math.ceil((XMAX - XMIN) * 2) + 2;
+const LY = new Float32Array(LUT_N), LNX = new Float32Array(LUT_N), LNY = new Float32Array(LUT_N);
+for (let j = 0; j < LUT_N; j++) {
+  const x = XMIN + j / 2;
+  LY[j] = 1e9;
+  for (let i = 0; i < NS; i++) {
+    if (Math.abs(SDX[i]) < 1e-6) continue;
+    if (x < SX0[i] - 1e-4 || x > SX1[i] + 1e-4) continue;
+    const y = SY0[i] + (x - SX0[i]) / (SX1[i] - SX0[i]) * (SY1[i] - SY0[i]);
+    if (y < LY[j]) {
+      LY[j] = y;
+      if (SSM[i]) { const nx = x - ARC.x, ny = y - ARC.y, l = Math.hypot(nx, ny); LNX[j] = nx / l; LNY[j] = ny / l; }
+      else { LNX[j] = SNX[i]; LNY[j] = SNY[i]; }
+    }
+  }
+}
+const SN = { x: 0, y: -1 };
+/** The hull's surface height at x (and its normal into SN); 1e9 off the ends */
+function surfY(x) {
+  if (x < XMIN || x > XMAX) return 1e9;
+  const j = ((x - XMIN) * 2 + 0.5) | 0;
+  SN.x = LNX[j]; SN.y = LNY[j];
+  return LY[j];
+}
+/** First surface a ray crosses from outside; fills h.x, h.y, h.nx, h.ny, h.s. False on a miss */
+function raycast(ox, oy, dx, dy, h) {
+  let best = Infinity, bi = -1, bu = 0;
+  for (let i = 0; i < NS; i++) {
+    if (SNX[i] * dx + SNY[i] * dy >= 0) continue;
+    const ex = SX1[i] - SX0[i], ey = SY1[i] - SY0[i], den = dx * ey - dy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const qx = SX0[i] - ox, qy = SY0[i] - oy;
+    const t = (qx * ey - qy * ex) / den, u = (qx * dy - qy * dx) / den;
+    if (t > 0 && u >= 0 && u <= 1 && t < best) { best = t; bi = i; bu = u; }
+  }
+  if (bi < 0) return false;
+  h.x = ox + dx * best; h.y = oy + dy * best; h.s = SS0[bi] + bu * SLEN[bi]; h.travel = best;
+  if (SSM[bi]) { const nx = h.x - ARC.x, ny = h.y - ARC.y, l = Math.hypot(nx, ny); h.nx = nx / l; h.ny = ny / l; }
+  else { h.nx = SNX[bi]; h.ny = SNY[bi]; }
+  return true;
+}
+const Q = { x: 0, y: 0, nx: 0, ny: 0, s: 0, d: 0 };
+/** A point along the outline by arc length (into Q) */
+function pointAt(s) {
+  let i = 0;
+  while (i < NS - 1 && s > SS0[i] + SLEN[i]) i++;
+  const u = Math.max(0, Math.min(1, (s - SS0[i]) / SLEN[i]));
+  Q.x = SX0[i] + (SX1[i] - SX0[i]) * u; Q.y = SY0[i] + (SY1[i] - SY0[i]) * u;
+  if (SSM[i]) { const nx = Q.x - ARC.x, ny = Q.y - ARC.y, l = Math.hypot(nx, ny); Q.nx = nx / l; Q.ny = ny / l; }
+  else { Q.nx = SNX[i]; Q.ny = SNY[i]; }
+  return Q;
+}
+/** The nearest outline point to (px, py) (into Q, with its arc length and distance) */
+function nearest(px, py) {
+  let bd = Infinity;
+  for (let i = 0; i < NS; i++) {
+    const ex = SX1[i] - SX0[i], ey = SY1[i] - SY0[i];
+    const w = Math.max(0, Math.min(1, ((px - SX0[i]) * ex + (py - SY0[i]) * ey) / (SLEN[i] * SLEN[i])));
+    const x = SX0[i] + ex * w, y = SY0[i] + ey * w, d = Math.hypot(px - x, py - y);
+    if (d < bd) { bd = d; Q.x = x; Q.y = y; Q.s = SS0[i] + w * SLEN[i]; Q.d = d; }
+  }
+  return Q;
+}
+// Cells near the outline (for the ripple's flash): rect corner and arc length of the nearest outline point
+const EDGE_CELLS = [];
+for (let gx = -8; gx < XMAX; gx += CELL) for (let gy = 96; gy < WH; gy += CELL) {
+  const n = nearest(gx + 8, gy + 8);
+  if (n.d < 22 && gy + CELL > surfY(gx + 8) - 2) EDGE_CELLS.push(gx, gy, n.s);
+}
+
+/* =====================================================================================
+   Palettes. Stops run white-hot to cool. The armour set uses the game's kinetic colours
+   (core 0xfff7e6, glow 0xffb04a, spray 0xffc070); the shield set the deflector's
+   (tint 0x7fd6fa, hit 0xc8f4ff); rock the terrain's warm browns.
+   ===================================================================================== */
+const MATS = {
+  armour: { ramp: ['#ffffff', '#fff7e6', '#ffd28a', '#ffb04a', '#e0782a', '#8a3a14', '#2a1208'], dust: [154, 148, 140], chunk: '#23272e', chunkHi: '#6b7280' },
+  shield: { ramp: ['#ffffff', '#f0ffff', '#c8f4ff', '#7fd6fa', '#3a9ad8', '#1a4a8a', '#081830'], dust: [110, 180, 210], chunk: '#17202e', chunkHi: '#4f7fa8' },
+  rock:   { ramp: ['#fff6e6', '#ffe0b0', '#ffc080', '#d98a4a', '#9a5a30', '#4a2c1c', '#1c1210'], dust: [138, 122, 102], chunk: '#2a2224', chunkHi: '#5a4a48' },
+};
+const CURRENT_RAMP = ['#ffffff', '#fff0d8', '#ffd9a0', '#ffc070', '#ffb04a', '#a0501e', '#3a2010'];
+const RAMP_N = 32;
+const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function buildRamp(stops) {
+  const rgb = stops.map(hexRgb), css = [], spr = [];
+  for (let i = 0; i < RAMP_N; i++) {
+    const f = i / (RAMP_N - 1) * (rgb.length - 1), a = Math.floor(f), b = Math.min(rgb.length - 1, a + 1), t = f - a;
+    const c = [0, 1, 2].map((k) => Math.round(rgb[a][k] + (rgb[b][k] - rgb[a][k]) * t));
+    css.push(`rgb(${c[0]},${c[1]},${c[2]})`);
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},1)`); gr.addColorStop(0.28, `rgba(${c[0]},${c[1]},${c[2]},0.5)`);
+    gr.addColorStop(0.6, `rgba(${c[0]},${c[1]},${c[2]},0.14)`); gr.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); spr.push(cv);
+  }
+  return { css, spr };
+}
+function smokeSprite(c) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},0.55)`); gr.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},0.22)`); gr.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return cv;
+}
+const ri = (h) => (h <= 0 ? 0 : h >= 1 ? RAMP_N - 1 : (h * (RAMP_N - 1)) | 0);
+
+/* =====================================================================================
+   Particle pool: structure of arrays, fixed capacity, swap-remove. No allocation per frame.
+   Moving kinds first; kinds from RING on sit still and are drawn from their age alone.
+   ===================================================================================== */
+const SPARK = 0, DROP = 1, GLOW = 2, SMOKE = 3, PETAL = 4, RING = 5, STREAK = 6, STAR = 7, WAVE = 8, SCORCH = 9, LIGHT = 10;
+const F_COLLIDE = 1, F_LAND = 2, F_STARHEAD = 4, F_EMBERS = 8;
+class Pool {
+  constructor(cap) {
+    this.cap = cap; this.n = 0; this.lifeScale = 1;
+    this.type = new Uint8Array(cap); this.flag = new Uint8Array(cap);
+    const f = () => new Float32Array(cap);
+    this.x = f(); this.y = f(); this.vx = f(); this.vy = f(); this.age = f(); this.life = f();
+    this.size = f(); this.grow = f(); this.len = f(); this.w = f(); this.drag = f(); this.heat = f(); this.cool = f();
+    this.rot = f(); this.vr = f(); this.a0 = f(); this.a1 = f(); this.pnx = f(); this.pny = f(); this.pull = f(); this.bounce = f(); this.alpha = f();
+    this.fields = [this.type, this.flag, this.x, this.y, this.vx, this.vy, this.age, this.life, this.size, this.grow, this.len, this.w, this.drag,
+      this.heat, this.cool, this.rot, this.vr, this.a0, this.a1, this.pnx, this.pny, this.pull, this.bounce, this.alpha];
+  }
+  add(type, x, y, vx, vy, life, size, heat, cool) {
+    const i = this.n < this.cap ? this.n++ : (Math.random() * this.cap) | 0;
+    this.type[i] = type; this.flag[i] = 0; this.x[i] = x; this.y[i] = y; this.vx[i] = vx; this.vy[i] = vy;
+    this.age[i] = 0; this.life[i] = Math.max(1, life * this.lifeScale); this.size[i] = size; this.heat[i] = heat; this.cool[i] = cool;
+    this.grow[i] = 0; this.len[i] = 0; this.w[i] = 1; this.drag[i] = 1; this.rot[i] = 0; this.vr[i] = 0; this.a0[i] = 0; this.a1[i] = 0;
+    this.pnx[i] = 0; this.pny[i] = 0; this.pull[i] = 0; this.bounce[i] = 0; this.alpha[i] = 1;
+    return i;
+  }
+  kill(i) { const j = --this.n; if (i !== j) for (const a of this.fields) a[i] = a[j]; }
+}
+
+/* Small vector helpers writing into V (no allocation) */
+const V = { x: 0, y: 0 };
+const D2R = Math.PI / 180;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+/** Unit direction between the normal (bias 0) and the reflection (bias 1) */
+function axisOf(h, bias) { const x = h.nx * (1 - bias) + h.rx * bias, y = h.ny * (1 - bias) + h.ry * bias, l = Math.hypot(x, y) || 1; V.x = x / l; V.y = y / l; return V; }
+/** (ax, ay) turned by `ang` radians, then lifted out of the surface to at least `minOut` along the normal */
+function turnOut(h, ax, ay, ang, minOut) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  let x = ax * c - ay * s, y = ax * s + ay * c;
+  const dn = x * h.nx + y * h.ny;
+  if (dn < minOut) { x += h.nx * (minOut - dn); y += h.ny * (minOut - dn); const l = Math.hypot(x, y); x /= l; y /= l; }
+  V.x = x; V.y = y; return V;
+}
+
+/* =====================================================================================
+   THE FIVE EFFECTS. Each is self-contained: name, one-line description, parameters P at the
+   top, and spawn(f, h) that emits into the pane's pool through f's helpers.
+   The hit h carries: x, y (point), dx, dy (incoming unit dir), nx, ny (surface normal, out),
+   rx, ry (reflection), tx, ty (surface tangent the round was sliding along),
+   cos (1 head-on .. 0 grazing), graze (1 - cos), k (damage scale), dmg, s (arc length), sdir.
+   ===================================================================================== */
+const EFFECTS = [
+{
+  id: 'crown', name: 'Crown splash',
+  desc: 'Molten drops thrown up in a ring around the rebound, falling back onto the hull.',
+  P: { crown: 16, jet: 5, speed: 3.6, jetSpeed: 6.5, cone: 64, jetCone: 9, bias: 0.45, pull: 0.15, drop: 1.3, rim: 12, rimLife: 15, flash: 7, light: 46 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), c = Math.min(2.6, Math.pow(k, 0.85));
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.glow(h.x, h.y, P.flash * 1.6 * k, 0.9 * k, 14, 0.3, 0.6);
+    f.light(h.x, h.y, P.light * sk, 22, 0.55);
+    f.ring(h, h.x, h.y, P.rim * Math.pow(k, 0.75), 0.5, 1.4 * sk, P.rimLife + 4 * k, 0.15, 0.35);
+    const ax = axisOf(h, P.bias), axx = ax.x, axy = ax.y;
+    const n = Math.round(P.crown * c);
+    for (let i = 0; i < n; i++) {
+      const spread = ((i + 0.5) / n - 0.5) * P.cone * D2R + gauss() * 0.08;
+      const d = turnOut(h, axx, axy, spread, 0.25), v = P.speed * sk * rnd(0.75, 1.2) * (1 - 0.35 * Math.abs(spread));
+      f.drop(h, h.x + d.x, h.y + d.y, d.x * v, d.y * v, rnd(34, 50), P.drop * Math.pow(k, 0.4) * rnd(0.7, 1.2), rnd(0, 0.15), 0.6, P.pull * rnd(0.8, 1.2));
+    }
+    const nj = Math.round(P.jet * Math.min(2, k));
+    for (let i = 0; i < nj; i++) {
+      const d = turnOut(h, h.rx, h.ry, gauss() * P.jetCone * D2R, 0.15), v = P.jetSpeed * sk * rnd(0.7, 1.25);
+      f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(30, 44), P.drop * 0.8 * Math.pow(k, 0.4), 0, 0.65, P.pull * 0.6);
+    }
+    for (let i = 0; i < 3 + k; i++) { const d = turnOut(h, axx, axy, gauss() * 0.9, 0.3); f.glow(h.x, h.y, rnd(2, 4) * sk, 0.25, rnd(10, 18), 0.25, 0.35, d.x * 0.8, d.y * 0.8); }
+    f.scorch(h.x, h.y, 3.5 * sk, 160);
+    if (k > 1.6) f.kick(0.6 * (k - 1.4));
+  },
+},
+{
+  id: 'skid', name: 'Skid sheet',
+  desc: 'A flat fan of sparks along the surface, mostly the way the round was sliding, skipping as they go.',
+  P: { count: 26, speed: 6.5, elev: 16, fwd: 0.88, bounce: 0.45, pull: 0.05, drag: 0.955, sheet: 30, rooster: 5, flash: 5, light: 40 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    const share = 0.5 + (P.fwd - 0.5) * Math.min(1, g * 1.4); // head-on hits spray both ways evenly
+    f.glow(h.x, h.y, P.flash * k, 0.3 * k, 5, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 18, 0.5);
+    const ta = Math.atan2(h.ty, h.tx);
+    f.streak(h.x, h.y, ta, P.sheet * k * share * (0.7 + 0.6 * g), 2.4 * sk, 11, 0.1);
+    f.streak(h.x, h.y, ta + Math.PI, P.sheet * k * (1 - share) * (0.7 + 0.6 * g), 2.0 * sk, 9, 0.15);
+    const n = Math.round(P.count * Math.min(2.6, k));
+    for (let i = 0; i < n; i++) {
+      const side = Math.random() < share ? 1 : -1, e = Math.pow(Math.random(), 1.8) * P.elev * D2R;
+      const ce = Math.cos(e), se = Math.sin(e);
+      const dx = h.tx * side * ce + h.nx * se, dy = h.ty * side * ce + h.ny * se;
+      const v = P.speed * sk * rnd(0.45, 1.25) * (side > 0 ? 1 : 0.7);
+      const j = f.spark(h.x + h.nx * 0.5, h.y + h.ny * 0.5, dx * v, dy * v, rnd(16, 32) * (0.8 + 0.2 * k), 0.8 + 0.35 * sk, 1.7, rnd(0, 0.2), 0.75, P.drag);
+      f.collide(j, h, P.bounce, P.pull);
+    }
+    if (k > 1) {
+      const nr = Math.round(P.rooster * (k - 0.8));
+      for (let i = 0; i < nr; i++) {
+        const d = turnOut(h, h.rx, h.ry, gauss() * 0.25, 0.2), v = P.speed * sk * rnd(0.6, 1.1);
+        f.spark(h.x, h.y, d.x * v, d.y * v, rnd(14, 24), 1.1 * sk, 2.2, 0, 0.8, 0.96);
+      }
+    }
+    if (f.mat === 'rock') for (let i = 0; i < 2 + k * 2; i++) { const s = Math.random() < share ? 1 : -1; f.smoke(h.x, h.y, h.tx * s * rnd(0.3, 1) + h.nx * 0.3, h.ty * s * rnd(0.3, 1) + h.ny * 0.3, rnd(4, 7) * sk, 0.25, rnd(40, 60), 0.5); }
+    f.scorch(h.x, h.y, 3 * sk, 140);
+    if (k > 1.8) f.kick(0.5 * (k - 1.6));
+  },
+},
+{
+  id: 'glint', name: 'Ricochet glint',
+  desc: 'The round glances off along the rebound as a bright glint. Head-on hits flash instead.',
+  P: { speed: 13, tail: 3.2, fan: 5, star: 15, starLife: 11, flare: 44, spray: 7, sprayCone: 8, flash: 6, light: 42 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze, e = 0.25 + 0.75 * g; // the rebound keeps more energy the shallower the hit
+    f.glow(h.x, h.y, P.flash * k * (1.6 - 0.8 * g), 0.3 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 18, 0.5);
+    f.star(h.x, h.y, Math.atan2(h.ny, h.nx), P.star * k * (1.35 - 0.6 * g), 1.2 * sk, P.starLife + 2 * k);
+    const ra = Math.atan2(h.ry, h.rx);
+    f.streak(h.x, h.y, ra, P.flare * k * e, 1.8 * sk, 9 + 2 * k, 0.05);
+    const frags = Math.max(1, Math.min(4, 1 + Math.floor((k - 0.9) * 1.3)));
+    for (let i = 0; i < frags; i++) {
+      const off = (i - (frags - 1) / 2) * P.fan * D2R + gauss() * 0.03;
+      const d = turnOut(h, h.rx, h.ry, off, 0.06), v = P.speed * e * rnd(0.85, 1.1) * (i === 0 ? 1 : 0.8);
+      const j = f.spark(h.x, h.y, d.x * v, d.y * v, 22 + 12 * e, (i === 0 ? 1.7 : 1.1) * sk, P.tail * (0.6 + e), 0, 0.45, 0.985);
+      f.pool.flag[j] |= F_STARHEAD;
+    }
+    const n = Math.round(P.spray * Math.min(2.2, k));
+    for (let i = 0; i < n; i++) {
+      const d = turnOut(h, h.rx, h.ry, gauss() * P.sprayCone * D2R * (1.6 - g), 0.08), v = P.speed * 0.6 * e * rnd(0.4, 1);
+      f.spark(h.x, h.y, d.x * v, d.y * v, rnd(10, 18), 0.7, 1.6, 0.1, 0.8, 0.94);
+    }
+    f.scorch(h.x, h.y, 2.6 * sk, 130);
+    if (k > 2) f.kick(0.4 * (k - 1.8));
+  },
+},
+{
+  id: 'ripple', name: 'Surface ripple',
+  desc: 'A bright wave runs along the hull both ways from the hit, throwing spray off its crest.',
+  P: { speed: 2.3, amp: 4, width: 12, life: 30, fwdBoost: 0.8, shock: 22, shockLife: 12, drops: 8, lean: 35, pull: 0.12, flash: 6, light: 44 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k), g = h.graze;
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 24, 0.5);
+    // Forward wave (the way the round slid) runs faster and taller; the back wave weaker
+    f.wave(h.s, h.sdir, P.speed * sk * (1 + 0.4 * g), P.amp * sk * (1 + P.fwdBoost * g), P.width * Math.pow(k, 0.5), P.life + 6 * k);
+    f.wave(h.s, -h.sdir, P.speed * sk * (1 - 0.3 * g), P.amp * sk * (1 - 0.55 * g), P.width * Math.pow(k, 0.5) * 0.85, P.life + 4 * k);
+    f.ring(h, h.x, h.y, P.shock * Math.pow(k, 0.6), 1, 1.1 * sk, P.shockLife + 2 * k, 0.2, 0.5);
+    for (let side = -1; side <= 1; side += 2) {
+      const fw = side === 1 ? 1 + P.fwdBoost * g : 1 - 0.55 * g;
+      const n = Math.round(P.drops * Math.min(2.2, k) * fw);
+      for (let i = 0; i < n; i++) {
+        const off = rnd(1, 7) * sk, lean = rnd(0.4, 1) * P.lean * D2R;
+        const dx = h.nx * Math.cos(lean) + h.tx * side * Math.sin(lean), dy = h.ny * Math.cos(lean) + h.ty * side * Math.sin(lean);
+        const v = rnd(1.6, 3.2) * sk * (0.7 + 0.3 * fw);
+        f.drop(h, h.x + h.tx * side * off + h.nx, h.y + h.ty * side * off + h.ny, dx * v, dy * v, rnd(26, 40), rnd(0.9, 1.4) * Math.pow(k, 0.35), rnd(0.05, 0.2), 0.6, P.pull);
+      }
+    }
+    for (let i = 0; i < 2 + Math.round(k); i++) { const d = turnOut(h, h.rx, h.ry, gauss() * 0.15, 0.2), v = rnd(3, 5) * sk; f.drop(h, h.x, h.y, d.x * v, d.y * v, 30, 1.1 * Math.pow(k, 0.35), 0, 0.6, P.pull * 0.7); }
+    f.scorch(h.x, h.y, 3 * sk, 150);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+},
+{
+  id: 'petal', name: 'Petal burst',
+  desc: 'The plating tears into hot petals that peel back off the hit, leaving a glowing crater.',
+  P: { petals: 3, speed: 2.8, size: 3.4, spin: 0.22, bias: 0.35, cone: 90, drops: 8, pull: 0.14, fire: 9, crater: 6.5, smoke: 3, light: 56 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, 8 * k, 0.5 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 30, 0.6);
+    const ax = axisOf(h, P.bias), axx = ax.x, axy = ax.y;
+    f.glow(h.x + axx * 2, h.y + axy * 2, P.fire * k, 0.35 * k, 24, 0.3, 0.75, axx * 0.35, axy * 0.35);
+    const n = Math.min(9, P.petals + Math.round(1.5 * k));
+    for (let i = 0; i < n; i++) {
+      const spread = ((i + 0.5) / n - 0.5) * P.cone * D2R + gauss() * 0.12;
+      const d = turnOut(h, axx, axy, spread, 0.2), v = P.speed * sk * rnd(0.6, 1.2);
+      f.petal(h, h.x, h.y, d.x * v, d.y * v, P.size * Math.pow(k, 0.6) * rnd(0.7, 1.2), (Math.random() < 0.5 ? -1 : 1) * P.spin * rnd(0.5, 1.2), rnd(40, 64));
+    }
+    const nd = Math.round(P.drops * Math.min(2.4, k));
+    for (let i = 0; i < nd; i++) {
+      const d = turnOut(h, axx, axy, gauss() * 0.8, 0.3), v = rnd(2, 4.5) * sk;
+      f.drop(h, h.x, h.y, d.x * v, d.y * v, rnd(26, 42), rnd(0.8, 1.2) * Math.pow(k, 0.35), 0.05, 0.65, P.pull);
+    }
+    if (k > 1.2) for (let i = 0; i < P.smoke * (k - 0.8); i++) f.smoke(h.x, h.y, axx * rnd(0.2, 0.6) + gauss() * 0.15, axy * rnd(0.2, 0.6) + gauss() * 0.15, rnd(5, 8) * sk, 0.3, rnd(60, 90), 0.55);
+    f.scorch(h.x, h.y, P.crater * sk, 240);
+    if (k > 1.3) f.kick(0.7 * (k - 1.1));
+  },
+},
+];
+
+/* The game's current hit, approximated: DIRECTED_HIT(0xffc070, 1) from weaponStyles.ts (the cannon), sized by
+   impactScale = sqrt(shotScale(damage)) and counts capped at 1.5x, as WeaponFx does. Thrown along the reflection. */
+const CURRENT = {
+  id: 'current', name: 'Current game hit',
+  P: { core: 3, bloom: 6, spray: 8, sprayCone: 28, spraySpeed: 7.5, sprayLife: 13, flare: 26, flareLife: 9, sparks: 12, sparkSpeed: 3.6, sparkLife: 18, light: 35 },
+  spawn(f, h) {
+    const P = this.P, ss = Math.max(0.75, Math.min(1.7, Math.pow(h.dmg / 14, 0.3))), s = Math.sqrt(ss), c = Math.min(1.5, s);
+    f.glow(h.x, h.y, P.core * s * 2, 0, 3, 0, 1);
+    f.glow(h.x, h.y, P.bloom * s * 2, 0.2, 6, 0.3, 0.8);
+    f.light(h.x, h.y, P.light * s, 14, 0.45);
+    const ra = Math.atan2(h.ry, h.rx);
+    f.streak(h.x, h.y, ra, P.flare * s, 2 * s, P.flareLife, 0.1);
+    for (let i = 0; i < Math.round(P.spray * c); i++) {
+      const d = turnOut(h, h.rx, h.ry, (Math.random() - 0.5) * P.sprayCone * D2R, 0.05), v = P.spraySpeed * rnd(0.6, 1.1);
+      f.spark(h.x, h.y, d.x * v, d.y * v, P.sprayLife * rnd(0.7, 1.1), 1.2, 1.3, 0.1, 0.7, 0.93);
+    }
+    for (let i = 0; i < Math.round(P.sparks * c); i++) {
+      const d = turnOut(h, h.rx, h.ry, (Math.random() - 0.5) * 2 * P.sprayCone * D2R, 0.1), v = P.sparkSpeed * rnd(0.4, 1.2);
+      f.spark(h.x, h.y, d.x * v, d.y * v, P.sparkLife * rnd(0.6, 1.1), 0.8, 1.2, 0.2, 0.7, 0.94);
+    }
+  },
+};
+
+/* =====================================================================================
+   A viewport: its own pool, shots, static layer (stars + hull), ramp, and the drawing.
+   ===================================================================================== */
+const MAX_SHOTS = 24, MAX_MARKS = 8;
+const newHit = () => ({ x: 0, y: 0, dx: 0, dy: 0, nx: 0, ny: 0, rx: 0, ry: 0, tx: 0, ty: 0, cos: 1, graze: 0, k: 1, dmg: 14, s: 0, sdir: 1, travel: 0, age: 1e9 });
+function copyHit(a, b) { for (const key in b) a[key] = b[key]; }
+const DASH = [3, 2.5], NODASH = [];
+
+class Pane {
+  constructor(canvas, effect, rampStops) {
+    this.cv = canvas; this.ctx = canvas.getContext('2d');
+    this.effect = effect; this.pool = new Pool(3200);
+    this.fixedRamp = rampStops; this.mat = 'armour';
+    this.shots = Array.from({ length: MAX_SHOTS }, () => ({ on: false, x: 0, y: 0, dist: 0, gone: 0, speed: 12, k: 1, h: newHit() }));
+    this.marks = Array.from({ length: MAX_MARKS }, newHit); this.markHead = 0;
+    this.stat = document.createElement('canvas'); this.scale = 1; this.dpr = 1; this.shake = 0; this.sx = 0; this.sy = 0;
+    this.setMaterial('armour');
+  }
+  setMaterial(m) {
+    this.mat = m; const M = MATS[m];
+    const r = buildRamp(this.fixedRamp || M.ramp); this.ramp = r.css; this.spr = r.spr;
+    this.smokeSpr = smokeSprite(M.dust); this.chunk = M.chunk;
+    this.drawStatic();
+  }
+  resize() {
+    const w = this.cv.clientWidth; if (!w) return;
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.cv.width = Math.round(w * this.dpr); this.cv.height = Math.round(w * this.dpr * WH / WW);
+    this.scale = this.cv.width / WW; this.drawStatic();
+  }
+  drawStatic() {
+    const W = this.cv.width, H = this.cv.height; if (!W) return;
+    this.stat.width = W; this.stat.height = H;
+    const g = this.stat.getContext('2d'), s = this.scale;
+    g.fillStyle = '#06080c'; g.fillRect(0, 0, W, H);
+    let seed = 7; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const neb = g.createRadialGradient(W * 0.25, H * 0.2, 0, W * 0.25, H * 0.2, W * 0.6);
+    neb.addColorStop(0, 'rgba(60,80,120,0.10)'); neb.addColorStop(1, 'rgba(60,80,120,0)'); g.fillStyle = neb; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 150; i++) { const a = r() * r(); g.fillStyle = `rgba(${200 + r() * 55 | 0},${210 + r() * 45 | 0},255,${0.15 + a * 0.8})`; const z = (0.4 + a * 1.1) * this.dpr; g.fillRect(r() * W, r() * H * 0.75, z, z); }
+    g.setTransform(s, 0, 0, s, 0, 0);
+    g.save(); g.clip(HULL);
+    const m = this.mat;
+    if (m === 'rock') {
+      g.fillStyle = '#3a3033'; g.fillRect(XMIN, 90, XMAX - XMIN, WH);
+      const cols = ['#302a2d', '#2c2224', '#45393a', '#4a3d3c'];
+      for (let i = 0; i < 160; i++) { g.fillStyle = cols[i & 3]; g.beginPath(); g.arc(XMIN + r() * (XMAX - XMIN), 96 + r() * 110, 1.5 + r() * 7, 0, Math.PI * 2); g.fill(); }
+    } else {
+      const base = m === 'shield' ? [44, 54, 70] : [70, 77, 88];
+      g.fillStyle = '#15181d'; g.fillRect(XMIN, 90, XMAX - XMIN, WH);
+      for (let gx = -8; gx < XMAX; gx += CELL) for (let gy = 96; gy < WH; gy += CELL) {
+        const v = (r() - 0.5) * 14;
+        g.fillStyle = `rgb(${base[0] + v | 0},${base[1] + v | 0},${base[2] + v | 0})`; g.fillRect(gx + 0.6, gy + 0.6, CELL - 1.2, CELL - 1.2);
+        g.fillStyle = 'rgba(255,255,255,0.09)'; g.fillRect(gx + 0.6, gy + 0.6, CELL - 1.2, 1.1); g.fillRect(gx + 0.6, gy + 0.6, 1.1, CELL - 1.2);
+        g.fillStyle = 'rgba(0,0,0,0.32)'; g.fillRect(gx + 0.6, gy + CELL - 1.7, CELL - 1.2, 1.1); g.fillRect(gx + CELL - 1.7, gy + 0.6, 1.1, CELL - 1.2);
+      }
+    }
+    const shade = g.createLinearGradient(0, 110, 0, WH); shade.addColorStop(0, 'rgba(0,0,0,0)'); shade.addColorStop(1, 'rgba(0,0,0,0.55)');
+    g.fillStyle = shade; g.fillRect(XMIN, 90, XMAX - XMIN, WH);
+    g.restore();
+    g.lineJoin = 'round';
+    if (m === 'shield') {
+      g.globalCompositeOperation = 'lighter';
+      g.strokeStyle = 'rgba(127,214,250,0.18)'; g.lineWidth = 6; g.stroke(RIM);
+      g.strokeStyle = 'rgba(200,244,255,0.75)'; g.lineWidth = 1; g.stroke(RIM);
+      g.globalCompositeOperation = 'source-over';
+    } else { g.strokeStyle = m === 'rock' ? 'rgba(120,100,92,0.8)' : 'rgba(170,180,195,0.6)'; g.lineWidth = 1; g.stroke(RIM); }
+  }
+
+  // ---- emit helpers used by the effects ----
+  glow(x, y, size, grow, life, heat, alpha, vx = 0, vy = 0) { const p = this.pool, i = p.add(GLOW, x, y, vx, vy, life, size, heat, 0.7); p.grow[i] = grow; p.alpha[i] = alpha; p.drag[i] = 0.94; return i; }
+  spark(x, y, vx, vy, life, w, len, heat, cool, drag) { const p = this.pool, i = p.add(SPARK, x, y, vx, vy, life, 0, heat, cool); p.w[i] = w; p.len[i] = len; p.drag[i] = drag; return i; }
+  collide(i, h, bounce, pull) { const p = this.pool; p.flag[i] |= F_COLLIDE; p.x[i] += h.nx * 1.2; p.y[i] += h.ny * 1.2; p.bounce[i] = bounce; p.pull[i] = pull; p.pnx[i] = h.nx; p.pny[i] = h.ny; }
+  drop(h, x, y, vx, vy, life, size, heat, cool, pull) {
+    const p = this.pool, i = p.add(DROP, x + h.nx * 1.2, y + h.ny * 1.2, vx, vy, life, size, heat, cool);
+    p.flag[i] = F_LAND; p.pull[i] = pull; p.pnx[i] = h.nx; p.pny[i] = h.ny; p.drag[i] = 0.985; p.len[i] = 1.3; return i;
+  }
+  ring(h, x, y, radius, squash, w, life, heat, cool) {
+    const p = this.pool, i = p.add(RING, x, y, 0, 0, life, radius, heat, cool), rot = Math.atan2(h.ty, h.tx);
+    p.rot[i] = rot; p.len[i] = squash; p.w[i] = w;
+    const up = -Math.sin(rot) * h.nx + Math.cos(rot) * h.ny > 0; p.a0[i] = up ? 0 : Math.PI; p.a1[i] = up ? Math.PI : Math.PI * 2;
+    const sh = (h.rx * h.tx + h.ry * h.ty) * 0.3 * radius; p.vx[i] = h.tx * sh; p.vy[i] = h.ty * sh; // skewed toward the rebound
+    return i;
+  }
+  streak(x, y, ang, len, w, life, heat) { const p = this.pool, i = p.add(STREAK, x, y, 0, 0, life, len, heat, 0.6); p.rot[i] = ang; p.w[i] = w; return i; }
+  star(x, y, rot, size, w, life) { const p = this.pool, i = p.add(STAR, x, y, 0, 0, life, size, 0, 0.4); p.rot[i] = rot; p.w[i] = w; return i; }
+  wave(s0, dir, speed, amp, width, life) { const p = this.pool, i = p.add(WAVE, s0, 0, speed, 0, life, amp, 0.1, 0.6); p.a0[i] = dir; p.w[i] = width; return i; }
+  petal(h, x, y, vx, vy, size, vr, life) { const p = this.pool, i = p.add(PETAL, x, y, vx, vy, life, size, 0.22, 0.75); p.vr[i] = vr; p.rot[i] = Math.random() * 6.28; p.drag[i] = 0.965; this.collide(i, h, 0.3, 0.02); p.flag[i] |= F_EMBERS; return i; }
+  smoke(x, y, vx, vy, size, grow, life, alpha) { const p = this.pool, i = p.add(SMOKE, x, y, vx, vy, life, size, 0, 0); p.grow[i] = grow; p.alpha[i] = alpha; p.drag[i] = 0.97; return i; }
+  scorch(x, y, size, life) { this.pool.add(SCORCH, x, y, 0, 0, life, size, 0, 1); }
+  light(x, y, radius, life, alpha) { const p = this.pool, i = p.add(LIGHT, x, y, 0, 0, life, radius, 0.3, 0.5); p.alpha[i] = alpha; }
+  kick(a) { if (!REDUCED) this.shake = Math.min(3, Math.max(this.shake, a)); }
+
+  fire(src, k, speed) {
+    let s = null; for (const o of this.shots) if (!o.on) { s = o; break; }
+    if (!s) return;
+    copyHit(s.h, src); s.on = true; s.dist = src.travel; s.gone = 0; s.speed = speed; s.k = k;
+  }
+  step() {
+    for (const s of this.shots) {
+      if (!s.on) continue;
+      s.gone += s.speed;
+      if (s.gone >= s.dist) {
+        s.on = false; const h = s.h;
+        // (heavier rounds linger: the new effects' lives grow with k; the current game's stay as they are)
+        this.pool.lifeScale = this.effect === CURRENT ? 1 : 0.8 + 0.22 * h.k;
+        this.effect.spawn(this, h);
+        this.pool.lifeScale = 1;
+        const m = this.marks[this.markHead]; copyHit(m, h); m.age = 0; this.markHead = (this.markHead + 1) % MAX_MARKS;
+      }
+    }
+    for (const m of this.marks) m.age++;
+    const p = this.pool;
+    for (let i = 0; i < p.n; i++) {
+      if (++p.age[i] >= p.life[i]) { p.kill(i); i--; continue; }
+      const ty = p.type[i];
+      if (ty >= RING) continue;
+      if (p.pull[i]) { p.vx[i] -= p.pnx[i] * p.pull[i]; p.vy[i] -= p.pny[i] * p.pull[i]; }
+      const d = p.drag[i]; p.vx[i] *= d; p.vy[i] *= d;
+      const ox = p.x[i], oy = p.y[i];
+      p.x[i] += p.vx[i]; p.y[i] += p.vy[i]; p.rot[i] += p.vr[i]; p.size[i] += p.grow[i];
+      const fl = p.flag[i];
+      if (fl & F_EMBERS && (p.age[i] | 0) % 3 === 0 && p.age[i] < p.life[i] * 0.55) {
+        this.spark(p.x[i], p.y[i], p.vx[i] * 0.2 + gauss() * 0.4, p.vy[i] * 0.2 + gauss() * 0.4, rnd(8, 14), 0.6, 1.5, 0.15 + p.age[i] / p.life[i] * 0.5, 0.5, 0.93);
+      }
+      if (fl & (F_COLLIDE | F_LAND)) {
+        const hy = surfY(p.x[i]);
+        if (p.y[i] > hy) {
+          let nx = SN.x, ny = SN.y;
+          const hyo = surfY(ox);
+          if (oy <= hyo && oy > hy + 0.5) { nx = ox < p.x[i] ? -1 : 1; ny = 0; } // ran into a step's wall
+          if (fl & F_LAND) { // a drop lands: a little splat where it touched
+            const h = p.heat[i] + p.cool[i] * p.age[i] / p.life[i];
+            this.glow(ox, oy, p.size[i] * 2.4, 0.2, 9, h, 0.7);
+            p.kill(i); i--; continue;
+          }
+          const vn = p.vx[i] * nx + p.vy[i] * ny;
+          if (vn < 0) { const b = 1 + p.bounce[i]; p.vx[i] -= b * vn * nx; p.vy[i] -= b * vn * ny; p.vx[i] *= 0.88; p.vy[i] *= 0.88; }
+          p.x[i] = ox; p.y[i] = oy;
+        }
+      }
+    }
+    this.shake *= 0.86; if (this.shake < 0.02) this.shake = 0;
+    this.sx = (Math.random() - 0.5) * 2 * this.shake; this.sy = (Math.random() - 0.5) * 2 * this.shake;
+  }
+
+  draw(showVectors) {
+    const c = this.ctx, p = this.pool, s = this.scale, R = this.ramp, S = this.spr;
+    if (!this.cv.width) return;
+    c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    c.drawImage(this.stat, this.sx * s, this.sy * s);
+    c.setTransform(s, 0, 0, s, this.sx * s, this.sy * s);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    // Pass 1: on the hull (clipped): scorch marks, hit light, the ripple's cell flash
+    c.save(); c.clip(HULL);
+    for (let i = 0; i < p.n; i++) {
+      if (p.type[i] !== SCORCH) continue;
+      const t = p.age[i] / p.life[i]; c.globalAlpha = 0.6 * (1 - t); c.fillStyle = '#0b0807';
+      c.beginPath(); c.arc(p.x[i], p.y[i], p.size[i], 0, 6.2832); c.fill();
+    }
+    c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < p.n; i++) {
+      const ty = p.type[i], t = p.age[i] / p.life[i];
+      if (ty === SCORCH) {
+        if (t > 0.45) continue; const r = p.size[i] * 1.6; c.globalAlpha = 1 - t / 0.45;
+        c.drawImage(S[ri(0.2 + t * 1.6)], p.x[i] - r, p.y[i] - r, r * 2, r * 2);
+      } else if (ty === LIGHT) {
+        const r = p.size[i]; c.globalAlpha = Math.min(1, p.alpha[i] * 1.5) * (1 - t) * (1 - t);
+        c.drawImage(S[ri(0.3)], p.x[i] - r, p.y[i] - r, r * 2, r * 2);
+      } else if (ty === WAVE) {
+        const amp = p.size[i] * Math.pow(1 - t, 1.3), sf = p.x[i] + p.a0[i] * p.vx[i] * p.age[i], w = p.w[i], dir = p.a0[i];
+        c.fillStyle = c.strokeStyle = R[ri(0.3 + 0.4 * t)]; c.lineWidth = 0.8;
+        for (let j = 0; j < EDGE_CELLS.length; j += 3) {
+          const d = (EDGE_CELLS[j + 2] - sf) * dir + w * 0.5, a = Math.exp(-(d * d) / (w * w * 0.35)) * amp / (p.size[i] + 0.001) * 0.42;
+          if (a < 0.02) continue;
+          c.globalAlpha = a * 0.3; c.fillRect(EDGE_CELLS[j] + 0.6, EDGE_CELLS[j + 1] + 0.6, CELL - 1.2, CELL - 1.2);
+          c.globalAlpha = a; c.strokeRect(EDGE_CELLS[j] + 1, EDGE_CELLS[j + 1] + 1, CELL - 2, CELL - 2);
+        }
+      }
+    }
+    c.restore();
+    // Pass 2: normal blend: smoke and the petals' dark bodies
+    c.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < p.n; i++) {
+      const ty = p.type[i]; if (ty !== SMOKE && ty !== PETAL) continue;
+      const t = p.age[i] / p.life[i];
+      if (ty === SMOKE) { const r = p.size[i]; c.globalAlpha = p.alpha[i] * (1 - t) * Math.min(1, t * 6); c.drawImage(this.smokeSpr, p.x[i] - r, p.y[i] - r, r * 2, r * 2); }
+      else { c.globalAlpha = t > 0.8 ? (1 - t) * 5 : 1; c.fillStyle = this.chunk; this.petalPath(c, i); c.fill(); }
+    }
+    // Pass 3: light (additive)
+    c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < p.n; i++) {
+      const ty = p.type[i], t = p.age[i] / p.life[i], x = p.x[i], y = p.y[i];
+      switch (ty) {
+        case SPARK: case DROP: {
+          const col = R[ri(p.heat[i] + p.cool[i] * t)], L = p.len[i];
+          c.globalAlpha = 1 - t * t; c.strokeStyle = col;
+          c.lineWidth = ty === DROP ? p.size[i] * (1 - 0.4 * t) : p.w[i] * 1.25 * (1 - 0.5 * t);
+          c.beginPath(); c.moveTo(x, y); c.lineTo(x - p.vx[i] * L, y - p.vy[i] * L); c.stroke();
+          const hr = ty === DROP ? p.size[i] * 2.8 : p.w[i] * 3.2; // a soft halo on the head (stands in for bloom)
+          c.globalAlpha = 0.4 * (1 - t); c.drawImage(S[ri(p.heat[i] + 0.15 + p.cool[i] * t)], x - hr, y - hr, hr * 2, hr * 2);
+          if (p.flag[i] & F_STARHEAD) {
+            const z = p.w[i] * 3.2 * (1 - t), a = p.age[i] * 0.3, ca = Math.cos(a) * z, sa = Math.sin(a) * z;
+            c.lineWidth = p.w[i] * 0.5; c.strokeStyle = R[0];
+            c.beginPath(); c.moveTo(x - ca, y - sa); c.lineTo(x + ca, y + sa); c.moveTo(x + sa, y - ca); c.lineTo(x - sa, y + ca); c.stroke();
+            const r = z * 1.4; c.drawImage(S[ri(0.15)], x - r, y - r, r * 2, r * 2);
+          }
+          break;
+        }
+        case GLOW: { const r = p.size[i]; if (r <= 0) break; c.globalAlpha = p.alpha[i] * Math.pow(1 - t, 1.5); c.drawImage(S[ri(p.heat[i] + p.cool[i] * t)], x - r, y - r, r * 2, r * 2); break; }
+        case LIGHT: { const r = p.size[i] * 0.8; c.globalAlpha = p.alpha[i] * 0.3 * (1 - t) * (1 - t); c.drawImage(S[ri(0.4)], x - r, y - r, r * 2, r * 2); break; }
+        case PETAL: { c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = 0.9; this.petalPath(c, i); c.stroke(); break; }
+        case RING: {
+          const e = 1 - (1 - t) * (1 - t), r = Math.max(0.01, p.size[i] * e);
+          c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = p.w[i] * (1 - t) + 0.25;
+          c.beginPath(); c.ellipse(x + p.vx[i] * e, y + p.vy[i] * e, r, r * p.len[i], p.rot[i], p.a0[i], p.a1[i]); c.stroke();
+          break;
+        }
+        case STREAK: {
+          const ux = Math.cos(p.rot[i]), uy = Math.sin(p.rot[i]), reach = p.size[i] * Math.min(1, t * 3 + 0.25), a = reach * t * 0.6;
+          c.globalAlpha = 0.4 * (1 - t); c.strokeStyle = R[ri(p.heat[i] + 0.3 + p.cool[i] * t)]; c.lineWidth = p.w[i] * 2.6 * (1 - t);
+          c.beginPath(); c.moveTo(x + ux * a, y + uy * a); c.lineTo(x + ux * reach, y + uy * reach); c.stroke();
+          c.globalAlpha = 1 - t; c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = p.w[i] * (1 - t);
+          c.stroke();
+          break;
+        }
+        case STAR: {
+          const L = p.size[i] * Math.pow(1 - t, 0.6), ux = Math.cos(p.rot[i]) * L, uy = Math.sin(p.rot[i]) * L;
+          c.globalAlpha = 1 - t; c.strokeStyle = R[ri(0.05 + 0.3 * t)]; c.lineWidth = p.w[i] * (1 - t) + 0.2;
+          c.beginPath(); c.moveTo(x - ux * 0.35, y - uy * 0.35); c.lineTo(x + ux, y + uy); c.moveTo(x + uy * 0.6, y - ux * 0.6); c.lineTo(x - uy * 0.6, y + ux * 0.6); c.stroke();
+          const r = L * 0.45; c.drawImage(S[0], x - r, y - r, r * 2, r * 2);
+          break;
+        }
+        case WAVE: {
+          const amp = p.size[i] * Math.pow(1 - t, 1.3), dir = p.a0[i], sf = x + dir * p.vx[i] * p.age[i], w = p.w[i];
+          if (sf < 0 || sf > SL) break;
+          c.globalAlpha = 0.9 * (1 - t); c.strokeStyle = R[ri(p.heat[i] + p.cool[i] * t)]; c.lineWidth = 1.2 + amp * 0.35;
+          c.beginPath();
+          for (let j = 0; j <= 10; j++) {
+            const u = j / 10, q = pointAt(sf - dir * u * w), b = amp * Math.sin(Math.PI * u) * (1 - 0.35 * u);
+            if (j === 0) c.moveTo(q.x + q.nx * b, q.y + q.ny * b); else c.lineTo(q.x + q.nx * b, q.y + q.ny * b);
+          }
+          c.stroke();
+          const q = pointAt(sf - dir * w * 0.45), r = 2 + amp * 1.8;
+          c.globalAlpha = 0.55 * (1 - t); c.drawImage(S[ri(0.2 + 0.4 * t)], q.x + q.nx * amp - r, q.y + q.ny * amp - r, r * 2, r * 2);
+          break;
+        }
+      }
+    }
+    // Shots in flight: the game's kinetic tracer (core 0xfff7e6, glow 0xffb04a at 0.34)
+    for (const o of this.shots) {
+      if (!o.on) continue;
+      const h = o.h, hx = h.x - h.dx * (o.dist - o.gone), hy = h.y - h.dy * (o.dist - o.gone), L = o.speed * 2.2, sk = Math.sqrt(o.k);
+      c.globalAlpha = 0.34; c.strokeStyle = '#ffb04a'; c.lineWidth = 7 * sk;
+      c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx - h.dx * L, hy - h.dy * L); c.stroke();
+      c.globalAlpha = 1; c.strokeStyle = '#fff7e6'; c.lineWidth = 2.4 * sk; c.stroke();
+      const r = 10 * sk; c.globalAlpha = 0.8; c.drawImage(S[ri(0.15)], hx - r, hy - r, r * 2, r * 2);
+    }
+    // Debug vectors
+    c.globalCompositeOperation = 'source-over';
+    if (showVectors) {
+      for (const m of this.marks) {
+        if (m.age > 150) continue;
+        const a = m.age < 110 ? 1 : (150 - m.age) / 40;
+        c.globalAlpha = a; c.lineWidth = 1;
+        c.setLineDash(DASH); c.strokeStyle = '#ffffff';
+        c.beginPath(); c.moveTo(m.x - m.dx * 40, m.y - m.dy * 40); c.lineTo(m.x, m.y); c.stroke();
+        c.setLineDash(NODASH);
+        this.arrow(c, m.x, m.y, m.nx, m.ny, 24, '#7fd6fa');
+        this.arrow(c, m.x, m.y, m.rx, m.ry, 34, '#ffb04a');
+        this.arrow(c, m.x, m.y, m.tx, m.ty, 16, '#8fe388');
+      }
+    }
+    c.globalAlpha = 1;
+  }
+  arrow(c, x, y, ux, uy, L, col) {
+    const ex = x + ux * L, ey = y + uy * L;
+    c.strokeStyle = col; c.beginPath(); c.moveTo(x, y); c.lineTo(ex, ey);
+    c.moveTo(ex, ey); c.lineTo(ex - ux * 4 - uy * 2.5, ey - uy * 4 + ux * 2.5);
+    c.moveTo(ex, ey); c.lineTo(ex - ux * 4 + uy * 2.5, ey - uy * 4 - ux * 2.5); c.stroke();
+  }
+  petalPath(c, i) {
+    const p = this.pool, z = p.size[i], cr = Math.cos(p.rot[i]) * z, sr = Math.sin(p.rot[i]) * z, x = p.x[i], y = p.y[i];
+    // a torn, slightly curled plate: four corners in its own frame
+    c.beginPath();
+    c.moveTo(x + (-1 * cr - -0.5 * sr), y + (-1 * sr + -0.5 * cr));
+    c.lineTo(x + (1 * cr - -0.25 * sr), y + (1 * sr + -0.25 * cr));
+    c.lineTo(x + (0.7 * cr - 0.6 * sr), y + (0.7 * sr + 0.6 * cr));
+    c.lineTo(x + (-0.6 * cr - 0.35 * sr), y + (-0.6 * sr + 0.35 * cr));
+    c.closePath();
+  }
+}
+
+/* =====================================================================================
+   Controller: UI state, firing, loop
+   ===================================================================================== */
+const state = { fx: 0, angle: 35, dmg: 60, mat: 'armour', slow: false, vectors: false, auto: !REDUCED };
+const paneNew = new Pane(document.getElementById('cvNew'), EFFECTS[0], null);
+const paneOld = new Pane(document.getElementById('cvOld'), CURRENT, CURRENT_RAMP);
+const panes = [paneNew, paneOld];
+const kOf = (dmg) => Math.max(0.55, Math.min(3.6, Math.pow(dmg / 14, 0.42)));
+const dmgFromSlider = (v) => Math.round(4 * Math.exp(Math.log(60) * v / 1000));
+const sliderFromDmg = (d) => Math.round(1000 * Math.log(d / 4) / Math.log(60));
+const dmgWord = (d) => (d < 10 ? 'light' : d < 30 ? 'standard' : d < 120 ? 'heavy' : 'siege');
+
+const H = newHit();
+function fireAt(px, py, jitterDeg) {
+  const a = (state.angle + jitterDeg) * D2R, dx = Math.sin(a), dy = Math.cos(a);
+  if (!raycast(px - dx * 380, py - dy * 380, dx, dy, H)) return;
+  H.dx = dx; H.dy = dy;
+  const dn = dx * H.nx + dy * H.ny;
+  H.cos = Math.min(1, Math.max(0, -dn)); H.graze = 1 - H.cos;
+  H.rx = dx - 2 * dn * H.nx; H.ry = dy - 2 * dn * H.ny;
+  let tx = dx - dn * H.nx, ty = dy - dn * H.ny, tl = Math.hypot(tx, ty);
+  if (tl < 1e-3) { tx = -H.ny; ty = H.nx; tl = 1; }
+  H.tx = tx / tl; H.ty = ty / tl;
+  // Which way along the outline the slide runs: compare the tangent with the outline's direction there
+  let i = 0; while (i < NS - 1 && H.s > SS0[i] + SLEN[i]) i++;
+  H.sdir = (H.tx * SDX[i] + H.ty * SDY[i]) >= 0 ? 1 : -1;
+  H.dmg = state.dmg; H.k = kOf(state.dmg);
+  H.travel -= 0.01;
+  for (const p of panes) p.fire(H, H.k, 12);
+  const off = Math.round(Math.acos(H.cos) / D2R);
+  lastEl.textContent = `Last hit ${String(off).padStart(2, ' ')}° from the normal, ${off < 25 ? 'head-on' : off < 60 ? 'angled' : 'glancing'}`;
+}
+function fireAuto() { const x = rnd(6, 314); fireAt(x, surfY(x) - 0.2, rnd(-4, 4)); }
+
+// ---- UI ----
+const $ = (id) => document.getElementById(id);
+const lastEl = $('last'), picker = $('picker'), params = $('params');
+EFFECTS.forEach((e, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'pick'; b.id = 'fx-' + e.id; b.setAttribute('role', 'radio');
+  b.innerHTML = `<kbd>${i + 1}</kbd><b>${e.name}</b><span>${e.desc}</span>`;
+  b.addEventListener('click', () => selectFx(i));
+  picker.appendChild(b);
+});
+function fmtParams(e) {
+  const keys = Object.keys(e.P), w = Math.max(...keys.map((k) => k.length));
+  return `${e.id}.P = {\n` + keys.map((k) => `  ${(k + ':').padEnd(w + 1)} ${e.P[k]},`).join('\n') + '\n}';
+}
+function selectFx(i) {
+  state.fx = i; paneNew.effect = EFFECTS[i];
+  [...picker.children].forEach((b, j) => { b.setAttribute('aria-checked', String(j === i)); b.tabIndex = j === i ? 0 : -1; });
+  $('newName').textContent = EFFECTS[i].name; params.textContent = fmtParams(EFFECTS[i]);
+}
+picker.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault(); const n = (state.fx + (e.key === 'ArrowDown' ? 1 : EFFECTS.length - 1)) % EFFECTS.length; selectFx(n); picker.children[n].focus();
+});
+function setAngle(v) { state.angle = v; $('angleVal').textContent = `${v > 0 ? '+' : ''}${v}°`; }
+function setDmg(d) { state.dmg = d; $('dmgVal').textContent = `${d} · ${dmgWord(d)} · k ${kOf(d).toFixed(2)}`; paneHud(); }
+function paneHud() {
+  const k = kOf(state.dmg), cur = Math.sqrt(Math.max(0.75, Math.min(1.7, Math.pow(state.dmg / 14, 0.3))));
+  $('roNew').textContent = `size ×${k.toFixed(2)}`; $('roOld').textContent = `size ×${cur.toFixed(2)}`;
+}
+$('angle').addEventListener('input', (e) => setAngle(+e.target.value));
+$('dmg').addEventListener('input', (e) => setDmg(dmgFromSlider(+e.target.value)));
+document.querySelectorAll('.chips button').forEach((b) => b.addEventListener('click', () => { const d = +b.dataset.dmg; $('dmg').value = sliderFromDmg(d); setDmg(d); fireAuto(); }));
+document.querySelectorAll('#mat button').forEach((b) => b.addEventListener('click', () => {
+  state.mat = b.dataset.mat; document.querySelectorAll('#mat button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+  panes.forEach((p) => p.setMaterial(state.mat));
+}));
+$('fire').addEventListener('click', fireAuto);
+$('auto').addEventListener('change', (e) => { state.auto = e.target.checked; });
+$('slow').addEventListener('change', (e) => { state.slow = e.target.checked; });
+$('vectors').addEventListener('change', (e) => { state.vectors = e.target.checked; $('legend').hidden = !state.vectors; });
+$('auto').checked = state.auto;
+for (const p of panes) p.cv.addEventListener('pointerdown', (e) => {
+  const r = p.cv.getBoundingClientRect(), wx = (e.clientX - r.left) / r.width * WW, wy = (e.clientY - r.top) / r.height * WH;
+  const n = nearest(wx, wy); fireAt(n.x, n.y, 0);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === 'range') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k >= '1' && k <= '5') selectFx(+k - 1);
+  else if (k === 'f') fireAuto();
+  else if (k === 's') { $('slow').checked = state.slow = !state.slow; }
+  else if (k === 'v') { $('vectors').checked = state.vectors = !state.vectors; $('legend').hidden = !state.vectors; }
+});
+
+// ---- loop ----
+let autoT = 50, acc = 0, last = performance.now();
+const cadence = () => Math.round(46 + 34 * Math.min(1, (kOf(state.dmg) - 0.55) / 2.5));
+function tick() {
+  if (state.auto && --autoT <= 0) { fireAuto(); autoT = cadence(); }
+  for (const p of panes) p.step();
+}
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  acc += dt * (state.slow ? 0.2 : 1);
+  let n = 0; while (acc >= TICK && n++ < 6) { tick(); acc -= TICK; }
+  if (n >= 6) acc = 0;
+  for (const p of panes) p.draw(state.vectors);
+  requestAnimationFrame(frame);
+}
+function resizeAll() { for (const p of panes) p.resize(); }
+new ResizeObserver(resizeAll).observe(document.querySelector('.stage'));
+
+setAngle(state.angle); $('dmg').value = sliderFromDmg(state.dmg); setDmg(state.dmg); selectFx(0);
+resizeAll();
+// Open on a hit already landing, so the first frame shows the effect
+fireAt(150, surfY(150) - 0.2, 0);
+for (let i = 0; i < 34; i++) tick();
+for (const p of panes) p.draw(state.vectors);
+requestAnimationFrame(frame);
+})();
+</script>
