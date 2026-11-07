@@ -87,6 +87,14 @@ export interface FeatureInstance {
   onShieldBreak?(eid: number): void;
   /** An entity left the world (every per-entity table of the feature should forget it) */
   onLeave?(eid: number): void;
+  // ---- The game's events, each fired by the code that knows (no feature polls the ECS or the input arrays for them).
+  // They may come at any point of a tick: a feature that acts on one in its own tick keeps a note and reads it there.
+  /** A pilot's ship was destroyed: its health ran out (GameServer's player deaths) */
+  onDied?(eid: number): void;
+  /** A pilot berthed at a station (game/Docking.ts handleDock) */
+  onBerthed?(eid: number): void;
+  /** An input that holds the jump key was applied to a pilot (net/handlers/flight.ts applyInputToEntity): it asks its drive to jump */
+  onJumpKey?(eid: number): void;
 }
 
 /**

@@ -7,8 +7,9 @@
  *           server finds them lined up now (clampLinedUp, no slack). The first to press steers (the leader)
  *   swap    docked, both pressed the swap key (`clampSwap`) within the window: the same pair, the other one steers
  *   undock  docked, either pilot alone (`clampUndock`): they let go, pushed apart along the clamps' line
- *   breaks  either ship destroyed (death), gone from the world or the system (gone), a jump key held (jump: the drive
- *           works only solo; the charge starts the tick after), berthed at a station (station), either clamp lost (part)
+ *   breaks  either ship destroyed (death: onDied), gone from the world or the system (gone), an input holding the jump
+ *           key (jump: onJumpKey; the drive works only solo, the charge starts the tick after), berthed at a station
+ *           (station: onBerthed), either clamp lost (part). The events are noted when they come and read in the tick
  *
  * Told as rare events: `clampAsk` to the other pilot while a press waits, `clampLink` (lock, swap, a rebuild's fresh
  * offset) and `clampBreak` to every pilot in the pair's system, and each open link again to a pilot that comes there.
@@ -16,7 +17,7 @@
 
 import { hasComponent } from 'bitecs';
 import {
-  Position, Velocity, Rotation, InSystem, Dead, Player, Input, CLAMP, clampWorld, clampFit, clampLinedUp, clampOffset, pairKey,
+  Position, Velocity, Rotation, InSystem, Dead, Player, CLAMP, clampWorld, clampFit, clampLinedUp, clampOffset, pairKey,
   type ClampInfo, type ClampBody, type ShipState, type ClampBreak,
 } from '@space-game/common';
 import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
@@ -30,12 +31,17 @@ interface Press { what: 'dock' | 'swap'; with: number; mine: number; theirs: num
 /** How often an open link is offered to pilots who came to the pair's system (ticks) */
 const RETELL_TICKS = 30;
 
+/** The game's events a link breaks on (FeatureInstance onDied, onBerthed, onJumpKey), as bits; the order is the break's precedence */
+const HEARD_DIED = 1, HEARD_BERTHED = 2, HEARD_JUMP = 4;
+
 export class Clamps implements FeatureInstance {
   private readonly presses = new Map<number, Press>();
   /** Pairs that let go lately: no lock again until this tick */
   private readonly relock = new Map<string, number>();
   /** The pilots each open link was told to (by its leader and follower) */
   private readonly told = new Map<ServerClampLink, Set<number>>();
+  /** The game's events on pilots in a link since the last tick (HEARD_ bits), by pilot */
+  private readonly heard = new Map<number, number>();
   readonly messages: Readonly<Record<string, FeatureMessageHandler>>;
 
   constructor(private readonly host: FeatureHost) {
@@ -193,21 +199,38 @@ export class Clamps implements FeatureInstance {
       if (why) { this.breakLink(k, why); continue; }
       if (now % RETELL_TICKS === 0) this.tellLink(k, false);
     }
+    // (The events heard since the last tick are spent: one on a pilot in no link meant nothing)
+    this.heard.clear();
   }
 
   /** Why this link must let go now (null: it holds) */
   private broken(k: ServerClampLink): ClampBreak | null {
     const w = this.host.world;
+    const heard = (this.heard.get(k.leader) ?? 0) | (this.heard.get(k.follower) ?? 0);
+    // (A death first: by the tick after it the wreck's pilot is out of the world too, which is not why it let go)
+    if (heard & HEARD_DIED) return 'death';
     for (const eid of [k.leader, k.follower]) if (!this.host.ships.has(eid) || !hasComponent(w, Player, eid)) return 'gone';
     if (InSystem.systemId[k.leader] !== InSystem.systemId[k.follower]) return 'gone';
     // (A pilot whose connection went: its ship may linger a while, but nobody flies it)
     const here = this.host.pilotsIn?.(k.leader);
     if (here && (!here.includes(k.leader) || !here.includes(k.follower))) return 'gone';
-    if (hasComponent(w, Dead, k.leader) || hasComponent(w, Dead, k.follower)) return 'death';
-    if (this.host.isDocked(k.leader) || this.host.isDocked(k.follower)) return 'station';
-    if (Input.jump[k.leader] || Input.jump[k.follower]) return 'jump';
+    if (heard & HEARD_BERTHED) return 'station';
+    if (heard & HEARD_JUMP) return 'jump';
     if (!this.clampOf(k.leader, k.lc) || !this.clampOf(k.follower, k.fc)) return 'part';
     return null;
+  }
+
+  // ------------------------------------------------------------------------------------------------ the game's events
+  // (Each noted, and read by the next tick's break check: a link lets go from the tick after its features' tick, as
+  // every decision here does, whenever in the tick the event came)
+
+  onDied(eid: number): void { this.hear(eid, HEARD_DIED); }
+  onBerthed(eid: number): void { this.hear(eid, HEARD_BERTHED); }
+  onJumpKey(eid: number): void { this.hear(eid, HEARD_JUMP); }
+
+  private hear(eid: number, what: number): void {
+    // (Only a pilot in a link: a jump key held by everyone else, every input, notes nothing)
+    if (this.table.open(eid)) this.heard.set(eid, (this.heard.get(eid) ?? 0) | what);
   }
 
   onShipRebuilt(eid: number): void {
@@ -223,7 +246,8 @@ export class Clamps implements FeatureInstance {
   onLeave(eid: number): void {
     this.presses.delete(eid);
     const k = this.table.open(eid);
-    if (k) this.breakLink(k, 'gone');
+    // (A destroyed ship leaves the world the tick it died: that's why it let go)
+    if (k) this.breakLink(k, (this.heard.get(eid) ?? 0) & HEARD_DIED ? 'death' : 'gone');
   }
 
   /** The link a pilot is in now (tests, the HUD's server side) */

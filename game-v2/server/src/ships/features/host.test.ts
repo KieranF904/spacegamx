@@ -12,7 +12,7 @@ const HOST = {} as FeatureHost;
 describe('ServerFeatures', () => {
   it('with no features every call is a no-op', () => {
     const f = new ServerFeatures([], HOST);
-    f.tick(); f.onShipRebuilt(1); f.onLeave(1);
+    f.tick(); f.onShipRebuilt(1); f.onLeave(1); f.onDied(1); f.onBerthed(1); f.onJumpKey(1);
     expect(f.cargoMass(1)).toBe(0);
     expect(f.wire(1, [])).toBe(0);
     expect(f.status('tow', 1)).toBe(0);
@@ -33,13 +33,16 @@ describe('ServerFeatures', () => {
           status: () => mass,
           onShipRebuilt: (eid) => { log.push(`rebuilt ${id} ${eid}`); },
           onLeave: (eid) => { log.push(`leave ${id} ${eid}`); },
+          onDied: (eid) => { log.push(`died ${id} ${eid}`); },
+          onBerthed: (eid) => { log.push(`berthed ${id} ${eid}`); },
+          onJumpKey: (eid) => { log.push(`jump ${id} ${eid}`); },
         };
       },
     });
     const f = new ServerFeatures([make('b', 2, [7, 8]), make('a', 1, [5])], HOST);
     expect(f.list()).toEqual(['a', 'b']);
-    f.tick(); f.onShipRebuilt(3); f.onLeave(4);
-    expect(log).toEqual(['tick a', 'tick b', 'rebuilt a 3', 'rebuilt b 3', 'leave a 4', 'leave b 4']);
+    f.tick(); f.onShipRebuilt(3); f.onLeave(4); f.onDied(5); f.onBerthed(6); f.onJumpKey(7);
+    expect(log).toEqual(['tick a', 'tick b', 'rebuilt a 3', 'rebuilt b 3', 'leave a 4', 'leave b 4', 'died a 5', 'died b 5', 'berthed a 6', 'berthed b 6', 'jump a 7', 'jump b 7']);
     expect(f.cargoMass(10)).toBe(30);
     const out: number[] = [];
     expect(f.wire(1, out)).toBe(3);

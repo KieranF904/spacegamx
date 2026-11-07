@@ -17,7 +17,7 @@ import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Rotation, Input, Dead, InSystem, ReplicaMode, CTL, replicaStep, controlBits, buildFlightInputs, simAimQ, stepOwnShip, ownStructure,
+  Position, Velocity, Rotation, Input, Health, InSystem, ReplicaMode, CTL, replicaStep, controlBits, buildFlightInputs, simAimQ, stepOwnShip, ownStructure,
   quantizeCursorAngle, dequantizeCursorAngle, replicaAngle, followerPose, clampOffset, ClampLinks, linksSource, CLAMP,
   type ServerMessage, type FlightBody, type OwnExtras, type SimEnv, type ReplicaEnv, type Blueprint, type ShipState, type ClientInputMessage,
 } from '@space-game/common';
@@ -30,6 +30,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { Clamps } from '../ships/features/clamp/Clamps.js';
+import { stationQuery } from '../game/Docking.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -228,9 +229,18 @@ describe('docking clamps on the server', () => {
 
   it('breaks: a jump key, a destroyed ship, a station berth, a clamp lost, a pilot gone', () => {
     const cases: [string, (w: ReturnType<typeof world>) => void][] = [
-      ['jump', (w) => { Input.jump[w.b.id] = 1; }],
-      ['death', (w) => { bitecs.addComponent((w.server as any).world, Dead, w.a.id); }],
-      ['station', (w) => { (w.server as any).dockedShips.add(w.b.id); }],
+      // (Each through the game's own path: an input holding the jump key, health run out, a berth at a station)
+      ['jump', (w) => { w.b.t.send(input(900, { jump: true }, UP)); }],
+      ['death', (w) => { Health.current[w.a.id] = 0; }],
+      ['station', (w) => {
+        const s = (w.server as any), sys = InSystem.systemId[w.b.id];
+        const st = stationQuery(s.world).find((e: number) => InSystem.systemId[e] === sys);
+        expect(st, 'a station in the pair\'s system').toBeDefined();
+        Position.x[st!] = Position.x[w.b.id]; Position.y[st!] = Position.y[w.b.id];
+        const conn = [...s.clients.values()].find((c: any) => c.playerId === w.b.id);
+        s.docking.handleDock(conn);
+        expect(s.dockedShips.has(w.b.id), 'berthed').toBe(true);
+      }],
       ['part', (w) => { const s = w.ships.get(w.a.id)!; const i = s.blueprint.parts.findIndex((p) => p.uid === w.ca.uid); w.ships.damagePartBy(w.a.id, i, 1e9, -1); }],
       ['gone', (w) => { w.b.t.disconnect(); }],
     ];

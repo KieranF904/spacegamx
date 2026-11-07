@@ -39,6 +39,8 @@ export interface DockingHost {
   clock(): number;
   /** Let go of every key (GameServer.releaseControls) */
   releaseControls(eid: number): void;
+  /** A pilot berthed (the part features' onBerthed) */
+  berthed?(eid: number): void;
 }
 
 export class Docking {
@@ -52,6 +54,7 @@ export class Docking {
   private readonly send: (ws: ClientSocket, msg: ServerMessage) => void;
   private readonly clock: () => number;
   private readonly releaseControls: (eid: number) => void;
+  private readonly berthed: (eid: number) => void;
 
   /** Docked ships (inside a station): invulnerable, untouchable, unseen by hostiles */
   readonly dockedShips = new Set<number>();
@@ -67,6 +70,7 @@ export class Docking {
     this.send = host.send;
     this.clock = host.clock;
     this.releaseControls = host.releaseControls;
+    this.berthed = host.berthed ?? (() => {});
   }
 
   /** The station this player is close enough to dock at, or -1. */
@@ -98,6 +102,7 @@ export class Docking {
     conn.docked = { station: st, ox: 0, oy: 0, exit: { x: Position.x[eid] - Position.x[st], y: Position.y[eid] - Position.y[st] } };
     this.dockedShips.add(eid);
     this.releaseControls(eid);
+    this.berthed(eid);
     // (Berthed, the controls stay neutral: inputs still waiting for their tick are dropped, as are any that come before
     // the client knows: net/handlers/flight.ts handleInput)
     conn.scheduledInputs.length = 0;
