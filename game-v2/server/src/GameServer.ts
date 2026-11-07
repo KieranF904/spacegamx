@@ -785,6 +785,16 @@ export class GameServer implements ServerCtx {
       isDocked: (pilot) => this.dockedShips.has(pilot),
       deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
       effect: (eid, type) => this.broadcastToSystem(InSystem.systemId[eid], { type: 'effect', effectType: type, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]), entityId: eid }),
+      // (Field machines: features/machines)
+      econ: this.econ,
+      send: (pilot, msg) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, msg); },
+      profile: (pilot) => { const c = this.pilots.connOf(pilot); return c && this.pilots.get(c); },
+      markDirty: (pilot) => { const c = this.pilots.connOf(pilot); if (c) this.pilots.markDirty(c); },
+      holdCount: (pilot, id) => { const c = this.pilots.connOf(pilot); return c ? countOf(this.pilots.get(c)?.cargo ?? [], id) : 0; },
+      holdTake: (pilot, items) => { const c = this.pilots.connOf(pilot); return !!c && this.pilots.take(c, items, 'cargo'); },
+      holdGive: (pilot, items) => { const c = this.pilots.connOf(pilot); return c ? this.pilots.give(c, items, { quiet: true }) : items; },
+      holdRoom: (pilot) => { const c = this.pilots.connOf(pilot); return c ? this.pilots.cargoFree(c) : 0; },
+      freeBuild: (pilot) => { const c = this.pilots.connOf(pilot); return !!c && this.freeBuild(c as ClientConnection); },
     }, new Set(this.handlers.keys()));
     // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
     for (const [type, fn] of this.features.messages) {

@@ -28,6 +28,10 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   slotSave: { per: 60, burst: 10 },
   designSave: { per: 60, burst: 10 },
   designDelete: { per: 60, burst: 10 },
+  // A field plan diffed against the live ship and validated part by part (game/field/plan.ts), the ship refitted
+  fieldPlan: { per: 60, burst: 10 },
+  fieldPlanClear: { per: 60, burst: 10 },
+  fieldRecycle: { per: 120, burst: 20 },
   // Popups on other people's screens
   partyInvite: { per: 20, burst: 6 },
   tradeRequest: { per: 20, burst: 6 },

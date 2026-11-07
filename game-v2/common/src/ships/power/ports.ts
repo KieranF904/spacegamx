@@ -682,6 +682,33 @@ export function remapPorts(e: PortsState, after: PortsLayout, sameDesign: boolea
   e.sig = after.sig; e.gauge = portsGauge(after, e);
   return e;
 }
+/**
+ * Into another design whose parts are the old one's moved about, some added (a field plan's appended parts) or taken
+ * away (a recycled part): `keep[i]` is the old index of the new part i, or -1 for a new part. A kept part keeps what it
+ * held (clamped, as remapPorts does); a new one starts empty. So a plan save or a recycle is never a free store refill
+ * (docs/design/field-fabrication.md section 5.1). The machines' switches and counters go with the ship
+ */
+export function remapPortsByIndex(e: PortsState, after: PortsLayout, keep: ArrayLike<number>): PortsState {
+  const out = createPortsState(after);
+  const old = e.held.length;
+  out.held.fill(0); out.aug.fill(0);
+  for (let i = 0; i < after.n; i++) {
+    const o = i < keep.length ? keep[i] : -1;
+    if (!(o >= 0 && o < old)) continue;
+    out.held[i] = Math.max(0, Math.min(after.cap[i], e.held[o]));
+    out.aug[i] = Math.max(0, Math.min(after.augCap[i], e.aug[o]));
+    out.amt[i] = Math.max(0, Math.min(after.matCap[i], e.amt[o]));
+    out.mat[i] = out.amt[i] > 0 ? e.mat[o] : 0;
+    out.closed[i] = e.closed[o];
+    out.sat[i] = e.sat[o];
+    out.flags[i] = after.gun[i] === 0 && after.role[i] !== P_SELECTOR ? 0 : e.flags[o];
+  }
+  out.shieldSat = e.shieldSat;
+  out.mach = e.mach;
+  out.machEu.set(e.machEu);
+  out.sig = after.sig; out.gauge = portsGauge(after, out);
+  return out;
+}
 export function portsGauge(L: PortsLayout, e: PortsState): number { let g = 0; for (const r of L.relays) g += e.held[r]; return g; }
 export function portsGaugePct(L: PortsLayout, e: PortsState): number { return L.gaugeMax > 0 ? Math.round((10000 * e.gauge) / L.gaugeMax) / 100 : 100; }
 /** The live part that is this kind of field machine (MACHINE_FAB, MACHINE_REF), or -1 */

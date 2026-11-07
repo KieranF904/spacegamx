@@ -17,7 +17,7 @@ describe('ServerFeatures', () => {
     expect(f.wire(1, [])).toBe(0);
     expect(f.status('tow', 1)).toBe(0);
     expect(f.messages.size).toBe(0);
-    expect(SERVER_FEATURES.map((s) => s.id)).toEqual(['flash', 'strafer', 'support', 'tow', 'weaponry']);
+    expect(SERVER_FEATURES.map((s) => s.id)).toEqual(['flash', 'machines', 'strafer', 'support', 'tow', 'weaponry']);
   });
 
   it('runs hooks in id order, sums cargo, concatenates wire values', () => {

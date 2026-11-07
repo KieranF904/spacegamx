@@ -6,7 +6,7 @@
  * TYPE-ONLY imports: GameServer builds the host, features only name types.
  */
 import type { IWorld } from 'bitecs';
-import type { ShipTuning, ShipState, TowKind, WeaponInfo, WeaponTuning } from '@space-game/common';
+import type { Bag, Economy, PlayerProfile, ServerMessage, ShipTuning, ShipState, TowKind, WeaponInfo, WeaponTuning } from '@space-game/common';
 import type { WeaponBridge } from '../bridge/core.js';
 import type { ShipBridge } from '../ShipBridge.js';
 import type { LootPods } from '../../game/LootPods.js';
@@ -32,6 +32,28 @@ export interface FeatureHost {
   deliver(pilot: number, target: number, kind: TowKind): void;
   /** An effect everyone in the entity's system sees, at the entity (a Flash Screen's bloom) */
   effect(eid: number, type: number): void;
+
+  // ---- Field machines (features/machines, docs/design/field-fabrication.md): the pilot's hold, profile and bank
+  readonly econ: Economy;
+  /** A message to one pilot's client */
+  send(pilot: number, msg: ServerMessage): void;
+  /** The pilot's profile (its `ship` is the live ship's record: blueprint, ghosts, field); undefined: no pilot there */
+  profile(pilot: number): PlayerProfile | undefined;
+  /** The profile changed: save it in time */
+  markDirty(pilot: number): void;
+  /** How many of an item the hold has */
+  holdCount(pilot: number, id: string): number;
+  /** Take items from the hold, all or nothing */
+  holdTake(pilot: number, items: Bag): boolean;
+  /** Put items in the hold as far as there's room (by volume); returns what didn't fit */
+  holdGive(pilot: number, items: Bag): Bag;
+  /** Room left in the hold, in volume units */
+  holdRoom(pilot: number): number;
+  /** Dev servers: this pilot builds without licences or build points (Hangar's freeBuild) */
+  freeBuild?(pilot: number): boolean;
+  /** The repair bank's free spare the pilot's repairs may use (bank.ts freeSpare), and spending from it (package B) */
+  bankSpare?(pilot: number): Bag;
+  spendBankSpare?(pilot: number, bill: Bag): boolean;
 }
 
 /** One message handler: the pilot's entity and the message (already past the drops and limits of net/dispatch.ts) */
