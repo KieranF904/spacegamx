@@ -1292,7 +1292,7 @@ function lensPath(L, W, oy) {
   ctx.beginPath(); ctx.moveTo(-L / 2, oy);
   ctx.quadraticCurveTo(0, oy - W * 2, L / 2, oy); ctx.quadraticCurveTo(0, oy + W * 2, -L / 2, oy); ctx.closePath();
 }
-const LP = new Float32Array(72 * 3); // scratch: a round's path points, newest first
+const LP = new Float32Array(100 * 3); // scratch: a round's path points, newest first
 
 // ===================================================================================================================
 // STYLES. Hooks (all optional): spawn(r, k, L) after launch; update(r, k, L, dt) before the move (may steer, or
@@ -1593,20 +1593,29 @@ const STYLES = [
     id: 'lash', name: 'Burning Lash', family: 'Pulse laser', now: 'pulse', impact: 'tongue',
     desc: 'A bolt that unfurls a burning ribbon behind it. The ribbon hangs in the lane for a moment as a hazard line, then burns out.',
     def: { spd: 70, dmg: 30, rate: 1.4 },
-    // (The ribbon is laid straight; each point then drifts on a slowly turning flow field, `flow` its speed, `scale`
-    // how wide its swirls are, further the older it is: drift × (age / life)^agePow)
-    P: { r: 3, width: 3.2, drift: 22, agePow: 1.6, flow: 0.035, scale: 0.018, unfurl: 7, life: 46, gap: 0.7, sub: 4, core: '#fff0f8', hot: '#ff8cc6', outer: '#ff4fa3', ember: '#ffb0d8' },
+    // (The ribbon is laid straight; each point then drifts on a slowly turning flow field (`flow` how fast it turns,
+    // `scale` how tight its swirls), further the older it is: drift × (age / life)^agePow, unevenly along the ribbon
+    // (`patch`: how much that varies), and not at all at the end that hit: it stays anchored there, easing in over
+    // `anchor` units. It hangs for life + lifePerSpd × speed ticks, so a fast round still leaves a long-lived line)
+    P: { r: 3, width: 3.2, drift: 20, agePow: 1.4, flow: 0.012, scale: 0.018, patch: 0.75, anchor: 150, unfurl: 7, life: 90, lifePerSpd: 0.8, gap: 0.7, sub: 4, core: '#fff0f8', hot: '#ff8cc6', outer: '#ff4fa3', ember: '#ffb0d8' },
     trail: true,
-    linger() { return this.P.life; },
+    lifeOf(k) { return this.P.life + this.P.lifePerSpd * k.spd; },
+    linger(r) { return this.lifeOf(r.lane.k); },
     spawn(r, k, L) { r.y = L.y + (hash(r.n * 4.1) - 0.5) * 2 * L.jit; pushTrail(r); r.lastTr = 0; },
     embers(r, L) { // the odd ember off a point of the ribbon that's still burning
       if (!r.tn) return;
       const q = trailAt(r, Math.floor(hash(r.t * 7.1 + r.n) * r.tn)), age = r.t - r.tr[q + 2];
-      if (age > this.P.life * 0.8) return;
+      if (age > this.lifeOf(L.k) * 0.8) return;
       emit(L, 1, r.tr[q], r.tr[q + 1], (hash(r.t) - 0.5) * 0.8, -0.3 - 0.5 * hash(r.t + 1), 14, 1, 0, this.P.ember, 0.8);
     },
     update(r, k, L, dt) {
-      if (r.dist - r.lastTr >= Math.max(6, k.spd * this.P.gap)) { pushTrail(r); r.lastTr = r.dist; }
+      // (a point every `g` units back along this tick's flight, however fast it flies, so the drifting ribbon stays a
+      // smooth curve: one point a tick left a fast round's ribbon in long straight pieces)
+      const g = clamp(k.spd * this.P.gap, 6, 24), ux = Math.cos(r.hd), uy = Math.sin(r.hd), v = Math.max(1e-3, r.v);
+      for (let d = r.lastTr + g, n = 0; d <= r.dist && n < 16; d += g, n++) {
+        const back = r.dist - d;
+        pushTrailAt(r, r.x - ux * back, r.y - uy * back, r.t - back / v); r.lastTr = d;
+      }
       r.acc += dt; if (r.acc >= 3) { r.acc = 0; this.embers(r, L); }
     },
     after(r, k, L, dt) { r.acc += dt; if (r.acc >= 3) { r.acc = 0; this.embers(r, L); } },
@@ -1614,19 +1623,25 @@ const STYLES = [
       const P = this.P, m = Math.pow(k.m, 0.7), nx = -Math.sin(r.hd), ny = Math.cos(r.hd);
       let c = 0;
       if (r.state === 1) { LP[0] = r.x; LP[1] = r.y; LP[2] = r.t; c = 1; }
-      for (let i = 0; i < r.tn && c < 72; i++) { const q = trailAt(r, i); LP[c * 3] = r.tr[q]; LP[c * 3 + 1] = r.tr[q + 1]; LP[c * 3 + 2] = r.tr[q + 2]; c++; }
-      toWorld(); ADD();
-      let px = 0, py = 0, ok = false;
+      for (let i = 0; i < r.tn && c < 100; i++) { const q = trailAt(r, i); LP[c * 3] = r.tr[q]; LP[c * 3 + 1] = r.tr[q + 1]; LP[c * 3 + 2] = r.tr[q + 2]; c++; }
+      toWorld(); ADD(); ctx.lineCap = 'butt'; // (round caps on every piece stacked into bright beads at the joints)
+      const LIFE = this.lifeOf(k), T = r.t * (REDUCE ? 0.25 : 1) + r.n * 37, anchor = P.anchor * m;
+      let px = 0, py = 0, ok = false, rx = LP[0], ry = LP[1], fromHead = 0;
       done: for (let i = 0; i < c - 1; i++) {
         for (let s = i === 0 ? 0 : 1; s <= P.sub; s++) {
           const f = s / P.sub, x = LP[i * 3] + (LP[i * 3 + 3] - LP[i * 3]) * f, y = LP[i * 3 + 1] + (LP[i * 3 + 4] - LP[i * 3 + 1]) * f, t = LP[i * 3 + 2] + (LP[i * 3 + 5] - LP[i * 3 + 2]) * f;
           const age = r.t - t;
-          if (age > P.life) break done;
-          const u = Math.min(1, age / P.unfurl), along = Math.hypot(x - r.sx, y - r.sy), life = 1 - age / P.life;
-          // straight where it was just laid; drifting along the flow field the longer it has hung there
-          const T = r.t * (REDUCE ? 0.25 : 1) + r.n * 37, amt = P.drift * m * Math.pow(age / P.life, P.agePow);
-          const ang = 1.7 * (Math.sin(x * P.scale + T * P.flow + r.seed * 6) + Math.sin(y * P.scale * 1.7 - T * P.flow * 0.8 + along * 0.004));
-          const qx = x + Math.cos(ang) * amt, qy = y + Math.sin(ang) * amt;
+          if (age > LIFE) break done;
+          fromHead += Math.hypot(x - rx, y - ry); rx = x; ry = y;
+          const u = Math.min(1, age / P.unfurl), along = Math.hypot(x - r.sx, y - r.sy), life = 1 - age / LIFE;
+          // straight where it was just laid; drifting on the flow field the longer it has hung there, in uneven patches,
+          // and held still at the end that hit (the head while it flies)
+          const patch = 1 - P.patch * (0.5 + 0.5 * Math.sin(along * P.scale * 1.3 + r.seed * 7 + T * P.flow * 0.5));
+          const amt = P.drift * m * Math.pow(age / LIFE, P.agePow) * patch * sstep(fromHead / anchor);
+          // (a smooth vector field, two octaves: neighbouring points move together, so the ribbon bends rather than zigzags)
+          const dxn = Math.sin(x * P.scale + T * P.flow + r.seed * 6) + 0.4 * Math.sin(along * P.scale * 2.3 + T * P.flow * 1.4 + r.seed * 3);
+          const dyn = Math.cos(y * P.scale * 1.3 + along * P.scale * 0.6 - T * P.flow * 0.7 + r.seed * 4) + 0.4 * Math.cos(along * P.scale * 2.9 - T * P.flow * 1.2 + r.seed * 9);
+          const qx = x + dxn * amt * 0.6, qy = y + dyn * amt;
           if (ok) {
             const tw = 0.35 + 0.65 * Math.abs(Math.cos(along * 0.021 + age * 0.07)), w = P.width * m * u * tw * Math.sqrt(life);
             const fl = (REDUCE ? 1 : 0.82 + 0.18 * Math.sin(age * 0.9 + along * 0.1)) * life;
@@ -1637,6 +1652,7 @@ const STYLES = [
           px = qx; py = qy; ok = true;
         }
       }
+      ctx.lineCap = 'round';
       if (r.state !== 1) return;
       glow(P.outer, r.x, r.y, 9 * m, 0.5);
       seg(r.x - r.vx * 0.8, r.y - r.vy * 0.8, r.x, r.y, 2 * m, P.core, 0.9);
@@ -1812,7 +1828,7 @@ for (const s of STYLES) { s.nowStyle = nowStyle(s); s.hitCol = s.hitCol || '#ffd
 // ===================================================================================================================
 // Simulation: lanes of pooled rounds and particles. Nothing below allocates once running.
 // ===================================================================================================================
-const TRAIL = 64;
+const TRAIL = 96;
 /** A contact with a surface: world point, normal, incoming direction, cos (1 head-on); and the same in the fx frame */
 function HitW() { this.x = 0; this.y = 0; this.nx = -1; this.ny = 0; this.dx = 1; this.dy = 0; this.cos = 1; this.fx = 0; this.fy = 0; this.fnx = 0; this.fny = -1; this.fs = 0; this.fdx = 0; this.fdy = 1; }
 function copyHW(a, b) { a.x = b.x; a.y = b.y; a.nx = b.nx; a.ny = b.ny; a.dx = b.dx; a.dy = b.dy; a.cos = b.cos; a.fx = b.fx; a.fy = b.fy; a.fnx = b.fnx; a.fny = b.fny; a.fs = b.fs; a.fdx = b.fdx; a.fdy = b.fdy; }
@@ -1823,7 +1839,8 @@ function Round() {
   this.jx = new Int8Array(4); this.nj = 0; this.hw = new HitW(); this.lane = null;
   this.tr = new Float32Array(TRAIL * 3); this.ti = 0; this.tn = 0; this.lastTr = 0;
 }
-function pushTrail(r) { const i = r.ti * 3; r.tr[i] = r.x; r.tr[i + 1] = r.y; r.tr[i + 2] = r.t; r.ti = (r.ti + 1) % TRAIL; if (r.tn < TRAIL) r.tn++; }
+function pushTrail(r) { pushTrailAt(r, r.x, r.y, r.t); }
+function pushTrailAt(r, x, y, t) { const i = r.ti * 3; r.tr[i] = x; r.tr[i + 1] = y; r.tr[i + 2] = t; r.ti = (r.ti + 1) % TRAIL; if (r.tn < TRAIL) r.tn++; }
 /** Index into r.tr of the i-th newest trail point (0 = newest) */
 function trailAt(r, i) { return ((r.ti - 1 - i + TRAIL * 2) % TRAIL) * 3; }
 function Part() { this.on = false; this.kind = 0; this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.t = 0; this.life = 1; this.size = 1; this.grow = 0; this.g = 0; this.col = '#ffffff'; this.a = 1; }
