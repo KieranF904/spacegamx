@@ -158,6 +158,11 @@ export class AdminTools {
     return this.freeBuilders.has(c) && c.isAdmin && !!this.host.freeBuildAllowed?.();
   }
 
+  /** An admin on a dev server (one that allows free build): the dev-only tools (the repair bank's) are theirs */
+  devTools(c: AdminConn): boolean {
+    return !!c.isAdmin && !!this.host.freeBuildAllowed?.();
+  }
+
   /** A connection left (or lost the rank) */
   forget(c: AdminConn): void {
     this.god.delete(c);

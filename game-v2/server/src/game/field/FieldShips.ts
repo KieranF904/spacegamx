@@ -527,6 +527,8 @@ export class FieldShips implements FeatureInstance {
     if (ship.ghost[i]) {
       this.host.ships.installGhost(fs.eid, uid);
       if (fs.rec.ghosts) fs.rec.ghosts = fs.rec.ghosts.filter((u) => u !== uid);
+      // (A part the bank owed since a death, built by the machine instead: the bank owes it no longer)
+      if (fs.rec.owed) { fs.rec.owed = fs.rec.owed.filter((u) => u !== uid); if (!fs.rec.owed.length) delete fs.rec.owed; }
     } else {
       restorePart(ship, i, 1);
       // (Not "freshly destroyed" if lost again before the rebuild point)

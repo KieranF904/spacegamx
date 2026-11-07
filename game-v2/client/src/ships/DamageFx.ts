@@ -116,9 +116,6 @@ export class DamageFx {
     this.cap = Math.min(MAX_PARTICLES, cap);
   }
 
-  /** Ships with a repair kit at work (glints like station repair) */
-  readonly kitShips = new Set<number>();
-
   constructor(layer: Container, private source: ShipSource, private state: GameState, private sound: Sound, private repairRange: number) {
     this.add.blendMode = 'add';
     this.addGroup.addChild(this.add);
@@ -950,7 +947,7 @@ export class DamageFx {
       const missing = ship.derived.alive.length - alive.length;
       if (!damaged.length && !missing) continue;
       const nearStation = stations.some((s) => Math.hypot(s.renderX - e.renderX, s.renderY - e.renderY) < (s.data?.[8] ?? 200) + this.repairRange);
-      if (!nearStation && !this.kitShips.has(id)) continue;
+      if (!nearStation) continue;
       const pool = damaged.length ? damaged : alive;
       const p = this.partWorld(id, pool[Math.floor(Math.random() * pool.length)]);
       if (!p) continue;

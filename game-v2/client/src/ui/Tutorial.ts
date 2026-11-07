@@ -163,7 +163,7 @@ export class Tutorial {
         done: () => d.jumpPhase() === 'burn',
       },
       {
-        text: () => `That's the basics. Inner Sol is <b style="color:#5eead4">safe space</b>: hostiles keep out, and a ship lost here comes back whole. Past Jovan it gets rough, and the gates show what's beyond them. ${k('log')} jobs · ${k('map')} map · ${k('party')} party · ${k('quick1')}–${k('quick5')} quick bar · hold ${k('contextMenu')} and right-click anything for what you can do with it. Good flying!`,
+        text: () => `That's the basics. Inner Sol is <b style="color:#5eead4">safe space</b>: hostiles keep out, and a ship lost here keeps its whole hold. Past Jovan it gets rough, and the gates show what's beyond them. ${k('log')} jobs · ${k('map')} map · ${k('party')} party · ${k('quick1')}–${k('quick5')} quick bar · hold ${k('contextMenu')} and right-click anything for what you can do with it. Good flying!`,
         done: () => performance.now() - this.stepStart > 14000,
       },
     ];

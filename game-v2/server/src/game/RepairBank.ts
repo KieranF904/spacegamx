@@ -257,8 +257,10 @@ export class RepairBanks {
       case 'empty': bank.free = {}; bank.at = now; return true;
       case 'clearDeposits': bank.deposits = {}; return true;
       case 'grant': {
+        // (No items: a kit of every pack, 10 each)
+        const asked = items && Object.keys(items).length ? items : Object.fromEntries(this.packs.map((k) => [k.id, 10]));
         const give: Bag = {};
-        for (const [id, n] of Object.entries(items ?? {})) {
+        for (const [id, n] of Object.entries(asked)) {
           const k = Math.min(9999, Math.floor(Number(n)));
           if (k >= 1 && depositable(this.econ, id)) give[id] = k;
         }

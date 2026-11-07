@@ -7,9 +7,9 @@ import type { HandlerRegistry } from '../dispatch.js';
 import type { ServerCtx } from '../ServerCtx.js';
 import type { ClientConnection } from '../ClientConnection.js';
 
-/** May this connection use the dev bank tools? The flags that open the hangar anywhere / free building: never set on production */
+/** May this connection use the dev bank tools? An admin on a dev server, or the flags that open the hangar anywhere / free building: never on production */
 export function devBankAllowed(ctx: ServerCtx, conn: ClientConnection): boolean {
-  return ctx.shipEditAnywhere || ctx.freeBuild(conn);
+  return ctx.shipEditAnywhere || ctx.freeBuild(conn) || ctx.admin.devTools(conn);
 }
 
 /** A bag from a client: item id to whole count, a few entries, nothing else */

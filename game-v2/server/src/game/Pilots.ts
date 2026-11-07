@@ -958,14 +958,15 @@ export class Pilots {
   }
 
   /** `devBank` (net/handlers/bank.ts has checked this is a dev server): fill or empty the free part, clear or grant deposits */
-  devBank(conn: PilotConn, action: string, items?: Bag): void {
+  devBank(conn: PilotConn, action: string, items?: Bag): boolean {
     const s = this.sessions.get(conn);
-    if (!s || s.loading) return;
-    if (!this.bank.dev(s.profile, action, items, this.now())) return this.toast(conn, 'Nothing to do', 'info');
+    if (!s || s.loading) return false;
+    if (!this.bank.dev(s.profile, action, items, this.now())) { this.toast(conn, 'Nothing to do', 'info'); return false; }
     s.dirty = true;
     this.payOwedFree(s);
     this.sendBank(s, true);
     this.toast(conn, `Repair bank (dev): ${action}`, 'info');
+    return true;
   }
 
   /** The free part pays the owed parts of the ship it can, core outward, building them on the live ship */

@@ -73,28 +73,29 @@ describe('licences', () => {
 });
 
 describe('station repair', () => {
-  it('is billed at the station rate once past the free levels, and never strands a broke pilot', () => {
+  it('is paid from the repair bank, never credits; an empty bank with no deposits mends nothing', () => {
     const w = world();
     const ships = w.server.getShips();
     (ships as any).host.nearRepairSite = () => true;
-    const rate = 2;
-    (w.server as any).repairRate = () => rate;
-    w.server.pilots.addXp(w.conn(), 5000);
-    expect(w.profile().level).toBeGreaterThanOrEqual(3);
     const park = () => { Position.x[w.pid] = 40000; Position.y[w.pid] = 40000; };
     const part = ships.get(w.pid)!.blueprint.parts.findIndex((p) => p.fn === 'hull');
-    ships.damagePartFraction(w.pid, part, 0.5);
-    w.profile().credits = 1000;
-    for (let i = 0; i < 600; i++) { park(); w.server.step(); }
-    expect(w.profile().credits).toBeLessThan(1000);
-    // Broke: it still heals, slowly, for free
-    ships.damagePartFraction(w.pid, part, 0.5);
     const hp = () => ships.get(w.pid)!.hp[part];
-    const before = hp();
-    w.profile().credits = 0;
+    // A full free part: its spare pays, and the part heals on
+    ships.damagePartFraction(w.pid, part, 0.2);
+    w.profile().credits = 1000;
+    let before = hp();
     for (let i = 0; i < 600; i++) { park(); w.server.step(); }
-    expect(w.profile().credits).toBe(0);
+    expect(w.profile().credits).toBe(1000);
     expect(hp()).toBeGreaterThan(before);
+    // Nothing in the bank: no repair, and still no credits taken
+    w.server.pilots.bank.dev(w.profile(), 'empty', undefined, Date.now());
+    w.server.pilots.bank.dev(w.profile(), 'clearDeposits', undefined, Date.now());
+    ships.damagePartFraction(w.pid, part, 0.5);
+    for (let i = 0; i < 120; i++) { park(); w.server.step(); }
+    before = hp();
+    for (let i = 0; i < 600; i++) { park(); w.server.step(); }
+    expect(w.profile().credits).toBe(1000);
+    expect(hp()).toBe(before);
   });
 });
 

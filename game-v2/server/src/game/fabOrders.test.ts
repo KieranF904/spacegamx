@@ -28,18 +28,18 @@ describe('fabrication orders', () => {
     const p = server.pilots.get(conn)!;
     p.storage = [{ id: 'iron_ore', n: 12 }, { id: 'nickel_ore', n: 6 }, { id: 'copper_ore', n: 3 }];
     const run = (secs: number) => { for (let i = 0; i < secs; i++) { clock.t += 1000; for (let k = 0; k < 60; k++) server.step(); } };
-    // 3 kits: 6 alloy plate (12 iron, 6 nickel) and 6 wire (3 copper)
-    server.hangar.orderItem(conn, 'repair_kit', 3);
+    // 3 crates of HV shells: 6 alloy plate (12 iron, 6 nickel) and 3 wire (2 copper)
+    server.hangar.orderItem(conn, 'cannon_hv', 3);
     run(40);
-    expect(countOf(p.storage, 'repair_kit')).toBe(3);
+    expect(countOf(p.storage, 'cannon_hv')).toBe(3);
     expect(p.fabOrders).toBeUndefined();
     // No ore: it waits, and goes on when the ore turns up
-    server.hangar.orderItem(conn, 'repair_kit', 1);
+    server.hangar.orderItem(conn, 'cannon_hv', 1);
     run(5);
     expect(p.fabOrders?.length).toBe(1);
     server.pilots.give(conn, { iron_ore: 4, nickel_ore: 2, copper_ore: 1 }, { toStorage: true, quiet: true });
     run(30);
-    expect(countOf(p.storage, 'repair_kit')).toBe(4);
+    expect(countOf(p.storage, 'cannon_hv')).toBe(4);
   });
 
   it('a component a part needs (a power coupling) is fabricated from its own inputs, not left short', () => {

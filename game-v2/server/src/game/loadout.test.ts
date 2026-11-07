@@ -118,7 +118,7 @@ describe('ammunition loadouts', () => {
 
 describe('quick storage controls', () => {
   const HOLD = ['iron_ore', 'ruby', 'helium3', 'alloy_plate', 'scrap_electronics', 'ancient_relic', 'gem_frost_1', 'frost_heart',
-    'repair_kit', 'boost_cell', 'railgun_slugs', 'cannon_hv', 'fractured_plating'];
+    'boost_cell', 'railgun_slugs', 'cannon_hv', 'fractured_plating'];
   const sweep = (what: string) => {
     const { server, t, pid, profile } = liveServer();
     t.send({ type: 'slotLoadout', slot: 0, load: { cannon_hv: 2 } } as any);
@@ -139,7 +139,7 @@ describe('quick storage controls', () => {
   });
 
   it('safe: everything but ammunition, the loadout, utility and job items', () => {
-    expect(sweep('safe').kept).toEqual(['boost_cell', 'cannon_hv', 'fractured_plating', 'railgun_slugs', 'repair_kit']);
+    expect(sweep('safe').kept).toEqual(['boost_cell', 'cannon_hv', 'fractured_plating', 'railgun_slugs']);
   });
 
   it('all: the whole hold', () => {

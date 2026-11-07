@@ -103,10 +103,10 @@ describe('admin tools', () => {
     const a = join('boss'); a.conn.isAdmin = true;
     const credits = server.pilots.get(a.conn)!.credits;
     a.t.send({ type: 'chat', text: '/credits 2500' } as any);
-    a.t.send({ type: 'chat', text: '/give repair_kit 3' } as any);
+    a.t.send({ type: 'chat', text: '/give pack_hull 3' } as any);
     step();
     expect(server.pilots.get(a.conn)!.credits).toBe(credits + 2500);
-    expect(server.pilots.available(a.conn, 'repair_kit')).toBeGreaterThanOrEqual(3);
+    expect(server.pilots.available(a.conn, 'pack_hull')).toBeGreaterThanOrEqual(3);
     const num = InSystem.systemId[a.pid];
     a.t.send({ type: 'chat', text: '/spawn pirates pirate_skiff x3' } as any);
     step();

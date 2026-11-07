@@ -156,6 +156,7 @@ import { Dens } from './game/dens/Dens.js';
 import { Mobs, MobsFile } from './game/Mobs.js';
 import { Events } from './game/Events.js';
 import { AdminTools, type AdminConn, type AdminHost } from './game/AdminTools.js';
+import type { FieldShips } from './game/field/FieldShips.js';
 import { ContributorNotes, type ContribStore } from './game/ContributorNotes.js';
 import { Surfaces, type SurfaceHost } from './game/Surfaces.js';
 import { Sieges, type SiegeHost } from './game/Sieges.js';
@@ -796,6 +797,8 @@ export class GameServer implements ServerCtx {
       holdGive: (pilot, items) => { const c = this.pilots.connOf(pilot); return c ? this.pilots.give(c, items, { quiet: true }) : items; },
       holdRoom: (pilot) => { const c = this.pilots.connOf(pilot); return c ? this.pilots.cargoFree(c) : 0; },
       freeBuild: (pilot) => { const c = this.pilots.connOf(pilot); return !!c && this.freeBuild(c as ClientConnection); },
+      bankSpare: (pilot) => this.pilots.bankSpare(pilot),
+      spendBankSpare: (pilot, bill) => this.pilots.spendBankSpare(pilot, bill),
     }, new Set(this.handlers.keys()));
     // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
     for (const [type, fn] of this.features.messages) {
@@ -833,6 +836,9 @@ export class GameServer implements ServerCtx {
       now: opts.clock,
     });
     this.pilots.telemetry = new Telemetry(opts.telemetry ?? null, opts.clock);
+    // (The field machines tell the bank which parts they hold, and a death empties them into the wreck)
+    const field = this.features.get('machines') as unknown as FieldShips | undefined;
+    if (field) this.pilots.fieldHooks = { isClaimed: (eid, uid) => field.isClaimed(eid, uid), machineContents: (eid) => field.machineContents(eid, true) };
     const stationAtConn = (conn: unknown) => {
       const c = conn as ClientConnection;
       const st = c.docked && entityExists(this.world, c.docked.station) ? c.docked.station : this.stationInRange(c.playerId);
@@ -2132,6 +2138,7 @@ this.devTeleport = opts.devTeleport ?? false;
       hitStats: () => this.hits.stats,
       crowd: (c, to) => this.crowd?.admin(InSystem.systemId[C(c).playerId], to) ?? { ok: false, text: "This server doesn't take crowd fallbacks" },
       freeBuildChanged: (c) => this.hangar.send(C(c)),
+      devBank: (c, action, items) => (this.pilots.devBank(C(c), action, items) ? { ok: true, text: `Repair bank: ${action}` } : { ok: false, text: 'Nothing to do' }),
       setAdminLive: (c, on) => {
         C(c).isAdmin = on;
         // Their client opens (or puts away) the admin and contributor tools as it does on signing in

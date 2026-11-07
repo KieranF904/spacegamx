@@ -47,7 +47,8 @@ function design(opts: { reactors?: number; fabricator?: boolean; fabRot?: Rot } 
   return { name: 'Field test', catalogVersion: catalog.version, power: 'ports', parts };
 }
 
-function world(bp: Blueprint) {
+/** `bank`: keep the repair bank's free part (full; its spare pays repairs and rebuilds of the ship's own parts). Off: emptied, so the hold alone pays */
+function world(bp: Blueprint, opts: { bank?: boolean } = {}) {
   resetGlobals();
   const server = new GameServer({
     gameData: new GameData(files),
@@ -72,6 +73,7 @@ function world(bp: Blueprint) {
   prof.ship.hp = {};
   prof.ship.ghosts = [];
   delete prof.ship.field;
+  if (!opts.bank) server.pilots.bank.dev(prof, 'empty', undefined, 1_000_000);
   server.pilots.reapplyShip(conn);
   const ships = server.getShips()!;
   const run = (n: number) => { for (let k = 0; k < n; k++) server.step(); };
@@ -436,6 +438,17 @@ describe('field fabricator: packs', () => {
       expect(w.alive(1)).toBe(true);
     });
   }
+
+  it('with nothing in the hold the bank spare pays to rebuild a lost part of its own design', () => {
+    const w = world(design(), { bank: true });
+    const spare0 = w.server.pilots.bankSpare(w.pid);
+    expect(Object.keys(spare0).length).toBeGreaterThan(0);
+    w.destroy(1);
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    expect(until(w, () => w.alive(1), 8000)).toBeGreaterThan(0);
+    const spare1 = w.server.pilots.bankSpare(w.pid);
+    expect(Object.entries(spare0).some(([id, n]) => (spare1[id] ?? 0) < n)).toBe(true);
+  });
 
   it('in off mode packs are never used', () => {
     const w = world(design());

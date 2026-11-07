@@ -31,7 +31,7 @@ function restockable(pilot: PilotState): number {
 }
 
 const LABELS: Record<StoreSweep, [string, string]> = {
-  safe: ['Store all but ammo & utility', 'Everything except ammunition, your loadout, repair kits and other consumables, quick bar items and job items'],
+  safe: ['Store all but ammo & utility', 'Everything except ammunition, your loadout, consumables, quick bar items and job items'],
   ores: ['Store ore & materials', 'Raw ore, gems, volatiles and refined plate and wire'],
   loot: ['Store loot', 'Components, artefacts, cut gems and modules'],
   all: ['Store everything', 'The whole hold, ammunition and utility too (click twice)'],
@@ -53,7 +53,7 @@ export function storeControls(pilot: PilotState, send: (m: ClientMessage) => voi
     b.disabled = !pilot.atStation || n === 0;
     let armed = 0;
     b.onclick = () => {
-      // Everything asks twice: it takes the ammunition and repair kits too
+      // Everything asks twice: it takes the ammunition and consumables too
       if (mode === 'all' && Date.now() - armed > 3000) {
         armed = Date.now();
         b.textContent = 'Click again: everything';

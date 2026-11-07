@@ -254,7 +254,7 @@ describe('quests: nothing is forced', () => {
     goTo(server, pid, 'sol_station_central');
     expect(profile().quests.done).toContain('main_01');
     expect(profile().credits).toBe(credits + 30);
-    expect(countOf(profile().storage, 'repair_kit')).toBeGreaterThanOrEqual(4);
+    expect(countOf(profile().storage, 'pack_hull')).toBeGreaterThanOrEqual(2);
     // A toast, not a conversation; the Prospector job is a new lead, and Vance offers it when you talk to him
     expect(view(last)).toBeNull();
     expect(got.some((m) => m.type === 'toast' && /Job complete: .*\+30 cr.*New work in your log/.test(m.text))).toBe(true);
@@ -859,7 +859,7 @@ describe('quests: the v5 ship wipe', () => {
     for (const stage of [1, 2]) {
       const w = await wiped({ main_02: { stage, progress: 0 } }, stage === 2);
       const { profile, t, server, pid, got } = w;
-      expect(profile().version).toBe(5);
+      expect(profile().version).toBe(6);
       expect(profile().hangar[1]).toBeNull();
       expect(profile().ship.plan).toBe('sparrow-t');
       expect(profile().quests.active.main_02.stage).toBe(0);

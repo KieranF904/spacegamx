@@ -74,7 +74,7 @@ describe('the design update at login', () => {
   it("a mapped account's save below v5 is swapped by its username: remakes in place, progress kept, a one-time notice", async () => {
     const { got, profile: p } = await login('Pig_Benis');
     const bps = shipConfig.designUpdate!.blueprints;
-    expect(p.version).toBe(5);
+    expect(p.version).toBe(6);
     expect(p.hangar[0]!.blueprint).toEqual(bps['remakes/player-pigbenis-sparrow']);
     expect(p.hangar[1]!.blueprint).toEqual(shipConfig.library!.prospector);
     expect(p.activeSlot).toBe(1);
@@ -92,7 +92,7 @@ describe('the design update at login', () => {
 
   it('an account not in the mapping is wiped (a fresh starter, the wipe notice)', async () => {
     const { got, profile: p } = await login('someone_else');
-    expect(p.version).toBe(5);
+    expect(p.version).toBe(6);
     expect(p.hangar.slice(1).every((s) => s === null)).toBe(true);
     expect(p.ship.plan).toBe('sparrow-t');
     expect(p.xp).toBe(3000);
