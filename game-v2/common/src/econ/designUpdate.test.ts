@@ -313,27 +313,24 @@ describe('v5 design update: the swap', () => {
     expect(p.ship.plan).toBe('sparrow-t');
   });
 
-  it('a lost ship comes back lost, on order on the new layout (core first), what had been rebuilt refunded; a loaner meanwhile if nothing else flies', () => {
+  it('a lost or unfinished ship comes back whole (Kieran: give them built ships), nothing refunded for it, flown if nothing else flies', () => {
     const lost = custom('Sparrow T', 30, 'sparrow-t', { lost: true, auto: true });
     lost.ghosts = lost.blueprint.parts.slice(2).map((q) => q.uid);
     const loaner = rec('sparrow-t', { loaner: true });
     const { p, r } = update(v4([lost, loaner], { activeSlot: 1 }), { map, user: 'pilotA' });
     const bp = remakes['player-xire-sparrow'];
-    expect(r!.swapped).toEqual([{ slot: 0, from: { name: 'Sparrow T', parts: 30 }, to: 'remakes/player-xire-sparrow', name: bp.name, onOrder: true }]);
+    expect(r!.swapped).toEqual([{ slot: 0, from: { name: 'Sparrow T', parts: 30 }, to: 'remakes/player-xire-sparrow', name: bp.name }]);
     expect(r!.wiped).toEqual([{ slot: 1, from: { name: 'Sparrow T', parts: plans['sparrow-t'].parts.length }, why: 'loaner' }]);
-    expect(r!.refund).toEqual(salvageParts(econ, lost.blueprint.parts.slice(0, 2), 1));
+    expect(r!.refund).toEqual({});
     const swapped = p.hangar[0]!;
-    expect(swapped).toMatchObject({ lost: true, auto: true, hp: {} });
-    expect(swapped.ghosts).toHaveLength(bp.parts.length);
-    expect(swapped.ghosts![0]).toBe(bp.parts.find((q) => q.fn === 'core')!.uid);
-    // Nothing whole to fly: a loaner (the starter, lent) in a free slot, flown
-    expect(r!.loaner).toBe(true);
-    expect(p.ship.loaner).toBe(true);
-    expect(p.ship.blueprint).toEqual(kit.blueprint);
-    expect(p.hangar[p.activeSlot]).toBe(p.ship);
-    expect(p.activeSlot).not.toBe(0);
-    expect(p.notices![0].text).toMatch(/still being built/);
-    expect(p.notices![0].text).toMatch(/loaner/);
+    expect(swapped.lost).toBeUndefined();
+    expect(swapped.ghosts).toEqual([]);
+    expect(swapped.blueprint.parts).toHaveLength(bp.parts.length);
+    // Whole now: it's the ship flown, no loaner
+    expect(r!.loaner).toBeFalsy();
+    expect(p.ship).toBe(swapped);
+    expect(p.activeSlot).toBe(0);
+    expect(p.notices![0].text).not.toMatch(/still being built/);
   });
 
   it('keeps an ammo loadout where the new guns take it, and drops crates for guns it no longer has', () => {

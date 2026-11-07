@@ -166,10 +166,13 @@ function keepLoadout(tuning: ShipTuning | undefined, econ: Economy, bp: Blueprin
   return { load, ...(Object.keys(first).length ? { first } : {}) };
 }
 
-/** The remake in a record's place: whole if the old one was whole, else on order (core first), what was built refunded */
-function swapRecord(input: DesignUpdateInput, rec: ShipRecord, swap: DesignSwap, bp: Blueprint, refund: Bag): { rec: ShipRecord; onOrder: boolean } {
+/**
+ * The remake in a record's place, whole (Kieran 2026-11-07: a lost or unfinished ship is given back built too;
+ * the on-order path is kept for `wholeOnly: false`)
+ */
+function swapRecord(input: DesignUpdateInput, rec: ShipRecord, swap: DesignSwap, bp: Blueprint, refund: Bag, wholeOnly = true): { rec: ShipRecord; onOrder: boolean } {
   const blueprint = clone(bp);
-  const whole = !rec.lost && !(rec.ghosts ?? []).length;
+  const whole = wholeOnly || (!rec.lost && !(rec.ghosts ?? []).length);
   const plan = swap.stock ? swap.blueprint : rec.plan;
   const ammo = keepLoadout(input.tuning ?? input.econ.tuning, input.econ, blueprint, rec.ammo);
   const base: ShipRecord = { blueprint, hp: {}, ghosts: [], ...(plan ? { plan } : {}), ...(Number.isFinite(rec.rank) ? { rank: rec.rank } : {}), ...(ammo ? { ammo } : {}) };
