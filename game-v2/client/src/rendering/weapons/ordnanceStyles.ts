@@ -5,7 +5,7 @@
  *
  *   Lobber       olive shell that swells and shrinks over its arc, dust ring and flash where it lands
  *   Quake        heavy dark shells, ochre shock rings, the ground shaking for ships near the blast
- *   Dart         today's missile (no entry)
+ *   Dart         the kind's finned dart (no entry)
  *   Swarm        thin red-orange rockets weaving on short trails
  *   Hammerhead   big dark body, a blinking red nose light, a thick white trail, a guide to your cursor
  *   Eel          fat amber slug with a sonar ring that quickens as it closes, wake specks
@@ -17,6 +17,7 @@
  */
 
 import type { WeaponStyle } from './weaponStyles';
+import { DART_SHELL } from './shellBodies';
 
 export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
   mortar_lobber: {
@@ -38,6 +39,7 @@ export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
     landBurst: { shake: 1100 },
   },
   missile_swarm: {
+    shell: { ...DART_SHELL, len: 10, width: 2.6, fin: 2.8, flame: 7 },
     coreWidth: 2.4, glowWidth: 6, coreColor: 0xffe2cf, glowColor: 0xff5a2a, glowAlpha: 0.5, headRadius: 2, haloRadius: 7,
     wobble: { amp: 2.8, period: 16 },
     trail: { color: 0x8f7c74, size: 3.2, life: 24 },
@@ -45,6 +47,7 @@ export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
     impact: { sparks: 7, speed: 3, life: 14, color: 0xff9a5a, flash: 15 },
   },
   missile_hammerhead: {
+    shell: undefined,
     coreWidth: 7.5, glowWidth: 15, coreColor: 0x59606c, glowColor: 0xff8a3c, glowAlpha: 0.45, headRadius: 3, haloRadius: 14, tracerTicks: 1.1,
     nose: { color: 0xff2a22, size: 7, period: 32, blink: true },
     guide: true,

@@ -10,6 +10,7 @@ import { KINETIC_MODEL_STYLES } from './kineticStyles';
 import { ORDNANCE_STYLES } from './ordnanceStyles';
 import { LEGENDARY_STYLES, LEGENDARY_BEAMS } from './legendaryStyles';
 import type { HitThrow } from './impactAim';
+import { CANISTER_SHELL, DART_SHELL, type ShellBody } from './shellBodies';
 
 export interface WeaponStyle {
   /** How the head is placed: from spawn point + velocity (straight shots), or from the server's interpolated position (guided or slowing shots) */
@@ -36,6 +37,8 @@ export interface WeaponStyle {
   impact: { sparks: number; speed: number; life: number; color: number; flash: number; ring?: number };
   /** Leaves a smoke trail (missiles) */
   trail?: { color: number; size: number; life: number };
+  /** Drawn as a body (a finned dart, a banded canister with a fuse ring) in place of the tracer: shellBodies.ts. Visual only */
+  shell?: ShellBody;
   /** Drawn as a crackling orb rather than a tracer (EMP) */
   orb?: boolean;
   // ---- Per-model extras (rework-2026-11 section 7). Each is optional; the kind styles set none of them. ----
@@ -348,13 +351,13 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Flak: a stubby glowing shell (the burst is the show)
   [WeaponType.Flak]: {
     ...KINETIC, tracerTicks: 1.2, coreWidth: 3, glowWidth: 8, coreColor: 0xffe0b0, glowColor: 0xff8a3c, glowAlpha: 0.38,
-    headRadius: 3.5, haloRadius: 10, muzzle: { life: 6, size: 20, sparks: 5, color: 0xffb070, smoke: 4 }, hit: BURST_MARK(0xffb070, 0.8),
+    headRadius: 3.5, haloRadius: 10, muzzle: { life: 6, size: 20, sparks: 5, color: 0xffb070, smoke: 4 }, shell: CANISTER_SHELL, hit: BURST_MARK(0xffb070, 0.8),
   },
   // Missile: a body with an engine flare and a smoke trail, steered by the server
   [WeaponType.Missile]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.8, coreWidth: 4, glowWidth: 10, coreColor: 0xdfe6ee, glowColor: 0xff9a3c, glowAlpha: 0.5,
     headRadius: 3, haloRadius: 12, muzzle: { life: 8, size: 22, sparks: 4, color: 0xffc080, smoke: 6 },
-    trail: { color: 0x8c8780, size: 7, life: 50 }, hit: BURST_MARK(0xffc070),
+    trail: { color: 0x8c8780, size: 7, life: 50 }, shell: DART_SHELL, hit: BURST_MARK(0xffc070),
   },
   // EMP: a crackling blue orb
   [WeaponType.Emp]: {

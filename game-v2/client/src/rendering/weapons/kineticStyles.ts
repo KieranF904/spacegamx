@@ -15,6 +15,7 @@
  */
 
 import type { WeaponStyle } from './weaponStyles';
+import { CANISTER_SHELL } from './shellBodies';
 
 // ---- Kinetic models (rework-2026-11 section 4): amber and yellow for shells and streams, cyan for rails ----
 const CYAN = { core: 0xeafcff, glow: 0x4fd0ff, flash: 0xaee8ff };
@@ -117,6 +118,7 @@ export const KINETIC_MODEL_STYLES = {
   },
   // The wall you place: a brown-gold shell blinking like a timer
   flak_cloudmaker: {
+    shell: { ...CANISTER_SHELL, body: 0x6a5a3a, cap: 0x44381f, band: 0xb8802c, lamp: 0xe0a040, timer: 0xf0d090 },
     coreColor: 0xf0d090, glowColor: 0xb8802c, glowAlpha: 0.42, haloRadius: 12, blink: 9, aimTick: true,
     muzzle: { life: 7, size: 20, sparks: 4, color: 0xd9a050, smoke: 5 },
   },

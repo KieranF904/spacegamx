@@ -28,6 +28,7 @@
  */
 
 import { Container, Graphics, Texture } from 'pixi.js';
+import { ShellBodies, fuseFraction } from './shellBodies';
 import { disc, softDot, streak, streakScale, petal, petalScale, ring, puff, glowBall, DOT_SIZE } from '../fxTextures';
 import { ParticlePool } from '../particlePool';
 import { EntityType, WeaponType } from '@space-game/common';
@@ -299,6 +300,8 @@ export class WeaponFx {
   /** Layered impacts (ImpactLayers): core flashes, glows and hull scorches as light (additive), and their shock rings as true thin rings */
   private hitG = new ParticlePool('add');
   private shockG = new ParticlePool('add', 'rings');
+  /** Shells drawn as bodies (a dart, a canister) rather than tracers: solid parts in the extra pool, light in the glow pool */
+  private shells = new ShellBodies(this.extraG, this.glow);
   /** What the bloom takes: the glow pool and the layered impacts' light */
   private glowRoot = new Container();
   private hitGlows: HitGlow[] = [];
@@ -1347,26 +1350,34 @@ export class WeaponFx {
         hx += nx * sw; hy += ny * sw;
         bx += nx * sw * 0.4; by += ny * sw * 0.4;
       }
-      const lanes = st.pair ? 2 : 1;
-      for (let lane = 0; lane < lanes; lane++) {
-        // A pair runs as two thinner tracers either side of the line
-        const off = lanes === 2 ? (lane === 0 ? -0.5 : 0.5) * st.pair!.gap * z : 0, wk = lanes === 2 ? 0.7 : 1;
-        const ox = nx * off, oy = ny * off;
-        if (shot.ended) {
-          // Ended at a surface: the tracer collapses into the impact point, its round end kept behind it, no head or halo
-          // past it (the impact is drawn there)
-          const gw = st.glowWidth * z * wk, cw = st.coreWidth * z * wk;
-          if (gw > 0 && dl > gw) this.line(bx + ox, by + oy, hx + ox - ux * gw * 0.5, hy + oy - uy * gw * 0.5, gw, glowCol, st.glowAlpha * alpha);
-          if (cw > 0 && dl > cw) this.line(bx + ox, by + oy, hx + ox - ux * cw * 0.5, hy + oy - uy * cw * 0.5, cw, coreCol, 0.9 * alpha);
-          continue;
+      if (st.shell) {
+        // A body in place of the tracer; once it ends at a surface nothing of it is drawn (the impact is)
+        if (!shot.ended) {
+          this.shells.draw(st.shell, hx, hy, bx, by, ux, uy, z, alpha, shot.glow, this.clock, shot.phase,
+            fuseFraction(shot.t, shot.spawnTick, shot.endTick, shot.endAt), this.particleKeep);
         }
-        if (st.glowWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, glowCol, st.glowAlpha * alpha);
-        if (st.coreWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, coreCol, 0.9 * alpha);
-        if (st.haloRadius > 0) {
-          this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk, shot.glow, 0.14 * alpha);
-          this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk * 0.55, shot.glow, 0.22 * alpha);
+      } else {
+        const lanes = st.pair ? 2 : 1;
+        for (let lane = 0; lane < lanes; lane++) {
+          // A pair runs as two thinner tracers either side of the line
+          const off = lanes === 2 ? (lane === 0 ? -0.5 : 0.5) * st.pair!.gap * z : 0, wk = lanes === 2 ? 0.7 : 1;
+          const ox = nx * off, oy = ny * off;
+          if (shot.ended) {
+            // Ended at a surface: the tracer collapses into the impact point, its round end kept behind it, no head or halo
+            // past it (the impact is drawn there)
+            const gw = st.glowWidth * z * wk, cw = st.coreWidth * z * wk;
+            if (gw > 0 && dl > gw) this.line(bx + ox, by + oy, hx + ox - ux * gw * 0.5, hy + oy - uy * gw * 0.5, gw, glowCol, st.glowAlpha * alpha);
+            if (cw > 0 && dl > cw) this.line(bx + ox, by + oy, hx + ox - ux * cw * 0.5, hy + oy - uy * cw * 0.5, cw, coreCol, 0.9 * alpha);
+            continue;
+          }
+          if (st.glowWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, glowCol, st.glowAlpha * alpha);
+          if (st.coreWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, coreCol, 0.9 * alpha);
+          if (st.haloRadius > 0) {
+            this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk, shot.glow, 0.14 * alpha);
+            this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk * 0.55, shot.glow, 0.22 * alpha);
+          }
+          if (st.headRadius > 0) this.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, st.headColor ?? 0xffffff, alpha);
         }
-        if (st.headRadius > 0) this.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, st.headColor ?? 0xffffff, alpha);
       }
       const speed = Math.hypot(shot.vx, shot.vy);
       // A contrail: a segment laid from where the head was last frame to where it is now, left in the world to fade over `life` frames
