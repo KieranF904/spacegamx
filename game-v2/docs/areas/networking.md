@@ -339,6 +339,31 @@ Tests: server/src/net/causes/pullFields.test.ts. It covers the haul and intake, 
 the server alone, and a star. Both pilots and every body are exact at every snapshot. Measured:
 docs/audits/sim-foundation-after-2026-11-06.md, "Pull fields".
 
+### Docking Clamps' links (common network/clampProtocol.ts, sim/clampPair.ts; no wire table change)
+
+Two pilots' ships locked by Docking Clamps (docs/design/groups-mines-docking.md 3) are decision records, plain JSON:
+`clampLink {tick, leader, follower, lc, fc, offset}` (a lock, a swap of who steers, a rebuild's fresh offset: the pair's
+new record ends the old at its tick) and `clampBreak {tick, a, b, why, push?}` (`tick` the first tick each flies alone;
+an undock's `push` on the leader, the follower's the reverse), to every pilot in the pair's system, and each open link
+again to a pilot who comes there (Clamps.ts `tellLink`, every 30 ticks for newcomers only). `clampAsk {from, what, until}`
+goes to the other pilot while a press waits. Up: `clampDock {with, clamp, theirs}`, `clampSwap`, `clampUndock`
+(MessageLimits: 240 a minute each).
+
+From the records every end steps the pair alike (the step's clamp source, `SimEnv.clamp` / `ReplicaEnv.clamp`): the
+leader as the pair (the joined structure, its CTL power bits carrying the pair's engine share), the follower placed on
+the leader as it ended the tick (`placeFollower`). No positions are sent for the follower and no input is delayed: the
+client's ShipReplicaSet holds the links (`noteClampLink`, `noteClampBreak`, `clamps`), steps a follower's leader first
+(`leaderFirst`: the steppers' scratch isn't re-entrant) and steps a follower again whenever its leader is
+(`dropped`); the server's Replication shadow of a follower is the real ship while linked (`clampFollower`: never keyed
+for it), the leader's shadows step the pair (`envOf`). A leader's own client flies the pair on its own engines' share:
+when the follower's was lower the server sends it a keyframe of its own ship (`ClampTable.limited`). A contact on either
+ship (the server's `foldClampContacts`) moves the leader off its shadows: a keyframe, the follower placed from it.
+The linked pair is left out of the contact pass (`ContactEntry.link`, both ends).
+
+Tests: common/src/sim/clampPair.test.ts (the joined flight on the three steppers), common/src/network/clampReplicas.test.ts
+(the replica set), server/src/golden/clampParity.test.ts (600 ticks on a real server, the steering pilot, the other pilot
+and a third client; no follower keyframes; the breaks).
+
 ## Invariants
 - Any change to the wire tables needs `PROTOCOL_VERSION` + `PROTOCOL_WIRE_HASH` updated (protocol.test.ts fails otherwise, on purpose). JSON-only messages not in `COMPACT` do not change the hash.
 - The dictionary is append-only (indices are the wire format).

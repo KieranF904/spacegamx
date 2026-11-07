@@ -31,6 +31,7 @@ import { StructLog } from './bridge/structLog.js';
 import { OwnCauses } from './bridge/ownCauses.js';
 import { ContactLog } from '../net/causes/contactLog.js';
 import { ServerPulls } from './bridge/pullFields.js';
+import { ClampTable } from './bridge/clamp.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -63,6 +64,8 @@ export class ShipBridge {
    * their pulls from them (stepMovement), as every client's steps do from the records it is sent
    */
   readonly pulls = new ServerPulls((e) => this.bodies.has(e), (e) => this.host?.terrainAt?.(e));
+  /** Docking Clamps' links: pairs flown as one body (bridge/clamp.ts; the decisions: ships/features/clamp) */
+  readonly clamps: ClampTable = new ClampTable(this as unknown as BridgeCtx);
   /** Repair kits only work on a ship holding still (world units per tick) */
   static readonly KIT_STILL_SPEED = 0.8;
   /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */

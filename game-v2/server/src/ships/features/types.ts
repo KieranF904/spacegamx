@@ -32,6 +32,8 @@ export interface FeatureHost {
   deliver(pilot: number, target: number, kind: TowKind): void;
   /** An effect everyone in the entity's system sees, at the entity (a Flash Screen's bloom) */
   effect(eid: number, type: number): void;
+  /** The pilots in the entity's system now (whoever may hold it: Docking Clamps' link records go to them) */
+  pilotsIn?(eid: number): number[];
 
   // ---- Field machines (features/machines, docs/design/field-fabrication.md): the pilot's hold, profile and bank
   readonly econ: Economy;

@@ -121,15 +121,18 @@ export function clampOffset(
 /** The follower's pose from the leader's (rounded as ships are: position 2 decimals, angle 5) */
 export function followerPose(leader: Readonly<ClampBody>, o: Readonly<ClampOffset>, out: ClampBody = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0 }): ClampBody {
   rotate(o.ox, o.oy, leader.angle, V);
-  out.x = Math.round((leader.x + V[0]) * 100) / 100;
-  out.y = Math.round((leader.y + V[1]) * 100) / 100;
-  out.angle = Math.round(wrap(leader.angle + o.oa) * 1e5) / 1e5;
+  out.x = noNegZero(Math.round((leader.x + V[0]) * 100) / 100);
+  out.y = noNegZero(Math.round((leader.y + V[1]) * 100) / 100);
+  out.angle = noNegZero(Math.round(wrap(leader.angle + o.oa) * 1e5) / 1e5);
   // (A point on a turning body: v + w x r)
-  out.vx = Math.round((leader.vx - leader.angVel * V[1]) * 1e4) / 1e4;
-  out.vy = Math.round((leader.vy + leader.angVel * V[0]) * 1e4) / 1e4;
-  out.angVel = leader.angVel;
+  out.vx = noNegZero(Math.round((leader.vx - leader.angVel * V[1]) * 1e4) / 1e4);
+  out.vy = noNegZero(Math.round((leader.vy + leader.angVel * V[0]) * 1e4) / 1e4);
+  out.angVel = noNegZero(leader.angVel);
   return out;
 }
+
+/** (Rounded as ships are: no -0, physics.ts quantizeShipBody) */
+const noNegZero = (v: number): number => (v === 0 ? 0 : v);
 
 const TAU = Math.PI * 2;
 function wrap(a: number): number {

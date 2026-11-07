@@ -34,6 +34,8 @@ import { CtlChangeInputs, DriverInputs } from '../sim/d-sources.js';
 import { simAim, simAimQ, type InputSource, type SimInput } from '../sim/input.js';
 import type { PullSource } from '../sim/env.js';
 import { PullBook, fieldPulls, unpackPullField, type PullerPose, type PullFieldRow } from '../sim/pullFields.js';
+import { ClampLinks, linksSource, type ClampSource } from '../sim/clampPair.js';
+import type { ServerClampLinkMessage, ServerClampBreakMessage } from './clampProtocol.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
@@ -381,9 +383,46 @@ export class ShipReplicaSet {
   };
   private readonly pullerPoses = new Map<number, Map<number, PullerPose>>();
 
-  /** The env a step here flies in: the world's, with the pulls (a copy: the host's may be shared) */
+  /** The env a step here flies in: the world's, with the pulls and the clamps' links (a copy: the host's may be shared) */
   private stepEnv(): ReplicaEnv {
-    return { ...this.env(), pulls: this.pullSource };
+    return this.clamps.size ? { ...this.env(), pulls: this.pullSource, clamp: this.clampSource } : { ...this.env(), pulls: this.pullSource };
+  }
+
+  /**
+   * Docking Clamps' links (sim/clampPair.ts: the clampLink and clampBreak records): a leader is stepped as the pair, its
+   * follower placed on it (the leader as it ended the tick), the tick an undock lets go each gets its push
+   */
+  readonly clamps = new ClampLinks();
+  private readonly clampSource: ClampSource = linksSource(this.clamps,
+    (id, t) => (this.own?.id === id ? this.own.src.derived(t) : this.causes?.derived(id, t)) || this.derived(id),
+    (id, t) => { const st = this.at(id, t); return st ? { body: st.body, bits: st.bits } : null; });
+
+  /** A lock or a swap (clampLink): both ships are stepped again from its tick */
+  noteClampLink(m: Pick<ServerClampLinkMessage, 'tick' | 'leader' | 'follower' | 'lc' | 'fc' | 'offset'>): void {
+    const from = this.clamps.link({ tick: m.tick, leader: m.leader, follower: m.follower, lc: m.lc, fc: m.fc, offset: m.offset });
+    if (from !== Infinity) { this.rewindHeld(m.leader, from); this.rewindHeld(m.follower, from); }
+  }
+
+  /** The pair let go (clampBreak): both stepped again from its tick (an undock's push, `push`, on the leader `a`) */
+  noteClampBreak(m: Pick<ServerClampBreakMessage, 'tick' | 'a' | 'b'> & { push?: readonly [number, number] }): void {
+    const from = this.clamps.unlink(m.a, m.b, m.tick, m.push);
+    if (from !== Infinity) { this.rewindHeld(m.a, from); this.rewindHeld(m.b, from); }
+    this.clamps.prune(m.tick);
+  }
+
+  /**
+   * A clamped follower's leader stepped to tick t before the follower's step starts: the step reads it there (the clamp
+   * source), and the steppers' scratch isn't re-entrant, so it must not be stepped from inside it
+   */
+  private leaderFirst(id: number, t: number): void {
+    if (!this.clamps.size) return;
+    const x = this.clamps.recAt(id, t);
+    if (x && x.follower === id) this.at(x.leader, t);
+  }
+
+  /** The ship this one is clamped to on tick t (undefined: none): the contact pass leaves the pair out */
+  clampPartner(id: number, t: number): number | undefined {
+    return this.clamps.size ? this.clamps.partner(id, t) : undefined;
   }
 
   /**
@@ -561,6 +600,10 @@ export class ShipReplicaSet {
     this.hook?.rewound(id, t);
     this.sides?.rewound(id, t);
     if (gone) return;
+    // (A clamped leader: its follower sits on it, so it is stepped again from there too)
+    if (this.clamps.size) for (const [f, from] of this.clamps.readers(id, t)) {
+      if (this.stepping > 0) this.pullRewinds.push([f, from]); else this.rewindHeld(f, from);
+    }
     // (A puller: the ships its fields pull from t + 1 read it at t, so they are stepped again from there too)
     // (Not the pulls of a window a snapshot has closed (pullsFinal): those the server judged with the puller as this set had
     // it then, and told where this set couldn't work them out. A puller stepped again over them later (a keyframe, its body
@@ -626,6 +669,7 @@ export class ShipReplicaSet {
   }
 
   private stepPreNow(id: number, r: Rep, t: number, prev: ReplicaState, d: ShipDerived): ReplicaState {
+    this.leaderFirst(id, t);
     const own = this.own?.id === id ? this.own.src : null;
     // Its input from its source (sim/d-sources.ts): its own timeline (known) or its control rows (assumed), held
     // between changes; flown by its body, its driver's controls and push (decided, CAPS.BODIES), the rows where it doesn't
@@ -662,6 +706,7 @@ export class ShipReplicaSet {
   stepAlone(id: number, prev: Readonly<Step>, t: number, bits: number, q: number): ReplicaState | null {
     const r = this.reps.get(id), d = this.derived(id);
     if (!r || !d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift) return null;
+    this.leaderFirst(id, t);
     const body = cloneBody(prev.body);
     // (Its pulls too, the fields' (and what was told for the tick), each puller as this set has it: the PT layer's step is this)
     replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, d, this.tuning, this.stepEnv(), t, id);
@@ -728,6 +773,7 @@ export class ShipReplicaSet {
     this.pre.clear();
     this.ahead.clear();
     this.pulls.clear();
+    this.clamps.clear();
     this.pullRewinds.length = 0;
     this.pullerPoses.clear();
     this.pullsFinal = this.snapSeen = -Infinity;

@@ -270,6 +270,8 @@ export class Replication {
       // (Flown by its body: the shadow its body-running clients have, whatever the others need)
       if (rec?.body && mode === ReplicaMode.Pilotless) this.stepBodied(eid, s, rec.body, rec.derived ?? ship.derived, tick, worked);
       else if (s.bodied) s.bodied.diverged = true;
+      // (Docking Clamps: a follower sits where its leader puts it, on every client that has the link, clampFollower)
+      if (this.clampFollower(eid, s, tick)) continue;
       // A pilot whose client steps its own ship: its shadow is that, whatever the others need (stepOwn)
       if (ship.kind === 'ship' && this.host.ownSim?.(eid)) { this.stepOwn(eid, s, mode, bits, q, rec?.derived ?? ship.derived, tick, worked, dock ? q : rec?.rawQ ?? q); continue; }
       if (s.own) s.own = undefined;
@@ -283,7 +285,7 @@ export class Replication {
       }
       // (The hold's mass it flew this step with, if that changed: a CARGO cause goes in first)
       if (worked) cargoBefore(s.body, worked.rows);
-      replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, rec?.derived ?? ship.derived, this.ships.tuning, this.host.env(eid), tick);
+      replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, rec?.derived ?? ship.derived, this.ships.tuning, this.envOf(eid), tick, this.clampId(eid));
       // (Its pulls are part of its step, before every other cause: what a client works out or is told, common sim/pulls.ts)
       if (worked) applyPullRows(s.body, worked.rows);
       s.stepped = tick;
@@ -386,6 +388,8 @@ export class Replication {
     o.excLast = !want || want.bits !== (bits & ~OWN_DERIVED_BITS) || want.q !== rawQ;
     if (o.excLast) o.exc = true;
     if (this.host.ownLate?.(eid)) return hard('late input');
+    // (Steering a docked pair its follower's engines held back: its client flew it on its own share)
+    if (this.ships.clamps?.limited(eid, tick)) return hard('clamp power');
     // (Not flown by its pilot: its client has it from its last keyframe, so another only when that's out of date. Docked,
     // its keyframe says where at its station (it rides the station as every client's docked replica does); else when it moved)
     if (mode !== ReplicaMode.Player) {
@@ -405,7 +409,7 @@ export class Replication {
     // (With the jump distance its client flies, its input's cursor distance: ownStep.ts. The others' replicas don't know
     // it, so theirs waits at the end of the charge: the burn's start is a keyframe for them, not for its own client)
     const jumpWas = s.body.jump ?? 0;
-    replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q), jumpDist: Input.cursorDist[eid] }, derived, this.ships.tuning, this.host.env(eid), tick);
+    replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q), jumpDist: Input.cursorDist[eid] }, derived, this.ships.tuning, this.envOf(eid), tick, this.clampId(eid));
     const burnAt = jumpBurnAt(jumpTuning(this.ships.tuning));
     if (jumpWas < burnAt && (s.body.jump ?? 0) === burnAt) { if (!s.diverged) this.why(`${ReplicaMode[mode]}:jump`); s.diverged = true; }
     if (worked) {
@@ -430,6 +434,39 @@ export class Replication {
       || b.jumpAim !== ship.jumpAim || (b.jumpAim !== undefined && b.jumpTo !== ship.jumpTo)) {
       hard(worked ? 'unexplained, with causes' : 'unexplained');
     }
+  }
+
+  /**
+   * Docking Clamps (ships/bridge/clamp.ts): the env a pilot's shadow flies in, with the links (a leader is stepped as the
+   * pair, an undock's push), and the id the step names it by (only under links: the server's env has no pulls)
+   */
+  private envOf(eid: number): ReplicaEnv {
+    const env = this.host.env(eid), c = this.ships.clamps;
+    if (!c?.any) return env;
+    let e = this.clampEnvs.get(env);
+    if (!e) this.clampEnvs.set(env, (e = { ...env, clamp: c.source }));
+    return e;
+  }
+  private readonly clampEnvs = new WeakMap<ReplicaEnv, ReplicaEnv>();
+  private clampId(eid: number): number {
+    return this.ships.clamps?.any ? eid : -1;
+  }
+
+  /**
+   * A clamped follower's shadows (its clients' replica of it, its own client's): it sits where its leader puts it
+   * (common sim/clampPair.ts placeFollower), which every client holding the link works out from the leader as it has it,
+   * so they are the real ship whenever the leader's are (a leader keyframed, its follower is where it puts it). Not
+   * stepped, never keyframed for it. True: the shadow is done for this tick
+   */
+  private clampFollower(eid: number, s: Shadow, tick: number): boolean {
+    const c = this.ships.clamps;
+    if (!c?.links.length) return false;
+    const k = c.at(eid, tick);
+    if (!k || k.follower !== eid || s.mode !== ReplicaMode.Player) return false;
+    s.body = this.real(eid);
+    s.stepped = tick;
+    if (s.own) { s.own.hard = false; s.own.exc = s.own.excLast = false; s.own.held = undefined; s.own.heldDock = undefined; }
+    return true;
   }
 
   /** Bodies' clients' shadow of a ship its body flies (Shadow.bodied): stepped as their tick layer steps it */

@@ -788,6 +788,7 @@ export class GameServer implements ServerCtx {
       isDocked: (pilot) => this.dockedShips.has(pilot),
       deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
       effect: (eid, type) => this.broadcastToSystem(InSystem.systemId[eid], { type: 'effect', effectType: type, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]), entityId: eid }),
+      pilotsIn: (eid) => { const out: number[] = []; for (const c of this.clients.values()) if (InSystem.systemId[c.playerId] === InSystem.systemId[eid] && hasComponent(this.world, Player, c.playerId)) out.push(c.playerId); return out; },
       // (Field machines: features/machines)
       econ: this.econ,
       send: (pilot, msg) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, msg); },

@@ -21,6 +21,7 @@ import { SimShipView, aimQ } from '../sim/a-adapt.js';
 import type { SimInput } from '../sim/input.js';
 import type { SimEnv, PullSource } from '../sim/env.js';
 import { stepPulls } from '../sim/pulls.js';
+import type { ClampSource } from '../sim/clampPair.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { getPlan } from './features/plan.js';
@@ -121,6 +122,8 @@ export interface ReplicaEnv extends FieldEnv {
    * replica step takes them after its motion, as its own step does (sim/pulls.ts). Absent: none
    */
   pulls?: PullSource;
+  /** Docking Clamps' links (sim/clampPair.ts): a pilot locked to another flies as the pair, or rides its leader. Absent: none */
+  clamp?: ClampSource;
 }
 
 /**
@@ -133,16 +136,17 @@ export interface ReplicaEnv extends FieldEnv {
  */
 export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaControls, derived: ShipDerived, tuning: ShipTuning, env: ReplicaEnv, tick = 0, id = -1): void {
   if (mode === ReplicaMode.Docked) return;
-  const s = (VIEW ??= new SimShipView()).load(0, mode, body, derived, undefined, FULL_CHARGE, false, body.jumpPrime ?? 0);
+  const s = (VIEW ??= new SimShipView()).load(id < 0 ? 0 : id, mode, body, derived, undefined, FULL_CHARGE, false, body.jumpPrime ?? 0);
   IN.bits = c.bits;
   IN.q = aimQ(c.targetAngle);
   IN.jumpDist = c.jumpDist ?? -1;
   ENV.tick = tick; ENV.tuning = tuning; ENV.gravity = env.gravity; ENV.terrain = env.terrain ?? null; ENV.hazard = env.hazard;
   FIELDS.central = env.central; FIELDS.lodestones = env.lodestones;
-  stepShipMotion(s, IN, ENV, stepHazards(s, IN, tick, HZ));
+  ENV.clamp = id >= 0 ? env.clamp : undefined;
+  const m = stepShipMotion(s, IN, ENV, stepHazards(s, IN, tick, HZ));
   if (s.jumpPrime || body.jumpPrime !== undefined) body.jumpPrime = s.jumpPrime;
   // (A pilot's pulls, after its motion: the step's pull phase, sim/pulls.ts; `id` names it to its source)
-  if (mode === ReplicaMode.Player && env.pulls && id >= 0) { ENV.pulls = env.pulls; stepPulls(id, body, ENV); ENV.pulls = undefined; }
+  if (mode === ReplicaMode.Player && env.pulls && id >= 0 && !m.follow) { ENV.pulls = env.pulls; stepPulls(id, body, ENV); ENV.pulls = undefined; }
 }
 
 /** (replicaStep's scratch: the view, its input (where a jump lands isn't replicated: -1, the charge waits), env, hazards) */

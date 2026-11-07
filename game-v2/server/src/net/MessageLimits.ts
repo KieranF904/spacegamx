@@ -57,6 +57,10 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   packedResync: { per: 60, burst: 3 },
   // A Mine Bay's drop (each a decision every holder is told: about 4 a second)
   mineDrop: { per: 240, burst: 4 },
+  // Docking Clamps: a press each (the lock, a swap of who steers, letting go: ships/features/clamp), about 4 a second
+  clampDock: { per: 240, burst: 8 },
+  clampSwap: { per: 240, burst: 8 },
+  clampUndock: { per: 240, burst: 8 },
   // What it kept of cells it dropped (CAPS.FOCUS: one a few seconds at a cruise, a burst after a jump)
 };
 

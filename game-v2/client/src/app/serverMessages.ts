@@ -13,6 +13,7 @@ import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { noteBossLife } from '../ships/bossLife';
 import { fieldClient } from '../ships/field/fieldState';
 import { mineClient } from '../ships/features/minebay/mines';
+import { onClampAsk, onClampLink, onClampBreak } from '../ships/features/clamp';
 import { devFeeds } from './devFeeds';
 import { setBank } from '../ui/station/bankStore';
 import { showHitTick } from '../ui/HitTick';
@@ -408,6 +409,10 @@ const TABLE: Handlers = {
   ownSync: (h, msg) => { h.shipClient.onOwnSync(msg); },
   // (Other ships' gun lanes, and pilots' gun controls: their guns stepped here from their inputs, ships/guns/OtherGuns.ts)
   gunSync: (h, msg) => { h.shipClient.onGunSync(msg); },
+  // (Docking Clamps: the other pilot's press, a lock or swap, letting go: ships/features/clamp)
+  clampAsk: (_h, msg) => { onClampAsk(msg); },
+  clampLink: (h, msg) => { onClampLink(msg, h.shipClient.replicas, h.state.playerId); },
+  clampBreak: (h, msg) => { onClampBreak(msg, h.shipClient.replicas, h.state.playerId); },
   // (Pull fields its tick layer works out itself, opened or ended early: before the snapshot they go with)
   pulls: (h, msg) => { h.shipClient.onPulls(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },

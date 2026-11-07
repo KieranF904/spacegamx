@@ -32,3 +32,5 @@ export * from './pullFields.js';
 export * from './ownStep.js';
 // Other ships' guns stepped from their inputs on every end (gun lanes, gunSync, gun rows, shot names)
 export * from './otherGuns.js';
+// Docking Clamps: the joined pair's flight, its links and their clamp source
+export * from './clampPair.js';
