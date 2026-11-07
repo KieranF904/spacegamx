@@ -2139,9 +2139,13 @@ const lv = { cssW: 0, cssH: 0, dpr: 1, rowH: 46, labelW: 120 };
 const mainC = $('main'), mainX = mainC.getContext('2d');
 const lineC = $('lineup'), lineX = lineC.getContext('2d');
 
+let sizedW = -1, sizedDpr = -1;
 function resize() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const r = mainC.getBoundingClientRect();
+  // (Only a real change of width restarts the lanes: text rewrapping below the canvas changes the page's height, not this)
+  if (Math.round(r.width) === sizedW && dpr === sizedDpr) return;
+  sizedW = Math.round(r.width); sizedDpr = dpr;
   view.cssW = Math.max(200, r.width); view.cssH = Math.max(160, r.height); view.dpr = dpr;
   mainC.width = Math.round(view.cssW * dpr); mainC.height = Math.round(view.cssH * dpr);
   lv.cssW = Math.max(200, lineC.getBoundingClientRect().width); lv.dpr = dpr;
