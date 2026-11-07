@@ -1,0 +1,1020 @@
+<title>Round Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Round Lab: new looks for shots in flight. One viewport (new round above, the game's current round below, same shots),
+   a control bar, knobs, a style picker, then a 1:1 lineup of every style. Single dark theme: it matches the space view. */
+:root {
+  color-scheme: dark;
+  --void: #06080c;
+  --panel: #0c1016;
+  --raise: #131922;
+  --line: #222a35;
+  --text: #d9dee6;
+  --muted: #8a94a3;
+  --amber: #ffb04a;
+  --amber-hot: #ffd9a0;
+  --cyan: #7fd6fa;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--void); color: var(--text); font: 15px/1.5 var(--body); }
+.wrap {
+  max-width: 1200px; margin: 0 auto;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 14px;
+}
+header { display: grid; gap: 4px; }
+h1 { margin: 0; font: 600 34px/1.05 var(--display); letter-spacing: 0.03em; text-transform: uppercase; }
+h1 span { color: var(--amber); }
+header p { margin: 0; color: var(--muted); max-width: 70ch; }
+h2 { margin: 0; font: 600 15px/1.2 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.pane { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.pane figcaption {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.pane figcaption b { font: 600 19px/1.2 var(--display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--amber-hot); }
+.pane figcaption p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: 14px; }
+.tag { font: 600 12px/1.4 var(--display); letter-spacing: 0.12em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.ro { margin-left: auto; font: 400 12px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+canvas { display: block; width: 100%; max-width: 100%; background: var(--void); touch-action: manipulation; }
+#main { aspect-ratio: 16 / 8; min-height: 230px; }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; }
+.seg button, .btn {
+  font: 500 14px/1 var(--body); color: var(--text); background: var(--raise); border: 1px solid var(--line);
+  padding: 9px 12px; cursor: pointer;
+}
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.btn { border-radius: 4px; }
+.seg button:hover, .btn:hover { border-color: #3a4554; }
+.seg button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber-hot); position: relative; }
+.btn.main { font: 600 16px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--amber); border-color: var(--amber); min-width: 86px; }
+.tog { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-weight: 500; }
+.tog input { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); position: relative; margin: 0; cursor: pointer; }
+.tog input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s; }
+.tog input:checked { background: #3a2a12; border-color: var(--amber); }
+.tog input:checked::after { transform: translateX(14px); background: var(--amber); }
+@media (prefers-reduced-motion: reduce) { .tog input::after { transition: none; } }
+
+.knobs { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 14px 22px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .knobs { grid-template-columns: 1fr 1fr 1fr; } }
+.knob { display: grid; gap: 6px; }
+.knob .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.knob label { font-weight: 600; }
+.val { font: 500 13px/1 var(--mono); color: var(--amber-hot); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
+.scale { display: flex; justify-content: space-between; font: 400 11px/1 var(--mono); color: var(--muted); }
+.knobfoot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.knobfoot .ro { margin-left: 0; }
+
+.picker { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.pick {
+  display: grid; gap: 2px; text-align: left; font: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 13px; cursor: pointer;
+}
+.pick:hover { border-color: #3a4554; }
+.pick .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pick b { font: 600 18px/1.2 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.pick span.d { color: var(--muted); font-size: 14px; }
+.pick[aria-checked="true"] { background: var(--raise); border-color: var(--amber); }
+.pick[aria-checked="true"] b { color: var(--amber-hot); }
+.pick[aria-checked="true"] .tag { color: #1a1206; background: var(--amber); border-color: var(--amber); }
+#lineup { cursor: pointer; }
+.note { margin: 0; color: var(--muted); font-size: 13px; max-width: 75ch; }
+@media (max-width: 480px) { h1 { font-size: 28px; } .ro { margin-left: 0; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Round <span>Lab</span></h1>
+    <p>Eleven new looks for shots in flight, one per weapon family, so heavier and slower rounds read by role at a glance. Each grows with damage per round and stretches with round speed. The lower lane fires the game's current round on the same shots.</p>
+  </header>
+
+  <figure class="pane">
+    <figcaption>
+      <b id="sName">Style</b><span class="tag" id="sFam">family</span><span class="ro" id="roMain"></span>
+      <p id="sDesc"></p>
+    </figcaption>
+    <canvas id="main" aria-label="Selected round in flight"></canvas>
+  </figure>
+
+  <div class="bar">
+    <button class="btn main" id="play" type="button">Pause</button>
+    <div class="seg" role="group" aria-label="Zoom">
+      <button type="button" id="zGame" aria-pressed="true">Game scale</button>
+      <button type="button" id="zClose" aria-pressed="false">Close-up</button>
+    </div>
+    <label class="tog"><input type="checkbox" id="slow"> Slow motion</label>
+    <label class="tog"><input type="checkbox" id="now" checked> Current round</label>
+  </div>
+
+  <section class="knobs" aria-label="Round">
+    <div class="knob">
+      <div class="row"><label for="spd">Round speed</label><span class="val" id="spdVal"></span></div>
+      <input type="range" id="spd" min="8" max="160" step="1" value="54">
+      <div class="scale"><span>8 slow</span><span>160 rail</span></div>
+    </div>
+    <div class="knob">
+      <div class="row"><label for="dmg">Damage per round</label><span class="val" id="dmgVal"></span></div>
+      <input type="range" id="dmg" min="0" max="1000" step="1" value="500">
+      <div class="scale"><span>5</span><span>600</span></div>
+    </div>
+    <div class="knob">
+      <div class="row"><label for="rate">Fire rate</label><span class="val" id="rateVal"></span></div>
+      <input type="range" id="rate" min="0" max="1000" step="1" value="500">
+      <div class="scale"><span>0.2 / s</span><span>8 / s</span></div>
+    </div>
+    <div class="knobfoot">
+      <button class="btn" id="reset" type="button">Suggested values</button>
+      <span class="ro" id="roScale"></span>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:10px">
+    <h2>Styles</h2>
+    <div class="picker" id="picker" role="radiogroup" aria-label="Round style"></div>
+    <p class="note">Keys: [ and ] step through styles, Space pauses, S slows, Z switches zoom, N shows the current round.</p>
+  </section>
+
+  <section style="display:grid;gap:10px">
+    <h2>All styles at game scale</h2>
+    <p class="note">1:1 with the game at zoom 1, each at its suggested speed and damage (fire rate at least 1.5 a second, so every row stays busy). Top line new, bottom line current. Tap a row to pick it.</p>
+    <canvas id="lineup" aria-label="Every style at game scale"></canvas>
+  </section>
+
+  <p class="note">Sizes are world units (a hull cell is 24), speeds in units a tick (60 ticks a second). Size × = (damage / 18)^0.33, stretch × = (speed / 54)^0.6. Current rounds only grow with shell size, not damage, so the lower lane stays the same size.</p>
+</div>
+
+<script>
+'use strict';
+// ===================================================================================================================
+// Round Lab. Every style below is one self-contained object: name, family, desc, suggested values (def), its
+// parameters P, and spawn/update/draw. Sizes are world units, times 60 Hz ticks. Drawing helpers (glow, disc, seg,
+// toWorld, toLocal, ADD, NORM) map one to one onto sprite and line draws in the client's WeaponFx.
+// k (per lane): m = size from damage, s = stretch from speed, spd = speed (u/tick), dmg, rate.
+// r (a round): x, y, hd (heading), t (ticks alive), dist (travelled), v (speed now), state 1 flying / 2 spent
+// (trails fading at the impact point, `dead` ticks), n (shot number), seed (0..1), sx/sy (spawn), range, tr (trail).
+// ===================================================================================================================
+const TAU = Math.PI * 2;
+const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
+let REDUCE = reduceMQ.matches;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+
+// ---- Drawing helpers (current context and view) ----
+const V = { a: 1, e: 0, f: 0 };
+let ctx = null;
+function toWorld() { ctx.setTransform(V.a, 0, 0, V.a, V.e, V.f); }
+function toLocal(x, y, ang, sc) {
+  const c = Math.cos(ang) * V.a * sc, s = Math.sin(ang) * V.a * sc;
+  ctx.setTransform(c, s, -s, c, V.a * x + V.e, V.a * y + V.f);
+}
+function ADD() { ctx.globalCompositeOperation = 'lighter'; }
+function NORM() { ctx.globalCompositeOperation = 'source-over'; }
+const SPR = new Map();
+function sprite(col, hard) {
+  const key = hard ? col + 'h' : col;
+  let s = SPR.get(key);
+  if (s) return s;
+  s = document.createElement('canvas'); s.width = s.height = 64;
+  const g = s.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  if (hard) { gr.addColorStop(0, col); gr.addColorStop(0.62, col); gr.addColorStop(0.85, col + '66'); gr.addColorStop(1, col + '00'); }
+  else { gr.addColorStop(0, col); gr.addColorStop(0.2, col + 'bb'); gr.addColorStop(0.5, col + '3a'); gr.addColorStop(1, col + '00'); }
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  SPR.set(key, s);
+  return s;
+}
+/** Soft glow of radius r */
+function glow(col, x, y, r, a) { if (a <= 0.004 || r <= 0.05) return; ctx.globalAlpha = a > 1 ? 1 : a; ctx.drawImage(sprite(col, false), x - r, y - r, r * 2, r * 2); }
+/** Solid disc with a soft edge, radius r */
+function disc(col, x, y, r, a) { if (a <= 0.004 || r <= 0.05) return; ctx.globalAlpha = a > 1 ? 1 : a; ctx.drawImage(sprite(col, true), x - r, y - r, r * 2, r * 2); }
+function seg(x0, y0, x1, y1, w, col, a) {
+  if (a <= 0.004 || w <= 0) return;
+  ctx.globalAlpha = a > 1 ? 1 : a; ctx.strokeStyle = col; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+}
+function fillPath(col, a) { ctx.globalAlpha = a > 1 ? 1 : a; ctx.fillStyle = col; ctx.fill(); }
+const NO_DASH = [], DASH = [0, 0];
+
+/** A teardrop: round head of radius R at the origin, tail tip at (-L, wob) */
+function tearPath(R, L, wob) {
+  const h = Math.PI / 2 + 0.2;
+  ctx.beginPath();
+  ctx.moveTo(-L, wob);
+  ctx.quadraticCurveTo(-L * 0.4, wob * 0.5 - R * 0.95, Math.cos(-h) * R, Math.sin(-h) * R);
+  ctx.arc(0, 0, R, -h, h, false);
+  ctx.quadraticCurveTo(-L * 0.4, wob * 0.5 + R * 0.95, -L, wob);
+  ctx.closePath();
+}
+/** A crescent opening backwards: outer arc radius R across +-half, the inner arc's centre `d` behind */
+function crescentPath(R, half, d, ox) {
+  const ex = R * Math.cos(half), ey = R * Math.sin(half);
+  const ri = Math.hypot(ex + d, ey), hi = Math.atan2(ey, ex + d);
+  ctx.beginPath();
+  ctx.arc(ox, 0, R, -half, half, false);
+  ctx.arc(ox - d, 0, ri, hi, -hi, true);
+  ctx.closePath();
+}
+
+// ===================================================================================================================
+// STYLES
+// ===================================================================================================================
+const STYLES = [
+  {
+    id: 'corkscrew', name: 'Corkscrew Slug', family: 'Cannon', now: 'cannon',
+    desc: 'A pointed brass slug that spins in flight; two tracer strands wind round its path.',
+    def: { spd: 54, dmg: 18, rate: 3 },
+    P: { len: 10, wid: 3.6, amp: 3.2, pitch: 34, trailTicks: 3.4, segs: 90, body: '#f2c27a', rim: '#a8682a', shine: '#fff4dc', hot: '#ffb04a', strand: '#ffd08a' },
+    hitCol: '#ffc070', linger: 10,
+    draw(r, k) {
+      const P = this.P, m = k.m, s = k.s;
+      const fade = r.state === 2 ? 1 - r.dead / this.linger : 1;
+      const T = Math.min(r.dist, k.spd * P.trailTicks * (0.7 + 0.3 * m)) * fade;
+      const pitch = P.pitch * s * (0.8 + 0.2 * m), amp = P.amp * Math.pow(m, 0.8);
+      toWorld(); ADD();
+      seg(r.x - T * 0.6, r.y, r.x, r.y, 4 * m, P.hot, 0.1 * fade);
+      const N = Math.max(8, Math.min(P.segs, Math.ceil(T / (pitch / 9)))), w = 1.1 * Math.sqrt(m);
+      let px = r.x, pa = r.y, pb = r.y;
+      for (let i = 1; i <= N; i++) {
+        const d = T * i / N, ph = (r.dist - d) / pitch * TAU;
+        const a = amp * Math.min(1, 0.25 + d / (amp * 5)), sv = Math.sin(ph) * a;
+        const x = r.x - d, ya = r.y + sv, yb = r.y - sv, f = (1 - i / N) * fade, front = Math.cos(ph) > 0;
+        seg(px, pa, x, ya, w, P.strand, f * (front ? 0.85 : 0.3));
+        seg(px, pb, x, yb, w, P.strand, f * (front ? 0.3 : 0.85));
+        px = x; pa = ya; pb = yb;
+      }
+      if (r.state !== 1) return;
+      const L = P.len * m * (0.85 + 0.2 * s), W = P.wid * m;
+      glow(P.hot, r.x, r.y, 11 * m, 0.4);
+      toLocal(r.x, r.y, r.hd, 1); NORM();
+      ctx.beginPath();
+      ctx.moveTo(L * 0.5, 0);
+      ctx.quadraticCurveTo(L * 0.22, -W * 0.5, -L * 0.1, -W * 0.5);
+      ctx.lineTo(-L * 0.5, -W * 0.45); ctx.lineTo(-L * 0.5, W * 0.45); ctx.lineTo(-L * 0.1, W * 0.5);
+      ctx.quadraticCurveTo(L * 0.22, W * 0.5, L * 0.5, 0);
+      ctx.closePath();
+      fillPath(P.rim, 1);
+      // (the spin: a shine band rolling across the body, and a rifling band round its waist)
+      const spin = r.dist / pitch * TAU, hv = Math.sin(spin) * W * 0.28;
+      seg(-L * 0.45, hv, L * 0.28, hv * 0.5, W * 0.32, P.body, 0.75);
+      seg(-L * 0.4, hv, L * 0.2, hv * 0.5, W * 0.12, P.shine, 0.5 + 0.5 * Math.cos(spin));
+      seg(-L * 0.22, -W * 0.48, -L * 0.22, W * 0.48, Math.max(0.6, L * 0.07), P.rim, 1);
+      ADD(); glow(P.shine, -L * 0.5, 0, W * 0.9, 0.6);
+    },
+  },
+  {
+    id: 'chevron', name: 'Chevron Bolts', family: 'Autocannon', now: 'autocannon',
+    desc: 'Small arrowheads with two ghost copies; every third is a bright tracer. Narrows as it gets faster.',
+    def: { spd: 62, dmg: 11, rate: 4 },
+    P: { size: 5.5, ghosts: 2, gapTicks: 0.35, spread: 0.022, accent: 3, col: '#ffd9a0', glowC: '#ffa040', core: '#fff4e0' },
+    hitCol: '#ffd9a0', linger: 0,
+    spawn(r) { r.hd = (hash(r.n * 1.7 + 3) - 0.5) * 2 * this.P.spread; },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.85), S = P.size * m, wing = S * 0.75 / (0.6 + 0.4 * k.s);
+      const bright = r.n % P.accent === 0, w = (bright ? 1.9 : 1.4) * Math.pow(m, 0.6);
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      const back = Math.min(r.dist, k.spd * P.gapTicks);
+      for (let g = P.ghosts; g >= 0; g--) {
+        const ox = -back * g, sc = Math.pow(0.82, g), a = (g === 0 ? 1 : 0.38 / g) * (bright ? 1 : 0.7);
+        ctx.beginPath();
+        ctx.moveTo(ox - S * 0.6 * sc, -wing * sc); ctx.lineTo(ox + S * 0.4 * sc, 0); ctx.lineTo(ox - S * 0.6 * sc, wing * sc);
+        ctx.globalAlpha = a * 0.35; ctx.strokeStyle = P.glowC; ctx.lineWidth = w * 3; ctx.stroke();
+        ctx.globalAlpha = a; ctx.strokeStyle = g === 0 ? P.core : P.col; ctx.lineWidth = w; ctx.stroke();
+      }
+      glow(P.glowC, S * 0.1, 0, S * (bright ? 2.4 : 1.6), bright ? 0.5 : 0.3);
+    },
+  },
+  {
+    id: 'teardrop', name: 'Plasma Teardrop', family: 'Pulse laser', now: 'pulse',
+    desc: 'A bright plasma drop with a tail that wobbles and pulls longer the faster it flies.',
+    def: { spd: 84, dmg: 14, rate: 4 },
+    P: { r: 3.4, tail: 3.2, wob: 0.6, wobRate: 0.45, throb: 0.08, outer: '#ff4fa3', mid: '#ff8cc6', core: '#fff0f8' },
+    hitCol: '#ffb0d8', linger: 0,
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, R = P.r * Math.pow(k.m, 0.8), Lt = Math.min(R * (1.6 + P.tail * k.s), r.dist + R);
+      const wob = Math.sin(r.t * P.wobRate * (REDUCE ? 0.3 : 1) + r.seed * TAU) * R * P.wob;
+      const th = 1 + P.throb * Math.sin(r.t * 0.9);
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      glow(P.outer, 0, 0, R * 4.5, 0.32);
+      tearPath(R * 1.55, Lt * 1.15, wob * 1.25); fillPath(P.outer, 0.32);
+      tearPath(R * th, Lt, wob); fillPath(P.mid, 0.7);
+      tearPath(R * 0.55, Lt * 0.55, wob * 0.5); fillPath(P.core, 0.95);
+    },
+  },
+  {
+    id: 'needle', name: 'Rail Needle', family: 'Railgun', now: 'railgun',
+    desc: 'A hairline needle with a star at its tip, leaving a shimmering heat wake and sparkles that hang behind.',
+    def: { spd: 150, dmg: 60, rate: 1.2 },
+    P: { len: 16, w: 1.3, wakeTicks: 4, sparkGap: 34, sparkLife: 28, core: '#ffffff', glowC: '#8fd0ff', haze: '#bfe6ff', spark: '#e8f8ff' },
+    hitCol: '#d8f6ff', linger: 34,
+    draw(r, k) {
+      const P = this.P, m = k.m, fs = r.state === 2 ? Math.max(0, 1 - r.dead / 22) : 1;
+      toWorld(); ADD();
+      // Heat shimmer: three wavy lines widening behind, drawn in four chunks fading back
+      const Tw = Math.min(r.dist, k.spd * P.wakeTicks * (0.6 + 0.4 * m));
+      if (fs > 0) for (let j = 0; j < 3; j++) {
+        for (let c = 0; c < 4; c++) {
+          ctx.beginPath();
+          for (let i = 0; i <= 12; i++) {
+            const d = Tw * (c * 12 + i) / 48, dc = Math.min(d, 260);
+            const y = r.y + (j - 1) * (0.6 + dc * 0.022) * m + Math.sin(d * 0.07 - r.t * (REDUCE ? 0.1 : 0.55) + j * 2.1) * (0.4 + dc * 0.009) * m;
+            if (i === 0) ctx.moveTo(r.x - d, y); else ctx.lineTo(r.x - d, y);
+          }
+          ctx.globalAlpha = 0.16 * fs * (1 - c / 4); ctx.strokeStyle = j === 1 ? P.haze : P.glowC; ctx.lineWidth = (j === 1 ? 1.6 : 0.9) * Math.sqrt(m); ctx.stroke();
+        }
+      }
+      // Sparkles: fixed points along the track that flare as the needle passes and fade after
+      const gap = P.sparkGap, last = Math.floor(r.dist / gap), first = Math.max(0, last - 14);
+      for (let q = first; q <= last; q++) {
+        const h1 = hash(q * 3.1 + r.n * 17.3), h2 = hash(q * 7.7 + r.n * 5.9);
+        const dk = (q + h1) * gap;
+        if (dk > r.dist) continue;
+        const age = r.t - dk / Math.max(1, k.spd);
+        const f = age / P.sparkLife;
+        if (f < 0 || f >= 1) continue;
+        const sz = (1 - f) * (1.8 + h2 * 2.2) * Math.sqrt(m), x = r.sx + dk, y = r.sy + (h2 - 0.5) * 6 * m + (h2 - 0.5) * f * 4;
+        const tw = REDUCE ? 1 : 0.7 + 0.3 * Math.sin(age * 0.9 + q);
+        seg(x - sz * 1.6, y, x + sz * 1.6, y, 0.7, P.spark, (1 - f) * tw);
+        seg(x, y - sz, x, y + sz, 0.7, P.spark, (1 - f) * tw * 0.8);
+        glow(P.glowC, x, y, sz * 2.4, 0.35 * (1 - f));
+      }
+      if (r.state !== 1) return;
+      const L = Math.min(P.len * Math.sqrt(m) * k.s, r.dist + 2);
+      seg(r.x - L * 2.2, r.y, r.x, r.y, P.w * m * 1.2, P.glowC, 0.25);
+      toLocal(r.x, r.y, r.hd, 1);
+      seg(-L, 0, 2, 0, P.w * m * 2.8, P.glowC, 0.45);
+      seg(-L, 0, 2, 0, P.w * Math.sqrt(m), P.core, 1);
+      const st = 4.5 * Math.sqrt(m), sp = REDUCE ? 0.7 : r.t * 0.35;
+      toLocal(r.x + 2, r.y, sp, 1);
+      seg(-st, 0, st, 0, 0.9, P.core, 0.9); seg(0, -st * 0.6, 0, st * 0.6, 0.9, P.core, 0.9);
+      glow(P.core, 0, 0, st * 1.3, 0.7);
+    },
+  },
+  {
+    id: 'canister', name: 'Tumbling Canister', family: 'Flak', now: 'flak',
+    desc: 'A banded canister tumbling end over end; its lamp blinks faster until it bursts short of the target.',
+    def: { spd: 34, dmg: 16, rate: 1.8 },
+    P: { len: 9, wid: 5.4, tumble: 0.2, fuse: 70, body: '#5d6352', cap: '#3d4237', band: '#ff8a3c', lamp: '#ff5a2a', trail: '#ff8a3c', frags: 12 },
+    hitCol: '#ffb070', linger: 0,
+    fuse(r, k) { return Math.max(r.range * 0.45, r.range - this.P.fuse * Math.sqrt(k.m)); },
+    burst(r, k, L) {
+      const m = k.m;
+      emit(L, 3, r.x, r.y, 0, 0, 5, 5 * m, 0, '#ffffff', 1);
+      emit(L, 2, r.x, r.y, 0, 0, 12, 22 * m, 0, '#ff9a4a', 0.8);
+      for (let i = 0; i < this.P.frags; i++) {
+        const a = (i / this.P.frags) * TAU + hash(r.n + i) * 0.5, v = (2.5 + hash(i * 3 + r.n) * 3) * Math.sqrt(m);
+        emit(L, 1, r.x, r.y, Math.cos(a) * v, Math.sin(a) * v, 12 + 6 * hash(i), 3, 0, '#ffc080', 0.9);
+      }
+      for (let i = 0; i < 3; i++) emit(L, 0, r.x, r.y, (hash(i + r.n) - 0.5) * 0.6, (hash(i * 2 + r.n) - 0.5) * 0.6, 50, 6 * m, 0.15 * m, '#5a5650', 0.35);
+    },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = k.m, L = P.len * Math.pow(m, 0.75), W = P.wid * Math.pow(m, 0.75);
+      toWorld(); ADD();
+      seg(r.x - Math.min(r.dist, k.spd * 1.2), r.y, r.x, r.y, 2 * m, P.trail, 0.22);
+      glow(P.trail, r.x, r.y, 9 * m, 0.2);
+      const ang = r.t * P.tumble / Math.sqrt(m) * (REDUCE ? 0.4 : 1) + r.seed * TAU;
+      toLocal(r.x, r.y, ang, 1); NORM();
+      ctx.globalAlpha = 1; ctx.fillStyle = P.body; ctx.fillRect(-L / 2, -W / 2, L, W);
+      ctx.fillStyle = P.cap; ctx.fillRect(-L / 2, -W / 2, L * 0.14, W); ctx.fillRect(L / 2 - L * 0.14, -W / 2, L * 0.14, W);
+      ctx.fillStyle = P.band; ctx.fillRect(-L * 0.12, -W / 2, L * 0.1, W); ctx.fillRect(L * 0.08, -W / 2, L * 0.1, W);
+      ctx.strokeStyle = '#a3a991'; ctx.lineWidth = 0.6; ctx.strokeRect(-L / 2, -W / 2, L, W);
+      const f = clamp(r.dist / r.fuseAt, 0, 1), period = 22 - 18 * f;
+      const on = REDUCE ? true : (r.t % period) < period * 0.4;
+      ADD();
+      glow(P.lamp, L * 0.42, 0, (on ? 6 : 2) * Math.sqrt(m) * (REDUCE ? 0.5 + f : 1), on ? 0.95 : 0.25);
+      disc('#ffe0c0', L * 0.42, 0, 0.9 * Math.sqrt(m), on ? 1 : 0.3);
+    },
+  },
+  {
+    id: 'shell', name: 'Lobbed Shell', family: 'Mortar', now: 'mortar',
+    desc: 'A fat shell that swells at the top of its arc over its own shadow, trailing a curling smoke ribbon.',
+    def: { spd: 22, dmg: 70, rate: 0.7 },
+    P: { len: 11, wid: 6.5, lob: 0.75, shadow: 14, every: 5, ribbonLife: 90, body: '#c7cc84', band: '#6e7136', nose: '#e6ee9c', fuse: '#ffd070', smoke: '#9a9686' },
+    hitCol: '#f0e0a0', linger: 90, trail: true,
+    update(r) { if (r.dist - r.lastTr >= this.P.every) { pushTrail(r); r.lastTr = r.dist; } },
+    draw(r, k) {
+      const P = this.P, m = k.m;
+      toWorld(); NORM();
+      // Smoke ribbon (oldest first)
+      const n = r.tn;
+      ctx.lineCap = 'butt';
+      for (let i = n - 1; i > 0; i--) {
+        const a = trailAt(r, i), b = trailAt(r, i - 1);
+        const ax = r.tr[a], ay = r.tr[a + 1], at = r.tr[a + 2], bx = r.tr[b], by = r.tr[b + 1], bt = r.tr[b + 2];
+        const age = r.t - at; if (age > P.ribbonLife) continue;
+        const f = 1 - age / P.ribbonLife, ageB = r.t - bt;
+        const dA = Math.sin(at * 0.06 + r.seed * 6) * age * 0.07 * m, dB = Math.sin(bt * 0.06 + r.seed * 6) * ageB * 0.07 * m;
+        seg(ax, ay + dA, bx, by + dB, (2 + age * 0.09) * m, P.smoke, 0.32 * f * f);
+      }
+      ctx.lineCap = 'round';
+      if (r.state !== 1) return;
+      const fr = clamp(r.dist / r.range, 0, 1), h = Math.sin(Math.PI * fr), z = 1 + P.lob * h;
+      const L = P.len * Math.pow(m, 0.7) * z, W = P.wid * Math.pow(m, 0.7) * z;
+      disc('#1d232c', r.x + h * P.shadow * m, r.y + h * P.shadow * m * 0.8, W * (0.55 + h * 0.25), 0.9 * (1 - h * 0.35));
+      toLocal(r.x, r.y, r.hd, 1);
+      ctx.beginPath(); ctx.ellipse(0, 0, L / 2, W / 2, 0, 0, TAU); fillPath(P.body, 1);
+      ctx.globalAlpha = 1; ctx.fillStyle = P.band; ctx.fillRect(-L * 0.18, -W * 0.44, L * 0.12, W * 0.88);
+      ctx.beginPath(); ctx.ellipse(L * 0.18, -W * 0.14, L * 0.18, W * 0.14, 0, 0, TAU); fillPath(P.nose, 0.8);
+      ADD(); glow(P.fuse, -L * 0.48, 0, 4 * Math.sqrt(m), 0.55);
+    },
+  },
+  {
+    id: 'dart', name: 'Finned Dart', family: 'Missile', now: 'missile',
+    desc: 'A slim body with tail fins and a flickering exhaust; it ramps up to speed and weaves a little as it steers.',
+    def: { spd: 44, dmg: 30, rate: 0.6 },
+    P: { len: 15, wid: 2.8, fin: 3.8, ramp: 28, start: 0.3, flame: 9, weave: 0.05, puffEvery: 2, body: '#dfe6ee', finC: '#8e98a3', nose: '#ff5a3c', flameC: '#ffb060', flameCore: '#fff2d0', smoke: '#8c8780' },
+    hitCol: '#ffc070', linger: 0,
+    speed(r, k) { return k.spd * (this.P.start + (1 - this.P.start) * Math.min(1, r.t / this.P.ramp)); },
+    update(r, k, L, dt) {
+      r.hd = Math.sin(r.t * 0.12 + r.seed * TAU) * this.P.weave;
+      r.acc += dt;
+      if (r.acc >= this.P.puffEvery) {
+        r.acc = 0;
+        const m = k.m, back = this.P.len * Math.pow(m, 0.7) * 0.55;
+        emit(L, 0, r.x - Math.cos(r.hd) * back, r.y - Math.sin(r.hd) * back, (hash(r.t) - 0.5) * 0.3, (hash(r.t + 9) - 0.5) * 0.3, 44 * (0.7 + 0.3 * m), 2.6 * m, 0.11 * m, this.P.smoke, 0.32);
+      }
+    },
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.7), L = P.len * m, W = P.wid * m, F = P.fin * m;
+      const fl = P.flame * m * (0.7 + 0.6 * (REDUCE ? 0.5 : hash(Math.floor(r.t * 1.5) + r.n * 13))) * (0.6 + 0.4 * r.v / k.spd);
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      ctx.beginPath(); ctx.moveTo(-L / 2, -W * 0.42); ctx.lineTo(-L / 2 - fl, 0); ctx.lineTo(-L / 2, W * 0.42); ctx.closePath(); fillPath(P.flameC, 0.75);
+      ctx.beginPath(); ctx.moveTo(-L / 2, -W * 0.22); ctx.lineTo(-L / 2 - fl * 0.55, 0); ctx.lineTo(-L / 2, W * 0.22); ctx.closePath(); fillPath(P.flameCore, 0.95);
+      glow(P.flameC, -L / 2 - fl * 0.3, 0, 7 * m, 0.5);
+      NORM();
+      ctx.beginPath();
+      ctx.moveTo(-L * 0.28, -W / 2); ctx.lineTo(-L * 0.5, -W / 2 - F); ctx.lineTo(-L * 0.5, -W / 2); ctx.closePath();
+      ctx.moveTo(-L * 0.28, W / 2); ctx.lineTo(-L * 0.5, W / 2 + F); ctx.lineTo(-L * 0.5, W / 2); ctx.closePath();
+      ctx.moveTo(L * 0.12, -W / 2); ctx.lineTo(L * 0.02, -W / 2 - F * 0.4); ctx.lineTo(-L * 0.04, -W / 2); ctx.closePath();
+      ctx.moveTo(L * 0.12, W / 2); ctx.lineTo(L * 0.02, W / 2 + F * 0.4); ctx.lineTo(-L * 0.04, W / 2); ctx.closePath();
+      fillPath(P.finC, 1);
+      ctx.beginPath(); ctx.moveTo(-L / 2, -W / 2); ctx.lineTo(L * 0.3, -W / 2); ctx.lineTo(L / 2, 0); ctx.lineTo(L * 0.3, W / 2); ctx.lineTo(-L / 2, W / 2); ctx.closePath();
+      fillPath(P.body, 1);
+      ctx.globalAlpha = 1; ctx.fillStyle = P.nose; ctx.fillRect(L * 0.2, -W / 2, L * 0.08, W);
+    },
+  },
+  {
+    id: 'torpedo', name: 'Wake Torpedo', family: 'Torpedo', now: 'torpedo',
+    desc: 'A long dark hull with glowing seams and a pulsing nose lamp, opening a V-shaped wake behind it.',
+    def: { spd: 10, dmg: 560, rate: 0.33 },
+    P: { len: 28, wid: 7, wakeAng: 0.24, wakeTicks: 16, dots: 22, hull: '#363b42', seam: '#ffa040', lamp: '#ffe0a0', wake: '#ffcf8a', engine: '#ff8a2a' },
+    hitCol: '#ffd08a', linger: 40,
+    draw(r, k) {
+      const P = this.P, m = Math.pow(k.m, 0.7), L = P.len * m, W = P.wid * m;
+      const fs = r.state === 2 ? Math.max(0, 1 - r.dead / this.linger) : 1;
+      const tail = r.state === 1 ? L / 2 : 0;
+      const T = Math.min(Math.max(0, r.dist - tail), Math.max(90, k.spd * P.wakeTicks) * Math.pow(k.m, 0.3));
+      toWorld(); ADD();
+      const N = P.dots, tn = Math.tan(P.wakeAng), x0 = r.x - tail;
+      for (let i = 1; i <= N; i++) {
+        const d = T * i / N, sp = W * 0.45 + d * tn, f = (1 - i / N) * fs;
+        const sh = REDUCE ? 0.8 : 0.6 + 0.4 * Math.sin(r.t * 0.25 - i * 0.9), dl = T / N * 0.6, w = (0.8 + d * 0.012) * Math.sqrt(m);
+        seg(x0 - d, r.y - sp, x0 - d - dl, r.y - sp - dl * tn, w, P.wake, 0.5 * f * sh);
+        seg(x0 - d, r.y + sp, x0 - d - dl, r.y + sp + dl * tn, w, P.wake, 0.5 * f * sh);
+        glow(P.wake, x0 - d, r.y + Math.sin(i * 1.3 + r.t * 0.2) * 1.5 * m, 2 + d * 0.06, 0.18 * f);
+      }
+      if (r.state !== 1) return;
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      glow(P.engine, -L / 2, 0, 11 * m, 0.55);
+      NORM();
+      ctx.beginPath();
+      ctx.moveTo(-L / 2 - W * 0.4, -W * 0.75); ctx.lineTo(-L * 0.32, -W * 0.45); ctx.lineTo(-L * 0.32, W * 0.45); ctx.lineTo(-L / 2 - W * 0.4, W * 0.75); ctx.closePath();
+      fillPath('#262a30', 1);
+      ctx.beginPath();
+      ctx.moveTo(-L / 2, -W / 2); ctx.lineTo(L / 2 - W / 2, -W / 2); ctx.arc(L / 2 - W / 2, 0, W / 2, -Math.PI / 2, Math.PI / 2, false);
+      ctx.lineTo(-L / 2, W / 2); ctx.closePath();
+      fillPath(P.hull, 1);
+      ADD();
+      seg(-L * 0.38, -W * 0.28, L * 0.3, -W * 0.28, 0.7 * m, P.seam, 0.55);
+      seg(-L * 0.38, W * 0.28, L * 0.3, W * 0.28, 0.7 * m, P.seam, 0.55);
+      seg(-L * 0.1, -W * 0.48, -L * 0.1, W * 0.48, 0.8 * m, P.seam, 0.8);
+      seg(L * 0.16, -W * 0.48, L * 0.16, W * 0.48, 0.8 * m, P.seam, 0.8);
+      const pl = REDUCE ? 0.8 : 0.6 + 0.4 * Math.sin(r.t * 0.15);
+      glow(P.lamp, L / 2 - W * 0.3, 0, 5 * m * pl, 0.8);
+      disc('#ffffff', L / 2 - W * 0.3, 0, 1 * m, 0.9);
+    },
+  },
+  {
+    id: 'halo', name: 'Halo Ring', family: 'EMP', now: 'emp',
+    desc: 'A hollow ring of charge with turning dashes and fading echo rings; the middle is empty.',
+    def: { spd: 30, dmg: 24, rate: 0.5 },
+    P: { r: 8, w: 1.5, dashes: 6, spin: 0.12, ghosts: 3, ghostTicks: 1.4, ring: '#4fc3f7', core: '#e8f7ff', inner: '#9fe0ff' },
+    hitCol: '#d8f4ff', linger: 0,
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.8), R = P.r * m * (REDUCE ? 1 : 1 + 0.07 * Math.sin(r.t * 0.2));
+      const sx = clamp(1 + 0.35 * (k.s - 1), 0.85, 1.8);
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      for (let g = P.ghosts; g >= 1; g--) {
+        const off = Math.min(r.dist, k.spd * P.ghostTicks * g * 0.6), gr = 1 + 0.14 * g;
+        ctx.beginPath(); ctx.ellipse(-off, 0, R * sx * gr, R * gr, 0, 0, TAU);
+        ctx.globalAlpha = 0.28 / g; ctx.strokeStyle = P.ring; ctx.lineWidth = P.w * m * 0.8; ctx.stroke();
+      }
+      glow(P.ring, 0, 0, R * 2.1, 0.22);
+      ctx.beginPath(); ctx.ellipse(0, 0, R * sx, R, 0, 0, TAU);
+      ctx.globalAlpha = 0.3; ctx.strokeStyle = P.ring; ctx.lineWidth = P.w * m * 3.2; ctx.stroke();
+      ctx.globalAlpha = 0.95; ctx.strokeStyle = P.core; ctx.lineWidth = P.w * m; ctx.stroke();
+      const Rd = R * 1.32, circ = TAU * Rd;
+      DASH[0] = circ / P.dashes * 0.32; DASH[1] = circ / P.dashes * 0.68;
+      toLocal(r.x, r.y, (REDUCE ? 0.2 : 1) * r.t * P.spin + r.seed * TAU, 1);
+      ctx.setLineDash(DASH);
+      ctx.beginPath(); ctx.arc(0, 0, Rd, 0, TAU);
+      ctx.globalAlpha = 0.7; ctx.strokeStyle = P.inner; ctx.lineWidth = P.w * m * 0.9; ctx.stroke();
+      ctx.setLineDash(NO_DASH);
+      disc(P.core, 0, 0, 0.9 * m, 0.6);
+    },
+  },
+  {
+    id: 'motes', name: 'Mote Orb', family: 'Arc projector', now: 'arc',
+    desc: 'A small charged core with motes on tilted orbits; sparks jump from core to mote. Motes stream back when fast.',
+    def: { spd: 110, dmg: 24, rate: 1.3 },
+    P: { r: 3.4, motes: 3, orbit: 8.5, tilt: 0.38, rate: 0.32, tail: 5, zapEvery: 5, core: '#f0fbff', glowC: '#6ac8ff', mote: '#bfe8ff', zap: '#d8f2ff' },
+    hitCol: '#d8f2ff', linger: 0,
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, m = Math.pow(k.m, 0.7), R = P.r * m, nm = P.motes + Math.min(3, Math.floor(k.m));
+      const lag = R * 2.2 * Math.max(0, k.s - 0.9), O = P.orbit * Math.pow(k.m, 0.6), rt = REDUCE ? 0.3 : 1;
+      toLocal(r.x, r.y, r.hd, 1); ADD();
+      seg(-Math.min(r.dist, k.spd * 0.8), 0, 0, 0, R * 1.2, P.glowC, 0.18);
+      glow(P.glowC, 0, 0, R * 5, 0.35);
+      for (let j = 0; j < nm; j++) {
+        const pa = j * Math.PI / nm + 0.3, ca = Math.cos(pa), sa = Math.sin(pa), oj = O * (j % 2 ? 1.12 : 0.92);
+        const ph0 = r.t * P.rate * rt * (1 + 0.15 * j) + j * TAU / nm;
+        for (let q = P.tail; q >= 0; q--) {
+          const ph = ph0 - q * 0.2, ex = Math.cos(ph) * oj, ey = Math.sin(ph) * oj * P.tilt;
+          const mx = ex * ca - ey * sa - lag * (0.4 + 0.12 * q), my = ex * sa + ey * ca;
+          const dep = Math.sin(ph) < 0 ? 0.45 : 1, sz = 1.3 * Math.sqrt(m) * (1 - q / (P.tail + 1));
+          disc(P.mote, mx, my, sz, dep * (q === 0 ? 1 : 0.5));
+          if (q === 0) glow(P.glowC, mx, my, sz * 3, 0.4 * dep);
+        }
+      }
+      disc(P.core, 0, 0, R, 1);
+      glow(P.core, 0, 0, R * 2, 0.6);
+      // A spark to one mote now and then (always the same for a given tick, so it doesn't flicker frame to frame)
+      const zt = Math.floor(r.t / P.zapEvery);
+      if (!REDUCE && hash(zt + r.n * 7) > 0.35) {
+        const j = Math.floor(hash(zt * 3 + r.n) * nm), pa = j * Math.PI / nm + 0.3, oj = O * (j % 2 ? 1.12 : 0.92);
+        const ph = r.t * P.rate * (1 + 0.15 * j) + j * TAU / nm, ex = Math.cos(ph) * oj, ey = Math.sin(ph) * oj * P.tilt;
+        const mx = ex * Math.cos(pa) - ey * Math.sin(pa) - lag * 0.4, my = ex * Math.sin(pa) + ey * Math.cos(pa);
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        for (let i = 1; i < 4; i++) { const f = i / 4, jit = (hash(zt * 11 + i + r.n) - 0.5) * 3 * m; ctx.lineTo(mx * f - my * jit * 0.1, my * f + jit); }
+        ctx.lineTo(mx, my);
+        ctx.globalAlpha = 0.8; ctx.strokeStyle = P.zap; ctx.lineWidth = 0.7; ctx.stroke();
+      }
+    },
+  },
+  {
+    id: 'crescent', name: 'Crescent Blade', family: 'Phase cannon (legendary)', now: 'phase',
+    desc: 'A violet crescent edge-first, with echo crescents behind; it sweeps back narrower when fast.',
+    def: { spd: 60, dmg: 90, rate: 0.5 },
+    P: { r: 9, thick: 0.42, arc: 1.25, echoes: 3, echoTicks: 0.7, edge: '#f5f3ff', body: '#8b5cf6', glowC: '#a78bfa' },
+    hitCol: '#ddd6fe', linger: 0,
+    draw(r, k) {
+      if (r.state !== 1) return;
+      const P = this.P, R = P.r * Math.pow(k.m, 0.75), half = P.arc / (0.75 + 0.25 * k.s), d = R * P.thick;
+      const ang = r.hd + (REDUCE ? 0 : Math.sin(r.t * 0.2 + r.seed * 6) * 0.06);
+      toLocal(r.x, r.y, ang, 1); ADD();
+      for (let e = P.echoes; e >= 1; e--) {
+        const off = Math.min(r.dist, k.spd * P.echoTicks * e * 0.55);
+        crescentPath(R * (1 + 0.08 * e), half, d, -off - R * 0.55);
+        fillPath(P.body, 0.32 / e);
+      }
+      glow(P.glowC, 0, 0, R * 2.3, 0.32);
+      crescentPath(R, half, d, -R * 0.55); fillPath(P.body, 0.9);
+      ctx.beginPath(); ctx.arc(-R * 0.55, 0, R, -half, half, false);
+      ctx.globalAlpha = 1; ctx.strokeStyle = P.edge; ctx.lineWidth = 1.3 * Math.sqrt(k.m); ctx.stroke();
+      glow(P.edge, R * 0.45, 0, R * 0.7, 0.5);
+    },
+  },
+];
+
+// ---- The game's current rounds (WEAPON_STYLES in client/src/rendering/weapons/weaponStyles.ts, at shell size 1). ----
+// Drawn as WeaponFx does: a glow line and a core line from the tail (speed × tracerTicks back) to the head, two halo
+// discs in the glow colour and a white head disc, all additive.
+const NOW = {
+  cannon:     { name: 'Cannon',     tracerTicks: 2.2, coreWidth: 2.4, glowWidth: 7,  core: '#fff7e6', glow: '#ffb04a', glowAlpha: 0.34, head: 3,   halo: 10 },
+  autocannon: { name: 'Autocannon', tracerTicks: 0.9, coreWidth: 1.6, glowWidth: 5,  core: '#ffe8c0', glow: '#ffa040', glowAlpha: 0.35, head: 3,   halo: 10 },
+  pulse:      { name: 'Pulse',      tracerTicks: 2.2, coreWidth: 2.4, glowWidth: 10, core: '#ffe4f2', glow: '#ff4fa3', glowAlpha: 0.55, head: 3,   halo: 10 },
+  railgun:    { name: 'Railgun',    tracerTicks: 1.4, coreWidth: 2,   glowWidth: 9,  core: '#f2fbff', glow: '#6ab8ff', glowAlpha: 0.45, head: 3.5, halo: 14 },
+  flak:       { name: 'Flak',       tracerTicks: 1.2, coreWidth: 3,   glowWidth: 8,  core: '#ffe0b0', glow: '#ff8a3c', glowAlpha: 0.38, head: 3.5, halo: 10 },
+  mortar:     { name: 'Mortar',     tracerTicks: 1,   coreWidth: 4,   glowWidth: 9,  core: '#e6ee9c', glow: '#9e9d24', glowAlpha: 0.4,  head: 3,   halo: 10 },
+  missile:    { name: 'Missile',    tracerTicks: 0.8, coreWidth: 4,   glowWidth: 10, core: '#dfe6ee', glow: '#ff9a3c', glowAlpha: 0.5,  head: 3,   halo: 12, smoke: '#8c8780' },
+  torpedo:    { name: 'Torpedo',    tracerTicks: 1.2, coreWidth: 6,   glowWidth: 18, core: '#fff3d6', glow: '#ffa040', glowAlpha: 0.5,  head: 3,   halo: 10 },
+  emp:        { name: 'EMP',        tracerTicks: 1.5, coreWidth: 0,   glowWidth: 14, core: '#e8f7ff', glow: '#4fc3f7', glowAlpha: 0.3,  head: 6,   halo: 22 },
+  arc:        { name: 'Arc',        tracerTicks: 2.8, coreWidth: 2.2, glowWidth: 14, core: '#f0fbff', glow: '#6ac8ff', glowAlpha: 0.6,  head: 3,   halo: 10 },
+  phase:      { name: 'Phase',      tracerTicks: 2.6, coreWidth: 4,   glowWidth: 16, core: '#f5f3ff', glow: '#8b5cf6', glowAlpha: 0.5,  head: 6,   halo: 24 },
+};
+function nowStyle(pair) {
+  const c = NOW[pair.now];
+  return {
+    cur: true, name: c.name, hitCol: c.glow, linger: 0,
+    speed: pair.speed ? pair.speed.bind(pair) : undefined, spawn: pair.spawn ? pair.spawn.bind(pair) : undefined,
+    update(r, k, L, dt) {
+      if (!c.smoke) return;
+      r.acc += dt;
+      if (r.acc >= 2) { r.acc = 0; emit(L, 0, r.x, r.y, 0, 0, 50, 3.5, 0.08, c.smoke, 0.3); }
+    },
+    draw(r) {
+      if (r.state !== 1) return;
+      const back = Math.min(r.v * c.tracerTicks, r.dist);
+      const tx = r.x - Math.cos(r.hd) * back, ty = r.y - Math.sin(r.hd) * back;
+      toWorld(); ADD();
+      if (c.glowWidth > 0) seg(tx, ty, r.x, r.y, c.glowWidth, c.glow, c.glowAlpha);
+      if (c.coreWidth > 0) seg(tx, ty, r.x, r.y, c.coreWidth, c.core, 0.9);
+      disc(c.glow, r.x, r.y, c.halo, 0.14);
+      disc(c.glow, r.x, r.y, c.halo * 0.55, 0.22);
+      disc('#ffffff', r.x, r.y, c.head, 1);
+    },
+  };
+}
+for (const s of STYLES) s.nowStyle = nowStyle(s);
+
+// ===================================================================================================================
+// Simulation: lanes of pooled rounds and particles. Nothing below allocates once running.
+// ===================================================================================================================
+const TRAIL = 48;
+function Round() {
+  this.state = 0; this.x = 0; this.y = 0; this.hd = 0; this.t = 0; this.dist = 0; this.v = 0; this.dead = 0;
+  this.n = 0; this.seed = 0; this.sx = 0; this.sy = 0; this.range = 1; this.fuseAt = 1; this.acc = 0;
+  this.tr = new Float32Array(TRAIL * 3); this.ti = 0; this.tn = 0; this.lastTr = 0;
+}
+function pushTrail(r) { const i = r.ti * 3; r.tr[i] = r.x; r.tr[i + 1] = r.y; r.tr[i + 2] = r.t; r.ti = (r.ti + 1) % TRAIL; if (r.tn < TRAIL) r.tn++; }
+/** Index into r.tr of the i-th newest trail point (0 = newest) */
+function trailAt(r, i) { return ((r.ti - 1 - i + TRAIL * 2) % TRAIL) * 3; }
+function Part() { this.on = false; this.kind = 0; this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.t = 0; this.life = 1; this.size = 1; this.grow = 0; this.col = '#ffffff'; this.a = 1; }
+function Lane(nRounds, nParts) {
+  this.rounds = []; for (let i = 0; i < nRounds; i++) this.rounds.push(new Round());
+  this.parts = []; for (let i = 0; i < nParts; i++) this.parts.push(new Part());
+  this.pi = 0; this.style = null; this.y = 0; this.x0 = 0; this.hullX = 0; this.hullR = 60; this.front = 0;
+  this.hasHull = true; this.cool = 0; this.flash = 0; this.count = 0;
+  this.k = { m: 1, s: 1, spd: 54, dmg: 18, rate: 3 };
+}
+function emit(L, kind, x, y, vx, vy, life, size, grow, col, a) {
+  const p = L.parts[L.pi]; L.pi = (L.pi + 1) % L.parts.length;
+  p.on = true; p.kind = kind; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.t = 0; p.life = life; p.size = size; p.grow = grow; p.col = col; p.a = a;
+}
+function setK(k, spd, dmg, rate) {
+  k.spd = spd; k.dmg = dmg; k.rate = rate;
+  k.m = clamp(Math.pow(dmg / 18, 0.33), 0.6, 3.2);
+  k.s = clamp(Math.pow(spd / 54, 0.6), 0.4, 2.8);
+}
+function clearLane(L) {
+  for (let i = 0; i < L.rounds.length; i++) L.rounds[i].state = 0;
+  for (let i = 0; i < L.parts.length; i++) L.parts[i].on = false;
+  L.cool = 0; L.flash = 0; L.count = 0;
+}
+function spawn(L) {
+  const R = L.rounds;
+  let r = null, oldest = null;
+  for (let i = 0; i < R.length; i++) { if (R[i].state === 0) { r = R[i]; break; } if (!oldest || R[i].n < oldest.n) oldest = R[i]; }
+  if (!r) r = oldest;
+  const st = L.style;
+  r.state = 1; r.x = L.x0; r.y = L.y; r.sx = r.x; r.sy = r.y; r.hd = 0; r.t = 0; r.dist = 0; r.dead = 0; r.acc = 0;
+  r.n = ++L.count; r.seed = (r.n * 0.618034) % 1; r.ti = 0; r.tn = 0; r.lastTr = -1e9;
+  r.range = Math.max(40, L.front - L.x0); r.fuseAt = r.range;
+  if (st.spawn) st.spawn(r, L.k, L);
+  if (st.fuse) r.fuseAt = st.fuse(r, L.k);
+  r.v = st.speed ? st.speed(r, L.k) : L.k.spd;
+  emit(L, 2, L.x0 + 4, L.y, 0, 0, 5, 7 * Math.sqrt(L.k.m), 0, '#ffd28a', 0.7);
+}
+function hitAt(L, r) {
+  const m = L.style.cur ? 1 : L.k.m, col = L.style.hitCol;
+  emit(L, 3, r.x, r.y, 0, 0, 5, 4 * m, 0, '#ffffff', 1);
+  emit(L, 2, r.x, r.y, 0, 0, 10, 14 * m, 0, col, 0.7);
+  if (L.hasHull) L.flash = Math.min(1, L.flash + 0.5 + 0.2 * m);
+}
+function stepLane(L, dt, fire) {
+  const k = L.k, st = L.style;
+  if (fire && dt > 0) {
+    L.cool -= dt;
+    let guard = 0;
+    while (L.cool <= 0 && guard++ < 6) { L.cool += 60 / k.rate; spawn(L); }
+  }
+  const R = L.rounds;
+  for (let i = 0; i < R.length; i++) {
+    const r = R[i];
+    if (r.state === 0) continue;
+    r.t += dt;
+    if (r.state === 2) { r.dead += dt; if (r.dead > (st.linger || 0)) r.state = 0; continue; }
+    r.v = st.speed ? st.speed(r, k) : k.spd;
+    r.x += Math.cos(r.hd) * r.v * dt; r.y += Math.sin(r.hd) * r.v * dt; r.dist += r.v * dt;
+    if (st.update) st.update(r, k, L, dt);
+    if (st.fuse && r.dist >= r.fuseAt) {
+      st.burst(r, k, L); r.state = 2; r.dead = 0;
+      if (L.hasHull && r.x > L.front - 90 * k.m) L.flash = Math.min(1, L.flash + 0.4);
+    } else if (r.x >= L.front) {
+      r.x = L.front; if (st.trail) pushTrail(r);
+      r.state = 2; r.dead = 0; hitAt(L, r);
+    }
+  }
+  const Pp = L.parts;
+  for (let i = 0; i < Pp.length; i++) {
+    const p = Pp[i];
+    if (!p.on) continue;
+    p.t += dt; if (p.t >= p.life) { p.on = false; continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.size += p.grow * dt;
+    if (p.kind === 1) { p.vx *= Math.pow(0.9, dt); p.vy *= Math.pow(0.9, dt); }
+  }
+  L.flash = Math.max(0, L.flash - dt * 0.07);
+}
+
+// ---- Drawing a lane ----
+const HULL = [-1, 0, -0.62, -0.4, 0.05, -0.48, 0.3, -0.92, 0.72, -0.92, 0.62, -0.42, 1, -0.3, 1, 0.3, 0.62, 0.42, 0.72, 0.92, 0.3, 0.92, 0.05, 0.48, -0.62, 0.4];
+function drawHull(L) {
+  const R = L.hullR, x = L.hullX, y = L.y;
+  toWorld(); NORM();
+  ctx.beginPath();
+  for (let i = 0; i < HULL.length; i += 2) { const px = x + HULL[i] * R, py = y + HULL[i + 1] * R * 0.8; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+  ctx.closePath();
+  fillPath('#232a33', 1);
+  ctx.globalAlpha = 1; ctx.strokeStyle = '#4a5563'; ctx.lineWidth = 1.4; ctx.stroke();
+  if (L.flash > 0.01) { ADD(); fillPath('#ffe6c8', L.flash * 0.16); NORM(); }
+  seg(x - R * 0.45, y, x + R * 0.9, y, 1, '#36404c', 1);
+  seg(x + R * 0.2, y - R * 0.38, x + R * 0.2, y + R * 0.38, 1, '#36404c', 1);
+  ADD(); glow('#7fd6fa', x - R * 0.3, y, R * 0.12, 0.6);
+}
+function drawGun(L) {
+  toWorld(); NORM();
+  ctx.globalAlpha = 1; ctx.fillStyle = '#2b333e'; ctx.fillRect(L.x0 - 22, L.y - 8, 18, 16);
+  ctx.fillStyle = '#3b4552'; ctx.fillRect(L.x0 - 6, L.y - 3, 10, 6);
+}
+function drawParts(L, add) {
+  const Pp = L.parts;
+  for (let i = 0; i < Pp.length; i++) {
+    const p = Pp[i];
+    if (!p.on) continue;
+    const f = p.t / p.life;
+    if (p.kind === 0) { if (add) continue; glow(p.col, p.x, p.y, p.size, p.a * (1 - f) * Math.min(1, p.t / 3)); }
+    else if (!add) continue;
+    else if (p.kind === 1) seg(p.x - p.vx * 1.8, p.y - p.vy * 1.8, p.x, p.y, 1.1, p.col, p.a * (1 - f));
+    else if (p.kind === 2) glow(p.col, p.x, p.y, p.size * (0.6 + 0.6 * f), p.a * (1 - f) * (1 - f));
+    else disc(p.col, p.x, p.y, p.size * (1 - 0.5 * f), p.a * (1 - f));
+  }
+}
+function drawLane(L) {
+  if (L.hasHull) { drawHull(L); drawGun(L); }
+  toWorld(); NORM(); drawParts(L, false);
+  const R = L.rounds;
+  for (let i = 0; i < R.length; i++) if (R[i].state !== 0) L.style.draw(R[i], L.k, L);
+  toWorld(); ADD(); drawParts(L, true);
+  NORM(); ctx.globalAlpha = 1;
+}
+
+// ---- Stars (screen space, parallax) ----
+const STARS = new Float32Array(240 * 3);
+for (let i = 0; i < 240; i++) { STARS[i * 3] = hash(i * 1.3) * 2400; STARS[i * 3 + 1] = hash(i * 2.9 + 4) * 1600; STARS[i * 3 + 2] = hash(i * 5.1 + 9); }
+function drawStars(cssW, cssH, camX, dpr, zoom) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); NORM(); ctx.fillStyle = '#c8d4e6';
+  const off = camX * zoom * 0.25;
+  for (let i = 0; i < 240; i++) {
+    const b = STARS[i * 3 + 2], x = ((STARS[i * 3] - off * (0.4 + b)) % 2400 + 2400) % 2400, y = STARS[i * 3 + 1];
+    if (x > cssW || y > cssH) continue;
+    ctx.globalAlpha = 0.15 + b * 0.45; const s = b > 0.85 ? 1.6 : 1; ctx.fillRect(x, y, s, s);
+  }
+}
+
+// ===================================================================================================================
+// Page state and views
+// ===================================================================================================================
+const $ = (id) => document.getElementById(id);
+const state = { sel: 0, close: false, slow: REDUCE, showNow: true, paused: false, spd: 54, dmg: 18, rate: 3 };
+const mainLanes = [new Lane(64, 260), new Lane(64, 200)];
+const LINEUP_MIN_RATE = 1.5;
+const lineup = STYLES.map((s) => {
+  const a = new Lane(24, 120), b = new Lane(24, 80);
+  a.style = s; b.style = s.nowStyle; a.hasHull = b.hasHull = false;
+  const lr = Math.max(s.def.rate, LINEUP_MIN_RATE);
+  setK(a.k, s.def.spd, s.def.dmg, lr); setK(b.k, s.def.spd, s.def.dmg, lr);
+  a.cool = b.cool = hash(STYLES.indexOf(s) * 4.7) * 30;
+  return [a, b];
+});
+let zoomText = 'GAME SCALE 1:1';
+const view = { cssW: 0, cssH: 0, dpr: 1, zoom: 1, camX: 0, follow: -1, easing: false };
+const lv = { cssW: 0, cssH: 0, dpr: 1, rowH: 46, labelW: 120 };
+const mainC = $('main'), mainX = mainC.getContext('2d');
+const lineC = $('lineup'), lineX = lineC.getContext('2d');
+
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = mainC.getBoundingClientRect();
+  view.cssW = Math.max(200, r.width); view.cssH = Math.max(160, r.height); view.dpr = dpr;
+  mainC.width = Math.round(view.cssW * dpr); mainC.height = Math.round(view.cssH * dpr);
+  lv.cssW = Math.max(200, lineC.getBoundingClientRect().width); lv.dpr = dpr;
+  lv.labelW = lv.cssW < 520 ? 112 : 140;
+  lv.rowH = 46; lv.cssH = STYLES.length * lv.rowH + 8;
+  lineC.style.height = lv.cssH + 'px';
+  lineC.width = Math.round(lv.cssW * dpr); lineC.height = Math.round(lv.cssH * dpr);
+  for (let i = 0; i < lineup.length; i++) {
+    const y0 = 4 + i * lv.rowH;
+    const a = lineup[i][0], b = lineup[i][1];
+    a.y = y0 + lv.rowH * 0.32; b.y = y0 + lv.rowH * 0.74;
+    a.x0 = b.x0 = lv.labelW + 14; a.front = b.front = lv.cssW - 10;
+  }
+}
+
+function layoutMain() {
+  const cw = view.cssW, ch = view.cssH;
+  const zoom = state.close ? clamp(cw / 320, 2.2, 4) : 1;
+  const vw = cw / zoom, vh = ch / zoom, two = state.showNow;
+  const A = mainLanes[0], B = mainLanes[1];
+  A.y = two ? -vh * 0.24 : 0; B.y = vh * 0.24;
+  const hullR = Math.min(64, (two ? vh * 0.5 : vh) * 0.36);
+  A.hullR = B.hullR = hullR;
+  A.x0 = B.x0 = 0;
+  const hx = state.close ? 900 : Math.max(220, vw - 60) - 26 - hullR;
+  A.hullX = B.hullX = hx; A.front = B.front = hx - hullR * 0.98;
+  if (zoom !== view.zoom) zoomText = state.close ? 'CLOSE-UP ×' + (Math.round(zoom * 10) / 10) : 'GAME SCALE 1:1';
+  view.zoom = zoom;
+  return { vw, vh };
+}
+
+function updateCamera(vw, dtSim, frames) {
+  if (!state.close) { view.camX = vw / 2 - 40; view.follow = -1; return; }
+  const R = mainLanes[0].rounds;
+  let tgt = null;
+  for (let i = 0; i < R.length; i++) if (R[i].state === 1 && (!tgt || R[i].n < tgt.n)) tgt = R[i];
+  const lo = vw / 2 - 44, hi = mainLanes[0].hullX + mainLanes[0].hullR + 24 - vw / 2;
+  if (!tgt) { if (view.follow === -1) view.camX = lo; return; }
+  const want = clamp(tgt.x - vw * 0.16, lo, Math.max(lo, hi));
+  if (tgt.n !== view.follow) { view.follow = tgt.n; view.easing = !REDUCE; }
+  if (view.easing) {
+    view.camX += (want < hi && want > lo ? tgt.v * dtSim : 0) + (want - view.camX) * Math.min(1, 0.22 * frames);
+    if (Math.abs(want - view.camX) < 1) view.easing = false;
+  } else view.camX = want;
+}
+
+function drawLabel(text, x, y, col) {
+  ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.fillText(text, x, y);
+}
+function renderMain(dtSim, frames) {
+  ctx = mainX;
+  const { vw } = layoutMain();
+  updateCamera(vw, dtSim, frames);
+  const dpr = view.dpr, z = view.zoom;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); NORM(); ctx.globalAlpha = 1;
+  ctx.fillStyle = '#06080c'; ctx.fillRect(0, 0, mainC.width, mainC.height);
+  drawStars(view.cssW, view.cssH, view.camX, dpr, z);
+  V.a = z * dpr; V.e = (view.cssW / 2 - view.camX * z) * dpr; V.f = (view.cssH / 2) * dpr;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  drawLane(mainLanes[0]);
+  if (state.showNow) drawLane(mainLanes[1]);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); NORM();
+  ctx.font = '600 12px "Barlow Condensed", "Arial Narrow", sans-serif'; ctx.textBaseline = 'middle';
+  const yA = view.cssH / 2 + mainLanes[0].y * z, yB = view.cssH / 2 + mainLanes[1].y * z;
+  drawLabel('NEW', 10, yA - 16, '#ffb04a');
+  if (state.showNow) drawLabel('NOW', 10, yB - 16, '#8a94a3');
+  drawLabel(zoomText, view.cssW - 110, 14, '#56606e');
+}
+function renderLineup() {
+  ctx = lineX;
+  const dpr = lv.dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); NORM(); ctx.globalAlpha = 1;
+  ctx.fillStyle = '#06080c'; ctx.fillRect(0, 0, lineC.width, lineC.height);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (let i = 0; i < lineup.length; i++) {
+    const y0 = 4 + i * lv.rowH;
+    ctx.globalAlpha = 1; ctx.fillStyle = i === state.sel ? '#131922' : (i % 2 ? '#090c11' : '#06080c');
+    ctx.fillRect(0, y0, lv.cssW, lv.rowH - 2);
+    if (i === state.sel) { ctx.fillStyle = '#ffb04a'; ctx.fillRect(0, y0, 3, lv.rowH - 2); }
+    ctx.font = '600 13px "Barlow Condensed", "Arial Narrow", sans-serif'; ctx.textBaseline = 'middle';
+    drawLabel(LABELS[i], 10, y0 + lv.rowH * 0.32, i === state.sel ? '#ffd9a0' : '#d9dee6');
+    ctx.font = '400 11px "Barlow", "Segoe UI", sans-serif';
+    drawLabel(FAMS[i], 10, y0 + lv.rowH * 0.72, '#8a94a3');
+    ctx.globalAlpha = 1; ctx.fillStyle = '#1b222c'; ctx.fillRect(lv.cssW - 10, y0 + 4, 2, lv.rowH - 10);
+  }
+  V.a = dpr; V.e = 0; V.f = 0;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let i = 0; i < lineup.length; i++) {
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath(); ctx.rect(lv.labelW * dpr, (4 + i * lv.rowH) * dpr, lineC.width, (lv.rowH - 2) * dpr); ctx.clip();
+    drawLane(lineup[i][0]); drawLane(lineup[i][1]);
+    ctx.restore();
+  }
+}
+const LABELS = STYLES.map((s) => s.name.toUpperCase());
+const FAMS = STYLES.map((s) => s.family.replace(' (legendary)', ''));
+
+// ---- Controls ----
+const dmgFrom = (v) => 5 * Math.exp(Math.log(120) * v / 1000);
+const dmgTo = (d) => Math.round(1000 * Math.log(d / 5) / Math.log(120));
+const rateFrom = (v) => 0.2 * Math.exp(Math.log(40) * v / 1000);
+const rateTo = (r) => Math.round(1000 * Math.log(r / 0.2) / Math.log(40));
+function fmtDmg(d) { return d < 20 ? d.toFixed(1).replace('.0', '') : String(Math.round(d)); }
+function applyK() {
+  for (let i = 0; i < 2; i++) setK(mainLanes[i].k, state.spd, state.dmg, state.rate);
+  const k = mainLanes[0].k;
+  $('spdVal').textContent = state.spd + ' u/tick';
+  $('dmgVal').textContent = fmtDmg(state.dmg);
+  $('rateVal').textContent = (state.rate < 1 ? state.rate.toFixed(2) : state.rate.toFixed(1)) + ' / s';
+  $('roScale').textContent = 'size ×' + k.m.toFixed(2) + ' · stretch ×' + k.s.toFixed(2) + ' · ' + (state.spd * 60).toLocaleString() + ' u/s';
+  $('roMain').textContent = state.spd + ' u/tick · ' + fmtDmg(state.dmg) + ' dmg · ' + state.rate.toFixed(state.rate < 1 ? 2 : 1) + '/s';
+}
+function resetLanes() {
+  clearLane(mainLanes[0]); clearLane(mainLanes[1]);
+  mainLanes[0].cool = mainLanes[1].cool = 6;
+  view.follow = -1;
+}
+function setValues(spd, dmg, rate) {
+  state.spd = spd; state.dmg = dmg; state.rate = rate;
+  $('spd').value = spd; $('dmg').value = dmgTo(dmg); $('rate').value = rateTo(rate);
+  applyK();
+}
+function select(i) {
+  state.sel = (i + STYLES.length) % STYLES.length;
+  const s = STYLES[state.sel];
+  mainLanes[0].style = s; mainLanes[1].style = s.nowStyle;
+  $('sName').textContent = s.name; $('sFam').textContent = s.family; $('sDesc').textContent = s.desc;
+  document.querySelectorAll('.pick').forEach((b, j) => b.setAttribute('aria-checked', String(j === state.sel)));
+  setValues(s.def.spd, s.def.dmg, s.def.rate);
+  resetLanes();
+  if (state.paused) prewarm(60);
+}
+function prewarm(ticks) {
+  layoutMain();
+  for (let t = 0; t < ticks; t++) { stepLane(mainLanes[0], 1, true); stepLane(mainLanes[1], 1, true); }
+  view.easing = false;
+}
+const picker = $('picker');
+STYLES.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'pick'; b.setAttribute('role', 'radio');
+  b.innerHTML = '<span class="top"><b></b><span class="tag"></span></span><span class="d"></span>';
+  b.querySelector('b').textContent = s.name;
+  b.querySelector('.tag').textContent = s.family;
+  b.querySelector('.d').textContent = s.desc;
+  b.addEventListener('click', () => select(i));
+  picker.appendChild(b);
+});
+$('spd').addEventListener('input', (e) => { state.spd = +e.target.value; applyK(); });
+$('dmg').addEventListener('input', (e) => { state.dmg = dmgFrom(+e.target.value); applyK(); });
+$('rate').addEventListener('input', (e) => { state.rate = rateFrom(+e.target.value); applyK(); });
+$('reset').addEventListener('click', () => { const d = STYLES[state.sel].def; setValues(d.spd, d.dmg, d.rate); resetLanes(); });
+function setZoom(close) {
+  state.close = close;
+  $('zGame').setAttribute('aria-pressed', String(!close)); $('zClose').setAttribute('aria-pressed', String(close));
+  resetLanes(); if (state.paused) prewarm(60);
+}
+$('zGame').addEventListener('click', () => setZoom(false));
+$('zClose').addEventListener('click', () => setZoom(true));
+$('slow').checked = state.slow;
+$('slow').addEventListener('change', (e) => { state.slow = e.target.checked; });
+$('now').addEventListener('change', (e) => { state.showNow = e.target.checked; });
+function setPaused(p) { state.paused = p; $('play').textContent = p ? 'Play' : 'Pause'; }
+$('play').addEventListener('click', () => setPaused(!state.paused));
+lineC.addEventListener('click', (e) => {
+  const y = e.clientY - lineC.getBoundingClientRect().top, i = Math.floor((y - 4) / lv.rowH);
+  if (i >= 0 && i < STYLES.length) select(i);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === 'range' && e.key !== ' ') return;
+  if (e.key === ']') select(state.sel + 1);
+  else if (e.key === '[') select(state.sel - 1);
+  else if (e.key === ' ') { e.preventDefault(); setPaused(!state.paused); }
+  else if (e.key === 's' || e.key === 'S') { state.slow = !state.slow; $('slow').checked = state.slow; }
+  else if (e.key === 'z' || e.key === 'Z') setZoom(!state.close);
+  else if (e.key === 'n' || e.key === 'N') { state.showNow = !state.showNow; $('now').checked = state.showNow; }
+});
+reduceMQ.addEventListener?.('change', (e) => { REDUCE = e.matches; });
+new ResizeObserver(resize).observe(document.querySelector('.wrap'));
+
+// ---- Loop ----
+let lastT = 0;
+function frame(now) {
+  const ms = lastT ? Math.min(50, now - lastT) : 16.7; lastT = now;
+  const frames = ms / (1000 / 60);
+  const dt = state.paused ? 0 : frames * (state.slow ? 0.2 : 1);
+  stepLane(mainLanes[0], dt, true);
+  stepLane(mainLanes[1], dt, true);
+  for (let i = 0; i < lineup.length; i++) { stepLane(lineup[i][0], dt, true); stepLane(lineup[i][1], dt, true); }
+  renderMain(dt, frames);
+  renderLineup();
+  requestAnimationFrame(frame);
+}
+resize();
+select(0);
+if (REDUCE) setPaused(true);
+prewarm(40);
+for (let t = 0; t < 120; t++) for (let i = 0; i < lineup.length; i++) { stepLane(lineup[i][0], 0.5, true); stepLane(lineup[i][1], 0.5, true); }
+requestAnimationFrame(frame);
+// For screenshots and quick checks: window.lab.select(3), lab.zoom(true), lab.freeze(ticks)
+window.lab = {
+  select, zoom: setZoom, styles: STYLES.map((s) => s.id),
+  freeze(ticks) { resetLanes(); prewarm(ticks || 30); setPaused(true); },
+};
+</script>
