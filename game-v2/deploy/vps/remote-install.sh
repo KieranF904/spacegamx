@@ -295,7 +295,10 @@ run "cd $B/server && npm ci --no-audit --no-fund && npx tsc"
 run "cd $B/server-browser && npm ci --no-audit --no-fund && npx tsc"
 # The website runs its TypeScript through tsx (a dev dependency, so no --omit=dev); the check stops a broken deploy before the swap
 if [ $SITE = 1 ]; then run "cd $B/site && npm ci --no-audit --no-fund && npx tsc --noEmit -p ."; fi
-run "cd $B/client && npm ci --no-audit --no-fund && VITE_BROWSER_URL=https://space.brotherk3d.com/lobby npx vite build"
+# (The client comes built: deploy.sh builds it on the deploying machine, as vite needs more memory than this box spares.
+# An older tarball without client/dist is built here as before)
+if [ -f "$B/client/dist/index.html" ]; then log "client: built by the deploy"
+else run "cd $B/client && npm ci --no-audit --no-fund && VITE_BROWSER_URL=https://space.brotherk3d.com/lobby npx vite build"; fi
 # Only the built files are needed at runtime (nginx and the website read client/dist); nginx must be able to read them
 rm -rf "$B/client/node_modules"
 chmod -R a+rX "$B/client/dist"

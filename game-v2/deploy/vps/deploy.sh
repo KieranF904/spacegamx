@@ -44,14 +44,17 @@ cat "$WORK/REVISION"
 
 # Runtime data (accounts, players' ships, profiles, telemetry, contributor notes, status, the website's data, the
 # world's memory, backups) never ships; nor do the dev-only data files (the dev systems and dev test ships: the
-# production server doesn't read them). blueprints/remakes does ship: the design update swaps players' saves for them
-tar -czf "$TGZ" --exclude=node_modules --exclude=dist \
+# production server doesn't read them). blueprints/remakes does ship: the design update swaps players' saves for them.
+# The client is built here, not on the box: its production build needs more memory than the shared VPS can spare (vite
+# ran out of heap there, 2026-11-07). It ships as client/dist; remote-install.sh builds only if none came
+(cd client && VITE_BROWSER_URL=https://space.brotherk3d.com/lobby npx vite build --outDir "$WORK/client-build" --emptyOutDir --logLevel warn)
+tar -czf "$TGZ" --exclude=node_modules --exclude=dist --transform 's,^client-build,client/dist,' \
   --exclude='data/users.json' --exclude='data/users.json.tmp' --exclude='data/users.db*' --exclude='data/lobby' \
   --exclude='data/ships/players' --exclude='data/profiles' --exclude='data/telemetry' --exclude='data/contributor' \
   --exclude='data/status' --exclude='data/site' --exclude='data/world' --exclude='data/backups' \
   --exclude='data/dev' --exclude='data/ships/blueprints/dev' \
   common server server-browser client data $([ "${WITH_SITE:-}" = 1 ] && echo site) \
-  -C "$WORK" REVISION
+  -C "$WORK" REVISION client-build
 $SSH "$HOST" 'mkdir -p /root/spacegame-deploy && if [ -f /root/spacegame.tgz ]; then cp -p /root/spacegame.tgz /root/spacegame.prev.tgz; fi'
 scp -i "$KEY" -o BatchMode=yes "$TGZ" "$HOST:/root/spacegame.tgz"
 scp -i "$KEY" -o BatchMode=yes deploy/vps/*.service deploy/vps/*.timer deploy/vps/nginx-*.conf deploy/vps/remote-install.sh deploy/vps/spacegame-dbdump.sh "$HOST:/root/spacegame-deploy/"
