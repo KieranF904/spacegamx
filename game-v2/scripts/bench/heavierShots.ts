@@ -41,6 +41,7 @@ import { guideKind, guideTick, newGuide, qGuide, type Guide, type GuideBody } fr
 import { steerToward } from '../../common/src/ships/features/weaponry/weaponry.js';
 import type { WeaponInfo } from '../../common/src/ships/rebuild.js';
 import type { WeaponTuning } from '../../common/src/ships/tuning.js';
+import { leadTicks, roundLead } from '../../common/src/bodies/aiLead.js';
 
 const argv = process.argv;
 const AFTER = argv.includes('--after'), MD = argv.includes('--md'), ENEMY = argv.includes('--enemy');
@@ -268,8 +269,8 @@ function scenario(fn: string, T: Target, range: number, seed: number, aim: AimMo
     let aimX: number, aimY: number;
     const sp = speedOf(def0) * (def0.homing ? 0 : 1);
     if (aim === 'ai') {
-      // (bodies/aiPilot.ts: the flight time as if every shell flew 45 a tick, at most 40 ticks)
-      const tof = Math.min(40, Math.hypot(tx, ty) / 45);
+      // (bodies/aiPilot.ts: the flight time of the main gun's round, bodies/aiLead.ts; here the gun under test is it)
+      const tof = leadTicks(Math.hypot(tx, ty), roundLead(def0));
       aimX = tx; aimY = ty + tvy * tof;
     } else if (sp > 0) {
       const tt = intercept(tx, ty, estVx, estVy, sp) ?? Math.hypot(tx, ty) / sp;

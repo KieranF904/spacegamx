@@ -286,7 +286,9 @@ Swarm pair is caught by one, as now.
    Rail Driver's 1.5 s reload sends the aim distance every tick (35-39 updates/s in the bench, about 120 B/s to each
    watcher). Treating a reloading semi clip like any clip (due at the reload's end and half) would bring that to about
    4. It is shared deterministic code (server, own prediction, lanes), so the parity tests go with it.
-3. **The AI leads every gun as if its rounds flew 45 u/tick.** With rounds spread from 10 to 150 it over-leads fast
+3. **The AI leads every gun as if its rounds flew 45 u/tick.** (FIXED 2026-11-07: it leads by its main gun's round,
+   common bodies/aiLead.ts; the bench's `--enemy` AI aim uses it. Railgun hit rate 63/82/56 % -> 92/100/100 %,
+   the slow guns a little up, the 45-ish guns unchanged; enemy balance is up to Kieran.) With rounds spread from 10 to 150 it over-leads fast
    rounds and under-leads slow ones; reading the gun's own speed would be cheap. Enemy balance today is tuned around
    the current misses, so it's left alone here.
 

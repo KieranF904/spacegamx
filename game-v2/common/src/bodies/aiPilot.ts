@@ -9,7 +9,7 @@
  *   PATROL  [0, wx, wy, pace, pauseUntil]  to a waypoint, cruising in pulses: thrusting while (tick + id × 13) % 120 is
  *                                          at most `pace`, holding still before tick `pauseUntil`
  *   RETURN  [1, hx, hy]                    home, straight
- *   ENGAGE  [2, range, reach, hitBy, errMax, seed, strafe, flank, ...mates]
+ *   ENGAGE  [2, range, reach, hitBy, errMax, seed, strafe, flank, leadV, leadA, leadMax, ...mates]
  *                                          at its target: its fighting range and its guns' reach; hitBy bit 0 while its
  *                                          target has shot it lately (shot at from past its reach it closes in), bit 1
  *                                          when one of its guns lobs (it fires from further off: aiFires);
@@ -18,9 +18,10 @@
  *                                          seed, so nobody works its misses out ahead); strafing while (tick + id × 7) % 180 is
  *                                          under `strafe`; a pack's ships (flank q13 + 1, mates as ids less its own)
  *                                          fight from round the side the pack is on (its centroid as the ships ended
- *                                          the last tick, summed in id order); flank 0: alone, from its own side
+ *                                          the last tick, summed in id order); flank 0: alone, from its own side;
+ *                                          led by its main gun's round (lead*: bodies/aiLead.ts leadPlaces; 0: 45 a tick)
  *   FLEE    [3]                            away from its target, boosting
- *   HAUL    [5, arrive, reach, flags, errMax, seed, wx, wy]
+ *   HAUL    [5, arrive, reach, flags, errMax, seed, wx, wy, leadV, leadA, leadMax]
  *                                          a freighter on its course (flags bit 0: to (wx, wy), flown as the autopilot
  *                                          flies one, bridge/pilotless.ts autopilotControls; else holding its heading),
  *                                          never turning to fight; its guns on its target (whoever last shot it) as an
@@ -38,6 +39,7 @@ import { hashUnit } from '../math/rng.js';
 import type { BodyState, WantRec } from './decisions.js';
 import type { BodyOut, BodyPose } from './stagedFlight.js';
 import { CUSTOM_DESIGNS, CO, moveAt, type CustomCtx, type CustomFlight } from './custom/index.js';
+import { ENGAGE_MATES, LEGACY_LEAD, ORDER_LEAD, leadAt, leadPlaces, leadTicks, type AiLead } from './aiLead.js';
 
 /** CUSTOM: a custom enemy's ENGAGE, its design, pieces gone and move in it (bodies/custom/order.ts) */
 export const AI_ORDER = { PATROL: 0, RETURN: 1, ENGAGE: 2, FLEE: 3, CUSTOM: 4, HAUL: 5 } as const;
@@ -46,7 +48,9 @@ const engages = (w: WantRec) => w[0] === AI_ORDER.ENGAGE || w[0] === AI_ORDER.CU
 /** An order whose guns aim at its target with an aim error (an engage, or a freighter shooting back) */
 const aims = (w: WantRec) => engages(w) || w[0] === AI_ORDER.HAUL;
 /** Where an engage order's mates start */
-const matesAt = (w: WantRec) => (w[0] === AI_ORDER.CUSTOM ? CO.MATES : 8);
+const matesAt = (w: WantRec) => (w[0] === AI_ORDER.CUSTOM ? CO.MATES : ENGAGE_MATES);
+/** The round an order's guns are led by (a custom enemy fires no part guns: as before) */
+const leadOf = (w: WantRec): AiLead => (w[0] === AI_ORDER.ENGAGE || w[0] === AI_ORDER.HAUL ? leadAt(w, ORDER_LEAD) : LEGACY_LEAD);
 /** The aim error's grid (radians × this) */
 export const AIM_ERR_GRID = 4096;
 /** Strafing every tick (no `strafe` share in its behaviour) */
@@ -65,15 +69,16 @@ export const orderFlee = (): WantRec => [AI_ORDER.FLEE];
  * A freighter on its course (`to`: its autopilot's, null: holding its heading), its guns at its target from up to
  * `reach` (its guns' real reach), its aim off by up to `errMax` radians from `seed`; `lobs` as orderEngage's
  */
-export const orderHaul = (to: { x: number; y: number; arrive: number } | null, reach: number, errMax: number, seed: number, lobs = false): WantRec =>
-  [AI_ORDER.HAUL, Math.round(to?.arrive ?? 0), Math.round(reach), (to ? 1 : 0) | (lobs ? 2 : 0), Math.round(errMax * AIM_ERR_GRID), seed & 255, Math.round(to?.x ?? 0), Math.round(to?.y ?? 0)];
+export const orderHaul = (to: { x: number; y: number; arrive: number } | null, reach: number, errMax: number, seed: number, lobs = false, lead?: Readonly<AiLead>): WantRec =>
+  [AI_ORDER.HAUL, Math.round(to?.arrive ?? 0), Math.round(reach), (to ? 1 : 0) | (lobs ? 2 : 0), Math.round(errMax * AIM_ERR_GRID), seed & 255, Math.round(to?.x ?? 0), Math.round(to?.y ?? 0), ...(lead ? leadPlaces(lead) : [0, 0, 0])];
 /**
  * At its target. `strafe`: its behaviour's share of the time it strafes (undefined: always); `flank` (radians) and
- * `mates` (its pack's other ships, ids) only for a pack of more than one
+ * `mates` (its pack's other ships, ids) only for a pack of more than one; `lead`: its main gun's round (aiLead.ts
+ * aiLoadout; absent: led as if at 45 a tick)
  */
-export function orderEngage(id: number, range: number, reach: number, hitBy: boolean, errMax: number, seed: number, strafe: number | undefined, flank?: number, mates?: readonly number[], lobs = false): WantRec {
+export function orderEngage(id: number, range: number, reach: number, hitBy: boolean, errMax: number, seed: number, strafe: number | undefined, flank?: number, mates?: readonly number[], lobs = false, lead?: Readonly<AiLead>): WantRec {
   const out = [AI_ORDER.ENGAGE, Math.round(range), Math.round(reach), (hitBy ? 1 : 0) | (lobs ? 2 : 0), Math.round(errMax * AIM_ERR_GRID), seed & 255,
-    strafe === undefined ? ALWAYS_STRAFE : Math.max(0, Math.min(ALWAYS_STRAFE, Math.ceil(180 * strafe))), 0];
+    strafe === undefined ? ALWAYS_STRAFE : Math.max(0, Math.min(ALWAYS_STRAFE, Math.ceil(180 * strafe))), 0, ...(lead ? leadPlaces(lead) : [0, 0, 0])];
   if (flank !== undefined && mates?.length) {
     out[7] = quantizeCursorAngle(flank) + 1;
     for (const m of [...mates].sort((a, b) => a - b)) out.push(m - id);
@@ -147,8 +152,8 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: (BodyPose & { r?: numbe
     const tx = tgt.x, ty = tgt.y, dx = tx - me.x, dy = ty - me.y;
     d = dhypot(dx, dy) || 1;
     const [range, reach] = custom?.design.ranges ? custom.design.ranges(custom.c, w[1], w[2]) : [w[1], w[2]];
-    // Lead the target by the shell's flight time
-    tof = Math.min(40, d / 45);
+    // Lead the target by the shell's flight time (its main gun's round: bodies/aiLead.ts)
+    tof = leadTicks(d, leadOf(w));
     const rvx = tgt.vx - me.vx, rvy = tgt.vy - me.vy;
     const lx = dx + rvx * tof, ly = dy + rvy * tof;
     face = datan2(ly, lx) + aiAimError(w, id, tick);
@@ -221,7 +226,7 @@ function haul(w: WantRec, me: BodyPose, tgt: (BodyPose & { r?: number }) | null,
   if (tgt) {
     const dx = tgt.x - me.x, dy = tgt.y - me.y;
     d = dhypot(dx, dy) || 1;
-    tof = Math.min(40, d / 45);
+    tof = leadTicks(d, leadOf(w));
     const rvx = tgt.vx - me.vx, rvy = tgt.vy - me.vy, lx = dx + rvx * tof, ly = dy + rvy * tof;
     aim = datan2(ly, lx) + aiAimError(w, id, tick);
     aimDist = dhypot(lx, ly);

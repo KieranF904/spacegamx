@@ -34,7 +34,7 @@ import { hasComponent, IWorld } from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, Player, Dead, Radius,
   Blueprint, Bag, ShipState, partItemId, mulberry32,
-  MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
+  MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, aiLoadout, AI_BEAM_REACH, type AiLead, migratePartItem,
   nestPosition, nestPost, NEST_RADIUS, insideTerrain, rayTerrain, terrainRadius, type Terrain, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
   orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec,
   spawnersOf, seedGroups, pickGroup, ghostCentre, ghostShip, slotStyle, packPopSlot, lureSector, packLure, LIFE_ASLEEP_RESET, FOCUS_RANGE, GHOST_STEP,
@@ -272,8 +272,6 @@ export interface EnemyHost {
 
 /** Party members this close to a kill share it */
 const PARTY_SHARE_RANGE = 8000;
-/** The furthest a hostile opens fire with a beam, whatever the beam itself reaches */
-const NPC_BEAM_REACH = 1600;
 
 export type Behaviour = FactionDef['behaviour'];
 
@@ -303,9 +301,10 @@ interface Enemy {
   /** Aim error (radians): its aim's off by up to this either way, re-rolled from `aimSeed` every 12 + id % 7 ticks */
   aimErr: number;
   aimSeed?: number;
-  /** How far its guns really reach (worked out from its loadout the first time it fights), and whether it lobs shells */
+  /** How far its guns really reach (worked out from its loadout the first time it fights), whether it lobs shells, and its main gun's round (its lead) */
   reach?: number;
   lobs?: boolean;
+  lead?: AiLead;
   /** Where round a target it fights from, against the pack's side (radians): packs spread out to flank */
   flank: number;
   /** One target it goes for first while it stands, from any distance (a siege's sapper on a turret); `preyOnly`: it ignores everything else, even what shoots it (a runner on the bastion) */
@@ -1613,7 +1612,7 @@ export class Enemies {
       const c = pack?.cent, mates = c && c.ids.includes(eid) ? c.ids.filter((m) => m !== eid) : undefined;
       if (c && mates?.length) cent = [c.x, c.y];
       // (whether one of its guns lobs: its trigger fires from further off, common bodies/aiPilot.ts aiFires)
-      want = orderEngage(eid, cs?.range ?? b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined, !cs && e.lobs === true);
+      want = orderEngage(eid, cs?.range ?? b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined, !cs && e.lobs === true, cs ? undefined : e.lead);
       if (cs) want = this.custom.order(eid, want, t);
     } else if (e.state === 'flee') want = orderFlee();
     else if (e.state === 'return') want = orderReturn(home.x, home.y);
@@ -1638,18 +1637,12 @@ export class Enemies {
     return this.pilots.on(eid);
   }
 
-  /** How far an enemy's guns really reach (its longest), and whether any lob shells */
+  /** How far an enemy's guns really reach (its longest), whether any lob shells, and the round it leads by (common bodies/aiLead.ts) */
   private learnLoadout(e: Enemy, ship: ShipState): void {
-    let reach = 0, lobs = false;
-    for (const w of ship.derived.weapons) {
-      const def = partWeaponDef(this.ships.tuning, w.kind, ship.blueprint.parts[w.part], { model: w.model });
-      // Beams: pilots' pulse lasers reach far, but hostiles only open up from nearer in (no sniping from past the edge of the screen)
-      const r = def.type === 'beam' ? Math.min(def.range ?? 800, NPC_BEAM_REACH) : (def.maxSpeed ?? def.speed ?? 30) * (def.life ?? 60);
-      if (endsAtAim(def)) lobs = true;
-      reach = Math.max(reach, r);
-    }
-    e.reach = reach > 0 ? reach : undefined;
-    e.lobs = lobs;
+    const l = aiLoadout(this.ships.tuning, ship, AI_BEAM_REACH);
+    e.reach = l.reach > 0 ? l.reach : undefined;
+    e.lobs = l.lobs;
+    e.lead = l.lead;
   }
 
   /** Alive, and not sheltering at a station */
