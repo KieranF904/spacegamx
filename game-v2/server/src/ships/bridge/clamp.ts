@@ -16,7 +16,7 @@
 
 import { hasComponent } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Player, joinDerived, followerPose, powerOfCtl, quantizeShipBody, pairLimited, clampStepInfo,
+  Position, Velocity, Rotation, Player, joinDerived, followerPose, powerOfCtl, quantizeShipBody, pairLimited, clampStepInfo, dsincos,
   type ClampAt, type ClampSource, type ClampOffset, type ClampBody,
 } from '@space-game/common';
 import type { BridgeCtx } from './core.js';
@@ -164,10 +164,10 @@ function noteFollower(b: BridgeCtx, k: ServerClampLink): void {
   k.fshare = rec ? powerOfCtl(rec.bits) : undefined;
 }
 
-const SC = { x: 0, y: 0 };
+const SC = { x: 0, y: 0 }, SC2: [number, number] = [0, 0];
 function rot(vx: number, vy: number, angle: number): { x: number; y: number } {
   // (A leader-frame vector in the world, as clamp.ts turns it: grid forward is -y)
-  const a = angle + Math.PI / 2, s = Math.sin(a), c = Math.cos(a);
+  const [s, c] = dsincos(angle + Math.PI / 2, SC2);
   SC.x = vx * c - vy * s; SC.y = vx * s + vy * c;
   return SC;
 }

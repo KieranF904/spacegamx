@@ -8,7 +8,7 @@
  * server and every client agree with nothing streamed. Pure: no state, no allocation in the per-tick queries.
  */
 
-import { dsincos } from '../../../math/detTrig.js';
+import { datan2, dsincos } from '../../../math/detTrig.js';
 import { hashInts } from '../../../math/rng.js';
 import type { FunctionDef } from '../../types.js';
 
@@ -144,7 +144,7 @@ const SC2: [number, number] = [0, 0];
 function localAngle(dx: number, dy: number): number {
   if (dx === 0) return dy < 0 ? 0 : Math.PI;
   if (dy === 0) return dx > 0 ? Math.PI / 2 : -Math.PI / 2;
-  return Math.atan2(dx, -dy);
+  return datan2(dx, -dy);
 }
 
 function wrapPi(a: number): number {

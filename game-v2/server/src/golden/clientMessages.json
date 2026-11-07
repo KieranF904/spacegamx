@@ -6,6 +6,9 @@
   "bankDeposit",
   "bossDevTool",
   "chat",
+  "clampDock",
+  "clampSwap",
+  "clampUndock",
   "codexRead",
   "contrib",
   "craft",
@@ -48,6 +51,7 @@
   "marketScan",
   "marketSell",
   "marketSellAll",
+  "mineDrop",
   "outpostCharter",
   "outpostUpgrade",
   "packedResync",
@@ -95,5 +99,6 @@
   "undock",
   "vendorBuy",
   "vendorOpen",
+  "weaponGroups",
   "whisper"
 ]

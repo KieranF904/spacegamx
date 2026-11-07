@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Heavy Docking Clamp
+Mk II · Panel · 2 cells
+Hull · mass263 hp · 3.6
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Clamplocks to another ship's 2-cell clamp lined up with it, when both pilots agree; one steers, each keeps their own guns
+
+== partStats (stats rows) ==
+GradeMk II
+Clamplocks to a 2-cell clamp
+Hull · mass263 hp · 3.6
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 263
+
+== familyLabel ==
+Docking Clamps
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ships
+
+== keyStats ==
+2-cell clamp
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 16","why":"Learned at level 16 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 16","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":2,"hp":263.2,"mass":3.6399999999999997,"firepower":0,"toughness":263.2,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

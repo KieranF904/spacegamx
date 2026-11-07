@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Docking Clamp
+Mk I · Square · 1 cell
+Hull · mass90 hp · 1.0
+Armour · build1 · 1 pts
+Clamplocks to another ship's one-cell clamp lined up with it, when both pilots agree; one steers, each keeps their own guns
+
+== partStats (stats rows) ==
+GradeMk I
+Clamplocks to a one-cell clamp
+Hull · mass90 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 90
+
+== familyLabel ==
+Docking Clamps
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+A clamp on its open edge
+
+== keyStats ==
+one-cell clamp
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 4","why":"Learned at level 4 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 4","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":90,"mass":1,"firepower":0,"toughness":90,"armour":1}

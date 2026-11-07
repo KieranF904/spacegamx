@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Mine Bay
+Mk I · Panel · 2 cells
+Hull · mass150 hp · 3.4
+Armour · build1 · 2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Dropsdrops 4 proximity mines behind you a press, from a magazine of 12 · they arm after 1 s, never go off for you or your party, and last 90 s
+Mine blasteach mine hits for up to 140 across 110 m
+
+== partStats (stats rows) ==
+GradeMk I
+Drops4 mines a drop, 12 held
+Mine blast140 a mine
+Hull · mass150 hp · 3.4
+Armour · build1 · 2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 150
+
+== familyLabel ==
+Mine Bays
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+Drops a batch of 4 proximity mines out of its open edge on a key press, from a magazine of 12 the fabricator refills
+
+== keyStats ==
+4 mines a drop · each mine hits for up to 140 across 110 m
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 8","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":2,"hp":150.4,"mass":3.36,"firepower":0,"toughness":150.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}
