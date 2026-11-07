@@ -38,6 +38,7 @@ import type { ShipClient } from '../ships/ShipClient';
 import type { Autopilot } from '../ships/Autopilot';
 import type { GameState } from '../state/GameState';
 import type { ProtoHooks } from '../Game';
+import { groupSelection } from '../ships/weaponGroups/selection';
 
 /** What the input path reads from the game (Game supplies it as getters, so late-built windows resolve at use) */
 export interface InputSendHost {
@@ -273,6 +274,13 @@ export function tickInput(s: InputSendCtx): void {
     // Check if anything changed from last sent state
     changed = inputChanged(s, msg, quantized, cursorDistQ);
   }
+  // The weapon groups selection is state, not a held key: it goes on the input it changes on, and on the first one after a
+  // welcome or a respawn (not while berthed or dead: the server holds it, and it goes on the first input after). No delay:
+  // an input that was going to be sent goes as it did, and a change sends one now
+  if (groupSelection.due() && !berthed && !dead && !(!s.proto && s.state.inputLate?.(targetTick))) {
+    msg.weaponGroups = groupSelection.packed;
+    changed = true;
+  }
   // (The jump overlay draws from the aim and distance the server flies: the burn goes along the aim, flight.ts jumpAimed)
   s.shipClient.setJumpSent?.(msg.targetAngle, msg.cursorDist ?? 0);
   // Debris worked out here is confirmed on the next input, which goes now if nothing else would (ShipClient.takeAcks)
@@ -328,6 +336,7 @@ export function forgetSent(s: InputSendState): void {
   s.lastSentAngle = n.lastSentAngle;
   s.lastSentCursorDist = n.lastSentCursorDist;
   s.sentDist = n.sentDist;
+  groupSelection.forget();
 }
 
 /** Remember this input as the last one sent */
@@ -336,6 +345,7 @@ export function markSent(s: InputSendState, msg: ClientInputMessage, quantized: 
   s.lastSentAngle = quantized;
   s.lastSentCursorDist = cursorDistQ;
   s.sentDist = msg.cursorDist ?? 0;
+  if (msg.weaponGroups !== undefined) groupSelection.sent(msg.weaponGroups);
 }
 
 /**

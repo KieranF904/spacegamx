@@ -34,6 +34,7 @@ import type { ContextActions } from '../input/ContextActions';
 import type { ProtoHooks } from '../Game';
 import { settings } from '../settings/Settings';
 import { viewMode } from '../input/viewMode';
+import { groupKey } from '../ships/weaponGroups/keys';
 
 /** What the key handlers read from the game (Game supplies it as getters, so late-built windows resolve at use) */
 export interface KeyHost {
@@ -121,8 +122,12 @@ export const MODAL_CHAIN: readonly KeyFn[] = [
   },
 ];
 
+const groups: KeyFn = (h, code) => h.loggedIn && !h.shipClient.hangarOpen && groupKey(code);
+
 /** Global keys that run before the ship's own keys (ShipClient.onKey) */
 export const PRE_KEYS: Readonly<Record<string, KeyFn>> = {
+  // Weapon groups: , . / cycle the left and right button's group; with the setting on, 1-5 pick one instead of the quick bar
+  Comma: groups, Period: groups, Slash: groups, Digit1: groups, Digit2: groups, Digit3: groups, Digit4: groups, Digit5: groups,
   // Esc calls off a menu order (instead of opening the game menu)
   Escape: (h) => h.context.active && h.context.cancel(h.context.jumpMark() ? 'Jump cancelled' : 'Autopilot off'),
   // G: autopilot to the job you're following (again: off)

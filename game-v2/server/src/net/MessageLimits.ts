@@ -32,6 +32,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   fieldPlan: { per: 60, burst: 10 },
   fieldPlanClear: { per: 60, burst: 10 },
   fieldRecycle: { per: 120, burst: 20 },
+  // A weapon-group change refits the live ship (net/handlers/weaponGroups.ts)
+  weaponGroups: { per: 60, burst: 10 },
   // Items moved into the repair bank and the profile saved
   bankDeposit: { per: 120, burst: 20 },
   // Popups on other people's screens

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { CURSOR_DIST_STEP, dequantizeCursorAngle, quantizeCursorAngle, noseFrame, type ClientInputMessage } from '@space-game/common';
 import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './inputSend';
 import { ViewMode, type CameraMode } from '../input/viewMode';
+import { groupSelection } from '../ships/weaponGroups/selection';
+import { packGroupSel } from '@space-game/common';
 
 /** A scripted pilot: keys, mouse and a few ship/menu switches the test flips between ticks */
 interface Script {
@@ -225,5 +227,51 @@ describe('inputSend: the four control / view combinations (input/viewMode.ts)', 
     const m = sent.length > 1 ? sent[sent.length - 1] : predicted[predicted.length - 1];
     // (The autopilot's keys are along the world)
     expect([m.forward, m.strafeLeft, m.strafeRight]).toEqual([true, false, false]);
+  });
+});
+
+describe('inputSend: the weapon groups selection', () => {
+  it('goes once, on the input it changes on; nothing carries it otherwise', () => {
+    groupSelection.reset(); groupSelection.sent(0);
+    const { sent, tick, sc } = fakeCtx();
+    tick();
+    expect(sent[0].weaponGroups).toBeUndefined();
+    groupSelection.cycleLeft(1);                       // left: 1
+    tick();                                            // nothing else changed: the selection alone is an input
+    expect(sent.length).toBe(2);
+    expect(sent[1].weaponGroups).toBe(packGroupSel(1, 0));
+    tick(); tick();                                    // held: not sent again
+    expect(sent.length).toBe(2);
+    sc.keys.add('KeyW'); tick();                       // another change carries no selection
+    expect(sent[2].weaponGroups).toBeUndefined();
+    groupSelection.cycleRight(1); sc.keys.delete('KeyW'); tick();
+    expect(sent[3].weaponGroups).toBe(packGroupSel(1, 1));
+    groupSelection.reset();
+  });
+
+  it('goes on the first input after a welcome or a respawn, even when it is all/all', () => {
+    groupSelection.reset(); groupSelection.sent(0);
+    const { sent, tick } = fakeCtx();
+    tick();
+    groupSelection.forget();                           // a welcome (ShipClient.onWelcome) or a respawn (forgetSent)
+    tick();
+    expect(sent.length).toBe(2);
+    expect(sent[1].weaponGroups).toBe(0);
+    tick();
+    expect(sent.length).toBe(2);
+  });
+
+  it('waits while berthed (the server holds it) and goes on the first input after', () => {
+    groupSelection.reset(); groupSelection.sent(0);
+    const { sent, tick, sc } = fakeCtx();
+    tick();
+    sc.berthed = true;
+    groupSelection.cycleLeft(1);
+    tick();
+    expect(sent.every((m) => m.weaponGroups === undefined)).toBe(true);
+    sc.berthed = false;
+    tick();
+    expect(sent[sent.length - 1].weaponGroups).toBe(packGroupSel(1, 0));
+    groupSelection.reset();
   });
 });

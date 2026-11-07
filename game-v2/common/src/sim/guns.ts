@@ -22,6 +22,7 @@ import type { ShipState } from '../ships/state.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import type { WeaponInfo } from '../ships/rebuild.js';
 import type { WeaponMods } from '../ships/types.js';
+import { rightFiresGuns, trigWord } from '../ships/weaponGroups.js';
 import { stepGuns, type GunOrders, type GunStep } from '../ships/guns.js';
 import { gunDef, shotAimQ } from '../ships/launch.js';
 import { ensurePortsCharge, payMining, type Charge } from '../ships/energy.js';
@@ -93,16 +94,19 @@ export function gunsTick(ship: ShipState, owner: number, pose: GunPose, orders: 
 
 /** What a ship's controls ask of its guns this tick, gated by its state (no firing mid-jump or under an EMP) */
 export interface GunControls {
+  /** Some gun's button is down (the left button, or the right one where it fires guns: weaponGroups.ts rightFiresGuns) */
   firing: boolean;
+  /** The trigger word the guns step on (weaponGroups.ts trigWord): the buttons (none while stopped) and the selection */
+  word: number;
   mining: boolean;
   /** Burning (mid-jump) or EMP'd: nothing fires, the mining lasers stop */
   stopped: boolean;
 }
 
 /** The trigger as the server's stepWeapons and the client's predictGuns read it (the right button fires the guns on a ship with no mining lasers) */
-export function gunControls(ship: Pick<ShipState, 'derived'>, fire: boolean, fireAlt: boolean, stopped: boolean): GunControls {
-  const hasMiners = ship.derived.miners.length > 0;
-  return { firing: (fire || (fireAlt && !hasMiners)) && !stopped, mining: fireAlt && hasMiners && !stopped, stopped };
+export function gunControls(ship: Pick<ShipState, 'derived'>, fire: boolean, fireAlt: boolean, stopped: boolean, sel = 0): GunControls {
+  const hasMiners = ship.derived.miners.length > 0, gunsOnRight = rightFiresGuns(sel, hasMiners);
+  return { firing: (fire || (fireAlt && gunsOnRight)) && !stopped, word: trigWord(fire && !stopped, fireAlt && !stopped, sel), mining: fireAlt && hasMiners && !gunsOnRight && !stopped, stopped };
 }
 
 /**
@@ -127,7 +131,7 @@ function gunView(state: SimShipState): ShipState {
   v.id = state.id;
   v.derived = state.structure.derived;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin; v.aim = g.aim;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt;
+  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.trig = g.trig ?? 0;
   v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
   return v;
 }
@@ -146,13 +150,13 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   const emp = t < state.hazard.empUntil || (input.bits & BIT_EMP) !== 0;
   const burning = jumpPhase(body.jump ?? 0, jumpTuning(env.tuning)).phase === 'burn';
   const view = gunView(state);
-  const c = gunControls(view, input.fire, input.fireAlt, burning || emp);
+  const c = gunControls(view, input.fire, input.fireAlt, burning || emp, input.sel ?? 0);
   const pose: GunPose = { x: body.x, y: body.y, angle: body.angle };
   const energy = state.accounted ? { charge: state.charge } : undefined;
   if (energy) ensurePortsCharge(d, energy.charge);
   // (A pilot's held aim, where its flight kept it: weighed by the guns too, sim/aimHold.ts)
   const pilot = state.mode === 0 /* ReplicaMode.Player */ && input.gunAim === undefined;
-  const step = gunsTick(view, state.id, pose, { firing: c.firing, aimWorld: input.gunAim === undefined ? simAim(input.q) : input.gunAim ?? undefined, aimDist: input.aimDist, energy, hold: pilot, heldAim: pilot && heldQ !== undefined ? simAim(heldQ) : undefined }, t, env.tuning, events);
+  const step = gunsTick(view, state.id, pose, { firing: c.firing, word: c.word, aimWorld: input.gunAim === undefined ? simAim(input.q) : input.gunAim ?? undefined, aimDist: input.aimDist, energy, hold: pilot, heldAim: pilot && heldQ !== undefined ? simAim(heldQ) : undefined }, t, env.tuning, events);
   if (energy) {
     miningTick(view, state.id, pose, c, t, energy, events);
     state.charge = energy.charge;
@@ -160,6 +164,7 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   const g = state.guns;
   g.triggerHeld = view.triggerHeld;
   g.clickAt = view.clickAt;
+  g.trig = view.trig;
   g.minePaid = view.minePaid;
   g.mineUntil = view.mineUntil;
   g.mineShare = view.mineShare;

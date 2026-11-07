@@ -38,6 +38,7 @@ import { powerTick, gunLoadTick, ensurePortsCharge, remapCharge, type Charge } f
 import { firesStraight } from '../ships/launch.js';
 import { gunShell } from '../ships/hitRules.js';
 import { TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '../ships/guns.js';
+import { TRIG_LEFT, TRIG_RIGHT, trigSel } from '../ships/weaponGroups.js';
 import { NO_HAZARD, cloneCharge, type GunState, type SimShipState, type SimStructure } from './state.js';
 import type { SimInput } from './input.js';
 import type { SimEnv } from './env.js';
@@ -71,9 +72,9 @@ export const TELL_NONE = 251;
 /** Fire-row ammo code: a point-defence turret fired (its cooldown restarts: lanePd); drawn by its intercept */
 export const TELL_PD = 250;
 
-/** Gun-row control bits */
-export const GUN_FIRE = 1;
-export const GUN_ALT = 2;
+/** Gun-row control bits: a gun row's bits are the trigger word (weaponGroups.ts trigWord: left 1, right 2, the selection from bit 2) */
+export const GUN_FIRE = TRIG_LEFT;
+export const GUN_ALT = TRIG_RIGHT;
 
 /** A ship's gun controls on a tick: its triggers and cursor distance (world units, on the 4-unit input grid) */
 export interface GunCtl { bits: number; dist: number }
@@ -145,7 +146,7 @@ export function laneFireRow(owner: number, snapTick: number, r: LaneRec): number
 
 const BIT_EMP = 512;
 const PILOT_IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
-const PILOT_X = { fire: false, fireAlt: false, jumpDist: -1, aimDist: 0 };
+const PILOT_X = { fire: false, fireAlt: false, jumpDist: -1, aimDist: 0, sel: 0 };
 const NO_EVENTS: SimEvent[] = [];
 /** (lanePilot's flight: the env given, the guns left to the lane's own phase) */
 const MOTION_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: { central: null }, terrain: null, gunsByHost: true };
@@ -163,12 +164,12 @@ export function lanePilot(id: number, prev: Readonly<OwnExtras>, before: Readonl
     const me = MOTION_ENV;
     me.tick = env.tick; me.tuning = env.tuning; me.gravity = env.gravity; me.fields = env.fields; me.terrain = env.terrain; me.hazard = env.hazard;
     NO_EVENTS.length = 0;
-    PILOT_X.fire = (g.bits & GUN_FIRE) !== 0; PILOT_X.fireAlt = (g.bits & GUN_ALT) !== 0; PILOT_X.aimDist = g.dist;
+    PILOT_X.fire = (g.bits & GUN_FIRE) !== 0; PILOT_X.fireAlt = (g.bits & GUN_ALT) !== 0; PILOT_X.aimDist = g.dist; PILOT_X.sel = trigSel(g.bits);
     const s = stepOwnShip(id, prev, { ...before }, bits, q, PILOT_X, structure, me, NO_EVENTS);
     x = { charge: s.charge, guns: s.guns, hazard: { ...NO_HAZARD }, jumpPrime: s.jumpPrime };
   } else x = cloneOwnExtras(prev);
   const s: SimShipState = { id, mode: 0 as SimShipState['mode'], body: after as FlightBody, ctl: { bits, q }, charge: x.charge, accounted: true, jumpPrime: x.jumpPrime, hazard: x.hazard, guns: x.guns, structure };
-  PILOT_IN.bits = bits; PILOT_IN.q = q; PILOT_IN.fire = (g.bits & GUN_FIRE) !== 0; PILOT_IN.fireAlt = (g.bits & GUN_ALT) !== 0; PILOT_IN.aimDist = g.dist;
+  PILOT_IN.bits = bits; PILOT_IN.q = q; PILOT_IN.fire = (g.bits & GUN_FIRE) !== 0; PILOT_IN.fireAlt = (g.bits & GUN_ALT) !== 0; PILOT_IN.aimDist = g.dist; PILOT_IN.sel = trigSel(g.bits);
   ensurePortsCharge(structure.derived, s.charge);
   stepShipGuns(s, PILOT_IN, env, events);
   x.charge = s.charge;
@@ -179,7 +180,7 @@ export function lanePilot(id: number, prev: Readonly<OwnExtras>, before: Readonl
 function laneView(ship: ShipState, g: GunState): ShipState {
   const v = Object.create(ship) as ShipState;
   v.cooldown = g.cooldown; v.rounds = g.rounds; v.reload = g.reload; v.charge = g.charge; v.spin = g.spin; v.aim = g.aim;
-  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt;
+  v.triggerHeld = g.triggerHeld; v.clickAt = g.clickAt; v.trig = g.trig ?? 0;
   v.minePaid = g.minePaid; v.mineUntil = g.mineUntil; v.mineShare = g.mineShare; v.tow = g.tow; v.heldDist = g.heldDist;
   return v;
 }
@@ -203,7 +204,7 @@ export function lanePilotless(id: number, prev: Readonly<OwnExtras>, after: Read
   const firing = fire && (bits & BIT_EMP) === 0 && !burning;
   gunsTick(view, id, after, { firing, aimWorld: aim, aimDist, energy }, tick, tuning, events);
   const g = x.guns;
-  g.triggerHeld = view.triggerHeld; g.clickAt = view.clickAt; g.heldDist = view.heldDist;
+  g.triggerHeld = view.triggerHeld; g.clickAt = view.clickAt; g.trig = view.trig; g.heldDist = view.heldDist;
   x.charge = energy.charge;
   return x;
 }
@@ -253,7 +254,7 @@ export function laneHash(id: number, x: Readonly<OwnExtras>, pd: readonly number
   let aim = g.aim;
   if (!g.triggerHeld) aim = g.aim.length ? new Array<number>(g.aim.length).fill(0) : g.aim;
   else if (pd.length) { aim = [...g.aim]; for (const p of pd) aim[p] = 0; }
-  s.guns = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim, triggerHeld: g.triggerHeld, clickAt: g.clickAt, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, heldDist: g.heldDist };
+  s.guns = { cooldown: g.cooldown, rounds: g.rounds, reload: g.reload, charge: g.charge, spin: g.spin, aim, triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, heldDist: g.heldDist };
   return shipHash(s);
 }
 
@@ -270,7 +271,7 @@ export function laneOf(guns: GunState, charge: Charge): OwnExtras {
  * through t are told. `z` is the whole state as one list of numbers (packGunSync: each array sparse, packArr):
  *   [pool, ...banks, ...eng, ...gun, ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
  *    ...sat), ...cooldown, ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, minePaid, mineUntil,
- *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue)]
+ *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord)]
  * (each `...x` an array as its packArr's length, then the packArr; absent: -1; an absent scalar: null)
  */
 export interface ServerGunSyncMessage {
@@ -322,7 +323,7 @@ export function packGunSync(id: number, t: number, x: Readonly<OwnExtras>, k: Re
   // (mach: which field machines draw, so another ship's guns get the power its own do; their energy counters aren't needed here)
   if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge, c.e.mach ?? 0); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
   for (const a of GUN_ARRAYS) putArr(z, g[a]);
-  z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist));
+  z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist), g.trig ?? 0);
   return { type: 'gunSync', id, t, z };
 }
 
@@ -345,6 +346,7 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
   const guns: GunState = { cooldown, rounds, reload, charge: gcharge, spin, aim, triggerHeld: num() === 1, clickAt: num(), minePaid: val(), mineUntil: val(), mineShare: val(), tow: val() };
   const bits = num(), dist = num() * 4;
   if (i < z.length) guns.heldDist = val();
+  if (i < z.length) guns.trig = num();
   return { x: { charge, guns, hazard: { ...NO_HAZARD }, jumpPrime: 0 }, k: { bits, dist } };
 }
 

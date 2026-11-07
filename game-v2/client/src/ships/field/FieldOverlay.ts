@@ -16,6 +16,8 @@ import type { PlacedGeom, PlacedPart, ShipState, Side, Vec2 } from '@space-game/
 import type { HangarPalette, PaletteSel } from '../HangarPalette';
 import type { ShipDrawCtx } from '../features/types';
 import { fieldClient } from './fieldState';
+import { drawFieldGroups, fieldGroupEdit } from '../weaponGroups/fieldEditor';
+import { groupOfKey } from '../weaponGroups/editor';
 import type { FieldDeps } from './bridge';
 import {
   addPart, candidate, openDraft, partAtPoint, placementProblem, planChanged, planDiff, planTarget, removePart, targetErrors,
@@ -319,10 +321,25 @@ export class FieldOverlay {
   onKey(code: string): boolean {
     if (!this.isOpen) return false;
     if (code === 'Escape') { this.close(); return true; }
+    if (groupOfKey(code)) return this.groupKey(code);
     if (code === 'KeyR') { this.hand.rot = ((this.hand.rot + 1) & 3) as PaletteSel['rot']; this.pal?.renderHand(); return true; }
     if (code === 'KeyF') { this.hand.flip = !this.hand.flip; this.pal?.renderHand(); return true; }
     if (code === 'KeyT') { this.hand.facing = SIDE_CYCLE[(SIDE_CYCLE.indexOf(this.hand.facing) + 1) % SIDE_CYCLE.length]; this.pal?.renderHand(); return true; }
     return false;
+  }
+
+  /** 1-4 over a standing weapon: its weapon groups on the live ship (ships/weaponGroups/fieldEditor.ts) */
+  private groupKey(code: string): boolean {
+    const d = this.draft, ship = this.deps.ship();
+    if (!d || !ship || !this.mouse) return false;
+    const at = this.gridAt(this.mouse.x, this.mouse.y);
+    const i = at ? partAtPoint(this.deps.catalog, d, at) : -1;
+    if (i < 0) return false;
+    const r = fieldGroupEdit(code, ship, d.bp.parts[i].uid, planChanged(d, fieldClient.recycleUids()));
+    if (!r) return false;
+    if ('problem' in r) this.say(r.problem, true);
+    else { this.deps.send(r.send); this.say(r.said); }
+    return true;
   }
 
   // ---------------------------------------------------------------- save, undo, clear
@@ -410,6 +427,8 @@ export class FieldOverlay {
       if (d.marked.has(p.uid)) fillPoly(g, X, geoms[i], 0xef4444, 0.18, 0xef4444, 0.95);
       else if (!d.live.has(p.uid)) fillPoly(g, X, geoms[i], 0x38bdf8, 0.28, 0x7dd3fc, 0.95);
     });
+    const live = this.deps.ship();
+    if (live) drawFieldGroups(g, live, (uid) => geoms[d.bp.parts.findIndex((q) => q.uid === uid)], (gx, gy) => X.at(gx, gy), ctx.cs);
     if (this.mouse && this.near(this.gridAt(this.mouse.x, this.mouse.y) ?? [1e9, 1e9])) {
       const at = this.gridAt(this.mouse.x, this.mouse.y)!;
       const pv = this.preview(at);

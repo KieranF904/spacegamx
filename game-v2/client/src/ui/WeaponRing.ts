@@ -10,6 +10,9 @@
  *                    shrinking, a part-filled one as a dim amber sliver (it can't fire), and the cooldown a thin grey arc inside
  *   mining pulse     a ports ship's mining lasers: the pulse sweeping along the segment, cyan when fully fed and dimming to red
  *                    as its fulfilment drops (the share of its draw it gets), its buffer a thin arc inside
+ * Weapon groups (ships/weaponGroups.ts): a group outside both buttons' selected groups is dim, and with a group selected a
+ * dot by each segment in the left group shows its state (green ready, amber reloading, red short of power); a small chip under
+ * the ring says the selection ("L: 2  R: all"). With both on "all" the ring is as it always was.
  * Cycle and beam guns show a plain readiness arc. A transparent canvas that follows the mouse; nothing in it is
  * allocated per frame.
  */
@@ -33,6 +36,8 @@ export class WeaponRing {
   private ctx: CanvasRenderingContext2D | null;
   private shown = false;
   private sweep = 0;
+  /** The alpha scale of the segment being drawn (a dim group) */
+  private mul = 1;
 
   constructor() {
     const c = document.createElement('canvas');
@@ -46,7 +51,7 @@ export class WeaponRing {
   }
 
   /** Draw the ring at the cursor (x, y in CSS pixels); hidden when `show` is false or there is nothing to show */
-  update(groups: readonly RingGroup[], x: number, y: number, show: boolean): void {
+  update(groups: readonly RingGroup[], x: number, y: number, show: boolean, chip = ''): void {
     const ctx = this.ctx;
     const on = show && !!ctx && groups.length > 0;
     if (on !== this.shown) { this.shown = on; this.canvas.style.display = on ? 'block' : 'none'; }
@@ -55,13 +60,22 @@ export class WeaponRing {
     if (tx !== this.tx || ty !== this.ty) { this.tx = tx; this.ty = ty; this.canvas.style.transform = `translate(${tx}px, ${ty}px)`; }
     this.sweep = (this.sweep + 0.12) % TAU;
     // Redrawn only when what it shows changed (or a reload's pips are breathing): idle guns at the ready draw nothing
-    if (!this.changed(groups)) return;
+    if (!this.changed(groups, chip)) return;
     ctx.clearRect(0, 0, SIZE, SIZE);
     const n = groups.length, span = TAU / n;
     for (let i = 0; i < n; i++) {
       // Segment i starts at the top and runs clockwise
       const a0 = -Math.PI / 2 + i * span + GAP / 2, a1 = -Math.PI / 2 + (i + 1) * span - GAP / 2;
       this.segment(ctx, groups[i], a0, n === 1 ? a0 + TAU - GAP : a1);
+    }
+    if (chip) {
+      ctx.globalAlpha = 0.9;
+      ctx.font = "600 10px 'Segoe UI', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(chip, C, C + R + 30);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -71,15 +85,16 @@ export class WeaponRing {
   private drawn: (number | string | boolean)[] = [];
 
   /** Whether the groups differ from what was last drawn (remembering them if so); always while a reload sweeps */
-  private changed(groups: readonly RingGroup[]): boolean {
+  private changed(groups: readonly RingGroup[], chip: string): boolean {
     this.at = 0; this.diff = false;
     let sweeping = false;
-    this.put(groups.length);
+    this.put(groups.length); this.put(chip);
     for (const g of groups) {
       if (g.reloading && !g.starved) sweeping = true;
       this.put(g.model); this.put(g.clip); this.put(g.rounds); this.put(g.reloading); this.put(g.starved); this.put(g.charge);
       this.put(g.cooling); this.put(g.flash); this.put(g.ready); this.put(g.spin); this.put(g.bank); this.put(g.ammo); this.put(g.crates);
       this.put(g.minePhase < 0 ? -1 : Math.round(g.minePhase * 30)); this.put(Math.round(g.mineFill * 20)); this.put(Math.round(g.mineBuffer * 20));
+      this.put(g.dim); this.put(g.showState && g.inLeft ? g.state : -1);
       this.put(g.pieces); this.put(g.piecesFull); this.put(Math.round(g.piecePart * 40)); this.put(Math.round(g.pieceBurn * 40)); this.put(Math.round(g.pieceCool * 40));
     }
     this.drawn.length = this.at;
@@ -94,9 +109,10 @@ export class WeaponRing {
 
   private segment(ctx: CanvasRenderingContext2D, g: RingGroup, a0: number, a1: number): void {
     const accent = ACCENT[g.model] ?? '#93c5fd';
+    this.mul = g.dim ? 0.28 : 1;
     const arc = (r: number, from: number, to: number, color: string, width: number, alpha = 1): void => {
       if (to <= from) return;
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = alpha * this.mul;
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.lineCap = 'round';
@@ -132,10 +148,18 @@ export class WeaponRing {
       arc(R + 6, a0, a1, '#fbbf24', 1.5, 0.18);
       arc(R + 6, a0, a0 + len * g.bank, g.bank < 0.12 ? '#ef4444' : '#fbbf24', 1.5, 0.85);
     }
+    // The group's state, when a group is selected and this one is in the left button's: a dot inside the segment's middle
+    if (g.showState && g.inLeft && !g.mine) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g.state === 2 ? '#f87171' : g.state === 1 ? '#fbbf24' : '#4ade80';
+      ctx.beginPath();
+      ctx.arc(C + Math.cos(mid) * (R - 13), C + Math.sin(mid) * (R - 13), 2.6, 0, TAU);
+      ctx.fill();
+    }
     // The ammo count, outside the segment's middle (red when out)
     if (g.ammo >= 0) {
       const tx = C + Math.cos(mid) * (R + 15), ty = C + Math.sin(mid) * (R + 15);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = this.mul;
       ctx.font = "700 10px 'Segoe UI', sans-serif";
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -167,13 +191,13 @@ export class WeaponRing {
     for (let k = 0; k < shown; k++) {
       const a = shown === 1 ? (a0 + a1) / 2 : a0 + ((a1 - a0) * k) / (shown - 1);
       const lit = k < full;
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = this.mul;
       ctx.fillStyle = lit ? ACCENT.clip : g.starved ? '#6b7280' : '#334155';
       if (g.reloading && !lit && !g.starved) {
         // A reload running: the empty pips breathe in sequence
-        ctx.globalAlpha = 0.35 + 0.35 * Math.max(0, Math.cos(this.sweep - k * 0.5));
+        ctx.globalAlpha = (0.35 + 0.35 * Math.max(0, Math.cos(this.sweep - k * 0.5))) * this.mul;
         ctx.fillStyle = '#fde68a';
-      } else if (!lit) ctx.globalAlpha = g.starved ? 0.9 : 0.6;
+      } else if (!lit) ctx.globalAlpha = (g.starved ? 0.9 : 0.6) * this.mul;
       ctx.beginPath();
       ctx.arc(C + Math.cos(a) * R, C + Math.sin(a) * R, r, 0, TAU);
       ctx.fill();

@@ -7,7 +7,7 @@
  * every frame, so a frame allocates nothing.
  */
 
-import { BROWNOUT, PF_LIT, bankHeld, clipReloading, feedShare, portsMinePhase, portsPiecesHeld, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
+import { BROWNOUT, PF_LIT, bankHeld, clipReloading, feedShare, gunSelected, inGroup, partWeaponGroups, portsMinePhase, portsPiecesHeld, rightFiresGuns, selLeft, selRight, GROUP_ALL, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
 
 export interface RingGroup {
   /** The model (the part's function id) these guns are */
@@ -15,6 +15,16 @@ export interface RingGroup {
   model: FireModel;
   /** Weapon kind (tuning.weapons key): what its ammo is looked up by */
   kind: string;
+  /** The weapon groups the guns are in (ships/weaponGroups.ts, a 4-bit mask; a group is one mask) */
+  wg: number;
+  /** In neither the left nor the right button's selected group (drawn dim); a mining laser group while the right button is on a group */
+  dim: boolean;
+  /** In the left button's selected group: shows its state (a chip colour) when a group is selected */
+  inLeft: boolean;
+  /** Show `state` (a group is selected: with the default selection the ring reads as it always did) */
+  showState: boolean;
+  /** Ready 0, reloading 1, short of power 2 (any gun of the group) */
+  state: 0 | 1 | 2;
   /** Part indices of the guns in the group */
   parts: number[];
   /** The guns' weapon records, parallel to `parts` (resolved at regroup so a frame looks nothing up) */
@@ -65,6 +75,8 @@ export interface RingSources {
   charge: Charge;
   /** Rounds in the open crate and crates in the hold, for a kind of gun that fires them; null for a gun that takes no ammo (the same record each call) */
   ammoOf(kind: string): { loose: number; crates: number } | null;
+  /** The weapon groups selection (packGroupSel; absent: all/all) */
+  sel?: number;
 }
 
 type Weapon = ShipState['derived']['weapons'][number];
@@ -85,11 +97,12 @@ export class RingModel {
     for (const w of ship.derived.weapons) {
       // (Mining lasers and tools aren't guns here: only what stepGuns steps)
       const fn = ship.blueprint.parts[w.part]?.fn ?? w.kind;
-      const key = `${fn}|${w.fire.model}`;
+      const mask = partWeaponGroups(ship.blueprint.parts[w.part]);
+      const key = `${fn}|${w.fire.model}|${mask}`;
       let g = by.get(key);
       if (!g) {
         g = {
-          fn, model: w.fire.model, kind: w.kind, parts: [], ws: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
+          fn, model: w.fire.model, kind: w.kind, wg: mask, dim: false, inLeft: true, showState: false, state: 0, parts: [], ws: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
           rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
           pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0, mine: false, minePhase: -1, mineFill: 1, mineBuffer: 1,
         };
@@ -105,7 +118,7 @@ export class RingModel {
       let g = by.get(key);
       if (!g) {
         g = {
-          fn, model: 'beam', kind: fn, parts: [], ws: [], clip: 0, rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
+          fn, model: 'beam', kind: fn, wg: 1, dim: false, inLeft: false, showState: false, state: 0, parts: [], ws: [], clip: 0, rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
           pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0, mine: true, minePhase: -1, mineFill: 1, mineBuffer: 1,
         };
         by.set(key, g);
@@ -114,15 +127,34 @@ export class RingModel {
       g.parts.push(m.part);
     }
     this.groups = out;
+    this.multi = ship.derived.weapons.some((w) => partWeaponGroups(ship.blueprint.parts[w.part]) !== 1);
+  }
+
+  /** Some weapon is in a group other than 1 (the chip is worth showing before anything is selected) */
+  private multi = false;
+
+  /** The HUD chip, "L: 2  R: all": when a group is selected or a weapon has been put in another group; else empty */
+  chip(sel: number): string {
+    if (!this.groups.length || (sel === 0 && !this.multi)) return '';
+    const n = (g: number) => (g === GROUP_ALL ? 'all' : String(g));
+    return `L: ${n(selLeft(sel))}  R: ${n(selRight(sel))}`;
   }
 
   /** This frame's values (the same records, rewritten). Returns the groups, empty without a gun */
   update(ship: ShipState | null, src: RingSources): RingGroup[] {
     if (!ship || ship.kind !== 'ship') { this.ship = null; this.groups.length = 0; return this.groups; }
     if (ship !== this.ship || ship.rebuilds !== this.rebuilds) this.regroup(ship);
-    const d = ship.derived;
+    const d = ship.derived, sel = src.sel ?? 0, hasMiners = d.miners.length > 0;
     for (const g of this.groups) {
-      if (g.mine) { this.mine(g, ship, src.charge); continue; }
+      g.showState = sel !== 0;
+      if (g.mine) {
+        this.mine(g, ship, src.charge);
+        g.dim = rightFiresGuns(sel, true);
+        continue;
+      }
+      g.dim = !gunSelected(g.wg, sel, hasMiners);
+      g.inLeft = selLeft(sel) === GROUP_ALL || inGroup(g.wg, selLeft(sel));
+      let short = false;
       let rounds = 0, n = 0, reloading = false, starved = false, charge = 0, cooling = 0, spin = 0, ready = 1, bank = -1;
       for (let gi = 0; gi < g.parts.length; gi++) {
         const part = g.parts[gi], w = g.ws[gi];
@@ -148,6 +180,7 @@ export class RingModel {
         if (f.model === 'cycle' || f.model === 'ammo' || f.model === 'auto') {
           ready = Math.min(ready, 1 - Math.min(1, Math.max(0, ship.cooldown[part] ?? 0) / Math.max(1, w.interval)));
         }
+        if (!d.ports && feedShare(d, src.charge, part, 'gun') < BROWNOUT) short = true;
         const b = d.power?.bankOf[part] ?? -1;
         const B = b >= 0 ? d.power!.banks[b] : null;
         if (B && B.cap > 0) bank = Math.max(bank, Math.min(1, bankHeld(d, src.charge, b) / B.cap));
@@ -156,6 +189,7 @@ export class RingModel {
       g.rounds = n ? rounds / n : 0;
       g.reloading = reloading;
       g.starved = starved;
+      g.state = short || starved ? 2 : reloading || cooling > 0 ? 1 : 0;
       g.charge = Math.min(1, charge);
       g.cooling = Math.min(1, cooling);
       g.spin = spin;

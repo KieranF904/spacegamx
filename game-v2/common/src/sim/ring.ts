@@ -66,6 +66,8 @@ export function shipHash(s: Readonly<SimShipState>): number {
   h = num(h, g.triggerHeld ? 1 : 0); h = num(h, g.clickAt); h = num(h, g.minePaid); h = num(h, g.mineUntil); h = num(h, g.mineShare); h = num(h, g.tow);
   // (A pilot's held aim distance only while its trigger is held: idle, its guns step on the cursor's, guns.ts distDue)
   if (g.triggerHeld && g.heldDist !== undefined) h = num(h, g.heldDist);
+  // (The trigger word, once a group is selected: with "all" on both it is the buttons, which triggerHeld has)
+  if (g.trig !== undefined && g.trig > 3) h = num(h, g.trig);
   return fin(h);
 }
 

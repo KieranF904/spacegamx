@@ -82,6 +82,8 @@ export function gunTriggered(mask: number, left: boolean, right: boolean, sel: n
 export const TRIG_LEFT = 1;
 export const TRIG_RIGHT = 2;
 export const TRIG_SEL_SHIFT = 2;
+/** A trigger word's button bits: "a trigger is held" is `word & TRIG_BUTTONS`; the selection above them is not a trigger */
+export const TRIG_BUTTONS = TRIG_LEFT | TRIG_RIGHT;
 export function trigWord(left: boolean, right: boolean, sel: number): number {
   return (left ? TRIG_LEFT : 0) | (right ? TRIG_RIGHT : 0) | ((sel & 0xff) << TRIG_SEL_SHIFT);
 }
@@ -89,4 +91,16 @@ export const trigSel = (word: number): number => (word >> TRIG_SEL_SHIFT) & 0xff
 /** gunTriggered on a trigger word */
 export function gunTriggeredBy(mask: number, word: number, hasMiners: boolean): boolean {
   return gunTriggered(mask, (word & TRIG_LEFT) !== 0, (word & TRIG_RIGHT) !== 0, trigSel(word), hasMiners);
+}
+
+/**
+ * Is this gun in a group a button would fire (whatever is held)? A semi-automatic gun answers a buffered click only while
+ * selected. With both selections "all" every gun is (the right button's guns only where it fires guns, which "all" on the
+ * left already covers)
+ */
+export function gunSelected(mask: number, sel: number, hasMiners: boolean): boolean {
+  const l = selLeft(sel);
+  if (l === GROUP_ALL || inGroup(mask, l)) return true;
+  const r = selRight(sel);
+  return rightFiresGuns(sel, hasMiners) && (r === GROUP_ALL || inGroup(mask, r));
 }

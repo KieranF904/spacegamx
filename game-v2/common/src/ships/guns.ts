@@ -27,9 +27,16 @@ import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
 import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 import { datan2, dcos, dsin } from '../math/detTrig.js';
+import { TRIG_LEFT, gunSelected, gunTriggeredBy, partWeaponGroups, trigSel } from './weaponGroups.js';
 
 export interface GunOrders {
+  /** Some gun's button is down (ship-wide: the held aim distance, the aim reads); each gun's own trigger is `word` */
   firing: boolean;
+  /**
+   * The trigger word (weaponGroups.ts trigWord: left 1, right 2, the group selection from bit 2): each gun fires on it
+   * if its groups are selected. Absent (an AI's): the left button when `firing`, selection "all"
+   */
+  word?: number;
   /** World angle to the aim point (undefined: hold aim) */
   aimWorld?: number;
   /** How far away the aim point is (0: aim along aimWorld from anywhere) */
@@ -366,6 +373,9 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   // tick it goes down, a turret points straight at the aim (pointTurretAim): no slew state is carried while idle, so
   // what fires on a trigger-down depends only on that tick's aim (other pilots' idle aim distance isn't sent exactly)
   const slewing = orders.firing && ship.triggerHeld;
+  // (Per gun, from this tick's trigger word and last tick's: with the selection on "all" every gun reads what the ship does)
+  const word = orders.word ?? (orders.firing ? TRIG_LEFT : 0), prevWord = ship.trig ?? 0;
+  const hasMiners = ship.derived.miners.length > 0, sel = trigSel(word);
   // (A pilot's guns, held through: on the distance held from earlier ticks, taken afresh on a due tick: distDue)
   let aimDist = orders.aimDist;
   if (orders.hold) {
@@ -384,8 +394,12 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const ready: WeaponInfo[] = [];
   letGo.clear();
   // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
-  if (orders.firing && !ship.triggerHeld) ship.clickAt = tick;
+  // (A click: some gun's trigger goes down. A semi-automatic gun answers a click while its groups are selected)
+  let click = orders.firing && !ship.triggerHeld;
+  if (!click && word !== prevWord) for (const w of ship.derived.weapons) { const m = partWeaponGroups(ship.blueprint.parts[w.part]); if (gunTriggeredBy(m, word, hasMiners) && !gunTriggeredBy(m, prevWord, hasMiners)) { click = true; break; } }
+  if (click) ship.clickAt = tick;
   ship.triggerHeld = orders.firing;
+  ship.trig = word;
   const semiReady: WeaponInfo[] = [];
   const clicked = tick - ship.clickAt <= SEMI_BUFFER;
   let semiWaits = false;
@@ -404,7 +418,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // (Point defence reloads here, drawing its power as any gun does, but aims and fires on its own: support.ts)
     if (f.model === 'auto' || weapons[w.kind]?.pointDefence) continue;
     let canFire = true;
-    if (f.semi && clicked) semiWaits = true;
+    const mask = partWeaponGroups(ship.blueprint.parts[p]), trigNow = gunTriggeredBy(mask, word, hasMiners);
+    const slewGun = trigNow && gunTriggeredBy(mask, prevWord, hasMiners);
+    const selected = gunSelected(mask, sel, hasMiners);
+    if (f.semi && clicked && selected) semiWaits = true;
     if (w.window) {
       let desired = w.window.center + ship.aim[p];
       let px = 0, py = 0;
@@ -417,10 +434,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
         // World angle → local grid frame (grid forward is -y)
         desired = worldAngle - (pose.angle + Math.PI / 2);
       }
-      const res = slewing ? stepTurretAim(w.window, ship.aim[p], desired, tuning) : pointTurretAim(w.window, desired, tuning);
+      const res = slewGun ? stepTurretAim(w.window, ship.aim[p], desired, tuning) : pointTurretAim(w.window, desired, tuning);
       if (heldAim !== undefined && !heldDiff) {
         const dh = (aimDist > 0 ? datan2(heldY - py, heldX - px) : heldAim) - (pose.angle + Math.PI / 2);
-        const rh = slewing ? stepTurretAim(w.window, ship.aim[p], dh, tuning) : pointTurretAim(w.window, dh, tuning);
+        const rh = slewGun ? stepTurretAim(w.window, ship.aim[p], dh, tuning) : pointTurretAim(w.window, dh, tuning);
         if (rh.offset !== res.offset || rh.canFire !== res.canFire) heldDiff = true;
       }
       ship.aim[p] = res.offset;
@@ -445,10 +462,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       ship.aim[p] = res.offset;
       canFire = res.canFire;
     }
-    const want = orders.firing && canFire;
+    const want = trigNow && canFire;
     if (f.semi) {
       // (Held or not, it needs a fresh click; a reloading or busy gun is skipped, so the next of its kind takes the shot)
-      if (clicked && canFire && ship.cooldown[p] <= 0 && ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)) semiReady.push(w);
+      if (clicked && selected && canFire && ship.cooldown[p] <= 0 && ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)) semiReady.push(w);
       continue;
     }
     // A spinning gun spins up while it's fired, and down when it isn't

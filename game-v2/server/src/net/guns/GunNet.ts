@@ -34,11 +34,12 @@
  */
 import {
   Input, Position, Velocity, Rotation, ReplicaMode, SEMI_BUFFER, shipPointToWorld, quantizeCursorDist, gunStateOf, firedRec, sameRecs, laneRecords, lanePilot,
-  lanePilotless, lanePd, laneRemap, laneHash, laneOf, pdParts, packGunRow, packGunSync, ownStructure, TELL_PD, TELL_NONE, GUN_FIRE, GUN_ALT,
+  lanePilotless, lanePd, laneRemap, laneHash, laneOf, pdParts, packGunRow, packGunSync, ownStructure, TELL_PD, TELL_NONE, trigWord, TRIG_BUTTONS,
   type FlightBody, type GunCtl, type LaneRec, type OwnExtras, type ReplicaEnv, type ServerGunSyncMessage, type ShipState,
   type SimEnv, type SimEvent, type FieldEnv,
 } from '@space-game/common';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
+
 
 /** Ticks after a lane is put back to the real ship's in which it isn't again (a shield draining the stores every hit) */
 export const GUN_FIX_GAP = 60;
@@ -215,8 +216,10 @@ export class GunNet {
    * cursor's distance only on a gun's due ticks (common ships/guns.ts distDue), so it goes only as it's applied
    */
   private ctlTick(eid: number, l: GunLane, ship: ShipState, g: GunCtl, t: number): void {
-    if (g.bits) l.exactTo = t + SEMI_BUFFER;
-    const exact = g.bits !== 0 || g.bits !== l.ctl.bits || t <= l.exactTo;
+    // (The bits are the trigger word: a held trigger is its button bits, not the group selection that rides above them)
+    const held = (g.bits & TRIG_BUTTONS) !== 0;
+    if (held) l.exactTo = t + SEMI_BUFFER;
+    const exact = held || g.bits !== l.ctl.bits || t <= l.exactTo;
     if (g.dist !== l.exactDist) { if (exact) this.stats.exactChanges++; else this.stats.idleChanges++; }
     l.exactDist = g.dist;
     const want = exact && ship.heldDist !== undefined ? quantizeCursorDist(ship.heldDist) * 4 : g.dist;
@@ -284,7 +287,7 @@ export class GunNet {
     l.at = t;
     this.stats.steps++;
     laneRecords(EVENTS, ship, this.host.ships().tuning, LANE_RECS);
-    if (real.length || LANE_RECS.length || (l.kind === 'pilot' && l.ctl.bits)) l.active = t;
+    if (real.length || LANE_RECS.length || (l.kind === 'pilot' && (l.ctl.bits & TRIG_BUTTONS))) l.active = t;
     if (!sameRecs(LANE_RECS, real)) {
       l.told.add(t);
       this.stats.toldTicks++;
@@ -431,6 +434,6 @@ export interface GunClient {
 
 /** A pilot's gun controls as its input set them (the triggers; the cursor distance on the input's grid) */
 function pilotCtl(eid: number): GunCtl {
-  return { bits: (Input.fireLeft[eid] === 1 ? GUN_FIRE : 0) | (Input.fireRight[eid] === 1 ? GUN_ALT : 0), dist: quantizeCursorDist(Input.cursorDist[eid]) * 4 };
+  return { bits: trigWord(Input.fireLeft[eid] === 1, Input.fireRight[eid] === 1, Input.weaponGroups[eid]), dist: quantizeCursorDist(Input.cursorDist[eid]) * 4 };
 }
 

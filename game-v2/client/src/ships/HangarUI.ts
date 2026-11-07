@@ -51,6 +51,7 @@ import { powerReport, pruneWires, DEAD_NET, type PowerReport } from './wireEdit'
 import { drawsText, portsReport, portsWarnings } from './portsReport';
 import { PortsGrid, portsPanelHtml } from './portsGrid';
 import { HangarPalette } from './HangarPalette';
+import { drawHangarGroups, groupOfKey, groupsSaid, hangarGroupKey } from './weaponGroups/editor';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -403,6 +404,8 @@ export class HangarUI {
     if (code === 'KeyR') this.sel.rot = ((this.sel.rot + 1) % 4) as Rot;
     else if (code === 'KeyF') this.sel.flip = !this.sel.flip;
     else if (code === 'KeyE') { this.overlays.energy = !this.overlays.energy; this.renderStats(); }
+    // (1-4 on the weapon under the mouse: its weapon groups, ships/weaponGroups/editor.ts)
+    else if (groupOfKey(code)) { const p = hangarGroupKey(code, this.bp, this.derived, this.mouse ? this.partAt(this.mouse) : -1); if (p) this.status(groupsSaid(p)); }
     else if (code === 'KeyT') {
       const order: (Side | 'auto')[] = ['auto', ...SIDES];
       this.sel.facing = order[(order.indexOf(this.sel.facing) + 1) % order.length];
@@ -853,7 +856,7 @@ export class HangarUI {
   private renderFooter(): void {
     const el = this.pal.foot;
     el.innerHTML = '';
-    const keys = 'Click places · right-click removes · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · Tab: keyboard into the parts list';
+    const keys = 'Click places · right-click removes · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
     const info = document.createElement('div');
     info.title = keys;
     info.style.cssText = 'color:#6b7a93; margin:3px 0 2px; font-size:10.5px; line-height:1.45;';
@@ -1404,6 +1407,7 @@ export class HangarUI {
       const broken = this.mountingBroken.get(i);
       if (broken) this.drawMounting(g, broken, sx, sy, false);
     });
+    drawHangarGroups(ctx, this.bp, this.geoms, this.derived, sx, sy, px);
 
     const d = this.derived;
     if (this.overlays.connectors) {

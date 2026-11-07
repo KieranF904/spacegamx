@@ -44,6 +44,10 @@ export interface SettingsData {
     controlMode: ControlMode; jumpMode: JumpMode; invertZoom: boolean; zoomSpeed: number;
     /** The view (input/viewMode.ts): 'auto' follows the controls (helm turned, mouse-steer north up), as before it was a setting */
     cameraMode: CameraMode;
+    /** Weapon groups (ships/weaponGroups): the mouse wheel cycles the left button's group instead of zooming (zoom stays on Home) */
+    wheelGroups: boolean;
+    /** Number keys 1-4 pick the left button's group and 5 picks all, instead of the quick bar */
+    digitGroups: boolean;
   };
   /** Action id → key code (KeyboardEvent.code) */
   bindings: Record<string, string>;
@@ -54,7 +58,7 @@ export function defaultSettings(): SettingsData {
     audio: { master: 0.8, sfx: 1, music: 0.5, muteUnfocused: true },
     display: { screenShake: 1, jumpEffects: true, jumpCamera: true, planets: true, damageNumbers: true, playerNames: true, bloom: true, lighting: true, renderScale: 1, quality: 'high', fpsCap: 0, ownShield: 0.6 },
     ui: { navMarkers: true, minimap: true, shipHud: true, netStats: false, chat: true, hazardEffects: true, questTracker: true, questGuide: true },
-    gameplay: { controlMode: 'mouse', jumpMode: 'tap', invertZoom: false, zoomSpeed: 1, cameraMode: 'auto' },
+    gameplay: { controlMode: 'mouse', jumpMode: 'tap', invertZoom: false, zoomSpeed: 1, cameraMode: 'auto', wheelGroups: false, digitGroups: false },
     bindings: Object.fromEntries(ACTIONS.filter((a) => a.rebindable !== false).map((a) => [a.id, a.key])),
   };
 }

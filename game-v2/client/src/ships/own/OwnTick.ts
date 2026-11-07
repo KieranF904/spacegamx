@@ -120,6 +120,8 @@ export class OwnTick implements OwnTimeline {
   private readonly hazTold = new Map<number, HazardState>();
   /** What it starts from with nothing earlier (its record's gun state, full stores) */
   private seed: OwnExtras | null = null;
+  /** The weapon groups selection as the inputs sent so far have it (packGroupSel) */
+  private sel = 0;
 
   constructor(private readonly host: OwnTickHost) {}
 
@@ -139,6 +141,7 @@ export class OwnTick implements OwnTimeline {
     this.synced.clear();
     this.hazTold.clear();
     this.seed = null;
+    this.sel = 0;
     this.host.reps.setOwn(id, this);
   }
 
@@ -151,7 +154,9 @@ export class OwnTick implements OwnTimeline {
     this.ctls.set(t, [controlBits(buildFlightInputs(msg, false)), q]);
     this.setAim(t, q);
     const dist = Number(msg.cursorDist) || 0;
-    this.noteExtras(t, { fire: !!msg.fireLeft, fireAlt: !!msg.fireRight, jumpDist: dist, aimDist: dist });
+    // (The weapon groups selection is state: an input carries it only where it changes, so the rest hold the last: weaponGroups.ts)
+    if (msg.weaponGroups !== undefined) this.sel = msg.weaponGroups;
+    this.noteExtras(t, { fire: !!msg.fireLeft, fireAlt: !!msg.fireRight, jumpDist: dist, aimDist: dist, sel: this.sel });
     this.stats.inputs++;
     if (this.ctls.size > KEEP_TICKS) for (const k of [...this.ctls.keys()]) if (k < t - KEEP_TICKS) this.ctls.delete(k);
     if (this.on) this.host.reps.rewind(this.host.self(), t);

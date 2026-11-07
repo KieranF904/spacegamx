@@ -1115,7 +1115,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.updateHeatGauge();
     // The weapon ring round the cursor: your gun groups' clips, charges, spin and ammo
     this.weaponRing?.update(this.shipClient.ringGroups(), this.input.mouseX, this.input.mouseY,
-      this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.stationOpen && !this.w.systemMapUI.isOpen);
+      this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.stationOpen && !this.w.systemMapUI.isOpen, this.shipClient.ringChip());
 
     // Update screen shake
     this.state.updateScreenShake(delta);

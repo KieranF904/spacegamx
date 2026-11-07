@@ -82,6 +82,11 @@ export interface ShipState {
   triggerHeld: boolean;
   clickAt: number;
   /**
+   * The trigger word the guns stepped on last tick (weaponGroups.ts trigWord: buttons and selection): each gun's own
+   * trigger last tick is gunTriggeredBy on it (turret slew and semi-automatic clicks are per gun). 0: none
+   */
+  trig: number;
+  /**
    * A pilot's aim distance as its guns last stepped on it (guns.ts distDue: while the trigger is held it takes the
    * cursor's only on a gun's fire tick and halfway to its next); unset for a ship whose guns aim on the raw distance (AI)
    */
@@ -202,6 +207,7 @@ export function createShipState(
     spin: blueprint.parts.map(() => 0),
     triggerHeld: false,
     clickAt: -1e9,
+    trig: 0,
   };
   rebuildShip(state, catalog, tuning);
   // (Every clip starts full)

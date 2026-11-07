@@ -100,7 +100,7 @@ export function stepWeapons(b: BridgeCtx, eid: number): boolean {
   const jumping = b.isJumping(ship) || b.isEmped(eid) || !!b.host.sheltered?.(eid);
   // (the trigger as the step reads it: common sim/guns.ts gunControls; aimed on the one aim rule, simAim(q), which a
   // pilot's Input.targetAngle already is: fround(dequantize(q)) off the wire)
-  const c = gunControls(ship, Input.fireLeft[eid] === 1, Input.fireRight[eid] === 1, jumping);
+  const c = gunControls(ship, Input.fireLeft[eid] === 1, Input.fireRight[eid] === 1, jumping, Input.weaponGroups[eid]);
   // Shots spend stored energy (energy.ts); then the mining lasers pay for their segment from what's left
   const energy = { charge: b.chargeOf(eid) };
   // (a pilot's guns: their aim distance held while the trigger is, common ships/guns.ts distDue; its aim held where its
@@ -109,7 +109,7 @@ export function stepWeapons(b: BridgeCtx, eid: number): boolean {
   const rec = b.replicaCtl.get(eid);
   const was = rec?.mode === ReplicaMode.Player ? rec.heldQ : undefined, raw = rec?.rawQ, flightHeld = rec !== undefined && raw !== undefined && rec.q !== raw;
   if (rec && flightHeld && c.mining) { rec.q = raw!; ship.aimQ = raw; }
-  b.fireWeapons(eid, ship, c.firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy, true);
+  b.fireWeapons(eid, ship, c.firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy, true, c.word);
   if (was !== undefined && raw !== undefined) {
     const st = b.stats.aimHold;
     st.ticks++;
@@ -194,7 +194,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
  * out; turrets only fire when on target and pointing through an open part
  * of their window.
  */
-export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: boolean, aimWorld?: number, cursorDist = 0, target = -1, energy?: { charge: Charge }, hold = false): void {
+export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: boolean, aimWorld?: number, cursorDist = 0, target = -1, energy?: { charge: Charge }, hold = false, word?: number): void {
   const tick = b.host.getTick();
   const pose = b.pose(eid);
   const def = (w: WeaponInfo) => partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w);
@@ -206,7 +206,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   // where they'd have aimed otherwise on it, the tick's applied aim is the raw one: common sim/aimHold.ts)
   const rec = hold ? b.replicaCtl.get(eid) : undefined;
   const heldQ = rec && rec.mode === ReplicaMode.Player && rec.rawQ !== undefined && rec.q !== rec.rawQ ? rec.q : undefined;
-  const { shots, beams, pulses, tells, dist: aimDist, aimHeld } = gunsTick(ship, eid, pose, { firing, aimWorld, aimDist: cursorDist, energy, hold, heldAim: heldQ === undefined ? undefined : simAim(heldQ) }, tick, b.tuning, GUN_EVENTS);
+  const { shots, beams, pulses, tells, dist: aimDist, aimHeld } = gunsTick(ship, eid, pose, { firing, word, aimWorld, aimDist: cursorDist, energy, hold, heldAim: heldQ === undefined ? undefined : simAim(heldQ) }, tick, b.tuning, GUN_EVENTS);
   if (rec && heldQ !== undefined && !aimHeld) { rec.q = rec.rawQ!; ship.aimQ = rec.q; }
   // (the shells fly the distance the guns stepped on, `aimDist`: a pilot's held one, as every end has it; a guided
   // shell steers to the cursor's, which only the server reads)

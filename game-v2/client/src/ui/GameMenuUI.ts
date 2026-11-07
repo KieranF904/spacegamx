@@ -439,6 +439,8 @@ export class GameMenuUI {
           (v) => upd((d) => { d.gameplay.jumpMode = v as any; }, true)),
         slider('Zoom speed', s.gameplay.zoomSpeed, 0.4, 2, 0.1, (v) => `${v.toFixed(1)}×`, (v) => upd((d) => { d.gameplay.zoomSpeed = v; })),
         toggle('Invert mouse wheel zoom', s.gameplay.invertZoom, (v) => upd((d) => { d.gameplay.invertZoom = v; })),
+        toggle('Mouse wheel changes weapon group', s.gameplay.wheelGroups, (v) => upd((d) => { d.gameplay.wheelGroups = v; }), 'The wheel picks the left group instead of zooming'),
+        toggle('Number keys pick weapon group', s.gameplay.digitGroups, (v) => upd((d) => { d.gameplay.digitGroups = v; }), '1-4 pick a group, 5 picks all. Off: the quick bar'),
       );
       const note = document.createElement('p');
       note.className = 'muted';

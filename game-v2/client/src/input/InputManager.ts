@@ -8,6 +8,7 @@
  */
 
 import type { AimPin } from './aimPin';
+import { groupWheel } from '../ships/weaponGroups/keys';
 
 export class InputManager {
   /** Held keys, as the game sees them (translated codes) */
@@ -128,6 +129,8 @@ export class InputManager {
     // Mouse wheel for zoom
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      // (With the setting on, the wheel changes the weapon group and does not zoom: ships/weaponGroups/keys.ts)
+      if (groupWheel(e.deltaY)) return;
       
       // Each notch scales the view by the same factor, so zooming feels the same near and far
       const step = this.zoomSpeed * this.zoomSpeedScale;

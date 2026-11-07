@@ -34,6 +34,8 @@ export interface OwnInputExtras {
   jumpDist: number;
   /** The guns' aim distance (the same cursor distance) */
   aimDist: number;
+  /** The weapon groups selection (ships/weaponGroups.ts packGroupSel; absent: all/all) */
+  sel?: number;
 }
 
 /**
@@ -55,7 +57,7 @@ export function cloneOwnExtras(x: Readonly<OwnExtras>): OwnExtras {
     hazard: { empUntil: x.hazard.empUntil, slowUntil: x.hazard.slowUntil, numb: x.hazard.numb },
     guns: {
       cooldown: [...g.cooldown], rounds: [...g.rounds], reload: [...g.reload], charge: [...g.charge], spin: [...g.spin], aim: [...g.aim],
-      triggerHeld: g.triggerHeld, clickAt: g.clickAt, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
+      triggerHeld: g.triggerHeld, clickAt: g.clickAt, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
     },
   };
 }
@@ -90,7 +92,7 @@ export function stepOwnShip(id: number, prev: Readonly<OwnExtras>, body: FlightB
     hazard: e.hazard, guns: e.guns, structure,
   };
   INPUT.bits = bits & ~OWN_DERIVED_BITS; INPUT.q = q;
-  INPUT.jumpDist = x.jumpDist; INPUT.fire = x.fire; INPUT.fireAlt = x.fireAlt; INPUT.aimDist = x.aimDist; INPUT.impulse = undefined; INPUT.heldQ = heldQ;
+  INPUT.jumpDist = x.jumpDist; INPUT.fire = x.fire; INPUT.fireAlt = x.fireAlt; INPUT.aimDist = x.aimDist; INPUT.sel = x.sel; INPUT.impulse = undefined; INPUT.heldQ = heldQ;
   ensurePortsCharge(structure.derived, s.charge);
   stepShip(s, INPUT, env, s, events);
   return s;
@@ -172,7 +174,7 @@ export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
   // (Absent scalars come back undefined, as they went)
   const guns: GunState = {
     cooldown: [...(g.cooldown ?? [])], rounds: [...(g.rounds ?? [])], reload: [...(g.reload ?? [])], charge: [...(g.charge ?? [])], spin: [...(g.spin ?? [])], aim: [...(g.aim ?? [])],
-    triggerHeld: !!g.triggerHeld, clickAt: g.clickAt ?? -1, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
+    triggerHeld: !!g.triggerHeld, clickAt: g.clickAt ?? -1, trig: g.trig, minePaid: g.minePaid, mineUntil: g.mineUntil, mineShare: g.mineShare, tow: g.tow, heldDist: g.heldDist,
   };
   const charge: Charge = { ...m.c, b: [...(m.c.b ?? [])] };
   if (m.c.e) charge.e = portsIn(m.c.e);

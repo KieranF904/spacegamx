@@ -10,11 +10,12 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, type ServerGunSyncMessage, type GunCtlRows, type LaneRec, type ReplicaEnv } from '@space-game/common';
+import { rightFiresGuns, endsAtAim, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE, TELL_NONE, TELL_PD, type ServerGunSyncMessage, type GunCtlRows, type LaneRec, type ReplicaEnv } from '@space-game/common';
 import { bossRise, clearBossLives } from './bossLife';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
+import { groupSelection } from './weaponGroups/selection';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
 import { cloneCharge, gradeOf, type MiningTable, type SimShipState, type ServerOwnSyncMessage, type ServerPullsMessage } from '@space-game/common';
 import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
@@ -578,6 +579,8 @@ export class ShipClient {
 
   /** Its pilot is known (welcome, a respawn's too): its own ship is stepped on its tick layer from its own inputs */
   onWelcome(): void {
+    // (The server may hold another group selection for this ship: the next input carries ours)
+    groupSelection.forget();
     this.own.start();
   }
 
@@ -1018,7 +1021,7 @@ export class ShipClient {
     this.beamFx = new MiningBeamFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, () => {
       const aim = this.opts.localAim();
       const ship = this.store.get(this.opts.state.playerId);
-      return { firing: !!this.opts.miningHeld?.() && !!ship?.derived.miners.length && !this.hangarOpen, aim: aim.angle, dist: aim.dist };
+      return { firing: !!this.opts.miningHeld?.() && !!ship?.derived.miners.length && !rightFiresGuns(groupSelection.packed, true) && !this.hangarOpen, aim: aim.angle, dist: aim.dist };
     });
     this.beamFx.ownBeams = () => this.ownBeams;
     // A held beam's burn throws impacts off what it lights (BeamLook.burn: the Cutter's, the Tesla's, the Searchlight's)
@@ -1147,7 +1150,7 @@ export class ShipClient {
     // (No firing mid-jump, nor knocked out by an EMP: the trigger as the step read it, common sim/guns.ts)
     const input = this.own.inputAt(tick);
     const burning = jumpPhase(state.body.jump ?? 0, this.jump).phase === 'burn' || tick < state.hazard.empUntil;
-    this.fireHeld = gunControls(ship, input.fire, input.fireAlt, burning).firing;
+    this.fireHeld = gunControls(ship, input.fire, input.fireAlt, burning, input.sel).firing;
     this.gunFeel.own(ship, tick);
     const pose = { x: state.body.x, y: state.body.y, angle: state.body.angle };
     for (const ev of events) {
@@ -1590,7 +1593,13 @@ export class ShipClient {
   ringGroups(): RingGroup[] {
     const ship = this.store.get(this.opts.state.playerId);
     this.ringSrc.charge = this.opts.state.charge;
+    this.ringSrc.sel = groupSelection.packed;
     return this.ringModel.update(ship ?? null, this.ringSrc);
+  }
+
+  /** The weapon ring's chip, "L: 2  R: all" (empty while there is nothing to choose between: gunHud.ts RingModel.chip) */
+  ringChip(): string {
+    return this.ringModel.chip(groupSelection.packed);
   }
 
   /**
@@ -1934,7 +1943,7 @@ function mirrorGuns(ship: ShipState, st: Readonly<SimShipState>): void {
   const g = st.guns;
   copyInto(ship.cooldown, g.cooldown); copyInto(ship.rounds, g.rounds); copyInto(ship.reload, g.reload);
   copyInto(ship.charge, g.charge); copyInto(ship.spin, g.spin); copyInto(ship.aim, g.aim);
-  ship.triggerHeld = g.triggerHeld; ship.clickAt = g.clickAt;
+  ship.triggerHeld = g.triggerHeld; ship.clickAt = g.clickAt; ship.trig = g.trig ?? 0;
   ship.minePaid = g.minePaid; ship.mineUntil = g.mineUntil; ship.mineShare = g.mineShare; ship.tow = g.tow; ship.heldDist = g.heldDist;
 }
 

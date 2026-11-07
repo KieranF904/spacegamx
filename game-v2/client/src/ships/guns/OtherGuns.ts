@@ -10,7 +10,7 @@
  */
 import {
   ReplicaMode, laneRecords, laneFireRow, lanePilot, lanePilotless, lanePd, laneRemap, laneHash, unpackGunSync, unpackGunRow, gunRowId, ownStructure,
-  isOtherShotWire, TELL_NONE, TELL_PD,
+  isOtherShotWire, TELL_NONE, TELL_PD, TRIG_BUTTONS,
   type FlightBody, type GunCtl, type LaneRec, type OwnExtras, type ReplicaEnv, type ReplicaSideSteps, type GunCtlRows,
   type ServerGunSyncMessage, type ServerSnapshotMessage, type ShipDerived, type ShipReplicaSet, type ShipState, type ShipTuning, type SimEnv,
   type SimEvent, type SimInput, type Step, type FieldEnv,
@@ -291,9 +291,9 @@ export function easedDist(ticks: readonly number[], ctls: ReadonlyMap<number, Gu
   while (lo < hi) { const mid = (lo + hi) >> 1; if (ticks[mid] <= t) lo = mid + 1; else hi = mid; }
   if (!lo) return ctls.get(ticks[0])?.dist ?? 0;
   const t0 = ticks[lo - 1], a = ctls.get(t0)!;
-  if (lo >= ticks.length || a.bits) return a.dist;
+  if (lo >= ticks.length || (a.bits & TRIG_BUTTONS)) return a.dist;
   const t1 = ticks[lo], b = ctls.get(t1)!;
-  if (b.bits) return a.dist;
+  if (b.bits & TRIG_BUTTONS) return a.dist;
   return a.dist + ((b.dist - a.dist) * (t - t0)) / (t1 - t0);
 }
 
