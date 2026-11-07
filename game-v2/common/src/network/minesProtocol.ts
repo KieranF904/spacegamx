@@ -29,10 +29,20 @@ export interface ServerMinesLaidMessage extends MineDrop { type: 'minesLaid' }
 export type MineEnd = 'blast' | 'fizzle' | 'clear';
 
 /**
- * Mines that went on `tick` (mineId names). A life's end is derived and never sent; a blast and the cap's and a clear's
- * fizzles are told (rare events). Damage goes the usual way (damage sums and HP)
+ * Mines that went on `tick` (mineId names). A life's end is derived and never sent; the cap's and a clear's fizzles
+ * are told at once (rare events). A blast (stage M2) is told only to a client that can't find it itself on its tick
+ * layer (common ships/features/minebay/blasts.ts), just before the snapshot that closes the window it went off in.
+ * Damage goes the usual way (damage sums and HP)
  */
 export interface ServerMinesGoneMessage { type: 'minesGone'; tick: number; ids: number[]; how: MineEnd; by?: number }
+
+/**
+ * Mines that did NOT go off on `tick`, though this client's search would find them going off then (a ship only the
+ * server knows can't set them off: dormant, jumping, a berthed owner): they stay live, a blast found or predicted for
+ * them is taken back, and from now on their ends are told to this client (it no longer searches them). Sent just
+ * before the snapshot that closes the window
+ */
+export interface ServerMinesKeptMessage { type: 'minesKept'; tick: number; ids: number[] }
 
 /**
  * The pilot's own magazines (each Mine Bay's loaded mines by blueprint uid) and when the next drop is ready: sent when
@@ -41,4 +51,4 @@ export interface ServerMinesGoneMessage { type: 'minesGone'; tick: number; ids: 
  */
 export interface ServerMineBayMessage { type: 'mineBay'; loaded: Record<number, number>; readyAt: number; readyBy?: Record<number, number>; refused?: boolean }
 
-export type MinesServerMessage = ServerMinesLaidMessage | ServerMinesGoneMessage | ServerMineBayMessage;
+export type MinesServerMessage = ServerMinesLaidMessage | ServerMinesGoneMessage | ServerMinesKeptMessage | ServerMineBayMessage;

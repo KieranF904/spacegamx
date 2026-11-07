@@ -1,10 +1,12 @@
 /**
  * The Mine Bay's client half (shared half: common/src/ships/features/minebay; docs/design/groups-mines-docking.md,
  * package M): the drop key (Digit0, "Drop mines"), the magazine chip, and the mines drawn from their drops (mines.ts,
- * MinesLayer.ts). The server's three messages reach mines.ts through app/serverMessages.ts.
+ * MinesLayer.ts): blasts predicted against the ships as drawn, found on each searched window (onWindow), and told.
+ * The server's messages reach mines.ts through app/serverMessages.ts.
  */
+import { EntityType, MINES, mineFindable } from '@space-game/common';
 import type { ClientFeature, ClientFeatureHost } from '../types';
-import { mineClient } from './mines';
+import { mineClient, type DrawnShip } from './mines';
 import { MinesLayer } from './MinesLayer';
 import { MineChip } from './MineChip';
 
@@ -37,6 +39,30 @@ function drop(host: ClientFeatureHost): void {
 
 let seen = { me: -1, sys: '' };
 
+const drawn: DrawnShip[] = [];
+const box: [number, number, number, number] = [0, 0, 0, 0];
+/** The widest ship a drawn ship's centre is looked for round the mines (world units): a boss's bounding circle */
+const NEAR = 2000;
+
+/**
+ * Blasts predicted against the ships as drawn (mines.ts predict): the drawn ships near the mines that may go off, on
+ * the replicas' drawing tick. Only findable ships (no pilot: the server's PvP zones and parties)
+ */
+function predict(host: ClientFeatureHost): void {
+  const tick = Math.floor(host.tick?.(false) ?? 0), ents = host.entities?.(), side = host.side;
+  if (!ents || !side || tick <= 0 || !mineClient.predictBox(tick, box)) return;
+  drawn.length = 0;
+  const reach = NEAR + MINES.triggerReach;
+  for (const [id, e] of ents) {
+    if (e.type !== EntityType.ShipBody && e.type !== EntityType.Player) continue;
+    const x = e.renderX, y = e.renderY;
+    if (x < box[0] - reach || x > box[2] + reach || y < box[1] - reach || y > box[3] + reach) continue;
+    const s = side(id), ship = mineFindable(s) ? host.ship(id) : undefined;
+    if (ship?.kind === 'ship') drawn.push({ id, x, y, radius: ship.derived.radius, side: s });
+  }
+  mineClient.predict(drawn, tick);
+}
+
 export const clientFeature: ClientFeature = {
   id: 'minebay',
   actions: [
@@ -52,7 +78,12 @@ export const clientFeature: ClientFeature = {
     // (A new ship, or another system: what was known is gone; the server tells this one's mines afresh)
     if (me !== seen.me || sys !== seen.sys) { mineClient.reset(); seen = { me, sys }; }
     if (!mineClient.drops.length && !mineClient.blasts.length) return;
+    predict(host);
     layer.draw(shared, mineClient, me, tickOf(host, me), performance.now());
+  },
+  // (Each snapshot window as it is searched: the blasts found on the tick layer, the predictions settled)
+  onWindow(win) {
+    mineClient.window(win.from, win.to, win.ships);
   },
   indicator: {
     update(host) {

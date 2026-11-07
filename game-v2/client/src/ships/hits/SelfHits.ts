@@ -27,7 +27,7 @@
  * plus this client's hits since.
  */
 import {
-  hitHash, chainAdd, shipSegmentHit, sidesHurt, SIDE, gunShell, firesStraight, unpackHits, shellGone, confirmRules, CONFIRM, OWN_CAUSE,
+  hitHash, chainAdd, shipSegmentHit, sidesHurt, SIDE, gunShell, firesStraight, unpackHits, shellGone, confirmRules, CONFIRM, OWN_CAUSE, SEARCH_WINDOW_MAX,
   type HitCtx, type ConfirmRules, type HitReport, type ShipState, type ServerHitFixMessage, type WeaponTuning,
 } from '@space-game/common';
 import type { HitDone, OwnHit } from './ConfirmedHits';
@@ -71,6 +71,12 @@ export interface SelfHitsHost {
    * hits on its own ship are its to find as on any other (the server's HitLedger.unfindable agrees)
    */
   ownExact?(): boolean;
+  /**
+   * Each window as it is searched (`from` exclusive, `to` the snapshot's tick), with the ships whose poses are exact in
+   * it (the shells' targets; null: not searched here, the server tells everything in it): the Mine Bay's blasts are
+   * searched against the same ships (the server mirrors both: HitLedger.poseExact)
+   */
+  window?(from: number, to: number, ships: readonly number[] | null): void;
 }
 
 /** A hit the server told this frame (its record): the shell struck `target` on `tick`, and was spent if `gone` */
@@ -288,10 +294,11 @@ export class SelfHits {
       toldAt.set(t.shell * 4096 + (t.tick & 4095), t);
     }
     // (STRICT: the server tells every hit; the told records still go through the layer, at settle)
-    if (this.on && !this.rules.strict && from >= 0 && tick > from && tick - from <= 120) {
+    let searched: number[] | null = null;
+    if (this.on && !this.rules.strict && from >= 0 && tick > from && tick - from <= SEARCH_WINDOW_MAX) {
       this.stats.windows++;
       const { store } = this.host, me = this.host.self(), mine = this.host.ownExact?.() ?? false;
-      const targets: number[] = [];
+      const targets: number[] = (searched = []);
       for (const id of this.host.ships()) {
         const s = store.get(id);
         if ((id !== me || mine) && s && s.kind !== 'debris' && !this.synced.has(id)) targets.push(id);
@@ -334,6 +341,8 @@ export class SelfHits {
         }
       }
     }
+    // (The window's other searches, against the same ships: a Mine Bay's blasts, ships/features/minebay)
+    this.host.window?.(from, tick, searched);
     for (const id of this.removed) { this.shells.delete(id); this.dropped.delete(id); }
     if (this.dropped.size > 512) this.dropped.clear();
     this.removed.clear();

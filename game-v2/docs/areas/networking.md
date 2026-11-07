@@ -339,6 +339,19 @@ Tests: server/src/net/causes/pullFields.test.ts. It covers the haul and intake, 
 the server alone, and a star. Both pilots and every body are exact at every snapshot. Measured:
 docs/audits/sim-foundation-after-2026-11-06.md, "Pull fields".
 
+### Mine Bay blasts (common network/minesProtocol.ts, ships/features/minebay/blasts.ts; JSON, no wire table change)
+
+A drop is one record (`minesLaid`); blasts (stage M2, docs/design/groups-mines-docking.md 2.4) are found by each client
+on its tick layer when the pilotless ship that set the mine off is exact there: client SelfHits calls its host's
+`window(from, to, ships)` with the same targets its shell search uses, and the Mine Bay feature searches them
+(`findMineBlasts`). The server keeps each tick's touches (server ships/features/minebay/Minefield.ts) and settles them
+per pilot as its snapshot window closes: the SnapshotBuilder calls the part features' `onSnapshot(pilot, {from, to,
+finds, exact})` just before the snapshot (`finds`: `HitLedger.searches` and a window of at most `SEARCH_WINDOW_MAX`;
+`exact`: held and `HitLedger.poseExact` with the window's told ships). A blast the client finds goes unsaid; the rest go
+as `minesGone` before the snapshot (a dead or departed pilot's at once); a blast it would find that never happened gets
+`minesKept` (the mine is told only, for that client, from then on). A rule for what the client finds must be the same
+on both sides (`poseExact` and SelfHits' targets), or blasts are missed or drawn wrongly: there is no chain for mines.
+
 ### Docking Clamps' links (common network/clampProtocol.ts, sim/clampPair.ts; no wire table change)
 
 Two pilots' ships locked by Docking Clamps (docs/design/groups-mines-docking.md 3) are decision records, plain JSON:
