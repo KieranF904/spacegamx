@@ -285,6 +285,7 @@ private xpFillEl: HTMLElement | null;
       editAnywhere: options.ships?.editAnywhere,
       onHangarOpen: options.ships?.onHangarOpen,
       onHangarClose: options.ships?.onHangarClose,
+      zoom: { get: () => this.input.targetZoom, set: (z) => { this.input.targetZoom = z; } },
     });
     this.state.chargeTotal = (charge) => this.shipClient.chargeTotal(charge);
     // Every other ship moves by replication (proto writes its state straight in instead)

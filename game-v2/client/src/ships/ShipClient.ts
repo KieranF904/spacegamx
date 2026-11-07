@@ -76,6 +76,7 @@ import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
+import { mountField } from './field/mount';
 import type { QualityProfile } from '../settings/quality';
 import { ShipMemory } from './cells/ShipMemory';
 import { GhostLayer, type Ghost } from './cells/GhostLayer';
@@ -121,6 +122,8 @@ export interface ShipClientOptions {
   editAnywhere?: boolean;
   onHangarOpen?(): void;
   onHangarClose?(): void;
+  /** The flight zoom (the build overlay zooms in on the ship and puts it back) */
+  zoom?: { get(): number; set(z: number): void };
 }
 
 /** The own layer's events handed out per tick (ShipClient.ownStepTo's scratch) */
@@ -215,6 +218,27 @@ export class ShipClient {
       charge: () => opts.state.charge,
     });
     this.dodgeCtl = this.features.controlFor('dodge');
+    // The field machines' HUD and build overlay (ships/field): they read the game through this
+    mountField({
+      catalog: opts.catalog, tuning: opts.tuning, econ: opts.pilot.econ,
+      send: (msg) => opts.send(msg),
+      toast: (text, kind) => (opts.toast ? opts.toast(text, kind ?? 'info') : opts.showMessage(text)),
+      ship: () => this.store.get(opts.state.playerId),
+      entity: () => opts.state.entities.get(opts.state.playerId),
+      clocks: () => ({ charge: opts.state.charge, tick: opts.state.predictedTick }),
+      level: () => opts.pilot.profile?.level ?? 1,
+      learned: () => opts.pilot.profile?.recipes ?? [],
+      have: (id) => opts.pilot.count(id),
+      canMake: (id) => opts.pilot.canMake(id),
+      flying: () => !this.hangarOpen && !this.docked && (opts.inputEnabled?.() ?? true),
+      view: {
+        zoom: () => opts.zoom?.get() ?? 1,
+        setZoom: (z) => opts.zoom?.set(z),
+        helm: () => this.helm,
+        setHelm: (on) => { this.helm = on; },
+        screenToWorld: (x, y) => this.scene?.screenToWorld(x, y) ?? { x: 0, y: 0 },
+      },
+    });
     this.jump = jumpTuning(opts.tuning);
     this.dockHint = document.createElement('div');
     this.dockHint.style.cssText = `position: fixed; left: 50%; bottom: 152px; transform: translateX(-50%); display: none;
@@ -1630,12 +1654,6 @@ export class ShipClient {
       if (c >= 1) ready++;
     }
     return total ? { charge, ready, total } : null;
-  }
-
-  /** Your repair kit started or finished (its glints) */
-  setKitActive(on: boolean): void {
-    const id = this.opts.state.playerId;
-    if (on) this.damageFx?.kitShips.add(id); else this.damageFx?.kitShips.delete(id);
   }
 
   /** Open the hangar (from the station screen), on a slot or the ship you fly */
