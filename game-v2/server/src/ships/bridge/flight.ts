@@ -248,7 +248,7 @@ function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {
   MOVE_ENV.tick = tick; MOVE_ENV.tuning = b.tuning; MOVE_ENV.gravity = b.host.gravityAt(eid); MOVE_ENV.terrain = b.host.terrainAt?.(eid) ?? null;
   MOVE_ENV.hazard = b.host.hazardFlight ? moveHazard : undefined;
   MOVE_ENV.pulls = b.pulls?.any ? b.pulls.source : undefined;
-  MOVE_ENV.clamp = b.clamps.any ? b.clamps.source : undefined;
+  MOVE_ENV.clamp = b.clamps?.any ? b.clamps.source : undefined;
   return MOVE_ENV;
 }
 
@@ -436,7 +436,7 @@ function findPairs(ctx: BridgeCtx, tick: number): ContactPair[] {
   const pairs: ContactPair[] = [];
   for (const [sys, l] of bySys) {
     if (l.length < 2 && !log.wanted) continue;
-    const entries = l.map(([id, s]) => ({ id, x: Position.x[id], y: Position.y[id], r: s.derived.radius, link: ctx.clamps.partner(id, tick) }));
+    const entries = l.map(([id, s]) => ({ id, x: Position.x[id], y: Position.y[id], r: s.derived.radius, link: ctx.clamps?.partner(id, tick) }));
     const from = pairs.length;
     if (l.length >= 2) contactPairs(entries, pairs);
     // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)

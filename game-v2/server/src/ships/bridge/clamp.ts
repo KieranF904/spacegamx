@@ -131,8 +131,9 @@ let inner = false;
  * leader's body after its step is kept (foldClampContacts) and the follower's engine share (the pair's next step)
  */
 export function clampMove(b: BridgeCtx, eid: number): boolean {
+  // (A bridge without the table, a test's stand-in: no links)
   const T = b.clamps;
-  if (inner || !T.links.length) return false;
+  if (inner || !T?.links.length) return false;
   const tick = b.host.getTick();
   const k = T.at(eid, tick);
   if (!k) return false;
@@ -178,7 +179,7 @@ function rot(vx: number, vy: number, angle: number): { x: number; y: number } {
  */
 export function foldClampContacts(b: BridgeCtx): void {
   const T = b.clamps;
-  if (!T.links.length) return;
+  if (!T?.links.length) return;
   const tick = b.host.getTick();
   for (const k of T.links) {
     if (!(k.from <= tick && tick < k.until) || k.led !== tick || !k.after) continue;

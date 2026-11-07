@@ -410,6 +410,16 @@ export class ShipReplicaSet {
     this.clamps.prune(m.tick);
   }
 
+  /**
+   * A clamped follower's leader stepped to tick t before the follower's step starts: the step reads it there (the clamp
+   * source), and the steppers' scratch isn't re-entrant, so it must not be stepped from inside it
+   */
+  private leaderFirst(id: number, t: number): void {
+    if (!this.clamps.size) return;
+    const x = this.clamps.recAt(id, t);
+    if (x && x.follower === id) this.at(x.leader, t);
+  }
+
   /** The ship this one is clamped to on tick t (undefined: none): the contact pass leaves the pair out */
   clampPartner(id: number, t: number): number | undefined {
     return this.clamps.size ? this.clamps.partner(id, t) : undefined;
@@ -659,6 +669,7 @@ export class ShipReplicaSet {
   }
 
   private stepPreNow(id: number, r: Rep, t: number, prev: ReplicaState, d: ShipDerived): ReplicaState {
+    this.leaderFirst(id, t);
     const own = this.own?.id === id ? this.own.src : null;
     // Its input from its source (sim/d-sources.ts): its own timeline (known) or its control rows (assumed), held
     // between changes; flown by its body, its driver's controls and push (decided, CAPS.BODIES), the rows where it doesn't
@@ -695,6 +706,7 @@ export class ShipReplicaSet {
   stepAlone(id: number, prev: Readonly<Step>, t: number, bits: number, q: number): ReplicaState | null {
     const r = this.reps.get(id), d = this.derived(id);
     if (!r || !d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift) return null;
+    this.leaderFirst(id, t);
     const body = cloneBody(prev.body);
     // (Its pulls too, the fields' (and what was told for the tick), each puller as this set has it: the PT layer's step is this)
     replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, d, this.tuning, this.stepEnv(), t, id);

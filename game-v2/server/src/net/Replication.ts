@@ -389,7 +389,7 @@ export class Replication {
     if (o.excLast) o.exc = true;
     if (this.host.ownLate?.(eid)) return hard('late input');
     // (Steering a docked pair its follower's engines held back: its client flew it on its own share)
-    if (this.ships.clamps.limited(eid, tick)) return hard('clamp power');
+    if (this.ships.clamps?.limited(eid, tick)) return hard('clamp power');
     // (Not flown by its pilot: its client has it from its last keyframe, so another only when that's out of date. Docked,
     // its keyframe says where at its station (it rides the station as every client's docked replica does); else when it moved)
     if (mode !== ReplicaMode.Player) {
@@ -442,14 +442,14 @@ export class Replication {
    */
   private envOf(eid: number): ReplicaEnv {
     const env = this.host.env(eid), c = this.ships.clamps;
-    if (!c.any) return env;
+    if (!c?.any) return env;
     let e = this.clampEnvs.get(env);
     if (!e) this.clampEnvs.set(env, (e = { ...env, clamp: c.source }));
     return e;
   }
   private readonly clampEnvs = new WeakMap<ReplicaEnv, ReplicaEnv>();
   private clampId(eid: number): number {
-    return this.ships.clamps.any ? eid : -1;
+    return this.ships.clamps?.any ? eid : -1;
   }
 
   /**
@@ -460,7 +460,7 @@ export class Replication {
    */
   private clampFollower(eid: number, s: Shadow, tick: number): boolean {
     const c = this.ships.clamps;
-    if (!c.links.length) return false;
+    if (!c?.links.length) return false;
     const k = c.at(eid, tick);
     if (!k || k.follower !== eid || s.mode !== ReplicaMode.Player) return false;
     s.body = this.real(eid);
