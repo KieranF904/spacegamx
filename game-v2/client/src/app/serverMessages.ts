@@ -11,6 +11,7 @@
  */
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { noteBossLife } from '../ships/bossLife';
+import { fieldClient } from '../ships/field/fieldState';
 import { devFeeds } from './devFeeds';
 import { showHitTick } from '../ui/HitTick';
 import { rangeHead, rangeRow } from '../ui/devRangeFeed';
@@ -342,9 +343,12 @@ const TABLE: Handlers = {
     h.toasts?.show(`${msg.from} shared the ${msg.blueprint.name}. Open the hangar at a station and pick it under Load → Shared with you`, 'info');
     h.audio.playUI('scan_ping', 0.5);
   },
-  repairKit: (h, msg) => {
-    h.quickBar.setKit(msg.left, msg.total);
-    h.shipClient.setKitActive(msg.left > 0);
+  fieldState: (_h, msg) => { fieldClient.applyState(msg); },
+  fieldDone: (h, msg) => {
+    const line = fieldClient.applyDone(msg, (id) => h.pilot.econ.items.name(id));
+    if (!line) return;
+    h.toasts.show(line, 'good');
+    h.audio.playUI('craft_done', 0.5);
   },
   questBoard: (h, msg) => { h.quests.setBoard(msg); },
   talk: (h, msg) => { h.dialogue.set(msg.view); },

@@ -2,7 +2,8 @@
 // One import per client/src/ships/features/<id>/index.ts (its `clientFeature` export), sorted by folder.
 
 import type { ClientFeature } from './types.js';
+import { clientFeature as f_machines } from './machines/index.js';
 import { clientFeature as f_strafer } from './strafer/index.js';
 import { clientFeature as f_tow } from './tow/index.js';
 
-export const CLIENT_FEATURES: readonly ClientFeature[] = [f_strafer, f_tow];
+export const CLIENT_FEATURES: readonly ClientFeature[] = [f_machines, f_strafer, f_tow];

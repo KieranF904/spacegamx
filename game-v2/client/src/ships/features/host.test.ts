@@ -8,7 +8,7 @@ const HOST = {} as ClientFeatureHost;
 
 describe('ClientFeatures', () => {
   it('with no features every loop is empty', () => {
-    expect(CLIENT_FEATURES.map((s) => s.id)).toEqual(['strafer', 'tow']);
+    expect(CLIENT_FEATURES.map((s) => s.id)).toEqual(['machines', 'strafer', 'tow']);
     const f = new ClientFeatures([], HOST);
     expect(f.onKey('KeyU')).toBe(false);
     expect(f.hasDrawers).toBe(false);
