@@ -85,6 +85,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .pick[aria-checked="true"] { background: var(--raise); border-color: var(--amber); }
 .pick[aria-checked="true"] kbd { color: #1a1206; background: var(--amber); border-color: var(--amber); }
 .pick[aria-checked="true"] b { color: var(--amber-hot); }
+.pick kbd.nokey { border-style: dashed; }
+.grp { margin: 8px 0 -2px; font: 600 13px/1.2 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); }
+.grp:first-child { margin-top: 0; }
 
 .knobs { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 16px; }
 .knob { display: grid; gap: 6px; }
@@ -108,7 +111,7 @@ pre { margin: 0; font: 400 12px/1.55 var(--mono); color: var(--muted); backgroun
 <div class="wrap">
   <header>
     <h1>Impact <span>Lab</span></h1>
-    <p>Seven new hit effects for heavier shots. Each one reads the hull's surface normal and the round's rebound at the point of impact, and grows with damage per shot. The second view runs the game's current hit on the same shots.</p>
+    <p>Twelve new hit effects for heavier shots: seven sprays and decals, and five unified bodies that form, deform and settle as one shape. Each one reads the hull's surface normal and the round's rebound at the point of impact, and grows with damage per shot. The second view runs the game's current hit on the same shots.</p>
   </header>
 
   <section class="stage" aria-label="Viewports">
@@ -135,7 +138,7 @@ pre { margin: 0; font: 400 12px/1.55 var(--mono); color: var(--muted); backgroun
     <span><i style="background:var(--amber)"></i>reflection</span>
     <span><i style="background:var(--green)"></i>tangent (slide)</span>
   </div>
-  <p class="hint">Tap or click the hull to fire at that spot. Keys: 1 to 7 pick an effect, F fires, S slows time, V shows vectors.</p>
+  <p class="hint">Tap or click the hull to fire at that spot. Keys: 1 to 9 pick an effect, [ and ] step through all twelve, F fires, S slows time, V shows vectors.</p>
 
   <section class="deck">
     <div class="col">
@@ -374,7 +377,42 @@ function turnOut(h, ax, ay, ang, minOut) {
 }
 
 /* =====================================================================================
-   THE FIVE EFFECTS. Each is self-contained: name, one-line description, parameters P at the
+   Unified bodies: one shape per hit, held in a preallocated slot with its own small fixed point
+   arrays (pu, pv, qu, qv) and a few scalars (q0..q3). The effect that spawned a body steps it
+   (fx.step) and draws it (fx.draw) in two passes: solid (normal blend) and light (additive).
+   Local frame: u runs along the slide tangent (toward the rebound side), v out along the normal.
+   ===================================================================================== */
+const BODY_N = 32, MAX_BODIES = 16;
+const newBody = () => ({
+  on: false, fx: null, x: 0, y: 0, nx: 0, ny: -1, tx: 1, ty: 0, rx: 0, ry: -1, sl: 0, cs: 1, k: 1, age: 0, life: 1, seed: 0, ev: 0, n: 0,
+  q0: 0, q1: 0, q2: 0, q3: 0,
+  pu: new Float32Array(BODY_N), pv: new Float32Array(BODY_N), qu: new Float32Array(BODY_N), qv: new Float32Array(BODY_N),
+});
+// Outline scratch and per-lobe scratch (no allocation per frame)
+const BX = new Float32Array(BODY_N * 3), BY = new Float32Array(BODY_N * 3), BA = new Float32Array(BODY_N), BT = new Float32Array(BODY_N), BL = new Float32Array(BODY_N);
+const CG = { t: 0, H: 0, Hm: 0, hr: 0, R0: 0, Rr: 0, ry: 0, Bw: 0, sh: 0, heat: 0, fade: 0, cs: 0, sn: 0, bu: 0, bv: 0, du: 0, dv: 0, L: 0,
+  Hc: 0, Rc: 0, cu: 0, tilt: 0, Ws: 0, rv: 0, Lmax: 0 };
+// Local (u, v) to world, with an optional shear `sh` that leans height toward +u
+const lx = (b, u, v, sh) => b.x + b.tx * (u + v * sh) + b.nx * v;
+const ly = (b, u, v, sh) => b.y + b.ty * (u + v * sh) + b.ny * v;
+const mt = (c, b, sh, u, v) => c.moveTo(lx(b, u, v, sh), ly(b, u, v, sh));
+const lt = (c, b, sh, u, v) => c.lineTo(lx(b, u, v, sh), ly(b, u, v, sh));
+const qd = (c, b, sh, u1, v1, u2, v2) => c.quadraticCurveTo(lx(b, u1, v1, sh), ly(b, u1, v1, sh), lx(b, u2, v2, sh), ly(b, u2, v2, sh));
+const bz = (c, b, sh, u1, v1, u2, v2, u3, v3) => c.bezierCurveTo(lx(b, u1, v1, sh), ly(b, u1, v1, sh), lx(b, u2, v2, sh), ly(b, u2, v2, sh), lx(b, u3, v3, sh), ly(b, u3, v3, sh));
+function bpt(b, j, u, v, sh) { BX[j] = lx(b, u, v, sh); BY[j] = ly(b, u, v, sh); }
+/** A smooth closed curve through BX/BY[0..n) (midpoint quadratics); `fresh` false adds it as another subpath */
+function traceSmooth(c, n, fresh = true) {
+  if (fresh) c.beginPath();
+  c.moveTo((BX[n - 1] + BX[0]) * 0.5, (BY[n - 1] + BY[0]) * 0.5);
+  for (let j = 0; j < n; j++) { const q = j + 1 === n ? 0 : j + 1; c.quadraticCurveTo(BX[j], BY[j], (BX[j] + BX[q]) * 0.5, (BY[j] + BY[q]) * 0.5); }
+  c.closePath();
+}
+function glowAt(c, f, heat, x, y, r, a) { if (r <= 0 || a <= 0) return; c.globalAlpha = Math.min(1, a); c.drawImage(f.spr[ri(heat)], x - r, y - r, r * 2, r * 2); }
+const clampFan = (a) => Math.max(-0.05, Math.min(Math.PI + 0.05, a));
+const sstep = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+
+/* =====================================================================================
+   THE TWELVE EFFECTS. Each is self-contained: name, one-line description, parameters P at the
    top, and spawn(f, h) that emits into the pane's pool through f's helpers.
    The hit h carries: x, y (point), dx, dy (incoming unit dir), nx, ny (surface normal, out),
    rx, ry (reflection), tx, ty (surface tangent the round was sliding along),
@@ -570,6 +608,372 @@ const EFFECTS = [
     if (k > 1.6) f.kick(0.5 * (k - 1.4));
   },
 },
+
+/* ---- Unified bodies: each hit makes ONE shape that forms, deforms and settles (spawn, step, draw) ---- */
+{
+  id: 'sheet', name: 'Crown sheet', group: 1,
+  desc: 'One liquid sheet rises out of the hit as a crown leaning toward the rebound; its scalloped rim beads, then the sheet slumps back.',
+  P: { radius: 9, height: 12, spikes: 12, spike: 4.2, lean: 0.55, tall: 0.35, rise: 0.42, stiff: 0.06, damp: 0.87, bead: 0.95, life: 72, flash: 6, light: 46 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 28, 0.55);
+    const b = f.body(this, h, P.life + 10 * k);
+    b.n = Math.min(BODY_N, Math.round(P.spikes * Math.pow(k, 0.3)));
+    b.q1 = P.height * Math.pow(k, 0.6) * 0.3; // thrown up: an upward kick on the height spring
+    for (let j = 0; j < b.n; j++) { b.pu[j] = rnd(0.55, 1.3); b.pv[j] = rnd(-0.2, 0.2); }
+    f.scorch(h.x, h.y, 3.4 * sk, 170);
+    if (k > 1.6) f.kick(0.6 * (k - 1.4));
+  },
+  geo(b) {
+    const P = this.P, G = CG, t = b.age / b.life;
+    G.t = t; G.Hm = P.height * Math.pow(b.k, 0.6); G.H = Math.max(0, b.q0); G.hr = Math.min(1, G.H / G.Hm);
+    const slump = t > P.rise ? 1 - G.hr : 0; // as the sheet falls it spreads outward
+    G.R0 = P.radius * Math.pow(b.k, 0.55); G.Rr = G.R0 * (0.55 + 0.55 * Math.sqrt(t) + 0.5 * slump);
+    G.ry = G.Rr * 0.3; G.Bw = G.R0 * 0.45; G.sh = P.lean * b.sl; G.heat = 0.06 + 0.75 * t; G.fade = 1 - sstep((t - 0.72) / 0.28);
+  },
+  /** Height of the rim at an angle round it (the rebound side stands taller; the back of the ring sits higher on screen) */
+  rimV(b, cs, sn) { return CG.H * (1 + this.P.tall * b.sl * cs) + CG.ry * sn; },
+  /** Spike j: base on the rim (bu, bv), flaring direction (du, dv) and length L */
+  tip(b, j) {
+    const P = this.P, G = CG, a = 6.2832 * (j + 0.5) / b.n + b.pv[j], cs = Math.cos(a), sn = Math.sin(a);
+    G.cs = cs; G.sn = sn; G.bu = G.Rr * cs; G.bv = this.rimV(b, cs, sn);
+    const l = Math.hypot(cs * 0.5, 1); G.du = cs * 0.5 / l; G.dv = 1 / l;
+    G.L = P.spike * Math.sqrt(b.k) * b.pu[j] * G.hr * (1 + P.tall * b.sl * cs);
+  },
+  step(b, f) {
+    const P = this.P, t = b.age / b.life, Hm = P.height * Math.pow(b.k, 0.6);
+    b.q1 += ((t < P.rise ? Hm : -0.3 * Hm) - b.q0) * P.stiff * (t < P.rise ? 1 : 0.45); // (it falls slower than it rises) b.q1 *= P.damp; b.q0 += b.q1;
+    if (!(b.ev & 1) && t > P.rise + 0.06) { // the rim's beads let go as the sheet starts to fall
+      b.ev |= 1; this.geo(b);
+      const G = CG, sk = Math.sqrt(b.k);
+      for (let j = 0; j < b.n; j += 2) {
+        this.tip(b, j);
+        const u = G.bu + G.du * G.L, v = G.bv + G.dv * G.L, x = lx(b, u, v, G.sh), y = ly(b, u, v, G.sh);
+        const wx = b.tx * (G.du + G.dv * G.sh) + b.nx * G.dv, wy = b.ty * (G.du + G.dv * G.sh) + b.ny * G.dv, sp = rnd(0.5, 1) * sk;
+        f.drop(b, x, y, wx * sp + b.rx * 0.5 * b.sl, wy * sp + b.ry * 0.5 * b.sl, rnd(24, 36), P.bead * Math.pow(b.k, 0.4) * 0.75, G.heat, 0.6, 0.16);
+      }
+    }
+  },
+  spikes(c, b, back, col) {
+    const P = this.P, G = CG, w = Math.PI * G.Rr / b.n * 0.55, br = P.bead * Math.pow(b.k, 0.4);
+    c.fillStyle = col; c.globalAlpha = 0.95 * G.fade;
+    c.beginPath();
+    for (let j = 0; j < b.n; j++) {
+      this.tip(b, j); if ((G.sn > 0) !== back || G.L < 0.2) continue;
+      const tu = G.bu + G.du * G.L, tv = G.bv + G.dv * G.L;
+      mt(c, b, G.sh, G.bu - w, G.bv - 0.5);
+      qd(c, b, G.sh, G.bu - w * 0.2, G.bv + G.L * 0.55, tu, tv);
+      qd(c, b, G.sh, G.bu + w * 0.2, G.bv + G.L * 0.55, G.bu + w, G.bv - 0.5);
+      c.closePath();
+    }
+    c.fill();
+    if (b.ev & 1) return;
+    c.beginPath();
+    for (let j = 0; j < b.n; j++) {
+      this.tip(b, j); if ((G.sn > 0) !== back || G.L < 0.2) continue;
+      const x = lx(b, G.bu + G.du * G.L, G.bv + G.dv * G.L, G.sh), y = ly(b, G.bu + G.du * G.L, G.bv + G.dv * G.L, G.sh), r = br * (0.55 + 0.45 * b.pu[j]) * G.hr;
+      c.moveTo(x + r, y); c.arc(x, y, r, 0, 6.2832);
+    }
+    c.fill();
+  },
+  draw(c, b, f, add) {
+    const P = this.P, G = CG, R = f.ramp, M = 14; this.geo(b);
+    if (G.H < 0.35 && G.t > P.rise) return; // fully slumped back
+    const H = G.H, Rr = G.Rr, Bw = G.Bw, sh = G.sh, heat = G.heat, fade = G.fade, Hl = this.rimV(b, -1, 0), Hr = this.rimV(b, 1, 0);
+    if (!add) {
+      // the inside face of the sheet, seen over the front of the rim
+      for (let j = 0; j < M; j++) { const a = 6.2832 * j / M; bpt(b, j, Rr * Math.cos(a), this.rimV(b, Math.cos(a), Math.sin(a)), sh); }
+      traceSmooth(c, M); c.globalAlpha = 0.9 * fade; c.fillStyle = R[ri(heat + 0.34)]; c.fill();
+      this.spikes(c, b, true, R[ri(heat + 0.2)]);
+      // the sheet itself: walls flaring up from the hit to the rim, across the front of the rim
+      c.beginPath(); mt(c, b, sh, -Bw, -0.6);
+      bz(c, b, sh, -Bw * 1.1, Hl * 0.45, -Rr * 0.9, Hl * 0.8, -Rr, Hl);
+      for (let j = 1; j <= M; j++) { const a = Math.PI + Math.PI * j / M; lt(c, b, sh, Rr * Math.cos(a), this.rimV(b, Math.cos(a), Math.sin(a))); }
+      bz(c, b, sh, Rr * 0.9, Hr * 0.8, Bw * 1.1, Hr * 0.45, Bw, -0.6); c.closePath();
+      const g = c.createLinearGradient(lx(b, 0, 0, sh), ly(b, 0, 0, sh), lx(b, 0, H, sh), ly(b, 0, H, sh));
+      g.addColorStop(0, R[ri(heat + 0.3)]); g.addColorStop(1, R[ri(heat + 0.02)]);
+      c.globalAlpha = 0.95 * fade; c.fillStyle = g; c.fill();
+      this.spikes(c, b, false, R[ri(heat)]);
+      return;
+    }
+    // light: the hot lip of the front rim, the beads, a glow in the cup
+    c.beginPath();
+    for (let j = 0; j <= M; j++) { const a = Math.PI + Math.PI * j / M; (j ? lt : mt)(c, b, sh, Rr * Math.cos(a), this.rimV(b, Math.cos(a), Math.sin(a))); }
+    c.globalAlpha = 0.75 * fade; c.strokeStyle = R[ri(heat * 0.5)]; c.lineWidth = 0.6 + 0.35 * Math.sqrt(b.k); c.stroke();
+    glowAt(c, f, heat + 0.1, lx(b, 0, H * 0.35, sh), ly(b, 0, H * 0.35, sh), G.R0 * 2.2, 0.45 * (1 - G.t));
+    if (!(b.ev & 1)) for (let j = 0; j < b.n; j++) {
+      this.tip(b, j); if (G.L < 0.2) continue;
+      const u = G.bu + G.du * G.L, v = G.bv + G.dv * G.L;
+      glowAt(c, f, heat * 0.6, lx(b, u, v, sh), ly(b, u, v, sh), P.bead * Math.pow(b.k, 0.4) * 3, (G.sn > 0 ? 0.3 : 0.6) * fade);
+    }
+  },
+},
+{
+  id: 'tongue', name: 'Plasma tongue', group: 1,
+  desc: 'A single flame tongue licks out along the rebound, curling away from the hull and flickering as one body, then draws back in.',
+  P: { len: 26, width: 5, curl: 1.3, lick: 0.32, flicker: 0.1, stiff: 0.2, damp: 0.72, minOut: 0.3, out: 0.2, hold: 0.45, life: 52, flash: 6, light: 50 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 30, 0.6);
+    const b = f.body(this, h, P.life + 8 * k); b.n = 16;
+    b.q0 = Math.atan2(Math.max(P.minOut, b.cs), b.sl); // the rebound in the local frame, lifted off the hull
+    b.q1 = b.sl > 0.18 ? 1 : (Math.random() < 0.5 ? -1 : 1); // curl: up off the hull on an angled hit, either way head-on
+    for (let i = 0; i < b.n; i++) b.pv[i] = 0.3;
+    f.scorch(h.x, h.y, 3 * sk, 160);
+    if (k > 1.8) f.kick(0.5 * (k - 1.6));
+  },
+  step(b, f) {
+    const P = this.P, t = b.age / b.life, n = b.n, age = b.age;
+    const ext = t < P.out ? 1 - Math.pow(1 - t / P.out, 3) : t < P.hold ? 1 : 1 - sstep((t - P.hold) / (1 - P.hold));
+    b.q2 = ext;
+    const seg = P.len * Math.pow(b.k, 0.6) * (0.75 + 0.5 * b.sl) * ext / (n - 1);
+    // the spine's rest shape: along the rebound, curling more toward the tip, a lick running out along it; points chase it on springs
+    let tu = 0, tv = 0.3;
+    for (let i = 1; i < n; i++) {
+      const s = i / (n - 1);
+      const th = b.q0 + b.q1 * P.curl * s * s * (0.35 + 0.65 * Math.min(1, t * 2.2)) + P.lick * s * Math.sin(age * 0.24 - s * 5 + b.seed) + P.flicker * s * Math.sin(age * 0.9 + s * 11 + b.seed * 3);
+      tu += Math.cos(th) * seg; tv += Math.sin(th) * seg;
+      b.qu[i] = (b.qu[i] + (tu - b.pu[i]) * P.stiff) * P.damp; b.qv[i] = (b.qv[i] + (tv - b.pv[i]) * P.stiff) * P.damp;
+      b.pu[i] += b.qu[i]; b.pv[i] += b.qv[i];
+      if (b.pv[i] < 0.3) { b.pv[i] = 0.3; if (b.qv[i] < 0) b.qv[i] *= -0.3; }
+    }
+    if (ext > 0.6 && (age | 0) % 4 === 0) { // the odd ember shed off the tip
+      const u = b.pu[n - 1], v = b.pv[n - 1], du = u - b.pu[n - 3], dv = v - b.pv[n - 3];
+      f.spark(lx(b, u, v, 0), ly(b, u, v, 0), (b.tx * du + b.nx * dv) * 0.25 + gauss() * 0.3, (b.ty * du + b.ny * dv) * 0.25 + gauss() * 0.3, rnd(8, 14), 0.6, 1.6, 0.2 + t * 0.4, 0.5, 0.93);
+    }
+  },
+  /** The tongue's outline at width scale m into BX/BY: one side root to tip, the tip, the other side back */
+  outline(b, m) {
+    const P = this.P, n = b.n, W = P.width * Math.sqrt(b.k) * Math.sqrt(b.q2) * m, age = b.age;
+    for (let i = 0; i < n; i++) {
+      const s = i / (n - 1), i0 = i > 0 ? i - 1 : 0, i1 = i < n - 1 ? i + 1 : n - 1;
+      let du = b.pu[i1] - b.pu[i0], dv = b.pv[i1] - b.pv[i0]; const l = Math.hypot(du, dv);
+      if (l < 1e-4) { du = Math.cos(b.q0); dv = Math.sin(b.q0); } else { du /= l; dv /= l; }
+      const w = W * Math.pow(1 - s, 0.75) * (0.5 + 1.8 * s * (1 - s)) * (1 + 0.15 * Math.sin(age * 0.6 + s * 9 + b.seed));
+      bpt(b, i, b.pu[i] - dv * w, b.pv[i] + du * w, 0);
+      bpt(b, 2 * n - i, b.pu[i] + dv * w, b.pv[i] - du * w, 0);
+      if (i === n - 1) bpt(b, n, b.pu[i] + du * W * 0.5, b.pv[i] + dv * W * 0.5, 0);
+    }
+    return 2 * n + 1;
+  },
+  draw(c, b, f, add) {
+    const P = this.P, R = f.ramp, t = b.age / b.life, ext = b.q2, n = b.n;
+    if (!add || ext < 0.02) return; // all light: the tongue is plasma
+    const heat = 0.04 + 0.5 * t, fade = Math.min(1, ext * 1.6) * (1 - t * t);
+    const x0 = lx(b, 0, 0.3, 0), y0 = ly(b, 0, 0.3, 0), x1 = lx(b, b.pu[n - 1], b.pv[n - 1], 0), y1 = ly(b, b.pu[n - 1], b.pv[n - 1], 0);
+    traceSmooth(c, this.outline(b, 2.3)); c.globalAlpha = 0.22 * fade; c.fillStyle = R[ri(heat + 0.3)]; c.fill();
+    traceSmooth(c, this.outline(b, 1));
+    const g = c.createLinearGradient(x0, y0, x1 + 0.01, y1);
+    g.addColorStop(0, R[ri(heat)]); g.addColorStop(0.6, R[ri(heat + 0.25)]); g.addColorStop(1, R[ri(heat + 0.5)]);
+    c.globalAlpha = 0.85 * fade; c.fillStyle = g; c.fill();
+    traceSmooth(c, this.outline(b, 0.4)); c.globalAlpha = 0.9 * fade; c.fillStyle = R[ri(heat * 0.2)]; c.fill();
+    glowAt(c, f, heat + 0.1, x0, y0, P.width * Math.sqrt(b.k) * 3, 0.6 * fade);
+  },
+},
+{
+  id: 'dome', name: 'Pressure dome', group: 1,
+  desc: 'A half bubble swells out of the hull along the normal, skewed toward the rebound, its skin wobbling until it pops into a ring.',
+  P: { radius: 9.5, stiff: 0.05, damp: 0.92, couple: 0.3, kick: 0.6, skew: 0.55, pop: 0.6, ring: 22, life: 80, flash: 5, light: 44 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.3 * k, 5, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 24, 0.5);
+    const b = f.body(this, h, P.life + 10 * k), n = (b.n = 25), Rm = (b.q0 = P.radius * Math.pow(k, 0.55)), thr = Math.atan2(b.cs, b.sl);
+    // the skin is kicked out hardest along the rebound, a little unevenly, so it wobbles as it inflates
+    for (let j = 0; j < n; j++) { const a = Math.PI * j / (n - 1), d = Math.max(0, Math.cos(a - thr)); b.qu[j] = Rm * (0.09 + 0.1 * P.kick * d * d * (0.4 + b.sl) + rnd(-0.015, 0.015)); }
+    f.scorch(h.x, h.y, 3 * sk, 160);
+  },
+  step(b, f) {
+    const P = this.P, t = b.age / b.life, n = b.n, Rt = b.q0 * (1 + 0.08 * t);
+    if (t < P.pop) { // each rim point springs to the dome's radius and is coupled to its neighbours: ripples run round the skin
+      for (let j = 0; j < n; j++) { const l = b.pu[j > 0 ? j - 1 : 1], r = b.pu[j < n - 1 ? j + 1 : n - 2]; b.pv[j] = (Rt - b.pu[j]) * P.stiff + P.couple * (l + r - 2 * b.pu[j]); }
+      for (let j = 0; j < n; j++) { b.qu[j] = (b.qu[j] + b.pv[j]) * P.damp; b.pu[j] += b.qu[j]; }
+    } else if (!(b.ev & 1)) { // pop
+      b.ev |= 1; const k = b.k, sk = Math.sqrt(k), Rm = b.q0;
+      f.ring(b, b.x, b.y, P.ring * Math.pow(k, 0.6), 0.5, 1.2 * sk, 16 + 3 * k, 0.1, 0.5);
+      f.glow(b.x + b.nx * Rm * 0.5, b.y + b.ny * Rm * 0.5, Rm * 1.5, 0.3, 8, 0.1, 0.7);
+      for (let i = 0; i < 3 + Math.round(k); i++) {
+        const ax = axisOf(b, 0.4), d = turnOut(b, ax.x, ax.y, gauss() * 0.6, 0.3), v = rnd(1.5, 3) * sk;
+        f.drop(b, b.x + d.x * Rm, b.y + d.y * Rm, d.x * v, d.y * v, rnd(22, 34), 0.8 * Math.pow(k, 0.35), 0.15, 0.6, 0.12);
+      }
+    }
+  },
+  rim(b, grow, squash, upto) { // rim points into BX/BY (j from the +u side round to the -u side)
+    const P = this.P, n = b.n, su = P.skew * b.sl * b.q0 * 0.6, sv = (1 - 0.15 * b.sl) * squash;
+    for (let j = 0; j < n; j++) { const a = Math.PI * j / (n - 1), r = Math.max(0.2, b.pu[j]) * grow; bpt(b, j, r * Math.cos(a) + su * Math.sin(a), r * Math.sin(a) * sv, 0); }
+  },
+  draw(c, b, f, add) {
+    const P = this.P, R = f.ramp, t = b.age / b.life, n = b.n, Rm = b.q0, heat = 0.12 + 0.5 * t;
+    if (t < P.pop) {
+      this.rim(b, 1, 1);
+      c.beginPath(); c.moveTo(BX[0], BY[0]); for (let j = 1; j < n; j++) c.lineTo(BX[j], BY[j]); c.closePath();
+      if (!add) { c.globalAlpha = 0.35; c.fillStyle = '#06080c'; c.fill(); return; } // the gas dims what is behind it: reads as a volume
+      c.globalAlpha = 0.2; c.fillStyle = R[ri(heat + 0.25)]; c.fill();
+      glowAt(c, f, heat, b.x + b.nx * Rm * 0.25, b.y + b.ny * Rm * 0.25, Rm * 1.1, 0.55 * (1 - t));
+      // the skin, thinning as it stretches
+      c.beginPath(); c.moveTo(BX[0], BY[0]); for (let j = 1; j < n; j++) c.lineTo(BX[j], BY[j]);
+      const lw = (1.5 - 0.7 * t / P.pop) * Math.pow(b.k, 0.4);
+      c.globalAlpha = 0.9; c.strokeStyle = R[ri(heat)]; c.lineWidth = lw; c.stroke();
+      c.globalAlpha = 0.5; c.strokeStyle = R[0]; c.lineWidth = lw * 0.35; c.stroke();
+      // a highlight just inside the skin, on the side away from the rebound
+      const cx = b.x + b.nx * Rm * 0.3, cy = b.y + b.ny * Rm * 0.3, j0 = Math.round(n * 0.55), j1 = Math.round(n * 0.8);
+      c.beginPath(); for (let j = j0; j <= j1; j++) { const x = cx + (BX[j] - cx) * 0.8, y = cy + (BY[j] - cy) * 0.8; j === j0 ? c.moveTo(x, y) : c.lineTo(x, y); }
+      c.globalAlpha = 0.55; c.strokeStyle = R[0]; c.lineWidth = 0.7; c.stroke();
+      if (t > P.pop - 0.1) glowAt(c, f, 0.05, b.x + b.nx * Rm * 0.5, b.y + b.ny * Rm * 0.5, Rm * 1.2, (t - P.pop + 0.1) * 6); // pressure peaking
+      return;
+    }
+    if (!add) return;
+    // popped: the torn skin snaps back toward the hull as two shreds
+    const tp = (t - P.pop) / (1 - P.pop), cut = Math.max(1, Math.round((n - 1) * 0.5 * Math.pow(1 - tp, 1.4)));
+    this.rim(b, 1 + 0.6 * tp, 1 - 0.5 * tp);
+    c.beginPath();
+    c.moveTo(BX[0], BY[0]); for (let j = 1; j <= cut; j++) c.lineTo(BX[j], BY[j]);
+    c.moveTo(BX[n - 1], BY[n - 1]); for (let j = n - 2; j >= n - 1 - cut; j--) c.lineTo(BX[j], BY[j]);
+    c.globalAlpha = 0.8 * Math.pow(1 - tp, 1.5); c.strokeStyle = R[ri(heat + 0.15)]; c.lineWidth = Math.pow(b.k, 0.4) * (1 - tp * 0.6); c.stroke();
+  },
+},
+{
+  id: 'plume', name: 'Mushroom plume', group: 1,
+  desc: 'A cohesive plume climbs out along the normal and rolls over into a turning cap, sheared the way the round slid, cooling to smoke.',
+  P: { height: 30, cap: 8, stem: 3.6, shear: 0.75, tilt: 0.45, rise: 0.055, roll: 0.07, life: 120, flash: 7, light: 56 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 7, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 36, 0.6);
+    f.body(this, h, P.life + 15 * k);
+    f.scorch(h.x, h.y, 4 * sk, 240);
+    if (k > 1.3) f.kick(0.7 * (k - 1.1));
+  },
+  step() {},
+  geo(b) {
+    const P = this.P, G = CG, age = b.age, t = age / b.life;
+    G.t = t; G.Hc = P.height * Math.pow(b.k, 0.6) * (1 - Math.exp(-age * P.rise));
+    G.Rc = P.cap * Math.pow(b.k, 0.55) * (0.3 + 0.7 * (1 - Math.exp(-age * 0.05))) * (1 + 0.25 * t);
+    G.cu = P.shear * b.sl * G.Hc * 0.6 + Math.sin(age * 0.05 + b.seed) * 0.6; // sheared downstream of the slide, swaying a little
+    G.tilt = -P.tilt * b.sl; G.Ws = P.stem * Math.sqrt(b.k) * (1 - 0.45 * t);
+    G.heat = 0.2 + 1.1 * t; G.fade = 1 - sstep((t - 0.65) / 0.35);
+  },
+  /** Stem and cap as one path (both traced the same way round, so the fill is their union) */
+  trace(c, b) {
+    const P = this.P, G = CG, age = b.age, Hc = G.Hc, Rc = G.Rc, cu = G.cu, ct = Math.cos(G.tilt), st = Math.sin(G.tilt), vt = Hc - 0.15 * Rc, S = 8;
+    c.beginPath();
+    for (let i = 0; i <= S; i++) { const s = i / S, sp = cu * Math.pow(s, 1.6) + 0.5 * Math.sin(age * 0.09 + s * 3 + b.seed) * s, w = G.Ws * (0.6 + 1.1 * Math.pow(1 - s, 4)); (i ? lt : mt)(c, b, 0, sp + w, s ? vt * s : -0.6); }
+    for (let i = S; i >= 0; i--) { const s = i / S, sp = cu * Math.pow(s, 1.6) + 0.5 * Math.sin(age * 0.09 + s * 3 + b.seed) * s, w = G.Ws * (0.6 + 1.1 * Math.pow(1 - s, 4)); lt(c, b, 0, sp - w, s ? vt * s : -0.6); }
+    c.closePath();
+    const m = 22;
+    for (let j = 0; j < m; j++) {
+      const a = 6.2832 * j / m, ca = Math.cos(a), sa = Math.sin(a);
+      let beta = Math.abs(a - Math.PI / 2); if (beta > Math.PI) beta = 6.2832 - beta; // angle from the top: billows roll out from the crown and under
+      const bill = 1 + 0.08 * Math.sin(4 * beta - age * P.roll * 1.6 + b.seed) + 0.04 * Math.sin(7 * beta - age * 0.05);
+      const eu = 1.3 * Rc * ca * bill, ev = (sa >= 0 ? 1.0 * sa : 0.85 * sa * (0.28 + 0.72 * Math.pow(Math.abs(ca), 1.3))) * Rc * bill;
+      bpt(b, j, cu + eu * ct - ev * st, Hc + eu * st + ev * ct, 0);
+    }
+    traceSmooth(c, m, false);
+  },
+  draw(c, b, f, add) {
+    const P = this.P, G = CG, R = f.ramp; this.geo(b);
+    const t = G.t, heat = G.heat, fade = G.fade, Rc = G.Rc, Hc = G.Hc, cu = G.cu, ct = Math.cos(G.tilt), st = Math.sin(G.tilt);
+    if (Hc < 0.5) return;
+    this.trace(c, b);
+    if (!add) {
+      // volume: hottest in the core under the cap, cooler toward the cap's edge and down the stem
+      const gx = lx(b, cu, Hc - 0.2 * Rc, 0), gy = ly(b, cu, Hc - 0.2 * Rc, 0), g = c.createRadialGradient(gx, gy, 0, gx, gy, Math.max(Rc * 1.7, Hc));
+      g.addColorStop(0, R[ri(heat - 0.12)]); g.addColorStop(0.45, R[ri(heat + 0.1)]); g.addColorStop(1, R[ri(heat + 0.4)]);
+      c.globalAlpha = 0.92 * fade; c.fillStyle = g; c.fill();
+      return;
+    }
+    // light: fire inside the body while it is hot, the cap's crown edge, the two rolling curls, glow under the cap
+    c.globalAlpha = 0.28 * (1 - t) * (1 - t); c.fillStyle = R[ri(heat * 0.6)]; c.fill();
+    c.beginPath(); c.moveTo(BX[0], BY[0]); for (let j = 1; j <= 11; j++) c.lineTo(BX[j], BY[j]);
+    c.globalAlpha = 0.6 * (1 - t) * fade; c.strokeStyle = R[ri(heat * 0.6)]; c.lineWidth = 0.8; c.stroke();
+    c.beginPath();
+    for (let side = -1; side <= 1; side += 2) {
+      for (let i = 0; i <= 9; i++) {
+        const s = i / 9, a = -b.age * P.roll + s * 4.2, r = 0.42 * Rc * (1 - 0.55 * s);
+        const lu = side * (0.7 * 1.3 * Rc + r * Math.cos(a)), lv = -0.05 * Rc + r * Math.sin(a);
+        (i ? lt : mt)(c, b, 0, cu + lu * ct - lv * st, Hc + lu * st + lv * ct);
+      }
+    }
+    c.globalAlpha = 0.5 * fade * (1 - t * 0.6); c.strokeStyle = R[ri(heat * 0.7 + 0.1)]; c.lineWidth = 0.7 + 0.2 * Math.sqrt(b.k); c.stroke();
+    glowAt(c, f, heat * 0.5, lx(b, cu, Hc - 0.3 * Rc, 0), ly(b, cu, Hc - 0.3 * Rc, 0), Rc * 1.8, 0.6 * (1 - t) * (1 - t));
+    glowAt(c, f, heat * 0.4, b.x, b.y, G.Ws * 4, 0.6 * Math.pow(1 - t, 3));
+  },
+},
+{
+  id: 'blossom', name: 'Blossom', group: 1,
+  desc: 'One connected flower of molten plating unfolds from the hit, lobes fanned about the normal and reaching toward the rebound, then wilts and folds back.',
+  P: { lobes: 5, len: 13, spread: 150, inner: 0.45, width: 0.78, stagger: 3, stiff: 0.11, damp: 0.8, lean: 0.45, curl: 0.45, wilt: 0.55, life: 86, flash: 6, light: 48 },
+  spawn(f, h) {
+    const P = this.P, k = h.k, sk = Math.sqrt(k);
+    f.glow(h.x, h.y, P.flash * k, 0.4 * k, 6, 0, 1);
+    f.light(h.x, h.y, P.light * sk, 30, 0.55);
+    const b = f.body(this, h, P.life + 10 * k), n = (b.n = Math.max(3, Math.min(9, P.lobes + Math.round((k - 1) * 1.5))));
+    // the fan's axis sits between the normal and the rebound; it is squeezed to stay off the hull
+    const thr = Math.atan2(b.cs, b.sl), tha = Math.PI / 2 - (Math.PI / 2 - thr) * P.lean, hs = P.spread * D2R / 2;
+    const lo = Math.max(0.16, tha - hs), hi = Math.min(Math.PI - 0.16, tha + hs);
+    b.q0 = (hi - lo) / n * P.width; // lobe half width (radians)
+    for (let j = 0; j < n; j++) {
+      const a = lo + (hi - lo) * (j + 0.5) / n + gauss() * 0.04;
+      b.qv[j] = a; b.pv[j] = P.len * Math.pow(k, 0.6) * (0.75 + 0.6 * b.sl * Math.max(0, Math.cos(a - thr))) * rnd(0.85, 1.15);
+    }
+    f.scorch(h.x, h.y, 3.6 * sk, 190);
+    if (k > 1.6) f.kick(0.5 * (k - 1.4));
+  },
+  step(b) {
+    const P = this.P, t = b.age / b.life, n = b.n, wil = t > P.wilt;
+    for (let j = 0; j < n; j++) { // each lobe unfolds on its own spring, the middle ones first
+      if (b.age < Math.abs(j - (n - 1) / 2) * P.stagger) continue;
+      const st = wil ? P.stiff * 0.35 : P.stiff;
+      b.qu[j] = (b.qu[j] + ((wil ? 0.04 : 1) - b.pu[j]) * st) * P.damp; b.pu[j] += b.qu[j];
+    }
+  },
+  /** Lobe angles (drooping as they wilt), tip angles (curled) and lengths into BA/BT/BL; the bud radius and reach into CG */
+  prep(b) {
+    const P = this.P, G = CG, n = b.n, t = b.age / b.life, dr = sstep((t - P.wilt) / (1 - P.wilt));
+    let full = 0; for (let j = 0; j < n; j++) full += b.pv[j];
+    G.rv = P.inner * full / n * (0.4 + 0.6 * sstep(b.age / 6)) * (1 - 0.4 * dr) + 0.4; G.Lmax = G.rv;
+    for (let j = 0; j < n; j++) {
+      const p = Math.max(0, b.pu[j]), a0 = b.qv[j], side = a0 < Math.PI / 2 ? -1 : 1, room = Math.min(a0, Math.PI - a0) - 0.08;
+      BA[j] = a0 + side * dr * room * 0.75; // wilting lobes droop toward the hull
+      BT[j] = BA[j] - P.curl * 0.5 * b.sl * Math.min(1, p) + side * P.curl * dr * 0.6; // tips curl toward the rebound, then fold over
+      BL[j] = G.rv + (b.pv[j] - G.rv) * p; if (BL[j] > G.Lmax) G.Lmax = BL[j];
+    }
+    G.t = t; G.heat = 0.06 + 0.6 * t; G.fade = 1 - sstep((t - 0.82) / 0.18); G.sh = dr;
+  },
+  trace(c, b) {
+    const G = CG, n = b.n, hw = b.q0, rv = G.rv, cl = clampFan;
+    c.beginPath(); mt(c, b, 0, rv * 1.1, -0.6);
+    let va = Math.max(0.03, BA[0] - hw * 1.3); lt(c, b, 0, rv * Math.cos(va), rv * Math.sin(va));
+    for (let j = 0; j < n; j++) {
+      const a = BA[j], ta = BT[j], L = BL[j], a1 = cl(a - hw * 1.25), a2 = ta - hw * 0.6, a3 = ta + hw * 0.6, a4 = cl(a + hw * 1.25);
+      bz(c, b, 0, 0.6 * L * Math.cos(a1), 0.6 * L * Math.sin(a1), L * Math.cos(a2), L * Math.sin(a2), L * Math.cos(ta), L * Math.sin(ta));
+      va = j < n - 1 ? (a + BA[j + 1]) * 0.5 : Math.min(Math.PI - 0.03, a + hw * 1.3);
+      bz(c, b, 0, L * Math.cos(a3), L * Math.sin(a3), 0.6 * L * Math.cos(a4), 0.6 * L * Math.sin(a4), rv * Math.cos(va), rv * Math.sin(va));
+    }
+    lt(c, b, 0, -rv * 1.1, -0.6); c.closePath();
+  },
+  draw(c, b, f, add) {
+    const G = CG, R = f.ramp, n = b.n; this.prep(b);
+    const heat = G.heat, fade = G.fade, dr = G.sh;
+    this.trace(c, b);
+    if (!add) {
+      const g = c.createRadialGradient(b.x, b.y, 0, b.x, b.y, G.Lmax);
+      g.addColorStop(0, R[ri(heat * 0.25)]); g.addColorStop(0.3, R[ri(heat + 0.12)]); g.addColorStop(1, R[ri(heat + 0.42)]);
+      c.globalAlpha = 0.95 * fade; c.fillStyle = g; c.fill();
+      return;
+    }
+    c.globalAlpha = 0.7 * fade; c.strokeStyle = R[ri(heat * 0.6)]; c.lineWidth = 0.7; c.stroke();
+    c.beginPath(); // veins out to each tip
+    for (let j = 0; j < n; j++) {
+      const a = BA[j], ta = BT[j], L = BL[j];
+      mt(c, b, 0, 0, 0); qd(c, b, 0, 0.5 * L * Math.cos(a), 0.5 * L * Math.sin(a), 0.85 * L * Math.cos(ta), 0.85 * L * Math.sin(ta));
+    }
+    c.globalAlpha = 0.6 * fade * (1 - dr); c.strokeStyle = R[ri(heat * 0.4)]; c.lineWidth = 0.6; c.stroke();
+    glowAt(c, f, heat * 0.5, b.x, b.y, G.rv * 2.5, 0.7 * (1 - G.t));
+  },
+},
 ];
 
 /* The game's current hit, approximated: DIRECTED_HIT(0xffc070, 1) from weaponStyles.ts (the cannon), sized by
@@ -610,6 +1014,7 @@ class Pane {
     this.fixedRamp = rampStops; this.mat = 'armour';
     this.shots = Array.from({ length: MAX_SHOTS }, () => ({ on: false, x: 0, y: 0, dist: 0, gone: 0, speed: 12, k: 1, h: newHit() }));
     this.marks = Array.from({ length: MAX_MARKS }, newHit); this.markHead = 0;
+    this.bodies = Array.from({ length: MAX_BODIES }, newBody);
     this.stat = document.createElement('canvas'); this.scale = 1; this.dpr = 1; this.shake = 0; this.sx = 0; this.sy = 0;
     this.setMaterial('armour');
   }
@@ -710,6 +1115,17 @@ class Pane {
     c.globalAlpha = 0.7 * (1 - t) * (1 - t); c.strokeStyle = this.ramp[ri(p.heat[i] * 0.6)]; c.lineWidth = 0.7;
     c.beginPath(); c.moveTo(SOX[0], SOY[0]); for (let j = 1; j <= SM_N; j++) c.lineTo(SOX[j], SOY[j]); c.stroke();
   }
+  /** A unified body for effect `fx` at hit h: a free slot (or the oldest), its arrays cleared, its frame taken from h */
+  body(fx, h, life) {
+    let b = null;
+    for (const o of this.bodies) if (!o.on) { b = o; break; }
+    if (!b) { b = this.bodies[0]; for (const o of this.bodies) if (o.age / o.life > b.age / b.life) b = o; }
+    b.on = true; b.fx = fx; b.x = h.x; b.y = h.y; b.nx = h.nx; b.ny = h.ny; b.tx = h.tx; b.ty = h.ty; b.rx = h.rx; b.ry = h.ry;
+    b.cs = h.cos; b.sl = Math.max(0, Math.min(1, h.rx * h.tx + h.ry * h.ty)); b.k = h.k;
+    b.age = 0; b.life = Math.max(1, life * this.pool.lifeScale); b.seed = Math.random() * 100; b.ev = 0; b.n = 0; b.q0 = b.q1 = b.q2 = b.q3 = 0;
+    b.pu.fill(0); b.pv.fill(0); b.qu.fill(0); b.qv.fill(0);
+    return b;
+  }
   kick(a) { if (!REDUCED) this.shake = Math.min(3, Math.max(this.shake, a)); }
 
   fire(src, k, speed) {
@@ -765,6 +1181,7 @@ class Pane {
         }
       }
     }
+    for (const b of this.bodies) { if (!b.on) continue; if (++b.age >= b.life) { b.on = false; continue; } b.fx.step(b, this); }
     this.shake *= 0.86; if (this.shake < 0.02) this.shake = 0;
     this.sx = (Math.random() - 0.5) * 2 * this.shake; this.sy = (Math.random() - 0.5) * 2 * this.shake;
   }
@@ -813,6 +1230,7 @@ class Pane {
       if (ty === SMOKE) { const r = p.size[i]; c.globalAlpha = p.alpha[i] * (1 - t) * Math.min(1, t * 6); c.drawImage(this.smokeSpr, p.x[i] - r, p.y[i] - r, r * 2, r * 2); }
       else { c.globalAlpha = t > 0.8 ? (1 - t) * 5 : 1; c.fillStyle = this.chunk; this.petalPath(c, i); c.fill(); }
     }
+    for (const b of this.bodies) if (b.on) b.fx.draw(c, b, this, false); // unified bodies: their solid pass
     // Pass 3: light (additive)
     c.globalCompositeOperation = 'lighter';
     for (let i = 0; i < p.n; i++) {
@@ -874,6 +1292,7 @@ class Pane {
         }
       }
     }
+    for (const b of this.bodies) if (b.on) b.fx.draw(c, b, this, true); // unified bodies: their light pass
     // Shots in flight: the game's kinetic tracer (core 0xfff7e6, glow 0xffb04a at 0.34)
     for (const o of this.shots) {
       if (!o.on) continue;
@@ -955,12 +1374,17 @@ function fireAuto() { const x = rnd(6, 314); fireAt(x, surfY(x) - 0.2, rnd(-4, 4
 // ---- UI ----
 const $ = (id) => document.getElementById(id);
 const lastEl = $('last'), picker = $('picker'), params = $('params');
+const GROUPS = ['Spray and decals', 'Unified bodies'], picks = [];
+let lastGroup = -1;
 EFFECTS.forEach((e, i) => {
+  const grp = e.group || 0;
+  if (grp !== lastGroup) { lastGroup = grp; const hd = document.createElement('div'); hd.className = 'grp'; hd.textContent = GROUPS[grp]; picker.appendChild(hd); }
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'pick'; b.id = 'fx-' + e.id; b.setAttribute('role', 'radio');
-  b.innerHTML = `<kbd>${i + 1}</kbd><b>${e.name}</b><span>${e.desc}</span>`;
+  // (number keys cover 1 to 9; the rest are reached with [ and ], so their badge is dashed)
+  b.innerHTML = `<kbd${i < 9 ? '' : ' class="nokey"'}>${i + 1}</kbd><b>${e.name}</b><span>${e.desc}</span>`;
   b.addEventListener('click', () => selectFx(i));
-  picker.appendChild(b);
+  picker.appendChild(b); picks.push(b);
 });
 function fmtParams(e) {
   const keys = Object.keys(e.P), w = Math.max(...keys.map((k) => k.length));
@@ -968,12 +1392,12 @@ function fmtParams(e) {
 }
 function selectFx(i) {
   state.fx = i; paneNew.effect = EFFECTS[i];
-  [...picker.children].forEach((b, j) => { b.setAttribute('aria-checked', String(j === i)); b.tabIndex = j === i ? 0 : -1; });
+  picks.forEach((b, j) => { b.setAttribute('aria-checked', String(j === i)); b.tabIndex = j === i ? 0 : -1; });
   $('newName').textContent = EFFECTS[i].name; params.textContent = fmtParams(EFFECTS[i]);
 }
 picker.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-  e.preventDefault(); const n = (state.fx + (e.key === 'ArrowDown' ? 1 : EFFECTS.length - 1)) % EFFECTS.length; selectFx(n); picker.children[n].focus();
+  e.preventDefault(); const n = (state.fx + (e.key === 'ArrowDown' ? 1 : EFFECTS.length - 1)) % EFFECTS.length; selectFx(n); picks[n].focus();
 });
 function setAngle(v) { state.angle = v; $('angleVal').textContent = `${v > 0 ? '+' : ''}${v}°`; }
 function setDmg(d) { state.dmg = d; $('dmgVal').textContent = `${d} · ${dmgWord(d)} · k ${kOf(d).toFixed(2)}`; paneHud(); }
@@ -1001,7 +1425,8 @@ document.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement && e.target.type === 'range') return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
-  if (k >= '1' && k <= String(EFFECTS.length)) selectFx(+k - 1);
+  if (k.length === 1 && k >= '1' && k <= '9') { if (+k <= EFFECTS.length) selectFx(+k - 1); }
+  else if (k === '[' || k === ']') selectFx((state.fx + (k === ']' ? 1 : EFFECTS.length - 1)) % EFFECTS.length);
   else if (k === 'f') fireAuto();
   else if (k === 's') { $('slow').checked = state.slow = !state.slow; }
   else if (k === 'v') { $('vectors').checked = state.vectors = !state.vectors; $('legend').hidden = !state.vectors; }
