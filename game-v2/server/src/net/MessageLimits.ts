@@ -53,6 +53,10 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // Every part's HP of a few ships resent (confirmed hits: a client whose copy is off)
   hpResync: { per: 600, burst: 20 },
   packedResync: { per: 60, burst: 3 },
+  // Docking Clamps: a press each (the lock, a swap of who steers, letting go: ships/features/clamp), about 4 a second
+  clampDock: { per: 240, burst: 8 },
+  clampSwap: { per: 240, burst: 8 },
+  clampUndock: { per: 240, burst: 8 },
   // What it kept of cells it dropped (CAPS.FOCUS: one a few seconds at a cruise, a burst after a jump)
 };
 

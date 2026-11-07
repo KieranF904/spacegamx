@@ -14,8 +14,11 @@ import type { ShipTuning } from './tuning.js';
 /** Bounding circles are padded by this much for the pushes earlier pairs in the pass make */
 export const CONTACT_MARGIN = 256;
 
-/** A body in the pass: its id, its centre before the pass, and its reach (ShipDerived.radius) */
-export interface ContactEntry { id: number; x: number; y: number; r: number }
+/**
+ * A body in the pass: its id, its centre before the pass, and its reach (ShipDerived.radius); `link`, the ship it is
+ * clamped to this tick (Docking Clamps, sim/clampPair.ts): the two fly as one body and never touch each other
+ */
+export interface ContactEntry { id: number; x: number; y: number; r: number; link?: number }
 
 /**
  * The pass's candidate pairs among `list` (sorted by id, one system), as index pairs [i, j] (i < j) flat in `out`, in
@@ -39,6 +42,7 @@ export function contactCandidates(list: readonly ContactEntry[], out: number[] =
       const j = order[b];
       if (lefts[j] > right) break;
       if (Math.abs(list[j].y - yi) > ri + list[j].r) continue;
+      if (ei.link !== undefined && ei.link === list[j].id) continue;
       keys.push(i < j ? i * n + j : j * n + i);
     }
   }

@@ -1,11 +1,14 @@
 /**
- * Docking Clamps' world half (shared half: common/src/ships/features/clamp; docs/design/groups-mines-docking.md,
- * package K). A stub until package K fills it: the presses, the lock, swap and undock decisions, the joined pair's
- * server step and the breaks (death, disconnect, jump, station dock).
+ * Docking Clamps' world half (shared half: common/src/ships/features/clamp; docs/design/groups-mines-docking.md 3):
+ * the presses, the lock, swap and undock decisions and the breaks (Clamps.ts); the joined pair's server step is
+ * ships/bridge/clamp.ts.
  */
 import type { ServerFeature } from '../types.js';
+import { Clamps } from './Clamps.js';
+
+export { Clamps };
 
 export const serverFeature: ServerFeature = {
   id: 'clamp',
-  create: () => ({}),
+  create: (host) => new Clamps(host),
 };

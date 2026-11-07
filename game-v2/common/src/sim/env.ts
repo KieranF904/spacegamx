@@ -13,6 +13,7 @@ import type { Terrain } from '../terrain.js';
 import type { SimShipState } from './state.js';
 import type { SimInput } from './input.js';
 import type { SimEvent } from './events.js';
+import type { ClampSource } from './clampPair.js';
 
 /**
  * Pulls as forces inside the step (magnets, the Hookboat's reel, custom pulls, collapsing stars: sim/pullFields.ts).
@@ -57,6 +58,11 @@ export interface SimEnv {
    * guns phase after every ship has moved (SIM_PHASES), and its projectiles need the gun step's specs (damage scale)
    */
   gunsByHost?: boolean;
+  /**
+   * Docking Clamps' links (sim/clampPair.ts ClampSource): what a pilot's ship is on this tick under a link (the pair's
+   * leader, its follower, or let go with a push). Absent: no links
+   */
+  clamp?: ClampSource;
 }
 
 export interface StepResult {

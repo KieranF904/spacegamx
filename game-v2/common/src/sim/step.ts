@@ -43,6 +43,7 @@ import type { SimEnv, StepResult } from './env.js';
 import type { SimEvent } from './events.js';
 import { stepShipGuns } from './guns.js';
 import { applyPulls } from './pulls.js';
+import { stepClamped } from './clampPair.js';
 
 // (CTL's hazard bits as numbers: replica.ts imports this file (replicaStep delegates here), so nothing from it may be
 // read while this module loads. a-callers.test.ts checks they equal CTL's)
@@ -63,6 +64,8 @@ export interface MotionOut {
   isBoosting: boolean;
   /** Its held aim (input.heldQ) would have flown it exactly the same (sim/aimHold.ts; true when none was given) */
   aimHeld: boolean;
+  /** Placed by the ship it is clamped to this tick (sim/clampPair.ts): its pulls are the pair's, on the leader */
+  follow: boolean;
 }
 
 function copyInto(out: SimShipState, from: SimShipState): void {
@@ -98,8 +101,8 @@ export function stepShip(prev: SimShipState, input: Readonly<SimInput>, env: Rea
   const held = input.heldQ !== undefined && input.heldQ !== input.q ? input.heldQ : undefined;
   let aimHeld = held !== undefined && m.aimHeld;
   if (!env.gunsByHost) { const g = stepShipGuns(s, input, env, events, aimHeld ? held : undefined); aimHeld &&= g; }
-  // 5. Pulls (Stage 1C), then back on the snapshot grid
-  if (env.pulls) { applyPulls(s, env, events); quantizeShipBody(s.body); }
+  // 5. Pulls (Stage 1C), then back on the snapshot grid (a clamped follower sits where its leader puts it: none)
+  if (env.pulls && !m.follow) { applyPulls(s, env, events); quantizeShipBody(s.body); }
   // 6. What it flew with (an EMP'd drive starts no jump: the bit goes as the step read it)
   const hazBits = (hz.emp ? BIT_EMP : 0) | (hz.numb < 1 ? BIT_NUMB : 0) | (hz.slowed ? BIT_SLOWED : 0);
   s.ctl.bits = (input.bits & ~CTL_STATE_BITS & ~(hz.emp ? BIT_JUMP : 0)) | hazBits | ctlPower;
@@ -109,22 +112,28 @@ export function stepShip(prev: SimShipState, input: Readonly<SimInput>, env: Rea
   return { state: s, events, isBoosting };
 }
 
-const MOTION: MotionOut = { ctlPower: 0, isBoosting: false, aimHeld: true };
+const MOTION: MotionOut = { ctlPower: 0, isBoosting: false, aimHeld: true, follow: false };
 
 /**
  * Phases 1-3 of the step, in place on `s`: the impulse and the motion of whatever mode it is in. Writes the CTL power
  * bits it flew with and whether it boosted into `out` (returned). replicaStep is this, on a replica's view.
  */
 export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: Readonly<SimEnv>, hz: Readonly<StepHazards>, out: MotionOut = MOTION): MotionOut {
-  out.ctlPower = 0; out.isBoosting = false; out.aimHeld = true;
+  out.ctlPower = 0; out.isBoosting = false; out.aimHeld = true; out.follow = false;
   const t = env.tick, body = s.body, d = s.structure.derived;
   switch (s.mode) {
     case ReplicaMode.Player:
     case ReplicaMode.Pilotless: {
       // 2. A decided source's push
       if (input.impulse && !hz.emp) { body.vx += input.impulse[0]; body.vy += input.impulse[1]; }
+      // (Docking Clamps, sim/clampPair.ts: a pilot locked to another flies as the pair, or sits where its leader puts it;
+      // the tick an undock lets go, the push apart)
+      const clamp = s.mode === ReplicaMode.Player && env.clamp ? env.clamp.at(s.id, t) : null;
+      if (clamp?.kind === 'push') { body.vx += clamp.ix; body.vy += clamp.iy; }
       // 1. The hazard chain: env hazard, numb, slowed, EMP
       const controls = simControls(input, body);      if (hz.emp) controls.jump = false;
+      // (No jump and no dodge while docked)
+      if (clamp && clamp.kind !== 'push') { controls.jump = false; (controls as { dodge?: boolean }).dodge = false; out.follow = clamp.kind === 'follow'; }
       NUMB_STAGE.control = hz.numb;
       const here = ENV_HAZARD_MODES.has(s.mode) ? env.hazard?.(d, body.x, body.y) : undefined;
       const flown = withSlowed(withNumb(here, NUMB_STAGE), hz.slowed);
@@ -137,6 +146,7 @@ export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: 
         const energy = accounted ? { charge: s.charge, drainRate: 1, load: gunLoadTick(gunLoadOf(s), t), tick: t }
           // (A replica: no stores, the engines' power replayed from the authority's bits; pilotless: full charge)
           : pilot ? { charge: FULL_CHARGE, drainRate: 0, replay: input.bits } : { charge: FULL_CHARGE, drainRate: 0 };
+        if (clamp && clamp.kind !== 'push') { stepClamped(clamp, s, controls, accounted, energy, input.bits, env, rangeBoost, hazard, out); return; }
         const res = stepShipPhysics(body, controls, d, env.tuning, energy, env.gravity, rangeBoost, hazard, env.terrain);
         if (accounted) { s.charge = res.charge; out.ctlPower = res.ctlPower; } else if (pilot) out.ctlPower = input.bits & CTL_REPLAY_BITS;
         out.isBoosting = res.isBoosting;

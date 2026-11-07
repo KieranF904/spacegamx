@@ -47,6 +47,10 @@ export interface ServerClampLinkMessage {
 export type ClampBreak = 'undock' | 'death' | 'gone' | 'jump' | 'station' | 'part';
 
 /** The two ships let go on `tick` (each then flies alone from the pose the pair left it at; an undock pushes them apart) */
-export interface ServerClampBreakMessage { type: 'clampBreak'; tick: number; a: number; b: number; why: ClampBreak }
+export interface ServerClampBreakMessage {
+  type: 'clampBreak'; tick: number; a: number; b: number; why: ClampBreak;
+  /** An undock's push apart on `a` (the leader) on `tick`, world units a tick (`b` gets the reverse); absent: none */
+  push?: [number, number];
+}
 
 export type ClampServerMessage = ServerClampAskMessage | ServerClampLinkMessage | ServerClampBreakMessage;

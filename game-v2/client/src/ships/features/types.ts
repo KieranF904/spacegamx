@@ -30,6 +30,10 @@ export interface ClientFeatureHost {
   readonly helm: () => boolean;
   /** The pilot's charge as predicted (energy.ts) */
   readonly charge: () => Charge;
+  /** Every entity drawn now, by id (a Docking Clamp's prompt looks for other pilots' clamps near it) */
+  readonly entities?: () => ReadonlyMap<number, InterpolatedEntity>;
+  /** World units a cell (tuning.json cellSize) */
+  readonly cellSize?: number;
 }
 
 /** Per-frame drawing of one ship (ShipRenderer calls every feature's drawShip for each body, in id order) */

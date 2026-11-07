@@ -22,6 +22,7 @@ import { ownShape } from './ownCauses.js';
 import { readPilotInput } from './inputs.js';
 import { dhypot } from '@space-game/common';
 import { SimPass } from '../../sim/SystemClocks.js';
+import { clampMove, foldClampContacts } from './clamp.js';
 
 export function isDormant(b: BridgeCtx, eid: number): boolean {
   return b.dormant.has(eid);
@@ -166,6 +167,8 @@ export function isPilot(b: BridgeCtx, eid: number): boolean {
 
 /** Player movement. Returns false for non-ship entities so the legacy path runs. */
 export function stepMovement(b: BridgeCtx, eid: number): boolean {
+  // (Docking Clamps: a follower steps after its leader, bridge/clamp.ts)
+  if (clampMove(b, eid)) return true;
   const ship = b.bodies.get(eid);
   if (!ship || ship.kind !== 'ship') return false;
   const body = b.readBody(eid, ship);
@@ -245,6 +248,7 @@ function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {
   MOVE_ENV.tick = tick; MOVE_ENV.tuning = b.tuning; MOVE_ENV.gravity = b.host.gravityAt(eid); MOVE_ENV.terrain = b.host.terrainAt?.(eid) ?? null;
   MOVE_ENV.hazard = b.host.hazardFlight ? moveHazard : undefined;
   MOVE_ENV.pulls = b.pulls?.any ? b.pulls.source : undefined;
+  MOVE_ENV.clamp = b.clamps.any ? b.clamps.source : undefined;
   return MOVE_ENV;
 }
 
@@ -330,6 +334,7 @@ export function tick(ctx: BridgeCtx): void {
 
   // 2. Ship-to-ship contacts (debris knocks only into debris, above)
   ctx.resolveContacts();
+  foldClampContacts(ctx);
 
   // Past an event horizon nothing survives: every part is crushed (ships then
   // go through the normal core-loss path; debris simply vanishes)
@@ -431,7 +436,7 @@ function findPairs(ctx: BridgeCtx, tick: number): ContactPair[] {
   const pairs: ContactPair[] = [];
   for (const [sys, l] of bySys) {
     if (l.length < 2 && !log.wanted) continue;
-    const entries = l.map(([id, s]) => ({ id, x: Position.x[id], y: Position.y[id], r: s.derived.radius }));
+    const entries = l.map(([id, s]) => ({ id, x: Position.x[id], y: Position.y[id], r: s.derived.radius, link: ctx.clamps.partner(id, tick) }));
     const from = pairs.length;
     if (l.length >= 2) contactPairs(entries, pairs);
     // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)

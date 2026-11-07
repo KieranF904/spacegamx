@@ -330,7 +330,8 @@ export class ContactWorld implements ReplicaRewinds {
       if (!d || !(d.mass > 0)) continue;
       const pre = reps.preAt(id, t);
       if (!pre || contactJumping(pre.jump, tuning)) continue;
-      entries.push({ id, x: pre.x, y: pre.y, r: d.radius });
+      // (A clamped pair flies as one body: the pass leaves it out, as the server's does)
+      entries.push({ id, x: pre.x, y: pre.y, r: d.radius, link: reps.clampPartner(id, t) });
     }
     return entries;
   }
