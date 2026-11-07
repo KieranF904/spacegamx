@@ -1,0 +1,112 @@
+{
+ "when": "2026-11-07T00:06:51.420Z",
+ "results": [
+  {
+   "scenario": "idle",
+   "label": "Idle in Sol (Sparrow T parked, alone)",
+   "secs": 20,
+   "protocol": 62,
+   "caps": 8388607,
+   "client": "FakeHitsClient",
+   "payloadBps": 79,
+   "wsMsgsPerSec": 1.35,
+   "wireBps": 168,
+   "upBps": 3,
+   "upMsgsPerSec": 0.5,
+   "msPerTick": 0.512,
+   "notes": [],
+   "byType": {}
+  },
+  {
+   "scenario": "cruise",
+   "label": "Cruise (Sparrow T flying 24 km legs, alone)",
+   "secs": 20,
+   "protocol": 62,
+   "caps": 8388607,
+   "client": "FakeHitsClient",
+   "payloadBps": 190,
+   "wsMsgsPerSec": 2.3,
+   "wireBps": 342,
+   "upBps": 107,
+   "upMsgsPerSec": 26.9,
+   "msPerTick": 0.597,
+   "notes": [],
+   "byType": {}
+  },
+  {
+   "scenario": "crowd-100",
+   "label": "Crowd cruise, 100 pilots",
+   "secs": 15,
+   "protocol": 62,
+   "caps": 8388607,
+   "client": "FakeHitsClient",
+   "payloadBps": 1049,
+   "wsMsgsPerSec": 10.07,
+   "wireBps": 1714,
+   "upBps": 107,
+   "upMsgsPerSec": 25.9,
+   "msPerTick": 9.179,
+   "notes": [
+    "mean of 2 pilots"
+   ],
+   "byType": {}
+  },
+  {
+   "scenario": "rock-starter",
+   "label": "Starter (Sparrow T, 2 Pips) firing at a rock",
+   "secs": 20,
+   "protocol": 62,
+   "caps": 8388607,
+   "client": "FakeHitsClient",
+   "payloadBps": 139,
+   "wsMsgsPerSec": 2.65,
+   "wireBps": 314,
+   "upBps": 37,
+   "upMsgsPerSec": 8.85,
+   "msPerTick": 0.5,
+   "notes": [
+    "rock size 88.92827606201172",
+    "firing 100% of ticks"
+   ],
+   "byType": {}
+  },
+  {
+   "scenario": "mother",
+   "label": "Scrap Mother (Halberd)",
+   "secs": 20,
+   "protocol": 62,
+   "caps": 8388607,
+   "client": "FakeHitsClient",
+   "payloadBps": 1506,
+   "wsMsgsPerSec": 14.4,
+   "wireBps": 2456,
+   "upBps": 578,
+   "upMsgsPerSec": 49.15,
+   "msPerTick": 1.351,
+   "notes": [
+    "boss alive at the end",
+    "firing 97% of ticks"
+   ],
+   "byType": {}
+  },
+  {
+   "scenario": "pirates",
+   "label": "Pirates (Sunspear vs two packs)",
+   "secs": 20,
+   "protocol": 62,
+   "caps": 8388607,
+   "client": "FakeHitsClient",
+   "payloadBps": 1549,
+   "wsMsgsPerSec": 10.85,
+   "wireBps": 2265,
+   "upBps": 694,
+   "upMsgsPerSec": 59.9,
+   "msPerTick": 1.13,
+   "notes": [
+    "firing 75% of ticks",
+    "19 hostiles at the end"
+   ],
+   "byType": {}
+  }
+ ]
+}
