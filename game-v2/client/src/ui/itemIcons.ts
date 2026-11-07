@@ -11,7 +11,7 @@ import { pictureData } from '../assets/gameData';
 
 const SIZE = 64;
 /** What it draws, by version (assetCache.ts): bump it whenever the icons change */
-export const ITEM_ICONS_VERSION = 1;
+export const ITEM_ICONS_VERSION = 2;
 const cache = pictureSheet<string>('itemIcons', ITEM_ICONS_VERSION, pictureData);
 
 function hash(s: string): number {
@@ -202,6 +202,7 @@ function draw(g: CanvasRenderingContext2D, d: ItemDef, econ: Economy): void {
       break;
     }
     case 'consumable': {
+      if (d.pack) { packCrate(g, d, econ, col); break; }
       // A capsule with a symbol
       g.fillStyle = shade(col, -0.35);
       roundRect(g, -12, -20, 24, 40, 10); g.fill();
@@ -211,7 +212,7 @@ function draw(g: CanvasRenderingContext2D, d: ItemDef, econ: Economy): void {
       roundRect(g, -12, -20, 24, 40, 10); g.stroke();
       g.fillStyle = '#ffffff';
       g.font = 'bold 15px Segoe UI, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      const sym = d.id.startsWith('repair') ? '+' : d.id.startsWith('boost') ? '»' : d.id.startsWith('insurance') ? '§' : d.id.startsWith('scanner') ? '◎' : '•';
+      const sym = d.id.startsWith('repair') ? '+' : d.id.startsWith('boost') ? '»' : d.id.startsWith('scanner') ? '◎' : '•';
       g.fillText(sym, 0, 8);
       break;
     }
@@ -268,6 +269,22 @@ function draw(g: CanvasRenderingContext2D, d: ItemDef, econ: Economy): void {
 }
 
 /** What a part does, drawn on top of its outline */
+/** A material pack: a lidded crate with a stripe of each material it holds (its constituents' own colours) */
+function packCrate(g: CanvasRenderingContext2D, d: ItemDef, econ: Economy, col: string): void {
+  g.fillStyle = shade(col, -0.5);
+  roundRect(g, -22, -14, 44, 32, 3); g.fill();
+  g.fillStyle = shade(col, -0.15);
+  roundRect(g, -24, -20, 48, 10, 3); g.fill();
+  const ids = Object.keys(d.pack ?? {});
+  const w = 36 / Math.max(1, ids.length);
+  ids.forEach((id, i) => {
+    g.fillStyle = econ.items.get(id)?.color || col;
+    g.fillRect(-18 + i * w + 1, -5, w - 2, 18);
+  });
+  g.strokeStyle = shade(col, 0.5); g.lineWidth = 1.5;
+  roundRect(g, -22, -14, 44, 32, 3); g.stroke();
+}
+
 function fnMark(g: CanvasRenderingContext2D, fn: string): void {
   g.lineWidth = 2;
   switch (fn) {

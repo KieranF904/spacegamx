@@ -13,6 +13,7 @@ import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { noteBossLife } from '../ships/bossLife';
 import { fieldClient } from '../ships/field/fieldState';
 import { devFeeds } from './devFeeds';
+import { setBank } from '../ui/station/bankStore';
 import { showHitTick } from '../ui/HitTick';
 import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
@@ -350,6 +351,7 @@ const TABLE: Handlers = {
     h.toasts.show(line, 'good');
     h.audio.playUI('craft_done', 0.5);
   },
+  repairBank: (_h, msg) => { setBank(msg); },
   questBoard: (h, msg) => { h.quests.setBoard(msg); },
   talk: (h, msg) => { h.dialogue.set(msg.view); },
   people: (h, msg) => { h.quests.setPeople(msg.people); },

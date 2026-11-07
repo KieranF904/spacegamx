@@ -920,7 +920,6 @@ export class HangarUI {
     const ids = Object.keys(need).sort((a, b) => econ.items.rank(a) - econ.items.rank(b));
     const total = rec.blueprint.parts.length, built = total - rec.ghosts.length;
     const font = `font-family:'Segoe UI',sans-serif;`;
-    if (rec.loaner) html += `<div style="${font} color:#7dd3fc; line-height:1.5; margin-bottom:8px">A loaner: a free starter ship while yours is rebuilt. It goes back when you fly your own.</div>`;
     if (rec.lost) html += `<div style="${font} color:#fbbf24; line-height:1.5; margin-bottom:8px">Lost in battle. ${Math.round(SALVAGE * 100)}% of its materials and all its components were salvaged: it's being rebuilt, and can't be flown until it's whole.</div>`;
     html += `<div style="${font} margin-bottom:6px">${built} / ${total} parts built${rec.auto && ids.length ? ' <span style="color:#7dd3fc">· on order</span>' : ''}</div>
       <div style="height:5px; border-radius:3px; background:#1a2438; overflow:hidden; margin-bottom:8px"><i style="display:block; height:100%; width:${(built / total) * 100}%; background:linear-gradient(90deg,#2c87ad,#7dd3fc)"></i></div>`;
@@ -963,7 +962,7 @@ export class HangarUI {
       const flyable = !!core && !ghosts.has(core.uid) && !rec.lost;
       html += `<div style="display:flex; gap:5px; margin-bottom:12px">
         <button data-act="fly" style="${btnCss(flyable ? '#2f6f4f' : '#2a3346')}" ${flyable ? '' : `disabled title="${rec.lost ? 'Being rebuilt: fly it once it\'s whole' : 'Build its core first'}"`}>Fly this ship</button>
-        <button data-act="clear" style="${btnCss('#4a2430')}" title="${rec.loaner ? 'Hand the loaner back' : `Break its built parts down: ${Math.round(SALVAGE * 100)}% of their minerals back as ore, every component in full`}">${rec.loaner ? 'Return loaner' : 'Scrap ship'}</button></div>`;
+        <button data-act="clear" style="${btnCss('#4a2430')}" title="Break its built parts down: ${Math.round(SALVAGE * 100)}% of their minerals back as ore, every component in full">Scrap ship</button></div>`;
     }
     return html;
   }
@@ -976,7 +975,7 @@ export class HangarUI {
   private ammoHtml(): string {
     const hs = this.deps.hangarState();
     const rec = hs?.slots[this.slot];
-    if (!hs || !rec || this.grantAll || rec.loaner) return '';
+    if (!hs || !rec || this.grantAll) return '';
     const { catalog, tuning, econ } = this.deps;
     const kinds = loadoutKinds(catalog, tuning, rec.blueprint);
     if (!kinds.length) return '';
@@ -1041,7 +1040,7 @@ export class HangarUI {
     act('fly', () => { this.deps.send({ type: 'slotFly', slot: this.slot }); this.close(null); });
     act('clear', () => {
       const rec = this.deps.hangarState()?.slots[this.slot];
-      if (rec?.loaner || confirm(`Scrap the ${rec?.blueprint.name ?? 'ship'}? Its built parts break down: ${Math.round(SALVAGE * 100)}% of their minerals come back as ore, and every component.`)) this.deps.send({ type: 'slotClear', slot: this.slot });
+      if (confirm(`Scrap the ${rec?.blueprint.name ?? 'ship'}? Its built parts break down: ${Math.round(SALVAGE * 100)}% of their minerals come back as ore, and every component.`)) this.deps.send({ type: 'slotClear', slot: this.slot });
     });
   }
 
@@ -1197,7 +1196,7 @@ export class HangarUI {
       + "Tow it into a station's reach to salvage it into your storage. It draws power only while towing");
     for (const f of designFields(catalog, tuning, this.bp)) html += row(f.label, f.text);
     html += row('Mass', `${n0(now.mass)}`, 'mass');
-    html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices (an insurance bond covers it)`);
+    html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices`);
     html += energyHtml(now.energy, this.derived, this.deps.tuning);
     return html + '<div style="margin-bottom:12px"></div>';
   }
