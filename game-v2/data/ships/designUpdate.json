@@ -1,0 +1,31 @@
+{
+  "about": "Design update for the ports-core deploy: per account (username), what each saved ship becomes. A slot or design maps to a blueprint id under data/ships/blueprints (dev/... for the hand-made player remakes, which the deploy tarball leaves out: the migration must carry them; a bare id for a stock library ship). 'wipe' means the account takes the v5 ship wipe (ships broken down and refunded, a fresh starter). 'was' is the save each remake was made from (name and part count, from production on 2026-11-07): a save that no longer matches has changed since and should be wiped, not swapped. Slots are 0-based hangar indices; designs are indices into the profile's designs list. Anything not listed here is wiped.",
+  "accounts": {
+    "brotherk3d": "wipe",
+    "Xire": {
+      "slots": {
+        "0": { "blueprint": "dev/player-xire-sparrow", "was": { "name": "Sparrow T", "parts": 70 } },
+        "1": { "blueprint": "dev/player-xire-prospector", "was": { "name": "Prospector", "parts": 101 } }
+      }
+    },
+    "I0lOl0I": {
+      "slots": {
+        "0": { "blueprint": "dev/player-i0lol0i-sparrow", "was": { "name": "Sparrow T", "parts": 28 } }
+      }
+    },
+    "Pig_Benis": {
+      "slots": {
+        "0": { "blueprint": "dev/player-pigbenis-sparrow", "was": { "name": "Sparrow T", "parts": 24 } },
+        "1": { "blueprint": "prospector", "stock": true, "was": { "name": "Prospector", "parts": 17 } }
+      },
+      "designs": {
+        "0": { "blueprint": "dev/player-pigbenis-pooper", "was": { "name": "Pooper", "parts": 30 } }
+      }
+    },
+    "YuhboiFlappysack": {
+      "slots": {
+        "0": { "blueprint": "sparrow-t", "stock": true, "was": { "name": "Sparrow T", "parts": 14 } }
+      }
+    }
+  }
+}
