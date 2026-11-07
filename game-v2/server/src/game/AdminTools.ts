@@ -78,6 +78,11 @@ export interface AdminHost {
   setAdminLive?(c: AdminConn, on: boolean): void;
   /** Admins may switch on free build here (dev servers only: GameServer refuses it in production) */
   freeBuildAllowed?(): boolean;
+  /**
+   * Dev servers only (the caller checks freeBuildAllowed): their repair bank (game/RepairBank.ts) filled, emptied, its
+   * deposits cleared, or `items` added to the deposits (none: a kit of every pack). The same code the `devBank` message runs
+   */
+  devBank?(c: AdminConn, action: 'fill' | 'empty' | 'clearDeposits' | 'grant', items?: Bag): Result;
   /** Someone's free build was switched on or off: tell their hangar */
   freeBuildChanged?(c: AdminConn): void;
   /** Confirmed hits' counters (net/hits/HitLedger.ts) */
@@ -119,6 +124,7 @@ const HELP = [
   '/mail name|everyone [subject |] text (to their inbox on the join screen: a banner until read)',
   '/contributor name on|off (the contributor rank: map notes, F6) · /contributors (who has it)',
   '/freebuild [on|off] (dev servers: place any part in the hangar, nothing taken)',
+  '/bank fill|empty|clear|grant [item n] (dev servers: your repair bank; grant: deposits, no item: a kit of every pack)',
   '/hits [on|off] [name] (confirmed hits: the network test switch; no on/off: the counters)',
   '/crowd [0-8|auto] (crowd fallbacks in your system: force a level, or back to automatic; none: the levels and costs)',
   '/players [name] (online or not) · /rank name player|contributor|admin (admin: the owner only) · /ban name 1h|1d|7d|perm [reason] · /unban name',
@@ -321,6 +327,18 @@ export class AdminTools {
         if (on) this.freeBuilders.add(me); else this.freeBuilders.delete(me);
         this.host.freeBuildChanged?.(me);
         return { ok: true, text: `Free build ${on ? 'on: place any part in the hangar, and saves take nothing' : 'off'}` };
+      }
+
+      case 'bank': {
+        // (Yourself only, and never on a production server)
+        if (!this.host.freeBuildAllowed?.()) return { ok: false, text: 'The bank commands are only on dev servers' };
+        if (!this.host.devBank) return { ok: false, text: "This server has no repair bank" };
+        const what = str(a.what).toLowerCase();
+        const action = what === 'fill' ? 'fill' : what === 'empty' ? 'empty' : what === 'clear' || what === 'cleardeposits' ? 'clearDeposits' : what === 'grant' ? 'grant' : null;
+        if (!action) return { ok: false, text: 'Usage: /bank fill | empty | clear | grant [item n]' };
+        const item = str(a.item);
+        const n = Math.max(1, Math.floor(num(a.n, 1)));
+        return this.host.devBank(me, action, action === 'grant' && item ? { [item]: n } : undefined);
       }
 
       case 'hits': {
@@ -644,6 +662,7 @@ export class AdminTools {
       }
       case 'freebuild': return { cmd, args: { on: a[0] } };
       case 'crowd': return { cmd, args: { to: a[0] ?? '' } };
+      case 'bank': return { cmd, args: { what: a[0], item: a[1], n: a[2] } };
       case 'hits': return { cmd, args: {} };
       case 'credits': case 'xp': case 'skillpoints': return { cmd, args: { n: a[0], player: a[1] } };
       case 'codex': return { cmd, args: a.length > 1 ? { player: a[0], what: a[1] } : { what: a[0] } };

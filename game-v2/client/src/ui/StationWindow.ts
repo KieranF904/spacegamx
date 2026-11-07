@@ -41,8 +41,13 @@ import { shipSummary } from '../ships/shipSummary';
 import type { QuestClient } from './QuestUI';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
+import { mountBank } from './station/BankPanel';
+import { getBank, onBank } from './station/bankStore';
 
-type Tab = 'overview' | 'ships' | 'contracts' | 'market' | 'vendors' | 'refinery' | 'fabricator' | 'outpost';
+type Tab = 'overview' | 'ships' | 'contracts' | 'market' | 'vendors' | 'refinery' | 'fabricator' | 'outpost' | 'bank';
+
+/** Tabs every station has (the rest need the station's service) */
+const ALWAYS_TABS = new Set<Tab>(['overview', 'contracts', 'ships', 'outpost', 'bank']);
 
 export interface StationWindowDeps {
   pilot: PilotState;
@@ -83,7 +88,7 @@ export class StationWindow {
     this.credits.className = 'sgw-credits';
     this.win.headExtra.append(this.credits);
     this.win.tabs.style.display = 'flex';
-    for (const [id, label] of [['overview', 'Overview'], ['ships', 'Ships'], ['contracts', 'Contracts'], ['market', 'Market'], ['vendors', 'Quartermasters'], ['refinery', 'Refinery'], ['fabricator', 'Fabricator'], ['outpost', 'Your station']] as [Tab, string][]) {
+    for (const [id, label] of [['overview', 'Overview'], ['ships', 'Ships'], ['contracts', 'Contracts'], ['market', 'Market'], ['vendors', 'Quartermasters'], ['refinery', 'Refinery'], ['fabricator', 'Fabricator'], ['bank', 'Repair bank'], ['outpost', 'Your station']] as [Tab, string][]) {
       const b = document.createElement('button');
       b.className = 'sgw-tab';
       b.textContent = label;
@@ -102,6 +107,7 @@ export class StationWindow {
       this.d.onClose();
     };
     d.pilot.onChange(() => { if (this.win.isOpen) this.render(); });
+    onBank(() => { if (this.win.isOpen && this.tab === 'bank') this.render(); });
     d.quests.onChange(() => { if (this.win.isOpen && (this.tab === 'contracts' || this.tab === 'overview')) this.render(); else this.badges(); });
   }
 
@@ -141,10 +147,10 @@ export class StationWindow {
     this.win.root.querySelector('.sgw-title')!.textContent = m.name;
     for (const [id, el] of this.tabEls) {
       if (id === 'vendors') { el.style.display = VENDOR_STATIONS.has(m.id) ? '' : 'none'; continue; }
-      const need = id === 'overview' || id === 'contracts' || id === 'ships' || id === 'outpost' ? null : id === 'market' ? 'market' : id;
+      const need = ALWAYS_TABS.has(id) ? null : id === 'market' ? 'market' : id;
       el.style.display = !need || m.services.includes(need) ? '' : 'none';
     }
-    if (this.tab === 'vendors' ? !VENDOR_STATIONS.has(m.id) : this.tab !== 'overview' && this.tab !== 'contracts' && this.tab !== 'ships' && this.tab !== 'outpost' && !m.services.includes(this.tab)) this.tab = 'overview';
+    if (this.tab === 'vendors' ? !VENDOR_STATIONS.has(m.id) : !ALWAYS_TABS.has(this.tab) && !m.services.includes(this.tab)) this.tab = 'overview';
     if (this.win.isOpen) this.render();
   }
 
@@ -202,7 +208,7 @@ export class StationWindow {
       const core = rec.blueprint.parts.find((q) => q.fn === 'core');
       const coreBuilt = !!core && !ghostIds.has(core.uid);
       const orderTag = rec.auto ? (rec.paused ? ' · <span style="color:#fbbf24">⏸ on hold</span>' : slot === firstOnOrder ? ' · <span style="color:#7dd3fc">on order · first</span>' : ' · <span style="color:#7dd3fc">on order</span>') : '';
-      const status = flying && !rec.ghosts.length ? `<span style="color:#4ade80">✈ flying${rec.loaner ? ' (loaner)' : ''}</span>` : !rec.ghosts.length ? '<span style="color:#4ade80">ready to fly</span>'
+      const status = flying && !rec.ghosts.length ? `<span style="color:#4ade80">✈ flying</span>` : !rec.ghosts.length ? '<span style="color:#4ade80">ready to fly</span>'
         : `<span style="color:${rec.lost ? '#fbbf24' : '#7dd3fc'}">${flying ? '✈ flying · ' : ''}${rec.lost ? 'rebuilding · ' : ''}${built} / ${total} parts built</span>${orderTag || (onWay ? ` · <span style="color:#fbbf24">⏳ parts on the way</span>` : '')}`;
       card.innerHTML = `<div style="display:flex; align-items:baseline; gap:8px"><b>Slot ${slot + 1} · ${esc(rec.blueprint.name)}</b><span style="flex:1"></span>${status}</div>
         <div class="sgw-bar" style="margin:6px 0 8px"><i style="width:${(built / total) * 100}%"></i></div>
@@ -411,6 +417,7 @@ export class StationWindow {
     else if (this.tab === 'vendors') this.renderVendors(b);
     else if (this.tab === 'refinery') this.renderRefinery(b);
     else if (this.tab === 'outpost') this.renderOutpost(b);
+    else if (this.tab === 'bank') this.renderBank(b);
     else this.renderFabricator(b);
   }
 
@@ -1212,6 +1219,15 @@ export class StationWindow {
   }
 
   /** Your station: charter it, then build its tracks up, a tier at a time (they build while you're away) */
+  private renderBank(b: HTMLElement): void {
+    const p = this.d.pilot, bank = getBank();
+    mountBank(b, {
+      econ: p.econ, icon: (id) => itemIcon(p.econ, id), send: (m) => this.d.send(m), sound: (id, v) => this.d.sound(id, v),
+      cargo: () => p.cargo, storage: () => p.storage,
+      learned: () => stationLearned(p.profile?.recipes ?? [], p.profile?.outpost ?? undefined, STATION), level: () => p.profile?.level ?? 1,
+    }, bank?.msg ?? null, bank?.at ?? Date.now());
+  }
+
   private renderOutpost(b: HTMLElement): void {
     const econ = this.d.pilot.econ, p = this.d.pilot.profile, file = STATION;
     const col = document.createElement('div');
@@ -1378,7 +1394,7 @@ const FAB_CATS: Record<FabCat, { label: string; title: string; icon: string; fns
   utility: { label: 'Mining', title: 'Mining & scanning', icon: 'part:alloy:utility_mining_laser:sq', fns: [] },
   core: { label: 'Core', title: 'Cores', icon: 'part:alloy:core:sq', fns: [] },
   ammo: { label: 'Ammo', title: 'Ammunition', icon: 'missile_crate', fns: [], items: (d) => d?.category === 'ammo' },
-  supplies: { label: 'Supplies', title: 'Repair kits & supplies', icon: 'repair_kit', fns: [], items: (d) => d?.category === 'consumable' },
+  supplies: { label: 'Supplies', title: 'Supplies', icon: 'pack_hull', fns: [], items: (d) => d?.category === 'consumable' },
   components: { label: 'Components', title: 'Components', icon: 'power_coupling', fns: [], items: (d) => d?.category !== 'ammo' && d?.category !== 'consumable' },
   gems: { label: 'Gems', title: 'Gems', icon: '', fns: [] },
 };

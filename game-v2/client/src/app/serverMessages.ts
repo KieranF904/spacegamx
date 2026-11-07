@@ -12,6 +12,7 @@
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { noteBossLife } from '../ships/bossLife';
 import { devFeeds } from './devFeeds';
+import { setBank } from '../ui/station/bankStore';
 import { showHitTick } from '../ui/HitTick';
 import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
@@ -346,6 +347,7 @@ const TABLE: Handlers = {
     h.quickBar.setKit(msg.left, msg.total);
     h.shipClient.setKitActive(msg.left > 0);
   },
+  repairBank: (_h, msg) => { setBank(msg); },
   questBoard: (h, msg) => { h.quests.setBoard(msg); },
   talk: (h, msg) => { h.dialogue.set(msg.view); },
   people: (h, msg) => { h.quests.setPeople(msg.people); },

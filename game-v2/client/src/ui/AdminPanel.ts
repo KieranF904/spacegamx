@@ -25,6 +25,7 @@ import { RARITY_COLOR, type AdminAccountInfo, type AdminPlayerInfo, type ClientM
 import type { GameState } from '../state/GameState';
 import { AdminGive, loadGiveRecents } from './AdminGive';
 import { itemIcon } from './itemIcons';
+import { devBankHtml, devBankMessage } from './station/devBank';
 import { closeMenu, injectWindowStyles, openMenu } from './windowKit';
 
 type Tab = 'me' | 'players' | 'world' | 'server';
@@ -407,6 +408,7 @@ export class AdminPanel {
         <button class="adm-btn" data-cmd="xp" data-args='{"n":1000}'>+1k XP</button>
         <button class="adm-btn" data-cmd="skillpoints" data-args='{"n":1}'>+1 skill pt</button>
       </div>
+      ${devBankHtml(!!this.info?.freeBuild)}
       <div class="adm-sec">Teleport</div>
       <div class="adm-row">
         <button class="adm-btn" data-pick="tp">Click a spot…</button>
@@ -433,6 +435,10 @@ export class AdminPanel {
       const f = b.dataset.flag!;
       if (f === 'cam') { this.cam ? this.stopCamera() : this.freeCamera(); return; }
       this.cmd(f, { on: !b.classList.contains('on') });
+    }));
+    this.body.querySelectorAll<HTMLElement>('[data-devbank]').forEach((b) => b.addEventListener('click', () => {
+      const m = devBankMessage(this.deps.econ, b.dataset.devbank!);
+      if (m) this.deps.send(m);
     }));
     this.body.querySelector('[data-pick="tp"]')!.addEventListener('click', () =>
       this.pick('teleport there', (p) => this.cmd('tp', { x: Math.round(p.x), y: Math.round(p.y), system: this.deps.state.systemId })));
