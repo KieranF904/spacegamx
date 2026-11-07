@@ -4,7 +4,7 @@ Mk I · Small · Square · 1 cell
 Hull · mass66 hp · 1.4
 Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage54/s · reach 5,040
+Damage56/s · reach 5,040
 Hits withEnergy · penetration 0.5
 Fire rate2.0/s · shells
 Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
@@ -34,7 +34,7 @@ Small · Square
 steady bursts that strip shields
 
 == keyStats ==
-54 dmg/s · reach 5,040 · cycle · draws 12
+56 dmg/s · reach 5,040 · cycle · draws 12
 
 == mountBadge ==
 TURRET 220°
@@ -50,4 +50,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 10","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":65.8,"mass":1.4,"firepower":54,"toughness":65.8,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":54,"range":5040,"damageType":"energy","pen":0.5,"draw":12}
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":65.8,"mass":1.4,"firepower":56,"toughness":65.8,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":56,"range":5040,"damageType":"energy","pen":0.5,"draw":12}

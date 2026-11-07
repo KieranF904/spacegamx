@@ -4,9 +4,9 @@ Mk II · Medium · Panel · 2 cells
 Hull · mass150 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage62/s · reach 7,200
+Damage60/s · reach 7,192
 Hits withKinetic · penetration 2
-Clip16 rounds at 10/s · reloads in 1.5s from energy (24 a clip), when empty or a second after you let go
+Clip8 rounds at 6.0/s · reloads in 1.3s from energy (24 a clip), when empty or a second after you let go
 Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
 MountTurret, 180°
 FittingBolts on any side
@@ -31,10 +31,10 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-the only cannon turret: 16 rounds, then a short reload
+the only cannon turret: 8 heavy rounds, then a short reload
 
 == keyStats ==
-62 dmg/s · reach 7,200 · clip 16 · 1.5s reload · draws 8
+60 dmg/s · reach 7,192 · clip 8 · 1.3s reload · draws 8
 
 == mountBadge ==
 TURRET 180°
@@ -50,4 +50,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 12","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":61.935483860645164,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":61.935483860645164,"range":7200,"damageType":"kinetic","pen":2,"draw":7.74}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":60,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":60,"range":7192,"damageType":"kinetic","pen":2,"draw":7.74}

@@ -3,9 +3,9 @@ Hammer
 Mk I · Medium · Panel · 2 cells
 Hull · mass120 hp · 2.0
 Armour · build1 · 2 pts
-Damage69/s · reach 5,700
+Damage88/s · reach 5,700
 Hits withKinetic · penetration 2
-Fire rate1.4/s · shells
+Fire rate1.0/s · shells
 Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
@@ -32,7 +32,7 @@ Medium · Panel
 slow heavy shell, punches plate
 
 == keyStats ==
-69 dmg/s · reach 5,700 · cycle · draws 10
+88 dmg/s · reach 5,700 · cycle · draws 10
 
 == mountBadge ==
 FIXED
@@ -49,4 +49,4 @@ Needs 1 clear cell ahead
 {"open":true,"badge":"Lv 6","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":120,"mass":2,"firepower":68.57142858,"toughness":120,"armour":1,"dps":68.57142858,"range":5700.0000024,"damageType":"kinetic","pen":2,"draw":10}
+{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":120,"mass":2,"firepower":88,"toughness":120,"armour":1,"dps":88,"range":5700.0000024,"damageType":"kinetic","pen":2,"draw":10}

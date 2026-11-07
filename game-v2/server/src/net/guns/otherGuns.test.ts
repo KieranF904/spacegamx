@@ -212,7 +212,8 @@ describe('other ships\' guns stepped from their inputs', () => {
   it('another pilot, every firing model: each shell the watcher built is the server\'s exactly, and its fire records are not sent', () => {
     const r = otherGunsFight();
     if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ exact: r.exact, inexact: r.inexact.slice(0, 10), n: r.inexact.length, derived: r.derivedShells, stats: r.stats, lane: r.laneStats, toldB: r.toldB, ownB: r.ownB }));
-    expect(r.derivedShells).toBeGreaterThan(200);
+    // (fewer, heavier rounds since heavier-shots-2026-11: about 120 shells in this fight, where it was over 200)
+    expect(r.derivedShells).toBeGreaterThan(90);
     expect(r.inexact).toEqual([]);
     // (every told hit named a shell it had; no HP put right)
     expect(r.A.hits.stats.missed).toBe(0);

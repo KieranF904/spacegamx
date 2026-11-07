@@ -1,6 +1,6 @@
 /**
  * The railguns (docs/design/rework-2026-11.md section 4): the Needle on ammo, the Coilgun's cone, the Spear's pierce at full damage,
- * and the Rail Driver rifle (a clip of six, a 90-tick reload drawing 48 E, no ammo).
+ * and the Rail Driver rifle (a clip of four at 12 ticks, a 90-tick reload drawing 48 E, no ammo). Numbers as docs/design/heavier-shots-2026-11.md.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -30,35 +30,35 @@ function armed(model: string): ShipState {
 const defOf = (s: ShipState) => { const w = s.derived.weapons[0]; return gunDef(tuning, w.kind, { model: w.model, grade: w.grade, size: w.size }); };
 
 describe('railguns', () => {
-  it('the Rail Driver fires six, reloads for 90 ticks, and spends no ammo', () => {
+  it('the Rail Driver fires four, reloads for 90 ticks, and spends no ammo', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
     const def = defOf(s);
     expect(def.ammo).toBeNull();
-    expect(def).toMatchObject({ damage: 40, pierce: 1, speed: 150 });
-    expect(w.fire).toMatchObject({ model: 'clip', clip: 6, interval: 10, reload: 90, reloadE: 48 });
+    expect(def).toMatchObject({ damage: 60, pierce: 1, speed: 150 });
+    expect(w.fire).toMatchObject({ model: 'clip', clip: 4, interval: 12, reload: 90, reloadE: 48 });
     const shots: number[] = [];
     for (let t = 1; t < 300; t++) {
       const r = stepGuns(s, pose, { firing: t % 2 === 1, aimWorld: UP, aimDist: 0 }, t, tuning);
       for (const sh of r.shots) { shots.push(t); expect(sh.shot.ammo).toBeFalsy(); }
     }
-    expect(shots.slice(0, 6)).toEqual([1, 11, 21, 31, 41, 51]);
-    // (The sixth shot empties it; the reload starts the next tick and takes 90, then the next clip begins)
-    expect(shots[6] - shots[5]).toBe(1 + 90);
-    expect(shots.slice(6, 12).map((t) => t - shots[6])).toEqual([0, 10, 20, 30, 40, 50]);
+    expect(shots.slice(0, 4)).toEqual([1, 13, 25, 37]);
+    // (The fourth shot empties it; the reload starts the next tick and takes 90, then the next clip begins)
+    expect(shots[4] - shots[3]).toBe(1 + 90);
+    expect(shots.slice(4, 8).map((t) => t - shots[4])).toEqual([0, 12, 24, 36]);
   });
 
-  it('the Coilgun throws five slugs in a 12 degree cone, 16 damage each, reaching 2,700', () => {
+  it('the Coilgun throws three slugs in a 6 degree cone, 25 damage each, reaching 2,700', () => {
     const s = armed('railgun_coilgun');
     const w = s.derived.weapons[0];
     const def = defOf(s);
-    expect(def).toMatchObject({ burst: 5, damage: 16, pierce: 1, life: 18, speed: 150 });
+    expect(def).toMatchObject({ burst: 3, damage: 25, pierce: 1, life: 18, speed: 150 });
     expect(def.ammo).toBeNull();
     expect((def.life ?? 0) * (def.speed ?? 0)).toBe(2700);
     expect(w.fire).toMatchObject({ model: 'cycle', interval: 54 });
     const angles = volleyAngles(def, 0);
-    expect(angles).toHaveLength(5);
-    expect((Math.max(...angles) - Math.min(...angles)) * 180 / Math.PI).toBeCloseTo(12, 6);
+    expect(angles).toHaveLength(3);
+    expect((Math.max(...angles) - Math.min(...angles)) * 180 / Math.PI).toBeCloseTo(6, 6);
     // The fan is exact: no scatter, so every slug flies where the cone puts it
     const shape = { speedScale: 1, sizeScale: 1, turret: false };
     angles.forEach((a, i) => {

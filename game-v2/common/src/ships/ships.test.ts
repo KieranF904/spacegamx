@@ -199,8 +199,8 @@ describe('rebuild: structure and derived stats (M3)', () => {
     expect(d.maxThrust.forward).toBeGreaterThan(d.maneuverForce);
     expect(d.maxTorque.cw).toBeCloseTo(d.maxTorque.ccw, 9);
     expect(d.weapons.map((w) => w.mount)).toEqual(['fixed', 'fixed']);
-    // (At the rate its legacy fixed guns had: a model's interval is its own)
-    expect(d.weapons.map((w) => w.interval)).toEqual([15, 15]);
+    // (A model's interval is its own: the Pip's 20 ticks, heavier-shots-2026-11; it was the legacy fixed guns' 15)
+    expect(d.weapons.map((w) => w.interval)).toEqual([20, 20]);
   });
 
   it('removing a side thruster gives a lopsided turn', () => {

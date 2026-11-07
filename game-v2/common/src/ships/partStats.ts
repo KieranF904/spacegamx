@@ -112,8 +112,12 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
     out.pen = hit.pen;
   }
   if ((fn.produce ?? 0) > 0) { out.supply = partSupply(fn, area, mat); out.size = sizeName(fn.model ? Math.max(1, area) : area); }
-  // (An ammunition gun pays with its crates, never the ship's power: energy.ts gunDraw)
-  if ((fn.demand ?? 0) > 0 && fn.fire?.model !== 'ammo') out.draw = partDemand(fn, area, mat);
+  // (An ammunition gun pays with its crates, never the ship's power: energy.ts gunDraw; a spinning gun what it draws spun up,
+  // its demand x its interval over its fastest beat, as gunDrawFlatOut)
+  if ((fn.demand ?? 0) > 0 && fn.fire?.model !== 'ammo') {
+    const spin = fn.fire?.spin;
+    out.draw = partDemand(fn, area, mat) * (spin && fn.fire!.interval > 0 ? fn.fire!.interval / spin.to : 1);
+  }
   if (isEngine(fn)) {
     out.thrust = partThrust(catalog, fn, area, mat);
     out.size = fn.model ? sizeName(Math.max(1, area)) : sizeName(dpow(weaponSizeFactor(catalog, fn, area), 1 / 1.15));

@@ -3,8 +3,19 @@
 Kieran's direction (2026-11-07): fewer rapid-fire weapons and heavier rounds. Rapid guns may stay, but slower and harder;
 balance on the damage that lands, not the damage on paper; vary round speed by role (fast precise rounds for precision
 guns, slow heavy dodgeable rounds only with big damage); point defence still catches missiles; enemies and bosses keep
-working. This doc is the measurement and a proposal. **Nothing in the game data is changed yet**: the proposal lives
-only in the bench's in-memory copy (`PROPOSAL` in the bench).
+working. This doc is the measurement and a proposal.
+
+**Applied 2026-11-07** (scripts/econ/models.mjs, regenerated): the bench without `--after` now prints the After table
+below exactly, and `PROPOSAL` in the bench is empty. On top of the proposal, as it went in:
+- the Chainsaw's `demand` 10.5 -> 22.4: a spin gun's legacy draw is demand x its interval over its beat, so the slower
+  top beat would have halved its energy a second; 22.4 keeps its spun-up 22.4 E/s per cell. The hangar now shows a
+  spinning gun's spun-up draw (partStats), 22 either way;
+- the Leviathan's `maxSpeed` is its speed, 10 (it never accelerates), so the hangar's reach reads its real 3,430
+  (it showed 8,580);
+- augments of the clip and spin guns (Twinlink, Chainsaw, Overpulse, Rail Driver) cost more a shot and buffer a clip,
+  keeping their E a second;
+- part descriptions and trade-off lines name the new rates and round counts.
+The side findings below are still open.
 
 Bench: `scripts/bench/heavierShots.ts`, run from game-v2/ (about 2 s, no world, no server):
 

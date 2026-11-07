@@ -51,16 +51,16 @@ describe('energy layout', () => {
     expect(L.rate[1]).toBe(perTick(35));
     const bat = catalog.functions.get('power_battery')!;
     expect([L.cap[2], L.give[2], L.take[2]]).toEqual([toEu(partHolds(bat, 1, undefined)), perTick(partGives(bat, 1, undefined, pt)), perTick(partTakes(bat, 1, undefined, pt))]);
-    // The Pip: a buffer of one 5 E shot, refilled at 20 E/s rounded up (so it has its shot on the 15-tick beat)
-    expect([L.gun[3], L.shot[3], L.cap[3], L.rate[3]]).toEqual([GUN_SHOT, toEu(5), toEu(5), perTickUp(20)]);
-    expect(L.rate[3] * 15).toBeGreaterThanOrEqual(L.shot[3]);
+    // The Pip: a buffer of one 6.67 E shot (20 E/s over its 20-tick beat), refilled at 20 E/s rounded up (so it has its shot on the beat)
+    expect([L.gun[3], L.shot[3], L.cap[3], L.rate[3]]).toEqual([GUN_SHOT, toEu(6.66667), toEu(6.66667), perTickUp(20)]);
+    expect(L.rate[3] * 20).toBeGreaterThanOrEqual(L.shot[3]);
     // The Ion Drive: burn 9, boost 9 × (1 + 2.2), × 2 thrust, intake 12, buffer 30
     expect([L.burn[4], L.bBurn[4], L.boostMul[4], L.rate[4], L.cap[4]]).toEqual([perTick(9), perTick(28.8), 2, perTick(12), toEu(30)]);
     expect([L.rate[5], L.shield[5]]).toEqual([perTick(16), 1]);
     expect(L.rate[6]).toBe(perTick(10));
-    // The Cutter: burns 90, takes 40, holds 180, relights at half; the Twinlink: a clip of 16
+    // The Cutter: burns 90, takes 40, holds 180, relights at half; the Twinlink: a clip of 8 (55 E/s over its 80-tick reload, an eighth a round)
     expect([L.gun[8], L.shot[8], L.rate[8], L.cap[8], L.relight[8]]).toEqual([GUN_BEAM, perTick(90), perTickUp(40), toEu(180), toEu(90)]);
-    expect([L.gun[9], L.shot[9], L.cap[9]]).toEqual([GUN_CLIP, toEu(5.15625), toEu(5.15625) * 16]);
+    expect([L.gun[9], L.shot[9], L.cap[9]]).toEqual([GUN_CLIP, toEu(9.16667), toEu(9.16667) * 8]);
     expect(L.gaugeMax).toBe(L.cap[0] + L.cap[2]);
   });
 
@@ -189,11 +189,11 @@ describe('energy layout', () => {
   it('grows a model gun\'s intake with a rate mod, so it keeps its faster beat; its shot is unchanged', () => {
     const specs: [string, string | FunctionDef, number, number, 'E'][] = [['sq', 'cannon_pip', 0, 0, 'E']];
     const base = layoutOf(specs), input = layoutInput(specs);
-    const fast = buildEnergyLayout({ ...input, weapons: [{ ...input.weapons![0], interval: 7.5 }] });
+    const fast = buildEnergyLayout({ ...input, weapons: [{ ...input.weapons![0], interval: 10 }] });
     expect(base.rate[0]).toBe(perTickUp(20));
     expect(fast.rate[0]).toBe(perTickUp(40));
     expect(fast.shot[0]).toBe(base.shot[0]);
-    expect(fast.rate[0] * 7.5).toBeGreaterThanOrEqual(fast.shot[0]);
+    expect(fast.rate[0] * 10).toBeGreaterThanOrEqual(fast.shot[0]);
   });
 
   it('gives legacy guns and engines their defaults (a shot of draw × interval from a buffer of one; a second of boost buffered)', () => {

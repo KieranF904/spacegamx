@@ -3,9 +3,9 @@ Rattler
 Mk I · Small · Square · 1 cell
 Hull · mass56 hp · 1.0
 Armour · build1 · 1 pts
-Damage43/s · reach 5,400
+Damage44/s · reach 5,394
 Hits withKinetic · penetration 0.5
-Fire rate8.6/s · shells
+Fire rate4.0/s · shells
 Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 270°
 FittingBolts on any side
@@ -29,10 +29,10 @@ Small
 Small · Square
 
 == tradeOff ==
-a stream of small shells
+a steady stream of shells
 
 == keyStats ==
-43 dmg/s · reach 5,400 · cycle · draws 12
+44 dmg/s · reach 5,394 · cycle · draws 12
 
 == mountBadge ==
 TURRET 270°
@@ -48,4 +48,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 3","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":56.25,"mass":1,"firepower":42.857142857142854,"toughness":56.25,"armour":1,"dps":42.857142857142854,"range":5400,"damageType":"kinetic","pen":0.5,"draw":12}
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":56.25,"mass":1,"firepower":44,"toughness":56.25,"armour":1,"dps":44,"range":5394,"damageType":"kinetic","pen":0.5,"draw":12}

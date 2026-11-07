@@ -25,7 +25,7 @@ export function perTick(eps: number): number {
 
 /**
  * A rate in E a second to eu a tick, rounded up: a weapon's intake. A shot is `intake × beat / 60` E, so rounding the
- * intake down would make a gun at full supply miss its beat by a tick (Pip: 85 × 15 = 1275 eu against a 1280 eu shot).
+ * intake down would make a gun at full supply miss its beat by a tick (Pip: 85 × 20 = 1700 eu against a 1707 eu shot).
  * Rounded up, it always has its shot on the beat (D3), for at most 1 eu a tick more
  */
 export function perTickUp(eps: number): number {

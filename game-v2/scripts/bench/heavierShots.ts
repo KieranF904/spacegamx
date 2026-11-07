@@ -2,7 +2,7 @@
  * Heavier shots bench (docs/design/heavier-shots-2026-11.md): stated DPS against landed DPS for every shell-firing
  * player gun, at moving targets, with a competent aim. Read-only: it loads the game data and steps the shared,
  * deterministic weapon code (common/src: stepGuns, volleyShells / launchShot, gunDef, guideTick, distDue, castParts,
- * nearestParts, hitMultiplier). Nothing in the game is changed; `--after` applies the doc's proposal to an in-memory
+ * nearestParts, hitMultiplier). Nothing in the game is changed; `--after` applies PROPOSAL (a trial) to an in-memory
  * copy of models.json before the catalogue is built.
  *
  *   Run from game-v2/:   server/node_modules/.bin/tsx scripts/bench/heavierShots.ts [--after] [--md] [--only id,id] [--enemy]
@@ -69,25 +69,9 @@ const SEEDS = [1, 2];
 //   same field dropped; life is worked out to keep its reach (speed x life) unless given
 // ---------------------------------------------------------------------------------------------------------------
 type Prop = { fire?: Record<string, unknown>; shell?: Record<string, any>; keepReach?: boolean };
-export const PROPOSAL: Record<string, Prop> = {
-  // Cannons: the starter a touch slower and harder; the Hammer the slow heavy slug; the Twinlink half the burst at twice the punch
-  cannon_pip: { fire: { interval: 20 }, shell: { damage: 18, speed: 54 } },
-  cannon_hammer: { fire: { interval: 60 }, shell: { damage: 88 } },
-  cannon_twinlink: { fire: { interval: 10, clip: 8, reload: 80 }, shell: { damage: 20, speed: 62 } },
-  // Autocannons: the hose and the minigun at half the rounds, twice the weight; the Stinger a marksman's fast needle
-  autocannon_rattler: { fire: { interval: 15 }, shell: { damage: 11, speed: 62 } },
-  autocannon_chainsaw: { fire: { spin: { from: 24, to: 8, up: 60, down: 30 } }, shell: { damage: 11, speed: 54 } },
-  autocannon_stinger: { fire: { interval: 12, clip: 6, reload: 60 }, shell: { damage: 12, speed: 88 } },
-  // Pulse bolts: fewer, faster, harder
-  pulse_strobe: { shell: { burst: 2, damage: 14, speed: 84 } },
-  pulse_overpulse: { fire: { interval: 10, clip: 6, reload: 60 }, shell: { damage: 13, speed: 96 } },
-  // Rails: the Coilgun three heavier slugs in a tighter fan; the Rail Driver four heavy clicks a clip
-  railgun_coilgun: { shell: { burst: 3, damage: 25, spread: 3 } },
-  railgun_rail_driver: { fire: { interval: 12, clip: 4 }, shell: { damage: 60 } },
-  // Ordnance: the Leviathan flies at its launch speed (6.6 a tick today: no homing, so nothing accelerates it); 10 is as
-  // fast as one point-defence turret still stops it (16 would need two)
-  torpedo_leviathan: { shell: { speed: 10 } },
-};
+// (Empty: the 2026-11 proposal is applied in scripts/econ/models.mjs (commit after 17545d4); its rows were the Pip, Hammer,
+// Twinlink, Rattler, Chainsaw, Stinger, Strobe, Overpulse, Coilgun, Rail Driver and Leviathan. Put the next trial here.)
+export const PROPOSAL: Record<string, Prop> = {};
 
 function applyProposal(): void {
   for (const [id, p] of Object.entries(PROPOSAL)) {

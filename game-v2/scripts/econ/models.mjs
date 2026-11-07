@@ -53,15 +53,17 @@ const W = [
   // (A fixed gun at the rate and draw the starter's legacy fixed cannons had, a shell every 15 ticks: the starter rates as it did)
   // (Section 4's cannon rows, rework-2026-11: Pip 14 dmg every 15 t for 2 E; Hammer 48 dmg every 42 t for 7 E; Twinlink a clip of 16
   // at 6 t, 12 dmg; Longbarrel a 120 t charge, 170 dmg, speed 140, life 60, no spread; Bastion a clip of 2, 18 t apart, 180 dmg.
-  // `demand` is the draw a cell gives while its beat runs (a clip or charge gun draws by its fire block instead: reloadE, chargeE).)
-  ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5, blurb: 'The reliable starter' }, {}, 'The starter gun: four reliable amber shells a second, and no tricks.'],
-  ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { int: 4.2, demand: 5, blurb: 'The breacher' }, { mul: { damage: xp(48 / 14), speed: xp(38 / 48), size: xp(1.6) }, add: { pen: 1 } }, 'The breacher: one slow, armour-piercing slug at a steady rhythm.'],
-  ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { demand: 3.87, blurb: 'Paired autoloader turret' }, { mul: { damage: xp(12 / 14), spread: x(3.3 / 1.8) } }, 'A paired autoloader turret: a rattling stream of sixteen rounds, then a pause to reload.'],
+  // `demand` is the draw a cell gives while its beat runs (a clip or charge gun draws by its fire block instead: reloadE, chargeE).
+  // Heavier shots 2026-11 then made the Pip 18 dmg every 20 t at 54, the Hammer 88 every 60 t, the Twinlink 8 at 10 t, 20 dmg at 62.)
+  ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5, blurb: 'The reliable starter' }, { set: { damage: 18, speed: 54, life: 133 } }, 'The starter gun: three reliable amber shells a second, and no tricks.'],
+  ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { int: 4.2, demand: 5, blurb: 'The breacher' }, { mul: { speed: xp(38 / 48), size: xp(1.6) }, add: { pen: 1 }, set: { damage: 88 } }, 'The breacher: one slow, heavy, armour-piercing slug a second, for 88.'],
+  ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { demand: 3.87, blurb: 'Paired autoloader turret' }, { mul: { spread: x(3.3 / 1.8) }, set: { damage: 20, speed: 62, life: 116 } }, 'A paired autoloader turret: a burst of eight heavy rounds, then a pause to reload.'],
   ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { demand: 5.14, blurb: 'The sniper' }, { mul: { damage: xp(170 / 14), speed: xp(140 / 48), life: xp(60 / 150) }, add: { pen: 1 }, set: { spread: 0 } }, 'The sniper: it charges while you hold and fires itself at full, one telegraphed shot that picks a part off.'],
   ['cannon_bastion', 'Bastion', 'cannon', 'block2', 30, { hp: 1.3, mass: 1.6, demand: 4.17, blurb: 'The ship-killer double tap' }, { mul: { damage: xp(180 / 14), speed: xp(32 / 48), size: xp(2.2) }, add: { pen: 1 } }, 'The ship-killer double tap: two huge, slow cannonballs you can dodge, then a long wait.'],
-  ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, {}, {}, 'The steady hose: a stream of small yellow shells at a fixed rhythm.'],
-  ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 10.5 }, { mul: { spread: x(1.5) } }, 'The minigun: it spins up from four shots a second to sixteen while you hold the trigger, and is useless on a tap.'],
-  ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { damage: x(1.6), spread: x(0.4) } }, 'The marksman SMG: twelve accurate needles in a burst, then a pause to reload.'],
+  ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, {}, { set: { damage: 11, speed: 62, life: 87 } }, 'The steady hose: a stream of yellow shells, four a second, at a fixed rhythm.'],
+  // (The Chainsaw's draw is its demand x 4 / its beat: 22.4 keeps its spun-up 22.4 E a second per cell at the 8-tick beat, as 10.5 did at 3.75)
+  ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 22.4 }, { mul: { spread: x(1.5) }, set: { damage: 11 } }, 'The minigun: it spins up from two and a half shots a second to seven and a half while you hold the trigger, and is useless on a tap.'],
+  ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { spread: x(0.4) }, set: { damage: 12, speed: 88, life: 61 } }, 'The marksman SMG: six fast, accurate needles in a burst, then a pause to reload.'],
   ['flak_burst', 'Burst', 'flak', 'sq', 4, {}, {}, 'The sky-filler: a canister shell that bursts on its own near whatever it passes.'],
   ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'The wall you place: four shells that burst where you aim, or sooner near a target, in wide clouds.'],
   // (Section 4's ordnance rows, rework-2026-11. Mortars: the Lobber lands at the cursor (out to 2,640), splash r220 / 70, a shell every 90 t, 40 a
@@ -75,12 +77,13 @@ const W = [
   // (Section 4's lasers and pulse guns, rework-2026-11 (family-beams-pulse). Glint: the pulse you time, 27 E a pulse. Cutter: a short held beam, 60 dps
   // rising to 150 over 1.5 s on one part, 32 E/s. Searchlight: a long thin beam, 25 dps, 15 E/s, that marks. Strobe: a burst of 3 every 0.5 s, 9 dmg,
   // x1.6 vs shields, x0.6 vs hull, 6 E a burst. Overpulse: a clip of 12 single bolts at 10/s, x1.9 vs shields, x0.5 vs hull. A beam's `demand` is its
-  // E/s spread over its cells; a pulse gun's, its E a burst x 60 / interval.)
+  // E/s spread over its cells; a pulse gun's, its E a burst x 60 / interval. Heavier shots 2026-11: the Strobe 2 bolts of 14 at 84, the
+  // Overpulse a clip of 6 at 10 t, 13 dmg at 96; their demand, and so their draw, stays.)
   ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The long pulse: it charges for 1.8 s, then a 1.4 s pulse peaking at 96 damage reaches 5,100 units. Time it; 27 E a pulse.'],
   ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { demand: r2(32 / PIECE_AREA.rect2) }, { set: { dps: 60, range: 900, width: 14, pulse: null, falloff: null, ramp: { to: 150, ticks: 90 } } }, 'The welding torch: a short held beam that burns deeper the longer it stays on one part, 60 rising to 150 damage a second over 1.5 s (it starts over if it slips off). 32 E a second.'],
   ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round) }, { set: { dps: 25, range: 7650, width: 8, pulse: null, falloff: null } }, 'The spotter: a thin beam that reaches furthest and barely hurts, but what it lights takes 20% more damage from everyone for 2 s after. 15 E a second.'],
-  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30) }, {}, 'Steady shield pressure: a burst of 3 bolts every half second, 9 damage each, 1.6 times against shields and 0.6 against hull. 6 E a burst.'],
-  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2) }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5 } }, 'The shield shredder: a clip of 12 bolts at 10 a second, then a 1.5 s reload drawing 36 E. 1.9 times against shields and half against hull.'],
+  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30) }, { set: { burst: 2, damage: 14, speed: 84, life: 60 } }, 'Steady shield pressure: a burst of 2 bolts every half second, 14 damage each, 1.6 times against shields and 0.6 against hull. 6 E a burst.'],
+  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2) }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5, damage: 13, speed: 96, life: 53 } }, 'The shield shredder: a clip of 6 fast bolts at 6 a second, 13 damage each, then a 1 s reload drawing 36 E. 1.9 times against shields and half against hull.'],
   ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Lock and forget' }, {}, 'Lock and forget: a missile every couple of seconds that homes on the ship nearest your cursor, 30 damage and a 120 blast. Twenty-four missiles a crate. Point defence kills it in one hit.'],
   ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 2, int: 0.41, blurb: 'The ripple that floods point defence' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'The ripple that floods point defence: a pair of small rockets every three-quarters of a second, steady for as long as you hold, spreading and then converging on the ship nearest your cursor. Each is 10 damage and a 60 blast and dies to one point-defence hit. One round a pair.'],
   ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'The steered warhead' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'The steered warhead: a slow, heavy missile, 105 damage and a 150 blast. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs two hits.'],
@@ -88,7 +91,7 @@ const W = [
   // life 18 (2,700 reach), 54 ticks, 14 E a shot; the Spear 160 dmg through three hulls at full damage, 114 ticks, 120 E. The energy a cycle gun
   // draws is its draw x its interval, so RAIL_E sets each demand to give 14 E and 120 E a shot)
   ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, {}, {}, 'The cheap rail: a long thin slug that goes through two ships. It fires slugs from the hold and needs no power.'],
-  ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8 }, { set: { ammo: null, damage: 16, burst: 5, spread: 6, jitter: 0, life: 18, pierce: 1 } }, 'The rail shotgun: five slugs in a tight cone, a finisher for close range that is spent past 2,700. It throws its own slugs for 14 E a shot, so it needs no ammo.'],
+  ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8 }, { set: { ammo: null, damage: 25, burst: 3, spread: 3, jitter: 0, life: 18, pierce: 1 } }, 'The rail shotgun: three heavy slugs in a tight cone, a finisher for close range that is spent past 2,700. It throws its own slugs for 14 E a shot, so it needs no ammo.'],
   ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.52, draw: 2.2, hp: 1.2 }, { set: { damage: 160, pierce: 3, pierceKeep: 1 } }, 'The capital rail: one slug every couple of seconds that goes through three ships at full damage, a ring of shock at each. It costs 120 E a shot and needs no ammo.'],
   ['emp_hush', 'Hush', 'emp', 'sq', 15, { blurb: 'Switch one ship off' }, {}, 'Switches one ship off: an orb that bursts on its fuse or beside a ship, and 2 s of dead engines and guns.'],
   ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6, blurb: 'The charged area blackout' }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'Hold to charge, then it fires itself: an orb that bursts where you aimed, or beside a ship, for a wide 2.8 s blackout.'],
@@ -96,7 +99,9 @@ const W = [
   ['arc_spark', 'Spark', 'arc', 'sq', 17, { blurb: 'The chain zap' }, { mul: { life: 5, damage: x(0.85) } }, 'A fast blue bolt that flies out to 4,000 and leaps to 3 more ships near what it hits, weaker each hop.'],
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4, blurb: 'The held storm' }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Hold to keep zapping, five times a second: each zap leaps to 5 more ships nearby, weaker each hop.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
-  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(1.1), maxSpeed: x(1.1), size: x(1.4) }, set: { damage: 560, splash: { radius: 160, damage: 120 }, intercept: 5, arm: 30 } }, 'The fight-ender: a huge torpedo, 560 damage straight through shields and a 120 blast, one every three seconds. It flies straight and fast and does not home, and arms half a second after launch. One round a shot. Point defence needs five hits.'],
+  // (The Leviathan flies at its launch speed all its life: nothing accelerates a shell that doesn't home or steer (server Weapons.tick), so its
+  // maxSpeed is its speed, and its reach (what the hangar shows) 10 x 343)
+  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { size: x(1.4) }, set: { damage: 560, speed: 10, maxSpeed: 10, life: 343, splash: { radius: 160, damage: 120 }, intercept: 5, arm: 30 } }, 'The fight-ender: a huge torpedo, 560 damage straight through shields and a 120 blast, one every three seconds. It flies straight at a steady pace and does not home, and arms half a second after launch. One round a shot. Point defence needs five hits.'],
   ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second; short of power it sputters.'],
 ];
 
@@ -339,13 +344,14 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
   MOUNT.railgun_rail_driver = 'fixed';
   MOUNTING.railgun_rail_driver = { attach: 'back', clear: ahead(3) };
-  // (The semi-automatic rifle, its own numbers: a clip of 6 at 10 ticks, 40 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E,
-  // the bank first. Its demand is that reload's draw spread over a clip's whole cycle; the fire block below gives the rest.)
-  const desc = 'The semi-automatic rifle: a clip of six sharp shots, one a click (as fast as you can click, up to six a second; a second Rail Driver takes alternate shots, skipping one that is reloading), then it reloads itself in a second and a half for 48 E, from its bank first. It needs no ammo.';
+  // (The semi-automatic rifle, its own numbers: a clip of 4 at 12 ticks, 60 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E,
+  // the bank first. Its demand is that reload's draw spread over the clip's cycle as it was (6 at 10 ticks: heavier-shots-2026-11 keeps
+  // the legacy pool draw); the fire block below gives the rest.)
+  const desc = 'The semi-automatic rifle: a clip of four heavy shots, one a click (as fast as you can click, up to five a second; a second Rail Driver takes alternate shots, skipping one that is reloading), then it reloads itself in a second and a half for 48 E, from its bank first. It needs no ammo.';
   models.push({
     ...base('railgun_rail_driver', 'Rail Driver', 'railgun', ['block2'], 29, 'titanium', { grade: 4 }),
     weapon: 'railgun', ...mounted('railgun_rail_driver', desc), hpScale: 0.96, demand: r2((48 * 60) / (90 + 6 * 10) / PIECE_AREA.block2), priority: 2, fireInterval: 10,
-    weaponMods: { set: { ammo: null, damage: 40, pierce: 1, speed: 150, life: 60 } },
+    weaponMods: { set: { ammo: null, damage: 60, pierce: 1, speed: 150, life: 60 } },
     rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('railgun'),
     guide: { name: 'Rail Driver', blurb: 'The semi-automatic rifle', piece: 'block2', order: guideOrder++ },
   });
@@ -475,14 +481,17 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // with power stop taking it (set: { ammo: null }); a held-beam model of a kind that isn't a beam gets its dps and range.
 {
   const FIRE = {
-    cannon_pip: { model: 'cycle' },
-    cannon_hammer: { model: 'cycle' },
-    cannon_twinlink: { model: 'clip', interval: 6, clip: 16, reload: 90, reloadE: 24 },
+    // (Heavier shots, docs/design/heavier-shots-2026-11.md: fewer, heavier rounds; the Pip 15 -> 20 t, the Hammer 42 -> 60 t, the
+    // Twinlink 16 @ 6 t -> 8 @ 10 t, the Rattler 7 -> 15 t, the Chainsaw's spin 15 -> 3.75 t -> 24 -> 8 t, the Stinger 12 @ 7.5 t -> 6 @ 12 t,
+    // the Overpulse 12 @ 6 t -> 6 @ 10 t, the Rail Driver 6 @ 10 t -> 4 @ 12 t. A cycle gun's demand stays: its draw a second is unchanged)
+    cannon_pip: { model: 'cycle', interval: 20 },
+    cannon_hammer: { model: 'cycle', interval: 60 },
+    cannon_twinlink: { model: 'clip', interval: 10, clip: 8, reload: 80, reloadE: 24 },
     cannon_longbarrel: { model: 'charge', charge: 120, cooldown: 90, chargeE: 36 },
     cannon_bastion: { model: 'clip', interval: 18, clip: 2, reload: 180, reloadE: 60 },
-    autocannon_rattler: { model: 'cycle' },
-    autocannon_chainsaw: { model: 'cycle', spin: { from: 15, to: 3.75, up: 60, down: 30 } },
-    autocannon_stinger: { model: 'clip', interval: 7.5, clip: 12, reload: 72, reloadE: 20 },
+    autocannon_rattler: { model: 'cycle', interval: 15 },
+    autocannon_chainsaw: { model: 'cycle', spin: { from: 24, to: 8, up: 60, down: 30 } },
+    autocannon_stinger: { model: 'clip', interval: 12, clip: 6, reload: 60, reloadE: 20 },
     flak_burst: { model: 'ammo' },
     flak_cloudmaker: { model: 'clip', interval: 30, clip: 4, reload: 150, reloadE: 30 },
     mortar_lobber: { model: 'ammo' },
@@ -491,14 +500,14 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     laser_cutter: { model: 'beam' },
     laser_searchlight: { model: 'beam' },
     pulse_strobe: { model: 'cycle' },
-    pulse_overpulse: { model: 'clip', interval: 6, clip: 12, reload: 90, reloadE: 36 },
+    pulse_overpulse: { model: 'clip', interval: 10, clip: 6, reload: 60, reloadE: 36 },
     missile_dart: { model: 'ammo', interval: 108 },
     missile_swarm: { model: 'ammo', rounds: 1, interval: 45 },
     missile_hammerhead: { model: 'ammo' },
     railgun_needle: { model: 'ammo' },
     railgun_coilgun: { model: 'cycle', interval: 54 },
     railgun_spear: { model: 'cycle', interval: 114 },
-    railgun_rail_driver: { model: 'clip', interval: 10, clip: 6, reload: 90, reloadE: 48, semi: true },
+    railgun_rail_driver: { model: 'clip', interval: 12, clip: 4, reload: 90, reloadE: 48, semi: true },
     emp_hush: { model: 'cycle', interval: 162 },
     emp_blackout: { model: 'charge', charge: 90, cooldown: 240, chargeE: 90 },
     arc_spark: { model: 'cycle', interval: 45 },
@@ -781,18 +790,20 @@ for (const m of models) m.carriesFlow = true;
   // Cannon's feed is its infrastructure)
   const DUAL = { railgun_coilgun: 0.55, cannon_slurry: 1.35, cannon_twinlink: 1.25, autocannon_rattler: 1.4, pulse_strobe: 1.2 };
   const AUG = (name, say, side, cell, rate, floor, cost, mods, buffer) => ({ name, say, side, ...(cell ? { cell } : {}), rate, floor, cost, ...(buffer ? { buffer } : {}), mods });
+  // (Heavier shots 2026-11: the Twinlink's, Chainsaw's, Overpulse's and Rail Driver's augments cost more a shot as the guns fire fewer,
+  // heavier rounds, so the E a second stays; a clip gun's augment buffer is its clip)
   const AUGMENT = {
     cannon_hammer: AUG('Breaching charge', 'its slug punches one grade deeper and bursts inside', 'S', 1, 60, 45, 30, { mul: { damage: 0.25 }, add: { pen: 1 }, set: { splash: { radius: 70, damage: 36 } } }),
-    cannon_twinlink: AUG('Tracer lock', 'a tight stream twice as fast, harder-hitting, that reaches much further', 'S', 1, 60, 45, 8, { mul: { spread: -0.7, speed: 1, damage: 0.4 }, add: { pen: 0.5 } }, 16),
-    autocannon_chainsaw: AUG('Incendiary belt', 'every round sets the part it hits burning', 'S', 1, 60, 45, 3, { set: { ignite: { dps: 6, ticks: 180, radius: 0.6 } } }, 20),
+    cannon_twinlink: AUG('Tracer lock', 'a tight stream twice as fast, harder-hitting, that reaches much further', 'S', 1, 60, 45, 13, { mul: { spread: -0.7, speed: 1, damage: 0.4 }, add: { pen: 0.5 } }, 8),
+    autocannon_chainsaw: AUG('Incendiary belt', 'every round sets the part it hits burning', 'S', 1, 60, 45, 6, { set: { ignite: { dps: 6, ticks: 180, radius: 0.6 } } }, 10),
     railgun_coilgun: AUG('Choke', 'a tight, heavy pattern that carries twice as far', 'S', 1, 60, 45, 36, { mul: { spread: -0.65, life: 1, damage: 0.8 } }),
     arc_spark: AUG('Storm coil', 'its arc leaps to six targets, further apart', 'W', 0, 60, 45, 30, { set: { chain: { count: 6, radius: 420, falloff: 0.65 } } }),
-    pulse_overpulse: AUG('Overdrive', 'three bolts a shot, fanned', 'S', 1, 60, 45, 10, { add: { burst: 2 }, mul: { spread: 0.4 } }, 12),
+    pulse_overpulse: AUG('Overdrive', 'three bolts a shot, fanned', 'S', 1, 60, 45, 15, { add: { burst: 2 }, mul: { spread: 0.4 } }, 6),
     flak_cloudmaker: AUG('Wide burst', 'bursts half again as wide and 60% harder', 'S', 0, 60, 45, 45, { mul: { splashRadius: 0.5, splashDamage: 0.6 } }),
     laser_searchlight: AUG('Sear', 'its marking beam burns twice as hot', 'S', 0, 60, 45, 40, { mul: { dps: 1 } }),
     cannon_longbarrel: AUG('Penetrator', 'its round goes on through two more ships', 'W', 0, 70, 50, 150, { add: { pierce: 2 }, set: { pierceKeep: 1 } }),
     cannon_bastion: AUG('Shatter', 'each ball bursts in a 200 blast', 'W', 0, 70, 50, 80, { set: { splash: { radius: 200, damage: 110 } } }),
-    railgun_rail_driver: AUG('Coil boost', 'half again the damage, a third faster', 'W', 0, 70, 50, 20, { mul: { damage: 0.5, speed: 0.3 } }, 6),
+    railgun_rail_driver: AUG('Coil boost', 'half again the damage, a third faster', 'W', 0, 70, 50, 28, { mul: { damage: 0.5, speed: 0.3 } }, 4),
     laser_cutter: AUG('Focus', 'burns half again as hot', 'W', 0, 70, 50, 60, { mul: { dps: 0.5 } }),
     arc_tesla: AUG('Storm', 'zaps half again as hard', 'S', 0, 70, 50, 50, { mul: { dps: 0.5 } }),
     lance_lance: AUG('Focus', 'burns half again as hot', 'W', 0, 100, 55, 100, { mul: { dps: 0.5 } }),

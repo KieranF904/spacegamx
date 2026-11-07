@@ -97,14 +97,16 @@ describe('models', () => {
     const base = tuning.weapons!.cannon;
     const def = partWeaponDef(tuning, w.kind, b.parts[1], w);
     const mods = FN('cannon_hammer').weaponMods!;
-    expect(def.damage).toBeCloseTo(base.damage! * (1 + mods.mul!.damage!), 9);
+    // (Its damage is its own, set outright: heavier-shots-2026-11's 88; its speed still its kind's x its mul)
+    expect(def.damage).toBeCloseTo(mods.set!.damage!, 9);
+    expect(def.speed).toBeCloseTo(base.speed! * (1 + mods.mul!.speed!), 9);
     expect(def.pen).toBeCloseTo((base.pen ?? 0) + mods.add!.pen!, 9);
     // Its interval is its own: a fixed model doesn't load slower as a legacy fixed cannon does
     expect(w.mount).toBe('fixed');
     expect(w.interval).toBeCloseTo(FN('cannon_hammer').fireInterval!, 9);
     // A gem's changes go on top of the model's
     const gem = { mul: { damage: 0.1 } };
-    expect(gunDef(tuning, 'cannon', { model: mods, mods: gem }).damage).toBeCloseTo(base.damage! * (1 + mods.mul!.damage!) * 1.1, 9);
+    expect(gunDef(tuning, 'cannon', { model: mods, mods: gem }).damage).toBeCloseTo(mods.set!.damage! * 1.1, 9);
     // A Coilgun needs no slugs; a Needle does
     expect(gunDef(tuning, 'railgun', { model: FN('railgun_coilgun').weaponMods }).ammo).toBeFalsy();
     expect(gunDef(tuning, 'railgun', { model: FN('railgun_needle').weaponMods }).ammo).toBeTruthy();

@@ -24,8 +24,8 @@ describe('weapon ring model', () => {
     const g = m.update(ship, src);
     expect(g).toHaveLength(1);
     expect(g[0].model).toBe('clip');
-    expect(g[0].clip).toBe(6);
-    expect(g[0].rounds).toBe(6);
+    expect(g[0].clip).toBe(4);
+    expect(g[0].rounds).toBe(4);
     expect(g[0].reloading).toBe(false);
     for (const w of ship.derived.weapons) { ship.rounds[w.part] = 2; ship.reload[w.part] = 40; }
     const again = m.update(ship, src);
@@ -56,9 +56,9 @@ describe('gun sounds', () => {
     const feel = new GunFeel((id) => { played.push(id); return null; });
     const ship = shipWith('railgun_rail_driver');
     const w = ship.derived.weapons[0];
-    for (let i = 0; i < 5; i++) feel.otherRound(7, w, 100 + i * 10, { x: 0, y: 0 });
+    for (let i = 0; i < 3; i++) feel.otherRound(7, w, 100 + i * 12, { x: 0, y: 0 });
     expect(played).toEqual([]);
-    feel.otherRound(7, w, 150, { x: 0, y: 0 });
+    feel.otherRound(7, w, 136, { x: 0, y: 0 });
     expect(played).toEqual(['gun_vent']);
   });
 
@@ -66,11 +66,11 @@ describe('gun sounds', () => {
     const played: string[] = [];
     const feel = new GunFeel((id) => { played.push(id); return null; });
     const w = shipWith('railgun_rail_driver').derived.weapons[0];
-    for (let i = 0; i < 4; i++) feel.otherRound(7, w, 100 + i * 10, { x: 0, y: 0 });
-    // (It reloaded the partial clip while out of sight: 6 more rounds are a whole clip)
-    for (let i = 0; i < 5; i++) feel.otherRound(7, w, 400 + i * 10, { x: 0, y: 0 });
+    for (let i = 0; i < 2; i++) feel.otherRound(7, w, 100 + i * 12, { x: 0, y: 0 });
+    // (It reloaded the partial clip while out of sight: 4 more rounds are a whole clip)
+    for (let i = 0; i < 3; i++) feel.otherRound(7, w, 400 + i * 12, { x: 0, y: 0 });
     expect(played).toEqual([]);
-    feel.otherRound(7, w, 450, { x: 0, y: 0 });
+    feel.otherRound(7, w, 436, { x: 0, y: 0 });
     expect(played).toEqual(['gun_vent']);
   });
 });

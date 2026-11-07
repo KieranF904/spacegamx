@@ -1,6 +1,6 @@
 /**
  * The five cannons (docs/design/rework-2026-11.md §4): the table's numbers as the guns resolve them, the Longbarrel's
- * charge (fires itself at tick 120 of a hold, nothing on a release at 114), and the Twinlink's and Bastion's clips.
+ * charge (fires itself at tick 120 of a hold, nothing on a release at 114), and the Twinlink's and Bastion's clips (rates as heavier-shots-2026-11).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -46,24 +46,26 @@ const def = (model: string) => {
 describe('cannons', () => {
   it('rows of the section 4 table: damage, speed, size, penetration, range and rate', () => {
     const pip = def('cannon_pip');
-    expect(pip.d).toMatchObject({ damage: 14, speed: 48 });
-    expect(pip.w.fire).toMatchObject({ model: 'cycle', interval: 15 });
-    expect(pip.w.energy).toBeCloseTo(2, 6);
+    // (Heavier shots 2026-11: 18 dmg at 54 every 20 t, reach kept (54 x 133); the same 8 E a second, so 8 x 20 / 60 a shot)
+    expect(pip.d).toMatchObject({ damage: 18, speed: 54, life: 133 });
+    expect(pip.w.fire).toMatchObject({ model: 'cycle', interval: 20 });
+    expect(pip.w.energy).toBeCloseTo(8 / 3, 6);
 
     const hammer = def('cannon_hammer');
-    expect(hammer.d.damage).toBeCloseTo(48, 4);
+    expect(hammer.d.damage).toBeCloseTo(88, 4);
     expect(hammer.d.speed).toBeCloseTo(38, 4);
     expect(hammer.d.size).toBeCloseTo(1.6, 6);
     expect(hammer.d.pen).toBe(1);
-    expect(hammer.w.fire).toMatchObject({ model: 'cycle', interval: 42 });
-    // (The test ship swaps it onto a one-cell Pip's place; the real Hammer is two cells: 2 x 3.5 = 7 E a shot)
-    expect(hammer.w.energy * 2).toBeCloseTo(7, 4);
+    expect(hammer.w.fire).toMatchObject({ model: 'cycle', interval: 60 });
+    // (The test ship swaps it onto a one-cell Pip's place; the real Hammer is two cells: 2 x 5 = 10 E a shot, 10 E a second)
+    expect(hammer.w.energy * 2).toBeCloseTo(10, 4);
 
     const twin = def('cannon_twinlink');
-    expect(twin.d.damage).toBeCloseTo(12, 4);
+    expect(twin.d.damage).toBeCloseTo(20, 4);
+    expect(twin.d.speed).toBeCloseTo(62, 4);
     expect(twin.d.burst ?? 1).toBe(1);
     expect(twin.w.mount).toBe('turret');
-    expect(twin.w.fire).toMatchObject({ model: 'clip', clip: 16, interval: 6, reload: 90, reloadE: 24 });
+    expect(twin.w.fire).toMatchObject({ model: 'clip', clip: 8, interval: 10, reload: 80, reloadE: 24 });
 
     const long = def('cannon_longbarrel');
     expect(long.d.damage).toBeCloseTo(170, 3);
@@ -92,12 +94,12 @@ describe('cannons', () => {
     expect(run(exact, 200, (t) => t <= 120)).toEqual([120]);
   });
 
-  it('Twinlink: a clip of 16 at a 6-tick beat, then a 90-tick reload', () => {
+  it('Twinlink: a clip of 8 at a 10-tick beat, then an 80-tick reload', () => {
     const s = armed('cannon_twinlink');
     const shots = run(s, 400, () => true);
-    expect(shots.slice(0, 16)).toEqual(Array.from({ length: 16 }, (_, i) => 1 + i * 6));
-    expect(shots[16]).toBe(1 + 15 * 6 + 1 + 90);
-    expect(shots.filter((t) => t < shots[16]).length).toBe(16);
+    expect(shots.slice(0, 8)).toEqual(Array.from({ length: 8 }, (_, i) => 1 + i * 10));
+    expect(shots[8]).toBe(1 + 7 * 10 + 1 + 80);
+    expect(shots.filter((t) => t < shots[8]).length).toBe(8);
   });
 
   it('Bastion: two rounds 18 ticks apart, then a 180-tick reload', () => {

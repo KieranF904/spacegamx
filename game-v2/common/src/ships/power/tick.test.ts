@@ -67,16 +67,16 @@ describe('energy tick: stores', () => {
     e.held[1] = 0;
     for (let t = 0; t < 60; t++) energyTick(L, e, IDLE_CONTROLS);
     expect(e.held[1]).toBe(perTick(50) * 60);
-    // Fed through a Battery that Gives 10 E/s, a Pip (20 E/s) fires every 30 ticks, not 15
+    // Fed through a Battery that Gives 10 E/s, a Pip (20 E/s) fires every 40 ticks, not 20
     e.held[1] = L.cap[1];
-    const g = new Gun(L, e, 2, 15);
+    const g = new Gun(L, e, 2, 20);
     for (let t = 0; t < 600; t++) { energyTick(L, e, IDLE_CONTROLS); g.step(t); }
-    expect(g.shots.length).toBeGreaterThanOrEqual(19);
-    expect(g.shots.length).toBeLessThanOrEqual(21);
+    expect(g.shots.length).toBeGreaterThanOrEqual(14);
+    expect(g.shots.length).toBeLessThanOrEqual(16);
   });
 
-  it('keeps a gun on its beat at full supply (D3): a Pip every 15 ticks, a Rattler every 7', () => {
-    for (const [fn, interval] of [['cannon_pip', 15], ['autocannon_rattler', 7]] as const) {
+  it('keeps a gun on its beat at full supply (D3): a Pip every 20 ticks, a Rattler every 15', () => {
+    for (const [fn, interval] of [['cannon_pip', 20], ['autocannon_rattler', 15]] as const) {
       const { L, e } = setup([['sq', GEN, 0, 0], ['sq', fn, 1, 0, 'E']]);
       const g = new Gun(L, e, 1, interval);
       for (let t = 0; t < 600; t++) { energyTick(L, e, IDLE_CONTROLS); g.step(t); }
@@ -89,7 +89,7 @@ describe('energy tick: stores', () => {
     const BAT = storeFn('t_bat', 300, 15, 50);
     const run = (withGun: boolean) => {
       const { L, e } = setup([['sq', 'cannon_pip', 0, 0, 'N'], ['sq', BAT, 1, 0], ['sq', 'engine_ion_drive', 2, 0, 'S']]);
-      const g = new Gun(L, e, 0, 15), c = ctl({ active: activeFor(L, [2]) });
+      const g = new Gun(L, e, 0, 20), c = ctl({ active: activeFor(L, [2]) });
       const frac: number[] = [];
       for (let t = 0; t < 1800; t++) { energyTick(L, e, c); frac.push(thrustFrac()[2]); g.step(t, withGun); }
       return { frac, shots: g.shots.length };
@@ -109,7 +109,7 @@ describe('energy tick: stores', () => {
       ['sq', 'cannon_pip', 0, 0, 'N'], ['sq', BAT, 1, 0], ['sq', mid, 2, 0, 'E'], ['sq', BAT, 3, 0], ['sq', 'engine_ion_drive', 4, 0, 'S'],
     ]);
     const firing = (mid: FunctionDef) => {
-      const { L, e } = build(mid), g = new Gun(L, e, 0, 15);
+      const { L, e } = build(mid), g = new Gun(L, e, 0, 20);
       for (let t = 0; t < 1200; t++) { energyTick(L, e, IDLE_CONTROLS); g.step(t); }
       return { L, e };
     };
@@ -136,10 +136,10 @@ describe('energy tick: stores', () => {
   it('feeds a gun through a Diode facing it (ticked): the stores behind it pay for the shots', () => {
     const BAT = storeFn('t_bat', 300, 150, 50), DIODE = storeFn('t_diode', 10, 200, 200, true);
     const { L, e } = setup([['sq', BAT, 0, 0], ['sq', DIODE, 1, 0, 'S'], ['sq', BAT, 2, 0], ['sq', 'cannon_pip', 1, 1, 'S']]);
-    const g = new Gun(L, e, 3, 15), trace = new Float64Array(L.links);
+    const g = new Gun(L, e, 3, 20), trace = new Float64Array(L.links);
     for (let t = 0; t < 600; t++) { energyTick(L, e, IDLE_CONTROLS, trace); g.step(t); }
-    // On its beat (40 shots of 5 E: far more than the diode's 10 E), drawn from both stores through the diode only
-    expect(g.shots.length).toBe(40);
+    // On its beat (30 shots of 6.67 E: far more than the diode's 10 E), drawn from both stores through the diode only
+    expect(g.shots.length).toBe(30);
     expect([L.linkFrom[0], L.linkTo[0], L.linkPush]).toEqual([1, 3, 1]);
     expect(trace[0]).toBeGreaterThan(toEu(150));
     expect(e.held[0]).toBeLessThan(L.cap[0]);
@@ -174,7 +174,7 @@ describe('energy tick: stores', () => {
       ['sq', 'cannon_pip', 0, 0, 'N'], ['sq', 'power_battery', 1, 0], ['sq', mid, 2, 0, 'E'], ['sq', 'power_battery', 3, 0], ['sq', 'engine_ion_drive', 4, 0, 'S'],
     ]);
     const firing = (mid: string) => {
-      const { L, e } = build(mid), g = new Gun(L, e, 0, 15);
+      const { L, e } = build(mid), g = new Gun(L, e, 0, 20);
       for (let t = 0; t < 1200; t++) { energyTick(L, e, IDLE_CONTROLS); g.step(t); }
       return { L, e, g };
     };
@@ -315,15 +315,15 @@ describe('energy tick: thrusters', () => {
 });
 
 describe('energy tick: weapons', () => {
-  it('keeps a clip a true magazine: no top-up while it has rounds, Reload refills the whole clip, empty it latches for 1.5 s (Twinlink)', () => {
+  it('keeps a clip a true magazine: no top-up while it has rounds, Reload refills the whole clip, empty it latches for its reload (Twinlink)', () => {
     const { L, e } = setup([['sq', BIG, 0, 0], ['rect2', 'cannon_twinlink', 1, 0, 'E']]);
     expect(L.gun[1]).toBe(GUN_CLIP);
-    const g = new Gun(L, e, 1, 6);
+    const g = new Gun(L, e, 1, 10);
     let t = 0;
     for (; g.shots.length < 5; t++) { energyTick(L, e, IDLE_CONTROLS); g.step(t); }
-    expect(clipRounds(L, e, 1)).toBe(11);
+    expect(clipRounds(L, e, 1)).toBe(3);
     for (let k = 0; k < 300; k++) energyTick(L, e, IDLE_CONTROLS);
-    expect(clipRounds(L, e, 1)).toBe(11);
+    expect(clipRounds(L, e, 1)).toBe(3);
     expect(e.flags[1]).toBe(0);
     // Reload: latched, it can't fire until the whole clip is back
     energyTick(L, e, ctl({ reload: true }));
@@ -333,14 +333,14 @@ describe('energy tick: weapons', () => {
     while (e.flags[1] & FLAG_LATCH) { energyTick(L, e, IDLE_CONTROLS); k++; }
     expect(e.held[1]).toBe(L.cap[1]);
     expect(k).toBe(Math.ceil((5 * L.shot[1]) / perTickUp(55)));
-    // Fired dry it latches itself, and the whole clip takes today's reload (90 ticks)
-    const h = new Gun(L, e, 1, 6);
+    // Fired dry it latches itself, and the whole clip takes its reload (80 ticks)
+    const h = new Gun(L, e, 1, 10);
     t = 0;
-    while (h.shots.length < 16) { energyTick(L, e, IDLE_CONTROLS); h.step(t++); }
+    while (h.shots.length < 8) { energyTick(L, e, IDLE_CONTROLS); h.step(t++); }
     expect(e.flags[1] & FLAG_LATCH).toBe(FLAG_LATCH);
     let wait = 0;
     while (!gunReady(L, e, 1)) { energyTick(L, e, IDLE_CONTROLS); wait++; expect(wait).toBeLessThan(200); }
-    expect(wait).toBe(90);
+    expect(wait).toBe(80);
   });
 
   it('gates a clip on a whole salvo (the Hive looses 4): short of one and unlatched, it latches itself and refills', () => {
@@ -472,7 +472,7 @@ describe('energy state', () => {
     for (let k = 0; k < 5; k++) { spendShot(L, e, 1); spendShot(L, e, 2); }
     e.flags[2] |= FLAG_LATCH;
     settleEnergy(L, e, 10 * Math.max(L.fillBound, SETTLE_TICKS));
-    expect(clipRounds(L, e, 1)).toBe(11);
+    expect(clipRounds(L, e, 1)).toBe(3);
     expect(e.flags[1]).toBe(0);
     expect(e.held[2]).toBe(L.cap[2]);
     expect(e.flags[2]).toBe(0);

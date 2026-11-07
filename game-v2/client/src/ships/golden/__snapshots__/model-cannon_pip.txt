@@ -3,9 +3,9 @@ Pip
 Mk I · Small · Square · 1 cell
 Hull · mass60 hp · 1.0
 Armour · build1 · 1 pts
-Damage56/s · reach 7,200
+Damage54/s · reach 7,182
 Hits withKinetic · penetration 1
-Fire rate4.0/s · shells
+Fire rate3.0/s · shells
 Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only
@@ -32,7 +32,7 @@ Small · Square
 light and quick
 
 == keyStats ==
-56 dmg/s · reach 7,200 · cycle · draws 8
+54 dmg/s · reach 7,182 · cycle · draws 8
 
 == mountBadge ==
 FIXED
@@ -48,4 +48,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 0","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":56,"toughness":60,"armour":1,"dps":56,"range":7200,"damageType":"kinetic","pen":1,"draw":8}
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":54,"toughness":60,"armour":1,"dps":54,"range":7182,"damageType":"kinetic","pen":1,"draw":8}

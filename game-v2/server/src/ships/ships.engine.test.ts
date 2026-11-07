@@ -88,10 +88,10 @@ describe('modular ship in the engine (M2/M3)', () => {
 describe('weapons, part hits and debris (M5)', () => {
   it('weapons fire the base shot from both muzzles at the derived interval', () => {
     const { server, bridge, pid, input, run } = setup();
-    // The starter's Pips are fixed guns, at their own interval (a model's: every 15 ticks, as its legacy fixed guns fired)
+    // The starter's Pips are fixed guns, at their own interval (a model's: every 20 ticks, heavier-shots-2026-11; its legacy fixed guns fired every 15)
     const interval = bridge!.get(pid)!.derived.weapons[0].interval;
     expect(bridge!.get(pid)!.derived.weapons.map((w) => w.mount)).toEqual(['fixed', 'fixed']);
-    expect(interval).toBeCloseTo(15, 2);
+    expect(interval).toBeCloseTo(20, 2);
     input({ fireLeft: true });
     run(1);
     const shots = () => liveShots(server.getWorld(), pid);
@@ -102,14 +102,15 @@ describe('weapons, part hits and debris (M5)', () => {
     expect(shots().length).toBe(4);
   });
 
-  it("a Pip's shells are the base shot", () => {
+  it("a Pip's shells are the base shot at its model's speed", () => {
     const { server, pid, input, run } = setup();
     input({ fireLeft: true });
     run(1);
     const [shot] = liveShots(server.getWorld(), pid);
     const speed = Math.hypot(Velocity.x[shot] - Velocity.x[pid] * 0.3, Velocity.y[shot] - Velocity.y[pid] * 0.3);
-    expect(speed / BULLET_SPEED).toBeGreaterThan(0.98);
-    expect(speed / BULLET_SPEED).toBeLessThan(1.02);
+    // (The Pip's own 54, heavier-shots-2026-11: the base shot's 48 x 54 / 48)
+    expect(speed / (BULLET_SPEED * 54 / 48)).toBeGreaterThan(0.98);
+    expect(speed / (BULLET_SPEED * 54 / 48)).toBeLessThan(1.02);
     expect(Radius.value[shot]).toBeCloseTo(5, 5);
   });
 

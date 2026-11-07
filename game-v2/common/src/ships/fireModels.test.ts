@@ -48,8 +48,8 @@ describe('firing models', () => {
   it('every weapon model carries a fire block through WeaponInfo, and no gun keeps heat', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
-    expect(w.fire).toMatchObject({ model: 'clip', clip: 6, reload: 90, reloadE: 48, interval: 10 });
-    expect(s.rounds[w.part]).toBe(6);
+    expect(w.fire).toMatchObject({ model: 'clip', clip: 4, reload: 90, reloadE: 48, interval: 12 });
+    expect(s.rounds[w.part]).toBe(4);
     for (const k of ['heat', 'overheated']) expect(Object.keys(s)).not.toContain(k);
     for (const m of catalog.functions.values()) if (m.model && m.weapon) expect(m.fire?.model, m.id).toBeDefined();
   });
@@ -58,40 +58,40 @@ describe('firing models', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
     const { shots } = run(s, 300, (t) => t % 2 === 1);
-    // Six shots ten ticks apart, the last one empties it; reloading 90 ticks from the next, then six more
-    expect(shots.slice(0, 6)).toEqual([1, 11, 21, 31, 41, 51]);
-    expect(shots[6]).toBe(51 + 1 + w.fire.reload!);
-    expect(shots.slice(6, 12).map((t, i) => t - shots[6] - i * 10)).toEqual([0, 0, 0, 0, 0, 0]);
+    // Four shots twelve ticks apart, the last one empties it; reloading 90 ticks from the next, then four more
+    expect(shots.slice(0, 4)).toEqual([1, 13, 25, 37]);
+    expect(shots[4]).toBe(37 + 1 + w.fire.reload!);
+    expect(shots.slice(4, 8).map((t, i) => t - shots[4] - i * 12)).toEqual([0, 0, 0, 0]);
   });
 
   it('clip: a partly spent clip reloads a second after the last shot, drawing its missing share of reloadE', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
     const { shots } = run(s, 15, (t) => t <= 15 && t % 2 === 1);
-    expect(shots).toEqual([1, 11]);
-    expect(s.rounds[w.part]).toBe(4);
+    expect(shots).toEqual([1, 13]);
+    expect(s.rounds[w.part]).toBe(2);
     let drawn = 0, t = 16, startedAt = -1;
-    for (; t < 400 && s.rounds[w.part] < 6; t++) {
+    for (; t < 400 && s.rounds[w.part] < 4; t++) {
       drawn += gunDraw(s, w, 0) / 60;
       stepGuns(s, pose, { firing: false, aimWorld: UP, aimDist: 0 }, t, tuning);
       if (startedAt < 0 && s.reload[w.part] > 0) startedAt = t;
     }
-    // (The last shot at 11: idle for CLIP_IDLE ticks from there)
-    expect(startedAt).toBe(11 + CLIP_IDLE);
-    expect(s.rounds[w.part]).toBe(6);
-    expect(drawn).toBeCloseTo(w.fire.reloadE! * 2 / 6, 6);
+    // (The last shot at 13: idle for CLIP_IDLE ticks from there)
+    expect(startedAt).toBe(13 + CLIP_IDLE);
+    expect(s.rounds[w.part]).toBe(4);
+    expect(drawn).toBeCloseTo(w.fire.reloadE! * 2 / 4, 6);
   });
 
   it('clip: short of power it reloads at its share; the energy is what a whole reload draws', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
-    // (The sixth shot at 51 empties it; its reload starts on the next tick)
-    run(s, 51, (t) => t % 2 === 1);
+    // (The fourth shot at 37 empties it; its reload starts on the next tick)
+    run(s, 37, (t) => t % 2 === 1);
     expect(s.rounds[w.part]).toBe(0);
     const L = s.derived.power!;
     const half: Charge = { g: 100, b: [], gun: L.feeds.map(() => 0.5), eng: L.feeds.map(() => 1) };
     let n = 0;
-    while (s.reload[w.part] > 0 || s.rounds[w.part] === 0) { stepGuns(s, pose, { firing: false, aimWorld: UP, aimDist: 0, energy: { charge: half } }, 52 + n, tuning); n++; if (n > 1000) break; }
+    while (s.reload[w.part] > 0 || s.rounds[w.part] === 0) { stepGuns(s, pose, { firing: false, aimWorld: UP, aimDist: 0, energy: { charge: half } }, 38 + n, tuning); n++; if (n > 1000) break; }
     expect(n).toBe(1 + 2 * w.fire.reload!);
   });
 
@@ -157,19 +157,21 @@ describe('firing models', () => {
     expect(s.spin[w.part]).toBe(1);
     expect(gunInterval(s, w)).toBeCloseTo((w.interval * sp.to) / w.fire.interval, 9);
     const early = shots.filter((t) => t <= 60).length, late = shots.filter((t) => t > 180).length;
-    expect(late).toBeGreaterThan(early * 2);
+    // (24 -> 8 ticks: three times the rate spun up; the first second still spins, so a little under that)
+    expect(late).toBeGreaterThan(early * 1.5);
     run(s, sp.down, () => false, 241);
     expect(s.spin[w.part]).toBeCloseTo(0, 9);
   });
 
-  it('autocannon and flak numbers: Chainsaw 4/s to 16/s, Stinger clip of 12, Cloudmaker splash r250 / 26', () => {
+  it('autocannon and flak numbers: Chainsaw 2.5/s to 7.5/s, Stinger clip of 6, Cloudmaker splash r250 / 26', () => {
+    // (Heavier shots 2026-11: the Chainsaw spun 4 -> 16/s, the Stinger a clip of 12 at 7.5 t, reload 72)
     const cs = armed('autocannon_chainsaw'), w = cs.derived.weapons[0];
-    expect(60 / gunInterval(cs, w)).toBeCloseTo(4, 6);
+    expect(60 / gunInterval(cs, w)).toBeCloseTo(2.5, 6);
     run(cs, 60, () => true);
-    expect(60 / gunInterval(cs, w)).toBeCloseTo(16, 6);
+    expect(60 / gunInterval(cs, w)).toBeCloseTo(7.5, 6);
     const st = armed('autocannon_stinger').derived.weapons[0];
-    expect(st.fire).toMatchObject({ model: 'clip', clip: 12, reload: 72, reloadE: 20 });
-    expect(st.interval).toBeCloseTo(7.5, 6);
+    expect(st.fire).toMatchObject({ model: 'clip', clip: 6, reload: 60, reloadE: 20 });
+    expect(st.interval).toBeCloseTo(12, 6);
     const cm = armed('flak_cloudmaker').derived.weapons[0];
     expect(cm.fire).toMatchObject({ model: 'clip', clip: 4, reload: 150, reloadE: 30 });
     expect(cm.ammo).toBeFalsy();
