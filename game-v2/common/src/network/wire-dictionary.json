@@ -112,7 +112,13 @@
   "shield_visor",
   "shield_buckler",
   "shield_shell",
-  "shield_half_dome"
+  "shield_half_dome",
+  "power_joiner_elbow",
+  "power_joiner_end",
+  "power_joiner_cross",
+  "power_splitter_elbow",
+  "power_splitter_tee",
+  "power_splitter_end"
  ],
  "skip": [
   "power_pulse_dynamo",

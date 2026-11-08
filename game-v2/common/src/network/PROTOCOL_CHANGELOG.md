@@ -55,3 +55,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 63 (2026-11-07): parts: the six field machines (fabricators and refiners) appended to the wire dictionary; field fabrication and repair bank JSON messages (fieldProtocol.ts); gunSync ports header carries the machines' draw bits
 - 64 (2026-11-07): weapon groups selection on inputs (base layout type 0x04, compact EXTRA GROUPS); Mine Bay and Docking Clamp parts in the wire dictionary; mines and clamp JSON messages (minesProtocol.ts, clampProtocol.ts, weaponGroupsProtocol.ts)
 - 65 (2026-11-08): shaped shields: seven new models (Spark Wall, Guard Wall, Rampart, Visor, Buckler, Shell, Half-dome) in the dictionary; the zoneshield feature's pilot-row extra and status-row slot 8 (a nibble of HP level a shield)
+- 66 (2026-11-08): six new power banks (elbow, end, cross joiners; elbow, tee, end splitters) appended to the wire dictionary
