@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Tee Splitter Bank
+Mk I · Panel · 2 cells
+Hull · mass113 hp · 2.8
+Armour · build1 · 2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Holds300 energy
+Givesup to 90/s into the ship's pool, on a powered network
+
+== partStats (stats rows) ==
+GradeMk I
+Hull · mass113 hp · 2.8
+Armour · build1 · 2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 113
+
+== familyLabel ==
+Batteries
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+A battery that splits a line from its end to its front and back
+
+== keyStats ==
+holds 300 · gives 90/s
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 8","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":2,"hp":112.8,"mass":2.8,"firepower":0,"toughness":112.8,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}
