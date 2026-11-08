@@ -1574,7 +1574,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 811,
+      "lines": 826,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1593,26 +1593,26 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 64,
-          "end": 65
+          "start": 65,
+          "end": 66
         },
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 68,
-          "end": 68
+          "start": 69,
+          "end": 69
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 69,
-          "end": 70
+          "start": 70,
+          "end": 71
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 72,
-          "end": 811
+          "start": 73,
+          "end": 826
         }
       ]
     },
@@ -1801,6 +1801,62 @@
           "kind": "function",
           "start": 68,
           "end": 83
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-drag-paint",
+      "path": "client/src/ships/build/dragPaint.ts",
+      "group": "client/ships/build",
+      "lines": 77,
+      "owns": "the drag-to-paint walk shared by the hangar and the world build view: the grid cells a cursor passes between two points, and the once-per-cell rule for one held-button drag",
+      "needs": "common Vec2 (a type only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a cell is handed out at most once per drag, in path order, and a fast drag skips none",
+          "test": "client/src/ships/build/dragPaint.test.ts"
+        },
+        {
+          "text": "it only walks cells; whether a part can go or be taken there stays with each editor's own rules",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "an editor starts a DragPaint on mouse down (after acting on the clicked cell) and calls visit() on each mouse move",
+      "exports": [
+        "DragPaint",
+        "cellsAlong"
+      ],
+      "sections": [
+        {
+          "name": "MAX_STEP_CELLS",
+          "kind": "const",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "INSIDE",
+          "kind": "const",
+          "start": 15,
+          "end": 16
+        },
+        {
+          "name": "cellsAlong",
+          "kind": "function",
+          "start": 18,
+          "end": 47
+        },
+        {
+          "name": "DragPaint",
+          "kind": "class",
+          "start": 49,
+          "end": 73
+        },
+        {
+          "name": "key",
+          "kind": "function",
+          "start": 75,
+          "end": 77
         }
       ]
     },
