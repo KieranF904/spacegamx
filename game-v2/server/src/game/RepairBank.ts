@@ -12,8 +12,8 @@
  * The repair bank on the server (docs/design/field-fabrication.md, sections 2.4 and 6; the rules and numbers are
  * common/src/econ/field/bank.ts, so client and server agree). Each pilot has one, on the profile (`PlayerProfile.bank`):
  *
- *   free      refills by the wall clock to a starter ship's worth; pays for the ship at once on a respawn (core outward),
- *             and its top quarter ("spare") may also pay repairs. Never withdrawn.
+ *   free      refills by the wall clock to two starter ships' worth (BANK.ships) in 5 minutes; pays for the ship at once on a respawn (core outward),
+ *             and its top half ("spare") may also pay repairs. Never withdrawn.
  *   deposits  packs and refined materials put in at a station. Never withdrawn. They mend the ship near any station
  *             (bridge/rebuild.ts repairStep, through payRepair / payRebuild here) and, after a respawn, rebuild what the
  *             free part didn't cover, anywhere, at BANK.respawnSpeed (stepDeposits): never instantly.

@@ -115,7 +115,7 @@ export interface ServerFieldDoneMessage { type: 'fieldDone'; kind: MachineKind; 
 /** The repair bank: sent at login, on a change and while it refills (at most once a minute) */
 export interface ServerRepairBankMessage {
   type: 'repairBank';
-  /** The free part (whole units) and its cap (a starter ship's worth) */
+  /** The free part (whole units) and its cap (BANK.ships starter ships' worth) */
   free: Bag;
   cap: Bag;
   /** Seconds until the free part is full (0: full) */

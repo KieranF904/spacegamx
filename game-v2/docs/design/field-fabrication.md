@@ -55,9 +55,9 @@ flag so flight doesn't count them; folding those in too is a later step.
    faster**.
 10. **Stations**: refine and fabricate quickly, swap ships, and so on. **No free station repairs.**
 11. **Insurance and loaners are removed entirely.** Each pilot has one **global repair bank**, the same at every station:
-    - **Free part**: refills slowly by itself, up to a starter ship's worth of basic materials. It can't be withdrawn. On a
-      respawn it pays for the ship at once, core outward. When it is (nearly) full it can also pay a modest amount of basic
-      materials for repairs.
+    - **Free part**: refills by itself, up to two starter ships' worth of basic materials, empty to full in about 5 minutes (changed 2026-11-09 from one ship over 30 minutes). It can't be withdrawn. On a
+      respawn it pays for the ship at once, core outward. The half above one ship's worth can also pay basic materials for
+      repairs.
     - **Deposits**: the pilot puts in packs and refined materials. Deposits can't be withdrawn and are counted apart from
       the free part. They do **not** pay at once on a respawn. They repair quickly and cover a wider range of materials:
       they mend the relevant parts as the ship passes a station, and after a respawn they rebuild, at the normal rate,

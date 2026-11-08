@@ -128,13 +128,15 @@ describe('a death', () => {
     const p = w.profile();
     const design = JSON.stringify(p.ship.blueprint);
     const cargoBefore = JSON.stringify(p.storage);
-    // A starter ship is exactly what a full free part pays
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    expect(JSON.stringify(w.profile().ship.blueprint)).toBe(design);
-    expect(w.profile().ship.loaner).toBeUndefined();
-    expect(w.profile().ship.ghosts).toEqual([]);
-    expect(w.profile().ship.lost).toBeUndefined();
-    expect(JSON.stringify(w.profile().storage)).toBe(cargoBefore);
+    // A full free part pays for BANK.ships starter ships, one per death
+    for (let k = 0; k < BANK.ships; k++) {
+      w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
+      expect(JSON.stringify(w.profile().ship.blueprint)).toBe(design);
+      expect(w.profile().ship.loaner).toBeUndefined();
+      expect(w.profile().ship.ghosts).toEqual([]);
+      expect(w.profile().ship.lost).toBeUndefined();
+      expect(JSON.stringify(w.profile().storage)).toBe(cargoBefore);
+    }
     expect(total(freeWhole(w.profile().bank!))).toBe(0);
     // Again, at once: the free part is empty, so a bare core
     w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);

@@ -2,7 +2,7 @@
  * The repair bank (docs/design/field-fabrication.md, "The repair bank"): one per pilot, the same at every station. It
  * replaces insurance and loaners.
  *
- *   free      basic materials that refill by themselves up to a starter ship's worth (bankCap), never withdrawn. On a
+ *   free      basic materials that refill by themselves up to BANK.ships starter ships' worth (bankCap), never withdrawn. On a
  *             respawn they pay for the ship at once, core outward (order.ts payCoreOutward). While nearly full the top
  *             BANK.spareShare of it may also pay repairs (freeSpare).
  *   deposits  packs and refined materials the pilot put in; never withdrawn, counted apart. They don't pay at a respawn;
@@ -28,10 +28,13 @@ export interface RepairBank {
 }
 
 export const BANK = Object.freeze({
+  /** The free part holds this many starter ships' worth */
+  ships: 2,
   /** The free part refills from empty to full in this many seconds (each item at its own cap's pace) */
-  refillSeconds: 1800,
-  /** While the free part holds more than (1 - spareShare) of its cap, what is above that may pay repairs */
-  spareShare: 0.25,
+  refillSeconds: 300,
+  /** While the free part holds more than (1 - spareShare) of its cap, what is above that may pay repairs (a half: one
+   *  starter ship's worth is always kept for a respawn, the other may mend) */
+  spareShare: 0.5,
   /** Deposits repair a ship within this distance of any station (world units) */
   stationRange: 1500,
   /** Near a station: a missing part rebuilt from deposits every this many seconds, nearest the core first */
@@ -42,12 +45,12 @@ export const BANK = Object.freeze({
   respawnSpeed: 1,
 });
 
-/** A starter ship's worth: every part's recipe inputs but the core's (the core always comes back, free) */
+/** BANK.ships starter ships' worth: every part's recipe inputs but the core's (the core always comes back, free) */
 export function bankCap(econ: Economy, starter: Blueprint): Bag {
   const out: Bag = {};
   for (const p of starter.parts) {
     if (p.fn === 'core') continue;
-    for (const [id, n] of Object.entries(econ.recipes.partInputs(p))) out[id] = (out[id] ?? 0) + n;
+    for (const [id, n] of Object.entries(econ.recipes.partInputs(p))) out[id] = (out[id] ?? 0) + n * BANK.ships;
   }
   return out;
 }
