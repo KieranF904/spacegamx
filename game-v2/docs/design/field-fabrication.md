@@ -16,6 +16,14 @@ marks it for recycling. There is no field plan apart from the blueprint: no draf
 placeholder (`ShipState.ghost`) flags for build view parts, no blue ghost overlay. Sections 1.5, 4, 5.1, 6 and 7 below
 say it that way; the package briefs in section 10 are the history of how it was first built, with planned "ghosts".
 
+**Planned ahead, not connected (Kieran, 2026-11-09).** Both editors accept a part that joins nothing, and the saved
+blueprint keeps it. It is *planned but unreachable* (`ValidationResult.unreachable`, a status and not an error): nothing
+builds it (the fabricator, the station, the bank and the hangar's fitting only pick parts that join a standing one), and
+it never counts as built, flies, or adds mass, stats or power until something joins it to the core's structure; then it
+builds as any missing part, nearest the core first. Both views show it faded with a dashed violet outline and a "not
+connected" note, and list it in the summary. The hangar keeps it as a placeholder that no order makes (`buildableGhosts`).
+Taking out a part no longer takes out the missing parts it held on: they stay, not connected.
+
 What follows from it, for playtesting: a planned part counts as a lost part in flight (the flight model divides by the
 whole design's mass, so planning a big addition slows the ship until it is built); the free spare, the station's
 passing-by rebuild and a death's free part pay for planned parts as for lost ones. Still separate: the hangar's own

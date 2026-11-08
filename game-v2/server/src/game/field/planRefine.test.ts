@@ -95,19 +95,36 @@ describe('plan diff (the build view save: new parts are missing parts)', () => {
     expect(planDiff(validate, catalog, live(bp), { ...bp, parts: bp.parts.map((p) => (p.fn === 'core' ? { ...p, y: 3 } : p)) })).toHaveProperty('error');
   });
 
-  it('taking a part out drops the missing parts it held on, never a standing one', () => {
+  it('taking a part out keeps the missing parts it held on (planned, not connected); a standing one is never left', () => {
     const bp = ship(part(3, 'sq', 'hull', 2, 0), part(4, 'sq', 'hull', 3, 0));
     const r = removeParts(validate, bp, new Set([3]), (u) => u !== 4)!;
-    expect(r.blueprint.parts.map((p) => p.uid)).toEqual([0, 1, 2]);
-    expect(r.dropped).toEqual([4]);
-    expect(removeParts(validate, bp, new Set([3]), () => true)).toBeNull();
+    expect(r.blueprint.parts.map((p) => p.uid)).toEqual([0, 1, 2, 4]);
+    expect(r.dropped).toEqual([]);
+    expect(validate(r.blueprint).unreachable).toEqual([4]);
+  });
+
+  it('a part that joins nothing is planned: saved as a missing part, listed unreachable, last in the build order', () => {
+    const bp = ship();
+    const target = { ...bp, parts: [...bp.parts, part(10, 'sq', 'hull', 20, 20), part(11, 'sq', 'hull', 2, 0)] };
+    const r = planDiff(validate, catalog, live(bp), target);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.added).toEqual([11, 10]); // (nearest the core first; the unconnected one after)
+    const v = validate(r.blueprint);
+    expect(v.ok).toBe(true);
+    expect(v.unreachable).toEqual([10]);
+    // Overlaps and the like are still refused
+    expect(planDiff(validate, catalog, live(bp), { ...bp, parts: [...bp.parts, part(10, 'sq', 'hull', 20, 20), part(12, 'sq', 'hull', 20, 20)] })).toHaveProperty('error');
+    // Joined later (a part between): it is connected, nothing unreachable
+    const joined = { ...r.blueprint, parts: [...r.blueprint.parts, ...Array.from({ length: 17 }, (_, k) => part(20 + k, 'sq', 'hull', 3 + k, 0)), ...Array.from({ length: 20 }, (_, k) => part(40 + k, 'sq', 'hull', 20, k))] };
+    expect(validate(joined).unreachable).toEqual([]);
   });
 
   it('an old save\'s waiting parts go in as far as the design stays valid', () => {
     const bp = ship();
     const r = admitLegacy(validate, bp, [part(11, 'sq', 'hull', 3, 0), part(10, 'sq', 'hull', 2, 0), part(12, 'sq', 'hull', 9, 9)]);
-    expect(r.added.sort()).toEqual([10, 11]);
+    expect(r.added.sort()).toEqual([10, 11, 12]);
     expect(validate(r.blueprint).ok).toBe(true);
+    expect(validate(r.blueprint).unreachable).toEqual([12]);
   });
 
   it('samePlacement reads piece, function, material, place, turn, flip, facing and mount', () => {

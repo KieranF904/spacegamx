@@ -342,12 +342,15 @@ export interface Structure {
 }
 
 /** A rebuild's first steps alone (state.ts splitRebuild looks ahead with it): `allJoins`, the design's (design.ts) */
-export function structureOf(blueprint: Blueprint, hp: readonly number[], detached: readonly boolean[], rootMode: 'core' | 'largest', allJoins: [number, number][]): Structure {
+export function structureOf(blueprint: Blueprint, hp: readonly number[], detached: readonly boolean[], rootMode: 'core' | 'largest', allJoins: [number, number][], reach?: readonly boolean[]): Structure {
   const parts = blueprint.parts;
   const n = parts.length;
+  // (A ship's part the core holds on to through no part of the design is planned only: never intact, whatever its HP says)
+  const planned = rootMode === 'core' && reach ? (i: number) => !reach[i] : null;
   // (A custom enemy's piece breaks as one: a part of a group that's gone isn't intact either, groups.ts)
   const gone = groupsGone(blueprint, hp, detached);
-  const intact = gone ? (i: number) => hp[i] > 0 && !detached[i] && !(parts[i].group !== undefined && gone & (1 << parts[i].group!)) : (i: number) => hp[i] > 0 && !detached[i];
+  const base = gone ? (i: number) => hp[i] > 0 && !detached[i] && !(parts[i].group !== undefined && gone & (1 << parts[i].group!)) : (i: number) => hp[i] > 0 && !detached[i];
+  const intact = planned ? (i: number) => base(i) && !planned(i) : base;
 
   // 1. Joins (between intact parts only: dead parts don't hold anything together)
   const joins = allJoins.filter(([a, b]) => intact(a) && intact(b));
@@ -375,7 +378,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const D = input.fresh ? newDesign(catalog, blueprint) : designOf(catalog, blueprint);
   const { geoms, mounts, fns, mats } = D;
   const allJoins = D.joins;
-  const { joins, root, alive, orphanGroups } = structureOf(blueprint, hp, input.detached, input.rootMode, allJoins);
+  const { joins, root, alive, orphanGroups } = structureOf(blueprint, hp, input.detached, input.rootMode, allJoins, D.core >= 0 ? wholeBuilt(D) : undefined);
   // (Parts only went since the last rebuild: its turrets' rays and engines' exhaust carry on from it, RebuildMemo)
   const last = input.fresh ? undefined : input.memo?.last;
   let shrunk = !!last && last.design === D && last.tuning === tuning;

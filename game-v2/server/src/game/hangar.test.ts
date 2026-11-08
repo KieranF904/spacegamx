@@ -3,7 +3,7 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
   Position, Velocity, ServerMessage, Station as StationComp, Blueprint, countOf, partItemId, migrateProfile, ghostBill, planOrders,
-  addTo, autoWire, cleanWires,
+  addTo, autoWire, cleanWires, orderRanking, buildableGhosts,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -97,6 +97,38 @@ describe('hangar slots', () => {
     // The ship you fly didn't change
     expect(ships.get(pid)!.blueprint.name).toBe('Sparrow T');
     expect(last('hangar')!.slots[1]!.ghosts.length).toBe(bp.parts.length);
+  });
+
+  it('a part joined to nothing saves as a placeholder and is never fitted, however much you hold; joined, it goes in', () => {
+    const { server, t, pid, profile, ships, last } = world();
+    dock(server, pid);
+    const bp = prospector(server);
+    const uid = Math.max(...bp.parts.map((p) => p.uid)) + 1;
+    const hull = (x: number, y: number) => ({ uid, piece: 'sq', fn: 'hull', material: 'alloy', x, y, rot: 0, flip: false });
+    const far = { ...bp, parts: [...bp.parts, hull(60, 60)] } as Blueprint;
+    expect(ships.validate(far).ok).toBe(true);
+    expect(ships.validate(far).unreachable).toEqual([uid]);
+    emptyStorage(server, pid, bill(server, far));
+    t.send({ type: 'slotSave', slot: 1, blueprint: far } as any);
+    expect(last('shipEditResult')!.ok).toBe(true);
+    for (let i = 0; i < 70; i++) server.step();
+    // Everything joined was fitted; the far hull waits as a placeholder (and its materials stay in storage)
+    expect(profile().hangar[1]!.ghosts).toEqual([uid]);
+    expect(profile().hangar[1]!.blueprint.parts.some((p) => p.uid === uid)).toBe(true);
+    // (Nothing to put on order: the only ghost left can't be built)
+    expect(buildableGhosts(ships.catalog, far, [uid])).toEqual([]);
+    expect(orderRanking(profile().hangar, ships.catalog)).toEqual([]);
+    // Moved next to the ship (joined): fitted
+    let near: Blueprint | null = null;
+    for (let x = -12; x <= 12 && !near; x++) for (let y = -12; y <= 12 && !near; y++) {
+      const c = { ...bp, parts: [...bp.parts, hull(x, y)] } as Blueprint;
+      const v = ships.validate(c);
+      if (v.ok && !v.unreachable.length) near = c;
+    }
+    expect(near).toBeTruthy();
+    t.send({ type: 'slotSave', slot: 1, blueprint: near } as any);
+    for (let i = 0; i < 70; i++) server.step();
+    expect(profile().hangar[1]!.ghosts ?? []).toEqual([]);
   });
 
   it('wires are retired: a design with saved wires costs no spools, and its wires are kept as sent', () => {

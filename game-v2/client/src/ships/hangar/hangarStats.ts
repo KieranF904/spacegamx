@@ -360,6 +360,10 @@ export function renderStats(host: HangarHost): void {
   html += host.errors.length
     ? host.errors.map((e) => `<div style="color:#f87171; margin-bottom:3px;">• ${e.message}</div>`).join('')
     : `<div style="color:#4ade80">none</div>`;
+  if (host.unreachable.size) {
+    const k = host.unreachable.size;
+    html += `<div style="color:#c4b5fd; margin-top:6px;">• ${k} part${k > 1 ? 's' : ''} not connected: ${k > 1 ? "they'll" : "it'll"} build once joined</div>`;
+  }
   host.stats.innerHTML = html;
   host.bindBuildButtons();
 }

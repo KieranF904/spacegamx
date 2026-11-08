@@ -80,7 +80,8 @@ export function draw(host: HangarHost): void {
   const wrecked = new Set(host.deps.hangarState()?.slots[host.slot]?.wrecked ?? []);
   host.geoms.forEach((g) => {
     const p = g.part;
-    const ghost = ghosts.has(p.uid) && !fresh.has(p.uid);
+    const loose = host.unreachable.has(p.uid);
+    const ghost = (ghosts.has(p.uid) && !fresh.has(p.uid)) || loose;
     const isNew = fresh.has(p.uid) && host.deps.hangarState() !== null;
     path(g.polygon);
     const look = partColors(host.deps.catalog, p.fn, p.material, host.bp.paint ? parseInt(host.bp.paint.slice(1), 16) : undefined);
@@ -94,7 +95,7 @@ export function draw(host: HangarHost): void {
     // Its outline only when it says something: a problem, new since the last save, or a ghost
     if (ghost || isNew || bad.has(p.uid)) {
       ctx.setLineDash(ghost || isNew ? [5, 4] : []);
-      ctx.strokeStyle = bad.has(p.uid) ? '#ef4444' : isNew ? '#fbbf24' : '#7dd3fc';
+      ctx.strokeStyle = bad.has(p.uid) ? '#ef4444' : loose ? '#c4b5fd' : isNew ? '#fbbf24' : '#7dd3fc';
       ctx.lineWidth = bad.has(p.uid) || isNew ? 2 : 1;
       ctx.stroke();
       ctx.setLineDash([]);
@@ -102,6 +103,14 @@ export function draw(host: HangarHost): void {
     // Guns' barrels (the hull draws the rest of its hardware); a ghost's all of it, faint
     drawDecor2d(ctx, g, (x, y) => [sx(x), sy(y)], px, ghost ? 0.35 : 1, gradeGlow(look.grade), !ghost);
   });
+  // Planned but not joined to the core: a small label (it builds once something joins it)
+  if (host.unreachable.size) {
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#c4b5fd';
+    for (const g of host.geoms) if (host.unreachable.has(g.part.uid)) ctx.fillText('not connected', sx(g.centroid[0]), sy(g.centroid[1]) + 3);
+    ctx.textAlign = 'start';
+  }
   drawPlacedMarks(host, sx, sy);
   // Guns that break their mounting rules (a ship fitted before a rule changed), engines with a blocked exhaust: what's wrong, in red
   host.geoms.forEach((g, i) => {

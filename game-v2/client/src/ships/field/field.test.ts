@@ -6,13 +6,13 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Economy, MACHINE_FAB, MACHINE_REF, parseBlueprint, validateBlueprint, partItemId, jobAt } from '@space-game/common';
-import type { Blueprint, Charge, FieldJob, MachineBlock, MachineView, ShipTuning } from '@space-game/common';
+import type { Blueprint, Charge, PlacedPart, FieldJob, MachineBlock, MachineView, ShipTuning } from '@space-game/common';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../../../common/src/ships/testData';
 import { HANDLERS } from '../../app/serverMessages';
 import { FieldClient, machineClock, machineJob, machineProgress } from './fieldState';
 import { blockText, jobText, machineName, machineStatus } from './fieldText';
 import { pickMessage, refineChoices, shortLine } from './FieldHud';
-import { addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, settle, summary, targetErrors, working, type BuildEdits, type LiveDesign } from './plan';
+import { addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, settle, summary, targetErrors, unjoinedText, unjoinedUids, working, type BuildEdits, type LiveDesign } from './plan';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -143,7 +143,7 @@ describe('build view edits (the blueprint, missing parts and all)', () => {
     const w = working(live, e);
     for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) {
       const p = candidate(catalog, live, w, hull, [x + 0.5, y + 0.5]);
-      if (p && !placementProblem(catalog, w, p, tuning)) return p;
+      if (p && !placementProblem(catalog, w, p, tuning) && !unjoinedUids(catalog, working(live, { ...e, added: [...e.added, p] })).size) return p;
     }
     throw new Error('no free spot');
   }
@@ -204,14 +204,58 @@ describe('build view edits (the blueprint, missing parts and all)', () => {
     expect(placementProblem(catalog, w, front, tuning)).toMatch(/free|blocked/);
   });
 
-  it('refuses a part that overlaps or joins nothing', () => {
+  it('refuses a part that overlaps; one that joins nothing is allowed, planned and shown as not connected', () => {
     const live = liveOf(sparrow());
     const w = working(live, noEdits());
     const core = live.bp.parts.find((q) => q.fn === 'core')!;
     const over = candidate(catalog, live, w, hull, [core.x + 0.5, core.y + 0.5])!;
     expect(placementProblem(catalog, w, over)).toBe('overlaps another part');
     const far = candidate(catalog, live, w, hull, [40.5, 40.5])!;
-    expect(placementProblem(catalog, w, far)).toBe("doesn't join anything");
+    expect(placementProblem(catalog, w, far)).toBeNull();
+    expect(placementProblem(catalog, w, far, tuning)).toBeNull();
+    // It saves (a valid design), and is listed as not connected until a part joins it
+    const e = noEdits();
+    addPart(e, far);
+    const w2 = working(live, e);
+    expect(targetErrors(catalog, tuning, w2)).toEqual([]);
+    expect([...unjoinedUids(catalog, w2)]).toEqual([far.uid]);
+    expect(unjoinedText(1)).toBe("1 part not connected: it'll build once joined.");
+    expect(unjoinedText(2)).toBe("2 parts not connected: they'll build once joined.");
+    expect(unjoinedText(0)).toBe('');
+    // Everything standing or joined is never listed
+    expect(unjoinedUids(catalog, w).size).toBe(0);
+  });
+
+  it('taking out a bridging missing part leaves what it held planned and not connected (not dropped)', () => {
+    const bp = sparrow();
+    const p1 = freeSpot(liveOf(bp), noEdits());
+    const saved = { ...bp, parts: [...bp.parts, p1] };
+    const live = liveOf(saved, [p1.uid]);
+    // A second planned part that touches only the first
+    let p2: PlacedPart | null = null;
+    for (let y = -9; y <= 9 && !p2; y++) for (let x = -9; x <= 9 && !p2; x++) {
+      const w = working(live, noEdits());
+      const c = candidate(catalog, live, w, hull, [x + 0.5, y + 0.5])!;
+      if (placementProblem(catalog, w, c, tuning)) continue;
+      const e = noEdits();
+      addPart(e, c);
+      if (unjoinedUids(catalog, working(live, e)).size) continue;
+      const f = noEdits();
+      addPart(f, c);
+      removePart(catalog, live, f, working(live, f).bp.parts.findIndex((q) => q.uid === p1.uid));
+      if (unjoinedUids(catalog, working(live, f)).has(c.uid)) p2 = c;
+    }
+    expect(p2).toBeTruthy();
+    const e = noEdits();
+    addPart(e, p2!);
+    const r = removePart(catalog, live, e, working(live, e).bp.parts.findIndex((q) => q.uid === p1.uid));
+    expect(r.kind).toBe('dropped');
+    expect('uids' in r ? r.uids : []).toEqual([p1.uid]); // (just itself: the part it held stays)
+    const w = working(live, e);
+    expect(w.bp.parts.some((q) => q.uid === p2!.uid)).toBe(true);
+    expect([...unjoinedUids(catalog, w)]).toEqual([p2!.uid]);
+    expect(targetErrors(catalog, tuning, w)).toEqual([]);
+    expect(summary(live, e).added).toBe(1);
   });
 
   it('taking out a standing part marks it for recycling, and what it cuts off goes with it', () => {

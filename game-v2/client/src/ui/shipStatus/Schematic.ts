@@ -93,7 +93,8 @@ export class Schematic {
     const t = nowMs / 1000;
     const parts = st.has ? st.parts : null;
     for (let i = 0; i < geoms.length; i++) {
-      const gone = ship.detached[i] || ship.hp[i] <= 0;
+      // (A part the core holds on to through nothing is planned only: shown gone, never built, whatever its HP)
+      const gone = ship.detached[i] || ship.hp[i] <= 0 || (ship.derived.root >= 0 && !ship.derived.alive[i]);
       const ps: PartStatus | undefined = parts?.[i];
       this.path(i);
       if (gone) {

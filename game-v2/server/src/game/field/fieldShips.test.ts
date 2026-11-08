@@ -403,14 +403,45 @@ describe('field plan', () => {
     expect(w.ships.validate(w.ship().blueprint, { mounting: false }).ok).toBe(true);
   });
 
+  it('a planned part that joins nothing is saved but never built, until a part joins it to the ship', () => {
+    const w = world(design());
+    const e = (w.server as any).econ;
+    const live = w.ship().blueprint;
+    const hull = { fn: 'hull', material: 'alloy', piece: 'sq' };
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    // A hull two cells off the ship's edge: nothing joins it
+    w.send({ type: 'fieldPlan', blueprint: { ...live, parts: [...live.parts, part(15, 'sq', 'hull', 4, 0)] } });
+    w.run(1);
+    expect(w.idx(15)).toBeGreaterThanOrEqual(0);
+    expect(w.ships.validate(w.ship().blueprint, { mounting: false }).unreachable).toEqual([15]);
+    expect(w.prof.ship.hp[15]).toBe(0);
+    // Even with the plates in the hold the fabricator leaves it alone, and the ship never counts it
+    w.give(e.recipes.partInputs(hull));
+    w.run(900);
+    expect(w.alive(15)).toBe(false);
+    expect(w.ship().derived.alive.filter(Boolean).length).toBe(live.parts.length);
+    expect(w.ship().blueprint.parts.some((p) => p.uid === 15)).toBe(true);
+    // A bridge joins it: the bridge is built first, then it
+    w.send({ type: 'fieldPlan', blueprint: { ...w.ship().blueprint, parts: [...w.ship().blueprint.parts, part(16, 'sq', 'hull', 2, 0), part(17, 'sq', 'hull', 3, 0)] } });
+    w.run(1);
+    expect(w.ships.validate(w.ship().blueprint, { mounting: false }).unreachable).toEqual([]);
+    w.give(e.recipes.partInputs(hull));
+    w.give(e.recipes.partInputs(hull));
+    w.give(e.recipes.partInputs(hull));
+    until(w, () => w.alive(16) && w.alive(17) && w.alive(15), 20000);
+    expect(w.alive(15)).toBe(true);
+  });
+
   it("an old save's waiting parts join the blueprint as missing parts", () => {
     const w = world(design());
     const live = w.ship().blueprint;
     w.prof.ship.field = { waiting: [part(13, 'sq', 'hull', 2, 0), part(14, 'sq', 'hull', 9, 9)] };
     w.server.pilots.reapplyShip(w.conn);
     w.run(2);
-    expect(w.ship().blueprint.parts.map((p) => p.uid)).toEqual([...live.parts.map((p) => p.uid), 13]);
+    // (14 joins nothing: planned, not connected, so kept rather than dropped)
+    expect(w.ship().blueprint.parts.map((p) => p.uid)).toEqual([...live.parts.map((p) => p.uid), 13, 14]);
     expect(w.alive(13)).toBe(false);
+    expect(w.alive(14)).toBe(false);
     expect(w.ship().ghost[w.idx(13)]).toBe(false);
     expect(w.prof.ship.field?.waiting).toBeUndefined();
   });

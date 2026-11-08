@@ -57,6 +57,8 @@ export interface PartTipCtx {
   index?: number;
   /** Where it stands: placed on the grid, or picked from the palette */
   state?: 'built' | 'ghost' | 'new' | 'wrecked' | 'palette';
+  /** Planned only: nothing joins it to the core yet, so nothing builds it */
+  loose?: boolean;
   /** On the ship you're flying: its HP now, and whether it's been shot off */
   live?: { hp: number; max: number; detached: boolean } | null;
   /** Every part is free (proto/admin): no build costs */
@@ -109,7 +111,8 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
 
   // State first: it's what matters most when it isn't simply fitted
   const live = c.live;
-  if (c.state === 'ghost') html += `<div style="color:#7dd3fc; margin-bottom:4px">Ghost: not built yet</div>`;
+  if (c.loose) html += `<div style="color:#c4b5fd; margin-bottom:4px">Not connected: it builds once something joins it to the core</div>`;
+  else if (c.state === 'ghost') html += `<div style="color:#7dd3fc; margin-bottom:4px">Ghost: not built yet</div>`;
   else if (c.state === 'new') html += `<div style="color:#fbbf24; margin-bottom:4px">New: save to build it in</div>`;
   else if (c.state === 'wrecked' || live?.detached || (live && live.hp <= 0)) html += `<div style="color:#f87171; margin-bottom:4px">${live?.detached ? 'Shot off' : 'Destroyed'}: the station rebuilds it</div>`;
   else if (live && live.hp < live.max - 1e-6) html += `<div style="color:#fbbf24; margin-bottom:4px">Damaged: ${Math.round((live.hp / live.max) * 100)}% (${n0(live.hp)} / ${n0(live.max)} hp)</div>`;

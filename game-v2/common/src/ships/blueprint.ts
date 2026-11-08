@@ -21,7 +21,7 @@ export { WEAPON_FNS, isWeaponFn, registerFunctionDefs, registeredFunction, lookF
 
 export type BlueprintErrorCode =
   | 'catalogVersion' | 'unknownPiece' | 'unknownFunction' | 'unknownMaterial' | 'functionNotAllowed'
-  | 'badUid' | 'duplicateUid' | 'tooManyParts' | 'coreCount' | 'overlap' | 'unreachable'
+  | 'badUid' | 'duplicateUid' | 'tooManyParts' | 'coreCount' | 'overlap'
   | 'facingMissing' | 'facingBlocked' | 'facingNotJoined' | 'notOwned' | 'materialNotOwned' | 'badPlacement' | 'badMount' | 'exclusive'
   | 'badMounting' | 'machineCount' | 'facingFixed';
 
@@ -34,6 +34,11 @@ export interface BlueprintError {
 export interface ValidationResult {
   ok: boolean;
   errors: BlueprintError[];
+  /**
+   * Parts (uids) the core doesn't hold on to through the design: planned only. A pilot may lay them out ahead of what joins
+   * them; they are never built, counted or flown until something joins them (a status, not an error)
+   */
+  unreachable: number[];
 }
 
 /**
@@ -129,10 +134,10 @@ export function validateBlueprint(
 
   const joins = computeJoins(geoms);
   const coreIdx = usable.findIndex((p) => p.fn === 'core');
+  let unreachable: number[] = [];
   if (coreIdx >= 0) {
     const reached = floodFill(usable.length, joins, coreIdx);
-    const lost = usable.filter((_, i) => !reached[i]).map((p) => p.uid);
-    if (lost.length) err('unreachable', lost, `${lost.length} part(s) not connected to the core`);
+    unreachable = usable.filter((_, i) => !reached[i]).map((p) => p.uid);
   }
 
   usable.forEach((p, i) => {
@@ -163,7 +168,7 @@ export function validateBlueprint(
     }
   }
 
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, unreachable };
 }
 
 /** Geometry for every part of a blueprint, in blueprint order. */

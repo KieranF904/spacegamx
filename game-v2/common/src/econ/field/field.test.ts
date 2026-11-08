@@ -149,6 +149,16 @@ describe('job order and placement', () => {
     expect(nextFieldTarget(n, root, joins, view(() => ({})))).toBeNull();
   });
 
+  it('a planned part nothing joins to the core is never picked; payCoreOutward passes it by too', () => {
+    // (One more part, far from the rest: joined to nothing)
+    const nn = n + 1;
+    const lone = (i: number) => i === n;
+    const v: FieldPartView[] = [...view(() => ({})), { alive: false, missing: 0, wanted: true, recycle: false, blocked: false, makeable: true }];
+    expect(nextFieldTarget(nn, root, joins, v)).toBeNull();
+    const built = Array.from({ length: nn }, (_, i) => !lone(i));
+    expect(payCoreOutward(nn, root, joins, built, lone, () => ({ alloy_plate: 1 }), { alloy_plate: 9 }).paid).toEqual([]);
+  });
+
   it('a missing part waits while nothing standing joins it', () => {
     const v = view((i) => (i === root ? {} : { alive: false, wanted: true }));
     const t = nextFieldTarget(n, root, joins, v);

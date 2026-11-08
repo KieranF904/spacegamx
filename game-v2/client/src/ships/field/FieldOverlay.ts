@@ -28,7 +28,7 @@ import { drawFacingMark, drawShieldCover } from '../build/buildMarks';
 import type { FieldDeps } from './bridge';
 import {
   addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, settle, summary,
-  targetErrors, working, type BuildEdits, type LiveDesign, type WorkingDesign,
+  targetErrors, unjoinedText, unjoinedUids, working, type BuildEdits, type LiveDesign, type WorkingDesign,
 } from './plan';
 
 const SIDE_CYCLE: readonly (Side | 'auto')[] = ['auto', 'N', 'E', 'S', 'W'];
@@ -36,6 +36,8 @@ const SIDE_CYCLE: readonly (Side | 'auto')[] = ['auto', 'N', 'E', 'S', 'W'];
 const REACH = 3;
 /** How a missing part shows (more as its build goes on) */
 const MISSING_ALPHA = 0.34, BUILDING_ALPHA = 0.5;
+/** A planned part nothing joins to the core yet: fainter than a missing one, outlined dashed in violet */
+const LOOSE_ALPHA = 0.2, LOOSE_LINE = 0xc4b5fd;
 
 const STYLE = `
 .fo { position: fixed; right: 0; top: 0; bottom: 0; width: 308px; z-index: 880; display: none; flex-direction: column; padding: 8px 8px 8px 10px;
@@ -75,7 +77,7 @@ export class FieldOverlay {
   private rev = 0;
   private note = '';
   private noteBad = false;
-  private cache: { key: unknown[]; w: WorkingDesign; geoms: PlacedGeom[] } | null = null;
+  private cache: { key: unknown[]; w: WorkingDesign; geoms: PlacedGeom[]; unjoined: Set<number> } | null = null;
 
   constructor(private deps: FieldDeps) {}
 
@@ -144,15 +146,16 @@ export class FieldOverlay {
   }
 
   /** The working design and its geometry, cached until the live ship, its recycling queue or the edits change */
-  private view(): { live: LiveDesign; w: WorkingDesign; geoms: PlacedGeom[] } | null {
+  private view(): { live: LiveDesign; w: WorkingDesign; geoms: PlacedGeom[]; unjoined: Set<number> } | null {
     const ship = this.deps.ship(), live = this.live();
     if (!ship || !live) return null;
     const key = [ship, ship.blueprint, ship.rebuilds, live.queued, this.rev];
     if (!this.cache || key.some((k, i) => k !== this.cache!.key[i])) {
       const w = working(live, this.edits);
-      this.cache = { key, w, geoms: w.bp.parts.map((p) => placeGeometry(this.deps.catalog, p)) };
+      this.cache = { key, w, geoms: w.bp.parts.map((p) => placeGeometry(this.deps.catalog, p)), unjoined: new Set() };
+      this.cache.unjoined = unjoinedUids(this.deps.catalog, w, this.cache.geoms);
     }
-    return { live, w: this.cache.w, geoms: this.cache.geoms };
+    return { live, w: this.cache.w, geoms: this.cache.geoms, unjoined: this.cache.unjoined };
   }
 
   /** The working design (null: closed or no ship) */
@@ -411,9 +414,20 @@ export class FieldOverlay {
     this.clearBtn.disabled = !(live.alive.some((a, i) => !a && live.bp.parts[i]?.fn !== 'core') || live.queued.size);
     const s = summary(live, this.edits);
     const sum = dirty ? `${s.added} new, ${s.recycle} to recycle${s.dropped ? `, ${s.dropped} dropped` : ''}` : '';
-    const text = [this.note, sum && `Unsaved: ${sum}.`].filter(Boolean).join(' ');
+    const v = this.view();
+    const loose = v ? v.unjoined : new Set<number>();
+    const hovered = v && this.mouse ? this.hoveredLoose(v, loose) : '';
+    const text = [this.note, sum && `Unsaved: ${sum}.`, unjoinedText(loose.size), hovered].filter(Boolean).join(' ');
     if (this.noteEl.textContent !== text) this.noteEl.textContent = text;
     this.noteEl.classList.toggle('bad', this.noteBad);
+  }
+
+  /** The tooltip for a not-connected part under the mouse ('' if none) */
+  private hoveredLoose(v: { w: WorkingDesign; unjoined: Set<number> }, loose: Set<number>): string {
+    if (!loose.size || !this.mouse) return '';
+    const at = this.gridAt(this.mouse.x, this.mouse.y);
+    const i = at ? partAtPoint(this.deps.catalog, v.w, at) : -1;
+    return i >= 0 && loose.has(v.w.bp.parts[i].uid) ? 'That part is not connected: nothing builds it until a part joins it to the core.' : '';
   }
 
   // ---------------------------------------------------------------- drawing
@@ -445,6 +459,12 @@ export class FieldOverlay {
       if (w.standing[i]) return; // (built: the ship itself)
       const job = w.liveIndex[i] >= 0 ? fieldClient.jobFor(p.uid) : undefined;
       const k = job && job.job.kind === 'build' ? machineProgress(job.m, clocks) : 0;
+      if (v.unjoined.has(p.uid)) {
+        // (planned only: faint, dashed, never shown as being built)
+        drawPartArt(g, this.deps.catalog, geom, at, ctx.cs, { alpha: LOOSE_ALPHA, paint });
+        dashPoly(g, X, geom, LOOSE_LINE, 0.9, ctx.cs * 0.03);
+        return;
+      }
       drawPartArt(g, this.deps.catalog, geom, at, ctx.cs, { alpha: job ? BUILDING_ALPHA + 0.4 * k : MISSING_ALPHA, paint });
       // (placed now and not saved yet: outlined amber, as the hangar marks a part new since the last save)
       if (w.liveIndex[i] < 0) fillPoly(g, X, geom, 0xfbbf24, 0, 0xfbbf24, 0.8, 1.2);
@@ -495,6 +515,22 @@ export function frameOf(ctx: Pick<ShipDrawCtx, 'entity' | 'ship' | 'cs'>): ShipF
       return [entity.renderX + lx * c - ly * s, entity.renderY + lx * s + ly * c];
     },
   };
+}
+
+/** A part's outline as dashes, in the world (a part planned but not connected) */
+export function dashPoly(g: Graphics, X: ShipFrame, geom: PlacedGeom, line: number, alpha: number, width: number): void {
+  const pts = geom.polygon.map(([x, y]) => X.at(x, y));
+  const n = pts.length;
+  for (let k = 0; k < n; k++) {
+    const a = pts[k], b = pts[(k + 1) % n];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const dash = Math.max(width * 3, 1), step = dash * 2, count = Math.max(1, Math.floor(len / step));
+    for (let d = 0; d < count; d++) {
+      const t0 = (d * step) / len, t1 = Math.min(1, (d * step + dash) / len);
+      g.moveTo(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0).lineTo(a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1);
+    }
+  }
+  g.stroke({ width, color: line, alpha });
 }
 
 /** A part's outline filled and stroked, in the world */

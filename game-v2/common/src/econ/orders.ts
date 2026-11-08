@@ -15,6 +15,8 @@
 import type { Bag, Stack } from './stacks.js';
 import type { Economy } from './economy.js';
 import type { Blueprint } from '../ships/types.js';
+import type { Catalog } from '../ships/catalog.js';
+import { buildableGhosts } from './hangar.js';
 import { canCraft } from './market.js';
 import { ghostBill } from './salvage.js';
 
@@ -59,9 +61,9 @@ export interface OrderSource {
 }
 
 /** The order the hangar works its slots in: on order first, by rank, then by slot */
-export function orderRanking(hangar: OrderSource['hangar']): number[] {
+export function orderRanking(hangar: OrderSource['hangar'], catalog?: Catalog): number[] {
   return hangar.map((rec, slot) => ({ rec, slot }))
-    .filter((x) => x.rec && (x.rec.ghosts ?? []).length)
+    .filter((x) => x.rec && (catalog ? buildableGhosts(catalog, x.rec.blueprint, x.rec.ghosts ?? []) : x.rec.ghosts ?? []).length)
     .sort((a, b) => Number(!!b.rec!.auto) - Number(!!a.rec!.auto) || (a.rec!.rank ?? 0) - (b.rec!.rank ?? 0) || a.slot - b.slot)
     .map((x) => x.slot);
 }
@@ -79,7 +81,7 @@ export function planOrders(econ: Economy, src: OrderSource): OrderPlan[] {
     return { r, c, left: n - r - c };
   };
   const out: OrderPlan[] = [];
-  for (const slot of orderRanking(src.hangar)) {
+  for (const slot of orderRanking(src.hangar, econ.ships)) {
     const rec = src.hangar[slot]!;
     const lines = new Map<string, OrderLine>();
     const line = (stage: OrderStage, id: string, n: number, why: string) => {
@@ -93,7 +95,7 @@ export function planOrders(econ: Economy, src: OrderSource): OrderPlan[] {
     const gather: Bag = {};
     const materials: [string, number, string][] = [];
     // Parts: modules as items, structure as plate
-    for (const [id, n] of Object.entries(ghostBill(econ, rec.blueprint, rec.ghosts ?? []))) {
+    for (const [id, n] of Object.entries(ghostBill(econ, rec.blueprint, buildableGhosts(econ.ships, rec.blueprint, rec.ghosts ?? [])))) {
       if (econ.recipes.refining.has(id)) { materials.push([id, n, 'structure']); continue; }
       const l = line('part', id, n, rec.blueprint.name);
       const t = take(id, n);

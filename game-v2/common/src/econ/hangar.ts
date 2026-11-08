@@ -67,6 +67,35 @@ function allocateDesign(catalog: Catalog, bp: Blueprint, take: (itemId: string, 
   return { installed, ghosts, used };
 }
 
+const looseCache = new WeakMap<Blueprint['parts'], { n: number; uids: Set<number> }>();
+
+/**
+ * Parts (uids) the core doesn't hold on to through the design: planned only, never built until something joins them. A
+ * ghost among them is not buildable, so no order makes it, nothing fits it, and it doesn't keep a ship "unbuilt"
+ */
+export function unreachableUids(catalog: Catalog, bp: Blueprint): Set<number> {
+  const hit = looseCache.get(bp.parts);
+  if (hit && hit.n === bp.parts.length) return hit.uids;
+  const uids = new Set<number>();
+  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  if (core >= 0) {
+    const adj = adjacency(catalog, bp);
+    const seen = new Set<number>([core]);
+    const queue = [core];
+    while (queue.length) for (const j of adj[queue.pop()!]) if (!seen.has(j)) { seen.add(j); queue.push(j); }
+    bp.parts.forEach((p, i) => { if (!seen.has(i)) uids.add(p.uid); });
+  }
+  looseCache.set(bp.parts, { n: bp.parts.length, uids });
+  return uids;
+}
+
+/** The ghosts (uids) a hangar slot can still build: those the core holds on to through the design */
+export function buildableGhosts(catalog: Catalog, bp: Blueprint, ghosts: readonly number[]): number[] {
+  if (!ghosts.length) return [];
+  const loose = unreachableUids(catalog, bp);
+  return loose.size ? ghosts.filter((u) => !loose.has(u)) : [...ghosts];
+}
+
 /** Ghost parts (uids) that join the built structure now, core outwards */
 export function installableGhosts(catalog: Catalog, bp: Blueprint, ghosts: number[], structural: (index: number) => boolean): number[] {
   const g = new Set(ghosts);
