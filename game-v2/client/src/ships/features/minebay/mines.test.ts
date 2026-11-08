@@ -105,6 +105,18 @@ describe('mine bay client: blasts predicted, found and told, drawn once (stage M
     expect(s.blasts).toHaveLength(0);
   });
 
+  it('never predicted or found for a pilot, a ward, a berthed ship or a person craft: those are the server job (PvP zones, parties)', () => {
+    for (const side of [SIDE.PILOT, SIDE.WARD, SIDE.DOCKED, SIDE.PERSON, SIDE.PILOT | SIDE.WARD]) {
+      const s = store();
+      expect(s.predict([{ id: NPC, x: touch[0], y: touch[1], radius: 20, side }], armedAt + 5, 0)).toBe(0);
+      s.window(armedAt, armedAt + 8, { ...layer(touch, armedAt), side: () => side }, 0);
+      expect(s.drops[0].ends[0]).toBeUndefined();
+      expect(s.blasts).toHaveLength(0);
+    }
+    // (the same ship with no side is found and predicted)
+    expect(store().predict(drawn(touch), armedAt + 5, 0)).toBe(1);
+  });
+
   it('predicted at once from the drawn ships, confirmed by the find: the same blast, never a second', () => {
     const s = store();
     expect(s.predict(drawn(touch), armedAt + 5, 0)).toBe(1);
