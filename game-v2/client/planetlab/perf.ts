@@ -1,5 +1,5 @@
 /**
- * The planet lab's live performance graph (after the sun lab's, client/sunlab/perf.ts): the last 30 s of what the shown
+ * The planet lab's live performance graph (after the sun lab's, client/tools/sunlab/perf.ts): the last 30 s of what the shown
  * option costs (ms a frame) against the current shader (dashed), a marker wherever something was changed, and a plain
  * readout of the last 2 s ("2.8x cheaper than current"). The numbers come from planetlab.ts's measure().
  */

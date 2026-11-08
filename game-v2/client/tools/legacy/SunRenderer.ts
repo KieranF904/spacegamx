@@ -11,7 +11,7 @@
  */
 
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
-import { shaderReady } from '../shaderWarmup';
+import { shaderReady } from '../../src/rendering/shaderWarmup';
 
 // Vertex shader - creates a quad and passes UV coordinates
 const VERTEX_SHADER = `#version 300 es

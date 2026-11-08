@@ -25,7 +25,7 @@ they were (the lab and the harness still draw them, with the shipped star beside
     kept by the asset cache (`plasmaNoise`, `PLASMA_NOISE_VERSION`). `rendering/texture3d.ts` uploads a 3D texture
     through Pixi.
   - The old sun, glow (it drew nothing) and corona renderers are gone from the game. They're kept in
-    `rendering/legacy/` for the sandbox and as the lab's "original".
+    `client/tools/legacy/` for the sandbox and as the lab's "original".
   - Black holes, the pulsar and the brown dwarf keep their own shaders.
 - **Per star data.** `centralBody.plasma` in `data/systems.json`. Rounds 4 and 5's tuning moved there.
   - The fields and their ranges are `STAR_PLASMA_FIELDS` in `common/src/data/schemas.ts`, checked by `validateGameData.ts`.
@@ -521,7 +521,7 @@ place). The lab now draws the whole system: the planets and moons too (with the 
 `docs/rendering/planet-prototypes.md`); see "Running it" below. Every comparison sheet puts **current first** and labels each option **FAITHFUL** or **ALT**, with its mean
 difference from current (0 to 255 a channel).
 
-**Live cost in the lab** (bottom right, `client/sunlab/perf.ts`):
+**Live cost in the lab** (bottom right, `client/tools/sunlab/perf.ts`):
 
 - **What it shows:**
   - A graph of the last 30 s, in ms a frame, in three plots: the sun's cost, the sky's, and the planets' (every
@@ -936,7 +936,7 @@ affordable if wanted.
 
 None of this is wired in. A suggested order:
 
-1. **Glow.** Remove `GlowRenderer` from `Renderer` (and from `sandbox.ts` if wanted). No visual change.
+1. **Glow.** Remove `GlowRenderer` from `Renderer` (and from `tools/sandbox.ts` if wanted). No visual change.
 2. **Star (B).**
    - Add a `SunPhotoRenderer` beside `SunRenderer`: one Pixi `Mesh` with `SUN_PHOTO_VERT`/`SUN_PHOTO_FRAG`, its quad
      ±R·`reach`, and a `uNoiseTex` resource made like `skyNoiseTexture()` from `sunNoiseData()` (`BufferImageSource`,
@@ -1035,7 +1035,7 @@ Each sun sheet is 2×2: current, A, B, B-lite.
   `sunPhotoFine`).
 - `client/src/rendering/proto/skyProto.ts`: sprite stars, deep sky, `spriteGrid`, `skyBox`, `ringBox`,
   `insideRingOnly`.
-- `client/sunlab.html`, `client/sunlab/sunlab.ts`: the lab (dev only).
+- `client/sunlab.html`, `client/tools/sunlab/sunlab.ts`: the lab (dev only).
 - `scripts/sun-sky-proto/`:
   - `layers.ts`, `skyLayers.ts`: the game's set-up and the prototypes', per view;
   - `scenes.ts`, `run.mjs`: jobs and runner;
