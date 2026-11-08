@@ -6,6 +6,7 @@
  */
 import type { MenuPilotInfo, MenuShipInfo } from '../../GameMenuUI';
 import type { HubTab } from '../hubTabs';
+import { esc } from '../../escape';
 
 export interface PilotTabDeps {
   pilot(): MenuPilotInfo;
@@ -17,7 +18,6 @@ export interface PilotTabDeps {
   keyName(action: string): string;
 }
 
-const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const pct = (v: number, max: number) => (max > 0 ? Math.max(0, Math.min(100, (v / max) * 100)) : 0);
 
 let styled = false;

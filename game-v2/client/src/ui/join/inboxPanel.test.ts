@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { bannerHtml, escapeHtml, listHtml, readerHtml, sentHtml } from './InboxPanel';
+import { bannerHtml, listHtml, readerHtml, sentHtml } from './InboxPanel';
+import { esc } from '../escape';
 import type { InboxMessage } from '../../network/inbox';
 
 const EVIL = `<img src=x onerror="alert(1)"> & 'quoted'`;
@@ -16,7 +17,7 @@ function noInjectedMarkup(html: string): void {
 
 describe('inbox rendering', () => {
   it('escapes every character that matters', () => {
-    expect(escapeHtml(EVIL)).toBe('&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &#39;quoted&#39;');
+    expect(esc(EVIL)).toBe('&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &#39;quoted&#39;');
   });
 
   it('lists messages, unread and important ones marked, the open one selected', () => {

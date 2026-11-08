@@ -11,8 +11,8 @@
 
 import { regionAt, threatLevel, insideArena, nearGate, GATE, type StarSystemData, type SystemRegionData } from '@space-game/common';
 import { threatTag } from './threat';
+import { esc } from './escape';
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export const REGION_COLOR: Record<SystemRegionData['danger'], string> = { safe: '#5eead4', contested: '#fbbf24', hostile: '#f87171' };
 const REGION_WORD: Record<SystemRegionData['danger'], string> = { safe: 'Safe space', contested: 'Contested', hostile: 'Hostile' };

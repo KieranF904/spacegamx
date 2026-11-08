@@ -9,8 +9,8 @@
  */
 
 import { setHtml, setStyle } from './domWrite';
+import { esc } from './escape';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 let styled = false;
 function injectStyles(): void {

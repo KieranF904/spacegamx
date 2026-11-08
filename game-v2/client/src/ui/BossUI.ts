@@ -10,6 +10,7 @@ import { EntityType, huntedBoss, WINDOW, type ServerBossWindowMessage } from '@s
 import type { GameState } from '../state/GameState';
 import { setStyle } from './domWrite';
 import bossData from '../../../data/bosses.json';
+import { esc } from './escape';
 
 interface BossInfo { name: string; title: string; phases: { at: number }[] }
 const BOSSES = (bossData as unknown as { rules: { barRange: number }; bosses: Record<string, BossInfo> });
@@ -195,7 +196,6 @@ export class BossUI {
   private card(kicker: string, name: string, title: string, text: string, ms: number): void {
     const el = document.createElement('div');
     el.className = 'bt';
-    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
     el.innerHTML = `<div class="bt-in"><div class="bt-k">${kicker}</div><div class="bt-n">${esc(name)}</div><div class="bt-t">${esc(title)}</div>${text ? `<div class="bt-x">${esc(text)}</div>` : ''}</div>`;
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add('on'));

@@ -25,6 +25,7 @@ import factionsData from '../../../data/factions.json';
 import systemsData from '../../../data/systems.json';
 import itemsData from '../../../data/items.json';
 import { threatTag } from './threat';
+import { esc } from './escape';
 
 export type GuideTab = 'basics' | 'combat' | 'ships' | 'industry' | 'progress' | 'tiers' | 'people';
 
@@ -131,7 +132,6 @@ const MODEL_LEVEL = (id: string, or: number) => (shipModels as unknown as { mode
 const REPAIR_LEVEL = MODEL_LEVEL('utility_repair_beam', 17), PD_LEVEL = MODEL_LEVEL('point_defence_turret', 10);
 const SUPPORT_W = (shipTuning as unknown as ShipTuning).weapons ?? {};
 const PD_RANGE = SUPPORT_W.point_defence?.pointDefence?.range ?? 560;
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 interface Material { id: string; name: string; grade: number; output: number; toughness: number; density: number; insulation?: number }
 const MATERIALS: Material[] = ((materialsData as unknown as { materials?: Material[] }).materials ?? (materialsData as unknown as Material[]));

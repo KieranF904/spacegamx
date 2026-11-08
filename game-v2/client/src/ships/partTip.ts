@@ -14,6 +14,7 @@ import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
 import { tipRows } from './describe';
 import { FIRE_SENTENCE, REGROW_SENTENCE, MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
+import { esc } from '../ui/escape';
 
 /** A ship's boost-and-fire load test, kept per derived state: a tooltip reads it for every gun (4 s of power ticks) */
 const boostFire = new WeakMap<ShipDerived, ReturnType<typeof loadTest>>();
@@ -67,7 +68,6 @@ export interface PartTipCtx {
   canMake(id: string): boolean;
 }
 
-const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
 const FACING: Record<Side, string> = { N: 'forward', E: 'right', S: 'back', W: 'left' };
 const KIND: Record<string, string> = { beam: 'beam', projectile: 'shells' };

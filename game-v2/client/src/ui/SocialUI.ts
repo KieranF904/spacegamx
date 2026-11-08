@@ -21,13 +21,11 @@ import { FriendsPanel } from './social/FriendsPanel';
 import { onlineCount } from './social/friendsView';
 import { settings } from '../settings/Settings';
 import systemsData from '../../../data/systems.json';
+import { esc } from './escape';
 
 const SYSTEMS = new Map((systemsData as { systems: StarSystemData[] }).systems.map((s) => [s.id, s]));
 const sysName = (id: string) => SYSTEMS.get(id)?.name.replace(/ System$/, '') ?? id;
 
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 export interface SocialDeps {
   state: GameState;

@@ -40,6 +40,7 @@ import { boundKeyName } from '../input/keybindings';
 import systemsFile from '../../../data/systems.json';
 import bossData from '../../../data/bosses.json';
 import hazardData from '../../../data/hazards.json';
+import { esc } from './escape';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
 const JUMP = jumpTuning(shipTuning as unknown as ShipTuning);
@@ -155,9 +156,6 @@ function fmtDist(u: number): string {
   return u >= 1000 ? `${(u / 1000).toFixed(u >= 10000 ? 0 : 1)}k` : `${Math.round(u)}`;
 }
 
-function escapeHtml(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 export class SystemMapUI {
   /** Map click-to-warp (dev tool): Game sends it to the server */
@@ -1761,85 +1759,85 @@ export class SystemMapUI {
       const rifts = (s.rifts ?? []).map((r) => this.byId.get(r.destination.system)?.name ?? r.destination.system);
       const here = s.id === this.state.systemId;
       html = `
-        <div class="t-name">${escapeHtml(s.name)}</div>
-        <div class="t-sub">${escapeHtml((s.sector ?? '').replace(/_/g, ' '))} · ${BODY_NAMES[cb] ?? cb}</div>
-        <div class="t-desc">${escapeHtml(s.description)}</div>
-        ${(() => { const l = this.locked?.(s.id); return l ? `<div class="t-row" style="color:#fbbf24"><b>🔒 Locked</b> ${escapeHtml(l.hint)}</div>` : ''; })()}
+        <div class="t-name">${esc(s.name)}</div>
+        <div class="t-sub">${esc((s.sector ?? '').replace(/_/g, ' '))} · ${BODY_NAMES[cb] ?? cb}</div>
+        <div class="t-desc">${esc(s.description)}</div>
+        ${(() => { const l = this.locked?.(s.id); return l ? `<div class="t-row" style="color:#fbbf24"><b>🔒 Locked</b> ${esc(l.hint)}</div>` : ''; })()}
         ${s.hazards.length ? `<div class="t-row"><b>Hazards</b> ${s.hazards.map((h) => HAZARD_NAMES[h] ?? h).join(', ')}</div>` : ''}
         <div class="t-row"><b>Stations</b> ${s.stations.length || 'none'}</div>
         ${this.state.threats[s.id] ? `<div class="t-row"><b>Threat</b> ${threatTag(this.myRating?.() ?? 0, this.state.threats[s.id], '◆')}</div>` : ''}
         ${hazardRows(s.hazardRatings, this.myShip?.() ?? null)}
-        ${s.planets?.length ? `<div class="t-row"><b>Planets</b> ${escapeHtml(s.planets.map((p) => p.name).join(', '))}</div>` : ''}
+        ${s.planets?.length ? `<div class="t-row"><b>Planets</b> ${esc(s.planets.map((p) => p.name).join(', '))}</div>` : ''}
         ${s.derelicts?.length ? `<div class="t-row"><b>Wrecks</b> ${s.derelicts.length}</div>` : ''}
-        <div class="t-row"><b>Gates to</b> ${links.length ? escapeHtml(links.join(', ')) : 'none'}</div>
-        ${rifts.length ? `<div class="t-row"><b>Rift to</b> ${escapeHtml(rifts.join(', '))}</div>` : ''}
+        <div class="t-row"><b>Gates to</b> ${links.length ? esc(links.join(', ')) : 'none'}</div>
+        ${rifts.length ? `<div class="t-row"><b>Rift to</b> ${esc(rifts.join(', '))}</div>` : ''}
         <div class="t-act">${here ? 'You are here' : 'Click: autopilot there, gate by gate'}${this.onWarp ? ' · Ctrl-click: warp <span>(dev)</span>' : ''}</div>`;
     } else if (hit.kind === 'station') {
-      html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">Station · shipyard</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">Station · shipyard</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'gate') {
-      html = `<div class="t-name">Jump gate</div><div class="t-sub">to ${escapeHtml(hit.target?.name ?? '?')}</div>${this.destRows(hit.target)}<div class="t-desc">Fly in and press ${escapeHtml(boundKeyName('interact', settings.data.bindings))} to jump.</div>${hazardRows(hit.target?.hazardRatings, this.myShip?.() ?? null)}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">Jump gate</div><div class="t-sub">to ${esc(hit.target?.name ?? '?')}</div>${this.destRows(hit.target)}<div class="t-desc">Fly in and press ${esc(boundKeyName('interact', settings.data.bindings))} to jump.</div>${hazardRows(hit.target?.hazardRatings, this.myShip?.() ?? null)}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'rift') {
-      html = `<div class="t-name">${escapeHtml(hit.label)}</div><div class="t-sub">Rift to ${escapeHtml(hit.dest?.name ?? '?')}</div>${this.destRows(hit.dest)}<div class="t-desc">Fly into the vortex to be pulled through.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(hit.label)}</div><div class="t-sub">Rift to ${esc(hit.dest?.name ?? '?')}</div>${this.destRows(hit.dest)}<div class="t-desc">Fly into the vortex to be pulled through.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'region') {
       const g = hit.region, st = REGION_STYLE[g.danger] ?? REGION_STYLE.contested;
       const threat = this.state.regionThreats?.[this.state.systemId]?.[g.id];
-      html = `<div class="t-name">${escapeHtml(g.name)}</div><div class="t-sub" style="text-transform:none"><span style="color:${st.color}">${st.word}</span> · ${hit.inner ? `${fmtDist(hit.inner)} to ` : 'out to '}${fmtDist(g.outer)} from the centre</div>`
-        + (g.description ? `<div class="t-desc">${escapeHtml(g.description)}</div>` : '')
+      html = `<div class="t-name">${esc(g.name)}</div><div class="t-sub" style="text-transform:none"><span style="color:${st.color}">${st.word}</span> · ${hit.inner ? `${fmtDist(hit.inner)} to ` : 'out to '}${fmtDist(g.outer)} from the centre</div>`
+        + (g.description ? `<div class="t-desc">${esc(g.description)}</div>` : '')
         + (threat ? `<div class="t-row"><b>Threat</b> ${threatTag(this.myRating?.() ?? 0, threat, '◆')}</div>` : '');
     } else if (hit.kind === 'zone') {
       const z = hit.zone;
-      html = `<div class="t-name" style="color:${z.color ?? '#e9f2ff'}">${escapeHtml(z.name)}</div><div class="t-sub" style="text-transform:none">${z.x !== undefined ? `${fmtDist(z.outer)} across the spot` : `${fmtDist(z.inner)} to ${fmtDist(z.outer)} from the centre`}</div>${z.description ? `<div class="t-desc">${escapeHtml(z.description)}</div>` : ''}`;
+      html = `<div class="t-name" style="color:${z.color ?? '#e9f2ff'}">${esc(z.name)}</div><div class="t-sub" style="text-transform:none">${z.x !== undefined ? `${fmtDist(z.outer)} across the spot` : `${fmtDist(z.inner)} to ${fmtDist(z.outer)} from the centre`}</div>${z.description ? `<div class="t-desc">${esc(z.description)}</div>` : ''}`;
     } else if (hit.kind === 'hostile') {
       const sub = hit.calm ? 'Passive · leaves you be unless provoked' : hit.rank === 2 ? 'Boss' : hit.rank === 1 ? 'Elite hostile' : 'Hostile';
-      html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">${sub}</div>${hit.rating ? `<div class="t-row"><b>Rates</b> ${threatTag(this.myRating?.() ?? 0, hit.rating, '◆')}</div>` : ''}<div class="t-act">Hold left to fire (rough aim at this scale)</div>`;
+      html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">${sub}</div>${hit.rating ? `<div class="t-row"><b>Rates</b> ${threatTag(this.myRating?.() ?? 0, hit.rating, '◆')}</div>` : ''}<div class="t-act">Hold left to fire (rough aim at this scale)</div>`;
     } else if (hit.kind === 'beacon') {
       html = `<div class="t-name">Your wreck</div><div class="t-sub">Kept for you a while</div><div class="t-desc">Fly back to it to recover what you lost.</div><div class="t-act">Click: autopilot there</div>`;
     } else if (hit.kind === 'moon') {
       const surf = this.byId.get(hit.surface);
       const b = surf?.surface?.bastion;
-      html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">Moon of ${escapeHtml(hit.planet.name)} · siege${b?.grade ? ` · Mk ${['', 'I', 'II', 'III', 'IV', 'V'][b.grade]} nights` : ''}</div>`
-        + (surf?.description ? `<div class="t-desc">${escapeHtml(surf.description)}</div>` : '')
+      html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">Moon of ${esc(hit.planet.name)} · siege${b?.grade ? ` · Mk ${['', 'I', 'II', 'III', 'IV', 'V'][b.grade]} nights` : ''}</div>`
+        + (surf?.description ? `<div class="t-desc">${esc(surf.description)}</div>` : '')
         + (this.state.threats[hit.surface] ? `<div class="t-row"><b>Threat</b> ${threatTag(this.myRating?.() ?? 0, this.state.threats[hit.surface], '◆')} <span style="color:#64748b">(night 3, solo)</span></div>` : '')
         + `<div class="t-act">Click: autopilot there, then X to descend · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'planet') {
       const pl = hit.planet;
-      html = `<div class="t-name">${escapeHtml(pl.name)}</div><div class="t-sub">${PLANET_KINDS[pl.kind] ?? pl.kind}${pl.rings ? ' · rings' : ''}${pl.moons?.length ? ` · ${pl.moons.length} moon${pl.moons.length > 1 ? 's' : ''}` : ''}</div>${pl.description ? `<div class="t-desc">${escapeHtml(pl.description)}</div>` : ''}<div class="t-act">Click: autopilot into orbit · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(pl.name)}</div><div class="t-sub">${PLANET_KINDS[pl.kind] ?? pl.kind}${pl.rings ? ' · rings' : ''}${pl.moons?.length ? ` · ${pl.moons.length} moon${pl.moons.length > 1 ? 's' : ''}` : ''}</div>${pl.description ? `<div class="t-desc">${esc(pl.description)}</div>` : ''}<div class="t-act">Click: autopilot into orbit · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'freighter') {
-      html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">Civilian hauler</div><div class="t-desc">Flies cargo between Sol's stations.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">Civilian hauler</div><div class="t-desc">Flies cargo between Sol's stations.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'comet') {
-      html = `<div class="t-name">${escapeHtml(hit.comet.name)}</div><div class="t-sub">Comet · ${Math.round(Math.hypot(hit.x, hit.y) / 1000)}k from the star</div>${hit.comet.description ? `<div class="t-desc">${escapeHtml(hit.comet.description)}</div>` : ''}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(hit.comet.name)}</div><div class="t-sub">Comet · ${Math.round(Math.hypot(hit.x, hit.y) / 1000)}k from the star</div>${hit.comet.description ? `<div class="t-desc">${esc(hit.comet.description)}</div>` : ''}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'structure') {
-      html = `<div class="t-name">${escapeHtml(hit.structure.name)}</div><div class="t-sub">Megastructure</div>${hit.structure.description ? `<div class="t-desc">${escapeHtml(hit.structure.description)}</div>` : ''}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(hit.structure.name)}</div><div class="t-sub">Megastructure</div>${hit.structure.description ? `<div class="t-desc">${esc(hit.structure.description)}</div>` : ''}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'lodestone') {
       const l = hit.lodestone;
       const camp = l.zone ? this.byId.get(this.state.systemId)?.zones?.find((z) => z.id === l.zone) : undefined;
       const live = lodestoneLive(l), size = fmtDist(lodestoneSize(l, JUMP) * 2);
       const sub = !live ? `${l.state === 'dead' ? 'Dead' : 'Shattered'}: no charging field · ${size} across`
         : `${l.state === 'scarred' ? 'Scarred · a weaker' : 'Jump-drive'} charging field · ${fmtDist(lodestoneFieldRadius(l, JUMP) * 2)} across`;
-      html = `<div class="t-name" style="color:${live ? LODE_COLOR : LODE_DEAD}">◈ ${escapeHtml(lodestoneLabel(l, JUMP))}</div><div class="t-sub">${sub}${l.orbit ? ' · orbiting' : ''}</div>`
-        + (l.description ? `<div class="t-desc">${escapeHtml(l.description)}</div>` : '')
+      html = `<div class="t-name" style="color:${live ? LODE_COLOR : LODE_DEAD}">◈ ${esc(lodestoneLabel(l, JUMP))}</div><div class="t-sub">${sub}${l.orbit ? ' · orbiting' : ''}</div>`
+        + (l.description ? `<div class="t-desc">${esc(l.description)}</div>` : '')
         + (live ? `<div class="t-row"><b>Inside</b> the drive recharges ${+(1 + lodestoneChargeOf(l, JUMP)).toFixed(2)}× as fast</div>`
           + `<div class="t-row"><b>After</b> your next jump within ${Math.round(JUMP.lodestonePrimeTicks / 60)}s reaches ${Math.round((lodestoneBoostOf(l, JUMP) - 1) * 100)}% further</div>` : '')
-        + (camp ? `<div class="t-row" style="color:#f87171"><b>Camped</b> hostiles wait here (${escapeHtml(camp.name)})</div>` : '')
+        + (camp ? `<div class="t-row" style="color:#f87171"><b>Camped</b> hostiles wait here (${esc(camp.name)})</div>` : '')
         + `<div class="t-act">Click: autopilot there · aim a jump here to lock on · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'nest') {
       const n = hit.nest, f = FACTIONS[n.faction];
       const pl = n.around !== undefined ? this.byId.get(this.state.systemId)?.planets?.find((p) => p.id === n.around) : undefined;
       const round = pl ? (n.moon !== undefined ? `orbiting a moon of ${pl.name}` : `orbiting ${pl.name}`) : n.orbit.period ? 'orbiting the centre' : 'anchored';
-      html = `<div class="t-name" style="color:${f?.color ?? '#f87171'}">▲ ${escapeHtml(n.name)}</div><div class="t-sub">${escapeHtml(f?.name ?? n.faction)} nest · ${escapeHtml(round)}</div>`
-        + (n.description ? `<div class="t-desc">${escapeHtml(n.description)}</div>` : '')
+      html = `<div class="t-name" style="color:${f?.color ?? '#f87171'}">▲ ${esc(n.name)}</div><div class="t-sub">${esc(f?.name ?? n.faction)} nest · ${esc(round)}</div>`
+        + (n.description ? `<div class="t-desc">${esc(n.description)}</div>` : '')
         + `<div class="t-row">Its packs launch from here and roam round it; shoot them down and it sends more in time</div>`
         + `<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'wayin') {
       const pk = hit.pocket, e = pk.pocket!.entrance, f = e.look ? FACTIONS[e.look.faction] : undefined;
-      html = `<div class="t-name" style="color:${f?.color ?? '#fbbf24'}">Way into ${escapeHtml(e.name)}</div><div class="t-sub">${escapeHtml(pk.name)}</div>`
-        + `<div class="t-desc">${escapeHtml(pk.description)}</div>`
-        + `<div class="t-row">Fly close and press <b>${escapeHtml(boundKeyName('interact', settings.data.bindings))}</b> to go in; fly out past its edge to come back here</div>`
+      html = `<div class="t-name" style="color:${f?.color ?? '#fbbf24'}">Way into ${esc(e.name)}</div><div class="t-sub">${esc(pk.name)}</div>`
+        + `<div class="t-desc">${esc(pk.description)}</div>`
+        + `<div class="t-row">Fly close and press <b>${esc(boundKeyName('interact', settings.data.bindings))}</b> to go in; fly out past its edge to come back here</div>`
         + `<div class="t-act">Click: autopilot there · aim a jump here to lock on · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'wreck') {
-      html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">Derelict hulk</div><div class="t-desc">Break its core for salvage credits.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">Derelict hulk</div><div class="t-desc">Break its core for salvage credits.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else {
-      html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">Pilot</div><div class="t-act">Click: autopilot alongside</div>`;
+      html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">Pilot</div><div class="t-act">Click: autopilot alongside</div>`;
     }
     this.tooltip.innerHTML = html;
     this.tooltip.style.display = 'block';
@@ -1864,7 +1862,7 @@ export class SystemMapUI {
       row = `<div class="t-row"><b>Threat</b> <span style="color:${o.color}">◆${Math.round(threat)}${mine ? ` vs your ◆${Math.round(mine)} · ${o.word}` : ''}</span></div>`;
     }
     const line = (t.description ?? '').split(/(?<=[.!?])\s/)[0];
-    return row + (line ? `<div class="t-desc">${escapeHtml(line)}</div>` : '');
+    return row + (line ? `<div class="t-desc">${esc(line)}</div>` : '');
   }
 
   private injectStyles(): void {

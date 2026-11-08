@@ -1,3 +1,4 @@
+import { esc } from './escape';
 /**
  * Event Feed UI - Shows notable game events
  * 
@@ -318,34 +319,34 @@ export class KillFeedUI {
       case 'enemy-defeat':
         return `
           <div class="kill-feed-entry type-enemy-defeat" data-id="${entry.id}" ${highlight}>
-            <span class="event-player">${this.escapeHtml(entry.player || 'Player')}</span>
+            <span class="event-player">${esc(entry.player || 'Player')}</span>
             <span style="color: #666;">defeated</span>
-            <span class="event-target">${this.escapeHtml(entry.target || 'enemy')}</span>
+            <span class="event-target">${esc(entry.target || 'enemy')}</span>
           </div>
         `;
         
       case 'mission':
         return `
           <div class="kill-feed-entry type-mission" data-id="${entry.id}" ${highlight}>
-            <span class="event-player">${this.escapeHtml(entry.player || 'Player')}</span>
+            <span class="event-player">${esc(entry.player || 'Player')}</span>
             <span style="color: #666;">completed</span>
-            <span class="event-mission">${this.escapeHtml(entry.message || 'mission')}</span>
+            <span class="event-mission">${esc(entry.message || 'mission')}</span>
           </div>
         `;
         
       case 'quest':
         return `
           <div class="kill-feed-entry type-quest" data-id="${entry.id}" ${highlight}>
-            <span class="event-player">${this.escapeHtml(entry.player || 'Player')}</span>
+            <span class="event-player">${esc(entry.player || 'Player')}</span>
             <span style="color: #666;">completed quest:</span>
-            <span class="event-quest">${this.escapeHtml(entry.message || '')}</span>
+            <span class="event-quest">${esc(entry.message || '')}</span>
           </div>
         `;
         
       case 'levelup':
         return `
           <div class="kill-feed-entry type-levelup" data-id="${entry.id}" ${highlight}>
-            <span class="event-player">${this.escapeHtml(entry.player || 'Player')}</span>
+            <span class="event-player">${esc(entry.player || 'Player')}</span>
             <span style="color: #666;">reached level</span>
             <span class="event-level">${entry.level || 1}</span>
           </div>
@@ -354,16 +355,16 @@ export class KillFeedUI {
       case 'loot':
         return `
           <div class="kill-feed-entry type-loot" data-id="${entry.id}" ${highlight}>
-            <span class="event-player">${this.escapeHtml(entry.player || 'Player')}</span>
+            <span class="event-player">${esc(entry.player || 'Player')}</span>
             <span style="color: #666;">found</span>
-            <span class="event-item">${this.escapeHtml(entry.item || 'item')}</span>
+            <span class="event-item">${esc(entry.item || 'item')}</span>
           </div>
         `;
         
       case 'join':
         return `
           <div class="kill-feed-entry type-join" data-id="${entry.id}" ${highlight}>
-            <span class="kill-feed-join">${this.escapeHtml(entry.message || 'Player')}</span>
+            <span class="kill-feed-join">${esc(entry.message || 'Player')}</span>
             <span style="color: #666;">joined the game</span>
           </div>
         `;
@@ -371,7 +372,7 @@ export class KillFeedUI {
       case 'leave':
         return `
           <div class="kill-feed-entry type-leave" data-id="${entry.id}" ${highlight}>
-            <span class="kill-feed-leave">${this.escapeHtml(entry.message || 'Player')}</span>
+            <span class="kill-feed-leave">${esc(entry.message || 'Player')}</span>
             <span style="color: #666;">left the game</span>
           </div>
         `;
@@ -379,14 +380,14 @@ export class KillFeedUI {
       case 'achievement':
         return `
           <div class="kill-feed-entry type-achievement" data-id="${entry.id}" ${highlight}>
-            <span class="kill-feed-achievement">★ ${this.escapeHtml(entry.message || '')}</span>
+            <span class="kill-feed-achievement">★ ${esc(entry.message || '')}</span>
           </div>
         `;
         
       case 'system':
         return `
           <div class="kill-feed-entry type-system" data-id="${entry.id}" ${highlight}>
-            <span style="color: #88ccff;">${this.escapeHtml(entry.message || '')}</span>
+            <span style="color: #88ccff;">${esc(entry.message || '')}</span>
           </div>
         `;
         
@@ -423,11 +424,6 @@ export class KillFeedUI {
     }
   }
   
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
   
   show(): void {
     this.feedEl.style.display = 'flex';

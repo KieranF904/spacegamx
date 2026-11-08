@@ -12,6 +12,7 @@
 import type { TalkView, ClientMessage } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
 import { rewardsHtml, CHAIN } from './QuestUI';
+import { esc } from './escape';
 
 export interface DialogueDeps {
   pilot: PilotState;
@@ -22,7 +23,6 @@ export interface DialogueDeps {
   toast(text: string, kind?: 'info' | 'good' | 'warn' | 'bad'): void;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 let styled = false;
 function injectStyles(): void {

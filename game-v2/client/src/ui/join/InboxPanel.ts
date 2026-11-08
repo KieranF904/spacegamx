@@ -9,6 +9,7 @@
  */
 
 import type { InboxApi, InboxMessage, SentInfo } from '../../network/inbox';
+import { esc } from '../escape';
 
 export interface InboxAccount { token: string; username: string; isAdmin: boolean }
 
@@ -16,9 +17,6 @@ const SUBJECT_MAX = 120;
 const BODY_MAX = 4000;
 
 /** Text into HTML text or a quoted attribute */
-export function escapeHtml(text: string): string {
-  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 
 /** "2026-11-05 14:03" in the reader's own time */
 export function formatWhen(ms: number): string {
@@ -34,8 +32,8 @@ export function listHtml(messages: InboxMessage[], selected: number | null): str
   if (!messages.length) return '<div class="inbox-empty">No messages yet. Messages from the developers will show up here.</div>';
   return messages.map((m) => `
     <button type="button" class="inbox-row${m.readAt === null ? ' unread' : ''}${m.important ? ' important' : ''}${m.id === selected ? ' selected' : ''}" data-id="${Number(m.id)}">
-      <span class="inbox-row-top"><span class="inbox-from">${escapeHtml(fromLabel(m.from))}</span><span class="inbox-date">${escapeHtml(formatWhen(m.createdAt))}</span></span>
-      <span class="inbox-subject">${escapeHtml(m.subject)}</span>
+      <span class="inbox-row-top"><span class="inbox-from">${esc(fromLabel(m.from))}</span><span class="inbox-date">${esc(formatWhen(m.createdAt))}</span></span>
+      <span class="inbox-subject">${esc(m.subject)}</span>
     </button>`).join('');
 }
 
@@ -43,9 +41,9 @@ export function listHtml(messages: InboxMessage[], selected: number | null): str
 export function readerHtml(m: InboxMessage | null): string {
   if (!m) return '<div class="inbox-hint">Pick a message to read it.</div>';
   return `
-    <div class="inbox-read-subject">${escapeHtml(m.subject)}</div>
-    <div class="inbox-read-meta">From <b>${escapeHtml(fromLabel(m.from))}</b> · ${escapeHtml(formatWhen(m.createdAt))}${m.important ? ` · <span class="inbox-tag">${m.from === 'system' ? 'important' : 'admin'}</span>` : ''}</div>
-    <div class="inbox-read-body">${escapeHtml(m.body)}</div>
+    <div class="inbox-read-subject">${esc(m.subject)}</div>
+    <div class="inbox-read-meta">From <b>${esc(fromLabel(m.from))}</b> · ${esc(formatWhen(m.createdAt))}${m.important ? ` · <span class="inbox-tag">${m.from === 'system' ? 'important' : 'admin'}</span>` : ''}</div>
+    <div class="inbox-read-body">${esc(m.body)}</div>
     <div class="inbox-read-actions"><button type="button" class="inbox-btn inbox-delete" data-id="${Number(m.id)}">Delete</button></div>`;
 }
 
@@ -58,8 +56,8 @@ export function bannerHtml(messages: InboxMessage[]): string {
   return `
     <div class="inbox-banner-icon" aria-hidden="true">✉</div>
     <div class="inbox-banner-text">
-      <div class="inbox-banner-label">Message from ${escapeHtml(fromLabel(m.from))} ${more}</div>
-      <div class="inbox-banner-subject">${escapeHtml(m.subject)}</div>
+      <div class="inbox-banner-label">Message from ${esc(fromLabel(m.from))} ${more}</div>
+      <div class="inbox-banner-subject">${esc(m.subject)}</div>
     </div>
     <button type="button" class="inbox-banner-read" data-id="${Number(m.id)}">Read</button>`;
 }
@@ -69,9 +67,9 @@ export function sentHtml(sent: SentInfo[]): string {
   if (!sent.length) return '<div class="inbox-empty">Nothing sent yet.</div>';
   return sent.slice(0, 8).map((s) => `
     <div class="inbox-sent-row">
-      <span class="inbox-sent-to">${s.to === '*' ? 'Everyone' : escapeHtml(s.to)}</span>
-      <span class="inbox-sent-subject">${escapeHtml(s.subject)}</span>
-      <span class="inbox-sent-read">${s.read}/${s.recipients} read · ${escapeHtml(formatWhen(s.createdAt))}</span>
+      <span class="inbox-sent-to">${s.to === '*' ? 'Everyone' : esc(s.to)}</span>
+      <span class="inbox-sent-subject">${esc(s.subject)}</span>
+      <span class="inbox-sent-read">${s.read}/${s.recipients} read · ${esc(formatWhen(s.createdAt))}</span>
     </div>`).join('');
 }
 
@@ -426,6 +424,6 @@ export class InboxPanel {
     const list = this.compose?.querySelector<HTMLElement>('.inbox-sent');
     if (!acc?.isAdmin || !list) return;
     const r = await this.api.sent(acc.token);
-    list.innerHTML = r.success ? sentHtml(r.sent) : `<div class="inbox-error">${escapeHtml(r.error)}</div>`;
+    list.innerHTML = r.success ? sentHtml(r.sent) : `<div class="inbox-error">${esc(r.error)}</div>`;
   }
 }

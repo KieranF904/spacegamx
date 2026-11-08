@@ -8,6 +8,7 @@
 import { SOCIAL_STATUSES, type ClientMessage, type FriendView, type ServerFriendsMessage } from '@space-game/common';
 import { openMenu } from '../windowKit';
 import { PRESENCE, emptyFriends, friendMenu, groupFriends } from './friendsView';
+import { esc } from '../escape';
 
 export interface FriendsDeps {
   send(m: ClientMessage): void;
@@ -19,9 +20,6 @@ export interface FriendsDeps {
   canInvite(): boolean;
 }
 
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 let styled = false;
 function injectStyles(): void {

@@ -13,6 +13,7 @@ import NEWS from './join/news.json';
 import sunRun from './join/sun-run.jpg';
 import planet from './join/planet.jpg';
 import boss from './join/boss.jpg';
+import { esc } from './escape';
 
 export interface ServerInfo {
   host: string;
@@ -242,9 +243,9 @@ export class ServerBrowserUI {
               ? '<div class="news-empty">No news yet. Updates from development will show up here.</div>'
               : news.map((n) => `
                 <div class="news-item">
-                  <div class="news-date">${this.escapeHtml(n.date)}</div>
-                  <div class="news-title">${this.escapeHtml(n.title)}</div>
-                  <div class="news-body">${this.escapeHtml(n.body)}</div>
+                  <div class="news-date">${esc(n.date)}</div>
+                  <div class="news-title">${esc(n.title)}</div>
+                  <div class="news-body">${esc(n.body)}</div>
                 </div>`).join('')}
           </div>
         </div>
@@ -252,7 +253,7 @@ export class ServerBrowserUI {
         <button class="join-main-btn" ${main && !this.loading ? '' : 'disabled'}>
           ${main || this.loading ? 'Join' : 'Server offline'}
           <span class="join-mail-badge" hidden></span>
-          <small class="join-server">${this.loading ? 'Finding the server…' : main ? this.escapeHtml(main.name) : 'Try again in a minute'}</small>
+          <small class="join-server">${this.loading ? 'Finding the server…' : main ? esc(main.name) : 'Try again in a minute'}</small>
         </button>
 
         <div class="inbox-slot"></div>
@@ -362,11 +363,6 @@ export class ServerBrowserUI {
     }
   }
 
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   /** `account`: the signed-in pilot (their inbox shows); none for a guest */
   show(account: InboxAccount | null = null): void {

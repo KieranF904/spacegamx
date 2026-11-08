@@ -8,10 +8,8 @@
 import type { Bag, ClientMessage, ServerTradeMessage, Stack } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
 import { GameWindow, ItemGrid } from './windowKit';
+import { esc } from './escape';
 
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 const toStacks = (b: Bag): Stack[] => Object.entries(b).map(([id, n]) => ({ id, n }));
 

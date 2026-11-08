@@ -10,8 +10,8 @@
 
 import type { ServerSiegeStateMessage } from '@space-game/common';
 import { ROLE_LOOKS, PLAIN_LOOK, type Glyph } from '../../rendering/surface/siege/siegeLook';
+import { esc } from '../escape';
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 /** Each night-mark glyph as text (the card's chips) */
 const GLYPH_TEXT: Record<Glyph, string> = { dot: '●', diamond: '◆', chevron: '»', cross: '✚', shield: '⛊', crown: '♛' };
