@@ -2,8 +2,8 @@
  * @contract client.weapon-fx
  * owns:       the life of every drawn shell (placing it on its timeline, predicted shells and the server's takeover, drawn
  *             hits and the server's), and the frame loop that hands it to the effect sub-systems in fx/
- * needs:      fx/FxField (pools and particles), fx/TracerFx (shell drawing), fx/MuzzleFx, fx/ImpactFx, fx/shotFactory, GameState,
- *             hooks set by the Renderer (barrelTip, castHit, surfaceAt, onStruck, sounds, shellLook, firePose, spinAt, guideTo); npm: @space-game/common, pixi.js
+ * needs:      fx/FxField (pools and particles), fx/TracerFx (shell drawing), fx/FlakAimFx (your flak guns' burst markers), fx/MuzzleFx, fx/ImpactFx, fx/shotFactory, GameState,
+ *             hooks set by the Renderer (barrelTip, castHit, surfaceAt, onStruck, sounds, shellLook, firePose, spinAt, guideTo, aimMarks); npm: @space-game/common, pixi.js
  * events:     onMuzzle (a shot left its gun), onStruck (a shell stopped at a drawn surface), tally (dev hit agreement)
  * invariants: a drawn shell stops at the first surface it touches and nothing of it shows past — client/src/rendering/weapons/visualStop.test.ts
  *             the server's copy of a shell fired ahead takes over its flight — client/src/rendering/weapons/adoptHit.test.ts
@@ -53,6 +53,7 @@ import { FxField } from './fx/FxField';
 import { ImpactFx } from './fx/ImpactFx';
 import { MuzzleFx } from './fx/MuzzleFx';
 import { TracerFx } from './fx/TracerFx';
+import { FlakAimFx, type AimMark } from './fx/FlakAimFx';
 import { FADE_FRAMES } from './fx/particleTypes';
 import { shotFromPrediction, shotFromRow } from './fx/shotFactory';
 import type { DrawnHit, FirePoseXY, PredictedShell, ShellLook, Shot } from './fx/shotTypes';
@@ -101,6 +102,7 @@ export class WeaponFx {
   private readonly impact: ImpactFx;
   private readonly muzzle: MuzzleFx;
   private readonly tracer: TracerFx;
+  private readonly flakAim: FlakAimFx;
   private clock = 0;
   private shots = new Map<number, Shot>();
   /** A shot seen leaving its gun (the ship renderer kicks the turret back) */
@@ -115,6 +117,8 @@ export class WeaponFx {
   shellLook: ((id: number, e: InterpolatedEntity) => ShellLook | undefined) | null = null;
   /** Where your cursor is in the world while you hold fire (a guided shell's guide line), else null; the object may be reused */
   guideTo: (() => { x: number; y: number } | null) | null = null;
+  /** Fills `out` with where each of your flak guns' shells will burst (ships/render/flakAim.ts) and returns how many; null: none shown */
+  aimMarks: ((out: AimMark[]) => number) | null = null;
   /**
    * The normal of the surface a shell flying (dx, dy) struck at (x, y), facing it (ships/hitSurface.ts: the part or rock
    * edge its line crossed), into `out`; null if none is known. Asked only by styles whose hits throw off the surface (hitThrow).
@@ -182,6 +186,7 @@ export class WeaponFx {
       get guideTo() { return fx.guideTo; },
       get state() { return fx.state; },
     });
+    this.flakAim = new FlakAimFx(this.f, { get aimMarks() { return fx.aimMarks; } });
     layer.addChild(this.tracer.crackleGroup);
   }
 
@@ -572,6 +577,7 @@ export class WeaponFx {
 
     this.ageShots(frames);
     this.tracer.drawAll(this.shots, this.clock, frames);
+    this.flakAim.draw(this.clock);
     f.drawParticles(frames);
     f.drawLayered(frames);
     f.end();

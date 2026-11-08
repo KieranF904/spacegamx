@@ -985,6 +985,11 @@ export class Renderer {
     this.weaponFx.guideTo = fn;
   }
 
+  /** Where each of your flak guns' shells will burst (WeaponFx.aimMarks) */
+  set aimMarks(fn: WeaponFx['aimMarks']) {
+    this.weaponFx.aimMarks = fn;
+  }
+
   /** A held beam's burn throws an impact off what it lights (WeaponFx.beamBurn) */
   beamBurn(...a: Parameters<WeaponFx['beamBurn']>): void {
     this.weaponFx.beamBurn(...a);

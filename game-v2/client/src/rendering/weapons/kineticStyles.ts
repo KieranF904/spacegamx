@@ -112,9 +112,10 @@ export const KINETIC_MODEL_STYLES = {
     impact: { sparks: 2, speed: 4.5, life: 10, color: 0xfff0a0, flash: 15 },
     hit: { core: { size: 3, life: 2 }, bloom: { size: 6, life: 4, color: 0xfff0a0 }, spray: { count: 6, speed: 10, cone: 14, life: 10, color: 0xffffff }, flare: { size: 26, width: 1.4, life: 7 }, scatter: 18, light: { radius: 30, power: 0.45 } },
   },
-  // The sky-filler: a stubby orange shell (the airburst, with its lingering cloud, is DamageFx's flak branch)
+  // The sky-filler: a banded orange canister blinking its fuse (the airburst, with its lingering cloud, is DamageFx's flak branch)
   flak_burst: {
-    coreColor: 0xffe0b0, glowColor: 0xff8a3c, muzzle: { life: 6, size: 18, sparks: 4, color: 0xffb070, smoke: 3 },
+    shell: { ...CANISTER_SHELL, body: 0x7a4a2a, cap: 0x4a2a16, band: 0xd0662a, lamp: 0xff8a3c, timer: 0xffd0a0 },
+    coreColor: 0xffe0b0, glowColor: 0xff8a3c, haloRadius: 10, blink: 7, aimTick: true, muzzle: { life: 6, size: 18, sparks: 4, color: 0xffb070, smoke: 3 },
   },
   // The wall you place: a brown-gold shell blinking like a timer
   flak_cloudmaker: {

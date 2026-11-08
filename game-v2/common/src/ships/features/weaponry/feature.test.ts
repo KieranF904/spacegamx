@@ -51,16 +51,16 @@ describe('weaponry: a weapon-kind feature', () => {
 
 describe('weaponry role: endAtAim (bursts or splits at the aim distance)', () => {
   it('picks the aim bursts and the walking salvo, and no beam', () => {
-    expect(playing(ROLE_END_AT_AIM)).toEqual(['emp_blackout', 'flak_cloudmaker', 'legendary_prism', 'legendary_singularity', 'mortar_quake']);
+    expect(playing(ROLE_END_AT_AIM)).toEqual(['emp_blackout', 'flak_burst', 'flak_cloudmaker', 'legendary_prism', 'legendary_singularity', 'mortar_quake']);
   });
   it('its shells are sent as they fly (the aim is the server\'s), and fly the mortar\'s land-at-cursor maths', () => {
-    for (const id of ['emp_blackout', 'flak_cloudmaker', 'legendary_prism']) {
+    for (const id of ['emp_blackout', 'flak_burst', 'flak_cloudmaker', 'legendary_prism']) {
       const d = models.find(([m]) => m === id)![1];
       expect(endsAtAim(d), id).toBe(true);
       expect(firesStraight(d), id).toBe(false);
     }
     // (Their family's plain guns stay straight flyers, predicted by the pilot)
-    for (const id of ['flak_burst', 'emp_hush']) expect(firesStraight(models.find(([m]) => m === id)![1]), id).toBe(true);
+    for (const id of ['emp_hush']) expect(firesStraight(models.find(([m]) => m === id)![1]), id).toBe(true);
     const d = models.find(([m]) => m === 'flak_cloudmaker')![1];
     expect(aimReach(900, d)).toBe(900);
     expect(aimReach(0, d)).toBe(MIN_AIM_REACH);

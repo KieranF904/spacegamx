@@ -64,8 +64,8 @@ const W = [
   // (The Chainsaw's draw is its demand x 4 / its beat: 22.4 keeps its spun-up 22.4 E a second per cell at the 8-tick beat, as 10.5 did at 3.75)
   ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 22.4 }, { mul: { spread: x(1.5) }, set: { damage: 11 } }, 'The minigun: it spins up from two and a half shots a second to seven and a half while you hold the trigger, and is useless on a tap.'],
   ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { spread: x(0.4) }, set: { damage: 12, speed: 88, life: 61 } }, 'The marksman SMG: six fast, accurate needles in a burst, then a pause to reload.'],
-  ['flak_burst', 'Burst', 'flak', 'sq', 4, {}, {}, 'The sky-filler: a canister shell that bursts on its own near whatever it passes.'],
-  ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'The wall you place: four shells that burst where you aim, or sooner near a target, in wide clouds.'],
+  ['flak_burst', 'Burst', 'flak', 'sq', 4, {}, {}, 'The sky-filler: a canister shell that bursts where you aim, or sooner when it passes near a target, throwing fragments over 170 units.'],
+  ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'The wall you place: four shells that burst where you aim, or sooner when they pass near a target, throwing fragments over 250 units.'],
   // (Section 4's ordnance rows, rework-2026-11. Mortars: the Lobber lands at the cursor (out to 2,640), splash r220 / 70, a shell every 90 t, 40 a
   // crate; the Quake walks three shells at 0.7, 1.0 and 1.3 of the aim distance, 15 t apart, r260 / 60 each, a salvo every 180 t (3 rounds).
   // Missiles: the Dart 24 a crate, 108 t, homing 0.07 on the ship nearest the cursor, 30 + r120 / 34; the Swarm six rockets over 30 t, a salvo
@@ -616,6 +616,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   // everyone while lit and `ticks` after; slow: a beam whose target flies slowed (-40% thrust and turning) while lit and
   // `ticks` after (the Frostbite's is its kind's: tuning.json weapons.frostbite.slow). A family unit tunes the numbers.
   const SHOT = {
+    flak_burst: { endAtAim: true },
     flak_cloudmaker: { endAtAim: true },
     legendary_prism: { endAtAim: true },
     emp_blackout: { endAtAim: true },

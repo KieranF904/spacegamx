@@ -3,7 +3,7 @@
  * weapons) and what it does in flight.
  *   cannon   a plain shell
  *   railgun  very fast, passes through `pierce` bodies before stopping
- *   flak     proximity fuse: bursts near a target (or at the end of its life), splash damage
+ *   flak     bursts at the aim distance (endAtAim), or sooner on its proximity fuse near a target; splash damage
  *   missile  accelerates and homes on its lock; splash damage on impact
  *   emp      proximity fuse: an EMP burst that knocks out engines and guns
  * Legendary (boss) weapons:

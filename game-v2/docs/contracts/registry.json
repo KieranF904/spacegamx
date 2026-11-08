@@ -614,7 +614,7 @@
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",
-      "lines": 1179,
+      "lines": 1184,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
       "needs": "GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
@@ -649,7 +649,7 @@
           "name": "Renderer",
           "kind": "class",
           "start": 71,
-          "end": 1179
+          "end": 1184
         }
       ]
     },
@@ -972,9 +972,9 @@
       "id": "client.weapon-fx",
       "path": "client/src/rendering/weapons/WeaponFx.ts",
       "group": "client/rendering/weapons",
-      "lines": 579,
+      "lines": 585,
       "owns": "the life of every drawn shell (placing it on its timeline, predicted shells and the server's takeover, drawn hits and the server's), and the frame loop that hands it to the effect sub-systems in fx/",
-      "needs": "fx/FxField (pools and particles), fx/TracerFx (shell drawing), fx/MuzzleFx, fx/ImpactFx, fx/shotFactory, GameState, hooks set by the Renderer (barrelTip, castHit, surfaceAt, onStruck, sounds, shellLook, firePose, spinAt, guideTo); npm: @space-game/common, pixi.js",
+      "needs": "fx/FxField (pools and particles), fx/TracerFx (shell drawing), fx/FlakAimFx (your flak guns' burst markers), fx/MuzzleFx, fx/ImpactFx, fx/shotFactory, GameState, hooks set by the Renderer (barrelTip, castHit, surfaceAt, onStruck, sounds, shellLook, firePose, spinAt, guideTo, aimMarks); npm: @space-game/common, pixi.js",
       "events": "onMuzzle (a shot left its gun), onStruck (a shell stopped at a drawn surface), tally (dev hit agreement)",
       "invariants": [
         {
@@ -1009,50 +1009,128 @@
         {
           "name": "KEEP_ENDED_FRAMES",
           "kind": "const",
-          "start": 63,
-          "end": 64
+          "start": 64,
+          "end": 65
         },
         {
           "name": "BARREL_EASE",
           "kind": "const",
-          "start": 66,
-          "end": 67
+          "start": 67,
+          "end": 68
         },
         {
           "name": "CONFIRM_TICKS",
           "kind": "const",
-          "start": 68,
-          "end": 69
+          "start": 69,
+          "end": 70
         },
         {
           "name": "ADOPT_REACH",
           "kind": "const",
-          "start": 70,
-          "end": 74
+          "start": 71,
+          "end": 75
         },
         {
           "name": "ADOPT_TICKS",
           "kind": "const",
-          "start": 75,
-          "end": 79
+          "start": 76,
+          "end": 80
         },
         {
           "name": "PENDING_FRAMES",
           "kind": "const",
-          "start": 81,
-          "end": 82
+          "start": 82,
+          "end": 83
         },
         {
           "name": "shotTimelines",
           "kind": "function",
-          "start": 84,
-          "end": 96
+          "start": 85,
+          "end": 97
         },
         {
           "name": "WeaponFx",
           "kind": "class",
-          "start": 98,
-          "end": 579
+          "start": 99,
+          "end": 585
+        }
+      ]
+    },
+    {
+      "id": "client.weapon-fx.flak-aim",
+      "path": "client/src/rendering/weapons/fx/FlakAimFx.ts",
+      "group": "client/rendering/weapons",
+      "lines": 62,
+      "owns": "the burst markers of your flak guns: a faint dashed circle of the burst's radius at the point each shell will burst along its turret's aim, with a small ring at its middle",
+      "needs": "FxField (line, ringAt), an aimMarks hook set by the Renderer (ships/render/flakAim.ts fills the marks)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a mark's dashes are evenly spaced round its circle and turn with the clock",
+          "test": "client/src/rendering/weapons/fx/FlakAimFx.test.ts"
+        },
+        {
+          "text": "nothing is allocated per frame",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new look for the marker is one change to draw below",
+      "exports": [
+        "AimMark",
+        "AimMarkHost",
+        "FlakAimFx",
+        "MAX_AIM_MARKS",
+        "dashCount",
+        "dashEnds"
+      ],
+      "sections": [
+        {
+          "name": "AimMark",
+          "kind": "interface",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "MAX_AIM_MARKS",
+          "kind": "const",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "AimMarkHost",
+          "kind": "interface",
+          "start": 19,
+          "end": 22
+        },
+        {
+          "name": "TAU",
+          "kind": "const",
+          "start": 24,
+          "end": 24
+        },
+        {
+          "name": "COLOR",
+          "kind": "const",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "dashCount",
+          "kind": "function",
+          "start": 27,
+          "end": 30
+        },
+        {
+          "name": "dashEnds",
+          "kind": "function",
+          "start": 32,
+          "end": 40
+        },
+        {
+          "name": "FlakAimFx",
+          "kind": "class",
+          "start": 42,
+          "end": 62
         }
       ]
     },
@@ -1662,9 +1740,9 @@
       "id": "client.ship.renderer",
       "path": "client/src/ships/ShipRenderer.ts",
       "group": "client/ships",
-      "lines": 498,
+      "lines": 504,
       "owns": "drawing modular ships and debris each frame: views per ship, hull slots, fades, labels, health bars, lights",
-      "needs": "ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,bankGlow,gunLooks,hullCaches}; npm: @space-game/common, pixi.js",
+      "needs": "ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,bankGlow,gunLooks,hullCaches}; npm: @space-game/common, pixi.js",
       "events": "",
       "invariants": [
         {
@@ -1685,14 +1763,14 @@
         {
           "name": "FACTION_COLORS",
           "kind": "const",
-          "start": 46,
-          "end": 47
+          "start": 47,
+          "end": 48
         },
         {
           "name": "ShipRenderer",
           "kind": "class",
-          "start": 49,
-          "end": 498
+          "start": 50,
+          "end": 504
         }
       ]
     },
@@ -1875,9 +1953,9 @@
       "id": "client.damage.detonations",
       "path": "client/src/ships/damage/detonations.ts",
       "group": "client/ships/damage",
-      "lines": 226,
+      "lines": 249,
       "owns": "what each kind of warhead, burst or bolt looks, sounds and shakes like where it goes off (the server's detonation message names the kind)",
-      "needs": "DamageCtx (particles, sound, shake, delayed actions)",
+      "needs": "DamageCtx (particles, sound, shake, delayed actions), damage/flakBurst (a flak burst's fragments)",
       "events": "",
       "invariants": [
         {
@@ -1898,122 +1976,134 @@
         {
           "name": "Detonation",
           "kind": "type",
-          "start": 13,
-          "end": 13
+          "start": 14,
+          "end": 14
         },
         {
           "name": "bolt",
           "kind": "function",
-          "start": 15,
-          "end": 30
+          "start": 16,
+          "end": 31
         },
         {
           "name": "eruption",
           "kind": "const",
-          "start": 32,
-          "end": 42
+          "start": 33,
+          "end": 43
         },
         {
           "name": "mobBurst",
           "kind": "const",
-          "start": 44,
-          "end": 52
+          "start": 45,
+          "end": 53
         },
         {
           "name": "sludge",
           "kind": "const",
-          "start": 54,
-          "end": 61
+          "start": 55,
+          "end": 62
         },
         {
           "name": "scrap",
           "kind": "const",
-          "start": 63,
-          "end": 69
+          "start": 64,
+          "end": 70
         },
         {
           "name": "synapse",
           "kind": "const",
-          "start": 71,
-          "end": 80
+          "start": 72,
+          "end": 81
         },
         {
           "name": "arcHit",
           "kind": "const",
-          "start": 82,
-          "end": 90
+          "start": 83,
+          "end": 91
         },
         {
           "name": "kineticBurst",
           "kind": "const",
-          "start": 92,
-          "end": 99
+          "start": 93,
+          "end": 100
         },
         {
           "name": "singularity",
           "kind": "const",
-          "start": 101,
-          "end": 112
+          "start": 102,
+          "end": 113
         },
         {
           "name": "prism",
           "kind": "const",
-          "start": 114,
-          "end": 123
+          "start": 115,
+          "end": 124
         },
         {
           "name": "magma",
           "kind": "const",
-          "start": 125,
-          "end": 132
+          "start": 126,
+          "end": 133
         },
         {
           "name": "cinderBloom",
           "kind": "const",
-          "start": 134,
-          "end": 138
+          "start": 135,
+          "end": 139
         },
         {
           "name": "phase",
           "kind": "const",
-          "start": 140,
-          "end": 146
+          "start": 141,
+          "end": 147
         },
         {
           "name": "railgun",
           "kind": "const",
-          "start": 148,
-          "end": 154
+          "start": 149,
+          "end": 155
         },
         {
           "name": "emp",
           "kind": "const",
-          "start": 156,
-          "end": 168
+          "start": 157,
+          "end": 169
         },
         {
           "name": "flak",
           "kind": "const",
-          "start": 170,
-          "end": 181
+          "start": 171,
+          "end": 202
+        },
+        {
+          "name": "FRAGMENTS",
+          "kind": "const",
+          "start": 203,
+          "end": 203
+        },
+        {
+          "name": "END",
+          "kind": "const",
+          "start": 204,
+          "end": 204
         },
         {
           "name": "missile",
           "kind": "const",
-          "start": 183,
-          "end": 195
+          "start": 206,
+          "end": 218
         },
         {
           "name": "KINDS",
           "kind": "const",
-          "start": 197,
-          "end": 221
+          "start": 220,
+          "end": 244
         },
         {
           "name": "detonate",
           "kind": "function",
-          "start": 223,
-          "end": 226
+          "start": 246,
+          "end": 249
         }
       ]
     },
@@ -2075,6 +2165,90 @@
           "kind": "function",
           "start": 115,
           "end": 130
+        }
+      ]
+    },
+    {
+      "id": "client.damage.flak-burst",
+      "path": "client/src/ships/damage/flakBurst.ts",
+      "group": "client/ships/damage",
+      "lines": 95,
+      "owns": "the maths of a flak burst's fragmentation: how many fragments a quality tier throws, where each one flies (a ring of streaks that end exactly on the burst's damage radius) and which ships' outlines the ends land inside",
+      "needs": "ShipSource (bodies, geometry, tuning), GameState (drawn ship poses), common standing/localToWorldDir",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every fragment ends at the damage radius from the burst, whatever its count",
+          "test": "client/src/ships/damage/flakBurst.test.ts"
+        },
+        {
+          "text": "a fragment's end is on a ship only when it is inside a standing part's outline",
+          "test": "client/src/ships/damage/flakBurst.test.ts"
+        },
+        {
+          "text": "nothing here changes a hit or a blast; it only draws what the server's detonation already says",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new quality tier is one more row of FRAGMENT_TIERS",
+      "exports": [
+        "FRAGMENT_FRAMES",
+        "FRAGMENT_TIERS",
+        "Fragment",
+        "fragmentCount",
+        "fragmentEnd",
+        "fragmentPlan",
+        "insideConvex",
+        "shipAtPoint"
+      ],
+      "sections": [
+        {
+          "name": "FRAGMENT_TIERS",
+          "kind": "const",
+          "start": 16,
+          "end": 21
+        },
+        {
+          "name": "FRAGMENT_FRAMES",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "fragmentCount",
+          "kind": "function",
+          "start": 26,
+          "end": 30
+        },
+        {
+          "name": "Fragment",
+          "kind": "interface",
+          "start": 32,
+          "end": 37
+        },
+        {
+          "name": "fragmentPlan",
+          "kind": "function",
+          "start": 39,
+          "end": 50
+        },
+        {
+          "name": "fragmentEnd",
+          "kind": "function",
+          "start": 52,
+          "end": 57
+        },
+        {
+          "name": "insideConvex",
+          "kind": "function",
+          "start": 59,
+          "end": 70
+        },
+        {
+          "name": "shipAtPoint",
+          "kind": "function",
+          "start": 72,
+          "end": 95
         }
       ]
     },
@@ -2165,7 +2339,7 @@
       "id": "client.damage.particles",
       "path": "client/src/ships/damage/particles.ts",
       "group": "client/ships/damage",
-      "lines": 275,
+      "lines": 283,
       "owns": "the damage effects' particle list and pools (sparks, glows, rings, smoke, chunks, beams, arcs) and their per-frame move, fade and draw, and the quality cap on them",
       "needs": "ParticlePool, fxTextures, gfx (clearIfDrawn), impactAnchor (AnchorList); npm: pixi.js",
       "events": "",
@@ -2212,7 +2386,7 @@
           "name": "DamageParticles",
           "kind": "class",
           "start": 43,
-          "end": 275
+          "end": 283
         }
       ]
     },
@@ -3949,6 +4123,47 @@
       ]
     },
     {
+      "id": "client.ship.render.flak-aim",
+      "path": "client/src/ships/render/flakAim.ts",
+      "group": "client/ships/render",
+      "lines": 50,
+      "owns": "where each of your flak turrets' shells will burst along its drawn aim (the aim distance, within the shell's reach), for the burst markers (rendering/weapons/fx/FlakAimFx.ts)",
+      "needs": "the views map (BodyView, Turret), common partWeaponDef/aimReach/lifeToReach/gunSelected/partWeaponGroups",
+      "events": "",
+      "invariants": [
+        {
+          "text": "only guns that end at the aim and burst (endAtAim with a splash) get a mark, at the distance the shell's life allows",
+          "test": "client/src/ships/render/flakAim.test.ts"
+        }
+      ],
+      "extend": "another gun that ends at the aim and bursts is already covered; a different marker shape is FlakAimFx's",
+      "exports": [
+        "FlakMark",
+        "burstTravel",
+        "flakMarks"
+      ],
+      "sections": [
+        {
+          "name": "FlakMark",
+          "kind": "interface",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "burstTravel",
+          "kind": "function",
+          "start": 16,
+          "end": 20
+        },
+        {
+          "name": "flakMarks",
+          "kind": "function",
+          "start": 22,
+          "end": 50
+        }
+      ]
+    },
+    {
       "id": "client.ship.render.gun-looks",
       "path": "client/src/ships/render/gunLooks.ts",
       "group": "client/ships/render",
@@ -4317,8 +4532,8 @@
       "id": "client.ship.renderer-hooks",
       "path": "client/src/ships/wiring/rendererHooks.ts",
       "group": "client/ships/wiring",
-      "lines": 66,
-      "owns": "the callbacks the scene renderer calls into the ship client for (muzzle kicks, barrel tips, shell looks and fire poses, struck surfaces, drawn-hit casts, guide line)",
+      "lines": 72,
+      "owns": "the callbacks the scene renderer calls into the ship client for (muzzle kicks, barrel tips, shell looks and fire poses, struck surfaces, drawn-hit casts, guide line, flak burst marks)",
       "needs": "RendererHooksHost (state, store, placement, jump, fire, drawnWorld, strike, ownPresent, localAim), Renderer hook fields",
       "events": "",
       "invariants": [
@@ -4336,14 +4551,14 @@
         {
           "name": "RendererHooksHost",
           "kind": "interface",
-          "start": 21,
-          "end": 31
+          "start": 22,
+          "end": 32
         },
         {
           "name": "wireRendererHooks",
           "kind": "function",
-          "start": 33,
-          "end": 66
+          "start": 34,
+          "end": 72
         }
       ]
     },
@@ -17517,7 +17732,7 @@
     "tables": [
       {
         "path": "client/src/rendering/weapons/kineticStyles.ts",
-        "line": 189,
+        "line": 190,
         "text": "} satisfies Record<string, Partial<WeaponStyle>>;"
       },
       {
