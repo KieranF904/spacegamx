@@ -42,13 +42,16 @@ export interface GunPlan {
   color?: string;
   width: number;
   fire: FireSpec;
+  /** A support gun, drawn its own way: a Repair Beam mending a friendly plate, a Point Defence Turret shooting down missiles */
+  support?: 'repair' | 'pd';
 }
 
-/** The plan for a gun model, or null when it has nothing to show (a Repair Beam, Point Defence, a part with no weapon) */
+/** The plan for a gun model, or null when it has nothing to show (a part with no weapon) */
 export function gunPlan(catalog: Catalog, tuning: ShipTuning, fn: FunctionDef): GunPlan | null {
   if (!fn.weapon || !fn.fire) return null;
   const base = tuning.weapons?.[fn.weapon];
-  if (!base || base.heal || base.pointDefence || fn.fire.model === 'auto') return null;
+  if (!base) return null;
+  if (base.heal || base.pointDefence || fn.fire.model === 'auto') return supportPlan(fn, base);
   const mat = fn.model && fn.material ? fn.material : 'alloy';
   const grade = partGrade(catalog, { fn: fn.id, material: mat });
   const def: WeaponTuning = gunDef(tuning, fn.weapon, { grade, size: 1, model: fn.weaponMods });
@@ -154,4 +157,17 @@ export class FireClock {
       }
     }
   }
+}
+
+/** A Repair Beam's or a Point Defence Turret's plan: a held beam to a hurt friend, or a gun firing on its own beat at what flies in */
+function supportPlan(fn: FunctionDef, base: WeaponTuning): GunPlan | null {
+  const repair = !!base.heal;
+  if (!repair && !base.pointDefence) return null;
+  return {
+    fnId: fn.id, model: fn.id, kind: fn.weapon!, type: WEAPON_KIND_TYPE[fn.weapon!] ?? 1, beam: repair, pulse: null,
+    speed: 0, accel: 0, maxSpeed: 0, life: 0, size: 1, spread: 0, damage: 0, splash: 0,
+    range: repair ? base.range ?? 520 : base.pointDefence?.range ?? 560,
+    tracked: false, lob: false, burst: 1, salvo: null, color: base.color, width: base.width ?? 34,
+    fire: fn.fire!, support: repair ? 'repair' : 'pd',
+  };
 }

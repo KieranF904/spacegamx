@@ -9,6 +9,7 @@ import { averageInterval, partStats, type Catalog, type Economy, type ShipTuning
 import { esc } from '../../ui/componentKit';
 import { fireChip } from '../modelCards';
 import { gunPlan, type GunPlan } from './gunPlan';
+import { gunArt } from './gunArt';
 import type { GunPreview } from './GunPreview';
 
 const PANEL_W = 316;
@@ -46,7 +47,9 @@ export function previewCaption(catalog: Catalog, tuning: ShipTuning, plan: GunPl
     const rate = 60 / Math.max(1, every);
     out.push({ label: 'Rate', value: `${rate >= 10 ? Math.round(rate) : rate.toFixed(1)}/s` });
   }
-  if (!plan.beam) out.push({ label: 'Round', value: `${Math.round(plan.maxSpeed || plan.speed)} u/tick${plan.tracked ? ', seeks' : ''}${plan.splash ? `, blast ${Math.round(plan.splash)}` : ''}` });
+  if (plan.support === 'repair') out.push({ label: 'Mends', value: 'a friendly plate' });
+  else if (plan.support === 'pd') out.push({ label: 'Shoots', value: 'missiles and seekers' });
+  else if (!plan.beam) out.push({ label: 'Round', value: `${Math.round(plan.maxSpeed || plan.speed)} u/tick${plan.tracked ? ', seeks' : ''}${plan.splash ? `, blast ${Math.round(plan.splash)}` : ''}` });
   const st = partStats(catalog, tuning, { fn: fn.id, piece: fn.pieces === '*' ? 'sq' : fn.pieces[0], material: fn.material ?? 'alloy' });
   if (st?.range) out.push({ label: 'Reach', value: Math.round(st.range).toLocaleString('en-US') });
   return out;
@@ -149,7 +152,7 @@ export class GunPreviewHover {
     this.watch = window.setInterval(() => { if (!this.list.isConnected || this.list.offsetParent === null) this.hideNow(); }, 400);
     const pv = await this.get();
     if (!pv || this.disposed || this.panel!.hidden || this.current === '') return;
-    pv.show(plan);
+    pv.show(plan, gunArt(this.d.catalog, fn, this.d.tuning.cellSize));
   }
 
   private get(): Promise<GunPreview | null> {
