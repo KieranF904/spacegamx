@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.renderer
  * owns:       drawing modular ships and debris each frame: views per ship, hull slots, fades, labels, health bars, lights
- * needs:      ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,bankGlow,gunLooks,hullCaches}; npm: @space-game/common, pixi.js
+ * needs:      ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,bankGlow,gunLooks,hullCaches}; npm: @space-game/common, pixi.js
  * invariants: a hull is built once per design, parts attached, colouring and kind, and shared by every ship like it — client/src/ships/rigidHull.test.ts
  *             damage and the hit flash are data the hull shader reads: taking hits builds nothing — none pinned
  * extend:     a new per-ship visual is a field on BodyView (render/viewTypes.ts) drawn in update(), or a new module under ships/render/
@@ -42,6 +42,7 @@ import { GunDrawer } from './render/GunDrawer';
 import { HullDrawer } from './render/HullDrawer';
 import { drawBankGlow } from './render/bankGlow';
 import { kickGun, spinAtGun, barrelTipOf } from './render/muzzle';
+import { flakMarks, type FlakMark } from './render/flakAim';
 
 /** Hostile factions' colours by index (snapshot data[3]) */
 export const FACTION_COLORS = Object.values((factionsData as { factions: Record<string, { color: string }> }).factions).map((f) => parseInt(f.color.slice(1), 16));
@@ -160,6 +161,11 @@ export class ShipRenderer {
   /** Where a shot leaving (x, y) along `angle` comes out of its gun as drawn (render/muzzle.ts) */
   barrelTip(owner: number, x: number, y: number, angle: number): { x: number; y: number } | null {
     return barrelTipOf(this.views, this.bridge.tuning.cellSize, owner, x, y, angle);
+  }
+
+  /** Where each of `owner`'s flak turrets' shells will burst for a cursor `dist` away (render/flakAim.ts), into `out`; returns how many */
+  flakMarks(owner: number, dist: number, sel: number, firing: number, out: FlakMark[]): number {
+    return flakMarks(this.views, this.bridge.tuning, owner, dist, sel, firing, out);
   }
 
   /** Headlights come on (fading in) where the ambient and the sun leave it dark; their beam shows faintly */

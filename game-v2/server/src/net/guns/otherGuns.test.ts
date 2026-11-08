@@ -4,7 +4,7 @@
  * was sent (control rows, gun rows, gunSyncs; an AI pilot's body).
  *
  * A real GameServer. A watcher A (a fake client, full caps, the game's client classes) holds another pilot B, flown by
- * input messages through every firing model in turn (a cycle cannon and a pulsed laser, a spinning minigun and flak, a
+ * input messages through every firing model in turn (a cycle cannon and a pulsed laser, a spinning minigun and a hose, a
  * clip turret and a rail clip, a charge gun and a regrowing nest), and later a pirate pack fighting A (their bodies on
  * A's tick layer). Each shell A built from a gun lane is held to the server's projectile with the same shot: spawn
  * point, velocity and spawn tick exactly. The server sends A no fire records for them, bar the ticks it tells.
@@ -38,7 +38,7 @@ function armed(lib: Map<string, Blueprint>, left: string, right: string): Bluepr
 
 export const MODEL_PAIRS: [string, string][] = [
   ['cannon_pip', 'laser_glint'],
-  ['autocannon_chainsaw', 'flak_burst'],
+  ['autocannon_chainsaw', 'autocannon_rattler'],
   ['autocannon_stinger', 'railgun_rail_driver'],
   ['cannon_longbarrel', 'legendary_hive'],
   ['railgun_coilgun', 'pulse_strobe'],

@@ -1,6 +1,6 @@
 /**
  * The shared shot behaviours (common/src/ships/features/weaponry) in a running server, one per weapon role:
- * endAtAim (Cloudmaker, Prism, Blackout), walk (Quake), guided (Hammerhead), mark (Searchlight), slow (Frostbite),
+ * endAtAim (Burst, Cloudmaker, Prism, Blackout), walk (Quake), guided (Hammerhead), mark (Searchlight), slow (Frostbite),
  * and the projectile row's end tick (data[9]) as a pilot's client receives it.
  */
 import { describe, it, expect } from 'vitest';
@@ -84,17 +84,48 @@ describe('weaponry endAtAim: bursts at the aim distance', () => {
     }
   });
 
-  it('a plain flak gun (Burst) still flies its whole fuse life and sends no end tick', () => {
-    const w = pilotWith('flak_burst', { id: 'flak_canisters', n: 1 });
-    for (let i = 0; i < 60 * 2; i++) {
+  it('Burst bursts at the aim distance too, and its row tells the client the tick it ends (data[9])', () => {
+    const w = pilotWith('flak_burst', { id: 'flak_canisters', n: 4 });
+    for (let i = 0; i < 60 * 2 && !w.detonations('flak').length; i++) {
       w.hold();
-      Input.fireLeft[w.pid] = i < 5 ? 1 : 0; Input.cursorDist[w.pid] = 300; Input.targetAngle[w.pid] = aimEast();
+      Input.fireLeft[w.pid] = i < 5 ? 1 : 0; Input.cursorDist[w.pid] = 600; Input.targetAngle[w.pid] = aimEast();
       w.server.step();
     }
     const boom = w.detonations('flak')[0];
     expect(boom).toBeTruthy();
-    // (life 50 at speed 34: far past the cursor)
-    expect(Math.hypot(boom.x - X, boom.y - Y)).toBeGreaterThan(1200);
+    const d = Math.hypot(boom.x - X, boom.y - Y);
+    expect(d).toBeGreaterThan(500);
+    expect(d).toBeLessThan(750);
+    // (keeps its own, smaller, burst: the detonation says the damage radius the fragments are drawn out to)
+    expect(boom.radius).toBe(170);
+    const booms = w.detonations('flak');
+    const rows = projectileRows(w.got).filter((e) => e.data[0] === WEAPON_KIND_TYPE.flak && e.data[6] === w.pid);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      const [spawnTick, sx, sy, end] = [r.data[3], r.data[4], r.data[5], r.data[9]];
+      expect(end).toBeGreaterThan(spawnTick);
+      const ex = sx + r.vx * (end - spawnTick), ey = sy + r.vy * (end - spawnTick);
+      expect(Math.min(...booms.map((b) => Math.hypot(ex - b.x, ey - b.y)))).toBeLessThan(40);
+    }
+  });
+
+  it('Burst and Cloudmaker still burst sooner when a shell passes near a target (the fuse), and no later than the aim', () => {
+    for (const model of ['flak_burst', 'flak_cloudmaker']) {
+      const w = pilotWith(model, { id: 'flak_canisters', n: 4 });
+      const [skiff] = w.server.enemies.spawnPack(InSystem.systemId[w.pid], { faction: 'pirates', ships: ['pirate_skiff'] }, X + 700, Y);
+      const place = () => { w.hold(); Position.x[skiff] = X + 700; Position.y[skiff] = Y; Velocity.x[skiff] = 0; Velocity.y[skiff] = 0; };
+      for (let i = 0; i < 60 * 2 && !w.detonations('flak').length; i++) {
+        place();
+        // (the cursor well past the skiff: only the fuse can burst it there)
+        Input.fireLeft[w.pid] = i < 5 ? 1 : 0; Input.cursorDist[w.pid] = 1500; Input.targetAngle[w.pid] = aimEast();
+        w.server.step();
+      }
+      const boom = w.detonations('flak')[0];
+      expect(boom, model).toBeTruthy();
+      const d = Math.hypot(boom.x - X, boom.y - Y);
+      expect(d, model).toBeLessThan(700);
+      expect(d, model).toBeGreaterThan(300);
+    }
   });
 
   it('Prism: the bolt splits into its fan of shards at the aim distance', () => {

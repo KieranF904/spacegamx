@@ -1,6 +1,6 @@
 /**
  * @contract client.ship.renderer-hooks
- * owns:       the callbacks the scene renderer calls into the ship client for (muzzle kicks, barrel tips, shell looks and fire poses, struck surfaces, drawn-hit casts, guide line)
+ * owns:       the callbacks the scene renderer calls into the ship client for (muzzle kicks, barrel tips, shell looks and fire poses, struck surfaces, drawn-hit casts, guide line, flak burst marks)
  * needs:      RendererHooksHost (state, store, placement, jump, fire, drawnWorld, strike, ownPresent, localAim), Renderer hook fields
  * invariants: every drawn shell stops at the first drawn surface it touches — client/src/ships/drawnHit.test.ts
  * extend:     a new renderer callback is one more assignment below
@@ -17,6 +17,7 @@ import type { DrawnWorld } from '../drawnHit';
 import type { StrikeFx } from '../hits/StrikeFx';
 import type { OwnPresent } from '../own/OwnPresent';
 import { hitSurface } from '../hitSurface';
+import { groupSelection } from '../weaponGroups/selection';
 
 export interface RendererHooksHost {
   readonly state: GameState;
@@ -62,5 +63,10 @@ export function wireRendererHooks(h: RendererHooksHost, renderer: Renderer, ship
     cursorPoint.x = me.renderX + Math.cos(a.angle) * a.dist;
     cursorPoint.y = me.renderY + Math.sin(a.angle) * a.dist;
     return cursorPoint;
+  };
+  // Where your flak guns' shells will burst along their aim: a faint circle of the burst's radius there (FlakAimFx)
+  renderer.aimMarks = (out) => {
+    if (!h.state.entities.get(h.state.playerId)) return 0;
+    return ship.flakMarks(h.state.playerId, h.localAim().dist, groupSelection.packed, h.ownPresent.fireHeld ? 1 : 0, out);
   };
 }

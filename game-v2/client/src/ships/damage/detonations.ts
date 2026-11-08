@@ -2,13 +2,14 @@
  * @contract client.damage.detonations
  * owns:       what each kind of warhead, burst or bolt looks, sounds and shakes like where it goes off (the server's detonation
  *             message names the kind)
- * needs:      DamageCtx (particles, sound, shake, delayed actions)
+ * needs:      DamageCtx (particles, sound, shake, delayed actions), damage/flakBurst (a flak burst's fragments)
  * invariants: a kind with no entry below is drawn as a missile's fireball — none pinned
  *             a hive's blast is a missile's at 0.7 of its radius — none pinned
  * extend:     a new kind of detonation is one function below and one line in KINDS
  */
 
 import type { DamageCtx } from './context';
+import { FRAGMENT_FRAMES, fragmentCount, fragmentEnd, fragmentPlan, shipAtPoint, type Fragment } from './flakBurst';
 
 type Detonation = (c: DamageCtx, x: number, y: number, radius: number, from?: [number, number], kind?: string) => void;
 
@@ -169,16 +170,38 @@ const emp: Detonation = (c, x, y, radius) => {
 
 /** `flak` */
 const flak: Detonation = (c, x, y, radius) => {
-  // A burst: an orange flash, shrapnel streaks and a cloud that lingers (the Burst's 1.2 s dark grey; the Cloudmaker's
-  // bigger one, brown-grey round a gold core, 2.5 s: a wall that stays)
+  // A burst: a white-orange flash, a ring of fragment streaks flying out to exactly the damage radius (sparking on any ship
+  // they end inside), a faint ring left at that radius so the area reads, and a cloud that lingers (the Burst's 1.2 s dark
+  // grey; the Cloudmaker's bigger one, brown-grey round a gold core, 2.5 s: a wall that stays)
   const wall = radius >= 220;
+  c.p.glow(x, y, 0, 0, radius * 0.3, 5, 0xffffff, 1);
   c.p.glow(x, y, 0, 0, radius * 0.45, 8, wall ? 0xffd070 : 0xffa050, 0.9);
-  c.p.burstSparks(x, y, 0, 0, wall ? 20 : 26, 3, 9, 0xffb050);
+  c.p.burstSparks(x, y, 0, 0, wall ? 8 : 10, 3, 9, 0xffb050);
+  c.p.ring(x, y, 0, 0, radius * 0.1, radius, FRAGMENT_FRAMES, 0xffe0a0, 0.55);
+  c.p.ring(x, y, 0, 0, radius, radius, 46, wall ? 0xffd070 : 0xffa050, 0.3);
+  const fragments = fragmentPlan(fragmentCount(c.p.keepShare), radius, Math.random, FRAGMENTS);
+  const secs = FRAGMENT_FRAMES / 60;
+  for (let i = 0; i < fragments.length; i++) {
+    const f = fragments[i], vx = Math.cos(f.angle) * f.speed, vy = Math.sin(f.angle) * f.speed;
+    c.p.fragment(x, y, vx, vy, FRAGMENT_FRAMES, 2.4, i % 3 === 0 ? 0xffffff : 0xffd890);
+    fragmentEnd(x, y, f, END);
+    const ex = END.x, ey = END.y, id = shipAtPoint(c.source, c.state, x, y, radius, ex, ey);
+    if (id >= 0) {
+      const e = c.state.entities.get(id);
+      const evx = e?.vx ?? 0, evy = e?.vy ?? 0;
+      c.later(secs, () => {
+        c.p.burstSparks(ex, ey, evx, evy, 4, 1, 4, 0xffd890);
+        c.p.glow(ex, ey, evx, evy, 9, 7, 0xffe0b0, 0.9);
+      });
+    }
+  }
   if (wall) c.p.glow(x, y, 0, 0, radius * 0.5, 60, 0xd9a040, 0.35, radius * 0.002);
   const stay = wall ? 150 : 72;
   for (let i = 0; i < 6; i++) c.p.dustPuff(x, y, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4, radius * (0.2 + Math.random() * 0.15), stay * (0.85 + Math.random() * 0.3), wall ? 0x5a4a3c : 0x3a3836, 0.55, radius * 0.004);
   c.sound('explosion_small', { x, y }, 0.55);
 };
+const FRAGMENTS: Fragment[] = [];
+const END = { x: 0, y: 0 };
 
 /** A missile's explosion, and any kind with no look of its own: a proper fireball */
 const missile: Detonation = (c, x, y, radius) => {

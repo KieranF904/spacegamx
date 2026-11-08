@@ -69,6 +69,14 @@ export class DamageParticles {
   private keep = 1;
   private cap = MAX_PARTICLES;
 
+  /** The share of small particles kept (1 at full quality) */
+  get keepShare(): number { return this.keep; }
+
+  /** A flak fragment: a bright streak flying straight at `speed` for `life` frames; never dropped by the quality share (its count is the tier's) */
+  fragment(x: number, y: number, vx: number, vy: number, life: number, size: number, color: number): void {
+    if (this.ps.length < this.cap) this.ps.push({ kind: 'spark', x, y, vx, vy, life: 0, max: life, size, grow: 0, color, alpha: 1, drag: 1, rot: 0, vr: 0 });
+  }
+
   setQuality(keep: number, cap: number): void {
     this.keep = keep;
     this.cap = Math.min(MAX_PARTICLES, cap);
