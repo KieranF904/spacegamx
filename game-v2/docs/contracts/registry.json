@@ -2272,9 +2272,9 @@
       "id": "feature.machines.client",
       "path": "client/src/ships/features/machines/index.ts",
       "group": "client/ships/features",
-      "lines": 85,
-      "owns": "the field machines client half: build overlay and machine keys, HUD chip, the plan drawn on the ship",
-      "needs": "ClientFeature, pixi.js, @space-game/common types, field/bridge, field/fieldState, field/FieldOverlay",
+      "lines": 64,
+      "owns": "the field machines client half: build view and machine keys, HUD chip, the build view drawn on the ship",
+      "needs": "ClientFeature, pixi.js, field/bridge, field/fieldState",
       "events": "",
       "invariants": [
         {
@@ -2290,32 +2290,20 @@
         {
           "name": "toggleMachine",
           "kind": "function",
-          "start": 23,
-          "end": 28
+          "start": 21,
+          "end": 26
         },
         {
           "name": "gfx",
           "kind": "let",
-          "start": 30,
-          "end": 30
-        },
-        {
-          "name": "plannedCache",
-          "kind": "const",
-          "start": 32,
-          "end": 33
-        },
-        {
-          "name": "plannedOf",
-          "kind": "function",
-          "start": 34,
-          "end": 41
+          "start": 28,
+          "end": 28
         },
         {
           "name": "clientFeature",
           "kind": "const",
-          "start": 43,
-          "end": 85
+          "start": 30,
+          "end": 64
         }
       ]
     },
@@ -5860,7 +5848,7 @@
       "id": "protocol.field",
       "path": "common/src/network/fieldProtocol.ts",
       "group": "common/network",
-      "lines": 129,
+      "lines": 130,
       "owns": "the field fabrication and repair bank messages: plans saved, machines switched, jobs done, bank changed (job progress is never sent)",
       "needs": "type-only import of ships/types (Blueprint); econ/field jobs for the clock",
       "events": "",
@@ -5896,85 +5884,85 @@
           "name": "ClientFieldPlanMessage",
           "kind": "interface",
           "start": 30,
-          "end": 35
+          "end": 36
         },
         {
           "name": "ClientFieldPlanClearMessage",
           "kind": "interface",
-          "start": 37,
-          "end": 38
+          "start": 38,
+          "end": 39
         },
         {
           "name": "ClientMachineMessage",
           "kind": "interface",
-          "start": 40,
-          "end": 44
+          "start": 41,
+          "end": 45
         },
         {
           "name": "ClientFieldCancelMessage",
           "kind": "interface",
-          "start": 46,
-          "end": 47
+          "start": 47,
+          "end": 48
         },
         {
           "name": "ClientFieldRecycleMessage",
           "kind": "interface",
-          "start": 49,
-          "end": 50
+          "start": 50,
+          "end": 51
         },
         {
           "name": "ClientBankDepositMessage",
           "kind": "interface",
-          "start": 52,
-          "end": 53
+          "start": 53,
+          "end": 54
         },
         {
           "name": "ClientDevBankMessage",
           "kind": "interface",
-          "start": 55,
-          "end": 56
+          "start": 56,
+          "end": 57
         },
         {
           "name": "FieldClientMessage",
           "kind": "type",
-          "start": 58,
-          "end": 61
+          "start": 59,
+          "end": 62
         },
         {
           "name": "MachineBlock",
           "kind": "type",
-          "start": 63,
-          "end": 72
+          "start": 64,
+          "end": 73
         },
         {
           "name": "MachineView",
           "kind": "interface",
-          "start": 74,
-          "end": 95
+          "start": 75,
+          "end": 96
         },
         {
           "name": "ServerFieldStateMessage",
           "kind": "interface",
-          "start": 97,
-          "end": 109
+          "start": 98,
+          "end": 110
         },
         {
           "name": "ServerFieldDoneMessage",
           "kind": "interface",
-          "start": 111,
-          "end": 112
+          "start": 112,
+          "end": 113
         },
         {
           "name": "ServerRepairBankMessage",
           "kind": "interface",
-          "start": 114,
-          "end": 127
+          "start": 115,
+          "end": 128
         },
         {
           "name": "FieldServerMessage",
           "kind": "type",
-          "start": 129,
-          "end": 129
+          "start": 130,
+          "end": 130
         }
       ]
     },
@@ -11267,7 +11255,7 @@
       "id": "server.repair-bank.sessions",
       "path": "server/src/game/RepairBank.ts",
       "group": "server/game",
-      "lines": 478,
+      "lines": 479,
       "owns": "the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live ship, and the `repairBank` message",
       "needs": "RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed); npm: bitecs",
       "events": "hangarChanged when a part is built in",
@@ -11294,38 +11282,38 @@
         {
           "name": "ClaimCheck",
           "kind": "type",
-          "start": 38,
-          "end": 39
+          "start": 39,
+          "end": 40
         },
         {
           "name": "RepairBanks",
           "kind": "class",
-          "start": 41,
-          "end": 290
+          "start": 42,
+          "end": 291
         },
         {
           "name": "BankSession",
           "kind": "interface",
-          "start": 292,
-          "end": 303
+          "start": 293,
+          "end": 304
         },
         {
           "name": "BankConn",
           "kind": "interface",
-          "start": 305,
-          "end": 306
+          "start": 306,
+          "end": 307
         },
         {
           "name": "BankHost",
           "kind": "interface",
-          "start": 308,
-          "end": 327
+          "start": 309,
+          "end": 328
         },
         {
           "name": "BankSessions",
           "kind": "class",
-          "start": 329,
-          "end": 478
+          "start": 330,
+          "end": 479
         }
       ]
     },
@@ -15941,7 +15929,7 @@
       "path": "server/src/ships/bridge/field.ts",
       "group": "server/ships/bridge",
       "lines": 75,
-      "owns": "field refit: a flying ship takes a new design keeping HP, gun state and port contents; new parts arrive as ghosts",
+      "owns": "field refit: a flying ship takes a new design keeping HP, gun state and port contents; new parts arrive missing (or as the listed hangar/bank placeholders)",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
       "invariants": [

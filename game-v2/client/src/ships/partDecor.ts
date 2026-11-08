@@ -632,52 +632,76 @@ export function decorOf(geom: PlacedGeom): PartDecor {
   return d;
 }
 
-const css = (c: number, glow = 0) => {
-  // Glowing bits read brighter on a flat canvas
+/** A colour as drawn flat: glowing bits read brighter on a flat canvas */
+const flat = (c: number, glow = 0): number => {
   const k = 1 + glow * 0.25;
-  const r = Math.min(255, ((c >> 16) & 255) * k), g = Math.min(255, ((c >> 8) & 255) * k), b = Math.min(255, (c & 255) * k);
-  return `rgb(${r | 0},${g | 0},${b | 0})`;
+  const r = Math.min(255, ((c >> 16) & 255) * k) | 0, g = Math.min(255, ((c >> 8) & 255) * k) | 0, b = Math.min(255, (c & 255) * k) | 0;
+  return (r << 16) | (g << 8) | b;
 };
+const css = (c: number) => `rgb(${(c >> 16) & 255},${(c >> 8) & 255},${c & 255})`;
+
+/** Where flat part hardware is drawn (a 2D canvas, a pixi Graphics): points already mapped, colours as drawn flat */
+export interface DecorSink {
+  poly(pts: number[], color: number): void;
+  /** `glow`: a glowing disc (an engine's chamber, a lens) */
+  disc(x: number, y: number, r: number, color: number, glow: boolean): void;
+}
 
 /**
- * Draw a part's hardware on a 2D canvas (the hangar, item icons): `map` takes
- * grid points to the canvas, `scale` is pixels per cell. Turrets show their
- * head along the part's facing, over their mount.
+ * A part's hardware, flat, into any sink (the hangar's canvas, the world build view's graphics): `map` takes grid points
+ * to the target, `scale` is its units per cell. Turrets show their head along the part's facing, over their mount.
+ * `barrelsOnly`: just the guns' moving parts (the rest drawn by the hull itself, as in the hangar's lit view)
  */
-export function drawDecor2d(ctx: CanvasRenderingContext2D, geom: PlacedGeom, map: (x: number, y: number) => [number, number], scale: number, alpha = 1, glowCss?: string, barrelsOnly = false): void {
+export function drawDecorTo(sink: DecorSink, geom: PlacedGeom, map: (x: number, y: number) => [number, number], scale: number, barrelsOnly = false): void {
   const d = decorOf(geom);
-  const poly = (pts: number[], fill: string) => {
-    ctx.beginPath();
-    for (let i = 0; i < pts.length; i += 2) { const [x, y] = map(pts[i], pts[i + 1]); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
-    ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
+  const poly = (pts: number[], color: number) => {
+    const out: number[] = [];
+    for (let i = 0; i < pts.length; i += 2) { const [x, y] = map(pts[i], pts[i + 1]); out.push(x, y); }
+    sink.poly(out, color);
   };
-  ctx.save();
-  ctx.globalAlpha *= alpha;
-  for (const b of d.barrels) for (const s of b.parts) poly(place(s.pts, b), css(s.color));
-  // (just the guns' moving parts: the rest is drawn by the hull itself, as in the hangar's lit view)
+  for (const b of d.barrels) for (const s of b.parts) poly(place(s.pts, b), flat(s.color));
   if (!barrelsOnly) {
     // A weapon's base (the rest of its cell open)
     if (d.base) {
       const c = functionColor(geom.part.fn);
-      for (const b of d.base) poly(b.pts, css(mix(c, b.tone > 0 ? 0xffffff : 0, Math.abs(b.tone))));
+      for (const b of d.base) poly(b.pts, flat(mix(c, b.tone > 0 ? 0xffffff : 0, Math.abs(b.tone))));
     }
-    for (const p of d.polys) poly(p.pts, css(p.color, p.glow));
+    for (const p of d.polys) poly(p.pts, flat(p.color, p.glow));
     for (const c of d.discs) {
       const [x, y] = map(c.x, c.y);
-      ctx.beginPath();
-      ctx.arc(x, y, c.r * scale, 0, Math.PI * 2);
-      // (glowing discs in their grade's glow, if given: engines' chambers, lenses)
-      ctx.fillStyle = c.glow && glowCss ? glowCss : css(c.color, c.glow);
-      ctx.fill();
+      sink.disc(x, y, c.r * scale, flat(c.color, c.glow), !!c.glow);
     }
   }
   const tm = isTurret(geom.part) ? mountOf(geom) : null;
   if (tm) {
     const n = tm.dir, t: Vec2 = [-n[1], n[0]];
     const head = turretHead(geom.part.fn, 0.8 * Math.sqrt(Math.max(1, geom.area)), geom.area);
-    for (const s of head.shapes) poly(place(s.pts, { base: geom.centroid, n, t }), css(s.color));
+    for (const s of head.shapes) poly(place(s.pts, { base: geom.centroid, n, t }), flat(s.color));
   }
+}
+
+/**
+ * Draw a part's hardware on a 2D canvas (the hangar, item icons): `map` takes
+ * grid points to the canvas, `scale` is pixels per cell (drawDecorTo).
+ */
+export function drawDecor2d(ctx: CanvasRenderingContext2D, geom: PlacedGeom, map: (x: number, y: number) => [number, number], scale: number, alpha = 1, glowCss?: string, barrelsOnly = false): void {
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  drawDecorTo({
+    poly(pts, color) {
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i += 2) { if (i) ctx.lineTo(pts[i], pts[i + 1]); else ctx.moveTo(pts[i], pts[i + 1]); }
+      ctx.closePath();
+      ctx.fillStyle = css(color);
+      ctx.fill();
+    },
+    disc(x, y, r, color, glow) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      // (glowing discs in their grade's glow, if given: engines' chambers, lenses)
+      ctx.fillStyle = glow && glowCss ? glowCss : css(color);
+      ctx.fill();
+    },
+  }, geom, map, scale, barrelsOnly);
   ctx.restore();
 }

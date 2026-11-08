@@ -1,32 +1,41 @@
 /**
- * The build overlay (docs/design/field-fabrication.md, rule 5): building in world space on the live game. Opening it
- * swaps to the helm view and zooms in on the ship, which keeps flying; the parts palette (HangarPalette, by import: the
- * hangar's own list) opens at the side, and the mouse builds on the ship itself:
+ * The world build view (docs/design/field-fabrication.md, rule 5): editing the ship's blueprint on the live game, as the
+ * hangar does. Opening it swaps to the helm view and zooms in on the ship, which keeps flying; the parts palette
+ * (HangarPalette, by import: the hangar's own list) opens at the side, and the mouse builds on the ship itself:
  *
  *   left click   place the part in hand         right click   take a part out (a standing part: mark it for recycling)
  *   middle click pick a part up                 R turn · F mirror · T facing · Esc or the build key closes
  *
+ * There is no plan apart from the blueprint: a part the blueprint has and the ship hasn't is missing (planned or shot
+ * off), drawn as the real part, faded, and built by the fabricator. Built parts are the ship itself (the game draws
+ * them); parts marked for recycling are outlined red; the part in hand is the real part tinted green or red. Facing
+ * arrows and shield cover (build/buildMarks.ts) show on every part while the view is open.
+ *
  * Clicks build only on and just around the ship; anywhere else they still fire and mine, and no flight key is touched,
- * so the ship is never held back. A save sends `fieldPlan` (free; only building costs), Clear sends `fieldPlanClear`.
- * Closing puts the zoom and the controls back as they were. The plan's editing is plan.ts, drawn by drawShip (index.ts).
+ * so the ship is never held back. A save sends `fieldPlan` with the new blueprint (free; only building costs), "As it
+ * stands" sends `fieldPlanClear`. The edits are plan.ts, laid over the live ship each frame.
  */
 import { placeGeometry, partItemId, hasFixedBarrel } from '@space-game/common';
 import type { Graphics } from 'pixi.js';
 import type { PlacedGeom, PlacedPart, ShipState, Side, Vec2 } from '@space-game/common';
 import type { HangarPalette, PaletteSel } from '../HangarPalette';
 import type { ShipDrawCtx } from '../features/types';
-import { fieldClient } from './fieldState';
+import { fieldClient, machineProgress } from './fieldState';
 import { drawFieldGroups, fieldGroupEdit } from '../weaponGroups/fieldEditor';
 import { groupOfKey } from '../weaponGroups/editor';
+import { drawPartArt } from '../build/partArt';
+import { drawFacingMark, drawShieldCover } from '../build/buildMarks';
 import type { FieldDeps } from './bridge';
 import {
-  addPart, candidate, openDraft, partAtPoint, placementProblem, planChanged, planDiff, planTarget, removePart, targetErrors,
-  targetGeoms, type PlanDraft,
+  addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, settle, summary,
+  targetErrors, working, type BuildEdits, type LiveDesign, type WorkingDesign,
 } from './plan';
 
 const SIDE_CYCLE: readonly (Side | 'auto')[] = ['auto', 'N', 'E', 'S', 'W'];
 /** How far round the ship (cells) a click still builds */
 const REACH = 3;
+/** How a missing part shows (more as its build goes on) */
+const MISSING_ALPHA = 0.34, BUILDING_ALPHA = 0.5;
 
 const STYLE = `
 .fo { position: fixed; right: 0; top: 0; bottom: 0; width: 308px; z-index: 880; display: none; flex-direction: column; padding: 8px 8px 8px 10px;
@@ -48,8 +57,8 @@ const ZOOM_MIN = 0.6, ZOOM_MAX = 2;
 
 export class FieldOverlay {
   isOpen = false;
-  /** The plan being edited (null while closed) */
-  draft: PlanDraft | null = null;
+  /** The pilot's unsaved edits (laid over the live ship) */
+  edits: BuildEdits = noEdits();
   readonly hand: PaletteSel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0, flip: false, facing: 'auto' };
 
   private root?: HTMLDivElement;
@@ -61,18 +70,12 @@ export class FieldOverlay {
   private mouse: { x: number; y: number } | null = null;
   /** What opening changed (so closing can put it back) */
   private was: { zoom: number; helm: boolean } | null = null;
-  /** The live ship's structure when the draft was taken (so a change under it is noticed) */
-  private liveKey = '';
-  private ghostKey = '';
-  private awaiting = false;
   private cs = 0;
-  private geoms: PlacedGeom[] = [];
-  private geomsFor: PlanDraft | null = null;
-  private geomsAt = -1;
-  /** Bumps on each edit (the cache above and the footer follow it) */
+  /** Bumps on each edit (the caches below and the footer follow it) */
   private rev = 0;
   private note = '';
   private noteBad = false;
+  private cache: { key: unknown[]; w: WorkingDesign; geoms: PlacedGeom[] } | null = null;
 
   constructor(private deps: FieldDeps) {}
 
@@ -91,12 +94,13 @@ export class FieldOverlay {
     this.was = { zoom: deps.view.zoom(), helm: deps.view.helm() };
     deps.view.setHelm(true);
     deps.view.setZoom(this.zoomFor(ship));
-    this.takeDraft(ship);
+    this.edits = noEdits();
+    this.rev++;
     this.ensurePanel();
     this.root!.style.display = 'flex';
     window.addEventListener('mousedown', this.onDown, true);
     window.addEventListener('mousemove', this.onMove, true);
-    this.say('Click on the ship to place. Saving a plan is free: building costs materials.');
+    this.say('Click on the ship to place. Saving is free: the fabricator builds missing parts from your hold.');
     void this.loadPalette();
   }
 
@@ -108,7 +112,8 @@ export class FieldOverlay {
     if (this.root) this.root.style.display = 'none';
     const was = this.was;
     this.was = null;
-    this.draft = null;
+    this.edits = noEdits();
+    this.cache = null;
     if (was) {
       this.deps.view.setZoom(was.zoom);
       if (this.deps.view.helm() !== was.helm) this.deps.view.setHelm(was.helm);
@@ -129,12 +134,30 @@ export class FieldOverlay {
     return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   }
 
-  private takeDraft(ship: ShipState): void {
-    this.draft = openDraft(ship.blueprint, ship.ghost, fieldClient.recycleUids());
-    this.liveKey = structureKey(ship);
-    this.ghostKey = ghostKey(ship);
-    this.awaiting = false;
-    this.rev++;
+  // ---------------------------------------------------------------- the design as shown
+
+  /** The live ship as the edits see it (null: no ship) */
+  live(): LiveDesign | null {
+    const ship = this.deps.ship();
+    if (!ship) return null;
+    return { bp: ship.blueprint, alive: ship.derived.alive, queued: fieldClient.recycleUids() };
+  }
+
+  /** The working design and its geometry, cached until the live ship, its recycling queue or the edits change */
+  private view(): { live: LiveDesign; w: WorkingDesign; geoms: PlacedGeom[] } | null {
+    const ship = this.deps.ship(), live = this.live();
+    if (!ship || !live) return null;
+    const key = [ship, ship.blueprint, ship.rebuilds, live.queued, this.rev];
+    if (!this.cache || key.some((k, i) => k !== this.cache!.key[i])) {
+      const w = working(live, this.edits);
+      this.cache = { key, w, geoms: w.bp.parts.map((p) => placeGeometry(this.deps.catalog, p)) };
+    }
+    return { live, w: this.cache.w, geoms: this.cache.geoms };
+  }
+
+  /** The working design (null: closed or no ship) */
+  get design(): WorkingDesign | null {
+    return this.isOpen ? this.view()?.w ?? null : null;
   }
 
   // ---------------------------------------------------------------- panel
@@ -150,10 +173,10 @@ export class FieldOverlay {
     const root = document.createElement('div');
     root.className = 'fo';
     root.dataset.hudAvoid = '1';
-    root.innerHTML = `<div class="fo-head"><b>Build plan</b><button class="fo-btn" data-a="close" style="flex:none">Close</button></div>
+    root.innerHTML = `<div class="fo-head"><b>Build</b><button class="fo-btn" data-a="close" style="flex:none">Close</button></div>
       <div class="fo-pal"></div>
       <div class="fo-foot"><div class="fo-note"></div>
-        <div class="fo-btns"><button class="fo-btn go" data-a="save">Save plan</button><button class="fo-btn" data-a="reset">Undo edits</button><button class="fo-btn" data-a="clear">Clear plan</button></div></div>`;
+        <div class="fo-btns"><button class="fo-btn go" data-a="save">Save</button><button class="fo-btn" data-a="reset">Undo edits</button><button class="fo-btn" data-a="clear" title="Drop every missing part (planned or lost) from the design and stop recycling: the ship as it stands">As it stands</button></div></div>`;
     root.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest<HTMLElement>('[data-a]')?.dataset.a;
       if (a === 'close') this.close();
@@ -211,7 +234,7 @@ export class FieldOverlay {
 
   /** Capture phase, before the game's own mouse handler: a click on or round the ship builds, any other still fires */
   private onDown = (e: MouseEvent): void => {
-    if (!this.isOpen || !this.draft) return;
+    if (!this.isOpen) return;
     const t = e.target as HTMLElement | null;
     if (!t || t.tagName !== 'CANVAS') return;
     const at = this.gridAt(e.clientX, e.clientY);
@@ -237,32 +260,21 @@ export class FieldOverlay {
 
   /** Is a grid point on the design or within REACH cells of it */
   private near(g: Vec2): boolean {
-    const d = this.draft;
-    if (!d) return false;
+    const v = this.view();
+    if (!v) return false;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const q of this.draftGeoms()) {
+    for (const q of v.geoms) {
       minX = Math.min(minX, q.bbox.minX); minY = Math.min(minY, q.bbox.minY);
       maxX = Math.max(maxX, q.bbox.maxX); maxY = Math.max(maxY, q.bbox.maxY);
     }
     return g[0] >= minX - REACH && g[0] <= maxX + REACH && g[1] >= minY - REACH && g[1] <= maxY + REACH;
   }
 
-  /** Every draft part's geometry (marked ones too), cached until an edit */
-  draftGeoms(): PlacedGeom[] {
-    const d = this.draft;
-    if (!d) return [];
-    if (this.geomsFor !== d || this.geomsAt !== this.rev) {
-      this.geomsFor = d; this.geomsAt = this.rev;
-      this.geoms = d.bp.parts.map((p) => placeGeometry(this.deps.catalog, p));
-    }
-    return this.geoms;
-  }
-
-  /** Why the part in hand can't be placed (the plan's rules, and the licence), or null */
+  /** Why the part in hand can't be placed (the hangar's rules, and the licence), or null */
   problemFor(p: PlacedPart): string | null {
-    const d = this.draft;
-    if (!d) return 'not open';
-    const why = placementProblem(this.deps.catalog, d, p, this.deps.tuning);
+    const v = this.view();
+    if (!v) return 'not open';
+    const why = placementProblem(this.deps.catalog, v.w, p, this.deps.tuning);
     if (why) return why;
     const id = partItemId(p);
     if (!this.deps.canMake(id)) return `you can't make ${this.deps.econ.items.name(id)} yet`;
@@ -271,45 +283,49 @@ export class FieldOverlay {
 
   /** The part in hand at a grid point, and whether it can go there (the hover preview) */
   preview(g: Vec2): { part: PlacedPart; problem: string | null } | null {
-    const d = this.draft;
-    if (!d) return null;
-    const part = candidate(this.deps.catalog, d, this.hand, g);
+    const v = this.view();
+    if (!v) return null;
+    const part = candidate(this.deps.catalog, v.live, v.w, this.hand, g);
     if (!part) return null;
-    // (Checked against the whole design, so only when the cell, the hand or the plan changes)
+    // (Checked against the whole design, so only when the cell, the hand or the design changes)
     const h = this.hand;
-    const key = `${this.rev}:${part.x},${part.y}:${h.piece}|${h.fn}|${h.material}|${h.rot}|${h.flip}|${part.facing ?? ''}`;
-    if (this.previewKey !== key) { this.previewKey = key; this.previewProblem = this.problemFor(part); }
+    const key = `${this.rev}:${v.w.bp.parts.length}:${part.x},${part.y}:${h.piece}|${h.fn}|${h.material}|${h.rot}|${h.flip}|${part.facing ?? ''}`;
+    if (this.previewKey !== key || this.previewFor !== v.w) { this.previewKey = key; this.previewFor = v.w; this.previewProblem = this.problemFor(part); }
     return { part, problem: this.previewProblem };
   }
   private previewKey = '';
+  private previewFor: WorkingDesign | null = null;
   private previewProblem: string | null = null;
 
   private place(g: Vec2): void {
-    const d = this.draft!;
-    const part = candidate(this.deps.catalog, d, this.hand, g);
+    const v = this.view();
+    if (!v) return;
+    const part = candidate(this.deps.catalog, v.live, v.w, this.hand, g);
     if (!part) return this.say('The design is full (255 parts).', true);
     const why = this.problemFor(part);
     if (why) return this.say(why[0].toUpperCase() + why.slice(1) + '.', true);
-    addPart(d, part);
+    addPart(this.edits, part);
     this.edited();
   }
 
   private take(g: Vec2): void {
-    const d = this.draft!;
-    const i = partAtPoint(this.deps.catalog, d, g);
+    const v = this.view();
+    if (!v) return;
+    const i = partAtPoint(this.deps.catalog, v.w, g);
     if (i < 0) return;
-    const res = removePart(this.deps.catalog, d, i);
+    const res = removePart(this.deps.catalog, v.live, this.edits, i);
     if (res.kind === 'none') return this.say("The core can't be taken out.", true);
     const more = res.uids.length > 1 ? ` and ${res.uids.length - 1} cut off with it` : '';
-    this.say(res.kind === 'marked' ? `Marked for recycling${more}. Right-click again to keep it.` : res.kind === 'unmarked' ? 'Kept.' : `Taken out of the plan${more}.`);
+    this.say(res.kind === 'marked' ? `Marked for recycling${more}. Right-click again to keep it.` : res.kind === 'unmarked' ? 'Kept.' : `Taken out of the design${more}.`);
     this.edited();
   }
 
   private pickUp(g: Vec2): void {
-    const d = this.draft!;
-    const i = partAtPoint(this.deps.catalog, d, g);
+    const v = this.view();
+    if (!v) return;
+    const i = partAtPoint(this.deps.catalog, v.w, g);
     if (i < 0) return;
-    const p = d.bp.parts[i];
+    const p = v.w.bp.parts[i];
     Object.assign(this.hand, { piece: p.piece, fn: p.fn, material: p.material, rot: p.rot, flip: p.flip, facing: p.facing ? (p.facing as Side) : 'auto' });
     this.pal?.showInHand();
     this.say(`In hand: ${this.deps.econ.items.name(partItemId(p))}.`);
@@ -319,7 +335,7 @@ export class FieldOverlay {
     this.rev++;
   }
 
-  /** A key the overlay uses while open (the feature's onKey): true if it took it */
+  /** A key the view uses while open (the feature's onKey): true if it took it */
   onKey(code: string): boolean {
     if (!this.isOpen) return false;
     if (code === 'Escape') { this.close(); return true; }
@@ -334,12 +350,13 @@ export class FieldOverlay {
 
   /** 1-4 over a standing weapon: its weapon groups on the live ship (ships/weaponGroups/fieldEditor.ts) */
   private groupKey(code: string): boolean {
-    const d = this.draft, ship = this.deps.ship();
-    if (!d || !ship || !this.mouse) return false;
+    const v = this.view(), ship = this.deps.ship();
+    if (!v || !ship || !this.mouse) return false;
     const at = this.gridAt(this.mouse.x, this.mouse.y);
-    const i = at ? partAtPoint(this.deps.catalog, d, at) : -1;
+    const i = at ? partAtPoint(this.deps.catalog, v.w, at) : -1;
     if (i < 0) return false;
-    const r = fieldGroupEdit(code, ship, d.bp.parts[i].uid, planChanged(d, fieldClient.recycleUids()));
+    // (The edits are laid over the live ship, so a refit for the groups keeps them: no need to save first)
+    const r = fieldGroupEdit(code, ship, v.w.bp.parts[i].uid, false);
     if (!r) return false;
     if ('problem' in r) this.say(r.problem, true);
     else { this.deps.send(r.send); this.say(r.said); }
@@ -349,50 +366,37 @@ export class FieldOverlay {
   // ---------------------------------------------------------------- save, undo, clear
 
   save(): void {
-    const d = this.draft;
-    if (!d) return;
-    const errors = targetErrors(this.deps.catalog, this.deps.tuning, d);
+    const v = this.view();
+    if (!v) return;
+    const errors = targetErrors(this.deps.catalog, this.deps.tuning, v.w);
     if (errors.length) return this.say(errors[0].message.replace(/^[^:]*?\d+: /, '') + '.', true);
-    this.deps.send({ type: 'fieldPlan', blueprint: planTarget(d) });
-    this.awaiting = true;
-    const diff = planDiff(d);
-    this.say(`Plan saved: ${diff.added.length} to build, ${diff.recycle.length} to recycle.`);
+    this.deps.send({ type: 'fieldPlan', blueprint: planTarget(v.w) });
+    const s = summary(v.live, this.edits);
+    this.say(`Saved: ${s.added} to build, ${s.recycle} to recycle.`);
   }
 
   undo(): void {
-    const ship = this.deps.ship();
-    if (ship && this.draft) { this.takeDraft(ship); this.say('Edits undone.'); }
+    this.edits = noEdits();
+    this.edited();
+    this.say('Edits undone.');
   }
 
   clear(): void {
     this.deps.send({ type: 'fieldPlanClear' });
-    this.awaiting = true;
-    this.say('Plan cleared: the ship as it stands.');
+    this.edits = noEdits();
+    this.edited();
+    this.say('The ship as it stands: missing parts dropped, recycling stopped.');
   }
 
   // ---------------------------------------------------------------- each frame
 
-  /** Once a frame: follow the live ship, keep the panel's footer honest, close when the flight ends */
+  /** Once a frame: the edits the live ship now shows fall away, the footer stays honest, the view closes when the flight ends */
   update(): void {
     if (!this.isOpen) return;
     const ship = this.deps.ship();
     if (!ship || !this.deps.entity() || !this.deps.flying()) { this.close(); return; }
-    const d = this.draft!;
-    const key = structureKey(ship);
-    if (key !== this.liveKey) {
-      // The ship changed under the draft (a plan saved, a part built or recycled, a part lost): start again from it
-      const lost = !this.awaiting && planChanged(d, fieldClient.recycleUids());
-      this.takeDraft(ship);
-      if (lost) this.say('The ship changed: your edits were undone.', true);
-    } else {
-      const gk = ghostKey(ship);
-      if (gk !== this.ghostKey) {
-        // A planned part was built: it is a standing part now
-        this.ghostKey = gk;
-        d.planned = new Set(ship.blueprint.parts.filter((_, i) => ship.ghost?.[i]).map((p) => p.uid));
-        this.rev++;
-      }
-    }
+    const live = this.live();
+    if (live && hasEdits(this.edits) && settle(live, this.edits)) this.edited();
     this.footer();
     // (the parts list shows costs against the hold, which moves as you fly: look every few frames)
     if (this.pal && ++this.frames % 15 === 0 && this.pal.stale()) this.pal.render();
@@ -400,13 +404,13 @@ export class FieldOverlay {
   private frames = 0;
 
   private footer(): void {
-    const d = this.draft;
-    if (!d || !this.noteEl || !this.saveBtn || !this.clearBtn) return;
-    const diff = planDiff(d);
-    const dirty = planChanged(d, fieldClient.recycleUids());
+    const live = this.live();
+    if (!live || !this.noteEl || !this.saveBtn || !this.clearBtn) return;
+    const dirty = planChanged(live, this.edits);
     this.saveBtn.disabled = !dirty;
-    this.clearBtn.disabled = !(d.planned.size || fieldClient.recycleUids().size);
-    const sum = dirty ? `${diff.added.length} new, ${diff.recycle.length} to recycle${diff.dropped.length ? `, ${diff.dropped.length} dropped` : ''}` : '';
+    this.clearBtn.disabled = !(live.alive.some((a, i) => !a && live.bp.parts[i]?.fn !== 'core') || live.queued.size);
+    const s = summary(live, this.edits);
+    const sum = dirty ? `${s.added} new, ${s.recycle} to recycle${s.dropped ? `, ${s.dropped} dropped` : ''}` : '';
     const text = [this.note, sum && `Unsaved: ${sum}.`].filter(Boolean).join(' ');
     if (this.noteEl.textContent !== text) this.noteEl.textContent = text;
     this.noteEl.classList.toggle('bad', this.noteBad);
@@ -414,13 +418,16 @@ export class FieldOverlay {
 
   // ---------------------------------------------------------------- drawing
 
-  /** The overlay's marks on the pilot's own ship (the feature's drawShip): grid, new parts, marked parts, the hover */
+  /** The view on the pilot's own ship (the feature's drawShip): grid, missing parts, marked parts, marks, the hand */
   draw(g: Graphics, ctx: ShipDrawCtx): void {
-    const d = this.draft;
-    if (!this.isOpen || !d) return;
+    const v = this.isOpen ? this.view() : null;
+    if (!v) return;
     this.cs = ctx.cs;
+    const { w, geoms } = v;
     const X = frameOf(ctx);
-    const geoms = this.draftGeoms();
+    const at = (gx: number, gy: number) => X.at(gx, gy);
+    const toScreen = (gx: number, gy: number) => { const p = X.at(gx, gy); return { x: p[0], y: p[1] }; };
+    const paint = ctx.ship.blueprint.paint ? parseInt(ctx.ship.blueprint.paint.slice(1), 16) : undefined;
     // The grid round the design, faint
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const q of geoms) { minX = Math.min(minX, q.bbox.minX); minY = Math.min(minY, q.bbox.minY); maxX = Math.max(maxX, q.bbox.maxX); maxY = Math.max(maxY, q.bbox.maxY); }
@@ -430,19 +437,34 @@ export class FieldOverlay {
       for (let y = y0; y <= y1; y++) { const a = X.at(x0, y), b = X.at(x1, y); g.moveTo(a[0], a[1]).lineTo(b[0], b[1]); }
       g.stroke({ width: ctx.cs * 0.02, color: 0x7dd3fc, alpha: 0.16 });
     }
-    d.bp.parts.forEach((p, i) => {
-      if (d.marked.has(p.uid)) fillPoly(g, X, geoms[i], 0xef4444, 0.18, 0xef4444, 0.95);
-      else if (!d.live.has(p.uid)) fillPoly(g, X, geoms[i], 0x38bdf8, 0.28, 0x7dd3fc, 0.95);
+    // The part a machine is building now: it fills in as the job goes
+    const clocks = this.deps.clocks();
+    w.bp.parts.forEach((p, i) => {
+      const geom = geoms[i];
+      if (w.marked.has(p.uid)) { fillPoly(g, X, geom, 0xef4444, 0.16, 0xef4444, 0.95); return; }
+      if (w.standing[i]) return; // (built: the ship itself)
+      const job = w.liveIndex[i] >= 0 ? fieldClient.jobFor(p.uid) : undefined;
+      const k = job && job.job.kind === 'build' ? machineProgress(job.m, clocks) : 0;
+      drawPartArt(g, this.deps.catalog, geom, at, ctx.cs, { alpha: job ? BUILDING_ALPHA + 0.4 * k : MISSING_ALPHA, paint });
+      // (placed now and not saved yet: outlined amber, as the hangar marks a part new since the last save)
+      if (w.liveIndex[i] < 0) fillPoly(g, X, geom, 0xfbbf24, 0, 0xfbbf24, 0.8, 1.2);
+    });
+    // Which way each part faces, and what each shield covers
+    w.bp.parts.forEach((p, i) => {
+      drawFacingMark(g, p, geoms[i], toScreen, ctx.cs, 0xe5ecf7);
+      drawShieldCover(g, p, geoms[i], toScreen, ctx.cs, 0.35);
     });
     const live = this.deps.ship();
-    if (live) drawFieldGroups(g, live, (uid) => geoms[d.bp.parts.findIndex((q) => q.uid === uid)], (gx, gy) => X.at(gx, gy), ctx.cs);
+    if (live) drawFieldGroups(g, live, (uid) => geoms[w.bp.parts.findIndex((q) => q.uid === uid)], at, ctx.cs);
     if (this.mouse && this.near(this.gridAt(this.mouse.x, this.mouse.y) ?? [1e9, 1e9])) {
-      const at = this.gridAt(this.mouse.x, this.mouse.y)!;
-      const pv = this.preview(at);
+      const pv = this.preview(this.gridAt(this.mouse.x, this.mouse.y)!);
       if (pv) {
         const pg = placeGeometry(this.deps.catalog, pv.part);
-        const ok = !pv.problem;
-        fillPoly(g, X, pg, ok ? 0x4ade80 : 0xf87171, 0.3, ok ? 0x86efac : 0xfca5a5, 0.95);
+        const ok = !pv.problem, tint = ok ? 0x4ade80 : 0xf87171;
+        drawPartArt(g, this.deps.catalog, pg, at, ctx.cs, { alpha: 0.85, tint, tintK: 0.45, paint });
+        fillPoly(g, X, pg, tint, 0, ok ? 0x86efac : 0xfca5a5, 0.95);
+        drawFacingMark(g, pv.part, pg, toScreen, ctx.cs, ok ? 0xbbf7d0 : 0xfecaca);
+        drawShieldCover(g, pv.part, pg, toScreen, ctx.cs, 0.8);
       }
     }
   }
@@ -454,10 +476,8 @@ export class FieldOverlay {
     this.pal = null;
   }
 
-  /** Test seam: the targets the overlay would send */
-  get targetKey(): string { return this.draft ? JSON.stringify(planTarget(this.draft)) : ''; }
-  /** Test seam: the geometry of the kept parts */
-  keptGeoms(): PlacedGeom[] { return this.draft ? targetGeoms(this.deps.catalog, this.draft) : []; }
+  /** Test seam: the target the view would send */
+  get targetKey(): string { const w = this.design; return w ? JSON.stringify(planTarget(w)) : ''; }
 }
 
 // ---------------------------------------------------------------- shared drawing helpers
@@ -482,15 +502,6 @@ export function fillPoly(g: Graphics, X: ShipFrame, geom: PlacedGeom, fill: numb
   const pts: number[] = [];
   for (const [x, y] of geom.polygon) { const w = X.at(x, y); pts.push(w[0], w[1]); }
   if (pts.length < 6) return;
-  g.poly(pts).fill({ color: fill, alpha: fillAlpha });
+  if (fillAlpha > 0) g.poly(pts).fill({ color: fill, alpha: fillAlpha });
   g.poly(pts).stroke({ width: lineWidth, color: line, alpha: lineAlpha });
 }
-
-/** What changes a ship's structure: its part list and rebuild count (not the planned flags, which flip as parts are built) */
-function structureKey(ship: ShipState): string {
-  let h = ship.blueprint.parts.length;
-  for (const p of ship.blueprint.parts) h = (h * 31 + p.uid) | 0;
-  return `${ship.rebuilds}:${h}`;
-}
-
-const ghostKey = (ship: ShipState): string => (ship.ghost ?? []).map((b) => (b ? 1 : 0)).join('');

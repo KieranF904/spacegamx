@@ -19,8 +19,9 @@
  *             free part didn't cover, anywhere, at BANK.respawnSpeed (stepDeposits): never instantly.
  *   No guaranteed ship: a pilot who dies until the free part is empty respawns as a bare core, and is rebuilt as it refills.
  *
- * A death makes every standing part (but the core) a ghost and records it as owed (`ShipRecord.owed`): ghosts of a field
- * plan are not owed, so the free part and the deposits only ever rebuild the ship's own design.
+ * A death makes every part of the design (but the core and the hangar's placeholders) a ghost and records it as owed
+ * (`ShipRecord.owed`): standing or missing alike, since a part the build view planned is a missing part of the design.
+ * Hangar placeholders are not owed, so the free part and the deposits only ever rebuild the ship's own design.
  *
  * RepairBanks is the rules applied to a profile (no ECS, no sockets); tests run it on bare profiles. BankSessions, below it,
  * is the bank of the pilots in play: it installs the parts that come back on the live ship and sends the `repairBank`

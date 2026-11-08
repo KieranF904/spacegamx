@@ -28,13 +28,14 @@ import type { PackMode } from '../econ/field/packs.js';
 // ============================================ client -> server
 
 /**
- * Save the field plan: `blueprint` is the design the pilot wants (validated as any design). Parts standing now that keep
- * their uid and placement stay; standing parts left out are queued for recycling; new parts become planned parts
- * (ghosts) the fabricator fills in. Free: only building costs
+ * Save the build view's edit of the ship's blueprint: `blueprint` is the design the pilot wants (validated as a hangar
+ * edit is). Parts that keep their uid and placement stay; standing parts left out are queued for recycling (they stand
+ * until broken down); missing parts left out go; new parts come in missing, built by the same repair path as a part shot
+ * off. Free: only building costs
  */
 export interface ClientFieldPlanMessage { type: 'fieldPlan'; blueprint: Blueprint }
 
-/** Drop the plan: every planned part not built yet goes, the recycling queue empties (the ship as it stands) */
+/** The ship as it stands: every missing part (planned or lost) leaves the blueprint, the recycling queue empties */
 export interface ClientFieldPlanClearMessage { type: 'fieldPlanClear' }
 
 /**

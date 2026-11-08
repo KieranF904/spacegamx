@@ -2,8 +2,8 @@
  * Field machines in the full server (docs/design/field-fabrication.md sections 5 and 5.1): a pilot's fabricator
  * rebuilds and repairs parts from the hold while the ship flies, the core's own does it slowly without power, jobs
  * progress by the energy the machine took (machEu) and nothing streams, the hold full stalls a machine with nothing
- * lost, finished parts follow the orphan rule, recycling gives half back leaf first, a plan save is free and keeps
- * the live blueprint valid, and packs pay one unit each and go faster.
+ * lost, finished parts follow the orphan rule, recycling gives half back leaf first, a build view save is free, adds
+ * its new parts as missing parts (no ghosts) and keeps the live blueprint valid, and packs pay one unit each and go faster.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
@@ -337,7 +337,7 @@ describe('field fabricator: recycling', () => {
 });
 
 describe('field plan', () => {
-  it('a save is free: standing parts stay, removals queue for recycling, new parts are appended as ghosts, and the blueprint stays valid', () => {
+  it('a save is free: standing parts stay, removals queue for recycling, new parts are appended as missing parts (no ghosts), and the blueprint stays valid', () => {
     const w = world(design());
     const before = JSON.stringify(w.prof.cargo);
     const live = w.ship().blueprint;
@@ -355,11 +355,16 @@ describe('field plan', () => {
     const bp = w.ship().blueprint;
     expect(bp.parts.slice(0, live.parts.length).map((p) => p.uid)).toEqual(live.parts.map((p) => p.uid));
     expect(bp.parts.slice(live.parts.length).map((p) => p.uid).sort()).toEqual([10, 11]);
-    expect(w.ships.isGhost(w.pid, w.idx(10))).toBe(true);
-    expect(w.ships.isGhost(w.pid, w.idx(11))).toBe(true);
+    // (missing, as a part shot off is: in the blueprint, not on the ship, and no placeholder flag)
+    for (const u of [10, 11]) {
+      expect(w.ships.isGhost(w.pid, w.idx(u))).toBe(false);
+      expect(w.ship().ghost[w.idx(u)]).toBe(false);
+      expect(w.alive(u)).toBe(false);
+      expect(w.prof.ship.hp[u]).toBe(0);
+    }
     expect(w.alive(2)).toBe(true);
     expect(w.prof.ship.field?.recycle).toEqual([2]);
-    expect(w.prof.ship.ghosts?.sort()).toEqual([10, 11]);
+    expect(w.prof.ship.ghosts ?? []).toEqual([]);
     expect(w.prof.ship.blueprint).toBe(bp);
     expect(w.ships.validate(bp, { mounting: false }).ok).toBe(true);
     expect(JSON.stringify(w.prof.cargo)).toBe(before);
@@ -372,35 +377,53 @@ describe('field plan', () => {
     expect(sum(after.held, after.held.length)).toBeLessThan(sum(cap, cap.length) * 0.75);
   });
 
-  it('a planned part that overlaps a part being recycled waits, and joins when its cells are free', () => {
+  it('a new part on the cells of a part still being recycled is refused; once that part is gone it goes in, and is built', () => {
     const w = world(design());
     const e = (w.server as any).econ;
     const live = w.ship().blueprint;
-    // Swap Pip 2 for a hull in the same cell
+    // Swap Pip 2 for a hull in the same cell: Pip 2 still stands while it is broken down, so not yet
     const target: Blueprint = { ...live, parts: [...live.parts.filter((p) => p.uid !== 2), part(12, 'sq', 'hull', 1, -1)] };
     w.send({ type: 'fieldPlan', blueprint: target });
     w.run(1);
     expect(w.idx(12)).toBe(-1);
-    expect(w.prof.ship.field?.waiting?.map((p) => p.uid)).toEqual([12]);
+    expect(w.ship().blueprint).toBe(live);
+    expect(w.prof.ship.field?.recycle).toBeUndefined();
+    expect(JSON.stringify(w.got.slice(-20))).toMatch(/still being recycled/);
+    // Recycle it first, then the same part goes in
+    w.send({ type: 'fieldRecycle', uids: [2] });
     w.send({ type: 'machine', kind: 'fabricator', on: true });
     until(w, () => w.idx(2) < 0, 5000);
+    w.send({ type: 'fieldPlan', blueprint: { ...w.ship().blueprint, parts: [...w.ship().blueprint.parts, part(12, 'sq', 'hull', 1, -1)] } });
     w.run(1);
     expect(w.idx(12)).toBeGreaterThanOrEqual(0);
-    expect(w.prof.ship.field?.waiting).toBeUndefined();
+    expect(w.alive(12)).toBe(false);
     // And it's built from the hold once the plates are there
     w.give(e.recipes.partInputs({ fn: 'hull', material: 'alloy', piece: 'sq' }));
     until(w, () => w.alive(12), 5000);
     expect(w.ships.validate(w.ship().blueprint, { mounting: false }).ok).toBe(true);
   });
 
-  it('clearing the plan drops planned parts and the recycling queue', () => {
+  it("an old save's waiting parts join the blueprint as missing parts", () => {
     const w = world(design());
     const live = w.ship().blueprint;
+    w.prof.ship.field = { waiting: [part(13, 'sq', 'hull', 2, 0), part(14, 'sq', 'hull', 9, 9)] };
+    w.server.pilots.reapplyShip(w.conn);
+    w.run(2);
+    expect(w.ship().blueprint.parts.map((p) => p.uid)).toEqual([...live.parts.map((p) => p.uid), 13]);
+    expect(w.alive(13)).toBe(false);
+    expect(w.ship().ghost[w.idx(13)]).toBe(false);
+    expect(w.prof.ship.field?.waiting).toBeUndefined();
+  });
+
+  it('as it stands: every missing part (planned or shot off) leaves the design and the recycling queue empties', () => {
+    const w = world(design());
+    const live = w.ship().blueprint;
+    w.destroy(1);
     w.send({ type: 'fieldPlan', blueprint: { ...live, parts: [...live.parts.filter((p) => p.uid !== 2), part(10, 'sq', 'hull', 2, 0)] } });
     w.run(1);
     w.send({ type: 'fieldPlanClear' });
     w.run(1);
-    expect(w.ship().blueprint.parts.map((p) => p.uid)).toEqual(live.parts.map((p) => p.uid));
+    expect(w.ship().blueprint.parts.map((p) => p.uid)).toEqual(live.parts.filter((p) => p.uid !== 1).map((p) => p.uid));
     expect(w.prof.ship.field?.recycle).toBeUndefined();
     expect(w.ship().ghost.some(Boolean)).toBe(false);
   });
@@ -559,7 +582,7 @@ describe('field refiner', () => {
 });
 
 describe('field fabricator: a planned part built in', () => {
-  it('leaves no ghost: the ship sync clears it on the pilot\'s client and a watcher\'s, and the pilot\'s hangar is sent again', () => {
+  it('is a missing part until built, then stands: on the pilot\'s client and a watcher\'s, and the pilot\'s hangar is sent again', () => {
     const w = world(design());
     const e = (w.server as any).econ;
     // (another pilot near by, holding the ship)
@@ -574,13 +597,15 @@ describe('field fabricator: a planned part built in', () => {
     w.send({ type: 'fieldPlan', blueprint: { ...live, parts: [...live.parts, part(10, 'sq', 'hull', 2, 0)] } });
     w.run(40);
     const i10 = w.idx(10);
-    expect(w.ship().ghost[i10]).toBe(true);
-    const planned = () => {
+    expect(w.ship().ghost[i10]).toBe(false);
+    expect(w.alive(10)).toBe(false);
+    const missing = () => {
       const h = w.got.filter((m) => m.type === 'hangar').at(-1) as Extract<ServerMessage, { type: 'hangar' }> | undefined;
-      return h?.slots[w.prof.activeSlot]?.ghosts;
+      const v = h?.slots[w.prof.activeSlot];
+      return v && { ghosts: v.ghosts, wrecked: v.wrecked };
     };
-    // (the plan's save is told to the hangar view too)
-    expect(planned()).toEqual([10]);
+    // (the save is told to the hangar view too: a missing part there, as one shot off is)
+    expect(missing()).toEqual({ ghosts: [], wrecked: [10] });
     w.give(e.recipes.partInputs({ fn: 'hull', material: 'alloy', piece: 'sq' }));
     w.send({ type: 'machine', kind: 'fabricator', on: true });
     expect(until(w, () => w.alive(10), 5000)).toBeGreaterThan(0);
@@ -597,7 +622,7 @@ describe('field fabricator: a planned part built in', () => {
       expect(cs.ghost[i10]).toBe(false);
       expect(cs.derived.alive[i10]).toBe(true);
     }
-    // And the hangar view (the station and hangar windows read the record, not the ship): built, not planned
-    expect(planned()).toEqual([]);
+    // And the hangar view (the station and hangar windows read the record, not the ship): built, not missing
+    expect(missing()).toEqual({ ghosts: [], wrecked: [] });
   });
 });

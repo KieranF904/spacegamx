@@ -114,7 +114,7 @@ export interface ShipRecord {
   rank?: number;
   /** Old saves only (loaners are gone, v6): nothing writes it, and the field update drops such records */
   loaner?: boolean;
-  /** Ghosts owed to a death (uids): parts of its own design the repair bank rebuilds, apart from planned (field plan) ones it never pays (server/src/game/RepairBank.ts) */
+  /** Ghosts owed to a death (uids): parts of its own design the repair bank rebuilds (standing or missing at the death; never the hangar's placeholders: server/src/game/RepairBank.ts) */
   owed?: number[];
   /** Its ammunition loadout (econ/loadout.ts): crates to carry, topped up from storage at a station, and which each gun opens first */
   ammo?: ShipLoadout;

@@ -1,8 +1,8 @@
 /**
  * What a ship keeps of its field work between sessions (ShipRecord.field; docs/design/field-fabrication.md, "State").
- * The plan itself is the record's blueprint (standing parts + planned parts, the planned ones in `ghosts`); this holds
- * the rest: the machines' switches, the recycling queue, planned parts that can't join the blueprint yet, and what sits
- * inside the machines. Jobs are not kept: a job under way when the pilot leaves is called off (its inputs go back to
+ * The plan itself is the record's blueprint: the parts standing, and the missing ones (planned or lost alike: hp 0 in the
+ * record) the fabricator builds. This holds the rest: the machines' switches, the recycling queue, and what sits inside
+ * the machines. Jobs are not kept: a job under way when the pilot leaves is called off (its inputs go back to
  * the hold, or into `held` if the hold is full).
  */
 
@@ -24,8 +24,8 @@ export interface FieldRecord {
   /** Standing parts queued for recycling (uids) */
   recycle?: number[];
   /**
-   * Planned parts that can't be in the blueprint yet: their cells are still taken by a part being recycled, or nothing
-   * standing or planned joins them yet. The blueprint must always pass validateBlueprint; these join it when they can
+   * (Old saves only, read once) planned parts an earlier field plan kept outside the blueprint. Nothing writes it now:
+   * the server moves them into the blueprint as missing parts when the ship is next flown (FieldShips.migrate)
    */
   waiting?: PlacedPart[];
   /** Items inside the machines: inputs of a job called off and finished output, waiting for room in the hold */
