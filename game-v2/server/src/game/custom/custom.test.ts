@@ -8,11 +8,11 @@ import { join } from 'path';
 import {
   createShipState, rebuildShip, groupsGone, customGroups, partHit, newPartHit, loadCatalog, blueprintGeometry, type ShipState, type Catalog, type ShipTuning,
 } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 
 const dataDir = join(__dirname, '../../../../data');
-const cfg = loadShipConfigFromDisk(dataDir);
+const cfg = loadShipConfigCached(dataDir);
 const catalog: Catalog = loadCatalog(cfg.catalog as never);
 const tuning = cfg.tuning as unknown as ShipTuning;
 const factions = readGameDataFiles(dataDir).factions as { custom: { types: Record<string, string>; designs: Record<string, { hp: Record<string, number> }> } };

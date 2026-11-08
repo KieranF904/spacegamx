@@ -48,7 +48,7 @@ import {
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -98,8 +98,8 @@ const LAZY_ON_ASTEROIDS = new Set(['Position', 'Velocity', 'Rotation']);
 
 type PilotSpec = { name: string; bp: Blueprint; dx: number; dy: number };
 
-function fixtures(): { specs: PilotSpec[]; corsair: Blueprint; shipCfg: ReturnType<typeof loadShipConfigFromDisk> } {
-  const shipCfg = loadShipConfigFromDisk(dataDir);
+function fixtures(): { specs: PilotSpec[]; corsair: Blueprint; shipCfg: ReturnType<typeof loadShipConfigCached> } {
+  const shipCfg = loadShipConfigCached(dataDir);
   const dev = shipCfg.dev ?? {};
   const bp = (f: string) => parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints', f), 'utf-8'));
   for (const id of ['test-strafer', 'test-tow-hauler', 'test-surge-striker']) if (!dev[id]) throw new Error(`dev ship ${id} missing`);

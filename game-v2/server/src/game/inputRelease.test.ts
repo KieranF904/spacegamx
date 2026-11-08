@@ -10,7 +10,7 @@ import { Input, InSystem, Position, Station as StationComp, INPUT_HELD, type Cli
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -21,7 +21,7 @@ function setup() {
   const server = new GameServer({
     gameData: new GameData(readGameDataFiles(dataDir)),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   let open = true;
   const socket: ClientSocket = { isOpen: () => open, send: () => {}, close: () => { open = false; } };

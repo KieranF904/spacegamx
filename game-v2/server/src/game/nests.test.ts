@@ -7,7 +7,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData, type GameDataFiles } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -21,7 +21,7 @@ function world(edit?: (f: any) => void) {
   const gameData = new GameData(f as GameDataFiles);
   const server = new GameServer({
     gameData, userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   const step = (n = 1, each?: () => void) => { for (let i = 0; i < n; i++) { each?.(); server.step(); } };
   const t = new LocalTransport(server);

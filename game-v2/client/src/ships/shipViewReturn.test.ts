@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
 import { Container } from 'pixi.js';
 import { createShipState, EntityType, isWeaponFn, type Blueprint } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 
 // The hull batch: which ship ids hold a slot, and which were placed (drawn) this frame
@@ -43,7 +43,7 @@ vi.mock('../rendering/fxTextures', () => ({ beam: () => null }));
 
 const { ShipRenderer } = await import('./ShipRenderer');
 
-const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 // A design with no frame or skeleton (nothing here builds lit meshes), its guns taken off (their looks paint canvases)
 const base = Object.values(bridge.enemyDesigns as Record<string, Blueprint>).find((bp) => !bp.rigid && bp.parts.every((p) => {
   const pc = bridge.catalog.pieces.get(p.piece);

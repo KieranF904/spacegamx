@@ -17,7 +17,7 @@ import { Position, Velocity, Rotation, InSystem, hpWire, type ReplicaEnv, type C
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 
@@ -31,7 +31,7 @@ function world(opts: { acks: boolean }) {
   const server = new GameServer({
     gameData: new GameData(readGameDataFiles(dataDir)),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)), clock: () => clock.t,
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);

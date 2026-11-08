@@ -7,7 +7,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { withDevData } from '../data/devData.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
@@ -15,7 +15,7 @@ import { MemoryProfileStore } from '../profile/ProfileStore.js';
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
 const files = withDevData(readGameDataFiles(dataDir), dataDir);
-const shipConfig = loadShipConfigFromDisk(dataDir);
+const shipConfig = loadShipConfigCached(dataDir);
 const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
 /** Signs in as "pilot" (user 1) with token "tok" */
 const userDB = {

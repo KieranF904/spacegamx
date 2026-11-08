@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { COMP_TABS, guideRows } from '../ui/componentGuide';
 import { PLATES } from '../ui/componentData';
@@ -13,7 +13,7 @@ import { ALL, applyFilters, emptyFilters, loadFilters, saveFilters, subCounts, s
 import { cardStats, fedFrom } from './paletteCard';
 import { FireClock, flightTicks, gunPlan, segmentCircle } from './gunPreview/gunPlan';
 
-const { catalog, tuning } = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const { catalog, tuning } = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const rows = paletteRows(catalog, guideRows(catalog, PLATES));
 const fn = (id: string) => catalog.functions.get(id)!;
 const ids = (rs: { fn: string }[]) => rs.map((r) => r.fn);

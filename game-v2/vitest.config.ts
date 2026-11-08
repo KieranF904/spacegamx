@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
 export default defineConfig({
@@ -8,6 +8,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Perf/bench files (*.perf.test.ts) run by npm run test:perf (vitest.perf.config.ts), not by default
+    exclude: [...configDefaults.exclude, '**/*.perf.test.ts'],
     include: ['common/src/**/*.test.ts', 'server/src/**/*.test.ts', 'client/src/**/*.test.ts', 'server-browser/src/**/*.test.ts', 'site/src/**/*.test.ts', 'scripts/db/**/*.test.ts', 'scripts/shipgen/**/*.test.ts'],
     environment: 'node',
     // The payout dice's secret fixed (server/src/game/payoutDice.ts): mining, loot and the like roll the same every run

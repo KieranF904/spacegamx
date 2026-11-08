@@ -13,7 +13,7 @@ import { Position, Velocity, Rotation, InSystem, DEBRIS_GRACE_TICKS, type Replic
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 
@@ -30,7 +30,7 @@ function world() {
     gameData: new GameData(readGameDataFiles(dataDir)),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
     scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
     clock: () => clock.t,
   });
   const ships = server.getShips();

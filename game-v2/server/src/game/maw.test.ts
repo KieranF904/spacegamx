@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -14,7 +14,7 @@ const files = readGameDataFiles(dataDir);
 
 describe('the Heart of the Maw', () => {
   it('is huge, slow and plated in Mk V, with Mk II vents that are the way in', () => {
-    const ships = createShipBridge(loadShipConfigFromDisk(dataDir));
+    const ships = createShipBridge(loadShipConfigCached(dataDir));
     const cat = ships.catalog, tun = ships.tuning;
     const bp = ships.enemyDesigns.maw_heart_titan;
     expect(validateBlueprint(cat, bp, tun).ok).toBe(true);
@@ -36,7 +36,7 @@ describe('the Heart of the Maw', () => {
 
   it('wakes at its lair as built, beats (a telegraphed ring), and its spawn launch from its hull', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'diver' } as any);

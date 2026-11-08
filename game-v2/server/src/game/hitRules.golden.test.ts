@@ -18,12 +18,12 @@ import { goldenFile, hashRows } from '../../../common/src/ships/golden/testData.
 import { createProtoServer } from '../proto/createProtoServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const shipsCfg = loadShipConfigFromDisk(dataDir);
+const shipsCfg = loadShipConfigCached(dataDir);
 const pins = goldenFile<{ hash: string; rows: number; dealt: number; sample: number[][] }>(join(__dirname, 'hitRules.golden.json'));
 afterAll(() => pins.save());
 

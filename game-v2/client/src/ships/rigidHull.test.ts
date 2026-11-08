@@ -5,14 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { createShipState } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { buildHull, skeletonCovered } from './hullBuild';
 import { buildSkeleton } from './skeletonBuild';
 import { LitGeometry } from '../rendering/lighting/LitGeometry';
 
 describe('a rigid hull', () => {
-  const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+  const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
   const ship = createShipState(bridge.catalog, bridge.tuning, 1, bridge.enemyDesigns.pyreclast, 0);
   const geoms = bridge.geometry(ship), cs = bridge.tuning.cellSize;
   const piece = (i: number) => bridge.catalog.pieces.get(ship.blueprint.parts[i].piece)!;

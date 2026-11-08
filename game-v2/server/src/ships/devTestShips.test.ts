@@ -1,6 +1,6 @@
 /**
  * The F9 dev test ships (data/ships/blueprints/dev/test-*.json): loaded the way the server's devShip does
- * (loadShipConfigFromDisk -> config.dev), each validates and mounts cleanly, carries the part it exists to test,
+ * (loadShipConfigCached -> config.dev), each validates and mounts cleanly, carries the part it exists to test,
  * and flies on its power (the Brownout one is short on purpose).
  */
 import { describe, it, expect } from 'vitest';
@@ -10,10 +10,10 @@ import {
   loadCatalog, validateBlueprint, createShipState, loadTest, stepShipPhysics, strafeForce, burstEnergy, chargeTotal,
   DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT, FULL_CHARGE, type ShipTuning, type Charge, type FlightBody,
 } from '@space-game/common';
-import { loadShipConfigFromDisk } from './loadShipConfig.js';
+import { loadShipConfigCached } from './loadShipConfig.js';
 
 const dataDir = join(dirname(fileURLToPath(import.meta.url)), '../../../data');
-const cfg = loadShipConfigFromDisk(dataDir);
+const cfg = loadShipConfigCached(dataDir);
 const catalog = loadCatalog(cfg.catalog as never);
 const tuning = cfg.tuning as ShipTuning;
 

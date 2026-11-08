@@ -6,11 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import { autoWire, parseBlueprint, createShipState, placeGeometry, wireCells, cellKey, type Blueprint } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { DEAD_NET, NET_COLORS, powerReport, pruneWires, whereOnShip } from './wireEdit';
 
-const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const { catalog, tuning } = bridge;
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const onHullOf = (bp: Blueprint) => {

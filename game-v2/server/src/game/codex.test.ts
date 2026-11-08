@@ -7,7 +7,7 @@ import { GameData, type GameDataFiles } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { validateGameData } from '../data/validateGameData.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
@@ -18,7 +18,7 @@ function world(data: GameDataFiles = files, store = new MemoryProfileStore()) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
   const server = new GameServer({
     profileStore: store, gameData: new GameData(data), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   const join = () => {
     const t = new LocalTransport(server);

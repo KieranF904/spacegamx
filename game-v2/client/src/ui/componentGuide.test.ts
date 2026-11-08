@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { Economy, JOB_MATERIALS, MATERIAL_LEVEL, type ItemsFile, type RecipesFile } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import items from '../../../data/items.json';
 import recipes from '../../../data/recipes.json';
@@ -17,7 +17,7 @@ import {
   type CompRow, type PilotView,
 } from './componentGuide';
 
-const { catalog } = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const { catalog } = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, catalog, {});
 const PLATES = (recipes as unknown as { parts: { plates: Record<string, string> } }).parts.plates;
 const rows = guideRows(catalog, PLATES);

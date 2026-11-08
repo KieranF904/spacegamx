@@ -12,7 +12,7 @@ import { GameData } from '../data/GameData.js';
 import { withDevData, loadRangeConfig } from '../data/devData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -28,7 +28,7 @@ function start(opts: { dev?: boolean; production?: boolean } = {}) {
   const server = new GameServer({
     gameData: new GameData(dev ? withDevData(readGameDataFiles(dataDir), dataDir) : readGameDataFiles(dataDir)),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, devTeleport: dev, devRange: config, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    scene: 'sectors', autoStart: false, devTeleport: dev, devRange: config, ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   process.env.NODE_ENV = savedEnv;
   const t = new LocalTransport(server);

@@ -7,7 +7,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 /** A feed with a hand-turned clock and a lobby that takes (or refuses) what it's sent */
@@ -228,7 +228,7 @@ describe('the game server sends its pilots\' sessions (fake client)', () => {
     const dataDir = join(__dirname, '../../../data');
     const server = new GameServer({
       gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
     });
     const batches: { server: string; events: FeedEvent[] }[] = [];
     activity.start({ url: 'http://lobby', secret: 's', server: 'Local dev', timer: false, send: async (events) => { batches.push({ server: 'Local dev', events }); return true; } });

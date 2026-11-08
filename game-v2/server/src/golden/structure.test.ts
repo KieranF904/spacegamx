@@ -15,7 +15,7 @@ import * as bitecs from 'bitecs';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
@@ -62,7 +62,7 @@ describe('structure pins', () => {
       userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
       scene: 'sectors',
       autoStart: false,
-      ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      ships: createShipBridge(loadShipConfigCached(dataDir)),
       clock: () => 1_000_000,
     });
     // One pilot, so the per-client periodic steps run too
@@ -95,7 +95,7 @@ describe('structure pins', () => {
       userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
       scene: 'sectors',
       autoStart: false,
-      ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      ships: createShipBridge(loadShipConfigCached(dataDir)),
       clock: () => 1_000_000,
     });
     const types = server.handledMessageTypes().sort();
@@ -106,7 +106,7 @@ describe('structure pins', () => {
   it('ShipBridge public API', () => {
     const src = readFileSync(join(srcRoot, 'server/src/ships/ShipBridge.ts'), 'utf8');
     const priv = new Set([...src.matchAll(/^\s*private\s+(?:readonly\s+|static\s+)*([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]));
-    const bridge = createShipBridge(loadShipConfigFromDisk(dataDir)) as any;
+    const bridge = createShipBridge(loadShipConfigCached(dataDir)) as any;
     const names = new Set<string>();
     for (let p = Object.getPrototypeOf(bridge); p && p !== Object.prototype; p = Object.getPrototypeOf(p)) {
       for (const n of Object.getOwnPropertyNames(p)) names.add(n);

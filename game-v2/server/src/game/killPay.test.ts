@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -21,7 +21,7 @@ describe('kill pay by grade', () => {
     for (let g = 1; g < 5; g++) expect(gc[g]).toBeGreaterThan(gc[g - 1]);
     // A Mk I kill still pays well over its ship's credits (fighting in Sol earns about what mining there does)
     expect(gc[0]).toBeGreaterThanOrEqual(5);
-    const bridge = createShipBridge(loadShipConfigFromDisk(dataDir));
+    const bridge = createShipBridge(loadShipConfigCached(dataDir));
     const xp = [1, 2, 3, 4, 5].map((g) => gradeReward(bridge.catalog, g));
     for (let g = 1; g < 5; g++) expect(xp[g]).toBeGreaterThan(xp[g - 1]);
   });
@@ -31,7 +31,7 @@ describe('kill pay by grade', () => {
     const server = new GameServer({
       gameData: new GameData(files),
       userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
     });
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];

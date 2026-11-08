@@ -6,12 +6,12 @@ import { Position, Velocity, Rotation, Input, InSystem, ServerMessage, parseBlue
 import { createProtoServer } from '../proto/createProtoServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const ships = loadShipConfigFromDisk(dataDir);
+const ships = loadShipConfigCached(dataDir);
 const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
 
 function setup(bubbles = false) {

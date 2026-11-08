@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
@@ -19,7 +19,7 @@ function world() {
   const clock = { t: 1_000_000 };
   const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)), clock: () => clock.t });
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

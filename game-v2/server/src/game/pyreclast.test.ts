@@ -9,7 +9,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { BossesFile } from './Bosses.js';
 import { PYRECLAST_EXPOSURE, PYRECLAST_LOOP, type PyreclastBrain } from './brains/pyreclast.js';
@@ -26,7 +26,7 @@ function world() {
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
     scene: 'sectors',
     autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   const pilots: { pid: number; got: ServerMessage[] }[] = [];
   // (A move's looks (its tells, beams, strikes' looks) are worked out by every client running the boss's body (CAPS.MOVES,

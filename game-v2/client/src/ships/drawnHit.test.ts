@@ -5,14 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { createShipState, EntityType, SIDE } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { ShipStore } from './ShipStore';
 import { DrawnWorld, bubbleRadius } from './drawnHit';
 import type { GameState } from '../state/GameState';
 import type { DrawnHit } from '../rendering/weapons/WeaponFx';
 
-const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 
 function world(shield = 0, sides: Record<number, number> = {}) {
   const store = new ShipStore(bridge.catalog, bridge.tuning);
