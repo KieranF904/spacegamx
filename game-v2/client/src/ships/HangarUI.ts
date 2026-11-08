@@ -43,6 +43,7 @@ import {
   cellMap, exhaustProblem } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
 import { bankKind, gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
+import { cloneJson as clone } from '@space-game/common';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
@@ -105,7 +106,6 @@ export interface HangarDeps {
 
 type Overlay = 'energy' | 'connectors' | 'joins' | 'power' | 'com' | 'thrust' | 'arcs';
 const DEFAULT_FACING: Record<string, Side> = { thruster: 'S', weapon: 'N', miner: 'N' };
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 /** What a save would change: the parts, the paint, the wiring (absent: auto-wired) */
 const designSig = (bp: Blueprint) => JSON.stringify(bp.parts) + (bp.paint ?? '') + (bp.wires ? JSON.stringify(bp.wires) : '~');
 

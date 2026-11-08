@@ -31,7 +31,7 @@
  * "Stop" does too.
  */
 
-import { EntityType, planetPosition, moonOffset, pocketsFrom, pocketAt, stationInteractRadius, type StarSystemData, type PersonView, type PingKind } from '@space-game/common';
+import { EntityType, wrapPi, planetPosition, moonOffset, pocketsFrom, pocketAt, stationInteractRadius, type StarSystemData, type PersonView, type PingKind } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Autopilot, AutoDest } from '../ships/Autopilot';
 import { ContextActionUI, type ScreenCircle } from '../ui/ContextActionUI';
@@ -39,7 +39,7 @@ import { ContextMenuUI, type MenuSection } from '../ui/ContextMenuUI';
 import { shipKind } from '../ui/shipReadout';
 import miningTable from '../../../data/mining.json';
 import {
-  RightClick, rightPress, pickTargets, targetOptions, openSpaceOptions, orderStep, jumpStep, wrapAngle, km, MENU_LEAVE_PX,
+  RightClick, rightPress, pickTargets, targetOptions, openSpaceOptions, orderStep, jumpStep, km, MENU_LEAVE_PX,
   type ContextTarget, type ContextKind, type TargetFacts, type MenuOption, type DriveFacts,
 } from './contextClick';
 
@@ -276,7 +276,7 @@ export class ContextActions {
     const angle = Math.atan2(o.y - me.y, o.x - me.x);
     const reach = this.host.jumpReach();
     const dist = Math.min(Math.hypot(o.x - me.x, o.y - me.y), reach || Infinity);
-    const s = jumpStep({ phase: this.host.jumpPhase(), facingErr: wrapAngle(angle - me.angle), angVel: me.angVel ?? 0, ticks: o.ticks++, asked: o.asked, charged: o.charged });
+    const s = jumpStep({ phase: this.host.jumpPhase(), facingErr: wrapPi(angle - me.angle), angVel: me.angVel ?? 0, ticks: o.ticks++, asked: o.asked, charged: o.charged });
     if (s.state === 'charging') o.charged = true;
     if (o.asked >= 0) o.asked++;
     else if (s.jump) o.asked = 0;

@@ -15,6 +15,7 @@
 import type { Blueprint } from '../ships/types.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import type { Economy } from './economy.js';
+import { cloneJson as clone } from '../math/basic.js';
 import type { PlayerProfile, ShipRecord, StarterKit } from './profile.js';
 import type { ShipLoadout } from './loadout.js';
 import { loadoutKinds } from './loadout.js';
@@ -130,7 +131,6 @@ export interface DesignUpdateInput {
 }
 
 const addBag = (bag: Bag, id: string, n: number) => { if (n > 0) bag[id] = (bag[id] ?? 0) + n; };
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 const sameSave = (a: SaveFingerprint | null | undefined, b: SaveFingerprint) => !!a && a.name === b.name && a.parts === b.parts;
 
 /** A record's built parts (not ghosts, not at 0 HP) as materials in full, plus its socketed gems; an old save's loaner gives nothing */

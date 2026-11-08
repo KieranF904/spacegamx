@@ -9,6 +9,7 @@
 import {
   Bag, partItemId, isWeaponFn, OrderPlan, OrderLine, countOf, type Blueprint,
 } from '@space-game/common';
+import { cloneJson } from '@space-game/common';
 import { costHtml, showTip, hideTip } from '../windowKit';
 import { itemIcon, shipIcon } from '../itemIcons';
 import { shipSummary } from '../../ships/shipSummary';
@@ -142,7 +143,7 @@ export class ShipsTab {
     go.className = 'sgw-btn primary' + (empty < 0 || locked.length ? ' off' : '');
     go.style.cssText = 'padding:5px 10px; white-space:nowrap;';
     go.textContent = empty < 0 ? 'No empty slot' : locked.length ? 'Licence needed' : `Build in slot ${empty + 1}`;
-    go.onclick = () => { this.d.send({ type: 'slotSave', slot: empty, blueprint: JSON.parse(JSON.stringify(bp)), ...(plan ? { plan } : {}) }); this.d.sound('ui_click', 0.5); };
+    go.onclick = () => { this.d.send({ type: 'slotSave', slot: empty, blueprint: cloneJson(bp), ...(plan ? { plan } : {}) }); this.d.sound('ui_click', 0.5); };
     row.appendChild(go);
     return row;
   }

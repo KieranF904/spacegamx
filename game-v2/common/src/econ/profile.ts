@@ -9,6 +9,7 @@
 import type { Blueprint, FunctionDef } from '../ships/types.js';
 import type { Catalog } from '../ships/catalog.js';
 import { migrateBlueprint, migrateItemBag, migratePartItem } from '../ships/migrate.js';
+import { cloneJson } from '../math/basic.js';
 import { migrateGunFacings } from '../ships/gunFacing.js';
 import { modelLicensed } from './market.js';
 import { Stack, Bag, cleanStacks, addTo } from './stacks.js';
@@ -249,7 +250,7 @@ export function newProfile(kit: StarterKit, now = new Date().toISOString()): Pla
     skills: {},
     cargo: [],
     storage: Object.entries(kit.storage).map(([id, n]) => ({ id, n })),
-    ship: { blueprint: JSON.parse(JSON.stringify(kit.blueprint)), hp: {}, ghosts: [], plan: kit.planFile },
+    ship: { blueprint: cloneJson(kit.blueprint), hp: {}, ghosts: [], plan: kit.planFile },
     hangar: [],
     activeSlot: 0,
     roster: [],

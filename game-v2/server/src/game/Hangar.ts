@@ -34,6 +34,7 @@ import {
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { StationServices, JobTag } from './StationServices.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
+import { cloneJson } from '@space-game/common';
 import { activity } from '../activity/index.js';
 
 export interface HangarHost {
@@ -299,7 +300,7 @@ export class Hangar {
 
   /** The record's design with one part's gems changed (a copy, so the ship flying keeps its own until it's put on again) */
   private regem(conn: PilotConn, p: PlayerProfile, slot: number, rec: ShipRecord, uid: number, gems: string[]): void {
-    const bp: Blueprint = JSON.parse(JSON.stringify(rec.blueprint));
+    const bp: Blueprint = cloneJson(rec.blueprint);
     const part = bp.parts.find((q) => q.uid === uid)!;
     setPartGems(this.gems!, part, gems);
     const next = { ...rec, blueprint: bp };
@@ -348,7 +349,7 @@ export class Hangar {
     const part = p?.ship.blueprint.parts.find((q) => q.uid === uid);
     if (!p || !part?.gems?.length || !this.gems) return;
     const names = part.gems.map((g) => this.econ.items.name(g));
-    const bp: Blueprint = JSON.parse(JSON.stringify(p.ship.blueprint));
+    const bp: Blueprint = cloneJson(p.ship.blueprint);
     setPartGems(this.gems, bp.parts.find((q) => q.uid === uid)!, []);
     // The record only: the live ship's part is gone anyway, and changes when it's next put on
     p.ship.blueprint = bp;
@@ -727,7 +728,7 @@ export class Hangar {
   saveDesign(conn: PilotConn, slot: number, bp: Blueprint): void {
     const p = this.pilots.get(conn);
     if (!p || !Number.isInteger(slot) || slot < 0 || slot >= unlocks(p).blueprintSlots) return;
-    const clean: Blueprint = JSON.parse(JSON.stringify(bp));
+    const clean: Blueprint = cloneJson(bp);
     for (const q of clean.parts) { delete q.mods; delete q.gems; }
     const designs = p.designs ?? [];
     while (designs.length <= slot) designs.push(null);

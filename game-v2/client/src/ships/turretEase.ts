@@ -6,17 +6,12 @@
  * constant (EASE_FRAMES), and on a shot it's pulled within FIRE_GAP of it at once: a shell never visibly leaves a barrel
  * pointing elsewhere by more than that (the muzzle flash and the shell come from the exact barrel: WeaponFx).
  */
+import { wrapPi } from '@space-game/common';
 
 /** Time constant of the chase, in 60 Hz frames (~50 ms: most of a gap gone in 3 frames, nearly all in 10) */
 export const EASE_FRAMES = 3;
 /** On a shot, the drawn barrel is pulled at once to within this of the angle it fired at (radians: 3°) */
 export const FIRE_GAP = 3 * (Math.PI / 180);
-
-const wrapPi = (a: number) => {
-  while (a > Math.PI) a -= 2 * Math.PI;
-  while (a < -Math.PI) a += 2 * Math.PI;
-  return a;
-};
 
 /** The gap from drawn to target (a full-circle turret's the short way round; a limited one's within its window) */
 function gapOf(drawn: number, target: number, full: boolean): number {

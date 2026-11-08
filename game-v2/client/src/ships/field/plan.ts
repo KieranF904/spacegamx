@@ -12,6 +12,7 @@ import {
   mountingOf, partMountingProblems, validateBlueprint, SIDES, partItemId,
 } from '@space-game/common';
 import type { Blueprint, Catalog, PlacedGeom, PlacedPart, ShipTuning, Side, Vec2, BlueprintError } from '@space-game/common';
+import { cloneJson as clone } from '@space-game/common';
 
 export interface PlanDraft {
   /** The design being edited: live parts first (in their order), new parts appended */
@@ -24,7 +25,6 @@ export interface PlanDraft {
   planned: Set<number>;
 }
 
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 /**
  * A draft of the live design. `ghost[i]`: the i-th part is planned. `queued`: the uids the server already has queued

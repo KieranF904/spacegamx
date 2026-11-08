@@ -15,7 +15,7 @@
  * out. Pure (no Pixi): it runs in a worker (proceduralWorker.ts) and in tests.
  */
 
-import { hashString, mulberry32, type LodestoneData } from '@space-game/common';
+import { smoothstep as smooth, hashString, mulberry32, type LodestoneData } from '@space-game/common';
 
 export const STILLSTONE_MAP = 256;
 /** What it makes, by version (assetCache.ts): bump it whenever the output changes (or it reads more of the stone than id, rough, scar and state) */
@@ -56,7 +56,6 @@ function makeNoise(seed: number): (x: number, y: number, oct?: number) => number
   };
 }
 
-const smooth = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 /** A soft ridge: 1 at d = 0, falling to 0 at |d| = w */
 const ridge = (d: number, w: number) => { const t = Math.min(1, Math.abs(d) / w); return 1 - t * t * (3 - 2 * t); };
 
