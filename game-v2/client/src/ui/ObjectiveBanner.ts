@@ -6,8 +6,8 @@
  */
 
 import type { ServerObjectiveMessage } from '@space-game/common';
+import { esc } from './escape';
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 let styled = false;
 function injectStyles(): void {

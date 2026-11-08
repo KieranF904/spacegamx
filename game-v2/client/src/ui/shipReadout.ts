@@ -8,12 +8,11 @@ import { EntityType } from '@space-game/common';
 import type { InterpolatedEntity } from '../state/GameState';
 import factionsData from '../../../data/factions.json';
 import { threatTag } from './threat';
+import { esc } from './escape';
+export { esc };
 
 const FACTIONS = Object.values((factionsData as unknown as { factions: Record<string, { name: string; color: string }> }).factions);
 
-export function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 export function isShip(e: InterpolatedEntity): boolean {
   return e.type === EntityType.ShipBody || e.type === EntityType.Player;

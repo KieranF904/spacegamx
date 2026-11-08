@@ -17,6 +17,8 @@ import questsData from '../../../../data/quests.json';
 import stationsData from '../../../../data/stations.json';
 import gemsData from '../../../../data/gems.json';
 import stationData from '../../../../data/station.json';
+import { esc } from '../escape';
+export { esc };
 
 export type Tab = 'overview' | 'ships' | 'contracts' | 'market' | 'vendors' | 'refinery' | 'fabricator' | 'outpost' | 'bank';
 
@@ -58,7 +60,6 @@ export const STATION = stationData as unknown as StationFile;
 const STATION_NAMES: Record<string, string> = Object.fromEntries(((stationsData as unknown as { stations: { id: string; name: string }[] }).stations ?? []).map((s) => [s.id, s.name]));
 export const stationName = (id: string) => STATION_NAMES[id] ?? id;
 
-export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** "for the hull & armour, Pulse Laser" */
 export function forText(l: OrderLine): string {

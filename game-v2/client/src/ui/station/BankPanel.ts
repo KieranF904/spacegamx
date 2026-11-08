@@ -12,8 +12,8 @@
 
 import { depositable, countOf, type Bag, type Economy, type ServerRepairBankMessage, type Stack, type ClientMessage } from '@space-game/common';
 import { packRows, packsHtml, wirePacks } from './packs';
+import { esc } from '../escape';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export type DepositFrom = 'cargo' | 'storage';
 

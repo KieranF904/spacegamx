@@ -37,6 +37,7 @@ import type { AutoDest } from '../ships/Autopilot';
 import { drawDraft, drawNotes, noteAt } from '../rendering/contributorDraw';
 import systemsData from '../../../data/systems.json';
 import stationsData from '../../../data/stations.json';
+import { esc } from './escape';
 
 export interface ContributorDeps {
   send(msg: ClientMessage): void;
@@ -67,7 +68,6 @@ const SHAPES: { kind: NoteShapeKind; label: string; tip: string }[] = [
 const COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#f87171', '#e2e8f0'];
 const STATUS_WORD: Record<NoteStatus, string> = { open: 'Open', done: 'Done', wontdo: "Won't do" };
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const fmt = (n: number) => (Math.abs(n) >= 10000 ? `${(n / 1000).toFixed(Math.abs(n) >= 100000 ? 0 : 1)}k` : `${Math.round(n)}`);
 
 /** A system's bodies for placing notes about */

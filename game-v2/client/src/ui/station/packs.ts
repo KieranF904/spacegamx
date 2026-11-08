@@ -5,8 +5,8 @@
  */
 
 import { canCraft, countOf, FIELD, type ClientMessage, type Economy, type Stack } from '@space-game/common';
+import { esc } from '../escape';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export interface PackRow {
   /** The pack's item id, which is also its craft recipe's id */

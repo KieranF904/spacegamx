@@ -11,13 +11,13 @@ import type { GameState } from '../state/GameState';
 import { setStyle } from './domWrite';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
+import { esc } from './escape';
 
 /** As the server's (People.ts TALK_RANGE) */
 export const TALK_RANGE = 900;
 /** The label sits this far (world units) above where they are, over their ship */
 const LIFT = 170;
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export class PeopleUI {
   private root: HTMLDivElement;

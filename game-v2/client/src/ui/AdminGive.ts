@@ -14,6 +14,7 @@
 import { CATEGORY_LABEL, RARITY_COLOR, type AdminPlayerInfo, type Economy, type ItemDef } from '@space-game/common';
 import { itemIcon } from './itemIcons';
 import { hideTip, itemTipHtml, showTip } from './windowKit';
+import { esc } from './escape';
 
 export interface AdminGiveDeps {
   econ: Economy;
@@ -29,7 +30,6 @@ export interface AdminGiveDeps {
 /** A card's item: the catalogue's def, or a bare one for a server-only id */
 interface Entry { d: ItemDef; group: string; words: string[]; partCat?: string; material?: string; legacy: boolean }
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** Cards drawn at a time (more as you scroll) */
 const PAGE = 120;

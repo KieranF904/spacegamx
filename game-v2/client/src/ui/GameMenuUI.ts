@@ -12,6 +12,7 @@ import { Lazy } from '../lazy';
 import { ACTIONS, ActionDef, RESERVED_KEYS, keyName } from '../input/keybindings';
 import { settings, SettingsData, defaultSettings } from '../settings/Settings';
 import { FPS_CAPS, type QualitySetting } from '../settings/quality';
+import { esc } from './escape';
 
 export interface MenuShipInfo {
   name: string;
@@ -578,9 +579,6 @@ export class GameMenuUI {
 // Small builders
 // ---------------------------------------------------------------------------
 
-function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 function pct(v: number, max: number): number {
   return max > 0 ? Math.max(0, Math.min(100, (v / max) * 100)) : 0;

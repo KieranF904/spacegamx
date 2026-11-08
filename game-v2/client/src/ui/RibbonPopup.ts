@@ -4,10 +4,8 @@
  */
 
 import type { RibbonDef } from '@space-game/common';
+import { esc } from './escape';
 
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 export class RibbonPopup {
   private queue: { def: RibbonDef; credits: number; xp: number }[] = [];

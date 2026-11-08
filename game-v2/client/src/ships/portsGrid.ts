@@ -11,6 +11,7 @@ import {
 } from '@space-game/common';
 import { PortsOverlay, ghostHint, portNear, type OverlayView } from './portsOverlay';
 import { SCENARIO_LABEL, loadRow, portTipHtml } from './portsReport';
+import { esc } from '../ui/escape';
 
 export class PortsGrid {
   /** Which load test the overlay's flows, fills and shares come from */
@@ -103,4 +104,3 @@ export function portsPanelHtml(d: ShipDerived, shown: PortsScenario, on: boolean
   return html;
 }
 
-const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);

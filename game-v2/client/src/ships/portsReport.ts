@@ -6,6 +6,7 @@
  */
 import type { ShipDerived, PortsLoadResult, PortsScenario, PortsView } from '@space-game/common';
 import { PS_CLASH, PS_LINKED, PS_OPEN, PS_SPARE, PS_WASTE, portsView } from '@space-game/common';
+import { esc } from '../ui/escape';
 
 type PortsLayout = NonNullable<ShipDerived['ports']>;
 
@@ -112,23 +113,22 @@ const STATE_WORDS: Record<number, [string, string]> = {
   [PS_SPARE]: ['Spare', '#94a3b8'],
 };
 const tipRow = (k: string, v: string) => `<div style="display:flex; justify-content:space-between; gap:12px; padding:2px 0; border-bottom:1px solid #18223a"><span style="color:#8ea0bd">${k}</span><b style="color:#e5ecf7; font-weight:600; text-align:right">${v}</b></div>`;
-const escT = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** A port's tooltip: whose, which way, its rating, what it links to (or why nothing crosses), and the flow on it in the load test */
 export function portTipHtml(v: PortsView, k: number, c: PortTipCtx): string {
-  const p = v.ports[k], [word, col] = STATE_WORDS[p.state], own = escT(c.name(p.part));
+  const p = v.ports[k], [word, col] = STATE_WORDS[p.state], own = esc(c.name(p.part));
   const kind = p.aug ? 'Augment input' : p.dir === 1 ? 'Out port' : 'In port';
   let html = `<div style="display:flex; gap:6px; align-items:center"><span style="width:9px; height:9px; border-radius:2px; flex:none; background:${p.dir === 1 ? '#fbbf24' : '#60a5fa'}"></span><b style="color:#e5ecf7">${kind}</b><span style="color:#8ea0bd">· ${own}</span></div>`;
   html += `<div style="color:${col}; font-size:11px; margin:1px 0 5px">${word}</div>`;
   html += tipRow('Rated', `${Math.round(p.rate)} E/s`);
-  const other = p.to >= 0 ? escT(c.name(p.to)) : '';
+  const other = p.to >= 0 ? esc(c.name(p.to)) : '';
   if (p.state === PS_LINKED) {
     const l = v.links[p.link];
     html += tipRow(p.dir === 1 ? 'Gives to' : 'Takes from', other);
     if (l) html += tipRow('Link carries', `up to ${Math.round(l.cap)} E/s`);
     if (l && c.flow) {
       const f = c.flow(l.id), u = l.cap > 0 ? f / l.cap : 0;
-      html += tipRow(`Flow${c.scenario ? ` (${escT(c.scenario.toLowerCase())})` : ''}`, `<span style="color:${u > 0.98 ? '#fbbf24' : '#e5ecf7'}">${f < 10 ? f.toFixed(1) : Math.round(f)} E/s · ${Math.round(u * 100)}%</span>`);
+      html += tipRow(`Flow${c.scenario ? ` (${esc(c.scenario.toLowerCase())})` : ''}`, `<span style="color:${u > 0.98 ? '#fbbf24' : '#e5ecf7'}">${f < 10 ? f.toFixed(1) : Math.round(f)} E/s · ${Math.round(u * 100)}%</span>`);
     }
   } else if (p.state === PS_CLASH) {
     html += `<div style="margin-top:5px; color:#fca5a5">It faces ${other}'s ${p.dir === 1 ? 'out' : 'in'} port: two ${p.dir === 1 ? 'outs' : 'ins'} on one edge pass nothing. Turn one of them (R) or mirror it (F).</div>`;

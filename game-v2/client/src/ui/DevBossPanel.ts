@@ -9,10 +9,10 @@
  */
 
 import type { ClientBossDevMessage, ServerBossDevMessage, BossDevRow } from '@space-game/common';
+import { esc } from './escape';
 
 type Send = (msg: Omit<ClientBossDevMessage, 'type'>) => void;
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const LIFE_WORD: Record<string, string> = { dormant: 'dormant', waking: 'waking', active: 'fighting', recovering: 'recovering', healing: 'healing', sleeping: 'sinking back', live: 'live' };
 
 export class DevBossPanel {

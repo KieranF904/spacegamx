@@ -24,6 +24,7 @@ import ribbonsData from '../../../data/achievements.json';
 import { settings } from '../settings/Settings';
 import { setText, setStyle } from './domWrite';
 import { boundKeyName } from '../input/keybindings';
+import { esc } from './escape';
 
 /** The key an action is bound to now (for the hints) */
 const keyOf = (id: string) => boundKeyName(id, settings.data.bindings);
@@ -45,7 +46,6 @@ const chainOf = (c: string) => CHAIN[c] ?? { label: c, color: '#c9d4e5' };
 /** Each Records group's colour */
 const CODEX_COLOR: Record<CodexTab, string> = { signal: '#fbbf24', peoples: '#c4b5fd', places: '#7ff0d0', records: '#7dd3fc', talk: '#f0abfc' };
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export interface QuestDeps {
   pilot: PilotState;

@@ -8,6 +8,7 @@ import { resistText } from '../ships/partTip';
 import { Economy, Stack, Bag, RARITY_COLOR, CATEGORY_LABEL, ItemDef, RARITIES, describePart, partBuildPoints, DAMAGE_NAMES } from '@space-game/common';
 import { tipRows } from '../ships/describe';
 import { itemIcon } from './itemIcons';
+import { esc } from './escape';
 
 let styled = false;
 export function injectWindowStyles(): void {
@@ -249,7 +250,6 @@ export function closeMenu(): void {
   menuEl = null;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** Rich tooltip for an item */
 export function itemTipHtml(econ: Economy, id: string, opts: { count?: number; hint?: string; extra?: string } = {}): string {

@@ -42,6 +42,7 @@ import {
   RightClick, rightPress, pickTargets, targetOptions, openSpaceOptions, orderStep, jumpStep, wrapAngle, km, MENU_LEAVE_PX,
   type ContextTarget, type ContextKind, type TargetFacts, type MenuOption, type DriveFacts,
 } from './contextClick';
+import { esc } from '../ui/escape';
 
 type JumpPhase = 'ready' | 'charging' | 'burn' | 'cooldown';
 
@@ -699,4 +700,3 @@ export class ContextActions {
   }
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);

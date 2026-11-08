@@ -7,12 +7,12 @@
 
 import { HAZARDS, hazardTolerance, hazardDeficit, insulationOf, secondsToFreeze, type HazardRules, type ShipDerived } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
+import { esc } from './escape';
 
 const RULES = hazardData as unknown as HazardRules;
 const NAME: Record<string, string> = {
   radiation: 'Radiation', thermal: 'Thermal', cryo: 'Cryo', corrosive: 'Corrosive', gravitational: 'Gravity', electromagnetic: 'EM',
 };
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
 /** Tooltip rows for a system's hazard ratings, against the ship you fly (null: no ship) */
 export function hazardRows(ratings: Record<string, number> | undefined, ship: ShipDerived | null): string {

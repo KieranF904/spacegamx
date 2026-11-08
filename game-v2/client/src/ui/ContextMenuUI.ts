@@ -11,8 +11,8 @@
  */
 
 import { placeMenu, defaultIndex, stepIndex, outsideBy, type MenuOption } from '../input/contextClick';
+import { esc } from './escape';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** One thing's part of the menu */
 export interface MenuSection {

@@ -6,6 +6,7 @@
 import type { ClientMessage, ServerWhisperMessage } from '@space-game/common';
 import { ChatLog, CHAT_CHANNELS, allOn, channelDef, lineText, parseToggles, saveToggles, toggleChannel, ALL_CHANNELS, type ChatChannel, type ChatLine } from './chatLog';
 import { ChatCompose } from './chatCompose';
+import { esc } from './escape';
 
 const TOGGLES_KEY = 'spacegame.chatChannels';
 /** (Before the toggles: one tab) */
@@ -25,9 +26,6 @@ export interface ChatPanelHost {
   sound?(id: string, v?: number): void;
 }
 
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 export class ChatPanel {
   readonly log = new ChatLog();

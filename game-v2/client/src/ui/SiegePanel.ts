@@ -23,8 +23,8 @@ import { SiegeCards } from './siege/SiegeCards';
 import { focusState, frontMarkers, nextOrders, padName, padsInReach, type BastionLayout } from './siege/siegeView';
 import { siegeFeed } from '../rendering/surface/siege/siegeFeed';
 import { TURRET_DEFAULT, TURRET_LOOKS } from '../rendering/surface/siege/siegeLook';
+import { esc } from './escape';
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 let styled = false;
 function injectStyles(): void {

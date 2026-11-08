@@ -52,6 +52,7 @@ import { drawsText, portsReport, portsWarnings } from './portsReport';
 import { PortsGrid, portsPanelHtml } from './portsGrid';
 import { HangarPalette } from './HangarPalette';
 import { drawHangarGroups, groupOfKey, groupsSaid, hangarGroupKey } from './weaponGroups/editor';
+import { esc } from '../ui/escape';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -1801,9 +1802,6 @@ function ruleText(m: MountingProblem): string {
   return m.message.replace(/^[^:]*?\d+: /, '');
 }
 
-function esc(t: string): string {
-  return t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-}
 
 function btnCss(bg: string): string {
   return `background:${bg}; color:#fff; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:6px 10px; cursor:pointer; font:12px 'Segoe UI', sans-serif; flex:1;`;

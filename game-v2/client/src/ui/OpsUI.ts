@@ -8,10 +8,8 @@
 
 import type { OpView, ServerOpsMessage } from '@space-game/common';
 import type { GameState } from '../state/GameState';
+import { esc } from './escape';
 
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}
 
 const COLORS: Record<string, string> = { idle: '#7dd3fc', active: '#4ade80', done: '#a3a3a3', danger: '#f87171' };
 /** Asking "give up?" this long before it lapses */

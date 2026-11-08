@@ -27,6 +27,7 @@ import { AdminGive, loadGiveRecents } from './AdminGive';
 import { itemIcon } from './itemIcons';
 import { devBankHtml, devBankMessage } from './station/devBank';
 import { closeMenu, injectWindowStyles, openMenu } from './windowKit';
+import { esc } from './escape';
 
 type Tab = 'me' | 'players' | 'world' | 'server';
 
@@ -46,7 +47,6 @@ export interface AdminPanelDeps {
   clientStats?(): string;
 }
 
-const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const fmt = (n: number) => Math.round(n).toLocaleString();
 /** How long a ban lasts (AdminTools reads these) */
 const BAN_LENGTHS = [['1h', '1 hour'], ['1d', '1 day'], ['7d', '7 days'], ['30d', '30 days'], ['perm', 'For good']];
