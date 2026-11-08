@@ -10,7 +10,7 @@
  * so the ship is never held back. A save sends `fieldPlan` (free; only building costs), Clear sends `fieldPlanClear`.
  * Closing puts the zoom and the controls back as they were. The plan's editing is plan.ts, drawn by drawShip (index.ts).
  */
-import { placeGeometry, partItemId } from '@space-game/common';
+import { placeGeometry, partItemId, hasFixedBarrel } from '@space-game/common';
 import type { Graphics } from 'pixi.js';
 import type { PlacedGeom, PlacedPart, ShipState, Side, Vec2 } from '@space-game/common';
 import type { HangarPalette, PaletteSel } from '../HangarPalette';
@@ -324,6 +324,8 @@ export class FieldOverlay {
     if (groupOfKey(code)) return this.groupKey(code);
     if (code === 'KeyR') { this.hand.rot = ((this.hand.rot + 1) & 3) as PaletteSel['rot']; this.pal?.renderHand(); return true; }
     if (code === 'KeyF') { this.hand.flip = !this.hand.flip; this.pal?.renderHand(); return true; }
+    // (A gun's barrel is fixed to its piece: R turns it, T has nothing to cycle)
+    if (code === 'KeyT' && hasFixedBarrel(this.deps.catalog, this.hand.fn)) return true;
     if (code === 'KeyT') { this.hand.facing = SIDE_CYCLE[(SIDE_CYCLE.indexOf(this.hand.facing) + 1) % SIDE_CYCLE.length]; this.pal?.renderHand(); return true; }
     return false;
   }

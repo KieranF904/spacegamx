@@ -19,7 +19,7 @@
  */
 
 import {
-  getVariant, isStructural, isWeaponFn, mountingOf, partItemId, partNeedsFacing, SIDES,
+  getVariant, gunFacing, hasFixedBarrel, isStructural, isWeaponFn, mountingOf, partItemId, partNeedsFacing, SIDES,
   type Bag, type Catalog, type Economy, type FunctionDef, type Rot, type ShipTuning, type Side,
 } from '@space-game/common';
 import { COMP_TABS, guideRows, requirementLine, type CompRow, type CompTab, type Gate, type PilotView } from '../ui/componentGuide';
@@ -437,7 +437,7 @@ export class HangarPalette {
     const cost = costLines(bag, (k) => this.h.have(k));
     const showCost = !this.h.free() && can && (structure || left <= 0) && cost.length;
     const fp = footprint(catalog, sel.piece);
-    let html = `<div class="hp-hand-top"><span>IN HAND</span><span class="keys">R ${sel.rot * 90}° · F ${sel.flip ? 'mirrored' : 'mirror'}${partNeedsFacing(sel.fn) ? ' · T facing' : ''}</span></div>`
+    let html = `<div class="hp-hand-top"><span>IN HAND</span><span class="keys">R ${sel.rot * 90}° · F ${sel.flip ? 'mirrored' : 'mirror'}${partNeedsFacing(sel.fn) && !hasFixedBarrel(catalog, sel.fn) ? ' · T facing' : ''}</span></div>`
       + `<div class="hp-hand-main" data-part="${esc(id)}"><img src="${itemIcon(econ, id)}" alt="">`
       + `<div style="min-width:0; flex:1"><div class="hp-hand-name"><b>${esc(f.model ? f.name ?? f.id : def?.name ?? f.name ?? f.id)}</b><span class="hp-dim">${esc(fp.size)}</span>${mountBadge(catalog, { fn: f.id })}</div>`
       + `<div class="hp-say">${say}</div></div></div>`;
@@ -452,7 +452,10 @@ export class HangarPalette {
     this.hand.style.setProperty('--c', color);
     if (row.shapes.length > 1) html += this.shapesHtml(row, material);
     if (structure) html += this.materialsHtml();
-    if (partNeedsFacing(sel.fn)) {
+    if (hasFixedBarrel(catalog, sel.fn)) {
+      // (A gun's barrel is on one side of its piece: R turns it, so there is no facing to pick)
+      html += `<div class="hp-line">Barrel: <b>${FACING_LABEL[gunFacing(catalog, sel) ?? 'N']}</b> <span class="mk">(R turns it)</span></div>`;
+    } else if (partNeedsFacing(sel.fn)) {
       html += `<div class="hp-cap">Facing <span>T cycles it</span></div><div class="hp-chips" role="radiogroup" aria-label="Facing" data-group="face">`
         + (['auto', ...SIDES] as (Side | 'auto')[]).map((s) => `<button class="hp-chip" role="radio" data-face="${s}" data-key="face:${s}" aria-checked="${sel.facing === s}" tabindex="${sel.facing === s ? 0 : -1}" title="${FACING_TIP[s]} (T)">${FACING_LABEL[s]}</button>`).join('')
         + `</div>`;

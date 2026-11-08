@@ -12,12 +12,13 @@ import { cleanWires } from './wires.js';
 import { checkMounting } from './mounting.js';
 import { MAX_GROUPS } from './groups.js';
 import { cleanWeaponGroups } from './weaponGroups.js';
+import { gunFacing } from './gunFacing.js';
 
 export type BlueprintErrorCode =
   | 'catalogVersion' | 'unknownPiece' | 'unknownFunction' | 'unknownMaterial' | 'functionNotAllowed'
   | 'badUid' | 'duplicateUid' | 'tooManyParts' | 'coreCount' | 'overlap' | 'unreachable'
   | 'facingMissing' | 'facingBlocked' | 'facingNotJoined' | 'notOwned' | 'materialNotOwned' | 'badPlacement' | 'badMount' | 'exclusive'
-  | 'badMounting' | 'machineCount';
+  | 'badMounting' | 'machineCount' | 'facingFixed';
 
 export interface BlueprintError {
   code: BlueprintErrorCode;
@@ -155,8 +156,9 @@ export function floodFill(count: number, joins: [number, number][], root: number
 
 export interface ValidateOptions {
   /**
-   * Check weapons' mounting rules (ships/mounting.ts: default true). A saved ship is loaded with this off, so one
-   * built before a rule changed still flies: only a new design or a refit must keep them.
+   * Check weapons' mounting rules (ships/mounting.ts: default true) and that a model gun's facing follows its turn
+   * (gunFacing.ts). A saved ship is loaded with this off, so one built before a rule changed still flies: only a new
+   * design or a refit must keep them.
    */
   mounting?: boolean;
 }
@@ -234,6 +236,10 @@ export function validateBlueprint(
   usable.forEach((p, i) => {
     if (!partNeedsFacing(p.fn)) return;
     if (!p.facing) { err('facingMissing', [p.uid], `${p.fn} ${p.uid} needs a facing`); return; }
+    // A model gun's barrel is on its piece's fixed side: it follows the turn (gunFacing.ts)
+    // (A saved ship that predates the rule still flies, flagged: validated with `mounting: false`)
+    const fixed = opts.mounting === false ? null : gunFacing(catalog, p);
+    if (fixed && fixed !== p.facing) { err('facingFixed', [p.uid], `${p.fn} ${p.uid}: its barrel is on a fixed side of the piece, so it fires ${fixed} as turned, not ${p.facing}: turn the part (R)`); return; }
     const problem = facingProblem(p.fn, geoms, i, p.facing as Side);
     if (problem === 'noEdge') err('facingMissing', [p.uid], `${p.fn} ${p.uid} has no straight edge facing ${p.facing}`);
     else if (problem === 'blocked') err('facingBlocked', [p.uid], `${p.fn} ${p.uid}: its ${p.facing} edge must be free`);
@@ -334,12 +340,15 @@ export function parseBlueprint(json: string): Blueprint {
   };
 }
 
-/** A design with each model part in its model's own material and mount (whatever a client said), in place */
+/** A design with each model part in its model's own material and mount, and each model gun's facing from its turn (whatever a client said), in place */
 export function fixModelMaterials(catalog: Catalog, bp: Blueprint): Blueprint {
   for (const p of bp.parts) {
     const fn = catalog.functions.get(p.fn);
     if (fn?.model && fn.material) p.material = fn.material;
     if (fn?.mount) delete p.mount;
+    // (And its gun's barrel on its piece's fixed side, as turned: gunFacing.ts)
+    const facing = gunFacing(catalog, p);
+    if (facing) p.facing = facing;
   }
   return bp;
 }

@@ -144,8 +144,8 @@ export function partMountingProblems(catalog: Catalog, geoms: PlacedGeom[], i: n
   if (m.attach === 'back') {
     if (!facingEdges(g, attach).length) {
       out.push({ uid: p.uid, rule: 'angle', message: m.angle === 'right'
-        ? `${name} ${p.uid}: a side mount bolts on at its ${attach} edge, and this piece has none there: turn it (R), mirror it (F) or fire another way (T)`
-        : `${name} ${p.uid}: it bolts on from behind, and firing ${fire} leaves no straight ${attach} edge: fire another way (T)` });
+        ? `${name} ${p.uid}: a side mount bolts on at its ${attach} edge, and this piece has none there: turn it (R) or mirror it (F)`
+        : `${name} ${p.uid}: it bolts on from behind, and firing ${fire} leaves no straight ${attach} edge: turn it (R)` });
     } else if (!joinedEdges(geoms, i, attach).length) {
       out.push({ uid: p.uid, rule: 'attach', message: m.angle === 'right'
         ? `${name} ${p.uid}: a side mount: its ${attach} edge must bolt to the ship (F mirrors which side)`
