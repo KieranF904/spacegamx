@@ -56,7 +56,7 @@ describe('shaped shields (server half)', () => {
     expect(shieldUp(ship, 0)).toBe(true);
     expect(shieldHp(ship, 0)).toBe(40);
     expect(ship.derived.shieldMax).toBe(0);
-    expect(ships.shieldFraction(e)).toBe(1);
+    expect(ships.shieldFraction(e)).toBe(0);
     const features = (server as any).features;
     expect(features.status('zoneshield', e)).toBe(packShaped(ship));
     expect(shapedLevel(features.status('zoneshield', e), 0)).toBe(15);

@@ -13,7 +13,7 @@ import {
   type ShipState, type Vec2, type FlightBody, type JumpField, type Charge,
 } from '@space-game/common';
 import type { BridgeCtx } from './core.js';
-import { dhypot, shapedFraction } from '@space-game/common';
+import { dhypot } from '@space-game/common';
 
 /** A ship's battery charge (energy.ts) */
 export function chargeOf(b: BridgeCtx, eid: number): Charge {
@@ -36,10 +36,9 @@ export function weaponBeamState(b: BridgeCtx, eid: number): { on: boolean; hit: 
 /** Shield charge 0..1 for the snapshot (0 also without a shield) */
 export function shieldFraction(b: BridgeCtx, eid: number): number {
   const ship = b.bodies.get(eid);
-  if (!ship) return 0;
-  // (Shaped shields (features/zoneshield) have no pool of their own: the share of all their capacity the ship holds)
-  if (ship.derived.shieldMax <= 0) return ship.derived.fx?.shaped ? shapedFraction(ship) : 0;
-  return ship.shield / ship.derived.shieldMax;
+  // (Only the ship-wide bubble: clients draw a bubble over a ship whose percent is above 0. Shaped shields are told apart,
+  // a nibble each: features/zoneshield)
+  return ship && ship.derived.shieldMax > 0 ? ship.shield / ship.derived.shieldMax : 0;
 }
 
 export function beamState(b: BridgeCtx, eid: number): { on: boolean; hit: number } {
