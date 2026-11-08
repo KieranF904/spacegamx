@@ -14,7 +14,7 @@
 import type { FlightBody } from '../ships/flight.js';
 import type { Charge } from '../ships/energy.js';
 import type { ShipDerived } from '../ships/rebuild.js';
-import { ReplicaMode } from '../ships/replica.js';
+import { ReplicaMode } from '../ships/replicaControls.js';
 import { NO_HAZARD, newGunState, type GunState, type HazardState, type SimCtl, type SimShipState, type SimStructure } from './state.js';
 import { shipHash } from './ring.js';
 

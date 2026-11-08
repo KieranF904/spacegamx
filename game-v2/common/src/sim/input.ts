@@ -30,7 +30,7 @@
 
 import { dequantizeCursorAngle, quantizeCursorAngle } from '../network/cursorState.js';
 import type { FlightControls } from '../ships/flight.js';
-import { flightControls } from '../ships/replica.js';
+import { flightControls } from '../ships/replicaControls.js';
 
 /** One tick's inputs for one ship */
 export interface SimInput {

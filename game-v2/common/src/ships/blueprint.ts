@@ -13,6 +13,11 @@ import { checkMounting } from './mounting.js';
 import { MAX_GROUPS } from './groups.js';
 import { cleanWeaponGroups } from './weaponGroups.js';
 import { gunFacing } from './gunFacing.js';
+import { WEAPON_FNS, isWeaponFn, registerFunctionDefs, registeredFunction, hasRegisteredFunctions, lookFn, partNeedsFacing, partFacingRule } from './functionRegistry.js';
+import { facingProblem, floodFill } from './facing.js';
+
+// (The function registry and the facing rules live in their own modules; this file stays their public face)
+export { WEAPON_FNS, isWeaponFn, registerFunctionDefs, registeredFunction, lookFn, partNeedsFacing, partFacingRule, facingProblem, floodFill };
 
 export type BlueprintErrorCode =
   | 'catalogVersion' | 'unknownPiece' | 'unknownFunction' | 'unknownMaterial' | 'functionNotAllowed'
@@ -32,44 +37,6 @@ export interface ValidationResult {
 }
 
 /**
- * Every weapon part function (they all fire out of a facing edge and can be
- * turret-mounted): the functions.json entries with a `weapon` kind. Filled by
- * loadCatalog (registerFunctionDefs), so it's empty until a catalog is loaded.
- */
-export const WEAPON_FNS = new Set<string>();
-export function isWeaponFn(fn: string): boolean {
-  return WEAPON_FNS.has(fn);
-}
-
-/** Parts that point a facing edge out: weapons, engines (thrust), and any marked `facing` (mining lasers) */
-const NEEDS_FACING = new Set<string>();
-/** Parts whose facing edge must touch a part instead: a Diode (`oneWay`: its out side, energy-routing-impl.md §3.4) */
-const JOINED_FACING = new Set<string>();
-
-/** Every function by id, and the legacy functions of each family (licences: econ/market.ts) */
-const FN_DEFS = new Map<string, FunctionDef>();
-const LEGACY_OF = new Map<string, string[]>();
-
-/** Note what each function is (called by loadCatalog) */
-export function registerFunctionDefs(defs: Iterable<FunctionDef>, legacyFamily?: Map<string, string>): void {
-  for (const f of defs) {
-    FN_DEFS.set(f.id, f);
-    if (f.weapon) WEAPON_FNS.add(f.id);
-    if (f.oneWay) JOINED_FACING.add(f.id);
-    else if (f.weapon || (f.thrust ?? 0) > 0 || f.facing) NEEDS_FACING.add(f.id);
-  }
-  if (legacyFamily) {
-    LEGACY_OF.clear();
-    for (const [fn, fam] of legacyFamily) LEGACY_OF.set(fam, [...(LEGACY_OF.get(fam) ?? []), fn]);
-  }
-}
-
-/** A function by id, from the last catalog loaded (for rules that have no catalog to hand: licences) */
-export function registeredFunction(id: string): FunctionDef | undefined {
-  return FN_DEFS.get(id);
-}
-
-/**
  * How a weapon part is mounted: its model's own mount when its function has one (a pilot doesn't choose), else the
  * part's (legacy graded weapons on enemies and bosses keep theirs), else 'fixed'.
  */
@@ -77,50 +44,6 @@ export function partMount(catalog: Catalog, p: { fn: string; mount?: Mount }): M
   return catalog.functions.get(p.fn)?.mount ?? (p.mount === 'turret' ? 'turret' : 'fixed');
 }
 
-/** What a part function looks and breaks like: a model's, the legacy function its family grew from (cannons: 'weapon'); anything else its own */
-export function lookFn(fn: string): string {
-  const f = FN_DEFS.get(fn);
-  return f?.model && f.family ? LEGACY_OF.get(f.family)?.[0] ?? (f.family === 'plating' ? 'armor' : fn) : fn;
-}
-
-/** The legacy functions whose parts became a family's models (their licences still teach it) */
-function legacyFunctionsOf(family: string): string[] {
-  return LEGACY_OF.get(family) ?? [];
-}
-
-/** Does a part of this function carry a facing (whichever rule its edge keeps: partFacingRule) */
-export function partNeedsFacing(fn: string): boolean {
-  return NEEDS_FACING.has(fn) || JOINED_FACING.has(fn);
-}
-
-/**
- * What a part's facing edge must be: 'free' (nothing across it: guns, engines, mining lasers), 'joined' (a part
- * across it: a Diode's out side, which power leaves by), or null (it has no facing). Validation, migration and the
- * hangar's placement all ask this.
- */
-export function partFacingRule(fn: string): 'free' | 'joined' | null {
-  return JOINED_FACING.has(fn) ? 'joined' : NEEDS_FACING.has(fn) ? 'free' : null;
-}
-
-/**
- * What's wrong with part `self`'s facing `side` among `geoms` under its function's rule: 'noEdge' (no straight edge
- * that way), 'blocked' (a 'free' edge with a part across it), 'notJoined' (a 'joined' edge with no part across some
- * of it), or null when it keeps the rule (or the function has none).
- */
-export function facingProblem(fn: string, geoms: PlacedGeom[], self: number, side: Side): 'noEdge' | 'blocked' | 'notJoined' | null {
-  const rule = partFacingRule(fn);
-  if (!rule) return null;
-  const edges = facingEdges(geoms[self], side);
-  if (!edges.length) return 'noEdge';
-  if (rule === 'free') return edges.every((e) => isEdgeFree(geoms, self, e, side)) ? null : 'blocked';
-  // (Joined: just past each unit edge's middle lies another part, as power/layout.ts finds a Diode's out part)
-  const n = SIDE_NORMAL[side];
-  const across = ([a, b]: (typeof edges)[number]) => {
-    const x = (a[0] + b[0]) / 2 + n[0] * 0.05, y = (a[1] + b[1]) / 2 + n[1] * 0.05;
-    return geoms.some((g, i) => i !== self && geomContainsPoint(g, x, y));
-  };
-  return edges.every(across) ? null : 'notJoined';
-}
 
 export function partMaxHp(catalog: Catalog, p: PlacedPart): number {
   const v = catalog.variants.get(p.piece)![p.rot + (p.flip ? 4 : 0)];
@@ -131,27 +54,6 @@ export function partMass(catalog: Catalog, p: PlacedPart): number {
   const v = catalog.variants.get(p.piece)![p.rot + (p.flip ? 4 : 0)];
   // (Armour plate: × its function's massScale)
   return (v.area * partMaterial(catalog, p)!.density) * (catalog.functions.get(p.fn)?.massScale ?? 1);
-}
-
-/** Flood fill over joins from `root`. Returns a reached flag per index. */
-export function floodFill(count: number, joins: [number, number][], root: number, include?: (i: number) => boolean): boolean[] {
-  const adj: number[][] = Array.from({ length: count }, () => []);
-  for (const [a, b] of joins) {
-    if (include && (!include(a) || !include(b))) continue;
-    adj[a].push(b);
-    adj[b].push(a);
-  }
-  const reached = new Array<boolean>(count).fill(false);
-  if (root < 0 || (include && !include(root))) return reached;
-  const stack = [root];
-  reached[root] = true;
-  while (stack.length) {
-    const i = stack.pop()!;
-    for (const j of adj[i]) {
-      if (!reached[j]) { reached[j] = true; stack.push(j); }
-    }
-  }
-  return reached;
 }
 
 export interface ValidateOptions {
@@ -280,13 +182,13 @@ function canonicalPart(p: PlacedPart): PlacedPart {
   };
   if (p.facing) out.facing = p.facing;
   // (A model's mount is its own: the part's would only mislead)
-  if (p.mount === 'turret' && !FN_DEFS.get(p.fn)?.mount) out.mount = 'turret';
+  if (p.mount === 'turret' && !registeredFunction(p.fn)?.mount) out.mount = 'turret';
   const mods = cleanMods(p.mods);
   if (mods) out.mods = mods;
   if (Array.isArray(p.gems) && p.gems.length) out.gems = p.gems.filter((g) => typeof g === 'string').slice(0, 4);
   if (Number.isInteger(p.group) && p.group! >= 0 && p.group! < MAX_GROUPS) out.group = p.group;
   // (Weapon groups: weapons only (any part before a catalog is loaded), and only when not the default)
-  const wg = !FN_DEFS.size || WEAPON_FNS.has(p.fn) ? cleanWeaponGroups(p.wg) : undefined;
+  const wg = !hasRegisteredFunctions() || WEAPON_FNS.has(p.fn) ? cleanWeaponGroups(p.wg) : undefined;
   if (wg !== undefined) out.wg = wg;
   return out;
 }

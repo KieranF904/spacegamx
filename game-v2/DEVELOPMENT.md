@@ -87,6 +87,13 @@ Each folder with a `CONTEXT.md` (`common/src/{ships,network,econ}`, `server/src/
 - **New boss**: follow [docs/boss-design.md](docs/boss-design.md). Stills: `npm run render` (native, no browser).
 - **Production data**: accounts and profiles are on Postgres since 2026-10-31; see `docs/ops/postgres-migration.md`
   (rollback steps). Local dev uses JSON files under `data/` (gitignored, kept by deploys).
+- **Layering** (checked by `server/src/layering.test.ts`; `npm run cycles:check`, also part of `npm run features:check`):
+  `common/`, `server/` and `client/` have no import cycles (type-only imports don't count). Break one by moving the shared
+  piece to a leaf module the others import (the old file re-exports it), or by passing the dependency in. An import line
+  may carry `// cycle-ok: <why>` only for a lazily read edge that cannot go (today only `features/plan.ts` -> `registry.ts`,
+  read inside `getPlan()`). The client and the server never import each other, except in tests (`*.test.ts`), test kits
+  (`*.testkit.ts`, `server/src/testkits/`), `bench/` and `proto/` folders, and the client's `Proto*` and `replay*` tools.
+  Shared code goes in `common/`.
 - **Lore**: [docs/lore-canon.md](docs/lore-canon.md); every lore claim needs an in-game owner.
 - Older long-form notes: `docs/engine-map.md` is now an index into the guides; design docs live in `docs/design/`,
   `docs/rendering/`, `docs/audits/`.

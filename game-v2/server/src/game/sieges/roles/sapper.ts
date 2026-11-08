@@ -1,7 +1,8 @@
 /** A sapper: goes for the nearest turret instead of the bastion (the next nearest when it falls; the bastion when none are left) */
 
 import type { Run, SiegeCtx } from '../types.js';
-import { bastionAt, type SiegeRole } from './index.js';
+import type { SiegeRole } from './index.js';
+import { bastionAt } from './bastion.js';
 import { dhypot } from '@space-game/common';
 
 /** The nearest turret standing to (x, y), or the bastion */

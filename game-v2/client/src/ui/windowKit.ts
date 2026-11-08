@@ -4,8 +4,7 @@
  * drag-and-drop, and rich item tooltips.
  */
 
-import { resistText } from '../ships/partTip';
-import { Economy, Stack, Bag, RARITY_COLOR, CATEGORY_LABEL, ItemDef, RARITIES, describePart, partBuildPoints, DAMAGE_NAMES } from '@space-game/common';
+import { Economy, Stack, Bag, RARITY_COLOR, CATEGORY_LABEL, ItemDef, RARITIES, describePart, partBuildPoints, DAMAGE_NAMES, type DamageType } from '@space-game/common';
 import { tipRows } from '../ships/describe';
 import { itemIcon } from './itemIcons';
 import { esc } from './escape';
@@ -306,6 +305,18 @@ export function partStatsHtml(econ: Economy, part: { material: string; fn: strin
 /** "2× Alloy Plate, 1× Copper Wiring" */
 export function bagText(econ: Economy, bag: Bag): string {
   return Object.entries(bag).map(([id, n]) => `${n}× ${esc(econ.items.name(id))}`).join(', ');
+}
+
+/**
+ * What a material takes more or less of: "Kinetic −15% · Energy +20%" (green
+ * where it shrugs some off, red where it takes more)
+ */
+export function resistText(r: Partial<Record<DamageType, number>> | undefined): string {
+  if (!r) return '';
+  return Object.entries(r).map(([t, v]) => {
+    const pct = Math.round((v! - 1) * 100);
+    return `<span style="color:${pct < 0 ? '#86efac' : '#fca5a5'}">${DAMAGE_NAMES[t as DamageType]} ${pct > 0 ? '+' : '−'}${Math.abs(pct)}%</span>`;
+  }).join(' · ');
 }
 
 /** Costs as small icon chips; red where the pilot is short */

@@ -1,6 +1,7 @@
 /** A runner: ignores pilots (even ones shooting it) and dives at the bastion */
 
-import { bastionAt, type SiegeRole } from './index.js';
+import type { SiegeRole } from './index.js';
+import { bastionAt } from './bastion.js';
 
 export const runner: SiegeRole = {
   id: 'runner',

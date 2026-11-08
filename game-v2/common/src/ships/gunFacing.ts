@@ -21,7 +21,7 @@ import type { Catalog } from './catalog.js';
 import { transformSide } from './catalog.js';
 import type { Blueprint, PlacedPart, Rot, Side } from './types.js';
 import { computeJoins, facingEdges, overlapsAny, placeGeometry, type PlacedGeom } from './grid.js';
-import { facingProblem, floodFill } from './blueprint.js';
+import { facingProblem, floodFill } from './facing.js';
 import { partMountingProblems } from './mounting.js';
 
 const BARREL_ORDER: readonly Side[] = ['N', 'W', 'S', 'E'];

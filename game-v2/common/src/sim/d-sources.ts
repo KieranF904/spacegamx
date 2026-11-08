@@ -5,10 +5,10 @@
  * CtlChangeInputs (own timeline: known; control rows: assumed) and DriverInputs (a body's driver: decided).
  */
 
-import { controlBits, flightControls } from '../ships/replica.js';
+import { controlBits, flightControls } from '../ships/replicaControls.js';
 import type { FlightBody, FlightControls } from '../ships/flight.js';
 import type { BodyDriver } from '../network/replication.js';
-import { quantizeCursorDist } from '../network/protocol.js';
+import { quantizeCursorDist } from '../network/cursorDist.js';
 import { NO_INPUT, simAimQ, type InputKnowledge, type InputPrev, type InputSource, type SimInput } from './input.js';
 
 /** A SimInput from held flight controls (their `targetAngle` onto the grid), as controlBits/simAimQ have them */

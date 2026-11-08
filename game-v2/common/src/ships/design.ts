@@ -13,7 +13,7 @@ import type { Blueprint, FunctionDef, MaterialDef, PlacedPart, Side } from './ty
 import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import { type PartMount, type PlacedGeom, computeJoins, mountOf, placeGeometry } from './grid.js';
-import { floodFill } from './blueprint.js';
+import { floodFill } from './facing.js';
 import { partMaterial } from './grades.js';
 import { type PartCircles, type TurretFrame, type TurretRays, castTurret, partCircles, turretFrame } from './turret.js';
 import { type CellMap, cellMap, engineExhaust } from './mounting.js';

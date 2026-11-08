@@ -14,7 +14,7 @@ import {
   convexAreaInBox, convexDecompose, flattenOutline, outlineArea, polygonCentroid,
   polygonPolarMomentCentroid, segmentEnd, segmentStart, shrinkConvex, signedArea, snap,
 } from './geometry.js';
-import { registerFunctionDefs } from './blueprint.js';
+import { registerFunctionDefs } from './functionRegistry.js';
 import { HAZARDS } from './hazards.js';
 import { dhypot } from '../math/detTrig.js';
 
