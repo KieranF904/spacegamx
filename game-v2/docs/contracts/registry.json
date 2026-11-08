@@ -1574,7 +1574,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 815,
+      "lines": 819,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1612,7 +1612,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 72,
-          "end": 815
+          "end": 819
         }
       ]
     },
@@ -1693,6 +1693,114 @@
           "kind": "class",
           "start": 49,
           "end": 498
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-marks",
+      "path": "client/src/ships/build/buildMarks.ts",
+      "group": "client/ships/build",
+      "lines": 83,
+      "owns": "build-view marks shared by the hangar and the world build view: the facing arrow of a directional part and the real cover (wall line or arc) of a shaped shield, as pure grid-space geometry plus a pixi Graphics drawer",
+      "needs": "common mountOf / shapedAt / registeredFunction / partNeedsFacing (the game's own rules); npm: pixi.js (types only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a shield's cover is the one shaped.ts builds, so the preview matches what blocks shots",
+          "test": "client/src/ships/build/buildMarks.test.ts"
+        },
+        {
+          "text": "marks only draw, never change a design",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a part kind with a direction but no `facing` is one more case in facingMark(); a canvas drawer reuses facingMark / coverPolyline",
+      "exports": [
+        "COVER_COLOR",
+        "COVER_DEEP_COLOR",
+        "FACING_COLOR",
+        "FacingMark",
+        "GUN_FACING_COLOR",
+        "ToScreen",
+        "coverPolyline",
+        "drawFacingMark",
+        "drawShieldCover",
+        "facingMark",
+        "hasDirection",
+        "shieldCover"
+      ],
+      "sections": [
+        {
+          "name": "ToScreen",
+          "kind": "type",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "FacingMark",
+          "kind": "interface",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "FACING_COLOR",
+          "kind": "const",
+          "start": 19,
+          "end": 20
+        },
+        {
+          "name": "GUN_FACING_COLOR",
+          "kind": "const",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "COVER_COLOR",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "COVER_DEEP_COLOR",
+          "kind": "const",
+          "start": 23,
+          "end": 23
+        },
+        {
+          "name": "hasDirection",
+          "kind": "function",
+          "start": 25,
+          "end": 28
+        },
+        {
+          "name": "facingMark",
+          "kind": "function",
+          "start": 30,
+          "end": 38
+        },
+        {
+          "name": "shieldCover",
+          "kind": "function",
+          "start": 40,
+          "end": 45
+        },
+        {
+          "name": "coverPolyline",
+          "kind": "function",
+          "start": 47,
+          "end": 56
+        },
+        {
+          "name": "drawFacingMark",
+          "kind": "function",
+          "start": 58,
+          "end": 66
+        },
+        {
+          "name": "drawShieldCover",
+          "kind": "function",
+          "start": 68,
+          "end": 83
         }
       ]
     },
@@ -2827,9 +2935,9 @@
       "id": "client.hangar.draw",
       "path": "client/src/ships/hangar/hangarDraw.ts",
       "group": "client/ships/hangar",
-      "lines": 195,
+      "lines": 197,
       "owns": "one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost",
-      "needs": "HangarHost, hangarOverlays; npm: @space-game/common",
+      "needs": "HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -2845,14 +2953,83 @@
         {
           "name": "arrow",
           "kind": "function",
-          "start": 18,
-          "end": 27
+          "start": 19,
+          "end": 28
         },
         {
           "name": "draw",
           "kind": "function",
-          "start": 29,
-          "end": 195
+          "start": 30,
+          "end": 197
+        }
+      ]
+    },
+    {
+      "id": "client.hangar.marks",
+      "path": "client/src/ships/hangar/hangarMarks.ts",
+      "group": "client/ships/hangar",
+      "lines": 85,
+      "owns": "the hangar's build marks on its 2d canvas: facing arrows (the part in hand always, placed parts faint and bright under the mouse) and shaped-shield cover (in hand, hovered in the parts list, fitted ones faint)",
+      "needs": "HangarHost (geoms, ctx, mouse, view, paletteHover, handTurn), ships/build/buildMarks geometry; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the cover drawn is the one shaped.ts derives",
+          "test": "client/src/ships/build/buildMarks.test.ts"
+        },
+        {
+          "text": "marks only draw, never change the design",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new kind of mark is one function here, called from hangarDraw.ts draw()",
+      "exports": [
+        "drawHandMarks",
+        "drawHoverCover",
+        "drawPlacedMarks"
+      ],
+      "sections": [
+        {
+          "name": "Px",
+          "kind": "type",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "css",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "arrow",
+          "kind": "function",
+          "start": 18,
+          "end": 33
+        },
+        {
+          "name": "cover",
+          "kind": "function",
+          "start": 35,
+          "end": 47
+        },
+        {
+          "name": "drawPlacedMarks",
+          "kind": "function",
+          "start": 49,
+          "end": 57
+        },
+        {
+          "name": "drawHandMarks",
+          "kind": "function",
+          "start": 59,
+          "end": 63
+        },
+        {
+          "name": "drawHoverCover",
+          "kind": "function",
+          "start": 65,
+          "end": 85
         }
       ]
     },
@@ -3085,7 +3262,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 136,
+      "lines": 138,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -3118,7 +3295,7 @@
           "name": "HangarHost",
           "kind": "interface",
           "start": 55,
-          "end": 136
+          "end": 138
         }
       ]
     },

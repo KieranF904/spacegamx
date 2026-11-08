@@ -19,7 +19,7 @@
  */
 
 import {
-  getVariant, gunFacing, hasFixedBarrel, isStructural, isWeaponFn, mountingOf, partItemId, partNeedsFacing, SIDES,
+  getVariant, gunFacing, hasFixedBarrel, isStructural, isWeaponFn, mountingOf, parsePartItemId, partItemId, partNeedsFacing, SIDES,
   type Bag, type Catalog, type Economy, type FunctionDef, type Rot, type ShipTuning, type Side,
 } from '@space-game/common';
 import { COMP_TABS, guideRows, requirementLine, type CompRow, type CompTab, type Gate, type PilotView } from '../ui/componentGuide';
@@ -48,6 +48,8 @@ export interface PaletteHost {
   sel(): PaletteSel;
   /** Something new is in hand: redraw the grid */
   changed(): void;
+  /** The part under the mouse in the list (null: none), for the grid's previews */
+  hoverPart?(p: { fn: string; piece: string; material: string } | null): void;
   /** How many more of a part (item id) could still be placed from what you have (Infinity: everything granted) */
   remaining(id: string): number;
   /** Licensed to fit / fabricate it (the server's check) */
@@ -265,9 +267,9 @@ export class HangarPalette {
     // Hover a part (a row, the part in hand): what it is and does
     this.root.addEventListener('mousemove', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-part]');
-      if (el) { this.h.partTip(el.dataset.part!, this.hover.clearOfPanel(el.dataset.part!, e)); this.hover.over(el.dataset.part!, el.closest<HTMLElement>('.hp-row') ?? el); } else { this.h.hideTip(); this.hover.out(); }
+      if (el) { this.h.hoverPart?.(parsePartItemId(el.dataset.part!)); this.h.partTip(el.dataset.part!, this.hover.clearOfPanel(el.dataset.part!, e)); this.hover.over(el.dataset.part!, el.closest<HTMLElement>('.hp-row') ?? el); } else { this.h.hoverPart?.(null); this.h.hideTip(); this.hover.out(); }
     });
-    this.root.addEventListener('mouseleave', () => { this.h.hideTip(); this.hover.out(); });
+    this.root.addEventListener('mouseleave', () => { this.h.hoverPart?.(null); this.h.hideTip(); this.hover.out(); });
   }
 
   // -------------------------------------------------------------------------
