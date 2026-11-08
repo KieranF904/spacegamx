@@ -1,4 +1,12 @@
 /**
+ * @contract bodies.moves
+ * owns:       bodies' moves, the same on both sides: a staged boss's moves by its brain, custom enemies' by design
+ * needs:      StagedFlightTables, MoveHost, StagedMoves, the per-boss move modules
+ * invariants: move output is the same on both sides — none pinned
+ * extend:     a new boss move set is a module and a line here
+ */
+
+/**
  * Bodies' moves, the same on both sides (decision-inputs stage 4, CAPS.MOVES): a staged boss's moves by its brain (a
  * module and a line here), custom enemies' by design (custom.ts)
  */

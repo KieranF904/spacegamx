@@ -1,4 +1,15 @@
 /**
+ * @contract server.ships.bridge.sync
+ * owns:       the plain readers and writers between a ship's ShipState and the engine components, plus the state
+ *             snapshots and keyframes read
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new field the snapshot reads is exposed here; the wire form is Replication / SnapshotBuilder
+ */
+
+/**
  * ShipBridge sync: the plain readers and writers between a ship's ShipState and the engine's components (body
  * pose, health), the jump fields where it is, Tow Beam glue, and the state the snapshot and keyframes read
  * (charge, beams, heat, shield). ShipBridge keeps one-line delegators with the same names.

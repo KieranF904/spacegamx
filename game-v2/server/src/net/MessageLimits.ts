@@ -1,4 +1,13 @@
 /**
+ * @contract server.net.limits
+ * owns:       per-connection token-bucket rate limits for expensive or player-reaching client messages
+ * needs:      nothing imported; a WeakMap keyed by connection
+ * invariants: a message type with a limit is dropped past its burst and passes under it —
+ *             server/src/net/dispatch.test.ts
+ * extend:     a new limited message is one entry in the limits table below (per minute, burst)
+ */
+
+/**
  * MessageLimits: per-connection rate limits for client messages that are
  * expensive (a design rebuilt and saved, every market priced, every account
  * ranked) or reach other players (chat, invites). Token buckets: `per` a

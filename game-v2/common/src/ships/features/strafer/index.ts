@@ -1,4 +1,18 @@
 /**
+ * @contract feature.strafer.common
+ * owns:       the Burst Strafer part feature, shared half: rebuild result, two flight hooks, its input and its wire
+ *             slots
+ * needs:      PartFeature, FlightCtx, InputDef (types.ts), strafer/strafer.ts
+ * events:     flight hooks for the dodge burst
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/strafer/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/strafer/contract.test.ts
+ * extend:     a new input is an InputDef and a control bit pinned in features.wire.json; a new flight behaviour is a
+ *             hook entry below
+ */
+
+/**
  * The Burst Strafer as a part feature (features/README.md; the part, its dodge and its numbers: strafer.ts). Shared half:
  * what a rebuild derives for it, how it flies (two flight hooks), its input and its wire slots. Its world half is
  * server/src/ships/features/strafer (the pilot row), its key, chip and jets client/src/ships/features/strafer.

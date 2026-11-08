@@ -1,4 +1,16 @@
 /**
+ * @contract feature.flash.common
+ * owns:       the Flash Screen part feature, shared half: the shield points a rebuild derives for the Flash Screens
+ * needs:      PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks, bank cost)
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/flash/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/flash/contract.test.ts
+ * extend:     a new rebuild result or card fact is a field in derive / describe below; a new wire slot is appended in
+ *             features.wire.json (npm run wire:sync)
+ */
+
+/**
  * The Flash Screen as a part feature (features/README.md; the numbers: flash.ts). Shared half: what a rebuild derives
  * (the shield points the Flash Screens hold). Its world half is server/src/ships/features/flash (the wait after a
  * break, the Capacitor bank's instant return, and the flash bloom). The shield itself and its capacity are the ordinary

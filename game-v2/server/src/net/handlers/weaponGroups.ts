@@ -1,4 +1,13 @@
 /**
+ * @contract server.net.handlers.weapon-groups
+ * owns:       the weapon-groups message: set each weapon's group on the live ship (weapons only, free, no plan save)
+ * needs:      HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx;
+ *             @space-game/common, bitecs
+ * invariants: only weapons change group and the design hash follows — server/src/net/handlers/weaponGroups.test.ts
+ * extend:     a new group rule is a branch of the one handler; the selection is an input, not a message here
+ */
+
+/**
  * The field build overlay's weapon groups (docs/design/groups-mines-docking.md, "Weapon groups"): `weaponGroups` sets
  * which of the four groups each weapon on the live ship is in. Weapons only (anything else in the message is ignored),
  * free, no plan save. It is a decision: the live blueprint and the saved record change together (as a field refit does,

@@ -1,4 +1,13 @@
 /**
+ * @contract client.predict.ship-kinds
+ * owns:       the kinds of ship on the PT layer: who claims a ship, how one is stepped a tick, and how far behind
+ *             your shells it is drawn
+ * needs:      @space-game/common (replica state, CtlChangeInputs), PtHost (predict/world)
+ * invariants: ships are stepped on PT from their kind's rule and the first claiming kind has the ship — none pinned
+ * extend:     a new ship kind registers with registerPtKind; nothing in the layer or the draw path names a kind
+ */
+
+/**
  * The kinds of ship on the PT layer (ptst.ts) and its tuning: a registry, each kind saying which ships are its own,
  * how one is stepped a tick on PT, whether contacts there move it, and how far behind your own shells it is drawn
  * (where your shells meet it on the tick layer: sim/timeline.ts hitStateTick). The first kind in PT_KINDS that claims

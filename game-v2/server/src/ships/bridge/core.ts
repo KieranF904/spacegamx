@@ -1,4 +1,15 @@
 /**
+ * @contract server.ships.bridge.core
+ * owns:       the types, constants and engine interface (ShipHost) the bridge modules share, and BridgeCtx, the
+ *             bridge's internal state
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new shared bridge type or constant goes here; behaviour never does
+ */
+
+/**
  * ShipBridge core: the types, constants and engine interface (ShipHost) the bridge and its modules (bridge/*.ts)
  * share, and BridgeCtx, the bridge's internal state as those modules see it.
  *

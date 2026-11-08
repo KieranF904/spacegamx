@@ -1,4 +1,12 @@
 /**
+ * @contract bodies.custom
+ * owns:       custom enemies' bodies in roster.json order
+ * needs:      roster.json, the per-enemy body modules
+ * invariants: bodies are listed in roster order (an order's design) — none pinned
+ * extend:     a new custom enemy is its module and a line here, in the roster's order
+ */
+
+/**
  * Custom enemies' bodies (docs/enemies/custom-roster.md), in their roster.json order (an order's design). Adding one is
  * its module and a line here, in the roster's order.
  */

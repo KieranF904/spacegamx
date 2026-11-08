@@ -1,4 +1,19 @@
 /**
+ * @contract network.replication
+ * owns:       ship motion on the wire: keyframe and control-row packing and the client's ShipReplicaSet that rebuilds
+ *             other ships from them
+ * needs:      common/ships (replicaStep, ReplicaMode, debris), common/sim (StateRing, sources, pull fields, clamp
+ *             links), network/clampProtocol types, cursorState, math/detTrig
+ * invariants: a client rebuilds every other ship exactly from keyframes, control changes and causes against the
+ *             server's state — server/src/net/replication.test.ts
+ *             a far ship costs nothing; coming into focus it is sent on its own and leaving is told once —
+ *             server/src/net/replication.test.ts
+ *             bit-packed and base frames decode to the same snapshot — common/src/network/packed/packedCodec.test.ts
+ * extend:     a new keyframe field is appended to packKeyframe / unpackKeyframe and needs npm run wire:bump; a new
+ *             thing a replica is moved by is a source or cause passed to ShipReplicaSet, not a branch in its step
+ */
+
+/**
  * Ship motion on the wire (see ships/replica.ts). A snapshot carries:
  *
  *   ships  keyframes, only for ships a client is new to or that left the

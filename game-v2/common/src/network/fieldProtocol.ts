@@ -1,4 +1,18 @@
 /**
+ * @contract protocol.field
+ * owns:       the field fabrication and repair bank messages: plans saved, machines switched, jobs done, bank changed
+ *             (job progress is never sent)
+ * needs:      type-only import of ships/types (Blueprint); econ/field jobs for the clock
+ * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
+ *             name — server/src/golden/structure.test.ts
+ *             the server types the client handles itself are exactly the pinned set (a type with no entry in the
+ *             client table fails) — client/src/app/serverMessages.test.ts
+ * extend:     a new message is an interface plus a member of this area's client / server union below; then its
+ *             handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * Field fabrication and the repair bank on the wire (docs/design/field-fabrication.md, "Protocol"). JSON messages, all
  * of them decisions or rare events: a plan saved, a machine switched, a job started or finished, the bank changed. A
  * job's progress is never sent: both sides step it by the machine's own clock (econ/field/jobs.ts jobAt; a powered

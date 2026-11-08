@@ -1,4 +1,18 @@
 /**
+ * @contract feature.plan
+ * owns:       compiling FEATURES into the plan every shared call site reads: ordered derive / flight / load hooks,
+ *             input bits, wire slots, weapon roles
+ * needs:      FEATURES (registry.ts), types.ts, features.wire.json (the pinned manifest), common/ships/replica
+ *             control bits
+ * invariants: feature numbers follow (order, id) and the pinned wire manifest is append-only: a dropped or moved slot
+ *             fails — common/src/ships/features/registry.test.ts
+ *             a feature missing from, or out of order in, the generated registry fails —
+ *             common/src/ships/features/registry.test.ts
+ * extend:     a new hook phase is an entry in FLIGHT_PHASES and its call site; a feature itself is a folder, not an
+ *             edit here (npm run features:gen)
+ */
+
+/**
  * The compiled feature plan: the registry (registry.ts, generated) checked and
  * flattened once, on first use, into frozen arrays the call sites index by
  * feature number. rebuild.ts, energy.ts and replica.ts import only this file

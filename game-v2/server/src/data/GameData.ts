@@ -1,4 +1,12 @@
 /**
+ * @contract server.data.game-data
+ * owns:       loading and indexing the game data JSON files into GameData
+ * needs:      @space-game/common data shapes and terrain builders
+ * invariants: the real data indexes without errors — server/src/data/validateGameData.test.ts
+ * extend:     a new data file is a field on GameDataFiles, an index in GameData and a read in loadGameDataFromDisk.ts
+ */
+
+/**
  * Data Loader - Loads and indexes game data from JSON files
  */
 

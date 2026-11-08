@@ -1,4 +1,13 @@
 /**
+ * @contract feature.machines.client
+ * owns:       the field machines client half: build overlay and machine keys, HUD chip, the plan drawn on the ship
+ * needs:      ClientFeature, pixi.js, @space-game/common types, field/bridge, field/fieldState, field/FieldOverlay
+ * invariants: its keys, parsers, drawers and chips run in feature id order and the first key user wins —
+ *             client/src/ships/features/host.test.ts
+ * extend:     a new behaviour is a method on the instance created below (FeatureInstance hooks, types.ts)
+ */
+
+/**
  * The field machines' client half (shared half: common/src/ships/features/machines; server half: the jobs). Its keys
  * (the build overlay, the fabricator and refiner switches), the HUD chip, and while the build overlay is open the plan on
  * your ship (out in the world, the build's progress is on the HUD's schematic: field/fieldState fieldHudMarks). The jobs themselves

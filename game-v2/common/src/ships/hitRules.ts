@@ -1,4 +1,16 @@
 /**
+ * @contract ships.hit-rules
+ * owns:       what a shell's hit on a ship does, worked out identically on server and client: cover, soak, armour,
+ *             splash, ignite, end fx, part HP on the wire
+ * needs:      @space-game/common ship model (state, damage, shaped shields, tuning); no engine or ECS
+ * invariants: hpWire is a tenth, never rounded to nothing, 0 for gone; shellAmount is def damage times strength and
+ *             f32 like the server stores it — common/src/ships/hitRules.test.ts
+ *             shellVs, igniteRule and hitEndFx follow their stated rules — common/src/ships/hitRules.test.ts
+ * extend:     a new hit modifier is a step inside partHit / shellVs, run by the server (bridge/damage.ts hurt) and
+ *             the client alike; never a server-only rule
+ */
+
+/**
  * What a shell's hit on a ship does, worked out the same way on both sides (docs/design/confirmed-hits.md, part B).
  * The server runs these for every hit (server/src/ships/bridge/damage.ts `hurt`, weapons.ts `cover`, game/Weapons.ts);
  * a client can run them on its own copy of a ship to know what a confirmed hit did without being told.

@@ -1,4 +1,14 @@
 /**
+ * @contract client.predict.world-kinds
+ * owns:       the PT kinds installed in the game (ships, bodies, guides, moves) in order, installed and removed by
+ *             Prediction
+ * needs:      @space-game/common, GameState, ShipClient, Renderer (types), predict/kinds/*, ptKinds, aheadReads
+ * invariants: kinds run in their declared order, confirm then advance (the registry rule, not this install list) —
+ *             client/src/predict/ptKinds.test.ts
+ * extend:     a new kind is one import and one entry in the install list, at an order above what it reads
+ */
+
+/**
  * The PT timeline's kinds in the game (C3, the default, and C2; the registry: predict/ptKinds.ts), in their order:
  *
  *   ships   the PT/ST layer (ptst.ts over world.ts): other pilots and the AI it steps, adapted as a kind

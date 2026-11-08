@@ -1,4 +1,18 @@
 /**
+ * @contract protocol.mines
+ * owns:       the Mine Bay messages: a drop asked for and made (the record every end derives its mines from), mines
+ *             gone, magazines changed
+ * needs:      type-only import of ships/features/minebay (MineDrop)
+ * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
+ *             name — server/src/golden/structure.test.ts
+ *             the server types the client handles itself are exactly the pinned set (a type with no entry in the
+ *             client table fails) — client/src/app/serverMessages.test.ts
+ * extend:     a new message is an interface plus a member of this area's client / server union below; then its
+ *             handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * The Mine Bay on the wire (docs/design/groups-mines-docking.md, "Mine bay"). JSON messages, all decisions or rare
  * events: a drop asked for, a drop made (the record every end derives its mines from: ships/features/minebay/minebay.ts
  * MineDrop), mines gone, and the pilot's magazines when they change. Nothing about a mine is streamed.

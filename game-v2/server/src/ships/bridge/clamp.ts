@@ -1,4 +1,18 @@
 /**
+ * @contract server.ships.bridge.clamp
+ * owns:       Docking Clamps' joined pair flown as one body on the server's real ships: the link table and the
+ *             leader-then-follower move order
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ *             a joined pair steps identically on the server, the replica and the client —
+ *             server/src/golden/clampParity.test.ts
+ * extend:     a new clamp rule belongs to common sim/clampPair.ts so every end steps it alike; only the table and
+ *             order are here
+ */
+
+/**
  * ShipBridge clamps: two pilots' ships locked by Docking Clamps flown as one body on the server's real ships (the shared
  * step: common sim/clampPair.ts; the decisions: ships/features/clamp; docs/design/groups-mines-docking.md 3).
  *

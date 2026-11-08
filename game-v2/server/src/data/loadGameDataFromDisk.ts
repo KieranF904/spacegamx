@@ -1,4 +1,12 @@
 /**
+ * @contract server.data.disk-loader
+ * owns:       Node-only reading of the data JSON files from a directory into GameDataFiles
+ * needs:      fs, path, GameData.ts (GameDataFiles)
+ * invariants: the real data loads and validates — server/src/data/validateGameData.test.ts
+ * extend:     a new data file is one more read() line here and its field on GameDataFiles
+ */
+
+/**
  * Node-only: read the game data JSON files from a directory.
  */
 

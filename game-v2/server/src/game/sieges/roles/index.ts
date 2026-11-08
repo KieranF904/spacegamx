@@ -1,4 +1,12 @@
 /**
+ * @contract server.sieges.roles
+ * owns:       how a siege's hostiles fight, by role (a roster entry's role)
+ * needs:      siege rules and types, the role modules
+ * invariants: siege nights run their roles — server/src/game/sieges/siegeNights.test.ts
+ * extend:     a new role is a file here and one entry in ROLES
+ */
+
+/**
  * How a siege's hostiles fight, by role (a roster entry's `role`). Without
  * one a ship is sent at the bastion and fights whatever's near, as its
  * faction does. A new role is a file here and an entry in ROLES.

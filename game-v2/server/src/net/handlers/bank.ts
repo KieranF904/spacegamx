@@ -1,4 +1,13 @@
 /**
+ * @contract server.net.handlers.bank
+ * owns:       the repair bank messages: bankDeposit at a station and the dev-only devBank tools
+ * needs:      HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx;
+ *             @space-game/common
+ * invariants: the types it registers are part of the pinned dispatched set — server/src/golden/structure.test.ts
+ * extend:     a new bank message is a t.on line; the rules are game/RepairBank.ts
+ */
+
+/**
  * The repair bank's messages (docs/design/field-fabrication.md, section 7): `bankDeposit` (at a station, from the hold or
  * storage, only what a bank takes) and `devBank` (dev servers only: fill or empty the free part, clear or grant deposits).
  * The rules are game/RepairBank.ts; the sessions and the messages back are Pilots'.

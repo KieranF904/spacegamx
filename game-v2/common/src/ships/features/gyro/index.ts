@@ -1,4 +1,17 @@
 /**
+ * @contract feature.gyro.common
+ * owns:       the Gyro and Heavy Gyro part feature, shared half: turn torque a rebuild derives and three flight hooks
+ *             that draw power only while the ship turns
+ * needs:      PartFeature, FlightCtx (types.ts), flight.ts turnScale / wrapAngle, gyro/gyro.ts
+ * events:     flight hooks at preJump, thrustGate and impulse
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/gyro/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/gyro/contract.test.ts
+ * extend:     a new flight behaviour is a hook entry in the feature object below (phases: plan.ts FLIGHT_PHASES)
+ */
+
+/**
  * The Gyro and Heavy Gyro as a part feature (features/README.md; the part and its arithmetic: gyro.ts). Shared half
  * only: what a rebuild derives (its torque goes into the ship's turning caps through DeriveCtx.turn) and three flight
  * hooks that make it draw power only while the ship turns. No input, no wire slot, no server or client half.

@@ -1,4 +1,15 @@
 /**
+ * @contract server.ships.bridge.pilotless
+ * owns:       ships nobody pilots: AI pilot orders, the autopilot and the end-of-tick step that flies them
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new pilotless behaviour is a PilotOrders field read here; what an AI decides lives in game/Enemies.ts
+ *             and Bosses.ts
+ */
+
+/**
  * ShipBridge pilotless: ships nobody pilots. Their AI pilots (setController: PilotOrders each tick), the autopilot
  * (setAutopilot, autopilotControls), and the end-of-tick step that flies them (stepPilotless, called from flight.ts
  * tick through the bridge). ShipBridge keeps one-line delegators with the same names.

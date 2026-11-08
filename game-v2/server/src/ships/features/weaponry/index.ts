@@ -1,4 +1,13 @@
 /**
+ * @contract feature.weaponry.server
+ * owns:       the shared shot behaviours world half: mark and slow beams and the statuses on the wire
+ * needs:      ServerFeature, ServerWeaponHooks, common ROLE_MARK / ROLE_SLOW / statusBits, bridge/core WeaponBridge
+ * invariants: its hooks run in feature id order and its message names never clash with another feature or the game —
+ *             server/src/ships/features/host.test.ts
+ * extend:     a new beam status is a role hook in the weapon hooks below plus its wire bit in features.wire.json
+ */
+
+/**
  * The shared shot behaviours' world half (the shared half, with the weapon roles: common/src/ships/features/weaponry).
  *   - mark and slow: a beam playing the role burns as the damaging beam does, then marks (MARK_TAKEN × every hit,
  *     bridge/damage.ts hurt) or slows (flight.ts SLOW_CONTROL, bridge/flight.ts and pilotless.ts) what it burned, while

@@ -1,4 +1,16 @@
 /**
+ * @contract server.net.handlers.flight
+ * owns:       the prediction-sensitive client messages: input, ping, stateHash, mapView, interact, respawn, training
+ *             drone, target
+ * needs:      HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx;
+ *             @space-game/common, bitecs
+ * invariants: the types it registers are pinned, and its order against the tick is the golden tick order —
+ *             tickOrder.json
+ * extend:     a new flight message is a handler here only if its order against the tick matters; otherwise use
+ *             modules.ts
+ */
+
+/**
  * Flight messages, the prediction-sensitive ones: input (queued for the tick boundary), ping, stateHash, mapView,
  * interact, respawn, trainingDrone, and target (the Tow Beam's `tow` is a part feature's: ships/features/tow). Moved verbatim from GameServer (the receiver `this` became `ctx`;
  * the helpers take ctx first).

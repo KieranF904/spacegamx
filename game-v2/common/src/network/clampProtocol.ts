@@ -1,4 +1,20 @@
 /**
+ * @contract protocol.clamp
+ * owns:       the Docking Clamps messages: dock, swap, undock asks up; the lock, link and break decisions down (JSON,
+ *             decisions only)
+ * needs:      type-only imports; the area unions are re-exported through protocol.ts (ClientMessage / ServerMessage)
+ * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
+ *             name — server/src/golden/structure.test.ts
+ *             the server types the client handles itself are exactly the pinned set (a type with no entry in the
+ *             client table fails) — client/src/app/serverMessages.test.ts
+ *             a joined pair steps identically on the server, the replica and the client from these records —
+ *             server/src/golden/clampParity.test.ts
+ * extend:     a new message is an interface plus a member of this area's client / server union below; then its
+ *             handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * Docking Clamps on the wire (docs/design/groups-mines-docking.md, "Docking clamps"). JSON messages, all decisions or
  * rare events. Whether two clamps are lined up is worked out on each client for the prompt (ships/features/clamp
  * clampLinedUp); the server decides, from both pilots' presses, the lock, a swap of who steers and an undock, and every

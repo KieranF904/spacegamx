@@ -29,6 +29,8 @@
     "wire:bump": "node scripts/wire/bump.mjs",
     "features:gen": "node scripts/features/gen.mjs",
     "features:check": "node scripts/features/gen.mjs --check && node scripts/cycles/check.mjs",
+    "contracts:gen": "node scripts/contracts/gen.mjs",
+    "contracts:check": "node scripts/contracts/gen.mjs --check",
     "cycles:check": "node scripts/cycles/check.mjs",
     "slideshow": "node scripts/slideshow/build.mjs",
     "sounds:review": "node scripts/sound-review/server.mjs",

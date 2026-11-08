@@ -1,4 +1,18 @@
 /**
+ * @contract protocol.econ
+ * owns:       the player-economy messages: profile and its deltas, cargo and storage, loot, item actions, quests and
+ *             builds; every action is a request the server checks
+ * needs:      type-only imports of econ/stacks, econ/quests and other econ shapes
+ * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
+ *             name — server/src/golden/structure.test.ts
+ *             the server types the client handles itself are exactly the pinned set (a type with no entry in the
+ *             client table fails) — client/src/app/serverMessages.test.ts
+ * extend:     a new message is an interface plus a member of this area's client / server union below; then its
+ *             handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * Messages for the player economy: profile, cargo and storage, loot, item
  * actions. Every action is a request; the server checks it (docked? room?
  * owned?) and answers with the new state, never trusting the client.

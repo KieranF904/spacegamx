@@ -1,4 +1,16 @@
 /**
+ * @contract server.ships.bridge.damage
+ * owns:       how ships take harm: hits, splash, EMP and cold, fire, nearest-part queries, part hp edits and part
+ *             deaths
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new damage effect is a function here reached as b.<name> from other modules; the hit rule itself is
+ *             common hitRules.ts
+ */
+
+/**
  * ShipBridge damage: how ships take harm and what comes of it. Hits (hurt, damagePartBy, splashAt, blasts), EMP and
  * cold (empUntil, warmth), fire (ignite, stepBurns), nearest-part queries, part hp edits (heal, scale, harden, ghosts),
  * and the end of a hit: partDeaths. ShipBridge keeps one-line delegators with the same names.

@@ -1,4 +1,15 @@
 /**
+ * @contract server.net.handlers.modules
+ * owns:       client messages that only forward to one game module: party, trade, market, items, gems, quests,
+ *             stations, sieges, contributor notes, admin
+ * needs:      HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx;
+ *             @space-game/common
+ * invariants: the types it registers are part of the pinned dispatched set — server/src/golden/structure.test.ts
+ * extend:     a new forwarding message is a t.on line in its register function; anything with logic goes in its own
+ *             area file
+ */
+
+/**
  * Client messages that only forward to one game module: party, trade, market and vendors, items, gems, quests,
  * stations, hangar orders, sieges, contributor notes, admin. Moved verbatim from GameServer's message switch
  * (the receiver `this` became `ctx`); every Number/String/slice coercion of hostile input is kept exactly as written.
