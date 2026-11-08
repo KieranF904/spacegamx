@@ -1574,7 +1574,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 826,
+      "lines": 847,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1593,26 +1593,26 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 65,
-          "end": 66
+          "start": 66,
+          "end": 67
         },
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 69,
-          "end": 69
+          "start": 70,
+          "end": 70
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 70,
-          "end": 71
+          "start": 71,
+          "end": 72
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 73,
-          "end": 826
+          "start": 74,
+          "end": 847
         }
       ]
     },
@@ -1857,6 +1857,117 @@
           "kind": "function",
           "start": 75,
           "end": 77
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build.edit-placed",
+      "path": "client/src/ships/build/editPlaced.ts",
+      "group": "client/ships/build",
+      "lines": 114,
+      "owns": "turning, mirroring or re-facing a part already on the ship in the hangar and the world build view: which part is under the cursor, the turned copy (anchored so the cell under the cursor stays put) and the rules it must pass; also the Escape step shared by both editors (clear the hand first, close second)",
+      "needs": "common placeGeometry / overlapsAny / facingProblem / computeJoins / partMountingProblems / gunFacing / getVariant (the game's own placement rules); no DOM, no editor state",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the turned part keeps its uid and the cell of it under the cursor where the new shape has that cell",
+          "test": "client/src/ships/build/editPlaced.test.ts"
+        },
+        {
+          "text": "a turn that overlaps, blocks a facing edge, breaks a mounting rule or cuts a part off from what it joined is refused with a reason",
+          "test": "client/src/ships/build/editPlaced.test.ts"
+        },
+        {
+          "text": "a fixed-barrel gun's facing is its barrel's, never chosen",
+          "test": "client/src/ships/build/editPlaced.test.ts"
+        },
+        {
+          "text": "Escape puts a part in hand away, and closes only with an empty hand",
+          "test": "client/src/ships/build/editPlaced.test.ts"
+        }
+      ],
+      "extend": "a new kind of edit on a placed part is one more TurnOp and one case in turnedCopy()",
+      "exports": [
+        "TURN_KEYS",
+        "TurnOp",
+        "TurnResult",
+        "escapeStep",
+        "partUnder",
+        "tryTurn",
+        "turnProblem"
+      ],
+      "sections": [
+        {
+          "name": "TurnOp",
+          "kind": "type",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "TURN_KEYS",
+          "kind": "const",
+          "start": 24,
+          "end": 24
+        },
+        {
+          "name": "partUnder",
+          "kind": "function",
+          "start": 26,
+          "end": 30
+        },
+        {
+          "name": "TurnResult",
+          "kind": "type",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "carriedFacing",
+          "kind": "function",
+          "start": 34,
+          "end": 41
+        },
+        {
+          "name": "turnedCopy",
+          "kind": "function",
+          "start": 43,
+          "end": 62
+        },
+        {
+          "name": "bare",
+          "kind": "const",
+          "start": 64,
+          "end": 64
+        },
+        {
+          "name": "turnProblem",
+          "kind": "function",
+          "start": 66,
+          "end": 88
+        },
+        {
+          "name": "SAID",
+          "kind": "const",
+          "start": 90,
+          "end": 90
+        },
+        {
+          "name": "CANT",
+          "kind": "const",
+          "start": 91,
+          "end": 91
+        },
+        {
+          "name": "tryTurn",
+          "kind": "function",
+          "start": 93,
+          "end": 109
+        },
+        {
+          "name": "escapeStep",
+          "kind": "function",
+          "start": 111,
+          "end": 114
         }
       ]
     },

@@ -218,6 +218,25 @@ export function addPart(e: BuildEdits, p: PlacedPart): void {
   e.added.push(p);
 }
 
+/**
+ * Swap working part `i` (not standing) for its turned copy `next`. An added part is replaced where it is; a planned one
+ * (in the live blueprint, not built) is dropped and a copy added under a fresh uid, since the live ship keeps the uid
+ * (false: the design is full)
+ */
+export function replacePart(live: LiveDesign, e: BuildEdits, w: WorkingDesign, i: number, next: PlacedPart): boolean {
+  if (w.liveIndex[i] < 0) {
+    const k = e.added.findIndex((q) => q.uid === next.uid);
+    if (k < 0) return false;
+    e.added[k] = next;
+    return true;
+  }
+  const uid = freeUid(w, live.bp);
+  if (uid < 0) return false;
+  e.dropped.add(next.uid);
+  e.added.push({ ...next, uid });
+  return true;
+}
+
 /** The working part under a grid point (the later one wins), -1 none */
 export function partAtPoint(catalog: Catalog, w: WorkingDesign, at: Vec2): number {
   const parts = w.bp.parts;
