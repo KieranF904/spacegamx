@@ -42,6 +42,16 @@ export interface GunPlan {
   color?: string;
   width: number;
   fire: FireSpec;
+  /** World units a ship cell (the preview's target blocks are built from it) */
+  cell: number;
+  /** Burst falloff exponent: damage scales as (1 - d/radius)^falloff */
+  splashFalloff: number;
+  /** Burst damage at the centre (0: none) */
+  splashDamage: number;
+  /** A chain: further targets within `radius` of the struck one, each `falloff` times the last */
+  chain: { count: number; radius: number; falloff: number } | null;
+  /** Beams: damage a tick at full strength (a pulse scales it by its swell); a Repair Beam: HP mended a tick */
+  perTick: number;
   /** A support gun, drawn its own way: a Repair Beam mending a friendly plate, a Point Defence Turret shooting down missiles */
   support?: 'repair' | 'pd';
 }
@@ -51,7 +61,7 @@ export function gunPlan(catalog: Catalog, tuning: ShipTuning, fn: FunctionDef): 
   if (!fn.weapon || !fn.fire) return null;
   const base = tuning.weapons?.[fn.weapon];
   if (!base) return null;
-  if (base.heal || base.pointDefence || fn.fire.model === 'auto') return supportPlan(fn, base);
+  if (base.heal || base.pointDefence || fn.fire.model === 'auto') return supportPlan(fn, base, tuning.cellSize);
   const mat = fn.model && fn.material ? fn.material : 'alloy';
   const grade = partGrade(catalog, { fn: fn.id, material: mat });
   const def: WeaponTuning = gunDef(tuning, fn.weapon, { grade, size: 1, model: fn.weaponMods });
@@ -69,8 +79,16 @@ export function gunPlan(catalog: Catalog, tuning: ShipTuning, fn: FunctionDef): 
     burst: Math.max(1, def.burst ?? 1),
     salvo: def.salvo ? { count: def.salvo.count, gap: def.salvo.gap } : null,
     color: def.color, width: def.width ?? 14,
-    fire: fn.fire,
+    fire: fn.fire, cell: tuning.cellSize,
+    splashFalloff: 1.5, splashDamage: def.splash?.damage ?? 0, chain: def.chain ? { ...def.chain } : null,
+    perTick: beam ? beamPerTick(def) : 0,
   };
+}
+
+/** A beam's damage a tick: a held beam's dps over 60, a pulse's damage spread over its length (its swell averages half) */
+function beamPerTick(def: WeaponTuning): number {
+  if (def.pulse) return (def.damage ?? 0) / Math.max(1, def.pulse.ticks * 0.5);
+  return (def.ramp?.to ?? def.dps ?? def.damage ?? 0) / 60;
 }
 
 /** The tick a round at constant `speed` takes to cover `dist`, or one that speeds up from `v0` by `accel` to `vmax` (whole ticks, at least 1) */
@@ -160,7 +178,7 @@ export class FireClock {
 }
 
 /** A Repair Beam's or a Point Defence Turret's plan: a held beam to a hurt friend, or a gun firing on its own beat at what flies in */
-function supportPlan(fn: FunctionDef, base: WeaponTuning): GunPlan | null {
+function supportPlan(fn: FunctionDef, base: WeaponTuning, cell: number): GunPlan | null {
   const repair = !!base.heal;
   if (!repair && !base.pointDefence) return null;
   return {
@@ -168,6 +186,6 @@ function supportPlan(fn: FunctionDef, base: WeaponTuning): GunPlan | null {
     speed: 0, accel: 0, maxSpeed: 0, life: 0, size: 1, spread: 0, damage: 0, splash: 0,
     range: repair ? base.range ?? 520 : base.pointDefence?.range ?? 560,
     tracked: false, lob: false, burst: 1, salvo: null, color: base.color, width: base.width ?? 34,
-    fire: fn.fire!, support: repair ? 'repair' : 'pd',
+    fire: fn.fire!, cell, splashFalloff: 1.5, splashDamage: 0, chain: null, perTick: repair ? (base.heal ?? 0) / 60 : 0, support: repair ? 'repair' : 'pd',
   };
 }
