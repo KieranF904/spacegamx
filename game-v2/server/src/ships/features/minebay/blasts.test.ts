@@ -167,6 +167,10 @@ describe('mine blasts: worked out on the clients (stage M2)', () => {
     // Into reach of mine 0 (and no other): it goes off on the server
     const tick = driftIn();
     expect(tick).toBeGreaterThan(0);
+    // (Held where it is till the window with the blast closes: a pin inside it keyframes the ship, and a keyframed
+    // pose isn't exact on the client's layer, so the blast would be told. Where the window falls shifts with the world)
+    const lastSnap = () => of(a.got, 'snapshot').reduce((t, s) => Math.max(t, s.tick), -1);
+    for (let k = 0; k < 12 && lastSnap() < tick; k++) w.run(1);
     pin(dummy, rest[0] + 900, rest[1]);
     w.run(4);
     // The client found it itself, on that tick: nothing told

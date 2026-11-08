@@ -91,7 +91,9 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
       const num = InSystem.systemId[A.pid];
       const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
       Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
-      for (let i = 0; i < 3; i++) step();
+      // (a settled client first: a hit in the 30-odd ticks after the hand-set teleport can be drawn ~9 units off on its own ship
+      // while its prediction is still finding the server's, which shifts with the world's entity ids)
+      for (let i = 0; i < 40; i++) step();
       server.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'] } as never, x0 + 1300, y0 + 700);
       server.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_raider', 'pirate_skiff'] } as never, x0 - 1300, y0 + 700);
       const hostiles = new Set<number>();

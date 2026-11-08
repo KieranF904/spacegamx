@@ -121,11 +121,14 @@ describe('a freighter shooting back, on its attacker\'s tick layer', () => {
     if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ locked, exact, truth: truth.size, told, laneChecks, laneOff: laneOff.length, bodyTicks, stats: server.gunNet.stats, lane: A.otherGuns.stats, inexact: inexact.slice(0, 5) }));
     expect(locked).toBe(true);
     expect(bodyTicks).toBeGreaterThan(300);
-    expect(truth.size).toBeGreaterThan(20);
+    // (the Hauler's two Chainsaws are gone: its two Rattlers alone fire 7 shells in this pass, 32 before)
+    expect(truth.size).toBeGreaterThan(4);
     expect(inexact).toEqual([]);
-    expect(exact).toBeGreaterThan(20);
+    expect(exact).toBeGreaterThan(3);
     // (its fire records to A: the told ticks only, far fewer than the shells A built itself)
-    expect(told).toBeLessThan(exact / 5);
+    // (and with so few shells the one told, the first volley after a quiet spell, is a fifth of them or more: at most that one)
+    expect(told).toBeLessThanOrEqual(1);
+    expect(told).toBeLessThan(exact);
     expect(server.gunNet.stats.fixes).toBe(0);
     // (held where A stepped its lane: while it was lately firing, GUN_ACTIVE)
     expect(laneChecks).toBeGreaterThan(5);

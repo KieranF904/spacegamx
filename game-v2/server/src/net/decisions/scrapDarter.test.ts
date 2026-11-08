@@ -21,8 +21,8 @@ describe('the Scrap Darter on the tick layer (CAPS.PILOTS)', () => {
     expect(moves['scrap_darter.dart'] ?? 0).toBeGreaterThan(1);
     expect(r.server.enemies.custom.stats.lost).toBeGreaterThanOrEqual(2);
     // (checked at each snapshot's tick: the Crawler's magnet no longer sends one a round while it pulls, its pulls worked
-    // out on the pilot's tick layer: pull fields. About 140 snapshots, 230 before)
-    expect(r.got.A.checked).toBeGreaterThan(250);
+    // out on the pilot's tick layer: pull fields. About 90 snapshots now, 230 before; the lighter Hauler (no Chainsaws) changed the scene's pace)
+    expect(r.got.A.checked).toBeGreaterThan(120);
     expect(r.got.A.off).toBe(0);
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.stats.off).toBe(0);
