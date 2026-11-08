@@ -119,15 +119,14 @@ export interface ClientConnection {
   ownWindow?: number[];
   /** ...as does anything that moves the ship besides its inputs (a new keyframe version), or a status change */
   selfVersion: number;
-  selfKey: string;
+  /** Its own row as last sent: [hp, maxHp, then what its flight depends on] (SnapshotBuilder selfRowState) */
+  selfState?: number[];
   /**
    * Its own row went in the last snapshot only for its HP, not to correct its
    * prediction or tell it something its flight depends on: a client finding its own hits needn't have it at once
    * (PackedLink urgentFor)
    */
   selfRowQuiet?: boolean;
-  /** ...the part of selfKey its flight depends on (all but its HP) */
-  selfFlight?: string;
   /** Hash of its ship's state at each recent tick (the client checks its prediction against these) */
   selfHashes: Map<number, number>;
   /**

@@ -96,6 +96,10 @@ interface SnapRow {
   strip?: EntityState;
 }
 
+/** A number for the self-row compare: anything JSON would have made null (non-numbers, NaN, infinities) is NaN */
+const selfNum = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) ? x : NaN);
+const selfSame = (a: number, b: number): boolean => a === b || (a !== a && b !== b);
+
 /** A blueprint's hash (designs are sent once per client; see ServerShipSyncMessage.design) */
 export function designHash(bp: unknown): string {
   const s = JSON.stringify(bp);
@@ -696,18 +700,30 @@ export class SnapshotBuilder {
    * version, first sight, or a change to what its flight depends on, apart from its HP: its slowing ending too,
    * features/weaponry)
    */
-  private selfRowState(conn: ClientConnection, r: SnapRow, prevStates: Map<number, string>): { need: boolean; fix: boolean; key: string; flight: string; version: number } {
+  private readonly selfScratch = { need: false, fix: false, version: 0 };
+  private readonly selfNow: number[] = [0, 0, 0, 0, 0, 0, 0];
+  private selfRowState(conn: ClientConnection, r: SnapRow, prevStates: Map<number, string>): { need: boolean; fix: boolean; version: number } {
     const d = r.state.data ?? [];
-    const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
-    const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
+    // (Numbers compared in place, no key strings: [hp, maxHp, then the five its flight depends on]; a non-number counts as
+    // NaN, which equals itself here, as JSON turned them all to null)
+    const now = this.selfNow;
+    now[0] = selfNum(r.state.hp); now[1] = selfNum(r.state.maxHp);
+    now[2] = selfNum(d[4]); now[3] = selfNum(d[5]); now[4] = selfNum(d[PILOT_ROW.field]); now[5] = selfNum(d[PILOT_ROW.warmth]); now[6] = selfNum(this.slowEnd(r.id));
+    const was = conn.selfState;
+    let flightSame = !!was, hpSame = !!was;
+    if (was) {
+      for (let i = 2; i < 7; i++) if (!selfSame(now[i], was[i])) { flightSame = false; break; }
+      hpSame = selfSame(now[0], was[0]) && selfSame(now[1], was[1]);
+    }
     // (Its client steps its own ship, so it goes by its own keyframe version: what its tick layer worked out itself (a
     // contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
     const version = this.replication.ownVersionOf(r.id) ?? this.replication.versionOf(r.id);
-    const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
+    const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || !flightSame;
     // (No copy now and then just in case: its snapshots carry the head hash (sim/headHash.ts), a client that disagrees
     // with it checks at once, and the fix brings the row)
-    const need = fix || key !== conn.selfKey;
-    return { need, fix, key, flight, version };
+    const sc = this.selfScratch;
+    sc.need = fix || !hpSame; sc.fix = fix; sc.version = version;
+    return sc;
   }
 
   /** Base tick of the last round, and each widened system's last (crowd fallbacks: its window, CrowdControl) */
@@ -913,8 +929,7 @@ export class SnapshotBuilder {
           conn.selfRowQuiet = !self.fix;
           conn.selfLate = false;
           conn.selfVersion = self.version;
-          conn.selfKey = self.key;
-          conn.selfFlight = self.flight;
+          if (conn.selfState) for (let i = 0; i < 7; i++) conn.selfState[i] = this.selfNow[i]; else conn.selfState = this.selfNow.slice();
         }
         let v = r.other && r.id !== conn.playerId ? r.other : r;
         if (r.id !== conn.playerId) {
