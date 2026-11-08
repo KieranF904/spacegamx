@@ -1,8 +1,8 @@
 /**
- * @contract server.snapshot.debrisHold
+ * @contract server.snapshot.debris-hold
  * owns:       debris splits a client works out itself: each told as a debrisSplit before the ship's sync and snapshot,
  *             its pieces held back until the client confirms them (ackDebris) or their time runs out
- * needs:      DebrisHoldHost (world, ships: debrisNet, replication.causedInWindow, send, ticks), common packers
+ * needs:      DebrisHoldHost (world, ships: debrisNet, replication.causedInWindow, send, ticks), common packers; npm: bitecs
  * invariants: a held piece sends no sync, keyframe, status row or HP until confirmed — server/src/net/snapshot/debrisAcks.test.ts
  *             a wrong confirmation goes in full — server/src/net/snapshot/debrisAcks.test.ts
  * extend:     a new reason a held piece goes in full is one branch in the first loop of holdDebris

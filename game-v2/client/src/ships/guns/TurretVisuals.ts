@@ -1,5 +1,5 @@
 /**
- * @contract client.ship.turretVisuals
+ * @contract client.ship.turret-visuals
  * owns:       the look-only gimbal steps for turrets and fixed guns on ships whose guns this client does not step, and point-defence aim
  * needs:      TurretVisualsHost (store, state, tuning, localAim), common stepTurretAim/stepFixedGunAim/stepPointDefenceAim
  * invariants: point defence turns to its last intercept and rests after 900 ms — none pinned

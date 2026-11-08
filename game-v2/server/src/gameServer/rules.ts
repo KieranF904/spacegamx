@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.rules
  * owns:       who may hurt or mend whom, PvP zones and the weekly hunt
- * needs:      GameServer (type), common hitRules
+ * needs:      GameServer (type), common hitRules; npm: bitecs
  * invariants: sides rule matches the client — server/src/golden/parity.test.ts
  * extend:      a new side bit is added in common hitRules, then read in sideOf
  */

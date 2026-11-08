@@ -12,6 +12,7 @@ import {
 } from '@space-game/common';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 import type { CauseEvent, WorkedCauses } from '../causes/shadowCauses.js';
+import type { OwnCause } from '../../ships/bridge/ownCauses.js';
 
 export interface ReplicationHost {
   tick(): number;
@@ -169,4 +170,6 @@ export interface ReplicationCore {
   /** The real ship's flight state now */
   real(eid: number): FlightBody;
   keyNow(eid: number, known: Map<number, number>, ships: KeyframeRow[]): void;
+  /** Work a shadow's causes out for one tick (replication/step.ts work); a method so tests can watch it */
+  work(eid: number, s: Shadow, causes: OwnCause[], tick: number): WorkedCauses | null;
 }

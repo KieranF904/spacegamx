@@ -67,7 +67,7 @@ export function endTick(rep: ReplicationCore): void {
       s.events.push(tick, bits, q);
     }
     // This tick's causes as rows, once for every client that takes them (a pilot's own, CAPS.OWN_SIM; any, CAPS.CAUSES)
-    const worked = causes?.length ? work(rep, eid, s, causes, tick) : null;
+    const worked = causes?.length ? rep.work(eid, s, causes, tick) : null;
     // A rebuild that changes how it flies: clients get the new structure with the next snapshot, so resend its state
     // too, unless it went as a cause (its clients fly the old structure until its tick)
     if (ship.rebuilds !== s.rebuilds) {

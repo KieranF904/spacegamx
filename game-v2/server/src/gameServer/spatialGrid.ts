@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.spatialgrid
  * owns:       the per-system broadphase grid
- * needs:      bitecs-free; plain data
+ * needs:      bitecs-free; plain data; npm: @space-game/common
  * invariants: query results and their order keep the frame hash — server/src/golden/frameHash.test.ts
  * extend:      n/a
  */

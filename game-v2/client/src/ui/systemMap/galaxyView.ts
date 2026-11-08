@@ -1,7 +1,7 @@
 /**
- * @contract client.systemMap.galaxyView
+ * @contract client.system-map.galaxy-view
  * owns:       the galaxy view and the central-body glyph: systems, links, sectors, your pin
- * needs:      MapHost (systems, byId, hits, state), mapConsts
+ * needs:      MapHost (systems, byId, hits, state), mapConsts; npm: @space-game/common
  * invariants: one hit per system, pushed as it is drawn — none pinned
  * extend:     a new galaxy mark is one block in drawGalaxy
  */

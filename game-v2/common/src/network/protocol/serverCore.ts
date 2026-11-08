@@ -2,7 +2,7 @@
  * @contract protocol.server-core
  * owns:       the core server-to-client message types: welcome, snapshot, player state, chat, range, dialogue, shop, damage, admin, asteroids
  * needs:      econ/social protocol types, ships/types, data/schemas
- * invariants: server message shapes are the wire contract — golden serverMessages.json
+ * invariants: server message shapes are the wire contract — serverMessages.json
  * extend:     a new server message is an interface here (or its own *Protocol.ts) plus one line in serverMessage.ts
  */
 import type { AsteroidBeltData, LodestoneData } from '../../data/schemas.js';

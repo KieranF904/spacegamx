@@ -1,7 +1,7 @@
 /**
- * @contract client.systemMap.tooltip
+ * @contract client.system-map.tooltip
  * owns:       the map's hover tooltip and its stylesheet
- * needs:      MapHost (hover, tooltip, state, myRating), mapConsts, hazardSums
+ * needs:      MapHost (hover, tooltip, state, myRating), mapConsts, hazardSums; npm: @space-game/common
  * invariants: the tooltip shows the nearest hit's details — none pinned
  * extend:     a new hit kind is one case in updateTooltip
  */

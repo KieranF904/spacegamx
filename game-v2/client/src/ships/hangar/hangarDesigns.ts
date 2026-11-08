@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar.designs
  * owns:       the hangar's load list and saved-design slots panel (save, load, delete with confirm)
- * needs:      HangarHost (deps, bp, designAsk, designPanel, loadSelect), blueprintApi
+ * needs:      HangarHost (deps, bp, designAsk, designPanel, loadSelect), blueprintApi; npm: @space-game/common
  * invariants: a save or delete that would lose a design asks first — none pinned
  * extend:     a new load source is one case in loadSelected() and one option group in refreshLoadList()
  */

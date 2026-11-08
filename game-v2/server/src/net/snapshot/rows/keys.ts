@@ -2,7 +2,7 @@
  * @contract server.snapshot.rows.keys
  * owns:       the snapshot row record (SnapRow), the host the row kinds read, and the interned row keys (last snapshot's
  *             and this one's) that make each client's "changed?" test a pointer compare
- * needs:      bitecs IWorld, ShipBridge, Enemies, Mobs, LootPods, ServerFeatures, GunNet, ClientConnection
+ * needs:      bitecs IWorld, ShipBridge, Enemies, Mobs, LootPods, ServerFeatures, GunNet, ClientConnection; npm: @space-game/common
  * invariants: an unchanged key is the very string it was last snapshot — none pinned
  *             row bytes per client unchanged — server/src/golden/frameHash.test.ts
  * extend:     a new field a row kind reads is one member of RowHost below

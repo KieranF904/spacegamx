@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.render.constants
  * owns:       tuning numbers and text styles for drawing ships (fades, recoil, headlights, labels)
- * needs:      pixi TextStyle
+ * needs:      pixi TextStyle; npm: pixi.js
  * invariants: values only; changing one changes the look of every ship — none pinned
  * extend:     a new draw constant is added here and imported where used
  */

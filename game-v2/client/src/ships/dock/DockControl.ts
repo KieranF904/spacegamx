@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.dock
  * owns:       docking at a station: the dock request/answer, the berth, undocking, the dock and planet and repair hints
- * needs:      DockHost (state, tuning, store, send, showMessage, sound, hangarOpen, openHangar, refreshShip, stationOpen, onDocked)
+ * needs:      DockHost (state, tuning, store, send, showMessage, sound, hangarOpen, openHangar, refreshShip, stationOpen, onDocked); npm: @space-game/common
  * invariants: berthed means no inputs go (the server holds controls neutral) — client/src/app/inputSend.test.ts
  *             undock puts the ship back where it came in — none pinned
  * extend:     a new hint line is one more branch in updateHints

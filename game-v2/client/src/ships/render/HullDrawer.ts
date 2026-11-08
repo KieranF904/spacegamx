@@ -1,7 +1,7 @@
 /**
- * @contract client.ship.render.hullDrawer
+ * @contract client.ship.render.hull-drawer
  * owns:       asking the hull worker for a design's hull and fitting a built hull to a view: batch slot, fixed barrels, skeleton and frame meshes
- * needs:      HullDrawHost (bridge, lighting, hulls batch, underLayer, destroyed), HullWorker, buildHull, hullCaches
+ * needs:      HullDrawHost (bridge, lighting, hulls batch, underLayer, destroyed), HullWorker, buildHull, hullCaches; npm: @space-game/common, pixi.js
  * invariants: a hull is built once per design, parts attached, colouring and kind, and shared — client/src/ships/rigidHull.test.ts
  *             a design changed in place drops a stale worker answer — none pinned
  * extend:     a new kind of per-view mesh is built in drawHull and freed in disposeFrame

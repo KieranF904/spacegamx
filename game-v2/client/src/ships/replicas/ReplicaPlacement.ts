@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.placement
  * owns:       where replicated ships are drawn each frame (pose, docked-to-you placement, pilot data rows), a ship's side bits and the far-ship ghosts
- * needs:      PlacementHost (state, store, replicas, own, otherGuns, scene), GhostLayer, features/clamp dockedDraw
+ * needs:      PlacementHost (state, store, replicas, own, otherGuns, scene), GhostLayer, features/clamp dockedDraw; npm: @space-game/common
  * invariants: a keyframe correction is already blended into the pose: drawn as it is — server/src/golden/parity.test.ts
  *             a ship docked to yours is placed at your draw tick — none pinned
  * extend:     a new per-pilot data column is one more entry in placeReplica's data row

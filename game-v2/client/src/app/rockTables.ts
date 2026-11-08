@@ -1,5 +1,5 @@
 /**
- * @contract client.app.rockTables
+ * @contract client.app.rock-tables
  * owns:       registering this build's rock types and belts (a dev build adds the dev-only rock system's field)
  * needs:      data/mining.json, common registerRockTypes
  * invariants: both sides generate the same rocks from the same table — none pinned

@@ -1,7 +1,7 @@
 /**
  * @contract server.pilots.cargo
  * owns:       the hold and storage: capacity, give/take, move, store, jettison, use, scrap
- * needs:      Pilots (sessions, econ, host, ships), common/econ bags
+ * needs:      Pilots (sessions, econ, host, ships), common/econ bags; npm: bitecs
  * invariants: cargo never exceeds capacity except through give() — none pinned
  * extend:     a new item action is a handleX here and a message handler calling it
  */

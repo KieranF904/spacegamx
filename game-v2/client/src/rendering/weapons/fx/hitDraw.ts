@@ -1,5 +1,5 @@
 /**
- * @contract client.weaponFx.hitDraw
+ * @contract client.weapon-fx.hit-draw
  * owns:       drawing and ageing a layered impact's cores, glows, fireballs, scorches, shock rings, fragments, streaks and lights
  * needs:      FxField (its pools and particle lists), particleTypes, impactAnchor (rideStep)
  * invariants: each list is aged and drawn newest first, spliced out at max life — none pinned

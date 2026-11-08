@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.loop
  * owns:       the real-time loop, one step, the guarded tick table and its per-tick passes
- * needs:      GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks
+ * needs:      GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks; npm: @space-game/common, bitecs
  * invariants: tick table order — server/src/tickOrder.test.ts
  *             one step is inputs, tick, own passes, snapshots, in that order — server/src/golden/frameHash.test.ts
  * extend:      a new tick system is one entry in buildTickSystems (and tickOrder.json)

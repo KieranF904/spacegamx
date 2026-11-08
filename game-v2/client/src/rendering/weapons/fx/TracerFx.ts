@@ -1,8 +1,8 @@
 /**
- * @contract client.weaponFx.tracer
+ * @contract client.weapon-fx.tracer
  * owns:       drawing every flying shell: its tracer or body, contrail, afterimages, pulse rings, nose light, crackle and pull
  *             field, the lobbed shells' landing marks and the guided shell's guide line
- * needs:      FxField (pools, smoke list, line/circle), ShellBodies, WeaponStyle fields, TracerHost (guideTo, state)
+ * needs:      FxField (pools, smoke list, line/circle), ShellBodies, WeaponStyle fields, TracerHost (guideTo, state); npm: @space-game/common, pixi.js
  * invariants: a shell that ended at a surface draws nothing past it — client/src/rendering/weapons/visualStop.test.ts
  *             a dying tracer shrinks towards its head over FADE_FRAMES — none pinned
  * extend:     a new tracer look is one block in drawExtras (or drawBody for the shape itself), driven by a WeaponStyle field

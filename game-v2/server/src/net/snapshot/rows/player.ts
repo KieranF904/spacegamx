@@ -2,7 +2,7 @@
  * @contract server.snapshot.rows.player
  * owns:       a pilot's snapshot rows: its own full row (motion, charge, the part features' values, gun state) and the
  *             status-only row every other pilot gets
- * needs:      RowHost (world, clients, lingering, ships, features, gunNet), RowKeys, common energy/guns packers
+ * needs:      RowHost (world, clients, lingering, ships, features, gunNet), RowKeys, common energy/guns packers; npm: bitecs
  * invariants: the own row's layout is PILOT_ROW / packCharge / gunStateAt — server/src/golden/parity.test.ts
  *             status row's data order matches features.wire.json status — none pinned
  * extend:     a new value on another pilot's status row is one entry at the end of `status.data` below

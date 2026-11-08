@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar.stats
  * owns:       the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems
- * needs:      HangarHost (deps, derived, bp, errors), shipSummary, portsReport
+ * needs:      HangarHost (deps, derived, bp, errors), shipSummary, portsReport; npm: @space-game/common
  * invariants: renderStats rebuilds the panel and rebinds its buttons — none pinned
  * extend:     a new section is one html function here, appended in renderStats()
  */

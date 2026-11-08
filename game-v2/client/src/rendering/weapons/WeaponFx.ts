@@ -1,9 +1,9 @@
 /**
- * @contract client.weaponFx
+ * @contract client.weapon-fx
  * owns:       the life of every drawn shell (placing it on its timeline, predicted shells and the server's takeover, drawn
  *             hits and the server's), and the frame loop that hands it to the effect sub-systems in fx/
  * needs:      fx/FxField (pools and particles), fx/TracerFx (shell drawing), fx/MuzzleFx, fx/ImpactFx, fx/shotFactory, GameState,
- *             hooks set by the Renderer (barrelTip, castHit, surfaceAt, onStruck, sounds, shellLook, firePose, spinAt, guideTo)
+ *             hooks set by the Renderer (barrelTip, castHit, surfaceAt, onStruck, sounds, shellLook, firePose, spinAt, guideTo); npm: @space-game/common, pixi.js
  * events:     onMuzzle (a shot left its gun), onStruck (a shell stopped at a drawn surface), tally (dev hit agreement)
  * invariants: a drawn shell stops at the first surface it touches and nothing of it shows past — client/src/rendering/weapons/visualStop.test.ts
  *             the server's copy of a shell fired ahead takes over its flight — client/src/rendering/weapons/adoptHit.test.ts

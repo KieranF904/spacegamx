@@ -2,7 +2,7 @@
  * @contract protocol.ship
  * owns:       ship sync, hp, hits, cells, crowd, dock and ship-edit message types
  * needs:      nothing beyond type imports
- * invariants: message shapes are the wire contract — golden serverMessages.json
+ * invariants: message shapes are the wire contract — serverMessages.json
  * extend:     a new ship-state message is an interface here and a line in serverMessage.ts
  */
 import type { Blueprint } from '../../ships/types.js';

@@ -1,8 +1,8 @@
 /**
- * @contract server.snapshot.ownRow
+ * @contract server.snapshot.own-row
  * owns:       a pilot's own ship in its snapshot: whether its own row goes and as a correction (selfRowState), its full
  *             state now for the head hash and ownSyncs (ownNow), its hazards' key, and its check's expectation (noteOwn)
- * needs:      OwnRowHost (world, ships, replication, ownChecks, bodies, guides, ticks), common sim/headHash
+ * needs:      OwnRowHost (world, ships, replication, ownChecks, bodies, guides, ticks), common sim/headHash; npm: bitecs
  * invariants: its own row goes only when its prediction needs correcting or its status changed — server/src/net/own/ownSim.test.ts
  *             a hazard running out on its own is no ownSync — none pinned
  * extend:     a new value its flight depends on is one more slot in selfNow (and ClientConnection.selfState)

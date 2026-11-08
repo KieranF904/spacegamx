@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.asteroids
  * owns:       creating, breaking, respawning and announcing asteroids and their ids
- * needs:      GameServer (type), common asteroid helpers
+ * needs:      GameServer (type), common asteroid helpers; npm: bitecs
  * invariants: asteroid ids stay stable across respawns — none pinned
  * extend:      a new asteroid stage rule goes into shedAsteroid or createAsteroid
  */

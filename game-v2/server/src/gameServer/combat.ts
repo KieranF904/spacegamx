@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.combat
  * owns:       the weapon, projectile and collision passes of a tick, shot walls and rock damage
- * needs:      GameServer (type), gameServer/spatialGrid, game/Weapons
+ * needs:      GameServer (type), gameServer/spatialGrid, game/Weapons; npm: @space-game/common, bitecs
  * invariants: collision order and spatial queries keep the frame hash — server/src/golden/frameHash.test.ts
  * extend:      a new kind of hit goes into collisionSystem beside the existing cases
  */

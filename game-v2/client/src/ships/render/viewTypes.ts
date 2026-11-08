@@ -1,7 +1,7 @@
 /**
- * @contract client.ship.render.viewTypes
+ * @contract client.ship.render.view-types
  * owns:       the per-ship view records ShipRenderer keeps (BodyView, Turret, Barrel)
- * needs:      pixi Container/Graphics/Sprite/Text, LitMesh, GunAnimSpec
+ * needs:      pixi Container/Graphics/Sprite/Text, LitMesh, GunAnimSpec; npm: @space-game/common, pixi.js
  * invariants: a view holds drawn state only; nothing here is decided by gameplay — none pinned
  * extend:     a new per-ship drawn thing is one more field on BodyView
  */

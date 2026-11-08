@@ -1,7 +1,7 @@
 /**
- * @contract client.weaponFx.shotFactory
+ * @contract client.weapon-fx.shot-factory
  * owns:       building a Shot record from a server projectile row (shotFromRow) or from a shell your client fired ahead (shotFromPrediction)
- * needs:      weaponStyles (weaponStyle, shotScale), ordnanceTells (landingPoint), shotTypes, particleTypes (colour helpers)
+ * needs:      weaponStyles (weaponStyle, shotScale), ordnanceTells (landingPoint), shotTypes, particleTypes (colour helpers); npm: @space-game/common
  * invariants: a predicted shell takes the server's id and keeps its flight when the server's copy arrives — client/src/rendering/weapons/adoptHit.test.ts
  * extend:     a new per-shell field is initialised in both builders below (and declared on Shot)
  */

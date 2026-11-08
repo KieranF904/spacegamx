@@ -1,5 +1,5 @@
 /**
- * @contract server.replication.forClient
+ * @contract server.replication.for-client
  * owns:       one client's share of a snapshot's ship motion: keyframes for ships it's new to or behind on, control rows,
  *             cause records (contacts it finds itself left out, pulls it works out left out, zero PULL records)
  * needs:      ReplicationCore (shadows, knocks, pullOff, pullsJudged, ships, stats, real, keyNow), ownShip (ownFor,

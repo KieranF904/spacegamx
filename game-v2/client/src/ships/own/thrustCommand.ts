@@ -1,5 +1,5 @@
 /**
- * @contract client.ship.thrustCommand
+ * @contract client.ship.thrust-command
  * owns:       what the local pilot's keys ask the engines for (ship grid frame), read by the thruster effects and the status panel
  * needs:      ThrustHost (state, hangarOpen, inputEnabled, jumpPhase, helm, noseThrust, isKeyDown), common worldToLocalDir
  * invariants: the drive has the engines while charging or burning (idle command) — none pinned

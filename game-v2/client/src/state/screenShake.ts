@@ -1,5 +1,5 @@
 /**
- * @contract client.state.screenShake
+ * @contract client.state.screen-shake
  * owns:       camera shake: trauma that hits add to and time drains, read as a smooth-noise offset and roll
  * needs:      nothing (pure functions over a ScreenShake)
  * invariants: shake is trauma squared, so small knocks stay small — none pinned

@@ -3,7 +3,7 @@
  * owns:       the protocol version pin, the wire-table summary, and the re-export of every message family
  * needs:      protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files
  * invariants: PROTOCOL_WIRE_HASH matches the hash of wireTables() — common/src/network/protocol.test.ts
- *             message families keep their wire ids and order — golden serverMessages.json
+ *             message families keep their wire ids and order — serverMessages.json
  * extend:     a new message family is a new *Protocol.ts file, re-exported below and added to the ClientMessage / ServerMessage unions
  */
 

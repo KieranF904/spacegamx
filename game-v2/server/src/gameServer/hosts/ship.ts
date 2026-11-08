@@ -1,8 +1,8 @@
 /**
  * @contract server.gameserver.hosts.ship
  * owns:       the ShipHost the ship bridge calls back into
- * needs:      GameServer (type), ships/ShipBridge
- * invariants: ShipBridge api — golden shipBridgeApi.json
+ * needs:      GameServer (type), ships/ShipBridge; npm: @space-game/common, bitecs
+ * invariants: the ShipBridge api is unchanged — shipBridgeApi.json
  * extend:      a new callback is a member of createShipHost
  */
 

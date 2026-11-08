@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.session
  * owns:       connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts
- * needs:      GameServer (type), game/Pilots, net/ClientConnection, common/network
+ * needs:      GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs
  * invariants: a new connection gets its player entity before any message is handled — none pinned
  *             saveAll saves every live pilot once — none pinned
  * extend:      a new join/leave step is a function here called from connect or loginPilot

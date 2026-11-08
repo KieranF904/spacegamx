@@ -1,7 +1,7 @@
 /**
- * @contract client.systemMap.layersTraffic
+ * @contract client.system-map.layers-traffic
  * owns:       the system view's moving layers: ghosts, hostiles, freighters, wrecks, stations, gates, rifts, other pilots
- * needs:      MapHost (state, hits, label, party, wreck), MapScene
+ * needs:      MapHost (state, hits, label, party, wreck), MapScene; npm: @space-game/common
  * invariants: layers push hits in draw order, so later ones win ties — none pinned
  * extend:     a new traffic layer is one function here, called from SystemMapUI.drawSystem
  */

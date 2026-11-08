@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.client
  * owns:       the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call
- * needs:      ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}
+ * needs:      ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js
  * events:     server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd
  * invariants: hits are searched once per snapshot window, before anything that reads HP — none pinned
  *             your own ship is stepped on its tick layer only (own/OwnTick), never here — server/src/golden/parity.test.ts

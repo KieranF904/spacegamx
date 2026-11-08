@@ -1,7 +1,7 @@
 /**
- * @contract client.systemMap
+ * @contract client.system-map
  * owns:       the map overlay shell: views, camera, input, hits and hover, the frame loop
- * needs:      systemMap/* modules (layers, galaxyView, marks, tooltip) through the MapHost interface, GameState
+ * needs:      systemMap/* modules (layers, galaxyView, marks, tooltip) through the MapHost interface, GameState; npm: @space-game/common
  * invariants: each frame rebuilds hits from the layers, in draw order — none pinned
  * extend:     a new system-view layer is one function in systemMap/layers*.ts, called from drawSystem; a new tooltip case goes in systemMap/tooltip.ts
  */

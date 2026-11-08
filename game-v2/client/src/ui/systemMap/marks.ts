@@ -1,5 +1,5 @@
 /**
- * @contract client.systemMap.marks
+ * @contract client.system-map.marks
  * owns:       labels (queued, placed so they make way for each other), your ship's marker and the jump drive's reach
  * needs:      MapHost (labelQueue, state, jump, jumpAim)
  * invariants: label priority decides who keeps a spot — none pinned

@@ -1,7 +1,7 @@
 /**
- * @contract client.systemMap.host
+ * @contract client.system-map.host
  * owns:       MapScene (one frame of the system view) and MapHost (what the map's layer and panel modules may use of SystemMapUI)
- * needs:      GameState, map types
+ * needs:      GameState, map types; npm: @space-game/common
  * invariants: modules reach the map only through this interface — none pinned
  * extend:     a member a new layer needs is added to MapHost, and made public in SystemMapUI
  */

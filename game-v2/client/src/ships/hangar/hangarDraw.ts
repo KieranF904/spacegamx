@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar.draw
  * owns:       one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost
- * needs:      HangarHost, hangarOverlays
+ * needs:      HangarHost, hangarOverlays; npm: @space-game/common
  * invariants: layer order is grid, turret arcs, parts, mounting, groups, overlays, ghost — none pinned
  * extend:     a new overlay is one block in draw() and one toggle in HangarHost.overlays
  */

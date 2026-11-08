@@ -1,7 +1,7 @@
 /**
  * @contract server.pilots
  * owns:       each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts
- * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}
+ * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs
  * events:     PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings
  * invariants: guests are never saved — none pinned
  *             a death costs what DeathRules says, the bank pays the rebuild — none pinned
@@ -667,6 +667,8 @@ export class Pilots {
   wreckRecovered(key: string): void { return death.wreckRecovered(this, key); }
   reapplyShip(conn: PilotConn): void { return persist.reapplyShip(this, conn); }
   captureNow(conn: PilotConn): void { return persist.captureNow(this, conn); }
+  /** What would be written to disk for this pilot (pilots/persist.ts) */
+  persistable(conn: PilotConn, p: PlayerProfile): PlayerProfile { return persist.persistable(this, conn, p); }
 }
 
 export type { Stack };

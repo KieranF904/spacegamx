@@ -2,7 +2,7 @@
  * @contract client.damage.events
  * owns:       one-off effects the server or the world announces: hulls grinding, a boss dying, point defence firing, a
  *             station turret firing, a part repaired
- * needs:      DamageCtx (particles, sound, shake, delayed actions), detonations (a boss's death chains blasts)
+ * needs:      DamageCtx (particles, sound, shake, delayed actions), detonations (a boss's death chains blasts); npm: @space-game/common
  * invariants: a boss's death is nine blasts across its hull then one huge one — none pinned
  * extend:     a new announced effect is one function below and one forwarding method on DamageFx
  */

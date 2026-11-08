@@ -1,7 +1,7 @@
 /**
- * @contract client.app.zoneHud
+ * @contract client.app.zone-hud
  * owns:       the HUD's zone readout each frame: sector danger, PvP safety, the ring and danger band you are in, and your rating against it
- * needs:      ZoneHost (state, world queries, ship rating, RegionUI, the pilot HUD and system map), data/systems.json
+ * needs:      ZoneHost (state, world queries, ship rating, RegionUI, the pilot HUD and system map), data/systems.json; npm: @space-game/common
  * invariants: safety follows the same rules as the server's canDamage — none pinned
  * extend:     a new zone fact on the HUD is one more argument to setZone below
  */

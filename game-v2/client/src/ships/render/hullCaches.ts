@@ -1,5 +1,5 @@
 /**
- * @contract client.ship.render.hullCaches
+ * @contract client.ship.render.hull-caches
  * owns:       the shared caches of built hulls, skeleton pieces and hull-worker requests, keyed by design, and the hull key a ship wears
  * needs:      common Blueprint/ShipState, hullBuild HullBuild, LitGeometry
  * invariants: built hulls are shared by every ship of a design and kept at most HULLS_KEPT per design — client/src/ships/rigidHull.test.ts

@@ -2,7 +2,7 @@
  * @contract protocol.client
  * owns:       every client-to-server message type and the ClientMessage union
  * needs:      the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick
- * invariants: client message shapes and union order are the wire contract — golden clientMessages.json
+ * invariants: client message shapes and union order are the wire contract — clientMessages.json
  * extend:     a new client message is an interface here and one line in the ClientMessage union (or its own *Protocol.ts)
  */
 import type { EconClientMessage } from '../econProtocol.js';

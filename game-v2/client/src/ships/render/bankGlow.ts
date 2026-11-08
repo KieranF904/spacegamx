@@ -1,7 +1,7 @@
 /**
- * @contract client.ship.render.bankGlow
+ * @contract client.ship.render.bank-glow
  * owns:       the pilot's own Capacitor and Drive Cell members glowing by their bank's charge
- * needs:      BankGlowHost (charge, geometry), pixi Graphics
+ * needs:      BankGlowHost (charge, geometry), pixi Graphics; npm: @space-game/common, pixi.js
  * invariants: redrawn only when a bank's charge moves a step — none pinned
  * extend:     a new bank kind is one more colour in drawBankGlow
  */

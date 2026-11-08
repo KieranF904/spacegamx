@@ -1,9 +1,9 @@
 /**
- * @contract server.snapshot.mapDots
+ * @contract server.snapshot.map-dots
  * owns:       what goes past the ship view: the system map's dots (legs, patrol routes, hostiles' places by distance
  *             tier, looks, names, the gone) and the hostile populations (pops) to the clients in their systems
  * needs:      MapHost (world, clients, ships, enemies, lod, namedBody, flying, gameData, focus.ghost, send, ticks),
- *             common map packers (packMapLeg, packMapRoute, mapDotFlags), FEED_TIERS
+ *             common map packers (packMapLeg, packMapRoute, mapDotFlags), FEED_TIERS; npm: bitecs
  * invariants: a dot is sent again only when its route changes or it strays MAP_DOT_SLACK — none pinned
  *             map bytes unchanged — server/src/golden/frameHash.test.ts
  * extend:     a new kind of dot is one `add(...)` source in rowsFor (sendMapDots)

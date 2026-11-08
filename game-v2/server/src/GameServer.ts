@@ -1,10 +1,10 @@
 /**
  * @contract server.gameserver
  * owns:       the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*
- * needs:      ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge
+ * needs:      ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs
  * invariants: module construction order in the constructor decides what each host can reach — server/src/golden/frameHash.test.ts
  *             the tick table order is the one tickOrder.json pins — server/src/tickOrder.test.ts
- *             the client message table is the one clientMessages.json pins — golden clientMessages.json
+ *             the client message table is the one clientMessages.json pins — clientMessages.json
  * extend:      a new area of server logic is a module under gameServer/ taking `gs: GameServer` (or a narrower Pick), wired in the constructor
  */
 

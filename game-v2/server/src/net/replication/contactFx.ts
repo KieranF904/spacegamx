@@ -1,7 +1,7 @@
 /**
- * @contract server.replication.contactFx
+ * @contract server.replication.contact-fx
  * owns:       contacts' sparks lately, and handing a CAPS.CONTACTS client those of pairs it doesn't find itself
- * needs:      causes/contactsFor ContactWindow (pair), the contact stats it counts into
+ * needs:      causes/contactsFor ContactWindow (pair), the contact stats it counts into; npm: @space-game/common
  * invariants: a spark a client finds itself is never sent to it — none pinned
  * extend:     a new kind of contact effect rides ServerContactMessage, not a new list here
  */

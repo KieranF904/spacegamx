@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.travel
  * owns:       moving a pilot between systems, rifts, and the system clock change
- * needs:      GameServer (type), game/SystemMemory
+ * needs:      GameServer (type), game/SystemMemory; npm: @space-game/common, bitecs
  * invariants: behaviour is unchanged from the class it was split from — none pinned
  * extend:      a new way between systems is a branch of travelTo
  */

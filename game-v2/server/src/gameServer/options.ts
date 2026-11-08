@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.options
  * owns:       the GameServer constructor options
- * needs:      types only
+ * needs:      types only; npm: @space-game/common
  * invariants: behaviour is unchanged from the class it was split from — none pinned
  * extend:      a new option is a field here
  */

@@ -5,7 +5,7 @@
  * needs:      ReplicationHost, ShipBridge, replication/{step, forClient, ownShip, workable, env, contactFx, types}
  * invariants: a ship's keyframe goes only when its shadow left the real ship — server/src/net/replication.test.ts
  *             bytes sent per client unchanged — server/src/golden/frameHash.test.ts
- *             tick order unchanged — tickOrder golden
+ *             tick order unchanged — tickOrder.json
  * extend:     the per-tick step is replication/step.ts; a client's share replication/forClient.ts; own ships replication/ownShip.ts
  *
  * Ship replication: send what clients can't work out for themselves, and
@@ -38,7 +38,9 @@ import {
   newOwnStats, newCauseStats, newContactStats, newBodyStats,
   type ReplicationCore, type ReplicationHost, type Shadow, type Kept,
 } from './replication/types.js';
-import { endTick } from './replication/step.js';
+import { endTick, work } from './replication/step.js';
+import type { OwnCause } from '../ships/bridge/ownCauses.js';
+import type { WorkedCauses } from './causes/shadowCauses.js';
 import { forClient } from './replication/forClient.js';
 import { ContactFx } from './replication/contactFx.js';
 
@@ -95,6 +97,11 @@ export class Replication implements ReplicationCore {
    */
   endTick(): void {
     endTick(this);
+  }
+
+  /** One shadow's causes worked out for a tick (replication/step.ts) */
+  work(eid: number, s: Shadow, causes: OwnCause[], tick: number): WorkedCauses | null {
+    return work(this, eid, s, causes, tick);
   }
 
   /**

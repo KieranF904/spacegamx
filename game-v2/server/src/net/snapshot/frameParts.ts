@@ -1,10 +1,10 @@
 /**
- * @contract server.snapshot.frameParts
+ * @contract server.snapshot.frame-parts
  * owns:       three parts of one client's snapshot, each called once per client: its fire events (shots it builds
  *             itself, or works out from gun lanes and its own shot log), the stations and portals it hasn't had, and
  *             the removals it cares about (renamed to shot-id names where it works the shell out)
  * needs:      FireHost (ships.fired, gunNet, ownShotLog, otherShotLog, fireRows, ticks), RemovalHost (pending removals,
- *             shot logs, hits), world + GameData for stations, Docking/flight queries
+ *             shot logs, hits), world + GameData for stations, Docking/flight queries; npm: bitecs
  * invariants: a fire event's row is made once a snapshot for every client (encode-once) — server/src/net/snapshot/shotIds.test.ts
  *             a client is told only of removals it was sent or made — server/src/net/snapshot/shotIds.test.ts
  *             fire and removal bytes unchanged — server/src/golden/frameHash.test.ts

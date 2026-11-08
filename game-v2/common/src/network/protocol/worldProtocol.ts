@@ -2,7 +2,7 @@
  * @contract protocol.world
  * owns:       station fire, boss, world-event, objective, siege and combat-effect server messages
  * needs:      nothing beyond type imports
- * invariants: message shapes are the wire contract — golden serverMessages.json
+ * invariants: message shapes are the wire contract — serverMessages.json
  * extend:     a new world-event message is an interface here and a line in serverMessage.ts
  */
 export interface ServerStationFireMessage {

@@ -1,7 +1,7 @@
 /**
- * @contract client.render.damageNumbers
+ * @contract client.render.damage-numbers
  * owns:       floating hit numbers: pooled bitmap text rising off what was hit
- * needs:      DamageNumbersHost (tagScale, cameraAngle), cameraView screenToWorldDir
+ * needs:      DamageNumbersHost (tagScale, cameraAngle), cameraView screenToWorldDir; npm: pixi.js
  * invariants: texts are pooled, never created per hit once warm — none pinned
  * extend:     a new number style (colour or size) is one more branch in show()
  */

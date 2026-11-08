@@ -1,7 +1,7 @@
 /**
  * @contract server.enemies
  * owns:       the hostile ships of every system: spawning, the tick, and the public doors to the rules in enemies/*.ts
- * needs:      EnemyHost, ShipBridge, enemies/{model, populations, placement, steering, memory, loot, stationDefence}
+ * needs:      EnemyHost, ShipBridge, enemies/{model, populations, placement, steering, memory, loot, stationDefence}; npm: @space-game/common
  * events:     BossHooks (Bosses plugs in), EnemyHost.reward/dropLoot/questKill on a kill
  * invariants: tick order: forget the dead, packs, populations, spawners, arrivals, station turrets — server/src/golden/tickOrder.json
  *             a ghost pack place is worked out from the seed and the tick — none pinned
@@ -506,6 +506,10 @@ export class Enemies {
   setPopMemory(data: Record<string, Record<string, PopulationMemory>> | undefined, offset: number): void { populations.setPopMemory(this, data, offset); }
   /** A nest's packs out now (their ships), and where it is (tests, tools) */
   nest(systemNum: number, id: string): { x: number; y: number; packs: number[][] } | null { return placement.nest(this, systemNum, id); }
+  /** A spawn group arrives in a system (enemies/placement.ts) */
+  arrive(num: number, group: SpawnGroup, players: number[], zone?: SpawnZone): void { placement.arrive(this, num, group, players, zone); }
+  /** Every system's populations, built on first use (enemies/populations.ts) */
+  populations(): Map<number, Population[]> { return populations.populations(this); }
   /** A system's packs as they are, to put the system away (enemies/memory.ts) */
   capture(num: number, where: (eid: number) => FarPose, offset: number, evict: boolean): PackMemory[] { return memory.capture(this, num, where, offset, evict); }
   /** A remembered system's packs back */

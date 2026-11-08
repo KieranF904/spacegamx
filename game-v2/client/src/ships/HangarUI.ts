@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar
  * owns:       the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow
- * needs:      hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView
+ * needs:      hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common
  * invariants: the hangar edits a copy of the blueprint until Save — none pinned
  * extend:     a new panel or overlay is a module under hangar/ taking HangarHost; add the members it needs to hangar/host.ts
  */

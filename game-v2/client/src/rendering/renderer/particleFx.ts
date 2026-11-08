@@ -1,7 +1,7 @@
 /**
- * @contract client.render.particleFx
+ * @contract client.render.particle-fx
  * owns:       short-lived effect particles, flashes and rings, tractor beams, and the named one-shot effects (explosion, warp, hit, break)
- * needs:      pooled sprites (SpritePool), fxTextures, Lighting (flash lights), GameState (player position, screen shake)
+ * needs:      pooled sprites (SpritePool), fxTextures, Lighting (flash lights), GameState (player position, screen shake); npm: @space-game/common, pixi.js
  * invariants: random draws happen in the same order as before the split (effects look the same) — none pinned
  * extend:     a new one-shot effect is one case in showEffect() plus a create* method
  */

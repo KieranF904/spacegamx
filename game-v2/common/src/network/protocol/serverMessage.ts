@@ -2,7 +2,7 @@
  * @contract protocol.server-union
  * owns:       the ServerMessage union over every family
  * needs:      every server message family file
- * invariants: union membership decides what the compact and binary codecs may carry — golden serverMessages.json
+ * invariants: union membership decides what the compact and binary codecs may carry — serverMessages.json
  * extend:     a new server message type is one line in ServerMessage
  */
 import type { EconServerMessage } from '../econProtocol.js';

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * The central contract registry. Scans common, server, client, server-browser and scripts for the contract
  * header (see docs/contracts/README.md), then writes docs/contracts/registry.md and registry.json: one entry per

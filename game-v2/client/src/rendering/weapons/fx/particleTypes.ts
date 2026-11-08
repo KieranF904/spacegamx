@@ -1,5 +1,5 @@
 /**
- * @contract client.weaponFx.particles
+ * @contract client.weapon-fx.particles
  * owns:       the particle record shapes, caps, colour helpers and texture handles that WeaponFx's sub-systems share
  * needs:      fxTextures, impactAnchor (ImpactAnchor type)
  * invariants: impactScale grows as the square root of shell size, never below 0.2 — client/src/rendering/weapons/weaponStyles.test.ts

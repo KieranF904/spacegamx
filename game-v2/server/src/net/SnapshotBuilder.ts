@@ -3,10 +3,10 @@
  * owns:       the snapshot round: every SNAPSHOT_RATE, one snapshot per client, assembled in a fixed order from the
  *             snapshot/ modules (rows, own row, debris hold, replication, fire, structure, removals), then map dots and pops
  * needs:      SnapshotHost (GameServer builds one, once), snapshot/{rows, ownRow, shipStructure, debrisHold, frameParts,
- *             mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet
+ *             mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet; npm: bitecs
  * invariants: message order per client per round is fixed (ownSync, gunSyncs, pulls, snapshot) — server/src/golden/frameHash.test.ts
  *             bytes sent unchanged — server/src/golden/frameHash.test.ts
- *             tick order unchanged — tickOrder golden
+ *             tick order unchanged — tickOrder.json
  * extend:     a new row kind is one entry in snapshot/rows/index.ts ROW_KINDS; a new per-client message goes in sendSnapshots
  *
  * The snapshot path: what each client is sent of the world as it changes. Moved verbatim from GameServer (bodies

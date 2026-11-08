@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.hosts.world
  * owns:       host adapters for operations, events, mobs and enemies
- * needs:      GameServer (type)
+ * needs:      GameServer (type); npm: @space-game/common, bitecs
  * invariants: behaviour is unchanged from the class it was split from — none pinned
  * extend:      a new host member is added to the matching create*Host
  */

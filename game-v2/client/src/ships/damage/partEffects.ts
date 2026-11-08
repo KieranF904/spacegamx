@@ -1,5 +1,5 @@
 /**
- * @contract client.damage.partEffects
+ * @contract client.damage.part-effects
  * owns:       what a destroyed part looks, sounds and shakes like, by the part's kind and how it died
  * needs:      DamageCtx (particles, sound, shake, delayed actions), common lookFn
  * invariants: a crumbling part throttles its sound — none pinned

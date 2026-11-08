@@ -1,5 +1,5 @@
 /**
- * @contract client.app.versionOverlay
+ * @contract client.app.version-overlay
  * owns:       the full-screen "a new version is out" notice shown when the server speaks another protocol
  * needs:      the DOM only
  * invariants: shown at most once per page — none pinned

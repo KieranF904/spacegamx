@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.systems
  * owns:       small per-tick systems: player movement, station orbits, the broadphase build, lifetimes and cleanup
- * needs:      GameServer (type), gameServer/shared queries
+ * needs:      GameServer (type), gameServer/shared queries; npm: @space-game/common, bitecs
  * invariants: run in the order of the tick table — server/src/tickOrder.test.ts
  * extend:      a new small system is a function here and an entry in loop.ts buildTickSystems
  */

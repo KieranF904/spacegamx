@@ -1,5 +1,5 @@
 /**
- * @contract client.ship.rendererHooks
+ * @contract client.ship.renderer-hooks
  * owns:       the callbacks the scene renderer calls into the ship client for (muzzle kicks, barrel tips, shell looks and fire poses, struck surfaces, drawn-hit casts, guide line)
  * needs:      RendererHooksHost (state, store, placement, jump, fire, drawnWorld, strike, ownPresent, localAim), Renderer hook fields
  * invariants: every drawn shell stops at the first drawn surface it touches — client/src/ships/drawnHit.test.ts

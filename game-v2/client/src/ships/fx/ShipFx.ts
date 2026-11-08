@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.fx
  * owns:       the ship effect layers (jump, mining beams, charge tells, scanner, damage, bosses, incoming warning), built on the renderer and wired to sounds
- * needs:      ShipFxHost (state, store, tuning, econ, localAim, miningHeld, hangarOpen, sound, jump, ownBeams, chargeTells, strike), Renderer layers
+ * needs:      ShipFxHost (state, store, tuning, econ, localAim, miningHeld, hangarOpen, sound, jump, ownBeams, chargeTells, strike), Renderer layers; npm: @space-game/common
  * invariants: what glows is added as a bloom source — none pinned
  *             the local jump charge sound is cut on abort — none pinned
  * extend:     a new effect layer is one more field and one more line in init

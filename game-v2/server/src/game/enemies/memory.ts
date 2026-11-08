@@ -1,7 +1,7 @@
 /**
  * @contract server.enemies.memory
  * owns:       what a system's hostiles remember when it is put away, and the spawner clocks
- * needs:      Enemies (packs, enemies, ships, host, data), ./populations, SystemMemory
+ * needs:      Enemies (packs, enemies, ships, host, data), ./populations, SystemMemory; npm: @space-game/common
  * invariants: a restored pack is the pack that was captured — server/src/game/systemMemory.test.ts
  * extend:     a new remembered field is added to PackMemory/EnemyMemory (model.ts) and to capture/restore here
  */

@@ -1,5 +1,5 @@
 /**
- * @contract client.app.sceneSounds
+ * @contract client.app.scene-sounds
  * owns:       sounds driven by what is on screen: engine and boost loops, held beams, the event-horizon alarm, the music's mood and dread
  * needs:      SceneSoundsHost (state, audio, input, ship client, combat sounds, music place, objectives, world queries), weaponSounds
  * invariants: shots and impacts are not heard here, they are heard as WeaponFx draws them (CombatSounds) — none pinned

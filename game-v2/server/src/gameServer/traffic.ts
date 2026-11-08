@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.traffic
  * owns:       freighter traffic between stations
- * needs:      GameServer (type), ships/SimLod
+ * needs:      GameServer (type), ships/SimLod; npm: @space-game/common
  * invariants: behaviour is unchanged from the class it was split from — none pinned
  * extend:      traffic rules live in trafficSystem and trafficIntent
  */

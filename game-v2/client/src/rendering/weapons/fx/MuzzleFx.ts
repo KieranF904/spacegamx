@@ -1,5 +1,5 @@
 /**
- * @contract client.weaponFx.muzzle
+ * @contract client.weapon-fx.muzzle
  * owns:       the muzzle flash, casings, coil rings and gun smoke a shell makes as it leaves its barrel, and a prism's split pop
  * needs:      FxField (flash, spark, ring and smoke lists), MuzzleHost (onMuzzle, barrelTip, spinAt), weaponStyles (muzzleScale)
  * invariants: the flash and the shell are drawn from the barrel's tip, the shell easing onto its true path — client/src/rendering/weapons/visualStop.test.ts

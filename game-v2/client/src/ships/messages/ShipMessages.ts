@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.messages
  * owns:       routing the server messages a ship client reacts to (hits, damage, bosses, scans, ship sync, system info, docking) to the pieces that draw or track them
- * needs:      ShipMessageHost (state, store, fx getters, debris, away, selfHits, hits, own, causes, moves, flow, turrets, dock, jump, strike)
+ * needs:      ShipMessageHost (state, store, fx getters, debris, away, selfHits, hits, own, causes, moves, flow, turrets, dock, jump, strike); npm: @space-game/common
  * invariants: returns false for messages the game also draws itself — client/src/app/serverMessages.test.ts
  * extend:     a new ship server message is one more case below
  */

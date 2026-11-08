@@ -1,4 +1,14 @@
 /**
+ * @contract server.repair-bank.sessions
+ * owns:       the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live
+ *             ship, and the `repairBank` message
+ * needs:      RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed); npm: bitecs
+ * events:     hangarChanged when a part is built in
+ * invariants: a changed bank is sent at most once a second, a refilling one once a minute — server/src/game/repairBank.test.ts
+ *             deposits only at a station — server/src/game/repairBank.test.ts
+ * extend:     a new bank action is a method here and a door in Pilots; its rules go in RepairBanks
+ */
+/**
  * The repair bank on the server (docs/design/field-fabrication.md, sections 2.4 and 6; the rules and numbers are
  * common/src/econ/field/bank.ts, so client and server agree). Each pilot has one, on the profile (`PlayerProfile.bank`):
  *
@@ -317,14 +327,7 @@ export interface BankHost<S extends BankSession = BankSession> {
 }
 
 /**
- * @contract server.repairBank.sessions
- * owns:       the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live
- *             ship, and the `repairBank` message
- * needs:      RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed)
- * events:     hangarChanged when a part is built in
- * invariants: a changed bank is sent at most once a second, a refilling one once a minute — server/src/game/repairBank.test.ts
- *             deposits only at a station — server/src/game/repairBank.test.ts
- * extend:     a new bank action is a method here and a door in Pilots; its rules go in RepairBanks
+ * The repair bank of connected pilots (contract header at the top of this file).
  */
 export class BankSessions<S extends BankSession = BankSession> {
   private ticks = 0;

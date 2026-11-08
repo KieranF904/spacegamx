@@ -1,5 +1,5 @@
 /**
- * @contract client.ship.strikeFx
+ * @contract client.ship.strike-fx
  * owns:       where a shell is seen to strike: shield ripples, plain-hit looks, mining strikes on rock and the progress ring towards your next drop
  * needs:      StrikeFxHost (state, store, scene, damageFx, shellModel, sound), MiningProgress, common gunShell
  * invariants: a hit that cannot mine shows plain sparks — none pinned

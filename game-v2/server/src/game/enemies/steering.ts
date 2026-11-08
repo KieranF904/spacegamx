@@ -1,8 +1,8 @@
 /**
  * @contract server.enemies.steering
  * owns:       one hostile's pilot: patrol, engage, flee, return, target choice, and the coarse intent for a distant one
- * needs:      Enemies (enemies, packs, wards, ships, host, data), ./placement, common/bodies orders
- * invariants: none pinned
+ * needs:      Enemies (enemies, packs, wards, ships, host, data), ./placement, common/bodies orders; npm: bitecs
+ * invariants: behaviour unchanged from Enemies.ts, which it was split from — none pinned
  * extend:     a new behaviour is a state in fly()
  */
 

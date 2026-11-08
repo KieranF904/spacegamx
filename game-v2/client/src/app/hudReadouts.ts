@@ -1,5 +1,5 @@
 /**
- * @contract client.app.hudReadouts
+ * @contract client.app.hud-readouts
  * owns:       the top-HUD readouts each frame: boost bar, bank bars, XP bar and level (with their gain glow), credits, system name
  * needs:      HudHost (state, pilot, ship client, system names), BankBars, domWrite setText and setStyle
  * invariants: each element is written only when its value changes (domWrite) — none pinned

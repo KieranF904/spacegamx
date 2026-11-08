@@ -2,7 +2,7 @@
  * @contract server.snapshot.rows.bodies
  * owns:       the snapshot rows of what isn't a pilot: pilotless ship bodies (status), single-body mobs, projectiles
  *             (keyed without their place while on their line) and loot pods (their drift anchor)
- * needs:      RowHost (world, ships, enemies, mobs, pods, namedBody, personCraft, wards, ticks), RowKeys
+ * needs:      RowHost (world, ships, enemies, mobs, pods, namedBody, personCraft, wards, ticks), RowKeys; npm: bitecs
  * invariants: a straight shell's row goes once and again only when its course changes — server/src/net/snapshot/shotIds.test.ts
  *             row bytes per client unchanged — server/src/golden/frameHash.test.ts
  * extend:     a new row kind is one function here (or its own file) added to ROW_KINDS in rows/index.ts

@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.wiring.game
  * owns:       constructor argument objects for the game modules (weapons, market, services, hazards, homes, bosses support, social, trade and more)
- * needs:      GameServer (type)
+ * needs:      GameServer (type); npm: @space-game/common, bitecs
  * invariants: called in constructor order; evaluation order is kept — server/src/golden/frameHash.test.ts
  * extend:      a new dependency for one of these modules is a member of its *Deps function
  */

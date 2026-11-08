@@ -1,5 +1,5 @@
 /**
- * @contract client.state.asteroidEntities
+ * @contract client.state.asteroid-entities
  * owns:       making the client's asteroid entities from spawn messages and from the deterministic belt seed, and clearing them
  * needs:      AsteroidHost (entities, composeAsteroid, getRawServerTick), common asteroid orbit maths
  * invariants: a rock's first position is its orbit position at the current tick, not (0, 0) — none pinned

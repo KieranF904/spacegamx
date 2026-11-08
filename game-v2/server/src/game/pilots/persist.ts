@@ -1,7 +1,7 @@
 /**
  * @contract server.pilots.persist
  * owns:       moving a profile between the store, the session and the live ship entity
- * needs:      Pilots (sessions, store, host, ships), ProfileStore
+ * needs:      Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs
  * invariants: a guest profile is never saved — none pinned
  * extend:     a new profile field that mirrors onto the ship goes in applyProfile/capture
  */

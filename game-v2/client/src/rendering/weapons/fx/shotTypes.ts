@@ -1,5 +1,5 @@
 /**
- * @contract client.weaponFx.shotTypes
+ * @contract client.weapon-fx.shot-types
  * owns:       the record of one drawn shell (Shot) and the shapes WeaponFx's callers hand it (PredictedShell, ShellLook, DrawnHit)
  * needs:      weaponStyles (WeaponStyle type)
  * invariants: a Shot's head and tail are null until it has left the barrel on its timeline — client/src/rendering/weapons/visualStop.test.ts

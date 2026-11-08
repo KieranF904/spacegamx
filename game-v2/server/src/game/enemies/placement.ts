@@ -1,8 +1,8 @@
 /**
  * @contract server.enemies.placement
  * owns:       where packs go and come from: nest tending, nomads, wandering, arrivals through gates, spawn points
- * needs:      Enemies (rng, packs, host, data, bosses), ../Roaming
- * invariants: none pinned
+ * needs:      Enemies (rng, packs, host, data, bosses), ../Roaming; npm: @space-game/common
+ * invariants: behaviour unchanged from Enemies.ts, which it was split from — none pinned
  * extend:     a new way a pack gets about is a Roaming style handled in steerNomad/wander
  */
 

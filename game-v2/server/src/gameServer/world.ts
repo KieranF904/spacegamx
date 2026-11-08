@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.world
  * owns:       building the starting world: stations, rifts, portals
- * needs:      GameServer (type), data/GameData
+ * needs:      GameServer (type), data/GameData; npm: @space-game/common, bitecs
  * invariants: entities are created in a fixed order (ids are part of the frame hash) — server/src/golden/frameHash.test.ts
  * extend:      a new static world entity kind is a create* function called from initializeWorld
  */

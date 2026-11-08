@@ -1,8 +1,8 @@
 /**
- * @contract client.weaponFx.impact
+ * @contract client.weapon-fx.impact
  * owns:       what a hit throws at (x, y): the throw direction, the group riding what was struck, the flat or layered
  *             (ImpactLayers) particles, a held beam's burn, and the hit's sound and screen shake
- * needs:      FxField (particle lists), ImpactHost (surfaceAt, sounds, state), weaponStyles, impactAim, impactAnchor, liquidSplash
+ * needs:      FxField (particle lists), ImpactHost (surfaceAt, sounds, state), weaponStyles, impactAim, impactAnchor, liquidSplash; npm: @space-game/common
  * invariants: a hit's throw follows the style's hitThrow, off the struck surface where one is known — client/src/rendering/weapons/impactAim.test.ts
  *             an impact's parts ride what it hit as one group — client/src/rendering/weapons/impactAnchor.test.ts
  *             layered particle lists stop growing at their caps — none pinned

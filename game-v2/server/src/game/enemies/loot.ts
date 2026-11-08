@@ -1,8 +1,8 @@
 /**
  * @contract server.enemies.loot
  * owns:       a hostile's death: pay the killer, party and helpers, roll the loot table and salvage parts
- * needs:      Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering
- * invariants: none pinned
+ * needs:      Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering; npm: @space-game/common
+ * invariants: behaviour unchanged from Enemies.ts, which it was split from — none pinned
  * extend:     a new payout rule is a step in onDestroyed
  */
 

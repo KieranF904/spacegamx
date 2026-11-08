@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.admin
  * owns:       the admin host and the admin server hooks, admin stats and perf metrics
- * needs:      GameServer (type), game/AdminTools, AdminServer
+ * needs:      GameServer (type), game/AdminTools, AdminServer; npm: @space-game/common, bitecs
  * invariants: behaviour is unchanged from the class it was split from — none pinned
  * extend:      a new admin command is an AdminHost member here
  */

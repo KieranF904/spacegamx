@@ -1,5 +1,5 @@
 /**
- * @contract client.ship.ownPresent
+ * @contract client.ship.own-present
  * owns:       what your own ship's tick layer fired, drawn as the prediction reaches each tick, and confirmed to OwnShells when a snapshot lands
  * needs:      OwnPresentHost (store, state, tuning, own, replicas, ownShells, gunFeel, scene, beamFx, docked, jump, ownAmmo), common fireVolley/gunControls
  * invariants: each tick's events are drawn once — none pinned

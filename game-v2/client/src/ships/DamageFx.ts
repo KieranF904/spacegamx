@@ -1,8 +1,8 @@
 /**
- * @contract client.damageFx
+ * @contract client.damage-fx
  * owns:       the facade the ship client drives damage, collision, shield and repair effects through, and the frame order
  *             they update in; each kind of effect lives in damage/
- * needs:      damage/{particles, context, partEffects, detonations, events, shields, ambient}, ShipSource, GameState
+ * needs:      damage/{particles, context, partEffects, detonations, events, shields, ambient}, ShipSource, GameState; npm: @space-game/common, pixi.js
  * invariants: a frame runs delayed actions, ambient effects, anchors, then draws particles, shields, ripples, charges — none pinned
  * extend:     a new announced effect is a function in damage/events.ts (or a kind in damage/detonations.ts) and one forwarding method here
  */
