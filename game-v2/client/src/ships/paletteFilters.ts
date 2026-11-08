@@ -46,7 +46,9 @@ const GROUPS: Record<Exclude<CompTab, 'weapons'>, { sub: SubDef; match: string[]
     { sub: { id: 'link', label: 'Links', hint: 'Relays, feeds and chargers' }, match: ['relay', 'feed', 'dynamo'] },
   ],
   shields: [
-    { sub: { id: 'shield', label: 'Shields' }, match: ['shield'] },
+    { sub: { id: 'wall', label: 'Walls' }, match: ['shieldwall'] },
+    { sub: { id: 'arc', label: 'Arcs' }, match: ['shieldarc'] },
+    { sub: { id: 'shield', label: 'Bubbles' }, match: ['shield'] },
     { sub: { id: 'plating', label: 'Plating' }, match: ['plating'] },
   ],
   utility: [

@@ -9,7 +9,7 @@
 //   HAt4 -3,1
 // Entries may also be separated by ";". The tool places each piece by its anchor and refuses overlaps by name.
 import type { Blueprint, PlacedPart, Side, Vec2 } from '../../../common/src/ships/index';
-import { getVariant, placeGeometry } from '../../../common/src/ships/index';
+import { getVariant, orientToFacing, placeGeometry } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
 import { CodeBook, FACING_MARK, partKey, type DecodeResult, type GridError } from './grid';
 import { type ShapeClass, pieceOfLetter, pieceShapes, placeShape, shapeOfPart } from './shapes';
@@ -179,7 +179,7 @@ export function partsToBlueprint(ctx: ShipgenContext, text: string, opts: { book
     const sh = shapeFor(ctx, book, c, shape, w ? [Number(w), Number(h)] : null);
     if (!sh.cls) { errors.push({ row: y, col: x, message: `"${entry}": ${sh.why}` }); continue; }
     const def = book.get(c)!;
-    const p: PlacedPart = { uid: parts.length, piece: sh.cls.piece, fn: def.fn, material: def.material, ...placeShape(sh.cls, [x, y]), ...(mark ? { facing: MARK_FACING[mark] } : {}), ...(def.mount ? { mount: def.mount } : {}) };
+    const p: PlacedPart = orientToFacing(ctx.catalog, { uid: parts.length, piece: sh.cls.piece, fn: def.fn, material: def.material, ...placeShape(sh.cls, [x, y]), ...(mark ? { facing: MARK_FACING[mark] } : {}), ...(def.mount ? { mount: def.mount } : {}) });
     let cells: Vec2[];
     try { cells = placeGeometry(ctx.catalog, p).cells; } catch (e) { errors.push({ row: y, col: x, message: `"${entry}": ${(e as Error).message}` }); continue; }
     // (Hull "under" a part: models often list a hull cell and a part on it; the part wins, with a note. A hull block only

@@ -7,7 +7,7 @@
 //   ##        a cell of a part the grid can't draw (it rides in the `raw:` section)
 // Rows are y (row labels), columns x (the header). Parts the legend has no code for get one in the `key:` section.
 import type { Blueprint, PlacedPart, Side, Vec2 } from '../../../common/src/ships/index';
-import { getVariant, placeGeometry } from '../../../common/src/ships/index';
+import { getVariant, orientToFacing, placeGeometry } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
 import { type CodeDef, type Legend, allocateCode, buildLegend } from './legend';
 import { type ShapeClass, mirrorShape, pieceOfLetter, pieceShapes, placeShape, polygonKey, shapeOfPart, topLeft } from './shapes';
@@ -318,7 +318,7 @@ export function gridToBlueprint(ctx: ShipgenContext, text: string, opts: { book?
   for (const { t, c } of solved.picks) {
     const def = book.get(t.code)!;
     const pl = placeShape(c.cls, [t.x, t.y]);
-    parts.push({ uid: parts.length, piece: c.cls.piece, fn: def.fn, material: def.material, ...pl, ...(t.facing ? { facing: t.facing } : {}), ...(def.mount ? { mount: def.mount } : {}) });
+    parts.push(orientToFacing(ctx.catalog, { uid: parts.length, piece: c.cls.piece, fn: def.fn, material: def.material, ...pl, ...(t.facing ? { facing: t.facing } : {}), ...(def.mount ? { mount: def.mount } : {}) }));
   }
   for (const r of pr.raw) parts.push({ ...r, uid: parts.length });
   const bp: Blueprint = {

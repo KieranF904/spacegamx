@@ -199,3 +199,26 @@ export function migrateGunFacings(catalog: Catalog, input: Blueprint): GunFacing
   if (trouble(catalog, first.blueprint) <= was) return first;
   return migratePass(catalog, input, false);
 }
+
+/**
+ * A fixed-barrel gun drawn on the same cells with its barrel the way `p.facing` says (a text grid's facing mark: the
+ * mark is the aim, the cells the place): the turn and mirror that do it, its own mirror first. Anything else, or a gun
+ * no turn of which fires that way on those cells, is returned as it is (validation then says what is wrong).
+ */
+export function orientToFacing(catalog: Catalog, p: PlacedPart): PlacedPart {
+  const aim = p.facing as Side | undefined;
+  if (!aim || gunFacing(catalog, p) === null || gunFacing(catalog, p) === aim) return p;
+  const cells0 = ckey(placeGeometry(catalog, p).cells);
+  for (const flip of [!!p.flip, !p.flip]) {
+    for (const rot of [0, 1, 2, 3] as Rot[]) {
+      if (gunFacing(catalog, { ...p, rot, flip }) !== aim) continue;
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const q: PlacedPart = { ...p, x: p.x + dx, y: p.y + dy, rot, flip };
+          if (ckey(placeGeometry(catalog, q).cells) === cells0) return q;
+        }
+      }
+    }
+  }
+  return p;
+}
