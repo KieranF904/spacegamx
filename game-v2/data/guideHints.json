@@ -1,0 +1,29 @@
+{
+  "_comment": "Hand-written hints for the field guide's resource dictionary (client/src/ui/resources). Keyed by item id; one plain line each, only where the data can't say it well. Where an item comes from and what it is used for are derived from the other data files, so don't repeat them here.",
+  "hints": {
+    "iron_ore": "Shoot a rock, then fly through the chunks it breaks into. Any gun cracks soft rock.",
+    "silicate": "Soft rock: any gun will do. Turns up in almost every belt.",
+    "ice": "Comets and ice bodies are the richest. Soft rock, so any gun will do.",
+    "copper_ore": "Every bit of wiring starts here, so mine plenty early.",
+    "crystal": "Crystal rock is harder than chondrite: bring a mining laser, not just a gun.",
+    "titanium_ore": "Hard ore. A strong mining laser (or one of the harder weapons) is needed to crack it.",
+    "cobalt_ore": "Dangerous belts only, and hard rock. Richest where the danger is highest.",
+    "neutronium_ore": "Rare. Comes out of Neutron Slugs, the big rocks.",
+    "pale_iridium": "You never see it as a rock. Refine ice or volatiles and a little turns up.",
+    "aurum": "You never see it as a rock. Refine copper or platinoid ore and a little turns up.",
+    "voidglass": "You never see it as a rock. Refine crystal ore: gem seams give three times as much.",
+    "singularity_dust": "You never see it as a rock. Only the Neutron Slugs give it up when refined.",
+    "scrap_electronics": "Every wreck has some. Pirates and scavengers drop it most; so does scrapping an old module.",
+    "power_coupling": "Scrapping a ship or module gives its couplings back in full, so lost gear is never wasted.",
+    "targeting_chip": "Scrapping a ship or module gives its chips back in full.",
+    "servo_motor": "Scrapping a ship or module gives its servos back in full.",
+    "wire_spool": "Fabricated from copper wire; one spool lays four segments of wiring.",
+    "pack_hull": "The first pack to learn: a crate of plate that makes field repairs and builds quicker.",
+    "boost_cell": "Cheap and quick to fabricate from ice and wire. Keep a few in the hold.",
+    "scanner_charge": "Cheap to fabricate from silicate and wire. Keep a few in the hold.",
+    "rustjaw_cog": "A rare drop (a few in a hundred kills). Rustjaw's Hive can't be made without it.",
+    "ancient_relic": "Sells to collectors and fabricators. Bosses carry them now and then.",
+    "ruby": "Valuable to traders. Cut gems are made from crystal, not from these.",
+    "sapphire": "Valuable to traders. Cut gems are made from crystal, not from these."
+  }
+}

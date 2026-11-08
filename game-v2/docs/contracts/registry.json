@@ -4674,6 +4674,329 @@
       ]
     },
     {
+      "id": "client.ui.resource-dictionary",
+      "path": "client/src/ui/resources/resourceDictionary.ts",
+      "group": "client/ui/resources",
+      "lines": 111,
+      "owns": "the field guide's Resources tab: a searchable, filterable list of every resource item, rows that open to how to get it and what it is for",
+      "needs": "resourceData (the entries), ../escape (esc), DOM (wireResources only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "search and the category chips only hide rows, they never re-render, so the box keeps focus while typing",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        },
+        {
+          "text": "every row's text is escaped",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        }
+      ],
+      "extend": "a new filter is one more data-attribute on a row (rowHtml) and one more check in apply()",
+      "exports": [
+        "RESOURCE_CSS",
+        "ResourceDeps",
+        "resourcesHtml",
+        "wireResources"
+      ],
+      "sections": [
+        {
+          "name": "ResourceDeps",
+          "kind": "interface",
+          "start": 14,
+          "end": 18
+        },
+        {
+          "name": "state",
+          "kind": "const",
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "RESOURCE_CSS",
+          "kind": "const",
+          "start": 23,
+          "end": 55
+        },
+        {
+          "name": "rowHtml",
+          "kind": "function",
+          "start": 57,
+          "end": 75
+        },
+        {
+          "name": "resourcesHtml",
+          "kind": "function",
+          "start": 77,
+          "end": 88
+        },
+        {
+          "name": "wireResources",
+          "kind": "function",
+          "start": 90,
+          "end": 111
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-index",
+      "path": "client/src/ui/resources/resourceIndex.ts",
+      "group": "client/ui/resources",
+      "lines": 322,
+      "owns": "the resource dictionary's entries: one per ore, gem, refined material, component, pack, ammo crate, cut gem and drop, each with how to get it and what it is used for, derived from the game data",
+      "needs": "common/ (FIELD only), the data/*.json shapes in GameData below (no I/O, no DOM)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every ore, refined, component, pack and ammo item has an entry, and an entry with no known source is marked notObtainable",
+          "test": "client/src/ui/resources/resourceIndex.test.ts"
+        },
+        {
+          "text": "a mined ore lists the systems whose belts hold a rock that drops it",
+          "test": "client/src/ui/resources/resourceIndex.test.ts"
+        },
+        {
+          "text": "a refined item lists its recipe",
+          "test": "client/src/ui/resources/resourceIndex.test.ts"
+        }
+      ],
+      "extend": "a new way of getting an item is one function in SOURCES below; a hand-written line is one entry in data/guideHints.json",
+      "exports": [
+        "CATEGORY_LABEL",
+        "CATEGORY_ORDER",
+        "GameData",
+        "ResourceCategory",
+        "ResourceEntry",
+        "ResourceSource",
+        "SOURCE_LABEL",
+        "SourceKind",
+        "buildResourceIndex"
+      ],
+      "sections": [
+        {
+          "name": "ResourceCategory",
+          "kind": "type",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "CATEGORY_LABEL",
+          "kind": "const",
+          "start": 16,
+          "end": 18
+        },
+        {
+          "name": "CATEGORY_ORDER",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "SourceKind",
+          "kind": "type",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "SOURCE_LABEL",
+          "kind": "const",
+          "start": 22,
+          "end": 25
+        },
+        {
+          "name": "KIND_ORDER",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "ResourceSource",
+          "kind": "interface",
+          "start": 28,
+          "end": 33
+        },
+        {
+          "name": "ResourceEntry",
+          "kind": "interface",
+          "start": 35,
+          "end": 50
+        },
+        {
+          "name": "Bag",
+          "kind": "type",
+          "start": 52,
+          "end": 52
+        },
+        {
+          "name": "ItemRow",
+          "kind": "interface",
+          "start": 53,
+          "end": 56
+        },
+        {
+          "name": "RockType",
+          "kind": "interface",
+          "start": 57,
+          "end": 57
+        },
+        {
+          "name": "DropRow",
+          "kind": "interface",
+          "start": 58,
+          "end": 58
+        },
+        {
+          "name": "Named",
+          "kind": "interface",
+          "start": 59,
+          "end": 59
+        },
+        {
+          "name": "GameData",
+          "kind": "interface",
+          "start": 60,
+          "end": 95
+        },
+        {
+          "name": "cap",
+          "kind": "const",
+          "start": 97,
+          "end": 97
+        },
+        {
+          "name": "pct",
+          "kind": "const",
+          "start": 98,
+          "end": 98
+        },
+        {
+          "name": "plural",
+          "kind": "const",
+          "start": 99,
+          "end": 99
+        },
+        {
+          "name": "secs",
+          "kind": "const",
+          "start": 100,
+          "end": 100
+        },
+        {
+          "name": "some",
+          "kind": "function",
+          "start": 101,
+          "end": 104
+        },
+        {
+          "name": "CATEGORY_OF",
+          "kind": "const",
+          "start": 106,
+          "end": 108
+        },
+        {
+          "name": "categoryOf",
+          "kind": "function",
+          "start": 109,
+          "end": 112
+        },
+        {
+          "name": "Ctx",
+          "kind": "interface",
+          "start": 114,
+          "end": 122
+        },
+        {
+          "name": "makeCtx",
+          "kind": "function",
+          "start": 124,
+          "end": 147
+        },
+        {
+          "name": "SourceFn",
+          "kind": "type",
+          "start": 149,
+          "end": 149
+        },
+        {
+          "name": "mined",
+          "kind": "const",
+          "start": 151,
+          "end": 175
+        },
+        {
+          "name": "seam",
+          "kind": "const",
+          "start": 177,
+          "end": 185
+        },
+        {
+          "name": "trace",
+          "kind": "const",
+          "start": 187,
+          "end": 196
+        },
+        {
+          "name": "refine",
+          "kind": "const",
+          "start": 198,
+          "end": 201
+        },
+        {
+          "name": "fabricate",
+          "kind": "const",
+          "start": 203,
+          "end": 210
+        },
+        {
+          "name": "cut",
+          "kind": "const",
+          "start": 212,
+          "end": 218
+        },
+        {
+          "name": "drop",
+          "kind": "const",
+          "start": 220,
+          "end": 230
+        },
+        {
+          "name": "bought",
+          "kind": "const",
+          "start": 232,
+          "end": 243
+        },
+        {
+          "name": "questReward",
+          "kind": "const",
+          "start": 245,
+          "end": 260
+        },
+        {
+          "name": "salvage",
+          "kind": "const",
+          "start": 262,
+          "end": 268
+        },
+        {
+          "name": "SOURCES",
+          "kind": "const",
+          "start": 270,
+          "end": 272
+        },
+        {
+          "name": "usedFor",
+          "kind": "function",
+          "start": 274,
+          "end": 306
+        },
+        {
+          "name": "buildResourceIndex",
+          "kind": "function",
+          "start": 308,
+          "end": 322
+        }
+      ]
+    },
+    {
       "id": "client.ui.station-shared",
       "path": "client/src/ui/station/shared.ts",
       "group": "client/ui/station",
