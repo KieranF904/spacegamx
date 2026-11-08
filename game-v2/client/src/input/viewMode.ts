@@ -14,7 +14,7 @@
 import { settings } from '../settings/Settings';
 
 export type CameraMode = 'auto' | 'north' | 'heading';
-export const CAMERA_MODES: readonly CameraMode[] = ['auto', 'north', 'heading'];
+const CAMERA_MODES: readonly CameraMode[] = ['auto', 'north', 'heading'];
 
 /** Does the view follow the heading, for this setting and controls? */
 export function followsHeading(mode: CameraMode, helm: boolean): boolean {

@@ -248,5 +248,5 @@ export function portsLoadTestCached(d: ShipDerived, scenario: PortsScenario): Po
 }
 
 /** A part's role for the panel's words */
-export const portsRoleOf = (L: PortsLayout, p: number): 'gun' | 'engine' | 'strafer' | 'gyro' | 'tool' | 'store' | 'other' =>
+const portsRoleOf = (L: PortsLayout, p: number): 'gun' | 'engine' | 'strafer' | 'gyro' | 'tool' | 'store' | 'other' =>
   L.role[p] === P_WEAPON || (L.role[p] === P_TOOL && L.miner[p]) ? 'gun' : L.role[p] === P_THRUSTER ? (L.thrustKind[p] === TK_STRAFER ? 'strafer' : L.thrustKind[p] === TK_GYRO ? 'gyro' : 'engine') : L.role[p] === P_TOOL ? 'tool' : L.role[p] === P_RELAY ? 'store' : 'other';

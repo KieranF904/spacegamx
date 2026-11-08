@@ -11,7 +11,7 @@ export type ItemType = 'weapon' | 'equipment' | 'resource' | 'consumable';
 export type WeaponTypeString = 'cannon' | 'laser' | 'scatter' | 'missile' | 'pulse' | 'mine' | 'mining' | 'warp';
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'quest';
 
-export interface ItemData {
+interface ItemData {
   id: string;
   name: string;
   type: ItemType;
@@ -748,11 +748,11 @@ export interface SystemsFile {
   systems: StarSystemData[];
 }
 
-export interface EnemiesFile {
+interface EnemiesFile {
   enemies: EnemyTypeData[];
 }
 
-export interface NPCsFile {
+interface NPCsFile {
   npcs: NPCData[];
 }
 

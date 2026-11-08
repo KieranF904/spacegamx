@@ -30,7 +30,7 @@ export function controlsOfInput(input: Readonly<SimInput>, body: { angle: number
 }
 
 /** A cursor distance (world units) as SimInput.aimDist has it */
-export const aimDistOf = (d: number): number => quantizeCursorDist(d);
+const aimDistOf = (d: number): number => quantizeCursorDist(d);
 
 /**
  * A source that answers from a function (a decided source: an AI order, a bot's controls). Remembers the last tick it

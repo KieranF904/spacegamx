@@ -36,7 +36,7 @@ function adjacency(catalog: Catalog, bp: Blueprint): number[][] {
  * Build what the pool covers, from the core outwards. `take(itemId)` returns
  * true (and uses one up) if a part of that kind is available.
  */
-export function allocateDesign(catalog: Catalog, bp: Blueprint, take: (itemId: string, uid: number) => boolean): DesignAllocation {
+function allocateDesign(catalog: Catalog, bp: Blueprint, take: (itemId: string, uid: number) => boolean): DesignAllocation {
   const installed = new Set<number>();
   const used: Bag = {};
   const core = bp.parts.findIndex((p) => p.fn === 'core');
@@ -91,7 +91,7 @@ export function installableGhosts(catalog: Catalog, bp: Blueprint, ghosts: numbe
 }
 
 /** The part items a slot's ghosts still need */
-export function ghostNeeds(bp: Blueprint, ghosts: number[]): Bag {
+function ghostNeeds(bp: Blueprint, ghosts: number[]): Bag {
   const g = new Set(ghosts);
   const out: Bag = {};
   for (const p of bp.parts) if (g.has(p.uid)) { const id = partItemId(p); out[id] = (out[id] ?? 0) + 1; }

@@ -35,7 +35,7 @@ export const filterStations = (list: CatalogStation[], q: Query): CatalogStation
 /** The distinct values of a field, in first-seen order (the filter menus) */
 export const distinct = <T>(list: T[], pick: (x: T) => string | null): string[] => [...new Set(list.map(pick).filter((x): x is string => !!x))];
 
-export const PART_CATEGORIES: PartCategory[] = ['weapons', 'engines', 'power', 'shields', 'utility', 'structure', 'core'];
+const PART_CATEGORIES: PartCategory[] = ['weapons', 'engines', 'power', 'shields', 'utility', 'structure', 'core'];
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
 /** Counts per tab, for the tab bar */

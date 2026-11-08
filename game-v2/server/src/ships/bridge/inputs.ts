@@ -98,4 +98,4 @@ export class ControllerInputSource implements InputSource {
 }
 
 /** The server's per-ship sources, with the possess hook (a pilot's slot holds PilotInputSource; an AI ship's ControllerInputSource) */
-export function newServerInputSlots(): InputSlots { return new InputSlots(); }
+function newServerInputSlots(): InputSlots { return new InputSlots(); }

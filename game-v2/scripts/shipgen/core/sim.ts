@@ -3,9 +3,11 @@
 // unlimited generation and relays), so a percentage is "of what this part could do", whatever its firing model.
 import type { Blueprint, EnergyLayout, EnergyLayoutInput, ShipDerived } from '../../../common/src/ships/index';
 import {
-  GUN_BEAM, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, beamStep, blueprintEnergyInput, buildEnergyLayout,
-  createEnergyState, createShipState, energyTick, givesLeft, gunReady, isEngine, spendShot, thrustFrac, thrustMul,
+  GUN_BEAM, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, blueprintEnergyInput, buildEnergyLayout,
+  createShipState, isEngine,
 } from '../../../common/src/ships/index';
+import { beamStep, energyTick, givesLeft, gunReady, spendShot, thrustFrac, thrustMul } from './energyTick';
+import { createEnergyState } from './energyState';
 import type { ShipgenContext } from './context';
 
 export interface ShipEnergy {

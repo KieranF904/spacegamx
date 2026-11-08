@@ -1,9 +1,13 @@
+// Local copy of the retired relay-style energy tick (was common/src/ships/power/tick.ts, removed from the shared core:
+// the game runs the ports core and the pool path). Only shipgen's check/partPower still read this model; retargeting
+// them at the ports core is a separate job.
+
 /**
  * A ship's energy, per part, in eu (docs/design/energy-routing-impl.md §2.3): what every relay, weapon and thruster
  * holds, and its flags. Allocated once per layout (createEnergyState), never per tick.
  */
 
-import { type EnergyLayout, GUN_BEAM, GUN_CLIP } from './layout.js';
+import { type EnergyLayout, GUN_BEAM, GUN_CLIP } from '../../../common/src/ships/index';
 
 /** A clip reloading (it takes energy, and can't fire, until the whole clip is paid), or a beam resting */
 export const FLAG_LATCH = 1;

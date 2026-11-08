@@ -60,7 +60,7 @@ export function addBag(a: Bag, b: Bag, k = 1): Bag {
   return out;
 }
 
-export function bagTotal(b: Bag): number {
+function bagTotal(b: Bag): number {
   return Object.values(b).reduce((s, n) => s + n, 0);
 }
 

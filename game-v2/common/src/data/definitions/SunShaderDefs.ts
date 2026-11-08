@@ -25,7 +25,7 @@ export const sunShaderDefs = sunShaderDefsJson as SunShaderDefs;
 export const sunStyles = sunShaderDefs.sunStyles;
 export const coronaStyles = sunShaderDefs.coronaStyles;
 
-export type SunStyleId = (typeof sunShaderDefsJson.sunStyles)[number]['id'];
-export type CoronaStyleId = (typeof sunShaderDefsJson.coronaStyles)[number]['id'];
+type SunStyleId = (typeof sunShaderDefsJson.sunStyles)[number]['id'];
+type CoronaStyleId = (typeof sunShaderDefsJson.coronaStyles)[number]['id'];
 
 export default sunShaderDefs;

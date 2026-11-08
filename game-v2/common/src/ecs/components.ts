@@ -383,7 +383,7 @@ export enum AIState {
   Return = 5,
 }
 
-export enum ParticleType {
+enum ParticleType {
   Engine = 0,
   Explosion = 1,
   Debris = 2,
@@ -391,7 +391,7 @@ export enum ParticleType {
   Ice = 4,
 }
 
-export enum ResourceType {
+enum ResourceType {
   Iron = 0,
   Crystal = 1,
   Plasma = 2,

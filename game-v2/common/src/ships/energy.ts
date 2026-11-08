@@ -125,7 +125,7 @@ export function unpackCharge(data: number[] | undefined): Charge {
   return { g: fin(data[CHARGE_GROUPS_AT], fin(data[PILOT_ROW.pool], 100)), b: data.slice(CHARGE_GROUPS_AT + 1, CHARGE_GROUPS_AT + n).map((v) => fin(v, 100)) };
 }
 /** Mining lasers' old payment segment (ticks): kept for the tick alignment of their pulse */
-export const MINE_SEGMENT = 15;
+const MINE_SEGMENT = 15;
 /** A mining laser's pulse (ticks): once started it runs to its end, whether or not the button's still held; it just isn't followed by another */
 export const MINE_CYCLE = 54;
 

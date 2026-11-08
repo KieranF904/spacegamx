@@ -88,7 +88,7 @@ export function migratePartItem(catalog: Catalog, id: string): string {
 }
 
 /** Item counts with each legacy part item as its model's (counts kept, like ids merged) */
-export function migrateBag(catalog: Catalog, bag: Bag): Bag {
+function migrateBag(catalog: Catalog, bag: Bag): Bag {
   const out: Bag = {};
   for (const [id, n] of Object.entries(bag)) { const to = migratePartItem(catalog, id); out[to] = (out[to] ?? 0) + n; }
   return out;

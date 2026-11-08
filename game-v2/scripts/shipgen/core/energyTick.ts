@@ -1,3 +1,7 @@
+// Local copy of the retired relay-style energy tick (was common/src/ships/power/tick.ts, removed from the shared core:
+// the game runs the ports core and the pool path). Only shipgen's check/partPower still read this model; retargeting
+// them at the ports core is a separate job.
+
 /**
  * The energy tick (docs/design/energy-routing-impl.md §1.3), 60 a second, the same on the server, in the pilot's
  * prediction and in the hangar. Integer eu throughout; allocation-free (module scratch, grown to the largest layout
@@ -12,8 +16,8 @@
 
 import {
   type EnergyLayout, GUN_BEAM, GUN_CLIP, PHASE_THRUST, PHASE_TOOL, PHASE_WEAPON, ROLE_GEN,
-} from './layout.js';
-import { type EnergyState, FLAG_LATCH, FLAG_LIT, energyGauge } from './state.js';
+} from '../../../common/src/ships/index';
+import { type EnergyState, FLAG_LATCH, FLAG_LIT, energyGauge } from './energyState';
 
 /** What the ship does this tick, as far as energy cares */
 export interface EnergyControls {

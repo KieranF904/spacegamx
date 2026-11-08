@@ -121,6 +121,6 @@ export function effectiveRange(def: WeaponTuning | undefined): number {
 }
 
 /** Is this weapon a pulse laser (a beam that fires in pulses) */
-export function isPulse(def: WeaponTuning | undefined): boolean {
+function isPulse(def: WeaponTuning | undefined): boolean {
   return def?.type === 'beam' && !!def.pulse;
 }

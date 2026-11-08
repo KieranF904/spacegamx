@@ -60,4 +60,4 @@ export class BodyDriverSource extends DriverInputs {
 }
 
 /** The client's per-ship sources, with the possess hook (an admin's live known source swaps in for the ship's own) */
-export function newClientInputSlots(): InputSlots { return new InputSlots(); }
+function newClientInputSlots(): InputSlots { return new InputSlots(); }

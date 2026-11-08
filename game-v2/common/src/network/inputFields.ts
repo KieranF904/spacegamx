@@ -32,7 +32,7 @@ export const INPUT_HELD: readonly InputBool[] = INPUT_BOOLS.filter((k) => k !== 
 /** (`weaponGroups` is state, not a held key: an input sets it only when it carries one, ClientInputMessage.weaponGroups) */
 export const INPUT_NUMBERS = ['cursorDist', 'targetAngle', 'sequence', 'weaponGroups'] as const;
 
-export type InputNumber = typeof INPUT_NUMBERS[number];
+type InputNumber = typeof INPUT_NUMBERS[number];
 
 // Compile-time: every key is a boolean field of the input message
 type _BoolsOnMessage = { [K in InputBool]: ClientInputMessage[K] extends boolean | undefined ? true : never };

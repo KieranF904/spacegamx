@@ -65,7 +65,7 @@ export type SimEvent =
    */
   | { k: 'damage'; tick: number; target: number; part: number; amount: number; source: number };
 
-export type SimEventKind = SimEvent['k'];
+type SimEventKind = SimEvent['k'];
 
 /** A key that is equal for the same event produced again by a re-step (consumers dedupe on it) */
 export function eventKey(e: SimEvent): string {
@@ -82,4 +82,4 @@ export function eventKey(e: SimEvent): string {
 }
 
 /** Where a step's events go: a plain array is enough; the push is the only call a step makes */
-export interface EventSink { push(e: SimEvent): void }
+interface EventSink { push(e: SimEvent): void }

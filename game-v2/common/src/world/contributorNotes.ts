@@ -36,7 +36,7 @@ export type NoteShape =
   | { kind: 'polygon'; points: [number, number][] };
 
 export type NoteShapeKind = NoteShape['kind'];
-export const NOTE_SHAPES: readonly NoteShapeKind[] = ['point', 'circle', 'ring', 'rect', 'line', 'arrow', 'polygon'];
+const NOTE_SHAPES: readonly NoteShapeKind[] = ['point', 'circle', 'ring', 'rect', 'line', 'arrow', 'polygon'];
 
 /** A body of the system a note can ride with */
 export type NoteBodyRef =

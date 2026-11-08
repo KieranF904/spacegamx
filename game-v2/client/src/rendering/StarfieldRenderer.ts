@@ -5,7 +5,7 @@
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
 import { starfieldVert, starfieldFrag } from './shaders/starfield';
 
-export interface StarfieldLayerConfig {
+interface StarfieldLayerConfig {
     starCount: number;
     depth: number;
     seed: number;

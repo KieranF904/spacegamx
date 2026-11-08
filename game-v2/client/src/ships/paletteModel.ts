@@ -76,7 +76,7 @@ export function rowPart(row: PaletteRow, sel: HandSel, remembered?: string): { f
   return { fn: row.fn, piece, material: row.kind === 'structure' || row.kind === 'core' ? sel.material : row.material };
 }
 
-export function rowPartId(row: PaletteRow, sel: HandSel, remembered?: string): string {
+function rowPartId(row: PaletteRow, sel: HandSel, remembered?: string): string {
   return partItemId(rowPart(row, sel, remembered));
 }
 
