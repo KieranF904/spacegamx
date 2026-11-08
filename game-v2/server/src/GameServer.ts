@@ -2969,7 +2969,6 @@ this.devTeleport = opts.devTeleport ?? false;
       playerStateKey: '',
       selfLate: false,
       selfVersion: 0,
-      selfKey: '',
       selfHashes: new Map(),
     };
     
