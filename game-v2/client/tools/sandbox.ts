@@ -12,11 +12,11 @@
 
 import { Application, Container, Graphics } from 'pixi.js';
 import { BitBuffer, sunShaderDefs, generateStars } from '@space-game/common';
-import { SunRenderer } from './rendering/legacy/SunRenderer';
-import { GlowRenderer } from './rendering/legacy/GlowRenderer';
-import { StarfieldRenderer } from './rendering/StarfieldRenderer';
-import { NebulaRenderer } from './rendering/NebulaRenderer';
-import { CoronaRaysRenderer } from './rendering/legacy/CoronaRaysRenderer';
+import { SunRenderer } from './legacy/SunRenderer';
+import { GlowRenderer } from './legacy/GlowRenderer';
+import { StarfieldRenderer } from '../src/rendering/StarfieldRenderer';
+import { NebulaRenderer } from '../src/rendering/NebulaRenderer';
+import { CoronaRaysRenderer } from './legacy/CoronaRaysRenderer';
 
 // Simplex noise constants
 const SIMPLEX_F2 = 0.5 * (Math.sqrt(3) - 1);

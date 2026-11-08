@@ -11,7 +11,7 @@
  */
 
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
-import { debugConfig } from '../../ui/DebugUI';
+import { debugConfig } from '../../src/ui/DebugUI';
 
 const VERTEX_SHADER = `#version 300 es
   in vec2 aPosition;

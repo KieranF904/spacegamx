@@ -12,23 +12,23 @@
  * times every program's cold compile instead.
  */
 
-import sunText from '../src/rendering/legacy/SunRenderer.ts?raw';
-import glowText from '../src/rendering/legacy/GlowRenderer.ts?raw';
-import raysText from '../src/rendering/legacy/CoronaRaysRenderer.ts?raw';
-import centralText from '../src/rendering/CentralBodyShaders.ts?raw';
-import quadText from '../src/rendering/shaderQuad.ts?raw';
-import planetText from '../src/rendering/planet-proto/planetClassic.ts?raw';
-import { planetCrackCells, planetNoiseData, PLANET_NOISE_SIZE } from '../src/rendering/planet-proto/planetNoise';
+import sunText from '../legacy/SunRenderer.ts?raw';
+import glowText from '../legacy/GlowRenderer.ts?raw';
+import raysText from '../legacy/CoronaRaysRenderer.ts?raw';
+import centralText from '../../src/rendering/CentralBodyShaders.ts?raw';
+import quadText from '../../src/rendering/shaderQuad.ts?raw';
+import planetText from '../../src/rendering/planet-proto/planetClassic.ts?raw';
+import { planetCrackCells, planetNoiseData, PLANET_NOISE_SIZE } from '../../src/rendering/planet-proto/planetNoise';
 import { moonOffset, planetPosition, type PlanetData } from '@space-game/common';
-import { GLSL_COMMON } from '../src/rendering/shaderQuad';
-import { skyNoiseTexture } from '../src/rendering/sky/noiseTexture';
-import { bakeSimplex, noise3Data, NOISE3_SIZE, sunNoiseData, SUN_NOISE_SIZE } from '../src/rendering/proto/protoNoise';
-import { EXACT_SIZE, EXACT_UNITS } from '../src/rendering/proto/sunProto';
-import systemsJson from '../../data/systems.json';
+import { GLSL_COMMON } from '../../src/rendering/shaderQuad';
+import { skyNoiseTexture } from '../../src/rendering/sky/noiseTexture';
+import { bakeSimplex, noise3Data, NOISE3_SIZE, sunNoiseData, SUN_NOISE_SIZE } from '../../src/rendering/proto/protoNoise';
+import { EXACT_SIZE, EXACT_UNITS } from '../../src/rendering/proto/sunProto';
+import systemsJson from '../../../data/systems.json';
 import { PerfGraph, type Series } from './perf';
-import { centralLayers, onScreen, sourcesFrom, sunPrograms, sunVariantLayers, type CentralBody, type Layer, type View } from '../../scripts/sun-sky-proto/layers';
-import { bodiesOf, bodyLayer, lightAmtOf, planetPrograms, sourcesFrom as planetSourcesFrom, type Body, type Variant } from '../../scripts/planet-proto/layers';
-import { skyOption, skyPrograms, systemBiome } from '../../scripts/sun-sky-proto/skyLayers';
+import { centralLayers, onScreen, sourcesFrom, sunPrograms, sunVariantLayers, type CentralBody, type Layer, type View } from '../../../scripts/sun-sky-proto/layers';
+import { bodiesOf, bodyLayer, lightAmtOf, planetPrograms, sourcesFrom as planetSourcesFrom, type Body, type Variant } from '../../../scripts/planet-proto/layers';
+import { skyOption, skyPrograms, systemBiome } from '../../../scripts/sun-sky-proto/skyLayers';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: true })!;
