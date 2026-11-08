@@ -2761,6 +2761,272 @@
       ]
     },
     {
+      "id": "client.ships.gun-preview.block-art",
+      "path": "client/src/ships/gunPreview/blockArt.ts",
+      "group": "client/ships/gunPreview",
+      "lines": 96,
+      "owns": "drawing the preview's block wall: each block as a hull or armour square in the game's own part art, darkening and cracking as its HP falls, fading in when the wall is rebuilt",
+      "needs": "BlockTarget, build/partArt drawPartArt (it takes the colours from hullPreview2d), render/gunLooks crackTexture and crackShow; common placeGeometry; npm: pixi.js",
+      "events": "",
+      "invariants": [
+        {
+          "text": "only a block whose HP changed is redrawn",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new damage look is one change in drawBlock",
+      "exports": [
+        "BlockArt"
+      ],
+      "sections": [
+        {
+          "name": "Cell",
+          "kind": "interface",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "BlockArt",
+          "kind": "class",
+          "start": 20,
+          "end": 96
+        }
+      ]
+    },
+    {
+      "id": "client.ships.gun-preview.block-target",
+      "path": "client/src/ships/gunPreview/blockTarget.ts",
+      "group": "client/ships/gunPreview",
+      "lines": 238,
+      "owns": "the hangar gun preview's target as a wall of square ship blocks (no Pixi, no DOM): each block's HP, the surface rounds meet and throw their impact off, the damage a round, burst, chain or beam does to the blocks it touches, blocks breaking, and the wall rebuilding when it is mostly gone",
+      "needs": "impactAim SurfaceProbe (the same normal finder the live client's hits use); common partMaxHp (the blocks' HP)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a round hurts only the block it strikes, a burst the blocks within its radius by falloff",
+          "test": "client/src/ships/gunPreview/blockTarget.test.ts"
+        },
+        {
+          "text": "a block at 0 HP is broken once and no longer met by rounds",
+          "test": "client/src/ships/gunPreview/blockTarget.test.ts"
+        },
+        {
+          "text": "a rebuilt wall has every block at full HP",
+          "test": "client/src/ships/gunPreview/blockTarget.test.ts"
+        }
+      ],
+      "extend": "a new kind of damage is one method here and one call in GunPreview's onStruck or frame",
+      "exports": [
+        "BLOCK_ID",
+        "Block",
+        "BlockSpec",
+        "BlockTarget",
+        "DEFAULT_SPEC",
+        "HitDamage",
+        "blockSpec"
+      ],
+      "sections": [
+        {
+          "name": "BLOCK_ID",
+          "kind": "const",
+          "start": 17,
+          "end": 18
+        },
+        {
+          "name": "BlockSpec",
+          "kind": "interface",
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "DEFAULT_SPEC",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "Block",
+          "kind": "interface",
+          "start": 24,
+          "end": 42
+        },
+        {
+          "name": "HitDamage",
+          "kind": "interface",
+          "start": 44,
+          "end": 51
+        },
+        {
+          "name": "BACK",
+          "kind": "const",
+          "start": 53,
+          "end": 54
+        },
+        {
+          "name": "GONE_SHARE",
+          "kind": "const",
+          "start": 55,
+          "end": 56
+        },
+        {
+          "name": "LULL_S",
+          "kind": "const",
+          "start": 57,
+          "end": 57
+        },
+        {
+          "name": "MAX_AGE_S",
+          "kind": "const",
+          "start": 58,
+          "end": 58
+        },
+        {
+          "name": "GROW_S",
+          "kind": "const",
+          "start": 59,
+          "end": 59
+        },
+        {
+          "name": "probe",
+          "kind": "const",
+          "start": 61,
+          "end": 61
+        },
+        {
+          "name": "BlockTarget",
+          "kind": "class",
+          "start": 63,
+          "end": 232
+        },
+        {
+          "name": "blockSpec",
+          "kind": "function",
+          "start": 234,
+          "end": 238
+        }
+      ]
+    },
+    {
+      "id": "client.ships.gun-preview.framing",
+      "path": "client/src/ships/gunPreview/framing.ts",
+      "group": "client/ships/gunPreview",
+      "lines": 86,
+      "owns": "where the hangar gun preview's block wall stands and how the view is scaled to fit gun, flight and wall (no Pixi, no DOM)",
+      "needs": "GunPlan (gunPlan.ts)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the wall stands at 70-85% of the gun's reach, held between a near and a far limit",
+          "test": "client/src/ships/gunPreview/framing.test.ts"
+        },
+        {
+          "text": "gun, flight and wall always fit the canvas, at no less than the minimum zoom",
+          "test": "client/src/ships/gunPreview/framing.test.ts"
+        }
+      ],
+      "extend": "a new kind of weapon reach is one case in reachOf",
+      "exports": [
+        "DIST_MAX",
+        "DIST_MIN",
+        "Framing",
+        "MAX_ZOOM",
+        "MIN_ZOOM",
+        "PREVIEW_H",
+        "PREVIEW_W",
+        "REACH_SHARE",
+        "WALL_COLS",
+        "WALL_ROWS",
+        "frame",
+        "reachOf"
+      ],
+      "sections": [
+        {
+          "name": "PREVIEW_W",
+          "kind": "const",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "PREVIEW_H",
+          "kind": "const",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "WALL_COLS",
+          "kind": "const",
+          "start": 14,
+          "end": 15
+        },
+        {
+          "name": "WALL_ROWS",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "REACH_SHARE",
+          "kind": "const",
+          "start": 17,
+          "end": 18
+        },
+        {
+          "name": "DIST_MIN",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "DIST_MAX",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "MIN_ZOOM",
+          "kind": "const",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "MAX_ZOOM",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "BLOCK_PER_DIST",
+          "kind": "const",
+          "start": 25,
+          "end": 26
+        },
+        {
+          "name": "BLOCK_MAX_SCALE",
+          "kind": "const",
+          "start": 27,
+          "end": 27
+        },
+        {
+          "name": "Framing",
+          "kind": "interface",
+          "start": 29,
+          "end": 47
+        },
+        {
+          "name": "reachOf",
+          "kind": "function",
+          "start": 49,
+          "end": 64
+        },
+        {
+          "name": "frame",
+          "kind": "function",
+          "start": 66,
+          "end": 86
+        }
+      ]
+    },
+    {
       "id": "client.ship.fire-shells",
       "path": "client/src/ships/guns/FireShells.ts",
       "group": "client/ships/guns",

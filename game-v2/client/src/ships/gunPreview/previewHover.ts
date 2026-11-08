@@ -1,6 +1,6 @@
 /**
  * Hover a gun in a parts list (the hangar's palette, the field build overlay's) and a small panel beside the list shows
- * it firing at a target dummy (GunPreview) with its real beat and round. One panel and one preview per list, made on
+ * it firing at a wall of ship blocks (GunPreview) with its real beat and round. One panel and one preview per list, made on
  * the first hover; the preview stops when the pointer leaves (after a short grace so moving between rows doesn't
  * flicker) and when the list is hidden or disposed. It opens no connection: everything is read from the catalogue.
  */
@@ -152,7 +152,7 @@ export class GunPreviewHover {
     this.watch = window.setInterval(() => { if (!this.list.isConnected || this.list.offsetParent === null) this.hideNow(); }, 400);
     const pv = await this.get();
     if (!pv || this.disposed || this.panel!.hidden || this.current === '') return;
-    pv.show(plan, gunArt(this.d.catalog, fn, this.d.tuning.cellSize));
+    pv.show(plan, gunArt(this.d.catalog, fn, this.d.tuning.cellSize), this.d.catalog);
   }
 
   private get(): Promise<GunPreview | null> {
