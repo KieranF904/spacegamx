@@ -16,6 +16,11 @@ import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charg
 /** The own ship on its tick layer at a tick (GameState.ownStep): its body, its stores and priming (no stores: docked, unchanged) */
 export interface OwnStepped { body: Readonly<FlightBody>; charge?: Charge; jumpPrime: number }
 import { FarShips } from './FarShips';
+import { EntityMap, type InterpolatedEntity } from './entities';
+import { triggerScreenShake, updateScreenShake, type ScreenShake } from './screenShake';
+import { spawnAsteroids, seedAsteroids, clearDeterministicAsteroids } from './asteroidEntities';
+import { interpolateFrame } from './interpolation';
+export { EntityMap, type InterpolatedEntity };
 import { Populations } from './Populations';
 import type { DrawModeHook } from './drawMode';
 import factionsFile from '../../../data/factions.json';
@@ -52,112 +57,8 @@ import {
 // INTERFACES
 // ============================================
 
-export interface InterpolatedEntity {
-  /** The tick a deterministic asteroid was last placed for */
-  orbitTick?: number;
-  id: number;
-  type: EntityType;
-  /** Asteroids: what they're made of (colours, seams, scanner) */
-  composition?: Composition;
-  // Physics (authoritative / predicted position)
-  x: number;
-  y: number;
-  angle: number;
-  vx: number;
-  vy: number;
-  // Smooth render position (visual, catches up to x/y)
-  renderX: number;
-  renderY: number;
-  renderAngle: number;
-  // Server state
-  hp: number;
-  maxHp: number;
-  data?: number[];
-  // Player display name
-  name?: string;
-  /** Modular ships: angular velocity (rad/tick), predicted for the local player */
-  angVel?: number;
-  /** Modular ships: jump drive counter, predicted for the local player (others: data[3]) */
-  jump?: number;
-  /** This jump's speed scale (local player; server data[PILOT_ROW.jumpScale] / 1000) */
-  jumpScale?: number;
-  /** A charging jump's locked heading and distance (local player, its tick layer's: common flight.ts FlightBody.jumpAim/jumpTo) */
-  jumpAim?: number;
-  jumpTo?: number;
-  /** A lodestone's priming left, ticks (local player; server data[PILOT_ROW.prime], then predicted) */
-  jumpPrime?: number;
-  /** Knocked out by an EMP until this tick (local player; the snapshot's tick + server data[5]): prediction drifts till then */
-  empUntil?: number;
-  /** Warmth, % (local player; server data[PILOT_ROW.warmth]: common/src/ships/warmth.ts): the frost vignette, and how cold prediction flies and fires */
-  warmth?: number;
-  /** Slowed by a Frostbite's beam until this tick (local player; the snapshot's tick + the pilot row's slowed ticks: features/weaponry): prediction flies it slowed till then */
-  slowUntil?: number;
-  /** Marked by a Searchlight until this tick (local player; the snapshot's tick + the pilot row's marked ticks) */
-  markUntil?: number;
-  /** Burst Strafer: the dodge counter and the last dodge's way (local player: the server's, then predicted; others: their replica's): ships/strafer.ts */
-  dodge?: number;
-  dodgeDir?: number;
-  /** Part features' values read from the pilot's row (local player; ships/features: ClientFeature.parsePilot) */
-  fx?: { [name: string]: number };
-  /** The hold's cargo mass (local player; server data[PILOT_ROW.cargo]: common/src/ships/load.ts): prediction flies it */
-  cargoMass?: number;
-  /** Other pilots: their status row (shield, EMP, beams, cursor distance, tow); data is rebuilt from it and their replica */
-  status?: number[];
-  /**
-   * The last few states the server sent (tick-stamped). Snapshots only carry what
-   * changed, and distant ships come less often, so between them we dead-reckon
-   * from the latest of these. Projectiles are sent once and flown from here.
-   */
-  hist?: { tick: number; x: number; y: number; vx: number; vy: number; angle: number }[];
-  // Projectile prediction fields
-  spawnTick?: number;
-  spawnX?: number;
-  spawnY?: number;
-  predictedX?: number;
-  predictedY?: number;
-  lastServerUpdate?: number;
-  // Orbit params (client-side position calculation)
-  orbitType?: number;
-  semiMajorAxis?: number;
-  eccentricity?: number;
-  argPeriapsis?: number;
-  meanAnomaly0?: number;
-  epochTick?: number;
-  /** Orbit clock rate (stations orbit slower than Kepler so ships can match them) */
-  orbitTimeScale?: number;
-  /** Station size (world units), for drawing */
-  stationRadius?: number;
-  wobblePhase?: number;
-  isDeterministic?: boolean; // true → skip snapshot interpolation, calculate position
-}
-
-interface ScreenShake {
-  /** 0..1: hits add to it, it drains away; the shake is trauma² (small knocks stay small) */
-  trauma: number;
-  /** Seconds, for the noise */
-  time: number;
-  /** This frame's offset (screen pixels) and roll (radians) */
-  offsetX: number;
-  offsetY: number;
-  rotation: number;
-}
-
-/** Smooth 1D value noise, -1..1 (one lattice value per unit of t) */
-function shakeNoise(t: number, seed: number): number {
-  const h = (n: number) => { const x = Math.sin(n * 127.1 + seed * 311.7) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
-  const i = Math.floor(t), f = t - i;
-  const a = h(i);
-  return a + (h(i + 1) - a) * f * f * (3 - 2 * f);
-}
-
-/** Screen shake at full trauma: offset (px), roll (rad), noise rate (Hz), and how fast trauma drains (per second) */
-const SHAKE_PX = 24;
-const SHAKE_ROLL = 0.01;
-const SHAKE_HZ = 25;
-const SHAKE_DECAY = 1.2;
-
 /** Buffered snapshot for interpolation */
-interface BufferedSnapshot {
+export interface BufferedSnapshot {
   tick: number;
   entities: Map<number, EntityState>;
 }
@@ -169,12 +70,8 @@ interface BufferedSnapshot {
 const PING_ALPHA = 0.12;           // EMA smoothing for ping
 const JITTER_ALPHA = 0.08;         // EMA smoothing for jitter
 const SNAPSHOT_BUFFER_SIZE = 6;    // Keep last N snapshots for interpolation
-const RENDER_SMOOTH_SELF = 1.0;    // Render lerp rate for local player (1.0 = no smoothing, instant)
-const RENDER_SMOOTH_OTHER = 0.25;  // Render lerp rate for other entities
 /** A correction of the own ship this far (world units) or more counts as a snap (the overlay's counters) */
 const SNAP_THRESHOLD = 260;
-/** Rocks out of sight are placed every this many ticks (see orbitFocus) */
-const ORBIT_FAR_TICKS = 8;
 
 // Input delay buffer: inputs are stamped this many ticks ahead (33ms, imperceptible)
 const INPUT_DELAY_INITIAL_TICKS = 2;
@@ -189,42 +86,6 @@ const PREDICT_RESYNC_TICKS = 30;
 const LATE_TICKS = 30;
 /** The local ship's predicted poses kept (ticks) */
 const SELF_POSE_TICKS = 180;
-
-const NONE: ReadonlySet<InterpolatedEntity> = new Set();
-
-/**
- * The entities by id, each type also kept in a set of its own as they come and go, for the passes a frame makes over
- * one kind (the shots, the stations) without walking the hundreds of rocks and ships besides. An entity's type never changes.
- */
-export class EntityMap extends Map<number, InterpolatedEntity> {
-  private byType = new Map<EntityType, Set<InterpolatedEntity>>();
-
-  override set(id: number, e: InterpolatedEntity): this {
-    const old = super.get(id);
-    if (old && old !== e) this.byType.get(old.type)?.delete(old);
-    super.set(id, e);
-    let s = this.byType.get(e.type);
-    if (!s) this.byType.set(e.type, (s = new Set()));
-    s.add(e);
-    return this;
-  }
-
-  override delete(id: number): boolean {
-    const old = super.get(id);
-    if (old) this.byType.get(old.type)?.delete(old);
-    return super.delete(id);
-  }
-
-  override clear(): void {
-    this.byType.clear();
-    super.clear();
-  }
-
-  /** The entities of one type (live: don't add or remove while going through it) */
-  ofType(type: EntityType): ReadonlySet<InterpolatedEntity> {
-    return this.byType.get(type) ?? NONE;
-  }
-}
 
 export class GameState {
   /** Asteroid composition (set by the game from the mining data), deterministic like the server's */
@@ -353,7 +214,8 @@ export class GameState {
     this.serverTickTarget = raw;
     this.serverTickTargetTime = now;
   }
-  private targetInterpDelayMs: number = 120;
+  /** @internal read by state/interpolation.ts */
+  targetInterpDelayMs: number = 120;
   private pingHistory: number[] = [];
   private smoothedPing: number = 0;
   private smoothedJitter: number = 0;
@@ -409,7 +271,8 @@ export class GameState {
   // ENTITY STATE
   // ============================================
   public entities = new EntityMap();
-  private snapshotBuffer: BufferedSnapshot[] = [];
+  /** @internal read by state/interpolation.ts */
+  snapshotBuffer: BufferedSnapshot[] = [];
   
   // Screen shake
   public screenShake: ScreenShake = {
@@ -551,9 +414,11 @@ export class GameState {
    */
   public predictedTick = 0;
   /** The local ship one step back (it's drawn between that and now: see interpolate) */
-  private selfPrev: { x: number; y: number; angle: number } | null = null;
+  /** @internal read by state/interpolation.ts */
+  selfPrev: { x: number; y: number; angle: number } | null = null;
   /** This frame's estimate of the server tick (fractional) */
-  private frameTick = 0;
+  /** @internal read by state/interpolation.ts */
+  frameTick = 0;
 
   /**
    * How far ahead of the server's tick the prediction runs: the trip to the
@@ -739,7 +604,8 @@ export class GameState {
   }
 
   /** A frame is being drawn (interpolate): what's made so far has been seen, and shells waiting on that can go */
-  private frameDrawn(): void {
+  /** @internal called by state/interpolation.ts */
+  frameDrawn(): void {
     this.madeNow.clear();
     if (this.lateRemovals.length) {
       for (const id of this.lateRemovals) this.lateDrawn.push(id);
@@ -881,131 +747,6 @@ export class GameState {
   }
 
   /**
-   * Handle one-time asteroid spawn data.
-   * Creates InterpolatedEntity objects with orbit params — positions will be
-   * calculated deterministically in interpolate() instead of from snapshots.
-   */
-  handleAsteroidSpawn(tick: number, asteroids: AsteroidSpawnData[]): void {
-    for (const a of asteroids) {
-      // Skip if we already have this entity (shouldn't happen, but be safe)
-      if (this.entities.has(a.id)) continue;
-
-      const entity: InterpolatedEntity = {
-        id: a.id,
-        type: EntityType.Asteroid,
-        x: 0,
-        y: 0,
-        angle: 0,
-        vx: 0,
-        vy: 0,
-        renderX: 0,
-        renderY: 0,
-        renderAngle: 0,
-        hp: a.hp,
-        maxHp: a.maxHp,
-        data: [a.size, a.resourceType],
-        // Deterministic orbit params
-        orbitType: a.orbitType,
-        semiMajorAxis: a.semiMajorAxis,
-        eccentricity: a.eccentricity,
-        argPeriapsis: a.argPeriapsis,
-        meanAnomaly0: a.meanAnomaly0,
-        epochTick: a.epochTick,
-        wobblePhase: a.wobblePhase,
-        isDeterministic: true,
-        composition: a.definitionId && a.index !== undefined && a.systemId
-          ? this.composeAsteroid?.(a.definitionId, `${a.systemId}:${a.index}:${a.epochTick}`, a.size, a.systemId, a.stage ?? undefined) : undefined,
-      };
-
-      // Calculate initial position so the first frame isn't at (0,0)
-      const currentTick = Math.round(this.getRawServerTick());
-      const { x, y } = calcAsteroidPosition({
-        orbitType: a.orbitType,
-        semiMajorAxis: a.semiMajorAxis,
-        eccentricity: a.eccentricity,
-        argPeriapsis: a.argPeriapsis,
-        meanAnomaly0: a.meanAnomaly0,
-        epochTick: a.epochTick,
-      }, currentTick);
-      entity.x = x;
-      entity.y = y;
-      entity.renderX = x;
-      entity.renderY = y;
-
-      this.entities.set(a.id, entity);
-    }
-  }
-
-  /**
-   * Deterministic asteroid seed message — client derives params locally.
-   */
-  handleAsteroidSeed(
-    tick: number,
-    systemId: string,
-    seed: string,
-    belt: AsteroidBeltData,
-    ids: number[],
-    indices: number[],
-    asteroidField?: string,
-  ): void {
-    // Replace any existing deterministic asteroids to avoid stale state
-    this.clearDeterministicAsteroids();
-    
-    for (let i = 0; i < ids.length; i++) {
-      const id = ids[i];
-      const index = indices[i] ?? i;
-      if (this.entities.has(id)) continue;
-
-      // Use definition-based generation if field config exists
-      const params = asteroidParamsAt(systemId, index, seed, tick, belt, asteroidField);
-      
-      // Calculate health using definition's healthPerUnit
-      const hp = Math.floor(params.size * params.healthPerUnit);
-
-      const entity: InterpolatedEntity = {
-        id,
-        type: EntityType.Asteroid,
-        x: 0,
-        y: 0,
-        angle: 0,
-        vx: 0,
-        vy: 0,
-        renderX: 0,
-        renderY: 0,
-        renderAngle: 0,
-        hp,
-        maxHp: hp,
-        data: [params.size, params.resourceType],
-        orbitType: params.orbitType,
-        semiMajorAxis: params.semiMajorAxis,
-        eccentricity: params.eccentricity,
-        argPeriapsis: params.argPeriapsis,
-        meanAnomaly0: params.meanAnomaly0,
-        epochTick: params.epochTick,
-        wobblePhase: params.wobblePhase,
-        isDeterministic: true,
-        composition: this.composeAsteroid?.(params.definitionId || 'asteroid_metal', `${systemId}:${index}:${params.epochTick}`, params.size, systemId, params.outlier ? 0 : undefined),
-      };
-
-      const currentTick = Math.round(this.getRawServerTick());
-      const { x, y } = calcAsteroidPosition({
-        orbitType: params.orbitType,
-        semiMajorAxis: params.semiMajorAxis,
-        eccentricity: params.eccentricity,
-        argPeriapsis: params.argPeriapsis,
-        meanAnomaly0: params.meanAnomaly0,
-        epochTick: params.epochTick,
-      }, currentTick);
-      entity.x = x;
-      entity.y = y;
-      entity.renderX = x;
-      entity.renderY = y;
-
-      this.entities.set(id, entity);
-    }
-  }
-
-  /**
    * Clear all deterministic asteroid entities — called on system change.
    */
   /** Travelled to another system: forget everything from the old one except our own ship. */
@@ -1016,14 +757,6 @@ export class GameState {
       if (id !== this.playerId) this.entities.delete(id);
     }
     this.snapshotBuffer.length = 0;
-  }
-
-  clearDeterministicAsteroids(): void {
-    for (const [id, entity] of this.entities) {
-      if (entity.isDeterministic) {
-        this.entities.delete(id);
-      }
-    }
   }
 
   /**
@@ -1081,227 +814,9 @@ export class GameState {
   // INTERPOLATION
   // ============================================
 
-  interpolate(delta: number): void {
-    const now = performance.now();
-    this.frameDrawn();
-    
-    // Cache the estimated server tick ONCE per frame.
-    // getEstimatedServerTick() has stateful EMA smoothing — calling it
-    // multiple times per frame (e.g. per-asteroid) causes drift.
-    const estimatedTick = this.getEstimatedServerTick(now);
-    const rawTick = this.getRawServerTick(now);
-    const rawTickRounded = Math.round(rawTick);
-    
-    // Slew interpolation delay toward target
-    const maxStep = INTERP_SLEW_MS_PER_SEC * delta;
-    const deltaDelay = Math.max(-maxStep, Math.min(maxStep, this.targetInterpDelayMs - this.interpDelayMs));
-    this.interpDelayMs = Math.max(INTERP_MIN_DELAY_MS, Math.min(INTERP_MAX_DELAY_MS, this.interpDelayMs + deltaDelay));
-    
-    const interpDelayTicks = this.interpDelayMs / this.tickMs;
-    const renderTick = Math.max(0, estimatedTick - interpDelayTicks);
-    this.renderTickNow = renderTick;
-    this.drawMode?.frame?.(now);
-    
-    // Find bracketing snapshots
-    const buffer = this.snapshotBuffer;
-    if (buffer.length < 2) {
-      this.fallbackInterpolate();
-      return;
-    }
-    
-    let from: BufferedSnapshot | null = null;
-    let to: BufferedSnapshot | null = null;
-    
-    for (let i = 0; i < buffer.length - 1; i++) {
-      if (buffer[i].tick <= renderTick && buffer[i + 1].tick >= renderTick) {
-        from = buffer[i];
-        to = buffer[i + 1];
-        break;
-      }
-    }
-    
-    if (!from && !to && renderTick < buffer[0].tick) {
-      from = buffer[0];
-      to = buffer[1];
-    }
-    
-    if (!from && !to) {
-      from = buffer[buffer.length - 2];
-      to = buffer[buffer.length - 1];
-    }
-    
-    if (!from || !to || from.tick === to.tick) {
-      this.fallbackInterpolate();
-      return;
-    }
-    
-    const t = Math.max(0, Math.min(1.2, (renderTick - from.tick) / (to.tick - from.tick)));
-    const focus = this.orbitFocus;
-    
-    for (const entity of this.entities.values()) {
-      if (entity.id === this.playerId) continue;
-      // Replicated ships: stepped from their keyframe and controls
-      // (A dev prediction mode may place it at another tick, and move it after: state/drawMode.ts)
-      const dm = this.drawMode;
-      if (this.replicaPose?.(entity, dm?.ship ? dm.ship(entity, renderTick) : renderTick)) { dm?.placed?.(entity); continue; }
-      // (Or another thing a dev prediction mode steps ahead itself: a homing shell, a mob)
-      if (dm?.entity?.(entity, renderTick)) continue;
-
-      // Loot pods drifting from their anchor (data[3] its tick: see podDrift)
-      if (entity.type === EntityType.DroppedItem && entity.data && entity.data.length >= 4 && entity.hist?.length) {
-        const b = entity.hist[entity.hist.length - 1];
-        const at = podDrift(b, renderTick - entity.data[3]);
-        entity.x = at.x; entity.y = at.y; entity.vx = at.vx; entity.vy = at.vy;
-        entity.renderX += (entity.x - entity.renderX) * RENDER_SMOOTH_OTHER;
-        entity.renderY += (entity.y - entity.renderY) * RENDER_SMOOTH_OTHER;
-        continue;
-      }
-      
-      // Deterministic asteroids — calculate position from orbit params
-      if (entity.isDeterministic && entity.orbitType !== undefined) {
-        // An asteroid is placed by the whole tick: nothing to do until the tick changes
-        if (entity.orbitTimeScale === undefined) {
-          if (entity.orbitTick === rawTickRounded) continue;
-          // Out of sight: every few ticks, each rock on its own turn (and at once if it has gone a while). Out of
-          // sight means all of it: its reach (as Renderer.radiusOf culls it) is added, or a big rock whose middle is
-          // just off the view while its body is on it stepped every ORBIT_FAR_TICKS
-          if (focus && (rawTickRounded + entity.id) % ORBIT_FAR_TICKS !== 0 && rawTickRounded - (entity.orbitTick ?? -1e9) < 2 * ORBIT_FAR_TICKS) {
-            const r = entity.type === EntityType.Asteroid ? (entity.data?.[0] || 30) * 1.3 : 0;
-            if ((Math.abs(entity.x - focus.cx) > focus.hw + r || Math.abs(entity.y - focus.cy) > focus.hh + r)
-              && (Math.abs(entity.x - focus.px) > focus.hw + r || Math.abs(entity.y - focus.py) > focus.hh + r)) continue;
-          }
-        }
-        entity.orbitTick = rawTickRounded;
-        const { x, y } = calcAsteroidPosition({
-          orbitType: entity.orbitType ?? 0,
-          semiMajorAxis: entity.semiMajorAxis ?? 0,
-          eccentricity: entity.eccentricity ?? 0,
-          argPeriapsis: entity.argPeriapsis ?? 0,
-          meanAnomaly0: entity.meanAnomaly0 ?? 0,
-          epochTick: entity.epochTick ?? 0,
-        }, entity.orbitTimeScale !== undefined
-          // Stations: slowed orbit clock, evaluated at the exact (fractional) tick for smooth motion
-          ? scaledOrbitTick(rawTick, entity.epochTick ?? 0, entity.orbitTimeScale)
-          : rawTickRounded);
-        entity.x = x;
-        entity.y = y;
-        // Snap render position — no lerp lag so hitscan visual matches server
-        entity.renderX = x;
-        entity.renderY = y;
-        // Asteroids turn with the tick, exactly as the server's outline does (polygon.ts)
-        if (entity.type === EntityType.Asteroid) entity.angle = entity.renderAngle = asteroidSpin(entity.id, rawTickRounded);
-        continue;
-      }
-      const fromState = from.entities.get(entity.id);
-      const toState = to.entities.get(entity.id);
-      
-      if (fromState && toState) {
-        entity.x = this.lerp(fromState.x, toState.x, t);
-        entity.y = this.lerp(fromState.y, toState.y, t);
-        entity.angle = this.lerpAngle(fromState.angle || 0, toState.angle || 0, t);
-        entity.vx = toState.vx || 0;
-        entity.vy = toState.vy || 0;
-      } else if (entity.hist?.length) {
-        // Not in both snapshots either side (unchanged, or far away and sent less often):
-        // carry on from the latest state at or before now along its velocity
-        let base = entity.hist[0];
-        for (const s of entity.hist) if (s.tick <= renderTick) base = s;
-        const lim = entity.type === EntityType.Projectile ? 900 : 45;
-        const dt = Math.max(-lim, Math.min(lim, renderTick - base.tick));
-        entity.x = base.x + base.vx * dt;
-        entity.y = base.y + base.vy * dt;
-        entity.angle = base.angle;
-        entity.vx = base.vx;
-        entity.vy = base.vy;
-      } else if (toState) {
-        entity.x = toState.x;
-        entity.y = toState.y;
-        entity.angle = toState.angle || 0;
-        entity.vx = toState.vx || 0;
-        entity.vy = toState.vy || 0;
-      }
-      
-      // Smooth render position
-      entity.renderX += (entity.x - entity.renderX) * RENDER_SMOOTH_OTHER;
-      entity.renderY += (entity.y - entity.renderY) * RENDER_SMOOTH_OTHER;
-      entity.renderAngle = this.lerpAngle(entity.renderAngle, entity.angle, 0.3);
-    }
-    
-    // The local ship: drawn between its last two steps, half a tick behind the estimate, so it
-    // moves evenly even when a frame runs no step or two (frames and ticks don't line up)
-    const player = this.entities.get(this.playerId);
-    // (On its tick layer: drawn there at its draw tick, a correction eased in (ShipReplicaSet.pose))
-    const drawn = player && this.predictionEnabled && this.predictedTick > 0 ? this.ownPose?.(this.ownDrawTick()) : null;
-    if (player && drawn) {
-      player.renderX = drawn.x;
-      player.renderY = drawn.y;
-      player.renderAngle = drawn.angle;
-    } else if (player) {
-      const prev = this.selfPrev;
-      if (prev && this.predictionEnabled && this.predictedTick > 0) {
-        // (the same k as ownDrawTick: your shells are drawn at the tick your ship is)
-        const k = Math.max(0, Math.min(1, this.frameTick - this.predictedTick + 0.5));
-        let da = player.angle - prev.angle;
-        while (da > Math.PI) da -= 2 * Math.PI;
-        while (da < -Math.PI) da += 2 * Math.PI;
-        player.renderX = prev.x + (player.x - prev.x) * k;
-        player.renderY = prev.y + (player.y - prev.y) * k;
-        player.renderAngle = prev.angle + da * k;
-      } else {
-        player.renderX += (player.x - player.renderX) * RENDER_SMOOTH_SELF;
-        player.renderY += (player.y - player.renderY) * RENDER_SMOOTH_SELF;
-        player.renderAngle = player.angle;
-      }
-    }
-  }
-
-  private fallbackInterpolate(): void {
-    const now = performance.now();
-    for (const entity of this.entities.values()) {
-      if (entity.id === this.playerId) {
-        entity.renderX += (entity.x - entity.renderX) * RENDER_SMOOTH_SELF;
-        entity.renderY += (entity.y - entity.renderY) * RENDER_SMOOTH_SELF;
-        entity.renderAngle = entity.angle;
-        continue;
-      }
-      // Deterministic asteroids still need position updates even in fallback
-      if (entity.isDeterministic && entity.orbitType !== undefined) {
-        const currentTick = Math.round(this.getEstimatedServerTick(now));
-        const { x, y } = calcAsteroidPosition({
-          orbitType: entity.orbitType ?? 0,
-          semiMajorAxis: entity.semiMajorAxis ?? 0,
-          eccentricity: entity.eccentricity ?? 0,
-          argPeriapsis: entity.argPeriapsis ?? 0,
-          meanAnomaly0: entity.meanAnomaly0 ?? 0,
-          epochTick: entity.epochTick ?? 0,
-        }, currentTick);
-        entity.x = x;
-        entity.y = y;
-        entity.renderX = entity.x;
-        entity.renderY = entity.y;
-        if (entity.type === EntityType.Asteroid) entity.angle = entity.renderAngle = asteroidSpin(entity.id, currentTick);
-        continue;
-      }
-      entity.renderX += (entity.x - entity.renderX) * RENDER_SMOOTH_OTHER;
-      entity.renderY += (entity.y - entity.renderY) * RENDER_SMOOTH_OTHER;
-      entity.renderAngle = this.lerpAngle(entity.renderAngle, entity.angle, 0.3);
-    }
-  }
-
   // ============================================
   // UTILITY
   // ============================================
-
-  private lerp(a: number, b: number, t: number): number {
-    return a + (b - a) * t;
-  }
-
-  private lerpAngle(a: number, b: number, t: number): number {
-    let diff = b - a;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    return a + diff * t;
-  }
 
   getPlayerPosition(): { x: number; y: number } {
     const player = this.entities.get(this.playerId);
@@ -1323,25 +838,34 @@ export class GameState {
   getEntitiesByType(type: EntityType): InterpolatedEntity[] {
     return Array.from(this.entities.values()).filter(e => e.type === type);
   }
-  
-  /**
-   * A knock: `intensity` (about px, 2 a nudge .. 18 a capital ship going up) and
-   * `duration` (s) add trauma, so a strong hit on top of a weak one shakes harder
-   * rather than replacing it.
-   */
-  triggerScreenShake(intensity: number, duration: number): void {
-    const s = this.screenShake;
-    s.trauma = Math.min(1, s.trauma + Math.sqrt(Math.max(0, Math.min(1, intensity / 18))) * Math.min(1, 0.45 + duration));
+
+  /** One asteroid spawn message in (state/asteroidEntities.ts) */
+  handleAsteroidSpawn(tick: number, asteroids: AsteroidSpawnData[]): void {
+    spawnAsteroids(this, tick, asteroids);
   }
 
-  /** Each frame (seconds): trauma drains; the offset follows smooth noise, the same at any frame rate */
+  /** The deterministic asteroid seed message in (state/asteroidEntities.ts) */
+  handleAsteroidSeed(tick: number, systemId: string, seed: string, belt: AsteroidBeltData, ids: number[], indices: number[], asteroidField?: string): void {
+    seedAsteroids(this, tick, systemId, seed, belt, ids, indices, asteroidField);
+  }
+
+  /** Clear all deterministic asteroid entities, on a system change */
+  clearDeterministicAsteroids(): void {
+    clearDeterministicAsteroids(this.entities);
+  }
+
+  /** The frame's draw pass over every entity (state/interpolation.ts) */
+  interpolate(delta: number): void {
+    interpolateFrame(this, delta);
+  }
+
+  /** A knock adds trauma (state/screenShake.ts) */
+  triggerScreenShake(intensity: number, duration: number): void {
+    triggerScreenShake(this.screenShake, intensity, duration);
+  }
+
+  /** Each frame (seconds): trauma drains and the offset follows smooth noise */
   updateScreenShake(delta: number): void {
-    const s = this.screenShake;
-    s.trauma = Math.max(0, s.trauma - Math.min(0.1, delta) * SHAKE_DECAY);
-    s.time += delta;
-    const k = s.trauma * s.trauma, t = s.time * SHAKE_HZ;
-    s.offsetX = k ? SHAKE_PX * k * shakeNoise(t, 1) : 0;
-    s.offsetY = k ? SHAKE_PX * k * shakeNoise(t, 2) : 0;
-    s.rotation = k ? SHAKE_ROLL * k * shakeNoise(t, 3) : 0;
+    updateScreenShake(this.screenShake, delta);
   }
 }

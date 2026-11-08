@@ -3,6 +3,14 @@
  */
 
 import { ChatPanel } from './ui/ChatPanel';
+import { WorldQueries } from './app/worldQueries';
+import { StaffPanels } from './app/staffPanels';
+import { TickDriver } from './app/tickDriver';
+import { HudReadouts } from './app/hudReadouts';
+import { SceneSounds } from './app/sceneSounds';
+import { ChargeGauge } from './app/chargeGauge';
+import { updateZone, type ZoneHost } from './app/zoneHud';
+import { showVersionOverlay } from './app/versionOverlay';
 import { buildWindows, type WindowHost, type WindowSet } from './app/windows';
 import { prefetchScreens } from './app/lazyScreens';
 import { installDevTools } from './app/devTools';
@@ -66,27 +74,11 @@ import shipMaterials from '../../data/ships/materials.json';
 import shipModels from '../../data/ships/models.json';
 import shipTuning from '../../data/ships/tuning.json';
 import miningTable from '../../data/mining.json';
+import './app/rockTables';
 import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
 import { itemIcon } from './ui/itemIcons';
 import { LoadingFlow } from './app/loadingFlow';
 import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, DEFAULT_CAPS } from '@space-game/common';
-
-/** Keys that take the controls back from the autopilot */
-// This build's rock types and belts (both sides generate the same rocks from them); a dev build adds the
-// dev-only rock system's field, as the dev server does (data/dev/rockery.json, server/src/data/devData.ts)
-if (import.meta.env.DEV) {
-  const found = import.meta.glob('../../data/dev/rockery.json', { eager: true, import: 'default' });
-  const dev = Object.values(found)[0] as { system: { id: string }; field: Record<string, number>; outliers?: number } | undefined;
-  const t = miningTable as unknown as MiningTable;
-  if (dev) {
-    t.fields = { ...t.fields, [dev.system.id]: dev.field };
-    if (t.outliers && dev.outliers) t.outliers.systems = { ...t.outliers.systems, [dev.system.id]: dev.outliers };
-  }
-}
-registerRockTypes(miningTable as unknown as MiningTable);
-
-/** A cannon shot's pitch by its gun's grade, Mk I-V (heavy shells lower, high-velocity slugs higher) */
-
 
 /** Proto mode (npm run proto): in-process server, no login, no prediction. */
 export interface ProtoHooks {
@@ -119,6 +111,14 @@ export class Game {
   /** Every window and HUD component (built in init; see app/windows.ts) */
   private w = {} as WindowSet;
   private shipClient: ShipClient;
+  /** Questions about where you are (app/worldQueries.ts) */
+  private world!: WorldQueries;
+  private staff!: StaffPanels;
+  private ticks!: TickDriver;
+  private hud!: HudReadouts;
+  private sceneSounds!: SceneSounds;
+  private zoneHost!: ZoneHost;
+  private chargeGauge = new ChargeGauge();
   /** Other ships predicted on the PT layer (predict/Prediction.ts: C3); null in proto */
   private prediction: Prediction | null = null;
   /** The time-scale badge: the system slowed in a crowd (CAPS.CROWD) */
@@ -158,7 +158,7 @@ export class Game {
     tick: () => this.state.getRawServerTick(),
     target: () => this.w?.targetUI.target ?? 0,
     me: () => { const e = this.state.entities.get(this.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
-    bastion: () => this.currentSystem()?.surface?.bastion ?? null,
+    bastion: () => this.world.currentSystem()?.surface?.bastion ?? null,
     focusKey: () => boundKeyName('siegeFocus', settings.data.bindings),
   });
   private lastTraffic = { t: 0, bytesIn: 0, bytesOut: 0, framesIn: 0 };
@@ -171,8 +171,7 @@ export class Game {
   private windowFocused = true;
   /** Shots and impacts heard as WeaponFx draws them (audio/CombatSounds.ts) */
   private combatSounds!: CombatSounds;
-  private systemArrivedAt = 0;
-  private lastAlarm = 0;
+  systemArrivedAt = 0;
   private statsPrimed = false;
   private damageIndicatorUI!: DamageIndicatorUI;
   private floatingRewardsUI!: FloatingRewardsUI;
@@ -206,32 +205,17 @@ private perfMonitor: PerfMonitor | null = null;
   private perfNet = '';
   
   // Individual HUD components
-private xpFillEl: HTMLElement | null;
-  private xpBarEl: HTMLElement | null = null;
-  /** The XP bar as last shown (to glow when it grows) */
-  private xpSeen: { level: number; into: number } | null = null;
-  private boostFillEl: HTMLElement | null;
-  /** Each bank's charge beside the ENERGY gauge (circuits.ts banks) */
-  private bankBars: BankBars | null = null;
   /** The weapon ring round the cursor (ui/WeaponRing.ts) */
   private weaponRing: WeaponRing | null = null;
   /** Mouse-steer with the view on the heading: the aim pinned in the world, and its drawn cursor (input/aimPin.ts) */
   private aimPinView: AimPinView | null = null;
-  private levelEl: HTMLElement | null;
-  private xpEl: HTMLElement | null;
-  private xpToNextEl: HTMLElement | null;
-  private creditsEl: HTMLElement | null;
-  private systemInfoEl: HTMLElement | null;
 
   // Chat elements
   /** The chat box: channel toggles, lines, the input and its private-message mode (ui/ChatPanel.ts) */
   private chat: ChatPanel;
   private chatFocused = false;
   
-  private lastStateHashTime = 0;
-
   // Tick-based input system
-  private inputTickAccum = 0;         // ms accumulator for fixed-rate input ticks
   /** Extra camera zoom factor while jumping */
   private jumpZoom = 1;
 
@@ -253,6 +237,7 @@ private xpFillEl: HTMLElement | null;
     this.proto = options.proto ?? null;
     this.input = new InputManager();
     this.state = new GameState();
+    this.world = new WorldQueries(this.state);
     // Asteroid compositions, exactly as the server derives them
     const systemDanger = new Map((systemsDataForMenu as { systems: { id: string; danger?: number }[] }).systems.map((s) => [s.id, s.danger ?? 1]));
     this.state.composeAsteroid = (type, key, size, systemId, stage) => asteroidComposition(miningTable as unknown as MiningTable, type, key, size, systemDanger.get(systemId) ?? 1, stage);
@@ -300,6 +285,22 @@ private xpFillEl: HTMLElement | null;
       this.prediction = new Prediction(this.state, this.shipClient, () => this.renderer ?? null);
     }
     this.audio = new AudioManager();
+    const g = this;
+    this.staff = new StaffPanels({
+      state: this.state, pilot: this.pilot, proto: !!this.proto,
+      get renderer() { return g.renderer; }, input: this.input, get w() { return g.w; },
+      isAdmin: () => g.isAdmin, send: (m) => g.network.send(m), flyTo: (d) => g.flyTo(d), chat: (n, t, s, c) => g.addChatMessage(n, t, s, c),
+    });
+    this.ticks = new TickDriver({ state: this.state, ctx: this.inputCtx, proto: !!this.proto, send: (m) => this.network.send(m) });
+    this.hud = new HudReadouts({ state: this.state, pilot: this.pilot, shipClient: this.shipClient, systemNames: this.systemNames });
+    this.zoneHost = { state: this.state, world: this.world, shipClient: this.shipClient, regionUI: this.regionUI, get w() { return g.w; } };
+    this.sceneSounds = new SceneSounds({
+      state: this.state, audio: this.audio, input: this.input, shipClient: this.shipClient, musicPlace: this.musicPlace,
+      objectives: this.objectives, world: this.world,
+      get combatSounds() { return g.combatSounds; }, get loggedIn() { return g.loggedIn; }, get menuOpen() { return g.menu.isOpen; },
+      get stationOpen() { return g.stationOpen; }, get bossId() { return g.w.bossUI.bossId; }, get systemArrivedAt() { return g.systemArrivedAt; },
+      updateZone: () => updateZone(g.zoneHost),
+    });
     
     // Cache UI elements - new HUD structure
     this.loadingEl = document.getElementById('loading');
@@ -309,16 +310,7 @@ this.boostHudEl = document.getElementById('boostHud');
     this.inventoryPanelEl = document.getElementById('inventoryPanel');
     
     // Individual components
-this.xpFillEl = document.getElementById('xpFill');
-    this.xpBarEl = document.getElementById('xpBar');
-    this.boostFillEl = document.getElementById('boostFill');
-    this.bankBars = new BankBars();
     this.weaponRing = new WeaponRing();
-    this.levelEl = document.getElementById('level');
-    this.xpEl = document.getElementById('xp');
-    this.xpToNextEl = document.getElementById('xpToNext');
-    this.creditsEl = document.getElementById('credits');
-    this.systemInfoEl = document.getElementById('systemInfo');
 
     // Chat
     this.chat = new ChatPanel({
@@ -608,7 +600,7 @@ this.xpFillEl = document.getElementById('xpFill');
 
   /** You as the readouts show you (the Esc menu's front page, the side panel's Pilot tab) */
   private pilotInfo(): MenuPilotInfo {
-    const sys = this.currentSystem();
+    const sys = this.world.currentSystem();
     return {
       name: this.state.playerName || 'Pilot',
       level: this.state.level,
@@ -620,150 +612,6 @@ this.xpFillEl = document.getElementById('xpFill');
       admin: this.isAdmin,
       owner: this.isOwner,
     };
-  }
-
-  /**
-   * Sounds driven by what's on screen: the engine and boost loops, held beams, the event-horizon alarm, and the music's
-   * mood. Shots and impacts are heard as WeaponFx draws them, this frame's drawing just after this (audio/CombatSounds.ts)
-   */
-  private updateSounds(now: number): void {
-    const me = this.state.entities.get(this.state.playerId);
-    // (don't play every shell already flying on arrival)
-    this.combatSounds.frame(now - this.systemArrivedAt > 1500);
-
-    const flying = this.loggedIn && !!me && !this.shipClient.hangarOpen && !this.menu.isOpen;
-    const thrusting = flying && ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some((k) => this.input.isKeyDown(k));
-    const boosting = thrusting && this.state.boostFuel > 0 && (this.input.isKeyDown('ShiftLeft') || this.input.isKeyDown('ShiftRight'));
-    const speed = me ? Math.hypot(me.vx, me.vy) : 0;
-    this.audio.setLoop('engine', flying ? (thrusting ? 1 : 0.25) : 0, 0.8 + Math.min(0.5, speed / 30));
-    this.audio.setLoop('boost', boosting ? 1 : 0, 1 + Math.min(0.3, speed / 60));
-    // (Mining lasers pulse, each pulse its own sound: ShipClient's beamFx.onMiningPulse)
-    this.beamSounds(flying);
-
-    if (this.shipClient.horizonDanger() > 0.35 && now - this.lastAlarm > 900) {
-      this.lastAlarm = now;
-      this.audio.playUI('warning', 0.6);
-    }
-    // The music follows the system, the area you're in, docking, a boss's arena or fight (audio/musicPlace.ts)
-    this.audio.setMusicPlace(this.musicPlace.update({
-      systemId: this.state.systemId || 'sol', sys: this.currentSystem(), x: me?.renderX, y: me?.renderY,
-      tick: this.state.getRawServerTick(), docked: this.stationOpen, boss: this.w.bossUI.bossId,
-    }), now);
-    // Nearing a boss's lair (a surface's or pocket's dread point), the music turns ominous
-    const dread = this.currentSystem()?.surface?.dread ?? this.currentSystem()?.pocket?.dread;
-    const d = dread && me ? Math.hypot(me.renderX - dread.x, me.renderY - dread.y) : Infinity;
-    this.audio.setDread(dread ? Math.max(0, Math.min(1, (dread.from - d) / Math.max(1, dread.from - dread.full))) : 0);
-    this.updateZone();
-    this.objectives.update(this.state.systemId);
-    const wayIn = flying ? this.pocketWayIn() : null;
-    this.shipClient.setPlanetHint(wayIn ?? (flying ? this.planetBelow() : null), wayIn ? 'Enter' : undefined);
-  }
-
-  /** Held beams lit last frame (ship * 256 + part), so a beam lighting is heard once */
-  private beamsLit = new Set<number>();
-  private beamsNow = new Set<number>();
-  private readonly beamSources: BeamSource[] = [];
-
-  /**
-   * Held beams, every ship's, heard as they're drawn (MiningBeamFx.litBeams): each its model's loop (weaponSounds
-   * beamLoopFor), and as one lights its model's ignition, if it has one (the Lance's)
-   */
-  private beamSounds(flying: boolean): void {
-    const src = this.beamSources, now = this.beamsNow;
-    src.length = 0;
-    now.clear();
-    if (flying) {
-      for (const b of this.shipClient.litBeams()) {
-        const key = b.owner * 256 + b.part;
-        now.add(key);
-        const loop = beamLoopFor(b.model, b.kind);
-        if (loop) src.push({ loop, x: b.x, y: b.y, own: b.own });
-        if (this.beamsLit.has(key)) continue;
-        const light = beamLightSound(b.model);
-        if (light) { if (b.own) this.audio.playUI(light, 0.6); else this.audio.play(light, b.x, b.y, { volume: 0.8 }); }
-      }
-    }
-    this.audio.setBeams(src);
-    this.beamsNow = this.beamsLit;
-    this.beamsLit = now;
-  }
-
-  /** A pocket's way in (a boss's nest), close enough to go in (X enters) */
-  private pocketWayIn(): string | null {
-    const me = this.state.entities.get(this.state.playerId);
-    if (!me) return null;
-    return pocketAt((systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems, this.state.systemId, me.renderX, me.renderY)?.pocket?.entrance.name ?? null;
-  }
-
-  private systemCache: { id: string; sys: StarSystemData | undefined } | null = null;
-
-  /** The current system's data (looked up once per system, not every frame) */
-  private currentSystem(): StarSystemData | undefined {
-    const id = this.state.systemId;
-    if (this.systemCache?.id !== id) {
-      this.systemCache = { id, sys: (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems.find((s) => s.id === id) };
-    }
-    return this.systemCache.sys;
-  }
-
-  /** A planet you can land on, close enough below you (X descends) */
-  private planetBelow(): string | null {
-    const me = this.state.entities.get(this.state.playerId);
-    const sys = this.currentSystem();
-    if (!me || !sys) return null;
-    // On a surface: a cave's mouth here
-    if (sys.surface) {
-      for (const s of (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems) {
-        const u = s.surface?.under;
-        if (u && u.surface === sys.id && Math.hypot(me.renderX - u.x, me.renderY - u.y) < u.radius) return u.name ?? s.name;
-      }
-      return null;
-    }
-    if (!sys.planets) return null;
-    for (const p of sys.planets) {
-      const tick = this.state.getRawServerTick();
-      const at = planetPosition(p, tick);
-      if (p.surface && Math.hypot(me.renderX - at.x, me.renderY - at.y) < p.radius + 900) return p.name;
-      // Moons you can land on (a party's siege)
-      for (let i = 0; i < (p.moons?.length ?? 0); i++) {
-        const m = p.moons![i];
-        if (!m.surface) continue;
-        const o = moonOffset(p, i, tick);
-        const threat = this.state.threats[m.surface];
-        if (Math.hypot(me.renderX - at.x - o.x, me.renderY - at.y - o.y) < m.radius + 900) return `${m.name ?? 'the moon'} (siege${threat ? `, threat ${threat}` : ''})`;
-      }
-    }
-    return null;
-  }
-
-  /** Sector danger and PvP status for the HUD (the same rules as the server's canDamage) */
-  private updateZone(): void {
-    const me = this.state.entities.get(this.state.playerId);
-    const sys = this.currentSystem();
-    if (!sys || !me) return;
-    let safe = true;
-    if (sys.pvp) {
-      safe = false;
-      for (const e of this.state.entities.values()) {
-        if (e.type !== EntityType.Station) continue;
-        const d = Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY);
-        const r = sys.pvp.mode === 'outer' ? sys.pvp.safeRadius ?? 3000 : Math.max((e.data?.[8] ?? 200) + 1500, 2200);
-        if (d < r) { safe = true; break; }
-      }
-    }
-    const r = Math.hypot(me.renderX, me.renderY);
-    const ring = sys.zones?.find((z) => { const d = z.x !== undefined ? Math.hypot(me.renderX - z.x, me.renderY - (z.y ?? 0)) : r; return d >= z.inner && d <= z.outer; });
-    const rating = this.shipClient.myRating();
-    const ctx = {
-      sys, x: me.renderX, y: me.renderY, rating, threats: this.state.threats, regionThreats: this.state.regionThreats,
-      system: (id: string) => (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems.find((s) => s.id === id),
-      locked: (id: string) => this.w.systemMapUI.locked?.(id) ?? null, interactKey: boundKeyName('interact', settings.data.bindings),
-    };
-    const region = this.regionUI.current(ctx);
-    this.regionUI.update(ctx);
-    this.w.pilotHud.setZone(sys.name.replace(/ System$/, ''), sys.danger ?? 1, !!sys.pvp, safe, ring, region ?? undefined);
-    // (Against the band you're in, where a system has them)
-    this.w.pilotHud.setRating(rating, (region && this.state.regionThreats[sys.id]?.[region.id]) || this.state.threats[sys.id]);
   }
 
   /** Apply every setting (runs on start and on each change). */
@@ -803,36 +651,6 @@ this.xpFillEl = document.getElementById('xpFill');
     this.input.setBindings(ACTIONS.filter((a) => a.rebindable !== false).map((a) => ({ defaultCode: a.key, code: s.bindings[a.id] ?? a.key })));
   }
 
-  private heatEl: HTMLDivElement | null = null;
-  private heatText: HTMLElement | null = null;
-  private heatFill: HTMLElement | null = null;
-
-  /** Charge guns' charge (Longbarrel, Blackout) and pulse lasers' charge to their next pulse: a thin bar over the jump gauge while they charge (no heat: rework 2026-11) */
-  private updateHeatGauge(): void {
-    if (!this.heatEl) {
-      this.heatEl = document.createElement('div');
-      this.heatEl.style.cssText = `position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); width: 240px; z-index: 860; pointer-events: none;
-        font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2px; text-align: center; display: none;`;
-      this.heatEl.innerHTML = '<div data-k="t"></div><div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin-top:3px; overflow:hidden"><i data-k="f" style="display:block; height:100%; transition: width .1s"></i></div>';
-      document.body.appendChild(this.heatEl);
-      this.heatText = this.heatEl.querySelector('[data-k="t"]') as HTMLElement;
-      this.heatFill = this.heatEl.querySelector('[data-k="f"]') as HTMLElement;
-    }
-    // (A charge gun's charge is on the weapon ring round the cursor: ui/WeaponRing.ts)
-    const laser = this.shipClient.laserCharge();
-    const charging = !!laser && laser.charge < 0.999;
-    const show = this.loggedIn && !this.shipClient.hangarOpen && charging;
-    setStyle(this.heatEl, 'display', show ? 'block' : 'none');
-    if (!show) return;
-    if (laser) {
-      // Pulse lasers: the charge to their next pulse
-      setText(this.heatText, laser.total > 1 ? `LASERS CHARGING · ${laser.ready}/${laser.total} READY` : 'LASER CHARGING');
-      setStyle(this.heatText, 'color', '#fecaca');
-      setStyle(this.heatFill, 'width', `${Math.round(laser.charge * 100)}%`);
-      setStyle(this.heatFill, 'background', 'linear-gradient(90deg,#7f1d1d,#f87171,#ffe4e4)');
-    }
-  }
-
   private applyVolume(s: SettingsData): void {
     const muted = s.audio.muteUnfocused && !this.windowFocused;
     this.audio.setMasterVolume(muted ? 0 : s.audio.master);
@@ -867,12 +685,12 @@ this.xpFillEl = document.getElementById('xpFill');
       get jumpZoom() { return g.jumpZoom; },
       get stationOpen() { return g.stationOpen; },
       get menu() { return g.menu; },
-      get adminPanel() { return g.adminPanel; },
+      get adminPanel() { return g.staff.adminPanel; },
       objective: () => g.objective(),
       flyTo: (d, note) => g.flyTo(d, note),
       showSystemMessage: (text, color) => g.showSystemMessage(text, color),
-      currentSystem: () => g.currentSystem(),
-      planetBelow: () => g.planetBelow(),
+      currentSystem: () => g.world.currentSystem(),
+      planetBelow: () => g.world.planetBelow(),
       wreckMarker: () => g.wreckMarker(),
       siegeMarkers: () => g.siegePanel.markers().map((m) => ({ ...m, system: g.state.systemId })),
       toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
@@ -1033,30 +851,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.timeBadge?.update(this.state.crowd);
     
     if (this.loggedIn && this.state.playerId && this.network.isConnected()) {
-      if (this.proto) {
-        // Proto: no prediction. Inputs go straight to the in-process simulation, at the tick rate.
-        this.state.updateCachedServerTick();
-        this.inputTickAccum += delta * 1000; // delta is in seconds
-        let ticksRun = 0;
-        while (this.inputTickAccum >= TICK_MS && ticksRun < 4) {
-          tickInput(this.inputCtx);
-          this.inputTickAccum -= TICK_MS;
-          ticksRun++;
-        }
-        if (this.inputTickAccum > TICK_MS * 4) this.inputTickAccum = 0;
-      } else {
-        // Prediction: one physics step per tick number, every tick number once, up to the
-        // server's tick (estimated). The replay after a snapshot then steps exactly the
-        // ticks the server will (see GameState.ticksDue: tick numbers and steps can't drift apart).
-        const due = Math.min(4, this.state.ticksDue());
-        for (let i = 0; i < due; i++) {
-          this.state.cachedServerTick = this.state.predictedTick;
-          tickInput(this.inputCtx);       // sample input, queued for targetTick = tick + input delay
-          this.state.drainDelayQueue();   // apply what's due and step to predictedTick + 1
-          this.state.predictedTick++;
-        }
-        this.state.cachedServerTick = this.state.predictedTick;
-      }
+      this.ticks.run(delta);
     }
 
     // Interpolate entities (rocks out of sight placed less often: see GameState.orbitFocus)
@@ -1071,7 +866,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.shipClient.update(now);
     this.hazards.setHorizonDanger(this.shipClient.horizonDanger());
     this.frost.update(this.loggedIn ? this.state.entities.get(this.state.playerId)?.warmth ?? null : null, delta);
-    this.updateSounds(now);
+    this.sceneSounds.update(now);
     if (this.w.navMarkers) {
       this.w.navMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen);
     this.regionUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen);
@@ -1110,9 +905,9 @@ this.xpFillEl = document.getElementById('xpFill');
       const me = this.state.entities.get(this.state.playerId);
       // The side panel on top of it: hidden behind the menu or the map; over the station or the hangar only when its key calls it up
       this.w.hub.update(!this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen ? 'off' : blocked || this.stationOpen || !me ? 'covered' : 'on');
-      this.w.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
+      this.w.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.world.currentSystem(), me.renderX, me.renderY));
     }
-    this.updateHeatGauge();
+    this.chargeGauge.update(this.shipClient.laserCharge(), this.loggedIn && !this.shipClient.hangarOpen);
     // The weapon ring round the cursor: your gun groups' clips, charges, spin and ammo
     this.weaponRing?.update(this.shipClient.ringGroups(), this.input.mouseX, this.input.mouseY,
       this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.stationOpen && !this.w.systemMapUI.isOpen, this.shipClient.ringChip());
@@ -1167,24 +962,7 @@ this.xpFillEl = document.getElementById('xpFill');
     
     // Periodic state hash for snapshot-on-mismatch (1 Hz). Proto has no prediction to check.
     if (!this.proto && this.loggedIn && this.state.playerId && this.network.isConnected()) {
-      if (now - this.lastStateHashTime > 1000) {
-        const player = this.state.entities.get(this.state.playerId);
-        if (player) {
-          const hash = computeStateHash(
-            player.x,
-            player.y,
-            player.angle || 0,
-            player.vx || 0,
-            player.vy || 0,
-            player.hp || 0,
-            this.state.boostFuel,
-            this.state.systemId,
-          );
-          // The tick the prediction is at: the server checks it against its own record of that tick
-          this.network.send({ type: 'stateHash', tick: this.state.cachedServerTick, hash });
-          this.lastStateHashTime = now;
-        }
-      }
+      this.ticks.sendHash(now);
     }
     
     // Chat bubbles: after the world's drawn, so they sit on this frame's camera (ui/bubbles)
@@ -1192,7 +970,8 @@ this.xpFillEl = document.getElementById('xpFill');
     this.w.chatBubbles?.update();
 
     // Update UI
-    this.updateUI();
+    this.staff.update();
+    this.hud.update();
   }
 
   /** What app/inputSend.ts (tickInput, sendNeutralInput) reads (getters, so windows built late resolve at use) plus its last-sent state; made once */
@@ -1207,7 +986,7 @@ this.xpFillEl = document.getElementById('xpFill');
       get noseThrust() { return viewMode.pinnedAim(g.shipClient.helmMode()); },
       get proto() { return g.proto; },
       get menu() { return g.menu; },
-      get adminPanel() { return g.adminPanel; },
+      get adminPanel() { return g.staff.adminPanel; },
       get shipClient() { return g.shipClient; },
       get autopilot() { return g.w.autopilot; },
       get context() { return g.w.context; },
@@ -1271,8 +1050,8 @@ this.xpFillEl = document.getElementById('xpFill');
       get bossUI() { return g.w.bossUI; },
       get stationWindow() { return g.w.stationWindow; },
       get worldEvents() { return g.worldEvents; },
-      get adminPanel() { return g.adminPanel; },
-      get contribPanel() { return g.contribPanel; },
+      get adminPanel() { return g.staff.adminPanel; },
+      get contribPanel() { return g.staff.contribPanel; },
       get chatBubbles() { return g.w.chatBubbles; },
       get loggedIn() { return g.loggedIn; },
       set loggedIn(v) { g.loggedIn = v; },
@@ -1295,8 +1074,8 @@ this.xpFillEl = document.getElementById('xpFill');
       addChatMessage: (playerName, text, isSystem, color) => g.addChatMessage(playerName, text, isSystem, color),
       showSystemMessage: (text, color) => g.showSystemMessage(text, color),
       handleAuthResult: (msg) => g.handleAuthResult(msg),
-      startContrib: () => g.startContrib(),
-      stopContrib: () => g.stopContrib(),
+      startContrib: () => g.staff.startContrib(),
+      stopContrib: () => g.staff.stopContrib(),
     };
   }
 
@@ -1369,7 +1148,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
       // A new version is out (or this one is newer than the server): only a reload helps
       this.versionMismatch = true;
       this.network.disconnect();
-      this.showVersionOverlay();
+      showVersionOverlay();
       if (this.loadingEl) this.loadingEl.style.display = 'none';
     } else if (this.authFailed) {
       if (this.loadingEl) this.loadingEl.style.display = 'none';
@@ -1433,18 +1212,18 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
       // Map warp (Ctrl-click) is an admin tool: the server refuses it for anyone else, so only admins see it offered
       this.w.systemMapUI.onWarp = this.isAdmin ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
       
-      if (this.isAdmin) this.startAdmin();
+      if (this.isAdmin) this.staff.startAdmin();
       else this.stopAdmin();
       this.mailToast();
-      if (msg.isContributor || this.isAdmin) this.startContrib();
-      else this.stopContrib();
+      if (msg.isContributor || this.isAdmin) this.staff.startContrib();
+      else this.staff.stopContrib();
     } else {
       // Wrong password or a refused registration: back to the sign-in screen with the reason
       // (the server hangs up too, so no nameless pilot is left in the world)
       console.warn('Auth failed:', msg.error);
       this.authFailed = true;
       this.stopAdmin();
-      this.stopContrib();
+      this.staff.stopContrib();
       this.network.disconnect();
       this.onDisconnected();
       this.serverBrowserUI.hide();
@@ -1464,139 +1243,14 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.loadingEl.style.cursor = 'default';
   }
 
-  /** The server speaks another protocol version: say so and offer a reload (no reconnecting) */
-  private showVersionOverlay(): void {
-    if (document.getElementById('version-overlay')) return;
-    const el = document.createElement('div');
-    el.id = 'version-overlay';
-    el.style.cssText = `position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center;
-      background: rgba(2, 6, 18, 0.88); font-family: 'Segoe UI', sans-serif; color: #e2e8f0;`;
-    el.innerHTML = `<div style="text-align:center; padding:28px 36px; border:1px solid rgba(148,163,184,0.3); border-radius:10px; background:rgba(15,23,42,0.95); max-width:360px">
-      <div style="font-size:18px; font-weight:700; letter-spacing:1px; margin-bottom:8px">A new version is out</div>
-      <div style="font-size:13px; color:#94a3b8; margin-bottom:18px">This page is older (or newer) than the server. Reload to get the current version.</div>
-      <button style="font:600 14px 'Segoe UI', sans-serif; padding:8px 26px; border-radius:6px; border:none; background:#38bdf8; color:#04121f; cursor:pointer">Reload</button>
-    </div>`;
-    el.querySelector('button')!.addEventListener('click', () => location.reload());
-    document.body.appendChild(el);
-  }
-
   /** The last sign-in was refused (the disconnect that follows isn't a dropped connection) */
   private authFailed = false;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
 
-  /** The admin panel (admins only; F2 opens it) */
-  private adminPanel: AdminPanel | null = null;
-
-  /** Its chunk is on its way (split out of the main chunk: only admins fetch it) */
-  private adminLoading = false;
-
-  private startAdmin(): void {
-    if (this.adminPanel || this.adminLoading) return;
-    this.adminLoading = true;
-    void import('./ui/AdminPanel').then(({ AdminPanel }) => {
-      this.adminLoading = false;
-      // (signed out while it loaded)
-      if (this.adminPanel || !this.isAdmin) return;
-      this.adminPanel = new AdminPanel({
-        send: (m) => this.network.send(m),
-        state: this.state,
-        econ: this.pilot.econ,
-        cursorWorld: () => this.renderer.screenToWorld(this.input.mouseX, this.input.mouseY),
-        screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
-        setCamera: (t) => this.renderer.setCameraTarget(t),
-        zoom: () => this.input.zoom,
-        isKeyDown: (c) => this.input.isKeyDown(c),
-        clientStats: () => {
-          const s = this.state;
-          return `<b>Prediction</b><span>${s.predErrorPre.toFixed(1)}px before · ${s.predErrorPost.toFixed(1)}px after (avg ${s.predErrorPreAvg.toFixed(1)})</span>
-            <b>Snaps</b><span>${s.predSnapCount}</span><b>Pending</b><span>${s.predPendingCount} inputs</span>
-            <b>Input delay</b><span>${s.inputDelayTicks} ticks (${(s.inputDelayTicks * 16.67).toFixed(0)} ms)</span>`;
-        },
-      });
-      this.addChatMessage('', 'Admin: F2 opens the admin panel, F3 teleports to the cursor, F4 frees the camera. /help lists the chat commands.', true, '#ff8a6a');
-    }, (e) => { this.adminLoading = false; console.error('Admin panel failed to load:', e); });
-  }
-
   private stopAdmin(): void {
-    this.adminPanel?.destroy();
-    this.adminPanel = null;
+    this.staff.stopAdmin();
     this.isAdmin = false;
     this.isOwner = false;
-  }
-
-  /** Contributor notes (contributors and admins; F6) */
-  private contribPanel: ContributorPanel | null = null;
-  /** Started and not stopped since (its chunk loads first: only contributors fetch it) */
-  private contribWanted = false;
-
-  private startContrib(): void {
-    if (this.contribPanel || this.proto) return;
-    this.contribWanted = true;
-    void import('./ui/ContributorPanel').then(({ ContributorPanel }) => {
-      if (this.contribPanel || !this.contribWanted) return;
-      this.contribPanel = new ContributorPanel({
-        send: (m) => this.network.send(m),
-        state: this.state,
-        me: () => this.state.playerName,
-        isAdmin: () => this.isAdmin,
-        screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
-        worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
-        zoom: () => this.renderer.getZoom(),
-        map: this.w.systemMapUI,
-        flyTo: (d) => this.flyTo(d),
-        setCamera: (t) => this.renderer.setCameraTarget(t),
-        warp: (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }),
-      });
-    }, (e) => console.error('Contributor panel failed to load:', e));
-  }
-
-  private stopContrib(): void {
-    this.contribWanted = false;
-    this.contribPanel?.destroy();
-    this.contribPanel = null;
-  }
-
-  /** The credits figure last written to the HUD */
-  private creditsShown = -1;
-
-  private updateUI(): void {
-    this.adminPanel?.update();
-    this.contribPanel?.update();
-    
-// Boost Bar (vertical)
-    if (this.boostFillEl) {
-      const boostPercent = (this.state.boostFuel / this.state.maxBoostFuel) * 100;
-      setStyle(this.boostFillEl, 'height', `${boostPercent.toFixed(1)}%`);
-    }
-    // (and each bank's, flashing while what it feeds browns out: ui/BankBars.ts)
-    this.bankBars?.update(this.shipClient?.myShip()?.derived, this.state.charge);
-    
-    // XP bar: progress through the current level (from the pilot's profile)
-    const prof = this.pilot.profile;
-    const into = prof ? prof.xp - prof.xpLevel : 0;
-    const span = prof ? Math.max(1, prof.xpNext - prof.xpLevel) : 100;
-    // (Each only when it changes: see domWrite)
-    setStyle(this.xpFillEl, 'width', `${Math.min(100, (into / span) * 100).toFixed(1)}%`);
-    setText(this.levelEl, String(prof?.level ?? this.state.level));
-    const lvl = prof?.level ?? this.state.level;
-    if (prof && this.xpSeen) {
-      if (lvl > this.xpSeen.level) { this.replayClass(this.xpBarEl, 'lvl'); this.replayClass(this.levelEl?.parentElement, 'lvl'); }
-      else if (into > this.xpSeen.into) this.replayClass(this.xpBarEl, 'gain');
-    }
-    if (prof) this.xpSeen = { level: lvl, into };
-    setText(this.xpEl, String(into));
-    setText(this.xpToNextEl, String(span));
-    // (Formatted only when it changes: toLocaleString is slow to run every frame)
-    if (this.state.credits !== this.creditsShown) { this.creditsShown = this.state.credits; setText(this.creditsEl, this.state.credits.toLocaleString()); }
-    setText(this.systemInfoEl, this.systemNames.get(this.state.systemId) ?? this.state.systemId ?? 'Unknown System');
-  }
-
-  /** Restart a one-shot CSS animation (remove the class, reflow, add it back) */
-  private replayClass(el: Element | null | undefined, cls: string): void {
-    if (!el) return;
-    el.classList.remove('gain', 'lvl');
-    void (el as HTMLElement).offsetWidth;
-    el.classList.add(cls);
   }
 
   /** The server's notices (party, travel, announcements) go in the chat */
