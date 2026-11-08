@@ -186,13 +186,13 @@ describe('gun preview plan', () => {
     expect(p.range).toBeGreaterThan(0);
   });
 
-  it('beams, pulses and seekers are told apart; support has no plan', () => {
+  it('beams, pulses and seekers are told apart; support guns have their own', () => {
     expect(gunPlan(catalog, tuning, fn('laser_cutter'))!.beam).toBe(true);
     expect(gunPlan(catalog, tuning, fn('laser_glint'))!.pulse).not.toBeNull();
     expect(gunPlan(catalog, tuning, fn('missile_dart'))!.tracked).toBe(true);
     expect(gunPlan(catalog, tuning, fn('mortar_lobber'))!.lob).toBe(true);
-    expect(gunPlan(catalog, tuning, fn('point_defence_turret'))).toBeNull();
-    expect(gunPlan(catalog, tuning, fn('utility_repair_beam'))).toBeNull();
+    expect(gunPlan(catalog, tuning, fn('point_defence_turret'))!.support).toBe('pd');
+    expect(gunPlan(catalog, tuning, fn('utility_repair_beam'))!.support).toBe('repair');
     expect(gunPlan(catalog, tuning, fn('engine_plasma_drive'))).toBeNull();
   });
 
@@ -202,7 +202,7 @@ describe('gun preview plan', () => {
       const p = gunPlan(catalog, tuning, f);
       if (!p) continue;
       expect(p.fire.interval, f.id).toBeGreaterThan(0);
-      if (!p.beam) expect(p.maxSpeed || p.speed, f.id).toBeGreaterThan(0);
+      if (!p.beam && !p.support) expect(p.maxSpeed || p.speed, f.id).toBeGreaterThan(0);
     }
   });
 });
