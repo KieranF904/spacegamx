@@ -2844,6 +2844,50 @@
       ]
     },
     {
+      "id": "client.hangar.filter-icons",
+      "path": "client/src/ships/hangar/filterIcons.ts",
+      "group": "client/ships/hangar",
+      "lines": 56,
+      "owns": "the small line icons on the hangar palette's filter tiles and pills, keyed by subcategory / toggle id",
+      "needs": "nothing (pure strings)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every id paletteFilters.subsOf can return has an icon",
+          "test": "client/src/ships/hangar/filterIcons.test.ts"
+        },
+        {
+          "text": "icons draw in currentColor only, so the CSS's selected / unselected colours reach them",
+          "test": "client/src/ships/hangar/filterIcons.test.ts"
+        }
+      ],
+      "extend": "a new subcategory or toggle is one entry in ICONS below (the test lists the ids that need one)",
+      "exports": [
+        "filterIcon",
+        "iconIds"
+      ],
+      "sections": [
+        {
+          "name": "ICONS",
+          "kind": "const",
+          "start": 10,
+          "end": 47
+        },
+        {
+          "name": "iconIds",
+          "kind": "function",
+          "start": 49,
+          "end": 50
+        },
+        {
+          "name": "filterIcon",
+          "kind": "function",
+          "start": 52,
+          "end": 56
+        }
+      ]
+    },
+    {
       "id": "client.hangar.designs",
       "path": "client/src/ships/hangar/hangarDesigns.ts",
       "group": "client/ships/hangar",
@@ -3284,6 +3328,64 @@
           "kind": "interface",
           "start": 55,
           "end": 138
+        }
+      ]
+    },
+    {
+      "id": "client.hangar.palette-subs",
+      "path": "client/src/ships/hangar/paletteSubs.ts",
+      "group": "client/ships/hangar",
+      "lines": 72,
+      "owns": "the hangar palette's filter area: a \"Type\" grid of icon tiles (All + each class, counts in the corner) and, for weapons, a \"Needs\" row of combinable icon pills (Ammo, No ammo, Fixed, Turret); its markup and its CSS",
+      "needs": "ships/paletteFilters (SubDef, ALL, FilterState), ./filterIcons, ui/componentKit (esc)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "tiles keep role=radio, pills aria-pressed, and the data-sub / data-needs / data-key / data-group hooks HangarPalette's click and keys use",
+          "test": "client/src/ships/hangar/paletteSubs.test.ts"
+        },
+        {
+          "text": "the tile grid fills the width evenly (the last tile spans any gap)",
+          "test": "client/src/ships/hangar/paletteSubs.test.ts"
+        }
+      ],
+      "extend": "a new toggle is one entry in NEEDS below (plus its icon in filterIcons and its handling in HangarPalette.onClick)",
+      "exports": [
+        "SUBS_STYLE",
+        "lastSpan",
+        "subsHtml",
+        "tileColumns"
+      ],
+      "sections": [
+        {
+          "name": "SUBS_STYLE",
+          "kind": "const",
+          "start": 15,
+          "end": 35
+        },
+        {
+          "name": "NEEDS",
+          "kind": "const",
+          "start": 37,
+          "end": 42
+        },
+        {
+          "name": "tileColumns",
+          "kind": "function",
+          "start": 44,
+          "end": 45
+        },
+        {
+          "name": "lastSpan",
+          "kind": "function",
+          "start": 47,
+          "end": 51
+        },
+        {
+          "name": "subsHtml",
+          "kind": "function",
+          "start": 53,
+          "end": 72
         }
       ]
     },

@@ -28,6 +28,7 @@ import { affordable, availability, costLines, lockLevel, lockText, splitOpen, ty
 import { footprint, footprintText, turned } from '../ui/componentShapes';
 import { CHEVRON, costChipsHtml, esc, LOCK } from '../ui/componentKit';
 import { itemIcon } from '../ui/itemIcons';
+import { subsHtml, SUBS_STYLE } from './hangar/paletteSubs';
 import { buildFacts, type FactGroup } from './buildFacts';
 import { keyStats, mountBadge, mountingText, MOUNT_TEXT, sizeWord, weaponMount } from './modelCards';
 import { paletteRows, rowInHand, rowPart, spareRows, tabOfFn, type PaletteRow } from './paletteModel';
@@ -136,16 +137,10 @@ const STYLE = `
 .hp-tab .n { min-width: 14px; padding: 0 4px; border-radius: 7px; box-sizing: border-box; text-align: center; background: rgba(125, 160, 210, 0.16); color: #c9d4e5;
   font-size: 9px; letter-spacing: 0; line-height: 13px; }
 .hp-tab .n.sp { background: rgba(74, 222, 128, 0.18); color: #86efac; }
-.hp-subs { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-.hp-subs[hidden] { display: none; }
 .hp-sub { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; line-height: 16px;
   background: #0f1626; border: 1px solid #2a3a5a; color: #a7b4c8; }
 .hp-sub:hover { border-color: #46608c; color: #e5ecf7; }
-.hp-sub[aria-checked="true"], .hp-sub[aria-pressed="true"] { background: #24406b; border-color: #5fd4c4; color: #fff; }
-.hp-sub small { font-size: 9px; color: #6b7a93; }
-.hp-sub[aria-checked="true"] small { color: #b6c8e4; }
-.hp-subs .gap { width: 6px; }
-.hp-card { display: block; white-space: normal; }
+${SUBS_STYLE}.hp-card { display: block; white-space: normal; }
 .hp-bars { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; }
 .hp-bar { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'l n' 'b b'; column-gap: 4px; row-gap: 1px; font-size: 10px; min-width: 0; }
 .hp-bar em { grid-area: l; font-style: normal; color: #6b7a93; font-size: 9px; }
@@ -412,32 +407,14 @@ export class HangarPalette {
     }).join('');
   }
 
-  /** The subcategory chips (with counts) and, for weapons, the ammo and mount toggles */
+  /** The filter area: type tiles (with counts) and, for weapons, the ammo and mount toggles (hangar/paletteSubs.ts) */
   private renderSubs(): void {
     const tab = this.tab, { catalog, tuning } = this.h;
     const { base } = this.visibleRows(tab);
     const counts = subCounts(base, tab, catalog, tuning);
     const cur = this.filters.sub[tab] ?? ALL;
     const subs = subsOf(tab).filter((s) => (counts.get(s.id) ?? 0) > 0 || s.id === cur);
-    const key = (k: string) => `data-key="sub:${k}"`;
-    let html = '';
-    if (subs.length > 1) {
-      html += `<span role="radiogroup" aria-label="Group" data-group="sub" style="display:contents">`;
-      const chip = (id: string, label: string, n: number, hint?: string) =>
-        `<button class="hp-sub" role="radio" data-sub="${id}" ${key(id)} aria-checked="${cur === id}" tabindex="${cur === id ? 0 : -1}"${hint ? ` title="${esc(hint)}"` : ''}>${esc(label)}<small>${n}</small></button>`;
-      html += chip(ALL, 'All', counts.get(ALL) ?? 0) + subs.map((s) => chip(s.id, s.label, counts.get(s.id) ?? 0, s.hint)).join('');
-      html += `</span>`;
-    }
-    if (tab === 'weapons') {
-      const tog = (k: string, label: string, on: boolean, hint: string) =>
-        `<button class="hp-sub" data-needs="${k}" ${key(k)} aria-pressed="${on}" title="${esc(hint)}">${esc(label)}</button>`;
-      html += (html ? '<span style="flex-basis:100%; height:0"></span>' : '') + `<span data-group="needs" style="display:contents">`
-        + tog('ammo', 'Ammo', this.filters.ammo === 'ammo', 'Only guns that fire ammunition items')
-        + tog('none', 'No ammo', this.filters.ammo === 'none', 'Only guns that run on power alone')
-        + tog('fixed', 'Fixed', this.filters.mount === 'fixed', 'Only guns that fire where the ship points')
-        + tog('turret', 'Turret', this.filters.mount === 'turret', 'Only guns that swivel to the cursor')
-        + `</span>`;
-    }
+    const html = subsHtml(tab, subs, counts, cur, this.filters);
     this.subsEl.hidden = !html;
     this.subsEl.innerHTML = html;
   }
