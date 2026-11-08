@@ -1,0 +1,667 @@
+<title>Shield Shapes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Shield Shapes: shields that cover a line or an arc instead of the whole ship. Shots only stop where their path
+   crosses a live shield; everything else reaches the hull. Single dark theme: it matches the space view. */
+:root {
+  color-scheme: dark;
+  --void: #06080c;
+  --panel: #0c1016;
+  --raise: #131922;
+  --line: #222a35;
+  --text: #d9dee6;
+  --muted: #8a94a3;
+  --amber: #ffb04a;
+  --amber-hot: #ffd9a0;
+  --cyan: #7fd6fa;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--void); color: var(--text); font: 15px/1.5 var(--body); }
+.wrap {
+  max-width: 1200px; margin: 0 auto;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 14px;
+}
+.wrap > * { min-width: 0; }
+header { display: grid; gap: 4px; }
+h1 { margin: 0; font: 600 34px/1.05 var(--display); letter-spacing: 0.03em; text-transform: uppercase; }
+h1 span { color: var(--amber); }
+header p { margin: 0; color: var(--muted); max-width: 72ch; }
+h2 { margin: 0; font: 600 15px/1.2 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.pane { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.pane figcaption {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.pane figcaption b { font: 600 19px/1.2 var(--display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--amber-hot); }
+.pane figcaption p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: 14px; }
+.tag { font: 600 12px/1.4 var(--display); letter-spacing: 0.12em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.tag.hit { color: var(--cyan); border-color: #24485a; }
+.ro { margin-left: auto; font: 400 12px/1.2 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+canvas { display: block; width: 100%; max-width: 100%; background: var(--void); touch-action: manipulation; cursor: crosshair; }
+#main { aspect-ratio: 1 / 1; }
+@media (min-width: 640px) { #main { aspect-ratio: 16 / 10; } }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; }
+.seg button, .btn {
+  font: 500 14px/1 var(--body); color: var(--text); background: var(--raise); border: 1px solid var(--line);
+  padding: 9px 12px; cursor: pointer;
+}
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.btn { border-radius: 4px; }
+.seg button:hover, .btn:hover { border-color: #3a4554; }
+.seg button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber-hot); position: relative; }
+.btn.main { font: 600 16px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--amber); border-color: var(--amber); min-width: 86px; }
+.tog { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-weight: 500; }
+.tog input { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); position: relative; margin: 0; cursor: pointer; }
+.tog input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s; }
+.tog input:checked { background: #3a2a12; border-color: var(--amber); }
+.tog input:checked::after { transform: translateX(14px); background: var(--amber); }
+@media (prefers-reduced-motion: reduce) { .tog input::after { transition: none; } }
+
+.knobs { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 14px 22px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .knobs { grid-template-columns: 1fr 1fr 1fr; } }
+.knob { display: grid; gap: 6px; }
+.knob .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.knob label { font-weight: 600; }
+.val { font: 500 13px/1 var(--mono); color: var(--amber-hot); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--amber); margin: 0; }
+.scale { display: flex; justify-content: space-between; font: 400 11px/1 var(--mono); color: var(--muted); }
+
+.picker { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.pick {
+  display: grid; gap: 3px; align-content: start; text-align: left; font: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 13px; cursor: pointer; min-width: 0;
+}
+.pick:hover { border-color: #3a4554; }
+.pick .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pick b { font: 600 18px/1.2 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+.pick span.d { color: var(--muted); font-size: 14px; }
+.pick span.h { font: 400 12px/1.3 var(--mono); }
+.pick[aria-checked="true"] { background: var(--raise); border-color: var(--amber); }
+.pick[aria-checked="true"] b { color: var(--amber-hot); }
+.pick[aria-checked="true"] .tag { color: #1a1206; background: var(--amber); border-color: var(--amber); }
+
+.mounted { display: grid; gap: 6px; }
+.mrow { display: grid; grid-template-columns: 12px minmax(70px, 1.1fr) minmax(60px, 2fr) auto auto; align-items: center; gap: 4px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.mrow[hidden] { display: none; }
+.mrow .sw { width: 10px; height: 10px; border-radius: 50%; }
+.mrow b { font: 600 15px/1.2 var(--display); letter-spacing: 0.05em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .mbar { height: 8px; background: var(--raise); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.mrow .mbar i { display: block; height: 100%; transform-origin: 0 50%; }
+.mrow .ro { margin: 0; min-width: 78px; text-align: right; }
+.mrow .x { font: 500 16px/1 var(--body); color: var(--muted); background: var(--raise); border: 1px solid var(--line); border-radius: 4px; padding: 4px 9px; cursor: pointer; }
+.mrow .x:hover { border-color: #3a4554; color: var(--text); }
+.empty { color: var(--muted); font-size: 14px; }
+
+.tbl { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font: 400 13px/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { font: 600 12px/1.2 var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+th:first-child, td:first-child { text-align: left; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-family: var(--body); font-weight: 600; }
+.note { margin: 0; color: var(--muted); font-size: 13px; max-width: 75ch; }
+@media (max-width: 480px) { h1 { font-size: 28px; } .ro { margin-left: 0; } .mrow { grid-template-columns: 12px 1fr auto auto; } .mrow .mbar { grid-column: 1 / -1; order: 5; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Shield <span>Shapes</span></h1>
+    <p>Shields that cover a wall or an arc, not the whole ship. A shot is stopped only if its path crosses a live shield. Pick a shape, then tap a hull edge to mount it.</p>
+  </header>
+
+  <figure class="pane">
+    <figcaption>
+      <b id="sName">Shape</b><span class="tag" id="sTag">variety</span><span class="tag hit" id="sLvl">level</span><span class="ro" id="roStat"></span>
+      <p id="sDesc"></p>
+    </figcaption>
+    <canvas id="main" aria-label="A ship with shaped shields, taking shots from all sides"></canvas>
+  </figure>
+
+  <div class="bar">
+    <button class="btn main" id="play" type="button">Pause</button>
+    <div class="seg" role="group" aria-label="Shot direction">
+      <button type="button" id="mSpread" aria-pressed="true">All sides</button>
+      <button type="button" id="mOne" aria-pressed="false">One way</button>
+    </div>
+    <div class="seg" role="group" aria-label="Tap action">
+      <button type="button" id="tMount" aria-pressed="true">Tap: mount</button>
+      <button type="button" id="tFire" aria-pressed="false">Tap: fire</button>
+    </div>
+    <label class="tog"><input type="checkbox" id="turn"> Ship turns</label>
+  </div>
+
+  <section class="knobs" aria-label="Shots">
+    <div class="knob">
+      <div class="row"><label for="rate">Shots per second</label><span class="val" id="rateVal"></span></div>
+      <input type="range" id="rate" min="0.5" max="8" step="0.1" value="2.5">
+      <div class="scale"><span>0.5</span><span>8</span></div>
+    </div>
+    <div class="knob">
+      <div class="row"><label for="dmg">Damage per shot</label><span class="val" id="dmgVal"></span></div>
+      <input type="range" id="dmg" min="5" max="80" step="1" value="16">
+      <div class="scale"><span>5</span><span>80</span></div>
+    </div>
+    <div class="knob">
+      <div class="row"><label for="ang">One-way angle</label><span class="val" id="angVal"></span></div>
+      <input type="range" id="ang" min="0" max="359" step="1" value="300">
+      <div class="scale"><span>0</span><span>359</span></div>
+    </div>
+  </section>
+
+  <h2>Shape</h2>
+  <div class="picker" id="picker" role="radiogroup" aria-label="Shield shape"></div>
+
+  <div class="bar">
+    <span class="ro" style="margin-left:0">Presets</span>
+    <div class="seg" id="presets" role="group" aria-label="Presets"></div>
+    <button class="btn" id="clear" type="button">Clear</button>
+    <button class="btn" id="zero" type="button">Reset counts</button>
+  </div>
+
+  <h2>Mounted</h2>
+  <div class="mounted" id="mounted"><div class="empty" id="mEmpty">Nothing mounted. Every shot reaches the hull.</div></div>
+
+  <h2>Numbers</h2>
+  <div class="tbl"><table id="tbl" aria-label="Shield numbers"></table></div>
+  <p class="note">Capacity is shield HP. Regen starts after a short quiet spell. When a shield breaks it is down for the delay, then returns at 25% and fills again. Edit the SHAPES list at the top of the script to tune.</p>
+</div>
+
+<script>
+'use strict';
+/* ---------- Parameters: tune here ---------- */
+const CELL = 24;                 // units per hull cell
+const VIEW = 165;                // half-height of the field, in units
+const SPAWN = 330;               // shots start this far from the ship centre
+const SHOT_SPEED = 260;          // units per second
+const REGEN_IDLE = 1.2;          // seconds without a hit before a shield regenerates
+const RETURN_FRAC = 0.25;        // fraction of capacity a broken shield returns with
+const TURN_RATE = 0.28;          // radians per second when the ship turns
+const MAX_SHIELDS = 8;
+const VARIETIES = {
+  flicker: { name: 'Flicker', col: '#5fd8ff', hot: '#e2f9ff' },   // quick and small
+  bulwark: { name: 'Bulwark', col: '#ffb04a', hot: '#ffe6bd' },   // deep and slow
+  full:    { name: 'Full',    col: '#b68cff', hot: '#eadfff' }    // late all-covering reference
+};
+// kind: wall (len cells, off cells off the hull) or arc (radius cells, span degrees; 360 is the full bubble)
+// cap = HP, rate = HP per second, delay = seconds down after a break, fp = projector footprint [along edge, deep] in cells
+const SHAPES = [
+  { id: 'spark',  name: 'Spark Wall',   v: 'flicker', kind: 'wall', len: 2, off: 1,               cap: 40,  rate: 14, delay: 1.5, fp: [1, 1], lvl: 1, desc: 'Two cells of flat shield just off the hull. Cheap and quick.' },
+  { id: 'guard',  name: 'Guard Wall',   v: 'flicker', kind: 'wall', len: 3, off: 1,               cap: 75,  rate: 12, delay: 2.2, fp: [2, 1], lvl: 2, desc: 'Three cells wide. Covers a gun and its neighbours.' },
+  { id: 'ramp',   name: 'Rampart',      v: 'bulwark', kind: 'wall', len: 5, off: 2,               cap: 260, rate: 9,  delay: 4.5, fp: [3, 1], lvl: 4, desc: 'Five cells of deep flat shield, two cells out. Slow to return.' },
+  { id: 'visor',  name: 'Visor',        v: 'flicker', kind: 'arc',  rad: 2.5, span: 60,           cap: 45,  rate: 16, delay: 1.2, fp: [1, 1], lvl: 1, desc: 'A tight 60 degree arc in front of a gun.' },
+  { id: 'buck',   name: 'Buckler',      v: 'flicker', kind: 'arc',  rad: 2,   span: 90,           cap: 60,  rate: 13, delay: 2.0, fp: [1, 1], lvl: 2, desc: 'A small 90 degree arc close to the hull.' },
+  { id: 'shell',  name: 'Shell',        v: 'bulwark', kind: 'arc',  rad: 3.5, span: 120,          cap: 160, rate: 8,  delay: 3.5, fp: [2, 1], lvl: 3, desc: 'A 120 degree arc that wraps most of a side.' },
+  { id: 'dome',   name: 'Half-dome',    v: 'bulwark', kind: 'arc',  rad: 5,   span: 180,          cap: 320, rate: 6,  delay: 5.5, fp: [2, 2], lvl: 5, desc: 'A 180 degree dome over one end. Deep and slow.' },
+  { id: 'bubble', name: 'Bubble',       v: 'full',    kind: 'arc',  rad: 5.5, span: 360, ctr: true, cap: 520, rate: 5,  delay: 8.0, fp: [3, 2], lvl: 6, desc: 'Covers everything. The late reference to compare against.' }
+];
+// Presets: [shape id, hull column, hull row, side (0 up, 1 right, 2 down, 3 left)]
+const PRESETS = [
+  { name: 'Starter',        mounts: [['spark', 2, 0, 0], ['spark', 4, 3, 1]] },
+  { name: 'Visor + walls',  mounts: [['visor', 2, 0, 0], ['guard', 0, 3, 3], ['guard', 4, 3, 1]] },
+  { name: 'Rear half-dome', mounts: [['dome', 2, 5, 2]] },
+  { name: 'Mixed',          mounts: [['ramp', 2, 0, 0], ['buck', 0, 4, 3], ['buck', 4, 4, 1], ['spark', 2, 5, 2]] },
+  { name: 'Bubble',         mounts: [['bubble', 2, 0, 0]] }
+];
+const HULL = ['..#..', '.###.', '.###.', '#####', '#####', '.###.', '.#.#.'];   // nose up
+
+/* ---------- State, all preallocated ---------- */
+const $ = (id) => document.getElementById(id);
+const RM = window.matchMedia('(prefers-reduced-motion: reduce)');
+const HW = HULL[0].length, HH = HULL.length;
+const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+const hullHas = (c, r) => c >= 0 && r >= 0 && c < HW && r < HH && HULL[r][c] === '#';
+
+// hull cells and exposed edges
+const cellX = [], cellY = [];
+for (let r = 0; r < HH; r++) for (let c = 0; c < HW; c++) if (hullHas(c, r)) { cellX.push((c - (HW - 1) / 2) * CELL); cellY.push((r - (HH - 1) / 2) * CELL); }
+const NCELL = cellX.length;
+const cellFlash = new Float32Array(HW * HH);
+const edgeC = [], edgeR = [], edgeS = [];
+for (let r = 0; r < HH; r++) for (let c = 0; c < HW; c++) if (hullHas(c, r))
+  for (let s = 0; s < 4; s++) if (!hullHas(c + DX[s], r + DY[s])) { edgeC.push(c); edgeR.push(r); edgeS.push(s); }
+const NEDGE = edgeC.length;
+const edgeMX = new Float32Array(NEDGE), edgeMY = new Float32Array(NEDGE);
+for (let i = 0; i < NEDGE; i++) {
+  edgeMX[i] = (edgeC[i] - (HW - 1) / 2) * CELL + DX[edgeS[i]] * CELL / 2;
+  edgeMY[i] = (edgeR[i] - (HH - 1) / 2) * CELL + DY[edgeS[i]] * CELL / 2;
+}
+function findEdge(c, r, s) { for (let i = 0; i < NEDGE; i++) if (edgeC[i] === c && edgeR[i] === r && edgeS[i] === s) return i; return -1; }
+
+// shield slots: 0..MAX_SHIELDS-1 live, MAX_SHIELDS is the placement ghost
+const NS = MAX_SHIELDS + 1, GHOST = MAX_SHIELDS;
+const sShape = new Int8Array(NS), sEdge = new Int16Array(NS), sArc = new Uint8Array(NS), sFull = new Uint8Array(NS);
+const gAx = new Float32Array(NS), gAy = new Float32Array(NS), gBx = new Float32Array(NS), gBy = new Float32Array(NS);   // wall ends
+const gCx = new Float32Array(NS), gCy = new Float32Array(NS), gR = new Float32Array(NS), gMid = new Float32Array(NS);   // arc
+const gHalf = new Float32Array(NS), gMdx = new Float32Array(NS), gMdy = new Float32Array(NS), gCosH = new Float32Array(NS);
+const gPx = new Float32Array(NS), gPy = new Float32Array(NS);                         // projector emitter
+const sHp = new Float32Array(NS), sCap = new Float32Array(NS), sIdle = new Float32Array(NS), sDown = new Float32Array(NS), sDownFor = new Float32Array(NS);
+const sFlash = new Float32Array(NS);
+const RIP = 4, RLIFE = 0.55;
+const rpPos = new Float32Array(NS * RIP), rpAge = new Float32Array(NS * RIP).fill(9), rpN = new Uint8Array(NS);
+let nShield = 0;
+
+const MAXSHOT = 96;
+const shX = new Float32Array(MAXSHOT), shY = new Float32Array(MAXSHOT), shVx = new Float32Array(MAXSHOT), shVy = new Float32Array(MAXSHOT);
+const shDmg = new Float32Array(MAXSHOT), shAlive = new Uint8Array(MAXSHOT), shAge = new Float32Array(MAXSHOT);
+const MAXSP = 120;
+const spX = new Float32Array(MAXSP), spY = new Float32Array(MAXSP), spVx = new Float32Array(MAXSP), spVy = new Float32Array(MAXSP), spL = new Float32Array(MAXSP);
+let spN = 0;
+const STARS = 48, starX = new Float32Array(STARS), starY = new Float32Array(STARS), starA = new Float32Array(STARS);
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < STARS; i++) { starX[i] = (rnd() - 0.5) * 900; starY[i] = (rnd() - 0.5) * 700; starA[i] = 0.15 + rnd() * 0.35; }
+
+let selShape = 1, shipAng = 0, paused = false, accFire = 0, clock = 0;
+let stopped = 0, reached = 0, oneWay = false, tapFire = false, hoverEdge = -1;
+const cv = $('main'), ctx = cv.getContext('2d');
+let W = 300, H = 300, dpr = 1, sc = 1;
+
+/* ---------- Geometry ---------- */
+function buildGeom(s, si, ei) {
+  const sh = SHAPES[si], side = edgeS[ei], nx = DX[side], ny = DY[side];
+  const px = edgeMX[ei], py = edgeMY[ei];
+  sShape[s] = si; sEdge[s] = ei; gPx[s] = px; gPy[s] = py;
+  sArc[s] = sh.kind === 'arc' ? 1 : 0; sFull[s] = sh.span >= 360 ? 1 : 0;
+  if (!sArc[s]) {
+    const cx = px + nx * sh.off * CELL, cy = py + ny * sh.off * CELL, tx = -ny, ty = nx, hl = sh.len * CELL / 2;
+    gAx[s] = cx - tx * hl; gAy[s] = cy - ty * hl; gBx[s] = cx + tx * hl; gBy[s] = cy + ty * hl;
+  } else {
+    gCx[s] = sh.ctr ? 0 : px; gCy[s] = sh.ctr ? 0 : py; gR[s] = sh.rad * CELL;
+    gMid[s] = Math.atan2(ny, nx); gHalf[s] = sh.span * Math.PI / 360;
+    gMdx[s] = nx; gMdy[s] = ny; gCosH[s] = Math.cos(gHalf[s]);
+  }
+}
+function setShield(s) { sCap[s] = SHAPES[sShape[s]].cap; sHp[s] = sCap[s]; sIdle[s] = 0; sDown[s] = 0; sFlash[s] = 0; for (let k = 0; k < RIP; k++) rpAge[s * RIP + k] = 9; }
+
+function mount(si, ei) {
+  let slot = -1;
+  for (let s = 0; s < nShield; s++) if (sEdge[s] === ei) slot = s;       // replace one on the same edge
+  if (slot < 0) {
+    if (nShield >= MAX_SHIELDS) { flashMsg('Eight shields at most. Remove one first.'); return; }
+    slot = nShield++;
+  }
+  buildGeom(slot, si, ei); setShield(slot); syncRows(); zeroCounts();
+}
+function removeShield(s) {
+  for (let i = s; i < nShield - 1; i++) copySlot(i, i + 1);
+  nShield--; syncRows(); zeroCounts();
+}
+function copySlot(d, s) {
+  sShape[d] = sShape[s]; sEdge[d] = sEdge[s]; sArc[d] = sArc[s]; sFull[d] = sFull[s];
+  gAx[d] = gAx[s]; gAy[d] = gAy[s]; gBx[d] = gBx[s]; gBy[d] = gBy[s]; gCx[d] = gCx[s]; gCy[d] = gCy[s]; gR[d] = gR[s];
+  gMid[d] = gMid[s]; gHalf[d] = gHalf[s]; gMdx[d] = gMdx[s]; gMdy[d] = gMdy[s]; gCosH[d] = gCosH[s]; gPx[d] = gPx[s]; gPy[d] = gPy[s];
+  sHp[d] = sHp[s]; sCap[d] = sCap[s]; sIdle[d] = sIdle[s]; sDown[d] = sDown[s]; sDownFor[d] = sDownFor[s]; sFlash[d] = sFlash[s]; rpN[d] = rpN[s];
+  for (let k = 0; k < RIP; k++) { rpPos[d * RIP + k] = rpPos[s * RIP + k]; rpAge[d * RIP + k] = rpAge[s * RIP + k]; }
+}
+function loadPreset(i) {
+  nShield = 0;
+  const m = PRESETS[i].mounts;
+  for (let k = 0; k < m.length; k++) {
+    let si = 0; for (let q = 0; q < SHAPES.length; q++) if (SHAPES[q].id === m[k][0]) si = q;
+    const ei = findEdge(m[k][1], m[k][2], m[k][3]);
+    if (ei >= 0 && nShield < MAX_SHIELDS) { const s = nShield++; buildGeom(s, si, ei); setShield(s); }
+  }
+  syncRows(); zeroCounts();
+}
+function clearAll() { nShield = 0; syncRows(); zeroCounts(); }
+function zeroCounts() { stopped = 0; reached = 0; statTxt = ''; }
+
+// first shield crossing of the segment p0 to p1 (ship frame); sets hitT, hitS
+let hitT = 2, hitS = -1;
+function crossShields(x0, y0, x1, y1) {
+  hitT = 2; hitS = -1;
+  const dx = x1 - x0, dy = y1 - y0;
+  for (let s = 0; s < nShield; s++) {
+    if (sDown[s] > 0) continue;
+    if (!sArc[s]) {
+      const ex = gBx[s] - gAx[s], ey = gBy[s] - gAy[s], den = dx * ey - dy * ex;
+      if (den > -1e-9 && den < 1e-9) continue;
+      const wx = gAx[s] - x0, wy = gAy[s] - y0, t = (wx * ey - wy * ex) / den, u = (wx * dy - wy * dx) / den;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && t < hitT) { hitT = t; hitS = s; }
+    } else {
+      const fx = x0 - gCx[s], fy = y0 - gCy[s], A = dx * dx + dy * dy;
+      if (A < 1e-9) continue;
+      const B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - gR[s] * gR[s], disc = B * B - 4 * A * C;
+      if (disc < 0) continue;
+      const sq = Math.sqrt(disc);
+      for (let k = 0; k < 2; k++) {
+        const t = (-B + (k ? sq : -sq)) / (2 * A);
+        if (t < 0 || t > 1 || t >= hitT) continue;
+        if (!sFull[s]) {
+          const qx = fx + dx * t, qy = fy + dy * t;
+          if ((qx * gMdx[s] + qy * gMdy[s]) / gR[s] < gCosH[s]) continue;
+        }
+        hitT = t; hitS = s;
+      }
+    }
+  }
+}
+
+/* ---------- Shots ---------- */
+function spawnShot(x, y, tx, ty) {
+  let i = 0; while (i < MAXSHOT && shAlive[i]) i++;
+  if (i >= MAXSHOT) return;
+  const dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy) || 1;
+  shX[i] = x; shY[i] = y; shVx[i] = dx / d * SHOT_SPEED; shVy[i] = dy / d * SHOT_SPEED;
+  shDmg[i] = +$('dmg').value * (0.8 + rnd() * 0.4); shAlive[i] = 1; shAge[i] = 0;
+}
+function aimPoint(out) {   // a random hull cell, in world space
+  const k = (rnd() * NCELL) | 0, c = Math.cos(shipAng), s = Math.sin(shipAng), lx = cellX[k] + (rnd() - 0.5) * 14, ly = cellY[k] + (rnd() - 0.5) * 14;
+  out[0] = lx * c - ly * s; out[1] = lx * s + ly * c;
+}
+const aim = [0, 0];
+function fireAuto() {
+  const a = oneWay ? (+$('ang').value + (rnd() - 0.5) * 6) * Math.PI / 180 : rnd() * Math.PI * 2;
+  aimPoint(aim);
+  spawnShot(Math.cos(a) * SPAWN, Math.sin(a) * SPAWN, aim[0], aim[1]);
+}
+function spark(x, y, n) {
+  for (let i = 0; i < n && spN < MAXSP; i++) {
+    const a = rnd() * 6.283, v = 30 + rnd() * 70;
+    spX[spN] = x; spY[spN] = y; spVx[spN] = Math.cos(a) * v; spVy[spN] = Math.sin(a) * v; spL[spN] = 0.35 + rnd() * 0.25; spN++;
+  }
+}
+
+function hitShield(s, t, x0, y0, dxl, dyl, dmg) {
+  const hx = x0 + dxl * t, hy = y0 + dyl * t, k = s * RIP + (rpN[s]++ % RIP);
+  if (!sArc[s]) {
+    const ex = gBx[s] - gAx[s], ey = gBy[s] - gAy[s];
+    rpPos[k] = ((hx - gAx[s]) * ex + (hy - gAy[s]) * ey) / (ex * ex + ey * ey);
+  } else {
+    let rel = Math.atan2(hy - gCy[s], hx - gCx[s]) - gMid[s];
+    while (rel > Math.PI) rel -= 6.2832; while (rel < -Math.PI) rel += 6.2832;
+    rpPos[k] = rel;
+  }
+  rpAge[k] = 0; sFlash[s] = 1; sIdle[s] = 0; sHp[s] -= dmg; stopped++;
+  if (sHp[s] <= 0) { sHp[s] = 0; sDown[s] = sDownFor[s] = SHAPES[sShape[s]].delay; }
+}
+
+function update(dt) {
+  clock += dt;
+  if ($('turn').checked) shipAng += TURN_RATE * dt;
+  accFire += dt * +$('rate').value;
+  while (accFire >= 1) { accFire -= 1; fireAuto(); }
+  const ca = Math.cos(-shipAng), sa = Math.sin(-shipAng);
+  for (let i = 0; i < MAXSHOT; i++) {
+    if (!shAlive[i]) continue;
+    const ox = shX[i], oy = shY[i];
+    shX[i] += shVx[i] * dt; shY[i] += shVy[i] * dt; shAge[i] += dt;
+    const lx0 = ox * ca - oy * sa, ly0 = ox * sa + oy * ca, lx1 = shX[i] * ca - shY[i] * sa, ly1 = shX[i] * sa + shY[i] * ca;
+    crossShields(lx0, ly0, lx1, ly1);
+    if (hitS >= 0) {
+      hitShield(hitS, hitT, lx0, ly0, lx1 - lx0, ly1 - ly0, shDmg[i]);
+      shAlive[i] = 0; continue;
+    }
+    const c = Math.floor(lx1 / CELL + HW / 2), r = Math.floor(ly1 / CELL + HH / 2);
+    if (hullHas(c, r)) {
+      reached++; cellFlash[r * HW + c] = 1; spark(shX[i], shY[i], RM.matches ? 3 : 7); shAlive[i] = 0; continue;
+    }
+    if (shAge[i] > 4 || shX[i] * shX[i] + shY[i] * shY[i] > 560 * 560) shAlive[i] = 0;
+  }
+  for (let s = 0; s < nShield; s++) {
+    if (sDown[s] > 0) { sDown[s] -= dt; if (sDown[s] <= 0) { sDown[s] = 0; sHp[s] = sCap[s] * RETURN_FRAC; sIdle[s] = REGEN_IDLE; sFlash[s] = 0.8; } }
+    else { sIdle[s] += dt; if (sIdle[s] >= REGEN_IDLE && sHp[s] < sCap[s]) sHp[s] = Math.min(sCap[s], sHp[s] + SHAPES[sShape[s]].rate * dt); }
+    if (sFlash[s] > 0) sFlash[s] = Math.max(0, sFlash[s] - dt * 3);
+    for (let k = 0; k < RIP; k++) rpAge[s * RIP + k] += dt;
+  }
+  for (let i = 0; i < HW * HH; i++) if (cellFlash[i] > 0) cellFlash[i] = Math.max(0, cellFlash[i] - dt * 4);
+  for (let i = 0; i < spN;) {
+    spL[i] -= dt;
+    if (spL[i] <= 0) { spN--; spX[i] = spX[spN]; spY[i] = spY[spN]; spVx[i] = spVx[spN]; spVy[i] = spVy[spN]; spL[i] = spL[spN]; continue; }
+    spX[i] += spVx[i] * dt; spY[i] += spVy[i] * dt; i++;
+  }
+}
+
+/* ---------- Drawing ---------- */
+function shieldPath(s) {
+  ctx.beginPath();
+  if (!sArc[s]) { ctx.moveTo(gAx[s], gAy[s]); ctx.lineTo(gBx[s], gBy[s]); }
+  else if (sFull[s]) ctx.arc(gCx[s], gCy[s], gR[s], 0, 6.2832);
+  else ctx.arc(gCx[s], gCy[s], gR[s], gMid[s] - gHalf[s], gMid[s] + gHalf[s]);
+}
+function drawShield(s, ghost) {
+  const sh = SHAPES[sShape[s]], v = VARIETIES[sh.v];
+  let a = 1;
+  if (!ghost) {
+    if (sDown[s] > 0) {
+      const since = sDownFor[s] - sDown[s];
+      if (since < 0.6 && !RM.matches) a = (Math.sin(clock * 90) > 0 ? 0.85 : 0.1) * (1 - since / 0.6);
+      else {
+        // offline: dashed outline, fading back in just before it returns
+        a = 0.16 + (sDown[s] < 0.5 ? (0.5 - sDown[s]) * 1.2 : 0);
+        ctx.setLineDash(DASH); ctx.strokeStyle = v.col; ctx.globalAlpha = a; ctx.lineWidth = 1.5; shieldPath(s); ctx.stroke(); ctx.setLineDash(NODASH);
+        ctx.globalAlpha = 1; return;
+      }
+    } else a = 0.4 + 0.6 * sHp[s] / sCap[s];
+  } else a = 0.45;
+  const f = ghost ? 0 : sFlash[s];
+  ctx.lineCap = 'round';
+  if (sArc[s]) {   // translucent body
+    ctx.beginPath(); if (!sFull[s]) ctx.moveTo(gCx[s], gCy[s]);
+    ctx.arc(gCx[s], gCy[s], gR[s], sFull[s] ? 0 : gMid[s] - gHalf[s], sFull[s] ? 6.2832 : gMid[s] + gHalf[s]); ctx.closePath();
+    ctx.fillStyle = v.col; ctx.globalAlpha = a * (0.07 + 0.08 * f); ctx.fill();
+  } else {         // faint tether from the projector to each end
+    ctx.beginPath(); ctx.moveTo(gAx[s], gAy[s]); ctx.lineTo(gPx[s], gPy[s]); ctx.lineTo(gBx[s], gBy[s]);
+    ctx.strokeStyle = v.col; ctx.globalAlpha = a * 0.12; ctx.lineWidth = 1; ctx.stroke();
+  }
+  if (ghost) { ctx.setLineDash(DASH); }
+  ctx.strokeStyle = v.col; shieldPath(s);
+  ctx.globalAlpha = a * (0.10 + 0.12 * f); ctx.lineWidth = 14; ctx.stroke();
+  ctx.globalAlpha = a * (0.22 + 0.25 * f); ctx.lineWidth = 6.5; ctx.stroke();
+  ctx.strokeStyle = v.hot; ctx.globalAlpha = a * (0.8 + 0.2 * f); ctx.lineWidth = 2; ctx.stroke();
+  if (ghost) ctx.setLineDash(NODASH);
+  if (!sArc[s]) {
+    ctx.fillStyle = v.hot; ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(gAx[s], gAy[s], 2.6, 0, 6.2832); ctx.arc(gBx[s], gBy[s], 2.6, 0, 6.2832); ctx.fill();
+  }
+  if (!ghost) {
+    for (let k = 0; k < RIP; k++) {
+      const age = rpAge[s * RIP + k];
+      if (age >= RLIFE) continue;
+      const q = 1 - age / RLIFE, rad = 10 + age * 260, pos = rpPos[s * RIP + k];
+      let hx, hy;
+      ctx.strokeStyle = v.hot; ctx.lineWidth = 4.5; ctx.globalAlpha = q * 0.95;
+      if (!sArc[s]) {
+        const len = Math.hypot(gBx[s] - gAx[s], gBy[s] - gAy[s]), hw = rad / len;
+        const u0 = Math.max(0, pos - hw), u1 = Math.min(1, pos + hw);
+        hx = gAx[s] + (gBx[s] - gAx[s]) * pos; hy = gAy[s] + (gBy[s] - gAy[s]) * pos;
+        ctx.beginPath(); ctx.moveTo(gAx[s] + (gBx[s] - gAx[s]) * u0, gAy[s] + (gBy[s] - gAy[s]) * u0); ctx.lineTo(gAx[s] + (gBx[s] - gAx[s]) * u1, gAy[s] + (gBy[s] - gAy[s]) * u1); ctx.stroke();
+      } else {
+        const hw = rad / gR[s];
+        let lo = pos - hw, hi = pos + hw;
+        if (!sFull[s]) { lo = Math.max(lo, -gHalf[s]); hi = Math.min(hi, gHalf[s]); }
+        hx = gCx[s] + Math.cos(gMid[s] + pos) * gR[s]; hy = gCy[s] + Math.sin(gMid[s] + pos) * gR[s];
+        if (hi > lo) { ctx.beginPath(); ctx.arc(gCx[s], gCy[s], gR[s], gMid[s] + lo, gMid[s] + hi); ctx.stroke(); }
+      }
+      ctx.fillStyle = v.hot; ctx.globalAlpha = q * 0.8; ctx.beginPath(); ctx.arc(hx, hy, 3 + 7 * q, 0, 6.2832); ctx.fill();
+      if (!RM.matches) { ctx.strokeStyle = v.col; ctx.lineWidth = 1.5; ctx.globalAlpha = q * 0.5; ctx.beginPath(); ctx.arc(hx, hy, 4 + age * 90, 0, 6.2832); ctx.stroke(); }
+    }
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+}
+const DASH = [5, 5], NODASH = [];
+
+function drawFootprint(s, ghost) {
+  const sh = SHAPES[sShape[s]], v = VARIETIES[sh.v], ei = sEdge[s], side = edgeS[ei];
+  const nx = DX[side], ny = DY[side], tx = -ny, ty = nx;
+  ctx.fillStyle = v.col; ctx.strokeStyle = v.hot;
+  for (let i = 0; i < sh.fp[0]; i++) for (let j = 0; j < sh.fp[1]; j++) {
+    const c = edgeC[ei] + tx * i - nx * j, r = edgeR[ei] + ty * i - ny * j;
+    if (!hullHas(c, r)) continue;
+    const x = (c - (HW - 1) / 2) * CELL, y = (r - (HH - 1) / 2) * CELL;
+    ctx.globalAlpha = ghost ? 0.18 : 0.32; ctx.fillRect(x - 11, y - 11, 22, 22);
+    ctx.globalAlpha = ghost ? 0.4 : 0.8; ctx.lineWidth = 1; ctx.strokeRect(x - 11.5, y - 11.5, 23, 23);
+  }
+  // emitter on the hull edge
+  ctx.globalAlpha = ghost ? 0.5 : 1; ctx.fillStyle = v.hot;
+  ctx.save(); ctx.translate(gPx[s], gPy[s]); ctx.rotate(Math.atan2(ny, nx));
+  ctx.fillRect(-2, -5, 6, 10); ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.setTransform(dpr * sc, 0, 0, dpr * sc, W * dpr / 2, H * dpr / 2);
+  ctx.fillStyle = '#06080c'; ctx.fillRect(-W / sc, -H / sc, 2 * W / sc, 2 * H / sc);
+  ctx.fillStyle = '#c8d4e6';
+  for (let i = 0; i < STARS; i++) { ctx.globalAlpha = starA[i]; ctx.fillRect(starX[i], starY[i], 1.3, 1.3); }
+  ctx.globalAlpha = 1;
+
+  ctx.save(); ctx.rotate(shipAng);
+  // hull
+  for (let k = 0; k < NCELL; k++) {
+    const x = cellX[k], y = cellY[k];
+    ctx.fillStyle = '#242c38'; ctx.fillRect(x - 11.5, y - 11.5, 23, 23);
+    ctx.fillStyle = '#323c4b'; ctx.fillRect(x - 9.5, y - 9.5, 19, 19);
+    ctx.strokeStyle = '#4a5668'; ctx.lineWidth = 1; ctx.strokeRect(x - 11.5, y - 11.5, 23, 23);
+    const f = cellFlash[Math.round(y / CELL + (HH - 1) / 2) * HW + Math.round(x / CELL + (HW - 1) / 2)];
+    if (f > 0) { ctx.fillStyle = '#ffd9a0'; ctx.globalAlpha = f * 0.8; ctx.fillRect(x - 11.5, y - 11.5, 23, 23); ctx.globalAlpha = 1; }
+  }
+  for (let s = 0; s < nShield; s++) drawFootprint(s, false);
+  if (hoverEdge >= 0) {
+    buildGeom(GHOST, selShape, hoverEdge);
+    drawFootprint(GHOST, true); drawShield(GHOST, true);
+  }
+  for (let s = 0; s < nShield; s++) drawShield(s, false);
+  ctx.restore();
+
+  // shots
+  ctx.lineCap = 'round';
+  for (let i = 0; i < MAXSHOT; i++) {
+    if (!shAlive[i]) continue;
+    const vx = shVx[i] / SHOT_SPEED, vy = shVy[i] / SHOT_SPEED;
+    ctx.strokeStyle = '#ffb04a'; ctx.globalAlpha = 0.35; ctx.lineWidth = 4.5;
+    ctx.beginPath(); ctx.moveTo(shX[i] - vx * 16, shY[i] - vy * 16); ctx.lineTo(shX[i], shY[i]); ctx.stroke();
+    ctx.strokeStyle = '#fff1d4'; ctx.globalAlpha = 1; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(shX[i] - vx * 10, shY[i] - vy * 10); ctx.lineTo(shX[i], shY[i]); ctx.stroke();
+  }
+  ctx.strokeStyle = '#ffd9a0'; ctx.lineWidth = 1.4;
+  for (let i = 0; i < spN; i++) {
+    ctx.globalAlpha = Math.min(1, spL[i] * 3);
+    ctx.beginPath(); ctx.moveTo(spX[i], spY[i]); ctx.lineTo(spX[i] - spVx[i] * 0.04, spY[i] - spVy[i] * 0.04); ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+}
+
+/* ---------- UI ---------- */
+let statTxt = '', msgT = 0;
+function flashMsg(t) { $('roStat').textContent = t; msgT = 2; statTxt = ''; }
+function refreshHead() {
+  const sh = SHAPES[selShape], v = VARIETIES[sh.v];
+  $('sName').textContent = sh.name; $('sTag').textContent = v.name; $('sTag').style.color = v.col; $('sLvl').textContent = 'Level ' + sh.lvl;
+  $('sDesc').textContent = sh.desc + ' Tap a hull edge to mount it.';
+}
+function shapeSize(sh) {
+  return sh.kind === 'wall' ? sh.len + ' cells long' : (sh.span >= 360 ? 'full, r ' : sh.span + ' deg, r ') + sh.rad;
+}
+const picker = $('picker'), pickBtns = [];
+SHAPES.forEach((sh, i) => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pick'; b.setAttribute('role', 'radio');
+  const v = VARIETIES[sh.v];
+  b.innerHTML = '<span class="top"><b></b><span class="tag">L' + sh.lvl + '</span></span><span class="d"></span><span class="h"></span>';
+  b.querySelector('b').textContent = sh.name; b.querySelector('b').style.borderLeft = '3px solid ' + v.col; b.querySelector('b').style.paddingLeft = '7px';
+  b.querySelector('.d').textContent = sh.desc;
+  b.querySelector('.h').textContent = shapeSize(sh) + ' | ' + sh.fp[0] + 'x' + sh.fp[1] + ' cells'; b.querySelector('.h').style.color = v.col;
+  b.addEventListener('click', () => { selShape = i; syncPick(); refreshHead(); });
+  picker.appendChild(b); pickBtns.push(b);
+});
+function syncPick() { pickBtns.forEach((b, i) => b.setAttribute('aria-checked', i === selShape ? 'true' : 'false')); }
+
+const tbl = $('tbl');
+tbl.innerHTML = '<thead><tr><th>Shape</th><th>Variety</th><th>Size</th><th>Capacity</th><th>Regen/s</th><th>Delay s</th><th>Cells</th><th>Level</th></tr></thead><tbody>' +
+  SHAPES.map((sh) => '<tr><td>' + sh.name + '</td><td style="color:' + VARIETIES[sh.v].col + '">' + VARIETIES[sh.v].name + '</td><td>' + shapeSize(sh) +
+    '</td><td>' + sh.cap + '</td><td>' + sh.rate + '</td><td>' + sh.delay.toFixed(1) + '</td><td>' + sh.fp[0] + 'x' + sh.fp[1] + '</td><td>' + sh.lvl + '</td></tr>').join('') + '</tbody>';
+
+const rows = [], rowBar = [], rowTxt = [], rowSw = [], rowName = [], lastTxt = [], lastW = [];
+const mounted = $('mounted');
+for (let s = 0; s < MAX_SHIELDS; s++) {
+  const d = document.createElement('div'); d.className = 'mrow'; d.hidden = true;
+  d.innerHTML = '<i class="sw"></i><b></b><span class="mbar"><i></i></span><span class="ro"></span><button class="x" type="button" aria-label="Remove shield">x</button>';
+  d.querySelector('.x').addEventListener('click', () => removeShield(s));
+  mounted.appendChild(d); rows.push(d); rowSw.push(d.querySelector('.sw')); rowName.push(d.querySelector('b')); rowBar.push(d.querySelector('.mbar i')); rowTxt.push(d.querySelector('.ro'));
+  lastTxt.push(''); lastW.push(-1);
+}
+function syncRows() {
+  for (let s = 0; s < MAX_SHIELDS; s++) {
+    rows[s].hidden = s >= nShield; lastTxt[s] = ''; lastW[s] = -1;
+    if (s < nShield) { const sh = SHAPES[sShape[s]], v = VARIETIES[sh.v]; rowSw[s].style.background = v.col; rowName[s].textContent = sh.name; rowBar[s].style.background = v.col; }
+  }
+  $('mEmpty').hidden = nShield > 0;
+}
+function updateRows() {
+  for (let s = 0; s < nShield; s++) {
+    const down = sDown[s] > 0, w = down ? 0 : Math.round(sHp[s] / sCap[s] * 100);
+    const t = down ? 'down ' + sDown[s].toFixed(1) + 's' : Math.ceil(sHp[s]) + '/' + sCap[s];
+    if (t !== lastTxt[s]) { rowTxt[s].textContent = t; lastTxt[s] = t; }
+    if (w !== lastW[s]) { rowBar[s].style.transform = 'scaleX(' + w / 100 + ')'; lastW[s] = w; }
+  }
+  if (msgT > 0) { msgT -= 1 / 60; if (msgT <= 0) statTxt = ''; return; }
+  const t = 'Stopped ' + stopped + ' | Hull ' + reached + (stopped + reached ? ' | ' + Math.round(stopped / (stopped + reached) * 100) + '% stopped' : '');
+  if (t !== statTxt) { $('roStat').textContent = t; statTxt = t; }
+}
+
+const presetsEl = $('presets');
+PRESETS.forEach((p, i) => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = p.name; b.addEventListener('click', () => loadPreset(i)); presetsEl.appendChild(b);
+});
+$('clear').addEventListener('click', clearAll);
+$('zero').addEventListener('click', zeroCounts);
+$('play').addEventListener('click', () => { paused = !paused; $('play').textContent = paused ? 'Play' : 'Pause'; });
+function setPress(a, b, first) { a.setAttribute('aria-pressed', first ? 'true' : 'false'); b.setAttribute('aria-pressed', first ? 'false' : 'true'); }
+$('mSpread').addEventListener('click', () => { oneWay = false; setPress($('mSpread'), $('mOne'), true); });
+$('mOne').addEventListener('click', () => { oneWay = true; setPress($('mSpread'), $('mOne'), false); });
+$('tMount').addEventListener('click', () => { tapFire = false; setPress($('tMount'), $('tFire'), true); });
+$('tFire').addEventListener('click', () => { tapFire = true; hoverEdge = -1; setPress($('tMount'), $('tFire'), false); });
+function knob(id, out, fmt) { const f = () => { $(out).textContent = fmt($(id).value); }; $(id).addEventListener('input', f); f(); }
+knob('rate', 'rateVal', (v) => (+v).toFixed(1) + '/s'); knob('dmg', 'dmgVal', (v) => v); knob('ang', 'angVal', (v) => v + ' deg');
+
+// pointer: world point -> ship frame -> nearest exposed edge
+const loc = [0, 0];
+function toShip(ev) {
+  const r = cv.getBoundingClientRect(), wx = (ev.clientX - r.left - r.width / 2) / (r.width / W * sc), wy = (ev.clientY - r.top - r.height / 2) / (r.height / H * sc);
+  const c = Math.cos(-shipAng), s = Math.sin(-shipAng);
+  loc[0] = wx * c - wy * s; loc[1] = wx * s + wy * c; return [wx, wy];
+}
+function nearestEdge() {
+  let best = -1, bd = 1e9;
+  for (let i = 0; i < NEDGE; i++) { const d = (edgeMX[i] - loc[0]) ** 2 + (edgeMY[i] - loc[1]) ** 2; if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+cv.addEventListener('pointermove', (ev) => { if (tapFire || ev.pointerType !== 'mouse') return; toShip(ev); hoverEdge = nearestEdge(); });
+cv.addEventListener('pointerleave', () => { hoverEdge = -1; });
+cv.addEventListener('pointerdown', (ev) => {
+  const w = toShip(ev);
+  if (tapFire) { aimPoint(aim); spawnShot(w[0], w[1], aim[0], aim[1]); }
+  else { const e = nearestEdge(); if (e >= 0) mount(selShape, e); }
+});
+
+function resize() {
+  const r = cv.getBoundingClientRect(); W = Math.max(200, r.width); H = Math.max(200, r.height); dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); sc = Math.min(W, H) / (2 * VIEW);
+}
+window.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(cv);
+
+let last = 0;
+function frame(t) {
+  const dt = Math.min(0.05, (t - last) / 1000 || 0); last = t;
+  if (!paused) update(dt);
+  draw(); updateRows();
+  requestAnimationFrame(frame);
+}
+$('turn').checked = !RM.matches;
+syncPick(); refreshHead(); resize(); loadPreset(1);
+requestAnimationFrame(frame);
+</script>
