@@ -9,7 +9,7 @@ import * as bitecs from 'bitecs';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { dispatch, HandlerRegistry, PRE_JOIN, MAX_INPUTS_PER_TICK } from './dispatch.js';
 import { MessageLimiter } from './MessageLimits.js';
@@ -25,7 +25,7 @@ describe('message dispatch', () => {
       userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
       scene: 'sectors',
       autoStart: false,
-      ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      ships: createShipBridge(loadShipConfigCached(dataDir)),
       clock: () => 1_000_000,
     });
     const pinned: string[] = JSON.parse(readFileSync(join(__dirname, '../golden/clientMessages.json'), 'utf8'));

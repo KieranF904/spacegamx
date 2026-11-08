@@ -11,7 +11,7 @@ import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { devHooks } from '../brains/kit.js';
 
@@ -28,7 +28,7 @@ function world() {
     scene: 'sectors',
     autoStart: false,
     devTeleport: true,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];

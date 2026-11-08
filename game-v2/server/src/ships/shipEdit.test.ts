@@ -7,7 +7,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from './loadShipConfig.js';
+import { loadShipConfigCached } from './loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
@@ -23,7 +23,7 @@ function liveServer(opts: { store?: MemoryProfileStore; user?: any } = {}) {
     userDB,
     scene: 'sectors',
     autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
     profileStore: opts.store,
   });
   const t = new LocalTransport(server);

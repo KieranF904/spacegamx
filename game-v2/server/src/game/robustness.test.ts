@@ -13,7 +13,7 @@ import { clientBlueprint } from '../net/handlers/shipEdit.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { MessageLimiter } from '../net/MessageLimits.js';
@@ -21,7 +21,7 @@ import { MessageLimiter } from '../net/MessageLimits.js';
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const shipConfig = loadShipConfigFromDisk(dataDir);
+const shipConfig = loadShipConfigCached(dataDir);
 
 function makeServer(userDB: Record<string, unknown> = {}) {
   resetGlobals();

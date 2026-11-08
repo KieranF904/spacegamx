@@ -5,14 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { Economy, createShipState, type Blueprint, type ItemsFile, type PlacedPart, type RecipesFile, type Rot } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import items from '../../../data/items.json';
 import recipes from '../../../data/recipes.json';
 import { fireChip } from './modelCards';
 import { partTipHtml } from './partTip';
 
-const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const { catalog, tuning } = bridge;
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, catalog, {});
 const p = (uid: number, piece: string, fn: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart =>

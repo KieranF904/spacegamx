@@ -19,6 +19,7 @@
     "start": "cd server && npm start",
     "proto": "cd client && npx vite --open \"/?proto\"",
     "test": "vitest run",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
     "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install",
     "gen:sfx": "node --env-file=.env scripts/gen-sfx.mjs",
     "panels:index": "node scripts/panels-index.mjs",

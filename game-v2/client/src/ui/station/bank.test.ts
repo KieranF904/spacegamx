@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { join } from 'path';
 import { Economy, setUnlockTable, depositable, packDefs, type ItemsFile, type RecipesFile, type ServerRepairBankMessage, type Stack, type UnlockTable } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
 import items from '../../../../data/items.json';
 import recipes from '../../../../data/recipes.json';
@@ -16,7 +16,7 @@ import { devBankHtml, devBankMessage, packKit } from './devBank';
 import { setBank, getBank } from './bankStore';
 import { guideHtml, GUIDE_TABS } from '../fieldGuide';
 
-const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../../data')));
+const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../../data')));
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, bridge.catalog, {});
 const icon = () => '';
 

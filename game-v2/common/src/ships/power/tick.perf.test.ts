@@ -1,6 +1,6 @@
 /**
  * Microbench (not CI): the energy tick's cost on the biggest bundled ships, and no heap growth over 100k ticks.
- * POWER_BENCH=1 npx vitest run common/src/ships/power/tick.bench.test.ts (with NODE_OPTIONS=--expose-gc for the heap check)
+ * npm run test:perf (the heap check needs NODE_OPTIONS=--expose-gc)
  */
 
 import { describe, it, expect } from 'vitest';

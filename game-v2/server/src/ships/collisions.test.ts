@@ -16,13 +16,13 @@ import {
 import { createProtoServer } from '../proto/createProtoServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from './loadShipConfig.js';
+import { loadShipConfigCached } from './loadShipConfig.js';
 import { STAGE_COVER, type ShipBridge } from './ShipBridge.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const shipsCfg = loadShipConfigFromDisk(dataDir);
+const shipsCfg = loadShipConfigCached(dataDir);
 const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
 
 function setup(design: string, angle = 0.4) {

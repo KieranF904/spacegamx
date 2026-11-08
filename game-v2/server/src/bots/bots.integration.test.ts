@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { BotManager } from './index.js';
 import type { ClientDriver } from './drivers/clientDriver.js';
@@ -18,7 +18,7 @@ function world() {
   const clock = { t: 1_000_000 };
   const server = new GameServer({
     gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, devTeleport: true, guestAdmin: true, ships: createShipBridge(loadShipConfigFromDisk(dataDir)), clock: () => clock.t,
+    scene: 'sectors', autoStart: false, devTeleport: true, guestAdmin: true, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t,
   } as never);
   const step = (secs: number) => { for (let i = 0; i < secs * TICK_RATE; i++) { clock.t += 1000 / TICK_RATE; server.step(); } };
   return { server, step };

@@ -6,7 +6,7 @@ import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { DEFAULT_SIEGE_RULES, SIEGE_STRINGS } from './rules.js';
 import { frontCount, siegeProfile, unitSpawns } from './plan.js';
@@ -22,7 +22,7 @@ function world() {
   const gameData = new GameData(files);
   const server = new GameServer({
     gameData, userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   const join = (name: string) => {
     const t = new LocalTransport(server);
@@ -94,7 +94,7 @@ function raider(s: ReturnType<typeof onSelene>, ship: string, x: number, y: numb
 describe('siege upgrades: building, orders, the night', () => {
   it('every role, objective and order the data names exists, with its text', () => {
     const rules = new GameServer({
-      gameData: new GameData(files), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      gameData: new GameData(files), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
     }).sieges.rules;
     for (const R of [rules, DEFAULT_SIEGE_RULES]) {
       for (const [id, P] of Object.entries(R.profiles)) {

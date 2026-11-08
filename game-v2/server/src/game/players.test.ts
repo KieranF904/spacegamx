@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { AccountAdmin, AccountInfo } from '../auth/types.js';
 import { JsonProfileStore } from '../profile/JsonProfileStore.js';
@@ -54,7 +54,7 @@ function world(lobby: boolean, profileStore?: JsonProfileStore, names = ['boss',
   const userDB = lobby ? fake.userDB : { ...fake.userDB, admin: null };
   const server = new GameServer({
     gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)), profileStore,
+    ships: createShipBridge(loadShipConfigCached(dataDir)), profileStore,
   });
   const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
   const join = async (name: string, guest = false) => {

@@ -8,7 +8,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { ContributorNotes, type ContribConn, type ContribHost } from './ContributorNotes.js';
 import { contribFileStore } from './contribFiles.js';
@@ -31,7 +31,7 @@ function world(clock = { t: Date.UTC(2026, 9, 25, 12) }) {
   resetGlobals();
   const server = new GameServer({
     gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)), clock: () => clock.t,
+    ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t,
   });
   const join = async (name: string, id?: number) => {
     const t = new LocalTransport(server);

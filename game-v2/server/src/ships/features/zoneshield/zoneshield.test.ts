@@ -11,7 +11,7 @@ import { readFileSync } from 'fs';
 import { GameServer } from '../../../GameServer.js';
 import { GameData } from '../../../data/GameData.js';
 import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../../loadShipConfig.js';
+import { loadShipConfigCached } from '../../loadShipConfig.js';
 import { createShipBridge } from '../../../proto/createProtoServer.js';
 import { LocalTransport } from '../../../net/LocalTransport.js';
 
@@ -19,7 +19,7 @@ const dataDir = join(__dirname, '../../../../../data');
 
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+  const server = new GameServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
   return { server, ships: server.getShips() };
 }
 

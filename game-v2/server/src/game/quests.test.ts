@@ -9,7 +9,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
@@ -25,7 +25,7 @@ function world(clock = { t: 1_000_000 }, store = new MemoryProfileStore()) {
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
     scene: 'sectors',
     autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
     clock: () => clock.t,
   });
   const t = new LocalTransport(server);
@@ -801,7 +801,7 @@ describe('reveals', () => {
     const server = new GameServer({
       profileStore: new MemoryProfileStore(), gameData: new GameData({ ...files, quests } as any),
       userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
     });
     const t = new LocalTransport(server);
     t.connect();

@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { readGameDataFiles } from './loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { validateGameData, checkGameData, formatProblems, type DataProblem } from './validateGameData.js';
 import type { GameDataFiles } from './GameData.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
-const ships = loadShipConfigFromDisk(dataDir);
+const ships = loadShipConfigCached(dataDir);
 
 const errors = (p: DataProblem[]) => p.filter((x) => x.level === 'error');
 const broken = (edit: (f: any, s: any) => void) => {

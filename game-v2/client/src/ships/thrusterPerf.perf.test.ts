@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
 import { Container, Texture } from 'pixi.js';
 import { blueprintGeometry, createShipState, loadCatalog, type Blueprint, type ShipState } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import type { InterpolatedEntity } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 
@@ -20,7 +20,7 @@ vi.mock('../rendering/fxTextures', async (orig) => {
 
 const { ThrusterFx } = await import('./ThrusterFx');
 
-const cfg = loadShipConfigFromDisk(join(__dirname, '../../../data')) as ReturnType<typeof loadShipConfigFromDisk> & { library: Record<string, Blueprint>; enemies: Record<string, Blueprint> };
+const cfg = loadShipConfigCached(join(__dirname, '../../../data')) as ReturnType<typeof loadShipConfigCached> & { library: Record<string, Blueprint>; enemies: Record<string, Blueprint> };
 const catalog = loadCatalog(cfg.catalog as never, { overlapShrink: cfg.tuning.overlapShrink });
 const tuning = cfg.tuning, cs = tuning.cellSize;
 

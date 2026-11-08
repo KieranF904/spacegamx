@@ -3,7 +3,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { Blueprint, parseBlueprint, resolveDesignUpdate, type DesignUpdateFile } from '@space-game/common';
 import type { ShipConfig } from '../proto/createProtoServer.js';
 
@@ -50,4 +50,25 @@ export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
     dev,
     ...(designUpdate ? { designUpdate: { accounts: designUpdate.accounts, blueprints: designUpdate.blueprints } } : {}),
   };
+}
+
+const cached = new Map<string, ShipConfig>();
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const v of Object.values(value)) deepFreeze(v);
+  }
+  return value;
+}
+
+/**
+ * Tests' loader: the same config as loadShipConfigFromDisk, read once per worker per data folder and handed (deep
+ * frozen) to every caller. A test that needs to change the config copies the part it changes.
+ */
+export function loadShipConfigCached(dataPath: string): ShipConfig {
+  const key = resolve(dataPath);
+  let config = cached.get(key);
+  if (!config) cached.set(key, config = deepFreeze(loadShipConfigFromDisk(dataPath)));
+  return config;
 }

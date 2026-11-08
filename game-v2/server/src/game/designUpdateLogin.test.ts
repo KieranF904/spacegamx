@@ -11,14 +11,14 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const shipConfig = loadShipConfigFromDisk(dataDir);
+const shipConfig = loadShipConfigCached(dataDir);
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 /** A saved ship named `name` with `n` parts (a library design cut down or padded with copies of one of its parts) */
@@ -42,7 +42,7 @@ async function login(username: string) {
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
     scene: 'sectors',
     autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
     clock: () => 1_000_000,
   });
   const t = new LocalTransport(server);

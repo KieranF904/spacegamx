@@ -4,10 +4,10 @@ import { Position, ServerMessage } from '@space-game/common';
 import { createProtoServer } from './createProtoServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 
 const files = readGameDataFiles(join(__dirname, '../../../data'));
-const ships = loadShipConfigFromDisk(join(__dirname, '../../../data'));
+const ships = loadShipConfigCached(join(__dirname, '../../../data'));
 
 describe('proto mode (M0)', () => {
   it('runs 300 ticks in-process with a LocalTransport client', () => {

@@ -11,7 +11,7 @@ import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
 import { SOCIAL_DOC, emptyDoc, touch, request, respond, unfriend, forget, parseDoc, findByName, MAX_PENDING } from './friendsDoc.js';
@@ -24,7 +24,7 @@ import { FriendsUnavailable } from './FriendsBackend.js';
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const shipConfig = loadShipConfigFromDisk(dataDir);
+const shipConfig = loadShipConfigCached(dataDir);
 
 // (Each test builds one or two whole servers)
 vi.setConfig({ testTimeout: 60_000 });

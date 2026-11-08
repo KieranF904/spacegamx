@@ -93,7 +93,7 @@ deterministic, integer eu (1/256 E), allocation-free per tick (module scratch: n
 - **Trace** (hangar): `Float64Array(L.links)`; link ids: feeds `[0, linkPush)`, pushes, pairs (signed), dynamos;
   `linkFrom`/`linkTo` per id.
 - Tests: `npx vitest run common/src/ships/power` (layout, tick scenarios from the prototype, 10k-tick determinism, wire
-  round trip). Bench: `POWER_BENCH=1 NODE_OPTIONS=--expose-gc npx vitest run common/src/ships/power/tick.bench.test.ts`.
+  round trip). Bench: `NODE_OPTIONS=--expose-gc npm run test:perf`.
 
 ## Design rules (for ship designers; scripts/shipgen reads the block below into its prompt: keep it true to the power core)
 <!-- shipgen:rules -->

@@ -5,14 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { Economy, partStats, type ItemsFile, type RecipesFile } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import items from '../../../data/items.json';
 import recipes from '../../../data/recipes.json';
 import { FAMILY_LABEL, LEGENDARY, familyLabel, keyStats, modelLock, mountBadge, mountingText, sizeText, sizeWord, tradeOff } from './modelCards';
 import { partTipHtml } from './partTip';
 
-const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const { catalog, tuning } = bridge;
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, catalog, {});
 const models = [...catalog.functions.values()].filter((f) => f.model && !f.exclusive);

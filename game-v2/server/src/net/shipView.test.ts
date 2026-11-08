@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from './LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -16,7 +16,7 @@ describe('ships in and out of view', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
     const server = new GameServer({
       gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
     });
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];

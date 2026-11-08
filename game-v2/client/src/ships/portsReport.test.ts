@@ -6,12 +6,12 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'path';
 import { createShipState, parseBlueprint, portsLoadTest, portsView, PORTS_SCENARIOS, PS_LINKED, PS_WASTE, type Blueprint } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { loadRow, portTipHtml, portsReport, portsWarnings } from './portsReport';
 import { ghostHint, glyphCentre, portNear } from './portsOverlay';
 
-const cfg = loadShipConfigFromDisk(join(__dirname, '../../../data'));
+const cfg = loadShipConfigCached(join(__dirname, '../../../data'));
 const bridge = createShipBridge(cfg);
 const { catalog, tuning } = bridge;
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));

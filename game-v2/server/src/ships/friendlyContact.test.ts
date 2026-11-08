@@ -10,7 +10,7 @@ import { Position, Velocity, contactHurts } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from './loadShipConfig.js';
+import { loadShipConfigCached } from './loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -22,7 +22,7 @@ function ram(a: { faction: string; ship: string }, b: { faction: string; ship: s
   resetGlobals();
   const server = new GameServer({
     gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)), clock: () => 0,
+    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => 0,
   });
   const ships = server.getShips(), num = server.gameData.getSystemNum('sol');
   const x0 = 140000, y0 = 140000;

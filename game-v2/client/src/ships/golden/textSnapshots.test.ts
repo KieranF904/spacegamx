@@ -10,7 +10,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { join } from 'path';
 import { Economy, type Blueprint, partStats, type ItemsFile, type RecipesFile } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
 import items from '../../../../data/items.json';
 import recipes from '../../../../data/recipes.json';
@@ -21,7 +21,7 @@ import { partStatsHtml } from '../../ui/windowKit';
 import { shipSummary } from '../shipSummary';
 
 const DATA = join(__dirname, '../../../../data');
-const config = loadShipConfigFromDisk(DATA);
+const config = loadShipConfigCached(DATA);
 const bridge = createShipBridge(config);
 const { catalog, tuning } = bridge;
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, catalog, {});

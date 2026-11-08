@@ -6,12 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import { Economy, loadCatalog, validateBlueprint, type Blueprint, type PlacedPart, type Rot, type ShipTuning } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { planDiff, promoteWaiting, removeParts, samePlacement } from './plan.js';
 import { pickRefine } from './refine.js';
 
 const dataDir = join(__dirname, '../../../../data');
-const config = loadShipConfigFromDisk(dataDir);
+const config = loadShipConfigCached(dataDir);
 const catalog = loadCatalog(config.catalog);
 const tuning = config.tuning as ShipTuning;
 const json = (p: string) => JSON.parse(readFileSync(join(dataDir, p), 'utf-8'));

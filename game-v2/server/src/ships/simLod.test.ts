@@ -6,7 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from './loadShipConfig.js';
+import { loadShipConfigCached } from './loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { PROMOTE_RADIUS, DEMOTE_RADIUS, DEMOTE_AFTER, DEMOTE_CHECK, RECENT, cruiseOf } from './SimLod.js';
 
@@ -21,7 +21,7 @@ function world() {
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
     scene: 'sectors',
     autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigCached(dataDir)),
   });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];

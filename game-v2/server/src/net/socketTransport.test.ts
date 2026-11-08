@@ -10,7 +10,7 @@ import type { IncomingMessage } from 'http';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { SocketTransport, clientAddress, MAX_CLIENT_MESSAGE_BYTES, MAX_SOCKETS_PER_IP } from './SocketTransport.js';
@@ -23,7 +23,7 @@ const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 const server = new GameServer({
   profileStore: new MemoryProfileStore(), gameData: new GameData(readGameDataFiles(dataDir)), autoStart: false, scene: 'sectors',
   userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-  ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+  ships: createShipBridge(loadShipConfigCached(dataDir)),
 });
 const transport = new SocketTransport(server, 0);
 const sockets: WebSocket[] = [];

@@ -9,12 +9,12 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
-const ships = createShipBridge(loadShipConfigFromDisk(dataDir));
+const ships = createShipBridge(loadShipConfigCached(dataDir));
 const cat = ships.catalog, tun = ships.tuning;
 const part = (fn: string, material: string, piece = 'sq'): PlacedPart => ({ uid: 0, piece, fn, material, x: 0, y: 0, rot: 0, flip: false });
 const cannon = (grade: number) => weaponHit('cannon', tun.weapons.cannon, grade);
@@ -96,7 +96,7 @@ describe('damage: penetration, armour and materials', () => {
 
   it('in a fight: the same shells hurt a Mk III hull far less than a Mk I one', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
     const bridge = server.getShips();
     const a = bridge.spawnDummy(legacyStarter(), 0, 300000, 0, 0), b = bridge.spawnDummy(regrade(bridge.catalog, legacyStarter(), 3), 2000, 300000, 0, 0);
     const sa = bridge.get(a)!, sb = bridge.get(b)!;
@@ -111,7 +111,7 @@ describe('damage: penetration, armour and materials', () => {
 
   it("a pilot's ship must fit their build points (a plan builds as designed)", () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'builder' } as any);

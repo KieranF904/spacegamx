@@ -4,14 +4,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import { COMP_TABS, guideRows } from '../ui/componentGuide';
 import { PLATES } from '../ui/componentData';
 import { paletteRows, rowInHand, rowPart, spareRows, tabOfFn } from './paletteModel';
 import { buildFacts, portsText } from './buildFacts';
 
-const { catalog, tuning } = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const { catalog, tuning } = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const guide = guideRows(catalog, PLATES);
 const rows = paletteRows(catalog, guide);
 const row = (id: string) => rows.find((r) => r.id === id)!;

@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { Economy, type ItemsFile, type RecipesFile } from '@space-game/common';
-import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
+import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
 import items from '../../../data/items.json';
 import recipes from '../../../data/recipes.json';
@@ -15,7 +15,7 @@ import { componentGates, PLATES } from './componentData';
 import { affordable, availability, AVAIL_RANK, costLines, isOpen, lockLevel, lockText, splitOpen, tabCounts } from './componentAvail';
 import { defaultShape, footprint, footprintText, shapesOf, sizeWordOf, turned } from './componentShapes';
 
-const { catalog } = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
+const { catalog } = createShipBridge(loadShipConfigCached(join(__dirname, '../../../data')));
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, catalog, {});
 const rows = guideRows(catalog, PLATES);
 const pilot = (level: number, learned: string[] = []): PilotView => ({ level, learned, have: () => 0 });
