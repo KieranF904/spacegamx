@@ -27,9 +27,10 @@ import { drawPartArt } from '../build/partArt';
 import { drawFacingMark, drawShieldCover } from '../build/buildMarks';
 import type { FieldDeps } from './bridge';
 import {
-  addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, settle, summary,
+  addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, replacePart, settle, summary,
   targetErrors, working, type BuildEdits, type LiveDesign, type WorkingDesign,
 } from './plan';
+import { TURN_KEYS, escapeStep, partUnder, tryTurn } from '../build/editPlaced';
 
 const SIDE_CYCLE: readonly (Side | 'auto')[] = ['auto', 'N', 'E', 'S', 'W'];
 /** How far round the ship (cells) a click still builds */
@@ -284,7 +285,7 @@ export class FieldOverlay {
   /** The part in hand at a grid point, and whether it can go there (the hover preview) */
   preview(g: Vec2): { part: PlacedPart; problem: string | null } | null {
     const v = this.view();
-    if (!v) return null;
+    if (!v || this.hand.empty) return null;
     const part = candidate(this.deps.catalog, v.live, v.w, this.hand, g);
     if (!part) return null;
     // (Checked against the whole design, so only when the cell, the hand or the design changes)
@@ -298,6 +299,8 @@ export class FieldOverlay {
   private previewProblem: string | null = null;
 
   private place(g: Vec2): void {
+    // (An empty hand: a click on a part of the design picks it up, as middle-click does; on an empty cell it does nothing)
+    if (this.hand.empty) return this.pickUp(g);
     const v = this.view();
     if (!v) return;
     const part = candidate(this.deps.catalog, v.live, v.w, this.hand, g);
@@ -320,13 +323,28 @@ export class FieldOverlay {
     this.edited();
   }
 
+  /** R / F / T with the mouse over a part of the design: turn it in place if it isn't built yet (build/editPlaced.ts). False: no part there */
+  private turnPlaced(code: string): boolean {
+    const v = this.view();
+    const at = v && this.mouse ? this.gridAt(this.mouse.x, this.mouse.y) : null;
+    const i = v && at ? partUnder(this.deps.catalog, v.w.bp.parts, at) : -1;
+    if (!v || !at || i < 0) return false;
+    if (v.w.standing[i]) { this.say('A built part stays as it is: turn it by recycling it and placing it again.', true); return true; }
+    const r = tryTurn(this.deps.catalog, v.w.bp.parts, i, TURN_KEYS[code], at);
+    if ('problem' in r) { this.say(r.problem[0].toUpperCase() + r.problem.slice(1) + '.', true); return true; }
+    if (!replacePart(v.live, this.edits, v.w, i, r.part)) { this.say('The design is full (255 parts).', true); return true; }
+    this.say(r.said + '.');
+    this.edited();
+    return true;
+  }
+
   private pickUp(g: Vec2): void {
     const v = this.view();
     if (!v) return;
     const i = partAtPoint(this.deps.catalog, v.w, g);
     if (i < 0) return;
     const p = v.w.bp.parts[i];
-    Object.assign(this.hand, { piece: p.piece, fn: p.fn, material: p.material, rot: p.rot, flip: p.flip, facing: p.facing ? (p.facing as Side) : 'auto' });
+    Object.assign(this.hand, { empty: false, piece: p.piece, fn: p.fn, material: p.material, rot: p.rot, flip: p.flip, facing: p.facing ? (p.facing as Side) : 'auto' });
     this.pal?.showInHand();
     this.say(`In hand: ${this.deps.econ.items.name(partItemId(p))}.`);
   }
@@ -338,8 +356,15 @@ export class FieldOverlay {
   /** A key the view uses while open (the feature's onKey): true if it took it */
   onKey(code: string): boolean {
     if (!this.isOpen) return false;
-    if (code === 'Escape') { this.close(); return true; }
+    if (code === 'Escape') {
+      // (The first Escape puts the part in hand away, the second closes the view)
+      if (escapeStep(!!this.hand.empty) === 'close') this.close();
+      else { this.hand.empty = true; this.pal?.render(); this.say('Hand emptied: Esc again closes.'); }
+      return true;
+    }
     if (groupOfKey(code)) return this.groupKey(code);
+    // (R / F / T over a part already in the design turn that part; elsewhere they act on the hand, below)
+    if (TURN_KEYS[code] && this.turnPlaced(code)) return true;
     if (code === 'KeyR') { this.hand.rot = ((this.hand.rot + 1) & 3) as PaletteSel['rot']; this.pal?.renderHand(); return true; }
     if (code === 'KeyF') { this.hand.flip = !this.hand.flip; this.pal?.renderHand(); return true; }
     // (A gun's barrel is fixed to its piece: R turns it, T has nothing to cycle)

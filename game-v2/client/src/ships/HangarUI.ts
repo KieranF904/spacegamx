@@ -35,7 +35,7 @@
  * server an admin can switch on free build (the admin panel): any part places
  * (rules still apply), and saving takes nothing.
  *
- * Click: place · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
+ * Click: place (empty hand: pick up) · Esc: empty the hand, then close · R/F/T over a placed part turn that part · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
  * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
  */
 
@@ -44,7 +44,7 @@ import { loadTest, type LoadTestResult } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
 import { powerReport, pruneWires, type PowerReport } from './wireEdit';
 import { PortsGrid } from './portsGrid';
-import { HangarPalette } from './HangarPalette';
+import { HangarPalette, type PaletteSel } from './HangarPalette';
 import { groupOfKey, groupsSaid, hangarGroupKey } from './weaponGroups/editor';
 import { esc } from '../ui/escape';
 import { modelLock } from './modelCards';
@@ -57,6 +57,7 @@ import { feedPreview, drawFeedPreview, drawWindow, drawPower, drawBanks, boltGly
 import { draw } from './hangar/hangarDraw';
 import { buildHtml, ammoHtml, bindBuildButtons, powerHtml, portsHtml, summaryHtml, renderStats } from './hangar/hangarStats';
 import { refreshLoadList, loadSelected, designKey, toggleDesigns, renderDesigns, saveDesign, deleteDesign, loadDesign } from './hangar/hangarDesigns';
+import { TURN_KEYS, escapeStep, partUnder, tryTurn } from './build/editPlaced';
 import { tipCtx, showTip, hideTip, gridTip, partTip } from './hangar/hangarTips';
 import { ruleText } from './hangar/hangarTips';
 export type { HangarDeps };
@@ -79,7 +80,7 @@ export class HangarUI implements HangarHost {
   grid!: HTMLCanvasElement;
   lit: HangarLitView;
   errors: BlueprintError[] = [];
-  private sel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0 as Rot, flip: false, facing: 'auto' as Side | 'auto' };
+  private sel: PaletteSel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0, flip: false, facing: 'auto' };
   /** Placed guns breaking their mounting rules, by part index (refresh) */
   mountingBroken = new Map<number, MountingProblem[]>();
   /** The part palette (HangarPalette.ts) */
@@ -364,6 +365,8 @@ export class HangarUI implements HangarHost {
   /** Keys while open. Returns true when consumed (always, so flight controls don't react). */
   handleKey(code: string): boolean {
     if (!this.isOpen) return false;
+    // (R / F / T over a part already placed turn that part; elsewhere they act on the hand, below)
+    if (TURN_KEYS[code] && this.turnPlaced(code)) { this.draw(); return true; }
     if (code === 'KeyR') this.sel.rot = ((this.sel.rot + 1) % 4) as Rot;
     else if (code === 'KeyF') this.sel.flip = !this.sel.flip;
     else if (code === 'KeyE') { this.overlays.energy = !this.overlays.energy; this.renderStats(); }
@@ -374,7 +377,8 @@ export class HangarUI implements HangarHost {
       if (hasFixedBarrel(this.deps.catalog, this.sel.fn)) { this.status('A gun fires out of one side of its piece: turn it with R'); return true; }
       const order: (Side | 'auto')[] = ['auto', ...SIDES];
       this.sel.facing = order[(order.indexOf(this.sel.facing) + 1) % order.length];
-    } else if (code === 'Escape' || code === 'KeyH') { this.close(null); return true; }
+    } else if (code === 'Escape' && escapeStep(!!this.sel.empty) === 'empty-hand') { this.sel.empty = true; this.pal.render(); this.status('Hand emptied: Esc again closes'); }
+    else if (code === 'Escape' || code === 'KeyH') { this.close(null); return true; }
     // (Tab: keyboard into the palette's tabs; there the palette takes the keys it needs, HangarPalette.ts)
     else if (code === 'Tab') { this.pal.focusTabs(); return true; }
     else if (code === 'ArrowLeft') this.view.cx -= 1;
@@ -392,6 +396,7 @@ export class HangarUI implements HangarHost {
   // -------------------------------------------------------------------------
 
   candidate(g: Vec2): PlacedPart | null {
+    if (this.sel.empty) return null;
     const uid = nextFreeUid(this.bp);
     if (uid < 0) return null;
     // (A model is always made of its own material)
@@ -462,6 +467,8 @@ export class HangarUI implements HangarHost {
   }
 
   private place(g: Vec2): void {
+    // (An empty hand: a click on a placed part picks it up, as middle-click does; on an empty cell it does nothing)
+    if (this.sel.empty) return this.pickUp(g);
     const p = this.candidate(g);
     if (!p) return this.status('blueprint is full (255 parts)');
     const problem = this.placementProblem(p);
@@ -473,6 +480,19 @@ export class HangarUI implements HangarHost {
   partAt(g: Vec2): number {
     for (let i = this.geoms.length - 1; i >= 0; i--) if (geomContainsPoint(this.geoms[i], g[0], g[1])) return i;
     return -1;
+  }
+
+  /** R / F / T with the mouse over a placed part: turn, mirror or re-face that part in place (build/editPlaced.ts). False: no part there */
+  private turnPlaced(code: string): boolean {
+    const i = this.mouse ? partUnder(this.deps.catalog, this.bp.parts, this.mouse) : -1;
+    if (i < 0 || !this.mouse) return false;
+    const r = tryTurn(this.deps.catalog, this.bp.parts, i, TURN_KEYS[code], this.mouse);
+    if ('problem' in r) { this.status(r.problem); return true; }
+    this.bp.parts[i] = r.part;
+    if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
+    this.status(r.said);
+    this.refresh();
+    return true;
   }
 
   /** Middle-click: put the part under the cursor in hand, exactly as it's placed (piece, function, material, turn, mirror, facing) */

@@ -38,7 +38,8 @@ import { cardStats } from './paletteCard';
 import { cardHtml } from './paletteCardView';
 import { GunPreviewHover } from './gunPreview/previewHover';
 
-export interface PaletteSel { piece: string; fn: string; material: string; rot: Rot; flip: boolean; facing: Side | 'auto' }
+/** The part in hand; `empty`: nothing is (Escape put it away): no preview, nothing to place, until a row is picked or a part picked up */
+export interface PaletteSel { piece: string; fn: string; material: string; rot: Rot; flip: boolean; facing: Side | 'auto'; empty?: boolean }
 
 /** What the palette reads from the hangar, and tells it */
 export interface PaletteHost {
@@ -381,6 +382,7 @@ export class HangarPalette {
 
   /** Show the part in hand's tab (a part picked up off the grid), its row in view */
   showInHand(): void {
+    this.h.sel().empty = false;
     const t = tabOfFn(this.rows, this.h.sel().fn);
     if (t) this.tab = t;
     this.shapeMemory.set(this.h.sel().fn, this.h.sel().piece);
@@ -423,7 +425,7 @@ export class HangarPalette {
     const scroll = this.list.scrollTop;
     const rows = this.visibleRows(this.tab).rows;
     const sel = this.h.sel();
-    const inHand = rowInHand(rows, sel);
+    const inHand = sel.empty ? undefined : rowInHand(rows, sel);
     const { open, locked } = splitOpen(rows, (r) => !this.statusOf(r).locked);
     let html = open.map((r) => this.rowHtml(r, r === inHand)).join('');
     if (!open.length && !locked.length && this.rowsOf(this.tab).length) html += `<div class="hp-none">Nothing matches these filters. <button class="hp-sub" data-clear data-key="clear">Show all</button></div>`;
@@ -505,6 +507,7 @@ export class HangarPalette {
     const sel = this.h.sel();
     const f = catalog.functions.get(sel.fn);
     if (!f) return '';
+    if (sel.empty) return `<div class="hp-hand-top"><span>IN HAND</span><span class="keys">Esc closes</span></div><div class="hp-line hp-dim">Nothing in hand — pick a part, or middle-click one on the ship</div>`;
     const row = rowInHand(this.rows, sel) ?? { id: `spare:${sel.fn}`, tab: 'structure' as CompTab, name: f.name ?? f.id, level: null, order: 0, fn: f.id, material: sel.material, kind: 'spare' as const, shapes: [sel.piece] };
     const material = f.model && f.material ? f.material : sel.material;
     const id = partItemId({ piece: sel.piece, fn: sel.fn, material });
@@ -603,6 +606,7 @@ export class HangarPalette {
     if (!r) return;
     const sel = this.h.sel();
     const part = rowPart(r, sel, this.shapeMemory.get(r.fn));
+    sel.empty = false;
     sel.fn = part.fn;
     sel.piece = part.piece;
     // (A model is made of its own material, so the one picked for structure stays; a spare is what it is; structure
