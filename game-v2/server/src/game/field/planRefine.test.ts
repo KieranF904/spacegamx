@@ -41,6 +41,14 @@ describe('plan diff (the build view save: new parts are missing parts)', () => {
     expect(validate(r.blueprint).ok).toBe(true);
   });
 
+  it('a new part keeps what it is: an alloy cargo hold goes in as a cargo hold', () => {
+    const bp = ship();
+    const r = planDiff(validate, catalog, live(bp), { ...bp, parts: [...bp.parts, part(10, 'sq', 'cargo', 0, 1, { material: 'alloy' })] });
+    if ('error' in r) throw new Error(r.error);
+    expect(r.blueprint.parts.find((p) => p.uid === 10)).toMatchObject({ fn: 'cargo', material: 'alloy', piece: 'sq' });
+    expect(r.added).toEqual([10]);
+  });
+
   it('a standing part moved gets a fresh uid (the old one recycled); a new part on a recycling part\'s cells is refused', () => {
     const bp = ship(part(3, 'sq', 'hull', 2, 0));
     // Hull 3 moved to the left of the core

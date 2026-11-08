@@ -1,9 +1,12 @@
 /**
  * Defenders: pilotless ships that keep to their course but shoot back (Ceres Haulers on their routes, an escorted
  * freighter). Each flies as its autopilot has it (GameServer trafficSystem, Operations' steer) and never turns to
- * fight; once something hurts it, its guns lock onto that attacker and fire only at it, only while it's inside a gun's
- * window and reach, led as an AI's are. A new attacker takes the lock over; the guns go quiet DEFEND_QUIET_TICKS after
- * the locked attacker's last hit, or at once when it's gone (dead, removed, docked, another system).
+ * fight; once something has really attacked it, its guns lock onto that attacker and fire only at it, only while it's
+ * inside a gun's window and reach, led as an AI's are. Its crew tolerates strays: a ship's hits count as an attack only
+ * once their damage, fading with a half-life of DEFEND_GRUDGE_HALF_TICKS, reaches DEFEND_GRUDGE_SHARE of the freighter's
+ * whole HP (each attacker counted apart; bumps never count). A new attacker past that takes the lock over; the guns go
+ * quiet DEFEND_QUIET_TICKS after the locked attacker's last hit, or at once when it's gone (dead, removed, docked,
+ * another system).
  *
  * While shooting back it is flown by the enemy AI's pilot body with a HAUL order (common bodies/aiPilot.ts: the
  * autopilot's course and the AI's trigger, aiFires), through the same AiPilots as hostile packs: at a pilot, its body is
@@ -19,6 +22,11 @@ import type { AiPilots } from '../brains/aiPilot.js';
 
 /** Quiet this long (ticks) after its attacker's last hit: 30 s */
 export const DEFEND_QUIET_TICKS = 60 * 30;
+/** A ship's damage to it counts as an attack once it reaches this share of the freighter's whole HP (a Ceres Hauler:
+ *  about 150: three Pip shells fade away; two Hammer shells, one Spear, or three seconds of a Pip don't) */
+export const DEFEND_GRUDGE_SHARE = 0.01;
+/** ...that damage fading by half every this many ticks (4 s: hits more than about 8 s apart barely add up) */
+export const DEFEND_GRUDGE_HALF_TICKS = 60 * 4;
 /** Its crew's aim: off by up to this either way (a pirate's at accuracy 0.85: Enemies.fly) */
 const AIM_ERR = (1 - 0.85) * 0.45;
 /** Its course's point is sent again only once its autopilot's has moved this far (a station orbits: not a decision a tick) */
@@ -37,8 +45,10 @@ interface Defender {
   /** Who it's shooting back at (-1: nobody), and when they last hit it */
   attacker: number;
   lastHit: number;
-  /** The last damage tick it has looked at */
-  seen: number;
+  /** Each other ship's fading damage to it (not yet an attack), and when it was last topped up */
+  grudges: Map<number, { dmg: number; at: number }>;
+  /** Damage that makes an attack (DEFEND_GRUDGE_SHARE of its whole HP) */
+  tolerance: number;
   /** Its guns' real reach, whether one lobs and its main gun's round (learnt once: common bodies/aiLead.ts aiLoadout) */
   reach?: number;
   lobs?: boolean;
@@ -59,8 +69,14 @@ export class Defenders {
   /** Make a pilotless ship a defender (it keeps whatever autopilot it has) */
   add(eid: number): void {
     if (!this.ships.has(eid)) return;
-    this.list.set(eid, { ship: this.ships.get(eid), attacker: -1, lastHit: -Infinity, seen: this.ships.lastHitTick(eid), course: null, seed: (eid * 97 + 31) & 255, bodyAt: -Infinity, auto: false });
-    this.ships.setController(eid, (id, ship) => this.fly(id, ship));
+    const ship = this.ships.get(eid)!;
+    const d: Defender = {
+      ship, attacker: -1, lastHit: -Infinity, grudges: new Map(), tolerance: DEFEND_GRUDGE_SHARE * ship.maxHp.reduce((a, h) => a + h, 0),
+      course: null, seed: (eid * 97 + 31) & 255, bodyAt: -Infinity, auto: false,
+    };
+    this.list.set(eid, d);
+    this.ships.setController(eid, (id, s) => this.fly(id, s));
+    this.ships.watchHurt(eid, (source, dealt, tick) => this.hurt(eid, d, source, dealt, tick));
   }
 
   has(eid: number): boolean {
@@ -78,6 +94,7 @@ export class Defenders {
   }
 
   private drop(eid: number): void {
+    if (this.list.get(eid)?.ship === this.ships.get(eid)) this.ships.watchHurt(eid, null);
     this.list.delete(eid);
     this.pilots.forget(eid);
   }
@@ -89,19 +106,26 @@ export class Defenders {
     return !this.host.docked?.(h);
   }
 
+  /** A hit with a source that isn't a bump (ShipBridge.watchHurt; a hazard's has none and never refreshes a lock) */
+  private hurt(eid: number, d: Defender, source: number, dealt: number, tick: number): void {
+    if (this.ships.get(eid) !== d.ship) return;
+    if (source === d.attacker) { d.lastHit = tick; return; }
+    const g = d.grudges.get(source);
+    const dmg = (g ? g.dmg * 0.5 ** ((tick - g.at) / DEFEND_GRUDGE_HALF_TICKS) : 0) + dealt;
+    if (dmg < d.tolerance) {
+      // (forgotten once faded to nothing much: the map stays as small as the ships hitting it)
+      if (d.grudges.size > 8) for (const [k, v] of d.grudges) if (v.dmg * 0.5 ** ((tick - v.at) / DEFEND_GRUDGE_HALF_TICKS) < 1) d.grudges.delete(k);
+      d.grudges.set(source, { dmg, at: tick });
+      return;
+    }
+    d.grudges.delete(source);
+    if (this.valid(eid, source)) { d.attacker = source; d.lastHit = tick; }
+  }
+
   private fly(eid: number, ship: ShipState): PilotOrders | null {
     const d = this.list.get(eid);
     if (!d || d.ship !== ship) return null;
     const now = this.host.tick();
-    // Hurt by someone since it last looked: whoever did it has its guns now (by the tick of the last hit with a source:
-    // a hazard's hurt, with none, leaves the hitter as the older attacker and must not refresh its lock)
-    const at = this.ships.lastHitTick(eid);
-    if (at > d.seen) {
-      d.seen = at;
-      const h = this.ships.lastHitter(eid);
-      // (a bump isn't an attack: a parked ship it flew into doesn't get its guns)
-      if (this.valid(eid, h) && !this.ships.lastHitBumped(eid)) { d.attacker = h; d.lastHit = at; }
-    }
     if (d.attacker >= 0 && (now - d.lastHit > DEFEND_QUIET_TICKS || !this.valid(eid, d.attacker))) {
       d.attacker = -1;
       this.pilots.forget(eid);

@@ -48,6 +48,8 @@ import { ClampTable } from './bridge/clamp.js';
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
 export type { ShipHost, PartDestroyedEvent, PilotOrders, ShipBridgeConfig, ShipBridgeStats };
+/** A watched body's hit: who landed it, the damage it dealt (shield + hull), and the tick */
+export type HurtWatcher = (source: number, dealt: number, tick: number) => void;
 
 export class ShipBridge {
   readonly catalog: Catalog;
@@ -94,6 +96,8 @@ export class ShipBridge {
   private lastHitAt = new Map<number, number>();
   /** Bodies whose last hit with a source was a collision (lastHitBy is the ship that bumped them, not an attacker) */
   private bumpedBy = new Set<number>();
+  /** Bodies whose sourced, non-contact hits are reported as they land (watchHurt: a defender's tolerance) */
+  private hurtWatch = new Map<number, HurtWatcher>();
   /** Wrecks: they drift (no gravity, no helm) instead of holding station like dummies */
   private anchored = new Set<number>();
   /** Structures fixed to the ground (a siege's bastion and turrets): nothing shoves them; they only turn */
@@ -471,6 +475,9 @@ export class ShipBridge {
   lastHitTick(eid: number): number { return dmg.lastHitTick(this.ctx, eid); }
 
   lastHitBumped(eid: number): boolean { return dmg.lastHitBumped(this.ctx, eid); }
+
+  /** Report each hit on `eid` that has a source and isn't a bump (who, damage dealt, tick); null stops it */
+  watchHurt(eid: number, fn: HurtWatcher | null): void { if (fn) this.hurtWatch.set(eid, fn); else this.hurtWatch.delete(eid); }
 
   hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean; shaped?: { i: number; spill: boolean } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
 

@@ -248,7 +248,7 @@ export const BIG_BODY = CONTACT_BIG_BODY;
  */
 export interface BridgeInternals {
   host: ShipBridge['host']; now: ShipBridge['now']; geomCache: ShipBridge['geomCache'];
-  lastHitBy: ShipBridge['lastHitBy']; lastHitAt: ShipBridge['lastHitAt']; bumpedBy: ShipBridge['bumpedBy']; anchored: ShipBridge['anchored']; pinned: ShipBridge['pinned'];
+  lastHitBy: ShipBridge['lastHitBy']; lastHitAt: ShipBridge['lastHitAt']; bumpedBy: ShipBridge['bumpedBy']; hurtWatch: ShipBridge['hurtWatch']; anchored: ShipBridge['anchored']; pinned: ShipBridge['pinned'];
   charge: ShipBridge['charge']; autopilot: ShipBridge['autopilot']; blasts: ShipBridge['blasts'];
   decayAt: ShipBridge['decayAt']; intangible: ShipBridge['intangible']; crumbled: ShipBridge['crumbled'];
   lastDamaged: ShipBridge['lastDamaged']; restoreProgress: ShipBridge['restoreProgress']; contactFx: ShipBridge['contactFx']; contactLog: ShipBridge['contactLog'];

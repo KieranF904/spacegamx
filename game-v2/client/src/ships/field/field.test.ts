@@ -164,6 +164,19 @@ describe('build view edits (the blueprint, missing parts and all)', () => {
     expect(planChanged(live, e)).toBe(true);
   });
 
+  it('a part in hand goes in as that part: an alloy cargo hold stays a cargo hold, not a hull', () => {
+    const live = liveOf(sparrow());
+    const e = noEdits();
+    const spot = freeSpot(live, e);
+    const cargo = { ...hull, fn: 'cargo' };
+    const p = candidate(catalog, live, working(live, e), cargo, [spot.x + 0.5, spot.y + 0.5])!;
+    expect(p).toMatchObject({ fn: 'cargo', material: 'alloy', piece: 'sq' });
+    expect(placementProblem(catalog, working(live, e), p, tuning)).toBeNull();
+    addPart(e, p);
+    const target = planTarget(working(live, e));
+    expect(target.parts[target.parts.length - 1]).toMatchObject({ fn: 'cargo', material: 'alloy' });
+  });
+
   it('a part once saved falls out of the edits as the live ship shows it (no ghost left behind once built)', () => {
     const bp = sparrow();
     const e = noEdits();

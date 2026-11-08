@@ -122,6 +122,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.lastHitBy.delete(eid);
   b.lastHitAt.delete(eid);
   b.bumpedBy.delete(eid);
+  b.hurtWatch.delete(eid);
   b.intangible.delete(eid);
   b.anchored.delete(eid);
   b.pinned.delete(eid);

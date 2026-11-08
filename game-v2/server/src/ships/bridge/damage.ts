@@ -295,6 +295,7 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
       b.lastHitBy.set(eid, source); b.lastHitAt.set(eid, tick);
       // (A bump isn't an attack: a freighter that flew into a parked ship mustn't take it for its attacker)
       if (vs?.contact) b.bumpedBy.add(eid); else b.bumpedBy.delete(eid);
+      if (!vs?.contact && b.hurtWatch.size) b.hurtWatch.get(eid)?.(source, dealt, tick);
     }
     // (A piece of debris hurt: its clients are told it from now on, bridge/debrisNet.ts)
     if (ship.kind === 'debris') b.debrisNet.told.add(eid);

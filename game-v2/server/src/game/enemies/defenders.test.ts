@@ -17,7 +17,7 @@ import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
-import { DEFEND_QUIET_TICKS } from './defenders.js';
+import { DEFEND_QUIET_TICKS, DEFEND_GRUDGE_HALF_TICKS } from './defenders.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -52,6 +52,24 @@ function live() {
   return { server, ships, A, B, shots };
 }
 
+/** Its tolerance: the damage one ship must deal (fading) before it counts as an attack */
+const toleranceOf = (server: GameServer, f: number) =>
+  (server.enemies.defenders as unknown as { list: Map<number, { tolerance: number }> }).list.get(f)!.tolerance;
+
+/** Hurt it by `by` with `total` damage this tick, spread over its parts in shell-sized pieces; returns what was dealt */
+function deal(server: GameServer, f: number, by: number, total: number, piece = 18): number {
+  const ships = server.getShips(), ship = ships.get(f)!;
+  let dealt = 0;
+  for (let i = 0, k = 0; dealt < total && k < 400; k++, i = (i + 1) % ship.hp.length) {
+    if (ship.hp[i] <= piece * 2 || ship.blueprint.parts[i].fn === 'core') continue;
+    dealt += ships.damagePartBy(f, i, Math.min(piece, total - dealt), by);
+  }
+  return dealt;
+}
+
+/** A real attack: past its tolerance in one go */
+const attack = (server: GameServer, f: number, by: number) => deal(server, f, by, toleranceOf(server, f) * 1.2, 40);
+
 const angleOff = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
 /** Keep a pilot `side` (+1 starboard, -1 port) of the freighter, `d` off (riding along with it: abeam, within its broadside turrets' windows and reach) */
@@ -73,7 +91,7 @@ function haul(ticks: number, hits: (t: number, A: number, B: number) => number) 
     ride(A, f, 1);
     ride(B, f, -1);
     const by = hits(t, A, B);
-    if (by >= 0) ships.damagePartBy(f, ships.get(f)!.derived.weapons.length ? 1 : 0, 4, by);
+    if (by >= 0) attack(server, f, by);
     server.step();
     const slot = server.getTrafficShips().find((s) => s.eid === f)!;
     trail.push({ tick: server.getTick(), x: Position.x[f], y: Position.y[f], leg: slot.leg, attacker: server.enemies.defenders.attackerOf(f), ap: ships.autopilotOf(f) });
@@ -159,8 +177,8 @@ describe('freighters shoot back (defenders)', () => {
     expect(r.ships.lastHitBumped(r.f)).toBe(true);
     for (let t = 0; t < 30; t++) r.server.step();
     expect(r.server.enemies.defenders.attackerOf(r.f)).toBe(-1);
-    // (A real hit from the same pilot does lock on)
-    r.ships.damagePartBy(r.f, part, 4, r.A);
+    // (A real attack from the same pilot does lock on)
+    attack(r.server, r.f, r.A);
     expect(r.ships.lastHitBumped(r.f)).toBe(false);
     r.server.step();
     expect(r.server.enemies.defenders.attackerOf(r.f)).toBe(r.A);
@@ -191,7 +209,7 @@ describe('freighters shoot back (defenders)', () => {
       // (the pirate held off its side, the escort riding off the other)
       ride(pirate, w, 1, 700);
       ride(A, w, -1, 700);
-      if (t === 20) ships.damagePartBy(w, 1, 4, pirate);
+      if (t === 20) attack(server, w, pirate);
       server.step();
     }
     expect(server.enemies.defenders.attackerOf(w)).toBe(pirate);
@@ -200,5 +218,36 @@ describe('freighters shoot back (defenders)', () => {
     for (const s of mine) expect(s.offA).toBeGreaterThan(1.5);
     // (at a hostile its body stays off: its rows fly it and its shots go as fire records, as a pack's at a ward do)
     expect(server.enemies.aiBodyOn(w)).toBe(false);
+  }, 240_000);
+});
+
+describe('freighters tolerate strays (defenders)', () => {
+  it('a few stray Pip shells, damage spread over time, or damage from two ships apart is not an attack; heavy shells are', () => {
+    const { server, A, B } = live();
+    server.step();
+    const f = server.getTrafficShips()[0].eid;
+    const tol = toleranceOf(server, f);
+    const attacker = () => server.enemies.defenders.attackerOf(f);
+    const step = (n: number) => { for (let t = 0; t < n; t++) { ride(A, f, 1); ride(B, f, -1); server.step(); } };
+    console.log(`hauler tolerance ${tol.toFixed(0)} damage (Pip shell 18, Hammer 88, Spear 160)`);
+    // (A Ceres Hauler: three Pip shells at once stay well under it)
+    expect(tol).toBeGreaterThan(3 * 18 * 1.5);
+    deal(server, f, A, 3 * 18);
+    step(5);
+    expect(attacker()).toBe(-1);
+    // (...and the same again every 10 s fades away between: never adds up to an attack)
+    for (let k = 0; k < 6; k++) { step(600); deal(server, f, A, 3 * 18); }
+    step(5);
+    expect(attacker()).toBe(-1);
+    // (Two ships each dealing most of it: counted apart, so neither is an attack)
+    step(DEFEND_GRUDGE_HALF_TICKS * 6);
+    deal(server, f, A, tol * 0.7);
+    deal(server, f, B, tol * 0.7);
+    step(5);
+    expect(attacker()).toBe(-1);
+    // (A heavy volley from B on top: past it, B has its guns)
+    deal(server, f, B, tol * 0.5, 88);
+    step(5);
+    expect(attacker()).toBe(B);
   }, 240_000);
 });
