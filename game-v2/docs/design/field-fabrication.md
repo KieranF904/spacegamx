@@ -8,6 +8,20 @@ Status: the shared foundation is built and committed (section 9). Packages A to 
 Kieran tests on the local dev server, where guests and signed-in pilots are admin. Every number here is a starting point
 for playtesting.
 
+**One build rule (Kieran, 2026-11-09).** The world build view (key 7) and the hangar both just edit the ship's
+**blueprint**, in the same format and with the same look. A part the blueprint has and the ship hasn't is **missing**,
+whether the build view planned it or a hit shot it off, and the same repair path builds it: the fabricator in the field
+(damaged first, then missing, nearest the core), the station and the repair bank when docked. Taking out a standing part
+marks it for recycling. There is no field plan apart from the blueprint: no draft kept beside it, no `waiting` list, no
+placeholder (`ShipState.ghost`) flags for build view parts, no blue ghost overlay. Sections 1.5, 4, 5.1, 6 and 7 below
+say it that way; the package briefs in section 10 are the history of how it was first built, with planned "ghosts".
+
+What follows from it, for playtesting: a planned part counts as a lost part in flight (the flight model divides by the
+whole design's mass, so planning a big addition slows the ship until it is built); the free spare, the station's
+passing-by rebuild and a death's free part pay for planned parts as for lost ones. Still separate: the hangar's own
+placeholders (`ShipRecord.ghosts`, parts the hangar has no item for yet, and a death's owed parts), which keep their
+flag so flight doesn't count them; folding those in too is a later step.
+
 ---
 
 ## 1. The rules (Kieran's, as agreed)
@@ -24,8 +38,8 @@ for playtesting.
 4. **Fabrication and attachment** are separate phases, so a hold full of finished parts cannot repair a ship instantly.
    A part placed from the hold still takes attachment time.
 5. **Field plan**: building in world space is an overlay on the live game. The view swaps to the helm view, zooms in and
-   shows the build interface while the ship keeps flying. A saved plan is a set of planned (ghost) parts that the
-   fabricator fills in. Saving a plan is free; only building costs.
+   shows the build interface while the ship keeps flying. Saving writes the ship's blueprint: new parts are missing
+   parts the fabricator fills in, as it rebuilds parts shot off. Saving is free; only building costs.
 6. **Recycling**: queue a standing part for removal. It is broken down slowly and returns about 50% of its materials.
    Rearranging a ship in space is recycling plus rebuilding.
 7. **Orphaned build**: if the part a build depends on for placement is destroyed, the fabricator finishes the part anyway.
@@ -177,16 +191,20 @@ Worked examples (from the data):
 
 ### 4.1 Saved (common, done)
 
-- `ShipRecord.blueprint` is the **live design**: the standing parts, plus the parts queued for recycling (still
-  standing), plus the planned parts, which are listed in `ShipRecord.ghosts` (uids, core outward). **Invariant: it always
-  passes `validateBlueprint(..., { mounting: false })`**. `Pilots.applyShip` resets a ship to the starter if it doesn't.
+- `ShipRecord.blueprint` is the **live design**: the standing parts, the parts queued for recycling (still standing),
+  and the **missing** parts (`ShipRecord.hp[uid] = 0`), planned in the build view or shot off alike. **Invariant: it
+  always passes `validateBlueprint(..., { mounting: false })`**. `Pilots.applyShip` resets a ship to the starter if it
+  doesn't. `ShipRecord.ghosts` holds only the hangar's and the bank's own placeholders (parts the hangar has no item for
+  yet, parts a death left owed); the build view never adds one.
 - `ShipRecord.field` (`econ/field/record.ts FieldRecord`) holds:
   - `fabOn` and `refOn`, the switches;
   - `packs` and `recipe`;
   - `recycle`, the uids queued for recycling;
-  - `waiting`, planned parts that can't be in the blueprint yet: their cells are still taken by a part being recycled,
-    or nothing standing or planned joins them yet;
-  - `held`, items inside the machines.
+  - `held`, items inside the machines;
+  - (old saves only) `waiting`, planned parts an earlier version kept outside the blueprint. The server moves them into
+    the blueprint as missing parts, as far as it stays valid, the next time the ship flies (`FieldShips.migrate`); the
+    rest are dropped. An old save's field-plan ghosts stay placeholders: they read as missing parts everywhere but the
+    flight model.
 
   Jobs are not saved. On logout a job is called off: its inputs go back to the hold, or into `held` if the hold is full.
 - `PlayerProfile.bank` (`RepairBank { free, deposits, at }`) is absent until the server first fills it at login
@@ -202,12 +220,24 @@ the core. It also holds the claimed uids (a part being built, repaired or recycl
 ### 4.3 Client (package C)
 
 The client keeps a copy of the last `fieldState`. Progress shown is `jobAt(job, at, nowClock)`, where `nowClock` is the
-own-ship prediction's `machEu[kind]`, or the predicted tick for the core. The planned parts come from the ship's blueprint
-ghosts (the replicated `ghost` flags already reach every client through the ship sync) and from `fieldState`.
-The hangar and station windows read the pilot's record instead (the `hangar` message: its design and `ghosts`), so
-FieldShips sends it again (`FeatureHost.recordChanged`, once at the tick's flush) whenever a planned part is built in or a
-refit changes the design (fixed 2026-11-07: a built part stayed planned there until some other hangar change). The
-repair bank's deposits building owed ghosts while flying (Pilots.installOwed) still don't resend it.
+own-ship prediction's `machEu[kind]`, or the predicted tick for the core. The missing parts are simply the blueprint's
+parts that aren't standing (`derived.alive`), read from the live ship every frame, so a part shows as built the moment
+it is.
+
+The world build view (`client/src/ships/field/FieldOverlay.ts`, edits in `plan.ts`) keeps only the pilot's unsaved
+edits (parts added, missing parts dropped, parts marked or unmarked for recycling) and lays them over the live ship each
+frame; each edit falls away by itself once the live ship shows it. It draws with the hangar's own part art
+(`ships/build/partArt.ts`: `hullPreview2d` colours and `partDecor` hardware, shared with the hangar's canvas through
+`drawDecorTo`): built parts are the ship itself, missing parts the real part faded (brighter as the fabricator builds
+it), parts marked for recycling outlined red, the part in hand the real part tinted green or red; facing arrows and
+shield cover on every part come from `ships/build/buildMarks.ts`. A new part can't go on the cells of a part still being
+recycled: place it once that part is gone. The HUD schematic (`field/bridge.ts fieldHudMarks`) shows the part being
+built and the parts being recycled from `fieldState`.
+
+The hangar and station windows read the pilot's record instead (the `hangar` message: its design, `ghosts` and
+`wrecked`; a missing part shows there as wrecked), so FieldShips sends it again (`FeatureHost.recordChanged`) whenever a
+save or refit changes the design, and once the ship is rebuilt with a missing part it built. The repair bank's deposits
+building owed ghosts while flying (Pilots.installOwed) still don't resend it.
 
 ---
 
@@ -216,15 +246,16 @@ repair bank's deposits building owed ghosts while flying (Pilots.installOwed) st
 1. **Picking the next job** (`order.ts nextFieldTarget`), once a machine is free:
    1. damaged standing parts, nearest the core first;
    2. then recycling (`recycleCandidates`: a part whose removal strands nothing, deepest first);
-   3. then missing or planned parts that join the standing structure, nearest the core first.
+   3. then missing parts (planned or shot off: the same thing) that join the standing structure, nearest the core first.
 
-   Parts are skipped when the machine can't make them (`canFabricate`, the grade cap), when they are claimed, when they
-   are `blocked` (cells still taken), or when they are waiting on materials. A ship's destroyed parts and its ghosts are
-   both "wanted".
+   Parts are skipped when the machine can't make them (`canFabricate`, the grade cap), when they are claimed, or when
+   they are waiting on materials. Every part of the blueprint that isn't standing is "wanted" (hangar and bank
+   placeholders too).
 2. **Starting a job takes its inputs from the hold, all or nothing** (`fieldPay` with the pack mode). They then sit in the
    job (`FieldJob.held`). A build whose part item is already in the hold (`partItemId`) takes that instead and starts at
-   ATTACH (`need: 0`). Repairs use `repairBill`. Repairs and rebuilds of the ship's own design may also be paid from the
-   bank's free spare (`freeSpare`, through the host), after the hold. If nothing can pay, the job is passed over and the
+   ATTACH (`need: 0`). Repairs use `repairBill`. Repairs and rebuilds of the ship's own design (any missing part of its
+   blueprint, planned or lost; not a hangar placeholder) may also be paid from the bank's free spare (`freeSpare`,
+   through the host), after the hold. If nothing can pay, the job is passed over and the
    machine shows `blocked: 'materials'` when nothing else is runnable.
 3. **Progress** is `stepJob(job, units)`, where units is the change in `machEu` (powered) or 1 per tick (the core). Builds
    run MAKE then ATTACH, and the rest run MAKE only.
@@ -233,12 +264,11 @@ repair bank's deposits building owed ghosts while flying (Pilots.installOwed) st
      (`placeFinished`): another open, joined spot wanting the same item, else the hold.
    - A **repair** sets the part's HP to full (one structural sync).
    - A **recycle** removes the part from the blueprint, puts `recycleReturn` into the hold, and drops the uid from
-     `field.recycle`. Then planned parts in `waiting` whose cells are now free and which join the structure move into the
-     blueprint as ghosts.
+     `field.recycle`. Its cells are free from then on, for a new part the pilot places there.
    - A **refine** puts its output in the hold.
 5. **Hold full**: output that doesn't fit (by volume, `ItemCatalog.volume`) stays in the machine (`holding`, saved as
    `field.held`). The machine stalls (`blocked: 'cargo'`, drawing off) until there is room. A finished part that can go
-   onto a planned spot needs no room.
+   onto a missing part's spot needs no room.
 6. **On/off** takes effect on the tick the message arrives. Switching off pauses the job, which keeps its progress and
    inputs. `fieldCancel` gives the inputs back.
 7. **The refiner**: `recipe` set means refine that recipe while the hold has its inputs. Auto means refine what the
@@ -246,20 +276,25 @@ repair bank's deposits building owed ghosts while flying (Pilots.installOwed) st
 8. **Death**: the machines' `held` items and the jobs' inputs go into the wreck with the cargo (B's `onDestroyed` asks A
    for them through the host).
 
-### 5.1 Saving a plan (`fieldPlan`)
+### 5.1 Saving the build view (`fieldPlan`; `server/src/game/field/plan.ts`)
 
-1. Validate the target with `clientBlueprint` and `validate`.
+1. Validate the target as a hangar edit is (`parseBlueprint`, `validate`, licences, build points).
 2. For each target part:
-   - a standing part with the same uid and the same placement (piece, fn, material, x, y, rot, flip, facing) stays;
-   - a standing part with the same uid but a different placement gets a fresh uid (the old one is recycled);
-   - a new part becomes a ghost, or goes to `waiting` if it overlaps a standing part or isn't joined yet.
-3. Standing parts not in the target are queued for recycling.
-4. Ghost parts not in the target are dropped from the blueprint. If one is being built, its job finishes and the part
+   - a part of the live design with the same uid and the same placement (piece, fn, material, x, y, rot, flip,
+     facing, mount) stays as it is: standing, missing or placeholder;
+   - a part with the same uid but a different placement is a new part with a fresh uid (the old one is recycled if it
+     stands, else dropped);
+   - a new part is appended **missing** (`ShipRecord.hp[uid] = 0`, no placeholder flag).
+3. Standing parts not in the target are queued for recycling. They stay in the blueprint, standing, until broken down.
+4. Missing parts not in the target are dropped from the blueprint. If one is being built, its job finishes and the part
    goes to the hold.
-5. Saving is free.
-6. Plan parts are **appended** at the end of `blueprint.parts`, and removed parts are spliced out only when their recycle
-   finishes. The ports state is carried across by part index: write `remapPortsByIndex` in `common/src/ships/power/ports.ts`
-   (A owns that one function), so a plan save is never a free store refill.
+5. The result must pass `validate` with the parts being recycled still in it. A new part on their cells (or blocked by
+   them) is refused with the reason: place it once the part is gone. The build view refuses the placement the same way.
+6. Saving is free. New parts are **appended** at the end of `blueprint.parts`, and removed parts are spliced out only
+   when their recycle finishes. The ports state is carried across by part index (`remapPortsByIndex`), so a save is never
+   a free store refill.
+7. `fieldPlanClear` ("As it stands"): every missing part, planned or lost, leaves the design and the recycling queue
+   empties.
 
 ---
 
@@ -271,8 +306,10 @@ repair bank's deposits building owed ghosts while flying (Pilots.installOwed) st
 2. **Respawn** at home, in the **same design**. The core always comes back free. The free part then pays at once, core
    outward (`payCoreOutward` with `bill = partInputs`, `purse = freeWhole(bank)`, and `spendFree`). Parts it couldn't pay
    become ghosts. Deposits then rebuild those ghosts, core outward, anywhere, at `BANK.respawnSpeed` (`bankPay`; a part
-   with a shortfall is skipped). Ghosts the deposits can't pay stay planned, for the fabricator, the core, or the free part
+   with a shortfall is skipped). Ghosts the deposits can't pay stay missing, for the fabricator, the core, or the free part
    as it refills: each time the free part could pay the next core-outward ghost, it does. An empty bank means a bare core.
+   Every part of the design is owed after a death, standing or missing (a part the build view planned included); only
+   the hangar's own placeholders are not.
 3. **Passing a station** (replaces `repairStep`'s free and paid station repair): within `BANK.stationRange` of any station,
    and not hit for `combatPauseTicks`, deposits heal damaged parts at 10% HP/s and rebuild a missing part every 2 s, paid
    with `bankPay` on the part's `repairBill` or `partInputs`.
@@ -289,8 +326,8 @@ These are JSON messages, wired into `ClientMessage` and `ServerMessage`. All of 
 
 | Message | Direction | When | Handled by |
 |---|---|---|---|
-| `fieldPlan { blueprint }` | C to S | a plan saved | A |
-| `fieldPlanClear` | C to S | the plan dropped | A |
+| `fieldPlan { blueprint }` | C to S | the build view saved: the new blueprint (new parts missing) | A |
+| `fieldPlanClear` | C to S | "As it stands": missing parts dropped, recycling stopped | A |
 | `machine { kind, on?, packs?, recipe? }` | C to S | a switch changed | A |
 | `fieldCancel { kind, job }` | C to S | a job called off | A |
 | `fieldRecycle { uids, cancel? }` | C to S | parts queued or unqueued | A |
@@ -300,7 +337,7 @@ These are JSON messages, wired into `ClientMessage` and `ServerMessage`. All of 
 | `fieldDone { kind, job, item, to, uid? }` | S to C | a part or batch finished: `to` is `ship`, `cargo` or `machine` | A sends; C toasts and plays the sound |
 | `repairBank { free, cap, fullIn, spare, deposits, rebuilding? }` | S to C | at login, on a change, and at most once a minute while refilling | B sends; D shows |
 
-- Part attachment, HP and ghost flags travel on the existing ship sync (rebuilds, hp, ghosts): no new structural message.
+- Part attachment and HP (a missing part is hp 0, as one shot off) travel on the existing ship sync (rebuilds, hp, ghosts): no new structural message.
 - **Prediction**: the own client steps `machEu` itself, because the ports tick runs in the own-ship sim with `mach` as the
   server set it, and the own sync corrects it. The client never predicts a job start, a finish or a placement. It waits
   for `fieldState` and `fieldDone`. Between those it shows `jobAt`.

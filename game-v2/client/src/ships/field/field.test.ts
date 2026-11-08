@@ -1,6 +1,6 @@
 /**
  * The client half of field fabrication: the copy of the server's field state and the progress worked out from the
- * predicted machine clock, the build overlay's plan diff, and the HUD's words for each way a machine can be stuck.
+ * predicted machine clock, the build view's edits to the blueprint, and the HUD's words for each way a machine can be stuck.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { HANDLERS } from '../../app/serverMessages';
 import { FieldClient, machineClock, machineJob, machineProgress } from './fieldState';
 import { blockText, jobText, machineName, machineStatus } from './fieldText';
 import { pickMessage, refineChoices, shortLine } from './FieldHud';
-import { addPart, candidate, openDraft, partAtPoint, placementProblem, planChanged, planDiff, planTarget, removePart, targetErrors } from './plan';
+import { addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, settle, summary, targetErrors, working, type BuildEdits, type LiveDesign } from './plan';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -134,114 +134,133 @@ describe('HUD words', () => {
   });
 });
 
-describe('build overlay plan', () => {
+describe('build view edits (the blueprint, missing parts and all)', () => {
+  const hull = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0 as const, flip: false, facing: 'auto' as const };
+  const liveOf = (bp: Blueprint, dead: number[] = [], queued: number[] = []): LiveDesign =>
+    ({ bp, alive: bp.parts.map((p) => !dead.includes(p.uid)), queued: new Set(queued) });
   /** A cell beside the ship where a hull square can go */
-  function freeSpot(d: ReturnType<typeof openDraft>) {
-    const hand = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0 as const, flip: false, facing: 'auto' as const };
+  function freeSpot(live: LiveDesign, e: BuildEdits) {
+    const w = working(live, e);
     for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) {
-      const p = candidate(catalog, d, hand, [x + 0.5, y + 0.5]);
-      if (p && !placementProblem(catalog, d, p, tuning)) return p;
+      const p = candidate(catalog, live, w, hull, [x + 0.5, y + 0.5]);
+      if (p && !placementProblem(catalog, w, p, tuning)) return p;
     }
     throw new Error('no free spot');
   }
 
-  it('a new part is appended as a planned part and the target stays a valid design', () => {
-    const live = sparrow();
-    const d = openDraft(live, live.parts.map(() => false));
-    expect(planDiff(d).changed).toBe(false);
-    const p = freeSpot(d);
-    addPart(d, p);
-    const diff = planDiff(d);
-    expect(diff.added.map((q) => q.uid)).toEqual([p.uid]);
-    expect(diff.recycle).toEqual([]);
-    const target = planTarget(d);
-    // The standing parts keep their order and uids, the new one is last
-    expect(target.parts.slice(0, live.parts.length)).toEqual(live.parts);
+  it('a new part is appended to the blueprint and the target stays a valid design', () => {
+    const live = liveOf(sparrow());
+    const e = noEdits();
+    expect(planChanged(live, e)).toBe(false);
+    const p = freeSpot(live, e);
+    addPart(e, p);
+    expect(summary(live, e)).toEqual({ added: 1, recycle: 0, dropped: 0 });
+    const target = planTarget(working(live, e));
+    // The live parts keep their order and uids, the new one is last
+    expect(target.parts.slice(0, live.bp.parts.length)).toEqual(live.bp.parts);
     expect(target.parts[target.parts.length - 1]).toEqual(p);
     expect(validateBlueprint(catalog, target, tuning, null, { mounting: false }).errors).toEqual([]);
-    expect(targetErrors(catalog, tuning, d)).toEqual([]);
-    expect(planChanged(d, new Set())).toBe(true);
+    expect(targetErrors(catalog, tuning, working(live, e))).toEqual([]);
+    expect(planChanged(live, e)).toBe(true);
+  });
+
+  it('a part once saved falls out of the edits as the live ship shows it (no ghost left behind once built)', () => {
+    const bp = sparrow();
+    const e = noEdits();
+    const p = freeSpot(liveOf(bp), e);
+    addPart(e, p);
+    // The server applied the save: the part is in the blueprint, missing
+    const saved = { ...bp, parts: [...bp.parts, p] };
+    const missing = liveOf(saved, [p.uid]);
+    expect(settle(missing, e)).toBe(true);
+    expect(hasEdits(e)).toBe(false);
+    let w = working(missing, e);
+    expect(w.standing[w.bp.parts.length - 1]).toBe(false);
+    // Built: the same part, standing, from the live ship alone
+    w = working(liveOf(saved), e);
+    expect(w.standing[w.bp.parts.length - 1]).toBe(true);
   });
 
   it('refuses a part that would wall in a gun', () => {
-    const live = sparrow();
-    const d = openDraft(live, undefined);
-    const gun = live.parts.find((q) => q.facing === 'N' && q.fn.startsWith('cannon'))!;
+    const live = liveOf(sparrow());
+    const w = working(live, noEdits());
+    const gun = live.bp.parts.find((q) => q.facing === 'N' && q.fn.startsWith('cannon'))!;
     expect(gun).toBeTruthy();
-    const hand = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0 as const, flip: false, facing: 'auto' as const };
-    const front = candidate(catalog, d, hand, [gun.x + 0.5, gun.y - 0.5])!;
-    expect(placementProblem(catalog, d, front)).toBeNull();
-    expect(placementProblem(catalog, d, front, tuning)).toMatch(/free|blocked/);
+    const front = candidate(catalog, live, w, hull, [gun.x + 0.5, gun.y - 0.5])!;
+    expect(placementProblem(catalog, w, front)).toBeNull();
+    expect(placementProblem(catalog, w, front, tuning)).toMatch(/free|blocked/);
   });
 
   it('refuses a part that overlaps or joins nothing', () => {
-    const live = sparrow();
-    const d = openDraft(live, undefined);
-    const core = live.parts.find((q) => q.fn === 'core')!;
-    const over = candidate(catalog, d, { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0, flip: false, facing: 'auto' }, [core.x + 0.5, core.y + 0.5])!;
-    expect(placementProblem(catalog, d, over)).toBe('overlaps another part');
-    const far = candidate(catalog, d, { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0, flip: false, facing: 'auto' }, [40.5, 40.5])!;
-    expect(placementProblem(catalog, d, far)).toBe("doesn't join anything");
+    const live = liveOf(sparrow());
+    const w = working(live, noEdits());
+    const core = live.bp.parts.find((q) => q.fn === 'core')!;
+    const over = candidate(catalog, live, w, hull, [core.x + 0.5, core.y + 0.5])!;
+    expect(placementProblem(catalog, w, over)).toBe('overlaps another part');
+    const far = candidate(catalog, live, w, hull, [40.5, 40.5])!;
+    expect(placementProblem(catalog, w, far)).toBe("doesn't join anything");
   });
 
   it('taking out a standing part marks it for recycling, and what it cuts off goes with it', () => {
-    const live = sparrow();
-    const d = openDraft(live, undefined);
-    const geoms = live.parts.map((q) => ({ q }));
-    expect(geoms.length).toBeGreaterThan(2);
-    const core = live.parts.findIndex((q) => q.fn === 'core');
+    const live = liveOf(sparrow());
+    const parts = live.bp.parts;
+    const core = parts.findIndex((q) => q.fn === 'core');
     // The core stays
-    expect(removePart(catalog, d, core).kind).toBe('none');
+    expect(removePart(catalog, live, noEdits(), core).kind).toBe('none');
     // Take out each part in turn: the target is always a valid design, with the core
-    for (let i = 0; i < live.parts.length; i++) {
+    for (let i = 0; i < parts.length; i++) {
       if (i === core) continue;
-      const e = openDraft(live, undefined);
-      const r = removePart(catalog, e, i);
+      const e = noEdits();
+      const r = removePart(catalog, live, e, i);
       expect(r.kind).toBe('marked');
-      expect(e.marked.has(live.parts[i].uid)).toBe(true);
-      const diff = planDiff(e);
-      expect(diff.recycle.sort()).toEqual([...e.marked].sort());
-      expect(diff.added).toEqual([]);
-      const target = planTarget(e);
+      const w = working(live, e);
+      expect(w.marked.has(parts[i].uid)).toBe(true);
+      // (marked parts stay in the design, standing, until broken down)
+      expect(w.bp.parts.length).toBe(parts.length);
+      const target = planTarget(w);
       expect(target.parts.some((q) => q.fn === 'core')).toBe(true);
-      expect(target.parts.length).toBe(live.parts.length - e.marked.size);
-      expect(validateBlueprint(catalog, target, tuning, null, { mounting: false }).errors, `without #${live.parts[i].uid}`).toEqual([]);
+      expect(target.parts.length).toBe(parts.length - w.marked.size);
+      expect(validateBlueprint(catalog, target, tuning, null, { mounting: false }).errors, `without #${parts[i].uid}`).toEqual([]);
       // Again: kept
-      expect(removePart(catalog, e, i).kind).toBe('unmarked');
-      expect(e.marked.has(live.parts[i].uid)).toBe(false);
+      expect(removePart(catalog, live, e, i).kind).toBe('unmarked');
+      expect(working(live, e).marked.has(parts[i].uid)).toBe(false);
     }
   });
 
-  it('taking out a planned part drops it, and one placed this session just goes', () => {
-    const live = sparrow();
-    const ghost = live.parts.map((_, i) => i === live.parts.length - 1);
-    const d = openDraft(live, ghost);
-    const last = d.bp.parts.length - 1;
-    const r = removePart(catalog, d, last);
-    expect(r.kind).toBe('dropped');
-    expect(planDiff(d).dropped).toEqual([live.parts[last].uid]);
-    expect(planDiff(d).recycle).toEqual([]);
-    expect(d.bp.parts.length).toBe(last);
+  it('taking out a missing part (planned or shot off) drops it from the design; one placed this session just goes', () => {
+    const bp = sparrow();
+    const last = bp.parts.length - 1;
+    const live = liveOf(bp, [bp.parts[last].uid]);
+    const e = noEdits();
+    expect(removePart(catalog, live, e, last).kind).toBe('dropped');
+    expect([...e.dropped]).toEqual([bp.parts[last].uid]);
+    expect(working(live, e).marked.size).toBe(0);
+    expect(working(live, e).bp.parts.length).toBe(last);
     // A part placed and then taken out again leaves no trace
-    const e = openDraft(live, undefined);
-    const p = freeSpot(e);
-    addPart(e, p);
-    expect(removePart(catalog, e, e.bp.parts.length - 1).kind).toBe('dropped');
-    expect(planDiff(e).changed).toBe(false);
+    const f = noEdits();
+    const whole = liveOf(bp);
+    addPart(f, freeSpot(whole, f));
+    expect(removePart(catalog, whole, f, working(whole, f).bp.parts.length - 1).kind).toBe('dropped');
+    expect(planChanged(whole, f)).toBe(false);
   });
 
-  it('a part can go where a part marked for recycling stands, and the server\'s queue opens marked', () => {
-    const live = sparrow();
-    const leaf = live.parts.findIndex((q, i) => q.fn !== 'core' && removePart(catalog, openDraft(live, undefined), i).kind === 'marked' && planDiff((() => { const e = openDraft(live, undefined); removePart(catalog, e, i); return e; })()).recycle.length === 1);
+  it("the server's queue opens marked; a part can't go where a part being recycled still stands", () => {
+    const bp = sparrow();
+    const leaf = bp.parts.findIndex((q, i) => { const e = noEdits(); return q.fn !== 'core' && removePart(catalog, liveOf(bp), e, i).kind === 'marked' && e.mark.size === 1; });
     expect(leaf).toBeGreaterThanOrEqual(0);
-    const d = openDraft(live, undefined, [live.parts[leaf].uid, 999]);
+    const uid = bp.parts[leaf].uid;
+    const live = liveOf(bp, [], [uid, 999]);
+    const e = noEdits();
     // (an unknown uid in the queue is ignored)
-    expect([...d.marked]).toEqual([live.parts[leaf].uid]);
-    expect(planChanged(d, new Set([live.parts[leaf].uid]))).toBe(false);
-    expect(planChanged(d, new Set())).toBe(true);
-    const g = partAtPoint(catalog, d, [live.parts[leaf].x + 0.5, live.parts[leaf].y + 0.5]);
-    expect(g).toBeGreaterThanOrEqual(0);
-    expect(partItemId(d.bp.parts[g])).toBeTypeOf('string');
+    expect([...working(live, e).marked]).toEqual([uid]);
+    expect(planChanged(live, e)).toBe(false);
+    const w = working(live, e);
+    const over = candidate(catalog, live, w, { ...hull }, [bp.parts[leaf].x + 0.5, bp.parts[leaf].y + 0.5])!;
+    expect(placementProblem(catalog, w, over)).toMatch(/still being recycled/);
+    // Kept after all: unmarked, and the save would take it off the queue
+    expect(removePart(catalog, live, e, leaf).kind).toBe('unmarked');
+    expect(planChanged(live, e)).toBe(true);
+    expect(partItemId(working(live, e).bp.parts[partAtPoint(catalog, w, [bp.parts[leaf].x + 0.5, bp.parts[leaf].y + 0.5])])).toBeTypeOf('string');
   });
 });
 

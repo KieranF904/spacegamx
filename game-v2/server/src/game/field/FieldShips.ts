@@ -6,7 +6,11 @@
  *
  * Every rule is common's (econ/field): which part is next (nextFieldTarget), what a job costs and takes (fieldPay,
  * repairBill, jobEu, jobTicks), how it steps (stepJob), where a finished part goes (placeFinished). This file only
- * runs them on the live ship and keeps the pilot's record (blueprint, ghosts, field) in step.
+ * runs them on the live ship and keeps the pilot's record (blueprint, hp, field) in step.
+ *
+ * One rule for what's wanted (5.1): a part the blueprint has and the ship hasn't is MISSING, whether a build view save
+ * planned it or a hit shot it off, and it is rebuilt the same way. A save adds no ghosts: new parts come in missing.
+ * (Hangar and bank placeholders, ShipState.ghost, are missing too as far as the fabricator goes; they keep their flag.)
  *
  * Netcode: a powered machine's job progresses by the energy its part took this tick (PortsState.machEu, the ports
  * core's counter, which the pilot's own prediction steps too); the core's by the tick. Progress is never sent: only
@@ -35,7 +39,7 @@ import type { BankCap, FeatureInstance, FeatureMessageHandler, HoldCap, ShipsOf,
 export type FieldHost = WorldCap & ShipsOf<'catalog' | 'chargeOf' | 'get' | 'installGhost' | 'refitInFlight' | 'validate'>
   & Pick<TellCap, 'tell' | 'send'> & HoldCap & BankCap;
 import { SimPass } from '../../sim/SystemClocks.js';
-import { joinsOf, planDiff, promoteWaiting, removeParts, type Validate } from './plan.js';
+import { admitLegacy, joinsOf, planDiff, removeParts, type Validate } from './plan.js';
 import { pickRefine } from './refine.js';
 
 const playerQuery = defineQuery([Player]);
@@ -86,6 +90,8 @@ interface FieldShip {
   changed: boolean;
   /** The record's design or planned parts changed (a part built in, a refit): its hangar view goes again at the flush */
   record?: boolean;
+  /** A missing part was built: its hangar view goes again once the ship is rebuilt with it standing */
+  recordAfterRebuild?: boolean;
   /** Look for work this tick */
   wake: boolean;
   /** What the fabricator's jobs were short of when it last looked (the HUD's list; the refiner's auto choice) */
@@ -144,7 +150,9 @@ export class FieldShips implements FeatureInstance {
 
   onShipRebuilt(eid: number): void {
     const fs = this.byEid.get(eid);
-    if (fs) fs.wake = true;
+    if (!fs) return;
+    fs.wake = true;
+    if (fs.recordAfterRebuild) { fs.recordAfterRebuild = false; this.host.recordChanged?.(eid); }
   }
 
   onLeave(eid: number): void {
@@ -158,6 +166,7 @@ export class FieldShips implements FeatureInstance {
       if (hasComponent(w, Dead, eid) || !SimPass.on(InSystem.systemId[eid])) continue;
       const fs = this.track(eid);
       if (!fs) continue;
+      if (fs.rec.field?.waiting) this.migrate(fs);
       this.step(fs, tick);
       if (fs.wake || (tick + eid) % POLL_TICKS === 0) { fs.wake = false; this.decide(fs, tick); }
       this.applyBits(fs);
@@ -212,6 +221,20 @@ export class FieldShips implements FeatureInstance {
     const e = this.host.ships.chargeOf(eid).e;
     if (e) { fs.eu[MACHINE_FAB] = portsMachineEu(e, MACHINE_FAB); fs.eu[MACHINE_REF] = portsMachineEu(e, MACHINE_REF); }
     return fs;
+  }
+
+  /**
+   * (Old saves) planned parts a field plan kept outside the blueprint (`field.waiting`) go into it as missing parts, as
+   * far as it stays a valid design; any left are dropped. An old save's field-plan ghosts are missing parts already as
+   * far as the fabricator and the build view go (their placeholder flag only spares the flight model)
+   */
+  private migrate(fs: FieldShip): void {
+    const w = fs.rec.field?.waiting;
+    if (!w) return;
+    delete fs.rec.field!.waiting;
+    this.host.markDirty(fs.eid);
+    const r = admitLegacy(this.validateLoose, fs.ship.blueprint, w);
+    if (r.added.length) this.refit(fs, r.blueprint, this.ghostUids(fs));
   }
 
   private field(fs: FieldShip): FieldRecord {
@@ -417,6 +440,7 @@ export class FieldShips implements FeatureInstance {
     if (!isStructural(p.fn) && this.host.holdCount(fs.eid, item) >= 1 && this.host.holdTake(fs.eid, { [item]: 1 })) {
       return this.begin(fs, m, 'build', { uid: p.uid, item, held: { [item]: 1 }, make: 0, attach: attachWork(cat, spec), share: 0, bank: {} }, tick);
     }
+    // (Any missing part of the design is its own, planned or lost; a hangar or bank placeholder is not yet)
     const own = !fs.ship.ghost[i];
     const pay = this.pay(fs, m, fieldBuildInputs(econ, spec), own, short);
     return !!pay && this.begin(fs, m, 'build', { uid: p.uid, item, held: pay.held, make: fabWork(econ, spec), attach: attachWork(cat, spec), share: pay.share, bank: pay.bank }, tick);
@@ -549,7 +573,6 @@ export class FieldShips implements FeatureInstance {
     rc.delete(j.uid!);
     this.setRecycle(fs, [...rc]);
     if (alive) done(j.item!, this.toHold(fs, m, recycleReturn(this.host.econ, this.specOfItem(j.item!)!)));
-    this.promote(fs);
   }
 
   /** Can this standing part (index) come off without stranding anything (order.ts recycleCandidates) */
@@ -560,7 +583,7 @@ export class FieldShips implements FeatureInstance {
     return recycleCandidates(n, ship.derived.root, joins, alive, queued).includes(i);
   }
 
-  /** A finished part onto its spot (a ghost built in, a lost part back): returns its uid */
+  /** A finished part onto its spot (a missing part built, or a hangar or bank placeholder built in): returns its uid */
   private install(fs: FieldShip, i: number): number {
     const ship = fs.ship, uid = ship.blueprint.parts[i].uid;
     if (ship.ghost[i]) {
@@ -575,6 +598,8 @@ export class FieldShips implements FeatureInstance {
       ship.rebuildHp[i] = 0;
     }
     if (fs.rec.hp) delete fs.rec.hp[uid];
+    // (The hangar view reads the live ship's standing parts: it goes again once the ship is rebuilt with this one)
+    fs.recordAfterRebuild = true;
     this.host.markDirty(fs.eid);
     return uid;
   }
@@ -629,9 +654,13 @@ export class FieldShips implements FeatureInstance {
 
   // ===================================================================== the blueprint (live ship and record together)
 
-  /** Put a new design on the live ship and its record together (ghosts: planned parts in it), keeping every part's state */
+  /**
+   * Put a new design on the live ship and its record together, keeping every part's state. Parts new to it come in
+   * missing (the record's hp 0); `ghosts`: the hangar and bank placeholders it keeps
+   */
   private refit(fs: FieldShip, bp: Blueprint, ghosts: number[]): boolean {
     if (!this.validateLoose(bp).ok) return false;
+    const before = new Set(fs.ship.blueprint.parts.map((p) => p.uid));
     if (!this.host.ships.refitInFlight(fs.eid, bp, ghosts)) return false;
     const ship = this.host.ships.get(fs.eid)!;
     fs.ship = ship;
@@ -641,6 +670,7 @@ export class FieldShips implements FeatureInstance {
     fs.rec.ghosts = bp.parts.filter((p) => g.has(p.uid)).map((p) => p.uid);
     fs.record = true;
     if (fs.rec.hp) for (const k of Object.keys(fs.rec.hp)) if (!bp.parts.some((p) => p.uid === Number(k))) delete fs.rec.hp[Number(k)];
+    for (const p of bp.parts) if (!before.has(p.uid) && !g.has(p.uid)) (fs.rec.hp ??= {})[p.uid] = 0;
     this.syncMachines(fs);
     this.host.markDirty(fs.eid);
     fs.changed = true; fs.wake = true;
@@ -651,31 +681,13 @@ export class FieldShips implements FeatureInstance {
     return fs.ship.blueprint.parts.filter((_, i) => fs.ship.ghost[i]).map((p) => p.uid);
   }
 
-  /** Take parts out of the design (a recycle done, a queued part lost); parts cut off by it wait. False: it can't be done now */
+  /** Take parts out of the design (a recycle done, a queued part lost); missing parts cut off by it go too. False: it can't be done now */
   private takeOff(fs: FieldShip, uids: Set<number>): boolean {
     const alive = (uid: number) => { const i = this.indexOf(fs, uid); return i >= 0 && !!fs.ship.derived.alive[i]; };
     const r = removeParts(this.validateLoose, fs.ship.blueprint, uids, (u) => !uids.has(u) && alive(u));
     if (!r) return false;
-    const ghosts = this.ghostUids(fs).filter((u) => !uids.has(u) && r.blueprint.parts.some((p) => p.uid === u));
-    if (!this.refit(fs, r.blueprint, ghosts)) return false;
-    if (r.waiting.length) this.setWaiting(fs, [...(fs.rec.field?.waiting ?? []), ...r.waiting]);
-    return true;
-  }
-
-  /** Waiting planned parts into the design as far as they can go now */
-  private promote(fs: FieldShip): void {
-    const w = fs.rec.field?.waiting;
-    if (!w?.length) return;
-    const r = promoteWaiting(this.validateLoose, fs.ship.blueprint, w);
-    if (!r.added.length) return;
-    if (this.refit(fs, r.blueprint, [...this.ghostUids(fs), ...r.added])) this.setWaiting(fs, r.left);
-  }
-
-  private setWaiting(fs: FieldShip, w: PlacedPart[]): void {
-    if (!w.length && !fs.rec.field?.waiting) return;
-    const f = this.field(fs);
-    if (w.length) f.waiting = w; else delete f.waiting;
-    this.host.markDirty(fs.eid);
+    const ghosts = this.ghostUids(fs).filter((u) => r.blueprint.parts.some((p) => p.uid === u));
+    return this.refit(fs, r.blueprint, ghosts);
   }
 
   private setRecycle(fs: FieldShip, uids: number[]): void {
@@ -696,7 +708,6 @@ export class FieldShips implements FeatureInstance {
     const gone = new Set(lost.filter((u) => u !== busy && this.indexOf(fs, u) >= 0));
     if (gone.size && !this.takeOff(fs, gone)) return;
     this.setRecycle(fs, rc.filter((u) => !lost.includes(u) || u === busy));
-    this.promote(fs);
   }
 
   // ===================================================================== messages
@@ -726,11 +737,12 @@ export class FieldShips implements FeatureInstance {
     this.applyPlan(fs, target);
   }
 
+  /** The ship as it stands: every missing part (planned or lost) leaves the design, the recycling queue empties */
   private onPlanClear(eid: number): void {
     const fs = this.ensure(eid);
     if (!fs) return;
-    const bp = fs.ship.blueprint;
-    this.applyPlan(fs, { ...bp, parts: bp.parts.filter((_, i) => !fs.ship.ghost[i]) }, true);
+    const bp = fs.ship.blueprint, alive = fs.ship.derived.alive;
+    this.applyPlan(fs, { ...bp, parts: bp.parts.filter((p, i) => alive[i] || p.fn === 'core') }, true);
   }
 
   /** What's wrong with a plan as a design for this pilot (null: nothing) */
@@ -760,9 +772,9 @@ export class FieldShips implements FeatureInstance {
       alive: (u) => { const i = this.indexOf(fs, u); return i >= 0 && !!ship.derived.alive[i]; },
     }, target);
     if ('error' in r) { this.host.tell(fs.eid, r.error, 'warn'); return; }
-    if (!this.refit(fs, r.blueprint, r.ghosts)) { this.host.tell(fs.eid, "That plan can't be saved", 'warn'); return; }
+    const kept = [...ghosts].filter((u) => r.blueprint.parts.some((p) => p.uid === u));
+    if (!this.refit(fs, r.blueprint, kept)) { this.host.tell(fs.eid, "That plan can't be saved", 'warn'); return; }
     this.setRecycle(fs, clear ? [] : r.recycle);
-    this.setWaiting(fs, clear ? [] : r.waiting);
     // Jobs on parts no longer in it, or no longer to recycle, are called off (a build carries on: its part goes where it can)
     const rc = new Set(fs.rec.field?.recycle ?? []);
     const j = fs.fab.job;

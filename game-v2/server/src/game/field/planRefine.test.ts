@@ -1,13 +1,13 @@
 /**
- * The pure halves of field fabrication's server side: the plan diff (plan.ts: standing parts kept, removals queued,
- * new parts appended as ghosts or left waiting, the blueprint always valid) and the refiner's choice (refine.ts).
+ * The pure halves of field fabrication's server side: the build view save (plan.ts: live parts kept, standing ones left
+ * out queued for recycling, new parts appended as missing parts, the blueprint always valid) and the refiner's choice (refine.ts).
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import { Economy, loadCatalog, validateBlueprint, type Blueprint, type PlacedPart, type Rot, type ShipTuning } from '@space-game/common';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { planDiff, promoteWaiting, removeParts, samePlacement } from './plan.js';
+import { admitLegacy, planDiff, removeParts, samePlacement } from './plan.js';
 import { pickRefine } from './refine.js';
 
 const dataDir = join(__dirname, '../../../../data');
@@ -26,48 +26,59 @@ const ship = (...more: PlacedPart[]): Blueprint => ({
 });
 const live = (bp: Blueprint, ghosts: number[] = [], dead: number[] = []) => ({ blueprint: bp, ghosts: new Set(ghosts), alive: (u: number) => !ghosts.includes(u) && !dead.includes(u) });
 
-describe('plan diff', () => {
-  it('keeps standing parts in place and order, queues the ones left out, appends the new ones as ghosts', () => {
+describe('plan diff (the build view save: new parts are missing parts)', () => {
+  it('keeps live parts in place and order, queues the standing ones left out, appends the new ones', () => {
     const bp = ship();
     expect(validate(bp).ok).toBe(true);
     const target = { ...bp, parts: [bp.parts[0], bp.parts[1], part(10, 'sq', 'hull', 2, 0), part(11, 'sq', 'cannon_pip', 2, -1, { facing: 'N' })] };
     const r = planDiff(validate, catalog, live(bp), target);
     if ('error' in r) throw new Error(r.error);
+    // (Pip 2 still stands while it is recycled: it stays in the blueprint)
     expect(r.blueprint.parts.slice(0, 3)).toEqual(bp.parts);
     expect(r.blueprint.parts.slice(3).map((p) => p.uid)).toEqual([10, 11]);
-    expect(r.ghosts).toEqual([10, 11]);
+    expect(r.added).toEqual([10, 11]);
     expect(r.recycle).toEqual([2]);
-    expect(r.waiting).toEqual([]);
     expect(validate(r.blueprint).ok).toBe(true);
   });
 
-  it('a standing part moved gets a fresh uid (the old one recycled); one overlapping a recycled part waits', () => {
+  it('a standing part moved gets a fresh uid (the old one recycled); a new part on a recycling part\'s cells is refused', () => {
     const bp = ship(part(3, 'sq', 'hull', 2, 0));
-    // Hull 3 moved to the left of the core; a hull where Pip 2 stands now
-    const target = { ...bp, parts: [bp.parts[0], bp.parts[1], { ...bp.parts[3], x: -1 }, part(12, 'sq', 'hull', 1, -1)] };
-    const r = planDiff(validate, catalog, live(bp), target);
+    // Hull 3 moved to the left of the core
+    const r = planDiff(validate, catalog, live(bp), { ...bp, parts: [bp.parts[0], bp.parts[1], bp.parts[2], { ...bp.parts[3], x: -1 }] });
     if ('error' in r) throw new Error(r.error);
-    expect(r.recycle.sort()).toEqual([2, 3]);
+    expect(r.recycle).toEqual([3]);
     const moved = r.blueprint.parts.find((p) => p.x === -1 && p.y === 0)!;
     expect(moved.uid).not.toBe(3);
-    expect(r.ghosts).toContain(moved.uid);
-    expect(r.waiting.map((p) => p.uid)).toEqual([12]);
+    expect(r.added).toEqual([moved.uid]);
     expect(validate(r.blueprint).ok).toBe(true);
-    // Pip 2 recycled: hull 12 joins
-    const off = removeParts(validate, r.blueprint, new Set([2]), () => true)!;
-    const p = promoteWaiting(validate, off.blueprint, r.waiting);
-    expect(p.added).toEqual([12]);
-    expect(validate(p.blueprint).ok).toBe(true);
+    // A hull where Pip 2 stands: not while Pip 2 is still there
+    const over = planDiff(validate, catalog, live(bp), { ...bp, parts: [bp.parts[0], bp.parts[1], bp.parts[3], part(12, 'sq', 'hull', 1, -1)] });
+    expect(over).toHaveProperty('error');
+    expect((over as { error: string }).error).toMatch(/still being recycled/);
+    // Pip 2 recycled: the hull goes in
+    const off = removeParts(validate, bp, new Set([2]), () => true)!;
+    const again = planDiff(validate, catalog, live(off.blueprint), { ...bp, parts: [bp.parts[0], bp.parts[1], bp.parts[3], part(12, 'sq', 'hull', 1, -1)] });
+    if ('error' in again) throw new Error(again.error);
+    expect(again.added).toEqual([12]);
   });
 
-  it('a new part nothing joins yet waits; destroyed parts left out simply go', () => {
+  it('missing parts kept stay missing (planned or shot off, the same); missing parts left out simply go', () => {
+    const bp = ship(part(3, 'sq', 'hull', 2, 0), part(4, 'sq', 'hull', -1, 0));
+    // Hull 3 shot off and kept, hull 4 shot off and left out
+    const target = { ...bp, parts: bp.parts.filter((p) => p.uid !== 4) };
+    const r = planDiff(validate, catalog, live(bp, [], [3, 4]), target);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.recycle).toEqual([]);
+    expect(r.added).toEqual([]);
+    expect(r.blueprint.parts.map((p) => p.uid)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('hangar placeholders kept stay as they are, and are never recycled', () => {
     const bp = ship(part(3, 'sq', 'hull', 2, 0));
-    const target = { ...bp, parts: [bp.parts[0], bp.parts[1], bp.parts[2], part(20, 'sq', 'hull', 5, 5)] };
-    const r = planDiff(validate, catalog, live(bp, [], [3]), target);
+    const r = planDiff(validate, catalog, live(bp, [3]), { ...bp, parts: bp.parts.filter((p) => p.uid !== 3) });
     if ('error' in r) throw new Error(r.error);
     expect(r.recycle).toEqual([]);
     expect(r.blueprint.parts.map((p) => p.uid)).toEqual([0, 1, 2]);
-    expect(r.waiting.map((p) => p.uid)).toEqual([20]);
   });
 
   it('refuses a plan that moves or drops the core', () => {
@@ -76,12 +87,19 @@ describe('plan diff', () => {
     expect(planDiff(validate, catalog, live(bp), { ...bp, parts: bp.parts.map((p) => (p.fn === 'core' ? { ...p, y: 3 } : p)) })).toHaveProperty('error');
   });
 
-  it('taking a part out moves the unbuilt parts it held on into waiting, never a standing one', () => {
+  it('taking a part out drops the missing parts it held on, never a standing one', () => {
     const bp = ship(part(3, 'sq', 'hull', 2, 0), part(4, 'sq', 'hull', 3, 0));
     const r = removeParts(validate, bp, new Set([3]), (u) => u !== 4)!;
     expect(r.blueprint.parts.map((p) => p.uid)).toEqual([0, 1, 2]);
-    expect(r.waiting.map((p) => p.uid)).toEqual([4]);
+    expect(r.dropped).toEqual([4]);
     expect(removeParts(validate, bp, new Set([3]), () => true)).toBeNull();
+  });
+
+  it('an old save\'s waiting parts go in as far as the design stays valid', () => {
+    const bp = ship();
+    const r = admitLegacy(validate, bp, [part(11, 'sq', 'hull', 3, 0), part(10, 'sq', 'hull', 2, 0), part(12, 'sq', 'hull', 9, 9)]);
+    expect(r.added.sort()).toEqual([10, 11]);
+    expect(validate(r.blueprint).ok).toBe(true);
   });
 
   it('samePlacement reads piece, function, material, place, turn, flip, facing and mount', () => {
