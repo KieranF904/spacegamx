@@ -21,7 +21,7 @@ const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en
 const n1 = (v: number) => (Math.round(v * 10) / 10).toString();
 
 /** A port's side on the part as drawn unturned */
-const SIDE_WORD: Record<Side, string> = { N: 'front', S: 'back', E: 'right', W: 'left' };
+export const SIDE_WORD: Record<Side, string> = { N: 'front', S: 'back', E: 'right', W: 'left' };
 
 /** Its ports (the ports power core: functions.json / models.json `ports`): "in at the back 29/s" */
 export function portsText(fn: Pick<FunctionDef, 'ports'>): string[] {
