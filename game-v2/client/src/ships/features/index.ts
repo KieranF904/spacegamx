@@ -7,5 +7,6 @@ import { clientFeature as f_machines } from './machines/index.js';
 import { clientFeature as f_minebay } from './minebay/index.js';
 import { clientFeature as f_strafer } from './strafer/index.js';
 import { clientFeature as f_tow } from './tow/index.js';
+import { clientFeature as f_zoneshield } from './zoneshield/index.js';
 
-export const CLIENT_FEATURES: readonly ClientFeature[] = [f_clamp, f_machines, f_minebay, f_strafer, f_tow];
+export const CLIENT_FEATURES: readonly ClientFeature[] = [f_clamp, f_machines, f_minebay, f_strafer, f_tow, f_zoneshield];

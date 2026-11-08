@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Spark Wall
+Mk I · Square · 1 cell
+Hull · mass45 hp · 1.0
+Armour · build1 · 1 pts
+Power draw10/s
+Shielda 2-cell wall 1 out from the hull: holds 40 and stops only shots that cross it
+Refill14 a second once unhit for 1.2 s; down 1.5 s when broken, back at 25%
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw10
+Shield40 HP, 2 cells wide
+Refill14 a second, down 1.5 s when broken
+Hull · mass45 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 45
+
+== familyLabel ==
+Shield walls
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Two cells of flat shield just off the hull
+
+== keyStats ==
+40 HP wall · 14 a second once unhit for 1.2 s; down 1.5 s when broken, back at 25% · draws 10 · 45 hp · armour 1
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 2","why":"Learned at level 2 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 2","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":45,"mass":1,"firepower":0,"toughness":45,"armour":1,"draw":10}

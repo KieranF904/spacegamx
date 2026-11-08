@@ -57,6 +57,7 @@ export * from './features/weaponry/weaponry.js';
 export * from './features/machines/machines.js';
 export * from './features/minebay/minebay.js';
 export * from './features/minebay/blasts.js';
+export * from './features/zoneshield/shaped.js';
 export * from './load.js';
 export * from './flightInputs.js';
 export * from './features/index.js';

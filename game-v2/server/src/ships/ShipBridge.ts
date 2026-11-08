@@ -12,7 +12,7 @@
 import {
   Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
-  GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, standing,
+  GravityWell, FlightConstants, type HitInfo, type SegmentHit, type WarmthStage, type JumpField, standing,
   WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot, newAimHoldStats, type DesignUpdate,
 } from '@space-game/common';
 import {
@@ -392,7 +392,7 @@ export class ShipBridge {
   /** Does a world-space segment come within a ship's bounding circle (segmentHit's first test) */
   private nearSegment(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean { return wpn.nearSegment(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
 
-  segmentHit(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.segmentHit(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
+  segmentHit(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0, shieldScale = 0): SegmentHit | null { return wpn.segmentHit(this.ctx, eid, ship, x0, y0, x1, y1, margin, shieldScale); }
 
   /** segmentHit without its bounding-circle test (for callers that have just made it) */
   private castShip(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.castShip(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
@@ -460,7 +460,7 @@ export class ShipBridge {
 
   lastHitBumped(eid: number): boolean { return dmg.lastHitBumped(this.ctx, eid); }
 
-  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
+  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean; shaped?: { i: number; spill: boolean } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
 
   /** Damage one part from outside the usual weapons (a boss's beam): hurt, and reported as any hit is */
   damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number { return dmg.damagePartBy(this.ctx, eid, part, amount, source, hit); }

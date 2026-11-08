@@ -25,7 +25,7 @@
 
 import {
   BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, portsInflow, bankHeld, chargeTotal, energyTuning, feedShare, gunLoad, poolHeld,
-  type Charge, type ShipState, type ShipTuning,
+  shapedOf, shieldHp, shieldUp, type Charge, type ShipState, type ShipTuning,
 } from '@space-game/common';
 import type { RingGroup } from '../../ships/gunHud';
 
@@ -255,6 +255,19 @@ function readHull(ship: ShipState, h: ShipStatus['hull']): void {
 
 function readShield(ship: ShipState, inp: StatusInput, mem: StatusMemory, s: ShipStatus['shield']): void {
   const d = ship.derived;
+  // Shaped shields (features/zoneshield) have no pool of their own: the bar is all of their HP together, and each
+  // shield shows on its own part in the schematic (readParts)
+  const shaped = (d.shieldMax ?? 0) <= 0 ? shapedOf(ship) : [];
+  if (shaped.length) {
+    let cap = 0, cur = 0, rate = 0, down = 0;
+    for (let i = 0; i < shaped.length; i++) { cap += shaped[i].cap; cur += shieldHp(ship, i); rate += shaped[i].rate; if (!shieldUp(ship, i)) down++; }
+    s.max = cap; s.regen = rate; s.cur = cur; s.pct = cap > 0 ? (cur / cap) * 100 : 0;
+    if (Number.isFinite(mem.shield) && s.pct < mem.shield - 0.05) mem.hitAt = inp.now;
+    mem.shield = s.pct;
+    s.wait = Math.max(0, (mem.hitAt + 1200 - inp.now) / 1000);
+    s.state = down === shaped.length ? 'down' : s.pct >= 99.95 ? 'full' : s.wait > 0 ? 'wait' : 'regen';
+    return;
+  }
   s.max = d.shieldMax ?? 0;
   s.regen = d.shieldRegen ?? 0;
   const pct = Math.max(0, Math.min(100, inp.shieldPct ?? 0));
@@ -451,6 +464,10 @@ function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
     else if (fn === 'generator') { r.kind = 'gen'; r.glow = 1; }
     else if (fn === 'shield') {
       r.kind = 'shield'; r.fill = out.shield.pct / 100; r.dim = out.shield.state === 'down';
+    } else if (d.fx?.shaped) {
+      // (a shaped shield's own part: its own HP, dim while it is down)
+      const list = shapedOf(ship), k = list.findIndex((x) => x.part === i);
+      if (k >= 0) { r.kind = 'shield'; r.fill = shieldHp(ship, k) / list[k].cap; r.dim = !shieldUp(ship, k); }
     }
   }
   for (const t of d.thrusters) {

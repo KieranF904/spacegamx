@@ -10,7 +10,7 @@
 
 import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
+  Position, Velocity, stepShaped, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
   chargeTotal, shieldShare, contactPieces, contactPair, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
@@ -102,6 +102,8 @@ export function wake(b: BridgeCtx, eid: number): void {
     const regen = Math.max(0, now - Math.max(since, ship.shieldHitTick + ship.derived.shieldDelay));
     ship.shield = Math.min(max, ship.shield + (rate / 60) * regen);
   }
+  // (Its shaped shields come back as they would have: a tick at a time, at most a minute of them)
+  if (ship.derived.fx?.shaped) for (let i = 0, share = shieldShare(ship.derived, b.charge.get(eid)); i < Math.min(dt, 3600); i++) stepShaped(ship, share);
   // Its battery: spare power tops it up as it would have, a tick at a time (it's never long)
   let c = b.charge.get(eid);
   if (c) {
@@ -323,6 +325,8 @@ export function tick(ctx: BridgeCtx): void {
   {
     for (const ship of ctx.bodies.values()) {
       if (ctx.dormant.has(ship.id) || !SimPass.on(InSystem.systemId[ship.id])) continue; // (caught up when it wakes; another pass's)
+      // (Shaped shields: each its own HP, wait, break and return; common features/zoneshield. Fed as the bubble is)
+      if (ship.derived.fx?.shaped) stepShaped(ship, shieldShare(ship.derived, ctx.charge.get(ship.id)), ctx.host.hazardScale?.(ship.id, 'shield') ?? 1);
       const max = ship.derived.shieldMax;
       if (max <= 0) { ship.shield = 0; continue; }
       if (ship.shield > max) ship.shield = max;

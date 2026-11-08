@@ -11,7 +11,7 @@ import {
   Position, Velocity, Player, InSystem, ShipState, Vec2, damagePart, coreHp, healPart, restorePart, hitMultiplier,
   type HitInfo, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, fartherThan,
   nearestParts, castParts, partDistance, standing, seededRng, hashInts, MARK_TAKEN, partHit, newPartHit, struckStands,
-  type HitMods, type CoverMemo,
+  type HitMods, type CoverMemo, crossShaped, shieldUp, type ShapedCross,
 } from '@space-game/common';
 import { GLANCING, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 import { dhypot, dpow } from '@space-game/common';
@@ -266,7 +266,7 @@ export function lastHurtShown(): number {
  * ruin floor), so a client can work a hit out alike; here: who's immune, and who's told.
  * Returns the damage dealt (shield + hull).
  */
-export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean }): number {
+export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean; shaped?: { i: number; spill: boolean } }): number {
   if (amount <= 0 || b.host.invulnerable?.(eid)) return 0;
   const m = hurtMods, tick = b.host.getTick();
   m.b = b; m.eid = eid; m.tick = tick; m.memo = b.coverMemo;
@@ -340,6 +340,8 @@ function overheadShare(b: BridgeCtx, eid: number, ship: ShipState, part: number,
   return dpow(OVERHEAD_LAYER, layers);
 }
 
+const SPLASH_CROSS: ShapedCross = { t: 0, i: -1 };
+
 export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo, overhead?: Vec2): void {
   const reach = Math.max(3, Math.round(radius / b.tuning.cellSize));
   for (const [eid, ship] of b.bodies) {
@@ -350,13 +352,23 @@ export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, 
     // Each part by how far the blast is from its own outline (not its middle: a boss's great plate is hit where it's struck)
     const cs = b.tuning.cellSize, [gx, gy] = b.worldToGrid(eid, ship, x, y), at: Vec2 = [gx, gy];
     const near = nearestParts(b.geometry(ship), (i) => ship.hp[i] > 0 && !ship.detached[i] && standing(b.catalog, ship, i), gx, gy, radius / cs);
-    let dealt = 0, through = 0;
+    let dealt = 0, through = 0, shieldsHit = 0;
+    const shields = ship.kind === 'ship' ? ship.derived.fx?.shaped?.shields : undefined;
     b.coverMemo = { ship, at, first: 0, best: -1 };
     try {
       for (let k = 0; k < near.length && k < reach; k++) {
         const { i, d } = near[k];
         const share = overhead ? overheadShare(b, eid, ship, i, overhead) : 1;
-        dealt += b.hurt(eid, ship, i, damage * share * (1 - 0.7 * ((d * cs) / radius)), source, { hit, at, splash: true });
+        const amount = damage * share * (1 - 0.7 * ((d * cs) / radius));
+        // (A blast the far side of a live shaped shield from the part: the shield takes it, once for the blast, and the part is spared)
+        if (shields && !overhead) {
+          const c = crossShaped(shields, (j) => shieldUp(ship, j), gx, gy, b.geometry(ship)[i].centroid[0], b.geometry(ship)[i].centroid[1], SPLASH_CROSS);
+          if (c) {
+            if (!(shieldsHit & (1 << c.i))) { shieldsHit |= 1 << c.i; dealt += b.hurt(eid, ship, shields[c.i].part, amount, source, { hit, at, splash: true, shaped: { i: c.i, spill: false } }); }
+            continue;
+          }
+        }
+        dealt += b.hurt(eid, ship, i, amount, source, { hit, at, splash: true });
         through = Math.max(through, b.lastThrough);
       }
     } finally {

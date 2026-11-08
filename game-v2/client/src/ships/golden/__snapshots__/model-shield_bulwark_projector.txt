@@ -4,14 +4,9 @@ Mk III · Block · 4 cells
 Hull · mass314 hp · 4.0
 Armour · build3 · 10 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Power draw77/s
-Shield240
-Refills20/s after 4 s unhit
 
 == partStats (stats rows) ==
 GradeMk III
-Power draw77
-Shield240
 Hull · mass314 hp · 4.0
 Armour · build3 · 10 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
@@ -30,7 +25,7 @@ Large · Block
 deep, slow to refill
 
 == keyStats ==
-shield 240 · refills 20/s after 4 s · draws 77
+314 hp · armour 3
 
 == mountBadge ==
 
@@ -45,4 +40,4 @@ shield 240 · refills 20/s after 4 s · draws 77
 {"open":true,"badge":"Lv 27","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"","area":4,"hp":313.59999999999997,"mass":4,"firepower":0,"toughness":313.59999999999997,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":76.8,"shield":240}
+{"grade":3,"mark":"Mk III","size":"","area":4,"hp":313.59999999999997,"mass":4,"firepower":0,"toughness":313.59999999999997,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9}}

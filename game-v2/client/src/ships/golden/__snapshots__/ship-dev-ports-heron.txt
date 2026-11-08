@@ -1,5 +1,5 @@
 {
-  "rating": 31.08119953845951,
+  "rating": 30.716613623650606,
   "parts": 44,
   "mass": 68.29999999999998,
   "topSpeed": 618.4011713030743,
@@ -7,20 +7,20 @@
   "turn180": 0.8927986354526308,
   "dps": 150,
   "hull": 4239.500000000001,
-  "shield": 80,
+  "shield": 0,
   "cargo": 30,
   "jump": 46.588,
   "jumpCooldown": 16.283333333333335,
   "jumpRatio": 0.89,
   "power": {
     "supply": 437,
-    "demand": 32
+    "demand": 0
   },
   "energy": {
     "max": 480,
     "driveMax": 0,
     "weaponMax": 0,
-    "spare": 405,
+    "spare": 437,
     "engineDraw": 58,
     "weaponDraw": 32,
     "boostDraw": 168

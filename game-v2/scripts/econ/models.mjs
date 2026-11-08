@@ -892,6 +892,48 @@ for (const m of models) m.carriesFlow = true;
   }
 }
 // ---- (end Mine Bay and Docking Clamps)
+// ---- Shaped shields (prototypes/shield-fx, the Shield Lab; common/src/ships/features/zoneshield): seven shields that cover a
+// line (walls) or an arc instead of the whole ship, each its own part with its own HP and refill, projected from the part's
+// open (facing) edge. `shaped`: kind, wall `len`/`off` or arc `rad`/`span` (cells, degrees), `cap` HP, `rate` HP a second
+// once unhit for 1.2 s, `delay` seconds down after a break (it returns at a quarter). The numbers are the Lab's; its levels 1..5
+// are spread over the track as 2, 4, 8, 12, 18 (level 1 opens nothing: track.test). All starting values to tune; the `demand` (E a second, per cell) is a placeholder. The Bubble is not
+// here. Appended after the Mine Bay block, so no other model's order moves.
+{
+  const SHAPED_LOOK = { quick: { color: '#3f9fc4', decor: 'none', glow: '#5fd8ff' }, deep: { color: '#b4762b', decor: 'none', glow: '#ffb04a' } };
+  const portsOf = (piece, demand) => {
+    const cells = PIECE_AREA[piece] >= 2 ? [0, 1] : [0];
+    const rate = Math.max(4, Math.ceil((demand * PIECE_AREA[piece] * 1.5) / cells.length));
+    return cells.map((cell) => ({ dir: 'in', side: 'S', cell, rate }));
+  };
+  // [id, name, family, piece, level, material, shaped, total draw, description]
+  const SHAPED = [
+    ['shield_spark_wall', 'Spark Wall', 'shieldwall', 'sq', 2, 'alloy', { kind: 'wall', len: 2, off: 1, cap: 40, rate: 14, delay: 1.5 }, 10,
+      'Two cells of flat shield just off the hull: 40 HP, 14 a second, 1.5 s down when broken. Cheap and quick.'],
+    ['shield_guard_wall', 'Guard Wall', 'shieldwall', 'rect2', 4, 'alloy', { kind: 'wall', len: 3, off: 1, cap: 75, rate: 12, delay: 2.2 }, 16,
+      'Three cells wide, one out: 75 HP, 12 a second, 2.2 s down when broken. Covers a gun and its neighbours.'],
+    ['shield_rampart', 'Rampart', 'shieldwall', 'block2', 12, 'steel', { kind: 'wall', len: 5, off: 2, cap: 260, rate: 9, delay: 4.5, deep: true }, 30,
+      'Five cells of deep flat shield, two out: 260 HP, 9 a second, 4.5 s down when broken. Slow to return.'],
+    ['shield_visor', 'Visor', 'shieldarc', 'sq', 2, 'alloy', { kind: 'arc', rad: 2.5, span: 60, cap: 45, rate: 16, delay: 1.2 }, 11,
+      'A tight 60 degree arc in front of a gun: 45 HP, 16 a second, 1.2 s down when broken.'],
+    ['shield_buckler', 'Buckler', 'shieldarc', 'sq', 4, 'alloy', { kind: 'arc', rad: 2, span: 90, cap: 60, rate: 13, delay: 2 }, 13,
+      'A small 90 degree arc close to the hull: 60 HP, 13 a second, 2 s down when broken.'],
+    ['shield_shell', 'Shell', 'shieldarc', 'rect2', 8, 'steel', { kind: 'arc', rad: 3.5, span: 120, cap: 160, rate: 8, delay: 3.5, deep: true }, 22,
+      'A 120 degree arc that wraps most of a side: 160 HP, 8 a second, 3.5 s down when broken.'],
+    ['shield_half_dome', 'Half-dome', 'shieldarc', 'block2', 18, 'titanium', { kind: 'arc', rad: 5, span: 180, cap: 320, rate: 6, delay: 5.5, deep: true }, 36,
+      'A 180 degree dome over one end: 320 HP, 6 a second, 5.5 s down when broken. Deep and slow.'],
+  ];
+  for (const [id, name, family, piece, level, material, shaped, draw, description] of SHAPED) {
+    const demand = r2(draw / PIECE_AREA[piece]);
+    models.push({
+      ...base(id, name, family, [piece], level, material, {}), shaped, facing: true, demand, priority: 2, hpScale: 0.6, description,
+      ports: portsOf(piece, demand),
+      rarity: level >= 5 ? 'rare' : level >= 3 ? 'uncommon' : 'common', category: 'shields', fabOrder: next('shields'),
+      ...SHAPED_LOOK[shaped.deep ? 'deep' : 'quick'],
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(piece !== 'sq' ? { piece } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end shaped shields)
 
 const COMPONENTS = [
   ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount: cannons, autocannons, flak and mortars.'],
@@ -1025,6 +1067,16 @@ Object.assign(RECIPES, {
   mine_bay: { steel_plate: 2, copper_wire: 2, servo_motor: 1 },
   docking_clamp: { alloy_plate: 2, servo_motor: 1 },
   docking_clamp_heavy: { steel_plate: 4, servo_motor: 2, power_coupling: 1 },
+});
+// (Shaped shields: placeholder costs, to tune)
+Object.assign(RECIPES, {
+  shield_spark_wall: { alloy_plate: 1, copper_wire: 2, shield_emitter: 1 },
+  shield_guard_wall: { alloy_plate: 2, copper_wire: 2, shield_emitter: 1 },
+  shield_rampart: { steel_plate: 3, copper_wire: 4, shield_emitter: 2, power_coupling: 1 },
+  shield_visor: { alloy_plate: 1, copper_wire: 2, shield_emitter: 1 },
+  shield_buckler: { alloy_plate: 1, copper_wire: 2, shield_emitter: 1, capacitor_cell: 1 },
+  shield_shell: { steel_plate: 2, copper_wire: 3, shield_emitter: 2 },
+  shield_half_dome: { titanium_plate: 4, copper_wire: 4, shield_emitter: 3, power_coupling: 1 },
 });
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);

@@ -1780,6 +1780,65 @@
         "power_coupling": 1
       },
       "time": 60
+    },
+    "shield_spark_wall": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "shield_emitter": 1
+      },
+      "time": 0
+    },
+    "shield_guard_wall": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 2,
+        "shield_emitter": 1
+      },
+      "time": 40
+    },
+    "shield_rampart": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 4,
+        "shield_emitter": 2,
+        "power_coupling": 1
+      },
+      "time": 120
+    },
+    "shield_visor": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "shield_emitter": 1
+      },
+      "time": 0
+    },
+    "shield_buckler": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "shield_emitter": 1,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "shield_shell": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 3,
+        "shield_emitter": 2
+      },
+      "time": 40
+    },
+    "shield_half_dome": {
+      "inputs": {
+        "titanium_plate": 4,
+        "copper_wire": 4,
+        "shield_emitter": 3,
+        "power_coupling": 1
+      },
+      "time": 120
     }
   }
 }

@@ -385,7 +385,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       rate[i] = perTick(partDemand(fn, a, m)); cap[i] = rate[i] * TPS;
       // (A shield's fulfilment is EnergyState.shieldSat, its regen's share (energy.ts shieldShare). A Flash Screen has no
       // slow refill, so it is left out of it, though it draws as a tool)
-      if ((fn.shield ?? 0) > 0 && !fn.flash) { shield[i] = 1; shieldDraw += partDemand(fn, a, m); }
+      if (((fn.shield ?? 0) > 0 || fn.shaped) && !fn.flash) { shield[i] = 1; shieldDraw += partDemand(fn, a, m); }
       if (fn.mining) { miner[i] = 1; minePulse[i] = Math.max(1, Math.round((fn.minePulse ?? 0.9) * TPS)); }
       if (fn.machine) { machine[i] = fn.machine.kind === 'fabricator' ? MACHINE_FAB : MACHINE_REF; machineDraw += partDemand(fn, a, m); }
     }

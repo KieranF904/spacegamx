@@ -560,7 +560,9 @@ export class SnapshotBuilder {
           // [6] what its Tow Beam tows (entity id + 1, 0 none: ships/features/tow, features.wire.json status)
           this.features.status('tow', eid),
           // [7] marked and slowed (bits: ships/features/weaponry, features.wire.json status)
-          this.features.status('weaponry', eid)],
+          this.features.status('weaponry', eid),
+          // [8] how full each shaped shield is (a nibble each: ships/features/zoneshield, features.wire.json status)
+          this.features.status('zoneshield', eid)],
       };
       row.other = { state: status, key: this.internKey(-1 - eid, `${status.hp},${status.maxHp},${status.data!.join(',')}`) };
     }

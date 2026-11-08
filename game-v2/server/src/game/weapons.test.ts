@@ -14,9 +14,10 @@ const files = readGameDataFiles(dataDir);
 const ships = loadShipConfigFromDisk(dataDir);
 const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
 
-function setup() {
+function setup(bubbles = false) {
   resetGlobals();
-  const server = createProtoServer({ files, ships, autoStart: false });
+  // (bubbles: the ship-wide shields work on player ships, as the bubble rules need: catalog.ts PLAYER_BUBBLE_MODELS)
+  const server = createProtoServer({ files, ships: bubbles ? { ...ships, playerBubbles: true } : ships, autoStart: false });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);
@@ -105,7 +106,7 @@ describe('weapons', () => {
   });
 
   it('shields soak damage first and recharge after a pause', () => {
-    const { bridge, step, pid } = setup();
+    const { bridge, step, pid } = setup(true);
     // (The library Halberd: its shields are wired to power on the ports core, so they refill; a hull swapped for a shield
     // on the starter would have no line and, unfed, never refill)
     const bp = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/halberd.json'), 'utf-8'));

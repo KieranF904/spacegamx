@@ -1,0 +1,49 @@
+== partTip (tooltip) ==
+Rampart
+Mk II · Block · 4 cells
+Hull · mass226 hp · 5.6
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw30/s
+Shielda 5-cell wall 2 out from the hull: holds 260 and stops only shots that cross it
+Refill9 a second once unhit for 1.2 s; down 4.5 s when broken, back at 25%
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw30
+Shield260 HP, 5 cells wide
+Refill9 a second, down 4.5 s when broken
+Hull · mass226 hp · 5.6
+Armour · build2 · 6.4 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 226
+
+== familyLabel ==
+Shield walls
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+Five cells of deep flat shield, two out
+
+== keyStats ==
+260 HP wall · 9 a second once unhit for 1.2 s; down 4.5 s when broken, back at 25% · draws 30 · 226 hp · armour 2
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":4,"hp":225.6,"mass":5.6,"firepower":0,"toughness":225.6,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":30}

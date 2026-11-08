@@ -11,5 +11,6 @@ import { feature as f_strafer } from './strafer/index.js';
 import { feature as f_support } from './support/index.js';
 import { feature as f_tow } from './tow/index.js';
 import { feature as f_weaponry } from './weaponry/index.js';
+import { feature as f_zoneshield } from './zoneshield/index.js';
 
-export const FEATURES: readonly PartFeature[] = [f_clamp, f_flash, f_gyro, f_machines, f_minebay, f_strafer, f_support, f_tow, f_weaponry];
+export const FEATURES: readonly PartFeature[] = [f_clamp, f_flash, f_gyro, f_machines, f_minebay, f_strafer, f_support, f_tow, f_weaponry, f_zoneshield];

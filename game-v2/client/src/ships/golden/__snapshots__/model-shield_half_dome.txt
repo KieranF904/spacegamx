@@ -1,0 +1,49 @@
+== partTip (tooltip) ==
+Half-dome
+Mk II · Block · 4 cells
+Hull · mass269 hp · 4.0
+Armour · build2 · 6.4 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw36/s
+Shielda 180 degree arc, 5 cells out: holds 320 and stops only shots that cross it
+Refill6 a second once unhit for 1.2 s; down 5.5 s when broken, back at 25%
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw36
+Shield320 HP, 180 degrees
+Refill6 a second, down 5.5 s when broken
+Hull · mass269 hp · 4.0
+Armour · build2 · 6.4 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 269
+
+== familyLabel ==
+Shield arcs
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+A 180 degree dome over one end
+
+== keyStats ==
+320 HP arc · 6 a second once unhit for 1.2 s; down 5.5 s when broken, back at 25% · draws 36 · 269 hp · armour 2
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 18","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":4,"hp":268.8,"mass":4,"firepower":0,"toughness":268.8,"armour":2,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":36}

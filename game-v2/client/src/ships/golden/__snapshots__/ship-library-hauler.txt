@@ -14,13 +14,13 @@
   "jumpRatio": 1.06,
   "power": {
     "supply": 1380,
-    "demand": 80
+    "demand": 64
   },
   "energy": {
     "max": 380,
     "driveMax": 0,
     "weaponMax": 0,
-    "spare": 1300,
+    "spare": 1316,
     "engineDraw": 452,
     "weaponDraw": 24,
     "boostDraw": 967.68

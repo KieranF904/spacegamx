@@ -329,7 +329,21 @@ function transformMount(m: PieceMount, rot: Rot, flip: boolean): PieceMount {
   return { at: transformPoint(m.at, rot, flip), dir: [d[0] / len, d[1] / len], width: m.width ?? 1 };
 }
 
-export function loadCatalog(files: CatalogFiles, opts: { overlapShrink?: number } = {}): Catalog {
+/**
+ * The ship-wide bubble shields (a shield over the whole ship): player ships no longer get them. Shaped shields
+ * (ships/features/zoneshield) took their place. The four are kept in the catalog, switched off (`bubbleOff`: no shield, no
+ * draw), so an old design still loads; the code path stays for enemies and bosses, whose own shield function is
+ * untouched. `loadCatalog(files, { playerBubbles: true })` brings them back (tests of the bubble rules).
+ */
+export const PLAYER_BUBBLE_MODELS: ReadonlySet<string> = new Set(['shield_deflector', 'shield_flicker_screen', 'shield_flash_screen', 'shield_bulwark_projector']);
+
+/** A bubble model with its shield and draw taken off */
+function switchedOff(f: FunctionDef): FunctionDef {
+  const { shield: _s, shieldRegen: _r, shieldDelay: _d, flash: _f, demand: _p, ports: _o, ...rest } = f;
+  return { ...rest, bubbleOff: true, description: 'Switched off: ship-wide bubble shields do not work on player ships. Use a shaped shield instead.' };
+}
+
+export function loadCatalog(files: CatalogFiles, opts: { overlapShrink?: number; playerBubbles?: boolean } = {}): Catalog {
   const shrink = opts.overlapShrink ?? 0.01;
   const pieces = new Map<string, PieceDef>();
   const variants = new Map<string, PieceVariant[]>();
@@ -366,7 +380,7 @@ export function loadCatalog(files: CatalogFiles, opts: { overlapShrink?: number 
         if (!pieces.has(id)) throw new CatalogError(`function "${f.id}": unknown piece "${id}"`);
       }
     }
-    functions.set(f.id, f);
+    functions.set(f.id, f.model && !opts.playerBubbles && PLAYER_BUBBLE_MODELS.has(f.id) ? switchedOff(f) : f);
   }
   if (!functions.has('core')) throw new CatalogError('functions: missing "core"');
 

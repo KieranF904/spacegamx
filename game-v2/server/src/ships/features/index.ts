@@ -10,5 +10,6 @@ import { serverFeature as f_strafer } from './strafer/index.js';
 import { serverFeature as f_support } from './support/index.js';
 import { serverFeature as f_tow } from './tow/index.js';
 import { serverFeature as f_weaponry } from './weaponry/index.js';
+import { serverFeature as f_zoneshield } from './zoneshield/index.js';
 
-export const SERVER_FEATURES: readonly ServerFeature[] = [f_clamp, f_flash, f_machines, f_minebay, f_strafer, f_support, f_tow, f_weaponry];
+export const SERVER_FEATURES: readonly ServerFeature[] = [f_clamp, f_flash, f_machines, f_minebay, f_strafer, f_support, f_tow, f_weaponry, f_zoneshield];

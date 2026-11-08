@@ -260,6 +260,15 @@ export interface FunctionDef {
   shieldDelay?: number;
   /** Flash Screen (ships/features/flash): no slow regen; when the shield breaks it comes back whole after a wait, or at once for 4 E a point from a Capacitor bank touching it */
   flash?: boolean;
+  /**
+   * Shaped shields (ships/features/zoneshield): a line (`wall`: `len` cells long, `off` cells out from the part's open edge)
+   * or an arc (`rad` cells round the edge's middle, `span` degrees about its outward normal) with its own HP (`cap`, ×
+   * the material's output), refill a second (`rate`) after `delay` seconds unhit, and back at a quarter of `cap` after a
+   * break. It stops only the shots whose path crosses it before the hull. `deep` marks the slow, deep kind (drawn amber).
+   */
+  shaped?: { kind: 'wall' | 'arc'; len?: number; off?: number; rad?: number; span?: number; cap: number; rate: number; delay: number; deep?: boolean };
+  /** A ship-wide bubble shield that player ships no longer get (catalog.ts PLAYER_BUBBLE_MODELS): the part is kept, switched off */
+  bubbleOff?: boolean;
   /** Plating: × the damage a blast does to it (0.5: half of the splash). Hits and beams are unchanged */
   splashTaken?: number;
   /** Jump coils: × the jump drive's cooldown (0.8: 20% faster). The best one a ship has counts; they do not stack */

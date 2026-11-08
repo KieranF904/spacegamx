@@ -32,6 +32,7 @@ import { partDistance, castParts } from './collide.js';
 import { worldToLocalDir } from './flight.js';
 import { gunDef, stackMods, ammoByCode } from './launch.js';
 import { dhypot } from '../math/detTrig.js';
+import { crossShaped, shapedOf, shapedReach, shieldUp, soakShaped, type ShapedCross, type ShapedSoak } from './features/zoneshield/shaped.js';
 
 /** A hit that gets less than this share through the armour it strikes shows as glancing */
 export const GLANCING = 0.6;
@@ -69,6 +70,12 @@ export interface HitVs {
   hit?: HitInfo;
   /** Where it struck, grid space (the cover picks the plate nearest it) */
   at?: Vec2;
+  /**
+   * A shaped shield (features/zoneshield) stopped it: shield `i` of the ship's list takes the hit first. `spill`: its path went
+   * on to the hull, so what a break leaves of the shot goes on to the part; else it was stopped short of any hull
+   * and the rest is lost. (The shot's `shield` scale applies; a shot that ignores shields is never given this)
+   */
+  shaped?: { i: number; spill: boolean };
   /** Ammunition made for one faction's ships: × damage against them */
   bane?: { faction: string; damage: number };
 }
@@ -114,6 +121,9 @@ export interface PartHitResult {
   /** share < GLANCING */
   glancing: boolean;
 }
+
+/** (partHit's scratch for a shaped shield's take: it never calls back into itself) */
+const SHAPED_SOAK: ShapedSoak = { soak: 0, rest: 0, broke: false };
 
 export function newPartHit(): PartHitResult {
   return { part: -1, dealt: 0, shown: 0, soak: 0, broke: false, through: 1, share: 1, glancing: false };
@@ -224,7 +234,13 @@ export function partHit(ctx: HitCtx, ship: ShipState, part: number, amount: numb
   const taken = mods.taken ? mods.taken() : 1;
   amount *= taken;
   let dealt = 0;
-  if (ship.shield > 0 && ship.kind === 'ship' && (vs?.shield ?? 1) > 0) {
+  if (vs?.shaped && ship.kind === 'ship' && (vs.shield ?? 1) > 0 && ship.derived.fx?.shaped?.shields[vs.shaped.i]) {
+    // A shaped shield took it (its path crossed the shield before any hull): the shield soaks first, a break lets the rest through
+    const r = soakShaped(ship, vs.shaped.i, amount, vs.shield ?? 1, SHAPED_SOAK);
+    dealt += r.soak;
+    out.soak = r.soak;
+    amount = vs.shaped.spill ? r.rest : 0;
+  } else if (ship.shield > 0 && ship.kind === 'ship' && (vs?.shield ?? 1) > 0) {
     // What it does to shields (× vs.shield), and the rest of the shot goes on to the hull (a torpedo: shields don't stop it)
     const k = vs?.shield ?? 1;
     const soak = Math.min(ship.shield, amount * k);
@@ -397,12 +413,41 @@ export function castShipAt(geoms: readonly PlacedGeom[], ok: (i: number) => bool
   return castParts(geoms as PlacedGeom[], ok, la / cellSize + com[0], lb / cellSize + com[1], lc / cellSize + com[0], ld / cellSize + com[1], margin / cellSize);
 }
 
+/** A segment's hit on a ship: the part and how far along (0..1); a shaped shield that stopped it first adds which and whether it went on to the hull */
+export interface SegmentHit { part: number; t: number; shield?: number; spill?: boolean }
+
+const SHAPED_CROSS: ShapedCross = { t: 0, i: -1 };
+
+/**
+ * Does one of the ship's live shaped shields (features/zoneshield) stop a world-space segment before the hull (the hull cast's hit,
+ * or null: nothing of the hull on its path)? The segment is taken into the ship's grid as castShipAt does and run against
+ * each live line and arc. Null: none stops it (a ship without shaped shields never allocates). Margin is ignored: a
+ * shield is a line, and a thick beam or great orb meets it by its centre line.
+ */
+export function shapedStopAt(ship: ShipState, cellSize: number, px: number, py: number, angle: number, x0: number, y0: number, x1: number, y1: number, hull: { part: number; t: number } | null): SegmentHit | null {
+  // (a wreck's or debris' shield parts stop nothing)
+  const list = ship.kind === 'ship' ? shapedOf(ship) : [];
+  if (!list.length) return null;
+  const com = ship.derived.com, [la, lb] = worldToLocalDir([x0 - px, y0 - py], angle), [lc, ld] = worldToLocalDir([x1 - px, y1 - py], angle);
+  const c = crossShaped(list, (i) => shieldUp(ship, i), la / cellSize + com[0], lb / cellSize + com[1], lc / cellSize + com[0], ld / cellSize + com[1], SHAPED_CROSS, hull ? hull.t : 1);
+  if (!c) return null;
+  return { part: hull ? hull.part : list[c.i].part, t: c.t, shield: c.i, spill: !!hull };
+}
+
+/** How far a ship's shaped shields reach past its centre, world units (0: it has none): widens the bounding test */
+export function shapedReachWorld(ship: ShipState, cellSize: number): number {
+  return ship.kind === 'ship' && ship.derived.fx?.shaped ? shapedReach(ship) * cellSize : 0;
+}
+
 /**
  * Where a shell's line this tick first meets a ship at a pose: its bounding circle, then its standing parts (a wreck's
- * bones and a beaten stage's ruins let shells through: stages.ts standing). The server's bridge segmentHit; a client
+ * bones and a beaten stage's ruins let shells through: stages.ts standing), and any live shaped shield its path crosses
+ * before that (a shieldScale of 0, a shot that ignores shields, skips them). The server's bridge segmentHit; a client
  * finding its own hits runs it on the ship as it has it, at the pose the server's collision step saw.
  */
-export function shipSegmentHit(ctx: HitCtx, ship: ShipState, px: number, py: number, angle: number, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
-  if (!nearShipSegment(px, py, ship.derived.radius, x0, y0, x1, y1, margin)) return null;
-  return castShipAt(ctx.geometry(ship), (i) => standing(ctx.catalog, ship, i), ctx.tuning.cellSize, ship.derived.com, px, py, angle, x0, y0, x1, y1, margin);
+export function shipSegmentHit(ctx: HitCtx, ship: ShipState, px: number, py: number, angle: number, x0: number, y0: number, x1: number, y1: number, margin = 0, shieldScale = 1): SegmentHit | null {
+  const reach = shieldScale > 0 ? shapedReachWorld(ship, ctx.tuning.cellSize) : 0;
+  if (!nearShipSegment(px, py, Math.max(ship.derived.radius, reach), x0, y0, x1, y1, margin)) return null;
+  const hull = castShipAt(ctx.geometry(ship), (i) => standing(ctx.catalog, ship, i), ctx.tuning.cellSize, ship.derived.com, px, py, angle, x0, y0, x1, y1, margin);
+  return (reach > 0 && shapedStopAt(ship, ctx.tuning.cellSize, px, py, angle, x0, y0, x1, y1, hull)) || hull;
 }

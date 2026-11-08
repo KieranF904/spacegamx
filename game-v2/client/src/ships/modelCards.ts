@@ -18,7 +18,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   reactor: 'Generators', dynamo: 'Bank chargers', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   // (Energy routing's Conduit and Diode: models.mjs)
   relay: 'Relays',
-  shield: 'Shields', plating: 'Plating',
+  shield: 'Shields', shieldwall: 'Shield walls', shieldarc: 'Shield arcs', plating: 'Plating',
   mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
   // (Support weapons: common/src/ships/features/support/support.ts)
   repair: 'Repair beams', point_defence: 'Point defence',

@@ -78,6 +78,7 @@ import { boundKeyName } from '../input/keybindings';
 import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
 import { dockedPlace, type Place } from './features/clamp/dockedDraw';
+import { shapedStruck } from './features/zoneshield';
 import { mountField } from './field/mount';
 import type { QualityProfile } from '../settings/quality';
 import { ShipMemory } from './cells/ShipMemory';
@@ -424,7 +425,8 @@ export class ShipClient {
    * Every hit's sound is its drawn impact's (WeaponFx.impactAt -> audio/CombatSounds.ts)
    */
   private struckFx(id: number, x: number, y: number, type: number, target = -1, owner = -1): void {
-    this.damageFx?.shieldHit(x, y, this.shellLooks.get(id)?.model);
+    // (a shaped shield ripples where it was struck, features/zoneshield; the bubble only if no such shield was)
+    if (!shapedStruck(x, y)) this.damageFx?.shieldHit(x, y, this.shellLooks.get(id)?.model);
     // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
     const kind = KIND_OF_TYPE.get(type);
     if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, x, y, 40);

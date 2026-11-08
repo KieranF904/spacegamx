@@ -70,6 +70,13 @@ export interface ShipState {
   shield: number;
   shieldHitTick: number;
   /**
+   * Shaped shields (features/zoneshield/shaped.ts), by the projector part's index: HP held (-1: not seen yet, comes up full),
+   * ticks left down after a break, ticks since its last hit. Made when a ship first has one; a refit carries them by part
+   */
+  shapedHp?: number[];
+  shapedDown?: number[];
+  shapedIdle?: number[];
+  /**
    * Gun state by part index (guns.ts stepGuns, the firing models): rounds in a clip gun's clip; a clip gun's reload
    * ticks left (a regrowing clip's: progress towards its next round); a charge gun's charge in ticks (below 0: draining
    * away after an early release), a beam's ticks lit (its windup); a spinning gun's spin (0..1)

@@ -73,7 +73,7 @@ describe('energy layout', () => {
   it('follows bespoke pieces\' joins (they hold on to what they touch)', () => {
     const SMALL: BespokeFile = { pieces: [{ id: 't_core', polygon: [[0, 0], [2, 0], [2, 2], [0, 2]] }, { id: 't_wing', polygon: [[2, 0], [4.5, 1], [2, 2]] }] };
     const files = readCatalogFiles();
-    const cat = loadCatalog({ ...files, bespoke: [...(files.bespoke ?? []), SMALL] }, { overlapShrink: readShipJson('tuning.json').overlapShrink });
+    const cat = loadCatalog({ ...files, bespoke: [...(files.bespoke ?? []), SMALL] }, { overlapShrink: readShipJson('tuning.json').overlapShrink, playerBubbles: true });
     const bp: Blueprint = { name: 'b', catalogVersion: 1, parts: [
       { uid: 0, piece: 't_core', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
       { uid: 1, piece: 't_wing', fn: 't_battery', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },

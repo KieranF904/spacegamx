@@ -42,11 +42,13 @@ export interface ShipConfig {
   dev?: Record<string, Blueprint>;
   /** The design update mapping, its blueprints found (loadShipConfig: data/ships/designUpdate.json and blueprints/remakes) */
   designUpdate?: DesignUpdate;
+  /** Keep the ship-wide bubble shields working on player ships (catalog.ts PLAYER_BUBBLE_MODELS; tests of the bubble rules) */
+  playerBubbles?: boolean;
 }
 
 export function createShipBridge(cfg: ShipConfig): ShipBridge {
   return new ShipBridge({
-    catalog: loadCatalog(cfg.catalog, { overlapShrink: cfg.tuning.overlapShrink }),
+    catalog: loadCatalog(cfg.catalog, { overlapShrink: cfg.tuning.overlapShrink, playerBubbles: cfg.playerBubbles }),
     tuning: cfg.tuning,
     starterBlueprint: cfg.starter,
     inventory: cfg.inventory,

@@ -7,7 +7,7 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul, portsPiecePhase, portsMinePhase, miningPulse, shotAimQ, TELL_BEAM_PIECE, TELL_MINE_PULSE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt } from '@space-game/common';
+import { rayTerrain, portsDamageMul, portsPiecePhase, portsMinePhase, miningPulse, shotAimQ, TELL_BEAM_PIECE, TELL_MINE_PULSE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt, shapedStopAt, shapedReachWorld, type SegmentHit } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
@@ -399,17 +399,21 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   // (A ports ship's gun: its infrastructure tier's damage and its material's, power/ports.ts)
   const pz = ship.derived.ports, pc = pz ? b.chargeOf(eid).e : undefined;
   const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc * (pz && pc ? portsDamageMul(pz, pc, w.part) : 1);
-  let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
+  let shipHit: { eid: number; ship: ShipState; part: number; t: number; shield?: number; spill?: boolean } | null = null;
   // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;
   for (const other of b.alongBeam(InSystem.systemId[eid], x, y, x1, y1, half)) {
     const os = b.bodies.get(other);
     if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || b.isJumping(os) || b.intangible.has(other) || b.dormant.has(other)) continue;
-    if (!b.nearSegment(other, os, x, y, x1, y1, half)) continue;
+    // (A shaped shield may stand past the hull: the bounding test takes in how far they reach)
+    const sReach = (def.vsShield ?? 1) > 0 ? shapedReachWorld(os, cs) : 0;
+    if (sReach > 0 ? !nearShipSegment(Position.x[other], Position.y[other], Math.max(os.derived.radius, sReach), x, y, x1, y1, half) : !b.nearSegment(other, os, x, y, x1, y1, half)) continue;
     if (b.host.canDamage && !b.host.canDamage(eid, other)) continue;
     // (Its whole width against the parts' real shapes: a capsule, collide.ts)
     const h = b.castShip(other, os, x, y, x1, y1, half);
-    if (h && (!shipHit || h.t < shipHit.t)) shipHit = { eid: other, ship: os, ...h };
+    // (and a live shaped shield its line crosses first stops it there, by its centre line: common hitRules.ts)
+    const hit = sReach > 0 ? shapedStopAt(os, cs, Position.x[other], Position.y[other], Rotation.angle[other], x, y, x1, y1, h) ?? h : h;
+    if (hit && (!shipHit || hit.t < shipHit.t)) shipHit = { eid: other, ship: os, ...hit };
   }
   // A surface's rock stops it before anything behind
   const wall = rayTerrain(b.host.terrainAt?.(eid), x, y, x1, y1);
@@ -433,10 +437,10 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
     const at = b.worldToGrid(shipHit.eid, shipHit.ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
     if (zapping) {
       // (Between zaps it only lights the line; on a zap it hurts the first hull, then leaps on from where it struck)
-      if (dmg > 0) zap(b, eid, w, def, shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, at, ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
+      if (dmg > 0) zap(b, eid, w, def, shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, at, ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t, shipHit.shield !== undefined ? { i: shipHit.shield, spill: !!shipHit.spill } : undefined);
       return shipHit.t;
     }
-    const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade * deeper, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at });
+    const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade * deeper, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at, ...(shipHit.shield !== undefined ? { shaped: { i: shipHit.shield, spill: !!shipHit.spill } } : {}) });
     if (pulse) b.pulseHit = { eid: shipHit.eid, dealt };
     else if (dealt > 0 && b.host.getTick() % 10 === 0) b.host.notifyDamage(shipHit.eid, dealt * 10, eid);
     return shipHit.t;
@@ -471,9 +475,9 @@ function rampScale(b: BridgeCtx, eid: number, part: number, target: number, def:
  * `chain.radius` of where it last struck (the nearest not yet struck, by hull), each time `chain.falloff` of the
  * last, on the part nearest where it leapt from. Each hop is shown to everyone (host.arcHop).
  */
-function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target: number, tship: ShipState, part: number, dmg: number, at: Vec2, ship: ShipState, hx: number, hy: number): void {
+function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target: number, tship: ShipState, part: number, dmg: number, at: Vec2, ship: ShipState, hx: number, hy: number, shaped?: { i: number; spill: boolean }): void {
   const hit = weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part]));
-  const dealt = b.hurt(target, tship, part, dmg, eid, { hit, at });
+  const dealt = b.hurt(target, tship, part, dmg, eid, shaped ? { hit, at, shaped } : { hit, at });
   if (dealt > 0) b.host.notifyDamage(target, dealt, eid);
   const c = def.chain;
   if (!c) return;
@@ -535,8 +539,11 @@ export function hitProjectile(
   b: BridgeCtx, proj: number, ownerId: number, x0: number, y0: number, x1: number, y1: number,
   nearby: { id: number }[], exclude?: Set<number>, radius = 0,
 ): { eid: number; x: number; y: number; part: number } | null {
-  let best: { eid: number; ship: ShipState; part: number; t: number } | null = null;
+  let best: { eid: number; ship: ShipState; part: number; t: number; shield?: number; spill?: boolean } | null = null;
   const systemNum = InSystem.systemId[proj];
+  // (What the shot does to shields: a shot that ignores them (0) is not stopped by a shaped shield either)
+  const shotVs = b.host.shotVs?.(proj);
+  const shieldScale = shotVs?.shield ?? 1;
   for (const { id: eid } of nearby) {
     // (Instanced copies share coordinates: only ships in the shot's own copy)
     if (eid === ownerId || exclude?.has(eid) || InSystem.systemId[eid] !== systemNum || b.intangible.has(eid)) continue;
@@ -544,12 +551,12 @@ export function hitProjectile(
     if (!ship) continue;
     // Shots pass straight through ships they may not hurt
     if (b.host.canDamage && !b.host.canDamage(ownerId, eid)) continue;
-    const hit = b.segmentHit(eid, ship, x0, y0, x1, y1, radius);
+    const hit = b.segmentHit(eid, ship, x0, y0, x1, y1, radius, shieldScale);
     if (hit && (!best || hit.t < best.t)) best = { eid, ship, ...hit };
   }
   if (!best) return null;
   const hx = x0 + (x1 - x0) * best.t, hy = y0 + (y1 - y0) * best.t;
-  const dealt = b.hurt(best.eid, best.ship, best.part, Projectile.damage[proj], ownerId, { ...b.host.shotVs?.(proj), at: b.worldToGrid(best.eid, best.ship, hx, hy) });
+  const dealt = b.hurt(best.eid, best.ship, best.part, Projectile.damage[proj], ownerId, { ...shotVs, at: b.worldToGrid(best.eid, best.ship, hx, hy), ...(best.shield !== undefined ? { shaped: { i: best.shield, spill: !!best.spill } } : {}) });
   const glancing = b.lastThrough < GLANCING;
   const shown = dealt > 0 ? lastHurtShown() : 0;
   b.host.notifyDamage(best.eid, dealt, ownerId, glancing, shown);
@@ -568,9 +575,17 @@ export function nearSegment(b: BridgeCtx, eid: number, ship: ShipState, x0: numb
  * (a beam's half-width, a great orb's radius: 0 for a line), against the
  * parts' real shapes in the ship's local grid space (collide.ts castParts).
  */
-export function segmentHit(b: BridgeCtx, eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
-  if (!b.nearSegment(eid, ship, x0, y0, x1, y1, margin)) return null;
-  return b.castShip(eid, ship, x0, y0, x1, y1, margin);
+export function segmentHit(b: BridgeCtx, eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0, shieldScale = 0): SegmentHit | null {
+  // (A shaped shield may stand past the hull, so the bounding test takes in how far they reach. A shieldScale of 0, the
+  // default: a caller that does not deal with shields gets the hull alone; shells and damaging beams ask for them)
+  const reach = shieldScale > 0 ? shapedReachWorld(ship, b.tuning.cellSize) : 0;
+  if (reach <= 0) {
+    if (!b.nearSegment(eid, ship, x0, y0, x1, y1, margin)) return null;
+    return b.castShip(eid, ship, x0, y0, x1, y1, margin);
+  }
+  if (!nearShipSegment(Position.x[eid], Position.y[eid], Math.max(ship.derived.radius, reach), x0, y0, x1, y1, margin)) return null;
+  const hull = b.castShip(eid, ship, x0, y0, x1, y1, margin);
+  return shapedStopAt(ship, b.tuning.cellSize, Position.x[eid], Position.y[eid], Rotation.angle[eid], x0, y0, x1, y1, hull) ?? hull;
 }
 
 /** segmentHit without its bounding-circle test (for callers that have just made it) */

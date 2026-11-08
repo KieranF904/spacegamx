@@ -11,7 +11,7 @@
  * A bounding-circle test first, then the parts in the ship's grid; nothing is allocated unless something is struck.
  */
 
-import { EntityType, castParts, getAsteroidPolygon, sidesHurt, standing, type ShipState } from '@space-game/common';
+import { EntityType, castParts, getAsteroidPolygon, shapedReachWorld, shapedStopAt, sidesHurt, standing, type ShipState } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
@@ -69,7 +69,8 @@ export class DrawnWorld {
       const e = this.state.entities.get(id);
       if (!e) continue;
       const shield = ship.kind === 'ship' ? shieldOf(e) : 0;
-      const R = shield > 0 ? Math.max(bubbleRadius(ship), ship.derived.radius) : ship.derived.radius;
+      // (a shaped shield may stand past the hull: features/zoneshield)
+      const R = Math.max(shield > 0 ? Math.max(bubbleRadius(ship), ship.derived.radius) : ship.derived.radius, shapedReachWorld(ship, cs));
       const cx = e.renderX, cy = e.renderY;
       // (coarse: the segment's box against the circle's, then its distance from the middle)
       if (cx + R < minX || cx - R > maxX || cy + R < minY || cy - R > maxY) continue;
@@ -88,6 +89,9 @@ export class DrawnWorld {
       const h = castParts(this.source.geometry(ship), this.ok,
         (ax * c + ay * s) / cs + com[0], (-ax * s + ay * c) / cs + com[1], (bx * c + by * s) / cs + com[0], (-bx * s + by * c) / cs + com[1]);
       this.cur = null;
+      // (a live shaped shield its line crosses before the hull stops it there: the same rule the server runs, common hitRules.ts)
+      const sh = ship.derived.fx?.shaped ? shapedStopAt(ship, cs, cx, cy, e.renderAngle, x0, y0, x1, y1, h) : null;
+      if (sh) { if (sh.t < best) { best = sh.t; target = id; } continue; }
       if (h && h.t < best) { best = h.t; target = id; }
     }
     for (const e of this.state.entities.ofType(EntityType.Asteroid)) {

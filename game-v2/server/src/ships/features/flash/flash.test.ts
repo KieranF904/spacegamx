@@ -13,7 +13,7 @@ const dataDir = join(__dirname, '../../../../../data');
 
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+  const server = new GameServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge({ ...loadShipConfigFromDisk(dataDir), playerBubbles: true }) });
   return { server, ships: server.getShips() };
 }
 

@@ -329,7 +329,7 @@ export class SelfHits {
             const ship = store.asOf?.(t, k) ?? store.get(t)!;
             const pose = this.host.at(t, this.host.side(t) & SIDE.PILOT ? k : k - 1);
             if (!pose) continue;
-            const h = shipSegmentHit(store, ship, pose.x, pose.y, pose.angle, x0, y0, x1, y1);
+            const h = shipSegmentHit(store, ship, pose.x, pose.y, pose.angle, x0, y0, x1, y1, 0, s.def.vsShield ?? 1);
             if (h && h.t < bt) { bt = h.t; best = t; bp = h.part; }
           }
           if (best < 0) continue;

@@ -24,5 +24,6 @@ export function readCatalogFiles(): CatalogFiles {
 }
 
 export function testCatalog() {
-  return loadCatalog(readCatalogFiles());
+  // (The ship-wide bubbles are kept on here: their rules are tested with them. Production catalogs have them off for player ships: catalog.ts PLAYER_BUBBLE_MODELS)
+  return loadCatalog(readCatalogFiles(), { playerBubbles: true });
 }

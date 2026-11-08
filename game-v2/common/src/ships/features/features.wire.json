@@ -5,11 +5,13 @@
     { "name": "dodgeDir", "feature": "strafer" },
     { "name": "tow", "feature": "tow" },
     { "name": "marked", "feature": "weaponry" },
-    { "name": "slowed", "feature": "weaponry" }
+    { "name": "slowed", "feature": "weaponry" },
+    { "name": "shaped", "feature": "zoneshield" }
   ],
   "status": [
     { "name": "tow", "feature": "tow", "index": 6 },
-    { "name": "statuses", "feature": "weaponry", "index": 7 }
+    { "name": "statuses", "feature": "weaponry", "index": 7 },
+    { "name": "shaped", "feature": "zoneshield", "index": 8 }
   ],
   "keyframe": [
     { "name": "dodge", "feature": "strafer", "index": 16 },

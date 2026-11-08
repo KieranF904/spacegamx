@@ -256,7 +256,7 @@ export function buildEnergyLayout(input: EnergyLayoutInput): EnergyLayout {
     } else if ((fn.demand ?? 0) > 0) {
       role[i] = ROLE_TOOL;
       rate[i] = perTick(partDemand(fn, a, m));
-      if ((fn.shield ?? 0) > 0) shield[i] = 1;
+      if ((fn.shield ?? 0) > 0 || fn.shaped) shield[i] = 1;
     }
   }
 

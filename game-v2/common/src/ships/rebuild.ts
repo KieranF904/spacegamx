@@ -683,6 +683,11 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       shieldDelayW += rate * sd;
     }
   }
+  // (Shaped shields by the same rule: one power cannot reach is not up; features/zoneshield)
+  if (ports && fxOut?.shaped) {
+    const fed = portsFed(ports), up = fxOut.shaped.shields.filter((s) => fed[s.part]);
+    if (up.length) fxOut.shaped.shields = up; else delete fxOut.shaped;
+  }
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
   if (input.memo) input.memo.last = { design: D, tuning, alive: Uint8Array.from(alive, Number), turrets: turretRays, exhaust: exhaustOf };
 

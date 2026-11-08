@@ -19,7 +19,8 @@ import { legacyCandidates, legacyModel, migrateBlueprint, migrateItemStack, migr
 import { isPowerPart } from './wires.js';
 import { describePart } from './describe.js';
 import type { ShipTuning } from './tuning.js';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
+import { readShipJson, readCatalogFiles, testCatalog, SHIP_DATA_DIR } from './testData.js';
+import { loadCatalog } from './catalog.js';
 import { canCraft, MATERIAL_LEVEL, modelLicensed, partLicensed } from '../econ/market.js';
 import { migrateProfile, newProfile, PROFILE_VERSION, type StarterKit } from '../econ/profile.js';
 import { FRICTION, BOOST_FACTOR, WORLD_SIZE } from '../constants.js';
@@ -454,12 +455,14 @@ describe('migration: legacy parts become models', () => {
   it('the library ships run on the ports core: valid, nothing legacy, every gun, engine and tool fed through its ports', () => {
     const names = readdirSync(join(SHIP_DATA_DIR, 'blueprints')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
     expect(names.sort()).toEqual(['ark-tender', 'arrow', 'bulwark', 'drum', 'halberd', 'hauler', 'prospector', 'quarry', 'sparrow-t', 'sunspear', 'wisp']);
+    // (a production catalog: the ship-wide bubbles are switched off for player ships, so a library ship's old shield asks nothing)
+    const prod = loadCatalog(readCatalogFiles());
     for (const name of names) {
       const b = blueprint(name);
       expect(b.power, name).toBe('ports');
       expect(b.parts.filter((q) => FN(q.fn).legacy).map((q) => q.fn), name).toEqual([]);
-      expect(validateBlueprint(catalog, b, tuning, null).errors, name).toEqual([]);
-      const d = createShipState(catalog, tuning, 1, b, 0).derived;
+      expect(validateBlueprint(prod, b, tuning, null).errors, name).toEqual([]);
+      const d = createShipState(prod, tuning, 1, b, 0).derived;
       expect(d.alive.every(Boolean), name).toBe(true);
       const L = d.ports!;
       const unfed = [...L.weapons, ...L.thrusters, ...L.tools].filter((i) => L.inStart[i + 1] === L.inStart[i] || L.openIn[i]).map((i) => b.parts[i].fn);
