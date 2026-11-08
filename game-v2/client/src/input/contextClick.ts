@@ -316,9 +316,3 @@ export function jumpStep(s: { phase: 'ready' | 'charging' | 'burn' | 'cooldown';
   if (s.ticks > JUMP_ALIGN_TICKS) return { jump: false, state: 'stuck' };
   return { jump: false, state: 'aligning' };
 }
-
-export function wrapAngle(a: number): number {
-  while (a > Math.PI) a -= 2 * Math.PI;
-  while (a < -Math.PI) a += 2 * Math.PI;
-  return a;
-}

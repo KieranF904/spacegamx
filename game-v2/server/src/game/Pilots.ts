@@ -24,6 +24,7 @@ import {
   BOOST_FUEL_DEFAULT, ShipRecord, SALVAGE, skillValue, type PlacedPart, refundRetiredSkills, salvageOf, salvageParts, isStructuralItem, parsePartItemId, licenceName, DOCK_FEE_LEVEL, dcos, dsin,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
+import { cloneJson } from '@space-game/common';
 import type { ProfileStore } from '../profile/ProfileStore.js';
 import { RepairBanks } from './RepairBank.js';
 
@@ -201,7 +202,7 @@ export class Pilots {
     const s: Session = { conn, profile: newProfile(this.opts.starter), dirty: false, lastSave: this.now(), atStation: false };
     for (const bp of this.opts.guestShips ?? []) {
       const slot = s.profile.hangar.indexOf(null);
-      if (slot >= 0) s.profile.hangar[slot] = { blueprint: JSON.parse(JSON.stringify(bp)), hp: {}, ghosts: [] };
+      if (slot >= 0) s.profile.hangar[slot] = { blueprint: cloneJson(bp), hp: {}, ghosts: [] };
     }
     this.sessions.set(conn, s);
     this.bank.ensure(s.profile, this.now());
@@ -284,7 +285,7 @@ export class Pilots {
     const p = s.profile;
     if (blueprint) {
       if (!this.devStash.has(conn)) this.devStash.set(conn, { rec: p.ship, slot: p.activeSlot });
-      setActiveShip(p, { blueprint: JSON.parse(JSON.stringify(blueprint)), hp: {}, ghosts: [] }, p.activeSlot);
+      setActiveShip(p, { blueprint: cloneJson(blueprint), hp: {}, ghosts: [] }, p.activeSlot);
     } else {
       const st = this.devStash.get(conn);
       if (!st) return false;
@@ -433,7 +434,7 @@ export class Pilots {
     // (a borrowed dev ship flies as it is: an enemy's design needn't pass a pilot's rules. A saved ship needn't keep
     // weapons' mounting rules made since it was fitted: it flies, its hangar flagging what to fix)
     if (!this.devStash.has(s.conn) && !this.ships.validate(bp, { mounting: false }).ok) {
-      setActiveShip(s.profile, { blueprint: JSON.parse(JSON.stringify(this.opts.starter.blueprint)), hp: {}, ghosts: [], plan: this.opts.starter.planFile });
+      setActiveShip(s.profile, { blueprint: cloneJson(this.opts.starter.blueprint), hp: {}, ghosts: [], plan: this.opts.starter.planFile });
     }
     const rec = s.profile.ship;
     // (The core always comes back, free)
@@ -1160,7 +1161,7 @@ export class Pilots {
     // ammo used to resend it every second or so)
     // The first goes whole; after that only the fields that changed (XP and credits are most of them)
     const prev = s.profileSent;
-    const sent = JSON.parse(JSON.stringify(msg)) as ServerProfileMessage;
+    const sent = cloneJson(msg) as ServerProfileMessage;
     s.profileSent = sent;
     if (!prev) { this.host.send(conn, msg); return; }
     const delta = diffProfile(prev, sent);

@@ -20,6 +20,7 @@ import { setActiveShip } from './profile.js';
 import { bankCap, newBank } from './field/bank.js';
 import { removeFrom, type Bag } from './stacks.js';
 import { unlocks } from './unlocks.js';
+import { cloneJson as clone } from '../math/basic.js';
 
 /**
  * The retired kits, bonds and what each was crafted from (their recipes are gone from data/recipes.json; this table is
@@ -46,7 +47,6 @@ export interface FieldUpdateReport {
   bankMade: boolean;
 }
 
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 const add = (bag: Bag, id: string, n: number) => { if (n > 0) bag[id] = (bag[id] ?? 0) + n; };
 

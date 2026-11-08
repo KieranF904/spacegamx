@@ -439,6 +439,7 @@ export function jumpScaleFor(dist: number, t: JumpTuning, friction: number): num
   return Math.round(Math.max(0, extra / ((t.speed - t.exitSpeed) * shape)) * 1000) / 1000;
 }
 
+/** The sim's angle wrap, into (-PI, PI]: canonical for deterministic code (the loop is part of the parity goldens). Non-sim code uses math/basic.ts. */
 export function wrapAngle(a: number): number {
   while (a > Math.PI) a -= 2 * Math.PI;
   while (a < -Math.PI) a += 2 * Math.PI;

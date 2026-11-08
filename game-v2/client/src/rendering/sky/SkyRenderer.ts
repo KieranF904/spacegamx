@@ -25,6 +25,7 @@ import { skyVert, hazeFrag, starsFrag } from './skyShaders';
 import { skyNoiseTexture } from './noiseTexture';
 import { SKY_SPRITE_VERT, SKY_SPRITE_FRAG, SKY_DEEP_VERT, SKY_DEEP_FRAG, insideRingOnly, oneDrawGrid, ringBox, spriteGrid, sunCovers, sunHole, type SkyView } from './skySprites';
 import type { SkyBiome } from './skyBiome';
+import { smoothstep as smooth } from '@space-game/common';
 
 /** Haze texture size, as a fraction of the screen's (CSS pixels); the quality setting can shrink it */
 const HAZE_SCALE = 1 / 2;
@@ -44,7 +45,6 @@ const MOTE_DEPTH = 0.3;
 const SKY_TILE = 320000;
 
 const scaleAt = (zoom: number, depth: number) => 1 / (1 / zoom + depth);
-const smooth = (a: number, b: number, x: number) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 function quad(x0: number, y0: number, x1: number, y1: number): MeshGeometry {
   return new MeshGeometry({
