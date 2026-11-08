@@ -12,12 +12,14 @@
  * A death makes every standing part (but the core) a ghost and records it as owed (`ShipRecord.owed`): ghosts of a field
  * plan are not owed, so the free part and the deposits only ever rebuild the ship's own design.
  *
- * This file is the rules applied to a profile (no ECS, no sockets): Pilots owns the sessions, installs the parts that
- * come back on the live ship and sends the `repairBank` message. Tests run it on bare profiles.
+ * RepairBanks is the rules applied to a profile (no ECS, no sockets); tests run it on bare profiles. BankSessions, below it,
+ * is the bank of the pilots in play: it installs the parts that come back on the live ship and sends the `repairBank`
+ * message, through a narrow BankHost that Pilots provides.
  */
 
+import { entityExists, hasComponent, type IWorld } from 'bitecs';
 import {
-  bankCap, newBank, refillBank, freeWhole, freeSpare, spendFree, spendDeposits, depositable, depositInto, bankFullIn,
+  Player, Dead, bankCap, newBank, refillBank, freeWhole, freeSpare, spendFree, spendDeposits, depositable, depositInto, bankFullIn,
   bankPay, packDefs, payCoreOutward, joinDepths, adjacency, jobTicks, fabWork, attachWork, repairBill, BANK,
   computeJoins, blueprintGeometry, countOf, removeFrom,
   type Economy, type PlayerProfile, type ShipRecord, type Bag, type Blueprint, type PlacedPart, type PackDef, type ServerRepairBankMessage,
@@ -270,5 +272,204 @@ export class RepairBanks {
       }
       default: return false;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The bank of pilots in play: sessions, the live ship and the `repairBank` message
+// ---------------------------------------------------------------------------
+
+/** The part of a pilot's session the bank reads and marks (Pilots' Session has more) */
+export interface BankSession {
+  conn: BankConn;
+  profile: PlayerProfile;
+  dirty: boolean;
+  /** The last `repairBank` message sent: when (wall ms) and what (JSON) */
+  bankSent?: { at: number; key: string };
+  /** The bank changed since it was last sent (a station repair paid from it): sent on the next tick, at most once a second */
+  bankDirty?: boolean;
+  /** Their saved profile is still loading: the one in hand isn't theirs, so it's never touched */
+  loading?: boolean;
+}
+
+/** What the bank needs to know about a connection (a PilotConn has it) */
+export interface BankConn { playerId: number }
+
+/** What the bank asks of Pilots and the game: a narrow door, so this file never sees the whole of either */
+export interface BankHost<S extends BankSession = BankSession> {
+  readonly world: IWorld;
+  now(): number;
+  session(conn: S['conn']): S | undefined;
+  sessionOfEid(eid: number): S | undefined;
+  sessions(): Iterable<S>;
+  atStation(conn: S['conn']): boolean;
+  toast(conn: S['conn'], text: string, kind: 'info' | 'good' | 'warn' | 'bad'): void;
+  sendItems(conn: S['conn']): void;
+  saveNow(conn: S['conn']): void;
+  send(conn: S['conn'], msg: ServerRepairBankMessage): void;
+  /** The pilot's ship record changed what their hangar view shows (a part the bank built in) */
+  hangarChanged?(conn: S['conn']): void;
+  /** Bring a part the bank just built onto the live ship, at full HP */
+  installGhost(eid: number, uid: number): void;
+  /** A machine of the pilot's ship is working on this part */
+  isClaimed(eid: number, uid: number): boolean;
+  itemName(id: string): string;
+}
+
+/**
+ * @contract server.repairBank.sessions
+ * owns:       the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live
+ *             ship, and the `repairBank` message
+ * needs:      RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed)
+ * events:     hangarChanged when a part is built in
+ * invariants: a changed bank is sent at most once a second, a refilling one once a minute — server/src/game/repairBank.test.ts
+ *             deposits only at a station — server/src/game/repairBank.test.ts
+ * extend:     a new bank action is a method here and a door in Pilots; its rules go in RepairBanks
+ */
+export class BankSessions<S extends BankSession = BankSession> {
+  private ticks = 0;
+
+  constructor(readonly rules: RepairBanks, private host: BankHost<S>) {}
+
+  /** The free part's spare (the top of it), what a field machine may use for repairs of the ship's own design */
+  spare(eid: number): Bag {
+    const s = this.host.sessionOfEid(eid);
+    return s ? this.rules.spare(s.profile) : {};
+  }
+
+  /** Take a bill from the spare (all or nothing) */
+  spendSpare(eid: number, bill: Bag): boolean {
+    const s = this.host.sessionOfEid(eid);
+    if (!s || !this.rules.spendSpare(s.profile, bill)) return false;
+    this.changed(s);
+    return true;
+  }
+
+  /** Passing a station (bridge/rebuild.ts repairStep): the deposits pay to mend a damaged part. A pilotless ship is mended free */
+  repair(eid: number, part: PlacedPart, missing: number): boolean {
+    const s = this.host.sessionOfEid(eid);
+    if (!s) return true;
+    if (!this.rules.payRepair(s.profile, part, missing)) return false;
+    this.changed(s);
+    return true;
+  }
+
+  /** Passing a station: the deposits pay to regrow a missing part */
+  rebuild(eid: number, part: PlacedPart): boolean {
+    const s = this.host.sessionOfEid(eid);
+    if (!s) return true;
+    if (!this.rules.payRebuild(s.profile, part)) return false;
+    this.changed(s);
+    return true;
+  }
+
+  /** The bank changed in passing (a repair paid): saved with the profile, sent within a second */
+  private changed(s: S): void {
+    s.dirty = true;
+    s.bankDirty = true;
+  }
+
+  /** `bankDeposit`: items from the hold or storage into the deposits, at a station, only what a bank takes */
+  deposit(conn: S['conn'], items: Bag, from?: 'cargo' | 'storage'): void {
+    const s = this.host.session(conn);
+    if (!s || s.loading || !items || typeof items !== 'object') return;
+    if (!this.host.atStation(conn)) return this.host.toast(conn, 'Put things in your repair bank at a station', 'warn');
+    const asked: Bag = {};
+    for (const [id, n] of Object.entries(items).slice(0, 64)) if (typeof id === 'string' && Number.isFinite(Number(n)) && Number(n) >= 1) asked[id] = Math.floor(Number(n));
+    this.rules.ensure(s.profile, this.host.now());
+    const moved: Bag = {}, refused = new Set<string>();
+    for (const where of from ? [from] : (['cargo', 'storage'] as const)) {
+      const want: Bag = {};
+      for (const [id, n] of Object.entries(asked)) { const left = n - (moved[id] ?? 0); if (left > 0) want[id] = left; }
+      const r = this.rules.deposit(s.profile, want, where);
+      for (const [id, n] of Object.entries(r.moved)) moved[id] = (moved[id] ?? 0) + n;
+      for (const id of r.refused) refused.add(id);
+    }
+    const total = Object.values(moved).reduce((a, n) => a + n, 0);
+    if (refused.size) this.host.toast(conn, `${[...refused].map((id) => this.host.itemName(id)).join(', ')} can't go in the repair bank: it takes packs, refined materials and components`, 'warn');
+    if (!total) { if (!refused.size) this.host.toast(conn, 'Nothing to put in the repair bank', 'info'); return; }
+    s.dirty = true;
+    this.host.toast(conn, `Put ${total} item${total > 1 ? 's' : ''} in your repair bank`, 'good');
+    this.host.sendItems(conn);
+    this.payOwedFree(s);
+    this.send(s, true);
+    this.host.saveNow(conn);
+  }
+
+  /** `devBank` (net/handlers/bank.ts has checked this is a dev server): fill or empty the free part, clear or grant deposits */
+  dev(conn: S['conn'], action: string, items?: Bag): boolean {
+    const s = this.host.session(conn);
+    if (!s || s.loading) return false;
+    if (!this.rules.dev(s.profile, action, items, this.host.now())) { this.host.toast(conn, 'Nothing to do', 'info'); return false; }
+    s.dirty = true;
+    this.payOwedFree(s);
+    this.send(s, true);
+    this.host.toast(conn, `Repair bank (dev): ${action}`, 'info');
+    return true;
+  }
+
+  /** The free part pays the owed parts of the ship it can, core outward, building them on the live ship */
+  payOwedFree(s: S): void {
+    const eid = s.conn.playerId;
+    const rec = s.profile.ship;
+    if (!rec.owed?.length) return;
+    const uids = this.rules.payFree(s.profile, rec, (uid) => this.host.isClaimed(eid, uid));
+    this.install(s, uids);
+  }
+
+  /** Parts the bank has just built are installed on the live ship (if it is flying), at full HP */
+  private install(s: S, uids: number[]): void {
+    if (!uids.length) return;
+    const eid = s.conn.playerId;
+    if (this.flying(eid)) {
+      for (const uid of uids) this.host.installGhost(eid, uid);
+    }
+    s.dirty = true;
+    // (The hangar and station windows read the record, not the ship: the parts built in must leave their missing list)
+    this.host.hangarChanged?.(s.conn);
+    if (!s.profile.ship.owed?.length) this.host.toast(s.conn, 'Your repair bank has rebuilt your ship', 'good');
+  }
+
+  private flying(eid: number): boolean {
+    return entityExists(this.host.world, eid) && hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid);
+  }
+
+  /** Once a tick: refill the free part by the clock, rebuild what is owed (free part as it refills, deposits at a fabricator's pace), send changes */
+  tick(now: number): void {
+    const n = ++this.ticks;
+    if (n % 15 !== 0) return;
+    for (const s of this.host.sessions()) {
+      if (s.loading) continue;
+      const p = s.profile;
+      this.rules.ensure(p, now);
+      const eid = s.conn.playerId;
+      if (this.flying(eid) && p.ship.owed?.length) {
+        this.payOwedFree(s);
+        const uid = this.rules.stepDeposits(p, p.ship, 15, (u) => this.host.isClaimed(eid, u));
+        if (uid !== null) { this.install(s, [uid]); s.bankDirty = true; }
+      }
+      this.send(s, false, now);
+    }
+  }
+
+  /**
+   * Tell the client its bank: at once when `force` (login, a deposit, a death), else when it changed (at most once a
+   * second) or, while the free part refills, once a minute
+   */
+  send(s: S, force = false, now = this.host.now()): void {
+    const owed = this.rules.owedUids(s.profile.ship).length;
+    const msg = this.rules.view(s.profile, owed);
+    const key = JSON.stringify([msg.free, msg.deposits, msg.rebuilding ?? 0]);
+    const last = s.bankSent;
+    const filling = msg.fullIn > 0;
+    if (!force) {
+      if (!last) { /* never sent: send */ }
+      else if (s.bankDirty && key !== last.key && now - last.at >= 1000) { /* changed */ }
+      else if (filling && now - last.at >= 60_000) { /* refilling */ }
+      else return;
+    }
+    s.bankDirty = false;
+    s.bankSent = { at: now, key };
+    this.host.send(s.conn, msg);
   }
 }
