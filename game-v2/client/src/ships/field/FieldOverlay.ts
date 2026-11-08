@@ -3,7 +3,7 @@
  * hangar does. Opening it swaps to the helm view and zooms in on the ship, which keeps flying; the parts palette
  * (HangarPalette, by import: the hangar's own list) opens at the side, and the mouse builds on the ship itself:
  *
- *   left click   place the part in hand         right click   take a part out (a standing part: mark it for recycling)
+ *   left click   place the part in hand (hold: along the path)   right click   take a part out (a standing part: mark it for recycling)
  *   middle click pick a part up                 R turn · F mirror · T facing · Esc or the build key closes
  *
  * There is no plan apart from the blueprint: a part the blueprint has and the ship hasn't is missing (planned or shot
@@ -15,6 +15,7 @@
  * so the ship is never held back. A save sends `fieldPlan` with the new blueprint (free; only building costs), "As it
  * stands" sends `fieldPlanClear`. The edits are plan.ts, laid over the live ship each frame.
  */
+import { DragPaint } from '../build/dragPaint';
 import { placeGeometry, partItemId, hasFixedBarrel } from '@space-game/common';
 import type { Graphics } from 'pixi.js';
 import type { PlacedGeom, PlacedPart, ShipState, Side, Vec2 } from '@space-game/common';
@@ -100,6 +101,7 @@ export class FieldOverlay {
     this.root!.style.display = 'flex';
     window.addEventListener('mousedown', this.onDown, true);
     window.addEventListener('mousemove', this.onMove, true);
+    window.addEventListener('mouseup', this.onUp, true);
     this.say('Click on the ship to place. Saving is free: the fabricator builds missing parts from your hold.');
     void this.loadPalette();
   }
@@ -109,6 +111,8 @@ export class FieldOverlay {
     this.isOpen = false;
     window.removeEventListener('mousedown', this.onDown, true);
     window.removeEventListener('mousemove', this.onMove, true);
+    window.removeEventListener('mouseup', this.onUp, true);
+    this.drag = null;
     if (this.root) this.root.style.display = 'none';
     const was = this.was;
     this.was = null;
@@ -230,7 +234,28 @@ export class FieldOverlay {
 
   private onMove = (e: MouseEvent): void => {
     this.mouse = { x: e.clientX, y: e.clientY };
+    this.dragTo(e);
   };
+
+  private onUp = (e: MouseEvent): void => {
+    if (this.drag && e.button === this.drag.button) this.drag = null;
+  };
+
+  /** A held left/right button that started on the ship: the cells the cursor passes are built on / taken out, each once */
+  private drag: { button: 0 | 2; paint: DragPaint; touched: Set<number> } | null = null;
+
+  private dragTo(e: MouseEvent): void {
+    const d = this.drag;
+    if (!d) return;
+    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.drag = null; return; }
+    if ((e.target as HTMLElement | null)?.tagName !== 'CANVAS') return;
+    const to = this.gridAt(e.clientX, e.clientY);
+    if (!to) return;
+    for (const at of d.paint.visit(to)) {
+      if (!this.near(at)) continue;
+      if (d.button === 0) this.place(at); else this.take(at, d.touched, true);
+    }
+  }
 
   /** Capture phase, before the game's own mouse handler: a click on or round the ship builds, any other still fires */
   private onDown = (e: MouseEvent): void => {
@@ -241,8 +266,12 @@ export class FieldOverlay {
     if (!at || !this.near(at)) return;
     e.stopPropagation();
     e.preventDefault();
-    if (e.button === 0) this.place(at);
-    else if (e.button === 2) this.take(at);
+    if (e.button === 0) { this.place(at); this.drag = { button: 0, paint: new DragPaint(at), touched: new Set() }; }
+    else if (e.button === 2) {
+      const touched = new Set<number>();
+      this.take(at, touched);
+      this.drag = { button: 2, paint: new DragPaint(at), touched };
+    }
     else if (e.button === 1) this.pickUp(at);
   };
 
@@ -308,13 +337,21 @@ export class FieldOverlay {
     this.edited();
   }
 
-  private take(g: Vec2): void {
+  /** `touched`: the parts this drag has already dealt with (a drag marks a part once, and `sweeping` over one already marked leaves it marked) */
+  private take(g: Vec2, touched?: Set<number>, sweeping = false): void {
     const v = this.view();
     if (!v) return;
     const i = partAtPoint(this.deps.catalog, v.w, g);
     if (i < 0) return;
+    if (touched) {
+      const uid = v.w.bp.parts[i].uid;
+      if (touched.has(uid)) return;
+      touched.add(uid);
+      if (sweeping && v.w.marked.has(uid)) return;
+    }
     const res = removePart(this.deps.catalog, v.live, this.edits, i);
     if (res.kind === 'none') return this.say("The core can't be taken out.", true);
+    if (touched) res.uids.forEach((u) => touched.add(u));
     const more = res.uids.length > 1 ? ` and ${res.uids.length - 1} cut off with it` : '';
     this.say(res.kind === 'marked' ? `Marked for recycling${more}. Right-click again to keep it.` : res.kind === 'unmarked' ? 'Kept.' : `Taken out of the design${more}.`);
     this.edited();

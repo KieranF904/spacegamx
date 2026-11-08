@@ -39,6 +39,7 @@
  * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
  */
 
+import { DragPaint } from './build/dragPaint';
 import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, overlapsAny, computeJoins, facingProblem, geomContainsPoint, validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, gunFacing, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, wireCells, cellKey, mountingOf, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
 import { loadTest, type LoadTestResult } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
@@ -251,11 +252,13 @@ export class HangarUI implements HangarHost {
         if (pan.moved) { this.view.cx = pan.cx - dx / this.view.px; this.view.cy = pan.cy - dy / this.view.px; this.draw(); return; }
       }
       this.mouse = this.toGrid(e);
+      this.dragTo(e, this.mouse);
       this.ports.hover(this.overlays.energy ? this.derived : null, this.mouse);
       this.draw();
       this.gridTip(e);
     });
     window.addEventListener('mouseup', (e) => {
+      if (this.drag && e.button === this.drag.button) this.drag = null;
       if (e.button !== 1 || !this.pan) return;
       const pan = this.pan;
       this.pan = null;
@@ -265,9 +268,9 @@ export class HangarUI implements HangarHost {
     this.canvas.addEventListener('mouseleave', () => { this.mouse = null; this.draw(); this.hideTip(); });
     this.canvas.addEventListener('mousedown', (e) => {
       const g = this.toGrid(e);
-      if (e.button === 0) this.place(g);
+      if (e.button === 0) { this.place(g); this.drag = { button: 0, paint: new DragPaint(g) }; }
       if (e.button === 1) { e.preventDefault(); this.pan = { x: e.clientX, y: e.clientY, cx: this.view.cx, cy: this.view.cy, at: g, moved: false }; }
-      if (e.button === 2) this.remove(g);
+      if (e.button === 2) { this.remove(g); this.drag = { button: 2, paint: new DragPaint(g) }; }
     });
     // (Middle-click picks a part up, middle-drag pans: no autoscroll, no paste)
     this.canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
@@ -486,7 +489,20 @@ export class HangarUI implements HangarHost {
     this.draw();
   }
 
-  private remove(g: Vec2): void {
+  /** A held left/right button: the cells the cursor has passed since the press are placed on / taken out, each once */
+  private drag: { button: 0 | 2; paint: DragPaint } | null = null;
+
+  private dragTo(e: MouseEvent, g: Vec2): void {
+    const d = this.drag;
+    if (!d) return;
+    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.drag = null; return; }
+    for (const at of d.paint.visit(g)) {
+      if (d.button === 0) this.place(at); else this.remove(at, true);
+    }
+  }
+
+  /** `sweeping`: a drag passing over it (it leaves a part alone whose removal would cut others off, rather than asking) */
+  private remove(g: Vec2, sweeping = false): void {
     const i = this.partAt(g);
     if (i < 0) return;
     const removed = new Set([i]);
@@ -495,6 +511,7 @@ export class HangarUI implements HangarHost {
       const joins = computeJoins(this.geoms);
       const reached = floodFill(this.geoms.length, joins, core, (k) => k !== i);
       const cut = this.bp.parts.map((_, k) => k).filter((k) => k !== i && !reached[k]);
+      if (cut.length && sweeping) return this.status('left a part that would cut others off: right-click it alone');
       if (cut.length) {
         if (!confirm(`Removing this part also cuts ${cut.length} part(s) off from the core. Remove them too?`)) return;
         cut.forEach((k) => removed.add(k));
@@ -703,11 +720,11 @@ export class HangarUI implements HangarHost {
   private renderFooter(): void {
     const el = this.pal.foot;
     el.innerHTML = '';
-    const keys = 'Click places · right-click removes · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
+    const keys = 'Click places · right-click removes · hold and drag to paint or sweep · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
     const info = document.createElement('div');
     info.title = keys;
     info.style.cssText = 'color:#6b7a93; margin:3px 0 2px; font-size:10.5px; line-height:1.45;';
-    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E energy · Tab list · wheel zoom`;
+    info.innerHTML = `Click places · right-click removes · hold and drag to paint or sweep · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E energy · Tab list · wheel zoom`;
     el.append(info);
     // Overlays (folded) and proto's debug switch, on one line
     const row = document.createElement('div');
