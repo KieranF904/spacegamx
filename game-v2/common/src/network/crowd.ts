@@ -77,6 +77,6 @@ export function crowdClockStep(acc: number, rate: number): [number, number] {
 }
 
 /** The fade's start for a focus radius: drawn fully as a ghost from the radius in, by the last km */
-export function crowdFadeFrom(focus: number): number {
+function crowdFadeFrom(focus: number): number {
   return focus - 1000;
 }

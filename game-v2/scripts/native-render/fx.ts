@@ -145,4 +145,4 @@ export function beam(radius: number, env: number): Draw {
   return q.draw('beam', 'normal');
 }
 
-export const DOT_PX = DOT;
+const DOT_PX = DOT;

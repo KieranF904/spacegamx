@@ -47,7 +47,7 @@ const TOUCH_AFTER = 60 * 60 * 1000;
 
 const kinds = new Map<string, number>();
 /** Every kind declared so far, with its version */
-export const assetKinds = (): ReadonlyMap<string, number> => kinds;
+const assetKinds = (): ReadonlyMap<string, number> => kinds;
 
 /**
  * A kind of asset. `memory: false` keeps nothing in memory once it's handed over (big ones the caller keeps, or a

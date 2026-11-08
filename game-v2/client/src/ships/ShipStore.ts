@@ -28,7 +28,7 @@ export interface StructSource {
 }
 
 /** A ship as it was on a tick, for the hits struck then (ShipStore.asOf) */
-export interface HitShipSource {
+interface HitShipSource {
   get(id: number): ShipState | undefined;
   /** The ship as a hit on tick t struck it: before a rebuild sync whose rebuild came on t or after, else as it is */
   asOf?(id: number, t: number): ShipState | undefined;

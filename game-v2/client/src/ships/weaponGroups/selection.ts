@@ -60,6 +60,6 @@ export const groupSelection = new GroupSelection();
 export const groupName = (g: number): string => (g === 0 ? 'all' : String(g));
 
 /** The HUD chip's text: "L: 2  R: all" */
-export function chipText(left: number, right: number): string {
+function chipText(left: number, right: number): string {
   return `L: ${groupName(left)}  R: ${groupName(right)}`;
 }

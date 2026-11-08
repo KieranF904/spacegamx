@@ -25,7 +25,7 @@ import { trailRegistry } from './TrailRegistry.js';
  * Initialize all registries (call on startup)
  * This ensures all singletons are created and defaults are loaded
  */
-export function initializeRegistries(): {
+function initializeRegistries(): {
   weapons: number;
   enemies: number;
   asteroids: number;

@@ -106,7 +106,7 @@ export function devHooks(b: BossBrain | undefined): BossDevHooks | undefined {
 }
 
 /** Parts still on the ship whose function has this ability (bosses' own parts: functions.json `ability`) */
-export function partsWith(host: BrainHost, ship: ShipState, ability: string): number[] {
+function partsWith(host: BrainHost, ship: ShipState, ability: string): number[] {
   const out: number[] = [];
   ship.blueprint.parts.forEach((p, i) => {
     // (a wrecked one does nothing: stages.ts)

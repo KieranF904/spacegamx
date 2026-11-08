@@ -84,7 +84,7 @@ export function lookFn(fn: string): string {
 }
 
 /** The legacy functions whose parts became a family's models (their licences still teach it) */
-export function legacyFunctionsOf(family: string): string[] {
+function legacyFunctionsOf(family: string): string[] {
   return LEGACY_OF.get(family) ?? [];
 }
 

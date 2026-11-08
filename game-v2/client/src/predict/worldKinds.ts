@@ -105,6 +105,6 @@ export function worldKinds(state: GameState, sc: ShipClient, renderer: () => Ren
 }
 
 /** The draw tick for a thing on PT that isn't a pilot (bosses, mobs, homing shells): where your shells meet it */
-export function aheadDraw(render: number, ownDraw: number): number {
+function aheadDraw(render: number, ownDraw: number): number {
   return Math.max(render, ownDraw - AHEAD_BACK);
 }

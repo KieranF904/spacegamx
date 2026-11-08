@@ -198,7 +198,7 @@ export function removePart(catalog: Catalog, d: PlanDraft, i: number): RemoveRes
 }
 
 /** Back to the live ship */
-export function resetDraft(d: PlanDraft, live: Blueprint, ghost: readonly boolean[] | undefined, queued: Iterable<number> = []): void {
+function resetDraft(d: PlanDraft, live: Blueprint, ghost: readonly boolean[] | undefined, queued: Iterable<number> = []): void {
   const n = openDraft(live, ghost, queued);
   d.bp = n.bp; d.live = n.live; d.planned = n.planned; d.marked = n.marked;
 }
@@ -209,7 +209,7 @@ export function targetErrors(catalog: Catalog, tuning: ShipTuning, d: PlanDraft)
 }
 
 /** The item ids a plan's new parts will cost, counted (the overlay's footer) */
-export function addedItems(diff: PlanDiff): Record<string, number> {
+function addedItems(diff: PlanDiff): Record<string, number> {
   const out: Record<string, number> = {};
   for (const p of diff.added) { const id = partItemId(p); out[id] = (out[id] ?? 0) + 1; }
   return out;

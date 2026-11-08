@@ -29,7 +29,7 @@ import { copyGunScalars, type SimShipState } from './state.js';
 import { shipHash } from './ring.js';
 
 /** The field's width on the wire */
-export const HEAD_HASH_BITS = 24;
+const HEAD_HASH_BITS = 24;
 export const HEAD_HASH_HELD = 1;
 export const HEAD_HASH_ROW = 2;
 

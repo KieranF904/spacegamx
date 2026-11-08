@@ -62,7 +62,7 @@ export function unlocks(p: { level: number; skills?: Record<string, number>; out
 }
 
 /** The next `n` levels (above `level`) that open something, and what */
-export function nextUnlocks(level: number, n = 5): { level: number; what: string[] }[] {
+function nextUnlocks(level: number, n = 5): { level: number; what: string[] }[] {
   const levels = new Set<number>();
   for (const k of UNLOCK_KEYS) for (const lv of Object.keys(table[k].levels ?? {})) if (Number(lv) > level) levels.add(Number(lv));
   return [...levels].sort((a, b) => a - b).slice(0, n).map((lv) => ({ level: lv, what: unlockedAt(lv) }));

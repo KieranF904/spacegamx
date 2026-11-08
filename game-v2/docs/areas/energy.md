@@ -67,9 +67,7 @@ deterministic, integer eu (1/256 E), allocation-free per tick (module scratch: n
 |---|---|
 | units.ts | `EU` (256), `toEu(E)`, `fromEu(eu)`, `perTick(E/s)` (rounded), `perTickUp(E/s)` (weapons' intake: rounded up so a gun keeps its beat) |
 | layout.ts | `buildEnergyLayout(input: EnergyLayoutInput): EnergyLayout`, `layoutSig(L)`, `partHolds`/`partGives`/`partTakes(fn, area, mat[, pt])`, `powerTuning(tuning)`, `POWER_DEFAULTS`; `ROLE_*`, `GUN_SHOT`/`GUN_CLIP`/`GUN_BEAM`, `PHASE_THRUST`/`PHASE_TOOL`/`PHASE_WEAPON`, `NO_FILL_BOUND`, `NO_DEPTH`. Layout extras: `rounds` (a clip's salvo), `depth` (a relay's hops from generation). The sig leaves out generators' and dynamos' rates (health-scaled) |
-| state.ts | `EnergyState {sig, held: Int32Array, flags: Uint8Array, sat: Uint8Array, shieldSat, gauge}`, `FLAG_LATCH` (1), `FLAG_LIT` (2), `createEnergyState(L)` (full), `fullEnergy(L, out?)`, `remapEnergy(e, after, sameDesign)`, `energyGauge(L, e)`, `energyGaugePct(L, e)` |
-| tick.ts | `energyTick(L, e, ctl: EnergyControls, trace?)`, `thrustFrac()`/`thrustMul()` (by part, scratch), `stepThrustersFree(L, e, ctl)` (replicas), `settleEnergy(L, e, ticks, ctl?)` (default: tools asleep, wanting nothing; never refills an unlatched clip), `IDLE_CONTROLS` (every tool at full rate), `SETTLE_TICKS`; `genLeft()`/`givesLeft()`/`takesLeft()` (by part, scratch: waste and the Gives/Takes left after the tick); `drawFromRelays(L, e, p, eu, whole?)` (a one-off draw from the relays feeding p, fullest first: Flash); the guns' gates: `gunReady(L, e, p, n = L.rounds[p])`, `spendShot(L, e, p, n = L.rounds[p])` (returns eu, latches a clip that can't pay another salvo), `clipRounds(L, e, p)`, `beamStep(L, e, p, trigger)` (returns eu burnt). Every scratch accessor is valid only straight after the tick, for that layout's parts of its role |
-| wire.ts | `ENERGY_SLOT_LAYOUT`, `ENERGY_ROW {sig: 8, count: 9, at: 13}`, `packEnergy(L, e, out)` (appends sparse `(part, held*4+flags)` pairs, returns n), `energySlotEnd(data)`, `unpackEnergyInto(L, e, data)` (false on a sig mismatch), `energyDigest(L, e)` (u16 over held/flags: §4.1b stateHash), `packThrusterTail`/`unpackThrusterTail` (P3) |
+| (removed) | state.ts, tick.ts and wire.ts (the relay-style `energyTick` model) had no production caller and are gone from the shared core; shipgen keeps a local copy in `scripts/shipgen/core/energyTick.ts` / `energyState.ts` until it moves to the ports core |
 
 - **Input** (`EnergyLayoutInput`, all from rebuild): `fns`, `area`, `mats`, `alive`, `joins`, `core` (index or -1),
   `tuning`, `weapons` (`{part, fire, interval}` from WeaponInfo: a gun not listed is inert; `interval` with mods but
@@ -92,8 +90,7 @@ deterministic, integer eu (1/256 E), allocation-free per tick (module scratch: n
   only while `gunReady`; fire = `spendShot`; beams call `beamStep` each tick they are held.
 - **Trace** (hangar): `Float64Array(L.links)`; link ids: feeds `[0, linkPush)`, pushes, pairs (signed), dynamos;
   `linkFrom`/`linkTo` per id.
-- Tests: `npx vitest run common/src/ships/power` (layout, tick scenarios from the prototype, 10k-tick determinism, wire
-  round trip). Bench: `POWER_BENCH=1 NODE_OPTIONS=--expose-gc npx vitest run common/src/ships/power/tick.bench.test.ts`.
+- Tests: `npx vitest run common/src/ships/power` (layout, ports).
 
 ## Design rules (for ship designers; scripts/shipgen reads the block below into its prompt: keep it true to the power core)
 <!-- shipgen:rules -->

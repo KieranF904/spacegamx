@@ -11,7 +11,8 @@
  */
 
 import { Application, Container, Graphics } from 'pixi.js';
-import { BitBuffer, sunShaderDefs, generateStars } from '@space-game/common';
+import { sunShaderDefs, generateStars } from '@space-game/common';
+import { BitBuffer } from './BitBuffer.js';
 import { SunRenderer } from './rendering/legacy/SunRenderer';
 import { GlowRenderer } from './rendering/legacy/GlowRenderer';
 import { StarfieldRenderer } from './rendering/StarfieldRenderer';

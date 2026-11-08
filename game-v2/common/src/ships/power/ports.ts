@@ -733,8 +733,8 @@ export function matOf(L: PortsLayout, e: PortsState, p: number): number {
 }
 const W = (L: PortsLayout) => L.feeds.length;
 export const effShot = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.shot[p] * L.mShot[p * W(L) + f]) : L.shot[p]; };
-export const effDamage = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mDamage[p * W(L) + f] : 1; };
-export const effCycle = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mCycle[p * W(L) + f] : 1; };
+const effDamage = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mDamage[p * W(L) + f] : 1; };
+const effCycle = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mCycle[p * W(L) + f] : 1; };
 const effDischarge = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.discharge[p] * L.mDischarge[p * W(L) + f]) : L.discharge[p]; };
 const effRest = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.rest[p] * L.mRest[p * W(L) + f]) : L.rest[p]; };
 const effSteady = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.steady[p] * L.mSteady[p * W(L) + f]) : L.steady[p]; };
@@ -948,7 +948,7 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
 }
 
 /** Thrusters alone, intake assumed met (replicas): each buffer refills at its full intake, then burns */
-export function portsThrustersFree(L: PortsLayout, e: PortsState, ctl: Readonly<PortsControls>): void {
+function portsThrustersFree(L: PortsLayout, e: PortsState, ctl: Readonly<PortsControls>): void {
   grow(L.links, L.n);
   for (const p of L.thrusters) { const room = L.cap[p] - e.held[p]; e.held[p] += room < L.rate[p] ? (room > 0 ? room : 0) : L.rate[p]; }
   const active = ctl.active;
@@ -1106,7 +1106,7 @@ export function portsSwitchFeeds(L: PortsLayout, e: PortsState, part = -1): void
   for (const s of L.selectors) if (part < 0 || s === part) e.flags[s] ^= PF_SEL;
 }
 /** Empty every feed buffer and line (what was in them is lost) */
-export function portsPurge(L: PortsLayout, e: PortsState): void {
+function portsPurge(L: PortsLayout, e: PortsState): void {
   for (let p = 0; p < L.n; p++) if (L.role[p] !== P_TANK) { e.amt[p] = 0; e.mat[p] = 0; }
 }
 

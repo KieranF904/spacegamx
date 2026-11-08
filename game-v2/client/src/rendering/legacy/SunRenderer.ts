@@ -912,7 +912,7 @@ export function sunProgram(sunStyle: number, coronaStyle: number): GlProgram {
 }
 
 /** Whether this is one of the suns' programs */
-export const isSunProgram = (p: GlProgram) => [...programs.values()].includes(p);
+const isSunProgram = (p: GlProgram) => [...programs.values()].includes(p);
 
 export class SunRenderer {
   private container: Container;

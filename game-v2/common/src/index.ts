@@ -26,7 +26,6 @@ export * from './network/cursorState.js';
 export * from './network/Transport.js';
 
 // Networking utilities
-export * from './networking/index.js';
 export * from './network/stateHash.js';
 
 // Constants

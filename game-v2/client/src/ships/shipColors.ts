@@ -10,7 +10,7 @@ export const FUNCTION_COLORS: Record<string, number> = Object.fromEntries(
   SHIP_FUNCTIONS.filter((f) => f.color).map((f) => [f.id, hexToNum(f.color!)]),
 );
 
-export const FLOW_COLOR = 0xffb547;
+const FLOW_COLOR = 0xffb547;
 export const CONNECTOR_COLOR = 0x5fd4c4;
 
 export function functionColor(fn: string): number {

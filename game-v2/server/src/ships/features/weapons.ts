@@ -45,6 +45,6 @@ export function tickWeaponHooks(b: WeaponBridge, eid: number, ship: ShipState, p
 }
 
 /** TESTS ONLY: forget the flattened hooks (after setPlanForTests) */
-export function resetWeaponHooksForTests(): void {
+function resetWeaponHooksForTests(): void {
   compiled = undefined;
 }

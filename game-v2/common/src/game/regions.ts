@@ -8,7 +8,7 @@
 import type { StarSystemData, SystemRegionData } from '../data/schemas.js';
 import { dhypot } from '../math/detTrig.js';
 
-export type RegionDanger = SystemRegionData['danger'];
+type RegionDanger = SystemRegionData['danger'];
 
 /** The band a point is in (past the last band's edge: the last band) */
 export function regionAt(sys: Pick<StarSystemData, 'regions'> | undefined, x: number, y: number): SystemRegionData | null {
@@ -36,7 +36,7 @@ export function inSafeSpace(sys: Pick<StarSystemData, 'regions'> | undefined, x:
 }
 
 /** Where a band starts (the previous one's edge) */
-export function regionInner(sys: Pick<StarSystemData, 'regions'> | undefined, id: string): number {
+function regionInner(sys: Pick<StarSystemData, 'regions'> | undefined, id: string): number {
   const list = sys?.regions ?? [];
   const i = list.findIndex((g) => g.id === id);
   return i > 0 ? list[i - 1].outer : 0;

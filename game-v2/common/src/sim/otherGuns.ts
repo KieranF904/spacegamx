@@ -78,7 +78,7 @@ export const GUN_ALT = TRIG_RIGHT;
 
 /** A ship's gun controls on a tick: its triggers and cursor distance (world units, on the 4-unit input grid) */
 export interface GunCtl { bits: number; dist: number }
-export const NO_GUN_CTL: Readonly<GunCtl> = Object.freeze({ bits: 0, dist: 0 });
+const NO_GUN_CTL: Readonly<GunCtl> = Object.freeze({ bits: 0, dist: 0 });
 
 /** What a ship's guns did on a tick, as a fire row carries it: a volley (n shells), a pulse (n 0) or a tell (code) */
 export interface LaneRec { tick: number; part: number; code: number; aimQ: number; aug: 0 | 1; n: number }
