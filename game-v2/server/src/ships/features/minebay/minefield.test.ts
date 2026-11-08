@@ -244,6 +244,81 @@ describe('mine bay: who sets a mine off', () => {
   }, 60_000);
 });
 
+describe('mine bay: the PvP and party rules (the guns own: GameServer.canDamage)', () => {
+  /** A lays a field; B parked near the mine, an enemy ship brought in beside it. Returns what B and the enemy lost */
+  function scene(setup: (w: ReturnType<typeof world>, a: ReturnType<ReturnType<typeof world>['pilot']>, b: ReturnType<ReturnType<typeof world>['pilot']>) => void = () => {}) {
+    const w = world();
+    const a = w.pilot('layer', 40000, 40000);
+    const b = w.pilot('other', 40000, 38000);
+    setup(w, a, b);
+    a.load(12);
+    w.run(2);
+    a.send({ type: 'mineDrop' });
+    w.run(1);
+    const d = of(a.got, 'minesLaid')[0];
+    const rest = minePos(d, 0, d.tick + MINES.slideTicks);
+    w.run(MINES.armTicks + 2);
+    return { w, a, b, d, rest, id0: mineId(a.pid, d.tick, 0) };
+  }
+  const hpOf = (w: ReturnType<typeof world>, eid: number) => { const sh = w.ships.get(eid); if (!sh) return 0; return sh.hp.reduce((t, v) => t + v, 0) + sh.shield; };
+  const live = (w: ReturnType<typeof world>, a: { pid: number }, id: number) => w.field().liveMines(a.pid).some((m) => m.id === id);
+
+  it('outside PvP another pilot never sets a mine off: it stays live, and nothing is hurt', () => {
+    const { w, a, b, rest, id0 } = scene();
+    expect((w.server as any).canDamage(a.pid, b.pid)).toBe(false);
+    const hp0 = hpOf(w, b.pid);
+    for (let k = 0; k < 10; k++) { b.place(rest[0], rest[1]); w.run(1); }
+    expect(live(w, a, id0)).toBe(true);
+    expect(of(a.got, 'minesGone')).toHaveLength(0);
+    expect(of(b.got, 'minesGone')).toHaveLength(0);
+    expect(hpOf(w, b.pid)).toBe(hp0);
+  }, 60_000);
+
+  it('outside PvP a blast an enemy sets off never hurts a pilot standing in it', () => {
+    const { w, a, b, rest, id0 } = scene();
+    const dummy = w.ships.spawnDummy(target(w), rest[0], rest[1] + 300, 0, InSystem.systemId[a.pid]);
+    w.run(1);
+    const ship = w.ships.get(dummy)!;
+    const hp0 = hpOf(w, b.pid), dummy0 = hpOf(w, dummy);
+    for (let k = 0; k < 4; k++) { b.place(rest[0], rest[1]); pin(dummy, rest[0], rest[1] + ship.derived.radius + MINES.triggerReach - 2); w.run(1); }
+    // (it went off, on the enemy, and B was in the blast)
+    expect(live(w, a, id0)).toBe(false);
+    expect(hpOf(w, dummy)).toBeLessThan(dummy0);
+    expect(hpOf(w, b.pid)).toBe(hp0);
+  }, 60_000);
+
+  it('in a PvP zone the other pilot sets it off and is hurt by the funnel; a party mate is neither triggered nor spared by anything the guns would not', () => {
+    const { w, a, b, rest, id0 } = scene((w) => { (w.server as any).inPvpZone = () => true; });
+    expect((w.server as any).canDamage(a.pid, b.pid)).toBe(true);
+    const hp0 = hpOf(w, b.pid);
+    for (let k = 0; k < 3; k++) { b.place(rest[0], rest[1]); w.run(1); }
+    expect(live(w, a, id0)).toBe(false);
+    expect(of(a.got, 'minesGone').some((g) => g.how === 'blast' && g.by === b.pid)).toBe(true);
+    expect(hpOf(w, b.pid)).toBeLessThan(hp0);
+  }, 60_000);
+
+  it('in a PvP zone a party mate does not set it off, and a blast an enemy sets off hurts them exactly as a gun splash would (canDamage)', () => {
+    const { w, a, b, rest, id0 } = scene((w, a, b) => {
+      (w.server as any).inPvpZone = () => true;
+      w.server.party.invite(a.conn, { id: b.pid });
+      w.server.party.respond(b.conn, true);
+      expect(w.server.party.same(a.conn, b.conn)).toBe(true);
+    });
+    const hp0 = hpOf(w, b.pid);
+    for (let k = 0; k < 5; k++) { b.place(rest[0], rest[1]); w.run(1); }
+    expect(live(w, a, id0)).toBe(true);
+    expect(hpOf(w, b.pid)).toBe(hp0);
+    // (an enemy sets it off with B in it: B takes what any splash of the owner takes where canDamage says yes)
+    const dummy = w.ships.spawnDummy(target(w), rest[0], rest[1] + 300, 0, InSystem.systemId[a.pid]);
+    w.run(1);
+    const ship = w.ships.get(dummy)!;
+    const may = (w.server as any).canDamage(a.pid, b.pid) as boolean;
+    for (let k = 0; k < 3; k++) { b.place(rest[0], rest[1]); pin(dummy, rest[0], rest[1] + ship.derived.radius + MINES.triggerReach - 2); w.run(1); }
+    expect(live(w, a, id0)).toBe(false);
+    expect(hpOf(w, b.pid) < hp0).toBe(may);
+  }, 60_000);
+});
+
 describe('mine bay: the field', () => {
   it('the cap fizzles the oldest mines first', () => {
     const w = world();

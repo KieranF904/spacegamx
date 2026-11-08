@@ -56,6 +56,8 @@ export interface PilotHost {
   spawnWreck?(systemNum: number, x: number, y: number, vx: number, vy: number, items: Bag, key: string, seconds: number): number;
   /** In the system's safe space (inner Sol) */
   safeAt?(systemNum: number, x: number, y: number): boolean;
+  /** The pilot's ship record changed what their hangar view shows (a part the bank built in): send the hangar again */
+  hangarChanged?(conn: PilotConn): void;
 }
 
 /**
@@ -986,6 +988,8 @@ export class Pilots {
       for (const uid of uids) this.ships.installGhost(eid, uid);
     }
     s.dirty = true;
+    // (The hangar and station windows read the record, not the ship: the parts built in must leave their missing list)
+    this.host.hangarChanged?.(s.conn);
     if (!s.profile.ship.owed?.length) this.toast(s.conn, 'Your repair bank has rebuilt your ship', 'good');
   }
 

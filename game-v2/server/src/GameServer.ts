@@ -1341,6 +1341,7 @@ this.devTeleport = opts.devTeleport ?? false;
       tick: () => this.currentTick,
       send: (conn, msg) => this.send((conn as ClientConnection).ws, msg),
       stationInRange: (eid) => this.stationInRange(eid),
+      hangarChanged: (conn) => this.hangar?.send(conn as ClientConnection),
       stationEntity: (id) => {
         const num = this.gameData.getStationNum(id);
         for (const st of stationQuery(this.world)) if (Station.stationId[st] === num) return st;

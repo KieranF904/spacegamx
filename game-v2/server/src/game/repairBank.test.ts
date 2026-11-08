@@ -292,6 +292,48 @@ describe('deposits rebuild over time', () => {
     const live = w.ships.get(w.pid)!;
     expect(live.derived.alive.every(Boolean)).toBe(true);
   });
+
+  it('the hangar view follows: parts built in while the pilot flies are sent again, not left missing', () => {
+    const w = world();
+    const p = w.profile();
+    p.bank!.free = {};
+    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
+    w.server.pilots.reapplyShip(w.conn);
+    park(w.pid);
+    w.server.hangar.send(w.conn as any); // (the pilot has the hangar as the death left it)
+    const ghostsSent = () => {
+      const h = [...w.got].reverse().find((m) => m.type === 'hangar') as Extract<ServerMessage, { type: 'hangar' }> | undefined;
+      return h?.slots[w.profile().activeSlot]?.ghosts ?? [];
+    };
+    expect(w.profile().ship.owed!.length).toBeGreaterThan(0);
+    expect(ghostsSent().length).toBeGreaterThan(0);
+    // (the free part refills and pays the owed parts: the view must drop them from the missing list)
+    w.clock.t += BANK.refillSeconds * 1000 + 1000;
+    steps(w.server, 30);
+    expect(w.profile().ship.ghosts).toEqual([]);
+    expect(ghostsSent()).toEqual([]);
+  });
+
+  it('the same for parts the deposits build', () => {
+    const w = world();
+    const p = w.profile();
+    p.bank!.free = {};
+    p.bank!.deposits = { alloy_plate: 400, copper_wire: 400, iron_plate: 400 };
+    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
+    w.server.pilots.reapplyShip(w.conn);
+    park(w.pid);
+    w.server.hangar.send(w.conn as any); // (the pilot has the hangar as the death left it)
+    const ghostsSent = () => {
+      const h = [...w.got].reverse().find((m) => m.type === 'hangar') as Extract<ServerMessage, { type: 'hangar' }> | undefined;
+      return h?.slots[w.profile().activeSlot]?.ghosts ?? [];
+    };
+    const n0 = w.profile().ship.owed!.length;
+    let ticks = 0;
+    while (w.profile().ship.owed && w.profile().ship.owed!.length === n0 && ticks++ < 4000) steps(w.server, 15);
+    const owedNow = w.profile().ship.owed?.length ?? 0;
+    expect(owedNow).toBeLessThan(n0);
+    expect(ghostsSent().length).toBe(w.profile().ship.ghosts!.length);
+  }, 120_000);
 });
 
 describe('passing a station', () => {
