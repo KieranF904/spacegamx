@@ -75,6 +75,8 @@ export interface HangarHost {
   mountingBroken: Map<number, MountingProblem[]>;
   ports: PortsGrid;
   mouse: Vec2 | null;
+  paletteHover: { fn: string; piece: string; material: string } | null;
+  handTurn(): { rot: 0 | 1 | 2 | 3; flip: boolean };
   stats: HTMLDivElement;
   designSig: string;
   loadSelect: HTMLSelectElement;

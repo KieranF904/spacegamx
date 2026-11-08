@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar.draw
  * owns:       one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost
- * needs:      HangarHost, hangarOverlays; npm: @space-game/common
+ * needs:      HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common
  * invariants: layer order is grid, turret arcs, parts, mounting, groups, overlays, ghost — none pinned
  * extend:     a new overlay is one block in draw() and one toggle in HangarHost.overlays
  */
@@ -13,6 +13,7 @@ import { weaponMount } from '../modelCards';
 import { gradeGlow, partColors } from '../hullPreview2d';
 import { HangarLitView } from '../HangarLitView';
 import { drawDecor2d } from '../partDecor';
+import { drawPlacedMarks, drawHandMarks, drawHoverCover } from './hangarMarks';
 import type { HangarHost } from './host';
 
 function arrow(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number): void {
@@ -100,8 +101,8 @@ export function draw(host: HangarHost): void {
     }
     // Guns' barrels (the hull draws the rest of its hardware); a ghost's all of it, faint
     drawDecor2d(ctx, g, (x, y) => [sx(x), sy(y)], px, ghost ? 0.35 : 1, gradeGlow(look.grade), !ghost);
-    if (p.facing) host.drawFacing(g, p.facing as Side, sx, sy);
   });
+  drawPlacedMarks(host, sx, sy);
   // Guns that break their mounting rules (a ship fitted before a rule changed), engines with a blocked exhaust: what's wrong, in red
   host.geoms.forEach((g, i) => {
     const broken = host.mountingBroken.get(i);
@@ -162,6 +163,7 @@ if (d && host.overlays.com && d.mass > 0) {
     ctx.beginPath(); ctx.moveTo(X - 11, Y); ctx.lineTo(X + 11, Y); ctx.moveTo(X, Y - 11); ctx.lineTo(X, Y + 11); ctx.stroke();
   }
 
+  drawHoverCover(host, sx, sy);
   // Ghost
   if (host.mouse && !host.ports.hovering) {
     const cand = host.candidate(host.mouse);
@@ -174,7 +176,7 @@ if (d && host.overlays.com && d.mass > 0) {
       ctx.strokeStyle = problem ? '#ef4444' : '#5fd4c4';
       ctx.lineWidth = 2;
       ctx.stroke();
-      if (cand.facing) host.drawFacing(g, cand.facing, sx, sy);
+      drawHandMarks(host, cand, g, sx, sy, !!problem);
       // Its mounting rules: the edge it bolts on at, the cells its barrel needs clear
       if (cand.facing) host.drawMounting(g, host.candidateMounting(cand, g), sx, sy, true);
       if (cand.facing && host.overlays.arcs && weaponMount(host.deps.catalog, cand) === 'turret') {

@@ -90,6 +90,8 @@ export class HangarUI implements HangarHost {
   /** A middle-button drag in progress: where it started (screen, view, grid), and whether it's moved enough to be a pan */
   private pan: { x: number; y: number; cx: number; cy: number; at: Vec2; moved: boolean } | null = null;
   mouse: Vec2 | null = null;
+  /** The part the mouse is over in the parts list (for the shield cover preview, hangarMarks.ts) */
+  paletteHover: { fn: string; piece: string; material: string } | null = null;
   overlays: Record<Overlay, boolean> = { energy: true, connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
   /** The energy overlay of a ports design (portsOverlay.ts): its layer, the load test it shows, and the port under the mouse */
   ports = new PortsGrid();
@@ -206,6 +208,7 @@ export class HangarUI implements HangarHost {
       catalog: deps.catalog, tuning: deps.tuning, econ: deps.econ,
       sel: () => this.sel,
       changed: () => this.draw(),
+      hoverPart: (p) => { if (p?.fn === this.paletteHover?.fn && p?.piece === this.paletteHover?.piece) return; this.paletteHover = p; this.draw(); },
       remaining: (id) => this.remaining(id),
       canMake: (id) => this.deps.canMake(id),
       have: (id) => this.deps.have(id),
@@ -811,5 +814,6 @@ export class HangarUI implements HangarHost {
 
   drawMounting(g: PlacedGeom, broken: MountingProblem[], sx: (x: number) => number, sy: (y: number) => number, all: boolean): void { return drawMounting(this, g, broken, sx, sy, all); }
 
+  handTurn(): { rot: Rot; flip: boolean } { return { rot: this.sel.rot, flip: this.sel.flip }; }
   drawFacing(g: PlacedGeom, side: Side, sx: (x: number) => number, sy: (y: number) => number): void { return drawFacing(this, g, side, sx, sy); }
 }
