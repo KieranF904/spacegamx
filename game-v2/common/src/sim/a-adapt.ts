@@ -14,7 +14,7 @@ import type { ShipDerived } from '../ships/rebuild.js';
 import type { ShipState } from '../ships/state.js';
 import type { FlightInputSource } from '../ships/flightInputs.js';
 import { buildFlightInputs, newFlightControls } from '../ships/flightInputs.js';
-import { controlBits, ReplicaMode } from '../ships/replica.js';
+import { controlBits, ReplicaMode } from '../ships/replicaControls.js';
 import { FULL_CHARGE } from '../ships/energy.js';
 import { dequantizeCursorAngle } from '../network/cursorState.js';
 import { copyGunScalars, newGunState, type GunState, type SimShipState, type SimStructure } from './state.js';

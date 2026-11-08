@@ -24,7 +24,7 @@
  */
 
 import type { FlightBody } from '../ships/flight.js';
-import type { ReplicaMode } from '../ships/replica.js';
+import type { ReplicaMode } from '../ships/replicaControls.js';
 import { copyGunScalars, type SimShipState } from './state.js';
 import { shipHash } from './ring.js';
 

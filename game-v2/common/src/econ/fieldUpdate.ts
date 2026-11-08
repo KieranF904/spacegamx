@@ -16,10 +16,16 @@
 import type { Blueprint } from '../ships/types.js';
 import type { Economy } from './economy.js';
 import type { PlayerProfile, ShipRecord, StarterKit } from './profile.js';
-import { setActiveShip } from './profile.js';
 import { bankCap, newBank } from './field/bank.js';
 import { removeFrom, type Bag } from './stacks.js';
 import { unlocks } from './unlocks.js';
+
+/** Keep `ship` and the active hangar slot the same record */
+export function setActiveShip(p: PlayerProfile, rec: ShipRecord, slot = p.activeSlot): void {
+  p.activeSlot = slot;
+  p.hangar[slot] = rec;
+  p.ship = rec;
+}
 
 /**
  * The retired kits, bonds and what each was crafted from (their recipes are gone from data/recipes.json; this table is

@@ -36,7 +36,7 @@ import { withEmp } from '../ships/hazards.js';
 import { withNumb, warmthStage, type WarmthStage } from '../ships/warmth.js';
 import { gunLoadTick, FULL_CHARGE } from '../ships/energy.js';
 import { stepDebrisBody } from '../ships/debris.js';
-import { ReplicaMode } from '../ships/replica.js';
+import { ReplicaMode } from '../ships/replicaControls.js';
 import { cloneSimShip, type SimShipState } from './state.js';
 import { simControls, type SimInput } from './input.js';
 import type { SimEnv, StepResult } from './env.js';

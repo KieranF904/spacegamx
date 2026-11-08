@@ -23,7 +23,7 @@ import { eventKey, type SimEvent } from './events.js';
 import { StateRing, shipHash } from './ring.js';
 import { runTick, type PhaseTable } from './phases.js';
 import { stepShip } from './step.js';
-import { ReplicaMode } from '../ships/replica.js';
+import { ReplicaMode } from '../ships/replicaControls.js';
 
 /** What a scenario's own phases get each tick */
 export interface HarnessTick {

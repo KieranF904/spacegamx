@@ -13,7 +13,7 @@ import type { FunctionDef } from '../types.js';
 import type { DeriveCtx, DescribeCtx, Fact, FlightHook, FlightPhase, InputDef, LoadShip, PartFeature, ReplicaField, ReplicaWhere, WeaponRole } from './types.js';
 import type { PowerLayout } from '../circuits.js';
 import type { ShipDerived } from '../rebuild.js';
-import { FEATURES } from './registry.js';
+import { FEATURES } from './registry.js'; // cycle-ok: read only inside getPlan(), never at module load; the features import the core that imports this file
 import WIRE from './features.wire.json' with { type: 'json' };
 
 /** How many part-feature values the pilot row carries after its charge groups (features.wire.json pilotExtra): the gun-state slot follows them (guns.ts gunStateAt) */

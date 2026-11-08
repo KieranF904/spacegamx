@@ -17,7 +17,7 @@ import type { Charge } from '../ships/energy.js';
 import type { ShipDerived } from '../ships/rebuild.js';
 import type { ShipState } from '../ships/state.js';
 import type { PortsState } from '../ships/power/ports.js';
-import { ReplicaMode } from '../ships/replica.js';
+import { ReplicaMode } from '../ships/replicaControls.js';
 
 /** The ship's structure: shared by reference by every copy of its state, replaced (not mutated) at a rebuild */
 export interface SimStructure {

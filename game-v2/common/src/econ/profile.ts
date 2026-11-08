@@ -19,7 +19,10 @@ import type { TraceLedger } from './traces.js';
 import type { Outpost } from './outpost.js';
 import type { ShipLoadout } from './loadout.js';
 import type { Economy } from './economy.js';
-import { fieldUpdate } from './fieldUpdate.js';
+import { fieldUpdate, setActiveShip } from './fieldUpdate.js';
+
+// (setActiveShip lives in fieldUpdate.ts so that file need not import this one)
+export { setActiveShip };
 import { designUpdateShips, fingerprint, type DesignUpdate, type DesignUpdateReport } from './designUpdate.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import { cleanBank, type RepairBank } from './field/bank.js';
@@ -269,13 +272,6 @@ export function newProfile(kit: StarterKit, now = new Date().toISOString()): Pla
   };
   p.hangar = [p.ship, ...Array.from({ length: unlocks(p).hangarSlots - 1 }, () => null)];
   return p;
-}
-
-/** Keep `ship` and the active hangar slot the same record */
-export function setActiveShip(p: PlayerProfile, rec: ShipRecord, slot = p.activeSlot): void {
-  p.activeSlot = slot;
-  p.hangar[slot] = rec;
-  p.ship = rec;
 }
 
 const validRecord = (s: unknown): s is ShipRecord =>

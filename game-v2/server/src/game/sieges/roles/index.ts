@@ -23,8 +23,5 @@ export interface SiegeRole {
 
 export const ROLES: Record<string, SiegeRole> = { artillery, escort, runner, sapper };
 
-/** The bastion's place */
-export function bastionAt(run: Run): { x: number; y: number } {
-  const b = run.sys.surface!.bastion!;
-  return { x: b.x, y: b.y };
-}
+// (bastionAt is its own file: the roles import it, and this file imports them)
+export { bastionAt } from './bastion.js';

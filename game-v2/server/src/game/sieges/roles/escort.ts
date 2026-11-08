@@ -1,7 +1,8 @@
 /** An escort: flies with the biggest ship of its front (a boss first) and fights round it; when that falls it goes for the bastion */
 
 import { SECOND } from '../rules.js';
-import { bastionAt, type SiegeRole } from './index.js';
+import type { SiegeRole } from './index.js';
+import { bastionAt } from './bastion.js';
 
 export const escort: SiegeRole = {
   id: 'escort',

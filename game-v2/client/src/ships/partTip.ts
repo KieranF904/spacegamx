@@ -9,7 +9,10 @@
 import {
   Catalog, Economy, FunctionDef, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
   partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, loadTest, gunDrawFlatOut, circuitTuning, partDischarge, partIntake, bankKind, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
-import { costHtml } from '../ui/windowKit';
+import { costHtml, resistText } from '../ui/windowKit';
+
+// (resistText lives in windowKit so that file need not import this one)
+export { resistText };
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
 import { tipRows } from './describe';
@@ -78,18 +81,6 @@ export const PART_TIP_CSS = `position:fixed; z-index:2100; pointer-events:none; 
 
 function row(k: string, v: string): string {
   return `<div style="display:flex; justify-content:space-between; gap:12px; padding:2px 0; border-bottom:1px solid #18223a"><span style="color:#8ea0bd">${k}</span><b style="color:#e5ecf7; font-weight:600; text-align:right">${v}</b></div>`;
-}
-
-/**
- * What a material takes more or less of: "Kinetic −15% · Energy +20%" (green
- * where it shrugs some off, red where it takes more)
- */
-export function resistText(r: Partial<Record<DamageType, number>> | undefined): string {
-  if (!r) return '';
-  return Object.entries(r).map(([t, v]) => {
-    const pct = Math.round((v! - 1) * 100);
-    return `<span style="color:${pct < 0 ? '#86efac' : '#fca5a5'}">${DAMAGE_NAMES[t as DamageType]} ${pct > 0 ? '+' : '−'}${Math.abs(pct)}%</span>`;
-  }).join(' · ');
 }
 
 /** "damage +20% · burst +1 · ignite" */

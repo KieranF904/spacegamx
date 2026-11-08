@@ -101,13 +101,8 @@ export interface ClientInputMessage {
 /** A body check as it rides an input (CAPS.BODIES) */
 export interface BodyCheck { hash: number; tick: number }
 
-/** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
-export const CURSOR_DIST_STEP = 4;
-export const CURSOR_DIST_MAX = 200000; // far enough to aim a jump (16 bits at 4-unit steps)
-
-export function quantizeCursorDist(d: number): number {
-  return Math.round(Math.max(0, Math.min(CURSOR_DIST_MAX, d)) / CURSOR_DIST_STEP);
-}
+import { CURSOR_DIST_STEP, CURSOR_DIST_MAX, quantizeCursorDist } from './cursorDist.js';
+export { CURSOR_DIST_STEP, CURSOR_DIST_MAX, quantizeCursorDist };
 
 export interface ClientPingMessage {
   type: 'ping';
