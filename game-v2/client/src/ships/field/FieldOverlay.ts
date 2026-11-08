@@ -179,14 +179,16 @@ export class FieldOverlay {
       catalog: deps.catalog, tuning: deps.tuning, econ: deps.econ,
       sel: () => this.hand,
       changed: () => { /* the hand is drawn each frame */ },
-      // (A plan is free: any part can be planned. Building it is what takes materials, and the fabricator's tier decides what it can make)
-      remaining: () => Infinity,
+      // (A plan is free: any part can be planned. Building it is what takes materials, and the fabricator's tier decides what it can make.
+      // A finished part in the hold is built from there: only attaching it. The list shows each part's cost, not "free")
+      remaining: (id) => deps.have(id),
       canMake: (id) => deps.canMake(id),
       have: (id) => deps.have(id),
       level: () => deps.level(),
       learned: () => deps.learned(),
       owned: () => ({}),
       free: () => true,
+      fieldBuild: true,
       freeBuild: () => false,
       grantAll: () => false,
       partTip: () => {},
@@ -390,7 +392,10 @@ export class FieldOverlay {
       }
     }
     this.footer();
+    // (the parts list shows costs against the hold, which moves as you fly: look every few frames)
+    if (this.pal && ++this.frames % 15 === 0 && this.pal.stale()) this.pal.render();
   }
+  private frames = 0;
 
   private footer(): void {
     const d = this.draft;

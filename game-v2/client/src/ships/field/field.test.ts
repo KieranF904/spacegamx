@@ -5,13 +5,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MACHINE_FAB, MACHINE_REF, parseBlueprint, validateBlueprint, partItemId, jobAt } from '@space-game/common';
+import { Economy, MACHINE_FAB, MACHINE_REF, parseBlueprint, validateBlueprint, partItemId, jobAt } from '@space-game/common';
 import type { Blueprint, Charge, FieldJob, MachineBlock, MachineView, ShipTuning } from '@space-game/common';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../../../common/src/ships/testData';
 import { HANDLERS } from '../../app/serverMessages';
 import { FieldClient, machineClock, machineJob, machineProgress } from './fieldState';
 import { blockText, jobText, machineName, machineStatus } from './fieldText';
-import { pickMessage, shortLine } from './FieldHud';
+import { pickMessage, refineChoices, shortLine } from './FieldHud';
 import { addPart, candidate, openDraft, partAtPoint, placementProblem, planChanged, planDiff, planTarget, removePart, targetErrors } from './plan';
 
 const catalog = testCatalog();
@@ -242,5 +242,26 @@ describe('build overlay plan', () => {
     const g = partAtPoint(catalog, d, [live.parts[leaf].x + 0.5, live.parts[leaf].y + 0.5]);
     expect(g).toBeGreaterThanOrEqual(0);
     expect(partItemId(d.bp.parts[g])).toBeTypeOf('string');
+  });
+});
+
+describe("the refiner's recipe picker", () => {
+  const dataFile = (f: string) => JSON.parse(readFileSync(join(SHIP_DATA_DIR, '..', f), 'utf-8'));
+  const econ = new Economy(dataFile('items.json'), dataFile('recipes.json'), catalog, {});
+
+  it('lists only recipes this refiner tier can run and the pilot has opened', () => {
+    const core = refineChoices(econ, 0, 99);
+    expect(core).toContain('alloy_plate');
+    expect(core).not.toContain('steel_plate');
+    expect(refineChoices(econ, 1, 99)).toContain('steel_plate');
+    expect(refineChoices(econ, 1, 99)).not.toContain('titanium_plate');
+    expect(refineChoices(econ, 3, 99)).toContain('neutronium_plate');
+    // A recipe the pilot's level hasn't opened is left out, whatever the tier
+    const gated = [...econ.recipes.refining.values()].find((r) => (r.level ?? 0) > 1 && refineChoices(econ, 3, 99).includes(r.id));
+    if (gated) {
+      expect(refineChoices(econ, 3, 99)).toContain(gated.id);
+      expect(refineChoices(econ, 3, (gated.level ?? 0) - 1)).not.toContain(gated.id);
+    }
+    for (const id of refineChoices(econ, 2, 99)) expect(econ.recipes.refining.has(id)).toBe(true);
   });
 });
