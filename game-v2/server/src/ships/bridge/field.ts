@@ -1,4 +1,15 @@
 /**
+ * @contract server.ships.bridge.field
+ * owns:       field refit: a flying ship takes a new design keeping HP, gun state and port contents; new parts arrive
+ *             as ghosts
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new thing a refit must keep is carried in the remap here
+ */
+
+/**
  * ShipBridge field refit: a pilot's ship takes a new design while it flies (docs/design/field-fabrication.md 5.1: a
  * field plan saved, a recycled part taken off). Unlike a hangar save (rebuild.ts respawnInPlace) nothing is reset:
  * each part that stays (same uid) keeps its HP, its guns' state and what its ports held (power/ports.ts

@@ -1,4 +1,16 @@
 /**
+ * @contract protocol.contributor
+ * owns:       the contributor-note messages: pin, edit and remove notes and shapes on the map (rank, ownership and
+ *             limits are checked on the server)
+ * needs:      type-only import of world/contributorNotes
+ * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
+ *             name — server/src/golden/structure.test.ts
+ * extend:     a new message is an interface plus a member of this area's client / server union below; then its
+ *             handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * Contributor notes (world/contributorNotes.ts): contributors and admins pin
  * notes and shapes to the map. Every op is checked on the server
  * (server/src/game/ContributorNotes.ts): rank, ownership, limits, rate.

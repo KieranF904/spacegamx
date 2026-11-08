@@ -1,4 +1,17 @@
 /**
+ * @contract feature.minebay.common
+ * owns:       the Mine Bay part feature, shared half: each working bay mouth, way out and model numbers
+ *             (derived.fx.minebay) and the card facts
+ * needs:      PartFeature, minebay/minebay.ts (MINES, mineBayOf)
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/minebay/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/minebay/contract.test.ts
+ * extend:     a new rebuild result or card fact is a field in derive / describe below; a new wire slot is appended in
+ *             features.wire.json (npm run wire:sync)
+ */
+
+/**
  * The Mine Bay as a part feature (features/README.md; its rules: minebay.ts; docs/design/groups-mines-docking.md).
  * Shared half: what a rebuild derives (`derived.fx.minebay`: each working bay's mouth, way out and model numbers) and
  * the facts a card shows. Not a weapon: no WeaponInfo, never aimed, never fired by the triggers or a weapon group. No

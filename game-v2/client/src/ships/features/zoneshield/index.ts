@@ -1,4 +1,13 @@
 /**
+ * @contract feature.zoneshield.client
+ * owns:       the shaped shields client half: reads shield fill into the ship copy and draws each live shield
+ * needs:      ClientFeature, pixi.js, common getPlan / shapedLevel / unpackShaped, ShapedView
+ * invariants: its keys, parsers, drawers and chips run in feature id order and the first key user wins —
+ *             client/src/ships/features/host.test.ts
+ * extend:     a new behaviour is a method on the instance created below (FeatureInstance hooks, types.ts)
+ */
+
+/**
  * Shaped shields' client half (shared half: common/src/ships/features/zoneshield). It reads how full each shield is (the pilot's
  * own row, or the status row others get: features.wire.json "shaped") into the ship's copy, so the hit rules and the
  * schematic see the same shields the server does, and draws each live one: a glowing line or arc with a bright edge (quick

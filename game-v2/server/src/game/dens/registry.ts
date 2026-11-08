@@ -1,3 +1,12 @@
+/**
+ * @contract server.dens.registry
+ * owns:       den features by kind (systems.json den[].kind)
+ * needs:      DenFeatureData (common), DenFactory (dens/types), the den feature modules
+ * invariants: the kiln den works through its kind — none pinned
+ * extend:     a new den kind is a module and one entry in DEN_KINDS (tsc fails if a kind of DenFeatureData has no
+ *             entry)
+ */
+
 /** Den features by kind (systems.json `den[].kind`): a new kind is a module and a line here */
 
 import type { DenFeatureData } from '@space-game/common';

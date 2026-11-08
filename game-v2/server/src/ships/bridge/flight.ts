@@ -1,4 +1,17 @@
 /**
+ * @contract server.ships.bridge.flight
+ * owns:       how bodies move: the pilot's movement step, the end-of-tick step, contacts, the broadphase and sleeping
+ *             ships
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ *             the server step, the client prediction and the replica agree bit for bit on the golden scenarios —
+ *             server/src/golden/parity.test.ts
+ * extend:     a new per-tick body behaviour is a step in tick() with its place in the golden tick order
+ */
+
+/**
  * ShipBridge flight: how bodies move. A pilot's movement step (stepMovement), the end-of-tick step (tick: pilotless
  * motion, shields, contacts, event horizons, part deaths and blasts, station repair, rebuilds, rounding), contacts
  * between bodies (resolveContacts, worldPieces, damageContact), the broadphase (addToSpatialGrid), and distant ships

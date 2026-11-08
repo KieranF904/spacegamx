@@ -1,4 +1,18 @@
 /**
+ * @contract feature.clamp.common
+ * owns:       the Docking Clamps part feature, shared half: what a rebuild derives (derived.fx.clamp) and the card
+ *             facts
+ * needs:      PartFeature (features/types.ts), clamp/clamp.ts for the numbers; nothing imported at module scope that
+ *             runs on load
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/clamp/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/clamp/contract.test.ts
+ * extend:     a new rebuild result or card fact is a field in derive / describe below; a new wire slot is appended in
+ *             features.wire.json (npm run wire:sync)
+ */
+
+/**
  * Docking Clamps as a part feature (features/README.md; their rules: clamp.ts; docs/design/groups-mines-docking.md).
  * Shared half: what a rebuild derives (`derived.fx.clamp`: each working clamp's mouth, way out and size) and the facts
  * a card shows. Locking, swapping who steers and undocking are decisions (network/clampProtocol.ts) the server takes

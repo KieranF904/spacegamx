@@ -1,4 +1,18 @@
 /**
+ * @contract server.net.dispatch
+ * owns:       client message dispatch: the drops and limits every message passes, and the one handler per message
+ *             type
+ * needs:      @space-game/common ClientMessage (type), ServerCtx and ClientConnection (type-only); nothing from
+ *             GameServer at runtime
+ * invariants: the handler table is exactly the pinned set of client types — server/src/net/dispatch.test.ts
+ *             non-messages, pre-join and rate-limited messages are dropped; a second handler for a type is refused —
+ *             server/src/net/dispatch.test.ts
+ *             nothing under net/ imports GameServer at runtime — server/src/net/dispatch.test.ts
+ * extend:     a new client message is a handler registered with t.on(type, ...) in an area file under net/handlers;
+ *             PRE_JOIN is the only list to touch here
+ */
+
+/**
  * Client message dispatch: the drops and limits every message goes through, then one handler per message type from
  * a table built once (GameServer.buildMessageHandlers; later cuts register areas from net/handlers/*).
  *

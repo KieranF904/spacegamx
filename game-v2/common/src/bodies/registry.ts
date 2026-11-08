@@ -1,4 +1,17 @@
 /**
+ * @contract bodies.registry
+ * owns:       the bodies there are, by the brain that decides for them; the index is the body kind on the wire (a
+ *             SYNC's first arg)
+ * needs:      bodies/stagedFlight, aiPilot, decisions
+ * invariants: a snapshot's decisions come back as they went, in the base and bit-packed formats —
+ *             common/src/bodies/bodies.test.ts
+ *             the AI pilot is pure of its inputs and its orders go through a SYNC as whole numbers —
+ *             common/src/bodies/bodies.test.ts
+ * extend:     a new body is a module and a line at the END of the registry (the index is wire format), never a branch
+ *             in ship code
+ */
+
+/**
  * The bodies there are (docs/design/decision-inputs.md 4.1), by the brain that decides for them (bosses.json `brain`;
  * `ai`: the enemy AI's commander, server/src/game/Enemies.ts): a ship with an entry here is flown by its body on both
  * sides once its brain has turned it on. Adding a body is a module and a line here, never a branch in the server's or

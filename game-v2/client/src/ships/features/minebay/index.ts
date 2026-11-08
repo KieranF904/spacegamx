@@ -1,4 +1,13 @@
 /**
+ * @contract feature.minebay.client
+ * owns:       the Mine Bay client half: drop key, magazine chip, mines drawn from drops, predicted blasts
+ * needs:      ClientFeature, common MINES / mineFindable, mines.ts, MinesLayer, MineChip
+ * invariants: its keys, parsers, drawers and chips run in feature id order and the first key user wins —
+ *             client/src/ships/features/host.test.ts
+ * extend:     a new behaviour is a method on the instance created below (FeatureInstance hooks, types.ts)
+ */
+
+/**
  * The Mine Bay's client half (shared half: common/src/ships/features/minebay; docs/design/groups-mines-docking.md,
  * package M): the drop key (Digit0, "Drop mines"), the magazine chip, and the mines drawn from their drops (mines.ts,
  * MinesLayer.ts): blasts predicted against the ships as drawn, found on each searched window (onWindow), and told.

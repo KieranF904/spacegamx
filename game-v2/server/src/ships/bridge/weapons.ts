@@ -1,4 +1,15 @@
 /**
+ * @contract server.ships.bridge.weapons
+ * owns:       what a ship's guns do each tick: firing, beams, the casts a beam or shot meets, a projectile's hit on a
+ *             ship, targets and damage scaling
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new weapon behaviour is a weapon role of a part feature (ships/features), not a branch here
+ */
+
+/**
  * ShipBridge weapons: what a ship's guns do each tick. Firing (stepWeapons, fireWeapons, pulses, miners), beams
  * (fireBeam, beamFrom; the Repair Beam and point defence are weapon roles of features/support), the casts that find what a beam or shot meets (alongBeam,
  * segmentHit, castShip, cover, partAt), a projectile's hit on a ship (hitProjectile), targets, and damage scaling.

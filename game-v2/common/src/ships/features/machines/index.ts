@@ -1,4 +1,17 @@
 /**
+ * @contract feature.machines.common
+ * owns:       the fabricator and refiner part feature, shared half: which part is each and its tier
+ *             (derived.fx.machines) and the card facts
+ * needs:      PartFeature, machines/machines.ts (machineOf, machineWords)
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/machines/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/machines/contract.test.ts
+ * extend:     a new rebuild result or card fact is a field in derive / describe below; a new wire slot is appended in
+ *             features.wire.json (npm run wire:sync)
+ */
+
+/**
  * The field machines as a part feature (features/README.md; their numbers: econ/field/rules.ts, and machines.ts): the
  * fabricator (builds, repairs, attaches and recycles parts from the hold) and the refiner (refines the hold's ore).
  * Shared half: what a rebuild derives (`derived.fx.machines`: which part is each, and its tier) and the facts a card

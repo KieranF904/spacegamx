@@ -1,4 +1,15 @@
 /**
+ * @contract network.input-compact-tables
+ * owns:       the compact input's constants: flag byte, group bits, key and mode lists, aim grids (the codec is
+ *             inputCompact.ts)
+ * needs:      no imports at all, so protocol.ts can hash compactInputTables() into wireTables()
+ * invariants: a compact input decodes to the same input as the base layout across the groups —
+ *             common/src/network/inputCompact.test.ts
+ * extend:     a new input group is a CI_* constant here and a case in inputCompact.ts; any change here is a wire
+ *             change (npm run wire:bump)
+ */
+
+/**
  * The compact input's constants (CAPS.INPUTS, protocol 35; the codec is inputCompact.ts). No imports: protocol.ts
  * hashes compactInputTables() into wireTables(), so a change here needs `npm run wire:bump`.
  *

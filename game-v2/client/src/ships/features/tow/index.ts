@@ -1,4 +1,13 @@
 /**
+ * @contract feature.tow.client
+ * owns:       the Tow Beam client half: key, pilot row reads, tether drawing, HUD chip
+ * needs:      ClientFeature, pixi.js, common canTow / cargoThrust / getPlan, TowIndicator, tether
+ * invariants: its keys, parsers, drawers and chips run in feature id order and the first key user wins —
+ *             client/src/ships/features/host.test.ts
+ * extend:     a new behaviour is a method on the instance created below (FeatureInstance hooks, types.ts)
+ */
+
+/**
  * The Tow Beam's client half (shared half: common/src/ships/features/tow): its key, what it reads from the pilot's row,
  * the tether it draws, and its HUD chip.
  */

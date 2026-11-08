@@ -1,4 +1,17 @@
 /**
+ * @contract power.ports-core
+ * owns:       the ports energy core: layout built per rebuild, per-tick offer / accept / apply across shared edges,
+ *             feed layer (tanks, pipes, selectors, combiners), integer eu
+ * needs:      common/ships types, tuning, catalog (transformPoint, SIDE_NORMAL), grades, power/units
+ * invariants: the reference ships feed every consumer, share power and burn their feeds as designed —
+ *             common/src/ships/power/ports.test.ts
+ *             feature parts (strafer, gyro, machines) draw through the ports core —
+ *             common/src/ships/power/portsFeatures.test.ts
+ * extend:     a new port consumer is a part kind constant (P_*) with a case in buildPortsLayout and portsTick;
+ *             mechanics first, no ship-level routing
+ */
+
+/**
  * The ports energy core (docs/design/energy-ports-2026-11.md; the Energy Lab's prototypes/energy-lab/ports-model.js is
  * the reference): a ship whose blueprint says `power: 'ports'` runs on this instead of energy.ts. Power moves only out of
  * an out port into an in port across a shared cell edge, in a synchronous tick (offer, accept, apply, then the consumers

@@ -1,4 +1,18 @@
 /**
+ * @contract feature.zoneshield.common
+ * owns:       the shaped shields part feature, shared half: each powered shield's line or arc, HP and refill
+ *             (derived.fx.shaped), card facts and the wire slots for how full each is
+ * needs:      PartFeature, zoneshield/shaped.ts, grades.ts
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/zoneshield/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/zoneshield/contract.test.ts
+ *             the shaped-shield soak rule and geometry hold — common/src/ships/features/zoneshield/zoneshield.test.ts
+ * extend:     a new rebuild result or card fact is a field in derive / describe below; a new wire slot is appended in
+ *             features.wire.json (npm run wire:sync)
+ */
+
+/**
  * Shaped shields as a part feature, id `zoneshield` (it sorts after `weaponry`: server features write their pilot-row values in id
  * order and features.wire.json is append-only). Features/README.md; the geometry and the soak rule: shaped.ts; the design:
  * prototypes/shield-fx). Shared half: what a rebuild derives (`derived.fx.shaped`: each powered shield's line or arc in

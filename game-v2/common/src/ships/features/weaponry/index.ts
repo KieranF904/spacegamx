@@ -1,4 +1,16 @@
 /**
+ * @contract feature.weaponry.common
+ * owns:       the shared shot behaviours and weapon statuses part feature, shared half: declares weapon roles picked
+ *             by a gun's resolved tuning
+ * needs:      PartFeature, weaponry/weaponry.ts
+ * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
+ *             pinned ones (none dropped) — common/src/ships/features/weaponry/contract.test.ts
+ *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
+ *             exactly — common/src/ships/features/weaponry/contract.test.ts
+ * extend:     a new shot behaviour or status is a new weapon role in the feature object below
+ */
+
+/**
  * The shared shot behaviours and weapon statuses as a part feature (features/README.md; the numbers and the maths:
  * weaponry.ts). Like `support` it is not a function flag but weapon roles picked by a gun's resolved tuning, so it
  * gives a ship nothing at a rebuild and `applies` picks no function. Its world half is server/src/ships/features/weaponry

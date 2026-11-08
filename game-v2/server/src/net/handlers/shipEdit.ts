@@ -1,4 +1,14 @@
 /**
+ * @contract server.net.handlers.ship-edit
+ * owns:       ship editing and the hangar docking messages: dock, undock, shipEdit, slot saves, designSave,
+ *             shareDesign, pilotInfo
+ * needs:      HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx;
+ *             @space-game/common, bitecs
+ * invariants: the types it registers are part of the pinned dispatched set — server/src/golden/structure.test.ts
+ * extend:     a new hangar message is a t.on line; the docking itself is game/Docking.ts
+ */
+
+/**
  * Ship editing and the hangar's docking messages: dock / undock, shipEdit, slotSave, slotFly, slotClear, designSave,
  * shareDesign and pilotInfo. Moved verbatim from GameServer (the receiver `this` became `ctx`; the helpers take ctx
  * first). The docking itself (berths, who is inside a station) lives in game/Docking.ts.

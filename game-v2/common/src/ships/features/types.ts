@@ -1,4 +1,15 @@
 /**
+ * @contract feature.types
+ * owns:       the shared half of the part-feature contract: PartFeature, its hook contexts, InputDef, Fact,
+ *             FeatureDerived
+ * needs:      type-only imports from the ship model (blueprint, state, flight, energy); no values
+ * invariants: every converted feature passes the same plan, catalogue, describe, energy, parity, replicate and
+ *             hot-path suite — common/src/ships/features/contract.ts
+ * extend:     a new per-feature derived result is a module augmentation of FeatureDerived in the feature's own
+ *             folder; a new hook is a field on PartFeature
+ */
+
+/**
  * Part features (features/README.md): one object per behaviour a part can
  * give a ship (a Tow Beam's tow, a Burst Strafer's dodge, ...), in place of
  * special cases spread over rebuild.ts, energy.ts, flight.ts and the UI.

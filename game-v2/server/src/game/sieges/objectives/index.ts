@@ -1,4 +1,12 @@
 /**
+ * @contract server.sieges.objectives
+ * owns:       moon-night siege objectives by kind (a profile's objectives.kinds names them)
+ * needs:      siege types and rules, Pilots (type), the objective modules
+ * invariants: siege nights run their objectives — server/src/game/sieges/siegeNights.test.ts
+ * extend:     a new objective kind is a file here and one entry in OBJECTIVES
+ */
+
+/**
  * Objectives out on the moon at night, by kind (a profile's `objectives.kinds`
  * names them). A new kind is a file here and an entry in OBJECTIVES.
  */

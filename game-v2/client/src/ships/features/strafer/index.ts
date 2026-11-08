@@ -1,4 +1,13 @@
 /**
+ * @contract feature.strafer.client
+ * owns:       the Burst Strafer client half: its key and dodge control, HUD chip, burst jets
+ * needs:      ClientFeature, common getPlan / dodge maths, input/keybindings, DodgeIndicator
+ * invariants: its keys, parsers, drawers and chips run in feature id order and the first key user wins —
+ *             client/src/ships/features/host.test.ts
+ * extend:     a new behaviour is a method on the instance created below (FeatureInstance hooks, types.ts)
+ */
+
+/**
  * The Burst Strafer's client half (shared half, which flies it: common/src/ships/features/strafer): its key and the
  * dodge control it sends, its HUD chip, and the jets drawn while a burst runs. Its counter and way are body state
  * (`entity.dodge`, `entity.dodgeDir`: the pilot's from its row and prediction, others' from their replicas).

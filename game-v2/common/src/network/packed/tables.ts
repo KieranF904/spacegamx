@@ -1,4 +1,15 @@
 /**
+ * @contract network.packed-tables
+ * owns:       the bit-packed frame format's constants: frame byte, message codes (PK), field precisions and chunk
+ *             sizes
+ * needs:      no imports at all, so protocol.ts can hash it into wireTables()
+ * invariants: every message that has a packed form decodes to exactly what the base format decodes to —
+ *             common/src/network/packed/packedCodec.test.ts
+ * extend:     a new packed message is a PK code here and its packer in packedCodec.ts; any change here is a wire
+ *             change (npm run wire:bump)
+ */
+
+/**
  * Bit-packed frames (CAPS.PACKED): the format's constants. The codec is packedCodec.ts; this file has no imports so
  * protocol.ts can hash it into wireTables() (a change here is a wire change: `npm run wire:bump`).
  *

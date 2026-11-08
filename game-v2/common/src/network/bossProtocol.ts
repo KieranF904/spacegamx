@@ -1,4 +1,18 @@
 /**
+ * @contract protocol.boss
+ * owns:       the boss-fight messages: a lair boss's life, weak-point windows and the dev tools for playtesting (dev
+ *             servers and admins)
+ * needs:      type-only imports; the area unions are re-exported through protocol.ts (ClientMessage / ServerMessage)
+ * invariants: every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by
+ *             name — server/src/golden/structure.test.ts
+ *             the server types the client handles itself are exactly the pinned set (a type with no entry in the
+ *             client table fails) — client/src/app/serverMessages.test.ts
+ * extend:     a new message is an interface plus a member of this area's client / server union below; then its
+ *             handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * Boss fights' messages (docs/bosses/rework-2026-11.md): a lair boss's life, its weak-point windows, and the dev tools
  * Kieran playtests with (dev servers and admins only).
  */

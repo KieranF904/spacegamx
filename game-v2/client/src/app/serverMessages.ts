@@ -1,4 +1,17 @@
 /**
+ * @contract client.app.server-messages
+ * owns:       the table of server messages Game handles itself, keyed by message type, read through MessageHost
+ * needs:      @space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages,
+ *             feature and ui stores
+ * invariants: the table handles exactly the types pinned in server/src/golden/serverMessages.json —
+ *             client/src/app/serverMessages.test.ts
+ *             a type ShipClient swallows whole has no entry, and unknown or prototype-ish types are ignored —
+ *             client/src/app/serverMessages.test.ts
+ * extend:     a new server message is one entry in HANDLERS (or a ShipClient case), then the golden pin
+ *             (UPDATE_GOLDEN=1 on structure.test.ts)
+ */
+
+/**
  * Server messages Game handles itself: one table, keyed by message type. Split out of Game.handleServerMessage.
  *
  * Game first offers every message to ShipClient.handleMessage (ship messages, which may also fall through to

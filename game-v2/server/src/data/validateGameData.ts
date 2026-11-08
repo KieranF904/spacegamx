@@ -1,4 +1,16 @@
 /**
+ * @contract server.data.validate
+ * owns:       load-time validation of the game data files: shape against the interfaces, then every cross-referenced
+ *             id resolves
+ * needs:      @space-game/common (data shapes, tables, dictionary), GameDataFiles; browser-safe: no Node imports
+ * invariants: the real data has no errors, with and without the ship files — server/src/data/validateGameData.test.ts
+ *             a dangling station, person, boss design or unknown weapon kind is caught —
+ *             server/src/data/validateGameData.test.ts
+ * extend:     a new data file is a shape spec in the tables and its ids a cross-reference check inside
+ *             validateGameData
+ */
+
+/**
  * Load-time validation of the game data files (docs/review-2026-10-22.md §3.3).
  *
  * Two passes:

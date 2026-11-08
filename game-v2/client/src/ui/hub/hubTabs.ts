@@ -1,4 +1,13 @@
 /**
+ * @contract client.ui.hub-tabs
+ * owns:       the side panel tab contract: HubTab and what the panel gives each tab (context, id, label, key action)
+ * needs:      nothing from the panel implementation; app/windows.ts registers tabs in order
+ * invariants: the panel sizes, folds and places itself around its tabs — none pinned
+ * extend:     a new tab is a module in ui/hub/tabs/ giving a HubTab and one register line in app/windows.ts; the
+ *             panel names no tab
+ */
+
+/**
  * The side panel's tabs: each tab is its own module (ui/hub/tabs/) giving a HubTab, and app/windows.ts registers them
  * in order on the panel (HubPanel.register). The panel owns the tab bar, folding, sizing and placing; a tab only draws
  * its body. Adding a tab is a new module and one register line: nothing in the panel names a tab.

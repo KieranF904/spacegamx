@@ -1,4 +1,14 @@
 /**
+ * @contract network.fx-kinds
+ * owns:       the detonation kind table: kind string to its wire number (append only)
+ * needs:      nothing imported; hashed into the wire tables by protocol.ts wireTables
+ * invariants: every weapon kind is listed once, weapon kinds first in WEAPON_KIND_TYPE order, and a kind round trips
+ *             — common/src/network/fxKinds.test.ts
+ * extend:     a new detonation kind is appended to FX_KINDS, then npm run wire:bump (an unlisted kind still works as
+ *             its string)
+ */
+
+/**
  * The detonation kinds the server sends, by number (the wire form of `detonation.kind`).
  *
  * APPEND ONLY: an index is the wire format, and the list is hashed into the wire tables (protocol.ts wireTables), so

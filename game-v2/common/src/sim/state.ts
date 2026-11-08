@@ -1,4 +1,15 @@
 /**
+ * @contract sim.state
+ * owns:       the sim's state shapes and GUN_FIELDS: the one table of per-gun fields every copy, wire form and hash
+ *             iterates
+ * needs:      common/ships ShipState and derived types
+ * invariants: every gun field rides every copy, both wire forms and the hash; a field added to the table but dropped
+ *             by one fails — common/src/sim/gunFields.test.ts
+ * extend:     a new per-gun field is one name in GUN_ARRAYS or GUN_SCALARS plus its declaration in GunState and the
+ *             ShipState type (tsc fails until they agree)
+ */
+
+/**
  * SimShipState: one ship as the deterministic stepper sees it (sim foundation, Stage 0 contract).
  *
  * A plain per-ship object: no ECS globals, no typed arrays indexed by entity, nothing reached through a host. Everything

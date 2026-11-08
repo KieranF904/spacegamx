@@ -1,4 +1,16 @@
 /**
+ * @contract client.predict.pt-kinds
+ * owns:       the PT timeline's kind registry: every kind of thing stepped ahead of the confirmed tick, in order
+ *             (confirm all, then advance all)
+ * needs:      @space-game/common, PtHost types; kinds read only kinds of lower order
+ * invariants: every kind confirms lowest order first, then all advance — client/src/predict/ptKinds.test.ts
+ *             a kind added again by name replaces the old, and the first that steps a thing places it —
+ *             client/src/predict/ptKinds.test.ts
+ * extend:     a new predicted thing is a PtKind module (predict/kinds/) registered in worldKinds.ts with an order
+ *             above what it reads
+ */
+
+/**
  * The PT timeline's kinds: every kind of thing the client steps ahead of the confirmed tick to the own predicted tick,
  * so what you see is at the same moment as your own ship and shells (prediction mode C3 game-wide, track C).
  *

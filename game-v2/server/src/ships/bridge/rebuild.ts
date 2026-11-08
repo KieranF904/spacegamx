@@ -1,4 +1,15 @@
 /**
+ * @contract server.ships.bridge.rebuild
+ * owns:       a ship's body coming and going: geometry cache, spawning, removal, rebuild after parts are lost,
+ *             shedding and station repair
+ * needs:      BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components,
+ *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
+ * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     a new way to spawn or remove a body is a function here with a delegator on ShipBridge
+ */
+
+/**
  * ShipBridge rebuild: a ship's body coming and going. Its geometry (cached per blueprint), spawning (spawnOn,
  * dummies, wrecks, players), removal (removeShip, forget, removeBody), the rebuild after parts are lost (markRebuild,
  * rebuildMarked, rebuildNow, shed, spawnDebris, decay), and repair (station repair from the repair bank, respawnInPlace). ShipBridge keeps one-line delegators with the same names.

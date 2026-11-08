@@ -1,3 +1,13 @@
+/**
+ * @contract math.basic
+ * owns:       plain maths helpers for non-sim code (UI, rendering, input, econ, scripts): clamp, lerp, smoothstep,
+ *             wrapPi, cloneJson
+ * needs:      nothing
+ * invariants: wrapPi matches the sim wraps bit for bit — common/src/math/basic.test.ts
+ *             the deterministic sim keeps its own copies on purpose and does not import this — none pinned
+ * extend:     add a helper only if non-sim code needs it; sim code uses detTrig / simMaths instead
+ */
+
 // Plain maths helpers for NON-SIM code (UI, rendering, input, econ, scripts).
 // The deterministic sim keeps its own copies on purpose (ships/flight.ts wrapAngle is its canonical angle wrap,
 // network/replication.ts, asteroid/orbit.ts, minebay, predict/*): do not swap those for these.

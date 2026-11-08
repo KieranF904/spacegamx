@@ -1,4 +1,16 @@
 /**
+ * @contract server.ships.bridge
+ * owns:       the facade between the engine (bitecs world, GameServer systems) and the shared ship logic: one-line
+ *             delegators to the bridge/* modules
+ * needs:      bitecs components, @space-game/common ship model, bridge/* modules, ShipHost (bridge/core.ts)
+ * invariants: ShipBridge keeps its public method, accessor and field names — shipBridgeApi.json
+ *             bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
+ *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ * extend:     behaviour goes in the matching bridge/<area>.ts module with a one-line delegator here, never a new body
+ *             in this file
+ */
+
+/**
  * ShipBridge: glue between the engine (bitecs world, GameServer systems) and the
  * shared, engine-agnostic ship logic in common/src/ships.
  *

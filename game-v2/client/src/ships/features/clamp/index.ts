@@ -1,4 +1,15 @@
 /**
+ * @contract feature.clamp.client
+ * owns:       the Docking Clamps client half: the prompt, dock and swap keys, HUD chip, glow, and the link messages
+ * needs:      ClientFeature (types.ts), pixi.js, common/network clampProtocol + clampWorld, ClampIndicator, clampView
+ * invariants: its keys, parsers, drawers and chips run in feature id order and the first key user wins —
+ *             client/src/ships/features/host.test.ts
+ *             the clamp card and prompt text come from the pure view —
+ *             client/src/ships/features/clamp/clampView.test.ts
+ * extend:     a new behaviour is a method on the instance created below (FeatureInstance hooks, types.ts)
+ */
+
+/**
  * Docking Clamps' client half (shared half: common/src/ships/features/clamp; docs/design/groups-mines-docking.md 3):
  * the lined-up prompt, the dock key (H, the Dock key: taken only while a prompt is up or the ship is docked, otherwise
  * H docks at a station as before), the swap key (Minus), the HUD chip and the clamps' glow. The links themselves step
