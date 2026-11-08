@@ -62,7 +62,7 @@ export function gridTip(host: HangarHost, e: MouseEvent): void {
   }
   const key = `g:${host.tipGen}:${p.uid}:${live ? `${Math.round((live.hp / live.max) * 100)}${live.detached ? 'x' : ''}` : ''}`;
   const mounting = host.mountingBroken.get(i)?.map(ruleText);
-  host.showTip(key, () => partTipHtml(p, { ...host.tipCtx(), derived: host.derived, index: i, state, live, mounting }), e.clientX, e.clientY);
+  host.showTip(key, () => partTipHtml(p, { ...host.tipCtx(), derived: host.derived, index: i, state, live, mounting, loose: host.unreachable.has(p.uid) }), e.clientX, e.clientY);
 }
 
 /** A palette part's tooltip (by item id): what it is, how many you have, what making it takes or what it waits on */

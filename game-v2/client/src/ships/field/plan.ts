@@ -96,6 +96,26 @@ export function summary(live: LiveDesign, e: BuildEdits): EditSummary {
   return { added: e.added.length, recycle: w.marked.size, dropped: e.dropped.size };
 }
 
+/**
+ * Parts (uids) of the design the core doesn't hold on to: planned only. Nothing builds them (the fabricator, the station
+ * and the bank pick only parts that join a standing one) until something joins them. The parts being recycled don't hold
+ * anything (the target is the design without them); a part standing now is built, so never listed
+ */
+export function unjoinedUids(catalog: Catalog, w: WorkingDesign, geoms: readonly PlacedGeom[] = geomsOf(catalog, w.bp.parts)): Set<number> {
+  const parts = w.bp.parts;
+  const core = parts.findIndex((p) => p.fn === 'core');
+  const out = new Set<number>();
+  if (core < 0) return out;
+  const reached = floodFill(parts.length, computeJoins(geoms as PlacedGeom[]), core, (k) => !w.marked.has(parts[k].uid));
+  parts.forEach((p, k) => { if (!reached[k] && !w.marked.has(p.uid) && !w.standing[k]) out.add(p.uid); });
+  return out;
+}
+
+/** The footer's line about them ("2 parts not connected: they'll build once joined"), or '' */
+export function unjoinedText(n: number): string {
+  return n ? `${n} part${n > 1 ? 's' : ''} not connected: ${n > 1 ? "they'll" : "it'll"} build once joined.` : '';
+}
+
 /** Does saving change anything on the server */
 export function planChanged(live: LiveDesign, e: BuildEdits): boolean {
   if (e.added.length || e.dropped.size) return true;
@@ -178,7 +198,7 @@ function ownProblem(catalog: Catalog, w: WorkingDesign, p: PlacedPart): string |
     if (why === 'blocked') return `its ${p.facing} edge is blocked: ${fix}`;
     if (why === 'notJoined') return `its ${p.facing} edge must touch a part: ${fix}`;
   }
-  if (geoms.length && computeJoins([...geoms, g]).every(([a, b]) => a !== geoms.length && b !== geoms.length)) return "doesn't join anything";
+  // (A part that joins nothing may be planned: it is shown as not connected and builds once something joins it, `unjoinedUids`)
   const broken = geoms.length ? partMountingProblems(catalog, [...geoms, g], geoms.length) : [];
   if (broken.length) return broken.map((m) => m.message.replace(/^[^:]*?\d+: /, '')).join('; ');
   return null;
@@ -211,8 +231,8 @@ export type RemoveResult = { kind: 'none' } | { kind: 'dropped' | 'marked' | 'un
 
 /**
  * Take out the working part at index `i`. A missing part (planned, lost, or placed now) leaves the design; a standing part
- * is marked for recycling (again: kept). Whatever the removal would cut off from the core goes with it the same way,
- * since the server breaks a ship down leaf first and a design with stranded parts is not a ship
+ * is marked for recycling (again: kept). Whatever STANDING the removal would cut off from the core goes with it the same
+ * way, since the server breaks a ship down leaf first. Missing parts it cuts off stay: planned, not connected
  */
 export function removePart(catalog: Catalog, live: LiveDesign, e: BuildEdits, i: number): RemoveResult {
   const w = working(live, e);
@@ -234,6 +254,7 @@ export function removePart(catalog: Catalog, live: LiveDesign, e: BuildEdits, i:
     parts.forEach((q, k) => { if (k !== at && !reached[k]) gone.add(q.uid); });
   }
   const standing = new Set(w.bp.parts.filter((_, k) => w.standing[k]).map((q) => q.uid));
+  for (const u of gone) if (u !== p.uid && !standing.has(u)) gone.delete(u);
   const addedUids = new Set(e.added.map((q) => q.uid));
   for (const u of gone) {
     if (standing.has(u)) { e.unmark.delete(u); if (!live.queued.has(u)) e.mark.add(u); }

@@ -9,7 +9,7 @@ import type { ShipTuning } from './tuning.js';
 import { partMaxHp } from './blueprint.js';
 import { type RebuildMemo, ShipDerived, rebuild, structureOf } from './rebuild.js';
 import { hasGroups, shedGroup } from './groups.js';
-import { designOf } from './design.js';
+import { designOf, wholeBuilt } from './design.js';
 
 export interface ShipState {
   /** Engine entity id */
@@ -173,7 +173,8 @@ export function splitRebuild(state: ShipState, catalog: Catalog, tuning: ShipTun
     }
     return groups;
   }
-  const groups = structureOf(state.blueprint, state.hp, state.detached, state.kind === 'ship' ? 'core' : 'largest', designOf(catalog, state.blueprint).joins).orphanGroups;
+  const D = designOf(catalog, state.blueprint);
+  const groups = structureOf(state.blueprint, state.hp, state.detached, state.kind === 'ship' ? 'core' : 'largest', D.joins, D.core >= 0 ? wholeBuilt(D) : undefined).orphanGroups;
   for (const g of groups) for (const i of g) state.detached[i] = true;
   rebuildShip(state, catalog, tuning);
   if (groups.length) {

@@ -39,7 +39,7 @@
  * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
  */
 
-import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, overlapsAny, computeJoins, facingProblem, geomContainsPoint, validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, gunFacing, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, wireCells, cellKey, mountingOf, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
+import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, overlapsAny, facingProblem, geomContainsPoint, validateBlueprint, nextFreeUid, partNeedsFacing, gunFacing, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, wireCells, cellKey, mountingOf, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
 import { loadTest, type LoadTestResult } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
 import { powerReport, pruneWires, type PowerReport } from './wireEdit';
@@ -79,6 +79,8 @@ export class HangarUI implements HangarHost {
   grid!: HTMLCanvasElement;
   lit: HangarLitView;
   errors: BlueprintError[] = [];
+  /** Parts (uids) the core doesn't hold on to: planned only, never built until something joins them */
+  unreachable: ReadonlySet<number> = new Set();
   private sel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0 as Rot, flip: false, facing: 'auto' as Side | 'auto' };
   /** Placed guns breaking their mounting rules, by part index (refresh) */
   mountingBroken = new Map<number, MountingProblem[]>();
@@ -447,9 +449,7 @@ export class HangarUI implements HangarHost {
       if (why === 'blocked') return `its ${p.facing} edge is blocked: ${fix}`;
       if (why === 'notJoined') return `its ${p.facing} edge (where power leaves) must touch a part: ${fix}`;
     }
-    if (this.geoms.length && computeJoins([...this.geoms, g]).every(([a, b]) => b !== this.geoms.length && a !== this.geoms.length)) {
-      return "doesn't join anything";
-    }
+    // (A part that joins nothing may be planned: it shows "not connected" and builds once something joins it)
     // Its mounting rules (always: free build skips ownership, never these)
     const broken = this.candidateMounting(p, g);
     if (broken.length) return broken.map((m) => ruleText(m)).join('; ');
@@ -489,18 +489,8 @@ export class HangarUI implements HangarHost {
   private remove(g: Vec2): void {
     const i = this.partAt(g);
     if (i < 0) return;
-    const removed = new Set([i]);
-    const core = this.bp.parts.findIndex((p) => p.fn === 'core');
-    if (core >= 0 && core !== i) {
-      const joins = computeJoins(this.geoms);
-      const reached = floodFill(this.geoms.length, joins, core, (k) => k !== i);
-      const cut = this.bp.parts.map((_, k) => k).filter((k) => k !== i && !reached[k]);
-      if (cut.length) {
-        if (!confirm(`Removing this part also cuts ${cut.length} part(s) off from the core. Remove them too?`)) return;
-        cut.forEach((k) => removed.add(k));
-      }
-    }
-    this.bp.parts = this.bp.parts.filter((_, k) => !removed.has(k));
+    // (What it held on to stays, planned and not connected, until something joins it again)
+    this.bp.parts = this.bp.parts.filter((_, k) => k !== i);
     // (wire laid over what's gone goes with it)
     if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
     this.refresh();
@@ -619,7 +609,9 @@ export class HangarUI implements HangarHost {
     this.paintInput.value = this.bp.paint ?? '#24324d';
     this.geoms = this.bp.parts.map((p) => placeGeometry(catalog, p));
     this.owned = this.deps.owned(this.slot);
-    this.errors = validateBlueprint(catalog, this.bp, tuning, null).errors;
+    const checked = validateBlueprint(catalog, this.bp, tuning, null);
+    this.errors = checked.errors;
+    this.unreachable = new Set(checked.unreachable);
     // (Each gun's broken mounting rules, by index: drawn on the grid and listed in its tooltip)
     this.mountingBroken = new Map();
     // (and each engine whose exhaust the ship blocks: a warning, its lost thrust, never a refusal: common mounting.ts engineExhaust)
@@ -665,7 +657,7 @@ export class HangarUI implements HangarHost {
   private showLit(): void {
     const { ghosts, fresh } = this.grantAll ? { ghosts: new Set<number>(), fresh: new Set<number>() } : this.ghostInfo();
     const wrecked = new Set(this.deps.hangarState()?.slots[this.slot]?.wrecked ?? []);
-    const keep = this.bp.parts.map((p, i) => [p, i] as const).filter(([p]) => !(ghosts.has(p.uid) && !fresh.has(p.uid)));
+    const keep = this.bp.parts.map((p, i) => [p, i] as const).filter(([p]) => !(ghosts.has(p.uid) && !fresh.has(p.uid)) && !this.unreachable.has(p.uid));
     if (!keep.length) { this.lit.show(null, []); return; }
     try {
       const ship = createShipState(this.deps.catalog, this.deps.tuning, 0, { ...this.bp, parts: keep.map(([p]) => p) }, 0);

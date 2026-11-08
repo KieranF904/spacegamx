@@ -29,7 +29,7 @@
 import {
   Blueprint, Bag, Economy, ShipRecord, PlayerProfile, Catalog, ServerMessage, unlocks,
   partItemId, canCraft, countOf, addTo, removeFrom, installableGhosts, setActiveShip, placeGeometry, computeJoins,
-  placeCost, ghostBill, salvageParts, orderRanking, CraftJob, partLicensed,
+  placeCost, ghostBill, salvageParts, orderRanking, buildableGhosts, CraftJob, partLicensed,
   socketsFor, setPartGems, parseGemItemId, type GemsFile, buildPoints, shipLoadout } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { StationServices, JobTag } from './StationServices.js';
@@ -374,7 +374,7 @@ export class Hangar {
     const p = this.pilots.get(conn);
     const rec = p?.hangar[slot];
     if (!p || !rec) return;
-    if (!(rec.ghosts ?? []).length) return this.pilots.toast(conn, `The ${rec.blueprint.name} is already built`, 'info');
+    if (!this.buildable(rec).length) return this.pilots.toast(conn, `The ${rec.blueprint.name} is already built`, 'info');
     rec.auto = true;
     rec.paused = false;
     // New orders go after the ones already running
@@ -448,11 +448,16 @@ export class Hangar {
     return out;
   }
 
+  /** A slot's ghosts that can be built: those the core holds on to through the design (a planned part joined to nothing waits) */
+  private buildable(rec: { blueprint: Blueprint; ghosts?: number[] }): number[] {
+    return buildableGhosts(this.catalog, rec.blueprint, rec.ghosts ?? []);
+  }
+
   /** What a slot's ghosts still need beyond storage and what's being made (modules as items, structure as materials) */
   stillNeeded(p: PlayerProfile, slot: number): Bag {
     const rec = p.hangar[slot];
     if (!rec) return {};
-    const need = ghostBill(this.econ, rec.blueprint, rec.ghosts ?? []);
+    const need = ghostBill(this.econ, rec.blueprint, this.buildable(rec));
     const coming = this.coming(p);
     for (const id of Object.keys(need)) need[id] = Math.max(0, need[id] - countOf(p.storage, id) - (coming[id] ?? 0));
     return need;
@@ -471,7 +476,7 @@ export class Hangar {
     const out = { refining: 0, fabricating: 0, short: [] as string[] };
     if (rec.paused) return out;
     const tag = { for: rec.blueprint.name, slot };
-    const need = ghostBill(this.econ, rec.blueprint, rec.ghosts ?? []);
+    const need = ghostBill(this.econ, rec.blueprint, this.buildable(rec));
     const avail = (id: string) => countOf(p.storage, id) + (this.coming(p)[id] ?? 0);
     // Materials wanted in all: structure's own, plus the inputs of modules still to fabricate
     const materials: Bag = {};
@@ -621,14 +626,14 @@ export class Hangar {
     const p = this.pilots.get(conn);
     if (!p) return;
     let changed = this.workOrders(conn);
-    for (const slot of orderRanking(p.hangar)) {
+    for (const slot of orderRanking(p.hangar, this.catalog)) {
       const rec = p.hangar[slot];
       if (!rec?.auto) continue;
       const r = this.work(conn, slot);
       if (r.refining || r.fabricating) changed = true;
     }
     p.hangar.forEach((rec) => {
-      if (!rec?.auto || (rec.ghosts ?? []).length) return;
+      if (!rec?.auto || this.buildable(rec).length) return;
       rec.auto = false;
       rec.paused = false;
       delete rec.rank;
@@ -658,9 +663,9 @@ export class Hangar {
     let fitted = 0;
     const atStation = this.pilots.atStation(conn);
     p.hangar.forEach((rec, slot) => {
-      if (!rec || !(rec.ghosts ?? []).length) return;
+      if (!rec || !this.buildable(rec).length) return;
       // Cheap check first: anything in storage this slot wants at all?
-      if (!Object.keys(ghostBill(this.econ, rec.blueprint, rec.ghosts ?? [])).some((id) => countOf(p.storage, id) > 0)) return;
+      if (!Object.keys(ghostBill(this.econ, rec.blueprint, this.buildable(rec))).some((id) => countOf(p.storage, id) > 0)) return;
       const active = slot === p.activeSlot;
       if (active && !atStation) return;
       const live = active ? this.ships.get(conn.playerId) : undefined;

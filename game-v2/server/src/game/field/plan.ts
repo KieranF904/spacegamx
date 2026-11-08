@@ -9,6 +9,10 @@
  *   - drops the missing parts left out (nothing there to break down);
  *   - appends the target's new parts as missing parts (a part moved is a new part: a fresh uid, the old one recycled).
  *
+ * A new part that joins nothing is kept too: planned ahead, unreachable (ValidationResult.unreachable). Nothing builds
+ * it (the fabricator and the bank pick only parts that join a standing one, and `byDepth` puts it last) until something
+ * joins it to the core's structure.
+ *
  * The invariant: the live blueprint always passes `validate` (validateBlueprint with mounting: false). The parts being
  * recycled still stand, so a new part can't take their cells (or block their way) until they are gone: such a save is
  * refused with the reason, as the build view refuses the placement. Pure: no world.
@@ -44,8 +48,8 @@ export function samePlacement(a: PlacedPart, b: PlacedPart): boolean {
 const withParts = (bp: Blueprint, parts: PlacedPart[]): Blueprint => ({ ...bp, parts });
 
 /**
- * Take parts out of the blueprint (a recycle finished, a queued part lost). Missing parts that then no longer pass (cut
- * off from the core: a saved target never leaves one, but a part lost meanwhile can) go with them, listed in `dropped`.
+ * Take parts out of the blueprint (a recycle finished, a queued part lost). Missing parts that then no longer pass go with
+ * them, listed in `dropped`. (A missing part cut off from the core is not one: it stays, planned and unreachable.)
  * Null if a standing part would be left broken (the caller keeps the blueprint as it is)
  */
 export function removeParts(validate: Validate, bp: Blueprint, uids: ReadonlySet<number>, alive: (uid: number) => boolean): { blueprint: Blueprint; dropped: number[] } | null {

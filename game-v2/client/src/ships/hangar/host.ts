@@ -70,6 +70,8 @@ export interface HangarHost {
   lit: HangarLitView;
   grid: HTMLCanvasElement;
   errors: BlueprintError[];
+  /** Parts (uids) the core doesn't hold on to: planned only, drawn faded and dashed */
+  unreachable: ReadonlySet<number>;
   grantAll: boolean;
   slot: number;
   mountingBroken: Map<number, MountingProblem[]>;

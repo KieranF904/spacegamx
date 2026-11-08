@@ -1574,7 +1574,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 819,
+      "lines": 811,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1612,7 +1612,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 72,
-          "end": 819
+          "end": 811
         }
       ]
     },
@@ -2967,7 +2967,7 @@
       "id": "client.hangar.draw",
       "path": "client/src/ships/hangar/hangarDraw.ts",
       "group": "client/ships/hangar",
-      "lines": 197,
+      "lines": 206,
       "owns": "one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost",
       "needs": "HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common",
       "events": "",
@@ -2992,7 +2992,7 @@
           "name": "draw",
           "kind": "function",
           "start": 30,
-          "end": 197
+          "end": 206
         }
       ]
     },
@@ -3145,7 +3145,7 @@
       "id": "client.hangar.stats",
       "path": "client/src/ships/hangar/hangarStats.ts",
       "group": "client/ships/hangar",
-      "lines": 423,
+      "lines": 427,
       "owns": "the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems",
       "needs": "HangarHost (deps, derived, bp, errors), shipSummary, portsReport; npm: @space-game/common",
       "events": "",
@@ -3206,25 +3206,25 @@
           "name": "renderStats",
           "kind": "function",
           "start": 317,
-          "end": 365
+          "end": 369
         },
         {
           "name": "energyRuns",
           "kind": "const",
-          "start": 367,
-          "end": 377
+          "start": 371,
+          "end": 381
         },
         {
           "name": "ENERGY_ROW_SECONDS",
           "kind": "const",
-          "start": 378,
-          "end": 378
+          "start": 382,
+          "end": 382
         },
         {
           "name": "energyHtml",
           "kind": "function",
-          "start": 380,
-          "end": 423
+          "start": 384,
+          "end": 427
         }
       ]
     },
@@ -3294,7 +3294,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 138,
+      "lines": 140,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -3327,7 +3327,7 @@
           "name": "HangarHost",
           "kind": "interface",
           "start": 55,
-          "end": 138
+          "end": 140
         }
       ]
     },

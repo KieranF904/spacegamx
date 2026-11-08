@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Blueprint, InventoryStub, PlacedPart, Rot, Side } from './types.js';
 import { parseBlueprint, partFacingRule, partNeedsFacing, serializeBlueprint, validateBlueprint } from './blueprint.js';
 import { allocateFlow, rebuild, type ShipDerived } from './rebuild.js';
-import { createShipState, damagePart } from './state.js';
+import { createShipState, damagePart, splitRebuild } from './state.js';
 import { healthFactor, ShipTuning } from './tuning.js';
 import { stepFlight, FlightBody, jumpTuning, jumpPhase, jumpDistance, jumpCoast, jumpScaleFor, jumpDriveStats, jumpChargeNeed, jumpBurnAt } from './flight.js';
 import { pilotJumpStep, NO_FIELDS } from './jumpFields.js';
@@ -87,10 +87,39 @@ describe('blueprints (M2)', () => {
       b.parts.push(p(20, 'tri', 'hull', -1, 1));
       expect(codes(b)).toContain('overlap');
     });
-    it('every part reachable from the core', () => {
+    it('a part joined to nothing is allowed (planned ahead) and reported as unreachable', () => {
       const b = sparrow();
       b.parts.push(p(20, 'sq', 'hull', 10, 10));
-      expect(codes(b)).toContain('unreachable');
+      expect(codes(b)).toEqual([]);
+      const r = validateBlueprint(catalog, b, tuning);
+      expect(r.ok).toBe(true);
+      expect(r.unreachable).toEqual([20]);
+      expect(validateBlueprint(catalog, sparrow(), tuning).unreachable).toEqual([]);
+    });
+    it('a planned part joined to nothing is never built: not alive, no mass, not shed as debris; joined, it stands', () => {
+      const plain = createShipState(catalog, tuning, 1, sparrow(), 0);
+      const b = sparrow();
+      b.parts.push(p(20, 'sq', 'hull', 10, 10));
+      const s = createShipState(catalog, tuning, 1, b, 0);
+      const k = b.parts.length - 1;
+      expect(s.derived.alive[k]).toBe(false);
+      expect(s.derived.alive.slice(0, k).every(Boolean)).toBe(true);
+      expect(s.derived.mass).toBeCloseTo(plain.derived.mass, 9);
+      // (Even at full HP it stays put: a rebuild point doesn't break it off as a piece)
+      expect(splitRebuild(s, catalog, tuning)).toEqual([]);
+      expect(s.detached[k]).toBe(false);
+      expect(s.derived.alive[k]).toBe(false);
+      // Something joins it to the core's structure: it is built
+      let joined: Blueprint | null = null;
+      for (let x = -6; x <= 6 && !joined; x++) for (let y = -8; y <= 8 && !joined; y++) {
+        const c = { ...sparrow(), parts: [...sparrow().parts, p(20, 'sq', 'hull', x, y)] };
+        const v = validateBlueprint(catalog, c, tuning);
+        if (v.ok && !v.unreachable.length) joined = c;
+      }
+      expect(joined).toBeTruthy();
+      const j = createShipState(catalog, tuning, 1, joined!, 0);
+      expect(j.derived.alive[joined!.parts.length - 1]).toBe(true);
+      expect(j.derived.mass).toBeGreaterThan(plain.derived.mass);
     });
     it('facing edges free', () => {
       const b = sparrow();
