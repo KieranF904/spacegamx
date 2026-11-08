@@ -12,7 +12,7 @@
  */
 
 import {
-  threatLevel, xpToReach, GRADE_LEVEL, LEVEL_CAP, SKILL_POINT_CAP, jumpTuning, towTuning, unlockTrack, nextBuildUnlock, nextUnlockHint, materialUnlockName,
+  threatLevel, unlocks, xpToReach, GRADE_LEVEL, LEVEL_CAP, SKILL_POINT_CAP, jumpTuning, towTuning, unlockTrack, nextBuildUnlock, nextUnlockHint, materialUnlockName,
   secondsToFreeze, warmthStage, BANK, FIELD, FAB_TIERS, REFINE_TIERS, SALVAGE, type FunctionDef, type ShipTuning, type TrackStep, type HazardRules,
 } from '@space-game/common';
 import shipTuning from '../../../data/ships/tuning.json';
@@ -26,8 +26,9 @@ import systemsData from '../../../data/systems.json';
 import itemsData from '../../../data/items.json';
 import { threatTag } from './threat';
 import { esc } from './escape';
+import { resourcesHtml, wireResources, RESOURCE_CSS } from './resources/resourceDictionary';
 
-export type GuideTab = 'basics' | 'combat' | 'ships' | 'industry' | 'progress' | 'tiers' | 'people';
+export type GuideTab = 'basics' | 'combat' | 'ships' | 'industry' | 'progress' | 'tiers' | 'people' | 'resources';
 
 export const GUIDE_TABS: { id: GuideTab; label: string }[] = [
   { id: 'basics', label: 'Flying' },
@@ -37,6 +38,7 @@ export const GUIDE_TABS: { id: GuideTab; label: string }[] = [
   { id: 'progress', label: 'Progress' },
   { id: 'tiers', label: 'Tiers & scaling' },
   { id: 'people', label: 'Jobs & pilots' },
+  { id: 'resources', label: 'Resources' },
 ];
 
 export interface GuideDeps {
@@ -120,7 +122,7 @@ export const GUIDE_CSS = `
 #game-menu .fg-chip em { font-style: normal; color: #7dd3fc; font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; }
 #game-menu .fg-chip img { width: 18px; height: 18px; }
 #game-menu .fg-chip.mat em { color: #fbbf24; }
-#game-menu .fg-chip.room { color: #a9b6c9; border-style: dashed; }`;
+#game-menu .fg-chip.room { color: #a9b6c9; border-style: dashed; }` + RESOURCE_CSS;
 
 const JUMP = jumpTuning(shipTuning as unknown as ShipTuning);
 /** The Burst Strafer and the Tow Beam (common/src/ships/strafer.ts, tow.ts): their levels and numbers */
@@ -167,6 +169,7 @@ export function guideHtml(tab: GuideTab, d: GuideDeps): string {
     case 'progress': return progress(d);
     case 'tiers': return tiers(d);
     case 'people': return people(d);
+    case 'resources': return resourcesHtml(d);
   }
 }
 
@@ -219,7 +222,7 @@ function basics({ k }: GuideDeps): string {
     ${sec('Getting around', `<b>Jump gates</b> link systems: fly in and press ${k('interact')}. Close to one, a card says where it goes, what it's like there against your ship and what it needs; the first time a gate leads somewhere deadly for your ship, it asks you to press again. <b>Rifts</b> pull you through the moment you touch them. Some systems need a licence (Jobs & pilots, Leaving Sol). ${k('map')} opens the galaxy and system maps; ${k('nav')} toggles the markers on the screen edge.`)}
     ${sec('Autopilot', `${k('autopilot')} flies you to the job you're following, gate by gate if it's in another system, using the jump drive on long legs. Or open the map (${k('map')}) and click a station, gate, wreck or system; right-click anywhere in a system to fly to that point. Any flight key or a click takes back control.`,
       `In flight, hold ${k('contextMenu')} and right-click anything (or open space) for what you can do with it: dock, travel through, land, hail, target, inspect, trade, fly there or jump there. A plain right-click is the right-hand guns and the mining laser, firing at once.`)}
-    ${sec('Stations', `Fly into a station's docking ring and press ${k('dock')}. While docked you're safe: your ship is inside. Stations have storage (shared between every station), a market, a refinery and a fabricator, and post contracts. ${k('inventory')} shows your cargo; storage opens while you're docked.`)}
+    ${sec('Stations', `Fly into a station's docking ring and press ${k('dock')}. While docked you're safe: your ship is inside. Stations have storage (shared between every station) and a market; most also have a refinery and a fabricator (the market and the Resources tab say where), and they post contracts. ${k('inventory')} shows your cargo; storage opens while you're docked.`)}
     ${sec('The info panel', `Rest the cursor on anything (another pilot, a ship, an asteroid) and the panel at the bottom right reads it out: who they are and their ship, a hostile's faction and rating against yours, or roughly what ore a rock holds. It stays a moment after you move off.`)}
     ${sec('Hazards', `Radiation, cold, darkness and low visibility make some systems harder to read. Black holes pull on everything; past the event horizon nothing survives. Watch for the red warning.`)}
     ${sec('Cold and warmth', coldGuide())}
@@ -261,7 +264,7 @@ function componentsLink(d: GuideDeps): string {
 
 function ships(d: GuideDeps): string {
   return `<h3 style="margin-top:12px">Parts</h3><p class="muted">Structure is built from plate in its material; every module is a named model with its own size and numbers, learned at the level on it, and never earlier.</p>${componentsLink(d)}<div class="fg-cols">
-    ${sec('The hangar', `You have three hangar slots: the ship you fly and two more to build in. Place any part you know how to make, even ones you don't have: they're ghosts until built. Start a ship plan from the station's Ships tab, and fly any ship whose core is built. Pick a hull paint next to the ship's name: it's saved with the design, and everyone sees it.`,
+    ${sec('The hangar', `You have ${unlocks({ level: d.level() }).hangarSlots} hangar bays at your level (more open later): the ship you fly and the rest to build in. Place any part you know how to make, even ones you don't have: they're ghosts until built. Start a ship plan from the station's Ships tab, and fly any ship whose core is built. Pick a hull paint next to the ship's name: it's saved with the design, and everyone sees it.`,
       `In the hangar, <b>Share</b> sends the design you're editing to your party; they find it under Load → Shared with you.`)}
     ${sec('Build orders', `<b>Put it on order</b> and the hangar refines your ore, fabricates the modules and fits everything as it's ready, wherever you are. The station's <b>Ships</b> tab shows what each ship still needs at a glance (what to gather) and, opened up, the full bill down to the ore: what's ready, what's being made, and what's waiting.`,
       `Orders are worked first in line first: the first takes what it needs before the others. <b>⇧ Do first</b> moves one up, <b>⏸ Hold</b> stops it starting anything new (its jobs wait), and <b>Call off</b> stops it and gives its materials back. The refinery and fabricator list what orders are waiting on, and what for, and every job can be held, moved to the front or called off.`)}
@@ -529,6 +532,7 @@ function barChart(title: string, bars: { label: string; value: number; cells: nu
 
 /** Hover readouts on the guide's charts */
 export function wireGuideCharts(root: HTMLElement): void {
+  wireResources(root);
   for (const el of root.querySelectorAll<HTMLElement>('.fg-chart[data-levels]')) {
     const c = JSON.parse(el.dataset.levels!) as { lv: { level: number; need: number; total: number }[] };
     const tip = el.querySelector<HTMLElement>('.fg-tip')!;
