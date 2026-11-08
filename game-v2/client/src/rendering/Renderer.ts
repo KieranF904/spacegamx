@@ -1,31 +1,38 @@
 /**
- * Renderer - PixiJS WebGL rendering
+ * @contract client.render.renderer
+ * owns:       the PixiJS scene: layers, camera, entity views, background and lighting, per frame
+ * needs:      GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting
+ * invariants: one update(delta) per frame draws everything from GameState — none pinned
+ *             effects, hit numbers, minimap and death screen are modules under renderer/, not code here — none pinned
+ * extend:     a new effect or overlay is a module under renderer/ created in the constructor and stepped in update()
  */
 
 import { Bloom } from './Bloom';
+import { PanControl } from './renderer/panControl';
+import { placeUpright, buildPlayerParts, buildPortalParts, updateHealthBar, type Tag, type Gate } from './renderer/entityParts';
+import { DEFAULT_SYSTEM_VISUALS, visualsFromInfo, lightSystem, type SystemVisuals, type Day } from './renderer/systemVisuals';
+import { ParticleFx } from './renderer/particleFx';
+import { DamageNumbers } from './renderer/damageNumbers';
+import { DeathScreen } from './renderer/deathScreen';
+import { Minimap } from './renderer/minimap';
 import type { QualityProfile } from '../settings/quality';
 import { SpritePool } from './spritePool';
-import { disc, ring, rock, glowBall, softDot, streak, streakScale, vignette, DOT_SIZE } from './fxTextures';
+import { disc, ring, rock, glowBall, vignette, DOT_SIZE } from './fxTextures';
 import { stepOverlays, screenTint } from './overlayFrame';
 import { cameraView, helmFollow, MAX_VIEW_SPIN, NORTH_RETURN_RATE, screenToWorld, screenToWorldDir, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
-import { FACTION_COLORS } from '../ships/ShipRenderer';
 import { PlanetRenderer } from './PlanetRenderer';
 import { setPlanetDetail } from './planet-proto/planetQuad';
 import { installVolumeUpload } from './texture3d';
 import { SceneryRenderer } from './Scenery';
-import { NestRenderer, nestColor } from './NestViews';
+import { NestRenderer } from './NestViews';
 import systemsData from '../../../data/systems.json';
 import {
   Application,
-  BitmapFont,
-  BitmapText,
   Sprite,
-  Texture,
   Container,
   Graphics,
   Text,
   TextStyle,
-  Color,
 } from 'pixi.js';
 import { GameState } from '../state/GameState';
 import { WeaponFx, shotTimelines, type PredictedShell } from './weapons/WeaponFx';
@@ -37,14 +44,13 @@ import { MobView } from './MobView';
 import { drawAsteroid, AsteroidSeams } from './AsteroidLook';
 import { RiftShader } from './RiftShader';
 import { StationShot, StationView } from './StationView';
-import { CentralBodyShaders, CentralType } from './CentralBodyShaders';
+import { CentralBodyShaders } from './CentralBodyShaders';
 import { SunRenderer, starOf } from './sun/SunRenderer';
 import type { StarBody } from './sun/plasmaSun';
 import {
   EntityType,
   EffectType,
   getAsteroidPolygon,
-  nestPosition,
   pocketsFrom,
   entranceNest,
 } from '@space-game/common';
@@ -56,123 +62,11 @@ import { Lighting } from './lighting/Lighting';
 import { AsteroidBatch } from './lighting/AsteroidBatch';
 import { skyBiome, SkyBiome } from './sky/skyBiome';
 import type { NestData, ServerSystemInfoMessage, StarSystemData } from '@space-game/common';
-import { boundKeyName } from '../input/keybindings';
-import { settings } from '../settings/Settings';
-
-interface DamageNumber {
-  /** Where it was hit (world) */
-  x: number;
-  y: number;
-  /** Its rise and drift from there, along the screen's axes (world units) */
-  ox: number;
-  oy: number;
-  amount: number;
-  critical: boolean;
-  lifetime: number;
-  /** Sideways drift (world units a second at the start) */
-  drift: number;
-  text: BitmapText;
-}
-
-/** A short-lived effect particle, drawn from a sprite pool (see updateEffects) */
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  color: number;
-  /** Scale at full life (it shrinks as it fades) */
-  size: number;
-  /** Its radius in world units at scale 1 */
-  radius: number;
-  tex: Texture;
-  alpha: number;
-  rot: number;
-  rotSpeed: number;
-}
-
-/** An expanding, fading flash or ring */
-interface Flash { x: number; y: number; radius: number; life: number; max: number; color: number; alpha: number; grow: number; tex: Texture }
-
-interface TractorBeam {
-  startX: number;
-  startY: number;
-  targetX: number;
-  targetY: number;
-  progress: number;
-}
-
-/** A name tag and health bar over an entity (kept, not looked up by name each frame) */
-interface Tag {
-  name: Text | null;
-  bar: Graphics | null;
-  /** What the bar shows now (it's redrawn only when that changes) */
-  barKey: string;
-}
-
-/** A jump gate's moving parts */
-interface Gate { outer: Graphics; inner: Graphics; core: Graphics; phase: number; pulse: number }
 
 /** Seconds to fade an entity in as it appears, or out as it goes */
 const FADE = 0.25;
 /** A panned view (middle mouse) keeps your ship at least this fraction of the screen in from every edge */
 const PAN_MARGIN = 0.1;
-
-// System-specific visual configuration
-// Populated from server 'systemInfo' messages (data-driven via systems.json),
-// with a Sol-like fallback for systems without data.
-interface SystemVisuals {
-  starHue: number;          // Base hue for the central star (0-360)
-  starRadius: number;       // Size of central star
-  specialStarChance?: number;      // Chance for special colored stars
-  specialStarHue?: number;         // Hue for special stars
-  hasNebula?: boolean;
-  /** Hazards here ('darkness' dims the ambient light) */
-  hazards?: string[];
-  nebulaHue?: number;
-  sunStyle?: string;
-  sunStyleParams?: Record<string, number>;
-  coronaStyle?: string;
-  coronaStyleParams?: Record<string, number>;
-  /** Central body type 'none' (e.g. the proto empty scene): no sun or glow */
-  noCentralBody?: boolean;
-  /** Black holes and pulsars get their own shaders instead of the sun */
-  centralType?: CentralType;
-  centralRadius?: number;
-  centralHue?: number;
-  /** Detail-star mode: full fBM/warp/plasma control (like sandbox detail_sun) */
-  detailStar?: boolean;
-  detailParams?: Record<string, number>;
-  detailColors?: Record<string, string>;
-  /** Starfield shader config (sandbox-style GPU starfield) */
-  starfield?: {
-    starBrightness?: number;
-    twinkleSpeed?: number;
-    twinkleAmount?: number;
-    hueShift?: number;
-    density?: number;
-    starSize?: number;
-    parallaxStrength?: number;
-    baseCell?: number;
-    lodBlendWidth?: number;
-  };
-}
-
-// Fallback visuals used until the server sends systemInfo
-const DEFAULT_SYSTEM_VISUALS: SystemVisuals = {
-  starHue: 40,
-  starRadius: 1000,
-  sunStyle: 'granular',
-  coronaStyle: 'plasmaStreams',
-};
-
-/** A screen-aligned offset (ox, oy) in an entity's turned frame (c, sn: the cos and sin of `up`, the roll that keeps `o` upright) */
-function placeUpright(o: Container, c: number, sn: number, up: number, ox: number, oy: number): void {
-  o.position.set(c * ox - sn * oy, sn * ox + c * oy);
-  o.rotation = up;
-}
 
 export class Renderer {
   private app: Application;
@@ -192,7 +86,7 @@ export class Renderer {
   /** Projectile tracers, muzzle flashes and impacts */
   private weaponFx: WeaponFx;
   /** Mining strikes on rock (a hit that rolls for ore), and a chunk's richer puff where it appears (weapons/MiningStrikeFx.ts) */
-  private miningStrikes = new MiningStrikeFx({ spark: (...a) => this.spark(...a), flash: (...a) => this.flash(...a) }, () => performance.now() / 1000);
+  private miningStrikes = new MiningStrikeFx({ spark: (...a) => this.fx.spark(...a), flash: (...a) => this.fx.flash(...a) }, () => performance.now() / 1000);
   /** A loot pod appeared at (x, y) (a mined chunk among them: ships/MiningProgress.ts takes it as your drop when it's by your strikes) */
   onPodAppeared: ((x: number, y: number) => void) | null = null;
   /** Black hole / pulsar central bodies */
@@ -236,16 +130,14 @@ export class Renderer {
   /** Seconds the view has been following a heading (helm): it follows loosely at first, then closely */
   private helmTime = 0;
   private cameraHeading: number | null = null;
-  /** Where the pilot has dragged the view from their ship (middle mouse), in world units along the screen's axes; it always keeps the ship PAN_MARGIN inside the screen */
-  private pan = { x: 0, y: 0 };
-  private panDrag: number | null = null;
-  private recenterBtn: HTMLButtonElement | null = null;
-  private recenterShown = false;
+  /** The middle-mouse drag of the view and its button (renderer/panControl.ts); the view always keeps the ship PAN_MARGIN inside the screen */
+  private panCtl: PanControl;
   /** Camera catch-up per frame (0..1) */
   public cameraFollow = 0.1;
   /** Display settings */
   public shakeScale = 1;
-  public showDamageNumbers = true;
+  get showDamageNumbers(): boolean { return this.damageNumbers.visible; }
+  set showDamageNumbers(v: boolean) { this.damageNumbers.visible = v; }
   public showNames = true;
   
   /** The star (plasma, drawn at a share of the screen's resolution: sun/SunRenderer.ts) */
@@ -258,8 +150,7 @@ export class Renderer {
   /** A planet's ground and clouds, in place of the sky while you're on one */
   private surface: SurfaceRenderer;
   private city: { system: string; view: CityView | null; bastion: BastionView | null } | null = null;
-  /** A surface's daylight (night dims it) */
-  private day = { ambient: [1, 1, 1] as [number, number, number], power: 0, sun: [1, 1, 1] as [number, number, number] };
+  private day: Day = { ambient: [1, 1, 1], power: 0, sun: [1, 1, 1] };
   /** The edge of a surface's map */
   private surfaceEdge = new Graphics();
   /** On a surface, ships cast soft shadows on the ground (that's what puts them up in the air) */
@@ -292,41 +183,19 @@ export class Renderer {
   private sys: { id: string; data: (StarSystemData & { visuals?: Record<string, any> }) | undefined } = { id: '', data: undefined };
 
   // Effects
-  private damageNumbers: DamageNumber[] = [];
-  private particles: Particle[] = [];
-  private flashes: Flash[] = [];
-  /** Particles and flashes are pooled sprites (no Graphics made and destroyed per spark) */
-  private fxPool = new SpritePool('normal');
-  /** Damage numbers: a bitmap font (digits drawn once), pooled */
-  private numberPool: BitmapText[] = [];
-  /** Over the other effects. Its own render group: a number coming or going rebuilds its draw list, not the scene's */
-  private numberLayer = new Container({ isRenderGroup: true });
-  private tractorBeams: TractorBeam[] = [];
-  /** Tractor beams: pooled streaks and dots */
-  private beamPool = new SpritePool('add');
-  
+  private fx!: ParticleFx;
+  private damageNumbers!: DamageNumbers;
+  private death!: DeathScreen;
+  private minimap!: Minimap;
   // Debug asteroid markers (server-provided)
   private debugAsteroidGraphics: Graphics;
   private debugAsteroidMarkers: { x: number; y: number; expiresAt: number }[] = [];
   private debugDrawn = false;
   /** Glow over the bright effects (Display settings) */
   readonly bloom: Bloom;
-  private static fontInstalled = false;
-  /** The minimap redraws at 20 Hz (its dots move a fraction of a pixel a frame) */
-  private minimapAt = 0;
-
   // Death screen
-  private deathOverlay: Container | null = null;
-  private deathAt = 0;
-  private killerName: string | undefined;
   /** A soft dark edge to the screen (reddening when you're hit) */
   private vignette = new Sprite(vignette());
-  
-  // Minimap
-  private minimapContainer: Container | null = null;
-  private minimapGraphics: Graphics | null = null;
-  private readonly MINIMAP_SIZE = 180;
-  private readonly MINIMAP_RANGE = 8000; // World units to display
   
   // Culling margin (pixels beyond viewport to render)
   private readonly CULL_MARGIN = 200;
@@ -339,7 +208,7 @@ export class Renderer {
     this.state = state;
     // (the planets' noise is a 3D texture: planet-proto/planetTextures.ts)
     installVolumeUpload(app.renderer);
-    this.initPan();
+    this.panCtl = new PanControl(app.canvas as HTMLCanvasElement, { zoom: () => this.cameraZoom, locked: () => !!this.cameraTarget });
 
     // Create layer containers
     this.worldContainer = new Container();
@@ -364,8 +233,7 @@ export class Renderer {
     this.worldContainer.addChild(this.effectContainer);
     this.weaponFx = new WeaponFx(this.effectContainer);
     this.lighting.addSource((L) => this.collectLights(L));
-    this.effectContainer.addChild(this.fxPool.container);
-    this.effectContainer.addChild(this.beamPool.container);
+    this.fx = new ParticleFx(this.effectContainer, this.state);
     
     this.app.stage.addChild(this.worldContainer);
     // Bloom over the world, under the UI (see Bloom.ts)
@@ -398,38 +266,16 @@ export class Renderer {
     this.debugAsteroidGraphics = new Graphics();
     this.debugAsteroidGraphics.name = 'debugAsteroidMarkers';
     this.effectContainer.addChild(this.debugAsteroidGraphics);
-    this.effectContainer.addChild(this.numberLayer);
+    this.damageNumbers = new DamageNumbers(this.effectContainer, { tagScale: () => this.tagScale, cameraAngle: () => this.cameraAngle });
+    this.death = new DeathScreen(this.uiContainer, () => this.app.screen);
     
-    // Initialize minimap
-    this.initMinimap();
+    this.minimap = new Minimap(() => this.app.screen.width, this.uiContainer, this.state, {
+      cameraAngle: () => this.cameraAngle,
+      sysData: () => this.sys.data,
+      wayIns: () => this.wayIns,
+    });
   }
   
-  private initMinimap(): void {
-    this.minimapContainer = new Container();
-    this.minimapContainer.x = this.app.screen.width - this.MINIMAP_SIZE - 15;
-    this.minimapContainer.y = 15;
-    this.uiContainer.addChild(this.minimapContainer);
-    
-    // Background circle
-    const bg = new Graphics();
-    bg.circle(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2);
-    bg.fill({ color: 0x000000, alpha: 0.6 });
-    bg.circle(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2);
-    bg.stroke({ color: 0x44ffff, width: 2, alpha: 0.8 });
-    this.minimapContainer.addChild(bg);
-    
-    // Graphics layer for entities
-    this.minimapGraphics = new Graphics();
-    this.minimapContainer.addChild(this.minimapGraphics);
-    
-    // Mask to keep dots inside circle
-    const mask = new Graphics();
-    mask.circle(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2 - 2);
-    mask.fill({ color: 0xffffff });
-    this.minimapContainer.addChild(mask);
-    this.minimapGraphics.mask = mask;
-  }
-
   setCurrentSystem(systemId: string): void {
     this.currentSystemId = systemId;
   }
@@ -439,39 +285,7 @@ export class Renderer {
    * Called when entering a system (or on join).
    */
   setSystemInfo(msg: ServerSystemInfoMessage): void {
-    const visuals: SystemVisuals = {
-      starHue: msg.centralBody.hue ?? 40,
-      starRadius: msg.centralBody.radius ?? 1000,
-      sunStyle: msg.centralBody.sunStyle,
-      sunStyleParams: msg.centralBody.sunStyleParams,
-      coronaStyle: msg.centralBody.coronaStyle,
-      coronaStyleParams: msg.centralBody.coronaStyleParams,
-      specialStarChance: msg.visuals.specialStarChance,
-      specialStarHue: msg.visuals.specialStarHue,
-      hasNebula: msg.visuals.hasNebula,
-      hazards: msg.hazards,
-      nebulaHue: msg.visuals.nebulaHue,
-      starfield: {
-        hueShift: msg.visuals.starHueShift,
-      },
-    };
-
-    // Detail-star mode: full fBM/warp/plasma control
-    const cb = msg.centralBody as any;
-    visuals.noCentralBody = cb.type === 'none';
-    if (cb.type === 'black_hole' || cb.type === 'pulsar' || cb.type === 'brown_dwarf') {
-      visuals.centralType = cb.type;
-      visuals.centralRadius = cb.radius ?? 1000;
-      visuals.centralHue = cb.type === 'black_hole' ? (cb.diskHue ?? 30) : cb.type === 'brown_dwarf' ? (cb.hue ?? 14) : (cb.beamHue ?? 190);
-    }
-    if (cb.detailStar) {
-      visuals.detailStar = true;
-      visuals.detailParams = cb.detailParams ?? {};
-      visuals.detailColors = cb.detailColors ?? {};
-    }
-
-    this.systemVisuals.set(msg.systemId, visuals);
-  }
+    this.systemVisuals.set(msg.systemId, visualsFromInfo(msg));  }
 
   update(delta: number): void {
     // Update animation time
@@ -503,13 +317,9 @@ export class Renderer {
     this.updateEffects(delta);
     
     // Render damage numbers
-    this.renderDamageNumbers(delta);
-    
-    // Update minimap
-    if (performance.now() - this.minimapAt >= this.minimapMs) {
-      this.minimapAt = performance.now();
-      this.updateMinimap();
-    }
+    this.damageNumbers.update(delta);
+
+    this.minimap.tick();
     this.updateScreen();
     // The 2D overlay canvases, in step with this frame (every few frames on the lower tiers)
     this.overlayDelta += delta;
@@ -534,14 +344,7 @@ export class Renderer {
     v.tint = (Math.round(0xc8 * red) << 16) | (Math.round(0x10 * red) << 8);
     v.visible = v.alpha > 0.01;
 
-    const o = this.deathOverlay;
-    if (o) {
-      const t = Math.min(1, (performance.now() - this.deathAt) / 700);
-      const e = 1 - (1 - t) ** 3;
-      o.alpha = e;
-      const title = o.getChildByLabel('deathTitle');
-      if (title) title.scale.set(1.35 - 0.35 * e);
-    }
+    this.death.step();
   }
 
   /** Whether a circle (world units) is on screen (ShipRenderer skips work for ships that aren't) */
@@ -629,7 +432,7 @@ export class Renderer {
   }
 
   setMinimapVisible(on: boolean): void {
-    if (this.minimapContainer) this.minimapContainer.visible = on;
+    this.minimap.setVisible(on);
   }
 
   private updatePlanets(delta: number): void {
@@ -657,42 +460,6 @@ export class Renderer {
     this.cameraTarget = target;
   }
 
-  /** Middle mouse drags the view about your ship; a button at the top brings it back */
-  private initPan(): void {
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    // (No browser autoscroll on the middle button)
-    canvas.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
-    canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
-    canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 1 || this.cameraTarget) return;
-      e.preventDefault();
-      this.panDrag = e.pointerId;
-      canvas.setPointerCapture?.(e.pointerId);
-    });
-    canvas.addEventListener('pointermove', (e) => {
-      if (this.panDrag !== e.pointerId) return;
-      // Grab and drag: the world follows the mouse (clamped to the margin each frame, in updateCamera; along the screen's axes, the view may be turned)
-      this.pan.x -= e.movementX / this.cameraZoom;
-      this.pan.y -= e.movementY / this.cameraZoom;
-    });
-    const end = (e: PointerEvent) => {
-      if (this.panDrag !== e.pointerId) return;
-      this.panDrag = null;
-      canvas.releasePointerCapture?.(e.pointerId);
-    };
-    canvas.addEventListener('pointerup', end);
-    canvas.addEventListener('pointercancel', end);
-    const b = document.createElement('button');
-    b.textContent = '⌖ RECENTER VIEW';
-    b.title = 'Bring the view back onto your ship (middle mouse drags it about)';
-    b.style.cssText = 'position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:26;display:none;padding:5px 14px;'
-      + 'border-radius:999px;border:1px solid rgba(125,211,252,0.45);background:rgba(8,14,28,0.8);color:#bfe6ff;'
-      + 'font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.1em;cursor:pointer;';
-    b.addEventListener('click', () => this.recenter());
-    document.body.appendChild(b);
-    this.recenterBtn = b;
-  }
-
   /** Next frame the view goes straight onto your ship (pan, roll and all), no easing: behind the loading screen, so it
    *  is already there when the screen lifts (app/loadingFlow.ts) */
   snapCamera(): void {
@@ -707,8 +474,7 @@ export class Renderer {
 
   /** The view back onto your ship */
   recenter(): void {
-    this.pan.x = 0;
-    this.pan.y = 0;
+    this.panCtl.recenter();
   }
 
   private updateCamera(dt: number): void {
@@ -717,23 +483,23 @@ export class Renderer {
     const own = !this.cameraTarget;
     const maxX = Math.max(0, (0.5 - PAN_MARGIN) * this.app.screen.width / this.cameraZoom);
     const maxY = Math.max(0, (0.5 - PAN_MARGIN) * this.app.screen.height / this.cameraZoom);
-    this.pan.x = Math.max(-maxX, Math.min(maxX, this.pan.x));
-    this.pan.y = Math.max(-maxY, Math.min(maxY, this.pan.y));
+    this.panCtl.pan.x = Math.max(-maxX, Math.min(maxX, this.panCtl.pan.x));
+    this.panCtl.pan.y = Math.max(-maxY, Math.min(maxY, this.panCtl.pan.y));
     // The roll: onto the heading in helm, back to north-up out of it (gentle, and the same at any frame rate)
     // (Not on a free camera or someone else's ship)
     const heading = own ? this.cameraHeading : null;
     this.helmTime = heading === null ? 0 : this.helmTime + dt;
     const roll = heading === null ? { rate: NORTH_RETURN_RATE, maxSpin: MAX_VIEW_SPIN } : helmFollow(this.helmTime);
-    if (this.cameraSnap) { this.pan.x = this.pan.y = 0; this.cameraAngle = heading ?? 0; }
+    if (this.cameraSnap) { this.panCtl.pan.x = this.panCtl.pan.y = 0; this.cameraAngle = heading ?? 0; }
     this.cameraAngle = smoothAngle(this.cameraAngle, heading ?? 0, roll.rate, Math.min(0.1, dt), roll.maxSpin);
     if (heading === null && Math.abs(this.cameraAngle) < 1e-4) this.cameraAngle = 0;
     cameraView.angle = this.cameraAngle;
-    const pw = own ? screenToWorldDir(this.pan.x, this.pan.y, this.cameraAngle) : { x: 0, y: 0 };
+    const pw = own ? screenToWorldDir(this.panCtl.pan.x, this.panCtl.pan.y, this.cameraAngle) : { x: 0, y: 0 };
     const tx = playerPos.x + pw.x, ty = playerPos.y + pw.y;
 
     // Smooth camera follow (tighter mid-jump, or the ship would leave the screen; a slow drift while dead).
     // cameraFollow is the catch-up per 60 Hz frame, so it's the same at any frame rate.
-    const follow = this.deathOverlay ? this.cameraFollow * 0.12 : this.cameraFollow;
+    const follow = this.death.active ? this.cameraFollow * 0.12 : this.cameraFollow;
     const lerpFactor = this.cameraSnap ? 1 : 1 - Math.pow(1 - Math.min(1, follow), Math.min(0.1, dt) * 60);
     this.cameraSnap = false;
     this.cameraX += (tx - this.cameraX) * lerpFactor;
@@ -745,11 +511,8 @@ export class Renderer {
       this.cameraX = playerPos.x + c.x;
       this.cameraY = playerPos.y + c.y;
     }
-    const off = own && Math.hypot(this.pan.x, this.pan.y) * this.cameraZoom > 24;
-    if (off !== this.recenterShown && this.recenterBtn) {
-      this.recenterShown = off;
-      this.recenterBtn.style.display = off ? 'block' : 'none';
-    }
+    const off = own && Math.hypot(this.panCtl.pan.x, this.panCtl.pan.y) * this.cameraZoom > 24;
+    this.panCtl.showRecenter(off);
 
     // Apply camera transform to world container with screen shake: the camera's point sits at the
     // screen's centre (plus the shake), and the shake's roll turns about it
@@ -799,7 +562,7 @@ export class Renderer {
     const lightKey = `${this.currentSystemId}|${this.systemVisuals.has(this.currentSystemId)}`;
     if (lightKey !== this.lightKey) {
       this.lightKey = lightKey;
-      this.lightSystem(systemVisuals, biome);
+      lightSystem(this.lighting, this.surface, this.sys.data, systemVisuals, biome, (d) => { this.day = d; });
     }
     if (surface) {
       this.sky.container.visible = false;
@@ -844,11 +607,6 @@ export class Renderer {
     let b = this.starBodies.get(v);
     if (!b) this.starBodies.set(v, (b = { radius: v.starRadius, hue: v.starHue, sunStyle: v.sunStyle, detailStar: v.detailStar, detailParams: v.detailParams, detailColors: v.detailColors }));
     return b;
-  }
-
-  private hslRgb(h: number, s: number, l: number): [number, number, number] {
-    const hex = this.hslToHex(h, s * 100, l * 100);
-    return [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
   }
 
   private renderEntities(dt: number): void {
@@ -932,7 +690,7 @@ export class Renderer {
           placeUpright(tag.name, c, sn, up, 0, r + 14);
         }
         if (tag.bar) {
-          this.updateHealthBar(tag, entity);
+          updateHealthBar(tag, entity);
           // Drawn from its left edge, 35 × 4 (the shield strip above it)
           tag.bar.scale.set(k);
           placeUpright(tag.bar, c, sn, up, -17.5 * k, -(r + 10) - 4 * k);
@@ -1001,7 +759,7 @@ export class Renderer {
 
     switch (type) {
       case EntityType.Player:
-        this.createPlayerGraphics(container, id);
+        this.tags.set(id, buildPlayerParts(container));
         break;
       case EntityType.Asteroid:
         // data[0] = size, data[1] = resourceType
@@ -1039,7 +797,7 @@ export class Renderer {
           this.rifts.set(id, rift);
           container.addChild(rift.container);
         } else {
-          this.createPortalGraphics(container, id);
+          this.gates.set(id, buildPortalParts(container, id));
         }
         break;
       case EntityType.Enemy: {
@@ -1063,125 +821,8 @@ export class Renderer {
     return container;
   }
 
-  private createPlayerGraphics(container: Container, id: number): void {
-    // The ship itself is drawn by the ship renderer; this container carries
-    // the health bar and name tag
-
-    // Health bar (above ship): drawn from its left edge, so it empties from the right (see updateHealthBar)
-    const bar = new Graphics();
-    bar.label = 'healthBar';
-    bar.visible = false;  // Only show when damaged
-    container.addChild(bar);
-
-    // Nametag (below ship), rastered at 2x so it stays crisp zoomed in
-    const nameTag = new Text({
-      text: '',
-      resolution: 2,
-      style: new TextStyle({
-        fontFamily: 'Arial, sans-serif',
-        fontSize: 11,
-        fill: 0xffffff,
-        align: 'center',
-        dropShadow: {
-          color: 0x000000,
-          blur: 2,
-          distance: 1,
-          alpha: 0.8,
-        },
-      }),
-    });
-    nameTag.anchor.set(0.5, 0);
-    nameTag.position.set(0, 38);
-    nameTag.label = 'nameTag';
-    container.addChild(nameTag);
-    this.tags.set(id, { name: nameTag, bar, barKey: '' });
-  }
-
-  /** A jump gate: a glowing core in two counter-rotating broken rings, breathing slowly (see updateEffects) */
-  private createPortalGraphics(container: Container, id: number): void {
-    const g = new Graphics();
-    g.circle(0, 0, 150);
-    g.fill({ color: 0x4400aa, alpha: 0.3 });
-    g.circle(0, 0, 100);
-    g.fill({ color: 0x6600cc, alpha: 0.5 });
-    container.addChild(g);
-
-    // Rings broken into arcs, so their turning shows
-    const arcs = (r: number, n: number, gap: number, color: number, width: number, alpha: number) => {
-      const ring = new Graphics();
-      for (let i = 0; i < n; i++) {
-        const a0 = (i / n) * Math.PI * 2, a1 = a0 + (Math.PI * 2 / n) * (1 - gap);
-        ring.moveTo(Math.cos(a0) * r, Math.sin(a0) * r).arc(0, 0, r, a0, a1);
-      }
-      ring.stroke({ color, width, alpha });
-      ring.blendMode = 'add';
-      container.addChild(ring);
-      return ring;
-    };
-    const outer = arcs(138, 6, 0.28, 0xa98bff, 6, 0.65);
-    const inner = arcs(84, 4, 0.35, 0xc9b6ff, 4, 0.7);
-
-    const core = new Graphics();
-    core.circle(0, 0, 50);
-    core.fill({ color: 0x8800ff, alpha: 0.7 });
-    core.circle(0, 0, 20);
-    core.fill({ color: 0xffffff });
-    container.addChild(core);
-    this.gates.set(id, { outer, inner, core, phase: (id * 1.618) % (Math.PI * 2), pulse: 1 });
-  }
-
-  /** A pilot's health bar and shield strip, redrawn only when what it shows changes; shown once damaged */
-  private updateHealthBar(tag: Tag, entity: { hp: number; maxHp: number; data?: number[] }): void {
-    const bar = tag.bar!;
-    if (entity.hp === undefined || !entity.maxHp) return;
-    const f = Math.max(0, Math.min(1, entity.hp / entity.maxHp));
-    // Shield (data[4], 0..100): a strip over the bar while it's partly down
-    const sh = Math.max(0, Math.min(1, (entity.data?.[4] ?? 0) / 100));
-    const show = f < 1 || (sh > 0 && sh < 1);
-    bar.visible = show;
-    if (!show) return;
-    const key = `${f.toFixed(3)}|${sh.toFixed(2)}`;
-    if (key === tag.barKey) return;
-    tag.barKey = key;
-    const w = 35;
-    bar.clear();
-    bar.rect(-0.5, -0.5, w + 1, 5).fill({ color: 0x000000, alpha: 0.5 }).stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
-    // Red-orange, amber below half, deep red below a quarter (as the hostiles' bars)
-    bar.rect(0, 0, w * f, 4).fill({ color: f > 0.5 ? 0xff6b5a : f > 0.25 ? 0xffa94d : 0xff3b3b });
-    if (sh > 0) bar.rect(0, -3, w * sh, 2).fill({ color: 0x7dd3fc });
-  }
-
   private updateEffects(delta: number): void {
-    // Particles and flashes: pooled sprites, moved and faded
-    const pool = this.fxPool;
-    pool.begin();
-    let w = 0;
-    for (const p of this.particles) {
-      p.x += p.vx * delta * 60;
-      p.y += p.vy * delta * 60;
-      p.life -= delta;
-      if (p.life <= 0) continue;
-      p.rot += p.rotSpeed * delta;
-      const k = p.life / p.maxLife;
-      const sp = pool.take(p.tex, p.x, p.y, 0.5, 0.5, p.color, p.alpha * k, p.rot);
-      sp.scale.set(k * p.size * (p.radius * 2) / DOT_SIZE);
-      this.particles[w++] = p;
-    }
-    this.particles.length = w;
-    w = 0;
-    for (const f of this.flashes) {
-      f.life += delta;
-      if (f.life >= f.max) continue;
-      const t = f.life / f.max;
-      const sp = pool.take(f.tex, f.x, f.y, 0.5, 0.5, f.color, f.alpha * (1 - t));
-      sp.scale.set((f.radius * (1 + f.grow * t) * 2) / DOT_SIZE);
-      this.flashes[w++] = f;
-    }
-    this.flashes.length = w;
-    pool.end();
-
-    // Update tractor beam animations
-    this.updateTractorBeams(delta);
+    this.fx.update(delta);
 
     for (const rift of this.rifts.values()) rift.update(delta);
     // Jump gates: the rings turn slowly against each other and the whole gate breathes (its light with it, see collectLights)
@@ -1215,59 +856,6 @@ export class Renderer {
     // (Each shell on the timeline its firing ship is drawn on: shotTimelines)
     this.weaponFx.update(this.state, delta, ...shotTimelines(this.state));
 }
-
-  /** Convert HSL to hex color (matching original game's color system) */
-  private hslToHex(h: number, s: number, l: number): number {
-    s /= 100;
-    l /= 100;
-    const a = s * Math.min(l, 1 - l);
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    };
-    const r = Math.round(f(0) * 255);
-    const g = Math.round(f(8) * 255);
-    const b = Math.round(f(4) * 255);
-    return (r << 16) | (g << 8) | b;
-  }
-
-  private renderDamageNumbers(delta: number): void {
-    // Counter-scaled zoomed out (so they stay readable), and they float as far on screen
-    const k = this.tagScale;
-    for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
-      const dn = this.damageNumbers[i];
-      dn.lifetime -= delta;
-      // Float up the screen, slowing, drifting a little to its side (so a burst of hits fans out instead of stacking)
-      dn.oy -= 55 * k * delta * dn.lifetime;
-      dn.ox += dn.drift * k * delta * dn.lifetime;
-      
-      if (dn.lifetime <= 0) {
-        this.numberLayer.removeChild(dn.text);
-        this.numberPool.push(dn.text);
-        this.damageNumbers.splice(i, 1);
-      } else {
-        const o = screenToWorldDir(dn.ox, dn.oy, this.cameraAngle);
-        dn.text.x = dn.x + o.x;
-        dn.text.y = dn.y + o.y;
-        dn.text.rotation = this.cameraAngle;
-        dn.text.alpha = Math.min(1, dn.lifetime * 2);
-        // A pop as it appears: big, settling to size in the first ~0.12 s
-        const age = 1 - dn.lifetime;
-        dn.text.scale.set((age < 0.12 ? 1 + 0.6 * (1 - age / 0.12) : 1) * k);
-      }
-    }
-  }
-
-  /** A particle (see updateEffects) */
-  private spark(x: number, y: number, vx: number, vy: number, life: number, radius: number, color: number, o: Partial<Particle> = {}): void {
-    if (this.particleKeep < 1 && Math.random() > this.particleKeep) return;
-    this.particles.push({ x, y, vx, vy, life, maxLife: o.maxLife ?? life, color, size: o.size ?? 1, radius, tex: o.tex ?? disc(), alpha: o.alpha ?? 1, rot: o.rot ?? 0, rotSpeed: o.rotSpeed ?? 0 });
-  }
-
-  /** A flash: `radius` growing by `grow` (×radius) while it fades from `alpha` over `max` seconds */
-  private flash(x: number, y: number, radius: number, color: number, alpha: number, max: number, grow: number, tex: Texture = disc()): void {
-    this.flashes.push({ x, y, radius, life: 0, max, color, alpha, grow, tex });
-  }
 
   // Public methods for effects
 
@@ -1313,346 +901,29 @@ export class Renderer {
     if (k <= 0) this.rockHits.delete(id);
   }
 
-  /** A hit's number over what it hit: yellow and bigger for a critical, small and grey for a glancing hit (a gun too weak for that armour) */
+  /** A hit's number over what it hit (DamageNumbers) */
   showDamageNumber(entityId: number, amount: number, critical?: boolean, glancing?: boolean): void {
     const entity = this.state.getEntity(entityId);
     if (!entity) return;
-    // A bitmap font (its digits drawn once), pooled: no text rasterised and uploaded per hit
-    if (!Renderer.fontInstalled) {
-      BitmapFont.install({ name: 'DamageNumbers', style: { fontFamily: 'Arial', fontSize: 36, fill: 0xffffff, fontWeight: 'bold' }, chars: [['0', '9']], resolution: 2 });
-      Renderer.fontInstalled = true;
-    }
-    const text = this.numberPool.pop() ?? new BitmapText({ text: '', style: { fontFamily: 'DamageNumbers', fontSize: 18 } });
-    text.text = Math.floor(amount).toString();
-    text.style.fontSize = critical ? 24 : glancing ? 14 : 18;
-    text.tint = critical ? 0xffff00 : glancing ? 0x94a3b8 : 0xff4444;
-    text.anchor.set(0.5);
-    text.alpha = 1;
-    text.visible = this.showDamageNumbers;
-    text.rotation = this.cameraAngle;
-    this.numberLayer.addChild(text);
-
-    text.scale.set(1.6 * this.tagScale);
-    const jx = (Math.random() - 0.5) * 24 * this.tagScale;
-    // (Its rise and drift along the screen's axes, from the hit)
-    const o = screenToWorldDir(jx, -30, this.cameraAngle);
-    text.x = entity.renderX + o.x;
-    text.y = entity.renderY + o.y;
-    this.damageNumbers.push({
-      drift: jx * 1.5,
-      x: entity.renderX,
-      y: entity.renderY,
-      ox: jx,
-      oy: -30,
-      amount,
-      critical: critical || false,
-      lifetime: 1,
-      text,
-    });
+    this.damageNumbers.show(entity.renderX, entity.renderY, amount, critical, glancing);
   }
 
   showExplosion(entityId: number): void {
     const entity = this.state.getEntity(entityId);
     if (!entity) return;
-    const particleCount = 30;
-    for (let i = 0; i < particleCount; i++) {
-      const angle = (i / particleCount) * Math.PI * 2;
-      const speed = 2 + Math.random() * 4;
-      this.spark(entity.renderX, entity.renderY, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.5 + Math.random() * 0.5, 5,
-        Math.random() > 0.5 ? 0xff8800 : 0xffff00, { maxLife: 1 });
-    }
+    this.fx.explosion(entity.renderX, entity.renderY);
   }
 
-  showEffect(type: EffectType, x: number, y: number, data?: number[], targetX?: number, targetY?: number, entityId?: number): void {
-    switch (type) {
-      case EffectType.Explosion:
-        this.createExplosionAt(x, y, data?.[0] || 100);
-        break;
-      case EffectType.LaserHit:
-        // Laser beams are now rendered from snapshot data (see updateRemoteLasers / CURSOR_STATE.md).
-        // The server no longer broadcasts per-fire LaserHit effects.
-        // Fall through to bullet hit for any legacy messages.
-        this.createBulletHitEffect(x, y, data?.[0] || 10, data?.[1] || 30);
-        break;
-      case EffectType.AsteroidBreak:
-        this.createAsteroidBreakEffect(x, y, data?.[0] || 50, data?.[1] || 30);
-        break;
-      case EffectType.MineArm:
-        this.createMineArmEffect(x, y);
-        break;
-      case EffectType.PickupItem:
-        if (targetX !== undefined && targetY !== undefined) {
-          this.createTractorBeam(x, y, targetX, targetY);
-        }
-        break;
-      case EffectType.MissileTrail:
-        // Handled by trail system
-        break;
-      case EffectType.WarpOut:
-      case EffectType.WarpIn:
-        // (data 2: something's spooling up to come through here, a few seconds off)
-        if (data?.[0] === 2) this.createArrivalWarning(x, y);
-        else this.createWarpEffect(x, y, type === EffectType.WarpOut);
-        break;
-      case EffectType.ShieldFlash:
-        // (a Flash Screen came back: a white bloom and a ring where the ship is)
-        this.flash(x, y, 90, 0xffffff, 0.8, 0.35, 1.4);
-        this.flash(x, y, 80, 0xbfe6ff, 0.7, 0.6, 3, ring());
-        break;
-      // Add more effect types as needed
-    }
-  }
-  
-  /**
-   * A ship went through a gate (out: leaving here; in: arriving): a white-blue
-   * flash and a shockwave ring, as the jump drive's launch and arrival (JumpFx).
-   */
-  private createWarpEffect(x: number, y: number, out: boolean): void {
-    if (out) {
-      this.flash(x, y, 70, 0xe8f6ff, 0.85, 0.45, 1.6);
-      this.flash(x, y, 60, 0x7dd3fc, 0.9, 0.8, 9, ring());
-      this.flash(x, y, 40, 0x3b82f6, 0.6, 0.6, 5, ring());
-    } else {
-      this.flash(x, y, 50, 0xe8f6ff, 0.7, 0.35, 1);
-      this.flash(x, y, 45, 0x7dd3fc, 0.8, 0.55, 4, ring());
-    }
-    for (let i = 0; i < 14; i++) {
-      const a = Math.random() * Math.PI * 2, sp = (out ? 4 : 2.5) + Math.random() * 4;
-      this.spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.3 + Math.random() * 0.3, 3 + Math.random() * 3, Math.random() > 0.4 ? 0x9fd8ff : 0xffffff,
-        { maxLife: 0.6, size: 0.8, tex: softDot() });
-    }
-  }
-
-  /**
-   * Something is about to come through here (a gate spooling up, a front
-   * arriving out of the dark): slow amber rings drawing in, a few seconds'
-   * warning to get ready or get clear.
-   */
-  private createArrivalWarning(x: number, y: number): void {
-    for (let k = 0; k < 4; k++) this.flash(x, y, 380 - k * 60, 0xffb547, 0.5, 0.9 + k * 0.55, -0.6, ring());
-    this.flash(x, y, 160, 0xffd890, 0.35, 3, 0.4);
-  }
-
-  private createMineArmEffect(x: number, y: number): void {
-    // Pulsing ring effect when mine arms
-    this.flash(x, y, 20, 0xff4444, 0.8, 0.21, 2, ring());
-  }
-
-  private createExplosionAt(x: number, y: number, radius: number): void {
-    const particleCount = Math.floor(radius / 3); // More particles
-    const debrisCount = Math.floor(radius / 10); // Add debris
-
-    // Main explosion particles: white/yellow core to orange/red edges
-    for (let i = 0; i < particleCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 4;
-      const roll = Math.random();
-      const color = roll < 0.2 ? 0xffffff : roll < 0.4 ? 0xffffaa : roll < 0.7 ? 0xff8800 : 0xff4400;
-      this.spark(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.2 + Math.random() * 0.5, 2 + Math.random() * 4, color, { maxLife: 0.7, size: 1.2 });
-    }
-    // Debris chunks, spinning
-    for (let i = 0; i < debrisCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 2 + Math.random() * 3;
-      this.spark(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.5 + Math.random() * 0.5, 3 + Math.random() * 5, 0x6a6a6a,
-        { maxLife: 1, tex: rock(i), rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 10 });
-    }
-    // Central flash
-    this.flash(x, y, radius * 0.8, 0xffffff, 0.8, 0.13, 0.8);
-
-    // Trigger screen shake for nearby explosions
-    const player = this.state.entities.get(this.state.playerId);
-    if (player) {
-      const dx = player.x - x;
-      const dy = player.y - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const maxDist = 500;
-      if (dist < maxDist) {
-        const intensity = ((maxDist - dist) / maxDist) * (radius / 50);
-        this.state.triggerScreenShake(Math.min(intensity, 15), 0.3);
-      }
-    }
-  }
-
-  // Update active lasers (call from render loop)
-
-  private createTractorBeam(startX: number, startY: number, targetX: number, targetY: number): void {
-    this.tractorBeams.push({ startX, startY, targetX, targetY, progress: 0 });
-  }
-
-  private updateTractorBeams(dt: number): void {
-    const pool = this.beamPool;
-    pool.begin();
-    let w = 0;
-    for (const beam of this.tractorBeams) {
-      beam.progress += dt * 2.5; // ~0.4 second animation
-      if (beam.progress >= 1) continue;
-      this.tractorBeams[w++] = beam;
-
-      // Animate the item moving toward the player
-      const t = beam.progress;
-      const easeT = 1 - Math.pow(1 - t, 3); // Ease out cubic
-      const currentX = beam.startX + (beam.targetX - beam.startX) * easeT;
-      const currentY = beam.startY + (beam.targetY - beam.startY) * easeT;
-
-      // Pulsing energy beam from player to item pickup point: a wide glow and a bright core
-      const pulse = Math.sin(t * Math.PI * 8) * 0.3 + 0.7;
-      const beamWidth = 3 + pulse * 2;
-      const len = Math.hypot(currentX - beam.targetX, currentY - beam.targetY);
-      const rot = Math.atan2(currentY - beam.targetY, currentX - beam.targetX);
-      const fade = 1 - t;
-      for (const [width, color, alpha] of [[beamWidth + 8, 0x00ffff, 0.3], [beamWidth, 0xaaffff, 0.7], [1.5, 0xffffff, 0.8]] as const) {
-        const sp = pool.take(streak(), beam.targetX, beam.targetY, 0, 0.5, color, alpha * fade);
-        const sc = streakScale(len, width);
-        sp.scale.set(sc.x, sc.y);
-        // The streak's tail cap starts half a width behind its anchor
-        sp.position.set(beam.targetX - Math.cos(rot) * width / 2, beam.targetY - Math.sin(rot) * width / 2);
-        sp.rotation = rot;
-      }
-
-      // Item dot at current position
-      const dotSize = 6 * (1 - t * 0.5);
-      pool.take(softDot(), currentX, currentY, 0.5, 0.5, 0x00ffff, 0.5).scale.set(((dotSize + 4) * 2) / DOT_SIZE);
-      pool.take(disc(), currentX, currentY, 0.5, 0.5, 0xffffff, 0.8).scale.set((dotSize * 2) / DOT_SIZE);
-
-      // Sparkle particles along beam (about 18 a second)
-      if (Math.random() < dt * 18) {
-        const sparkT = Math.random();
-        const sparkX = beam.targetX + (currentX - beam.targetX) * sparkT;
-        const sparkY = beam.targetY + (currentY - beam.targetY) * sparkT;
-
-        this.spark(sparkX + (Math.random() - 0.5) * 10, sparkY + (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2,
-          0.2, 2 + Math.random() * 2, 0x88ffff, { size: 0.5, alpha: 0.8 });
-      }
-    }
-    this.tractorBeams.length = w;
-    pool.end();
-  }
-
-  /**
-   * Create a bullet hit effect at a position (hitting asteroid/enemy)
-   */
-  private createBulletHitEffect(x: number, y: number, damage: number, hue: number): void {
-    const color = this.hueToColor(hue);
-    // Flash at impact point
-    this.flash(x, y, 8 + damage * 0.5, 0xffffff, 0.8, 0.08, 0);
-    this.flash(x, y, 5 + damage * 0.3, color, 0.9, 0.08, 0);
-    // Spark particles
-    const sparkCount = Math.min(12, 4 + Math.floor(damage / 5));
-    for (let i = 0; i < sparkCount; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = 2 + Math.random() * 4;
-      this.spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.15 + Math.random() * 0.15, 1.5 + Math.random() * 1.5, Math.random() > 0.3 ? color : 0xffffff,
-        { maxLife: 0.3, size: 0.6 });
-    }
-  }
-
-  /**
-   * Create asteroid break/destroy effect
-   */
-  private createAsteroidBreakEffect(x: number, y: number, size: number, hue: number): void {
-    const color = this.hueToColor(hue);
-    const particleCount = Math.min(30, Math.floor(size / 3));
-    // Central flash, expanding as it fades
-    this.flash(x, y, size * 1.2, 0xffffff, 0.6, 0.16, 1.5);
-    // Rock debris
-    for (let i = 0; i < particleCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1 + Math.random() * 4;
-      this.spark(x + (Math.random() - 0.5) * size * 0.5, y + (Math.random() - 0.5) * size * 0.5, Math.cos(angle) * speed, Math.sin(angle) * speed,
-        0.5 + Math.random() * 0.5, 2 + Math.random() * (size / 10), Math.random() > 0.2 ? color : this.hueToColor(hue + 10),
-        { maxLife: 1, size: 0.8, tex: rock(i), rot: Math.random() * Math.PI * 2 });
-    }
-    // Dust cloud (small fading particles)
-    for (let i = 0; i < particleCount / 2; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 0.5 + Math.random() * 2;
-      this.spark(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.3 + Math.random() * 0.3, 3 + Math.random() * 4, color,
-        { maxLife: 0.6, size: 0.5, alpha: 0.4 });
-    }
-  }
-
-  /**
-   * Convert HSL hue (0-360) to RGB color number
-   */
-  private hueToColor(hue: number): number {
-    const h = (hue % 360) / 360;
-    const s = 0.7;
-    const l = 0.5;
-    
-    const hueToRgb = (p: number, q: number, t: number) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-    
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    
-    const r = Math.round(hueToRgb(p, q, h + 1/3) * 255);
-    const g = Math.round(hueToRgb(p, q, h) * 255);
-    const b = Math.round(hueToRgb(p, q, h - 1/3) * 255);
-    
-    return (r << 16) | (g << 8) | b;
+  showEffect(type: EffectType, x: number, y: number, data?: number[], targetX?: number, targetY?: number, _entityId?: number): void {
+    this.fx.showEffect(type, x, y, data, targetX, targetY);
   }
 
   showDeathScreen(killerName?: string): void {
-    if (this.deathOverlay) return;
-    this.killerName = killerName;
-    this.deathAt = performance.now();
-    this.buildDeathScreen();
-  }
-
-  /** The overlay (it fades and settles in from deathAt, see updateScreen) */
-  private buildDeathScreen(): void {
-    const w = this.app.screen.width, h = this.app.screen.height;
-    this.deathOverlay = new Container();
-    this.deathOverlay.alpha = 0;
-
-    const bg = new Graphics();
-    bg.rect(0, 0, w, h);
-    bg.fill({ color: 0x000000, alpha: 0.7 });
-    this.deathOverlay.addChild(bg);
-
-    const text = new Text({
-      text: 'DESTROYED',
-      style: new TextStyle({ fontFamily: 'Arial', fontSize: 48, fill: 0xff4444, fontWeight: 'bold', letterSpacing: 6 }),
-    });
-    text.anchor.set(0.5);
-    text.position.set(w / 2, h / 2 - 50);
-    text.label = 'deathTitle';
-    this.deathOverlay.addChild(text);
-
-    if (this.killerName) {
-      const by = new Text({
-        text: `by ${this.killerName}`,
-        style: new TextStyle({ fontFamily: 'Arial', fontSize: 20, fill: 0xffb4a8 }),
-      });
-      by.anchor.set(0.5);
-      by.position.set(w / 2, h / 2 - 8);
-      this.deathOverlay.addChild(by);
-    }
-
-    const subText = new Text({
-      text: `Press ${boundKeyName('respawn', settings.data.bindings)} to respawn`,
-      style: new TextStyle({ fontFamily: 'Arial', fontSize: 24, fill: 0xffffff }),
-    });
-    subText.anchor.set(0.5);
-    subText.position.set(w / 2, h / 2 + 34);
-    this.deathOverlay.addChild(subText);
-
-    this.uiContainer.addChild(this.deathOverlay);
+    this.death.show(killerName);
   }
 
   hideDeathScreen(): void {
-    if (this.deathOverlay) {
-      this.uiContainer.removeChild(this.deathOverlay);
-      this.deathOverlay.destroy({ children: true });
-      this.deathOverlay = null;
-    }
+    this.death.hide();
   }
 
   /** (Through the view's roll; not the shake) */
@@ -1798,9 +1069,6 @@ export class Renderer {
     return { x: this.cameraX, y: this.cameraY, width: this.app.screen.width, height: this.app.screen.height };
   }
 
-  /** Share of the small effect particles spawned (the quality setting) */
-  private particleKeep = 1;
-  private minimapMs = 50;
   /** The overlays are stepped every hudEvery frames, with the time since */
   private hudEvery = 1;
   private overlayFrames = 0;
@@ -1812,9 +1080,9 @@ export class Renderer {
     this.bloom.setQuality(q.bloomScale, q.bloomQuality);
     this.sky.setDetail(q.hazeScale, q.starLayers);
     this.sun.setScale(q.sunScale);
-    this.particleKeep = q.particles;
+    this.fx.particleKeep = q.particles;
     this.weaponFx.particleKeep = q.particles;
-    this.minimapMs = 1000 / q.minimapHz;
+    this.minimap.setHz(q.minimapHz);
     this.hudEvery = q.hudEvery;
   }
 
@@ -1827,57 +1095,6 @@ export class Renderer {
   applyLighting(): void {
     const w = this.app.screen.width, h = this.app.screen.height;
     this.lighting.frame({ x: this.cameraX, y: this.cameraY, r: Math.hypot(w, h) / 2 / this.cameraZoom });
-  }
-
-  /**
-   * A system's light: its ambient (from its sky, dimmer in dark systems, or
-   * set in its data) and its central body's (a sun's warm light, a black
-   * hole's disc glow, a pulsar's cold one).
-   */
-  private lightSystem(v: SystemVisuals, biome: SkyBiome): void {
-    const sys = this.sys.data;
-    // A planet's surface: daylight, from the same way the ground is shaded
-    const day = sys?.surface ? this.surface.light() : null;
-    if (day) {
-      const tl = Math.max(...day.tint) || 1;
-      // Underground: no sun, a little dim light, most of it the glow of the cracks in the floor coming up
-      if (!day.sun) {
-        this.lighting.ambient = [0, 1, 2].map((i) => day.ambient * (0.45 + 0.55 * (day.tint[i] / tl))) as [number, number, number];
-        this.lighting.sun.power = 0;
-        this.lighting.ground = day.ground;
-        this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0, sun: [1, 1, 1] };
-        return;
-      }
-      const lava = sys?.surface?.kind === 'lava';
-      // (a lava world's sky is its own haze: the light takes much more of its colour, and the sun comes through it warm)
-      this.lighting.ambient = [0, 1, 2].map((i) => day.ambient * ((lava ? 0.55 : 0.8) + (lava ? 0.45 : 0.2) * (day.tint[i] / tl))) as [number, number, number];
-      Object.assign(this.lighting.sun, { x: -SUN_DIR[0] * 1e8, y: -SUN_DIR[1] * 1e8, falloff: 1e9, power: 0.8, color: lava ? [1, 0.82, 0.66] : [1, 0.96, 0.88], elevation: 0.85 });
-      this.lighting.ground = day.ground;
-      this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0.8, sun: [...this.lighting.sun.color] as [number, number, number] };
-      return;
-    }
-    this.lighting.ground = [0, 0, 0];
-    const AMBIENT: Record<string, number> = { band: 0.3, cluster: 0.32, emission: 0.28, ember: 0.22, remnant: 0.22, void: 0.06, abyss: 0.07 };
-    let level = typeof sys?.visuals?.ambient === 'number' ? sys.visuals.ambient : AMBIENT[biome.kind] ?? 0.25;
-    if (v.hazards?.includes('darkness')) level *= 0.6;
-    // Tinted a little by the sky's own colour
-    const tint = biome.nebula.strength > 0.05 ? biome.nebula.b : biome.band.edge;
-    const tl = Math.max(tint[0], tint[1], tint[2]) || 1;
-    this.lighting.ambient = [0, 1, 2].map((i) => level * (0.75 + 0.25 * (tint[i] / tl))) as [number, number, number];
-    const sun = this.lighting.sun;
-    sun.x = 0; sun.y = 0;
-    if (v.noCentralBody) sun.power = 0;
-    else if (v.centralType === 'black_hole') {
-      Object.assign(sun, { power: 1.1, falloff: (v.centralRadius ?? 1000) * 10, color: this.hslRgb(v.centralHue ?? 30, 0.85, 0.62), elevation: 0.55 });
-    } else if (v.centralType === 'pulsar') {
-      Object.assign(sun, { power: 0.9, falloff: 25000, color: this.hslRgb(v.centralHue ?? 190, 0.6, 0.78), elevation: 0.7 });
-    } else if (v.centralType === 'brown_dwarf') {
-      // Dim and red: the planets and rocks catch a low ember light
-      Object.assign(sun, { power: 0.75, falloff: 30000 + (v.centralRadius ?? 0), color: this.hslRgb(v.centralHue ?? 14, 0.75, 0.6), elevation: 0.45 });
-    } else {
-      const r = v.detailStar ? v.detailParams?.radius ?? v.starRadius : v.starRadius;
-      Object.assign(sun, { power: 1.0, falloff: 39000 + r, color: this.hslRgb(v.starHue, 0.55, 0.84), elevation: 0.55 });
-    }
   }
 
   /** How dark it is on this surface (0 day .. 1 night): a moon siege's nights */
@@ -1910,7 +1127,7 @@ export class Renderer {
     if (!sys?.surface) return;
     const s = sys.surface;
     const view = s.city ? new CityView(s.city, s.seed ?? 1, this.lighting) : null;
-    const bastion = s.bastion ? new BastionView(s.bastion, this.lighting, { radius: s.radius, boom: (x, y, r) => this.createExplosionAt(x, y, r) }) : null;
+    const bastion = s.bastion ? new BastionView(s.bastion, this.lighting, { radius: s.radius, boom: (x, y, r) => this.fx.createExplosionAt(x, y, r) }) : null;
     if (view) this.backgroundContainer.addChild(view.container);
     if (bastion) { this.backgroundContainer.addChild(bastion.container); this.effectContainer.addChild(bastion.top); }
     this.city = { system: sys.id, view, bastion };
@@ -1926,10 +1143,7 @@ export class Renderer {
   /** The renderer's own lights: old-style flashes, loot, rifts, stations */
   private collectLights(L: Lighting): void {
     this.weaponFx.collectLights(L);
-    for (const f of this.flashes) {
-      const t = f.life / f.max;
-      L.point(f.x, f.y, f.color, f.radius * (1 + f.grow * t) * 3 + 40, f.alpha * (1 - t) * 1.2);
-    }
+    this.fx.collectLights(L);
     const RARITY = [0xc8d0dc, 0x5fd38d, 0x4fa3ff, 0xc77dff, 0xffb347];
     for (const [id, c] of this.entityGraphics) {
       if (!c.visible) continue;
@@ -1956,156 +1170,10 @@ export class Renderer {
     this.sky.resize();
     this.surface.resize();
     // Update any screen-space UI (the death screen keeps its place in its fade)
-    if (this.deathOverlay) {
-      const old = this.deathOverlay;
-      const alpha = old.alpha, titleScale = old.getChildByLabel('deathTitle')?.scale.x;
-      this.uiContainer.removeChild(old);
-      old.destroy({ children: true });
-      this.buildDeathScreen();
-      // (It starts at 0: carry the fade across, so a resize while dead doesn't flash the world back)
-      if (this.deathOverlay) {
-        this.deathOverlay.alpha = alpha;
-        if (titleScale !== undefined) this.deathOverlay.getChildByLabel('deathTitle')?.scale.set(titleScale);
-      }
-    }
-    
-    // Reposition minimap
-    if (this.minimapContainer) {
-      this.minimapContainer.x = this.app.screen.width - this.MINIMAP_SIZE - 15;
-    }
-    
+    this.death.rebuild();
+    this.minimap.onResize();
+
     // Starfield quad rescales itself in update(), nothing to do here
   }
   
-  /** The minimap's nests and way-ins together (reused) */
-  private nestScratch: typeof this.wayIns = [];
-  /** The populations' ghosts (packs nobody's near: state/Populations.ts), reused */
-  private ghostScratch: import('../state/Populations').PopGhost[] = [];
-
-  private updateMinimap(): void {
-    if (!this.minimapGraphics || !this.minimapContainer) return;
-    
-    const g = this.minimapGraphics;
-    g.clear();
-    // Turned with the view, so it reads the same way as the screen
-    g.pivot.set(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2);
-    g.position.set(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2);
-    g.rotation = -this.cameraAngle;
-    
-    const playerPos = this.state.getPlayerPosition();
-    const center = this.MINIMAP_SIZE / 2;
-    const scale = (this.MINIMAP_SIZE / 2) / this.MINIMAP_RANGE;
-    
-    // Draw star/sun at center if close enough
-    const sunDist = Math.sqrt(playerPos.x ** 2 + playerPos.y ** 2);
-    if (sunDist < this.MINIMAP_RANGE * 2) {
-      const sunX = center + (-playerPos.x) * scale;
-      const sunY = center + (-playerPos.y) * scale;
-      g.circle(sunX, sunY, 8);
-      g.fill({ color: 0xffaa00, alpha: 0.9 });
-      g.circle(sunX, sunY, 5);
-      g.fill({ color: 0xffff88, alpha: 1.0 });
-    }
-
-    // Hostile nests: a triangle in their faction's colour
-    const nestList = this.nestScratch;
-    nestList.length = 0;
-    for (const n of this.sys.data?.nests ?? []) if (!n.hidden) nestList.push(n);
-    for (const n of this.wayIns) nestList.push(n);
-    for (const n of nestList) {
-      const at = nestPosition(n, this.sys.data?.planets, this.state.getRawServerTick());
-      const dx = at.x - playerPos.x, dy = at.y - playerPos.y;
-      if (dx * dx + dy * dy > this.MINIMAP_RANGE * this.MINIMAP_RANGE) continue;
-      const mx = center + dx * scale, my = center + dy * scale;
-      g.poly([mx, my - 6, mx + 5.5, my + 4, mx - 5.5, my + 4]);
-      g.fill({ color: nestColor(n.faction), alpha: 0.35 });
-      g.stroke({ color: nestColor(n.faction), width: 1.5, alpha: 0.95 });
-    }
-
-    // Ghosts: packs nobody's near, as faint rings in their faction's colour (real ships once a pilot comes near)
-    for (const gh of this.state.populations.ghosts(this.state.systemId, this.sys.data, this.state.getRawServerTick(), this.ghostScratch)) {
-      const dx = gh.x - playerPos.x, dy = gh.y - playerPos.y;
-      if (dx * dx + dy * dy > this.MINIMAP_RANGE * this.MINIMAP_RANGE) continue;
-      g.circle(center + dx * scale, center + dy * scale, 3);
-      g.stroke({ color: gh.calm ? 0x9ca3af : FACTION_COLORS[gh.faction] ?? 0xff4444, width: 1, alpha: 0.5 });
-    }
-
-    // Draw entities
-    for (const [id, entity] of this.state.entities) {
-      const dx = entity.renderX - playerPos.x;
-      const dy = entity.renderY - playerPos.y;
-      const dist = Math.sqrt(dx ** 2 + dy ** 2);
-      
-      if (dist > this.MINIMAP_RANGE) continue;
-      
-      const mx = center + dx * scale;
-      const my = center + dy * scale;
-      
-      // Color based on entity type
-      switch (entity.type) {
-        case EntityType.Player:
-          if (id === this.state.playerId) continue; // Skip self
-          g.circle(mx, my, 4);
-          g.fill({ color: 0x44ff44, alpha: 0.9 }); // Green for other players
-          break;
-          
-        case EntityType.Asteroid:
-          g.circle(mx, my, 2 + (entity.data?.[0] || 50) / 50);
-          g.fill({ color: 0x888888, alpha: 0.6 }); // Gray for asteroids
-          break;
-          
-        case EntityType.DroppedItem:
-          g.circle(mx, my, 3);
-          g.fill({ color: 0xffff00, alpha: 0.9 }); // Yellow for items
-          break;
-          
-        case EntityType.Enemy:
-          g.circle(mx, my, 4);
-          g.fill({ color: 0xff4444, alpha: 0.9 }); // Red for enemies
-          break;
-
-        case EntityType.ShipBody: {
-          // data[0]: 3 hostile (in its faction's colour; bigger for elites and bosses), 2 traffic, 1 wreck/derelict
-          const kind = entity.data?.[0] ?? 0;
-          if (kind === 3) {
-            const rank = entity.data?.[4] ?? 0;
-            g.circle(mx, my, rank === 2 ? 6 : rank === 1 ? 4.5 : 3.5);
-            // (Grey while it's a passive pack nobody's provoked)
-            g.fill({ color: entity.data?.[9] === 1 ? 0x9ca3af : FACTION_COLORS[entity.data?.[3] ?? -1] ?? 0xff4444, alpha: entity.data?.[9] === 1 ? 0.7 : 0.95 });
-          } else if (kind === 2) {
-            g.circle(mx, my, 2.5);
-            g.fill({ color: 0x9fd8ff, alpha: 0.75 }); // Pale blue for traffic
-          } else if (kind === 1) {
-            g.circle(mx, my, 2.5);
-            g.fill({ color: 0x8a8a8a, alpha: 0.7 }); // Grey for wrecks and derelicts
-          }
-          break;
-        }
-          
-        case EntityType.Station:
-          g.rect(mx - 5, my - 5, 10, 10);
-          g.fill({ color: 0x4488ff, alpha: 0.9 }); // Blue for stations
-          break;
-          
-        case EntityType.NPC:
-          g.circle(mx, my, 4);
-          g.fill({ color: 0x44ffff, alpha: 0.9 }); // Cyan for NPCs
-          break;
-      }
-    }
-    
-    // Draw player at center
-    g.circle(center, center, 5);
-    g.fill({ color: 0x00ff00, alpha: 1.0 });
-    
-    // Draw player direction indicator
-    const player = this.state.entities.get(this.state.playerId);
-    if (player) {
-      const angle = player.angle || 0;
-      const dirLen = 12;
-      g.moveTo(center, center);
-      g.lineTo(center + Math.cos(angle) * dirLen, center + Math.sin(angle) * dirLen);
-      g.stroke({ color: 0x00ff00, width: 2, alpha: 0.8 });
-    }
-  }
 }
