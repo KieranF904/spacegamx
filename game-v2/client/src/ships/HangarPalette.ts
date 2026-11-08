@@ -32,6 +32,10 @@ import { buildFacts, type FactGroup } from './buildFacts';
 import { keyStats, mountBadge, mountingText, MOUNT_TEXT, sizeWord, weaponMount } from './modelCards';
 import { paletteRows, rowInHand, rowPart, spareRows, tabOfFn, type PaletteRow } from './paletteModel';
 import { functionColor, numToCss } from './shipColors';
+import { ALL, applyFilters, loadFilters, saveFilters, subCounts, subsOf, type AmmoFilter, type FilterState, type MountFilter } from './paletteFilters';
+import { cardStats } from './paletteCard';
+import { cardHtml } from './paletteCardView';
+import { GunPreviewHover } from './gunPreview/previewHover';
 
 export interface PaletteSel { piece: string; fn: string; material: string; rot: Rot; flip: boolean; facing: Side | 'auto' }
 
@@ -128,6 +132,30 @@ const STYLE = `
 .hp-tab .n { min-width: 14px; padding: 0 4px; border-radius: 7px; box-sizing: border-box; text-align: center; background: rgba(125, 160, 210, 0.16); color: #c9d4e5;
   font-size: 9px; letter-spacing: 0; line-height: 13px; }
 .hp-tab .n.sp { background: rgba(74, 222, 128, 0.18); color: #86efac; }
+.hp-subs { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.hp-subs[hidden] { display: none; }
+.hp-sub { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; line-height: 16px;
+  background: #0f1626; border: 1px solid #2a3a5a; color: #a7b4c8; }
+.hp-sub:hover { border-color: #46608c; color: #e5ecf7; }
+.hp-sub[aria-checked="true"], .hp-sub[aria-pressed="true"] { background: #24406b; border-color: #5fd4c4; color: #fff; }
+.hp-sub small { font-size: 9px; color: #6b7a93; }
+.hp-sub[aria-checked="true"] small { color: #b6c8e4; }
+.hp-subs .gap { width: 6px; }
+.hp-card { display: block; white-space: normal; }
+.hp-bars { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; }
+.hp-bar { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'l n' 'b b'; column-gap: 4px; row-gap: 1px; font-size: 10px; min-width: 0; }
+.hp-bar em { grid-area: l; font-style: normal; color: #6b7a93; font-size: 9px; }
+.hp-bar b { grid-area: n; text-align: right; color: #d6deeb; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp-bar i { grid-area: b; display: block; height: 4px; border-radius: 2px; background: #1b2740; position: relative; overflow: hidden; }
+.hp-bar i::after { content: ''; position: absolute; inset: 0; width: var(--f, 0%); background: var(--c, #7dd3fc); border-radius: 2px; }
+.hp-held { font-size: 9px; color: #7dd3fc; border: 1px solid #2f6f8f; border-radius: 3px; padding: 0 3px; }
+.hp-heads { font-size: 10.5px; color: #a7b4c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp-chipsrow { display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+.hp-am, .hp-pw { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; color: #d6deeb; white-space: nowrap; }
+.hp-am img { width: 14px; height: 14px; }
+.hp-pw svg { width: 10px; height: 10px; color: #fbbf24; }
+.hp-pw.make svg { color: #4ade80; } .hp-pw.hold svg { color: #7dd3fc; }
+.hp-pw small { color: #6b7a93; font-size: 9px; }
 .hp-list { flex: 1; min-height: 60px; overflow-y: auto; padding-right: 2px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #2a3a5a transparent; }
 .hp-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px; margin-bottom: 3px; border-radius: 6px; background: #0f1626; border: 1px solid #22304a;
   border-left: 3px solid var(--c, #8ea0bd); overflow: hidden; }
@@ -194,6 +222,11 @@ export class HangarPalette {
   private stats = new Map<string, string>();
   /** This render's statuses, by row id */
   private st = new Map<string, RowStatus>();
+  /** The subcategory chips under the tabs, and what they and the weapon toggles have chosen (remembered) */
+  private subsEl: HTMLDivElement;
+  private filters: FilterState = loadFilters();
+  /** The live gun preview beside the list (made on the first hover over a gun) */
+  private hover: GunPreviewHover;
 
   constructor(private h: PaletteHost) {
     if (!styled) {
@@ -212,12 +245,17 @@ export class HangarPalette {
     this.tabsEl.className = 'hp-tabs';
     this.tabsEl.setAttribute('role', 'tablist');
     this.tabsEl.setAttribute('aria-label', 'Part categories');
+    this.subsEl = document.createElement('div');
+    this.subsEl.className = 'hp-subs';
+    this.subsEl.setAttribute('role', 'group');
+    this.subsEl.setAttribute('aria-label', 'Filter this category');
     this.list = document.createElement('div');
     this.list.className = 'hp-list';
     this.list.setAttribute('role', 'tabpanel');
     this.foot = document.createElement('div');
     this.foot.className = 'hp-foot';
-    this.root.append(this.hand, this.tabsEl, this.list, this.foot);
+    this.root.append(this.hand, this.tabsEl, this.subsEl, this.list, this.foot);
+    this.hover = new GunPreviewHover(this.root, { catalog: h.catalog, tuning: h.tuning, econ: h.econ });
     this.tab = tabOfFn(this.rows, h.sel().fn) ?? 'structure';
 
     this.root.addEventListener('click', (e) => this.onClick(e));
@@ -225,9 +263,9 @@ export class HangarPalette {
     // Hover a part (a row, the part in hand): what it is and does
     this.root.addEventListener('mousemove', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-part]');
-      if (el) this.h.partTip(el.dataset.part!, e); else this.h.hideTip();
+      if (el) { this.h.partTip(el.dataset.part!, this.hover.clearOfPanel(el.dataset.part!, e)); this.hover.over(el.dataset.part!, el.closest<HTMLElement>('.hp-row') ?? el); } else { this.h.hideTip(); this.hover.out(); }
     });
-    this.root.addEventListener('mouseleave', () => this.h.hideTip());
+    this.root.addEventListener('mouseleave', () => { this.h.hideTip(); this.hover.out(); });
   }
 
   // -------------------------------------------------------------------------
@@ -278,6 +316,26 @@ export class HangarPalette {
     return [...this.rows, ...spares].filter((r) => r.tab === tab);
   }
 
+  /** The tab's rows after the subcategory and weapon filters; `base`: before the subcategory (its chips' counts) */
+  private visibleRows(tab: CompTab): { rows: PaletteRow[]; base: PaletteRow[] } {
+    const { catalog, tuning } = this.h;
+    const base = applyFilters(this.rowsOf(tab), tab, { ...this.filters, sub: {} }, catalog, tuning);
+    return { base, rows: applyFilters(base, tab, this.filters, catalog, tuning) };
+  }
+
+  /** Keeps the row of the part in hand on screen: a filter that hides it is let go */
+  private ensureVisible(): void {
+    const tab = tabOfFn(this.rows, this.h.sel().fn);
+    if (!tab) return;
+    const row = this.rows.find((r) => r.kind !== 'spare' && r.fn === this.h.sel().fn);
+    if (row && !this.visibleRows(tab).rows.includes(row)) {
+      delete this.filters.sub[tab];
+      this.filters.ammo = 'any';
+      this.filters.mount = 'any';
+      saveFilters(this.filters);
+    }
+  }
+
   private keyStatsOf(f: FunctionDef, piece: string, material: string): string {
     const k = `${f.id}:${piece}:${material}`;
     let s = this.stats.get(k);
@@ -295,6 +353,7 @@ export class HangarPalette {
     this.st.clear();
     this.renderHand();
     this.renderTabs();
+    this.renderSubs();
     this.renderList();
     this.refocus(focus);
   }
@@ -311,6 +370,7 @@ export class HangarPalette {
     const t = tabOfFn(this.rows, this.h.sel().fn);
     if (t) this.tab = t;
     this.shapeMemory.set(this.h.sel().fn, this.h.sel().piece);
+    this.ensureVisible();
     this.render();
     this.list.querySelector<HTMLElement>('.hp-row.on')?.scrollIntoView({ block: 'nearest' });
   }
@@ -333,14 +393,45 @@ export class HangarPalette {
     }).join('');
   }
 
+  /** The subcategory chips (with counts) and, for weapons, the ammo and mount toggles */
+  private renderSubs(): void {
+    const tab = this.tab, { catalog, tuning } = this.h;
+    const { base } = this.visibleRows(tab);
+    const counts = subCounts(base, tab, catalog, tuning);
+    const cur = this.filters.sub[tab] ?? ALL;
+    const subs = subsOf(tab).filter((s) => (counts.get(s.id) ?? 0) > 0 || s.id === cur);
+    const key = (k: string) => `data-key="sub:${k}"`;
+    let html = '';
+    if (subs.length > 1) {
+      html += `<span role="radiogroup" aria-label="Group" data-group="sub" style="display:contents">`;
+      const chip = (id: string, label: string, n: number, hint?: string) =>
+        `<button class="hp-sub" role="radio" data-sub="${id}" ${key(id)} aria-checked="${cur === id}" tabindex="${cur === id ? 0 : -1}"${hint ? ` title="${esc(hint)}"` : ''}>${esc(label)}<small>${n}</small></button>`;
+      html += chip(ALL, 'All', counts.get(ALL) ?? 0) + subs.map((s) => chip(s.id, s.label, counts.get(s.id) ?? 0, s.hint)).join('');
+      html += `</span>`;
+    }
+    if (tab === 'weapons') {
+      const tog = (k: string, label: string, on: boolean, hint: string) =>
+        `<button class="hp-sub" data-needs="${k}" ${key(k)} aria-pressed="${on}" title="${esc(hint)}">${esc(label)}</button>`;
+      html += (html ? '<span style="flex-basis:100%; height:0"></span>' : '') + `<span data-group="needs" style="display:contents">`
+        + tog('ammo', 'Ammo', this.filters.ammo === 'ammo', 'Only guns that fire ammunition items')
+        + tog('none', 'No ammo', this.filters.ammo === 'none', 'Only guns that run on power alone')
+        + tog('fixed', 'Fixed', this.filters.mount === 'fixed', 'Only guns that fire where the ship points')
+        + tog('turret', 'Turret', this.filters.mount === 'turret', 'Only guns that swivel to the cursor')
+        + `</span>`;
+    }
+    this.subsEl.hidden = !html;
+    this.subsEl.innerHTML = html;
+  }
+
   private renderList(): void {
     const scroll = this.list.scrollTop;
-    const rows = this.rowsOf(this.tab);
+    const rows = this.visibleRows(this.tab).rows;
     const sel = this.h.sel();
     const inHand = rowInHand(rows, sel);
     const { open, locked } = splitOpen(rows, (r) => !this.statusOf(r).locked);
     let html = open.map((r) => this.rowHtml(r, r === inHand)).join('');
-    if (!open.length) html += `<div class="hp-none">Nothing here is open to you yet.</div>`;
+    if (!open.length && !locked.length && this.rowsOf(this.tab).length) html += `<div class="hp-none">Nothing matches these filters. <button class="hp-sub" data-clear data-key="clear">Show all</button></div>`;
+    else if (!open.length) html += `<div class="hp-none">Nothing here is open to you yet.</div>`;
     if (locked.length) {
       const next = locked.map((r) => lockLevel(this.statusOf(r).gates)).find((n) => n !== null);
       const note = this.h.free() ? ' · free build places these too' : next ? ` · next at level ${next}` : '';
@@ -359,11 +450,12 @@ export class HangarPalette {
     const dim = s.locked && !this.h.free();
     const open = this.openRows.has(r.id);
     const size = f.model ? sizeWord(catalog, s.part.piece) : r.shapes.length > 1 ? '' : sizeWord(catalog, s.part.piece);
+    const color = f.color ?? numToCss(functionColor(f.id));
     const shapes = r.shapes.length > 1 ? `<span class="ns">${r.shapes.length} shapes</span>` : '';
     const line2 = dim
       ? `<span class="hp-l2 lk">${LOCK}<span>${esc(s.lock)}</span></span>`
-      : `<span class="hp-l2">${esc(this.keyStatsOf(f, s.part.piece, s.part.material))}</span>`;
-    const color = f.color ?? numToCss(functionColor(f.id));
+      : `<span class="hp-l2 hp-card" title="${esc(this.keyStatsOf(f, s.part.piece, s.part.material))}" style="--c:${color}">${cardHtml(econ, cardStats(catalog, this.h.tuning, f, s.part.piece, s.part.material))}</span>`;
+    // (the long text is the tooltip's; the row shows bars, ammo and power)
     return `<div class="hp-row${on ? ' on' : ''}${dim ? ' dim' : ''}" data-row="${esc(r.id)}" style="--c:${color}">`
       + `<button class="hp-pick" data-pick="${esc(r.id)}" data-part="${esc(s.id)}" data-key="pick:${esc(r.id)}" aria-pressed="${on}" aria-label="${esc(`${r.name}${dim ? `, locked: ${s.lock}` : ''}`)}">`
       + `<img src="${itemIcon(econ, s.id)}" alt="">`
@@ -537,6 +629,15 @@ export class HangarPalette {
     this.h.changed();
   }
 
+  /** A filter chip changed: remember it, and redraw the chips and the list from the top */
+  private setFilter(apply: () => void): void {
+    apply();
+    saveFilters(this.filters);
+    this.list.scrollTop = 0;
+    this.h.sound?.('ui_click');
+    this.render();
+  }
+
   private setTab(t: CompTab, focus = false): void {
     if (t !== this.tab) {
       this.tab = t;
@@ -549,10 +650,18 @@ export class HangarPalette {
 
   private onClick(e: MouseEvent): void {
     const t = e.target as HTMLElement;
-    const b = t.closest<HTMLElement>('[data-tab],[data-pick],[data-more],[data-fold],[data-shape],[data-mat],[data-face]');
+    const b = t.closest<HTMLElement>('[data-tab],[data-pick],[data-more],[data-fold],[data-shape],[data-mat],[data-face],[data-sub],[data-needs],[data-clear]');
     if (!b) return;
     const d = b.dataset;
     if (d.tab) this.setTab(d.tab as CompTab);
+    else if (d.sub !== undefined) this.setFilter(() => { if (d.sub === ALL) delete this.filters.sub[this.tab]; else this.filters.sub[this.tab] = d.sub!; });
+    else if (d.needs) {
+      const k = d.needs;
+      this.setFilter(() => {
+        if (k === 'ammo' || k === 'none') this.filters.ammo = this.filters.ammo === k ? 'any' : (k as AmmoFilter);
+        else this.filters.mount = this.filters.mount === k ? 'any' : (k as MountFilter);
+      });
+    } else if (d.clear !== undefined) this.setFilter(() => { this.filters = { sub: {}, ammo: 'any', mount: 'any' }; });
     else if (d.pick) this.pickRow(d.pick);
     else if (d.more) { if (this.openRows.has(d.more)) this.openRows.delete(d.more); else this.openRows.add(d.more); this.render(); }
     else if (d.fold !== undefined) { this.lockedOpen = !this.lockedOpen; this.render(); }
@@ -584,6 +693,11 @@ export class HangarPalette {
     const tab = this.tabsEl.querySelector<HTMLElement>('[aria-selected="true"]');
     if (tab) out.push({ box: this.tabsEl, to: tab });
     for (const g of this.hand.querySelectorAll<HTMLElement>('[data-group]')) {
+      const el = g.querySelector<HTMLElement>('[aria-checked="true"]') ?? g.querySelector<HTMLElement>('button');
+      if (el) out.push({ box: g, to: el });
+    }
+    // (the filter chips: one stop for the groups, one for the weapon toggles)
+    for (const g of this.subsEl.querySelectorAll<HTMLElement>('[data-group]')) {
       const el = g.querySelector<HTMLElement>('[aria-checked="true"]') ?? g.querySelector<HTMLElement>('button');
       if (el) out.push({ box: g, to: el });
     }
