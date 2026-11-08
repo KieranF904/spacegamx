@@ -1580,6 +1580,54 @@
       },
       "time": 40
     },
+    "power_joiner_elbow": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_joiner_end": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_joiner_cross": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_splitter_elbow": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_splitter_tee": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_splitter_end": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
     "power_surge_cell": {
       "inputs": {
         "steel_plate": 1,
