@@ -17,6 +17,7 @@
 import type { Blueprint, FunctionDef, PlacedPart, Rot, Side } from './types.js';
 import type { Catalog } from './catalog.js';
 import { facingEdges, placeGeometry } from './grid.js';
+import { gunFacing, hasFixedBarrel, migrateGunFacings } from './gunFacing.js';
 import { partThrust } from './grades.js';
 import { partNeedsFacing } from './blueprint.js';
 
@@ -176,7 +177,8 @@ export function migrateBlueprint(catalog: Catalog, bp: Blueprint, opts: { maxLev
       added.push({ uid, from: p.uid });
     }
   }
-  return { blueprint: changed ? { ...bp, parts } : bp, added, refund, changed };
+  // (Model guns whose barrel is not where the old part faced: turned to put it there, gunFacing.ts)
+  return { blueprint: changed ? migrateGunFacings(catalog, { ...bp, parts }).blueprint : bp, added, refund, changed };
 }
 
 /**
@@ -207,6 +209,8 @@ function fitModels(catalog: Catalog, p: PlacedPart, cands: FunctionDef[]): { mod
           for (const rot of [0, 1, 2, 3] as Rot[]) {
             const v = catalog.variants.get(piece)?.[rot + (flip ? 4 : 0)];
             if (!v) continue;
+            // (A model gun's barrel is on its piece's fixed side: only the turns that put it where the old one fired)
+            if (facing && p.facing && hasFixedBarrel(catalog, m.id) && gunFacing(catalog, { fn: m.id, piece, rot, flip }) !== p.facing) continue;
             // Its first cell on this one
             const x = cx - v.cells[0][0], y = cy - v.cells[0][1];
             if (!v.cells.every(([vx, vy]) => free.has(ck(x + vx, y + vy)))) continue;

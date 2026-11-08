@@ -9,6 +9,7 @@
 import type { Blueprint, FunctionDef } from '../ships/types.js';
 import type { Catalog } from '../ships/catalog.js';
 import { migrateBlueprint, migrateItemBag, migratePartItem } from '../ships/migrate.js';
+import { migrateGunFacings } from '../ships/gunFacing.js';
 import { modelLicensed } from './market.js';
 import { Stack, Bag, cleanStacks, addTo } from './stacks.js';
 import { levelAt } from './levels.js';
@@ -459,5 +460,19 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     if (!opts.econ) { out.version = 5; return out; }
     fieldUpdate(out, opts.econ, kit, opts.now);
   }
+  // Gun shape rules (ships/gunFacing.ts): a gun's barrel follows its turn, so a ship or design saved with a gun facing
+  // another way has the gun turned to keep its barrel where it was. Safe on every load (a gun already right is left alone)
+  if (catalog) migrateProfileGunFacings(out, catalog);
   return out;
+}
+
+/** Every ship and design of a profile with its guns' barrels following their turn (ships/gunFacing.ts) */
+export function migrateProfileGunFacings(p: PlayerProfile, catalog: Catalog): void {
+  const record = (rec: ShipRecord): ShipRecord => {
+    const m = migrateGunFacings(catalog, rec.blueprint);
+    return m.changed ? { ...rec, blueprint: m.blueprint } : rec;
+  };
+  p.hangar = p.hangar.map((rec) => (rec ? record(rec) : null));
+  setActiveShip(p, p.hangar[p.activeSlot] ?? record(p.ship), p.activeSlot);
+  if (p.designs) p.designs = p.designs.map((b) => (b ? migrateGunFacings(catalog, b).blueprint : null));
 }

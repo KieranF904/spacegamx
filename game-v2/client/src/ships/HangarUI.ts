@@ -35,7 +35,7 @@
 import {
   Blueprint, Catalog, Economy, Bag, partItemId, isWeaponFn, PlacedPart, PlacedGeom, Rot, Side, ShipTuning, ShipDerived, Vec2,
   SIDES, SIDE_NORMAL, placeGeometry, overlapsAny, computeJoins, facingEdges, facingProblem, geomContainsPoint,
-  validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, createShipState, connectorEndpoints,
+  validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, gunFacing, hasFixedBarrel, createShipState, connectorEndpoints,
   BlueprintError, TurretWindow, computeTurretWindow, ClientMessage, ServerHangarMessage, partDemand, parsePartItemId,
   ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
   loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, wireCells, cellKey,
@@ -407,6 +407,8 @@ export class HangarUI {
     // (1-4 on the weapon under the mouse: its weapon groups, ships/weaponGroups/editor.ts)
     else if (groupOfKey(code)) { const p = hangarGroupKey(code, this.bp, this.derived, this.mouse ? this.partAt(this.mouse) : -1); if (p) this.status(groupsSaid(p)); }
     else if (code === 'KeyT') {
+      // (A gun's barrel is fixed to its piece: R turns it, there is no facing to cycle)
+      if (hasFixedBarrel(this.deps.catalog, this.sel.fn)) { this.status('A gun fires out of one side of its piece: turn it with R'); return true; }
       const order: (Side | 'auto')[] = ['auto', ...SIDES];
       this.sel.facing = order[(order.indexOf(this.sel.facing) + 1) % order.length];
     } else if (code === 'Escape' || code === 'KeyH') { this.close(null); return true; }
@@ -435,7 +437,7 @@ export class HangarUI {
       uid, piece: this.sel.piece, fn: this.sel.fn, material: fd?.model && fd.material ? fd.material : this.sel.material,
       x: Math.floor(g[0]), y: Math.floor(g[1]), rot: this.sel.rot, flip: this.sel.flip,
     };
-    if (partNeedsFacing(p.fn)) p.facing = this.pickFacing(p);
+    if (partNeedsFacing(p.fn)) p.facing = gunFacing(this.deps.catalog, p) ?? this.pickFacing(p);
     return p;
   }
 
@@ -477,9 +479,10 @@ export class HangarUI {
     // (A Diode's instead must touch a part: power leaves by it)
     if (p.facing) {
       const why = facingProblem(p.fn, [...this.geoms, g], this.geoms.length, p.facing as Side);
-      if (why === 'noEdge') return `no straight edge facing ${p.facing} on this piece: press T for another side`;
-      if (why === 'blocked') return `its ${p.facing} edge is blocked: press T for another side`;
-      if (why === 'notJoined') return `its ${p.facing} edge (where power leaves) must touch a part: press T for another side`;
+      const fix = hasFixedBarrel(this.deps.catalog, p.fn) ? 'turn it (R)' : 'press T for another side';
+      if (why === 'noEdge') return `no straight edge facing ${p.facing} on this piece: ${fix}`;
+      if (why === 'blocked') return `its ${p.facing} edge is blocked: ${fix}`;
+      if (why === 'notJoined') return `its ${p.facing} edge (where power leaves) must touch a part: ${fix}`;
     }
     if (this.geoms.length && computeJoins([...this.geoms, g]).every(([a, b]) => b !== this.geoms.length && a !== this.geoms.length)) {
       return "doesn't join anything";

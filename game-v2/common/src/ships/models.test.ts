@@ -86,7 +86,7 @@ describe('models', () => {
 
   it('a model gun fires its kind with its own changes (gems on top), not its grade\'s and size\'s', () => {
     // (A Cell Reactor beside it: plugged in)
-    const b = bp([p(0, 'rect2', 'core', 0, 0), p(1, 'rect2', 'cannon_hammer', 0, -2, { rot: 1 as Rot, facing: 'N', material: 'alloy' }), p(2, 'sq', 'power_cell_reactor', 1, -1)]);
+    const b = bp([p(0, 'rect2', 'core', 0, 0), p(1, 'rect2', 'cannon_hammer', 0, -1, { facing: 'N', material: 'alloy' }), p(2, 'sq', 'power_cell_reactor', 2, -1)]);
     expect(validateBlueprint(catalog, b, tuning, null).errors).toEqual([]);
     const s = createShipState(catalog, tuning, 1, b, 0);
     const w = s.derived.weapons[0];
@@ -189,8 +189,8 @@ describe('weapon mounts: each model its own', () => {
   // A Hammer (fixed) said to be a turret, and a Rattler (turret) said to be fixed
   const mixed = () => bp([
     p(0, 'rect2', 'core', 0, 0),
-    p(1, 'rect2', 'cannon_hammer', 0, -2, { rot: 1 as Rot, facing: 'N', material: FN('cannon_hammer').material!, mount: 'turret' }),
-    p(2, 'sq', 'autocannon_rattler', 1, -1, { facing: 'N', material: FN('autocannon_rattler').material!, mount: 'fixed' }),
+    p(1, 'rect2', 'cannon_hammer', 0, -1, { facing: 'N', material: FN('cannon_hammer').material!, mount: 'turret' }),
+    p(2, 'sq', 'autocannon_rattler', 2, -1, { facing: 'N', material: FN('autocannon_rattler').material!, mount: 'fixed' }),
     p(3, 'sq', 'power_cell_reactor', 0, 1, { material: FN('power_cell_reactor').material! }),
   ]);
 
@@ -407,8 +407,8 @@ describe('migration: legacy parts become models', () => {
   });
 
   it('a ship keeps its shape: as many models as fit a part\'s place, business edge out, the rest hull; nothing loose', () => {
-    // A 2×1 shield: two Deflectors in its place; a 2×2 flak gun facing south: two Cloudmakers side by side, each with
-    // its end out of the gun's south edge
+    // A 2×1 shield: two Deflectors in its place; a 2×2 flak gun facing south: one Cloudmaker, lying along the south edge
+    // with its barrel (a model's is on its piece's long edge, gunFacing.ts) out of it, and hull in the cells above it
     const b = bp([
       p(0, 'rect2', 'core', 0, 0),
       p(1, 'rect2', 'shield', 0, 1, { material: 'steel' }),
@@ -418,7 +418,7 @@ describe('migration: legacy parts become models', () => {
     const m = migrateBlueprint(catalog, b);
     expect(m.changed).toBe(true);
     const fns = m.blueprint.parts.map((q) => q.fn).sort();
-    expect(fns).toEqual(['core', 'shield_deflector', 'shield_deflector', 'flak_cloudmaker', 'flak_cloudmaker', 'hull'].sort());
+    expect(fns).toEqual(['core', 'shield_deflector', 'shield_deflector', 'flak_cloudmaker', 'hull', 'hull', 'hull'].sort());
     const shields = m.blueprint.parts.filter((q) => q.fn === 'shield_deflector');
     expect(shields.every((q) => q.y === 1 && q.material === FN('shield_deflector').material)).toBe(true);
     expect(shields.some((q) => q.uid === 1)).toBe(true);
@@ -428,7 +428,7 @@ describe('migration: legacy parts become models', () => {
     expect(flak.some((q) => q.uid === 2)).toBe(true);
     // The rest are new uids, each from the part it replaced; the conduit is steel hull
     expect(m.added.filter((a) => a.from === 1)).toHaveLength(1);
-    expect(m.added.filter((a) => a.from === 2)).toHaveLength(1);
+    expect(m.added.filter((a) => a.from === 2)).toHaveLength(2);
     expect(m.blueprint.parts.find((q) => q.uid === 3)).toMatchObject({ fn: 'hull', material: 'steel' });
     // A 2×2 battery whose family has a 2×2 model: one Heavy Bank, as it lay; in a part too small for any, hull round one
     const bank = migrateBlueprint(catalog, bp([p(0, 'rect2', 'core', 0, 0), p(1, 'block2', 'battery', 0, 1)]));
@@ -442,7 +442,7 @@ describe('migration: legacy parts become models', () => {
     const strict = validateBlueprint(catalog, m.blueprint, tuning, null).errors;
     expect(strict.length).toBeGreaterThan(0);
     expect(strict.every((e) => e.code === 'badMounting' && e.uids.every((u) => m.blueprint.parts.find((q) => q.uid === u)!.fn === 'flak_cloudmaker'))).toBe(true);
-    expect(createShipState(catalog, tuning, 1, m.blueprint, 0).derived.weapons.filter((w) => w.kind === 'flak')).toHaveLength(2);
+    expect(createShipState(catalog, tuning, 1, m.blueprint, 0).derived.weapons.filter((w) => w.kind === 'flak')).toHaveLength(1);
     // A wedge gun: no model fits, so it's hull and its model is owed
     const w = migrateBlueprint(catalog, bp([p(0, 'rect2', 'core', 0, 0), p(1, 'tri', 'weapon', 2, 0, { facing: 'E', rot: 3 as Rot })]));
     expect(w.blueprint.parts.find((q) => q.uid === 1)!.fn).toBe('hull');
@@ -504,7 +504,8 @@ describe('migration: legacy parts become models', () => {
     expect(out.ship).toBe(out.hangar[0]);
     for (const b of [out.ship.blueprint, out.designs![0]!]) {
       expect(b.parts.filter((q) => FN(q.fn).legacy).map((q) => q.fn)).toEqual([]);
-      expect(validateBlueprint(catalog, b, tuning, null).errors).toEqual([]);
+      // (Its Cloudmaker is a side mount that lies where the flak gun's edge was: flagged, as a saved ship is)
+      expect(validateBlueprint(catalog, b, tuning, null, { mounting: false }).errors).toEqual([]);
       // (Auto-wired when built: no wires of its own)
       expect(b.wires).toBeUndefined();
     }
@@ -517,10 +518,11 @@ describe('migration: legacy parts become models', () => {
     // The rect2 generator is an Overclock Reactor (the model of its size); the conduit hull
     expect(byUid(4).fn).toBe('power_overclock_reactor');
     expect(byUid(6)).toMatchObject({ fn: 'hull', material: 'alloy' });
-    // The half-built 2×2 flak gun: two Cloudmakers, both still to build, at its HP; the thrusters Ion Drives
+    // The half-built 2×2 flak gun: one Cloudmaker (its barrel on its long edge, out of the south edge) and two hull cells above
+    // it, all still to build, at its HP; the thrusters Ion Drives
     const fromFlak = parts.filter((q) => q.uid === 5 || out.ship.ghosts!.includes(q.uid));
-    expect(fromFlak.map((q) => q.fn)).toEqual(['flak_cloudmaker', 'flak_cloudmaker']);
-    expect(out.ship.ghosts!.length).toBe(2);
+    expect(fromFlak.map((q) => q.fn).sort()).toEqual(['flak_cloudmaker', 'hull', 'hull']);
+    expect(out.ship.ghosts!.length).toBe(3);
     expect(out.ship.ghosts![0]).toBe(5);
     for (const q of fromFlak) expect(out.ship.hp[q.uid]).toBe(0.5);
     expect(byUid(7).fn).toBe('engine_ion_drive');

@@ -13,6 +13,7 @@ import type { Catalog } from './catalog.js';
 import type { Blueprint, PlacedPart, Rot, Side } from './types.js';
 import { attachSide, mountingOf, partMountingProblems } from './mounting.js';
 import { facingEdges, placeGeometry } from './grid.js';
+import { gunFacing } from './gunFacing.js';
 
 const HULL = 'hull', CORE = 'core', REACTOR = 'power_overclock_reactor', DRIVE = 'engine_ion_drive';
 
@@ -26,6 +27,8 @@ function fit(catalog: Catalog, fn: string): Fit | null {
   const piece = f.pieces[0], m = mountingOf(catalog, fn);
   for (const flip of [false, true]) {
     for (const rot of [0, 1, 2, 3] as Rot[]) {
+      // (A model gun's barrel is fixed to its piece: only the turns that put it north)
+      if ((gunFacing(catalog, { fn, piece, rot, flip }) ?? 'N') !== 'N') continue;
       const probe: PlacedPart = { uid: 0, piece, fn, material: f.material ?? 'alloy', x: 0, y: 0, rot, flip, facing: 'N' };
       const g = placeGeometry(catalog, probe);
       if (!facingEdges(g, 'N').length || partMountingProblems(catalog, [g], 0).some((q) => q.rule === 'angle')) continue;

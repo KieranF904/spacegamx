@@ -8,7 +8,7 @@
  * The server keeps standing parts that match, queues the missing ones for recycling and appends new ones as ghosts.
  */
 import {
-  placeGeometry, overlapsAny, computeJoins, facingProblem, geomContainsPoint, floodFill, nextFreeUid, partNeedsFacing,
+  placeGeometry, overlapsAny, computeJoins, facingProblem, geomContainsPoint, floodFill, nextFreeUid, partNeedsFacing, gunFacing, hasFixedBarrel,
   mountingOf, partMountingProblems, validateBlueprint, SIDES, partItemId,
 } from '@space-game/common';
 import type { Blueprint, Catalog, PlacedGeom, PlacedPart, ShipTuning, Side, Vec2, BlueprintError } from '@space-game/common';
@@ -115,7 +115,7 @@ export function candidate(catalog: Catalog, d: PlanDraft, hand: Hand, at: Vec2):
     uid, piece: hand.piece, fn: hand.fn, material: fd?.model && fd.material ? fd.material : hand.material,
     x: Math.floor(at[0]), y: Math.floor(at[1]), rot: hand.rot, flip: hand.flip,
   };
-  if (partNeedsFacing(p.fn)) p.facing = pickFacing(catalog, targetGeoms(catalog, d), p, hand.facing);
+  if (partNeedsFacing(p.fn)) p.facing = gunFacing(catalog, p) ?? pickFacing(catalog, targetGeoms(catalog, d), p, hand.facing);
   return p;
 }
 
@@ -142,9 +142,10 @@ function ownProblem(catalog: Catalog, d: PlanDraft, p: PlacedPart): string | nul
   if (overlapsAny(g, geoms)) return 'overlaps another part';
   if (p.facing) {
     const why = facingProblem(p.fn, [...geoms, g], geoms.length, p.facing as Side);
-    if (why === 'noEdge') return `no straight edge facing ${p.facing}: press T for another side`;
-    if (why === 'blocked') return `its ${p.facing} edge is blocked: press T for another side`;
-    if (why === 'notJoined') return `its ${p.facing} edge must touch a part: press T for another side`;
+    const fix = hasFixedBarrel(catalog, p.fn) ? 'turn it (R)' : 'press T for another side';
+    if (why === 'noEdge') return `no straight edge facing ${p.facing}: ${fix}`;
+    if (why === 'blocked') return `its ${p.facing} edge is blocked: ${fix}`;
+    if (why === 'notJoined') return `its ${p.facing} edge must touch a part: ${fix}`;
   }
   if (geoms.length && computeJoins([...geoms, g]).every(([a, b]) => a !== geoms.length && b !== geoms.length)) return "doesn't join anything";
   const broken = geoms.length ? partMountingProblems(catalog, [...geoms, g], geoms.length) : [];
