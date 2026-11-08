@@ -102,10 +102,16 @@ describe('a freighter shooting back, on its attacker\'s tick layer', () => {
     ships.setAutopilot(hauler, to);
     for (let t = -40; t < 0; t++) step(-1);
     const aimAt = () => ({ targetAngle: Math.atan2(Position.y[hauler] - Position.y[A.pid], Position.x[hauler] - Position.x[A.pid]), cursorDist: Math.min(1500, Math.hypot(Position.y[hauler] - Position.y[A.pid], Position.x[hauler] - Position.x[A.pid])) });
-    // A shoots it as it comes by, then holds fire and only turns to watch it
+    // A shoots it as it comes by, then holds fire and only turns to watch it. (A starter's Pips alone stay under a
+    // freighter's tolerance for strays, so a heavy shell of A's lands early on: past it, the hauler shoots back)
     script = (t) => ({ ...aimAt(), fireLeft: t < 150 && t % 40 < 25 });
     let locked = false;
-    for (let t = 0; t < DEFEND_QUIET_TICKS + 600; t++) { step(t); if (server.enemies.defenders.attackerOf(hauler) === A.pid) locked = true; }
+    const heavy = (server.enemies.defenders as unknown as { list: Map<number, { tolerance: number }> }).list.get(hauler)!.tolerance * 1.1;
+    for (let t = 0; t < DEFEND_QUIET_TICKS + 600; t++) {
+      if (t === 30) for (let i = 0, left = heavy; left > 0 && i < ships.get(hauler)!.hp.length; i++) if (ships.get(hauler)!.blueprint.parts[i].fn !== 'core' && ships.get(hauler)!.hp[i] > 40) left -= ships.damagePartBy(hauler, i, Math.min(30, left), A.pid);
+      step(t);
+      if (server.enemies.defenders.attackerOf(hauler) === A.pid) locked = true;
+    }
     script = () => ({});
 
     // (A's shells of the hauler, each the server's exactly)
@@ -121,7 +127,7 @@ describe('a freighter shooting back, on its attacker\'s tick layer', () => {
     if (process.env.GUNS_DEBUG) console.log(JSON.stringify({ locked, exact, truth: truth.size, told, laneChecks, laneOff: laneOff.length, bodyTicks, stats: server.gunNet.stats, lane: A.otherGuns.stats, inexact: inexact.slice(0, 5) }));
     expect(locked).toBe(true);
     expect(bodyTicks).toBeGreaterThan(300);
-    // (the Hauler's two Chainsaws are gone: its two Rattlers alone fire 7 shells in this pass, 32 before)
+    // (its two Rattlers and two light Overpulses: about 30 shells in this pass)
     expect(truth.size).toBeGreaterThan(4);
     expect(inexact).toEqual([]);
     expect(exact).toBeGreaterThan(3);

@@ -16,21 +16,24 @@
  */
 
 import { hasComponent, type IWorld } from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Player, Dead, Radius, aiLoadout, AI_BEAM_REACH, orderHaul, simAimQ, dhypot, type ShipState, type WantRec, type AiLead } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Player, Dead, Radius, aiLoadout, AI_BEAM_REACH, orderHaul, simAimQ, dhypot, dpow, type ShipState, type WantRec, type AiLead } from '@space-game/common';
 import type { ShipBridge, PilotOrders } from '../../ships/ShipBridge.js';
 import type { AiPilots } from '../brains/aiPilot.js';
 
 /** Quiet this long (ticks) after its attacker's last hit: 30 s */
 export const DEFEND_QUIET_TICKS = 60 * 30;
 /** A ship's damage to it counts as an attack once it reaches this share of the freighter's whole HP (a Ceres Hauler:
- *  about 150: three Pip shells fade away; two Hammer shells, one Spear, or three seconds of a Pip don't) */
-export const DEFEND_GRUDGE_SHARE = 0.01;
+ *  about 100: three Pip shells fade away; six of them at once, two Hammer shells or one Spear don't) */
+export const DEFEND_GRUDGE_SHARE = 0.0065;
 /** ...that damage fading by half every this many ticks (4 s: hits more than about 8 s apart barely add up) */
 export const DEFEND_GRUDGE_HALF_TICKS = 60 * 4;
 /** Its crew's aim: off by up to this either way (a pirate's at accuracy 0.85: Enemies.fly) */
 const AIM_ERR = (1 - 0.85) * 0.45;
 /** Its course's point is sent again only once its autopilot's has moved this far (a station orbits: not a decision a tick) */
 const COURSE_SLACK = 150;
+
+/** What's left of a grudge after `ticks` (deterministic maths: detTrig.ts) */
+const fade = (ticks: number) => dpow(0.5, ticks / DEFEND_GRUDGE_HALF_TICKS);
 
 export interface DefenderHost {
   readonly world: IWorld;
@@ -111,10 +114,10 @@ export class Defenders {
     if (this.ships.get(eid) !== d.ship) return;
     if (source === d.attacker) { d.lastHit = tick; return; }
     const g = d.grudges.get(source);
-    const dmg = (g ? g.dmg * 0.5 ** ((tick - g.at) / DEFEND_GRUDGE_HALF_TICKS) : 0) + dealt;
+    const dmg = (g ? g.dmg * fade(tick - g.at) : 0) + dealt;
     if (dmg < d.tolerance) {
       // (forgotten once faded to nothing much: the map stays as small as the ships hitting it)
-      if (d.grudges.size > 8) for (const [k, v] of d.grudges) if (v.dmg * 0.5 ** ((tick - v.at) / DEFEND_GRUDGE_HALF_TICKS) < 1) d.grudges.delete(k);
+      if (d.grudges.size > 8) for (const [k, v] of d.grudges) if (v.dmg * fade(tick - v.at) < 1) d.grudges.delete(k);
       d.grudges.set(source, { dmg, at: tick });
       return;
     }

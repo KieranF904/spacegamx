@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, ServerMessage, countOf, createShipState, inSafeSpace, regionAt, beltTotal, asteroidParamsAt, setAsteroidOutliers } from '@space-game/common';
+import { Position, Velocity, InSystem, ServerMessage, countOf, createShipState, inSafeSpace, regionAt, beltTotal, asteroidParamsAt, setAsteroidOutliers, BANK } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -156,8 +156,9 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(p.bank.free).toEqual(full);
     w.server.pilots.onDestroyed(conn, InSystem.systemId[pid], 0, 170000, 0, 0);
     expect(profile().storage.some((s: any) => s.id === 'insurance_bond')).toBe(false);
-    // The starter cost the whole free part
-    expect(Math.round(Object.values(profile().bank.free as Record<string, number>).reduce((a, b) => a + b, 0))).toBe(0);
+    // The starter cost one ship's worth of the free part (it holds BANK.ships of them)
+    const sum = (b: Record<string, number>) => Object.values(b).reduce((a, n) => a + n, 0);
+    expect(Math.round(sum(profile().bank.free))).toBe(Math.round(sum(full) * (1 - 1 / BANK.ships)));
   });
 
   it('a warband camps on the rim; breaking it pays everyone who fought', () => {
