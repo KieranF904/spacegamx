@@ -5,7 +5,7 @@
  * it never floats over the other panels. Its element is made on first use, so importing the feature touches no DOM.
  */
 import { canRefine, jobFraction } from '@space-game/common';
-import type { Bag, ClientMessage, MachineKind, MachineView, PackMode } from '@space-game/common';
+import type { Bag, ClientMessage, Economy, MachineKind, MachineView, PackMode } from '@space-game/common';
 import { fieldClient, machineJob, MACHINE_KINDS, type FieldClocks } from './fieldState';
 import { machineName, machineStatus, packModeOf, PACK_MODE_LIST, PACK_MODE_TEXT } from './fieldText';
 import type { FieldDeps } from './bridge';
@@ -98,15 +98,12 @@ export class FieldHud {
     return row;
   }
 
-  /** The refiner's recipe choices: auto, then every recipe the pilot has and this refiner can run */
+  /** The refiner's recipe choices (refineChoices), the chosen one kept in the list even when this refiner can't run it, so the picker never shows a blank */
   private recipeOptions(m: MachineView): { value: string; label: string }[] {
-    const { econ } = this.deps;
-    const level = this.deps.level();
     const out = [{ value: '', label: 'Refine: what the plan needs' }];
-    for (const [id, r] of econ.recipes.refining) {
-      if ((r.level ?? 0) > level || !canRefine(econ, m.tier, id)) continue;
-      out.push({ value: id, label: `Refine: ${this.name(id)}` });
-    }
+    const ids = refineChoices(this.deps.econ, m.tier, this.deps.level());
+    for (const id of ids) out.push({ value: id, label: `Refine: ${this.name(id)}` });
+    if (m.recipe && !ids.includes(m.recipe)) out.push({ value: m.recipe, label: `Refine: ${this.name(m.recipe)} (can't run)` });
     return out;
   }
 
@@ -166,7 +163,7 @@ export class FieldHud {
     const jobId = m.job?.id ?? -1;
     if (jobId !== s.job) { s.job = jobId; row.cancel.hidden = jobId < 0; }
     // The picker: the fabricator's pack mode, the refiner's recipe (rebuilt only when what it offers changes)
-    const key = m.kind === 'fabricator' ? 'packs' : `${m.tier}:${this.deps.level()}`;
+    const key = m.kind === 'fabricator' ? 'packs' : `${m.tier}:${this.deps.level()}:${m.recipe ?? ''}`;
     if (key !== s.pickKey) {
       s.pickKey = key;
       const opts = m.kind === 'fabricator'
@@ -190,6 +187,13 @@ export class FieldHud {
     this.rows = [];
     this.host = null;
   }
+}
+
+/** The recipes a refiner of this tier (0: the core) offers a pilot of this level: ones it can run, ones the pilot has opened */
+export function refineChoices(econ: Economy, tier: number, level: number): string[] {
+  const out: string[] = [];
+  for (const [id, r] of econ.recipes.refining) if ((r.level ?? 0) <= level && canRefine(econ, tier, id)) out.push(id);
+  return out;
 }
 
 /** The message a picker's choice sends */

@@ -63,6 +63,8 @@ export interface PaletteHost {
   free(): boolean;
   freeBuild(): boolean;
   grantAll(): boolean;
+  /** Field build overlay: `free()` only says a plan can hold any part; each part still costs materials to build, so show its cost, not "free" */
+  fieldBuild?: boolean;
   partTip(id: string, e: MouseEvent): void;
   hideTip(): void;
   sound?(id: string): void;
@@ -272,6 +274,11 @@ export class HangarPalette {
   // What's what
   // -------------------------------------------------------------------------
 
+  /** Every part places at no cost (the field overlay's plan places any part, but building it is paid for) */
+  private free(): boolean {
+    return this.h.free() && !this.h.fieldBuild;
+  }
+
   private pilot(): PilotView {
     return { level: this.h.level(), learned: this.h.learned(), have: (id) => this.h.have(id) };
   }
@@ -291,7 +298,7 @@ export class HangarPalette {
     const left = this.h.remaining(id);
     const spare = left === Infinity ? 0 : Math.max(0, left);
     const can = this.h.canMake(id);
-    const avail = availability({ free: this.h.free(), spare, canMake: can });
+    const avail = availability({ free: this.free(), spare, canMake: can });
     const rec = econ.recipes.recipeFor(id);
     const bag = isStructural(part.fn) || part.fn === 'core' || !rec ? econ.recipes.partInputs(part) : rec.inputs;
     return {
@@ -356,6 +363,16 @@ export class HangarPalette {
     this.renderSubs();
     this.renderList();
     this.refocus(focus);
+  }
+
+  /** Has what the hold has moved since the rows were worked out (a list left open while you fly): draw again if so */
+  stale(): boolean {
+    for (const s of this.st.values()) {
+      if (s.cost.some((c) => this.h.have(c.id) !== c.have)) return true;
+      const left = this.h.remaining(s.id);
+      if ((left === Infinity ? 0 : Math.max(0, left)) !== s.spare) return true;
+    }
+    return false;
   }
 
   /** Only the part in hand (a turn, a mirror, a facing) */
@@ -434,7 +451,7 @@ export class HangarPalette {
     else if (!open.length) html += `<div class="hp-none">Nothing here is open to you yet.</div>`;
     if (locked.length) {
       const next = locked.map((r) => lockLevel(this.statusOf(r).gates)).find((n) => n !== null);
-      const note = this.h.free() ? ' · free build places these too' : next ? ` · next at level ${next}` : '';
+      const note = this.free() ? ' · free build places these too' : next ? ` · next at level ${next}` : '';
       html += `<button class="hp-fold" data-fold data-key="fold" aria-expanded="${this.lockedOpen}"><b>${this.lockedOpen ? '▾' : '▸'} LOCKED</b><span>${locked.length}${note}</span></button>`;
       if (this.lockedOpen) html += locked.map((r) => this.rowHtml(r, r === inHand)).join('');
     }
@@ -447,7 +464,7 @@ export class HangarPalette {
     const { catalog, econ } = this.h;
     const s = this.statusOf(r);
     const f = catalog.functions.get(r.fn)!;
-    const dim = s.locked && !this.h.free();
+    const dim = s.locked && !this.free();
     const open = this.openRows.has(r.id);
     const size = f.model ? sizeWord(catalog, s.part.piece) : r.shapes.length > 1 ? '' : sizeWord(catalog, s.part.piece);
     const color = f.color ?? numToCss(functionColor(f.id));
@@ -491,7 +508,7 @@ export class HangarPalette {
       html += `<h6>${g}</h6>` + list.map((x) => kv(x.label, esc(x.value), x.warn)).join('');
     }
     html += `<h6>Cost</h6>`;
-    if (this.h.free()) html += kv('Making it', 'free here');
+    if (this.free()) html += kv('Making it', 'free here');
     else {
       const chips = costChipsHtml(econ, s.cost, 'hp-mat', true);
       html += kv(r.kind === 'structure' || r.kind === 'core' ? 'A cell takes' : 'Fabricating', chips ? `<span class="hp-cost">${chips}</span>` : 'nothing');
@@ -527,7 +544,7 @@ export class HangarPalette {
     const rec = econ.recipes.recipeFor(id);
     const bag = structure || !rec ? econ.recipes.partInputs({ piece: sel.piece, fn: sel.fn, material }) : rec.inputs;
     const cost = costLines(bag, (k) => this.h.have(k));
-    const showCost = !this.h.free() && can && (structure || left <= 0) && cost.length;
+    const showCost = !this.free() && can && (structure || left <= 0) && cost.length;
     const fp = footprint(catalog, sel.piece);
     let html = `<div class="hp-hand-top"><span>IN HAND</span><span class="keys">R ${sel.rot * 90}° · F ${sel.flip ? 'mirrored' : 'mirror'}${partNeedsFacing(sel.fn) && !hasFixedBarrel(catalog, sel.fn) ? ' · T facing' : ''}</span></div>`
       + `<div class="hp-hand-main" data-part="${esc(id)}"><img src="${itemIcon(econ, id)}" alt="">`
@@ -565,9 +582,9 @@ export class HangarPalette {
     for (const pc of row.shapes) {
       const id = partItemId({ piece: pc, fn: sel.fn, material });
       const n = this.h.remaining(id);
-      const ok = this.h.free() || this.h.canMake(id) || n > 0;
+      const ok = this.free() || this.h.canMake(id) || n > 0;
       const on = sel.piece === pc, p = turned(footprint(catalog, pc), sel.rot);
-      const tag = this.h.free() || structure || n === Infinity || n <= 0 ? '' : `<span class="tag">${n}</span>`;
+      const tag = this.free() || structure || n === Infinity || n <= 0 ? '' : `<span class="tag">${n}</span>`;
       html += `<button class="hp-shape${ok ? '' : ' no'}" role="radio" data-shape="${pc}" data-part="${esc(id)}" data-key="shape:${pc}" aria-checked="${on}" tabindex="${on ? 0 : -1}" aria-label="${esc(`${p.name}, ${footprintText(p)}`)}">`
         + `${pieceIcon(catalog, pc, sel.rot, sel.flip, 18)}<small>${p.w}×${p.h}</small>${tag}</button>`;
     }
@@ -583,7 +600,7 @@ export class HangarPalette {
       if (g.kind !== 'structure') continue;
       const m = catalog.materials.get(g.material)!;
       const sample = partItemId({ material: m.id, fn: sel.fn, piece: sel.piece });
-      const ok = this.h.free() || this.h.remaining(sample) > 0 || this.h.canMake(sample);
+      const ok = this.free() || this.h.remaining(sample) > 0 || this.h.canMake(sample);
       const on = sel.material === m.id;
       if (!ok && !on) {
         hidden++;
