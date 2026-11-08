@@ -221,6 +221,11 @@ export function lastDamagedTick(b: BridgeCtx, eid: number): number {
   return b.lastDamaged.get(eid) ?? -Infinity;
 }
 
+/** Was this body's last hit with a source a collision (a bump), not a shot or a blast */
+export function lastHitBumped(b: BridgeCtx, eid: number): boolean {
+  return b.bumpedBy.has(eid);
+}
+
 /** Last tick this body was hurt by someone (`lastHitter`'s tick; -Infinity if never): damage with no source leaves it */
 export function lastHitTick(b: BridgeCtx, eid: number): number {
   return b.lastHitAt.get(eid) ?? -Infinity;
@@ -261,7 +266,7 @@ export function lastHurtShown(): number {
  * ruin floor), so a client can work a hit out alike; here: who's immune, and who's told.
  * Returns the damage dealt (shield + hull).
  */
-export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number {
+export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean }): number {
   if (amount <= 0 || b.host.invulnerable?.(eid)) return 0;
   const m = hurtMods, tick = b.host.getTick();
   m.b = b; m.eid = eid; m.tick = tick; m.memo = b.coverMemo;
@@ -274,7 +279,11 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
   if (broke) b.host.shieldBroken?.(eid);
   if (dealt > 0) {
     b.lastDamaged.set(eid, tick);
-    if (source >= 0 && source !== eid) { b.lastHitBy.set(eid, source); b.lastHitAt.set(eid, tick); }
+    if (source >= 0 && source !== eid) {
+      b.lastHitBy.set(eid, source); b.lastHitAt.set(eid, tick);
+      // (A bump isn't an attack: a freighter that flew into a parked ship mustn't take it for its attacker)
+      if (vs?.contact) b.bumpedBy.add(eid); else b.bumpedBy.delete(eid);
+    }
     // (A piece of debris hurt: its clients are told it from now on, bridge/debrisNet.ts)
     if (ship.kind === 'debris') b.debrisNet.told.add(eid);
   }

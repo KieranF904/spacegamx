@@ -80,6 +80,8 @@ export class ShipBridge {
   private lastHitBy = new Map<number, number>();
   /** The tick of each body's last hit with a source (lastHitBy's tick: a sourceless hurt, a hazard's, leaves it) */
   private lastHitAt = new Map<number, number>();
+  /** Bodies whose last hit with a source was a collision (lastHitBy is the ship that bumped them, not an attacker) */
+  private bumpedBy = new Set<number>();
   /** Wrecks: they drift (no gravity, no helm) instead of holding station like dummies */
   private anchored = new Set<number>();
   /** Structures fixed to the ground (a siege's bastion and turrets): nothing shoves them; they only turn */
@@ -456,7 +458,9 @@ export class ShipBridge {
 
   lastHitTick(eid: number): number { return dmg.lastHitTick(this.ctx, eid); }
 
-  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
+  lastHitBumped(eid: number): boolean { return dmg.lastHitBumped(this.ctx, eid); }
+
+  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number }; contact?: boolean }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
 
   /** Damage one part from outside the usual weapons (a boss's beam): hurt, and reported as any hit is */
   damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number { return dmg.damagePartBy(this.ctx, eid, part, amount, source, hit); }

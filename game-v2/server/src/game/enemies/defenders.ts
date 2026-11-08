@@ -99,7 +99,8 @@ export class Defenders {
     if (at > d.seen) {
       d.seen = at;
       const h = this.ships.lastHitter(eid);
-      if (this.valid(eid, h)) { d.attacker = h; d.lastHit = at; }
+      // (a bump isn't an attack: a parked ship it flew into doesn't get its guns)
+      if (this.valid(eid, h) && !this.ships.lastHitBumped(eid)) { d.attacker = h; d.lastHit = at; }
     }
     if (d.attacker >= 0 && (now - d.lastHit > DEFEND_QUIET_TICKS || !this.valid(eid, d.attacker))) {
       d.attacker = -1;

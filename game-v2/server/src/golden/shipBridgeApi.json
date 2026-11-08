@@ -52,6 +52,7 @@
   "jumpFieldState",
   "lastDamagedTick",
   "lastFiredTick",
+  "lastHitBumped",
   "lastHitTick",
   "lastHitter",
   "library",

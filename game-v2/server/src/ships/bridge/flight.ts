@@ -528,10 +528,12 @@ export function resolveContacts(ctx: BridgeCtx): void {
   }
 }
 
+const CONTACT_HIT = { contact: true };
+
 export function damageContact(b: BridgeCtx, eid: number, ship: ShipState, parts: Set<number>, amount: number, source: number): void {
   let dealt = 0;
   // A wedge nose turns a blow aside; brittle material shatters
-  for (const p of parts) dealt += b.hurt(eid, ship, p, (amount / parts.size) * b.contactScale(ship, p), source);
+  for (const p of parts) dealt += b.hurt(eid, ship, p, (amount / parts.size) * b.contactScale(ship, p), source, CONTACT_HIT);
   if (dealt > 0) {
     b.lastDamaged.set(eid, b.host.getTick());
     b.host.notifyDamage(eid, dealt, source);

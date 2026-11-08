@@ -150,6 +150,22 @@ describe('freighters shoot back (defenders)', () => {
     expect(d.lastHit).toBe(again);
   }, 240_000);
 
+  it("a bump isn't an attack: a pilot it collides with doesn't draw its fire, a shot from that pilot after does", () => {
+    const r = haul(60, () => -1);
+    const ship = r.ships.get(r.f)!, part = ship.derived.weapons.length ? 1 : 0;
+    // (Contact damage, as flight.ts's collision pass deals it: the pilot is its source, but it only flew into it)
+    (r.ships as unknown as { damageContact(e: number, s: typeof ship, p: Set<number>, a: number, src: number): void }).damageContact(r.f, ship, new Set([part]), 4, r.A);
+    expect(r.ships.lastHitter(r.f)).toBe(r.A);
+    expect(r.ships.lastHitBumped(r.f)).toBe(true);
+    for (let t = 0; t < 30; t++) r.server.step();
+    expect(r.server.enemies.defenders.attackerOf(r.f)).toBe(-1);
+    // (A real hit from the same pilot does lock on)
+    r.ships.damagePartBy(r.f, part, 4, r.A);
+    expect(r.ships.lastHitBumped(r.f)).toBe(false);
+    r.server.step();
+    expect(r.server.enemies.defenders.attackerOf(r.f)).toBe(r.A);
+  }, 240_000);
+
   it('an attacker gone (another system) ends it at once', () => {
     const r = haul(300, (t, A) => (t === 30 ? A : -1));
     expect(r.trail[100].attacker).toBe(r.A);
