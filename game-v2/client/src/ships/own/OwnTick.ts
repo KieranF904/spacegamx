@@ -152,6 +152,36 @@ export class OwnTick implements OwnTimeline {
     this.host.reps.setOwn(id, this);
   }
 
+  /**
+   * A new connection (a reconnect, or a server that restarted): nothing of the last one is kept, its inputs included.
+   * The server's new session has none of them, and after a restart its ticks start over, so ticks kept from before would
+   * stand ahead of every new one (its checks never due, snapshots taken as old, the server's syncs stepped from nowhere).
+   * Stopped until the next welcome starts it again, even for the same ship id (a restarted server hands it out again)
+   */
+  reset(): void {
+    if (this.on) this.host.reps.setOwn(this.id, null);
+    this.on = false;
+    this.id = -1;
+    this.ctls.clear(); this.causes.clear();
+    this.before = null; this.othersBefore.clear(); this.touched.clear(); this.kept.clear();
+    this.until = null;
+    this.fired.clear();
+    this.snapTick = -Infinity;
+    this.keyed = false;
+    this.level = CONFIRM.NORMAL; this.levelSince = 0;
+    this.last = { tick: -Infinity, snap: -Infinity, body: -1, hp: -1 };
+    this.head = null; this.missed = false;
+    this.inTicks.length = 0; this.inVals.length = 0;
+    this.aimTicks.length = 0; this.aimQs.length = 0;
+    this.stepped.clear(); this.full.clear(); this.evs.clear();
+    this.presented = this.confirmedTo = this.syncedAt = -Infinity;
+    this.synced.clear(); this.hazTold.clear();
+    this.seed = null;
+    this.sel = 0;
+    this.ahead.clear(); this.pinned.clear();
+    this.cursors.clear();
+  }
+
   /** An input it sent (kept from before its start too: the inputs already sent ahead are needed) */
   noteInput(msg: ClientInputMessage): void {
     const t = msg.targetTick;

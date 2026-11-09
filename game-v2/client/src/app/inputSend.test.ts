@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CURSOR_DIST_STEP, dequantizeCursorAngle, quantizeCursorAngle, noseFrame, type ClientInputMessage } from '@space-game/common';
-import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './inputSend';
+import { tickInput, sendNeutralInput, newInputSendState, forgetSession, type InputSendCtx } from './inputSend';
 import { ViewMode, type CameraMode } from '../input/viewMode';
 import { groupSelection } from '../ships/weaponGroups/selection';
 import { packGroupSel } from '@space-game/common';
@@ -81,6 +81,20 @@ describe('inputSend: an input-script replay', () => {
     expect(sent.length).toBe(2);
     expect(sent[1].forward).toBe(true);
     expect(sent[1].targetTick).toBe(st.tick - 1 + 3);
+  });
+
+  it('a new connection: what was last sent is forgotten, so keys still held go again (the new session has none of them)', () => {
+    const { ctx, sc, sent, tick } = fakeCtx();
+    sc.keys.add('KeyW'); sc.mouse.add(0);
+    tick();
+    expect(sent.length).toBe(1);
+    tick();
+    expect(sent.length).toBe(1);         // unchanged: not sent again
+    // (The socket dropped and a new one opened with W and fire still held: the server's new ship has neither)
+    forgetSession(ctx);
+    tick();
+    expect(sent.length).toBe(2);
+    expect([sent[1].forward, sent[1].fireLeft, sent[1].cursorDist]).toEqual([true, true, sent[0].cursorDist]);
   });
 
   it('sends only on change, predicts otherwise, in order, with the same seq, ticks and quantisation', () => {

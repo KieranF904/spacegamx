@@ -150,6 +150,11 @@ export interface ClientJoinMessage {
   protocol?: number;
   /** What it can do beyond the base protocol (hits.ts CAPS): the server takes the bits it allows */
   caps?: number;
+  /**
+   * A guest's own secret, kept in their browser (client network/guestId.ts): a guest joining again with it (a dropped
+   * socket, a restarted server, a reload) gets the same pilot back, tutorial step and all (server game/pilots/guests.ts)
+   */
+  guestKey?: string;
 }
 
 /**

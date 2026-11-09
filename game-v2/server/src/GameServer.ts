@@ -103,7 +103,7 @@ import { initializeWorld } from './gameServer/world.js';
 import { asteroidSpawnData, placeAsteroid } from './gameServer/asteroids.js';
 import { shotWall, hurtAsteroid } from './gameServer/combat.js';
 import { getTrafficShips, stationEntity } from './gameServer/traffic.js';
-import { connect, createPlayer, placePlayer, loginPilot, forgetAccounts, saveAll } from './gameServer/session.js';
+import { connect, createPlayer, placePlayer, loginPilot, resumeGuest, forgetAccounts, saveAll } from './gameServer/session.js';
 import { buildMessageHandlers, handleMessage, handleInput, applyInputToEntity } from './gameServer/messages.js';
 import { canHeal, canDamage, sideOf, inPvpZone, hunted } from './gameServer/rules.js';
 import { fault, faultCounts } from './gameServer/faults.js';
@@ -574,6 +574,8 @@ this.devTeleport = opts.devTeleport ?? false;
   placePlayer(conn: ClientConnection, systemNum: number, x: number, y: number): void { placePlayer(this, conn, systemNum, x, y); }
 
   async loginPilot(conn: ClientConnection, userId: number): Promise<void> { return loginPilot(this, conn, userId); }
+
+  async resumeGuest(conn: ClientConnection): Promise<void> { return resumeGuest(this, conn); }
 
   canDamage(attacker: number, target: number): boolean { return canDamage(this, attacker, target); }
 

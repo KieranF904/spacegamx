@@ -1807,7 +1807,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 767,
+      "lines": 781,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -1841,7 +1841,7 @@
           "name": "ShipClient",
           "kind": "class",
           "start": 121,
-          "end": 767
+          "end": 781
         }
       ]
     },
@@ -11596,7 +11596,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 324,
+      "lines": 329,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -11740,109 +11740,109 @@
           "name": "ClientJoinMessage",
           "kind": "interface",
           "start": 145,
-          "end": 153
+          "end": 158
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 155,
-          "end": 162
+          "start": 160,
+          "end": 167
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 164,
-          "end": 167
+          "start": 169,
+          "end": 172
         },
         {
           "name": "ClientAuthLoginMessage",
           "kind": "interface",
-          "start": 169,
-          "end": 173
+          "start": 174,
+          "end": 178
         },
         {
           "name": "ClientAuthRegisterMessage",
           "kind": "interface",
-          "start": 175,
-          "end": 180
+          "start": 180,
+          "end": 185
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 182,
-          "end": 186
+          "start": 187,
+          "end": 191
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 188,
-          "end": 230
+          "start": 193,
+          "end": 235
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 232,
-          "end": 241
+          "start": 237,
+          "end": 246
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 243,
-          "end": 250
+          "start": 248,
+          "end": 255
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 252,
-          "end": 259
+          "start": 257,
+          "end": 264
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 261,
-          "end": 271
+          "start": 266,
+          "end": 276
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 273,
-          "end": 287
+          "start": 278,
+          "end": 292
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 289,
-          "end": 294
+          "start": 294,
+          "end": 299
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 296,
-          "end": 299
+          "start": 301,
+          "end": 304
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 301,
-          "end": 303
+          "start": 306,
+          "end": 308
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 305,
-          "end": 312
+          "start": 310,
+          "end": 317
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 314,
-          "end": 317
+          "start": 319,
+          "end": 322
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 319,
-          "end": 323
+          "start": 324,
+          "end": 328
         }
       ]
     },
@@ -15378,7 +15378,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 815,
+      "lines": 817,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -15406,7 +15406,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 148,
-          "end": 815
+          "end": 817
         }
       ]
     },
@@ -16383,14 +16383,14 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 756,
+      "lines": 798,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
       "invariants": [
         {
-          "text": "guests are never saved",
-          "test": "none pinned"
+          "text": "guests are never saved with the accounts: a guest with a key is kept a while by it (pilots/guests.ts)",
+          "test": "server/src/game/pilots/guests.test.ts"
         },
         {
           "text": "a death costs what DeathRules says, the bank pays the rebuild",
@@ -16416,62 +16416,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 39,
-          "end": 45
+          "start": 41,
+          "end": 49
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 47,
-          "end": 72
+          "start": 51,
+          "end": 76
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 74,
-          "end": 85
+          "start": 78,
+          "end": 89
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 87,
-          "end": 87
+          "start": 91,
+          "end": 91
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 89,
-          "end": 104
+          "start": 93,
+          "end": 108
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 106,
-          "end": 107
+          "start": 110,
+          "end": 111
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 109,
-          "end": 127
+          "start": 113,
+          "end": 131
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 129,
-          "end": 130
+          "start": 133,
+          "end": 134
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 132,
-          "end": 142
+          "start": 136,
+          "end": 146
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 144,
-          "end": 756
+          "start": 148,
+          "end": 798
         }
       ]
     },
@@ -17464,6 +17464,84 @@
       ]
     },
     {
+      "id": "server.pilots.guests",
+      "path": "server/src/game/pilots/guests.ts",
+      "group": "server/game/pilots",
+      "lines": 119,
+      "owns": "guest pilots kept for a while by their browser's guest key (the join's guestKey): a guest who joins again (a dropped socket, a restarted server, a reload) flies on as they were, tutorial step and all",
+      "needs": "ProfileStore (loadDoc / saveDoc only: never the accounts' saves); npm: node crypto, @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a guest is kept by a hash of their key, never the key or their name (a name proves nothing)",
+          "test": "server/src/game/pilots/guests.test.ts"
+        },
+        {
+          "text": "kept GUEST_KEEP_MS at most, GUEST_KEEP_MAX at most (the oldest go first)",
+          "test": "server/src/game/pilots/guests.test.ts"
+        }
+      ],
+      "extend": "none: what a guest keeps is their profile; Pilots decides when one is put or taken",
+      "exports": [
+        "GUEST_DOC",
+        "GUEST_KEEP_MAX",
+        "GUEST_KEEP_MS",
+        "GUEST_WRITE_MS",
+        "GuestKeep",
+        "guestIdOf"
+      ],
+      "sections": [
+        {
+          "name": "GUEST_KEEP_MS",
+          "kind": "const",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "GUEST_KEEP_MAX",
+          "kind": "const",
+          "start": 18,
+          "end": 19
+        },
+        {
+          "name": "GUEST_DOC",
+          "kind": "const",
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "GUEST_WRITE_MS",
+          "kind": "const",
+          "start": 22,
+          "end": 23
+        },
+        {
+          "name": "KEY",
+          "kind": "const",
+          "start": 25,
+          "end": 26
+        },
+        {
+          "name": "guestIdOf",
+          "kind": "function",
+          "start": 28,
+          "end": 32
+        },
+        {
+          "name": "Kept",
+          "kind": "interface",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "GuestKeep",
+          "kind": "class",
+          "start": 36,
+          "end": 119
+        }
+      ]
+    },
+    {
       "id": "server.pilots.lease",
       "path": "server/src/game/pilots/lease.ts",
       "group": "server/game/pilots",
@@ -17519,14 +17597,14 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 146,
+      "lines": 154,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
       "invariants": [
         {
-          "text": "a guest profile is never saved",
-          "test": "none pinned"
+          "text": "a guest profile is never saved with the accounts (one with a key is kept by it: pilots/guests.ts)",
+          "test": "server/src/game/pilots/guests.test.ts"
         }
       ],
       "extend": "a new profile field that mirrors onto the ship goes in applyProfile/capture",
@@ -17552,49 +17630,49 @@
           "name": "save",
           "kind": "function",
           "start": 19,
-          "end": 30
+          "end": 38
         },
         {
           "name": "capture",
           "kind": "function",
-          "start": 32,
-          "end": 60
+          "start": 40,
+          "end": 68
         },
         {
           "name": "applyProfile",
           "kind": "function",
-          "start": 62,
-          "end": 83
+          "start": 70,
+          "end": 91
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 85,
-          "end": 102
+          "start": 93,
+          "end": 110
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 104,
-          "end": 112
+          "start": 112,
+          "end": 120
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 114,
-          "end": 118
+          "start": 122,
+          "end": 126
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 120,
-          "end": 127
+          "start": 128,
+          "end": 135
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 129,
-          "end": 146
+          "start": 137,
+          "end": 154
         }
       ]
     },
@@ -17800,7 +17878,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 409,
+      "lines": 411,
       "owns": "the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps",
       "events": "",
@@ -17838,7 +17916,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 408
+          "end": 410
         }
       ]
     },
@@ -18503,8 +18581,8 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 320,
-      "owns": "connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts",
+      "lines": 341,
+      "owns": "connecting, creating and placing a player, logging a pilot in, a guest back by their key, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
       "invariants": [
@@ -18526,6 +18604,7 @@
         "lingerSystem",
         "loginPilot",
         "placePlayer",
+        "resumeGuest",
         "saveAll",
         "starterSpot"
       ],
@@ -18555,40 +18634,46 @@
           "end": 235
         },
         {
-          "name": "claimProfile",
+          "name": "resumeGuest",
           "kind": "function",
           "start": 237,
-          "end": 247
+          "end": 256
+        },
+        {
+          "name": "claimProfile",
+          "kind": "function",
+          "start": 258,
+          "end": 268
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 249,
-          "end": 259
+          "start": 270,
+          "end": 280
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 261,
-          "end": 275
+          "start": 282,
+          "end": 296
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 277,
-          "end": 290
+          "start": 298,
+          "end": 311
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 292,
-          "end": 307
+          "start": 313,
+          "end": 328
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 309,
-          "end": 320
+          "start": 330,
+          "end": 341
         }
       ]
     },

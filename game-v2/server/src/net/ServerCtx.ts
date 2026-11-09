@@ -84,6 +84,8 @@ export interface ServerCtx {
   /** The connection flying this entity, if any */
   liveConn(eid: number): ClientConnection | undefined;
   loginPilot(conn: ClientConnection, userId: number): Promise<void>;
+  /** A guest joined with a guest key: their kept pilot back, any other connection on it ended (gameServer/session.ts) */
+  resumeGuest(conn: ClientConnection): Promise<void>;
   /** Hangar edits cost nothing for this connection (proto, or an admin with free build on a dev server) */
   freeBuild(conn: ClientConnection): boolean;
 

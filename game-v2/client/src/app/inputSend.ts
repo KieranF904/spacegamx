@@ -339,6 +339,20 @@ export function forgetSent(s: InputSendState): void {
   groupSelection.forget();
 }
 
+/**
+ * A new connection: the server's new session holds nothing we sent on the last one (a new ship, Input zeroed), so all of
+ * the last-sent state goes back to its start. Otherwise keys still held when the socket dropped are never sent again
+ * (unchanged from "the last sent"), the server flies the ship without them and the prediction is corrected without end
+ */
+export function forgetSession(s: InputSendState): void {
+  forgetSent(s);
+  const n = newInputSendState();
+  s.aimSeen = n.aimSeen;
+  s.aimStill = n.aimStill;
+  s.lastFireLeft = n.lastFireLeft;
+  s.lastFireRight = n.lastFireRight;
+}
+
 /** Remember this input as the last one sent */
 export function markSent(s: InputSendState, msg: ClientInputMessage, quantized: number, cursorDistQ: number): void {
   for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; s.lastSent[k] = msg[k]; }

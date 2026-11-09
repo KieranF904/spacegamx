@@ -3,7 +3,7 @@
  * owns:       each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts
  * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs
  * events:     PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings
- * invariants: guests are never saved — none pinned
+ * invariants: guests are never saved with the accounts: a guest with a key is kept a while by it (pilots/guests.ts) — server/src/game/pilots/guests.test.ts
  *             a death costs what DeathRules says, the bank pays the rebuild — none pinned
  * extend:     a new item or death rule goes in pilots/; a new progress counter is a method here emitting a PilotEvent
  *
@@ -19,7 +19,8 @@
  *   - the repair bank (RepairBank.ts): deposits, the free part, station repair from deposits
  *   - death: cargo dropped as a wreck, the ship back in the same design with the bank paying for it
  *
- * Guests get a fresh profile that is never saved.
+ * Guests get a fresh profile, never saved with the accounts; one whose browser sent a guest key is kept a while under
+ * it (pilots/guests.ts), so joining again (a dropped socket, a restarted server) they fly on as they were.
  */
 
 import type { Telemetry } from './Telemetry.js';
@@ -34,6 +35,7 @@ import * as death from './pilots/death.js';
 import * as persist from './pilots/persist.js';
 import * as lease from './pilots/lease.js';
 import * as freezer from './pilots/freeze.js';
+import { GuestKeep } from './pilots/guests.js';
 import type { LeaseResult } from '../profile/lease.js';
 
 /** What Pilots needs to know about a connection */
@@ -42,6 +44,8 @@ export interface PilotConn {
   userId: number | null;
   username: string;
   docked: { station: number } | null;
+  /** A guest's id by their browser's key (pilots/guests.ts guestIdOf): kept under it a while. None: a guest kept nowhere */
+  guestId?: string | null;
 }
 
 export interface PilotHost {
@@ -165,8 +169,12 @@ export class Pilots {
     machineContents?: (eid: number) => Bag;
   } = {};
 
+  /** Guests kept a while by their browser's key (pilots/guests.ts) */
+  readonly guests: GuestKeep;
+
   constructor(readonly host: PilotHost, readonly econ: Economy, readonly ships: ShipBridge, readonly store: ProfileStore, readonly opts: PilotsOptions) {
     this.now = opts.now ?? (() => Date.now());
+    this.guests = new GuestKeep(store, () => this.now());
     this.bank = new RepairBanks(econ, opts.starter.blueprint);
     this.banking = new BankSessions<Session>(this.bank, {
       world: host.world,
@@ -304,6 +312,37 @@ export class Pilots {
     this.emit(conn, { type: 'login' });
   }
 
+  /**
+   * A guest joined with their browser's key (conn.guestId): the pilot kept under it, if any, is theirs again as they left
+   * it (their ship, hold, place and tutorial step: what a signed-in pilot's login loads from their save). False: none
+   * kept (a new guest: the fresh profile they were given stands), or they left or signed in meanwhile
+   */
+  async resumeGuest(conn: PilotConn): Promise<boolean> {
+    const id = conn.guestId;
+    if (!id) return false;
+    const kept = await this.guests.take(id);
+    const s = this.sessions.get(conn);
+    if (!kept || !s || s.loading || conn.userId !== null || conn.guestId !== id) return false;
+    let profile: PlayerProfile;
+    try {
+      profile = migrateProfile(kept.profile, this.opts.starter, this.econ.ships, { econ: this.econ, designUpdate: this.ships?.designUpdate, username: conn.username, tuning: this.ships?.tuning });
+    } catch (e) {
+      console.error(`[Pilots] could not migrate a kept guest profile (${conn.username}):`, e);
+      return false;
+    }
+    s.profile = profile;
+    s.dirty = false;
+    s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;
+    if (cargo.structureToMaterials(this, s.profile)) s.dirty = true;
+    if (refundRetiredSkills(s.profile)) s.dirty = true;
+    this.bank.ensure(s.profile, this.now());
+    persist.applyProfile(this, s, true);
+    this.sendBank(s, true);
+    death.sendWreck(this, s);
+    this.emit(conn, { type: 'login' });
+    return true;
+  }
+
   /** Take the account for this game server (one server per account at a time); refused while another holds it */
   claimLease(userId: number): Promise<LeaseResult> { return lease.claim(this, userId); }
 
@@ -414,6 +453,8 @@ export class Pilots {
   /** Save every account (shutdown) */
   async saveAll(): Promise<void> {
     await Promise.all([...this.sessions.values()].filter((s) => !s.loading).map((s) => { persist.capture(this, s); return persist.save(this, s); }));
+    // (Guests kept by their key too: written now, not on the next tick there won't be)
+    await this.guests.flush();
     // (Shutting down: the accounts are free for another server at once)
     await Promise.all([...this.sessions.values()].filter((s) => !s.dirty && s.conn.userId !== null).map((s) => this.store.releaseLease?.(s.conn.userId!, lease.serverId(this)).catch(() => {})));
   }
@@ -437,13 +478,14 @@ export class Pilots {
         if (at) this.setHome(s);
         this.sendItems(s.conn);
       }
-      if (s.dirty && !s.loading && s.conn.userId !== null && now - s.lastSave > this.opts.autosaveMs) {
+      if (s.dirty && !s.loading && (s.conn.userId !== null || !!s.conn.guestId) && now - s.lastSave > this.opts.autosaveMs) {
         persist.capture(this, s);
         void persist.save(this, s);
       }
     }
     this.banking.tick(now);
     lease.renewDue(this);
+    this.guests.tick();
   }
 
   /** Save soon (after something important: a trade, a refit, a turn-in) */

@@ -2,7 +2,7 @@
  * @contract server.pilots.persist
  * owns:       moving a profile between the store, the session and the live ship entity
  * needs:      Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs
- * invariants: a guest profile is never saved — none pinned
+ * invariants: a guest profile is never saved with the accounts (one with a key is kept by it: pilots/guests.ts) — server/src/game/pilots/guests.test.ts
  * extend:     a new profile field that mirrors onto the ship goes in applyProfile/capture
  */
 
@@ -18,7 +18,15 @@ export function holdsRangeShip(p: PlayerProfile): boolean {
 
 export async function save(self: Pilots, s: Session): Promise<void> {
   s.lastSave = self.now();
-  if (s.conn.userId === null) return;
+  if (s.conn.userId === null) {
+    // (A guest: never with the accounts. One with a key is kept a while under it, pilots/guests.ts; a profile still
+    // loading isn't theirs)
+    if (s.conn.guestId && !s.loading) {
+      s.dirty = false;
+      self.guests.put(s.conn.guestId, s.conn.username, persistable(self, s.conn, s.profile));
+    }
+    return;
+  }
   s.dirty = false;
   s.profile.updatedAt = new Date(self.now()).toISOString();
   try {

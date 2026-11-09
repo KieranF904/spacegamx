@@ -366,6 +366,20 @@ export class ShipClient {
     this.replicas.pulls.clear();
   }
 
+  /**
+   * A new connection (a reconnect after a drop, or a server that restarted): the server's session starts from nothing,
+   * so does everything here that the last one built up. Its own tick layer (inputs and checks by tick: OwnTick.reset),
+   * every replica and ship structure (the server sends again what it shows, and never removes what it never sent this
+   * session), and the hits; the berth too (a new session starts undocked). Its own ship starts again at the welcome.
+   */
+  resetSession(): void {
+    this.resetHits();
+    this.own.reset();
+    this.replicas.clear();
+    this.store.clear();
+    this.dock.leftBerth();
+  }
+
   /** Its pilot is known (welcome, a respawn's too): its own ship is stepped on its tick layer from its own inputs */
   onWelcome(): void {
     // (The server may hold another group selection for this ship: the next input carries ours)

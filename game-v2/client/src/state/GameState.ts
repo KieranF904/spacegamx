@@ -760,6 +760,46 @@ export class GameState {
   }
 
   /**
+   * A new connection (a reconnect after a drop, or a server that restarted): the world and the clock start over, as the
+   * server's session for us does. Nothing the last one sent is removed by the new one (it never sent it), and a restarted
+   * server's ticks start again from 0, so every tick kept here (the prediction's, the clock's offset, the delay queue,
+   * the poses by tick) would stand far ahead of the new ones. The ping estimate and the graphs stay (the link is the
+   * same); the first pong sets the clock afresh, the first snapshots the world, the welcome the own ship.
+   */
+  resetSession(): void {
+    this.playerId = 0;
+    this.entities.clear();
+    this.snapshotBuffer.length = 0;
+    this.farShips.clear();
+    this.populations.clear();
+    this.pendingHist.clear();
+    this.lateRemovals.length = 0;
+    this.lateDrawn.length = 0;
+    this.madeNow.clear();
+    this.selfPoses.clear();
+    this.selfPrev = null;
+    this.inputDelayQueue = [];
+    // (The clock: a pong sets it again; until then nothing is predicted, ticksDue starts afresh from predictedTick 0)
+    this.serverTick = 0;
+    this.serverTickTarget = 0;
+    this.serverTickTargetTime = 0;
+    this.tickOffset = null;
+    this.clockSynced = false;
+    this.cachedServerTick = 0;
+    this.predictedTick = 0;
+    this.frameTick = 0;
+    this.renderTickNow = 0;
+    // (Its system's crowd and rate come again with the new session)
+    this.crowd = { lv: 0, focus: FOCUS_RANGE, window: CROWD_BASE_WINDOW, rate: TICK_RATE };
+    this.tickMs = TICK_MS;
+    this.tickMsNext = null;
+    this.crowdDelayMs = 0;
+    // (systemId stays: the world it would clear on a change is already gone, and the first playerState sets it)
+    this.charge = { ...FULL_CHARGE };
+    this.serverCharge = { ...FULL_CHARGE };
+  }
+
+  /**
    * A snapshot in: the own ship's tick layer has taken its keyframe, causes and corrections (ShipClient.preSnapshot),
    * so its state at the prediction's tick may have moved (stepped again from there); the entity follows it, and the
    * size of the move is the reconcile statistics (the overlay's corrections). Its own row, when one came, gives the

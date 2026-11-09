@@ -152,6 +152,18 @@ export class ShipStore implements ShipSource, StructSource {
     }
   }
 
+  /**
+   * A new connection: every ship goes (the server sends each it shows again, and may give a gone one's id to something
+   * else). The designs by hash stay: a hash names the same design whichever session it came in
+   */
+  clear(): void {
+    this.bodies.clear();
+    this.lastSeen.clear();
+    this.structs.clear();
+    this.befores.clear();
+    this.aloof.clear();
+  }
+
   remove(id: number): void {
     this.bodies.delete(id);
     this.lastSeen.delete(id);

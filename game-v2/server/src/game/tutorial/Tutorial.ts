@@ -197,6 +197,8 @@ export class Tutorial {
     this.pilots.markDirty(conn);
     if (next) this.steps.entered(conn, next, true);
     this.sendState(conn);
+    // (A step is progress worth keeping at once: a server restarted or killed now resumes the pilot here)
+    this.pilots.saveNow(conn);
   }
 
   /** Put a step's grant in the pilot's storage */
