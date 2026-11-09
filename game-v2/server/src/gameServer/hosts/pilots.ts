@@ -41,7 +41,8 @@ export function createPilotHost(gs: GameServer): PilotHost {
     systemNum: (id) => (gs.gameData.getSystem(id) ? gs.gameData.getSystemNum(id) : -1),
     safeToAppear: (num, x, y) => {
       const sys = gs.gameData.getSystemByNum(num);
-      if (!sys) return false;
+      // (Nobody comes back into the gun range from a save: game/gunRange)
+      if (!sys || sys.gunRange) return false;
       const cb = sys.centralBody;
       // (Clear of the star's surface, whatever its size)
       const body = Math.max(cb?.gravity?.horizon ?? 0, cb?.radius ?? sys.starRadius ?? 0);
@@ -65,6 +66,7 @@ export function createPilotHost(gs: GameServer): PilotHost {
       return eid;
     },
     safeAt: (num, x, y) => inSafeSpace(gs.gameData.getSystemByNum(num), x, y),
+    transient: (num) => !!gs.gameData.getSystemByNum(num)?.gunRange,
   };
 }
 

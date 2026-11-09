@@ -3596,6 +3596,44 @@
         }
       ],
       "portals": []
+    },
+    {
+      "id": "gun_range",
+      "name": "Gun Range",
+      "description": "The stations' shared gun range: an indoor chamber with one big unshielded target at the far end. Try any weapon you can fit, then fly to the door and press X to go back to your station.",
+      "danger": 1,
+      "starColor": "#cfe3f5",
+      "starRadius": 0,
+      "position": {
+        "x": -210000,
+        "y": -200000
+      },
+      "sector": "private",
+      "private": true,
+      "centralBody": {
+        "type": "none"
+      },
+      "visuals": {
+        "ambient": 0.6
+      },
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [],
+      "portals": [],
+      "gunRange": {
+        "centre": { "x": 0, "y": 0 },
+        "width": 6000,
+        "height": 3200,
+        "wall": 400,
+        "door": { "wall": "W", "along": 0, "width": 360, "reach": 420 },
+        "spawn": { "x": -2550, "y": 0, "angle": 0 },
+        "target": { "ship": "giant_mammoth", "faction": "redtooth", "grade": 1, "x": 1900, "y": 0, "angle": 3.14159, "respawnSeconds": 5, "keepRadius": 120 }
+      }
     }
   ]
 }

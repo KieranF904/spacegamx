@@ -109,6 +109,8 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
       gs.guard('close', () => gs.sieges.leave(conn));
       gs.guard('close', () => gs.people.leave(conn));
       gs.guard('close', () => gs.arenas.leave(conn));
+      // Out of the gun range: their own ship and profile back, in the berth they left (game/gunRange)
+      gs.guard('close', () => gs.gunRange.leave(conn));
       gs.clients.delete(ws);
       gs.net.outbox.delete(ws);
       gs.net.lazy.delete(ws);

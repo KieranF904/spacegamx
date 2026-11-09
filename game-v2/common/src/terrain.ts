@@ -33,6 +33,8 @@ export interface TerrainFile {
   ridges?: { pts: Vec2[]; w: number[]; h: number[] }[];
   /** A boss arena's barrier (world/gates.ts, from systems.json `arena`): solid both ways, drawn as a shimmer, not rock */
   gates?: Vec2[][];
+  /** A station chamber's walls (gunRange/layout.ts, from systems.json `gunRange`): solid both ways, drawn as the chamber's own look, not as rock */
+  walls?: Vec2[][];
   /**
    * More outlines like `cliff` (look only), for rock in several pieces or open ground in several places (a hollowed
    * asteroid: its shell and its core): each with the way into the rock at every point, and how deep the rock goes there
@@ -78,7 +80,7 @@ const key = (cx: number, cy: number) => (cx + 4096) * 8192 + (cy + 4096);
 export function buildTerrain(file: TerrainFile): Terrain {
   const pieces: Piece[] = [];
   const grid = new Map<number, number[]>();
-  for (const rock of [...file.rocks, ...(file.mass ?? []), ...(file.gates ?? [])]) {
+  for (const rock of [...file.rocks, ...(file.mass ?? []), ...(file.gates ?? []), ...(file.walls ?? [])]) {
     if (rock.length < 3) continue;
     for (const c of convexDecompose(normalizePolygon(rock.map(([x, y]) => [x, y] as Vec2)))) {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;

@@ -64,6 +64,8 @@ export { clamp, lerp, smoothstep, cloneJson } from './math/basic.js';
 // Economy: items, stacks, recipes, player profiles
 export * from './econ/index.js';
 export * from './terrain.js';
+// The gun range: its chamber, the cheat ship and the weapon options (server game/gunRange)
+export * from './gunRange/index.js';
 // The tutorial: data shapes, saved progress, validator (tutorial/README.md)
 export * from './tutorial/index.js';
 // Decision inputs: bosses' bodies, the same on both sides (docs/design/decision-inputs.md)

@@ -732,7 +732,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     shieldRegen: Math.round(shieldRegen * 100) / 100,
     shieldDelay: shieldRegen > 0 ? Math.round(shieldDelayW / shieldRegen) : 0,
     ...(fxMask ? { fxMask, fxList, fx: fxOut } : {}),
-    jumpRange: jump.range,
+    // (A gun range cheat ship has no jump drive: it never leaves the chamber, types.ts Blueprint.range)
+    jumpRange: blueprint.range ? 0 : jump.range,
     jumpCooldown: coilCool < 1 ? Math.round(jump.cooldown * coilCool) : jump.cooldown,
     jumpRatio: jump.ratio,
     radius: radius * cs,

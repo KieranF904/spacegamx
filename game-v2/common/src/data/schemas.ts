@@ -473,6 +473,8 @@ export interface StarSystemData {
   pocket?: PocketData;
   /** A lair boss's enclosed arena: its barrier is solid both ways, passed by interact (world/gates.ts) */
   arena?: import('../world/gates.js').ArenaDef;
+  /** The gun range (server game/gunRange): one shared indoor chamber with walls all round, a door and a target (gunRange/layout.ts) */
+  gunRange?: import('../gunRange/layout.js').GunRangeDef;
   /** Data-driven visual overrides */
   visuals?: SystemVisualsData;
   /** Visual hazard tags (the screen treatment) */

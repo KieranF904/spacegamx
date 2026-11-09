@@ -10,7 +10,6 @@ import { GameData } from '../data/GameData.js';
 import type { UserStore } from '../auth/types.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { Blueprint } from '@space-game/common';
-import { type RangeConfig } from '../game/WeaponsRange.js';
 import { type TelemetryWriter } from '../game/Telemetry.js';
 import { type ContribStore } from '../game/ContributorNotes.js';
 import type { FriendsBackend } from '../game/social/FriendsBackend.js';
@@ -51,8 +50,6 @@ export interface GameServerOptions {
   clock?: () => number;
   /** Allow the map's click-to-warp for everyone (dev servers, proto). Admins can always use it. */
   devTeleport?: boolean;
-  /** The weapons range (data/dev/range.json): the dev server only (needs devTeleport), refused outright under NODE_ENV=production */
-  devRange?: RangeConfig;
   /** Admins may switch on free build (any part in the hangar, nothing taken): the dev server only. Refused outright under NODE_ENV=production. */
   freeBuild?: boolean;
   /** Every pilot joins and respawns in this system (the dev Rockery, `dev_rockery`), whatever their profile says: the dev server only. Refused outright under NODE_ENV=production. */

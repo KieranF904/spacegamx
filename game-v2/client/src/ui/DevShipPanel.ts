@@ -2,7 +2,7 @@
  * Ship swap (dev server only: Game makes it only in a Vite dev build; F9 opens
  * it): every ship in the plan library (data/ships/blueprints) as a button, to
  * fly it right now wherever you are, nothing spent, and a button for your own
- * ship back. A button takes you to the weapons range (F10). The server (devShip) never saves the borrowed one. Each row says
+ * ship back. The server (devShip) never saves the borrowed one. (Weapons are tried in the gun range, from any station.) Each row says
  * what the ship carries, so the ones with a mining laser are easy to find.
  */
 
@@ -34,8 +34,8 @@ export class DevShipPanel {
     this.el.style.display = this.el.style.display === 'none' ? 'block' : 'none';
   };
 
-  /** `ships`: the plan library by file name; `swap`: fly one of them (or, with none, your own); `boss`: wear the nearest boss down, or reset it; `range`: go to the weapons range (F10 has its panel) */
-  constructor(ships: Record<string, Plan>, private swap: (ship?: string) => void, boss?: (wear?: number, reset?: boolean) => void, range?: () => void, bossTools?: () => void) {
+  /** `ships`: the plan library by file name; `swap`: fly one of them (or, with none, your own); `boss`: wear the nearest boss down, or reset it */
+  constructor(ships: Record<string, Plan>, private swap: (ship?: string) => void, boss?: (wear?: number, reset?: boolean) => void, bossTools?: () => void) {
     Object.assign(this.el.style, {
       position: 'fixed', left: '16px', top: '70px', width: '330px', maxHeight: '70vh', overflowY: 'auto', padding: '12px 14px', zIndex: '9000', display: 'none',
       background: 'rgba(8, 14, 24, 0.94)', border: '1px solid #2c4a66', borderRadius: '6px', color: '#cfe3f5',
@@ -48,12 +48,6 @@ export class DevShipPanel {
     sub.textContent = 'Fly any library ship now. Nothing is saved: your own ship comes back on request or when you leave.';
     Object.assign(sub.style, { color: '#8aa5bc', marginBottom: '10px', lineHeight: '1.4' });
     this.el.append(title, sub);
-    // The weapons range: its own panel on F10
-    if (range) {
-      const go = this.button('Go to Weapons Range', 'Dev system with stationary target dummies. F10 opens the weapon picker and readout.', false, range);
-      go.style.borderColor = '#b08a3a';
-      go.style.marginBottom = '12px';
-    }
 
     const rows = Object.entries(ships).map(([id, bp]) => ({ id, bp, ...kit(bp) }));
     // By group, each under its heading; in a group mining ships first, then the smaller ships first

@@ -45,6 +45,8 @@ const FROZEN: [name: string, phase: string, gate?: string][] = [
   ['warmth', 'world'],
   ['homes', 'world'],
   ['tutorial', 'world'],
+  // (The gun range, 2026-11-09: only while anyone is in it, or its target stands: game/gunRange)
+  ['gunRange', 'world'],
   ['watchComet', 'world'],
   ['outpost', 'world', 'every60 perClient'],
   ['pilots', 'world'],

@@ -22,6 +22,7 @@ export * from './weaponGroupsProtocol.js';
 export * from './minesProtocol.js';
 export * from './clampProtocol.js';
 export * from './tutorialProtocol.js';
+export * from './gunRangeProtocol.js';
 export * from './combatProtocol.js';
 export * from './updateProtocol.js';
 export * from './replication.js';

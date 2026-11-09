@@ -10,7 +10,7 @@ import { AdminServer, adminPassword } from './AdminServer.js';
 import { createUserStore } from './auth/index.js';
 import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
 import { GameData } from './data/GameData.js';
-import { withDevData, devGuestShips, loadRangeConfig } from './data/devData.js';
+import { withDevData, devGuestShips } from './data/devData.js';
 import { checkGameData } from './data/validateGameData.js';
 import { SocketTransport } from './net/SocketTransport.js';
 import { loadShipConfigFromDisk } from './ships/loadShipConfig.js';
@@ -91,8 +91,6 @@ const gameServer = new GameServer({
   serverName: SERVER_NAME,
   friends: LOBBY_ADMIN_SECRET ? new LobbyFriends(BROWSER_URL, LOBBY_ADMIN_SECRET) : undefined,
   devTeleport: DEV_MODE,
-  // The dev weapons range (data/dev/range.json; never in production: GameServer refuses it there too)
-  devRange: DEV_MODE ? loadRangeConfig(dataPath) : undefined,
   // Everyone (guests and signed-in pilots) is an admin on the dev server (never in production: GameServer refuses it there too)
   guestAdmin: DEV_MODE,
   // Crowd fallbacks (net/crowd/CrowdControl.ts): every client takes them (the full caps set is required at join)

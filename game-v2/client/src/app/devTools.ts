@@ -1,10 +1,9 @@
 /**
- * Dev-only panels (F8 render tuning, F9 ship swap, Shift+F9 boss tools, F10 weapons range). Kept apart from the window registry so the import.meta.env.DEV
+ * Dev-only panels (F8 render tuning, F9 ship swap, Shift+F9 boss tools). Kept apart from the window registry so the import.meta.env.DEV
  * guard and the eager blueprint glob are tree-shaken from the deployed build.
  */
 import { RenderTuningPanel } from '../ui/RenderTuningPanel';
 import { DevShipPanel } from '../ui/DevShipPanel';
-import { DevRangePanel, type RangeGun } from '../ui/DevRangePanel';
 import { DevBossPanel } from '../ui/DevBossPanel';
 import { DevSimPanel } from '../ui/DevSimPanel';
 import { NetSim } from '../dev/netSim';
@@ -16,7 +15,6 @@ import type { GameState } from '../state/GameState';
 import type { ShipClient } from '../ships/ShipClient';
 import type { Prediction } from '../predict/Prediction';
 import { devFeeds } from './devFeeds';
-import shipModels from '../../../data/ships/models.json';
 import type { Renderer } from '../rendering/Renderer';
 import type { ClientTransport } from '@space-game/common';
 
@@ -32,13 +30,7 @@ export function installDevTools(host: { readonly renderer: Renderer; readonly ne
       const bossTools = new DevBossPanel((m) => host.network.send({ type: 'bossDevTool', ...m }));
       devFeeds.bossDev = (msg) => bossTools.update(msg);
       new DevShipPanel(Object.fromEntries(Object.entries(library).filter(([, bp]) => !bp.retired).map(([path, bp]) => [path.replace(/^.*\//, '').replace(/\.json$/, ''), { ...bp, group: groupOf(path, bp) }])), (ship) => host.network.send({ type: 'devShip', ship }),
-        (wear, reset) => host.network.send({ type: 'devBoss', wear, reset }), () => host.network.send({ type: 'devRange', action: 'go' }), () => bossTools.toggle());
-      // Weapons range (F10): every weapon model to arm a test rig with, the readout, ideal ammo
-      const NO_TARGET = new Set(['repair', 'point_defence']);
-      const guns: RangeGun[] = (shipModels as unknown as { models: { id: string; name: string; weapon?: string; grade?: number; mount?: string; fire?: { model?: string } }[] }).models
-        .filter((m) => m.weapon && !NO_TARGET.has(m.weapon))
-        .map((m) => ({ id: m.id, name: m.name, kind: m.weapon!, fire: m.fire?.model ?? 'cycle', grade: m.grade ?? 1, mount: m.mount ?? 'fixed' }));
-      new DevRangePanel(guns, (m) => host.network.send({ type: 'devRange', ...m }), () => host.network.send({ type: 'devShip' }));
+        (wear, reset) => host.network.send({ type: 'devBoss', wear, reset }), () => bossTools.toggle());
   }
 }
 

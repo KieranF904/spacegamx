@@ -238,7 +238,7 @@ export interface Enemy {
   faction: string;
   /** A boss (data/bosses.json id): its own behaviour, and Bosses handles its death */
   boss?: string;
-  /** A weapons-range target (dev only: WeaponsRange.ts): never moves, turns or fires, pays nothing, drops nothing, counts for nothing */
+  /** A gun range target (game/gunRange): no AI, never fires, pays nothing, drops nothing, counts for nothing */
   dummy?: boolean;
   behaviour?: Behaviour;
   pack: number;

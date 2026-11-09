@@ -60,7 +60,6 @@ export function createShipHost(gs: GameServer): ShipHost {
       gs.recovery?.hurt(targetEid, sourceEid);
       gs.bosses?.onDamage(targetEid, amount, sourceEid, !!glancing);
       gs.dens?.onDamage(targetEid, amount, sourceEid);
-      gs.range?.onDamage(targetEid, amount);
       // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
       // (a shell hit's sum is of its numbers, as a client works them out: tuning.ts damageUnits)
       gs.net.addDamage(InSystem.systemId[targetEid], targetEid, shown ?? amount, sourceEid, !!glancing);

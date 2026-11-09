@@ -1,6 +1,6 @@
 /**
  * @contract server.gameserver.messages
- * owns:       the client message table and the dev message handlers (teleport, range, spawn), chat and input forwarding
+ * owns:       the client message table and the dev message handlers (teleport, spawn), chat and input forwarding
  * needs:      GameServer (type), net/dispatch, net/handlers/*; npm: @space-game/common, bitecs
  * invariants: every client message type has one handler — golden clientMessages.json
  *             dev handlers refuse without devTeleport or admin — none pinned
@@ -8,11 +8,10 @@
  */
 
 import { hasComponent } from 'bitecs';
-import { Position, Player, Portal, InSystem, Dead, buildRangeRig, dhypot } from '@space-game/common';
+import { Position, Player, Portal, InSystem, Dead, dhypot } from '@space-game/common';
 import { ClientMessage } from '@space-game/common';
 import { portsSwitchFeeds } from '@space-game/common';
 import { stationTable } from '@space-game/common';
-import { WeaponsRange, type RangeConfig } from '../game/WeaponsRange.js';
 import { FactionsFile } from '../game/Enemies.js';
 import type { ClientConnection } from '../net/ClientConnection.js';
 import { registerModuleHandlers } from '../net/handlers/modules.js';
@@ -26,6 +25,7 @@ import { HandlerRegistry, dispatch, registerHandlers, type HandlerTable } from '
 import * as flight from '../net/handlers/flight.js';
 import { registerFlightHandlers, portalQuery } from '../net/handlers/flight.js';
 import { registerSocialHandlers } from '../net/handlers/social.js';
+import { registerGunRangeHandlers } from '../net/handlers/gunRange.js';
 import { SimPass } from '../sim/SystemClocks.js';
 import { designHash } from '../net/SnapshotBuilder.js';
 import type { GameServer } from '../GameServer.js';
@@ -43,6 +43,7 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
   registerHandlers(t, registerBankHandlers);
   registerHandlers(t, registerFlightHandlers);
   registerHandlers(t, registerSocialHandlers);
+  registerHandlers(t, registerGunRangeHandlers);
   t.on('chat', (_ctx, conn, msg) => {
     handleChat(gs, conn, msg);
   });
@@ -111,9 +112,6 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
     if (process.env.NODE_ENV === 'production' || (!gs.devTeleport && !conn.isAdmin)) return;
     gs.bossDev.handle(conn, msg);
   });
-  t.on('devRange', (_ctx, conn, msg) => {
-    handleDevRange(gs, conn, msg);
-  });
   t.on('shipNeed', (_ctx, conn, msg) => {
     // The client lost a ship's blueprint (or a ship it kept while away, CAPS.FOCUS): the next snapshot sends it in full
     conn.shipSynced.delete(Number(msg.id));
@@ -147,6 +145,8 @@ export function handleDevTeleport(gs: GameServer, conn: ClientConnection, msg: {
   }
   const system = gs.gameData.getSystem(msg.systemId);
   if (!system || !hasComponent(gs.world, Player, conn.playerId) || hasComponent(gs.world, Dead, conn.playerId)) return;
+  // (The gun range is gone into from a station only, in its own ship: game/gunRange)
+  if (system.gunRange) { gs.pilots.toast(conn, "The gun range is reached from any station's Gun range button", "warn"); return; }
   const systemNum = gs.gameData.getSystemNum(system.id);
   let x = msg.x, y = msg.y;
   if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) {
@@ -162,64 +162,6 @@ export function handleDevTeleport(gs: GameServer, conn: ClientConnection, msg: {
   }
   conn.docked = null;
   gs.travelTo(conn, systemNum, x, y, false);
-}
-
-/** The weapons range, wired to this server (dev only: the caller has checked the dev flag) */
-export function createRange(gs: GameServer, cfg: RangeConfig): WeaponsRange {
-  const live = (c: ClientConnection) => hasComponent(gs.world, Player, c.playerId) && !hasComponent(gs.world, Dead, c.playerId);
-  return new WeaponsRange(cfg, gs.enemies, gs.ships, {
-    tick: () => gs.currentTick,
-    systemNum: () => gs.gameData.getSystem(cfg.system) ? gs.gameData.getSystemNum(cfg.system) : -1,
-    players: (num) => [...gs.clients.values()].filter((c) => live(c) && InSystem.systemId[c.playerId] === num).map((c) => c.playerId),
-    pilot: (player) => {
-      const pc = gs.pilots.connOf(player), ship = gs.ships.get(player);
-      const ideal = !!pc && gs.ammo.isIdeal(pc);
-      const guns = (ship?.derived.weapons ?? []).map((w) => {
-        const fn = ship!.blueprint.parts[w.part]?.fn ?? '';
-        const crate = ideal ? gs.ammo.idealCrate(w.kind) : undefined;
-        return { name: gs.ships.catalog.functions.get(fn)?.name ?? fn, kind: w.kind, ...(crate ? { crate: gs.pilots.econ.items.name(crate) } : {}) };
-      });
-      return { ideal, guns };
-    },
-    send: (player, msg) => { const c = gs.pilots.connOf(player) as ClientConnection | undefined; if (c) gs.send(c.ws, msg); },
-  });
-}
-
-/** Dev tool, the weapons range (client message devRange): refused unless this is a dev server with the range loaded */
-export function handleDevRange(gs: GameServer, conn: ClientConnection, msg: { action?: string; guns?: unknown; on?: unknown }): void {
-  const range = gs.range;
-  if (!range || !gs.devTeleport || process.env.NODE_ENV === 'production') {
-    gs.send(conn.ws, { type: 'systemMessage', text: 'The weapons range is a dev tool (not enabled on this server)', color: '#f2d24b' });
-    return;
-  }
-  switch (msg.action) {
-    case 'go': {
-      const system = gs.gameData.getSystem(range.cfg.system);
-      if (!system || !hasComponent(gs.world, Player, conn.playerId) || hasComponent(gs.world, Dead, conn.playerId)) return;
-      conn.docked = null;
-      // (Ideal ammunition starts on: a borrowed rig carries no crates. The panel's switch turns it off.)
-      gs.ammo.setIdeal(conn, true);
-      gs.travelTo(conn, gs.gameData.getSystemNum(system.id), range.cfg.origin.x, range.cfg.origin.y, false);
-      return;
-    }
-    case 'arm': {
-      const guns = (Array.isArray(msg.guns) ? msg.guns : []).filter((g): g is string => typeof g === 'string').slice(0, 2);
-      const rig = guns.length ? buildRangeRig(gs.ships.catalog, guns) : null;
-      if (!rig) { gs.pilots.toast(conn, 'No such weapon for the test rig', 'warn'); return; }
-      if (gs.pilots.devSwapShip(conn, rig)) gs.pilots.toast(conn, `${rig.name} (dev: not saved)`, 'info');
-      return;
-    }
-    case 'ideal':
-      gs.ammo.setIdeal(conn, !!msg.on);
-      gs.pilots.toast(conn, msg.on ? 'Ideal ammo on: unlimited rounds of the best crate' : 'Ideal ammo off: your own crates', 'info');
-      return;
-    case 'moving':
-      range.setMoving(!!msg.on);
-      return;
-    case 'reset':
-      range.reset();
-      return;
-  }
 }
 
 /** Dev tool: a hostile pack here (the system's own kind unless given) */

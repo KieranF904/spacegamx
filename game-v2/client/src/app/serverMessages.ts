@@ -33,7 +33,6 @@ import { setTutorialState, tutorialEdge } from '../ui/tutorial/tutorialStore';
 import { showServerUpdate } from '../ui/updateBanner';
 import { showHitTick } from '../ui/HitTick';
 import { setCombatLock } from '../ui/CombatLockUI';
-import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
@@ -455,8 +454,6 @@ const TABLE: Handlers = {
   effect: (h, msg) => { h.renderer.showEffect(msg.effectType, msg.x, msg.y, msg.data, msg.targetX, msg.targetY, msg.entityId); },
   systemMessage: (h, msg) => { h.showSystemMessage(msg.text, msg.color); },
   // (dev weapons range readout: nobody listens outside a dev build)
-  rangeHead: (_h, msg) => { rangeHead(msg); },
-  rangeRow: (_h, msg) => { rangeRow(msg); },
   chat: (h, msg) => {
     h.addChatMessage(msg.playerName, msg.text);
     // (Public chat only: party lines come as playerId 0, not a ship)

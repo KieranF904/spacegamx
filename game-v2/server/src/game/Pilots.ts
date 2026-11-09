@@ -33,6 +33,7 @@ import * as cargo from './pilots/cargo.js';
 import * as death from './pilots/death.js';
 import * as persist from './pilots/persist.js';
 import * as lease from './pilots/lease.js';
+import * as freezer from './pilots/freeze.js';
 import type { LeaseResult } from '../profile/lease.js';
 
 /** What Pilots needs to know about a connection */
@@ -64,6 +65,8 @@ export interface PilotHost {
   spawnWreck?(systemNum: number, x: number, y: number, vx: number, vy: number, items: Bag, key: string, seconds: number): number;
   /** In the system's safe space (inner Sol) */
   safeAt?(systemNum: number, x: number, y: number): boolean;
+  /** A system no pilot is ever saved in, or put back in at login (the gun range): capture keeps the position it had */
+  transient?(systemNum: number): boolean;
   /** The pilot's ship record changed what their hangar view shows (a part the bank built in): send the hangar again */
   hangarChanged?(conn: PilotConn): void;
 }
@@ -196,7 +199,7 @@ export class Pilots {
   /** One line of telemetry about this pilot; `once`: only the first time it happens to them */
   track(conn: PilotConn, ev: string, extra: Record<string, unknown> = {}, once = false): void {
     const s = this.sessions.get(conn);
-    if (!s || s.loading || !this.telemetry?.enabled) return;
+    if (!s || s.loading || !this.telemetry?.enabled || this.frozen.has(conn)) return;
     const p = s.profile;
     if (once) {
       const flag = `tm:${ev}`;
@@ -221,6 +224,8 @@ export class Pilots {
   }
 
   emit(conn: PilotConn, ev: PilotEvent): void {
+    // (Nothing in the gun range counts: no quest, ribbon, ranking or milestone hears of it)
+    if (this.frozen.has(conn)) return;
     this.milestones(conn, ev);
     for (const fn of this.listeners) fn(conn, ev);
   }
@@ -311,6 +316,9 @@ export class Pilots {
     this.sessions.delete(conn);
     const userId = conn.userId;
     if (s.loading) { if (userId !== null) await lease.release(this, userId); return; }
+    // (Gone from the gun range: the real profile back first, as it was, so that is what's saved)
+    const real = this.frozen.get(conn);
+    if (real) { this.frozen.delete(conn); s.profile = real; }
     persist.capture(this, s);
     await persist.save(this, s);
     if (s.dirty && userId !== null) await persist.save(this, s);
@@ -328,6 +336,9 @@ export class Pilots {
     if (!s) return false;
     this.sessions.delete(from);
     this.sessions.delete(to);
+    const frozen = this.frozen.get(from);
+    this.frozen.delete(from);
+    if (frozen) this.frozen.set(to, frozen);
     s.conn = to;
     s.loading = false;
     s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;
@@ -343,12 +354,30 @@ export class Pilots {
   devStash = new Map<PilotConn, { rec: ShipRecord; slot: number }>();
 
   /**
+   * Pilots in the gun range (game/gunRange): their real profile, frozen as it was when they went in, while a throwaway
+   * copy flies the cheat ship (pilots/freeze.ts). Every save writes the frozen one; gives, takes and awards refuse.
+   */
+  /** @internal pilots/*.ts */ frozen = new Map<PilotConn, PlayerProfile>();
+
+  /** Set the profile aside and fly `ship` (the gun range's cheat ship) on a throwaway copy (pilots/freeze.ts) */
+  freeze(conn: PilotConn, ship: Blueprint): boolean { return freezer.freeze(this, conn, ship); }
+  /** Fly another cheat ship while frozen */
+  swapFrozenShip(conn: PilotConn, ship: Blueprint): boolean { return freezer.swapFrozenShip(this, conn, ship); }
+  /** The real profile back as it was; `apply`: its ship onto the entity now */
+  thaw(conn: PilotConn, apply = true): boolean { return freezer.thaw(this, conn, apply); }
+  isFrozen(conn: PilotConn): boolean { return this.frozen.has(conn); }
+  /** The real profile of a frozen pilot (read only: never change it), else their profile */
+  realProfile(conn: PilotConn): PlayerProfile | undefined { return this.frozen.get(conn) ?? this.get(conn); }
+  /** A frozen pilot's ship was destroyed (the gun range brings them back to their station): set by the range */
+  onFrozenDeath?: (conn: PilotConn) => void;
+
+  /**
    * Dev tool: fly `blueprint` now (a copy, at full health, nothing spent), or with none the ship you really have.
    * What's saved is always the real ship: the borrowed one is never written to the profile.
    */
   devSwapShip(conn: PilotConn, blueprint: Blueprint | null): boolean {
     const s = this.sessions.get(conn);
-    if (!s || s.loading) return false;
+    if (!s || s.loading || this.frozen.has(conn)) return false;
     persist.capture(this, s);
     const p = s.profile;
     if (blueprint) {
@@ -452,7 +481,7 @@ export class Pilots {
 
   addCredits(conn: PilotConn, n: number): void {
     const s = this.sessions.get(conn);
-    if (!s || n === 0) return;
+    if (!s || n === 0 || this.frozen.has(conn)) return;
     // A rebuild loan takes its share of what comes in
     const debt = s.profile.debt ?? 0;
     if (n > 0 && debt > 0) {
@@ -471,7 +500,7 @@ export class Pilots {
   /** Award XP; levels up (with a skill point each, to the cap) as thresholds pass */
   addXp(conn: PilotConn, n: number): void {
     const s = this.sessions.get(conn);
-    if (!s || n <= 0) return;
+    if (!s || n <= 0 || this.frozen.has(conn)) return;
     s.profile.xp += Math.round(n);
     const from = s.profile.level;
     let points = 0;
@@ -498,7 +527,7 @@ export class Pilots {
 
   bumpStat(conn: PilotConn, key: string, n = 1): void {
     const s = this.sessions.get(conn);
-    if (!s) return;
+    if (!s || this.frozen.has(conn)) return;
     s.profile.stats[key] = (s.profile.stats[key] ?? 0) + n;
     s.dirty = true;
     if (key === 'earned') this.emit(conn, { type: 'earned', credits: n });
@@ -521,7 +550,7 @@ export class Pilots {
   /** Quest rewards beyond items and money: plans, licences, standing, skill points */
   grant(conn: PilotConn, g: { plans?: string[]; recipes?: string[]; licences?: string[]; reputation?: Record<string, number>; skillPoints?: number }): void {
     const s = this.sessions.get(conn);
-    if (!s) return;
+    if (!s || this.frozen.has(conn)) return;
     const p = s.profile;
     for (const f of g.plans ?? []) if (!p.plans.includes(f)) p.plans.push(f);
     for (const r of g.recipes ?? []) if (!p.recipes.includes(r)) p.recipes.push(r);
@@ -705,8 +734,9 @@ export class Pilots {
   cargoMass(eid: number): number { return cargo.cargoMass(this, eid); }
   cargoFree(conn: PilotConn): number { return cargo.cargoFree(this, conn); }
   atStation(conn: PilotConn): boolean { return cargo.atStation(this, conn); }
-  give(conn: PilotConn, items: Bag, opts: { toStorage?: boolean; source?: string; at?: { x: number; y: number }; quiet?: boolean } = {}): Bag { return cargo.give(this, conn, items, opts); }
-  take(conn: PilotConn, need: Bag, from: 'cargo' | 'storage' | 'any' = 'any'): boolean { return cargo.take(this, conn, need, from); }
+  /** (A pilot in the gun range is given nothing, and nothing is taken from them: pilots/freeze.ts) */
+  give(conn: PilotConn, items: Bag, opts: { toStorage?: boolean; source?: string; at?: { x: number; y: number }; quiet?: boolean } = {}): Bag { return this.frozen.has(conn) ? { ...items } : cargo.give(this, conn, items, opts); }
+  take(conn: PilotConn, need: Bag, from: 'cargo' | 'storage' | 'any' = 'any'): boolean { return !this.frozen.has(conn) && cargo.take(this, conn, need, from); }
   removeEverywhere(conn: PilotConn, id: string): number { return cargo.removeEverywhere(this, conn, id); }
   available(conn: PilotConn, id: string): number { return cargo.available(this, conn, id); }
   handleMove(conn: PilotConn, msg: { id: string; n: number; to: 'cargo' | 'storage' }): void { return cargo.handleMove(this, conn, msg); }
