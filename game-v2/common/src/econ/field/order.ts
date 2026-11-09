@@ -8,9 +8,14 @@ import type { Bag } from '../stacks.js';
 
 /** Join distance of every part from the root (the core), over all joins; -1: not joined to it at all */
 export function joinDepths(n: number, root: number, joins: readonly (readonly [number, number])[]): Int32Array {
+  return depthsFromAdjacency(adjacency(n, joins), root);
+}
+
+/** The same over a ready adjacency list (an index pointer walks the queue, no shift) */
+export function depthsFromAdjacency(adj: readonly (readonly number[])[], root: number): Int32Array {
+  const n = adj.length;
   const depth = new Int32Array(n).fill(-1);
   if (root < 0 || root >= n) return depth;
-  const adj = adjacency(n, joins);
   depth[root] = 0;
   const queue = [root];
   for (let h = 0; h < queue.length; h++) {
@@ -18,6 +23,14 @@ export function joinDepths(n: number, root: number, joins: readonly (readonly [n
     for (const v of adj[u]) if (depth[v] < 0) { depth[v] = depth[u] + 1; queue.push(v); }
   }
   return depth;
+}
+
+/** Part uids ordered core outwards (nearest join distance first; stable; parts not joined to the core go last) */
+export function coreOutwards(uids: readonly number[], parts: readonly { uid: number }[], adj: readonly (readonly number[])[], core: number): number[] {
+  const depth = depthsFromAdjacency(adj, core);
+  const idx = new Map(parts.map((p, i) => [p.uid, i]));
+  const d = (u: number) => { const k = depth[idx.get(u)!]; return k < 0 ? 999 : k; };
+  return [...uids].sort((a, b) => d(a) - d(b));
 }
 
 export function adjacency(n: number, joins: readonly (readonly [number, number])[]): number[][] {

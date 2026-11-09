@@ -13,6 +13,7 @@ import type { Blueprint } from '../ships/types.js';
 import type { Catalog } from '../ships/catalog.js';
 import { placeGeometry, computeJoins } from '../ships/grid.js';
 import { partItemId } from './items.js';
+import { coreOutwards } from './field/order.js';
 import type { Bag } from './stacks.js';
 
 
@@ -109,14 +110,7 @@ export function installableGhosts(catalog: Catalog, bp: Blueprint, ghosts: numbe
     if (adj[i].some((j) => !g.has(bp.parts[j].uid) && structural(j))) out.push(p.uid);
   });
   // Core outwards: order by join distance from the core
-  const dist = new Map<number, number>([[core, 0]]);
-  const queue = [core];
-  while (queue.length) {
-    const i = queue.shift()!;
-    for (const j of adj[i]) if (!dist.has(j)) { dist.set(j, dist.get(i)! + 1); queue.push(j); }
-  }
-  const idx = new Map(bp.parts.map((p, i) => [p.uid, i]));
-  return out.sort((a, b) => (dist.get(idx.get(a)!) ?? 999) - (dist.get(idx.get(b)!) ?? 999));
+  return coreOutwards(out, bp.parts, adj, core);
 }
 
 /** The part items a slot's ghosts still need */

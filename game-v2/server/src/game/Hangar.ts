@@ -28,7 +28,7 @@
 
 import {
   Blueprint, Bag, Economy, ShipRecord, PlayerProfile, Catalog, ServerMessage, unlocks,
-  partItemId, canCraft, countOf, addTo, removeFrom, installableGhosts, setActiveShip, placeGeometry, computeJoins,
+  partItemId, canCraft, countOf, addTo, removeFrom, installableGhosts, coreOutwards, setActiveShip, placeGeometry, computeJoins,
   placeCost, ghostBill, salvageParts, orderRanking, buildableGhosts, CraftJob, partLicensed,
   socketsFor, setPartGems, parseGemItemId, type GemsFile, buildPoints, shipLoadout } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
@@ -769,13 +769,6 @@ export class Hangar {
 
   /** Ghost uids ordered by join distance from the core */
   private coreOutwards(bp: Blueprint, ghosts: number[], adj: number[][], core: number): number[] {
-    const dist = new Map<number, number>([[core, 0]]);
-    const queue = [core];
-    while (queue.length) {
-      const i = queue.shift()!;
-      for (const j of adj[i]) if (!dist.has(j)) { dist.set(j, dist.get(i)! + 1); queue.push(j); }
-    }
-    const idx = new Map(bp.parts.map((q, i) => [q.uid, i]));
-    return [...ghosts].sort((a, b) => (dist.get(idx.get(a)!) ?? 999) - (dist.get(idx.get(b)!) ?? 999));
+    return coreOutwards(ghosts, bp.parts, adj, core);
   }
 }
