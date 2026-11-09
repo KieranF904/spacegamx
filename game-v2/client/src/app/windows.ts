@@ -329,6 +329,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       worldToScreen: (x, y) => host.renderer.worldToScreen(x, y),
       setTrainingLook: (id, look) => host.renderer.setTrainingLook(id, look),
       keyOf: (a) => boundKeyName(a, settings.data.bindings),
+      helm: () => host.shipClient.helmMode(),
       itemName: (id) => host.pilot.econ.items.get(id)?.name ?? id,
       sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
       panelsOpen: () => {

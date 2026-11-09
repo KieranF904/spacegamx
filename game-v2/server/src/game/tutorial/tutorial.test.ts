@@ -52,7 +52,7 @@ describe('the training yard', () => {
       expect(p.profile().tutorial).toEqual({ step: 'welcome', done: [], left: false });
     }
     const state = w.pilots[0].got.filter((m) => m.type === 'tutorialState').pop() as Extract<ServerMessage, { type: 'tutorialState' }>;
-    expect(state).toMatchObject({ step: 'welcome', done: [], left: false, broken: [] });
+    expect(state).toMatchObject({ step: 'welcome', done: [], left: false, broken: [], passed: [] });
     // one shared yard: both are within the leash of each other
     expect(Math.hypot(Position.x[w.pilots[0].pid] - Position.x[w.pilots[1].pid], Position.y[w.pilots[0].pid] - Position.y[w.pilots[1].pid])).toBeLessThan(w.data.yard.spawnRadius * 2 + 50);
   });

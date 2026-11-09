@@ -26,6 +26,8 @@ function injectStyles(): void {
 .tp-l { margin: 2px 0; color: #cfd8e6; }
 .tp kbd { display: inline-block; min-width: 16px; padding: 0 6px; margin: 0 2px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.35); border-bottom-width: 3px;
   background: rgba(255,255,255,0.08); font: 700 12px 'Segoe UI', sans-serif; text-align: center; color: #fff; }
+.tp-ct { display: inline-block; margin: 5px 0 1px; padding: 1px 10px; border-radius: 999px; background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.5); color: #fde68a; font: 700 12px 'Segoe UI', sans-serif; letter-spacing: 0.5px; }
+.tp-ct.full { background: rgba(74, 222, 128, 0.16); border-color: rgba(74, 222, 128, 0.7); color: #bbf7d0; }
 .tp-bar { height: 4px; margin-top: 9px; border-radius: 2px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .tp-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); transition: width 0.4s; }
 .tp-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
@@ -117,7 +119,7 @@ export class TutorialPanel {
 
   private render(): void {
     const m = this.model;
-    const key = m ? `${m.stepId}|${this.flow.phase}|${m.progress}|${m.lines.join('~')}|${this.pack.join('~')}` : '';
+    const key = m ? `${m.stepId}|${this.flow.phase}|${m.progress}|${m.counter ? m.counter.done : ''}|${m.lines.join('~')}|${this.pack.join('~')}` : '';
     if (key === this.shown) return;
     this.shown = key;
     if (!m) { this.card.hidden = true; this.grad.hidden = true; return; }
@@ -135,6 +137,7 @@ export class TutorialPanel {
     this.card.innerHTML = `<div class="tp-h"><span>TRAINING · ${m.n} / ${m.total}</span></div>
       <div class="tp-t">${esc(m.title)}</div>
       ${m.lines.map((l) => `<div class="tp-l">${l}</div>`).join('')}
+      ${m.counter ? `<div class="tp-ct${m.counter.done >= m.counter.total ? ' full' : ''}" role="status">${esc(m.counter.label)} ${m.counter.done}/${m.counter.total}</div>` : ''}
       <div class="tp-bar"><i style="width:${Math.round(m.progress * 100)}%"></i></div>
       <div class="tp-row">${sent ? '<span class="q">Leaving...</span>' : confirm
         ? `<span class="q">Leave now? You'll get the starter pack and can't come back.</span><button class="warn" data-a="yes">Leave</button><button data-a="no">Stay</button>`
