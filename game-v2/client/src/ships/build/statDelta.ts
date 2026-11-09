@@ -130,13 +130,17 @@ export function diffMeasures(before: Measure, after: Measure, change: Change, op
     const line = lineOf(s, a, b, s.key === 'points' ? opts.budget : undefined);
     if (line) out.lines.push(line);
   }
-  if (!loose && after.summary && after.made - after.drawn < -0.5) {
-    const per = after.gens > 0 ? after.made / after.gens : 0;
-    const short = after.drawn - after.made;
-    if (per > 0) { const n = Math.ceil(short / per - 1e-9); out.powerNote = `${n} generator${n === 1 ? '' : 's'} short`; }
-    else out.powerNote = 'no generator to run it';
-  }
+  if (!loose && after.summary) out.powerNote = generatorsShort(after.made, after.drawn, after.gens);
   return out;
+}
+
+/** "2 generators short" when more is drawn than made (null when it balances); no generator at all: "no generator to run it" */
+export function generatorsShort(made: number, drawn: number, gens: number): string | null {
+  if (made - drawn >= -0.5) return null;
+  const per = gens > 0 ? made / gens : 0;
+  if (per <= 0) return 'no generator to run it';
+  const n = Math.ceil((drawn - made) / per - 1e-9);
+  return `${n} generator${n === 1 ? '' : 's'} short`;
 }
 
 function lineOf(s: StatDef, a: number, b: number, budget: number | undefined): DeltaLine | null {

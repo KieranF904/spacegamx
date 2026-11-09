@@ -35,6 +35,7 @@ import { drawFacingMark, drawShieldCover } from '../build/buildMarks';
 import type { FieldDeps } from './bridge';
 import { FieldFlow } from './fieldFlow';
 import { FLOW_KEY } from '../build/powerFlowView';
+import { detailToggle } from '../build/detailToggleView';
 import {
   addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, replacePart, settle, summary,
   targetErrors, unjoinedText, unjoinedUids, working, type BuildEdits, type LiveDesign, type WorkingDesign,
@@ -247,6 +248,9 @@ export class FieldOverlay {
       else if (a === 'sym') this.aids.toggleSymmetry();
       else if (a === 'clear') this.clear();
     });
+    const head = root.querySelector<HTMLElement>('.fo-head')!;
+    this.detail = detailToggle();
+    head.insertBefore(this.detail.el, head.lastElementChild);
     this.flow.mount(root.querySelector<HTMLElement>('.fo-foot')!);
     this.palWrap = root.querySelector<HTMLDivElement>('.fo-pal')!;
     this.noteEl = root.querySelector<HTMLElement>('.fo-note')!;
@@ -281,7 +285,6 @@ export class FieldOverlay {
       fieldBuild: true,
       freeBuild: () => false,
       grantAll: () => false,
-      partTip: () => {},
       hideTip: () => {},
     });
     this.palWrap.appendChild(this.pal.root);
@@ -571,6 +574,7 @@ export class FieldOverlay {
     if (this.pal && ++this.frames % 15 === 0 && this.pal.stale()) this.pal.render();
   }
   private frames = 0;
+  private detail: { el: HTMLElement; dispose(): void } | null = null;
   private costHtml = '';
   private costTick = 0;
 
@@ -673,6 +677,7 @@ export class FieldOverlay {
   dispose(): void {
     this.close();
     this.delta.dispose();
+    this.detail?.dispose();
     this.root?.remove();
     this.root = undefined;
     this.pal = null;

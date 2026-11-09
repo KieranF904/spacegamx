@@ -1,13 +1,12 @@
 /**
  * @contract client.hangar.tips
- * owns:       the hangar's part tooltips (grid and palette): when they show and what they say
+ * owns:       the hangar's grid part tooltips: when they show and what they say (the parts list has its own hover card: build/partHoverCard.ts)
  * needs:      HangarHost (tip, tipKey, tipGen, deps), partTip.ts; npm: @space-game/common
  * invariants: tooltip contents rebuild only when the key changes — none pinned
  * extend:     a new tooltip source is one function here, calling showTip with its key
  */
 
-import { partItemId, parsePartItemId, type MountingProblem } from '@space-game/common';
-import { modelLock } from '../modelCards';
+import { partItemId, type MountingProblem } from '@space-game/common';
 import { partTipHtml, type PartTipCtx } from '../partTip';
 import type { HangarHost } from './host';
 
@@ -63,14 +62,4 @@ export function gridTip(host: HangarHost, e: MouseEvent): void {
   const key = `g:${host.tipGen}:${p.uid}:${live ? `${Math.round((live.hp / live.max) * 100)}${live.detached ? 'x' : ''}` : ''}`;
   const mounting = host.mountingBroken.get(i)?.map(ruleText);
   host.showTip(key, () => partTipHtml(p, { ...host.tipCtx(), derived: host.derived, index: i, state, live, mounting, loose: host.unreachable.has(p.uid) }), e.clientX, e.clientY);
-}
-
-/** A palette part's tooltip (by item id): what it is, how many you have, what making it takes or what it waits on */
-export function partTip(host: HangarHost, id: string, e: MouseEvent): void {
-  const q = host.deps.econ.items.get(id)?.part ?? parsePartItemId(id);
-  const f = q && host.deps.catalog.functions.get(q.fn);
-  if (!q || !f) return;
-  const left = host.remaining(id);
-  const lock = f.model && !host.free && !host.deps.canMake(id) ? modelLock(f, false, host.deps.level?.() ?? 1).why : '';
-  host.showTip(`p:${host.tipGen}:${id}`, () => partTipHtml(q, { ...host.tipCtx(), state: 'palette', spare: left === Infinity ? 0 : Math.max(0, left), lock }), e.clientX, e.clientY);
 }

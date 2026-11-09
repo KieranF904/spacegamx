@@ -1,7 +1,7 @@
 /**
  * @contract client.hangar.stats
  * owns:       the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems
- * needs:      HangarHost (deps, derived, bp, errors), shipSummary, portsReport; npm: @space-game/common
+ * needs:      HangarHost (deps, derived, bp, errors), shipSummary, portsReport, build/detailMode (Simple swaps power + ship sections for hangarStatsSimple); npm: @space-game/common
  * invariants: renderStats rebuilds the panel and rebinds its buttons — none pinned
  * extend:     a new section is one html function here, appended in renderStats()
  */
@@ -20,6 +20,8 @@ import { shipSummary, designFields, ShipSummary, BIGGER_IS_BETTER, jumpRatioNote
 import type { HangarHost } from './host';
 import { btnCss } from './hangarWidgets';
 import { applyChips } from '../build/statDeltaView';
+import { isSimple } from '../build/detailMode';
+import { simpleSummaryHtml } from './hangarStatsSimple';
 import { stationCost } from '../build/planCost';
 import { stationReadoutHtml, bindResourceLinks } from '../build/planCostView';
 
@@ -328,9 +330,11 @@ export function renderStats(host: HangarHost): void {
   const fmt = (v: number, n = 2) => (Number.isFinite(v) ? v.toFixed(n) : '—');
   let html = host.buildHtml();
   html += host.ammoHtml();
-  html += host.powerHtml();
-  html += host.summaryHtml();
-  html += `<details style="margin-bottom:10px"><summary style="cursor:pointer; color:#8ea0bd">Engineering details</summary><div style="font-family:'Courier New', monospace; font-size:11px; margin-top:6px">`;
+  const simple = isSimple();
+  html += simple ? simpleSummaryHtml(host) : host.powerHtml() + host.summaryHtml();
+  // (Engineering details are Advanced only: built apart, then kept or dropped)
+  const head = html;
+  html = `<details style="margin-bottom:10px"><summary style="cursor:pointer; color:#8ea0bd">Engineering details</summary><div style="font-family:'Courier New', monospace; font-size:11px; margin-top:6px">`;
   html += `<div>parts   ${host.bp.parts.length} / ${t.maxParts}</div>`;
   const bill = host.deps.econ.rebuildBill(host.bp.parts.filter((q) => q.fn !== 'core'));
   const billText = Object.entries(bill).map(([id, n]) => `${n} ${host.deps.econ.items.name(id).replace(/ Ore$/, '')}`).join(', ');
@@ -363,7 +367,7 @@ export function renderStats(host: HangarHost): void {
   } else {
     html += `<div style="color:#8ea0bd">(no core: nothing attached)</div>`;
   }
-  html += `</div></details>`;
+  html = head + (simple ? '' : html + `</div></details>`);
   html += `<div style="color:#ffb547; font-weight:bold; margin:12px 0 6px;">PROBLEMS</div>`;
   html += host.errors.length
     ? host.errors.map((e) => `<div style="color:#f87171; margin-bottom:3px;">• ${e.message}</div>`).join('')
