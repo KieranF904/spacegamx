@@ -1,5 +1,5 @@
 /**
- * Node's built-ins, for the browser build only (vite.config.ts aliases fs, fs/promises, path, os, url and zlib here
+ * Node's built-ins, for the browser build only (vite.config.ts aliases fs, fs/promises, path, os, url, zlib and crypto here
  * when building). The client bundles server code for the sandbox and replays, and some of it imports these by name;
  * Vite's own stand-in has no named exports, so the build would fail. In the browser nothing reads or writes files:
  * reads find nothing and writes are refused.
@@ -43,5 +43,24 @@ export const hostname = (): string => 'browser';
 export const fileURLToPath = (u: string | URL): string => new URL(String(u)).pathname;
 export const createDeflateRaw = refuse('createDeflateRaw');
 export const constants = {};
+
+// crypto: createHash for the guest keep's ids (server pilots/guests.ts). In the browser server only, so its guests stay
+// in this tab: a plain 256-bit FNV-1a mix stands in for sha256 (the same key gives the same id; not cryptographic)
+export const createHash = (_alg: string) => {
+  let text = '';
+  const h = {
+    update(s: string) { text += s; return h; },
+    digest(_enc: 'hex') {
+      let out = '';
+      for (let lane = 0; lane < 8; lane++) {
+        let x = (0x811c9dc5 ^ Math.imul(lane + 1, 0x9e3779b1)) >>> 0;
+        for (let i = 0; i < text.length; i++) x = Math.imul(x ^ text.charCodeAt(i), 0x01000193) >>> 0;
+        out += x.toString(16).padStart(8, '0');
+      }
+      return out;
+    },
+  };
+  return h;
+};
 
 export default { existsSync, readdirSync, readFileSync, writeFileSync, promises, join, dirname, resolve, tmpdir };

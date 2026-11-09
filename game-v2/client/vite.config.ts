@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import { shipsDevApi } from './shipsDevApi';
 
 /** In the browser, Node's built-ins (imported by the server code the sandbox and replays bundle) are stubs */
-const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
+const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib|crypto)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
 
 /**
  * Fails the build if server code (proto mode's and the replays', which only load
