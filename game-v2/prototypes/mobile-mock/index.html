@@ -13,7 +13,7 @@
   --body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --sl: 0px; --sr: 0px; --st: 0px; --sb: 0px;   /* safe-area insets, read in JS and set here */
-  --btn: clamp(42px, 12.5vh, 62px);
+  --btn: clamp(44px, 12vmin, 64px);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: none; }
 html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--void); color: var(--text); font: 13px/1.3 var(--body); }
@@ -63,7 +63,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 #explain { margin: 0; text-align: center; font-size: 12px; color: var(--muted); background: rgba(6,8,12,.55); padding: 2px 8px; border-radius: 4px; }
 
 #mapWrap { right: calc(var(--sr) + 10px); top: calc(var(--st) + 8px); display: grid; gap: 6px; justify-items: end; pointer-events: none; }
-#mini { width: clamp(70px, 24vh, 100px); height: clamp(70px, 24vh, 100px); border-radius: 50%; display: block; }
+#mini { width: clamp(70px, 22vmin, 100px); height: clamp(70px, 22vmin, 100px); border-radius: 50%; display: block; }
 #mapWrap .sq { margin-right: 0; }
 
 /* buttons */
@@ -71,6 +71,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .btn small { display: block; font: 500 9px/1 var(--mono); color: var(--muted); letter-spacing: 0; margin-top: 3px; text-transform: none; }
 .btn.on, .btn.held { border-color: var(--amber); color: var(--amber-hot); background: #241a0a; }
 .btn.cd { opacity: .55; }
+.btn.boost { width: calc(var(--btn) * 1.18); height: calc(var(--btn) * 1.18); align-self: flex-end; }
 .row-l, .row-r { bottom: calc(var(--sb) + var(--stickR2) + 30px); display: flex; gap: 10px; }
 .row-l { left: calc(var(--sl) + 16px); } .row-r { right: calc(var(--sr) + 16px); }
 #dock { right: calc(var(--sr) + 16px); bottom: calc(var(--sb) + var(--stickR2) + 40px + var(--btn)); width: auto; border-radius: 22px; padding: 0 18px; height: 44px; background: var(--amber); border-color: var(--amber); color: #1a1206; font-size: 16px; display: none; }
@@ -79,7 +80,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { #dock.show { animation: none; } }
 
 #abil { left: 50%; transform: translateX(-50%); bottom: calc(var(--sb) + 8px); display: flex; gap: 6px; pointer-events: none; }
-.ab { pointer-events: auto; position: relative; width: clamp(40px, 11.5vh, 52px); height: clamp(40px, 11.5vh, 52px); border-radius: 8px; background: var(--panel); border: 1px solid #34404f; display: grid; place-items: center; cursor: pointer; padding: 0; overflow: hidden; font: 600 12px/1 var(--display); letter-spacing: .08em; color: var(--text); text-transform: uppercase; }
+.ab { pointer-events: auto; position: relative; width: clamp(40px, 10.5vmin, 52px); height: clamp(40px, 10.5vmin, 52px); border-radius: 8px; background: var(--panel); border: 1px solid #34404f; display: grid; place-items: center; cursor: pointer; padding: 0; overflow: hidden; font: 600 12px/1 var(--display); letter-spacing: .08em; color: var(--text); text-transform: uppercase; }
 .ab i { position: absolute; left: 3px; top: 2px; font: 500 9px/1 var(--mono); font-style: normal; color: var(--muted); }
 .ab u { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(6,8,12,.78); }
 .ab.lit { border-color: var(--cyan); color: var(--cyan); }
@@ -103,14 +104,13 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .go { font: 600 16px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; color: #1a1206; background: var(--amber); border: 1px solid var(--amber); border-radius: 4px; padding: 13px; cursor: pointer; }
 #dead { inset: 0; display: none; place-items: center; font: 600 28px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--red); background: rgba(40,0,0,.35); pointer-events: none; }
 #dead.show { display: grid; }
-#rotate { position: fixed; inset: 0; z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--void); padding: 24px; text-align: center; }
-#rotate svg { width: 84px; height: 84px; stroke: var(--amber); fill: none; stroke-width: 2; animation: turn 2.4s ease-in-out infinite; }
-@keyframes turn { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-@media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; transform: rotate(-90deg); } }
-#rotate h1 { margin: 0; font: 600 28px/1.05 var(--display); letter-spacing: .04em; text-transform: uppercase; }
-#rotate h1 span { color: var(--amber); }
-#rotate p { margin: 0; color: var(--muted); max-width: 30ch; font-size: 15px; }
-@media (orientation: portrait) { #rotate { display: flex; } }
+/* portrait: same controls, rearranged for a tall screen */
+@media (orientation: portrait) {
+  #top { top: calc(var(--st) + 118px); max-width: 94vw; }
+  #panel { width: min(280px, 78vw); }
+  #abil { bottom: calc(var(--sb) + var(--stickR2) + var(--btn) + 56px); }
+  #toast { bottom: calc(var(--sb) + var(--stickR2) + var(--btn) * 2 + 80px); }
+}
 </style>
 <div id="probe"></div>
 <canvas id="c"></canvas>
@@ -154,12 +154,12 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
   </div>
 
   <div class="row-l">
-    <button class="btn" data-hold="boost">Boost</button>
-    <button class="btn" data-tap="dodge">Dodge<small id="dodgeCd"></small></button>
+    <button class="btn" data-tap="group" id="groupBtn">Group<small id="groupName">All</small></button>
   </div>
   <div class="row-r">
     <button class="btn" data-hold="mine">Mine</button>
-    <button class="btn" data-tap="group" id="groupBtn">Group<small id="groupName">All</small></button>
+    <button class="btn" data-tap="dodge">Dodge<small id="dodgeCd"></small></button>
+    <button class="btn boost" data-hold="boost">Boost</button>
   </div>
   <button class="btn" id="dock" data-tap="dock">Dock</button>
 
@@ -173,12 +173,6 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
       <button class="go" id="undock">Undock</button>
     </div>
   </div>
-</div>
-
-<div id="rotate">
-  <svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>
-  <h1>Rotate <span>your phone</span></h1>
-  <p>Flying needs landscape. Menus and the map can work in portrait.</p>
 </div>
 
 <script>
@@ -204,8 +198,9 @@ function resize() {
   SAFE = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
   root.style.setProperty('--sl', SAFE.l + 'px'); root.style.setProperty('--sr', SAFE.r + 'px');
   root.style.setProperty('--st', SAFE.t + 'px'); root.style.setProperty('--sb', SAFE.b + 'px');
-  S = H / 640;                      // pixels per world unit
-  SR = clamp(H * 0.15, 44, 66);     // stick push radius (px)
+  const short = Math.min(W, H);
+  S = short / 640;                  // pixels per world unit (by the short side: same view in either orientation)
+  SR = clamp(short * 0.15, 44, 66); // stick push radius (px)
   root.style.setProperty('--stickR2', (SR * 2) + 'px');
   placeGhosts();
 }
@@ -229,13 +224,13 @@ function mkDrone() {
 for (let i = 0; i < 9; i++) rocks.push(mkRock());
 for (let i = 0; i < 4; i++) drones.push(mkDrone());
 const stars = [[], [], []];
-for (let l = 0; l < 3; l++) for (let i = 0; i < 70 + l * 30; i++) stars[l].push({ x: rnd(0, 1), y: rnd(0, 1), s: rnd(.5, 1.5) });
+for (let l = 0; l < 3; l++) for (let i = 0; i < 110 + l * 45; i++) stars[l].push({ x: rnd(0, 1), y: rnd(0, 1), s: rnd(.5, 1.5) });
 
 /* ---------- control schemes ---------- */
 const SCHEMES = {
   twin: { label: 'Twin stick', text: 'Left stick flies. Right stick aims and fires; push farther to aim farther.' },
   tap:  { label: 'Tap aim', text: 'Left stick flies. Tap an enemy to lock it and auto-fire. Hold empty space to fire there.' },
-  helm: { label: 'Helm', text: 'Left stick turns and thrusts along the nose. Hold the right side to fire ahead.' },
+  helm: { label: 'Helm', text: 'The view turns with your ship, nose up. Left stick turns and thrusts. Hold the right side to fire ahead.' },
 };
 let scheme = 'twin';
 const GROUPS = ['All', '1', '2', '3'];
@@ -290,8 +285,7 @@ function releaseAll() {                  // lifecycle clear: a stuck thumb must 
   document.querySelectorAll('.btn.held').forEach((b) => b.classList.remove('held'));
 }
 const zoneL = $('#zoneL'), zoneR = $('#zoneR');
-const portrait = () => window.matchMedia('(orientation: portrait)').matches;
-const blocked = () => docked || deadT > 0 || portrait();
+const blocked = () => docked || deadT > 0;
 
 zoneL.addEventListener('pointerdown', (e) => {
   e.preventDefault(); if (blocked() || L.id !== null) return;
@@ -335,7 +329,7 @@ document.querySelectorAll('[data-hold]').forEach((b) => {
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, (e) => { if (held.has(e.pointerId)) { press(held.get(e.pointerId), false); held.delete(e.pointerId); } });
 });
 document.querySelectorAll('[data-tap]').forEach((b) => b.addEventListener('pointerdown', (e) => {
-  e.preventDefault(); e.stopPropagation(); if (portrait()) return; act(b.dataset.tap);
+  e.preventDefault(); e.stopPropagation(); act(b.dataset.tap);
 }));
 
 function act(a) {
@@ -393,6 +387,8 @@ function dodge() {
 
 /* ---------- camera ---------- */
 const w2s = (x, y) => ({ x: W / 2 + (x - ship.x) * S, y: H / 2 + (y - ship.y) * S });
+/** Helm: the world is drawn turned so the ship's nose points up the screen (the world layer is rotated about the centre) */
+const camRot = () => scheme === 'helm' ? -(ship.a + Math.PI / 2) : 0;
 const s2w = (x, y) => ({ x: ship.x + (x - W / 2) / S, y: ship.y + (y - H / 2) / S });
 
 /* ---------- sim ---------- */
@@ -406,7 +402,7 @@ function hitDrone(d, dmg) { d.hp -= dmg; burst(d.x, d.y, 4, '255,217,160', 140);
 function spawn(dx, dy, ang, sp, o) { shots.push(Object.assign({ x: dx, y: dy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp }, o)); }
 
 function update(dt) {
-  if (portrait() || docked) return;
+  if (docked) return;
   if (deadT > 0) { deadT -= dt; if (deadT <= 0) { ship.x = station.x; ship.y = station.y + station.ring + 40; ship.vx = ship.vy = 0; ship.hp = 100; ship.en = 100; cargo = 0; $('#dead').classList.remove('show'); } return; }
   const boosting = hold.boost && ship.en > 0.5;
   let thrustX = 0, thrustY = 0, wantAng = ship.a;
@@ -513,12 +509,16 @@ function update(dt) {
 function draw(now) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#06080c'; ctx.fillRect(0, 0, W, H);
-  // stars: three parallax layers
+  // the world layer: turned about the centre in helm (nose up), straight otherwise
+  const rot = camRot();
+  ctx.translate(W / 2, H / 2); ctx.rotate(rot); ctx.translate(-W / 2, -H / 2);
+  // stars: three parallax layers, tiled over a square that covers the screen at any turn
+  const B = Math.hypot(W, H), bx = (W - B) / 2, by = (H - B) / 2;
   for (let l = 0; l < 3; l++) {
     const f = [.12, .3, .55][l]; ctx.fillStyle = ['#2c3646', '#566176', '#9aa6ba'][l];
     for (const s of stars[l]) {
-      const x = ((s.x * W - ship.x * S * f) % W + W) % W, y = ((s.y * H - ship.y * S * f) % H + H) % H;
-      ctx.fillRect(x, y, s.s, s.s);
+      const x = bx + ((s.x * B - ship.x * S * f) % B + B) % B, y = by + ((s.y * B - ship.y * S * f) % B + B) % B;
+      ctx.fillRect(x, y, s.s * 1.2, s.s * 1.2);
     }
   }
   const c = w2s(0, 0);
@@ -584,13 +584,13 @@ function drawMini() {
   const m = mini.width, h = m / 2; mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.clearRect(0, 0, m, m);
   mctx.save(); mctx.beginPath(); mctx.arc(h, h, h - 2, 0, TAU); mctx.clip();
   mctx.fillStyle = 'rgba(8,11,16,.85)'; mctx.fillRect(0, 0, m, m);
-  const k = (h - 4) / 1700;
-  const P = (x, y) => [h + (x - ship.x) * k, h + (y - ship.y) * k];
+  const k = (h - 4) / 1700, mr = camRot(), mc = Math.cos(mr), ms = Math.sin(mr);
+  const P = (x, y) => { const dx = (x - ship.x) * k, dy = (y - ship.y) * k; return [h + dx * mc - dy * ms, h + dx * ms + dy * mc]; };
   mctx.strokeStyle = '#222a35'; mctx.lineWidth = 1; mctx.beginPath(); mctx.arc(h, h, h * .5, 0, TAU); mctx.stroke();
   let q = P(station.x, station.y); mctx.fillStyle = '#ffb04a'; mctx.fillRect(q[0] - 3, q[1] - 3, 6, 6);
   mctx.fillStyle = '#566176'; for (const r of rocks) { q = P(r.x, r.y); mctx.fillRect(q[0] - 1.5, q[1] - 1.5, 3, 3); }
   mctx.fillStyle = '#ff6b5e'; for (const d of drones) if (!d.dead) { q = P(d.x, d.y); mctx.beginPath(); mctx.arc(q[0], q[1], 3, 0, TAU); mctx.fill(); }
-  mctx.translate(h, h); mctx.rotate(ship.a); mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.moveTo(6, 0); mctx.lineTo(-4, 4); mctx.lineTo(-4, -4); mctx.fill();
+  mctx.translate(h, h); mctx.rotate(ship.a + camRot()); mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.moveTo(6, 0); mctx.lineTo(-4, 4); mctx.lineTo(-4, -4); mctx.fill();
   mctx.restore();
   mctx.strokeStyle = '#34404f'; mctx.lineWidth = 2; mctx.beginPath(); mctx.arc(h, h, h - 1, 0, TAU); mctx.stroke();
 }
@@ -639,7 +639,7 @@ fs.addEventListener('pointerdown', (e) => {
   const d = document.documentElement;
   try {
     if (document.fullscreenElement) document.exitFullscreen();
-    else { const p = (d.requestFullscreen || d.webkitRequestFullscreen).call(d); if (p && p.then) p.then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {}); }
+    else { const p = (d.requestFullscreen || d.webkitRequestFullscreen).call(d); if (p && p.then) p.catch(() => {}); }
   } catch (err) { /* blocked: stay windowed */ }
 });
 
@@ -652,7 +652,7 @@ window.addEventListener('blur', releaseAll);
 window.addEventListener('orientationchange', releaseAll);
 window.addEventListener('resize', () => { resize(); releaseAll(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
-window.matchMedia('(orientation: portrait)').addEventListener('change', releaseAll);
+window.matchMedia('(orientation: portrait)').addEventListener('change', () => { resize(); releaseAll(); });
 
 /* ---------- loop ---------- */
 let last = performance.now();
