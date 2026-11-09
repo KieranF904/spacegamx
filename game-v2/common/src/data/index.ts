@@ -20,6 +20,5 @@ export * from './registries/index.js';
 export * from './registries/WeaponRegistry.js';
 export * from './registries/EnemyRegistry.js';
 export * from './registries/AsteroidRegistry.js';
-export * from './registries/ItemRegistry.js';
 export * from './registries/ParticleRegistry.js';
 export * from './registries/TrailRegistry.js';
