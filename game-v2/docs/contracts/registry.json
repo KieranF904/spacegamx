@@ -16523,7 +16523,7 @@
       "id": "server.rankings.reporter",
       "path": "server/src/game/rankings/RankingReporter.ts",
       "group": "server/game/rankings",
-      "lines": 84,
+      "lines": 83,
       "owns": "collecting pilots' ranked-stat changes and sending them to the lobby in batches (retried, never lost on a failed send, never counted twice)",
       "needs": "RankingsBackend, a clock, common weekOf",
       "events": "",
@@ -16553,32 +16553,32 @@
         {
           "name": "SEND_MS",
           "kind": "const",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "MAX_BACKOFF_MS",
+          "kind": "const",
           "start": 15,
           "end": 15
         },
         {
-          "name": "MAX_BACKOFF_MS",
+          "name": "BATCH_MAX",
           "kind": "const",
           "start": 16,
           "end": 16
         },
         {
-          "name": "BATCH_MAX",
+          "name": "MAX_PLAYERS",
           "kind": "const",
           "start": 17,
           "end": 17
         },
         {
-          "name": "MAX_PLAYERS",
-          "kind": "const",
-          "start": 18,
-          "end": 18
-        },
-        {
           "name": "RankingReporter",
           "kind": "class",
-          "start": 20,
-          "end": 84
+          "start": 19,
+          "end": 83
         }
       ]
     },
