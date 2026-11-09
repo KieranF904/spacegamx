@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { TutorialData } from '@space-game/common';
 import tutorialJson from '../../../../data/tutorial.json';
-import { LeaveFlow, arrowTargets, counterOf, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, phaseOf, pointsAtBelt, pointsAtStation, risingPanels, targetGained } from './tutorialModel';
+import { LeaveFlow, arrowTargets, counterOf, distLabel, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, phaseOf, pointsAtBelt, pointsAtStation, ringArrow, risingPanels, targetGained } from './tutorialModel';
+import { clearTrainingBodies, inertBody, isTrainingBody, setTrainingBody } from '../../state/trainingBodies';
 
 const data = tutorialJson as unknown as TutorialData;
 const obj = (id: string) => data.objects.find((o) => o.id === id)!;
@@ -148,6 +149,39 @@ describe('toast, pack, panel reports, arrows', () => {
     expect(b.y).toBeCloseTo(40, 5);
     expect(edgeArrow(400, 200, 1000, 600, 40).onScreen).toBe(true);
   });
+
+  it('puts an off-screen arrow on an ellipse round the ship, clear of the HUD at the sides, the card on top and the bars below', () => {
+    const w = 1280, h = 800;
+    for (const [sx, sy] of [[-5000, 400], [9000, 400], [640, -9000], [640, 9000], [-3000, -3000]]) {
+      const a = ringArrow(sx, sy, w, h);
+      expect(a.x).toBeGreaterThanOrEqual(380 - 1e-6);
+      expect(a.x).toBeLessThanOrEqual(900 + 1e-6);
+      expect(a.y).toBeGreaterThanOrEqual(210 - 1e-6);
+      expect(a.y).toBeLessThanOrEqual(590 + 1e-6);
+      expect(a.angle).toBeCloseTo(Math.atan2(sy - h / 2, sx - w / 2), 9);
+    }
+  });
+
+  it('writes distances as the nav markers do', () => {
+    expect(distLabel(644)).toBe('640');
+    expect(distLabel(3530)).toBe('3.5k');
+    expect(distLabel(10160)).toBe('10.2k');
+  });
+});
+
+describe('training bodies (state/trainingBodies.ts)', () => {
+  it('a hidden or ghosted drone is inert for this pilot; a live one is a training body but not inert; others are neither', () => {
+    clearTrainingBodies();
+    setTrainingBody(7, 'hidden');
+    setTrainingBody(8, 'droneGhost');
+    setTrainingBody(9, 'drone');
+    expect([inertBody(7), inertBody(8), inertBody(9), inertBody(10)]).toEqual([true, true, false, false]);
+    expect([isTrainingBody(7), isTrainingBody(9), isTrainingBody(10)]).toEqual([true, true, false]);
+    setTrainingBody(7, null);
+    expect(isTrainingBody(7)).toBe(false);
+    clearTrainingBodies();
+    expect(isTrainingBody(9)).toBe(false);
+  });
 });
 
 describe('tutorial control-mode lines and chips', () => {
@@ -166,7 +200,9 @@ describe('tutorial control-mode lines and chips', () => {
     expect(helm).toContain('<kbd>A</kbd> and <kbd>D</kbd>');
     expect(helm).not.toContain('face the cursor');
     expect(panelModel(st('brake'), data, keys, false)!.lines[0]).toContain('<kbd>S</kbd>');
-    expect(panelModel(st('brake'), data, keys, true)!.lines[0]).toContain('thrust against your drift with <kbd>S</kbd>');
+    expect(panelModel(st('brake'), data, keys, true)!.lines[0]).toContain('Thrust back with <kbd>S</kbd>');
+    // (ships glide to a stop by themselves: the card never says there is no brake)
+    expect(panelModel(st('brake'), data, keys, false)!.lines[0]).toContain('glide to a stop');
   });
   it('key chips follow rebinding', () => {
     expect(fillKeys('Move {wasd}', (a) => ({ forward: '↑', left: '←', backward: '↓', right: '→' } as Record<string, string>)[a])).toBe('Move <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>');

@@ -39,7 +39,7 @@ function injectStyles(): void {
 .tp button.go:hover, .tp-grad button.go:hover { background: #fbbf24; color: #1a1205; }
 .tp button.warn { border-color: rgba(248, 113, 113, 0.7); color: #fecaca; }
 .tp button.leave { border-color: transparent; color: #8394ad; padding: 3px 6px; }
-.tp-toast { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 2110; padding: 6px 16px; border-radius: 999px; pointer-events: none;
+.tp-toast { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 2610; padding: 6px 16px; border-radius: 999px; pointer-events: none;
   background: rgba(10, 40, 28, 0.94); border: 1px solid rgba(74, 222, 128, 0.7); color: #bbf7d0; font: 600 13px 'Segoe UI', sans-serif; animation: tpToast 2.6s ease-out forwards; }
 @keyframes tpToast { 0% { opacity: 0; transform: translate(-50%, -8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
 .tp-grad { position: fixed; inset: 0; z-index: 2200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 6, 14, 0.78); }
@@ -50,6 +50,12 @@ function injectStyles(): void {
 .tp-grad ul { list-style: none; margin: 12px 0 16px; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); text-align: left; max-height: 40vh; overflow: auto; }
 .tp-grad li { padding: 1px 0; }
 .tp-grad button { padding: 7px 26px; font-size: 14px; }
+/* Over a window (the station's, the hold) or the hangar: a strip along the bottom, above the window's veil, so the card stays readable without covering its tabs */
+.tp.low { top: auto; bottom: 8px; z-index: 2600; width: min(640px, calc(100vw - 32px)); padding: 6px 12px; }
+.tp.low .tp-h, .tp.low .tp-bar { display: none; }
+.tp.low .tp-t { display: inline; margin: 0 8px 0 0; font-size: 13px; }
+.tp.low .tp-l, .tp.low .tp-ct { display: inline; margin: 0 6px 0 0; }
+.tp.low .tp-row { float: right; margin: 0 0 0 8px; }
 @media (prefers-reduced-motion: reduce) { .tp-toast { animation: none; } .tp-bar > i { transition: none; } }
 `;
   document.head.appendChild(css);
@@ -111,6 +117,11 @@ export class TutorialPanel {
   /** Hide behind full-screen views (the map, the hangar, the menu) */
   setHidden(hidden: boolean): void {
     this.card.style.visibility = hidden ? 'hidden' : 'visible';
+  }
+
+  /** Over a window (the station's, the hold) or the hangar: the card as a strip along the bottom, above it */
+  setLow(low: boolean): void {
+    this.card.classList.toggle('low', low);
   }
 
   toast(text: string): void {

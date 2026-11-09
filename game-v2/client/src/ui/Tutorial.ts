@@ -10,7 +10,7 @@ import { EntityType } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
-import { inTutorialNow } from './tutorial/tutorialStore';
+import { getTutorialState } from './tutorial/tutorialStore';
 
 const DONE_KEY = 'sg.tutorialDone';
 
@@ -174,7 +174,8 @@ export class Tutorial {
   maybeStart(isNew: boolean): void {
     let done = false;
     try { done = localStorage.getItem(DONE_KEY) === '1'; } catch { /* private window */ }
-    if (this.active || done || !isNew || inTutorialNow()) return;
+    // (Not on a server that runs the training yard: it teaches there, and a graduate never gets this as well)
+    if (this.active || done || !isNew || getTutorialState()) return;
     this.active = true;
     this.go(0);
   }

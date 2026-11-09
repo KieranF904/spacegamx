@@ -340,6 +340,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
         };
       },
       stopOldTour: () => w.tutorial.stop(),
+      windowOpen: () => host.stationOpen || host.shipClient.hangarOpen || w.inventoryWindow.isOpen,
     });
     w.killFeedUI = new KillFeedUI(uiOverlay);
     w.playerStatsUI = new PlayerStatsUI(uiOverlay);

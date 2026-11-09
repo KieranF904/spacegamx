@@ -43,6 +43,8 @@ export default defineConfig(({ command, mode }) => ({
     strictPort: true,
     // Proto mode imports ../server/src and ../data
     fs: { allow: ['..'] },
+    // (WS_TARGET: where this /ws proxy forwards, the dev server on 3000 by default. The game's own join doesn't use it: it
+    // connects straight to the server picked in the server browser, so a server on another port is joined from there)
     proxy: {
       '/ws': {
         target: process.env.WS_TARGET || 'ws://localhost:3000',

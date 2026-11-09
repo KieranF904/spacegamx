@@ -197,6 +197,21 @@ export function edgeArrow(sx: number, sy: number, w: number, h: number, margin: 
   return { onScreen: false, x: cx + dx * t, y: cy + dy * t, angle };
 }
 
+/**
+ * Where the arrow towards an off-screen target sits: on an ellipse round the middle of the screen (the ship), so it
+ * stays clear of the HUD down the left, the minimap, the card at the top and the bars at the bottom
+ */
+export function ringArrow(sx: number, sy: number, w: number, h: number): { x: number; y: number; angle: number } {
+  const cx = w / 2, cy = h / 2, angle = Math.atan2(sy - cy, sx - cx);
+  const rx = Math.max(120, w / 2 - 380), ry = Math.max(100, h / 2 - 210);
+  return { x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry, angle };
+}
+
+/** A distance as the nav markers write it: "640", "3.5k" */
+export function distLabel(d: number): string {
+  return d >= 1000 ? `${(d / 1000).toFixed(1)}k` : `${Math.round(d / 10) * 10}`;
+}
+
 /** Panels that are open now and were not before: the ones to report */
 export function risingPanels(prev: Record<string, boolean>, now: Record<string, boolean>): string[] {
   return Object.keys(now).filter((p) => now[p] && !prev[p]);
