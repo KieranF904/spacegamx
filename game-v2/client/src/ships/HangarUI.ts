@@ -35,11 +35,14 @@
  * server an admin can switch on free build (the admin panel): any part places
  * (rules still apply), and saving takes nothing.
  *
+ * M: symmetry (every place, remove and turn is mirrored across the core's centre line) · Ctrl+Z: undo · Ctrl+Y / Ctrl+Shift+Z: redo
  * Click: place (empty hand: pick up) · Esc: empty the hand, then close · R/F/T over a placed part turn that part · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
  * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
  */
 
 import { DragPaint } from './build/dragPaint';
+import { bindBuildKeys } from './build/buildKeys';
+import { HangarAids } from './hangar/hangarAids';
 import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, overlapsAny, facingProblem, geomContainsPoint, validateBlueprint, nextFreeUid, partNeedsFacing, gunFacing, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, wireCells, cellKey, mountingOf, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
 import { loadTest, type LoadTestResult } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
@@ -75,6 +78,8 @@ export class HangarUI implements HangarHost {
   isOpen = false;
 
   bp!: Blueprint;
+  /** Undo / redo and symmetry (hangar/hangarAids.ts) */
+  readonly aids: HangarAids = new HangarAids(this);
   geoms: PlacedGeom[] = [];
   derived: ShipDerived | null = null;
   /** The grid layer (under the ship), and the ship lit and drawn as in flight (between it and the marks) */
@@ -189,6 +194,7 @@ export class HangarUI implements HangarHost {
     bar.append(
       this.slotBar,
       this.nameInput, this.paintInput, unpaint,
+      this.aids.undoBtn, this.aids.redoBtn, this.aids.symBtn,
       this.loadSelect,
       button('New', () => this.newBlueprint()),
       this.designBtn,
@@ -261,7 +267,7 @@ export class HangarUI implements HangarHost {
       this.gridTip(e);
     });
     window.addEventListener('mouseup', (e) => {
-      if (this.drag && e.button === this.drag.button) this.drag = null;
+      if (this.drag && e.button === this.drag.button) this.stopDrag();
       if (e.button !== 1 || !this.pan) return;
       const pan = this.pan;
       this.pan = null;
@@ -272,9 +278,14 @@ export class HangarUI implements HangarHost {
     this.canvas.addEventListener('mousedown', (e) => {
       const g = this.toGrid(e);
       // (an empty hand's click picks a part up: no paint drag follows it)
-      if (e.button === 0) { const painting = !this.sel.empty; this.place(g); if (painting) this.drag = { button: 0, paint: new DragPaint(g) }; }
+      if (e.button === 0) {
+        const painting = !this.sel.empty;
+        if (painting) this.aids.beginDrag();
+        this.place(g);
+        if (painting) this.startDrag(0, g);
+      }
       if (e.button === 1) { e.preventDefault(); this.pan = { x: e.clientX, y: e.clientY, cx: this.view.cx, cy: this.view.cy, at: g, moved: false }; }
-      if (e.button === 2) { this.remove(g); this.drag = { button: 2, paint: new DragPaint(g) }; }
+      if (e.button === 2) { this.aids.beginDrag(); this.remove(g); this.startDrag(2, g); }
     });
     // (Middle-click picks a part up, middle-drag pans: no autoscroll, no paste)
     this.canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
@@ -285,6 +296,8 @@ export class HangarUI implements HangarHost {
       this.draw();
     }, { passive: false });
     window.addEventListener('resize', () => this.isOpen && this.draw());
+    // Ctrl+Z / Ctrl+Y / M, ahead of the game's own keys (build/buildKeys.ts)
+    bindBuildKeys({ active: () => this.isOpen, undo: () => this.aids.undo(), redo: () => this.aids.redo(), symmetry: () => this.aids.toggleSymmetry() });
   }
 
   // -------------------------------------------------------------------------
@@ -299,6 +312,7 @@ export class HangarUI implements HangarHost {
     const hs = this.deps.hangarState();
     this.slot = slot ?? hs?.active ?? 0;
     this.loadSlot();
+    this.aids.reset();
     this.status('');
     this.grantAll = this.deps.grantAll;
     this.isOpen = true;
@@ -355,12 +369,14 @@ export class HangarUI implements HangarHost {
     if (this.unsaved && !confirm('Discard your unsaved changes to this design?')) return;
     this.slot = slot;
     this.loadSlot();
+    this.aids.reset();
     this.recenter();
     this.refresh();
   }
 
   close(launch: Blueprint | null): void {
     this.isOpen = false;
+    this.stopDrag();
     this.hideTip();
     this.toggleDesigns(false);
     this.root.style.display = 'none';
@@ -477,8 +493,11 @@ export class HangarUI implements HangarHost {
     if (!p) return this.status('blueprint is full (255 parts)');
     const problem = this.placementProblem(p);
     if (problem) return this.status(problem);
-    this.bp.parts.push(p);
-    this.refresh();
+    this.aids.edit(() => {
+      this.bp.parts.push(p);
+      this.refresh();
+      this.aids.placeMirror(p);
+    });
   }
 
   partAt(g: Vec2): number {
@@ -492,10 +511,13 @@ export class HangarUI implements HangarHost {
     if (i < 0 || !this.mouse) return false;
     const r = tryTurn(this.deps.catalog, this.bp.parts, i, TURN_KEYS[code], this.mouse);
     if ('problem' in r) { this.status(r.problem); return true; }
-    this.bp.parts[i] = r.part;
-    if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
-    this.status(r.said);
-    this.refresh();
+    this.aids.edit(() => {
+      this.bp.parts[i] = r.part;
+      const note = this.aids.followTurn(i, this.mouse!);
+      if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
+      this.status(r.said + note);
+      this.refresh();
+    });
     return true;
   }
 
@@ -513,23 +535,43 @@ export class HangarUI implements HangarHost {
   /** A held left/right button: the cells the cursor has passed since the press are placed on / taken out, each once */
   private drag: { button: 0 | 2; paint: DragPaint } | null = null;
 
+  /** (the mirror of the cell pressed counts as visited too) */
+  private startDrag(button: 0 | 2, g: Vec2): void {
+    const paint = new DragPaint(g), m = this.aids.mirrorOf(g);
+    if (m) paint.mark(m);
+    this.drag = { button, paint };
+  }
+
+  /** The held button is up: the drag's edits close as one undo step */
+  private stopDrag(): void {
+    this.drag = null;
+    this.aids.endDrag();
+  }
+
   private dragTo(e: MouseEvent, g: Vec2): void {
     const d = this.drag;
     if (!d) return;
-    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.drag = null; return; }
+    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.stopDrag(); return; }
     for (const at of d.paint.visit(g)) {
+      const m = this.aids.mirrorOf(at);
+      if (m) d.paint.mark(m);
       if (d.button === 0) this.place(at); else this.remove(at);
     }
   }
 
-  private remove(g: Vec2): void {
+  private remove(g: Vec2, mirrored = false): void {
     const i = this.partAt(g);
     if (i < 0) return;
-    // (What it held on to stays, planned and not connected, until something joins it again)
-    this.bp.parts = this.bp.parts.filter((_, k) => k !== i);
-    // (wire laid over what's gone goes with it)
-    if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
-    this.refresh();
+    this.aids.edit(() => {
+      // (What it held on to stays, planned and not connected, until something joins it again)
+      this.bp.parts = this.bp.parts.filter((_, k) => k !== i);
+      // (wire laid over what's gone goes with it)
+      if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
+      this.refresh();
+      // (symmetry: the part across the centre line goes too)
+      const m = mirrored ? null : this.aids.mirrorOf(g);
+      if (m) this.remove(m, true);
+    });
   }
 
   /** Is a cell under one of the design's parts (where saved wire stays) */
@@ -539,9 +581,11 @@ export class HangarUI implements HangarHost {
   }
 
   private newBlueprint(): void {
-    this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, power: 'ports', parts: [
-      { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
-    ] };
+    this.aids.edit(() => {
+      this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, power: 'ports', parts: [
+        { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
+      ] };
+    });
     this.plan = undefined;
     this.recenter();
     this.refresh();
@@ -731,11 +775,11 @@ export class HangarUI implements HangarHost {
   private renderFooter(): void {
     const el = this.pal.foot;
     el.innerHTML = '';
-    const keys = 'Click places · right-click removes · hold and drag to paint or sweep · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
+    const keys = 'Click places · right-click removes · hold and drag to paint or sweep · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · M symmetry (mirror every edit across the centre line) · Ctrl+Z undo · Ctrl+Y redo · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
     const info = document.createElement('div');
     info.title = keys;
     info.style.cssText = 'color:#6b7a93; margin:3px 0 2px; font-size:10.5px; line-height:1.45;';
-    info.innerHTML = `Click places · right-click removes · hold and drag to paint or sweep · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E energy · Tab list · wheel zoom`;
+    info.innerHTML = `Click places · right-click removes · hold and drag to paint or sweep · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E energy · Tab list · wheel zoom<br>M symmetry · Ctrl+Z undo · Ctrl+Y redo`;
     el.append(info);
     // Overlays (folded) and proto's debug switch, on one line
     const row = document.createElement('div');

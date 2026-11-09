@@ -55,6 +55,7 @@ export async function loadSelected(host: HangarHost): Promise<void> {
       host.bp = preset ? clone(preset.bp) : await loadBlueprint(file);
       host.plan = preset?.file;
     }
+    host.aids.reset();
     host.recenter();
     host.refresh();
     host.status(`loaded ${host.bp.name}`);
@@ -142,6 +143,7 @@ export function loadDesign(host: HangarHost, slot: number): void {
   if (!d) return;
   host.bp = clone(d);
   host.plan = undefined;
+  host.aids.reset();
   host.toggleDesigns(false);
   host.recenter();
   host.refresh();

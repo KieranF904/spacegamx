@@ -5,6 +5,7 @@
  *
  *   left click   place the part in hand (hold: along the path)   right click   take a part out (a standing part: mark it for recycling)
  *   middle click pick a part up                 R turn · F mirror · T facing · Esc or the build key closes
+ *   M symmetry (every edit mirrored across the core's centre line) · Ctrl+Z undo · Ctrl+Y or Ctrl+Shift+Z redo (fieldAids.ts)
  *
  * There is no plan apart from the blueprint: a part the blueprint has and the ship hasn't is missing (planned or shot
  * off), drawn as the real part, faded, and built by the fabricator. Built parts are the ship itself (the game draws
@@ -16,6 +17,8 @@
  * stands" sends `fieldPlanClear`. The edits are plan.ts, laid over the live ship each frame.
  */
 import { DragPaint } from '../build/dragPaint';
+import { bindBuildKeys } from '../build/buildKeys';
+import { FieldAids } from './fieldAids';
 import { placeGeometry, partItemId, hasFixedBarrel } from '@space-game/common';
 import type { Graphics } from 'pixi.js';
 import type { PlacedGeom, PlacedPart, ShipState, Side, Vec2 } from '@space-game/common';
@@ -54,6 +57,7 @@ const STYLE = `
 .fo-btn { flex: 1; cursor: pointer; border: 1px solid #2a3a5a; background: #14203a; color: #cfe0f5; border-radius: 5px; padding: 4px 6px; font: inherit; }
 .fo-btn:hover:not(:disabled) { background: #1c2d52; }
 .fo-btn:disabled { opacity: 0.45; cursor: default; }
+.fo-btn.on { background: #24406b; border-color: #5fd4c4; }
 .fo-btn.go { background: #14532d; border-color: #22c55e; color: #bbf7d0; }
 `;
 
@@ -81,7 +85,21 @@ export class FieldOverlay {
   private noteBad = false;
   private cache: { key: unknown[]; w: WorkingDesign; geoms: PlacedGeom[]; unjoined: Set<number> } | null = null;
 
-  constructor(private deps: FieldDeps) {}
+  /** Undo / redo and symmetry (fieldAids.ts) */
+  readonly aids: FieldAids;
+  private unbindKeys: (() => void) | null = null;
+
+  constructor(private deps: FieldDeps) {
+    this.aids = new FieldAids({
+      catalog: deps.catalog,
+      edits: () => this.edits,
+      setEdits: (e) => { this.edits = e; },
+      changed: () => this.edited(),
+      say: (t, bad) => this.say(t, bad),
+      view: () => this.view(),
+      problemFor: (p) => this.problemFor(p),
+    });
+  }
 
   // ---------------------------------------------------------------- open and close
 
@@ -100,12 +118,14 @@ export class FieldOverlay {
     deps.view.setZoom(this.zoomFor(ship));
     this.edits = noEdits();
     this.rev++;
+    this.aids.reset();
     this.ensurePanel();
+    this.unbindKeys = bindBuildKeys({ active: () => this.isOpen, undo: () => this.aids.undo(), redo: () => this.aids.redo(), symmetry: () => this.aids.toggleSymmetry() });
     this.root!.style.display = 'flex';
     window.addEventListener('mousedown', this.onDown, true);
     window.addEventListener('mousemove', this.onMove, true);
     window.addEventListener('mouseup', this.onUp, true);
-    this.say('Click on the ship to place. Saving is free: the fabricator builds missing parts from your hold.');
+    this.say('Click on the ship to place. M mirrors edits, Ctrl+Z undoes. Saving is free: the fabricator builds missing parts from your hold.');
     void this.loadPalette();
   }
 
@@ -115,7 +135,10 @@ export class FieldOverlay {
     window.removeEventListener('mousedown', this.onDown, true);
     window.removeEventListener('mousemove', this.onMove, true);
     window.removeEventListener('mouseup', this.onUp, true);
-    this.drag = null;
+    this.stopDrag();
+    this.unbindKeys?.();
+    this.unbindKeys = null;
+    this.aids.reset();
     if (this.root) this.root.style.display = 'none';
     const was = this.was;
     this.was = null;
@@ -184,18 +207,23 @@ export class FieldOverlay {
     root.innerHTML = `<div class="fo-head"><b>Build</b><button class="fo-btn" data-a="close" style="flex:none">Close</button></div>
       <div class="fo-pal"></div>
       <div class="fo-foot"><div class="fo-note"></div>
-        <div class="fo-btns"><button class="fo-btn go" data-a="save">Save</button><button class="fo-btn" data-a="reset">Undo edits</button><button class="fo-btn" data-a="clear" title="Drop every missing part (planned or lost) from the design and stop recycling: the ship as it stands">As it stands</button></div></div>`;
+        <div class="fo-btns"><button class="fo-btn" data-a="undo" title="Undo the last edit (Ctrl+Z)">Undo</button><button class="fo-btn" data-a="redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)">Redo</button><button class="fo-btn" data-a="sym" title="Symmetry (M): every place, remove and turn is repeated across the ship's centre line">Mirror</button></div>
+        <div class="fo-btns"><button class="fo-btn go" data-a="save">Save</button><button class="fo-btn" data-a="reset" title="Throw away every unsaved edit (Undo brings them back)">Reset edits</button><button class="fo-btn" data-a="clear" title="Drop every missing part (planned or lost) from the design and stop recycling: the ship as it stands">As it stands</button></div></div>`;
     root.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest<HTMLElement>('[data-a]')?.dataset.a;
       if (a === 'close') this.close();
       else if (a === 'save') this.save();
-      else if (a === 'reset') this.undo();
+      else if (a === 'reset') this.reset();
+      else if (a === 'undo') this.aids.undo();
+      else if (a === 'redo') this.aids.redo();
+      else if (a === 'sym') this.aids.toggleSymmetry();
       else if (a === 'clear') this.clear();
     });
     this.palWrap = root.querySelector<HTMLDivElement>('.fo-pal')!;
     this.noteEl = root.querySelector<HTMLElement>('.fo-note')!;
     this.saveBtn = root.querySelector<HTMLButtonElement>('[data-a="save"]')!;
     this.clearBtn = root.querySelector<HTMLButtonElement>('[data-a="clear"]')!;
+    this.aids.bind(root.querySelector<HTMLButtonElement>('[data-a="undo"]')!, root.querySelector<HTMLButtonElement>('[data-a="redo"]')!, root.querySelector<HTMLButtonElement>('[data-a="sym"]')!);
     document.body.appendChild(root);
     this.root = root;
   }
@@ -242,20 +270,34 @@ export class FieldOverlay {
   };
 
   private onUp = (e: MouseEvent): void => {
-    if (this.drag && e.button === this.drag.button) this.drag = null;
+    if (this.drag && e.button === this.drag.button) this.stopDrag();
   };
 
   /** A held left/right button that started on the ship: the cells the cursor passes are built on / taken out, each once */
   private drag: { button: 0 | 2; paint: DragPaint; touched: Set<number> } | null = null;
 
+  private startDrag(button: 0 | 2, at: Vec2, touched: Set<number>): void {
+    const paint = new DragPaint(at), m = this.aids.mirrorOf(at);
+    if (m) paint.mark(m);
+    this.drag = { button, paint, touched };
+  }
+
+  /** The held button is up: the drag's edits close as one undo step */
+  private stopDrag(): void {
+    this.drag = null;
+    this.aids.endDrag();
+  }
+
   private dragTo(e: MouseEvent): void {
     const d = this.drag;
     if (!d) return;
-    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.drag = null; return; }
+    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.stopDrag(); return; }
     if ((e.target as HTMLElement | null)?.tagName !== 'CANVAS') return;
     const to = this.gridAt(e.clientX, e.clientY);
     if (!to) return;
     for (const at of d.paint.visit(to)) {
+      const m = this.aids.mirrorOf(at);
+      if (m) d.paint.mark(m);
       if (!this.near(at)) continue;
       if (d.button === 0) this.place(at); else this.take(at, d.touched, true);
     }
@@ -271,11 +313,17 @@ export class FieldOverlay {
     e.stopPropagation();
     e.preventDefault();
     // (an empty hand's click picks a part up: no paint drag follows it)
-    if (e.button === 0) { const painting = !this.hand.empty; this.place(at); if (painting) this.drag = { button: 0, paint: new DragPaint(at), touched: new Set() }; }
+    if (e.button === 0) {
+      const painting = !this.hand.empty;
+      if (painting) this.aids.beginDrag();
+      this.place(at);
+      if (painting) this.startDrag(0, at, new Set());
+    }
     else if (e.button === 2) {
       const touched = new Set<number>();
+      this.aids.beginDrag();
       this.take(at, touched);
-      this.drag = { button: 2, paint: new DragPaint(at), touched };
+      this.startDrag(2, at, touched);
     }
     else if (e.button === 1) this.pickUp(at);
   };
@@ -340,25 +388,35 @@ export class FieldOverlay {
     if (!part) return this.say('The design is full (255 parts).', true);
     const why = this.problemFor(part);
     if (why) return this.say(why[0].toUpperCase() + why.slice(1) + '.', true);
-    addPart(this.edits, part);
-    this.edited();
+    this.aids.edit(() => {
+      addPart(this.edits, part);
+      this.edited();
+      this.aids.placeMirror(part);
+    });
   }
 
   /** `touched`: the parts this drag has already dealt with (a drag marks a part once, and `sweeping` over one already marked leaves it marked) */
-  private take(g: Vec2, touched?: Set<number>, sweeping = false): void {
+  private take(g: Vec2, touched: Set<number> = new Set(), sweeping = false): void {
+    this.aids.edit(() => {
+      this.takeAt(g, touched, sweeping);
+      // (symmetry: the part across the centre line goes the same way; a part on the line was dealt with once)
+      const m = this.aids.mirrorOf(g);
+      if (m) this.takeAt(m, touched, sweeping);
+    });
+  }
+
+  private takeAt(g: Vec2, touched: Set<number>, sweeping: boolean): void {
     const v = this.view();
     if (!v) return;
     const i = partAtPoint(this.deps.catalog, v.w, g);
     if (i < 0) return;
-    if (touched) {
-      const uid = v.w.bp.parts[i].uid;
-      if (touched.has(uid)) return;
-      touched.add(uid);
-      if (sweeping && v.w.marked.has(uid)) return;
-    }
+    const uid = v.w.bp.parts[i].uid;
+    if (touched.has(uid)) return;
+    touched.add(uid);
+    if (sweeping && v.w.marked.has(uid)) return;
     const res = removePart(this.deps.catalog, v.live, this.edits, i);
     if (res.kind === 'none') return this.say("The core can't be taken out.", true);
-    if (touched) res.uids.forEach((u) => touched.add(u));
+    res.uids.forEach((u) => touched.add(u));
     const more = res.uids.length > 1 ? ` and ${res.uids.length - 1} cut off with it` : '';
     this.say(res.kind === 'marked' ? `Marked for recycling${more}. Right-click again to keep it.` : res.kind === 'unmarked' ? 'Kept.' : `Taken out of the design${more}.`);
     this.edited();
@@ -373,9 +431,12 @@ export class FieldOverlay {
     if (v.w.standing[i]) { this.say('A built part stays as it is: turn it by recycling it and placing it again.', true); return true; }
     const r = tryTurn(this.deps.catalog, v.w.bp.parts, i, TURN_KEYS[code], at);
     if ('problem' in r) { this.say(r.problem[0].toUpperCase() + r.problem.slice(1) + '.', true); return true; }
-    if (!replacePart(v.live, this.edits, v.w, i, r.part)) { this.say('The design is full (255 parts).', true); return true; }
-    this.say(r.said + '.');
-    this.edited();
+    this.aids.edit(() => {
+      if (!replacePart(v.live, this.edits, v.w, i, r.part)) return this.say('The design is full (255 parts).', true);
+      this.edited();
+      const note = this.aids.followTurn(at);
+      this.say(r.said + note + '.');
+    });
     return true;
   }
 
@@ -441,16 +502,21 @@ export class FieldOverlay {
     this.say(`Saved: ${s.added} to build, ${s.recycle} to recycle.`);
   }
 
-  undo(): void {
-    this.edits = noEdits();
-    this.edited();
-    this.say('Edits undone.');
+  /** Throw away every unsaved edit (one undo step: Undo brings them back) */
+  reset(): void {
+    this.aids.edit(() => {
+      this.edits = noEdits();
+      this.edited();
+    });
+    this.say('Edits reset. Undo (Ctrl+Z) brings them back.');
   }
 
   clear(): void {
     this.deps.send({ type: 'fieldPlanClear' });
-    this.edits = noEdits();
-    this.edited();
+    this.aids.edit(() => {
+      this.edits = noEdits();
+      this.edited();
+    });
     this.say('The ship as it stands: missing parts dropped, recycling stopped.');
   }
 
@@ -462,7 +528,7 @@ export class FieldOverlay {
     const ship = this.deps.ship();
     if (!ship || !this.deps.entity() || !this.deps.flying()) { this.close(); return; }
     const live = this.live();
-    if (live && hasEdits(this.edits) && settle(live, this.edits)) this.edited();
+    if (live && hasEdits(this.edits) && settle(live, this.edits)) { this.edited(); this.aids.reset(); }
     this.footer();
     // (the parts list shows costs against the hold, which moves as you fly: look every few frames)
     if (this.pal && ++this.frames % 15 === 0 && this.pal.stale()) this.pal.render();
@@ -513,6 +579,13 @@ export class FieldOverlay {
       for (let x = x0; x <= x1; x++) { const a = X.at(x, y0), b = X.at(x, y1); g.moveTo(a[0], a[1]).lineTo(b[0], b[1]); }
       for (let y = y0; y <= y1; y++) { const a = X.at(x0, y), b = X.at(x1, y); g.moveTo(a[0], a[1]).lineTo(b[0], b[1]); }
       g.stroke({ width: ctx.cs * 0.02, color: 0x7dd3fc, alpha: 0.16 });
+    }
+    // Symmetry: the centre line edits are mirrored across, dashed along the ship
+    const axis2 = this.aids.axis2();
+    if (axis2 !== null && Number.isFinite(minX)) {
+      const ax = axis2 / 2, y0 = Math.floor(minY) - REACH, y1 = Math.ceil(maxY) + REACH;
+      for (let y = y0; y < y1; y += 0.5) { const a = X.at(ax, y), b = X.at(ax, y + 0.3); g.moveTo(a[0], a[1]).lineTo(b[0], b[1]); }
+      g.stroke({ width: ctx.cs * 0.03, color: 0x5fd4c4, alpha: 0.55 });
     }
     // The part a machine is building now: it fills in as the job goes
     const clocks = this.deps.clocks();

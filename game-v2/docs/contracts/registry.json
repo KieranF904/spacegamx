@@ -1652,7 +1652,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 847,
+      "lines": 891,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1671,26 +1671,26 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 66,
-          "end": 67
+          "start": 69,
+          "end": 70
         },
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 70,
-          "end": 70
+          "start": 73,
+          "end": 73
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 71,
-          "end": 72
+          "start": 74,
+          "end": 75
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 74,
-          "end": 847
+          "start": 77,
+          "end": 891
         }
       ]
     },
@@ -1771,6 +1771,60 @@
           "kind": "class",
           "start": 50,
           "end": 504
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-keys",
+      "path": "client/src/ships/build/buildKeys.ts",
+      "group": "client/ships/build",
+      "lines": 48,
+      "owns": "the keys both build editors add on top of the game's key table: Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo and M for symmetry, caught before the game's own handlers (M is the system map there, and the table only passes a key's code)",
+      "needs": "DOM window keydown events",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the three keys are told apart from plain letters and from typing in a text box",
+          "test": "client/src/ships/build/buildKeys.test.ts"
+        }
+      ],
+      "extend": "a new editor-wide key is one more case in buildKeyAction() and one more member of BuildKeyActions",
+      "exports": [
+        "BuildKeyAction",
+        "BuildKeyActions",
+        "bindBuildKeys",
+        "buildKeyAction"
+      ],
+      "sections": [
+        {
+          "name": "BuildKeyAction",
+          "kind": "type",
+          "start": 10,
+          "end": 10
+        },
+        {
+          "name": "buildKeyAction",
+          "kind": "function",
+          "start": 12,
+          "end": 20
+        },
+        {
+          "name": "BuildKeyActions",
+          "kind": "interface",
+          "start": 22,
+          "end": 28
+        },
+        {
+          "name": "typing",
+          "kind": "const",
+          "start": 30,
+          "end": 33
+        },
+        {
+          "name": "bindBuildKeys",
+          "kind": "function",
+          "start": 35,
+          "end": 48
         }
       ]
     },
@@ -1886,7 +1940,7 @@
       "id": "client.ships.build-drag-paint",
       "path": "client/src/ships/build/dragPaint.ts",
       "group": "client/ships/build",
-      "lines": 77,
+      "lines": 82,
       "owns": "the drag-to-paint walk shared by the hangar and the world build view: the grid cells a cursor passes between two points, and the once-per-cell rule for one held-button drag",
       "needs": "common Vec2 (a type only)",
       "events": "",
@@ -1928,13 +1982,13 @@
           "name": "DragPaint",
           "kind": "class",
           "start": 49,
-          "end": 73
+          "end": 78
         },
         {
           "name": "key",
           "kind": "function",
-          "start": 75,
-          "end": 77
+          "start": 80,
+          "end": 82
         }
       ]
     },
@@ -2046,6 +2100,173 @@
           "kind": "function",
           "start": 111,
           "end": 114
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-history",
+      "path": "client/src/ships/build/history.ts",
+      "group": "client/ships/build",
+      "lines": 80,
+      "owns": "the undo / redo history both build editors keep: whole-design snapshots, a cap, and one step per drag",
+      "needs": "nothing (generic over the snapshot type; no DOM, no editor state)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "undo returns the design as it stood before the last step and redo the one after it, in order",
+          "test": "client/src/ships/build/history.test.ts"
+        },
+        {
+          "text": "a new edit drops the redo steps",
+          "test": "client/src/ships/build/history.test.ts"
+        },
+        {
+          "text": "a drag (begin .. end) is one step, and an edit that changed nothing is none",
+          "test": "client/src/ships/build/history.test.ts"
+        },
+        {
+          "text": "the oldest steps fall off past the cap",
+          "test": "client/src/ships/build/history.test.ts"
+        }
+      ],
+      "extend": "an editor snapshots its state (parts and wires, or its pending edits), records each edit with record(), wraps a drag in begin()/end()",
+      "exports": [
+        "HISTORY_CAP",
+        "History"
+      ],
+      "sections": [
+        {
+          "name": "HISTORY_CAP",
+          "kind": "const",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "History",
+          "kind": "class",
+          "start": 15,
+          "end": 80
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-symmetry",
+      "path": "client/src/ships/build/symmetry.ts",
+      "group": "client/ships/build",
+      "lines": 61,
+      "owns": "the mirror across the ship's centre line both build editors use for symmetry mode: the axis (the core's centre, ships point N so the line runs along y), a point, a side and a whole part reflected across it",
+      "needs": "common placeGeometry / hasFixedBarrel / gunFacing (the game's own geometry); no DOM, no editor state",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a mirrored part's footprint is the reflection of the original's, in all eight orientations of every piece",
+          "test": "client/src/ships/build/symmetry.test.ts"
+        },
+        {
+          "text": "a part on the axis is its own mirror, so only one is placed",
+          "test": "client/src/ships/build/symmetry.test.ts"
+        },
+        {
+          "text": "the mirror of a fixed-barrel gun fires out of the mirrored side",
+          "test": "client/src/ships/build/symmetry.test.ts"
+        },
+        {
+          "text": "mirroring twice gives the original back",
+          "test": "client/src/ships/build/symmetry.test.ts"
+        }
+      ],
+      "extend": "a new piece shape needs nothing (the mirror is rot -> -rot, flip toggled, then placed by bounding box); a new kind of per-part state that mirrors (not a facing) is one more line in mirrorPart()",
+      "exports": [
+        "axisOf",
+        "mirrorPart",
+        "mirrorPoint",
+        "mirrorSide",
+        "onAxis"
+      ],
+      "sections": [
+        {
+          "name": "axisOf",
+          "kind": "function",
+          "start": 17,
+          "end": 23
+        },
+        {
+          "name": "mirrorPoint",
+          "kind": "function",
+          "start": 25,
+          "end": 28
+        },
+        {
+          "name": "mirrorSide",
+          "kind": "function",
+          "start": 30,
+          "end": 33
+        },
+        {
+          "name": "EPS",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "mirrorPart",
+          "kind": "function",
+          "start": 37,
+          "end": 51
+        },
+        {
+          "name": "vertexKey",
+          "kind": "const",
+          "start": 53,
+          "end": 54
+        },
+        {
+          "name": "onAxis",
+          "kind": "function",
+          "start": 56,
+          "end": 61
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-symmetry-turn",
+      "path": "client/src/ships/build/symmetryTurn.ts",
+      "group": "client/ships/build",
+      "lines": 33,
+      "owns": "the other half of a turn, mirror or re-face in symmetry mode: which part across the axis follows, and the copy it becomes",
+      "needs": "build/symmetry (the mirror), build/editPlaced (partUnder, turnProblem: the rules a turned part must keep)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the follower is the part under the mirrored cursor, made the exact mirror of the turned part, keeping its own uid",
+          "test": "client/src/ships/build/symmetryTurn.test.ts"
+        },
+        {
+          "text": "a different part there, or a turn the rules refuse, leaves it alone with a reason",
+          "test": "client/src/ships/build/symmetryTurn.test.ts"
+        },
+        {
+          "text": "a part on the axis has no follower",
+          "test": "client/src/ships/build/symmetryTurn.test.ts"
+        }
+      ],
+      "extend": "none: an editor calls mirrorFollow() after it has applied its own turn",
+      "exports": [
+        "MirrorFollow",
+        "mirrorFollow"
+      ],
+      "sections": [
+        {
+          "name": "MirrorFollow",
+          "kind": "type",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "mirrorFollow",
+          "kind": "function",
+          "start": 17,
+          "end": 33
         }
       ]
     },
@@ -3058,6 +3279,69 @@
       ]
     },
     {
+      "id": "client.field.aids",
+      "path": "client/src/ships/field/fieldAids.ts",
+      "group": "client/ships/field",
+      "lines": 140,
+      "owns": "the world build view's undo / redo history and symmetry mode: a step is the pilot's pending edits (plan.ts BuildEdits), the mirrored half of a place / remove / turn, and the axis",
+      "needs": "plan.ts (BuildEdits, addPart, replacePart, freeUid), build/history, build/symmetry, build/symmetryTurn",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one place, remove or turn (with its mirror), and one whole held drag, is one undo step",
+          "test": "client/src/ships/field/fieldAids.test.ts"
+        },
+        {
+          "text": "an undone edit comes back whole on redo",
+          "test": "client/src/ships/field/fieldAids.test.ts"
+        },
+        {
+          "text": "a step the live ship has since made moot falls away (the history is dropped when edits settle)",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new kind of edit in the view runs inside aids.edit() so it is undoable",
+      "exports": [
+        "EditsSnap",
+        "FieldAids",
+        "FieldAidsHost",
+        "editsOf",
+        "snapEdits"
+      ],
+      "sections": [
+        {
+          "name": "EditsSnap",
+          "kind": "type",
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "snapEdits",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "editsOf",
+          "kind": "function",
+          "start": 26,
+          "end": 29
+        },
+        {
+          "name": "FieldAidsHost",
+          "kind": "interface",
+          "start": 31,
+          "end": 43
+        },
+        {
+          "name": "FieldAids",
+          "kind": "class",
+          "start": 45,
+          "end": 140
+        }
+      ]
+    },
+    {
       "id": "client.ship.fx",
       "path": "client/src/ships/fx/ShipFx.ts",
       "group": "client/ships/fx",
@@ -3495,10 +3779,47 @@
       ]
     },
     {
+      "id": "client.hangar.aids",
+      "path": "client/src/ships/hangar/hangarAids.ts",
+      "group": "client/ships/hangar",
+      "lines": 136,
+      "owns": "the hangar's undo / redo history and symmetry mode: what a step is (the parts and the saved wiring), the toolbar buttons, the mirrored half of a place / remove / turn, and the axis line",
+      "needs": "HangarHost (bp, deps, refresh, status), build/history, build/symmetry, build/symmetryTurn, build/buildKeys, hangar/hangarWidgets",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one place, remove or turn (with its mirror), and one whole held drag, is one undo step",
+          "test": "client/src/ships/build/history.test.ts"
+        },
+        {
+          "text": "the mirrored half follows the shared mirror rules",
+          "test": "client/src/ships/build/symmetry.test.ts"
+        }
+      ],
+      "extend": "a new kind of hangar edit runs inside aids.edit() so it is undoable (and mirrored if it asks for the mirror)",
+      "exports": [
+        "HangarAids"
+      ],
+      "sections": [
+        {
+          "name": "Snap",
+          "kind": "type",
+          "start": 19,
+          "end": 20
+        },
+        {
+          "name": "HangarAids",
+          "kind": "class",
+          "start": 22,
+          "end": 136
+        }
+      ]
+    },
+    {
       "id": "client.hangar.designs",
       "path": "client/src/ships/hangar/hangarDesigns.ts",
       "group": "client/ships/hangar",
-      "lines": 149,
+      "lines": 151,
       "owns": "the hangar's load list and saved-design slots panel (save, load, delete with confirm)",
       "needs": "HangarHost (deps, bp, designAsk, designPanel, loadSelect), blueprintApi; npm: @space-game/common",
       "events": "",
@@ -3530,43 +3851,43 @@
           "name": "loadSelected",
           "kind": "function",
           "start": 35,
-          "end": 65
+          "end": 66
         },
         {
           "name": "designKey",
           "kind": "function",
-          "start": 67,
-          "end": 69
+          "start": 68,
+          "end": 70
         },
         {
           "name": "toggleDesigns",
           "kind": "function",
-          "start": 71,
-          "end": 80
+          "start": 72,
+          "end": 81
         },
         {
           "name": "renderDesigns",
           "kind": "function",
-          "start": 82,
-          "end": 124
+          "start": 83,
+          "end": 125
         },
         {
           "name": "saveDesign",
           "kind": "function",
-          "start": 126,
-          "end": 131
+          "start": 127,
+          "end": 132
         },
         {
           "name": "deleteDesign",
           "kind": "function",
-          "start": 133,
-          "end": 138
+          "start": 134,
+          "end": 139
         },
         {
           "name": "loadDesign",
           "kind": "function",
-          "start": 140,
-          "end": 149
+          "start": 141,
+          "end": 151
         }
       ]
     },
@@ -3574,7 +3895,7 @@
       "id": "client.hangar.draw",
       "path": "client/src/ships/hangar/hangarDraw.ts",
       "group": "client/ships/hangar",
-      "lines": 206,
+      "lines": 216,
       "owns": "one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost",
       "needs": "HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common",
       "events": "",
@@ -3599,7 +3920,7 @@
           "name": "draw",
           "kind": "function",
           "start": 30,
-          "end": 206
+          "end": 216
         }
       ]
     },
@@ -3901,7 +4222,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 140,
+      "lines": 143,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -3921,20 +4242,20 @@
         {
           "name": "HangarDeps",
           "kind": "interface",
-          "start": 15,
-          "end": 51
+          "start": 16,
+          "end": 52
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 53,
-          "end": 53
+          "start": 54,
+          "end": 54
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 55,
-          "end": 140
+          "start": 56,
+          "end": 143
         }
       ]
     },

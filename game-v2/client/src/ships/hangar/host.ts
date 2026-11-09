@@ -11,6 +11,7 @@ import { type PowerReport } from '../wireEdit';
 import { PortsGrid } from '../portsGrid';
 import { HangarLitView } from '../HangarLitView';
 import { type PartTipCtx } from '../partTip';
+import type { HangarAids } from './hangarAids';
 
 export interface HangarDeps {
   catalog: Catalog;
@@ -60,6 +61,8 @@ export interface HangarHost {
   feedPreviewFor: ShipDerived | null;
   feedPreviewVal: { feeds: number[]; hint: string } | null;
   bp: Blueprint;
+  /** Undo / redo and symmetry */
+  readonly aids: HangarAids;
   ctx: CanvasRenderingContext2D;
   geoms: PlacedGeom[];
   view: { cx: number; cy: number; px: number };

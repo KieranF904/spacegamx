@@ -58,6 +58,16 @@ export function draw(host: HangarHost): void {
   ctx.fillStyle = '#3b4c6e';
   ctx.font = '11px sans-serif';
   ctx.fillText('▲ forward', sx(cx) - 26, 16);
+  // Symmetry: the centre line edits are mirrored across
+  const axisX = host.aids.axisX();
+  if (axisX !== null) {
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = 'rgba(95, 212, 196, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(sx(axisX), 0); ctx.lineTo(sx(axisX), h); ctx.stroke();
+    ctx.restore();
+  }
 
   const path = (poly: Vec2[]) => {
     ctx.beginPath();
