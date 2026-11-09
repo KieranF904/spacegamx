@@ -35,7 +35,7 @@
  * server an admin can switch on free build (the admin panel): any part places
  * (rules still apply), and saving takes nothing.
  *
- * M: symmetry (every place, remove and turn is mirrored across the core's centre line) · Ctrl+Z: undo · Ctrl+Y / Ctrl+Shift+Z: redo
+ * E / U: power flow overlay (pulses, ticks, crosses, legend; remembered) · M: symmetry (every place, remove and turn is mirrored across the core's centre line) · Ctrl+Z: undo · Ctrl+Y / Ctrl+Shift+Z: redo
  * Click: place (empty hand: pick up) · Esc: empty the hand, then close · R/F/T over a placed part turn that part · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
  * Hover: a part in hand over a cell it fits, or a placed part, shows a card at the cursor and +/- beside the stats: what placing / removing it changes
  * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
@@ -56,6 +56,8 @@ import { modelLock } from './modelCards';
 import { HangarLitView } from './HangarLitView';
 import { saveBlueprint } from './blueprintApi';
 import { PART_TIP_CSS, type PartTipCtx } from './partTip';
+import { loadPowerFlow, savePowerFlow } from './build/powerFlowPref';
+import { FlowCanvasLayer, FLOW_KEY } from './build/powerFlowView';
 import type { HangarDeps, HangarHost, Overlay } from './hangar/host';
 import { foldHeading, button, chip, checkbox } from './hangar/hangarWidgets';
 import { feedPreview, drawFeedPreview, drawWindow, drawPower, drawBanks, boltGlyph, drawMounting, drawFacing } from './hangar/hangarOverlays';
@@ -107,9 +109,11 @@ export class HangarUI implements HangarHost {
   deltaHover = makeDeltaHover(this);
   /** The part the mouse is over in the parts list (for the shield cover preview, hangarMarks.ts) */
   paletteHover: { fn: string; piece: string; material: string } | null = null;
-  overlays: Record<Overlay, boolean> = { energy: true, connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
+  overlays: Record<Overlay, boolean> = { energy: loadPowerFlow(), connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
   /** The energy overlay of a ports design (portsOverlay.ts): its layer, the load test it shows, and the port under the mouse */
   ports = new PortsGrid();
+  /** The power flow overlay's animated layer over the grid (pulses, ticks, crosses) */
+  flow!: FlowCanvasLayer;
   /** The power overlay's networks and warnings (from the design's derived state) */
   power: PowerReport | null = null;
   /** The last load test (local circuits): which, on which design (it's dropped once the design changes), and what it found */
@@ -247,6 +251,7 @@ export class HangarUI implements HangarHost {
     this.grid.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; display:block; pointer-events:none;';
     this.canvas.style.cssText += 'position:relative;';
     canvasWrap.append(this.grid, this.canvas);
+    this.flow = new FlowCanvasLayer(canvasWrap);
     this.lit = new HangarLitView(this.canvas, this.deps.catalog, this.deps.tuning.cellSize);
     this.stats = document.createElement('div');
     this.stats.style.cssText = 'overflow-y: auto; min-width: 0; padding: 10px; border-left: 1px solid #1f2a40; font-family: "Segoe UI", system-ui, sans-serif; font-size: 12px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #2a3a5a transparent; color-scheme: dark; overflow-wrap: break-word;';
@@ -384,6 +389,7 @@ export class HangarUI implements HangarHost {
   close(launch: Blueprint | null): void {
     this.isOpen = false;
     this.stopDrag();
+    this.flow.hide();
     this.hideTip();
     this.deltaHover.clear();
     this.toggleDesigns(false);
@@ -392,6 +398,9 @@ export class HangarUI implements HangarHost {
     this.deps.onClose(launch);
   }
 
+  /** The power flow overlay on or off (remembered: build/powerFlowPref.ts) */
+  setEnergy(on: boolean): void { this.overlays.energy = on; savePowerFlow(on); }
+
   /** Keys while open. Returns true when consumed (always, so flight controls don't react). */
   handleKey(code: string): boolean {
     if (!this.isOpen) return false;
@@ -399,7 +408,7 @@ export class HangarUI implements HangarHost {
     if (TURN_KEYS[code] && this.turnPlaced(code)) { this.draw(); return true; }
     if (code === 'KeyR') this.sel.rot = ((this.sel.rot + 1) % 4) as Rot;
     else if (code === 'KeyF') this.sel.flip = !this.sel.flip;
-    else if (code === 'KeyE') { this.overlays.energy = !this.overlays.energy; this.renderStats(); }
+    else if (code === 'KeyE' || code === FLOW_KEY) { this.setEnergy(!this.overlays.energy); this.renderStats(); }
     // (1-4 on the weapon under the mouse: its weapon groups, ships/weaponGroups/editor.ts)
     else if (groupOfKey(code)) { const p = hangarGroupKey(code, this.bp, this.derived, this.mouse ? this.partAt(this.mouse) : -1); if (p) this.status(groupsSaid(p)); }
     else if (code === 'KeyT') {
@@ -783,11 +792,11 @@ export class HangarUI implements HangarHost {
   private renderFooter(): void {
     const el = this.pal.foot;
     el.innerHTML = '';
-    const keys = 'Click places · right-click removes · hold and drag to paint or sweep · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E energy overlay · M symmetry (mirror every edit across the centre line) · Ctrl+Z undo · Ctrl+Y redo · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
+    const keys = 'Click places · right-click removes · hold and drag to paint or sweep · middle-click picks up · middle-drag or arrows pan · wheel zooms · R turn · F mirror · T facing · E or U power flow overlay · M symmetry (mirror every edit across the centre line) · Ctrl+Z undo · Ctrl+Y redo · 1-4 on a weapon: its groups · Tab: keyboard into the parts list';
     const info = document.createElement('div');
     info.title = keys;
     info.style.cssText = 'color:#6b7a93; margin:3px 0 2px; font-size:10.5px; line-height:1.45;';
-    info.innerHTML = `Click places · right-click removes · hold and drag to paint or sweep · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E energy · Tab list · wheel zoom<br>M symmetry · Ctrl+Z undo · Ctrl+Y redo`;
+    info.innerHTML = `Click places · right-click removes · hold and drag to paint or sweep · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E/U power flow · Tab list · wheel zoom<br>M symmetry · Ctrl+Z undo · Ctrl+Y redo`;
     el.append(info);
     // Overlays (folded) and proto's debug switch, on one line
     const row = document.createElement('div');
@@ -805,7 +814,7 @@ export class HangarUI implements HangarHost {
       const ov = document.createElement('div');
       ov.style.cssText = 'display:flex; flex-wrap:wrap; gap:3px; margin:2px 0 4px;';
       for (const key of Object.keys(this.overlays) as Overlay[]) {
-        ov.append(chip(key, this.overlays[key], this.overlays[key] ? '#5fd4c4' : '#2a3a5a', () => { this.overlays[key] = !this.overlays[key]; this.renderFooter(); this.draw(); }));
+        ov.append(chip(key, this.overlays[key], this.overlays[key] ? '#5fd4c4' : '#2a3a5a', () => { this.overlays[key] = !this.overlays[key]; if (key === 'energy') savePowerFlow(this.overlays.energy); this.renderFooter(); this.draw(); }));
       }
       el.append(ov);
     }

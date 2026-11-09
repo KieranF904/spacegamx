@@ -9,6 +9,7 @@ import { Blueprint, Catalog, Economy, Bag, PlacedPart, PlacedGeom, Side, ShipTun
 import { type LoadTestResult } from '@space-game/common';
 import { type PowerReport } from '../wireEdit';
 import { PortsGrid } from '../portsGrid';
+import type { FlowCanvasLayer } from '../build/powerFlowView';
 import { HangarLitView } from '../HangarLitView';
 import { type PartTipCtx } from '../partTip';
 import type { HangarAids } from './hangarAids';
@@ -81,6 +82,10 @@ export interface HangarHost {
   slot: number;
   mountingBroken: Map<number, MountingProblem[]>;
   ports: PortsGrid;
+  /** The power flow overlay's animated layer (pulses, ticks, crosses) */
+  flow: FlowCanvasLayer;
+  /** Turn the power flow overlay on or off (and remember it) */
+  setEnergy(on: boolean): void;
   mouse: Vec2 | null;
   /** The cursor on screen, and what placing / removing under it would change (hangarDelta.ts) */
   mouseClient: { x: number; y: number } | null;

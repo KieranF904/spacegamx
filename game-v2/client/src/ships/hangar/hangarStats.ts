@@ -154,8 +154,8 @@ export function bindBuildButtons(host: HangarHost): void {
     host.deps.send({ type: 'fabOrder', item, n: Number(n) });
   });
   // The ports load test's rows pick what the energy overlay shows; its toggle shows or hides it
-  host.stats.querySelectorAll<HTMLElement>('[data-scn]').forEach((b) => b.onclick = () => { host.ports.scenario = b.dataset.scn as typeof host.ports.scenario; host.overlays.energy = true; host.renderStats(); host.renderPalette(); host.draw(); });
-  act('energy', () => { host.overlays.energy = !host.overlays.energy; host.renderStats(); host.renderPalette(); host.draw(); });
+  host.stats.querySelectorAll<HTMLElement>('[data-scn]').forEach((b) => b.onclick = () => { host.ports.scenario = b.dataset.scn as typeof host.ports.scenario; host.setEnergy(true); host.renderStats(); host.renderPalette(); host.draw(); });
+  act('energy', () => { host.setEnergy(!host.overlays.energy); host.renderStats(); host.renderPalette(); host.draw(); });
   act('all', () => host.deps.send({ type: 'slotBuild', slot: host.slot }));
   act('fly', () => { host.deps.send({ type: 'slotFly', slot: host.slot }); host.close(null); });
   act('clear', () => {

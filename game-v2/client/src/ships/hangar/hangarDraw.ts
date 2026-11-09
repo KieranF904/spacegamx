@@ -161,7 +161,12 @@ export function draw(host: HangarHost): void {
   // Power: generators, batteries and what lacks power, each network its own colour
   if (d && !d.ports && host.overlays.power) host.drawPower(d, sx, sy);
   // Energy (a ports design): ports, links with their flow, stores' fill, what the load test left short (portsGrid.ts)
-  if (d?.ports && host.overlays.energy) host.ports.draw(ctx, d, host.geoms, { px, cx, cy, w, h, dpr });
+  if (d?.ports && host.overlays.energy) {
+    host.ports.draw(ctx, d, host.geoms, { px, cx, cy, w, h, dpr });
+    // (the moving pulses, ticks and crosses are their own animated layer: build/powerFlowView.ts)
+    const ff = host.ports.flowFrame(d, host.geoms, { px, cx, cy, w, h, dpr });
+    if (ff) host.flow.show(ff); else host.flow.hide();
+  } else host.flow.hide();
   if (d && host.overlays.thrust) {
     ctx.strokeStyle = '#7dd3fc';
     ctx.fillStyle = '#7dd3fc';

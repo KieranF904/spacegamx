@@ -12,6 +12,8 @@ import {
 import { PortsOverlay, ghostHint, portNear, type OverlayView } from './portsOverlay';
 import { SCENARIO_LABEL, loadRow, portTipHtml } from './portsReport';
 import { esc } from '../ui/escape';
+import { powerFlow, type PowerFlow } from './build/powerFlow';
+import type { FlowFrame } from './build/powerFlowView';
 
 export class PortsGrid {
   /** Which load test the overlay's flows, fills and shares come from */
@@ -38,6 +40,19 @@ export class PortsGrid {
   draw(ctx: CanvasRenderingContext2D, d: ShipDerived, geoms: readonly PlacedGeom[], v: OverlayView): void {
     this.overlay.draw(ctx, d, geoms, portsLoadTestCached(d, this.scenario), SCENARIO_LABEL[this.scenario], v);
     if (this.hoverAt >= 0) this.overlay.drawHover(ctx, d, geoms, this.hoverAt, v);
+  }
+
+  private flowKey: ShipDerived | null = null;
+  private flowScn = '';
+  private flowVal: PowerFlow | null = null;
+
+  /** The power flow overlay's animated layer for the shown load test (null: no ports); the flow is worked out once per design and test */
+  flowFrame(d: ShipDerived, geoms: readonly PlacedGeom[], v: OverlayView): FlowFrame | null {
+    if (this.flowKey !== d || this.flowScn !== this.scenario) {
+      this.flowKey = d; this.flowScn = this.scenario;
+      this.flowVal = powerFlow(d, portsLoadTestCached(d, this.scenario));
+    }
+    return this.flowVal ? { flow: this.flowVal, geoms, view: v } : null;
   }
 
   /** The port tooltip for the port under the mouse: a key (rebuilt only when it changes) and its html */

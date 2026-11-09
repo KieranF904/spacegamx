@@ -196,7 +196,7 @@ export class PortsOverlay {
       tag(ctx, text, t.sx(x) + ux * off, t.sy(y) + uy * off, lf, '#fde68a');
     }
     // 5. The legend: what's drawn, and which test the flows are from
-    const lines = [`ENERGY · ${r ? `${label} test` : 'ports'}`, '▲ out  ▽ in  · line width = E/s carried', 'red: open or clash · orange: wasted · grey: spare'];
+    const lines = [`POWER FLOW (U / E) · ${r ? `${label} test` : 'ports'}`, '▲ out  ▽ in · moving dots = power, width = E/s carried', '✓ linked · ✗ nothing to meet (open in, wasted out, clash)', 'orange tint: gets less power than it draws'];
     ctx.font = "600 11px 'Segoe UI', sans-serif";
     const lw = Math.max(...lines.map((s) => ctx.measureText(s).width)) + 14, lh = 15, by = v.h - lines.length * lh - 12;
     ctx.fillStyle = 'rgba(7, 11, 20, 0.86)'; ctx.fillRect(10, by - 4, lw, lines.length * lh + 8);
