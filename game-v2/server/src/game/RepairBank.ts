@@ -29,12 +29,10 @@
  */
 
 import { entityExists, hasComponent, type IWorld } from 'bitecs';
-import {
-  Player, Dead, bankCap, newBank, refillBank, freeWhole, freeSpare, spendFree, spendDeposits, depositable, depositInto, bankFullIn,
+import { Player, Dead, bankCap, newBank, refillBank, freeWhole, freeSpare, spendFree, spendDeposits, depositable, depositInto, bankFullIn,
   bankPay, packDefs, payCoreOutward, joinDepths, adjacency, jobTicks, fabWork, attachWork, repairBill, BANK,
   computeJoins, blueprintGeometry, countOf, removeFrom,
-  type Economy, type PlayerProfile, type ShipRecord, type Bag, type Blueprint, type PlacedPart, type PackDef, type ServerRepairBankMessage,
-} from '@space-game/common';
+  type Economy, type PlayerProfile, type ShipRecord, type Bag, type Blueprint, type PlacedPart, type PackDef, type ServerRepairBankMessage, coreIndex, coreOf } from '@space-game/common';
 
 /** Is a part (uid) being built, repaired or recycled by a field machine (feature `machines`)? */
 export type ClaimCheck = (uid: number) => boolean;
@@ -169,7 +167,7 @@ export class RepairBanks {
    * Returns how many parts the free part paid and how many are still owed
    */
   respawn(p: PlayerProfile, rec: ShipRecord, claimed?: ClaimCheck): { paid: number; owed: number } {
-    const core = rec.blueprint.parts.find((q) => q.fn === 'core');
+    const core = coreOf(rec.blueprint.parts);
     const ghosts = new Set(rec.ghosts ?? []);
     const owed = new Set(this.owedUids(rec));
     for (const q of rec.blueprint.parts) {
@@ -196,7 +194,7 @@ export class RepairBanks {
     if (!owed.size) return [];
     const parts = rec.blueprint.parts;
     const ghosts = new Set(rec.ghosts ?? []);
-    const root = parts.findIndex((q) => q.fn === 'core');
+    const root = coreIndex(parts);
     const built = parts.map((q) => !ghosts.has(q.uid));
     const { paid, spent } = payCoreOutward(
       parts.length, root, this.joinsOf(rec.blueprint), built,
@@ -233,7 +231,7 @@ export class RepairBanks {
     if (!owed.size) { this.progress.delete(rec); return null; }
     const parts = rec.blueprint.parts;
     const ghosts = new Set(rec.ghosts ?? []);
-    const root = parts.findIndex((q) => q.fn === 'core');
+    const root = coreIndex(parts);
     if (root < 0) return null;
     const joins = this.joinsOf(rec.blueprint);
     const depth = joinDepths(parts.length, root, joins), adj = adjacency(parts.length, joins);

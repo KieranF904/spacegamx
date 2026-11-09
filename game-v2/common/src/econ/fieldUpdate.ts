@@ -20,6 +20,7 @@ import { bankCap, newBank } from './field/bank.js';
 import { removeFrom, type Bag } from './stacks.js';
 import { unlocks } from './unlocks.js';
 import { cloneJson as clone } from '../math/basic.js';
+import { coreOf } from '../ships/coreIndex.js';
 
 /** Keep `ship` and the active hangar slot the same record */
 export function setActiveShip(p: PlayerProfile, rec: ShipRecord, slot = p.activeSlot): void {
@@ -138,7 +139,7 @@ function fixLoaners(p: PlayerProfile, kit: StarterKit, report: FieldUpdateReport
   }
 
   if (lost) {
-    const core = lost.blueprint.parts.find((q) => q.fn === 'core');
+    const core = coreOf(lost.blueprint.parts);
     delete lost.lost;
     delete lost.auto;
     delete lost.paused;

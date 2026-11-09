@@ -6,9 +6,7 @@
  * Extend: a new per-ship control goes in render()'s button row; a new bill line in billHtml().
  */
 
-import {
-  Bag, partItemId, isWeaponFn, OrderPlan, OrderLine, countOf, type Blueprint,
-} from '@space-game/common';
+import { Bag, partItemId, isWeaponFn, OrderPlan, OrderLine, countOf, type Blueprint, coreOf } from '@space-game/common';
 import { cloneJson } from '@space-game/common';
 import { costHtml, showTip, hideTip } from '../windowKit';
 import { itemIcon, shipIcon } from '../itemIcons';
@@ -54,7 +52,7 @@ export class ShipsTab {
       const flying = slot === hs!.active;
       const ghostIds = new Set(rec.ghosts);
       const onWay = rec.blueprint.parts.filter((q) => ghostIds.has(q.uid)).reduce((t, q) => t + ((coming[partItemId(q)] ?? 0) > 0 ? 1 : 0), 0);
-      const core = rec.blueprint.parts.find((q) => q.fn === 'core');
+      const core = coreOf(rec.blueprint.parts);
       const coreBuilt = !!core && !ghostIds.has(core.uid);
       const orderTag = rec.auto ? (rec.paused ? ' · <span style="color:#fbbf24">⏸ on hold</span>' : slot === firstOnOrder ? ' · <span style="color:#7dd3fc">on order · first</span>' : ' · <span style="color:#7dd3fc">on order</span>') : '';
       const status = flying && !rec.ghosts.length ? `<span style="color:#4ade80">✈ flying</span>` : !rec.ghosts.length ? '<span style="color:#4ade80">ready to fly</span>'

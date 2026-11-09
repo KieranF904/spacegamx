@@ -17150,7 +17150,7 @@
       "id": "server.repair-bank.sessions",
       "path": "server/src/game/RepairBank.ts",
       "group": "server/game",
-      "lines": 479,
+      "lines": 477,
       "owns": "the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live ship, and the `repairBank` message",
       "needs": "RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed); npm: bitecs",
       "events": "hangarChanged when a part is built in",
@@ -17177,38 +17177,38 @@
         {
           "name": "ClaimCheck",
           "kind": "type",
-          "start": 39,
-          "end": 40
+          "start": 37,
+          "end": 38
         },
         {
           "name": "RepairBanks",
           "kind": "class",
-          "start": 42,
-          "end": 291
+          "start": 40,
+          "end": 289
         },
         {
           "name": "BankSession",
           "kind": "interface",
-          "start": 293,
-          "end": 304
+          "start": 291,
+          "end": 302
         },
         {
           "name": "BankConn",
           "kind": "interface",
-          "start": 306,
-          "end": 307
+          "start": 304,
+          "end": 305
         },
         {
           "name": "BankHost",
           "kind": "interface",
-          "start": 309,
-          "end": 328
+          "start": 307,
+          "end": 326
         },
         {
           "name": "BankSessions",
           "kind": "class",
-          "start": 330,
-          "end": 479
+          "start": 328,
+          "end": 477
         }
       ]
     },

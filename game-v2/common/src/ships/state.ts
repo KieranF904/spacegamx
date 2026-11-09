@@ -10,6 +10,7 @@ import { partMaxHp } from './blueprint.js';
 import { type RebuildMemo, ShipDerived, rebuild, structureOf } from './rebuild.js';
 import { hasGroups, shedGroup } from './groups.js';
 import { designOf, wholeBuilt } from './design.js';
+import { coreIndex } from './coreIndex.js';
 
 export interface ShipState {
   /** Engine entity id */
@@ -290,7 +291,7 @@ export function repairShip(state: ShipState): void {
 
 /** Core HP (0 when the core is gone). */
 export function coreHp(state: ShipState): { hp: number; max: number } {
-  const i = state.blueprint.parts.findIndex((p) => p.fn === 'core');
+  const i = coreIndex(state.blueprint.parts);
   if (i < 0) return { hp: 0, max: 1 };
   return { hp: state.detached[i] ? 0 : state.hp[i], max: state.maxHp[i] };
 }

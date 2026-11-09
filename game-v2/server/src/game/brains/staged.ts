@@ -22,12 +22,10 @@
  * near for the density cap, damage, pulls, homing shells, mobs) is the moves' `work`, here.
  */
 
-import {
-  Position, Velocity, Rotation, ShipState, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin,
+import { Position, Velocity, Rotation, ShipState, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin,
   CTL, DECISION, WANT, BODY_KINDS, MOVES_HOLD, NO_ORIGIN, STAGED_MOVES, applyDecision, sameWant, stagedFlight, syncArgs, wantFly, wantHold, dequantizeCursorAngle,
   hashString, restBeat, staggered, capMask, moveShotSeed, partState, StagedMoves,
-  type BodyState, type StagedFlightTables, type WantRec, type WindowSpec, type MoveHost, type MovePose,
-} from '@space-game/common';
+  type BodyState, type StagedFlightTables, type WantRec, type WindowSpec, type MoveHost, type MovePose, coreIndex } from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
 import { BossBrain, BossView, BrainHost, partMount, pose, strike } from './kit.js';
 import { FightRules, DEV_WINDOW, type FightTables } from './fightRules.js';
@@ -550,7 +548,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Each side's pair together (by name, less its _l/_r), outermost (from its core) first, its core last */
   protected outermostFirst(parts: number[]): number[][] {
     const ship = this.ship, geo = this.host.ships.geometry(ship);
-    const core = ship.blueprint.parts.findIndex((p) => p.fn === 'core'), c = geo[core]?.centroid ?? ship.derived.com;
+    const core = coreIndex(ship.blueprint.parts), c = geo[core]?.centroid ?? ship.derived.com;
     const groups = new Map<string, number[]>();
     for (const i of parts) { const k = ship.blueprint.parts[i].piece.replace(/_[lr]$/, ''); groups.set(k, [...(groups.get(k) ?? []), i]); }
     const last = (g: number[]) => (g.includes(core) ? 1 : 0);
@@ -670,7 +668,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Every piece blows apart at once (its core with them: it's destroyed) */
   protected burst(): void {
     const all = this.ship.blueprint.parts.flatMap((_, i) => (this.ship.derived.alive[i] ? [i] : []));
-    const core = this.ship.blueprint.parts.findIndex((p) => p.fn === 'core');
+    const core = coreIndex(this.ship.blueprint.parts);
     if (core >= 0 && this.ship.derived.alive[core]) this.boom(core, 1100);
     for (const i of all) if (deciding(this.host.ships.catalog, this.ship, i) && this.host.rng() < 0.5) this.boom(i, 260);
     this.drop(all, DEATH_FLING, false, DEATH_CRUMBLE, true);

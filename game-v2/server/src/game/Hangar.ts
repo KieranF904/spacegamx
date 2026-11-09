@@ -26,11 +26,10 @@
  * wait), resumed, moved to the front, or called off (its jobs refunded).
  */
 
-import {
-  Blueprint, Bag, Economy, ShipRecord, PlayerProfile, Catalog, ServerMessage, unlocks,
+import { Blueprint, Bag, Economy, ShipRecord, PlayerProfile, Catalog, ServerMessage, unlocks,
   partItemId, canCraft, countOf, addTo, removeFrom, installableGhosts, coreOutwards, setActiveShip, placeGeometry, computeJoins,
   placeCost, ghostBill, salvageParts, orderRanking, buildableGhosts, CraftJob, partLicensed,
-  socketsFor, setPartGems, parseGemItemId, type GemsFile, buildPoints, shipLoadout } from '@space-game/common';
+  socketsFor, setPartGems, parseGemItemId, type GemsFile, buildPoints, shipLoadout, coreIndex, coreOf } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { StationServices, JobTag } from './StationServices.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
@@ -114,7 +113,7 @@ export class Hangar {
     const p = this.pilots.get(conn);
     if (!p) return ['no pilot'];
     if (!Number.isInteger(slot) || slot < 0 || slot >= p.hangar.length) return ['no such hangar slot'];
-    if (!bp.parts.some((q) => q.fn === 'core')) return ['a ship needs a core'];
+    if (coreIndex(bp.parts) < 0) return ['a ship needs a core'];
     // Everything you can't build from what you have must be something you can make
     const old = p.hangar[slot];
     const prior = this.states(conn, p, slot);
@@ -169,7 +168,7 @@ export class Hangar {
     const geoms = bp.parts.map((q) => placeGeometry(this.catalog, q));
     const adj: number[][] = bp.parts.map(() => []);
     for (const [a, b] of computeJoins(geoms)) { adj[a].push(b); adj[b].push(a); }
-    const core = bp.parts.findIndex((q) => q.fn === 'core');
+    const core = coreIndex(bp.parts);
     const state = new Map<number, PartState>();
     const used: Bag = {};
     const take = (q: { material: string; fn: string; piece: string }): boolean => {
@@ -251,7 +250,7 @@ export class Hangar {
     const rec = p?.hangar[slot];
     if (!p || !rec || slot === p.activeSlot) return;
     if (!this.pilots.atStation(conn)) return this.pilots.toast(conn, 'Swap ships at a station', 'warn');
-    const core = rec.blueprint.parts.find((q) => q.fn === 'core');
+    const core = coreOf(rec.blueprint.parts);
     if (rec.lost) {
       const total = rec.blueprint.parts.length, built = total - (rec.ghosts ?? []).length;
       return this.pilots.toast(conn, `The ${rec.blueprint.name} is still being rebuilt (${built}/${total} parts): you can fly it once it's whole`, 'warn');

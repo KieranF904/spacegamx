@@ -24,6 +24,7 @@ import { partItemId } from './items.js';
 import { salvageParts } from './salvage.js';
 import { addTo, type Bag } from './stacks.js';
 import { unlocks } from './unlocks.js';
+import { coreOf } from '../ships/coreIndex.js';
 
 /** One saved ship's swap: the blueprint id to put in its place, and the save it was made from */
 export interface DesignSwap {
@@ -176,14 +177,14 @@ function swapRecord(input: DesignUpdateInput, rec: ShipRecord, swap: DesignSwap,
   const base: ShipRecord = { blueprint, hp: {}, ghosts: [], ...(plan ? { plan } : {}), ...(Number.isFinite(rec.rank) ? { rank: rec.rank } : {}), ...(ammo ? { ammo } : {}) };
   if (whole) return { rec: base, onOrder: false };
   breakDown(input.econ, rec, refund, null);
-  const core = blueprint.parts.find((q) => q.fn === 'core');
+  const core = coreOf(blueprint.parts);
   base.ghosts = [...(core ? [core.uid] : []), ...blueprint.parts.filter((q) => q !== core).map((q) => q.uid)];
   return { rec: { ...base, auto: true, ...(rec.lost ? { lost: true } : {}), ...(rec.paused ? { paused: true } : {}) }, onOrder: true };
 }
 
 const flyable = (r: ShipRecord | null | undefined): r is ShipRecord => {
   if (!r || r.lost || r.loaner) return false;
-  const core = r.blueprint.parts.find((q) => q.fn === 'core');
+  const core = coreOf(r.blueprint.parts);
   return !!core && !(r.ghosts ?? []).includes(core.uid);
 };
 
@@ -297,7 +298,7 @@ export function designUpdateShips(p: PlayerProfile, input: DesignUpdateInput): D
       // when a ship is lost; no loaner any more, v6)
       slot = hangar.findIndex(Boolean);
       const r = hangar[slot]!;
-      const core = r.blueprint.parts.find((q) => q.fn === 'core');
+      const core = coreOf(r.blueprint.parts);
       delete r.lost; delete r.auto; delete r.paused; delete r.rank;
       r.ghosts = (r.ghosts ?? []).filter((u) => u !== core?.uid);
       r.owed = [...r.ghosts];

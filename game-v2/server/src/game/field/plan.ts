@@ -18,7 +18,7 @@
  * refused with the reason, as the build view refuses the placement. Pure: no world.
  */
 
-import { blueprintGeometry, computeJoins, joinDepths, type Blueprint, type Catalog, type PlacedPart, type ValidationResult } from '@space-game/common';
+import { blueprintGeometry, computeJoins, joinDepths, type Blueprint, type Catalog, type PlacedPart, type ValidationResult, coreIndex, coreOf } from '@space-game/common';
 
 export type Validate = (bp: Blueprint) => ValidationResult;
 
@@ -75,8 +75,8 @@ export function removeParts(validate: Validate, bp: Blueprint, uids: ReadonlySet
 export function planDiff(validate: Validate, catalog: Catalog, live: LiveShip, target: Blueprint): PlanResult | { error: string } {
   const bp = live.blueprint;
   const liveBy = new Map(bp.parts.map((p) => [p.uid, p]));
-  const core = bp.parts.find((p) => p.fn === 'core');
-  const tcore = target.parts.find((p) => p.fn === 'core');
+  const core = coreOf(bp.parts);
+  const tcore = coreOf(target.parts);
   if (!core || !tcore || tcore.uid !== core.uid || !samePlacement(core, tcore)) return { error: 'The core must stay where it is' };
   const used = new Set<number>([...bp.parts.map((p) => p.uid), ...target.parts.map((p) => p.uid)]);
   const fresh = (): number => {
@@ -113,7 +113,7 @@ export function planDiff(validate: Validate, catalog: Catalog, live: LiveShip, t
 /** New parts nearest the target's core first (by joins in the target design), so the fabricator's order reads the same */
 function byDepth(catalog: Catalog, target: Blueprint, parts: PlacedPart[]): PlacedPart[] {
   const n = target.parts.length;
-  const depth = joinDepths(n, target.parts.findIndex((p) => p.fn === 'core'), joinsOf(catalog, target));
+  const depth = joinDepths(n, coreIndex(target.parts), joinsOf(catalog, target));
   const at = new Map(target.parts.map((p, i) => [p.uid, i]));
   const placeOf = (p: PlacedPart) => target.parts.findIndex((t) => samePlacement(t, p));
   const rank = (p: PlacedPart) => {

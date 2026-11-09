@@ -15,6 +15,7 @@ import { placeGeometry, computeJoins } from '../ships/grid.js';
 import { partItemId } from './items.js';
 import { coreOutwards } from './field/order.js';
 import type { Bag } from './stacks.js';
+import { coreIndex } from '../ships/coreIndex.js';
 
 
 export interface DesignAllocation {
@@ -40,7 +41,7 @@ function adjacency(catalog: Catalog, bp: Blueprint): number[][] {
 function allocateDesign(catalog: Catalog, bp: Blueprint, take: (itemId: string, uid: number) => boolean): DesignAllocation {
   const installed = new Set<number>();
   const used: Bag = {};
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   const order: number[] = [];
   if (core >= 0) {
     const adj = adjacency(catalog, bp);
@@ -78,7 +79,7 @@ export function unreachableUids(catalog: Catalog, bp: Blueprint): Set<number> {
   const hit = looseCache.get(bp.parts);
   if (hit && hit.n === bp.parts.length) return hit.uids;
   const uids = new Set<number>();
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   if (core >= 0) {
     const adj = adjacency(catalog, bp);
     const seen = new Set<number>([core]);
@@ -100,7 +101,7 @@ export function buildableGhosts(catalog: Catalog, bp: Blueprint, ghosts: readonl
 /** Ghost parts (uids) that join the built structure now, core outwards */
 export function installableGhosts(catalog: Catalog, bp: Blueprint, ghosts: number[], structural: (index: number) => boolean): number[] {
   const g = new Set(ghosts);
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   if (core < 0) return [];
   if (g.has(bp.parts[core].uid)) return [bp.parts[core].uid];
   const adj = adjacency(catalog, bp);

@@ -15,6 +15,7 @@ import { cleanWeaponGroups } from './weaponGroups.js';
 import { gunFacing } from './gunFacing.js';
 import { WEAPON_FNS, isWeaponFn, registerFunctionDefs, registeredFunction, hasRegisteredFunctions, lookFn, partNeedsFacing, partFacingRule } from './functionRegistry.js';
 import { facingProblem, floodFill } from './facing.js';
+import { coreIndex } from './coreIndex.js';
 
 // (The function registry and the facing rules live in their own modules; this file stays their public face)
 export { WEAPON_FNS, isWeaponFn, registerFunctionDefs, registeredFunction, lookFn, partNeedsFacing, partFacingRule, facingProblem, floodFill };
@@ -133,7 +134,7 @@ export function validateBlueprint(
   }
 
   const joins = computeJoins(geoms);
-  const coreIdx = usable.findIndex((p) => p.fn === 'core');
+  const coreIdx = coreIndex(usable);
   let unreachable: number[] = [];
   if (coreIdx >= 0) {
     const reached = floodFill(usable.length, joins, coreIdx);

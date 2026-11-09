@@ -11,12 +11,12 @@
  *             per-part state that mirrors (not a facing) is one more line in mirrorPart()
  */
 
-import { placeGeometry, gunFacing, hasFixedBarrel } from '@space-game/common';
+import { placeGeometry, gunFacing, hasFixedBarrel, coreOf } from '@space-game/common';
 import type { Catalog, PlacedPart, Rot, Side, Vec2 } from '@space-game/common';
 
 /** The axis as twice its x (an integer for a 1-wide core: the line through its middle), or null when there is no core */
 export function axisOf(catalog: Catalog, parts: readonly PlacedPart[]): number | null {
-  const core = parts.find((p) => p.fn === 'core');
+  const core = coreOf(parts);
   if (!core) return null;
   const b = placeGeometry(catalog, core).bbox;
   return b.minX + b.maxX;

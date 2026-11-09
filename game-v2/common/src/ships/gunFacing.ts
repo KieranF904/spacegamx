@@ -23,6 +23,7 @@ import type { Blueprint, PlacedPart, Rot, Side } from './types.js';
 import { computeJoins, facingEdges, overlapsAny, placeGeometry, type PlacedGeom } from './grid.js';
 import { facingProblem, floodFill } from './facing.js';
 import { partMountingProblems } from './mounting.js';
+import { coreIndex } from './coreIndex.js';
 
 const BARREL_ORDER: readonly Side[] = ['N', 'W', 'S', 'E'];
 const barrels = new WeakMap<Catalog, Map<string, Side>>();
@@ -108,7 +109,7 @@ function migratePass(catalog: Catalog, input: Blueprint, allowMove: boolean): Gu
 
   const geomsOf = () => parts.map((p) => placeGeometry(catalog, p));
   const reach = (geoms: PlacedGeom[]) => {
-    const core = parts.findIndex((p) => p.fn === 'core');
+    const core = coreIndex(parts);
     return core < 0 ? 0 : floodFill(geoms.length, computeJoins(geoms), core).filter(Boolean).length;
   };
 
@@ -178,7 +179,7 @@ function trouble(catalog: Catalog, bp: Blueprint): number {
     if (p.facing && facingProblem(p.fn, geoms, i, p.facing as Side)) n++;
     n += partMountingProblems(catalog, geoms, i).length;
   });
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   if (core >= 0) n += floodFill(geoms.length, computeJoins(geoms), core).filter((r) => !r).length;
   return n;
 }

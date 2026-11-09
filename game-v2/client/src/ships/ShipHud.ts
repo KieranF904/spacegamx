@@ -12,6 +12,7 @@ import { Schematic } from '../ui/shipStatus/Schematic';
 import { fieldHudMarks } from './field/bridge';
 import { readStatus, newMemory, emptyStatus, type StatusInput, type Tone } from '../ui/shipStatus/source';
 import { energyLine } from '../ui/shipStatus/energyLine';
+import { coreIndex } from '@space-game/common';
 
 /** How often the schematic and status are refreshed (a second) */
 const STATUS_HZ = 10;
@@ -86,7 +87,7 @@ const ship = this.bridge.get(this.getPlayerId());
     setHtml(this.mode, this.isHelm()
       ? `<b style="color:#ffb547">HELM</b> ${k('left')}/${k('right')} turn · ${k('strafeLeft')}/${k('strafeRight')} strafe · <kbd>${k('helm')}</kbd>`
       : `<b style="color:#7dd3fc">MOUSE-STEER</b> · <kbd>${k('helm')}</kbd> for helm`);
-    const core= ship.blueprint.parts.findIndex((p) => p.fn === 'core');
+    const core= coreIndex(ship.blueprint.parts);
     const hp = core >= 0 && !ship.detached[core] ? ship.hp[core] : 0;
     const max = core >= 0 ? ship.maxHp[core] : 1;
     const f = hp / max;

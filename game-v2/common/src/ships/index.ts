@@ -14,6 +14,7 @@ export * from './collide.js';
 export * from './tuning.js';
 export * from './rng.js';
 export * from './blueprint.js';
+export * from './coreIndex.js';
 export * from './rebuild.js';
 export * from './state.js';
 export * from './stages.js';
