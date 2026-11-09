@@ -127,6 +127,14 @@ export function injectWindowStyles(): void {
 }
 
 /** A modal window: veil, header (title, subtitle, extra controls, close), optional tabs, body */
+/** Does a key pressed in a window stay there (typing in a field, or working the focused button) rather than reach the game? */
+export function windowKeepsKey(e: { code: string; target: EventTarget | null }): boolean {
+  const t = e.target as HTMLElement | null;
+  if (!t || typeof t.tagName !== 'string') return true;
+  if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return true;
+  return /^(Space|Enter|NumpadEnter|Arrow(Up|Down|Left|Right)|Tab)$/.test(e.code);
+}
+
 export class GameWindow {
   readonly veil: HTMLDivElement;
   readonly root: HTMLDivElement;
@@ -169,8 +177,10 @@ export class GameWindow {
     this.root.append(this.head, this.tabs, this.body);
     this.veil.appendChild(this.root);
     this.veil.addEventListener('mousedown', (e) => { if (e.target === this.veil) this.close(); });
-    // Keys typed in a window never reach the game
-    this.root.addEventListener('keydown', (e) => { if (e.code !== 'Escape') e.stopPropagation(); });
+    // Keys typed in a window never reach the game, nor do the keys that work a focused button (Space, Enter, arrows). The
+    // game's own keys still do after a click on a tab or button (H leaves the station, I the hold, M the map), so a click
+    // in a window never leaves its keys dead
+    this.root.addEventListener('keydown', (e) => { if (e.code !== 'Escape' && windowKeepsKey(e)) e.stopPropagation(); });
     document.body.appendChild(this.veil);
   }
 

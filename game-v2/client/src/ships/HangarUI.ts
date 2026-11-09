@@ -203,6 +203,10 @@ export class HangarUI implements HangarHost {
     this.designBtn.title = 'Your saved designs: keep this one for later, or load one';
     const save = button('Save', () => this.saveAndLaunch(), '#2f6f4f');
     save.title = 'Save to this hangar slot: what you have goes in, the rest become ghosts to build';
+    // (the training yard's cards point at these: data/tutorial.json `highlight`)
+    save.dataset.tut = 'hangar-save';
+    const closeBtn = button('Close', () => this.close(null));
+    closeBtn.dataset.tut = 'hangar-close';
     bar.append(
       this.slotBar,
       this.nameInput, this.paintInput, unpaint,
@@ -213,7 +217,7 @@ export class HangarUI implements HangarHost {
       save,
       button('Share', () => { this.deps.send({ type: 'shareDesign', blueprint: clone(this.bp) }); this.status('sent to your party'); }),
       detailToggle().el,
-      button('Close', () => this.close(null)),
+      closeBtn,
       this.statusEl,
     );
     // (Simple / Advanced: the stats panel and the hover card follow the switch)

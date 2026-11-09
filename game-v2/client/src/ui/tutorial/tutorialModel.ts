@@ -11,7 +11,7 @@
 import type { ServerTutorialStateMessage, TutorialData, TutorialLine, TutorialObjectDef, TutorialStepDef } from '@space-game/common';
 import { esc } from '../escape';
 
-type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'> & { passed?: string[] };
+type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'> & { passed?: string[]; got?: number };
 
 /** How the renderer draws a training body: a live practice drone, a ghost (faded, grey) of one, or nothing (a later step's) */
 export type TrainingLook = 'drone' | 'droneGhost' | 'hidden';
@@ -64,9 +64,13 @@ export function markerStyle(o: TutorialObjectDef, s: State | null, step: Tutoria
   return nextRing(s, step) === o.id ? 'active' : 'upcoming';
 }
 
-/** The card's counter for a multi-target step ("Rings 2/3"), or null for a step without one */
+/** The card's counter for a multi-target step ("Rings 2/3") or a collecting one ("Ore 12/20"), or null for a step without one */
 export function counterOf(s: State | null, step: TutorialStepDef | undefined): { label: string; done: number; total: number } | null {
   if (!step?.counter) return null;
+  if (step.trigger.kind === 'collect') {
+    const total = step.trigger.count ?? 1;
+    return { label: step.counter, done: Math.min(total, s && !s.left ? s.got ?? 0 : 0), total };
+  }
   const total = step.trigger.objects?.length ?? 0;
   return total > 1 ? { label: step.counter, done: doneTargets(s, step).length, total } : null;
 }

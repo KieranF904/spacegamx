@@ -50,6 +50,9 @@ export class Glow<E> {
     return -1;
   }
 
+  /** The controls glowing now (the card keeps clear of them) */
+  litNow(): E[] { return [...this.lit]; }
+
   /** Put the glow on the up stage's controls and take it off all others (cheap: call it when the page changes, or now and then) */
   refresh(): void {
     const i = this.active();

@@ -42,7 +42,8 @@
     {
       "id": "mine",
       "title": "Mine the belt",
-      "lines": ["Shoot a rock in the belt around Vesta: chunks of ore break off.", "Fly through the chunks to scoop up 20 ore."],
+      "lines": ["Shoot a rock in the belt around Vesta: chunks of ore break off.", "Fly through the chunks to scoop them up."],
+      "counter": "Ore",
       "trigger": { "kind": "collect", "count": 20, "items": ["iron_ore", "nickel_ore", "silicate", "copper_ore", "leestone_ore"] }
     },
     {
@@ -62,22 +63,22 @@
     {
       "id": "refine",
       "title": "Refine your ore",
-      "lines": ["Open the Refinery tab and refine some ore into plate.", "Plate is what ship parts are made of."],
+      "lines": ["Open the Refinery tab and refine some ore into Alloy Plate.", "Plate is what ship parts are made of."],
       "trigger": { "kind": "refined" },
-      "highlight": ["[data-tab=\"refinery\"]","[data-key^=\"refine:\"]:not(.off)"],
+      "highlight": ["[data-tab=\"refinery\"]","[data-key^=\"refine:alloy_plate:\"]:not(.off)"],
       "grant": { "iron_ore": 4, "nickel_ore": 2 }
     },
     {
       "id": "hangar",
       "title": "Place a part",
-      "lines": ["On the station's Overview tab, click Open hangar.", "Place one hull cell on your ship, then click Save."],
+      "lines": ["Click Open hangar on the station's Overview tab.", "Pick Hull on the left, click next to your ship, then Save."],
       "trigger": { "kind": "partPlaced" },
-      "highlight": ["[data-tut=\"open-hangar\"]","[data-part*=\":hull:\"]"]
+      "highlight": [".sgw-tab[data-tab=\"overview\"]","[data-tut=\"open-hangar\"]",".hp-pick[data-part*=\":hull:\"]"]
     },
     {
       "id": "power",
       "title": "Add a generator",
-      "lines": ["Place the Cell Reactor we gave you on your ship, then save.", "Press {powerFlow} in the hangar to watch the power flow."],
+      "lines": ["On the Power tab, place the Cell Reactor we gave you, then Save.", "Press {powerFlow} to see power flow: an out port must meet an in port."],
       "trigger": { "kind": "powered" },
       "highlight": ["[data-tut=\"open-hangar\"]",".hp-tab[data-tab=\"power\"]","[data-part*=\":power_cell_reactor:\"]"],
       "grant": { "part:alloy:power_cell_reactor:sq": 1 }
@@ -85,9 +86,9 @@
     {
       "id": "bank",
       "title": "The repair bank",
-      "lines": ["The repair bank holds materials that rebuild damaged parts.", "Open the station's Repair bank tab to see it."],
+      "lines": ["The repair bank keeps materials that rebuild damaged parts.", "Close the hangar, then open the station's Repair bank tab."],
       "trigger": { "kind": "panel", "panel": "bank" },
-      "highlight": ["[data-tab=\"bank\"]"]
+      "highlight": ["[data-tut=\"hangar-close\"]","[data-tab=\"bank\"]"]
     },
     {
       "id": "guide",
@@ -99,7 +100,7 @@
     {
       "id": "jump",
       "title": "Jump to the marker",
-      "lines": ["Zoom out with the mouse wheel until you can see the exit marker.", "Put the cursor in it and press {jump} to jump there."],
+      "lines": ["Zoom out with the mouse wheel until you see the Jump here marker.", "Put the cursor in it and press {jump} to jump there."],
       "trigger": { "kind": "jumped", "objects": ["exit_marker"] },
       "highlight": [".gm-close"],
       "targets": ["exit_marker"]
