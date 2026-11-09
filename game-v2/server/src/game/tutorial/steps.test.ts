@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, TICK_RATE, ServerMessage, TutorialData, Blueprint, objectPos, countOf } from '@space-game/common';
+import { Position, Velocity, InSystem, TICK_RATE, ServerMessage, TutorialData, Blueprint, objectPos, countOf } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
@@ -90,6 +90,9 @@ describe('the step engine', () => {
     const w = yard();
     const a = w.pilots[0];
     const p = a.profile();
+    // it all happens in the Vesta yard system, and the walk ends in Sol
+    expect(w.data.yard.system).toBe('vesta_yard');
+    expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('vesta_yard'));
     const pack = w.data.starterPack;
     const seen: string[] = [stepOf(a)];
     const expectStep = (id: string) => { expect(stepOf(a)).toBe(id); seen.push(id); expect(a.state()).toMatchObject({ step: id, left: false }); };
@@ -193,7 +196,7 @@ describe('the step engine', () => {
     expect(a.state()).toMatchObject({ step: '', left: true });
     for (const [k, n] of Object.entries(pack.items)) expect(stored(a, k)).toBe((storage0[k] ?? 0) + n);
     expect(p.credits).toBe(credits0 + pack.credits);
-    expect(Math.hypot(Position.x[a.pid] - w.data.yard.center.x, Position.y[a.pid] - w.data.yard.center.y)).toBeGreaterThan(w.data.yard.keepOut);
+    expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));
     expect(seen).toEqual(w.data.steps.map((x) => x.id));
   });
 
@@ -226,7 +229,7 @@ describe('the step engine', () => {
       expect(stored(p, 'copper_wire')).toBe(before[i].wire + w.data.starterPack.items.copper_wire);
       expect(p.profile().credits).toBe(before[i].credits + w.data.starterPack.credits);
       expect(p.state()).toMatchObject({ step: '', left: true });
-      expect(Math.hypot(Position.x[p.pid] - w.data.yard.center.x, Position.y[p.pid] - w.data.yard.center.y)).toBeGreaterThan(w.data.yard.keepOut);
+      expect(InSystem.systemId[p.pid]).toBe(w.server.gameData.getSystemNum('sol'));
       p.t.send({ type: 'tutorialLeave' } as never);
       w.step(1);
       expect(stored(p, 'alloy_plate')).toBe(before[i].plate + w.data.starterPack.items.alloy_plate);
@@ -245,6 +248,7 @@ describe('the step engine', () => {
     w.step(3);
     expect(a.conn.docked).toBeFalsy();
     expect(a.profile().tutorial.left).toBe(true);
+    expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));
   });
 
   it('events for another step, and the client reporting the wrong thing, move nothing', () => {

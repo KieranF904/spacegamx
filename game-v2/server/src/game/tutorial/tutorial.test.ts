@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Asteroid, InSystem, Projectile, Dead, ServerMessage, TutorialEvent, objectPos } from '@space-game/common';
+import { Position, Velocity, Asteroid, InSystem, Projectile, Dead, ServerMessage, TutorialEvent, objectPos, planetPosition } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
@@ -44,10 +44,11 @@ function yard(names = ['ann', 'bo'], tutorial = true) {
 }
 
 describe('the training yard', () => {
-  it('puts new pilots in the yard at Vesta, in Sol, and tells each its state', () => {
+  it('puts new pilots in the Vesta yard system, and tells each its state', () => {
     const w = yard();
+    expect(w.data.yard.system).toBe('vesta_yard');
     for (const p of w.pilots) {
-      expect(InSystem.systemId[p.pid]).toBe(w.server.gameData.getSystemNum('sol'));
+      expect(InSystem.systemId[p.pid]).toBe(w.server.gameData.getSystemNum('vesta_yard'));
       expect(w.dist(p.pid)).toBeLessThan(w.data.yard.spawnRadius + 50);
       expect(p.profile().tutorial).toEqual({ step: 'welcome', done: [], left: false });
     }
@@ -60,7 +61,83 @@ describe('the training yard', () => {
   it('without the option nothing is built: no yard station, no bodies, pilots start beside Sol Central', () => {
     const w = yard(['solo'], false);
     expect(w.server.tutorial).toBeUndefined();
-    expect(Math.hypot(Position.x[w.pilots[0].pid] - w.center.x, Position.y[w.pilots[0].pid] - w.center.y)).toBeGreaterThan(20000);
+    expect(InSystem.systemId[w.pilots[0].pid]).toBe(w.server.gameData.getSystemNum('sol'));
+  });
+
+  it("the yard is its own system: Vesta large, the station fixed above it, nothing of Sol in it, not on the map", () => {
+    const w = yard(['ann']);
+    const gd = w.server.gameData;
+    const sys = gd.getSystem('vesta_yard')!;
+    expect(gd.getSystem('sol')!.stations).not.toContain('sol_station_yard');
+    expect(sys).toMatchObject({ tutorial: true, stations: ['sol_station_yard'], portals: [], danger: 1, centralBody: { type: 'none' } });
+    expect(sys.surface).toBeUndefined();
+    expect(sys.planets).toHaveLength(1);
+    expect(sys.planets![0]).toMatchObject({ id: 'vesta', kind: 'rocky', orbit: { period: 0 } });
+    expect(sys.planets![0].radius).toBeGreaterThan(gd.getSystem('sol')!.planets!.find((q) => q.id === 'vesta')!.radius * 3);
+    expect(sys.regions?.[0]?.danger).toBe('safe');
+    expect([sys.derelicts, sys.nests, sys.traffic, sys.structures, sys.rifts].every((l) => !l?.length)).toBe(true);
+    // the station does not orbit: a fixed spot just off the planet's limb
+    const st = gd.getStation('sol_station_yard')!;
+    expect(st.system).toBe('vesta_yard');
+    expect(st.orbit).toBeUndefined();
+    const planet = sys.planets![0], at = planetPosition(planet, 0);
+    const gap = Math.hypot(st.position.x - at.x, st.position.y - at.y) - planet.radius - st.radius;
+    expect(gap).toBeGreaterThan(300);
+    expect(gap).toBeLessThan(3000);
+    // every training object clears the planet and sits well inside the leash
+    for (const o of w.data.objects) {
+      const p = objectPos(w.data, o);
+      expect(Math.hypot(p.x - at.x, p.y - at.y)).toBeGreaterThan(planet.radius + o.radius);
+      expect(Math.hypot(p.x - w.center.x, p.y - w.center.y)).toBeLessThan(w.data.yard.leash / 2);
+    }
+    // the exit marker is far enough for a jump-drive jump
+    const exit = objectPos(w.data, w.tut.def('exit_marker')!);
+    expect(Math.hypot(exit.x - w.center.x, exit.y - w.center.y)).toBeGreaterThan(5000);
+    // the rocks and drones are all in the yard system, none in Sol
+    const solNum = gd.getSystemNum('sol'), yardNum = gd.getSystemNum('vesta_yard');
+    for (const id of ['training_rock', 'drone_1', 'drone_2', 'drone_3']) expect(InSystem.systemId[w.eid(id)]).toBe(yardNum);
+    const solIds = (w.server as never as { asteroidIdsBySystem: Map<number, number[]> }).asteroidIdsBySystem.get(solNum) ?? [];
+    for (const id of ['training_rock', 'drone_1']) expect(solIds).not.toContain(w.eid(id));
+  });
+
+  it('leaving lands in Sol at its usual start, and X near Vesta in Sol leads nowhere', () => {
+    const w = yard();
+    const [a] = w.pilots;
+    const gd = w.server.gameData;
+    a.t.send({ type: 'tutorialLeave' } as never);
+    w.step(3);
+    expect(InSystem.systemId[a.pid]).toBe(gd.getSystemNum('sol'));
+    // no way down to the yard from Vesta's orbit in Sol (it is not a surface): X does nothing there
+    const sol = gd.getSystem('sol')!;
+    const vp = planetPosition(sol.planets!.find((q) => q.id === 'vesta')!, w.server.currentTick);
+    expect(w.server.surfaces.surfaceNear(sol, vp.x + 1000, vp.y, w.server.currentTick)).toBeNull();
+    expect(w.server.surfaces.descend(a.conn as never, sol, vp.x + 1000, vp.y)).toBe(false);
+  });
+
+  it("a trainee at the yard's edge is stopped inside and asked to leave; nothing takes them out by itself", () => {
+    const w = yard();
+    const [a] = w.pilots;
+    const y = w.data.yard, yardNum = w.server.gameData.getSystemNum('vesta_yard');
+    expect(y.leash).toBeGreaterThan(15000);
+    a.got.length = 0;
+    w.put(a.pid, w.center.x - y.leash - 800, w.center.y);
+    w.step(3);
+    expect(InSystem.systemId[a.pid]).toBe(yardNum);
+    expect(w.dist(a.pid)).toBeLessThan(y.leash);
+    expect(a.profile().tutorial.left).toBe(false);
+    expect(a.got.filter((m) => m.type === 'tutorialEdge')).toHaveLength(1);
+    expect(a.got.some((m) => m.type === 'toast' && /Leave training/.test((m as { text?: string }).text ?? ''))).toBe(true);
+    // pushing out again soon after: held again, but the prompt waits its turn
+    w.put(a.pid, w.center.x, w.center.y - y.leash - 800);
+    w.step(3);
+    expect(w.dist(a.pid)).toBeLessThan(y.leash);
+    expect(a.got.filter((m) => m.type === 'tutorialEdge')).toHaveLength(1);
+    expect(InSystem.systemId[a.pid]).toBe(yardNum);
+    // answering Leave is the ordinary leave
+    a.t.send({ type: 'tutorialLeave' } as never);
+    w.step(3);
+    expect(a.profile().tutorial.left).toBe(true);
+    expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));
   });
 
   it('two pilots hitting one rock keep their own counters; the shared rock never changes', () => {
@@ -178,16 +255,16 @@ describe('the training yard', () => {
     for (const [k, n] of Object.entries(pack.items)) expect(storage1[k] ?? 0).toBe((storage0[k] ?? 0) + n);
     expect(p.credits).toBe(credits0 + pack.credits);
     expect(p.home).toBe('sol_station_central');
-    expect(w.dist(a.pid)).toBeGreaterThan(20000);
+    expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));
     const state = a.got.filter((m) => m.type === 'tutorialState').pop() as Extract<ServerMessage, { type: 'tutorialState' }>;
     expect(state).toMatchObject({ step: '', left: true });
     // B, still in training, is untouched
     expect(b.profile().tutorial.left).toBe(false);
     expect(w.dist(b.pid)).toBeLessThan(w.data.yard.leash);
-    // A flies back to the yard: turned away
-    w.put(a.pid, w.center.x + 1500, w.center.y);
+    // A is put back on the surface (an admin teleport, say): turned away to Sol
+    w.server.travelTo(a.conn, w.server.gameData.getSystemNum('vesta_yard'), w.center.x + 1500, w.center.y, false);
     w.step(3);
-    expect(w.dist(a.pid)).toBeGreaterThan(w.data.yard.keepOut);
+    expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));
     // a second leave does nothing (no second pack)
     a.t.send({ type: 'tutorialLeave' } as never);
     w.step(2);

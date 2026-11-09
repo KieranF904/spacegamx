@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 489,
+      "lines": 490,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -212,19 +212,19 @@
           "name": "TABLE",
           "kind": "const",
           "start": 297,
-          "end": 479
+          "end": 480
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 481,
-          "end": 482
+          "start": 482,
+          "end": 483
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 484,
-          "end": 489
+          "start": 485,
+          "end": 490
         }
       ]
     },
@@ -7824,7 +7824,7 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 157,
+      "lines": 164,
       "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
@@ -7862,7 +7862,7 @@
           "name": "TutorialPanel",
           "kind": "class",
           "start": 64,
-          "end": 157
+          "end": 164
         }
       ]
     },
@@ -7870,7 +7870,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 122,
+      "lines": 124,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, ghost/drone looks for the training bodies, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, the game's entities, a send function, a renderer hook",
       "events": "",
@@ -7902,7 +7902,7 @@
           "name": "TutorialUI",
           "kind": "class",
           "start": 36,
-          "end": 122
+          "end": 124
         }
       ]
     },
@@ -8040,7 +8040,7 @@
       "id": "client.ui.tutorial.store",
       "path": "client/src/ui/tutorial/tutorialStore.ts",
       "group": "client/ui/tutorial",
-      "lines": 58,
+      "lines": 69,
       "owns": "this pilot's tutorial state as the server last sent it (`tutorialState`), and sending the two tutorial messages (leave, report); the lesson's UI reads and writes only through here",
       "needs": "common ServerTutorialStateMessage, TutorialData (data/tutorial.json, bundled)",
       "events": "",
@@ -8058,10 +8058,12 @@
         "inTutorialNow",
         "leaveMessage",
         "onTutorial",
+        "onTutorialEdge",
         "reportMessage",
         "resetTutorial",
         "setTutorialState",
-        "tutorialData"
+        "tutorialData",
+        "tutorialEdge"
       ],
       "sections": [
         {
@@ -8095,52 +8097,70 @@
           "end": 26
         },
         {
+          "name": "edgeListeners",
+          "kind": "const",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "tutorialEdge",
+          "kind": "function",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "onTutorialEdge",
+          "kind": "function",
+          "start": 33,
+          "end": 37
+        },
+        {
           "name": "getTutorialState",
           "kind": "function",
-          "start": 28,
-          "end": 29
+          "start": 39,
+          "end": 40
         },
         {
           "name": "inTutorialNow",
           "kind": "function",
-          "start": 31,
-          "end": 32
+          "start": 42,
+          "end": 43
         },
         {
           "name": "onTutorial",
           "kind": "function",
-          "start": 34,
-          "end": 39
+          "start": 45,
+          "end": 50
         },
         {
           "name": "currentStep",
           "kind": "function",
-          "start": 41,
-          "end": 44
+          "start": 52,
+          "end": 55
         },
         {
           "name": "ghosted",
           "kind": "function",
-          "start": 46,
-          "end": 49
+          "start": 57,
+          "end": 60
         },
         {
           "name": "resetTutorial",
           "kind": "function",
-          "start": 51,
-          "end": 52
+          "start": 62,
+          "end": 63
         },
         {
           "name": "leaveMessage",
           "kind": "function",
-          "start": 54,
-          "end": 55
+          "start": 65,
+          "end": 66
         },
         {
           "name": "reportMessage",
           "kind": "function",
-          "start": 56,
-          "end": 58
+          "start": 67,
+          "end": 69
         }
       ]
     },
@@ -10192,7 +10212,7 @@
       "id": "protocol.tutorial",
       "path": "common/src/network/tutorialProtocol.ts",
       "group": "common/network",
-      "lines": 37,
+      "lines": 43,
       "owns": "the training yard's messages: leave (skip or graduate), report (an acknowledgement or an opened panel), and the pilot's own tutorial state",
       "needs": "type-only import of tutorial/types (TutorialPanel)",
       "events": "",
@@ -10210,6 +10230,7 @@
       "exports": [
         "ClientTutorialLeaveMessage",
         "ClientTutorialReportMessage",
+        "ServerTutorialEdgeMessage",
         "ServerTutorialStateMessage",
         "TutorialClientMessage",
         "TutorialServerMessage"
@@ -10240,10 +10261,16 @@
           "end": 35
         },
         {
+          "name": "ServerTutorialEdgeMessage",
+          "kind": "interface",
+          "start": 37,
+          "end": 41
+        },
+        {
           "name": "TutorialServerMessage",
           "kind": "type",
-          "start": 37,
-          "end": 37
+          "start": 43,
+          "end": 43
         }
       ]
     },
@@ -15789,7 +15816,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 395,
+      "lines": 412,
       "owns": "the training yard: its stationary rocks and drones, each pilot's own damage counters on them, owner-only drops, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), LootPods (private pods), common/tutorial, TutorialSteps",
       "events": "",
@@ -15818,10 +15845,16 @@
           "end": 40
         },
         {
+          "name": "EDGE_BACK",
+          "kind": "const",
+          "start": 41,
+          "end": 42
+        },
+        {
           "name": "Tutorial",
           "kind": "class",
-          "start": 42,
-          "end": 394
+          "start": 44,
+          "end": 411
         }
       ]
     },
@@ -16786,7 +16819,7 @@
       "id": "server.gameserver.threats",
       "path": "server/src/gameServer/threats.ts",
       "group": "server/gameServer",
-      "lines": 41,
+      "lines": 43,
       "owns": "threat ratings of systems and regions for maps and HUD",
       "needs": "GameServer (type), game/Enemies",
       "events": "",
@@ -16806,13 +16839,13 @@
           "name": "threats",
           "kind": "function",
           "start": 11,
-          "end": 21
+          "end": 23
         },
         {
           "name": "regionThreats",
           "kind": "function",
-          "start": 23,
-          "end": 41
+          "start": 25,
+          "end": 43
         }
       ]
     },

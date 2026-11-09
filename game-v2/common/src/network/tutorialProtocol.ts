@@ -34,4 +34,10 @@ export type TutorialClientMessage = ClientTutorialLeaveMessage | ClientTutorialR
  */
 export interface ServerTutorialStateMessage { type: 'tutorialState'; step: string; done: string[]; left: boolean; broken: string[] }
 
-export type TutorialServerMessage = ServerTutorialStateMessage;
+/**
+ * The pilot reached the edge of the yard: the server has stopped them just inside. The client asks whether to leave
+ * training (the same confirm as the Leave training button: Leave sends `tutorialLeave`, Stay does nothing)
+ */
+export interface ServerTutorialEdgeMessage { type: 'tutorialEdge' }
+
+export type TutorialServerMessage = ServerTutorialStateMessage | ServerTutorialEdgeMessage;

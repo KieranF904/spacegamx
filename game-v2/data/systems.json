@@ -83,8 +83,7 @@
         "sol_station_sentinel",
         "sol_station_farwatch",
         "sol_station_ark",
-        "sol_station_helios",
-        "sol_station_yard"
+        "sol_station_helios"
       ],
       "planets": [
         {
@@ -3535,6 +3534,57 @@
           "salvage": 65
         }
       ]
+    },
+    {
+      "id": "vesta_yard",
+      "name": "Vesta Training Yard",
+      "description": "A great cratered Vesta and the training yard floating above it. Closed to everyone but pilots in training.",
+      "danger": 1,
+      "starColor": "#FFDD44",
+      "starRadius": 0,
+      "position": {
+        "x": -60000,
+        "y": 0
+      },
+      "sector": "core",
+      "tutorial": true,
+      "centralBody": {
+        "type": "none"
+      },
+      "regions": [
+        {
+          "id": "yard",
+          "name": "Vesta Yard",
+          "outer": 200000,
+          "danger": "safe",
+          "description": "The training yard. Nothing here can hurt you."
+        }
+      ],
+      "hazards": [],
+      "asteroidDensity": 0,
+      "asteroidBelt": {
+        "innerRadius": 0,
+        "outerRadius": 0,
+        "count": 0
+      },
+      "stations": [
+        "sol_station_yard"
+      ],
+      "planets": [
+        {
+          "id": "vesta",
+          "name": "Vesta",
+          "kind": "rocky",
+          "radius": 4000,
+          "orbit": {
+            "radius": 9000,
+            "phase": 0,
+            "period": 0
+          },
+          "description": "A small cratered rocky planet close to the sun, seen close."
+        }
+      ],
+      "portals": []
     }
   ]
 }

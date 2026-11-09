@@ -432,7 +432,7 @@ const SHAPES: Record<string, Spec> = {
   'systems.json': strict({
     systems: arr(strict({
       id: 'string', name: 'string', 'danger?': 'number', 'pvp?': obj({ mode: oneOf('all', 'outer'), 'safeRadius?': 'number' }),
-      description: 'string', starColor: 'string', starRadius: 'number', position: 'xy', 'sector?': 'string',
+      description: 'string', starColor: 'string', starRadius: 'number', position: 'xy', 'sector?': 'string', 'tutorial?': 'boolean',
       'centralBody?': obj({ type: oneOf('sun', 'binary', 'black_hole', 'pulsar', 'brown_dwarf', 'none'), 'look?': lookSpec, 'plasma?': plasmaSpec }),
       'zones?': arr(obj({ id: 'string', name: 'string', inner: 'number', outer: 'number', 'x?': 'number', 'y?': 'number' })),
       'regions?': arr(obj({ id: 'string', name: 'string', outer: 'number', danger: oneOf('safe', 'contested', 'hostile'), 'description?': 'string' })),

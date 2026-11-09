@@ -38,6 +38,8 @@ export interface TutorialHost {
 
 /** Spacing, in ticks, between boundary reminders to one pilot */
 const BOUNDARY_COOLDOWN = 180;
+/** The soft wall puts a pilot back this far inside the leash */
+const EDGE_BACK = 600;
 
 export class Tutorial {
   readonly data: TutorialData;
@@ -249,7 +251,7 @@ export class Tutorial {
   // ------------------------------------------------------------ leaving
 
   /**
-   * Leave training: skip at any step, or graduate. Grants the starter pack, sends the pilot to Sol's normal start and
+   * Leave training: skip at any step, or graduate. Grants the starter pack, sends the pilot up from Vesta's surface to Sol's normal start (beside Sol Central) and
    * marks them left for good (the yard is then unreachable for them). Does nothing for a pilot who has already left.
    */
   leave(conn: PilotConn): boolean {
@@ -329,24 +331,39 @@ export class Tutorial {
       const p = this.pilots.get(conn);
       if (!p) continue;
       if (!inTutorial(p.tutorial)) {
-        // A pilot who has left (or never was in it) is kept out of the yard
-        if (d < y.keepOut && !conn.docked) this.turnAway(conn, eid, now, true);
+        // A pilot who has left (or never was in it) is kept out of the yard: all of it is the trainees'
+        if (!conn.docked) this.turnAway(conn, eid, now);
         continue;
       }
-      if (d > y.leash) { this.turnAway(conn, eid, now, false); continue; }
+      if (d > y.leash) { this.edge(conn, eid, px, py, d, now); continue; }
       if (conn.docked) continue;
       this.markers(conn, eid, px, py);
       this.jumps(conn, eid, px, py);
     }
   }
 
-  private turnAway(conn: PilotConn, eid: number, now: number, out: boolean): void {
+  /**
+   * A trainee at the yard's edge: a soft wall. They are stopped just inside (never out of the system by crossing a
+   * boundary), and the client is asked once in a while whether to leave training (Leave = the Leave training button,
+   * Stay or no answer = nothing)
+   */
+  private edge(conn: PilotConn, eid: number, px: number, py: number, d: number, now: number): void {
+    const y = this.data.yard, k = Math.max(0, y.leash - EDGE_BACK) / d;
+    this.host.travel(conn, this.host.systemNum(y.system), y.center.x + (px - y.center.x) * k, y.center.y + (py - y.center.y) * k);
     if ((this.nudged.get(eid) ?? -Infinity) > now - BOUNDARY_COOLDOWN) return;
     this.nudged.set(eid, now);
-    const spot = out ? this.pilots.homePoint(conn) : this.spawnFor(conn, false);
+    this.host.send(conn, { type: 'tutorialEdge' });
+    this.pilots.toast(conn, 'Use Leave training to leave the yard.', 'info');
+  }
+
+  /** A pilot who is not in training is in the yard: out to where they belong */
+  private turnAway(conn: PilotConn, eid: number, now: number): void {
+    if ((this.nudged.get(eid) ?? -Infinity) > now - BOUNDARY_COOLDOWN) return;
+    this.nudged.set(eid, now);
+    const spot = this.pilots.homePoint(conn);
     if (!spot) return;
     this.host.travel(conn, spot.system, spot.x, spot.y);
-    this.pilots.toast(conn, out ? 'The training yard is closed to you.' : 'That is the edge of the training area. Back to the yard.', 'info');
+    this.pilots.toast(conn, 'The training yard is closed to you.', 'info');
   }
 
   /** Rings passed and zones stopped in */

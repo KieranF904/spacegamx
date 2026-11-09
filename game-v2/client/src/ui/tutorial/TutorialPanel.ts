@@ -96,6 +96,13 @@ export class TutorialPanel {
     this.render();
   }
 
+  /** Ask whether to leave now (the yard's edge was reached): the card's leave confirm, if the card is up */
+  askLeave(): void {
+    if (!this.model || this.model.graduate) return;
+    this.flow.ask();
+    this.render();
+  }
+
   /** The reset on a new connection */
   reset(): void { this.flow.reset(); this.set(null, []); }
 

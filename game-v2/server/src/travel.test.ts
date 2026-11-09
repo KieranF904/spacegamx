@@ -39,8 +39,8 @@ describe('sectors and travel', () => {
       expect(links.has(`${a}>${b}`), `${a} → ${b}`).toBe(true);
       expect(links.has(`${b}>${a}`), `${b} → ${a}`).toBe(true);
     }
-    // (Planet surfaces and pilots' own stations have no asteroids)
-    for (const s of files.systems.systems.filter((x) => !x.surface && !x.private)) {
+    // (Planet surfaces, pilots' own stations and the training yard have no asteroids)
+    for (const s of files.systems.systems.filter((x) => !x.surface && !x.private && !x.tutorial)) {
       expect(s.asteroidField, s.id).toBeDefined();
     }
   });

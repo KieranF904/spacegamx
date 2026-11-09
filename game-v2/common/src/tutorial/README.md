@@ -1,9 +1,9 @@
 # Tutorial (the training yard): foundation interfaces
 
-Design (agreed with Kieran): new pilots start in ONE shared safe yard at Vesta in Sol (stationary station, rocks, drones, markers). Per pilot: the steps done and a damage counter per training object. Skip any time (`tutorialLeave`) or graduate: the starter pack, then a one-way exit into Sol. Existing profiles are marked left.
+Design (agreed with Kieran): new pilots start in ONE shared safe yard in its own small system `vesta_yard` (`tutorial: true`: a large Vesta as a fixed planet, the yard station fixed just off its limb, stationary rocks, drones, markers; nothing else of Sol in it, not on the galaxy map, no gate or descent leads there). Per pilot: the steps done and a damage counter per training object. Skip any time (`tutorialLeave`) or graduate: the starter pack, then a one-way exit up to Sol's usual start (beside Sol Central). The yard is a very large area; at its edge (`yard.leash`) a trainee is stopped just inside and sent `tutorialEdge`, which the client answers with the card's Leave / Stay confirm (Leave = `tutorialLeave`). Crossing a boundary never takes anyone out. Existing profiles are marked left.
 
 ## Data: `data/tutorial.json` (shapes in `types.ts`, checked by `validateTutorialData`, run by the server's data validation)
-- `yard`: system, station id (`data/stations.json`, `tutorial: true`), `center`, `spawnRadius`, `leash` (trainees held in), `keepOut` (others kept out), `stopSpeed`/`stopTicks` (a stop).
+- `yard`: system, station id (`data/stations.json`, `tutorial: true`), `center` (the station; objects are offsets from it), `spawnRadius`, `leash` (the soft wall trainees are stopped at), `keepOut` (unused now: a pilot who has left is turned out wherever they are in the yard), `stopSpeed`/`stopTicks` (a stop).
 - `steps[]`: `id, title, lines[1-2] (with {action} key names), trigger {kind, objects?, panel?, item?, count?}, targets?, grant?`. First is `welcome`, last `graduate`.
 - `objects[]`: `id, kind (rock|drone|ring|zone|exit), step, at (offset from yard.center), radius, hp?, drops?, chunks?, label?`. `rock`/`drone` are real asteroid entities (fixed orbit, never lose hp, asteroid index `TUTORIAL_INDEX_BASE + position in objects`, told to clients as an `asteroidSpawn`); `ring`/`zone`/`exit` are markers (no entity; the client draws them).
 - `starterPack {credits, items}`: granted to storage on leaving.
@@ -21,7 +21,7 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard at Vesta i
   - `hit(bodyEid, shooterEid, damage): boolean` (the three asteroid damage sites call it: `hurtAsteroid`, `mineBeam`, `beamAsteroid`; true = a training body, caller does nothing else).
   - `onEvent(pid, ev: TutorialEvent)`; `subscribe(fn(conn, ev))`; events emitted by the foundation: `objectBroken`, `ringPassed`, `zoneStopped`, `docked`, `jumped {x,y,exit?}`, plus `ack`/`panelOpened` from `tutorialReport`. Not yet emitted (other modules call `tutorial.onEvent`): `collected`, `refined`, `partPlaced`, `powered`.
   - `completeStep(conn, stepId)` (the engine's one way to advance; zeroes the next step's counters), `resetObjects(conn, step)`, `leave(conn)` (pack, home reset, exit, quests opened, state sent), `sendState(conn)`, `active(conn)`, `spawnFor(conn, resume)`, `objectOf/isBody/entityOf/def`.
-  - `tick()` ('tutorial' entry in the world phase): rings/zones/jumps for trainees, the leash (turned back to the yard), the keep-out (a pilot who has left is sent to Sol's start).
+  - `tick()` ('tutorial' entry in the world phase): rings/zones/jumps for trainees, the leash (a soft wall: stopped just inside, `tutorialEdge` asks the client to confirm Leave), a pilot who has left is turned out of the yard to Sol's start.
 - `TutorialSteps.advance(pid, ev)`: the STUB. Handles `ack` on the welcome step and `graduate`. The next stage fills in a case per trigger kind (see the header comment).
 - Owner-only drops: `LootPods.keepPrivate(pod, key)` / `visibleTo(pod, key)`; the snapshot skips another pilot's private pods.
 - The yard's station (`sol_station_yard`) and bodies exist only on a server with a tutorial. `GameData.getAllStations()` leaves the yard out.
@@ -30,4 +30,4 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard at Vesta i
 ## Caveats for the next stages
 - A drone is an asteroid body, so the client draws a drone model where the asteroid for index `TUTORIAL_INDEX_BASE + i` is (hide the rock look); shells stop on it like on a rock. Hits count for guns and mining beams.
 - The old client tour (`client/src/ui/Tutorial.ts`) still runs for everyone; retire or gate it on `inTutorialNow()`.
-- Left pilots are still told of the yard's bodies when they enter Sol (they cannot reach them); the client may skip indices `>= TUTORIAL_INDEX_BASE` once `left`.
+- The yard's bodies live in `vesta_yard`, so pilots in Sol (and anyone who has left) are never told of them.

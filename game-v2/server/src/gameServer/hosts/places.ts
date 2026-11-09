@@ -263,7 +263,7 @@ export function createMemoryHost(gs: GameServer): MemoryHost {
     tick: () => gs.currentTick,
     now: () => gs.clock(),
     // The world's own systems (an arena's copies, surfaces and pilots' stations look after their own)
-    systems: () => gs.gameData.getAllSystems().filter((s) => !s.private && !s.surface && !s.instance).map((s) => ({ num: gs.gameData.getSystemNum(s.id), id: s.id })),
+    systems: () => gs.gameData.getAllSystems().filter((s) => !s.private && !s.surface && !s.instance && !s.tutorial).map((s) => ({ num: gs.gameData.getSystemNum(s.id), id: s.id })),
     occupied: () => {
       const out = new Set<number>();
       for (const c of gs.clients.values()) out.add(InSystem.systemId[c.playerId]);
