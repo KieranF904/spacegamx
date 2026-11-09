@@ -15,7 +15,8 @@ import { TutorialPanel as PanelView } from './TutorialPanel';
 import { Glow, domGlowHost } from './glow';
 import { domFind, findAnchor } from './placement';
 import { leaveMessage, onTutorial, onTutorialEdge, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
-import { lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
+import { guideMarks, setGuideMarks } from '../../state/guideMarks';
+import { markerStyle, lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
 import { clearTrainingBodies, setTrainingBody } from '../../state/trainingBodies';
 
 export interface TutorialUIDeps {
@@ -134,7 +135,7 @@ export class TutorialUI {
     const s = this.cur;
     this.panel.setHidden(cardHidden);
     this.markers.setHidden(hidden);
-    if (!s || s.left) { this.markers.draw(null); this.glow.clear(); return; }
+    if (!s || s.left) { this.markers.draw(null); this.glow.clear(); setGuideMarks([]); return; }
     // The card by the window the pilot is in (the station, the hold, the hangar, the map), or at the top; the glowing controls follow the page
     if (this.frame % 15 === 0) this.glow.refresh();
     // (clear of the controls the step points at: the card's own key caps glow too, and are no reason to move)
@@ -144,6 +145,7 @@ export class TutorialUI {
     });
     if (!cardHidden) this.panel.place(findAnchor(this.find), avoid);
     this.markers.draw(s);
+    this.guideMarks(s);
     // (The control mode can change with a key: the card's keys follow it)
     if (this.d.helm() !== this.helmShown) { this.helmShown = this.d.helm(); this.showCard(); }
     // Panels: report each one as it opens
@@ -154,6 +156,16 @@ export class TutorialUI {
     this.prevPanels = now;
     // Bodies come and go as the yard streams in: match them again now and then
     if (++this.frame % 20 === 0) this.looks();
+  }
+
+  /** The exit marker on its step is also on the system map and the minimap: they read it from state/guideMarks */
+  private guideMarks(s: ServerTutorialStateMessage): void {
+    const step = tutorialData.steps.find((x) => x.id === s.step);
+    const marks = tutorialData.objects
+      .filter((o) => o.kind === 'exit' && markerStyle(o, s, step, tutorialData) === 'active')
+      .map((o) => ({ ...objectPos(tutorialData, o), radius: o.radius, label: o.label ?? 'Jump here' }));
+    const prev = guideMarks();
+    if (marks.length !== prev.length || marks.some((m, i) => m.x !== prev[i].x || m.y !== prev[i].y)) setGuideMarks(marks);
   }
 
   /** Give each training body its look (a drone, a ghost or nothing) */

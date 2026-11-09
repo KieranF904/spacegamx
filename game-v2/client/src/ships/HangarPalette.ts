@@ -158,6 +158,8 @@ ${SUBS_STYLE}.hp-card { display: block; white-space: normal; }
 .hp-list { flex: 1; min-height: 60px; overflow-y: auto; padding-right: 2px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #2a3a5a transparent; }
 .hp-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px; margin-bottom: 3px; border-radius: 6px; background: #0f1626; border: 1px solid #22304a;
   border-left: 3px solid var(--c, #8ea0bd); overflow: hidden; }
+/* (a row the training yard points at glows whole, inside its edge: the list and the row's own overflow would clip an outside glow) */
+.hp-row.tut-glow { outline-offset: -2px; }
 .hp-row.on { background: #1b3157; border-color: #5fd4c4; border-left-color: var(--c, #8ea0bd); }
 .hp-pick { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 7px; align-items: center; min-width: 0; padding: 3px 5px 3px 4px; }
 .hp-pick:hover { background: rgba(125, 211, 252, 0.05); }

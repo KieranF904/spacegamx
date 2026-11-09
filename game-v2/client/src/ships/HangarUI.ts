@@ -205,6 +205,7 @@ export class HangarUI implements HangarHost {
     save.title = 'Save to this hangar slot: what you have goes in, the rest become ghosts to build';
     // (the training yard's cards point at these: data/tutorial.json `highlight`)
     save.dataset.tut = 'hangar-save';
+    this.saveBtn = save;
     const closeBtn = button('Close', () => this.close(null));
     closeBtn.dataset.tut = 'hangar-close';
     bar.append(
@@ -363,6 +364,8 @@ export class HangarUI implements HangarHost {
     }
     this.savedSig = rec ? designSig(rec.blueprint) : '';
   }
+
+  private saveBtn!: HTMLButtonElement;
 
   get unsaved(): boolean {
     return designSig(this.bp) !== this.savedSig;
@@ -867,7 +870,12 @@ export class HangarUI implements HangarHost {
 
   summaryHtml(): string { return summaryHtml(this); }
 
-  renderStats(): void { return renderStats(this); }
+  renderStats(): void {
+    // (the training yard's Save glow waits for the part its step asks for: it matches [data-added*=":hull:"], the ids of parts added since the last save)
+    const fresh = this.ghostInfo().fresh;
+    this.saveBtn.dataset.added = this.bp.parts.filter((q) => fresh.has(q.uid)).map((q) => partItemId(q)).join(' ');
+    return renderStats(this);
+  }
 
   // -------------------------------------------------------------------------
   // Part tooltip

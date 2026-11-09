@@ -14,6 +14,7 @@ import type { GameState } from '../../state/GameState';
 import type { PopGhost } from '../../state/Populations';
 import { FACTION_COLORS } from '../../ships/ShipRenderer';
 import { nestColor } from '../NestViews';
+import { guideMarks } from '../../state/guideMarks';
 
 /** What the minimap reads from the renderer */
 export interface MinimapHost {
@@ -132,6 +133,18 @@ export class Minimap {
       if (dx * dx + dy * dy > this.MINIMAP_RANGE * this.MINIMAP_RANGE) continue;
       g.circle(center + dx * scale, center + dy * scale, 3);
       g.stroke({ color: gh.calm ? 0x9ca3af : FACTION_COLORS[gh.faction] ?? 0xff4444, width: 1, alpha: 0.5 });
+    }
+
+    // The lesson's spots (Jump here): an amber ring, pinned inside the disc's edge when it is further than the radar reaches
+    for (const m of guideMarks()) {
+      let dx = m.x - playerPos.x, dy = m.y - playerPos.y;
+      const far = Math.hypot(dx, dy), lim = this.MINIMAP_RANGE * 0.93;
+      if (far > lim) { dx *= lim / far; dy *= lim / far; }
+      const r = Math.max(4, Math.min(m.radius * scale, 40));
+      g.circle(center + dx * scale, center + dy * scale, r);
+      g.fill({ color: 0xfbbf24, alpha: 0.18 });
+      g.circle(center + dx * scale, center + dy * scale, r);
+      g.stroke({ color: 0xfbbf24, width: 1.5, alpha: 0.95 });
     }
 
     // Draw entities
