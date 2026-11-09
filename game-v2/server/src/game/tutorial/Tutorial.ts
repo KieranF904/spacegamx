@@ -1,9 +1,8 @@
 /**
  * @contract server.game.tutorial
- * owns:       the training yard: its stationary rocks and drones, each pilot's own damage counters on them, owner-only
- *             drops, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else
+ * owns:       the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else
  *             kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState
- * needs:      TutorialHost, Pilots (profiles, give, toast), LootPods (private pods), common/tutorial, TutorialSteps
+ * needs:      TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps
  * invariants: one pilot's hits never touch another's counter; the shared bodies never change (no hp loss, no movement);
  *             a pilot who has left is never placed in, or left in, the yard — server/src/game/tutorial/tutorial.test.ts
  * extend:     a new thing that happens in the yard is a TutorialEvent (common/tutorial/types.ts) emitted through
@@ -13,7 +12,6 @@
 import { Position, Velocity, InSystem, EffectType, registeredFunction, dhypot, dcos, dsin, objectLive, objectBroken, brokenIds, objectPos, inTutorial, leftTutorial, newTutorial, nextStep, TUTORIAL_PANELS, TUTORIAL_INDEX_BASE } from '@space-game/common';
 import type { TutorialData, TutorialProfile, TutorialObjectDef, TutorialEvent, ServerMessage, ClientTutorialReportMessage, Bag } from '@space-game/common';
 import type { PilotConn, Pilots } from '../Pilots.js';
-import type { LootPods } from '../LootPods.js';
 import { TutorialSteps } from './TutorialSteps.js';
 
 export interface TutorialHost {
@@ -28,7 +26,7 @@ export interface TutorialHost {
   isJumping(eid: number): boolean;
   /** Let a docked pilot out (before moving them) */
   undock(conn: PilotConn): void;
-  /** A stationary rock/drone body in the shared sim at (x, y): its entity */
+  /** A stationary drone body in the shared sim at (x, y): its entity */
   createBody(index: number, def: TutorialObjectDef, x: number, y: number): number;
   /** The starter home station a graduate gets back (Sol Central) */
   starterHome(): string;
@@ -54,7 +52,7 @@ export class Tutorial {
   private readonly jumping = new Set<number>();
   private readonly nudged = new Map<number, number>();
 
-  constructor(private readonly host: TutorialHost, private readonly pilots: Pilots, private readonly pods: LootPods) {
+  constructor(private readonly host: TutorialHost, private readonly pilots: Pilots) {
     this.data = host.data;
     this.steps = new TutorialSteps(this);
     // A pilot who joins is told where they stand
@@ -69,11 +67,11 @@ export class Tutorial {
 
   // ------------------------------------------------------------ the yard's bodies
 
-  /** Make the stationary rocks and drones (the world's start, after the yard's system has its asteroids). Idempotent */
+  /** Make the stationary drones (the world's start, after the yard's system has its belt). Idempotent */
   build(): void {
     if (this.byEid.size) return;
     this.data.objects.forEach((o, i) => {
-      if (o.kind !== 'rock' && o.kind !== 'drone') return;
+      if (o.kind !== 'drone') return;
       const at = objectPos(this.data, o);
       const eid = this.host.createBody(TUTORIAL_INDEX_BASE + i, o, at.x, at.y);
       if (eid < 0) return;
@@ -122,7 +120,7 @@ export class Tutorial {
     if (!o) return false;
     const conn = this.pilots.connOf(shooter);
     const p = conn && this.pilots.get(conn);
-    if (!conn || !p || !(damage > 0) || !o.hp || !objectLive(p.tutorial, o)) return true;
+    if (!conn || !p || !(damage > 0) || !o.hp || !objectLive(p.tutorial, o) || this.ahead(p.tutorial, o)) return true;
     const hits = (p.tutorial.hits ??= {});
     hits[o.id] = Math.min(o.hp, (hits[o.id] ?? 0) + damage);
     this.pilots.markDirty(conn);
@@ -130,28 +128,19 @@ export class Tutorial {
     return true;
   }
 
+  /** Is the object's step one this pilot has not reached? (It is hidden from them: it counts nothing, though it still collides) */
+  private ahead(t: TutorialProfile, o: TutorialObjectDef): boolean {
+    const at = this.data.steps.findIndex((s) => s.id === o.step), now = this.data.steps.findIndex((s) => s.id === t.step);
+    return at >= 0 && now >= 0 && at > now;
+  }
+
   /** The pilot's counter on an object reached its hp: it breaks for them alone */
   private broke(conn: PilotConn, o: TutorialObjectDef): void {
     const eid = this.eidOf.get(o.id);
     if (eid === undefined) return;
     const at = objectPos(this.data, o);
-    const system = this.host.systemNum(this.data.yard.system);
     // The break is shown to them only
     this.host.send(conn, { type: 'effect', effectType: EffectType.AsteroidBreak, x: Math.round(at.x), y: Math.round(at.y), data: [o.radius, 30] });
-    const key = this.pilots.keyOf(conn);
-    if (o.drops && key) {
-      const chunks = Math.max(1, o.chunks ?? 1);
-      for (let k = 0; k < chunks; k++) {
-        const bag: Bag = {};
-        for (const [item, n] of Object.entries(o.drops)) {
-          const share = Math.floor(n / chunks) + (k < n % chunks ? 1 : 0);
-          if (share > 0) bag[item] = share;
-        }
-        const a = (k / chunks) * Math.PI * 2 + 0.6;
-        const pod = this.pods.spawnChunk(system, at.x + dcos(a) * (o.radius + 20), at.y + dsin(a) * (o.radius + 20), dcos(a) * 3, dsin(a) * 3, bag, conn.playerId);
-        if (pod >= 0) this.pods.keepPrivate(pod, key);
-      }
-    }
     this.sendState(conn);
     this.onEvent(conn.playerId, { kind: 'objectBroken', object: o.id, step: o.step });
   }

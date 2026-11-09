@@ -45,7 +45,7 @@ export default defineConfig(({ command, mode }) => ({
     fs: { allow: ['..'] },
     proxy: {
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: process.env.WS_TARGET || 'ws://localhost:3000',
         ws: true,
       },
     },

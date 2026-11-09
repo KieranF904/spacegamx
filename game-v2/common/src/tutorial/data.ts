@@ -17,7 +17,7 @@ export interface TutorialRefs {
   stations?: ReadonlyMap<string, string>;
 }
 
-const KINDS = ['rock', 'drone', 'ring', 'zone', 'exit'];
+const KINDS = ['drone', 'ring', 'zone', 'exit'];
 const TRIGGERS = ['ack', 'rings', 'zoneStop', 'objectsBroken', 'collect', 'panel', 'docked', 'refined', 'partPlaced', 'powered', 'jumped', 'graduate'];
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -81,16 +81,7 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
     if (typeof o.step !== 'string' || !stepIdSet.has(o.step)) err(`${p}.step`, `unknown step "${String(o.step)}"`);
     if (!isPt(o.at)) err(`${p}.at`, 'expected {x, y}');
     if (!isNum(o.radius) || o.radius <= 0) err(`${p}.radius`, 'expected a positive number');
-    if (o.kind === 'rock' || o.kind === 'drone') {
-      if (!isNum(o.hp) || o.hp <= 0) err(`${p}.hp`, 'a rock or drone needs a positive hp');
-    }
-    if (o.kind === 'rock' && isObj(o.drops)) {
-      if (!isNum(o.chunks) || o.chunks < 1) err(`${p}.chunks`, 'a rock with drops needs chunks >= 1');
-      for (const [k, n] of Object.entries(o.drops)) {
-        if (!isNum(n) || n <= 0) err(`${p}.drops.${k}`, 'expected a positive number');
-        else if (refs.item && !refs.item(k)) err(`${p}.drops.${k}`, `unknown item "${k}"`);
-      }
-    }
+    if (o.kind === 'drone' && (!isNum(o.hp) || o.hp <= 0)) err(`${p}.hp`, 'a drone needs a positive hp');
   });
 
   steps.forEach((s, i) => {
@@ -103,6 +94,10 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
       const first = Array.isArray(t.objects) ? objIds.get(t.objects[0] as string) : undefined;
       if (first !== want) err(`steps[${i}].trigger.objects`, `${kind} needs a ${want} object first`);
     };
+    if (t.kind === 'collect') {
+      if (!isNum(t.count) || t.count < 1) err(`steps[${i}].trigger.count`, 'collect needs a positive count');
+      for (const k of Array.isArray(t.items) ? t.items : []) if (typeof k !== 'string' || (refs.item && !refs.item(k))) err(`steps[${i}].trigger.items`, `unknown item "${String(k)}"`);
+    }
     needs('zoneStop', 'zone');
     needs('jumped', 'exit');
     if ((t.kind === 'rings' || t.kind === 'objectsBroken') && !(Array.isArray(t.objects) && t.objects.length)) err(`steps[${i}].trigger.objects`, `${String(t.kind)} needs objects`);

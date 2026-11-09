@@ -95,9 +95,9 @@ describe('the training yard', () => {
     expect(Math.hypot(exit.x - w.center.x, exit.y - w.center.y)).toBeGreaterThan(5000);
     // the rocks and drones are all in the yard system, none in Sol
     const solNum = gd.getSystemNum('sol'), yardNum = gd.getSystemNum('vesta_yard');
-    for (const id of ['training_rock', 'drone_1', 'drone_2', 'drone_3']) expect(InSystem.systemId[w.eid(id)]).toBe(yardNum);
+    for (const id of ['drone_1', 'drone_2', 'drone_3']) expect(InSystem.systemId[w.eid(id)]).toBe(yardNum);
     const solIds = (w.server as never as { asteroidIdsBySystem: Map<number, number[]> }).asteroidIdsBySystem.get(solNum) ?? [];
-    for (const id of ['training_rock', 'drone_1']) expect(solIds).not.toContain(w.eid(id));
+    for (const id of ['drone_1']) expect(solIds).not.toContain(w.eid(id));
   });
 
   it('leaving lands in Sol at its usual start, and X near Vesta in Sol leads nowhere', () => {
@@ -140,90 +140,97 @@ describe('the training yard', () => {
     expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));
   });
 
-  it('two pilots hitting one rock keep their own counters; the shared rock never changes', () => {
+  it('two pilots hitting one drone keep their own counters; the shared drone never changes', () => {
     const w = yard();
     const [a, b] = w.pilots;
-    const rock = w.eid('training_rock');
-    const hp0 = Asteroid.hp[rock], x0 = Position.x[rock], y0 = Position.y[rock];
-    expect(w.tut.hit(rock, a.pid, 250)).toBe(true);
-    expect(w.tut.hit(rock, b.pid, 100)).toBe(true);
-    expect(a.profile().tutorial.hits?.training_rock).toBe(250);
-    expect(b.profile().tutorial.hits?.training_rock).toBe(100);
-    expect(w.tut.hit(rock, a.pid, 10_000)).toBe(true);
-    expect(a.profile().tutorial.hits?.training_rock).toBe(600);
-    expect(b.profile().tutorial.hits?.training_rock).toBe(100);
-    expect(Asteroid.hp[rock]).toBe(hp0);
-    expect(Position.x[rock]).toBe(x0);
-    expect(Position.y[rock]).toBe(y0);
+    for (const p of [a, b]) { p.profile().tutorial.step = 'drones'; p.profile().tutorial.done = ['welcome', 'rings', 'brake']; }
+    const d = w.eid('drone_1');
+    const hp0 = Asteroid.hp[d], x0 = Position.x[d], y0 = Position.y[d];
+    expect(w.tut.hit(d, a.pid, 100)).toBe(true);
+    expect(w.tut.hit(d, b.pid, 50)).toBe(true);
+    expect(a.profile().tutorial.hits?.drone_1).toBe(100);
+    expect(b.profile().tutorial.hits?.drone_1).toBe(50);
+    expect(w.tut.hit(d, a.pid, 10_000)).toBe(true);
+    expect(a.profile().tutorial.hits?.drone_1).toBe(160);
+    expect(b.profile().tutorial.hits?.drone_1).toBe(50);
+    expect(Asteroid.hp[d]).toBe(hp0);
+    expect(Position.x[d]).toBe(x0);
+    expect(Position.y[d]).toBe(y0);
     // a body that is not a training one is not claimed
     expect(w.tut.hit(999_999, a.pid, 5)).toBe(false);
   });
 
-  it('a real shell striking a training rock is counted for its owner and breaks nothing', () => {
+  it('a real shell striking a drone is counted for its owner and breaks nothing; a drone of a later step counts nothing', () => {
     const w = yard();
     const [a, b] = w.pilots;
-    const rock = w.eid('training_rock');
+    a.profile().tutorial.step = 'drones';
+    a.profile().tutorial.done = ['welcome', 'rings', 'brake'];
+    const d = w.eid('drone_1');
     const world = w.server.world;
     const shell = () => {
       const e = bitecs.addEntity(world);
       bitecs.addComponent(world, Projectile, e);
       bitecs.addComponent(world, InSystem, e);
-      InSystem.systemId[e] = InSystem.systemId[rock];
+      InSystem.systemId[e] = InSystem.systemId[d];
       Projectile.miningYield[e] = 1;
       return e;
     };
     const s1 = shell();
-    w.server.hurtAsteroid(s1, rock, a.pid, 700, Position.x[rock], Position.y[rock]);
+    w.server.hurtAsteroid(s1, d, a.pid, 700, Position.x[d], Position.y[d]);
     expect(bitecs.hasComponent(world, Dead, s1)).toBe(true);
-    expect(bitecs.hasComponent(world, Dead, rock)).toBe(false);
-    expect(Asteroid.hp[rock]).toBeGreaterThan(900_000);
-    expect(a.profile().tutorial.hits?.training_rock).toBe(600);
+    expect(bitecs.hasComponent(world, Dead, d)).toBe(false);
+    expect(Asteroid.hp[d]).toBeGreaterThan(900_000);
+    expect(a.profile().tutorial.hits?.drone_1).toBe(160);
     expect(b.profile().tutorial.hits).toBeUndefined();
-    // the same shell from B yields nothing of A's and counts for B
-    w.server.hurtAsteroid(shell(), rock, b.pid, 50, Position.x[rock], Position.y[rock]);
-    expect(b.profile().tutorial.hits?.training_rock).toBe(50);
+    // B is still at the first step: the drone is hidden from them, and their shell counts nothing
+    w.server.hurtAsteroid(shell(), d, b.pid, 50, Position.x[d], Position.y[d]);
+    expect(b.profile().tutorial.hits).toBeUndefined();
   });
 
-  it('breaking a rock drops ore only the owner sees and can take', () => {
+  it('breaking a drone is the breaking pilot alone: an event for them, listed in their state only', () => {
     const w = yard();
     const [a, b] = w.pilots;
+    for (const p of [a, b]) { p.profile().tutorial.step = 'drones'; p.profile().tutorial.done = ['welcome', 'rings', 'brake']; }
     const events: [number, TutorialEvent][] = [];
     w.tut.subscribe((c, ev) => events.push([c.playerId, ev]));
-    const rock = w.eid('training_rock');
-    w.tut.hit(rock, a.pid, 600);
-    expect(events).toEqual([[a.pid, { kind: 'objectBroken', object: 'training_rock', step: 'mine' }]]);
-    const pods = w.server.pods.near(InSystem.systemId[rock], Position.x[rock], Position.y[rock], 400);
-    expect(pods.length).toBe(4);
-    const total: Record<string, number> = {};
-    for (const p of pods) for (const [k, n] of Object.entries(w.server.pods.get(p)!)) total[k] = (total[k] ?? 0) + n;
-    expect(total).toEqual({ iron_ore: 8, nickel_ore: 4 });
-    const keyA = w.server.pilots.keyOf(a.conn), keyB = w.server.pilots.keyOf(b.conn);
-    expect(w.server.pods.hasPrivate).toBe(true);
-    for (const p of pods) { expect(w.server.pods.visibleTo(p, keyA)).toBe(true); expect(w.server.pods.visibleTo(p, keyB)).toBe(false); }
-    // B sits on the chunks: nothing is taken. A sits on them: all of it.
-    const cargoOf = (p: typeof a) => Object.fromEntries(p.profile().cargo.map((s) => [s.id, s.n]));
-    const at = { x: Position.x[pods[0]], y: Position.y[pods[0]] };
-    w.put(b.pid, at.x, at.y);
-    w.step(30);
-    expect(cargoOf(b)).toEqual({});
-    expect(w.server.pods.near(InSystem.systemId[rock], at.x, at.y, 600).length).toBeGreaterThan(0);
-    w.put(b.pid, w.center.x, w.center.y - 3000);
-    for (const p of pods) w.put(a.pid, Position.x[p], Position.y[p]), w.step(40);
-    expect((cargoOf(a).iron_ore ?? 0) + (cargoOf(a).nickel_ore ?? 0)).toBeGreaterThan(0);
-    // the pilot who broke it can no longer hurt it or collect from it again
-    w.tut.hit(rock, a.pid, 600);
-    expect(events.filter(([, e]) => e.kind === 'objectBroken').length).toBe(1);
-    // and the state they are sent lists it as broken, B's does not
+    const d = w.eid('drone_1');
+    w.tut.hit(d, a.pid, 160);
+    expect(events).toEqual([[a.pid, { kind: 'objectBroken', object: 'drone_1', step: 'drones' }]]);
+    // it cannot be broken twice by the same pilot
+    w.tut.hit(d, a.pid, 160);
+    expect(events.length).toBe(1);
     w.server.flushLazy();
     const stateOf = (p: typeof a) => p.got.filter((m) => m.type === 'tutorialState').pop() as Extract<ServerMessage, { type: 'tutorialState' }>;
-    expect(stateOf(a).broken).toEqual(['training_rock']);
+    expect(stateOf(a).broken).toEqual(['drone_1']);
     expect(stateOf(b).broken).toEqual([]);
+  });
+
+  it('the yard has an ordinary belt around Vesta, clear of the course and the station, of low-grade ore', () => {
+    const w = yard();
+    const gd = w.server.gameData;
+    const sys = gd.getSystem('vesta_yard')!;
+    const ring = sys.asteroidBelt.extra![0];
+    expect(ring.count).toBeGreaterThanOrEqual(20);
+    expect(ring.at!.length).toBe(ring.count);
+    const vesta = planetPosition(sys.planets![0], 0), vr = sys.planets![0].radius;
+    const clear = [...w.data.objects.map((o) => objectPos(w.data, o)), w.center];
+    for (const [x, y] of ring.at!) {
+      expect(Math.hypot(x - vesta.x, y - vesta.y)).toBeGreaterThan(vr + 500);
+      for (const c of clear) expect(Math.hypot(x - c.x, y - c.y)).toBeGreaterThan(2000);
+    }
+    // real asteroid entities of the shared sim, made of the yard's own field
+    const yardNum = gd.getSystemNum('vesta_yard');
+    const belt = (w.server as never as { asteroidIdsBySystem: Map<number, number[]> }).asteroidIdsBySystem.get(yardNum)!.filter((e) => !w.tut.isBody(e));
+    expect(belt.length).toBe(ring.count);
+    for (const e of belt) expect(InSystem.systemId[e]).toBe(yardNum);
+    expect(sys.asteroidField).toBe('yard_belt');
   });
 
   it('an object of a step a pilot has done is inert for them and live for another', () => {
     const w = yard();
     const [a, b] = w.pilots;
     a.profile().tutorial.done.push('drones');
+    b.profile().tutorial.step = 'drones';
     const d1 = w.eid('drone_1');
     expect(w.tut.hit(d1, a.pid, 100)).toBe(true);
     expect(w.tut.hit(d1, b.pid, 100)).toBe(true);
@@ -323,8 +330,8 @@ describe('the training yard', () => {
 
   it('the yard stays put: bodies, station and hp unchanged over 600 ticks', () => {
     const w = yard(['ann']);
-    const ids = ['ring_1', 'drone_1', 'drone_2', 'drone_3', 'training_rock'].filter((id) => w.tut.entityOf(id) !== undefined).map((id) => w.eid(id));
-    expect(ids.length).toBe(4);
+    const ids = ['ring_1', 'drone_1', 'drone_2', 'drone_3'].filter((id) => w.tut.entityOf(id) !== undefined).map((id) => w.eid(id));
+    expect(ids.length).toBe(3);
     const snap = () => ids.map((e) => [Position.x[e], Position.y[e], Asteroid.hp[e]]);
     const before = snap();
     for (const e of ids) w.server.placeAsteroid(e);
@@ -332,7 +339,7 @@ describe('the training yard', () => {
     w.step(600);
     for (const e of ids) w.server.placeAsteroid(e);
     expect(snap()).toEqual(before);
-    for (const id of ['drone_1', 'training_rock']) {
+    for (const id of ['drone_1']) {
       const o = w.tut.def(id)!, at = objectPos(w.data, o);
       expect(Math.hypot(Position.x[w.eid(id)] - at.x, Position.y[w.eid(id)] - at.y)).toBeLessThan(0.05);
     }

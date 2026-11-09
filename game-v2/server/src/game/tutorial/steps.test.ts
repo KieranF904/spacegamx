@@ -62,16 +62,17 @@ function withPart(w: World, p: Pilot, fn: string, piece: string, material: strin
   throw new Error('no place for the part: ' + JSON.stringify(w.server.ships.validate({ ...bp, parts: [...bp.parts, { uid, piece, fn, material, x: 0, y: 0, rot: 0, flip: false } as never] } as Blueprint).errors) + JSON.stringify(bp.parts.slice(0, 3)));
 }
 
-/** Break a drone or rock for a pilot (their own counter) */
+/** Break a drone for a pilot (their own counter) */
 const smash = (w: World, p: Pilot, id: string) => w.tut.hit(w.tut.entityOf(id)!, p.pid, w.tut.def(id)!.hp!);
 
-/** Take the ore a pilot's broken rock threw off */
-function scoop(w: World, p: Pilot, rockId: string): void {
-  const at = w.at(rockId);
-  for (const pod of w.server.pods.near(w.server.gameData.getSystemNum(w.data.yard.system), at.x, at.y, 400)) {
-    w.put(p.pid, Position.x[pod], Position.y[pod]);
-    w.step(40);
-  }
+/** A rock of the yard's belt breaks and throws off a chunk of `bag`, which the pilot flies through (the ordinary pods: anyone could take them) */
+function mineChunk(w: World, p: Pilot, bag: Record<string, number>): void {
+  const sys = w.server.gameData.getSystemNum(w.data.yard.system);
+  const rock = [...w.server.asteroidIdsBySystem.get(sys) ?? []].find((e) => !w.tut.isBody(e))!;
+  expect(rock).toBeDefined();
+  const pod = w.server.pods.spawnChunk(sys, Position.x[rock] + 120, Position.y[rock], 0, 0, bag, p.pid);
+  w.put(p.pid, Position.x[pod], Position.y[pod]);
+  w.step(40);
 }
 
 describe('the step engine', () => {
@@ -101,6 +102,18 @@ describe('the step engine', () => {
     // 1 welcome: nothing but an acknowledgement moves it
     w.step(60);
     expect(stepOf(a)).toBe('welcome');
+    // what this client was told of the yard's bodies: the three practice drones (as spawns: the yard's belt has none of them in its seed) and the belt's rocks (in the seed)
+    const spawned = a.got.filter((m) => m.type === 'asteroidSpawn').flatMap((m) => (m as Extract<ServerMessage, { type: 'asteroidSpawn' }>).asteroids);
+    for (const id of ['drone_1', 'drone_2', 'drone_3']) {
+      const sp = spawned.find((s) => s.id === w.tut.entityOf(id));
+      expect(sp, `${id} is told to the pilot in the yard`).toBeDefined();
+      const at = w.at(id);
+      expect(Math.round(sp!.semiMajorAxis * Math.cos(sp!.argPeriapsis))).toBe(Math.round(at.x));
+      expect(Math.round(sp!.semiMajorAxis * Math.sin(sp!.argPeriapsis))).toBe(Math.round(at.y));
+    }
+    const seed = a.got.find((m) => m.type === 'asteroidSeed') as Extract<ServerMessage, { type: 'asteroidSeed' }> | undefined;
+    expect(seed?.systemId).toBe('vesta_yard');
+    expect(seed!.belt.extra?.[0].count).toBeGreaterThanOrEqual(20);
     a.t.send({ type: 'tutorialReport', kind: 'ack', step: 'welcome' } as never);
     w.step(1);
     expectStep('rings');
@@ -125,10 +138,11 @@ describe('the step engine', () => {
     expectStep('mine');
     expect(a.state().broken).toEqual(['drone_1', 'drone_2', 'drone_3']);
 
-    // 5 mine: break the rock, fly through the chunks
-    smash(w, a, 'training_rock');
+    // 5 mine: the yard's belt, 20 of its ore (silicate and the like do not count)
+    expect(w.data.steps.find((s) => s.id === 'mine')!.trigger.count).toBe(20);
+    mineChunk(w, a, { silicate: 8, iron_ore: 12 });
     expect(stepOf(a)).toBe('mine');
-    scoop(w, a, 'training_rock');
+    mineChunk(w, a, { nickel_ore: 4, iron_ore: 4 });
     expectStep('hold');
 
     // 6 hold
@@ -289,11 +303,11 @@ describe('the step engine', () => {
     expect(stepOf(a)).toBe('guide');
   });
 
-  it('drones broken ahead of their step are whole again when it comes, and ore from the rock is counted per pilot', () => {
+  it('a drone shot before its step (it is hidden, but still in the way) counts nothing, and is whole when the step comes', () => {
     const w = yard(['ann', 'bo']);
     const [a, b] = w.pilots;
-    smash(w, a, 'drone_1');
-    expect(a.profile().tutorial.hits?.drone_1).toBeGreaterThan(0);
+    expect(smash(w, a, 'drone_1')).toBe(true);
+    expect(a.profile().tutorial.hits?.drone_1).toBeUndefined();
     w.tut.completeStep(a.conn, 'welcome');
     w.tut.completeStep(a.conn, 'rings');
     w.tut.completeStep(a.conn, 'brake');
@@ -315,25 +329,24 @@ describe('the step engine', () => {
     expect(stored(a, 'part:alloy:power_cell_reactor:sq')).toBe(1);
     w.tut.steps.entered(a.conn, 'power', false);
     expect(stored(a, 'part:alloy:power_cell_reactor:sq')).toBe(1);
-    // the rock, broken but not collected before a disconnect, is whole again on return
-    p.tutorial.step = 'mine';
-    p.tutorial.done = ['welcome', 'rings', 'brake', 'drones'];
-    smash(w, a, 'training_rock');
-    expect(p.tutorial.hits?.training_rock).toBeGreaterThan(0);
-    w.tut.steps.entered(a.conn, 'mine', false);
-    expect(p.tutorial.hits?.training_rock).toBeUndefined();
+    // a drone broken ahead of its step is whole again when the pilot comes back to it
+    p.tutorial.step = 'drones';
+    p.tutorial.done = ['welcome', 'rings', 'brake'];
+    smash(w, a, 'drone_1');
+    expect(p.tutorial.hits?.drone_1).toBeGreaterThan(0);
+    w.tut.steps.entered(a.conn, 'drones', false);
+    expect(p.tutorial.hits?.drone_1).toBeUndefined();
   });
 
-  it('ore is taken only by its owner and counts for the mining step', () => {
+  it('each pilot counts the belt ore they take themselves toward the mining step', () => {
     const w = yard(['ann', 'bo']);
     const [a, b] = w.pilots;
     for (const p of [a, b]) { p.profile().tutorial.step = 'mine'; p.profile().tutorial.done = ['welcome', 'rings', 'brake', 'drones']; }
-    smash(w, a, 'training_rock');
-    // b sits on the chunks: nothing; a's step does not move on b's account
-    scoop(w, b, 'training_rock');
-    expect(stepOf(b)).toBe('mine');
+    mineChunk(w, a, { iron_ore: 12 });
+    mineChunk(w, b, { iron_ore: 5 });
     expect(stepOf(a)).toBe('mine');
-    scoop(w, a, 'training_rock');
+    expect(stepOf(b)).toBe('mine');
+    mineChunk(w, a, { copper_ore: 8 });
     expect(stepOf(a)).toBe('hold');
     expect(stepOf(b)).toBe('mine');
   });

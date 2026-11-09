@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { TutorialData } from '@space-game/common';
 import tutorialJson from '../../../../data/tutorial.json';
-import { LeaveFlow, arrowTargets, counterOf, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, pointsAtStation, risingPanels, targetGained } from './tutorialModel';
+import { LeaveFlow, arrowTargets, counterOf, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, phaseOf, pointsAtBelt, pointsAtStation, risingPanels, targetGained } from './tutorialModel';
 
 const data = tutorialJson as unknown as TutorialData;
 const obj = (id: string) => data.objects.find((o) => o.id === id)!;
@@ -46,16 +46,36 @@ describe('ghosting', () => {
     expect(isGhosted(obj('drone_1'), st('drones', [], ['drone_1']))).toBe(true);
     expect(isGhosted(obj('drone_2'), st('drones', [], ['drone_1']))).toBe(false);
     expect(isGhosted(obj('drone_2'), st('mine', ['drones']))).toBe(true);
-    expect(isGhosted(obj('training_rock'), st('mine', ['drones']))).toBe(false);
-    expect(isGhosted(obj('training_rock'), st('hold', ['mine']))).toBe(true);
   });
 
-  it('picks the look: live drones are drawn as drones, live rocks as normal rocks, done ones as ghosts', () => {
-    expect(lookFor(obj('drone_1'), st('drones'))).toBe('drone');
-    expect(lookFor(obj('drone_1'), st('mine', ['drones']))).toBe('droneGhost');
-    expect(lookFor(obj('training_rock'), st('mine'))).toBeNull();
-    expect(lookFor(obj('training_rock'), st('hold', ['mine']))).toBe('rockGhost');
-    expect(lookFor(obj('ring_1'), st('rings'))).toBeNull();
+  it('picks the look: the current step drones live, done ones ghosts, later ones not drawn at all', () => {
+    expect(lookFor(obj('drone_1'), st('drones'), data)).toBe('drone');
+    expect(lookFor(obj('drone_1'), st('mine', ['drones']), data)).toBe('droneGhost');
+    expect(lookFor(obj('drone_1'), st('rings'), data)).toBe('hidden');
+    expect(lookFor(obj('drone_1'), st('brake', ['rings']), data)).toBe('hidden');
+    expect(lookFor(obj('drone_1'), st('drones', [], ['drone_1']), data)).toBe('droneGhost');
+    expect(lookFor(obj('ring_1'), st('rings'), data)).toBeNull();
+  });
+
+  it('every object is hidden, live or ghost by where the pilot is: later steps are never shown', () => {
+    for (const s of data.steps) {
+      const i = data.steps.indexOf(s);
+      const done = data.steps.slice(0, i).map((x) => x.id);
+      for (const o of data.objects) {
+        const at = data.steps.findIndex((x) => x.id === o.step);
+        const phase = phaseOf(o, st(s.id, done), data);
+        expect(phase, `${o.id} at ${s.id}`).toBe(at > i ? 'hidden' : at === i ? 'live' : 'ghost');
+        if (at > i) expect(markerStyle(o, st(s.id, done), s, data), `${o.id} marker at ${s.id}`).toBeNull();
+      }
+    }
+    expect(phaseOf(obj('drone_1'), null, data)).toBe('live');
+  });
+
+  it('the mining step points at the belt, not at a training object', () => {
+    const mine = data.steps.find((s) => s.id === 'mine')!;
+    expect(pointsAtBelt(mine)).toBe(true);
+    expect(pointsAtBelt(data.steps.find((s) => s.id === 'drones'))).toBe(false);
+    expect(arrowTargets(data, st('mine', ['drones']), mine)).toEqual([]);
   });
 
   it('nothing is ghosted without a state or once left', () => {
@@ -65,10 +85,10 @@ describe('ghosting', () => {
 
   it('markers: this step bright, later ones faint, done ones gone; arrows skip broken targets', () => {
     const rings = data.steps.find((s) => s.id === 'rings')!;
-    expect(markerStyle(obj('ring_1'), st('rings'), rings)).toBe('active');
-    expect(markerStyle(obj('stop_zone'), st('rings'), rings)).toBe('upcoming');
-    expect(markerStyle(obj('ring_1'), st('brake', ['welcome', 'rings']), data.steps[2])).toBeNull();
-    expect(markerStyle(obj('drone_1'), st('drones'), rings)).toBeNull();
+    expect(markerStyle(obj('ring_1'), st('rings'), rings, data)).toBe('active');
+    expect(markerStyle(obj('stop_zone'), st('rings'), rings, data)).toBeNull();
+    expect(markerStyle(obj('ring_1'), st('brake', ['welcome', 'rings']), data.steps[2], data)).toBeNull();
+    expect(markerStyle(obj('drone_1'), st('drones'), rings, data)).toBeNull();
     const drones = data.steps.find((s) => s.id === 'drones')!;
     expect(arrowTargets(data, st('drones', [], ['drone_1']), drones).map((o) => o.id)).toEqual(['drone_2', 'drone_3']);
   });
@@ -171,10 +191,10 @@ describe('tutorial multi-target progress', () => {
   });
   it('lights the next ring, ticks the passed ones, and the arrow follows the next', () => {
     const s0 = st('rings'), s1 = st('rings', [], [], ['ring_1']);
-    expect(markerStyle(obj('ring_1'), s0, step)).toBe('active');
-    expect(markerStyle(obj('ring_2'), s0, step)).toBe('upcoming');
-    expect(markerStyle(obj('ring_1'), s1, step)).toBe('passed');
-    expect(markerStyle(obj('ring_2'), s1, step)).toBe('active');
+    expect(markerStyle(obj('ring_1'), s0, step, data)).toBe('active');
+    expect(markerStyle(obj('ring_2'), s0, step, data)).toBe('upcoming');
+    expect(markerStyle(obj('ring_1'), s1, step, data)).toBe('passed');
+    expect(markerStyle(obj('ring_2'), s1, step, data)).toBe('active');
     expect(arrowTargets(data, s0, step).map((o) => o.id)).toEqual(['ring_1']);
     expect(arrowTargets(data, s1, step).map((o) => o.id)).toEqual(['ring_2']);
     expect(arrowTargets(data, st('rings', [], [], ['ring_1', 'ring_2', 'ring_3']), step)).toEqual([]);

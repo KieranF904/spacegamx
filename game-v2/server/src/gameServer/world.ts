@@ -47,8 +47,8 @@ export function initializeWorld(gs: GameServer): void {
       gs.traffic.push(slot);
     }
     
-    // Create asteroids
-    createAsteroids(gs, system, systemNum);
+    // Create asteroids (the training yard's belt exists only on a server that runs the tutorial, like its station)
+    if (!system.tutorial || gs.tutorial) createAsteroids(gs, system, systemNum);
   }
   
   // The training yard's rocks and drones (after the belts: nothing already made changes its id)

@@ -109,10 +109,11 @@ export function enterSystem(h: EntryHost, conn: ClientConnection, playerSystemId
       ids: packRanges(ids),
       indices: packRanges(indices),
     } as ServerAsteroidSeedMessage);
-    if (regrown.length) {
-      for (const id of regrown) conn.knownEntities.add(id);
-      h.send(conn.ws, { type: 'asteroidSpawn', tick: h.ticks.currentTick, asteroids: regrown.map((eid) => h.asteroidSpawnData(eid)) });
-    }
+  }
+  // (Outside the belt's seed: a system with no belt, the training yard's, has only these)
+  if (regrown.length) {
+    for (const id of regrown) conn.knownEntities.add(id);
+    h.send(conn.ws, { type: 'asteroidSpawn', tick: h.ticks.currentTick, asteroids: regrown.map((eid) => h.asteroidSpawnData(eid)) });
   }
 }
 

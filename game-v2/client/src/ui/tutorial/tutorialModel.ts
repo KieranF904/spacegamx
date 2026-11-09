@@ -13,22 +13,32 @@ import { esc } from '../escape';
 
 type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'> & { passed?: string[] };
 
-/** How the renderer draws a training body: a live practice drone, or a ghost (faded, grey) of a drone or rock */
-export type TrainingLook = 'drone' | 'droneGhost' | 'rockGhost';
+/** How the renderer draws a training body: a live practice drone, a ghost (faded, grey) of one, or nothing (a later step's) */
+export type TrainingLook = 'drone' | 'droneGhost' | 'hidden';
 
 /** Done for this pilot: its step is done, or they broke it (it still collides; it is drawn ghosted) */
 export function isGhosted(o: TutorialObjectDef, s: State | null): boolean {
   return !!s && !s.left && (s.done.includes(o.step) || s.broken.includes(o.id));
 }
 
-/** The look of a training body for this pilot; null: the normal rock (and for markers, which are not bodies) */
-export function lookFor(o: TutorialObjectDef, s: State | null): TrainingLook | null {
-  if (o.kind === 'drone') return isGhosted(o, s) ? 'droneGhost' : 'drone';
-  if (o.kind === 'rock') return isGhosted(o, s) ? 'rockGhost' : null;
-  return null;
+/** Where an object's step stands for this pilot: ahead of them (hidden: not drawn at all), theirs now (live), or behind them (ghost: done or broken by them) */
+export type ObjectPhase = 'hidden' | 'live' | 'ghost';
+
+export function phaseOf(o: TutorialObjectDef, s: State | null, data: TutorialData): ObjectPhase {
+  if (!s || s.left) return 'live';
+  const at = data.steps.findIndex((x) => x.id === o.step), now = data.steps.findIndex((x) => x.id === s.step);
+  if (at >= 0 && now >= 0 && at > now) return 'hidden';
+  return isGhosted(o, s) ? 'ghost' : 'live';
 }
 
-/** active: the target to go for now; passed: a ring of this step already flown through (green, ticked); upcoming: a later target or step's (faint); null: not drawn (its step is done) */
+/** The look of a training body for this pilot; null: not a body (the markers) */
+export function lookFor(o: TutorialObjectDef, s: State | null, data: TutorialData): TrainingLook | null {
+  if (o.kind !== 'drone') return null;
+  const phase = phaseOf(o, s, data);
+  return phase === 'hidden' ? 'hidden' : phase === 'ghost' ? 'droneGhost' : 'drone';
+}
+
+/** active: the target to go for now; passed: a ring of this step already flown through (green, ticked); upcoming: a later ring of this step (faint); null: not drawn (its step is done, or not reached yet) */
 export type MarkerStyle = 'active' | 'passed' | 'upcoming' | null;
 
 /** Which of the step's targets are done: rings the server counted as passed, drones broken (a hit-to-break step has no other progress) */
@@ -45,9 +55,9 @@ function nextRing(s: State, step: TutorialStepDef): string | undefined {
   return (step.targets ?? []).find((id) => !s.passed?.includes(id));
 }
 
-export function markerStyle(o: TutorialObjectDef, s: State | null, step: TutorialStepDef | undefined): MarkerStyle {
+export function markerStyle(o: TutorialObjectDef, s: State | null, step: TutorialStepDef | undefined, data: TutorialData): MarkerStyle {
   if (!s || s.left || (o.kind !== 'ring' && o.kind !== 'zone' && o.kind !== 'exit')) return null;
-  if (s.done.includes(o.step)) return null;
+  if (s.done.includes(o.step) || phaseOf(o, s, data) === 'hidden') return null;
   if (!step?.targets?.includes(o.id)) return 'upcoming';
   if (step.trigger.kind !== 'rings') return 'active';
   if (s.passed?.includes(o.id)) return 'passed';
@@ -71,6 +81,11 @@ export function targetGained(prev: State | null, next: State, data: TutorialData
 /** Does this step point at the yard station (the dock step: the station is no training object, so the data has no target for it)? */
 export function pointsAtStation(step: TutorialStepDef | undefined): boolean {
   return step?.trigger.kind === 'docked';
+}
+
+/** Does this step point at the nearest rock of the yard's belt (the mining step: the belt is no training object, so the data has no target for it)? */
+export function pointsAtBelt(step: TutorialStepDef | undefined): boolean {
+  return step?.trigger.kind === 'collect';
 }
 
 /** The objects the current step points at that are still live for this pilot (the arrow's targets) */

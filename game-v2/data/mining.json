@@ -632,6 +632,9 @@
     "scrap_seam": {
       "scrap_seam_rich": 1
     },
+    "yard_belt": {
+      "asteroid_metal": 1
+    },
     "sol_belt": {
       "asteroid_metal": 35,
       "asteroid_ice": 30,

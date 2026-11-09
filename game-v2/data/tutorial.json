@@ -42,10 +42,9 @@
     },
     {
       "id": "mine",
-      "title": "Mine your rock",
-      "lines": ["Shoot the training rock until it breaks.", "Then fly through the chunks to scoop up the ore."],
-      "trigger": { "kind": "collect", "count": 6 },
-      "targets": ["training_rock"]
+      "title": "Mine the belt",
+      "lines": ["Shoot a rock in the belt around Vesta until it breaks.", "Then fly through the chunks to scoop up 20 ore."],
+      "trigger": { "kind": "collect", "count": 20, "items": ["iron_ore", "nickel_ore", "copper_ore", "leestone_ore"] }
     },
     {
       "id": "hold",
@@ -113,7 +112,6 @@
     { "id": "drone_1", "kind": "drone", "step": "drones", "at": { "x": 2500, "y": -3500 }, "radius": 55, "hp": 160 },
     { "id": "drone_2", "kind": "drone", "step": "drones", "at": { "x": -1500, "y": -4200 }, "radius": 55, "hp": 160 },
     { "id": "drone_3", "kind": "drone", "step": "drones", "at": { "x": -3500, "y": -3000 }, "radius": 55, "hp": 160 },
-    { "id": "training_rock", "kind": "rock", "step": "mine", "at": { "x": -1800, "y": -1600 }, "radius": 80, "hp": 600, "drops": { "iron_ore": 8, "nickel_ore": 4 }, "chunks": 4, "label": "Training rock" },
     { "id": "exit_marker", "kind": "exit", "step": "jump", "at": { "x": -9000, "y": -2000 }, "radius": 700, "label": "Jump here" }
   ],
   "starterPack": {
