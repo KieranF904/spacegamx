@@ -19,6 +19,7 @@ import { itemIcon } from '../../ui/itemIcons';
 import { shipSummary, designFields, ShipSummary, BIGGER_IS_BETTER, jumpRatioNote } from '../shipSummary';
 import type { HangarHost } from './host';
 import { btnCss } from './hangarWidgets';
+import { applyChips } from '../build/statDeltaView';
 
 /** The build panel: what host slot still needs, and buttons to make it */
 export function buildHtml(host: HangarHost): string {
@@ -229,7 +230,7 @@ export function portsHtml(host: HangarHost, L: NonNullable<ShipDerived['ports']>
   const name = (i: number) => host.partName(i);
   const warn = portsWarnings(r, name);
   let html = '<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>';
-  html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="Power moves only out of an out port into an in port across a shared edge: generators give at their front, stores take at the back and give at the front, guns and engines take at their back, the core takes at its sides">Generation ${n0(r.supply)}/s · stores hold ${n0(r.store)} · ${r.links} link${r.links === 1 ? '' : 's'}</div>`;
+  html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="Power moves only out of an out port into an in port across a shared edge: generators give at their front, stores take at the back and give at the front, guns and engines take at their back, the core takes at its sides">Generation ${n0(r.supply)}/s · stores hold ${n0(r.store)} · ${r.links} link${r.links === 1 ? '' : 's'}<span data-sd="power" title="Change in generation minus what everything draws flat out"></span></div>`;
   const draws = drawsText(r);
   if (draws) html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="What each kind of part draws working flat out. Strafers burn only during a burst, gyros only while the ship turns (in proportion), shields all the time; each takes it from its own buffer, filled over its in ports, and works only as well as it is fed">Draws ${esc(draws)}</div>`;
   if (warn.length) html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${warn.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w)}</div>`).join('')}${warn.length > 6 ? `<div style="color:#6b7a93">and ${warn.length - 6} more</div>` : ''}</div>`;
@@ -254,8 +255,9 @@ export function summaryHtml(host: HangarHost): string {
     const good = (b > a) === BIGGER_IS_BETTER[k];
     return `<span style="color:${good ? '#4ade80' : '#f87171'}; font-size:11px; margin-left:6px">${b > a ? '▲' : '▼'}${Math.abs(pct) >= 1000 ? '' : ` ${Math.round(Math.abs(pct))}%`}</span>`;
   };
-  const row = (label: string, value: string, k?: keyof Omit<ShipSummary, 'power' | 'energy'>, tip = '') =>
-    `<div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid #18223a" title="${tip}"><span style="color:#8ea0bd">${label}</span><span><b style="color:#e5ecf7">${value}</b>${k ? delta(k) : ''}</span></div>`;
+  // (sd: the stat-delta preview's key, build/statDelta.ts: a chip fills in beside the value while a part is hovered)
+  const row = (label: string, value: string, k?: keyof Omit<ShipSummary, 'power' | 'energy'>, tip = '', sd?: string) =>
+    `<div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid #18223a" title="${tip}"><span style="color:#8ea0bd">${label}</span><span><b style="color:#e5ecf7">${value}</b>${k ? delta(k) : ''}${sd ? `<span data-sd="${sd}"></span>` : ''}</span></div>`;
   const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
   let html = `<div style="color:#ffb547; font-weight:bold; margin-bottom:6px; letter-spacing:1px">SHIP${was ? ' <span style="color:#8ea0bd; font-weight:400; letter-spacing:0">vs saved</span>' : ''}</div>`;
   html += `<div style="display:flex; justify-content:space-between; align-items:baseline; padding:2px 0 6px; border-bottom:1px solid #18223a" title="Firepower and toughness together: how strong the ship is. Systems and siege moons show what their hostiles rate">`
@@ -265,14 +267,14 @@ export function summaryHtml(host: HangarHost): string {
   if (budget !== undefined) {
     const over = cost > budget && !host.free;
     html += `<div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid #18223a" title="What the ship costs against your budget: every cell 1 point at Mk I, 1.6 at Mk II, 2.5 at Mk III, 3.8 at Mk IV, 5.5 at Mk V. More budget as you level; a ship built from a plan builds as designed">`
-      + `<span style="color:#8ea0bd">Build points</span><span><b style="color:${over ? '#f87171' : '#e5ecf7'}">${cost} / ${budget}</b>${over ? ' <span style="color:#f87171; font-size:11px">over budget</span>' : ''}</span></div>`;
+      + `<span style="color:#8ea0bd">Build points</span><span><b style="color:${over ? '#f87171' : '#e5ecf7'}">${cost} / ${budget}</b><span data-sd="points"></span><span data-sd="cost"></span>${over ? ' <span style="color:#f87171; font-size:11px">over budget</span>' : ''}</span></div>`;
   }
-  html += row('Top speed', `${n0(now.topSpeed)} m/s`, 'topSpeed', 'Flat out, without boost');
-  html += row('Acceleration', `${n0(now.accel)} m/s²`, 'accel', 'Main engines; more thrusters or less mass is faster');
-  html += row('Turn 180°', Number.isFinite(now.turn180) ? `${now.turn180.toFixed(1)} s` : 'can\'t turn', 'turn180', 'Thrusters and gyros against the ship\'s inertia');
-  html += row('Firepower', `${n0(now.dps)} dmg/s`, 'dps', `${now.guns} gun${now.guns === 1 ? '' : 's'}${now.turrets ? `, ${now.turrets} on turrets` : ''}`);
-  html += row('Hull', `${n0(now.hull)} hp`, 'hull', 'Every part\'s hit points together');
-  if (now.shield > 0 || (was && was.shield > 0)) html += row('Shield', `${n0(now.shield)}`, 'shield');
+  html += row('Top speed', `${n0(now.topSpeed)} m/s`, 'topSpeed', 'Flat out, without boost', 'topSpeed');
+  html += row('Acceleration', `${n0(now.accel)} m/s²`, 'accel', 'Main engines; more thrusters or less mass is faster', 'accel');
+  html += row('Turn 180°', Number.isFinite(now.turn180) ? `${now.turn180.toFixed(1)} s` : 'can\'t turn', 'turn180', 'Thrusters and gyros against the ship\'s inertia', 'turn180');
+  html += row('Firepower', `${n0(now.dps)} dmg/s`, 'dps', `${now.guns} gun${now.guns === 1 ? '' : 's'}${now.turrets ? `, ${now.turrets} on turrets` : ''}`, 'dps');
+  html += row('Hull', `${n0(now.hull)} hp`, 'hull', 'Every part\'s hit points together', 'hull');
+  if (now.shield > 0 || (was && was.shield > 0) || host.deltaNow?.lines.some((l) => l.key === 'shield')) html += row('Shield', `${n0(now.shield)}`, 'shield', '', 'shield');
   html += row('Cargo', `${n0(now.cargo)}`, 'cargo');
   // Cargo has mass (common/src/ships/load.ts): what the hold costs in thrust and turning, now and full of ore
   {
@@ -308,7 +310,7 @@ export function summaryHtml(host: HangarHost): string {
     `Press ${boundKeyName('tow', settings.data.bindings)} to take hold of the wreck, debris or pod nearest your cursor; again to let go. What you tow slows you by its mass. `
     + "Tow it into a station's reach to salvage it into your storage. It draws power only while towing");
   for (const f of designFields(catalog, tuning, host.bp)) html += row(f.label, f.text);
-  html += row('Mass', `${n0(now.mass)}`, 'mass');
+  html += row('Mass', `${n0(now.mass)}`, 'mass', '', 'mass');
   html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices`);
   html += energyHtml(now.energy, host.derived, host.deps.tuning);
   return html + '<div style="margin-bottom:12px"></div>';
@@ -365,6 +367,7 @@ export function renderStats(host: HangarHost): void {
     html += `<div style="color:#c4b5fd; margin-top:6px;">• ${k} part${k > 1 ? 's' : ''} not connected: ${k > 1 ? "they'll" : "it'll"} build once joined</div>`;
   }
   host.stats.innerHTML = html;
+  applyChips(host.stats, host.deltaNow);
   host.bindBuildButtons();
 }
 

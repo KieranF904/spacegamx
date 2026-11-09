@@ -14,7 +14,8 @@
  *
  * Clicks build only on and just around the ship; anywhere else they still fire and mine, and no flight key is touched,
  * so the ship is never held back. A save sends `fieldPlan` with the new blueprint (free; only building costs), "As it
- * stands" sends `fieldPlanClear`. The edits are plan.ts, laid over the live ship each frame.
+ * stands" sends `fieldPlanClear`. Hovering a cell the part in hand fits, or a part of the design, shows a card at the cursor with what
+ * placing / taking it out changes (mass, acceleration, power, shield, firepower, cost: build/statDelta.ts). The edits are plan.ts, laid over the live ship each frame.
  */
 import { DragPaint } from '../build/dragPaint';
 import { bindBuildKeys } from '../build/buildKeys';
@@ -35,6 +36,7 @@ import {
   targetErrors, unjoinedText, unjoinedUids, working, type BuildEdits, type LiveDesign, type WorkingDesign,
 } from './plan';
 import { TURN_KEYS, escapeStep, partUnder, tryTurn } from '../build/editPlaced';
+import { makeFieldDelta, syncFieldDelta } from './fieldDelta';
 
 const SIDE_CYCLE: readonly (Side | 'auto')[] = ['auto', 'N', 'E', 'S', 'W'];
 /** How far round the ship (cells) a click still builds */
@@ -85,6 +87,12 @@ export class FieldOverlay {
   private noteBad = false;
   private cache: { key: unknown[]; w: WorkingDesign; geoms: PlacedGeom[]; unjoined: Set<number> } | null = null;
 
+  /** What placing the hand's part / taking the part under the cursor out would change (card at the cursor: fieldDelta.ts) */
+  private delta = makeFieldDelta(() => this.deps);
+  private overShip = false;
+  private deltaW: WorkingDesign | null = null;
+  private deltaRev = 0;
+
   /** Undo / redo and symmetry (fieldAids.ts) */
   readonly aids: FieldAids;
   private unbindKeys: (() => void) | null = null;
@@ -99,6 +107,16 @@ export class FieldOverlay {
       view: () => this.view(),
       problemFor: (p) => this.problemFor(p),
     });
+  }
+
+  /** Keep the stat-delta card on what the cursor means (cheap: derives only when the cell, hand or design changes) */
+  private syncDelta(): void {
+    const v = this.isOpen && this.overShip && this.mouse ? this.view() : null;
+    const at = v && this.mouse ? this.gridAt(this.mouse.x, this.mouse.y) : null;
+    if (!v || !at || !this.near(at)) return syncFieldDelta(this.delta, null);
+    if (this.deltaW !== v.w) { this.deltaW = v.w; this.deltaRev++; }
+    const pv = this.preview(at);
+    syncFieldDelta(this.delta, { catalog: this.deps.catalog, w: v.w, rev: String(this.deltaRev), at, client: this.mouse, hand: pv });
   }
 
   // ---------------------------------------------------------------- open and close
@@ -139,6 +157,7 @@ export class FieldOverlay {
     this.unbindKeys?.();
     this.unbindKeys = null;
     this.aids.reset();
+    this.delta.clear();
     if (this.root) this.root.style.display = 'none';
     const was = this.was;
     this.was = null;
@@ -266,7 +285,10 @@ export class FieldOverlay {
 
   private onMove = (e: MouseEvent): void => {
     this.mouse = { x: e.clientX, y: e.clientY };
+    // (only over the game canvas: the parts list and the footer are no place to hover a part onto the ship)
+    this.overShip = (e.target as HTMLElement | null)?.tagName === 'CANVAS';
     this.dragTo(e);
+    this.syncDelta();
   };
 
   private onUp = (e: MouseEvent): void => {
@@ -530,6 +552,7 @@ export class FieldOverlay {
     const live = this.live();
     if (live && hasEdits(this.edits) && settle(live, this.edits)) { this.edited(); this.aids.reset(); }
     this.footer();
+    this.syncDelta();
     // (the parts list shows costs against the hold, which moves as you fly: look every few frames)
     if (this.pal && ++this.frames % 15 === 0 && this.pal.stale()) this.pal.render();
   }
@@ -627,6 +650,7 @@ export class FieldOverlay {
 
   dispose(): void {
     this.close();
+    this.delta.dispose();
     this.root?.remove();
     this.root = undefined;
     this.pal = null;
