@@ -327,9 +327,11 @@ export class Enemies {
   }
 
   /**
-   * A weapons-range target (dev only, WeaponsRange.ts): a real enemy ship that is held where it is, aims nowhere and fires
-   * nothing (pinned, no AI), takes damage as any ship does, and pays nothing when it dies (onDestroyed). Its own pack,
-   * never remembered with the system. `hp` scales its hull as a boss's (bosses.json) does, `core` hardens its core.
+   * A gun range target (game/gunRange): a real enemy ship with no AI, so it aims nowhere and fires nothing, and holds
+   * still (CTL.hold) unless steered back to its spot (steerTarget). Not pinned: it is a free body every client's contact
+   * pass and prediction take as they take any ship. It takes damage as any ship does, and pays nothing when it dies
+   * (onDestroyed: no XP, credits, loot, quests or achievements). Its own pack, never remembered with the system.
+   * `hp` scales its hull as a boss's (bosses.json) does, `core` hardens its core.
    */
   spawnTarget(systemNum: number, t: { ship: string; faction: string; grade?: number; plating?: number; elite?: boolean; hp?: number; core?: number }, x: number, y: number, angle: number): number {
     const pack: Pack = { id: this.nextPack++, systemNum, home: { x, y }, members: new Set(), lastSeen: this.host.tick() };
@@ -341,15 +343,13 @@ export class Enemies {
     this.ships.setController(eid, () => null);
     if (t.hp && t.hp !== 1) this.ships.scaleHp(eid, t.hp);
     if (t.core && t.core !== 1) this.ships.hardenParts(eid, 'core', t.core);
-    this.ships.pin(eid);
     return eid;
   }
 
-  /** Let a range target fly (or hold again): a slow sweep across its spot, else pinned where it stands */
-  setTargetMoving(eid: number, to: { x: number; y: number } | null): void {
+  /** Fly a gun range target to a spot (its autopilot: the clients replay its controls), or with none hold still where it is */
+  steerTarget(eid: number, to: { x: number; y: number; arriveRadius: number } | null): void {
     if (!this.enemies.get(eid)?.dummy) return;
-    if (to) { this.ships.pin(eid, false); this.ships.setAutopilot(eid, { x: to.x, y: to.y, arriveRadius: 60 }); }
-    else { this.ships.setAutopilot(eid, null); this.ships.pin(eid); }
+    this.ships.setAutopilot(eid, to ? { x: to.x, y: to.y, arriveRadius: to.arriveRadius } : null);
   }
 
   isTarget(eid: number): boolean {

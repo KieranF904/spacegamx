@@ -219,6 +219,8 @@ export function handlePing(ctx: ServerCtx, conn: ClientConnection, msg: any): vo
 export function handleInteract(ctx: ServerCtx, conn: ClientConnection, msg: any): void {
   const playerEid = conn.playerId;
   if (!hasComponent(ctx.world, Player, playerEid)) return;
+  // In the gun range X is only its door (game/gunRange)
+  if (ctx.gunRange?.interact(conn)) return;
   // Someone out here to talk to (People.ts)
   const person = hasComponent(ctx.world, Dead, playerEid) ? null : ctx.people.nearby(conn);
   if (person) return ctx.people.talkTo(conn, person.id);
@@ -302,6 +304,8 @@ export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: st
       tickRate: TICK_RATE,
       serverTime: Date.now(),
     });
+    // (Died in the gun range: back in the berth they left, in their own ship; after the welcome, so the client has the new ship)
+    ctx.gunRange?.respawned(conn);
   }
 }
 

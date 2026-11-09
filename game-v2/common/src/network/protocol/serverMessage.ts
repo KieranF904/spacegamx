@@ -13,12 +13,13 @@ import type { FieldServerMessage } from '../fieldProtocol.js';
 import type { MinesServerMessage } from '../minesProtocol.js';
 import type { ClampServerMessage } from '../clampProtocol.js';
 import type { TutorialServerMessage } from '../tutorialProtocol.js';
+import type { GunRangeServerMessage } from '../gunRangeProtocol.js';
 import type { CombatServerMessage } from '../combatProtocol.js';
 import type { UpdateServerMessage } from '../updateProtocol.js';
 import type { ServerOwnSyncMessage } from '../../sim/ownStep.js';
 import type { ServerGunSyncMessage } from '../../sim/otherGuns.js';
 import type { ServerPullsMessage } from '../../sim/pullFields.js';
-import type { ServerWelcomeMessage, ServerPongMessage, ServerSnapshotMessage, ServerPlayerStateMessage, ServerInventoryMessage, ServerBankMessage, ServerChatMessage, ServerRangeHeadMessage, ServerRangeRowMessage, ServerSystemMessage, ServerSystemInfoMessage, ServerDialogueMessage, ServerShopMessage, ServerDamageMessage, ServerDeathMessage, ServerLevelUpMessage, ServerLootMessage, ServerEffectMessage, ServerAuthResultMessage, ServerAdminStatsMessage, ServerAdminResultMessage, ServerAdminAccountsMessage, ServerAdminInfoMessage, ServerErrorMessage, ServerWarpMessage, ServerAsteroidSpawnMessage, ServerAsteroidSeedMessage, ServerAsteroidDebugMessage } from './serverCore.js';
+import type { ServerWelcomeMessage, ServerPongMessage, ServerSnapshotMessage, ServerPlayerStateMessage, ServerInventoryMessage, ServerBankMessage, ServerChatMessage,ServerSystemMessage, ServerSystemInfoMessage, ServerDialogueMessage, ServerShopMessage, ServerDamageMessage, ServerDeathMessage, ServerLevelUpMessage, ServerLootMessage, ServerEffectMessage, ServerAuthResultMessage, ServerAdminStatsMessage, ServerAdminResultMessage, ServerAdminAccountsMessage, ServerAdminInfoMessage, ServerErrorMessage, ServerWarpMessage, ServerAsteroidSpawnMessage, ServerAsteroidSeedMessage, ServerAsteroidDebugMessage } from './serverCore.js';
 import type { ServerMapDotsMessage, ServerPopsMessage } from './mapProtocol.js';
 import type { ServerStationFireMessage, ServerBossIntroMessage, ServerBossChargeMessage, ServerBossTelegraphMessage, ServerBossBeamMessage, ServerBossBlowMessage, ServerBossPhaseMessage, ServerWorldEventMessage, ServerWorldEventEndMessage, ServerObjectiveMessage, ServerSiegeStateMessage, ServerObjectiveEndMessage, ServerBossDefeatedMessage, ServerIgniteMessage, ServerInterceptMessage, ServerDetonationMessage, ServerPartDestroyedMessage, ServerContactMessage } from './worldProtocol.js';
 import type { ServerDockResultMessage, ServerHitsMessage, ServerHpCheckMessage, ServerHitFixMessage, ServerNetCapsMessage, ServerProjectileHitMessage, ServerShipSyncMessage, ServerShipHpMessage, ServerShipHpBatchMessage, ServerDebrisSplitMessage, ServerCellsMessage, ServerCrowdMessage, ServerShipEditResultMessage } from './shipProtocol.js';
@@ -32,8 +33,6 @@ export type ServerMessage =
   | ServerBankMessage
   | ServerChatMessage
   | ServerSystemMessage
-  | ServerRangeHeadMessage
-  | ServerRangeRowMessage
   | ServerDialogueMessage
   | ServerShopMessage
   | ServerDamageMessage
@@ -95,6 +94,7 @@ export type ServerMessage =
   | MinesServerMessage
   | ClampServerMessage
   | TutorialServerMessage
+  | GunRangeServerMessage
   | CombatServerMessage
   | UpdateServerMessage;
 

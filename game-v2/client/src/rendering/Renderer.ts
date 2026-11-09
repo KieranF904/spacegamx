@@ -39,7 +39,10 @@ import { WeaponFx, shotTimelines, type PredictedShell } from './weapons/WeaponFx
 import { MiningStrikeFx } from './weapons/MiningStrikeFx';
 import { LootPodView } from './LootPodView';
 import { TerrainView } from './TerrainView';
-import { terrainFor } from './terrainData';
+import { terrainFor, gunRangeFor } from './terrainData';
+import { ChamberView } from './gunRange/ChamberView';
+import { settings } from '../settings/Settings';
+import { boundKeyName } from '../input/keybindings';
 import { MobView } from './MobView';
 import { drawAsteroid, AsteroidSeams } from './AsteroidLook';
 import type { AsteroidRock } from './AsteroidLook';
@@ -82,6 +85,8 @@ export class Renderer {
   /** A surface's rock (TerrainView), and the system it's for */
   private terrainLayer = new Container();
   private terrainView: TerrainView | null = null;
+  /** A gun range's chamber (rendering/gunRange): indoors, so no sky */
+  private chamber: ChamberView | null = null;
   private terrainId: string | null = null;
   private effectContainer: Container;
   private uiContainer: Container;
@@ -561,10 +566,15 @@ export class Renderer {
       this.terrainId = this.currentSystemId;
       this.terrainView?.destroy();
       this.terrainView = null;
+      this.chamber?.destroy();
+      this.chamber = null;
       const t = terrainFor(this.currentSystemId);
       if (t) { this.terrainView = new TerrainView(t, this.lighting, surface?.kind === 'cavern'); this.terrainLayer.addChild(this.terrainView.container); }
+      const range = gunRangeFor(this.currentSystemId);
+      if (range) { this.chamber = new ChamberView(range, this.lighting, () => boundKeyName('interact', settings.data.bindings)); this.terrainLayer.addChildAt(this.chamber.container, 0); }
     }
     this.terrainView?.update(Math.min(0.1, delta));
+    this.chamber?.update();
     if (this.city?.bastion) { const vb = this.viewBox(); this.city.bastion.update(Math.min(0.1, delta), { night: this.surface.night, zoom: this.cameraZoom, angle: this.cameraAngle, entities: this.state.entities.ofType(EntityType.ShipBody), view: { x: this.cameraX, y: this.cameraY, hw: vb.hw, hh: vb.hh } }); }
     const lightKey = `${this.currentSystemId}|${this.systemVisuals.has(this.currentSystemId)}`;
     if (lightKey !== this.lightKey) {
@@ -604,7 +614,9 @@ export class Renderer {
       this.sun.update(animDelta, this.worldContainer.localTransform);
     }
     // The sky after it: nothing drawn behind its disc, none at all when the disc fills the screen
-    if (!surface) this.sky.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom, this.cameraAngle, this.sun.opaqueRadius);
+    // (Indoors, in a gun range's chamber: no sky at all)
+    if (this.chamber) this.sky.container.visible = false;
+    else if (!surface) this.sky.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom, this.cameraAngle, this.sun.opaqueRadius);
   }
 
   /** A system's star: its systems.json entry (its look there), else one made from what the server sent */

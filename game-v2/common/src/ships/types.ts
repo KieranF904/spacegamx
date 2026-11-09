@@ -447,6 +447,12 @@ export interface Blueprint {
   wires?: WireSeg[];
   /** 'ports': runs on the ports energy core (power/ports.ts): power crosses between parts only through their ports, no wires. Absent: the pool and banks (energy.ts) */
   power?: 'ports';
+  /**
+   * A gun range cheat ship (common/gunRange/cheatShip.ts, built by the server only: parseBlueprint drops it, so no client
+   * can claim it): its guns never want for power (guns.ts stepGuns) and it has no jump drive (rebuild.ts), on the server
+   * and in every client's prediction alike. Never written to a profile (server pilots/persist.ts capture skips it)
+   */
+  range?: true;
 }
 
 /** A wire segment: from cell (x0, y0) to the neighbouring cell (x1, y1) */

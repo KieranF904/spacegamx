@@ -2,8 +2,8 @@
  * @contract server.net.dispatch
  * owns:       client message dispatch: the drops and limits every message passes, and the one handler per message
  *             type
- * needs:      @space-game/common ClientMessage (type), ServerCtx and ClientConnection (type-only); nothing from
- *             GameServer at runtime
+ * needs:      @space-game/common ClientMessage (type), ServerCtx and ClientConnection (type-only), the gun range's
+ *             message gate (game/gunRange/messageGate.ts); nothing from GameServer at runtime
  * invariants: the handler table is exactly the pinned set of client types — server/src/net/dispatch.test.ts
  *             non-messages, pre-join and rate-limited messages are dropped; a second handler for a type is refused —
  *             server/src/net/dispatch.test.ts
@@ -24,6 +24,7 @@
 import type { ClientMessage } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
 import type { ServerCtx } from './ServerCtx.js';
+import { passesInRange } from '../game/gunRange/messageGate.js';
 
 /** Messages a connection may send before it has joined */
 export const PRE_JOIN = new Set(['join', 'ping', 'authLogin', 'authRegister']);
@@ -61,6 +62,8 @@ export function dispatch(table: HandlerTable, ctx: ServerCtx, conn: ClientConnec
   // (Anything that isn't a typed message object is dropped: a hostile client can send any JSON)
   if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') return;
   if (!conn.joined && !PRE_JOIN.has(msg.type)) return;
+  // (In the gun range only flying, talking and the range's own messages pass: game/gunRange/messageGate.ts)
+  if (ctx.gunRange?.isVisitor(conn) && !passesInRange(msg.type)) return;
   if (!conn.isAdmin && !ctx.limiter.allow(conn, msg.type)) {
     if (msg.type === 'chat') ctx.send(conn.ws, { type: 'systemMessage', text: 'Slow down: too many messages at once.', color: '#fca5a5' });
     return;

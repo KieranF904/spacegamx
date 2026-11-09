@@ -14,6 +14,7 @@ import type { WeaponGroupsClientMessage } from '../weaponGroupsProtocol.js';
 import type { MinesClientMessage } from '../minesProtocol.js';
 import type { ClampClientMessage } from '../clampProtocol.js';
 import type { TutorialClientMessage } from '../tutorialProtocol.js';
+import type { GunRangeClientMessage } from '../gunRangeProtocol.js';
 import type { HitReport } from '../hits.js';
 import type { OwnCheck } from '../ownTick.js';
 import type { Blueprint } from '../../ships/types.js';
@@ -215,7 +216,6 @@ export type ClientMessage =
   | ClientDevSpawnMessage
   | ClientDevShipMessage
   | ClientDevBossMessage
-  | ClientDevRangeMessage
   | ClientAdminMessage
   | ClientSiegeMessage
   | EconClientMessage
@@ -226,7 +226,8 @@ export type ClientMessage =
   | WeaponGroupsClientMessage
   | MinesClientMessage
   | ClampClientMessage
-  | TutorialClientMessage;
+  | TutorialClientMessage
+  | GunRangeClientMessage;
 
 /**
  * Dev tool (map click): jump to a system, optionally to a spot in it. Only
@@ -267,17 +268,6 @@ export interface ClientDevBossMessage {
   reset?: boolean;
   /** Its first this many shedding steps done at once (a boss that sheds: its stages, to look at) */
   shed?: number;
-}
-
-/**
- * Dev tool, the weapons range (WeaponsRange.ts; dev servers only, refused anywhere else): `go` to the range, `arm` the
- * test rig with one or two weapon models (`guns`), `ideal` ammo on or off, `moving` targets on or off, `reset` the dummies.
- */
-export interface ClientDevRangeMessage {
-  type: 'devRange';
-  action: 'go' | 'arm' | 'ideal' | 'moving' | 'reset';
-  guns?: string[];
-  on?: boolean;
 }
 
 /**

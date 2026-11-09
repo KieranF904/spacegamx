@@ -156,69 +156,6 @@ export interface ServerChatMessage {
   timestamp: number;
 }
 
-/** One range dummy's readout (ServerRangeStateMessage) */
-export interface RangeDummyState {
-  id: string;
-  name: string;
-  /** Distance from the firing line, units */
-  dist: number;
-  dead: boolean;
-  /** Hull (core) and shield, 0..1 */
-  hull: number;
-  shield: number;
-  /** Damage taken in the last 5 s, and per second over them */
-  dmg5: number;
-  dps: number;
-  /** Seconds of the current fight (first hit until now or its death), and the last kill's: first hit to death */
-  fight: number;
-  ttk: number | null;
-  /** Everything taken since its first hit */
-  total: number;
-}
-
-/**
- * The weapons range's readout as the client's panel sees it (client devRangeFeed.ts puts it together from rangeHead
- * and rangeRow; never sent whole)
- */
-export interface ServerRangeStateMessage {
-  type: 'rangeState';
-  moving: boolean;
-  ideal: boolean;
-  /** Each gun you carry: its model's name, its kind, and the crate "ideal ammo" gives it (or the one it is firing) */
-  guns: { name: string; kind: string; crate?: string }[];
-  dummies: RangeDummyState[];
-}
-
-/**
- * Dev tool, the weapons range (WeaponsRange.ts): what changes rarely, sent when a pilot arrives and when any of it
- * changes: the switches, your guns, and each dummy's label (its rangeRow index is its place here)
- */
-export interface ServerRangeHeadMessage {
-  type: 'rangeHead';
-  moving: boolean;
-  ideal: boolean;
-  guns: { name: string; kind: string; crate?: string }[];
-  dummies: { id: string; name: string; dist: number }[];
-}
-
-/**
- * Dev tool, the weapons range: one dummy's numbers, sent (a compact row) only when they change. On the wire `dead` is
- * 0/1, hull and shield are whole percent, fight and ttk tenths of a second (COMPACT_HOOKS); ttk absent is "none"
- */
-export interface ServerRangeRowMessage {
-  type: 'rangeRow';
-  /** The dummy's index in rangeHead.dummies */
-  i: number;
-  dead: boolean;
-  hull: number;
-  shield: number;
-  dmg5: number;
-  dps: number;
-  fight: number;
-  total: number;
-  ttk?: number;
-}
-
 export interface ServerSystemMessage {
   type: 'systemMessage';
   text: string;

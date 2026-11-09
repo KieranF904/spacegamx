@@ -33,8 +33,8 @@ import { setTutorialState, tutorialEdge } from '../ui/tutorial/tutorialStore';
 import { showServerUpdate } from '../ui/updateBanner';
 import { showHitTick } from '../ui/HitTick';
 import { setCombatLock } from '../ui/CombatLockUI';
-import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
+import { onGunRangeState } from '../ui/gunRange/rangeMessages';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
 import ribbonData from '../../../data/achievements.json';
@@ -323,6 +323,8 @@ const TABLE: Handlers = {
   },
   rebuild: (h, msg) => { h.pilot.setRebuild(msg); },
   station: (h, msg) => { h.stationWindow.use((w) => w.setStation(msg)); },
+  // The gun range: in or out, the weapon flown and the ones on offer (ui/gunRange/rangeMessages.ts)
+  gunRangeState: (h, msg) => { onGunRangeState(h, msg); },
   vendors: (h, msg) => { h.stationWindow.use((w) => w.setVendors(msg)); },
   marketScan: (h, msg) => { h.stationWindow.use((w) => w.setScan(msg)); },
   quests: (h, msg) => {
@@ -455,8 +457,6 @@ const TABLE: Handlers = {
   effect: (h, msg) => { h.renderer.showEffect(msg.effectType, msg.x, msg.y, msg.data, msg.targetX, msg.targetY, msg.entityId); },
   systemMessage: (h, msg) => { h.showSystemMessage(msg.text, msg.color); },
   // (dev weapons range readout: nobody listens outside a dev build)
-  rangeHead: (_h, msg) => { rangeHead(msg); },
-  rangeRow: (_h, msg) => { rangeRow(msg); },
   chat: (h, msg) => {
     h.addChatMessage(msg.playerName, msg.text);
     // (Public chat only: party lines come as playerId 0, not a ship)

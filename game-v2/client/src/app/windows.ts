@@ -63,6 +63,8 @@ import type { PilotState } from '../econ/clientEcon';
 import type { ClientTransport } from '@space-game/common';
 import type { ProtoHooks } from '../Game';
 import { makeComponentGuide, makeStationWindow } from './lazyScreens';
+import { GunRangeHud } from '../ui/gunRange/GunRangeHud';
+import { chamberOf, inGunRange } from '../ui/gunRange/rangeState';
 
 /** What the windows read from the game (Game supplies it as getters, so later-built state resolves at use) */
 export interface WindowHost {
@@ -142,6 +144,8 @@ export interface WindowSet {
   navMarkers: NavMarkersUI | null;
   /** Structures you've built or are building (drawn for you alone) */
   buildSites: BuildSites | null;
+  /** The gun range's banner, target bar, door prompt and weapon picker (ui/gunRange) */
+  gunRangeHud: GunRangeHud;
 }
 
 export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSet {
@@ -155,13 +159,16 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     // (The load is weighed against the ship you fly: common/src/ships/load.ts)
     w.cargoPanel.ship = () => host.shipClient.myShip()?.derived ?? null;
     host.shipClient.ownAmmo = (kind) => {
+      // (The gun range: every gun fires its kind's standard crate, as the server's Ammo.setFree does)
+      if (inGunRange()) { const std = cratesFor(shipTuning as ShipTuning, kind)[0]; return std ? ammoByCode(ammoCode(std))?.mods : undefined; }
       const prof = host.pilot.profile;
       const pick = chooseCrate(crateOrder(cratesFor(shipTuning as ShipTuning, kind), prof?.loadout), prof?.ammoPrefer?.[kind], prof?.ammo ?? {}, (id) => host.pilot.cargo.some((s) => s.id === id && s.n > 0));
       return pick ? ammoByCode(ammoCode(pick.item))?.mods : undefined;
     };
     w.pilotHud.ammoKinds = () => {
       const ship = host.shipClient?.myShip();
-      if (!ship) return [];
+      // (The gun range's ammunition is unlimited: nothing to count)
+      if (!ship || inGunRange()) return [];
       const out = new Set<string>();
       for (const w of ship.derived.weapons) { const a = (shipTuning as ShipTuning).weapons?.[w.kind]?.ammo; if (a) out.add(a.item); }
       // Special crates aboard for these guns too
@@ -392,6 +399,27 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       return { name: r.name, hint: r.hint };
     };
     w.systemMapUI.pings = () => w.pingUI.markers();
+    w.gunRangeHud = new GunRangeHud({
+      send: (m) => host.network.send(m),
+      sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
+      catalog: host.pilot.econ.ships,
+      econ: host.pilot.econ,
+      tuning: shipTuning as ShipTuning,
+      chamber: () => chamberOf(host.state.systemId),
+      me: () => { const e = host.state.entities.get(host.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
+      hull: (id) => {
+        const ship = host.shipClient.store.get(id);
+        if (!ship) return null;
+        let hp = 0, max = 0;
+        for (let i = 0; i < ship.hp.length; i++) { max += ship.maxHp[i]; if (ship.derived.alive[i]) hp += ship.hp[i]; }
+        return { hp, max, name: host.state.entities.get(id)?.name || ship.blueprint.name || 'Target' };
+      },
+      keyName: (a) => boundKeyName(a, settings.data.bindings),
+      column: () => {
+        const c = w.cargoPanel.column();
+        return { left: c.left, width: c.width, top: Math.max(w.pilotHud.bottom(), w.social.hudBottom()) + 8, lift: w.pilotHud.top(), floor: c.floor };
+      },
+    });
     w.systemMapUI.onPing = (x, y) => w.pingUI.pingAt(x, y);
 
   return w;

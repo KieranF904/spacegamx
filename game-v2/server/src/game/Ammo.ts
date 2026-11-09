@@ -27,9 +27,8 @@ export class Ammo {
   /** Every crate each weapon kind takes, the standard one first */
   private crates = new Map<string, string[]>();
 
-  /** Dev only (WeaponsRange): pilots whose ammunition guns fire the ideal crate without limit, spending nothing */
-  private ideal = new Set<PilotConn>();
-  private idealPicks = new Map<string, string | null>();
+  /** The gun range (game/gunRange): pilots whose guns fire their standard crate without limit, nothing opened or spent */
+  private free = new Set<PilotConn>();
 
   /** Resend the hangar (a slot's loadout changed) */
   hangar?: (conn: PilotConn) => void;
@@ -59,13 +58,11 @@ export class Ammo {
     const crates = this.crates.get(kind);
     const p = crates && this.pilots.get(conn);
     if (!crates || !p) return { scale: 1, dry: false };
-    // Ideal ammunition (dev tool): the best crate for this gun, unlimited, nothing opened or spent, never dry
-    if (this.ideal.size && this.ideal.has(conn)) {
-      const item = this.idealCrate(kind);
-      if (item) {
-        if (this.dry.delete(conn)) this.pilots.sendProfile(conn);
-        return { scale: 1, dry: false, mods: this.crate(item, kind).mods, item };
-      }
+    // The gun range: the gun's own standard crate, unlimited, nothing opened or spent, never dry
+    if (this.free.size && this.free.has(conn)) {
+      const item = crates[0];
+      if (this.dry.delete(conn)) this.pilots.sendProfile(conn);
+      return { scale: 1, dry: false, mods: this.crate(item, kind).mods, item };
     }
     const ammo = p.ammo ?? { open: {}, load: {} };
     // The loadout's crates open before any others; its first pick before those
@@ -95,32 +92,20 @@ export class Ammo {
   }
 
   /**
-   * Dev tool: switch "ideal ammo" on or off for a pilot. While on, every gun that takes crates fires
-   * `idealCrate(kind)` without limit: no crate opened, nothing leaves the hold. The caller gates it on the dev flag.
+   * The gun range: while on, every gun that takes crates fires its standard crate (the kind's first: cratesFor) without
+   * limit: no crate opened, nothing leaves the hold, never dry. The gun range alone switches it (game/gunRange).
    */
-  setIdeal(conn: PilotConn, on: boolean): void {
-    if (on) this.ideal.add(conn); else this.ideal.delete(conn);
+  setFree(conn: PilotConn, on: boolean): void {
+    if (on) this.free.add(conn); else this.free.delete(conn);
   }
 
-  isIdeal(conn: PilotConn): boolean {
-    return this.ideal.has(conn);
+  isFree(conn: PilotConn): boolean {
+    return this.free.has(conn);
   }
 
-  /**
-   * The crate "ideal ammo" fires for a gun kind: the one that does the most damage per round (its direct damage
-   * multiplier, 1 + mods.mul.damage; the splash, burn or frost a crate adds does not count), the standard crate on a tie.
-   * Undefined when the kind takes no crates.
-   */
-  idealCrate(kind: string): string | undefined {
-    if (this.idealPicks.has(kind)) return this.idealPicks.get(kind) ?? undefined;
-    const list = this.crates.get(kind) ?? [];
-    let best: string | undefined, score = -Infinity;
-    for (const c of list) {
-      const k = 1 + (this.crate(c, kind).mods?.mul?.damage ?? 0);
-      if (k > score + 1e-9) { best = c; score = k; }
-    }
-    this.idealPicks.set(kind, best ?? null);
-    return best;
+  /** The crate a gun of this kind fires in the gun range (undefined: it takes none) */
+  freeCrate(kind: string): string | undefined {
+    return this.crates.get(kind)?.[0];
   }
 
   /** Open this kind of crate first (for the gun it's for), on the ship you fly */
@@ -244,6 +229,6 @@ export class Ammo {
 
   forget(conn: PilotConn): void {
     this.dry.delete(conn);
-    this.ideal.delete(conn);
+    this.free.delete(conn);
   }
 }

@@ -19,7 +19,7 @@ import type { ShipBridge } from './ships/ShipBridge.js';
 import { Economy, StarterKit, starterKit, hazardFlight, type ShipDerived } from '@space-game/common';
 import { Pilots } from './game/Pilots.js';
 import { Ammo } from './game/Ammo.js';
-import { WeaponsRange } from './game/WeaponsRange.js';
+import type { GunRange } from './game/gunRange/GunRange.js';
 import { Hazards } from './game/Hazards.js';
 import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
@@ -96,6 +96,7 @@ import { createSurfaceHost, createSiegeHost, createPodHost, createMemoryHost, de
 import { createBossHost, moveFx, moveShot } from './gameServer/hosts/boss.js';
 import { createMiningHost, mineBeam, isGas, beamAsteroid } from './gameServer/hosts/mining.js';
 import { setupTutorial, installTutorialAdmin } from './gameServer/hosts/tutorial.js';
+import { setupGunRange } from './gameServer/hosts/gunRange.js';
 import { createShipHost } from './gameServer/hosts/ship.js';
 import { createAdminHost, setupAdminHandlers } from './gameServer/admin.js';
 import { initializeWorld } from './gameServer/world.js';
@@ -103,7 +104,7 @@ import { asteroidSpawnData, placeAsteroid } from './gameServer/asteroids.js';
 import { shotWall, hurtAsteroid } from './gameServer/combat.js';
 import { getTrafficShips, stationEntity } from './gameServer/traffic.js';
 import { connect, createPlayer, placePlayer, loginPilot, forgetAccounts, saveAll } from './gameServer/session.js';
-import { buildMessageHandlers, handleMessage, createRange, handleInput, applyInputToEntity } from './gameServer/messages.js';
+import { buildMessageHandlers, handleMessage, handleInput, applyInputToEntity } from './gameServer/messages.js';
 import { canHeal, canDamage, sideOf, inPvpZone, hunted } from './gameServer/rules.js';
 import { fault, faultCounts } from './gameServer/faults.js';
 import { threats, regionThreats } from './gameServer/threats.js';
@@ -239,8 +240,8 @@ export class GameServer implements ServerCtx {
   readonly mining: Mining;
   services: StationServices;
   ammo!: Ammo;
-  /** The dev weapons range (game/WeaponsRange.ts): null unless this is a dev server */
-  range: WeaponsRange | null = null;
+  /** The gun range (game/gunRange): any station's pilots try any weapon they can fit, in a cheat ship, nothing kept */
+  gunRange!: GunRange;
   hazards!: Hazards;
   warmth!: Warmth;
   outpost?: Outpost;
@@ -457,7 +458,7 @@ export class GameServer implements ServerCtx {
     this.trade = new Trade(tradeDeps(this), this.pilots);
     this.ops = new Operations(createOpsHost(this), this.quests, () => [...this.clients.values()].filter((c) => this.flying(c.playerId) || hasComponent(this.world, Player, c.playerId)), this.gameData.rulesFile.operations, this.gameData.stringsFile);
 this.devTeleport = opts.devTeleport ?? false;
-    if (opts.devRange && this.devTeleport && process.env.NODE_ENV !== 'production') this.range = createRange(this, opts.devRange);
+    this.gunRange = setupGunRange(this);
     
     // Crowd fallbacks (net/crowd/CrowdControl.ts), where the server runs them
     this.crowd = opts.crowd ? new CrowdControl(crowdDeps(this)) : null;

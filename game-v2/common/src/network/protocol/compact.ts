@@ -64,7 +64,8 @@ export const COMPACT: [string, string[]][] = [
   ['hpCheck', ['id', 'sum']],
   // (Appended, protocol 28: client-detected hits, hits.ts SELF_HITS)
   ['hitFix', ['s', 't', 'c', 'e', 'h']],
-  // (Appended, protocol 30: the dev weapons range's readout, a row per changed dummy)
+  // (Appended, protocol 30: the dev weapons range's readout. Retired with the range (the gun range replaced it), never
+  // sent; its slot is kept so the codes after it don't move)
   ['rangeRow', ['i', 'dead', 'hull', 'shield', 'dmg5', 'dps', 'fight', 'total', 'ttk']],
   // (Appended, protocol 38: the focus grid's drops, offers and logs, cells.ts)
   ['cells', ['tick', 'b', 'k']],
@@ -89,17 +90,6 @@ const COMPACT_HOOKS: Record<string, { pack(m: Fields): Fields; unpack(m: Fields)
   detonation: {
     pack: (m) => ({ ...m, kind: fxKindCode(m.kind as string) }),
     unpack: (m) => ({ ...m, kind: fxKindName(m.kind as number | string) }),
-  },
-  // Fractions as whole percent, seconds as tenths, the flag as 0/1 (all small whole numbers: a byte each)
-  rangeRow: {
-    pack: (m) => ({
-      ...m, dead: m.dead ? 1 : 0, hull: Math.round((m.hull as number) * 100), shield: Math.round((m.shield as number) * 100),
-      fight: Math.round((m.fight as number) * 10), ttk: m.ttk === undefined ? undefined : Math.round((m.ttk as number) * 10),
-    }),
-    unpack: (m) => ({
-      ...m, dead: m.dead === 1 || m.dead === true, hull: (m.hull as number) / 100, shield: (m.shield as number) / 100,
-      fight: (m.fight as number) / 10, ttk: m.ttk === undefined ? undefined : (m.ttk as number) / 10,
-    }),
   },
   // A flag goes as 0/1
   intercept: {

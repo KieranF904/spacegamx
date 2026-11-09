@@ -216,7 +216,7 @@ export function buildTickSystems(gs: GameServer): readonly TickSystem[] {
     // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
     { name: 'weaponSystem', pass: true, phase: 'combat', run: () => weaponSystem(gs) },
     { name: 'projectileSystem', pass: true, phase: 'combat', run: () => projectileSystem(gs) },
-    { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { gs.enemies.tick(); gs.range?.tick(); gs.recovery.tick(); } },
+    { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { gs.enemies.tick(); gs.recovery.tick(); } },
     { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => { gs.bosses.tick(); gs.bossDev.tick(); gs.dens.tick(); } },
     { name: 'mobs', pass: true, phase: 'combat', scene: 'sectors', run: () => gs.mobs.tick() },
     { name: 'events', phase: 'combat', scene: 'sectors', run: () => gs.events.tick() },
@@ -238,6 +238,8 @@ export function buildTickSystems(gs: GameServer): readonly TickSystem[] {
     { name: 'homes', phase: 'world', run: () => gs.homes.tick() },
     // (The training yard: markers, jumps and the boundary. Only on a server that runs one)
     { name: 'tutorial', phase: 'world', when: () => !!gs.tutorial, run: () => gs.tutorial!.tick() },
+    // (The gun range: its target and its visitors. Only while anyone is in it, or its target still stands)
+    { name: 'gunRange', phase: 'world', when: () => gs.gunRange.busy(), run: () => gs.gunRange.tick() },
     { name: 'watchComet', phase: 'world', run: () => watchComet(gs) },
     // (per-client entries guard each client themselves)
     { name: 'outpost', phase: 'world', every: 60, when: () => !!gs.outpost, perClient: true, run: () => {

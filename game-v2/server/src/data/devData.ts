@@ -1,17 +1,15 @@
 /**
- * Dev-only data (temporary): the systems in data/dev/*.json (rockery.json, a tiny system packed with every rock type;
- * range.json, the weapons range), merged into the game data only when the server runs in development (index.ts). The
- * client merges the rockery's rock field in its dev build (Game.ts), so both place the same rocks. A file's `system` is
- * added to the systems; its optional `field` (and `outliers`) to the mining table; its `range` block is the weapons
- * range's setup (loadRangeConfig).
+ * Dev-only data (temporary): the systems in data/dev/*.json (rockery.json, a tiny system packed with every rock type),
+ * merged into the game data only when the server runs in development (index.ts). The client merges the rockery's rock
+ * field in its dev build (Game.ts), so both place the same rocks. A file's `system` is added to the systems; its
+ * optional `field` (and `outliers`) to the mining table. (The old dev weapons range is now the gun range: game/gunRange.)
  */
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import type { GameDataFiles } from './GameData.js';
-import type { RangeConfig } from '../game/WeaponsRange.js';
 
-interface DevFile { system?: { id: string }; field?: Record<string, number>; outliers?: number; range?: Omit<RangeConfig, 'system'> }
+interface DevFile { system?: { id: string }; field?: Record<string, number>; outliers?: number }
 
 function devFiles(dataPath: string): DevFile[] {
   const dir = join(dataPath, 'dev');
@@ -31,12 +29,6 @@ export function withDevData(files: GameDataFiles, dataPath: string): GameDataFil
     console.log(`Dev data: added ${id}`);
   }
   return out;
-}
-
-/** The weapons range's setup (data/dev/range.json), or none */
-export function loadRangeConfig(dataPath: string): RangeConfig | undefined {
-  const d = devFiles(dataPath).find((f) => f.range && f.system);
-  return d ? { system: d.system!.id, ...d.range! } : undefined;
 }
 
 /** Dev-only: the designs every guest finds in their hangar (data/ships/blueprints/dev/guest-*.json) */

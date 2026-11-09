@@ -14,7 +14,7 @@ export function setHtml(el: Element | null | undefined, html: string): void {
   }
 }
 
-type Prop = 'width' | 'height' | 'background' | 'opacity' | 'display' | 'transform' | 'color' | 'flexDirection';
+type Prop = 'width' | 'height' | 'background' | 'opacity' | 'display' | 'transform' | 'color' | 'flexDirection' | 'left' | 'top' | 'maxHeight';
 /** The last value written per element and property (reading styles back gives them normalised, so they'd never match) */
 const written = new WeakMap<HTMLElement, Partial<Record<Prop, string>>>();
 

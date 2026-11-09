@@ -614,7 +614,7 @@
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",
-      "lines": 1211,
+      "lines": 1223,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
       "needs": "GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
@@ -636,20 +636,20 @@
         {
           "name": "FADE",
           "kind": "const",
-          "start": 69,
-          "end": 70
+          "start": 72,
+          "end": 73
         },
         {
           "name": "PAN_MARGIN",
           "kind": "const",
-          "start": 71,
-          "end": 72
+          "start": 74,
+          "end": 75
         },
         {
           "name": "Renderer",
           "kind": "class",
-          "start": 74,
-          "end": 1211
+          "start": 77,
+          "end": 1223
         }
       ]
     },
@@ -690,6 +690,75 @@
           "kind": "function",
           "start": 17,
           "end": 36
+        }
+      ]
+    },
+    {
+      "id": "client.rendering.gun-range-chamber",
+      "path": "client/src/rendering/gunRange/ChamberView.ts",
+      "group": "client/rendering/gunRange",
+      "lines": 216,
+      "owns": "how the gun range's chamber looks (systems.json `gunRange`, common gunRange/layout.ts): the station's dark beyond, the floor as a grid of panels with the firing lane and its distance marks, the rectangular wall all round (its face, ribs and lamps), the exit door in it with its EXIT sign and the zone X works in, the target's rings, light pools from the ceiling, and the lamps as lights on the ships",
+      "needs": "pixi.js, common gunRange layout (chamberBox, chamberWalls, rangeDoor), lighting/Lighting, fxTextures (softDot)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the wall is drawn on the same pieces the shared terrain collides with (chamberWalls), and the door zone with the server's reach",
+          "test": "client/src/rendering/terrainData.test.ts"
+        }
+      ],
+      "extend": "a new thing in the chamber is a draw step in the constructor (static: drawn once, never redrawn)",
+      "exports": [
+        "ChamberView"
+      ],
+      "sections": [
+        {
+          "name": "PANEL",
+          "kind": "const",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "COL",
+          "kind": "const",
+          "start": 23,
+          "end": 27
+        },
+        {
+          "name": "hash",
+          "kind": "const",
+          "start": 29,
+          "end": 29
+        },
+        {
+          "name": "SIGN",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "SIGN_SMALL",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "MARK",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "TARGET",
+          "kind": "const",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "ChamberView",
+          "kind": "class",
+          "start": 36,
+          "end": 216
         }
       ]
     },
@@ -1738,7 +1807,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 764,
+      "lines": 767,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -1765,14 +1834,14 @@
         {
           "name": "ShipClientOptions",
           "kind": "interface",
-          "start": 82,
-          "end": 118
+          "start": 83,
+          "end": 119
         },
         {
           "name": "ShipClient",
           "kind": "class",
-          "start": 120,
-          "end": 764
+          "start": 121,
+          "end": 767
         }
       ]
     },
@@ -3976,7 +4045,7 @@
       "id": "client.ship.dock",
       "path": "client/src/ships/dock/DockControl.ts",
       "group": "client/ships/dock",
-      "lines": 173,
+      "lines": 183,
       "owns": "docking at a station: the dock request/answer, the berth, undocking, the dock and planet and repair hints",
       "needs": "DockHost (state, tuning, store, send, showMessage, sound, hangarOpen, openHangar, refreshShip, stationOpen, onDocked); npm: @space-game/common",
       "events": "",
@@ -4006,7 +4075,7 @@
           "name": "DockControl",
           "kind": "class",
           "start": 36,
-          "end": 173
+          "end": 183
         }
       ]
     },
@@ -5695,7 +5764,7 @@
       "id": "client.ship.readouts",
       "path": "client/src/ships/hud/ShipReadouts.ts",
       "group": "client/ships/hud",
-      "lines": 206,
+      "lines": 208,
       "owns": "the numbers the HUD and menus read off your ship: weapon ring groups, gun and laser charge, status-panel input, rating, acceleration, menu ship info",
       "needs": "ReadoutsHost (state, store, catalog, tuning, pilot, features, thrustCommand, helm, localJump, jump, jumpReach), RingModel, common rateShip",
       "events": "",
@@ -5718,14 +5787,14 @@
         {
           "name": "ReadoutsHost",
           "kind": "interface",
-          "start": 21,
-          "end": 33
+          "start": 22,
+          "end": 34
         },
         {
           "name": "ShipReadouts",
           "kind": "class",
-          "start": 35,
-          "end": 206
+          "start": 36,
+          "end": 208
         }
       ]
     },
@@ -6995,6 +7064,324 @@
           "kind": "function",
           "start": 9,
           "end": 15
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.hud",
+      "path": "client/src/ui/gunRange/GunRangeHud.ts",
+      "group": "client/ui/gunRange",
+      "lines": 311,
+      "owns": "the gun range's HUD: the banner (GUN RANGE · weapons fully powered), the target's hull bar, the door prompt (\"Press X to leave the range\" in the door zone, common atRangeDoor) and the weapon picker (the weapons on offer with the hangar's icons, names, mount badges and class filter icons; the one flown highlighted; a click or Enter swaps it: gunRangeWeapon), in the left column where the side panel goes (the target is east: the aim stays clear); the job tracker and the quick bar put away while in",
+      "needs": "./rangeState, ./pickerModel, common (atRangeDoor, Catalog, ShipTuning), ui/itemIcons, ships/modelCards (mountBadge), ships/hangar/filterIcons, ui/domWrite, ui/escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "nothing shows outside the range; the door prompt shows by the server's own door rule",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        },
+        {
+          "text": "the picker sends only weapons on offer, and never the one already flown",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new HUD piece is an element built in the constructor and drawn in update()",
+      "exports": [
+        "GunRangeHud",
+        "GunRangeHudHost"
+      ],
+      "sections": [
+        {
+          "name": "GunRangeHudHost",
+          "kind": "interface",
+          "start": 28,
+          "end": 47
+        },
+        {
+          "name": "STYLE",
+          "kind": "const",
+          "start": 49,
+          "end": 100
+        },
+        {
+          "name": "WANT",
+          "kind": "const",
+          "start": 102,
+          "end": 103
+        },
+        {
+          "name": "ROLE_LABEL",
+          "kind": "const",
+          "start": 105,
+          "end": 105
+        },
+        {
+          "name": "GunRangeHud",
+          "kind": "class",
+          "start": 107,
+          "end": 305
+        },
+        {
+          "name": "el",
+          "kind": "function",
+          "start": 307,
+          "end": 311
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.picker-model",
+      "path": "client/src/ui/gunRange/pickerModel.ts",
+      "group": "client/ui/gunRange",
+      "lines": 67,
+      "owns": "the gun range weapon picker's rows: each weapon on offer with its name, role (the hangar palette's weapon classes: direct, burst, beam, guided, area, support), mount (fixed, turret, side), Mk grade and item icon id; the role filter (the classes present, in the palette's order) and the keyboard's next row",
+      "needs": "@space-game/common (Catalog, ShipTuning, mountingOf, partMount, partItemId), ships/paletteFilters (weaponRole, subsOf)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every option the server sent is a row, in its order, and nothing else",
+          "test": "client/src/ui/gunRange/pickerModel.test.ts"
+        },
+        {
+          "text": "the role filter offers only roles that have a row, in the palette's order",
+          "test": "client/src/ui/gunRange/pickerModel.test.ts"
+        }
+      ],
+      "extend": "a new thing shown on a row is a field of PickerRow, filled in pickerRows",
+      "exports": [
+        "ALL_ROLES",
+        "PickerRow",
+        "filterRows",
+        "nextRow",
+        "pickerRows",
+        "rolesPresent"
+      ],
+      "sections": [
+        {
+          "name": "PickerRow",
+          "kind": "interface",
+          "start": 15,
+          "end": 26
+        },
+        {
+          "name": "ALL_ROLES",
+          "kind": "const",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "pickerRows",
+          "kind": "function",
+          "start": 30,
+          "end": 44
+        },
+        {
+          "name": "rolesPresent",
+          "kind": "function",
+          "start": 46,
+          "end": 50
+        },
+        {
+          "name": "filterRows",
+          "kind": "function",
+          "start": 52,
+          "end": 55
+        },
+        {
+          "name": "nextRow",
+          "kind": "function",
+          "start": 57,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.keys",
+      "path": "client/src/ui/gunRange/rangeKeys.ts",
+      "group": "client/ui/gunRange",
+      "lines": 33,
+      "owns": "which keys do something else, or nothing, in the gun range: the inventory key folds the weapon picker; the build view, fabricator, refiner, dock / hangar, jump and quick bar keys are refused with a line saying why",
+      "needs": "nothing (pure); app/keys.ts runs it after the modal chain while inGunRange()",
+      "events": "",
+      "invariants": [
+        {
+          "text": "flying, firing, groups, targeting, the map, chat, respawn and X (the door) are never taken",
+          "test": "client/src/ui/gunRange/rangeKeys.test.ts"
+        }
+      ],
+      "extend": "a new key the range takes is one entry in RANGE_KEYS",
+      "exports": [
+        "RangeKey",
+        "rangeKey"
+      ],
+      "sections": [
+        {
+          "name": "RangeKey",
+          "kind": "type",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "NO_BUILD",
+          "kind": "const",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "RANGE_KEYS",
+          "kind": "const",
+          "start": 15,
+          "end": 24
+        },
+        {
+          "name": "QUICK",
+          "kind": "const",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "rangeKey",
+          "kind": "function",
+          "start": 29,
+          "end": 33
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.messages",
+      "path": "client/src/ui/gunRange/rangeMessages.ts",
+      "group": "client/ui/gunRange",
+      "lines": 35,
+      "owns": "what the client does with gunRangeState: the range state kept (./rangeState), and on going in the station screen put away and the berth let go (the server took the ship out of it); a refusal shown",
+      "needs": "./rangeState, common ServerGunRangeStateMessage; the host's station window, ship client and toasts",
+      "events": "",
+      "invariants": [
+        {
+          "text": "going in never sends anything (the server has already unberthed the pilot)",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        }
+      ],
+      "extend": "a new reaction to the range's state is a line in onGunRangeState",
+      "exports": [
+        "RangeMessageHost",
+        "onGunRangeState"
+      ],
+      "sections": [
+        {
+          "name": "RangeMessageHost",
+          "kind": "interface",
+          "start": 16,
+          "end": 21
+        },
+        {
+          "name": "onGunRangeState",
+          "kind": "function",
+          "start": 23,
+          "end": 35
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.state",
+      "path": "client/src/ui/gunRange/rangeState.ts",
+      "group": "client/ui/gunRange",
+      "lines": 83,
+      "owns": "the client's copy of this pilot's gun range state (the last gunRangeState): in or out, the weapon flown, the weapons on offer, the door, the target's entity and the station to go back to; `inGunRange()` for the code that behaves differently in there (keys, HUD, ammo shown)",
+      "needs": "@space-game/common (ServerGunRangeStateMessage, GunRangeDef type), rendering/terrainData (gunRangeFor)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "in only between an `in: true` state and the next `in: false` (or a reset on disconnect)",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        },
+        {
+          "text": "the chamber is the systems.json one for the system you are in (the same def the server's walls come from)",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        }
+      ],
+      "extend": "a new thing the client keeps about the range is a field of RangeView, filled in setRangeState",
+      "exports": [
+        "RangeView",
+        "chamberOf",
+        "inGunRange",
+        "onRangeState",
+        "rangeState",
+        "rangeVersion",
+        "resetRangeState",
+        "setRangeState"
+      ],
+      "sections": [
+        {
+          "name": "RangeView",
+          "kind": "interface",
+          "start": 18,
+          "end": 30
+        },
+        {
+          "name": "OUT",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "view",
+          "kind": "let",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "version",
+          "kind": "let",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "listeners",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "rangeState",
+          "kind": "function",
+          "start": 37,
+          "end": 40
+        },
+        {
+          "name": "inGunRange",
+          "kind": "function",
+          "start": 42,
+          "end": 45
+        },
+        {
+          "name": "rangeVersion",
+          "kind": "function",
+          "start": 47,
+          "end": 50
+        },
+        {
+          "name": "setRangeState",
+          "kind": "function",
+          "start": 52,
+          "end": 64
+        },
+        {
+          "name": "resetRangeState",
+          "kind": "function",
+          "start": 66,
+          "end": 72
+        },
+        {
+          "name": "onRangeState",
+          "kind": "function",
+          "start": 74,
+          "end": 78
+        },
+        {
+          "name": "chamberOf",
+          "kind": "function",
+          "start": 80,
+          "end": 83
         }
       ]
     },
@@ -8554,6 +8941,218 @@
       ]
     },
     {
+      "id": "common.gun-range.cheat-ship",
+      "path": "common/src/gunRange/cheatShip.ts",
+      "group": "common/gunRange",
+      "lines": 111,
+      "owns": "the gun range's cheat ship: a plain alloy bar of a ship carrying one chosen weapon model, fitted by its own mounting rules, with reactors to spare and the range flag (Blueprint.range: its guns always fully powered, no jump drive)",
+      "needs": "ships/{catalog, types, mounting, grid, gunFacing}",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every weapon model makes a valid ship (mounting rules kept) whose one gun is fully powered",
+          "test": "common/src/gunRange/cheatShip.test.ts"
+        }
+      ],
+      "extend": "a new kind of mount is a case in fit() (the turn that puts its barrel north, the side it bolts on at)",
+      "exports": [
+        "CHEAT_SHIP_PREFIX",
+        "buildCheatShip",
+        "isRangeWeapon"
+      ],
+      "sections": [
+        {
+          "name": "HULL",
+          "kind": "const",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "CHEAT_SHIP_PREFIX",
+          "kind": "const",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "Fit",
+          "kind": "interface",
+          "start": 29,
+          "end": 30
+        },
+        {
+          "name": "fit",
+          "kind": "function",
+          "start": 32,
+          "end": 50
+        },
+        {
+          "name": "isRangeWeapon",
+          "kind": "function",
+          "start": 52,
+          "end": 55
+        },
+        {
+          "name": "buildCheatShip",
+          "kind": "function",
+          "start": 57,
+          "end": 111
+        }
+      ]
+    },
+    {
+      "id": "common.gun-range",
+      "path": "common/src/gunRange/index.ts",
+      "group": "common/gunRange",
+      "lines": 10,
+      "owns": "the gun range's shared surface: the chamber layout, the cheat ship and the weapon options",
+      "needs": "layout, cheatShip, options",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the layout, the cheat ship and the options are pure and alike on both sides",
+          "test": "common/src/gunRange/layout.test.ts"
+        }
+      ],
+      "extend": "export a new gun range module here",
+      "exports": [
+        "*"
+      ],
+      "sections": []
+    },
+    {
+      "id": "common.gun-range.layout",
+      "path": "common/src/gunRange/layout.ts",
+      "group": "common/gunRange",
+      "lines": 101,
+      "owns": "the gun range's chamber (systems.json `gunRange`): its walls as solid terrain pieces, the exit door and the zone X works in, where a pilot comes in, and where the target stands",
+      "needs": "terrain.ts (TerrainFile), ships/types (Vec2), math/detTrig",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the walls close the chamber all round, and the door zone, the spawn and the target spot are inside it",
+          "test": "common/src/gunRange/layout.test.ts"
+        },
+        {
+          "text": "the server's terrain (data/GameData.ts) and the client's (rendering/terrainData.ts) take the same walls from the same def",
+          "test": "common/src/gunRange/layout.test.ts"
+        }
+      ],
+      "extend": "a new thing in the chamber is a field of GunRangeDef and a line in chamberWalls / the door helpers here",
+      "exports": [
+        "GunRangeDef",
+        "GunRangeTargetDef",
+        "RangeWall",
+        "atRangeDoor",
+        "chamberBox",
+        "chamberWalls",
+        "insideChamber",
+        "rangeDoor",
+        "withGunRange"
+      ],
+      "sections": [
+        {
+          "name": "RangeWall",
+          "kind": "type",
+          "start": 23,
+          "end": 23
+        },
+        {
+          "name": "GunRangeTargetDef",
+          "kind": "interface",
+          "start": 25,
+          "end": 39
+        },
+        {
+          "name": "GunRangeDef",
+          "kind": "interface",
+          "start": 41,
+          "end": 54
+        },
+        {
+          "name": "chamberBox",
+          "kind": "function",
+          "start": 56,
+          "end": 59
+        },
+        {
+          "name": "rect",
+          "kind": "const",
+          "start": 61,
+          "end": 61
+        },
+        {
+          "name": "chamberWalls",
+          "kind": "function",
+          "start": 63,
+          "end": 72
+        },
+        {
+          "name": "withGunRange",
+          "kind": "function",
+          "start": 74,
+          "end": 78
+        },
+        {
+          "name": "rangeDoor",
+          "kind": "function",
+          "start": 80,
+          "end": 89
+        },
+        {
+          "name": "atRangeDoor",
+          "kind": "function",
+          "start": 91,
+          "end": 95
+        },
+        {
+          "name": "insideChamber",
+          "kind": "function",
+          "start": 97,
+          "end": 101
+        }
+      ]
+    },
+    {
+      "id": "common.gun-range.options",
+      "path": "common/src/gunRange/options.ts",
+      "group": "common/gunRange",
+      "lines": 45,
+      "owns": "which weapon models a pilot may try in the gun range: every model licensed at their level (as the hangar's palette lets them fit it), and any model they already have (on a ship of theirs, in the hold or in storage)",
+      "needs": "econ/{market (modelLicensed), items (parsePartItemId)}, gunRange/cheatShip (isRangeWeapon), ships/catalog",
+      "events": "",
+      "invariants": [
+        {
+          "text": "nothing above the pilot's level unless they hold one, and never a game-only (exclusive) or legacy weapon",
+          "test": "common/src/gunRange/options.test.ts"
+        }
+      ],
+      "extend": "another way a pilot comes to have a weapon is one more source in owned() below",
+      "exports": [
+        "RangePilotView",
+        "gunRangeOptions"
+      ],
+      "sections": [
+        {
+          "name": "RangePilotView",
+          "kind": "interface",
+          "start": 17,
+          "end": 25
+        },
+        {
+          "name": "owned",
+          "kind": "function",
+          "start": 27,
+          "end": 33
+        },
+        {
+          "name": "gunRangeOptions",
+          "kind": "function",
+          "start": 35,
+          "end": 45
+        }
+      ]
+    },
+    {
       "id": "math.basic",
       "path": "common/src/math/basic.ts",
       "group": "common/math",
@@ -9629,6 +10228,61 @@
       ]
     },
     {
+      "id": "protocol.gun-range",
+      "path": "common/src/network/gunRangeProtocol.ts",
+      "group": "common/network",
+      "lines": 47,
+      "owns": "the gun range's messages: going in from a station, picking the weapon, and the pilot's own range state",
+      "needs": "nothing (plain shapes)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by name",
+          "test": "server/src/golden/structure.test.ts"
+        }
+      ],
+      "extend": "a new message is an interface plus a member of this area's client / server union below; then its handler (server/src/net/handlers/gunRange.ts) or its entry in client/src/app/serverMessages.ts, and the golden pins",
+      "exports": [
+        "ClientGunRangeEnterMessage",
+        "ClientGunRangeWeaponMessage",
+        "GunRangeClientMessage",
+        "GunRangeServerMessage",
+        "ServerGunRangeStateMessage"
+      ],
+      "sections": [
+        {
+          "name": "ClientGunRangeEnterMessage",
+          "kind": "interface",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "ClientGunRangeWeaponMessage",
+          "kind": "interface",
+          "start": 19,
+          "end": 20
+        },
+        {
+          "name": "GunRangeClientMessage",
+          "kind": "type",
+          "start": 22,
+          "end": 24
+        },
+        {
+          "name": "ServerGunRangeStateMessage",
+          "kind": "interface",
+          "start": 26,
+          "end": 45
+        },
+        {
+          "name": "GunRangeServerMessage",
+          "kind": "type",
+          "start": 47,
+          "end": 47
+        }
+      ]
+    },
+    {
       "id": "network.input-compact-tables",
       "path": "common/src/network/inputCompactTables.ts",
       "group": "common/network",
@@ -9809,7 +10463,7 @@
       "id": "protocol",
       "path": "common/src/network/protocol.ts",
       "group": "common/network",
-      "lines": 81,
+      "lines": 82,
       "owns": "the protocol version pin, the wire-table summary, and the re-export of every message family",
       "needs": "protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files",
       "events": "",
@@ -9836,32 +10490,32 @@
         {
           "name": "PROTOCOL_VERSION",
           "kind": "const",
-          "start": 48,
-          "end": 60
+          "start": 49,
+          "end": 61
         },
         {
           "name": "PROTOCOL_WIRE_HASH",
           "kind": "const",
-          "start": 61,
-          "end": 62
+          "start": 62,
+          "end": 63
         },
         {
           "name": "PROTOCOL_MISMATCH_CLOSE",
           "kind": "const",
-          "start": 63,
-          "end": 64
+          "start": 64,
+          "end": 65
         },
         {
           "name": "PROTOCOL_MISMATCH_REASON",
           "kind": "const",
-          "start": 65,
-          "end": 65
+          "start": 66,
+          "end": 66
         },
         {
           "name": "wireTables",
           "kind": "function",
-          "start": 67,
-          "end": 81
+          "start": 68,
+          "end": 82
         }
       ]
     },
@@ -10753,7 +11407,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 334,
+      "lines": 324,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -10774,7 +11428,6 @@
         "ClientBuyMessage",
         "ClientChatMessage",
         "ClientDevBossMessage",
-        "ClientDevRangeMessage",
         "ClientDevShipMessage",
         "ClientDevSpawnMessage",
         "ClientDevTeleportMessage",
@@ -10807,206 +11460,200 @@
         {
           "name": "ClientInputMessage",
           "kind": "interface",
-          "start": 25,
-          "end": 63
+          "start": 26,
+          "end": 64
         },
         {
           "name": "BodyCheck",
           "kind": "interface",
-          "start": 65,
-          "end": 69
+          "start": 66,
+          "end": 70
         },
         {
           "name": "ClientPingMessage",
           "kind": "interface",
-          "start": 71,
-          "end": 74
+          "start": 72,
+          "end": 75
         },
         {
           "name": "ClientMapViewMessage",
           "kind": "interface",
-          "start": 76,
-          "end": 80
+          "start": 77,
+          "end": 81
         },
         {
           "name": "ClientChatMessage",
           "kind": "interface",
-          "start": 82,
-          "end": 85
+          "start": 83,
+          "end": 86
         },
         {
           "name": "ClientInteractMessage",
           "kind": "interface",
-          "start": 87,
-          "end": 90
+          "start": 88,
+          "end": 91
         },
         {
           "name": "ClientDropItemMessage",
           "kind": "interface",
-          "start": 92,
-          "end": 96
+          "start": 93,
+          "end": 97
         },
         {
           "name": "ClientPickupMessage",
           "kind": "interface",
-          "start": 98,
-          "end": 101
+          "start": 99,
+          "end": 102
         },
         {
           "name": "ClientBuyMessage",
           "kind": "interface",
-          "start": 103,
-          "end": 108
+          "start": 104,
+          "end": 109
         },
         {
           "name": "ClientSellMessage",
           "kind": "interface",
-          "start": 110,
-          "end": 115
+          "start": 111,
+          "end": 116
         },
         {
           "name": "ClientRepairMessage",
           "kind": "interface",
-          "start": 117,
-          "end": 120
+          "start": 118,
+          "end": 121
         },
         {
           "name": "ClientRefuelMessage",
           "kind": "interface",
-          "start": 122,
-          "end": 125
+          "start": 123,
+          "end": 126
         },
         {
           "name": "ClientWarpMessage",
           "kind": "interface",
-          "start": 128,
-          "end": 131
+          "start": 129,
+          "end": 132
         },
         {
           "name": "ClientRespawnMessage",
           "kind": "interface",
-          "start": 133,
-          "end": 137
+          "start": 134,
+          "end": 138
         },
         {
           "name": "ClientTrainingDroneMessage",
           "kind": "interface",
-          "start": 139,
-          "end": 142
+          "start": 140,
+          "end": 143
         },
         {
           "name": "ClientJoinMessage",
           "kind": "interface",
-          "start": 144,
-          "end": 152
+          "start": 145,
+          "end": 153
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 154,
-          "end": 161
+          "start": 155,
+          "end": 162
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 163,
-          "end": 166
+          "start": 164,
+          "end": 167
         },
         {
           "name": "ClientAuthLoginMessage",
           "kind": "interface",
-          "start": 168,
-          "end": 172
+          "start": 169,
+          "end": 173
         },
         {
           "name": "ClientAuthRegisterMessage",
           "kind": "interface",
-          "start": 174,
-          "end": 179
+          "start": 175,
+          "end": 180
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 181,
-          "end": 185
+          "start": 182,
+          "end": 186
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 187,
-          "end": 229
+          "start": 188,
+          "end": 230
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 231,
-          "end": 240
+          "start": 232,
+          "end": 241
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 242,
-          "end": 249
+          "start": 243,
+          "end": 250
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 251,
-          "end": 258
+          "start": 252,
+          "end": 259
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 260,
-          "end": 270
-        },
-        {
-          "name": "ClientDevRangeMessage",
-          "kind": "interface",
-          "start": 272,
-          "end": 281
+          "start": 261,
+          "end": 271
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 283,
-          "end": 297
+          "start": 273,
+          "end": 287
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 299,
-          "end": 304
+          "start": 289,
+          "end": 294
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 306,
-          "end": 309
+          "start": 296,
+          "end": 299
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 311,
-          "end": 313
+          "start": 301,
+          "end": 303
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 315,
-          "end": 322
+          "start": 305,
+          "end": 312
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 324,
-          "end": 327
+          "start": 314,
+          "end": 317
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 329,
-          "end": 333
+          "start": 319,
+          "end": 323
         }
       ]
     },
@@ -11014,7 +11661,7 @@
       "id": "protocol.compact",
       "path": "common/src/network/protocol/compact.ts",
       "group": "common/network/protocol",
-      "lines": 142,
+      "lines": 132,
       "owns": "the COMPACT table of frequent server messages, its pack/unpack hooks and encodeMessage",
       "needs": "snapshotCodec, inputBinary, fxKinds",
       "events": "",
@@ -11044,49 +11691,49 @@
           "name": "COMPACT",
           "kind": "const",
           "start": 32,
-          "end": 80
+          "end": 81
         },
         {
           "name": "Fields",
           "kind": "type",
-          "start": 82,
-          "end": 86
+          "start": 83,
+          "end": 87
         },
         {
           "name": "COMPACT_HOOKS",
           "kind": "const",
-          "start": 87,
-          "end": 109
+          "start": 88,
+          "end": 99
         },
         {
           "name": "COMPACT_CODE",
           "kind": "const",
-          "start": 111,
-          "end": 111
+          "start": 101,
+          "end": 101
         },
         {
           "name": "COMPACT_TYPES",
           "kind": "const",
-          "start": 112,
-          "end": 113
+          "start": 102,
+          "end": 103
         },
         {
           "name": "packCompact",
           "kind": "function",
-          "start": 115,
-          "end": 126
+          "start": 105,
+          "end": 116
         },
         {
           "name": "unpackCompact",
           "kind": "function",
-          "start": 128,
-          "end": 135
+          "start": 118,
+          "end": 125
         },
         {
           "name": "unpackServer",
           "kind": "function",
-          "start": 137,
-          "end": 142
+          "start": 127,
+          "end": 132
         }
       ]
     },
@@ -11409,7 +12056,7 @@
       "id": "protocol.server-core",
       "path": "common/src/network/protocol/serverCore.ts",
       "group": "common/network/protocol",
-      "lines": 508,
+      "lines": 445,
       "owns": "the core server-to-client message types: welcome, snapshot, player state, chat, range, dialogue, shop, damage, admin, asteroids",
       "needs": "econ/social protocol types, ships/types, data/schemas",
       "events": "",
@@ -11429,7 +12076,6 @@
         "EntityState",
         "EntityType",
         "InventorySlot",
-        "RangeDummyState",
         "ServerAdminAccountsMessage",
         "ServerAdminInfoMessage",
         "ServerAdminResultMessage",
@@ -11450,9 +12096,6 @@
         "ServerLootMessage",
         "ServerPlayerStateMessage",
         "ServerPongMessage",
-        "ServerRangeHeadMessage",
-        "ServerRangeRowMessage",
-        "ServerRangeStateMessage",
         "ServerShopMessage",
         "ServerSnapshotMessage",
         "ServerSystemInfoMessage",
@@ -11523,178 +12166,154 @@
           "end": 157
         },
         {
-          "name": "RangeDummyState",
-          "kind": "interface",
-          "start": 159,
-          "end": 177
-        },
-        {
-          "name": "ServerRangeStateMessage",
-          "kind": "interface",
-          "start": 179,
-          "end": 190
-        },
-        {
-          "name": "ServerRangeHeadMessage",
-          "kind": "interface",
-          "start": 192,
-          "end": 202
-        },
-        {
-          "name": "ServerRangeRowMessage",
-          "kind": "interface",
-          "start": 204,
-          "end": 220
-        },
-        {
           "name": "ServerSystemMessage",
           "kind": "interface",
-          "start": 222,
-          "end": 226
+          "start": 159,
+          "end": 163
         },
         {
           "name": "ServerSystemInfoMessage",
           "kind": "interface",
-          "start": 228,
-          "end": 270
+          "start": 165,
+          "end": 207
         },
         {
           "name": "ServerDialogueMessage",
           "kind": "interface",
-          "start": 272,
-          "end": 278
+          "start": 209,
+          "end": 215
         },
         {
           "name": "DialogueOption",
           "kind": "interface",
-          "start": 280,
-          "end": 284
+          "start": 217,
+          "end": 221
         },
         {
           "name": "ServerShopMessage",
           "kind": "interface",
-          "start": 286,
-          "end": 293
+          "start": 223,
+          "end": 230
         },
         {
           "name": "ShopItemInfo",
           "kind": "interface",
-          "start": 295,
-          "end": 300
+          "start": 232,
+          "end": 237
         },
         {
           "name": "ServerDamageMessage",
           "kind": "interface",
-          "start": 302,
-          "end": 312
+          "start": 239,
+          "end": 249
         },
         {
           "name": "ServerDeathMessage",
           "kind": "interface",
-          "start": 314,
-          "end": 319
+          "start": 251,
+          "end": 256
         },
         {
           "name": "ServerLevelUpMessage",
           "kind": "interface",
-          "start": 321,
-          "end": 325
+          "start": 258,
+          "end": 262
         },
         {
           "name": "ServerLootMessage",
           "kind": "interface",
-          "start": 327,
-          "end": 332
+          "start": 264,
+          "end": 269
         },
         {
           "name": "ServerEffectMessage",
           "kind": "interface",
-          "start": 334,
-          "end": 343
+          "start": 271,
+          "end": 280
         },
         {
           "name": "EffectType",
           "kind": "enum",
-          "start": 345,
-          "end": 359
+          "start": 282,
+          "end": 296
         },
         {
           "name": "ServerAuthResultMessage",
           "kind": "interface",
-          "start": 361,
-          "end": 372
+          "start": 298,
+          "end": 309
         },
         {
           "name": "ServerAdminStatsMessage",
           "kind": "interface",
-          "start": 374,
-          "end": 389
+          "start": 311,
+          "end": 326
         },
         {
           "name": "AdminPlayerInfo",
           "kind": "interface",
-          "start": 391,
-          "end": 402
+          "start": 328,
+          "end": 339
         },
         {
           "name": "ServerAdminResultMessage",
           "kind": "interface",
-          "start": 404,
-          "end": 409
+          "start": 341,
+          "end": 346
         },
         {
           "name": "AdminAccountInfo",
           "kind": "interface",
-          "start": 411,
-          "end": 421
+          "start": 348,
+          "end": 358
         },
         {
           "name": "ServerAdminAccountsMessage",
           "kind": "interface",
-          "start": 423,
-          "end": 434
+          "start": 360,
+          "end": 371
         },
         {
           "name": "ServerAdminInfoMessage",
           "kind": "interface",
-          "start": 436,
-          "end": 446
+          "start": 373,
+          "end": 383
         },
         {
           "name": "ServerErrorMessage",
           "kind": "interface",
-          "start": 448,
-          "end": 452
+          "start": 385,
+          "end": 389
         },
         {
           "name": "ServerWarpMessage",
           "kind": "interface",
-          "start": 454,
-          "end": 459
+          "start": 391,
+          "end": 396
         },
         {
           "name": "ServerAsteroidSpawnMessage",
           "kind": "interface",
-          "start": 461,
-          "end": 466
+          "start": 398,
+          "end": 403
         },
         {
           "name": "ServerAsteroidSeedMessage",
           "kind": "interface",
-          "start": 468,
-          "end": 478
+          "start": 405,
+          "end": 415
         },
         {
           "name": "AsteroidSpawnData",
           "kind": "interface",
-          "start": 480,
-          "end": 499
+          "start": 417,
+          "end": 436
         },
         {
           "name": "ServerAsteroidDebugMessage",
           "kind": "interface",
-          "start": 501,
-          "end": 507
+          "start": 438,
+          "end": 444
         }
       ]
     },
@@ -11844,7 +12463,7 @@
         {
           "name": "ServerMessage",
           "kind": "type",
-          "start": 25,
+          "start": 26,
           "end": 128
         }
       ]
@@ -14570,7 +15189,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 814,
+      "lines": 815,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -14597,8 +15216,8 @@
         {
           "name": "GameServer",
           "kind": "class",
-          "start": 147,
-          "end": 814
+          "start": 148,
+          "end": 815
         }
       ]
     },
@@ -15234,7 +15853,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 1261,
+      "lines": 1277,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "@space-game/common (data shapes, tables, dictionary), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -15454,73 +16073,73 @@
           "name": "SHAPES",
           "kind": "const",
           "start": 292,
-          "end": 492
+          "end": 498
         },
         {
           "name": "SHIP_SHAPES",
           "kind": "const",
-          "start": 494,
-          "end": 603
+          "start": 500,
+          "end": 609
         },
         {
           "name": "blueprintSpec",
           "kind": "const",
-          "start": 605,
-          "end": 609
+          "start": 611,
+          "end": 615
         },
         {
           "name": "list",
           "kind": "const",
-          "start": 611,
-          "end": 612
+          "start": 617,
+          "end": 618
         },
         {
           "name": "entries",
           "kind": "const",
-          "start": 613,
-          "end": 613
+          "start": 619,
+          "end": 619
         },
         {
           "name": "keysOf",
           "kind": "const",
-          "start": 614,
-          "end": 614
+          "start": 620,
+          "end": 620
         },
         {
           "name": "str",
           "kind": "const",
-          "start": 615,
-          "end": 615
+          "start": 621,
+          "end": 621
         },
         {
           "name": "closest",
           "kind": "function",
-          "start": 617,
-          "end": 627
+          "start": 623,
+          "end": 633
         },
         {
           "name": "editDistance",
           "kind": "function",
-          "start": 629,
-          "end": 642
+          "start": 635,
+          "end": 648
         },
         {
           "name": "validateGameData",
           "kind": "function",
-          "start": 644,
-          "end": 1232
+          "start": 650,
+          "end": 1248
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 1234,
-          "end": 1240
+          "start": 1250,
+          "end": 1256
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 1242,
-          "end": 1261
+          "start": 1258,
+          "end": 1277
         }
       ]
     },
@@ -15575,7 +16194,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 726,
+      "lines": 756,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -15608,62 +16227,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 38,
-          "end": 44
+          "start": 39,
+          "end": 45
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 46,
-          "end": 69
+          "start": 47,
+          "end": 72
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 71,
-          "end": 82
+          "start": 74,
+          "end": 85
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 84,
-          "end": 84
+          "start": 87,
+          "end": 87
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 86,
-          "end": 101
+          "start": 89,
+          "end": 104
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 103,
-          "end": 104
+          "start": 106,
+          "end": 107
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 106,
-          "end": 124
+          "start": 109,
+          "end": 127
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 126,
-          "end": 127
+          "start": 129,
+          "end": 130
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 129,
-          "end": 139
+          "start": 132,
+          "end": 142
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 141,
-          "end": 726
+          "start": 144,
+          "end": 756
         }
       ]
     },
@@ -16293,6 +16912,149 @@
       ]
     },
     {
+      "id": "server.gun-range",
+      "path": "server/src/game/gunRange/GunRange.ts",
+      "group": "server/game/gunRange",
+      "lines": 245,
+      "owns": "the gun range: going in from any station (the pilot's own ship and profile set aside, a cheat ship flown), picking its weapon, leaving at the door with X, and the ways out that aren't the door (death, a disconnect, being moved out); the target's upkeep; each visitor's gunRangeState",
+      "needs": "GunRangeHost, Pilots (freeze, thaw, swapFrozenShip, realProfile, onFrozenDeath), Ammo (setFree), common gunRange (layout, buildCheatShip, gunRangeOptions), ./target",
+      "events": "Pilots.onFrozenDeath (the cheat ship destroyed)",
+      "invariants": [
+        {
+          "text": "the real profile is never changed by anything done in the range, and its saves are byte for byte the profile as it went in but for the timestamps",
+          "test": "server/src/game/gunRange/isolation.test.ts"
+        },
+        {
+          "text": "a pilot leaves docked at the station they came from with their own ship as it was; dying or disconnecting there takes them back too; nobody but a visitor stays in the range",
+          "test": "server/src/game/gunRange/gunRange.test.ts"
+        }
+      ],
+      "extend": "a new way into or out of the range is a method here that ends in enter() or leave()",
+      "exports": [
+        "GunRange",
+        "GunRangeHost",
+        "RangeBerth"
+      ],
+      "sections": [
+        {
+          "name": "RangeBerth",
+          "kind": "interface",
+          "start": 28,
+          "end": 35
+        },
+        {
+          "name": "GunRangeHost",
+          "kind": "interface",
+          "start": 37,
+          "end": 71
+        },
+        {
+          "name": "Visit",
+          "kind": "interface",
+          "start": 73,
+          "end": 81
+        },
+        {
+          "name": "GunRange",
+          "kind": "class",
+          "start": 83,
+          "end": 245
+        }
+      ]
+    },
+    {
+      "id": "server.gun-range.gate",
+      "path": "server/src/game/gunRange/messageGate.ts",
+      "group": "server/game/gunRange",
+      "lines": 54,
+      "owns": "which client messages a pilot in the gun range may send: flying, shooting, talking and leaving pass; every build, hangar, trade, item, market, quest, travel and dev message is refused before its handler runs",
+      "needs": "@space-game/common ClientMessage (type only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the table names every client message type (a new one fails to compile until it says pass or refuse), and an unknown type is refused",
+          "test": "server/src/game/gunRange/gunRange.test.ts"
+        }
+      ],
+      "extend": "a new client message type is one line in RANGE_GATE",
+      "exports": [
+        "RANGE_GATE",
+        "passesInRange"
+      ],
+      "sections": [
+        {
+          "name": "Verdict",
+          "kind": "type",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "RANGE_GATE",
+          "kind": "const",
+          "start": 15,
+          "end": 49
+        },
+        {
+          "name": "passesInRange",
+          "kind": "function",
+          "start": 51,
+          "end": 54
+        }
+      ]
+    },
+    {
+      "id": "server.gun-range.target",
+      "path": "server/src/game/gunRange/target.ts",
+      "group": "server/game/gunRange",
+      "lines": 86,
+      "owns": "the gun range's one target: standing while anyone is in the range, put away when nobody is, back whole a few seconds after it is destroyed, and flown back to its spot when it has been pushed off it",
+      "needs": "TargetHost (spawn, alive, remove, steer, where); npm: @space-game/common (dhypot, GunRangeTargetDef)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "it comes back after respawnSeconds and is gone while the range is empty; pushed beyond keepRadius it is steered home and let go near its spot",
+          "test": "server/src/game/gunRange/gunRange.test.ts"
+        }
+      ],
+      "extend": "a second target is a second RangeTarget (the range ticks each)",
+      "exports": [
+        "RangeTarget",
+        "TargetHost"
+      ],
+      "sections": [
+        {
+          "name": "TargetHost",
+          "kind": "interface",
+          "start": 19,
+          "end": 29
+        },
+        {
+          "name": "TPS",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "KEEP_EVERY",
+          "kind": "const",
+          "start": 32,
+          "end": 33
+        },
+        {
+          "name": "LET_GO",
+          "kind": "const",
+          "start": 34,
+          "end": 35
+        },
+        {
+          "name": "RangeTarget",
+          "kind": "class",
+          "start": 37,
+          "end": 86
+        }
+      ]
+    },
+    {
       "id": "server.pilots.cargo",
       "path": "server/src/game/pilots/cargo.ts",
       "group": "server/game/pilots",
@@ -16421,7 +17183,7 @@
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
-      "lines": 120,
+      "lines": 127,
       "owns": "what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return",
       "needs": "Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common",
       "events": "",
@@ -16443,25 +17205,72 @@
           "name": "onDestroyed",
           "kind": "function",
           "start": 13,
-          "end": 84
+          "end": 91
         },
         {
           "name": "wreckRecovered",
           "kind": "function",
-          "start": 86,
-          "end": 95
+          "start": 93,
+          "end": 102
         },
         {
           "name": "sendWreck",
           "kind": "function",
-          "start": 97,
-          "end": 106
+          "start": 104,
+          "end": 113
         },
         {
           "name": "showNotices",
           "kind": "function",
-          "start": 108,
-          "end": 120
+          "start": 115,
+          "end": 127
+        }
+      ]
+    },
+    {
+      "id": "server.pilots.freeze",
+      "path": "server/src/game/pilots/freeze.ts",
+      "group": "server/game/pilots",
+      "lines": 70,
+      "owns": "a pilot's profile set aside while they fly a ship that must never touch it (the gun range's cheat ship): the real profile frozen as it was, a throwaway copy in play (no hold, no storage, no other ships), and the real one put back untouched",
+      "needs": "Pilots (sessions, frozen), pilots/persist; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "nothing done while frozen reaches the real profile: every save writes the frozen one, the gives, takes and awards refuse, and a cheat ship is never captured into any profile",
+          "test": "server/src/game/gunRange/isolation.test.ts"
+        }
+      ],
+      "extend": "a new item or progress path in Pilots returns early for `self.frozen.has(conn)`",
+      "exports": [
+        "freeze",
+        "swapFrozenShip",
+        "thaw"
+      ],
+      "sections": [
+        {
+          "name": "freeze",
+          "kind": "function",
+          "start": 16,
+          "end": 40
+        },
+        {
+          "name": "swapFrozenShip",
+          "kind": "function",
+          "start": 42,
+          "end": 49
+        },
+        {
+          "name": "thaw",
+          "kind": "function",
+          "start": 51,
+          "end": 66
+        },
+        {
+          "name": "rangeRecord",
+          "kind": "function",
+          "start": 68,
+          "end": 70
         }
       ]
     },
@@ -16521,7 +17330,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 128,
+      "lines": 146,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -16537,6 +17346,7 @@
         "applyShip",
         "capture",
         "captureNow",
+        "holdsRangeShip",
         "mirror",
         "persistable",
         "reapplyShip",
@@ -16544,52 +17354,58 @@
       ],
       "sections": [
         {
-          "name": "save",
+          "name": "holdsRangeShip",
           "kind": "function",
           "start": 14,
-          "end": 25
+          "end": 17
+        },
+        {
+          "name": "save",
+          "kind": "function",
+          "start": 19,
+          "end": 30
         },
         {
           "name": "capture",
           "kind": "function",
-          "start": 27,
-          "end": 53
+          "start": 32,
+          "end": 60
         },
         {
           "name": "applyProfile",
           "kind": "function",
-          "start": 55,
-          "end": 76
+          "start": 62,
+          "end": 83
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 78,
-          "end": 95
+          "start": 85,
+          "end": 102
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 97,
-          "end": 105
+          "start": 104,
+          "end": 112
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 107,
-          "end": 111
+          "start": 114,
+          "end": 118
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 113,
-          "end": 120
+          "start": 120,
+          "end": 127
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 122,
-          "end": 128
+          "start": 129,
+          "end": 146
         }
       ]
     },
@@ -17225,7 +18041,7 @@
       "id": "server.gameserver.loop",
       "path": "server/src/gameServer/loop.ts",
       "group": "server/gameServer",
-      "lines": 296,
+      "lines": 298,
       "owns": "the real-time loop, one step, the guarded tick table and its per-tick passes",
       "needs": "GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks; npm: @space-game/common, bitecs",
       "events": "",
@@ -17291,13 +18107,13 @@
           "name": "buildTickSystems",
           "kind": "function",
           "start": 197,
-          "end": 270
+          "end": 272
         },
         {
           "name": "tick",
           "kind": "function",
-          "start": 272,
-          "end": 296
+          "start": 274,
+          "end": 298
         }
       ]
     },
@@ -17305,8 +18121,8 @@
       "id": "server.gameserver.messages",
       "path": "server/src/gameServer/messages.ts",
       "group": "server/gameServer",
-      "lines": 284,
-      "owns": "the client message table and the dev message handlers (teleport, range, spawn), chat and input forwarding",
+      "lines": 226,
+      "owns": "the client message table and the dev message handlers (teleport, spawn), chat and input forwarding",
       "needs": "GameServer (type), net/dispatch, net/handlers/*; npm: @space-game/common, bitecs",
       "events": "",
       "invariants": [
@@ -17319,9 +18135,7 @@
       "exports": [
         "applyInputToEntity",
         "buildMessageHandlers",
-        "createRange",
         "handleChat",
-        "handleDevRange",
         "handleDevSpawn",
         "handleDevTeleport",
         "handleInput",
@@ -17333,61 +18147,49 @@
           "name": "buildMessageHandlers",
           "kind": "function",
           "start": 33,
-          "end": 126
+          "end": 124
         },
         {
           "name": "handleMessage",
           "kind": "function",
-          "start": 128,
-          "end": 137
+          "start": 126,
+          "end": 135
         },
         {
           "name": "handleDevTeleport",
           "kind": "function",
-          "start": 139,
+          "start": 137,
           "end": 165
-        },
-        {
-          "name": "createRange",
-          "kind": "function",
-          "start": 167,
-          "end": 186
-        },
-        {
-          "name": "handleDevRange",
-          "kind": "function",
-          "start": 188,
-          "end": 223
         },
         {
           "name": "handleDevSpawn",
           "kind": "function",
-          "start": 225,
-          "end": 234
+          "start": 167,
+          "end": 176
         },
         {
           "name": "handleChat",
           "kind": "function",
-          "start": 236,
-          "end": 269
+          "start": 178,
+          "end": 211
         },
         {
           "name": "handleInput",
           "kind": "function",
-          "start": 271,
-          "end": 274
+          "start": 213,
+          "end": 216
         },
         {
           "name": "applyInputToEntity",
           "kind": "function",
-          "start": 276,
-          "end": 279
+          "start": 218,
+          "end": 221
         },
         {
           "name": "recordSelfHashes",
           "kind": "function",
-          "start": 281,
-          "end": 284
+          "start": 223,
+          "end": 226
         }
       ]
     },
@@ -17395,7 +18197,7 @@
       "id": "server.gameserver.options",
       "path": "server/src/gameServer/options.ts",
       "group": "server/gameServer",
-      "lines": 73,
+      "lines": 70,
       "owns": "the GameServer constructor options",
       "needs": "types only; npm: @space-game/common",
       "events": "",
@@ -17413,8 +18215,8 @@
         {
           "name": "GameServerOptions",
           "kind": "interface",
-          "start": 22,
-          "end": 73
+          "start": 21,
+          "end": 70
         }
       ]
     },
@@ -17511,7 +18313,7 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 318,
+      "lines": 320,
       "owns": "connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
@@ -17542,61 +18344,61 @@
           "name": "connect",
           "kind": "function",
           "start": 20,
-          "end": 130
+          "end": 132
         },
         {
           "name": "createPlayer",
           "kind": "function",
-          "start": 132,
-          "end": 186
+          "start": 134,
+          "end": 188
         },
         {
           "name": "placePlayer",
           "kind": "function",
-          "start": 188,
-          "end": 205
+          "start": 190,
+          "end": 207
         },
         {
           "name": "loginPilot",
           "kind": "function",
-          "start": 207,
-          "end": 233
+          "start": 209,
+          "end": 235
         },
         {
           "name": "claimProfile",
           "kind": "function",
-          "start": 235,
-          "end": 245
+          "start": 237,
+          "end": 247
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 247,
-          "end": 257
+          "start": 249,
+          "end": 259
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 259,
-          "end": 273
+          "start": 261,
+          "end": 275
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 275,
-          "end": 288
+          "start": 277,
+          "end": 290
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 290,
-          "end": 305
+          "start": 292,
+          "end": 307
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 307,
-          "end": 318
+          "start": 309,
+          "end": 320
         }
       ]
     },
@@ -18131,6 +18933,40 @@
       ]
     },
     {
+      "id": "server.gameserver.hosts.gun-range",
+      "path": "server/src/gameServer/hosts/gunRange.ts",
+      "group": "server/gameServer/hosts",
+      "lines": 90,
+      "owns": "the host adapter for the gun range (game/gunRange): its system, berths, travel, the target's ship, and the module's construction",
+      "needs": "GameServer (type), game/gunRange/GunRange, game/Docking (berths: conn.docked, dockedShips); npm: @space-game/common, bitecs",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a server whose data has no gun range builds the module but every entry is refused",
+          "test": "server/src/game/gunRange/gunRange.test.ts"
+        }
+      ],
+      "extend": "a new thing the range needs from the server is a member of GunRangeHost and a line here",
+      "exports": [
+        "createGunRangeHost",
+        "setupGunRange"
+      ],
+      "sections": [
+        {
+          "name": "createGunRangeHost",
+          "kind": "function",
+          "start": 17,
+          "end": 85
+        },
+        {
+          "name": "setupGunRange",
+          "kind": "function",
+          "start": 87,
+          "end": 90
+        }
+      ]
+    },
+    {
       "id": "server.gameserver.hosts.mining",
       "path": "server/src/gameServer/hosts/mining.ts",
       "group": "server/gameServer/hosts",
@@ -18217,7 +19053,7 @@
       "id": "server.gameserver.hosts.pilots",
       "path": "server/src/gameServer/hosts/pilots.ts",
       "group": "server/gameServer/hosts",
-      "lines": 205,
+      "lines": 207,
       "owns": "host adapters for pilots, quests, party, people and arenas",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -18240,31 +19076,31 @@
           "name": "createPilotHost",
           "kind": "function",
           "start": 24,
-          "end": 69
+          "end": 71
         },
         {
           "name": "createQuestHost",
           "kind": "function",
-          "start": 71,
-          "end": 153
+          "start": 73,
+          "end": 155
         },
         {
           "name": "createPartyHost",
           "kind": "function",
-          "start": 155,
-          "end": 175
+          "start": 157,
+          "end": 177
         },
         {
           "name": "createPeopleHost",
           "kind": "function",
-          "start": 177,
-          "end": 188
+          "start": 179,
+          "end": 190
         },
         {
           "name": "createArenaHost",
           "kind": "function",
-          "start": 190,
-          "end": 205
+          "start": 192,
+          "end": 207
         }
       ]
     },
@@ -18348,7 +19184,7 @@
       "id": "server.gameserver.hosts.ship",
       "path": "server/src/gameServer/hosts/ship.ts",
       "group": "server/gameServer/hosts",
-      "lines": 136,
+      "lines": 135,
       "owns": "the ShipHost the ship bridge calls back into",
       "needs": "GameServer (type), ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -18367,7 +19203,7 @@
           "name": "createShipHost",
           "kind": "function",
           "start": 16,
-          "end": 136
+          "end": 135
         }
       ]
     },
@@ -18686,7 +19522,7 @@
       "id": "server.net.limits",
       "path": "server/src/net/MessageLimits.ts",
       "group": "server/net",
-      "lines": 109,
+      "lines": 112,
       "owns": "per-connection token-bucket rate limits for expensive or player-reaching client messages",
       "needs": "nothing imported; a WeakMap keyed by connection",
       "events": "",
@@ -18712,19 +19548,19 @@
           "name": "MESSAGE_LIMITS",
           "kind": "const",
           "start": 24,
-          "end": 74
+          "end": 77
         },
         {
           "name": "Bucket",
           "kind": "class",
-          "start": 76,
-          "end": 87
+          "start": 79,
+          "end": 90
         },
         {
           "name": "MessageLimiter",
           "kind": "class",
-          "start": 89,
-          "end": 109
+          "start": 92,
+          "end": 112
         }
       ]
     },
@@ -18822,9 +19658,9 @@
       "id": "server.net.dispatch",
       "path": "server/src/net/dispatch.ts",
       "group": "server/net",
-      "lines": 69,
+      "lines": 72,
       "owns": "client message dispatch: the drops and limits every message passes, and the one handler per message type",
-      "needs": "@space-game/common ClientMessage (type), ServerCtx and ClientConnection (type-only); nothing from GameServer at runtime",
+      "needs": "@space-game/common ClientMessage (type), ServerCtx and ClientConnection (type-only), the gun range's message gate (game/gunRange/messageGate.ts); nothing from GameServer at runtime",
       "events": "",
       "invariants": [
         {
@@ -18856,56 +19692,56 @@
         {
           "name": "PRE_JOIN",
           "kind": "const",
-          "start": 28,
-          "end": 29
+          "start": 29,
+          "end": 30
         },
         {
           "name": "MAX_INPUTS_PER_TICK",
           "kind": "const",
-          "start": 30,
-          "end": 31
+          "start": 31,
+          "end": 32
         },
         {
           "name": "MessageType",
-          "kind": "type",
-          "start": 33,
-          "end": 33
-        },
-        {
-          "name": "MessageOf",
           "kind": "type",
           "start": 34,
           "end": 34
         },
         {
-          "name": "Handler",
+          "name": "MessageOf",
           "kind": "type",
           "start": 35,
           "end": 35
         },
         {
-          "name": "HandlerTable",
+          "name": "Handler",
           "kind": "type",
           "start": 36,
-          "end": 37
+          "end": 36
+        },
+        {
+          "name": "HandlerTable",
+          "kind": "type",
+          "start": 37,
+          "end": 38
         },
         {
           "name": "HandlerRegistry",
           "kind": "class",
-          "start": 39,
-          "end": 52
+          "start": 40,
+          "end": 53
         },
         {
           "name": "registerHandlers",
           "kind": "function",
-          "start": 54,
-          "end": 57
+          "start": 55,
+          "end": 58
         },
         {
           "name": "dispatch",
           "kind": "function",
-          "start": 59,
-          "end": 69
+          "start": 60,
+          "end": 72
         }
       ]
     },
@@ -18953,7 +19789,7 @@
       "id": "server.net.handlers.flight",
       "path": "server/src/net/handlers/flight.ts",
       "group": "server/net/handlers",
-      "lines": 333,
+      "lines": 337,
       "owns": "the prediction-sensitive client messages: input, ping, stateHash, mapView, interact, respawn, training drone, target",
       "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx; @space-game/common, bitecs",
       "events": "",
@@ -19050,31 +19886,58 @@
           "name": "handleInteract",
           "kind": "function",
           "start": 219,
-          "end": 266
+          "end": 268
         },
         {
           "name": "handleRespawn",
           "kind": "function",
-          "start": 268,
-          "end": 306
+          "start": 270,
+          "end": 310
         },
         {
           "name": "releaseControls",
           "kind": "function",
-          "start": 308,
-          "end": 314
+          "start": 312,
+          "end": 318
         },
         {
           "name": "neutralInput",
           "kind": "function",
-          "start": 316,
-          "end": 321
+          "start": 320,
+          "end": 325
         },
         {
           "name": "trainingDrone",
           "kind": "function",
-          "start": 323,
-          "end": 333
+          "start": 327,
+          "end": 337
+        }
+      ]
+    },
+    {
+      "id": "server.net.handlers.gun-range",
+      "path": "server/src/net/handlers/gunRange.ts",
+      "group": "server/net/handlers",
+      "lines": 19,
+      "owns": "the gun range's two messages: going in (gunRangeEnter, from a berth) and picking the weapon (gunRangeWeapon)",
+      "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx (gunRange)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the types it registers are pinned",
+          "test": "server/src/golden/clientMessages.json"
+        }
+      ],
+      "extend": "a new gun range message is one t.on here and a member of common network/gunRangeProtocol.ts",
+      "exports": [
+        "registerGunRangeHandlers"
+      ],
+      "sections": [
+        {
+          "name": "registerGunRangeHandlers",
+          "kind": "function",
+          "start": 12,
+          "end": 19
         }
       ]
     },
@@ -22331,6 +23194,11 @@
         "path": "scripts/contracts/gen.mjs",
         "line": 273,
         "text": "L.push('', '### `satisfies Record<...>` tables (tsc fails when a key is missing)', '');"
+      },
+      {
+        "path": "server/src/game/gunRange/messageGate.ts",
+        "line": 49,
+        "text": "} as const satisfies Record<ClientMessage['type'], Verdict>;"
       }
     ]
   }

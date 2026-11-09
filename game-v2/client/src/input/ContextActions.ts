@@ -44,6 +44,7 @@ import {
 } from './contextClick';
 import { esc } from '../ui/escape';
 import { isTrainingBody } from '../state/trainingBodies';
+import { inGunRange } from '../ui/gunRange/rangeState';
 
 type JumpPhase = 'ready' | 'charging' | 'burn' | 'cooldown';
 
@@ -345,6 +346,7 @@ export class ContextActions {
       const facts: TargetFacts = {
         kind: t.kind, dist: from(t.x, t.y, t.edge), inRange: t.inRange(), lock: t.lock, siege: t.siege,
         targeted: t.eid !== undefined && this.host.targetId() === t.eid, partyMate: t.eid !== undefined && this.host.partyMate(t.eid),
+        gunRange: inGunRange(),
       };
       sections.push({ title: t.name, kind: t.label, dist: me ? km(facts.dist) : '', color: t.color, options: targetOptions(facts) });
       m.refs.push(t);

@@ -375,9 +375,11 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const { aimWorld } = orders;
   // A ports ship (power/ports.ts): each gun fires from its own buffer, a shot's worth at a time, and a beam lights while its buffer
   // can feed it; nothing is shared. (Unaccounted without the state, as the old one is without a charge)
-  const pz: PortsLayout | undefined = ship.derived.ports && orders.energy?.charge.e ? ship.derived.ports : undefined, E = orders.energy?.charge.e as PortsState;
+  // (A gun range cheat ship's guns are always fully powered, types.ts Blueprint.range: its power goes unaccounted)
+  const energy = ship.blueprint.range ? undefined : orders.energy;
+  const pz: PortsLayout | undefined = ship.derived.ports && energy?.charge.e ? ship.derived.ports : undefined, E = energy?.charge.e as PortsState;
   // Each gun's share of the power it asked for this tick (1 unaccounted, or with plenty)
-  const share = (w: WeaponInfo) => (orders.energy && !pz ? feedShare(ship.derived, orders.energy.charge, w.part, 'gun') : 1);
+  const share = (w: WeaponInfo) => (energy && !pz ? feedShare(ship.derived, energy.charge, w.part, 'gun') : 1);
   // (A beam short of power burns that share of the ticks, evenly spread)
   // (A beam in pieces burns a piece out whatever the trigger: `want` only decides whether the next follows)
   const burns = (w: WeaponInfo, want: boolean) => { if (pz) return portsBeamStep(pz, E, w.part, want) > 0; const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };

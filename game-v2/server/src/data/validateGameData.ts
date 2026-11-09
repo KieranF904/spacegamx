@@ -447,6 +447,12 @@ const SHAPES: Record<string, Spec> = {
       }),
       'instance?': obj({ slots: 'number' }), 'private?': 'boolean', 'visuals?': 'any',
       'arena?': strict({ boss: 'string', centre: 'xy', radius: 'number', 'barrier?': arr(arr('number')), outside: 'xy' }),
+      'gunRange?': strict({
+        centre: 'xy', width: 'number', height: 'number', wall: 'number',
+        door: strict({ wall: oneOf('N', 'E', 'S', 'W'), 'along?': 'number', width: 'number', reach: 'number' }),
+        spawn: strict({ x: 'number', y: 'number', angle: 'number' }),
+        target: strict({ ship: 'string', faction: 'string', 'grade?': 'number', x: 'number', y: 'number', angle: 'number', respawnSeconds: 'number', keepRadius: 'number' }),
+      }),
       'pocket?': strict({
         entrance: strict({ system: 'string', x: 'number', y: 'number', radius: 'number', name: 'string', 'look?': strict({ kind: oneOf('dig', 'scrap', 'den', 'roost', 'sift', 'shrine', 'knot', 'dock'), faction: 'string', 'scale?': 'number' }) }),
         landing: 'xy', radius: 'number', 'dread?': obj({ x: 'number', y: 'number', from: 'number', full: 'number' }),
@@ -846,6 +852,16 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
         else if (bd.system !== s.id || bd.arena) c.err(`${P}.arena.boss`, `"${ar.boss}" doesn't lair in "${s.id}"`, F);
         if (isObj(ar.outside) && isObj(ar.centre) && typeof ar.radius === 'number' && dhypot(ar.outside.x - ar.centre.x, ar.outside.y - ar.centre.y) <= ar.radius + 100) c.err(`${P}.arena.outside`, 'inside the arena: a pilot put out would be put back in', F);
         if (ar.barrier !== undefined && (!Array.isArray(ar.barrier) || ar.barrier.length !== 2 || ar.barrier.some((p: unknown) => !Array.isArray(p) || p.length !== 2))) c.err(`${P}.arena.barrier`, 'two points, [[x, y], [x, y]]', F);
+      }
+      // The gun range: a private, empty system; its spawn and target on the chamber's floor, its target a real faction's
+      const gr = s?.gunRange;
+      if (isObj(gr) && isObj(gr.spawn) && isObj(gr.target) && isObj(gr.centre)) {
+        if (!s.private) c.err(`${P}.gunRange`, 'a gun range must be `private` (never on the galaxy map, reached only from a station)', F);
+        if (list(s.portals).length || list(s.stations).length) c.err(`${P}.gunRange`, 'a gun range has no gates and no stations of its own', F);
+        const inside = (x: number, y: number) => Math.abs(x - gr.centre.x) < gr.width / 2 && Math.abs(y - gr.centre.y) < gr.height / 2;
+        if (!inside(gr.spawn.x, gr.spawn.y)) c.err(`${P}.gunRange.spawn`, 'outside the chamber', F);
+        if (!inside(gr.target.x, gr.target.y)) c.err(`${P}.gunRange.target`, 'outside the chamber', F);
+        faction(F, `${P}.gunRange.target.faction`, gr.target.faction);
       }
       // A den's features: its vents' cycle takes each vent once; a cache's crust is a material, its loot items
       list(s?.den).forEach((d, j) => {

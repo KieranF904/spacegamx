@@ -7,9 +7,14 @@
  */
 
 import { hasComponent, entityExists } from 'bitecs';
-import { Player, Position, InSystem, Dead, PlayerProfile, setActiveShip } from '@space-game/common';
+import { Player, Position, InSystem, Dead, PlayerProfile, setActiveShip, type ShipRecord } from '@space-game/common';
 import { cloneJson } from '@space-game/common';
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
+
+/** Does this profile hold a gun range cheat ship anywhere (never to be saved: Blueprint.range) */
+export function holdsRangeShip(p: PlayerProfile): boolean {
+  return !!p.ship?.blueprint?.range || p.hangar.some((r) => !!r?.blueprint?.range);
+}
 
 export async function save(self: Pilots, s: Session): Promise<void> {
   s.lastSave = self.now();
@@ -29,7 +34,8 @@ export function capture(self: Pilots, s: Session): void {
   const eid = s.conn.playerId;
   if (!entityExists(self.host.world, eid) || !hasComponent(self.host.world, Player, eid) || hasComponent(self.host.world, Dead, eid)) return;
   const ship = self.ships.get(eid);
-  if (ship && ship.kind === 'ship' && ship.derived.root >= 0) {
+  // (A gun range cheat ship is never written into any profile, whatever the profile in hand: types.ts Blueprint.range)
+  if (ship && ship.kind === 'ship' && ship.derived.root >= 0 && !ship.blueprint.range) {
     const hp: Record<number, number> = {};
     ship.blueprint.parts.forEach((p, i) => {
       if (self.ships.isGhost(eid, i)) return; // not built yet: the record's ghost list says so
@@ -49,7 +55,8 @@ export function capture(self: Pilots, s: Session): void {
     if (rec.owed) { rec.owed = rec.owed.filter((u) => live.has(u)); if (!rec.owed.length) delete rec.owed; }
   }
   const system = self.host.systemId(InSystem.systemId[eid]);
-  if (system) s.profile.position = { system, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]) };
+  // (Nor is a place no pilot is ever saved in: the gun range. The profile keeps where it was)
+  if (system && !self.host.transient?.(InSystem.systemId[eid])) s.profile.position ={ system, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]) };
 }
 
 /** Put the profile into the world: stats, ship, position */
@@ -81,7 +88,7 @@ export function applyShip(self: Pilots, s: Session): void {
   const bp = s.profile.ship.blueprint;
   // (a borrowed dev ship flies as it is: an enemy's design needn't pass a pilot's rules. A saved ship needn't keep
   // weapons' mounting rules made since it was fitted: it flies, its hangar flagging what to fix)
-  if (!self.devStash.has(s.conn) && !self.ships.validate(bp, { mounting: false }).ok) {
+  if (!self.devStash.has(s.conn) && !self.frozen.has(s.conn) && !self.ships.validate(bp, { mounting: false }).ok) {
     setActiveShip(s.profile, { blueprint: cloneJson(self.opts.starter.blueprint), hp: {}, ghosts: [], plan: self.opts.starter.planFile });
   }
   const rec = s.profile.ship;
@@ -119,8 +126,19 @@ export function mirror(self: Pilots, s: Session): void {
   Player.level[eid] = s.profile.level;
 }
 
-/** What's written to disk: their profile, with the real ship back if a library ship's borrowed (devSwapShip) */
+/**
+ * What's written to disk: their profile, with the real ship back if a library ship's borrowed (devSwapShip); in the gun
+ * range, the real profile frozen as it was when they went in (pilots/freeze.ts), never the copy in play
+ */
 export function persistable(self: Pilots, conn: PilotConn, p: PlayerProfile): PlayerProfile {
+  const real = self.frozen.get(conn);
+  if (real) return real;
+  // (A cheat ship never goes to disk, however it got here: the starter in its place)
+  if (holdsRangeShip(p)) {
+    console.error(`[Pilots] a gun range ship was about to be saved for ${conn.username}: not saved`);
+    const swap = (r: ShipRecord | null) => (r?.blueprint.range ? { blueprint: cloneJson(self.opts.starter.blueprint), hp: {}, ghosts: [] } : r);
+    return { ...p, ship: swap(p.ship)!, hangar: p.hangar.map(swap) };
+  }
   const st = self.devStash.get(conn);
   if (!st) return p;
   const hangar = p.hangar.map((r, i) => (i === st.slot ? st.rec : r));

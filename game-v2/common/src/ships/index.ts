@@ -63,7 +63,6 @@ export * from './features/zoneshield/shaped.js';
 export * from './load.js';
 export * from './flightInputs.js';
 export * from './features/index.js';
-export * from './rangeRig.js';
 // Debris worked out alike on both sides (deterministic trig, push-only knocks): ships/debris.ts
 export * from './debris.js';
 // ...and its life after its spawn (crumbling), for a client running it (CAPS.DEBRIS): ships/debrisLife.ts

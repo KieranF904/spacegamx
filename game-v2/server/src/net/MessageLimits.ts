@@ -41,6 +41,9 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   fieldPlan: { per: 60, burst: 10 },
   fieldPlanClear: { per: 60, burst: 10 },
   fieldRecycle: { per: 120, burst: 20 },
+  // The gun range: going in sets a profile aside and moves the ship; a weapon pick rebuilds the cheat ship (game/gunRange)
+  gunRangeEnter: { per: 20, burst: 4 },
+  gunRangeWeapon: { per: 90, burst: 12 },
   // A weapon-group change refits the live ship (net/handlers/weaponGroups.ts)
   weaponGroups: { per: 60, burst: 10 },
   // Items moved into the repair bank and the profile saved

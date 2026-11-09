@@ -17,6 +17,7 @@ import type { ClientFeatures } from '../features/host';
 import type { ShipStore } from '../ShipStore';
 import { RingModel, type RingGroup, type RingSources } from '../gunHud';
 import { groupSelection } from '../weaponGroups/selection';
+import { inGunRange } from '../../ui/gunRange/rangeState';
 
 export interface ReadoutsHost {
   readonly state: GameState;
@@ -169,7 +170,8 @@ export class ShipReadouts {
     charge: { g: 100, b: [] },
     ammoOf: (kind) => {
       const item = this.h.tuning.weapons?.[kind]?.ammo?.item;
-      if (!item) return null;
+      // (The gun range's ammunition is unlimited, as the server's Ammo.setFree: nothing to count, never plain rounds)
+      if (!item || inGunRange()) return null;
       const a = this.ringAmmo;
       a.loose = this.h.pilot.profile?.ammo?.[item] ?? 0;
       a.crates = 0;

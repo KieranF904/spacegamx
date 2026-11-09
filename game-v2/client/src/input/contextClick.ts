@@ -144,6 +144,8 @@ export interface TargetFacts {
   targeted?: boolean;
   /** A pilot in your party */
   partyMate?: boolean;
+  /** You are in the gun range (no trading there: nothing in it may leave) */
+  gunRange?: boolean;
 }
 
 /** Trading reaches this far (the server's) */
@@ -172,7 +174,7 @@ export function targetOptions(f: TargetFacts): MenuOption[] {
     case 'person': out = [opt('talk', 'talk', 'Hail', { hint: f.inRange ? 'X' : 'autopilot' }), fly()]; break;
     case 'pilot': out = [
       fly('Fly to', 'autopilot · follows them'), tgt(), opt('inspect', 'inspect', 'Inspect pilot'),
-      opt('trade', 'trade', 'Trade', { disabled: f.dist > TRADE_RANGE ? `Too far: trading reaches ${km(TRADE_RANGE)}` : undefined }),
+      opt('trade', 'trade', 'Trade', { disabled: f.gunRange ? 'No trading in the gun range' : f.dist > TRADE_RANGE ? `Too far: trading reaches ${km(TRADE_RANGE)}` : undefined }),
       ...(f.partyMate ? [] : [opt('invite', 'invite', 'Invite to party', { hint: 'P' })]),
     ]; break;
     case 'hostile':
