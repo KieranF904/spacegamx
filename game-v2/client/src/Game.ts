@@ -18,7 +18,8 @@ import { installDevTools } from './app/devTools';
 import { Prediction } from './predict/Prediction';
 import { handleKey, type KeyHost } from './app/keys';
 import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
-import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './app/inputSend';
+import { tickInput, sendNeutralInput, newInputSendState, forgetSession, type InputSendCtx } from './app/inputSend';
+import { guestKey, guestName } from './network/guestId';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
 import { lobbyInbox } from './network/inbox';
 import { setText, setStyle } from './ui/domWrite';
@@ -517,9 +518,10 @@ this.boostHudEl = document.getElementById('boostHud');
   }
 
   private handleGuestPlay(): void {
-    const guestName = 'Guest_' + Math.floor(Math.random() * 10000);
-    this.state.playerName = guestName;
-    this.pendingAuth = { type: 'guest', username: guestName };
+    // (The name this browser's guest flew under last: with its key, the server gives them their pilot back)
+    const name = guestName();
+    this.state.playerName = name;
+    this.pendingAuth = { type: 'guest', username: name };
     this.loginUI.hide();
     this.serverBrowserUI.show();
     this.prefetchScreens();
@@ -1124,18 +1126,28 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     // Send join/auth message based on pending auth state
     // (Each carries our protocol version: a server on another one hangs up with PROTOCOL_MISMATCH_CLOSE)
     const pending = this.pendingAuth;
-    // (A new connection: confirmed hits' shell counts start afresh, as the server's do)
-    this.shipClient.resetHits();
+    // A new connection (the first, a reconnect after a drop, or to a server that restarted): the server's session starts
+    // from nothing, so the client's does too. The world and clock (GameState), every replica, structure, hit and its own
+    // tick layer (ShipClient), the PT layer and what inputs were last sent: kept from the last session, they disagree
+    // with the new one for good (ships it never removes, ticks far ahead of a restarted clock, keys it never heard)
+    this.state.resetSession();
+    this.shipClient.resetSession();
+    this.prediction?.reset();
+    forgetSession(this.inputCtx);
+    this.statsPrimed = false;
+    this.localDead = false;
     if (pending) {
       // Guest
-      this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS });
+      // (With this browser's guest key: joining again, a reconnect or after a restart, the server gives back the pilot it kept)
+      this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS, guestKey: guestKey() });
       this.pendingAuth = null;
     } else if (this.authToken) {
       // Signed in at the lobby: the server checks the token with it
       this.network.send({ type: 'join', token: this.authToken, username: this.state.playerName, protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS });
     } else {
       // Fallback guest
-      this.network.send({ type: 'join', username: this.state.playerName || 'Player', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS });
+      // (A guest reconnecting: the same name and key, so the same pilot)
+      this.network.send({ type: 'join', username: this.state.playerName || 'Player', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS, guestKey: guestKey() });
     }
     
     // Start ping loop (one per connection: a reconnect replaces it)

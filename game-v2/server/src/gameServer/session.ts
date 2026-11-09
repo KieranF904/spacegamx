@@ -1,6 +1,6 @@
 /**
  * @contract server.gameserver.session
- * owns:       connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts
+ * owns:       connecting, creating and placing a player, logging a pilot in, a guest back by their key, lingering, saving and forgetting accounts
  * needs:      GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs
  * invariants: a new connection gets its player entity before any message is handled — none pinned
  *             saveAll saves every live pilot once — none pinned
@@ -232,6 +232,27 @@ export async function loginPilot(gs: GameServer, conn: ClientConnection, userId:
   }
   if (!(await claimProfile(gs, conn, userId))) return;
   await gs.pilots.login(conn, userId);
+}
+
+/**
+ * A guest joined with their browser's guest key (conn.guestId): one guest flies in one place at a time, as an account
+ * does, so any other connection on that key (another tab, or the old socket of a reconnect the server hasn't seen close)
+ * is kept as it is and ended; then the pilot kept under the key is theirs again (Pilots.resumeGuest)
+ */
+export async function resumeGuest(gs: GameServer, conn: ClientConnection): Promise<void> {
+  const id = conn.guestId;
+  if (!id) return;
+  for (const other of [...gs.clients.values()]) {
+    if (other === conn || other.guestId !== id || other.userId !== null) continue;
+    const eid = other.playerId;
+    // (Kept as it is first; then it's a stranger's connection, so closing it can't keep over the one coming back)
+    await gs.pilots.detach(other);
+    other.guestId = null;
+    if (hasComponent(gs.world, Player, eid) && !hasComponent(gs.world, Dead, eid)) addComponent(gs.world, Dead, eid);
+    gs.rejectAuth(other, 'You joined from another tab, so this session has ended.');
+  }
+  if (!gs.clients.has(conn.ws)) return; // (left meanwhile)
+  await gs.pilots.resumeGuest(conn);
 }
 
 /** One game server per account: refused (and signed out) while another region still holds this pilot */

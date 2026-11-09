@@ -24,6 +24,8 @@ export interface ClientConnection {
   /** Contributor rank (ContributorNotes: the notes tools; admins have them anyway) */
   isContributor: boolean;
   authToken: string | null;
+  /** A guest's id by their browser's guest key (game/pilots/guests.ts): their pilot is kept under it a while */
+  guestId?: string | null;
   knownEntities: Set<number>;   // Entity IDs already sent one-time to this client (asteroids, stations, portals, NPCs)
   lastSystemId: number;         // Last system ID — clear knownEntities on change
   /** Last system id for which systemInfo was sent (string id) */

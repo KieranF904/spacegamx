@@ -76,6 +76,15 @@ export class Prediction {
 
   get mode(): PredictMode { return this.current; }
 
+  /**
+   * A new connection: the layer and every kind start over (RESTART_BACK catches a restarted server's clock going back,
+   * not a reconnect to the same one, whose ticks go on while the ships it held are the last session's)
+   */
+  reset(): void {
+    this.kinds.kinds.reset();
+    this.layer.reset();
+  }
+
   set(id: ModeId | string): boolean {
     const m = modeById(id);
     if (!m) return false;

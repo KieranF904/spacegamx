@@ -11,6 +11,7 @@ import type { HandlerRegistry } from './dispatch.js';
 import type { ServerCtx } from './ServerCtx.js';
 import { notifier } from '../auth/pushover.js';
 import { activity } from '../activity/index.js';
+import { guestIdOf } from '../game/pilots/guests.js';
 
 /** The join and sign-in messages */
 export function registerAuthHandlers(t: HandlerRegistry): void {
@@ -72,6 +73,8 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     }
     conn.username = name || `Guest_${Math.floor(Math.random() * 10000)}`;
     conn.userId = null;
+    // (Their browser's guest key, if it sent one: the pilot kept under it is theirs again, below)
+    conn.guestId = guestIdOf(msg.guestKey);
     conn.isAdmin = ctx.everyoneAdmin || ctx.guestAdmin;
     conn.isOwner = false;
     conn.isContributor = false;
@@ -88,6 +91,8 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     ...(conn.isOwner ? { isOwner: true } : {}),
     isContributor: ctx.contrib.allowed(conn),
   });
+  // A guest back (a dropped socket, a restarted server, a reload): the pilot they left, if it's kept
+  if (conn.userId === null && conn.guestId) ctx.resumeGuest(conn).catch((e) => ctx.fault('resumeGuest', e));
 }
 
 /** A server update is about to restart us (server/src/update): no new sign-ins. True if it refused this one */
