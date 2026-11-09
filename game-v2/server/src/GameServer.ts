@@ -432,7 +432,7 @@ export class GameServer implements ServerCtx {
     this.quests.codex = this.codex;
     this.people.codex = this.codex;
     this.arenas = new Arenas(createArenaHost(this));
-    this.achievements = new Achievements(achievementsDeps(this), this.pilots, this.gameData.achievementsFile as RibbonsFile, profileStore);
+    this.achievements = new Achievements(achievementsDeps(this), this.pilots, this.gameData.achievementsFile as RibbonsFile, profileStore, opts.rankings, opts.serverName);
     this.social = new Social(socialDeps(this), profileStore, opts.friends ?? new MemoryFriends());
     this.pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.social.join(conn); });
     // New arrivals hear about this week's hunt

@@ -25,6 +25,7 @@ import { settings } from '../settings/Settings';
 import { setText, setStyle } from './domWrite';
 import { boundKeyName } from '../input/keybindings';
 import { esc } from './escape';
+import { fetchRankings } from '../network/rankings';
 
 /** The key an action is bound to now (for the hints) */
 const keyOf = (id: string) => boundKeyName(id, settings.data.bindings);
@@ -224,6 +225,13 @@ export class QuestClient {
 
   setRibbons(m: ServerRibbonsMessage): void { this.ribbons = m; this.log.refresh(); }
   setRankings(m: ServerRankingsMessage): void { this.rankings = m; this.log.refresh(); }
+  /** The boards, from the lobby (every server's pilots ranked together); the last ones stay up if it can't be reached */
+  async loadRankings(): Promise<void> {
+    const m = await fetchRankings();
+    if (m) this.setRankings(m);
+    else if (!this.rankings) { this.rankingsDown = true; this.log.refresh(); }
+  }
+  rankingsDown = false;
   private listeners = new Set<() => void>();
   private tracker: QuestTracker;
   readonly log: QuestLogWindow;
@@ -535,10 +543,10 @@ class QuestLogWindow {
 
   get isOpen(): boolean { return this.win.isOpen; }
 
-  /** Ribbons and rankings come from the server when their tab opens */
+  /** Ribbons come from the game server and rankings from the lobby when their tabs open */
   private ask(): void {
     if (this.tab === 'ribbons') this.q.d.send({ type: 'ribbons' });
-    if (this.tab === 'rankings') this.q.d.send({ type: 'rankings' });
+    if (this.tab === 'rankings') void this.q.loadRankings();
   }
 
   open(tab: LogTab = this.tab, select?: string): void {
@@ -614,7 +622,7 @@ class QuestLogWindow {
 
   private renderRankings(b: HTMLElement): void {
     const m = this.q.rankings;
-    if (!m) { b.innerHTML = '<div class="sgw-empty">Fetching the rankings…</div>'; return; }
+    if (!m) { b.innerHTML = `<div class="sgw-empty">${this.q.rankingsDown ? "Can't reach the rankings right now." : 'Fetching the rankings…'}</div>`; return; }
     const days = Math.floor(m.weekEndsIn / 86_400_000), hours = Math.floor((m.weekEndsIn % 86_400_000) / 3_600_000);
     const wrap = document.createElement('div');
     wrap.innerHTML = `<div style="color:#8394ad; margin-bottom:10px">Registered pilots only. The weekly boards reset in ${days}d ${hours}h.</div>`;

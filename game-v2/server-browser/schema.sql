@@ -109,3 +109,16 @@ CREATE TABLE IF NOT EXISTS friend_lists (
     outgoing   BIGINT[] NOT NULL DEFAULT '{}',   -- requests it sent
     updated_at BIGINT NOT NULL                   -- epoch ms
 );
+
+-- Rankings (server-browser/src/rankings): one row per account with its ranked stats. The game servers report changes
+-- through the lobby's /admin/rankings/report and the lobby makes the weekly and all-time boards from the rows, so a pilot
+-- ranks across every server. PostgresRankingStore makes this at start too when it is missing. The JSON store
+-- (JsonRankingStore, data/lobby/rankings.json) holds the same records. A deleted account's row goes by cascade.
+CREATE TABLE IF NOT EXISTS ranking_rows (
+    user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    week       BIGINT NOT NULL,                  -- the week `weekly` counts (common weekOf)
+    weekly     JSONB NOT NULL DEFAULT '{}',      -- { stat: this week's total }
+    all_time   JSONB NOT NULL DEFAULT '{}',      -- { stat: total }
+    updated_at BIGINT NOT NULL                   -- epoch ms
+);
