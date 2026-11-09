@@ -54,11 +54,6 @@ export class RemovalSet extends Map<number, number> {
   }
 }
 
-/** A player who quits within this long of taking damage leaves their ship in space... */
-export const LINGER_COMBAT_TICKS = 60 * 15;
-/** ...for this long */
-export const LINGER_TICKS = 60 * 20;
-
 // setImmediate is Node-only; fall back to setTimeout when running in a browser (proto mode).
 export const scheduleImmediate: (fn: () => void) => unknown =
   typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
