@@ -30,6 +30,8 @@ export interface PtHost {
   candidates(): Iterable<number>;
   /** The structure a ship flew tick t with (default its current one) */
   derivedAt?(id: number, t: number): ShipDerived | null | undefined;
+  /** Is this ship known to be pinned (it doesn't give in a contact: the server said so when your own ship touched it)? */
+  pinned?(id: number): boolean;
 }
 
 const MODES = new Set([ReplicaMode.Player, ReplicaMode.Pilotless, ReplicaMode.Anchored]);
@@ -109,6 +111,6 @@ export class ReplicaPtWorld implements PtStWorld {
     if (!s || s.kind !== 'ship') return null;
     const d = h.derivedAt?.(id, t) ?? s.derived;
     if (!d || !(d.mass > 0)) return null;
-    return { mass: d.mass, radius: d.radius, geom: h.store.geometry(s), alive: d.alive, com: d.com, big: s.blueprint.parts.length > CONTACT_BIG_BODY };
+    return { mass: d.mass, radius: d.radius, geom: h.store.geometry(s), alive: d.alive, com: d.com, big: s.blueprint.parts.length > CONTACT_BIG_BODY, pinned: h.pinned?.(id) };
   }
 }

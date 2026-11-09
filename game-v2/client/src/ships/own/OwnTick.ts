@@ -33,6 +33,7 @@ import {
 import type { StructSource } from '../ShipStore.js';
 import type { ContactWorld } from '../causes/ContactWorld.js';
 import { MidCursors } from '../causes/MidCursors.js';
+import { aheadContacts } from './ownAhead.js';
 
 export interface OwnTickHost {
   /** The ships' structures (its own and the others it touches) */
@@ -90,7 +91,7 @@ export class OwnTick implements OwnTimeline {
   level: number = CONFIRM.NORMAL;
   private levelSince = 0;
   private last = { tick: -Infinity, snap: -Infinity, body: -1, hp: -1 };
-  readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0, heads: 0, headMisses: 0, syncs: 0 };
+  readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0, heads: 0, headMisses: 0, syncs: 0, ahead: 0 };
   /** The newest snapshot's head hash, to judge at its next check (sim/headHash.ts), and a miss not yet sent */
   private head: { tick: number; h: HeadHash } | null = null;
   private missed = false;
@@ -122,6 +123,10 @@ export class OwnTick implements OwnTimeline {
   private seed: OwnExtras | null = null;
   /** The weapon groups selection as the inputs sent so far have it (packGroupSel) */
   private sel = 0;
+  /** Its contacts predicted past the newest snapshot, by tick (ownAhead.ts: stepped again from each snapshot) */
+  private readonly ahead = new Map<number, CauseRow[]>();
+  /** Ships the server said were pinned when its ship last touched them (OTHER_PINNED): a predicted contact takes them so */
+  private readonly pinned = new Set<number>();
 
   constructor(private readonly host: OwnTickHost) {}
 
@@ -142,6 +147,8 @@ export class OwnTick implements OwnTimeline {
     this.hazTold.clear();
     this.seed = null;
     this.sel = 0;
+    this.ahead.clear();
+    this.pinned.clear();
     this.host.reps.setOwn(id, this);
   }
 
@@ -358,7 +365,11 @@ export class OwnTick implements OwnTimeline {
       if (at) at.push(r.slice(1)); else this.causes.set(t, [r.slice(1)]);
       earliest = Math.min(earliest, t);
       this.stats.causes++;
-      if (r[1] === OWN_CAUSE.CONTACT) { const os = this.host.store.get(r[2]); if (os) this.kept.set(t + ':' + r[2], os); }
+      if (r[1] === OWN_CAUSE.CONTACT) {
+        const os = this.host.store.get(r[2]);
+        if (os) this.kept.set(t + ':' + r[2], os);
+        if (r[3] & CONTACT_FLAG.OTHER_PINNED) this.pinned.add(r[2]); else this.pinned.delete(r[2]);
+      }
       if (r[1] === OWN_CAUSE.CONTACT && r[3] & CONTACT_FLAG.OTHER_BEFORE) {
         const d = this.othersBefore.get(r[2]);
         if (d) this.touched.set(t + ':' + r[2], d);
@@ -370,6 +381,9 @@ export class OwnTick implements OwnTimeline {
     }
     this.before = null;
     this.othersBefore.clear();
+    // (What it predicted up to here is the snapshot's now; ids gone from its view needn't be remembered)
+    for (const k of [...this.ahead.keys()]) if (k <= m.tick) this.ahead.delete(k);
+    for (const id of m.removed ?? []) this.pinned.delete(id);
     for (const mp of [this.touched, this.kept] as Map<string, unknown>[]) if (mp.size > 64) for (const k of [...mp.keys()]) if (Number(k.split(':')[0]) < m.tick - KEEP_TICKS) mp.delete(k);
     if (this.causes.size > 64) for (const t of [...this.causes.keys()]) if (t < m.tick - KEEP_TICKS) this.causes.delete(t);
     if (earliest <= m.tick) this.host.reps.rewind(self, earliest);
@@ -418,6 +432,8 @@ export class OwnTick implements OwnTimeline {
     // (Past the newest snapshot (its ship stepped ahead, the prediction): no pairs found there. What it would touch
     // isn't known yet, and the other ships aren't stepped ahead for it; the snapshot's window finds them once, final)
     const told = this.causes.get(t), w = t <= this.snapTick ? this.finds() : null;
+    // (...but its own contacts there are predicted, as it was stepped: ownAhead.ts)
+    if (!told && t > this.snapTick) return this.ahead.get(t);
     if (!w) return told?.map((row, i) => ({ seq: i, row }));
     const self = this.host.self(), found = w.rowsFor(self, t);
     const pl = told ? placeRows(self, told) : [];
@@ -432,6 +448,9 @@ export class OwnTick implements OwnTimeline {
   }
 
   after(t: number, body: FlightBody): void {
+    // (Past the newest snapshot, nothing told: its contacts predicted from its body after this step, ownAhead.ts)
+    const ahead = t > this.snapTick && !this.causes.has(t);
+    if (ahead) this.predictAhead(t, body);
     const rows = this.rowsAt(t);
     this.finish(t);
     if (!rows) return;
@@ -439,7 +458,34 @@ export class OwnTick implements OwnTimeline {
     if (this.fired.size > 64) for (const k of [...this.fired.keys()]) if (k < t - KEEP_TICKS) this.fired.delete(k);
     // (Finding pairs itself: through its cursor, the states others read of it kept, MidCursors)
     if (this.finds() && t <= this.snapTick) { if (!this.cursors.after(this.host.self(), t, body, () => ({ pre: body, rows, env: this.env(t) }))) this.stats.failed++; return; }
-    if (!applyOwnCauses(body, rows.map((r) => r.row), this.env(t))) this.stats.failed++;
+    if (!applyOwnCauses(body, rows.map((r) => r.row), ahead ? this.aheadEnv(t) : this.env(t))) this.stats.failed++;
+  }
+
+  /** Did the server say ship `id` was pinned when its ship last touched it (the PT layer's pass takes it so: predict/world.ts)? */
+  pinnedOther(id: number): boolean {
+    return this.pinned.has(id);
+  }
+
+  /** Its contacts on tick t past the newest snapshot, predicted (ownAhead.ts) and kept for rowsAt until a snapshot covers t */
+  private predictAhead(t: number, body: FlightBody): void {
+    const d = this.derived(t);
+    const rows = d && d.mass > 0 ? aheadContacts(this.host, t, body, d.radius, (id) => this.pinned.has(id)) : undefined;
+    if (rows) { this.ahead.set(t, rows); this.stats.ahead += rows.length; } else this.ahead.delete(t);
+  }
+
+  /**
+   * The env a predicted contact is worked out with: the other's structure as it has it now, its pose from the row
+   * (CONTACT_FLAG.STATE), nothing stepped for it (it's part way through its own ship's step)
+   */
+  private aheadEnv(t: number): OwnCauseEnv {
+    const store = this.host.store;
+    return {
+      ...this.env(t),
+      other: (id) => {
+        const ship = store.get(id);
+        return ship ? { shape: shapeOf(ship, store.derivedAt?.(id, t) ?? ship.derived, store.geometry(ship)), body: { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } } : null;
+      },
+    };
   }
 
   /** Its ship part way through a tick's causes, worked out once (CAPS.CONTACTS) */

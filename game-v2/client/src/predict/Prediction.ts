@@ -26,6 +26,7 @@ export function gameHost(state: GameState, sc: ShipClient): PtHost {
     predicted: () => state.predictedTick,
     *candidates() { for (const type of SHIP_TYPES) for (const e of state.entities.ofType(type)) yield e.id; },
     derivedAt: (id, t) => sc.derivedAt(id, t),
+    pinned: (id) => sc.own.pinnedOther(id),
   };
 }
 
