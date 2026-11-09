@@ -1,0 +1,44 @@
+# On-demand regional game server. Not deployed by hand: scripts/deploy/regions.mjs passes --app and --primary-region
+# per region (the lobby's server definitions, data/lobby/servers.json; example deploy/fly/servers.example.json). Secrets are set per app, never here:
+#   fly secrets set -a <app> DATABASE_URL=... LOBBY_ADMIN_SECRET=... ADMIN_SERVER_PASSWORD=...
+# See docs/ops/regions.md.
+app = 'spacegame-game-template'
+primary_region = 'syd'
+
+[build]
+  dockerfile = 'Dockerfile.server'
+  ignorefile = 'Dockerfile.server.dockerignore'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3000'
+  ADMIN_PORT = '3005'
+  USER_STORE_BACKEND = 'postgres'
+  # (regions.mjs overrides these per app with --env, plus BUILD_ID. SERVER_ID must match the lobby definition: it is
+  # the heartbeat id and the profile-lease holder. The server reads BROWSER_URL; LOBBY_URL is for scripts/lobby-update.mjs)
+  SERVER_ID = 'set-per-app'
+  SERVER_REGION = 'set-per-app'
+  SERVER_NAME = 'set-per-app'
+  PUBLIC_HOST = 'set-per-app'
+  BROWSER_URL = 'https://space.brotherk3d.com/lobby'
+  LOBBY_URL = 'https://space.brotherk3d.com/lobby'
+
+# Suspended when empty (memory snapshot kept: fast wake, the game loop skips the gap: server/src/gameServer/wakeGap.ts),
+# woken by the first connection.
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = 'suspend'
+  min_machines_running = 0
+  max_machines_running = 1
+  processes = ['app']
+
+# The world's memory (world/memory.json) survives deploys and stops
+[mounts]
+  source = 'spacegame_world'
+  destination = '/app/data/world'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

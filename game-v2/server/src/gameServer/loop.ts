@@ -22,6 +22,7 @@ import { weaponSystem, projectileSystem, collisionSystem } from './combat.js';
 import { playerMovementSystem, stationOrbitSystem, buildSpatialGrid, lifetimeSystem, cleanupSystem } from './systems.js';
 import { trafficSystem } from './traffic.js';
 import { lingerSystem } from './session.js';
+import { skipWakeGap } from './wakeGap.js';
 import { recordSelfHashes } from './messages.js';
 import { riftSystem } from './travel.js';
 import type { GameServer } from '../GameServer.js';
@@ -93,7 +94,8 @@ export function gameLoop(gs: GameServer): void {
   const deltaMs = now - gs.lastTickTime;
   gs.lastTickTime = now;
 
-  gs.tickAccumulator += deltaMs;
+  // (A suspend/resume jumps the clock: skipped, not caught up. gameServer/wakeGap.ts)
+  if (!skipWakeGap(gs, deltaMs)) gs.tickAccumulator += deltaMs;
   if (gs.paused) gs.tickAccumulator = 0;
 
   // Fixed timestep updates— cap catch-up to avoid spiral of death

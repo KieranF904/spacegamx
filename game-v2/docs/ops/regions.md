@@ -46,3 +46,38 @@ Code: `server/src/update/` (countdown, install), `common/src/network/updateProto
 ## Config
 
 Lobby: `LOBBY_SERVERS_JSON` (optional), `LOBBY_ADMIN_SECRET` (existing). Game server: `SERVER_ID`, `BUILD_ID` (or `GIT_COMMIT`), existing `BROWSER_URL`, `LOBBY_ADMIN_SECRET`, `SERVER_NAME`, `SERVER_REGION`, `PUBLIC_HOST`.
+
+## Accounts on two servers
+
+One account plays on one server at a time: a profile lease (Postgres `profile_leases`, held 90 s, renewed every 30 s) is claimed at login and released after the leave save. Another region refuses the login with "You're still in another region; try again in a moment." Rankings are reported to the lobby and ranked across servers (`server-browser/src/rankings/`).
+
+## Fly.io files
+- `deploy/fly/Dockerfile.server` (+ `.dockerignore`), `deploy/fly/fly.server.toml`: the on-demand server (shared-cpu-1x, 512 MB,
+  `auto_stop_machines='suspend'`, `min_machines_running=0`, a 1 GB-ish volume for the world memory).
+- `scripts/deploy/regions.mjs`: build once, same image to every region, then the VPS. Dry run unless `--apply`.
+- Server env: `SERVER_REGION`, `SERVER_NAME`, `PUBLIC_HOST`, `BROWSER_URL` (= `LOBBY_URL`), `USER_STORE_BACKEND=postgres`;
+  secrets `DATABASE_URL`, `LOBBY_ADMIN_SECRET`, `ADMIN_SERVER_PASSWORD`.
+  `SERVER_ID` (lobby definition id, heartbeat id, profile-lease holder) and `BUILD_ID` are set per app by the script.
+- Wake-up: after a suspend/resume the loop skips a gap over 2 s (`server/src/gameServer/wakeGap.ts`): no catch-up ticks; the tick
+  counter jumps, so boss/nest timers and world memory advance by wall clock like an empty system. Logged as `[Loop] woke after ...`.
+- Old `fly.toml`, `fly.server.toml`, `fly.client.toml`, `server/fly.toml` are legacy (the old always-on apps); left untouched, unused.
+- The script reads the lobby's own server file (`data/lobby/servers.json`, example `deploy/fly/servers.example.json`): a Fly server is an `on-demand` entry with `app` and `flyRegion` (Fly region code), which the lobby ignores.
+
+## Add a region
+1. `fly apps create spacegame-<id>`; `fly volumes create spacegame_world -a spacegame-<id> -r <region> -n 1 -s 1`.
+2. `fly secrets set -a spacegame-<id> DATABASE_URL=... LOBBY_ADMIN_SECRET=... ADMIN_SERVER_PASSWORD=...`.
+3. Let the app reach VPS Postgres (VPS steps, Kieran approves each): either TLS on Postgres (server cert, `hostssl` line in
+   `pg_hba.conf` limited to Fly egress IPs, ufw rule for 5432 from those IPs) or a WireGuard tunnel (`fly wireguard create`, peer on the VPS,
+   Postgres listening on the tunnel address only). Prefer WireGuard: nothing public. Use `sslmode=require` either way.
+4. Add it to the lobby's `servers.json` (id, name, region, host `spacegame-<id>.fly.dev`, port 443, kind `on-demand`, app, flyRegion) so it is listed while asleep; restart the lobby to load it.
+5. `node scripts/deploy/regions.mjs --only <id> --no-vps` (dry run first), then with `--apply`.
+
+## Rolling out a release
+Frontend is served from the VPS (versioned). A release: `node scripts/deploy/regions.mjs --apply` builds one image, deploys it to each
+region, then runs `deploy/vps/deploy.sh`. Schedule the countdown first (`node scripts/lobby-update.mjs schedule 15`) so awake servers warn and restart on their own;
+suspended ones start on the new build when woken. Clients only join servers on their version.
+
+## Costs
+shared-cpu-1x 512 MB is about $3-4/month if it ran all month; suspended machines cost only their volume (about $0.15/GB-month) and
+snapshot storage. Egress and extra regions add up per region; check Fly's current pricing before the first apply. A suspended machine is
+free of CPU charges but takes a moment to wake on the first connection.

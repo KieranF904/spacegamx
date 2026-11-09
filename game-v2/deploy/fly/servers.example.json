@@ -1,0 +1,7 @@
+{
+  "servers": [
+    { "id": "vps", "name": "Main", "region": "eu", "host": "brotherk3d.com", "port": 443, "kind": "always-on" },
+    { "id": "fly-syd", "name": "Sydney", "region": "au", "host": "spacegame-syd.fly.dev", "port": 443, "kind": "on-demand",
+      "app": "spacegame-syd", "flyRegion": "syd" }
+  ]
+}
