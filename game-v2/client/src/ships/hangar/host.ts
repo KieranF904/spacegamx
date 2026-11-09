@@ -132,7 +132,6 @@ export interface HangarHost {
   loadSelected(): Promise<void>;
   partAt(g: Vec2): number;
   partName(i: number): string;
-  partTip(id: string, e: MouseEvent): void;
   placementProblem(p: PlacedPart): string | null;
   plans(): { file: string; bp: Blueprint }[];
   portsHtml(L: NonNullable<ShipDerived['ports']>): string;

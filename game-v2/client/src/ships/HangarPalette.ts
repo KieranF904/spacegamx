@@ -36,7 +36,7 @@ import { functionColor, numToCss } from './shipColors';
 import { ALL, applyFilters, loadFilters, saveFilters, subCounts, subsOf, type AmmoFilter, type FilterState, type MountFilter } from './paletteFilters';
 import { cardStats } from './paletteCard';
 import { cardHtml } from './paletteCardView';
-import { GunPreviewHover } from './gunPreview/previewHover';
+import { PartHoverCard } from './build/partHoverCard';
 
 /** The part in hand; `empty`: nothing is (Escape put it away): no preview, nothing to place, until a row is picked or a part picked up */
 export interface PaletteSel { piece: string; fn: string; material: string; rot: Rot; flip: boolean; facing: Side | 'auto'; empty?: boolean }
@@ -69,7 +69,6 @@ export interface PaletteHost {
   grantAll(): boolean;
   /** Field build overlay: `free()` only says a plan can hold any part; each part still costs materials to build, so show its cost, not "free" */
   fieldBuild?: boolean;
-  partTip(id: string, e: MouseEvent): void;
   hideTip(): void;
   sound?(id: string): void;
 }
@@ -186,6 +185,11 @@ ${SUBS_STYLE}.hp-card { display: block; white-space: normal; }
 .hp-x svg { width: 10px; height: 10px; transition: transform 0.15s; }
 .hp-x[aria-expanded="true"] svg { transform: rotate(180deg); }
 .hp-row.dim .hp-pick > img, .hp-row.dim .hp-txt { opacity: 0.55; }
+/* (a locked row: the name comes first; its cost is on the hover card, so the icons give way) */
+.hp-row.dim .hp-cost.lk { display: none; }
+.hp-row.dim .hp-l1 { overflow: hidden; }
+.hp-row.dim .hp-l1 b { flex: 0 0 auto; max-width: 100%; }
+.hp-row.dim .hp-st { max-width: 24%; }
 .hp-facts { grid-column: 1 / 3; padding: 4px 8px 7px; border-top: 1px solid rgba(140, 170, 220, 0.1); background: rgba(3, 6, 14, 0.3); font-size: 10.5px; }
 .hp-facts h6 { margin: 5px 0 1px; font: 700 8.5px 'Segoe UI', sans-serif; letter-spacing: 1.3px; color: #7dd3fc; text-transform: uppercase; }
 .hp-kv { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 6px; padding: 1px 0; border-bottom: 1px solid #16203a; }
@@ -225,8 +229,8 @@ export class HangarPalette {
   /** The subcategory chips under the tabs, and what they and the weapon toggles have chosen (remembered) */
   private subsEl: HTMLDivElement;
   private filters: FilterState = loadFilters();
-  /** The live gun preview beside the list (made on the first hover over a gun) */
-  private hover: GunPreviewHover;
+  /** The one hover card beside the list: preview or art, sentence, three numbers, cost, More... (made on the first hover) */
+  private hover: PartHoverCard;
 
   constructor(private h: PaletteHost) {
     if (!styled) {
@@ -255,7 +259,7 @@ export class HangarPalette {
     this.foot = document.createElement('div');
     this.foot.className = 'hp-foot';
     this.root.append(this.hand, this.tabsEl, this.subsEl, this.list, this.foot);
-    this.hover = new GunPreviewHover(this.root, { catalog: h.catalog, tuning: h.tuning, econ: h.econ });
+    this.hover = new PartHoverCard(this.root, { catalog: h.catalog, tuning: h.tuning, econ: h.econ, have: (id) => h.have(id), remaining: (id) => h.remaining(id), canMake: (id) => h.canMake(id), level: () => h.level(), free: () => this.free() });
     this.tab = tabOfFn(this.rows, h.sel().fn) ?? 'structure';
 
     this.root.addEventListener('click', (e) => this.onClick(e));
@@ -263,9 +267,12 @@ export class HangarPalette {
     // Hover a part (a row, the part in hand): what it is and does
     this.root.addEventListener('mousemove', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-part]');
-      if (el) { this.h.hoverPart?.(parsePartItemId(el.dataset.part!)); this.h.partTip(el.dataset.part!, this.hover.clearOfPanel(el.dataset.part!, e)); this.hover.over(el.dataset.part!, el.closest<HTMLElement>('.hp-row') ?? el); } else { this.h.hoverPart?.(null); this.h.hideTip(); this.hover.out(); }
+      if (el) { this.h.hoverPart?.(parsePartItemId(el.dataset.part!)); this.hover.over(el.dataset.part!, el.closest<HTMLElement>('.hp-row') ?? el); } else { this.h.hoverPart?.(null); this.hover.out(); }
     });
-    this.root.addEventListener('mouseleave', () => { this.h.hoverPart?.(null); this.h.hideTip(); this.hover.out(); });
+    this.root.addEventListener('mouseleave', () => { this.h.hoverPart?.(null); this.hover.out(); });
+    // Keyboard focus on a row shows its card too
+    this.root.addEventListener('focusin', (e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('.hp-pick[data-part]'); if (el) this.hover.over(el.dataset.part!, el.closest<HTMLElement>('.hp-row') ?? el); });
+    this.root.addEventListener('focusout', (e) => { if ((e.target as HTMLElement).closest('.hp-pick')) this.hover.out(); });
   }
 
   // -------------------------------------------------------------------------

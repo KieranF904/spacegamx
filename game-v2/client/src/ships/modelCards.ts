@@ -64,7 +64,6 @@ const TRADE_OFF: Record<string, string> = {
   autocannon_rattler: 'a steady stream of shells',
   autocannon_chainsaw: 'a hose: hard to dodge, harder to power',
   autocannon_stinger: 'fast, accurate needles in short bursts',
-  flak_burst: 'bursts near what it passes · ammo',
   flak_cloudmaker: 'placed clouds at your aim distance, slow reload',
   mortar_lobber: 'lands where you aim · ammo',
   mortar_quake: 'huge splash, slow · ammo',
@@ -152,8 +151,14 @@ export function mountBadge(catalog: Catalog, p: { fn: string; mount?: Mount }): 
     + (m?.angle === 'right' ? `<span title="Side mount: fires at right angles to the edge it bolts on at (F mirrors which side)" style="${BADGE} color:#bae6fd; border:1px solid #2f6f8f">SIDE</span>` : '');
 }
 
+/** A flak shell that ends at the aim point (weaponMods.set.endAtAim) bursts there, or sooner near a target: read from the data, so it stays true */
+function aimBurstNote(fn: FunctionDef): string {
+  if (!(fn.weaponMods?.set as { endAtAim?: boolean } | undefined)?.endAtAim) return '';
+  return `bursts at your aim distance, or sooner near a target${fn.fire?.model === 'ammo' ? ' · ammo' : ''}`;
+}
+
 export function tradeOff(fn: FunctionDef): string {
-  return TRADE_OFF[fn.id] ?? fn.guide?.blurb ?? (fn.description ?? '').split(/[.:]/)[0];
+  return (Object.hasOwn(TRADE_OFF, fn.id) ? TRADE_OFF[fn.id] : undefined) ?? (aimBurstNote(fn) || fn.guide?.blurb) ?? (fn.description ?? '').split(/[.:]/)[0];
 }
 
 /** Its size, by its piece: Small (a square, wedge or round), Medium (a panel), Large (a block) */

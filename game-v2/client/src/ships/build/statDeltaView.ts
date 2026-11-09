@@ -2,7 +2,7 @@
  * @contract client.ships.build.stat-delta-view
  * owns:       showing a StatDelta: the small card that follows the cursor, the +/- chips beside each stat in a stats panel, and
  *             the controller that keeps both current as the hovered cell, the hand or the design changes (debounced when a derive is slow)
- * needs:      statDelta (the numbers), ui/escape; DOM
+ * needs:      statDelta (the numbers), build/detailMode and simpleStats (Simple shows five stats), ui/escape; DOM
  * invariants: a stats panel opts in by putting <span data-sd="KEY"> beside a stat; chips fill and clear without rebuilding the panel — none pinned
  *             the card is hidden whenever there is no change under the cursor — none pinned
  * extend:     a stat gets a chip by emitting a data-sd span with its STATS key in the panel's html
@@ -10,6 +10,8 @@
 
 import type { Blueprint } from '@space-game/common';
 import { esc } from '../../ui/escape';
+import { isSimple } from './detailMode';
+import { SIMPLE_STAT_KEYS } from './simpleStats';
 import { DeltaCache, changeKey, type Change, type DeltaLine, type StatCtx, type StatDelta, type Tone } from './statDelta';
 
 const COLOR: Record<Tone, string> = { good: '#4ade80', bad: '#f87171', flat: '#9fb0cc' };
@@ -40,11 +42,12 @@ export function cardHtml(d: StatDelta): string {
   if (d.loose) h += `<div style="color:${AMBER}; margin-bottom:3px">not connected: no effect until joined</div>`;
   if (d.cutOff > 0) h += `<div style="color:${AMBER}; margin-bottom:3px">cuts off ${d.cutOff} part${d.cutOff === 1 ? '' : 's'} from the core</div>`;
   if (d.note) h += `<div style="color:${AMBER}; margin-bottom:3px">${esc(d.note)}</div>`;
-  for (const l of d.lines) {
+  const lines = isSimple() ? d.lines.filter((l) => SIMPLE_STAT_KEYS.has(l.key)) : d.lines;
+  for (const l of lines) {
     h += `<div style="display:flex; justify-content:space-between; gap:14px"><span style="color:#8ea0bd">${esc(l.label)}</span><b style="color:${lineColor(l)}">${esc(l.text)}</b></div>`;
   }
   if (d.powerNote) h += `<div style="color:#f87171; margin-top:3px; font-weight:600">${esc(d.powerNote)}</div>`;
-  if (!d.lines.length && !d.loose && !d.note) h += '<div style="color:#8ea0bd">no change to the stats</div>';
+  if (!lines.length && !d.loose && !d.note) h += '<div style="color:#8ea0bd">no change to the stats</div>';
   return h;
 }
 

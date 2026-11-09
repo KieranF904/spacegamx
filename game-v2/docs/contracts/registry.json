@@ -1652,7 +1652,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 908,
+      "lines": 911,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1671,26 +1671,26 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 74,
-          "end": 75
+          "start": 76,
+          "end": 77
         },
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 78,
-          "end": 78
+          "start": 80,
+          "end": 80
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 79,
-          "end": 80
+          "start": 81,
+          "end": 82
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 82,
-          "end": 908
+          "start": 84,
+          "end": 911
         }
       ]
     },
@@ -1937,6 +1937,149 @@
       ]
     },
     {
+      "id": "client.ships.build-detail-mode",
+      "path": "client/src/ships/build/detailMode.ts",
+      "group": "client/ships/build",
+      "lines": 65,
+      "owns": "the one remembered Simple / Advanced choice of the build editors (hangar and world build view): read it, set it, hear of changes",
+      "needs": "browser localStorage (optional: blocked storage just means the choice is not kept)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the default is Simple, and a blocked or broken store reads as Simple",
+          "test": "client/src/ships/build/detailMode.test.ts"
+        },
+        {
+          "text": "listeners hear only real changes",
+          "test": "client/src/ships/build/detailMode.test.ts"
+        }
+      ],
+      "extend": "a view reads detailMode() and subscribes with onDetailMode(); no second mode without a new key here",
+      "exports": [
+        "DetailMode",
+        "detailMode",
+        "isSimple",
+        "loadDetailMode",
+        "onDetailMode",
+        "resetDetailMode",
+        "saveDetailMode",
+        "setDetailMode"
+      ],
+      "sections": [
+        {
+          "name": "DetailMode",
+          "kind": "type",
+          "start": 10,
+          "end": 10
+        },
+        {
+          "name": "KEY",
+          "kind": "const",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "Store",
+          "kind": "type",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "safeStorage",
+          "kind": "function",
+          "start": 16,
+          "end": 22
+        },
+        {
+          "name": "loadDetailMode",
+          "kind": "function",
+          "start": 24,
+          "end": 31
+        },
+        {
+          "name": "saveDetailMode",
+          "kind": "function",
+          "start": 33,
+          "end": 37
+        },
+        {
+          "name": "current",
+          "kind": "let",
+          "start": 39,
+          "end": 39
+        },
+        {
+          "name": "listeners",
+          "kind": "const",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "detailMode",
+          "kind": "function",
+          "start": 42,
+          "end": 44
+        },
+        {
+          "name": "isSimple",
+          "kind": "const",
+          "start": 46,
+          "end": 46
+        },
+        {
+          "name": "setDetailMode",
+          "kind": "function",
+          "start": 48,
+          "end": 53
+        },
+        {
+          "name": "onDetailMode",
+          "kind": "function",
+          "start": 55,
+          "end": 59
+        },
+        {
+          "name": "resetDetailMode",
+          "kind": "function",
+          "start": 61,
+          "end": 65
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-detail-toggle",
+      "path": "client/src/ships/build/detailToggleView.ts",
+      "group": "client/ships/build",
+      "lines": 40,
+      "owns": "the small \"Simple · Advanced\" switch in an editor's header",
+      "needs": "build/detailMode; DOM",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the switch shows the stored mode and follows changes made elsewhere",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "none",
+      "exports": [
+        "detailToggle"
+      ],
+      "sections": [
+        {
+          "name": "CSS",
+          "kind": "const",
+          "start": 11,
+          "end": 11
+        },
+        {
+          "name": "detailToggle",
+          "kind": "function",
+          "start": 13,
+          "end": 40
+        }
+      ]
+    },
+    {
       "id": "client.ships.build-drag-paint",
       "path": "client/src/ships/build/dragPaint.ts",
       "group": "client/ships/build",
@@ -2146,6 +2289,207 @@
           "kind": "class",
           "start": 15,
           "end": 80
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-part-card",
+      "path": "client/src/ships/build/partCard.ts",
+      "group": "client/ships/build",
+      "lines": 139,
+      "owns": "what the one hover card says about a part (pure): its kind, the one plain sentence, the three key numbers, and where the card sits",
+      "needs": "modelCards (tradeOff, fireChip), npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the sentence is never empty and never over 15 words",
+          "test": "client/src/ships/build/partCard.test.ts"
+        },
+        {
+          "text": "at most three numbers, chosen by the part's kind",
+          "test": "client/src/ships/build/partCard.test.ts"
+        },
+        {
+          "text": "the card is placed inside the viewport",
+          "test": "client/src/ships/build/partCard.test.ts"
+        }
+      ],
+      "extend": "a new part kind is one case in cardKind() and one in cardNumbers()",
+      "exports": [
+        "CardKind",
+        "CardNumber",
+        "Place",
+        "SUMMARY_WORDS",
+        "cardKind",
+        "cardNumbers",
+        "fireNote",
+        "partSummary",
+        "placeCard"
+      ],
+      "sections": [
+        {
+          "name": "CardKind",
+          "kind": "type",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "CardNumber",
+          "kind": "interface",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "n0",
+          "kind": "const",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "words",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "SUMMARY_WORDS",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "Stats",
+          "kind": "type",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "statsOf",
+          "kind": "function",
+          "start": 24,
+          "end": 27
+        },
+        {
+          "name": "cardKind",
+          "kind": "function",
+          "start": 29,
+          "end": 37
+        },
+        {
+          "name": "rateText",
+          "kind": "function",
+          "start": 39,
+          "end": 48
+        },
+        {
+          "name": "cardNumbers",
+          "kind": "function",
+          "start": 50,
+          "end": 93
+        },
+        {
+          "name": "firstSentence",
+          "kind": "function",
+          "start": 95,
+          "end": 99
+        },
+        {
+          "name": "cap",
+          "kind": "const",
+          "start": 101,
+          "end": 101
+        },
+        {
+          "name": "partSummary",
+          "kind": "function",
+          "start": 103,
+          "end": 114
+        },
+        {
+          "name": "fireNote",
+          "kind": "function",
+          "start": 116,
+          "end": 119
+        },
+        {
+          "name": "Place",
+          "kind": "interface",
+          "start": 121,
+          "end": 121
+        },
+        {
+          "name": "placeCard",
+          "kind": "function",
+          "start": 123,
+          "end": 139
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-part-hover-card",
+      "path": "client/src/ships/build/partHoverCard.ts",
+      "group": "client/ships/build",
+      "lines": 255,
+      "owns": "the one card beside a parts list (hangar palette, world build view) for the part under the pointer or focus: live preview or art, name, size and mount, one sentence, three numbers, cost and lock, and a \"More…\" section holding the long tooltip rows",
+      "needs": "build/partCard (numbers, sentence, placement), build/detailMode, gunPreview (GunPlan, GunPreview, gunArt), partTip, modelCards, ui/componentKit; DOM; the palette's styles for .hp-mat chips",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one card and one preview per list, made on the first hover; the preview stops when the card hides",
+          "test": "none pinned"
+        },
+        {
+          "text": "\"More…\" starts open in Advanced and closed in Simple; Shift or a click flips it",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new part kind's numbers are in build/partCard.ts; a new card section is one function here, appended in render()",
+      "exports": [
+        "PartCardDeps",
+        "PartHoverCard"
+      ],
+      "sections": [
+        {
+          "name": "CARD_W",
+          "kind": "const",
+          "start": 24,
+          "end": 24
+        },
+        {
+          "name": "SHOW_DELAY",
+          "kind": "const",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "HIDE_DELAY",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "STYLE",
+          "kind": "const",
+          "start": 28,
+          "end": 52
+        },
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 54,
+          "end": 54
+        },
+        {
+          "name": "PartCardDeps",
+          "kind": "interface",
+          "start": 56,
+          "end": 68
+        },
+        {
+          "name": "PartHoverCard",
+          "kind": "class",
+          "start": 70,
+          "end": 255
         }
       ]
     },
@@ -2621,10 +2965,44 @@
       ]
     },
     {
+      "id": "client.ships.build-simple-stats",
+      "path": "client/src/ships/build/simpleStats.ts",
+      "group": "client/ships/build",
+      "lines": 18,
+      "owns": "what Simple mode keeps of the stats: the five stat keys the delta card and chips show, and the power balance line",
+      "needs": "build/statDelta (generatorsShort)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the power line says how many generators short, and nothing when balanced",
+          "test": "client/src/ships/build/simpleStats.test.ts"
+        }
+      ],
+      "extend": "a stat kept in Simple is one more key in SIMPLE_STAT_KEYS (and a row in the hangar's simple panel)",
+      "exports": [
+        "SIMPLE_STAT_KEYS",
+        "powerBalance"
+      ],
+      "sections": [
+        {
+          "name": "SIMPLE_STAT_KEYS",
+          "kind": "const",
+          "start": 11,
+          "end": 12
+        },
+        {
+          "name": "powerBalance",
+          "kind": "function",
+          "start": 14,
+          "end": 18
+        }
+      ]
+    },
+    {
       "id": "client.ships.build.stat-delta",
       "path": "client/src/ships/build/statDelta.ts",
       "group": "client/ships/build",
-      "lines": 213,
+      "lines": 217,
       "owns": "what placing the part in hand, or removing the part under the cursor, would change on the ship: mass, acceleration, top speed, turn, power made against drawn, shield, hull, firepower, build points and cost; the memo that keeps hovering cheap; which change the cursor means (changeFor). Pure: designs in, numbers and tones out",
       "needs": "shipSummary (the hangar's own derivation, one derive per design), common validateBlueprint / buildPoints / buyPrice (npm: @space-game/common); no DOM, no editor state",
       "events": "",
@@ -2661,6 +3039,7 @@
         "changeKey",
         "diffMeasures",
         "flowOf",
+        "generatorsShort",
         "measure"
       ],
       "sections": [
@@ -2758,31 +3137,37 @@
           "name": "diffMeasures",
           "kind": "function",
           "start": 121,
-          "end": 140
+          "end": 135
+        },
+        {
+          "name": "generatorsShort",
+          "kind": "function",
+          "start": 137,
+          "end": 144
         },
         {
           "name": "lineOf",
           "kind": "function",
-          "start": 142,
-          "end": 155
+          "start": 146,
+          "end": 159
         },
         {
           "name": "changeFor",
           "kind": "function",
-          "start": 157,
-          "end": 163
+          "start": 161,
+          "end": 167
         },
         {
           "name": "changeKey",
           "kind": "function",
-          "start": 165,
-          "end": 170
+          "start": 169,
+          "end": 174
         },
         {
           "name": "DeltaCache",
           "kind": "class",
-          "start": 172,
-          "end": 213
+          "start": 176,
+          "end": 217
         }
       ]
     },
@@ -2790,9 +3175,9 @@
       "id": "client.ships.build.stat-delta-view",
       "path": "client/src/ships/build/statDeltaView.ts",
       "group": "client/ships/build",
-      "lines": 135,
+      "lines": 138,
       "owns": "showing a StatDelta: the small card that follows the cursor, the +/- chips beside each stat in a stats panel, and the controller that keeps both current as the hovered cell, the hand or the design changes (debounced when a derive is slow)",
-      "needs": "statDelta (the numbers), ui/escape; DOM",
+      "needs": "statDelta (the numbers), build/detailMode and simpleStats (Simple shows five stats), ui/escape; DOM",
       "events": "",
       "invariants": [
         {
@@ -2816,68 +3201,68 @@
         {
           "name": "COLOR",
           "kind": "const",
-          "start": 15,
-          "end": 15
+          "start": 17,
+          "end": 17
         },
         {
           "name": "AMBER",
           "kind": "const",
-          "start": 16,
-          "end": 17
+          "start": 18,
+          "end": 19
         },
         {
           "name": "lineColor",
           "kind": "const",
-          "start": 19,
-          "end": 19
+          "start": 21,
+          "end": 21
         },
         {
           "name": "applyChips",
           "kind": "function",
-          "start": 21,
-          "end": 34
+          "start": 23,
+          "end": 36
         },
         {
           "name": "cardHtml",
           "kind": "function",
-          "start": 36,
-          "end": 49
+          "start": 38,
+          "end": 52
         },
         {
           "name": "CARD_CSS",
           "kind": "const",
-          "start": 51,
-          "end": 52
+          "start": 54,
+          "end": 55
         },
         {
           "name": "DeltaCard",
           "kind": "class",
-          "start": 54,
-          "end": 71
+          "start": 57,
+          "end": 74
         },
         {
           "name": "SLOW_MS",
           "kind": "const",
-          "start": 73,
-          "end": 74
+          "start": 76,
+          "end": 77
         },
         {
           "name": "SETTLE_MS",
           "kind": "const",
-          "start": 75,
-          "end": 75
+          "start": 78,
+          "end": 78
         },
         {
           "name": "HoverIn",
           "kind": "interface",
-          "start": 77,
-          "end": 87
+          "start": 80,
+          "end": 90
         },
         {
           "name": "DeltaHover",
           "kind": "class",
-          "start": 89,
-          "end": 135
+          "start": 92,
+          "end": 138
         }
       ]
     },
@@ -4907,9 +5292,9 @@
       "id": "client.hangar.stats",
       "path": "client/src/ships/hangar/hangarStats.ts",
       "group": "client/ships/hangar",
-      "lines": 436,
+      "lines": 440,
       "owns": "the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems",
-      "needs": "HangarHost (deps, derived, bp, errors), shipSummary, portsReport; npm: @space-game/common",
+      "needs": "HangarHost (deps, derived, bp, errors), shipSummary, portsReport, build/detailMode (Simple swaps power + ship sections for hangarStatsSimple); npm: @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -4931,62 +5316,89 @@
         {
           "name": "buildHtml",
           "kind": "function",
-          "start": 26,
-          "end": 93
+          "start": 28,
+          "end": 95
         },
         {
           "name": "ammoHtml",
           "kind": "function",
-          "start": 95,
-          "end": 143
+          "start": 97,
+          "end": 145
         },
         {
           "name": "bindBuildButtons",
           "kind": "function",
-          "start": 145,
-          "end": 171
+          "start": 147,
+          "end": 173
         },
         {
           "name": "powerHtml",
           "kind": "function",
-          "start": 173,
-          "end": 231
+          "start": 175,
+          "end": 233
         },
         {
           "name": "portsHtml",
           "kind": "function",
-          "start": 233,
-          "end": 246
+          "start": 235,
+          "end": 248
         },
         {
           "name": "summaryHtml",
           "kind": "function",
-          "start": 248,
-          "end": 323
+          "start": 250,
+          "end": 325
         },
         {
           "name": "renderStats",
           "kind": "function",
-          "start": 325,
-          "end": 378
+          "start": 327,
+          "end": 382
         },
         {
           "name": "energyRuns",
           "kind": "const",
-          "start": 380,
-          "end": 390
+          "start": 384,
+          "end": 394
         },
         {
           "name": "ENERGY_ROW_SECONDS",
           "kind": "const",
-          "start": 391,
-          "end": 391
+          "start": 395,
+          "end": 395
         },
         {
           "name": "energyHtml",
           "kind": "function",
-          "start": 393,
-          "end": 436
+          "start": 397,
+          "end": 440
+        }
+      ]
+    },
+    {
+      "id": "client.hangar.stats-simple",
+      "path": "client/src/ships/hangar/hangarStatsSimple.ts",
+      "group": "client/ships/hangar",
+      "lines": 35,
+      "owns": "the hangar's right-hand ship section in Simple mode: top speed, turn, firepower, hull (and shield), power balance",
+      "needs": "HangarHost (deps, derived, bp, unsaved, overlays, deltaNow), shipSummary, build/simpleStats, build/statDelta (flowOf)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every row carries its data-sd span, so the stat-delta chips fill in as in Advanced",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a stat kept in Simple is one row here and one key in build/simpleStats.ts",
+      "exports": [
+        "simpleSummaryHtml"
+      ],
+      "sections": [
+        {
+          "name": "simpleSummaryHtml",
+          "kind": "function",
+          "start": 14,
+          "end": 35
         }
       ]
     },
@@ -4994,8 +5406,8 @@
       "id": "client.hangar.tips",
       "path": "client/src/ships/hangar/hangarTips.ts",
       "group": "client/ships/hangar",
-      "lines": 76,
-      "owns": "the hangar's part tooltips (grid and palette): when they show and what they say",
+      "lines": 65,
+      "owns": "the hangar's grid part tooltips: when they show and what they say (the parts list has its own hover card: build/partHoverCard.ts)",
       "needs": "HangarHost (tip, tipKey, tipGen, deps), partTip.ts; npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -5008,7 +5420,6 @@
       "exports": [
         "gridTip",
         "hideTip",
-        "partTip",
         "ruleText",
         "showTip",
         "tipCtx"
@@ -5017,38 +5428,32 @@
         {
           "name": "ruleText",
           "kind": "function",
-          "start": 14,
-          "end": 17
+          "start": 13,
+          "end": 16
         },
         {
           "name": "tipCtx",
           "kind": "function",
-          "start": 19,
-          "end": 21
+          "start": 18,
+          "end": 20
         },
         {
           "name": "showTip",
           "kind": "function",
-          "start": 23,
-          "end": 35
+          "start": 22,
+          "end": 34
         },
         {
           "name": "hideTip",
           "kind": "function",
-          "start": 37,
-          "end": 41
+          "start": 36,
+          "end": 40
         },
         {
           "name": "gridTip",
           "kind": "function",
-          "start": 43,
-          "end": 66
-        },
-        {
-          "name": "partTip",
-          "kind": "function",
-          "start": 68,
-          "end": 76
+          "start": 42,
+          "end": 65
         }
       ]
     },
@@ -5056,7 +5461,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 154,
+      "lines": 153,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -5089,7 +5494,7 @@
           "name": "HangarHost",
           "kind": "interface",
           "start": 59,
-          "end": 154
+          "end": 153
         }
       ]
     },

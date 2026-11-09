@@ -57,6 +57,8 @@ import { HangarLitView } from './HangarLitView';
 import { saveBlueprint } from './blueprintApi';
 import { PART_TIP_CSS, type PartTipCtx } from './partTip';
 import { loadPowerFlow, savePowerFlow } from './build/powerFlowPref';
+import { onDetailMode } from './build/detailMode';
+import { detailToggle } from './build/detailToggleView';
 import { FlowCanvasLayer, FLOW_KEY } from './build/powerFlowView';
 import type { HangarDeps, HangarHost, Overlay } from './hangar/host';
 import { foldHeading, button, chip, checkbox } from './hangar/hangarWidgets';
@@ -65,7 +67,7 @@ import { draw } from './hangar/hangarDraw';
 import { buildHtml, ammoHtml, bindBuildButtons, powerHtml, portsHtml, summaryHtml, renderStats } from './hangar/hangarStats';
 import { refreshLoadList, loadSelected, designKey, toggleDesigns, renderDesigns, saveDesign, deleteDesign, loadDesign } from './hangar/hangarDesigns';
 import { TURN_KEYS, escapeStep, partUnder, tryTurn } from './build/editPlaced';
-import { tipCtx, showTip, hideTip, gridTip, partTip } from './hangar/hangarTips';
+import { tipCtx, showTip, hideTip, gridTip } from './hangar/hangarTips';
 import { ruleText } from './hangar/hangarTips';
 import { makeDeltaHover, syncDelta } from './hangar/hangarDelta';
 import type { StatDelta } from './build/statDelta';
@@ -210,9 +212,12 @@ export class HangarUI implements HangarHost {
       this.designBtn,
       save,
       button('Share', () => { this.deps.send({ type: 'shareDesign', blueprint: clone(this.bp) }); this.status('sent to your party'); }),
+      detailToggle().el,
       button('Close', () => this.close(null)),
       this.statusEl,
     );
+    // (Simple / Advanced: the stats panel and the hover card follow the switch)
+    onDetailMode(() => { if (this.isOpen) this.renderStats(); });
     // (buttons keep their one line; the slots and the status give way)
     for (const b of bar.querySelectorAll<HTMLElement>(':scope > button')) { b.style.whiteSpace = 'nowrap'; b.style.flexShrink = '0'; }
     // Saved designs: a panel under the bar
@@ -238,7 +243,6 @@ export class HangarUI implements HangarHost {
       free: () => this.free,
       freeBuild: () => this.freeBuild,
       grantAll: () => this.grantAll,
-      partTip: (id, e) => this.partTip(id, e),
       hideTip: () => { if (this.tipKey.startsWith('p:')) this.hideTip(); },
     });
     this.palette.append(this.pal.root);
@@ -872,7 +876,6 @@ export class HangarUI implements HangarHost {
 
   gridTip(e: MouseEvent): void { return gridTip(this, e); }
 
-  partTip(id: string, e: MouseEvent): void { return partTip(this, id, e); }
 
   // -------------------------------------------------------------------------
   // Canvas
