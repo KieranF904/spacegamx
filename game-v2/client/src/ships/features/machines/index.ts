@@ -30,7 +30,7 @@ let gfx: Graphics | undefined;
 export const clientFeature: ClientFeature = {
   id: 'machines',
   actions: [
-    { id: 'fieldBuild', label: 'Build view (edit your ship in flight)', category: 'Ship & world', key: 'Digit7', hint: 'Zooms in on your ship and opens the parts list: place parts, right-click a part to recycle it, then save. New parts are missing parts the fabricator builds from your hold, as it rebuilds parts shot off' },
+    { id: 'fieldBuild', label: 'Build view (edit your ship in flight)', category: 'Ship & world', key: 'Digit7', hint: 'Zooms in on your ship and opens the parts list: place parts, right-click a part to recycle it, then save. New parts are missing parts the fabricator builds from your hold, as it rebuilds parts shot off. Ctrl+Z undoes, Ctrl+Y redoes, M mirrors every edit across the centre line' },
     { id: 'fabricator', label: 'Fabricator on / off', category: 'Ship & world', key: 'Digit8', after: 'fieldBuild', hint: 'It draws power only while it works' },
     { id: 'refiner', label: 'Refiner on / off', category: 'Ship & world', key: 'Digit9', after: 'fabricator' },
   ],

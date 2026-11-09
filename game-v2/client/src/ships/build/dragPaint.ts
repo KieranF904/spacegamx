@@ -57,6 +57,11 @@ export class DragPaint {
     this.seen.add(key(start));
   }
 
+  /** A cell the editor acted on besides the one visited (the mirror cell in symmetry mode): not handed out later */
+  mark(p: Vec2): void {
+    this.seen.add(key(p));
+  }
+
   /** The points (one per cell) the cursor passed over since the last call, never a cell seen before in this drag */
   visit(to: Vec2): Vec2[] {
     const path = cellsAlong(this.last, to);
