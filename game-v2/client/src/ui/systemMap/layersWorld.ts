@@ -158,7 +158,8 @@ export function drawCentral(host: MapHost, sc: MapScene): void {
     ctx.beginPath(); ctx.arc(ox, oy, sys.pocket.radius * S, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
     host.label(ctx, `Edge of ${sys.pocket.entrance.name}: fly out to leave`, ox, oy - sys.pocket.radius * S - 14, '#cfe6ff', 2);
-  } else {
+  } else if (cb.type !== 'none') {
+    // (A system with no central body, the training yard, has nothing at the middle)
     host.drawBodyGlyph(ctx, cb, sys?.starColor, ox, oy, bodyR, time);
   }
 }

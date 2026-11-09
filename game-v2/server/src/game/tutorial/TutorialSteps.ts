@@ -81,7 +81,7 @@ export class TutorialSteps {
         return !!t && objects.every((id) => { const def = this.tutorial.def(id); return !!def && objectBroken(t, def); });
       }
       case 'collect':
-        if (ev.kind !== 'collected') return false;
+        if (ev.kind !== 'collected' || (tr.items && !tr.items.includes(ev.item))) return false;
         p.n += ev.n;
         return p.n >= (tr.count ?? 1);
       case 'panel': {

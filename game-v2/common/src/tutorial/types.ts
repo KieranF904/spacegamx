@@ -8,8 +8,8 @@
  *             case in server/src/game/tutorial/TutorialSteps.ts; a new event is a member of TutorialEvent
  */
 
-/** What a training object is. `rock`/`drone` are real (stationary) asteroid entities every pilot collides with; `ring`/`zone`/`exit` are markers that collide with nothing */
-export type TutorialObjectKind = 'rock' | 'drone' | 'ring' | 'zone' | 'exit';
+/** What a training object is. `drone` is a real (stationary) asteroid entity every pilot collides with; `ring`/`zone`/`exit` are markers that collide with nothing. (The mining lesson uses the yard's own asteroid belt: data/systems.json) */
+export type TutorialObjectKind = 'drone' | 'ring' | 'zone' | 'exit';
 
 /** A point in the yard, as an offset from `yard.center` (the whole yard moves with one number) */
 export interface TutorialPoint { x: number; y: number }
@@ -17,17 +17,14 @@ export interface TutorialPoint { x: number; y: number }
 export interface TutorialObjectDef {
   id: string;
   kind: TutorialObjectKind;
-  /** The step this object belongs to: once a pilot has done that step the object is inert for them (no damage, no drops, drawn ghosted) */
+  /** The step this object belongs to: once a pilot has done that step the object is inert for them (no damage, drawn ghosted; before they reach it, not drawn at all) */
   step: string;
   /** Offset from yard.center */
   at: TutorialPoint;
-  /** Body size (rock/drone) or trigger radius (ring/zone/exit) */
+  /** Body size (drone) or trigger radius (ring/zone/exit) */
   radius: number;
-  /** rock/drone: damage one pilot must deal (their own counter) before it "breaks" for them */
+  /** drone: damage one pilot must deal (their own counter) before it "breaks" for them */
   hp?: number;
-  /** rock: what breaks off for that pilot alone, split over `chunks` pods (only they see and take them) */
-  drops?: Record<string, number>;
-  chunks?: number;
   /** Label the client may draw on the marker */
   label?: string;
 }
@@ -37,7 +34,7 @@ export type TutorialTriggerKind =
   | 'rings'          // every object in `objects` passed
   | 'zoneStop'       // stopped inside the zone in `objects[0]`
   | 'objectsBroken'  // every object in `objects` broken (for this pilot)
-  | 'collect'        // `count` ore taken into the hold
+  | 'collect'        // `count` ore (of `items`, when given) taken into the hold since the step began
   | 'panel'          // the client opened `panel`, or every one of `panels` (hold, hangar, bank, guide, map ...)
   | 'docked'         // docked at the yard station
   | 'refined'        // refined `item` once
@@ -53,6 +50,8 @@ export interface TutorialTrigger {
   /** Several panels, all to be opened (in any order) */
   panels?: string[];
   item?: string;
+  /** collect: only these items count toward `count` (any item, if absent) */
+  items?: string[];
   count?: number;
 }
 
@@ -109,7 +108,7 @@ export interface TutorialData {
 
 /** Asteroid index of training object `i` (the Nth in data.objects): above any belt's, so clients tell them apart */
 export const TUTORIAL_INDEX_BASE = 900_000;
-/** The asteroid definition training rocks and drones are made from (a real type in data/mining.json) */
+/** The asteroid definition training drones are made from (a real type in data/mining.json) */
 export const TUTORIAL_ROCK_TYPE = 'asteroid_metal';
 /** The first step's id (a new pilot starts here) */
 export const TUTORIAL_FIRST_STEP = 'welcome';

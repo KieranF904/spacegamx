@@ -34,7 +34,7 @@ export function createTutorialHost(gs: GameServer): TutorialHost {
 /** Build the yard if this server runs one: the module, and the pilots' spawn hook */
 export function setupTutorial(gs: GameServer, opts: GameServerOptions): Tutorial | undefined {
   if (!opts.tutorial || gs.devStartNum >= 0 || !gs.gameData.tutorialFile) return undefined;
-  const tutorial = new Tutorial(createTutorialHost(gs), gs.pilots, gs.pods);
+  const tutorial = new Tutorial(createTutorialHost(gs), gs.pilots);
   gs.pilots.tutorialSpawn = (conn, resume) => tutorial.spawnFor(conn, resume);
   return tutorial;
 }

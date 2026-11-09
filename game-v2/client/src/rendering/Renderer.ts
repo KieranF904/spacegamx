@@ -279,6 +279,7 @@ export class Renderer {
       cameraAngle: () => this.cameraAngle,
       sysData: () => this.sys.data,
       wayIns: () => this.wayIns,
+      hiddenBody: (id) => this.trainingLooks.get(id) === 'hidden',
     });
   }
   

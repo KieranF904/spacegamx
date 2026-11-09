@@ -1,7 +1,7 @@
 /**
  * @contract client.ui.tutorial.ui
- * owns:       wiring the lesson into the game: the card, markers and toast from each tutorialState, ghost/drone looks for the
- *             training bodies, panel-open reports (polled here, so no panel's own code changes), retiring the old tour
+ * owns:       wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the
+ *             training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour
  * needs:      tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, the game's entities, a send function, a renderer hook
  * invariants: step text, targets and rules come from the server's state and data/tutorial.json, never hardcoded here — client/src/ui/tutorial/tutorialModel.test.ts
  * extend:     a new panel to report is an entry in `panelsOpen` (Game wiring) and in common TUTORIAL_PANELS
@@ -56,6 +56,7 @@ export class TutorialUI {
       worldToScreen: (x, y) => d.worldToScreen(x, y),
       me: () => { const e = d.state.entities.get(d.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
       station: () => this.yardStation(),
+      nearestRock: () => this.nearestRock(),
     });
     onTutorial((s) => this.onState(s));
     // (The yard's edge: the card's own leave confirm, Leave / Stay)
@@ -102,6 +103,20 @@ export class TutorialUI {
     return best;
   }
 
+  /** The belt rock nearest the pilot (the mining step's mark): any asteroid the client knows that is not a training drone */
+  private nearestRock(): { x: number; y: number; radius: number } | null {
+    const me = this.d.state.entities.get(this.d.state.playerId);
+    if (!me) return null;
+    const drones = new Set(this.entityOf.values());
+    let best: { x: number; y: number; radius: number } | null = null, bd = Infinity;
+    for (const e of this.d.state.entities.values()) {
+      if (e.type !== EntityType.Asteroid || drones.has(e.id)) continue;
+      const d = Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY);
+      if (d < bd) { bd = d; best = { x: e.renderX, y: e.renderY, radius: e.data?.[0] ?? 60 }; }
+    }
+    return best;
+  }
+
   /** Each frame; `hidden`: behind a full-screen view */
   update(hidden: boolean): void {
     const s = this.cur;
@@ -121,12 +136,12 @@ export class TutorialUI {
     if (++this.frame % 20 === 0) this.looks();
   }
 
-  /** Give each training body its look (a drone, a ghost, or the plain rock) */
+  /** Give each training body its look (a drone, a ghost or nothing) */
   private looks(): void {
     const s = this.cur;
     if (!s) return;
     for (const o of tutorialData.objects) {
-      if (o.kind !== 'rock' && o.kind !== 'drone') continue;
+      if (o.kind !== 'drone') continue;
       let id = this.entityOf.get(o.id);
       const known = id !== undefined ? this.d.state.entities.get(id) : undefined;
       if (!known || known.type !== EntityType.Asteroid) {
@@ -140,7 +155,7 @@ export class TutorialUI {
         if (id === undefined) continue;
         this.entityOf.set(o.id, id);
       }
-      const look = lookFor(o, s);
+      const look = lookFor(o, s, tutorialData);
       if (this.applied.has(o.id) && this.applied.get(o.id) === look) continue;
       this.applied.set(o.id, look);
       this.d.setTrainingLook(id!, look);

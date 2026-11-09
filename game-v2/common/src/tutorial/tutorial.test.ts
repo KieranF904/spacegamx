@@ -50,13 +50,13 @@ describe('a pilot\'s tutorial state', () => {
   });
 
   it('objects are live until their step is done or the pilot broke them', () => {
-    const rock = data.objects.find((o) => o.id === 'training_rock')!;
+    const rock = data.objects.find((o) => o.id === 'drone_1')!;
     const t = newTutorial();
     expect(objectLive(t, rock)).toBe(true);
-    t.hits = { training_rock: rock.hp! };
+    t.hits = { drone_1: rock.hp! };
     expect(objectBroken(t, rock)).toBe(true);
     expect(objectLive(t, rock)).toBe(false);
-    expect(objectLive({ ...newTutorial(), done: ['mine'] }, rock)).toBe(false);
+    expect(objectLive({ ...newTutorial(), done: ['drones'] }, rock)).toBe(false);
     expect(objectLive({ step: '', done: [], left: true }, rock)).toBe(false);
     expect(objectLive(undefined, rock)).toBe(false);
   });

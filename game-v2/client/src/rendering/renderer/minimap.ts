@@ -20,6 +20,8 @@ export interface MinimapHost {
   cameraAngle(): number;
   sysData(): StarSystemData | undefined;
   wayIns(): NestData[];
+  /** A body the lesson hides from this pilot (a training rock or drone of a step they have not reached) */
+  hiddenBody(id: number): boolean;
 }
 
 export class Minimap {
@@ -96,8 +98,11 @@ export class Minimap {
     const scale = (this.MINIMAP_SIZE / 2) / this.MINIMAP_RANGE;
     
     // Draw star/sun at center if close enough
+    // (A system with no central body, the training yard, has no sun to show)
+    const sys = this.host.sysData();
+    const hasSun = (sys?.centralBody?.type ?? 'sun') !== 'none' && (sys?.starRadius ?? 1) > 0;
     const sunDist = Math.sqrt(playerPos.x ** 2 + playerPos.y ** 2);
-    if (sunDist < this.MINIMAP_RANGE * 2) {
+    if (hasSun && sunDist < this.MINIMAP_RANGE * 2) {
       const sunX = center + (-playerPos.x) * scale;
       const sunY = center + (-playerPos.y) * scale;
       g.circle(sunX, sunY, 8);
@@ -149,6 +154,7 @@ export class Minimap {
           break;
           
         case EntityType.Asteroid:
+          if (this.host.hiddenBody(id)) break;
           g.circle(mx, my, 2 + (entity.data?.[0] || 50) / 50);
           g.fill({ color: 0x888888, alpha: 0.6 }); // Gray for asteroids
           break;

@@ -429,7 +429,8 @@ export class SystemMapUI implements MapHost {
     for (const p of sys?.portals ?? []) ext = Math.max(ext, Math.hypot(p.position.x, p.position.y));
     for (const z of sys?.zones ?? []) ext = Math.max(ext, z.outer + (z.x !== undefined ? Math.hypot(z.x, z.y ?? 0) : 0));
     for (const b of sys?.asteroidBelt?.extra ?? []) ext = Math.max(ext, b.outerRadius);
-    for (const g of sys?.regions ?? []) ext = Math.max(ext, g.outer);
+    // (The yard's one region reaches far past anything in it: fit what is there)
+    if (!sys?.tutorial) for (const g of sys?.regions ?? []) ext = Math.max(ext, g.outer);
     if (sys?.surface) ext = sys.surface.radius;
     if (sys?.pocket) ext = sys.pocket.radius;
     for (const e of this.state.entities.values()) if (e.type === EntityType.Station) ext = Math.max(ext, Math.hypot(e.x, e.y));
