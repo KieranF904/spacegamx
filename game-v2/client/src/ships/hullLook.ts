@@ -19,7 +19,6 @@ import type { Catalog, PlacedGeom } from '@space-game/common';
 import { HULL_ROWS, HULL_TILE } from './hullTextures';
 
 /** By what a part does: 0 plating, 1 armour, 2 machinery, 3 core, 4 plain hardware (decor), 5 energy parts, 6 jump coils */
-export const ENGINE_FNS = new Set(['thruster', 'afterburner', 'plasma_drive']);
 const ENERGY_FNS = new Set(['generator', 'battery', 'drive_battery', 'weapon_battery', 'shield']);
 export const hullKind = (fn: string) => (fn === 'core' ? 3 : fn === 'armor' || fn === 'molten_plate' ? 1 : fn === 'hull' || fn === 'cargo' ? 0 : ENERGY_FNS.has(fn) ? 5 : fn === 'jumpcoil' ? 6 : 2);
 

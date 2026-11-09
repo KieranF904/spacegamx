@@ -8,8 +8,8 @@
 import { pointInConvex, type Catalog, type PieceDetail, type PlacedGeom, type ShipState } from '@space-game/common';
 import { LitGeometry } from '../rendering/lighting/LitGeometry';
 import { ShipGeometry, type ShipHull } from '../rendering/lighting/ShipBatch';
-import { ENGINE_FNS, HULL_MAT, bakeHull, gradeOfMaterial, hullKind } from './hullLook';
-import { decorOf } from './partDecor';
+import { HULL_MAT, bakeHull, gradeOfMaterial, hullKind } from './hullLook';
+import { ENGINE_FNS, decorOf } from './partDecor';
 import { functionColor, mix } from './shipColors';
 import { carve, drawDetail } from './bespokeRelief';
 import { SOLAR_CELL_HEX, SOLAR_FRAME_HEX, SOLAR_HULL_TILE } from '../rendering/solarCells';
