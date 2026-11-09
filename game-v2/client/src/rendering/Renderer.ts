@@ -9,96 +9,79 @@
 
 import { Bloom } from './Bloom';
 import { PanControl } from './renderer/panControl';
-import { placeUpright, buildPlayerParts, buildPortalParts, updateHealthBar, type Tag, type Gate } from './renderer/entityParts';
-import { DEFAULT_SYSTEM_VISUALS, visualsFromInfo, lightSystem, type SystemVisuals, type Day } from './renderer/systemVisuals';
+import { type Tag, type Gate } from './renderer/entityParts';
+import { visualsFromInfo, type SystemVisuals, type Day } from './renderer/systemVisuals';
 import { ParticleFx } from './renderer/particleFx';
 import { DamageNumbers } from './renderer/damageNumbers';
 import { DeathScreen } from './renderer/deathScreen';
 import { Minimap } from './renderer/minimap';
 import type { QualityProfile } from '../settings/quality';
 import { SpritePool } from './spritePool';
-import { disc, ring, rock, glowBall, vignette, DOT_SIZE } from './fxTextures';
+import { vignette } from './fxTextures';
 import { stepOverlays, screenTint } from './overlayFrame';
-import { cameraView, helmFollow, MAX_VIEW_SPIN, NORTH_RETURN_RATE, screenToWorld, screenToWorldDir, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
+import { screenToWorld, viewHalfExtents, worldToScreen } from './cameraView';
 import { PlanetRenderer } from './PlanetRenderer';
 import { setPlanetDetail } from './planet-proto/planetQuad';
 import { installVolumeUpload } from './texture3d';
 import { SceneryRenderer } from './Scenery';
 import { NestRenderer } from './NestViews';
 import systemsData from '../../../data/systems.json';
-import {
-  Application,
-  Sprite,
-  Container,
-  Graphics,
-  Text,
-  TextStyle,
-} from 'pixi.js';
+import { Application, Sprite, Container, Graphics } from 'pixi.js';
 import { GameState } from '../state/GameState';
-import { WeaponFx, shotTimelines, type PredictedShell } from './weapons/WeaponFx';
+import { WeaponFx, type PredictedShell } from './weapons/WeaponFx';
 import { MiningStrikeFx } from './weapons/MiningStrikeFx';
 import { LootPodView } from './LootPodView';
 import { TerrainView } from './TerrainView';
-import { terrainFor, gunRangeFor } from './terrainData';
 import { ChamberView } from './gunRange/ChamberView';
-import { settings } from '../settings/Settings';
-import { boundKeyName } from '../input/keybindings';
 import { MobView } from './MobView';
-import { drawAsteroid, AsteroidSeams } from './AsteroidLook';
+import { AsteroidSeams } from './AsteroidLook';
 import type { AsteroidRock } from './AsteroidLook';
 import { drawTrainingLook, TRAINING_LABEL } from './TrainingLook';
 import type { TrainingLook } from '../ui/tutorial/tutorialModel';
 import { RiftShader } from './RiftShader';
 import { StationShot, StationView } from './StationView';
 import { CentralBodyShaders } from './CentralBodyShaders';
-import { SunRenderer, starOf } from './sun/SunRenderer';
+import { SunRenderer } from './sun/SunRenderer';
 import type { StarBody } from './sun/plasmaSun';
-import {
-  EntityType,
-  EffectType,
-  getAsteroidPolygon,
-  pocketsFrom,
-  entranceNest,
-} from '@space-game/common';
+import { EntityType, EffectType, pocketsFrom, entranceNest } from '@space-game/common';
 import { SkyRenderer } from './sky/SkyRenderer';
-import { SurfaceRenderer, SUN_DIR } from './surface/SurfaceRenderer';
+import { SurfaceRenderer } from './surface/SurfaceRenderer';
 import { CityView } from './surface/CityView';
 import { BastionView } from './surface/siege/BastionView';
 import { Lighting } from './lighting/Lighting';
 import { AsteroidBatch } from './lighting/AsteroidBatch';
-import { skyBiome, SkyBiome } from './sky/skyBiome';
+import { SkyBiome } from './sky/skyBiome';
 import type { NestData, ServerSystemInfoMessage, StarSystemData } from '@space-game/common';
-
-/** Seconds to fade an entity in as it appears, or out as it goes */
-const FADE = 0.25;
-/** A panned view (middle mouse) keeps your ship at least this fraction of the screen in from every edge */
-const PAN_MARGIN = 0.1;
+import { renderEntities } from './renderer/entityViews';
+import { renderBackground } from './renderer/background';
+import { updateCamera } from './renderer/cameraStep';
+import { updateEffects, collectLights } from './renderer/frameEffects';
 
 export class Renderer {
-  private app: Application;
-  private state: GameState;
+  app: Application;
+  state: GameState;
   
   // Containers (render order)
-  private worldContainer: Container;
-  private backgroundContainer: Container;
-  private entityContainer: Container;
+  worldContainer: Container;
+  backgroundContainer: Container;
+  entityContainer: Container;
   /** A surface's rock (TerrainView), and the system it's for */
-  private terrainLayer = new Container();
-  private terrainView: TerrainView | null = null;
+  terrainLayer = new Container();
+  terrainView: TerrainView | null = null;
   /** A gun range's chamber (rendering/gunRange): indoors, so no sky */
-  private chamber: ChamberView | null = null;
-  private terrainId: string | null = null;
-  private effectContainer: Container;
+  chamber: ChamberView | null = null;
+  terrainId: string | null = null;
+  effectContainer: Container;
   private uiContainer: Container;
   
   /** Projectile tracers, muzzle flashes and impacts */
-  private weaponFx: WeaponFx;
+  weaponFx: WeaponFx;
   /** Mining strikes on rock (a hit that rolls for ore), and a chunk's richer puff where it appears (weapons/MiningStrikeFx.ts) */
-  private miningStrikes = new MiningStrikeFx({ spark: (...a) => this.fx.spark(...a), flash: (...a) => this.fx.flash(...a) }, () => performance.now() / 1000);
+  miningStrikes = new MiningStrikeFx({ spark: (...a) => this.fx.spark(...a), flash: (...a) => this.fx.flash(...a) }, () => performance.now() / 1000);
   /** A loot pod appeared at (x, y) (a mined chunk among them: ships/MiningProgress.ts takes it as your drop when it's by your strikes) */
   onPodAppeared: ((x: number, y: number) => void) | null = null;
   /** Black hole / pulsar central bodies */
-  private centralShaders = new CentralBodyShaders();
+  centralShaders = new CentralBodyShaders();
   /** The current system's planets and moons */
   private planets = new PlanetRenderer();
   /** Comets, built structures and stillstones */
@@ -111,19 +94,19 @@ export class Renderer {
   lodestoneGlow: ((id: string) => number) | null = null;
   private scenerySystem = '';
   /** Rift portal vortex shaders, by entity id */
-  private rifts = new Map<number, RiftShader>();
-  private lootPods = new Map<number, LootPodView>();
+  rifts = new Map<number, RiftShader>();
+  lootPods = new Map<number, LootPodView>();
   /** Single-body enemies (data/mobs.json) */
-  private mobs = new Map<number, MobView>();
-  private asteroidSeams = new Map<number, AsteroidSeams>();
+  mobs = new Map<number, MobView>();
+  asteroidSeams = new Map<number, AsteroidSeams>();
   /** Training-yard bodies drawn another way (a drone, a ghost) instead of in the rock batch, and each rock's own object to put it back */
-  private trainingLooks = new Map<number, TrainingLook>();
-  private rockObjs = new Map<number, AsteroidRock>();
+  trainingLooks = new Map<number, TrainingLook>();
+  rockObjs = new Map<number, AsteroidRock>();
   /** Asteroids just struck (when, how hard): a white flash and a little jolt */
-  private rockHits = new Map<number, { at: number; strength: number }>();
-  private seamTime = 0;
+  rockHits = new Map<number, { at: number; strength: number }>();
+  seamTime = 0;
   /** Station visuals, by entity id */
-  private stations = new Map<number, StationView>();
+  stations = new Map<number, StationView>();
   /** Modular ships and debris (drawn by ShipRenderer) */
   private shipLayer = new Container();
 
@@ -133,16 +116,16 @@ export class Renderer {
   public shipRadius = new Map<number, number>();
   
   // Camera
-  private cameraX = 0;
-  private cameraY = 0;
-  private cameraZoom = 1;
+  cameraX = 0;
+  cameraY = 0;
+  cameraZoom = 1;
   /** The view's roll (cameraView.ts): eases onto this heading in helm, back to north-up (null) otherwise */
-  private cameraAngle = 0;
+  cameraAngle = 0;
   /** Seconds the view has been following a heading (helm): it follows loosely at first, then closely */
-  private helmTime = 0;
-  private cameraHeading: number | null = null;
+  helmTime = 0;
+  cameraHeading: number | null = null;
   /** The middle-mouse drag of the view and its button (renderer/panControl.ts); the view always keeps the ship PAN_MARGIN inside the screen */
-  private panCtl: PanControl;
+  panCtl: PanControl;
   /** Camera catch-up per frame (0..1) */
   public cameraFollow = 0.1;
   /** Display settings */
@@ -154,49 +137,49 @@ export class Renderer {
   /** The star (plasma, drawn at a share of the screen's resolution: sun/SunRenderer.ts) */
   readonly sun: SunRenderer;
   /** A system's star, for one not in systems.json (made from its visuals once) */
-  private starBodies = new WeakMap<SystemVisuals, StarBody>();
+  starBodies = new WeakMap<SystemVisuals, StarBody>();
   
   // GPU procedural starfield (sandbox-style)
-  private sky: SkyRenderer;
+  sky: SkyRenderer;
   /** A planet's ground and clouds, in place of the sky while you're on one */
-  private surface: SurfaceRenderer;
-  private city: { system: string; view: CityView | null; bastion: BastionView | null } | null = null;
-  private day: Day = { ambient: [1, 1, 1], power: 0, sun: [1, 1, 1] };
+  surface: SurfaceRenderer;
+  city: { system: string; view: CityView | null; bastion: BastionView | null } | null = null;
+  day: Day = { ambient: [1, 1, 1], power: 0, sun: [1, 1, 1] };
   /** The edge of a surface's map */
-  private surfaceEdge = new Graphics();
+  surfaceEdge = new Graphics();
   /** On a surface, ships cast soft shadows on the ground (that's what puts them up in the air) */
-  private shadows = new SpritePool('normal');
+  shadows = new SpritePool('normal');
   /** Ships, stations and asteroids lit by the sun, the system's ambient light and every light nearby */
   readonly lighting: Lighting;
   /** Asteroid rocks, lit, in batches */
-  private rocks: AsteroidBatch;
-  private lightKey = '';
-  private podLight: [number, number, number] = [1, 1, 1];
+  rocks: AsteroidBatch;
+  lightKey = '';
+  podLight: [number, number, number] = [1, 1, 1];
   /** Each system's sky, made the first time it's seen */
-  private biomes = new Map<string, SkyBiome>();
+  biomes = new Map<string, SkyBiome>();
   
   // Current system info
-  private currentSystemId: string = 'sol';
+  currentSystemId: string = 'sol';
   /** Data-driven visuals per system, from server systemInfo messages */
-  private systemVisuals: Map<string, SystemVisuals> = new Map();
+  systemVisuals: Map<string, SystemVisuals> = new Map();
   
   // Entity graphics cache
-  private entityGraphics: Map<number, Container> = new Map();
+  entityGraphics: Map<number, Container> = new Map();
   /** Name tags and health bars, by entity id */
-  private tags = new Map<number, Tag>();
+  tags = new Map<number, Tag>();
   /** Jump gates, by entity id */
-  private gates = new Map<number, Gate>();
+  gates = new Map<number, Gate>();
   /** Entities just made, fading in (id → 0..1) */
-  private fadingIn = new Map<number, number>();
+  fadingIn = new Map<number, number>();
   /** Entities gone, fading out where they were (then destroyed) */
-  private fadingOut: { id: number; container: Container }[] = [];
+  fadingOut: { id: number; container: Container }[] = [];
   /** This system's data (looked up once per system, not per frame) */
-  private sys: { id: string; data: (StarSystemData & { visuals?: Record<string, any> }) | undefined } = { id: '', data: undefined };
+  sys: { id: string; data: (StarSystemData & { visuals?: Record<string, any> }) | undefined } = { id: '', data: undefined };
 
   // Effects
-  private fx!: ParticleFx;
+  fx!: ParticleFx;
   private damageNumbers!: DamageNumbers;
-  private death!: DeathScreen;
+  death!: DeathScreen;
   private minimap!: Minimap;
   // Debug asteroid markers (server-provided)
   private debugAsteroidGraphics: Graphics;
@@ -209,10 +192,10 @@ export class Renderer {
   private vignette = new Sprite(vignette());
   
   // Culling margin (pixels beyond viewport to render)
-  private readonly CULL_MARGIN = 200;
+  readonly CULL_MARGIN = 200;
   
   // Animation timing
-  private time: number = 0;
+  time: number = 0;
 
   constructor(app: Application, state: GameState) {
     this.app = app;
@@ -243,7 +226,7 @@ export class Renderer {
     this.worldContainer.addChild(this.shipLayer);
     this.worldContainer.addChild(this.effectContainer);
     this.weaponFx = new WeaponFx(this.effectContainer);
-    this.lighting.addSource((L) => this.collectLights(L));
+    this.lighting.addSource((L) => collectLights(this, L));
     this.fx = new ParticleFx(this.effectContainer, this.state);
     
     this.app.stage.addChild(this.worldContainer);
@@ -312,21 +295,21 @@ export class Renderer {
     }
     
     // Update camera to follow player
-    this.updateCamera(delta);
+    updateCamera(this, delta);
     
     // Render background
-    this.renderBackground(delta);
+    renderBackground(this, delta);
     this.updatePlanets(delta);
     
     // Render entities
-    this.renderEntities(delta);
+    renderEntities(this, delta);
     this.rocks.update(this.entityGraphics, this.cameraZoom);
 
     // Render debug asteroid markers
     this.renderDebugAsteroidMarkers();
     
     // Update effects
-    this.updateEffects(delta);
+    updateEffects(this, delta);
     
     // Render damage numbers
     this.damageNumbers.update(delta);
@@ -378,7 +361,7 @@ export class Renderer {
   }
 
   /** Half-size (world units) of the box round the view, turned or not */
-  private viewBox(): { hw: number; hh: number } {
+  viewBox(): { hw: number; hh: number } {
     // (Memoised on its inputs: asked once per entity-batch and again per ship, and it only changes with the camera)
     const m = this.vbMemo, w = this.app.screen.width, h = this.app.screen.height;
     if (m.w !== w || m.h !== h || m.zoom !== this.cameraZoom || m.angle !== this.cameraAngle) {
@@ -389,7 +372,7 @@ export class Renderer {
   }
   private vbMemo = { w: -1, h: -1, zoom: NaN, angle: NaN, box: { hw: 0, hh: 0 } };
   /** Entities seen this frame (reused: cleared each frame instead of a new Set) */
-  private aliveIds = new Set<number>();
+  aliveIds = new Set<number>();
 
   /** The view's roll: the heading to put up the screen (helm), or null for north-up */
   setCameraHeading(angle: number | null): void {
@@ -466,7 +449,7 @@ export class Renderer {
   }
 
   /** Admin free camera / watching another pilot: the camera follows this instead of your ship */
-  private cameraTarget: (() => { x: number; y: number } | null) | null = null;
+  cameraTarget: (() => { x: number; y: number } | null) | null = null;
 
   setCameraTarget(target: (() => { x: number; y: number } | null) | null): void {
     this.cameraTarget = target;
@@ -477,7 +460,7 @@ export class Renderer {
   snapCamera(): void {
     this.cameraSnap = true;
   }
-  private cameraSnap = false;
+  cameraSnap = false;
 
   /** Rock chunks still to be built (and the relief atlas still coming): the loading screen waits for none */
   buildPending(): number {
@@ -489,399 +472,12 @@ export class Renderer {
     this.panCtl.recenter();
   }
 
-  private updateCamera(dt: number): void {
-    const playerPos = this.cameraTarget?.() ?? this.state.getPlayerPosition();
-    // Your own ship (not the admin free camera or someone watched): the view may sit off it, as far as keeps the ship a margin inside every edge
-    const own = !this.cameraTarget;
-    const maxX = Math.max(0, (0.5 - PAN_MARGIN) * this.app.screen.width / this.cameraZoom);
-    const maxY = Math.max(0, (0.5 - PAN_MARGIN) * this.app.screen.height / this.cameraZoom);
-    this.panCtl.pan.x = Math.max(-maxX, Math.min(maxX, this.panCtl.pan.x));
-    this.panCtl.pan.y = Math.max(-maxY, Math.min(maxY, this.panCtl.pan.y));
-    // The roll: onto the heading in helm, back to north-up out of it (gentle, and the same at any frame rate)
-    // (Not on a free camera or someone else's ship)
-    const heading = own ? this.cameraHeading : null;
-    this.helmTime = heading === null ? 0 : this.helmTime + dt;
-    const roll = heading === null ? { rate: NORTH_RETURN_RATE, maxSpin: MAX_VIEW_SPIN } : helmFollow(this.helmTime);
-    if (this.cameraSnap) { this.panCtl.pan.x = this.panCtl.pan.y = 0; this.cameraAngle = heading ?? 0; }
-    this.cameraAngle = smoothAngle(this.cameraAngle, heading ?? 0, roll.rate, Math.min(0.1, dt), roll.maxSpin);
-    if (heading === null && Math.abs(this.cameraAngle) < 1e-4) this.cameraAngle = 0;
-    cameraView.angle = this.cameraAngle;
-    const pw = own ? screenToWorldDir(this.panCtl.pan.x, this.panCtl.pan.y, this.cameraAngle) : { x: 0, y: 0 };
-    const tx = playerPos.x + pw.x, ty = playerPos.y + pw.y;
-
-    // Smooth camera follow (tighter mid-jump, or the ship would leave the screen; a slow drift while dead).
-    // cameraFollow is the catch-up per 60 Hz frame, so it's the same at any frame rate.
-    const follow = this.death.active ? this.cameraFollow * 0.12 : this.cameraFollow;
-    const lerpFactor = this.cameraSnap ? 1 : 1 - Math.pow(1 - Math.min(1, follow), Math.min(0.1, dt) * 60);
-    this.cameraSnap = false;
-    this.cameraX += (tx - this.cameraX) * lerpFactor;
-    this.cameraY += (ty - this.cameraY) * lerpFactor;
-    if (own) {
-      // However fast the ship goes (a jump's burn), it never slips past the margin (along the screen's axes)
-      const d = worldToScreenDir(this.cameraX - playerPos.x, this.cameraY - playerPos.y, this.cameraAngle);
-      const c = screenToWorldDir(Math.max(-maxX, Math.min(maxX, d.x)), Math.max(-maxY, Math.min(maxY, d.y)), this.cameraAngle);
-      this.cameraX = playerPos.x + c.x;
-      this.cameraY = playerPos.y + c.y;
-    }
-    const off = own && Math.hypot(this.panCtl.pan.x, this.panCtl.pan.y) * this.cameraZoom > 24;
-    this.panCtl.showRecenter(off);
-
-    // Apply camera transform to world container with screen shake: the camera's point sits at the
-    // screen's centre (plus the shake), and the shake's roll turns about it
-    const shake = this.state.screenShake;
-    this.worldContainer.pivot.set(this.cameraX, this.cameraY);
-    this.worldContainer.x = this.app.screen.width / 2 + (shake.offsetX || 0) * this.shakeScale;
-    this.worldContainer.y = this.app.screen.height / 2 + (shake.offsetY || 0) * this.shakeScale;
-    this.worldContainer.rotation = (shake.rotation || 0) * this.shakeScale - this.cameraAngle;
-    this.worldContainer.scale.set(this.cameraZoom);
-  }
-
-  private renderBackground(delta: number): void {
-    const zoom = this.cameraZoom;
-    
-    // Get system visuals (data-driven from server, with Sol-like fallback)
-    const systemVisuals = this.systemVisuals.get(this.currentSystemId) || DEFAULT_SYSTEM_VISUALS;
-    
-    // The sky: this system's biome (made once per system), following the camera
-    let biome = this.biomes.get(this.currentSystemId);
-    if (!biome) {
-      const sys = this.sys.data;
-      const v = sys?.visuals ?? {};
-      biome = skyBiome(this.currentSystemId || 'sol', {
-        biome: v.biome, sector: sys?.sector, position: sys?.position, central: sys?.centralBody?.type,
-        hasNebula: v.hasNebula ?? systemVisuals.hasNebula, nebulaHue: v.nebulaHue ?? systemVisuals.nebulaHue,
-        starHueShift: v.starHueShift, specialStarChance: v.specialStarChance, specialStarHue: v.specialStarHue,
-      });
-      this.biomes.set(this.currentSystemId, biome);
-    }
-    this.sky.setBiome(biome);
-    this.sky.setLens(systemVisuals.centralType === 'black_hole' ? systemVisuals.centralRadius ?? 0 : 0);
-    // On a planet: its ground and clouds instead of the sky, and its city
-    const here = this.sys.data;
-    const surface = here?.surface ?? null;
-    this.surface.setSurface(surface, here?.id);
-    this.setCity(surface ? here! : null);
-    // Its rock (built once, when you arrive)
-    if (this.terrainId !== this.currentSystemId) {
-      this.terrainId = this.currentSystemId;
-      this.terrainView?.destroy();
-      this.terrainView = null;
-      this.chamber?.destroy();
-      this.chamber = null;
-      const t = terrainFor(this.currentSystemId);
-      if (t) { this.terrainView = new TerrainView(t, this.lighting, surface?.kind === 'cavern'); this.terrainLayer.addChild(this.terrainView.container); }
-      const range = gunRangeFor(this.currentSystemId);
-      if (range) { this.chamber = new ChamberView(range, this.lighting, () => boundKeyName('interact', settings.data.bindings)); this.terrainLayer.addChildAt(this.chamber.container, 0); }
-    }
-    this.terrainView?.update(Math.min(0.1, delta));
-    this.chamber?.update();
-    if (this.city?.bastion) { const vb = this.viewBox(); this.city.bastion.update(Math.min(0.1, delta), { night: this.surface.night, zoom: this.cameraZoom, angle: this.cameraAngle, entities: this.state.entities.ofType(EntityType.ShipBody), view: { x: this.cameraX, y: this.cameraY, hw: vb.hw, hh: vb.hh } }); }
-    const lightKey = `${this.currentSystemId}|${this.systemVisuals.has(this.currentSystemId)}`;
-    if (lightKey !== this.lightKey) {
-      this.lightKey = lightKey;
-      lightSystem(this.lighting, this.surface, this.sys.data, systemVisuals, biome, (d) => { this.day = d; });
-    }
-    if (surface) {
-      this.sky.container.visible = false;
-      const shake = this.state.screenShake;
-      this.surface.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom,
-        { x: (shake.offsetX || 0) * this.shakeScale, y: (shake.offsetY || 0) * this.shakeScale, rot: (shake.rotation || 0) * this.shakeScale - this.cameraAngle });
-      this.drawShadows(this.day.power <= 0);
-      // Night falls on the light too (headlights come on by themselves in the dark): warm through dusk, cold at night
-      const n = this.surface.night, shade = this.surface.shade(), sun = this.lighting.sun;
-      for (let i = 0; i < 3; i++) { this.lighting.ambient[i] = this.day.ambient[i] * shade.ambient[i]; sun.color[i] = this.day.sun[i] * shade.sun[i]; }
-      sun.power = this.day.power * (1 - 0.92 * n);
-      this.shadows.container.alpha = 1 - n * 0.8;
-    } else {
-      this.shadows.begin();
-      this.shadows.end();
-    }
-
-    // The star (seconds: the same speed at any frame rate), at the world's origin: drawn into its own target with the
-    // camera's transform, and stretched back over the screen in the background layer's frame (the world's)
-    const animDelta = Math.min(0.1, delta);
-    const plainSun = !systemVisuals.noCentralBody && !systemVisuals.centralType;
-    this.centralShaders.set(systemVisuals.centralType ?? null, systemVisuals.centralRadius ?? 1000, systemVisuals.centralHue ?? 30, this.sys.data?.centralBody?.look);
-    this.centralShaders.update(animDelta);
-    if (plainSun) {
-      this.sun.setStar(this.currentSystemId, this.starBody(systemVisuals));
-      this.worldContainer.updateLocalTransform();
-      const toScreen = this.worldContainer.localTransform;
-      this.sun.update(animDelta, toScreen, toScreen);
-    } else {
-      // (none here: it draws nothing, and the sky has no hole)
-      this.sun.setStar(this.currentSystemId, null);
-      this.sun.update(animDelta, this.worldContainer.localTransform);
-    }
-    // The sky after it: nothing drawn behind its disc, none at all when the disc fills the screen
-    // (Indoors, in a gun range's chamber: no sky at all)
-    if (this.chamber) this.sky.container.visible = false;
-    else if (!surface) this.sky.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom, this.cameraAngle, this.sun.opaqueRadius);
-  }
-
-  /** A system's star: its systems.json entry (its look there), else one made from what the server sent */
-  private starBody(v: SystemVisuals): StarBody {
-    const known = starOf(this.currentSystemId);
-    if (known) return known;
-    let b = this.starBodies.get(v);
-    if (!b) this.starBodies.set(v, (b = { radius: v.starRadius, hue: v.starHue, sunStyle: v.sunStyle, detailStar: v.detailStar, detailParams: v.detailParams, detailColors: v.detailColors }));
-    return b;
-  }
-
-  private renderEntities(dt: number): void {
-    // Track which entities are still alive
-    const aliveIds = this.aliveIds;
-    aliveIds.clear();
-
-    // Calculate visible bounds for culling (each entity's own size is added below, so big ones don't pop at the edge)
-    const vb = this.viewBox();
-    const halfW = vb.hw + this.CULL_MARGIN;
-    const halfH = vb.hh + this.CULL_MARGIN;
-    const k = this.tagScale;
-
-    for (const entity of this.state.entities.values()) {
-      // Shots are drawn by WeaponFx: no view of their own (one made and dropped per shot rebuilt the scene's draw list)
-      if (entity.type === EntityType.Projectile) continue;
-      aliveIds.add(entity.id);
-
-      // Culling - skip entities outside viewport (but always render player)
-      if (entity.id !== this.state.playerId) {
-        const r = this.radiusOf(entity);
-        if (Math.abs(entity.x - this.cameraX) > halfW + r || Math.abs(entity.y - this.cameraY) > halfH + r) {
-          // Hide if exists but out of view
-          const existing = this.entityGraphics.get(entity.id);
-          if (existing) {
-            existing.visible = false;
-          }
-          continue;
-        }
-      }
-
-      let container = this.entityGraphics.get(entity.id);
-
-      if (!container) {
-        // Create new graphics for this entity, passing entity data for size/type info
-        container = this.createEntityGraphics(entity.type, entity.id, entity.data);
-        this.entityGraphics.set(entity.id, container);
-        this.entityContainer.addChild(container);
-        // It fades in (asteroids are drawn in batches, which don't fade: they just appear; ship bodies are drawn elsewhere)
-        if (entity.type !== EntityType.ShipBody && entity.type !== EntityType.Asteroid) {
-          container.alpha = 0;
-          this.fadingIn.set(entity.id, 0);
-        }
-      }
-
-      // Make visible (modular ships keep only their name tag and health bar here)
-      container.visible = true;
-      if (this.hiddenEntityIds.has(entity.id)) {
-        // (the tag's name and bar are shown or not below: set here too, an undamaged ship's bar went on and off every frame)
-        for (const c of container.children) if (c.label !== 'nameTag' && c.label !== 'healthBar') c.visible = false;
-      }
-      const fade = this.fadingIn.get(entity.id);
-      if (fade !== undefined) {
-        const a = Math.min(1, fade + dt / FADE);
-        container.alpha = a;
-        if (a >= 1) this.fadingIn.delete(entity.id);
-        else this.fadingIn.set(entity.id, a);
-      }
-
-      // Update position (use smooth render position)
-      container.x = entity.renderX;
-      container.y = entity.renderY;
-      container.rotation = entity.renderAngle;
-      if (entity.type === EntityType.Enemy) this.mobs.get(entity.id)?.update(dt, entity.hp);
-
-      if (this.rockHits.size && this.rockHits.has(entity.id)) this.animateRockHit(container, entity.id, entity.data?.[0] || 30);
-
-      // Name tag and health bar: upright, fixed on screen however the ship turns, counter-scaled zoomed out
-      const tag = this.tags.get(entity.id);
-      if (tag) {
-        const r = this.shipRadius.get(entity.id) ?? 20;
-        // (Upright on screen: the view's roll less the ship's)
-        const up = this.cameraAngle - entity.renderAngle;
-        const c = Math.cos(up), sn = Math.sin(up);
-        if (tag.name) {
-          if (entity.name) {
-            if (tag.name.text !== entity.name) tag.name.text = entity.name;
-            tag.name.visible = this.showNames;
-          }
-          tag.name.scale.set(k);
-          placeUpright(tag.name, c, sn, up, 0, r + 14);
-        }
-        if (tag.bar) {
-          updateHealthBar(tag, entity);
-          // Drawn from its left edge, 35 × 4 (the shield strip above it)
-          tag.bar.scale.set(k);
-          placeUpright(tag.bar, c, sn, up, -17.5 * k, -(r + 10) - 4 * k);
-        }
-      }
-    }
-
-    // Remove dead entities: stations, gates and loot fade out where they were, then go
-    for (const [id, container] of this.entityGraphics) {
-      if (!aliveIds.has(id)) {
-        this.entityGraphics.delete(id);
-        this.fadingIn.delete(id);
-        this.tags.delete(id);
-        this.rocks.remove(id);
-        this.rockObjs.delete(id);
-        const type = this.typeOf.get(id);
-        this.typeOf.delete(id);
-        if (container.visible && (type === EntityType.Station || type === EntityType.Portal || type === EntityType.DroppedItem)) {
-          this.fadingOut.push({ id, container });
-        } else {
-          this.disposeEntity(id, container);
-        }
-      }
-    }
-    let w = 0;
-    for (const f of this.fadingOut) {
-      f.container.alpha -= dt / FADE;
-      if (f.container.alpha <= 0 || this.entityGraphics.has(f.id)) { this.disposeEntity(f.id, f.container); continue; }
-      this.fadingOut[w++] = f;
-    }
-    this.fadingOut.length = w;
-  }
-
-  /** An entity's views gone for good */
-  private disposeEntity(id: number, container: Container): void {
-    // (Its id may be back already, with new views of its own)
-    if (!this.entityGraphics.has(id)) {
-      this.rifts.delete(id);
-      this.gates.delete(id);
-      this.stations.get(id)?.dispose();
-      this.stations.delete(id);
-      this.mobs.delete(id);
-    }
-    this.entityContainer.removeChild(container);
-    container.destroy({ children: true });
-  }
-
   /** Each entity's type, for when it's gone */
-  private typeOf = new Map<number, EntityType>();
-
-  /** How far an entity reaches from its centre (world units), for culling */
-  private radiusOf(e: { id: number; type: EntityType; data?: number[] }): number {
-    switch (e.type) {
-      // (Its look reaches well past its radius: a citadel's arms nearly four times it)
-      case EntityType.Station: return this.stations.get(e.id)?.reach ?? (e.data?.[8] ?? 200) * 3.8;
-      case EntityType.Asteroid: return (e.data?.[0] || 30) * 1.3;
-      case EntityType.Portal: return e.data?.[1] === 1 ? 600 : 220;
-      case EntityType.Enemy: return 80;
-      // Ships: the hull, and their name tag and health bar
-      default: return (this.shipRadius.get(e.id) ?? 30) + 60;
-    }
-  }
-
-  private createEntityGraphics(type: EntityType, id: number, data?: number[]): Container {
-    const container = new Container();
-    this.typeOf.set(id, type);
-
-    switch (type) {
-      case EntityType.Player:
-        this.tags.set(id, buildPlayerParts(container));
-        break;
-      case EntityType.Asteroid:
-        // data[0] = size, data[1] = resourceType
-        {
-          const { rock, seams } = drawAsteroid(container, id, data?.[0] || 30, this.state.entities.get(id)?.composition, this.sys.data?.visuals?.greyseam);
-          const at = this.state.entities.get(id);
-          this.rockObjs.set(id, rock);
-          if (this.trainingLooks.has(id)) container.addChild(drawTrainingLook(this.trainingLooks.get(id)!, id, data?.[0] || 30));
-          else this.rocks.add(id, rock, at?.x ?? 0, at?.y ?? 0);
-          if (seams) this.asteroidSeams.set(id, seams);
-        }
-        break;
-      case EntityType.Projectile:
-        // Drawn by WeaponFx (tracers placed from the true spawn point)
-        break;
-      case EntityType.DroppedItem: {
-        // data: [rarity index, kinds of item, item count]
-        const pod = new LootPodView(data?.[0] ?? 0, data?.[2] ?? 1);
-        this.lootPods.set(id, pod);
-        // (A chunk thrown out of a rock just struck: the strike kept ore, and it shows richer where it appears)
-        const at = this.state.entities.get(id);
-        if (at) { this.miningStrikes.pod(at.x, at.y); this.onPodAppeared?.(at.x, at.y); }
-        container.addChild(pod.container);
-        break;
-      }
-      case EntityType.Station: {
-        // data: [stationId, orbit..., orbitTimeScale, radius, design, turrets, weapon]
-        const view = new StationView(data?.[0] ?? id, data?.[8] ?? 200, this.state.entities.get(id)?.name, this.lighting, data?.[9] ?? 0, data?.[10] ?? 0, data?.[11] ?? 0);
-        this.stations.set(id, view);
-        container.addChild(view.container);
-        break;
-      }
-      case EntityType.Portal:
-        // data: [targetSystem, kind (0 jump gate, 1 rift), hue]
-        if (data?.[1] === 1) {
-          const rift = new RiftShader(data[2] ?? 275);
-          this.rifts.set(id, rift);
-          container.addChild(rift.container);
-        } else {
-          this.gates.set(id, buildPortalParts(container, id));
-        }
-        break;
-      case EntityType.Enemy: {
-        // A single-body enemy: data[0] its kind's index in data/mobs.json
-        const view = new MobView(data?.[0] ?? 0);
-        this.mobs.set(id, view);
-        container.addChild(view.container);
-        break;
-      }
-      case EntityType.ShipBody:
-        // Dummies and debris are drawn by the ship renderer
-        break;
-      default:
-        // Default circle
-        const g = new Graphics();
-        g.circle(0, 0, 10);
-        g.fill({ color: 0xffffff });
-        container.addChild(g);
-    }
-
-    return container;
-  }
-
-  private updateEffects(delta: number): void {
-    this.fx.update(delta);
-
-    for (const rift of this.rifts.values()) rift.update(delta);
-    // Jump gates: the rings turn slowly against each other and the whole gate breathes (its light with it, see collectLights)
-    for (const gate of this.gates.values()) {
-      gate.pulse = 0.82 + 0.18 * Math.sin(this.time * 1.3 + gate.phase);
-      gate.outer.rotation = this.time * 0.12 + gate.phase;
-      gate.inner.rotation = -this.time * 0.2 - gate.phase;
-      gate.outer.alpha = gate.pulse;
-      gate.inner.alpha = 0.6 + 0.4 * Math.sin(this.time * 1.3 + gate.phase + 0.8);
-      gate.core.scale.set(0.94 + 0.06 * gate.pulse);
-    }
-    this.seamTime += delta;
-    for (const [id, s] of this.asteroidSeams) {
-      if (!this.entityGraphics.has(id)) { this.asteroidSeams.delete(id); continue; }
-      s.glow.alpha = 0.55 + 0.45 * Math.sin(this.seamTime * 2.2 + s.phase);
-    }
-    for (const [id, pod] of this.lootPods) {
-      const c = this.entityGraphics.get(id);
-      if (!c) { this.lootPods.delete(id); continue; }
-      pod.update(delta);
-      if (c.visible) pod.light(this.lighting.levelAt(c.x, c.y, this.podLight));
-    }
-    const me = this.state.entities.get(this.state.playerId);
-    for (const [id, station] of this.stations) {
-      const e = this.state.entities.get(id);
-      station.update(delta, me && e ? Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) : Infinity,
-        e ? { x: e.renderX, y: e.renderY } : undefined, this.entityAt);
-    }
-
-    // Projectile tracers, muzzle flashes and impacts
-    // (Each shell on the timeline its firing ship is drawn on: shotTimelines)
-    this.weaponFx.update(this.state, delta, ...shotTimelines(this.state));
-}
+  typeOf = new Map<number, EntityType>();
 
   // Public methods for effects
 
-  private entityAt = (id: number) => {
+  entityAt = (id: number) => {
     const e = this.state.entities.get(id);
     return e ? { x: e.renderX, y: e.renderY } : null;
   };
@@ -902,25 +498,6 @@ export class Renderer {
   hitEntity(id: number, amount: number): void {
     if (this.state.entities.get(id)?.type !== EntityType.Asteroid) return;
     this.rockHits.set(id, { at: performance.now(), strength: Math.min(1, 0.45 + amount / 50) });
-  }
-
-  private animateRockHit(container: Container, id: number, size: number): void {
-    const hit = this.rockHits.get(id)!;
-    const k = Math.max(0, 1 - (performance.now() - hit.at) / 170);
-    let flash = container.getChildByLabel('rockFlash') as Graphics | null;
-    if (!flash && k > 0) {
-      // The rock's outline in white, made on its first hit and kept (hidden) after
-      flash = new Graphics().poly(getAsteroidPolygon(id, 0, 0, size).flatMap((v) => [v.x, v.y])).fill({ color: 0xffffff });
-      flash.label = 'rockFlash';
-      flash.blendMode = 'add';
-      container.addChild(flash);
-    }
-    if (flash) {
-      flash.visible = k > 0;
-      flash.alpha = 0.5 * hit.strength * k * k * k;
-    }
-    container.scale.set(1 + 0.03 * hit.strength * k * k);
-    if (k <= 0) this.rockHits.delete(id);
   }
 
   /** A hit's number over what it hit (DamageNumbers) */
@@ -1144,64 +721,6 @@ export class Renderer {
   /** How dark it is on this surface (0 day .. 1 night): a moon siege's nights */
   setNight(k: number): void {
     this.surface.setNight(k);
-  }
-
-  /** Each ship's shadow on the ground, cast away from the sun */
-  /** `under`: underground (no sun: each falls nearly straight below its ship, darker, the glow all round softening it) */
-  private drawShadows(under = false): void {
-    this.shadows.begin();
-    for (const [id, r] of this.shipRadius) {
-      const e = this.state.entities.get(id);
-      if (!e) continue;
-      const off = under ? 20 + r * 0.25 : 60 + r * 0.9;
-      const s = this.shadows.take(glowBall(), e.renderX + SUN_DIR[0] * off, e.renderY + SUN_DIR[1] * off, 0.5, 0.5, 0x000000, under ? 0.62 : 0.42);
-      s.scale.set((r * (under ? 2.9 : 2.6)) / DOT_SIZE);
-    }
-    this.shadows.end();
-  }
-
-  /** A surface's city (built once while you're there) and the edge of its map */
-  private setCity(sys: StarSystemData | null): void {
-    const id = sys?.id ?? null;
-    if ((this.city?.system ?? null) === id) return;
-    this.city?.view?.dispose();
-    this.city?.bastion?.dispose();
-    this.city = null;
-    this.surfaceEdge.clear();
-    if (!sys?.surface) return;
-    const s = sys.surface;
-    const view = s.city ? new CityView(s.city, s.seed ?? 1, this.lighting) : null;
-    const bastion = s.bastion ? new BastionView(s.bastion, this.lighting, { radius: s.radius, boom: (x, y, r) => this.fx.createExplosionAt(x, y, r) }) : null;
-    if (view) this.backgroundContainer.addChild(view.container);
-    if (bastion) { this.backgroundContainer.addChild(bastion.container); this.effectContainer.addChild(bastion.top); }
-    this.city = { system: sys.id, view, bastion };
-    // The edge: a dashed ring (fly past it to climb back to orbit)
-    const R = s.radius, dashes = 120;
-    for (let k = 0; k < dashes; k++) {
-      const a0 = (k / dashes) * Math.PI * 2, a1 = a0 + (Math.PI * 2 / dashes) * 0.55;
-      this.surfaceEdge.moveTo(Math.cos(a0) * R, Math.sin(a0) * R).arc(0, 0, R, a0, a1);
-    }
-    this.surfaceEdge.stroke({ color: 0xe8f4ff, width: 40, alpha: 0.35 });
-  }
-
-  /** The renderer's own lights: old-style flashes, loot, rifts, stations */
-  private collectLights(L: Lighting): void {
-    this.weaponFx.collectLights(L);
-    this.fx.collectLights(L);
-    const RARITY = [0xc8d0dc, 0x5fd38d, 0x4fa3ff, 0xc77dff, 0xffb347];
-    for (const [id, c] of this.entityGraphics) {
-      if (!c.visible) continue;
-      const e = this.state.entities.get(id);
-      if (!e) continue;
-      if (e.type === EntityType.DroppedItem) L.point(c.x, c.y, RARITY[Math.max(0, Math.min(4, e.data?.[0] ?? 0))], 170, 0.45, 50);
-      else if (e.type === EntityType.Portal) L.point(c.x, c.y, e.data?.[1] === 1 ? 0xb28cff : 0x7dd3fc, 1600, 0.8 * (this.gates.get(id)?.pulse ?? 1), 300);
-      else if (e.type === EntityType.Station) this.stations.get(id)?.collectLights(L, c.x, c.y, c.rotation);
-    }
-    // In space, ships shade the structures under them (on a surface they have their shadows on the ground)
-    if (!this.surface.active) for (const [id, r] of this.shipRadius) {
-      const e = this.state.entities.get(id);
-      if (e) L.shadow(e.renderX, e.renderY, r);
-    }
   }
 
   /** Once a frame, after everything has moved */

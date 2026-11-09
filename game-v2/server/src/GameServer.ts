@@ -9,8 +9,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'http';
-import { createWorld, addEntity, hasComponent, entityExists, getAllEntities, IWorld } from 'bitecs';
-import { Player, Station, InSystem, Dead } from '@space-game/common';
+import { createWorld, addEntity, hasComponent, getAllEntities, IWorld } from 'bitecs';
+import { Player, InSystem, Dead } from '@space-game/common';
 import { ClientMessage, ServerMessage, ReplicaEnv, mulberry32, TrafficData } from '@space-game/common';
 import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
@@ -73,7 +73,7 @@ import type { ServerCtx } from './net/ServerCtx.js';
 import { rejectAuth, handleHttpAuth } from './net/auth.js';
 import { Docking } from './game/Docking.js';
 import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
-import { type Handler, type HandlerTable } from './net/dispatch.js';
+import { type HandlerTable } from './net/dispatch.js';
 import { Outbox } from './net/snapshot/Outbox.js';
 import { HitLedger } from './net/hits/HitLedger.js';
 import { OwnChecks } from './net/own/OwnChecks.js';
@@ -100,6 +100,7 @@ import { setupGunRange } from './gameServer/hosts/gunRange.js';
 import { createShipHost } from './gameServer/hosts/ship.js';
 import { createAdminHost, setupAdminHandlers } from './gameServer/admin.js';
 import { initializeWorld } from './gameServer/world.js';
+import { joinFeatureMessages, stationAtConn, installHangarLogin, installSocialLogin, trackErrors } from './gameServer/hooks.js';
 import { asteroidSpawnData, placeAsteroid } from './gameServer/asteroids.js';
 import { shotWall, hurtAsteroid } from './gameServer/combat.js';
 import { getTrafficShips, stationEntity } from './gameServer/traffic.js';
@@ -116,34 +117,6 @@ import { dockingDeps, pilotsOpts, weaponsDeps, marketDeps, servicesDeps, hazards
 /**
  * Game Server - Main server with ECS world and systems
  */
-
-// ============================================
-// SPATIAL PARTITIONING
-// ============================================
-
-// ============================================
-// PERFORMANCE METRICS
-// ============================================
-
-// ============================================
-// QUERIES
-// ============================================
-
-// ============================================
-// CLIENT CONNECTION
-// ============================================
-
-// (ClientConnection: net/ClientConnection.ts)
-
-// (The snapshot path's tuning: net/snapshot/constants.ts)
-
-// (designHash, hpWire, SnapRow: net/SnapshotBuilder.ts)
-
-// (hexToHue: net/SnapshotBuilder.ts)
-
-// ============================================
-// GAME SERVER
-// ============================================
 
 export class GameServer implements ServerCtx {
   readonly world: IWorld;
@@ -327,7 +300,6 @@ export class GameServer implements ServerCtx {
   
   // Error tracking for admin stats
   recentErrors: string[] = [];
-  private static readonly MAX_ERRORS = 50;
   tickTimeHistory: number[] = [];
   totalConnectionsEver = 0;
   
@@ -359,13 +331,7 @@ export class GameServer implements ServerCtx {
     this.pods = new LootPods(createPodHost(this), this.econ.items);
     // ---- Part features (ships/features: the Tow Beam; the tick, cargo, wire and message seams)
     this.features = new ServerFeatures(SERVER_FEATURES, featuresDeps(this), new Set(this.handlers.keys()));
-    // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
-    for (const [type, fn] of this.features.messages) {
-      (this.handlers as Map<string, Handler>).set(type, (_ctx, conn, msg) => {
-        if (!hasComponent(this.world, Player, conn.playerId)) return;
-        fn(conn.playerId, msg);
-      });
-    }
+    joinFeatureMessages(this);
     this.support = this.features.get('support') as unknown as Support;
     // ---- (end part features)
     this.mining = new Mining(createMiningHost(this), this.gameData.miningTable, this.payout);
@@ -379,13 +345,7 @@ export class GameServer implements ServerCtx {
     // (The field machines tell the bank which parts they hold, and a death empties them into the wreck)
     const field = this.features.get('machines') as unknown as FieldShips | undefined;
     if (field) this.pilots.fieldHooks = { isClaimed: (eid, uid) => field.isClaimed(eid, uid), machineContents: (eid) => field.machineContents(eid, true) };
-    const stationAtConn = (conn: unknown) => {
-      const c = conn as ClientConnection;
-      const st = c.docked && entityExists(this.world, c.docked.station) ? c.docked.station : this.stationInRange(c.playerId);
-      return st >= 0 && hasComponent(this.world, Player, c.playerId) && !hasComponent(this.world, Dead, c.playerId)
-        ? this.gameData.getStationByNum(Station.stationId[st]) ?? null : null;
-    };
-    this.market = new Market(marketDeps(this, opts, stationAtConn), this.econ, this.pilots, this.gameData.questsFile.reputations);
+    this.market = new Market(marketDeps(this, opts, stationAtConn(this)), this.econ, this.pilots, this.gameData.questsFile.reputations);
     this.services = new StationServices(servicesDeps(this, opts), this.pilots, this.econ, this.market, this.payout);
     this.ammo = new Ammo(this.pilots, this.ships.tuning, this.ships.catalog);
     this.ammo.hangar = (conn) => this.hangar?.send(conn);
@@ -402,11 +362,7 @@ export class GameServer implements ServerCtx {
     this.hangar = new Hangar({ send: (conn, msg) => this.send((conn as ClientConnection).ws, msg), now: opts.clock ?? (() => Date.now()), freeBuild: (conn) => this.freeBuild(conn as ClientConnection), placed: (conn, parts) => this.tutorial?.partsPlaced(conn as ClientConnection, parts) },
       this.pilots, this.ships, this.econ, this.ships.catalog, this.services);
     this.hangar.gems = this.gameData.gemsFile;
-    this.pilots.onEvent((conn, ev) => {
-      if (ev.type !== 'login') return;
-      this.hangar.send(conn);
-      this.ammo.firstIssue(conn, this.ships.get(conn.playerId));
-    });
+    installHangarLogin(this);
     this.clock = opts.clock ?? (() => Date.now());
     this.quests = new Quests(createQuestHost(this), this.pilots, this.gameData.questsFile);
     this.docking = new Docking(dockingDeps(this));
@@ -437,13 +393,7 @@ export class GameServer implements ServerCtx {
     this.arenas = new Arenas(createArenaHost(this));
     this.achievements = new Achievements(achievementsDeps(this), this.pilots, this.gameData.achievementsFile as RibbonsFile, profileStore, opts.rankings, opts.serverName);
     this.social = new Social(socialDeps(this), profileStore, opts.friends ?? new MemoryFriends());
-    this.pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.social.join(conn); });
-    // New arrivals hear about this week's hunt
-    this.pilots.onEvent((conn, ev) => {
-      if (ev.type !== 'login') return;
-      const h = this.hunted();
-      if (h) this.send((conn as ClientConnection).ws, { type: 'news', text: `This week's hunt: ${h.name} in ${this.gameData.getSystem(h.system)?.name ?? h.system}. Double XP and credits for everyone in on the kill`, kind: 'hunt', at: this.clock(), old: true });
-    });
+    installSocialLogin(this);
     this.replication = new Replication(replicationDeps(this), this.ships);
     this.lod = new SimLod(lodDeps(this), this.ships);
     // (A distant pack sent somewhere new is flown there from where its route has it)
@@ -484,13 +434,7 @@ this.devTeleport = opts.devTeleport ?? false;
     }
 
     // Track errors for admin stats
-    const origConsoleError = console.error;
-    console.error = (...args: any[]) => {
-      origConsoleError.apply(console, args);
-      const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
-      this.recentErrors.push(`[${new Date().toISOString()}] ${msg}`);
-      if (this.recentErrors.length > GameServer.MAX_ERRORS) this.recentErrors.shift();
-    };
+    trackErrors(this);
 
     // Clean up expired sessions periodically
     setInterval(() => this.userDB.cleanupExpiredSessions(), 60 * 60 * 1000);
