@@ -7763,11 +7763,51 @@
       ]
     },
     {
+      "id": "client.ui.resource-category-icons",
+      "path": "client/src/ui/resources/categoryIcons.ts",
+      "group": "client/ui/resources",
+      "lines": 34,
+      "owns": "the small line icons for the guide's four views (Resources, Rocks, Enemies, Systems) and the resource categories (All, Ore, Refined, Components, Packs, Ammo, Cut gems, Drops), as inline svg",
+      "needs": "nothing (pure strings; same 16x16 style as the hangar's filterIcons.ts)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every view id and every ResourceCategory has an icon, and all draw in currentColor only",
+          "test": "client/src/ui/resources/categoryIcons.test.ts"
+        }
+      ],
+      "extend": "a new view or category is one entry in ICONS below (the test lists what is missing)",
+      "exports": [
+        "categoryIcon",
+        "categoryIconIds"
+      ],
+      "sections": [
+        {
+          "name": "ICONS",
+          "kind": "const",
+          "start": 9,
+          "end": 25
+        },
+        {
+          "name": "categoryIconIds",
+          "kind": "function",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "categoryIcon",
+          "kind": "function",
+          "start": 30,
+          "end": 34
+        }
+      ]
+    },
+    {
       "id": "client.ui.resource-cards",
       "path": "client/src/ui/resources/entryCards.ts",
       "group": "client/ui/resources",
-      "lines": 147,
-      "owns": "the two levels of detail for a guide entry (resource, rock, enemy or system): a small PREVIEW (icon, name, the short hint and the one most important source row) and the EXTENDED details (every section, icons that open other entries), as escaped HTML",
+      "lines": 172,
+      "owns": "the levels of detail for a guide entry (resource, rock, enemy or system): a small PREVIEW (icon, name, the short hint and the one most important source row), the EXTENDED details block and the full detail PAGE (big icon, every section, icons that open other entries), as escaped HTML",
       "needs": "resourceData (entries, source index), guideChips (the chips and the icons), tiers, ../escape",
       "events": "",
       "invariants": [
@@ -7791,6 +7831,7 @@
         "detailHtml",
         "entryIds",
         "entryName",
+        "pageHtml",
         "previewHtml"
       ],
       "sections": [
@@ -7804,115 +7845,121 @@
           "name": "CARDS_CSS",
           "kind": "const",
           "start": 19,
-          "end": 30
+          "end": 48
         },
         {
           "name": "ORDER",
           "kind": "const",
-          "start": 32,
-          "end": 32
+          "start": 50,
+          "end": 50
         },
         {
           "name": "byTier",
           "kind": "const",
-          "start": 33,
-          "end": 33
+          "start": 51,
+          "end": 51
         },
         {
           "name": "sec",
           "kind": "const",
-          "start": 34,
-          "end": 34
+          "start": 52,
+          "end": 52
         },
         {
           "name": "lines",
           "kind": "const",
-          "start": 35,
-          "end": 35
+          "start": 53,
+          "end": 53
         },
         {
           "name": "Card",
           "kind": "interface",
-          "start": 37,
-          "end": 38
+          "start": 55,
+          "end": 56
         },
         {
           "name": "MAX",
           "kind": "const",
-          "start": 40,
-          "end": 40
+          "start": 58,
+          "end": 58
         },
         {
           "name": "OTHER",
           "kind": "const",
-          "start": 41,
-          "end": 41
+          "start": 59,
+          "end": 59
         },
         {
           "name": "L",
           "kind": "const",
-          "start": 42,
-          "end": 42
+          "start": 60,
+          "end": 60
         },
         {
           "name": "resCard",
           "kind": "function",
-          "start": 44,
-          "end": 69
+          "start": 62,
+          "end": 87
         },
         {
           "name": "rockCard",
           "kind": "function",
-          "start": 71,
-          "end": 81
+          "start": 89,
+          "end": 99
         },
         {
           "name": "enemyCard",
           "kind": "function",
-          "start": 83,
-          "end": 94
+          "start": 101,
+          "end": 112
         },
         {
           "name": "sysCard",
           "kind": "function",
-          "start": 96,
-          "end": 108
-        },
-        {
-          "name": "cardOf",
-          "kind": "function",
-          "start": 110,
-          "end": 115
-        },
-        {
-          "name": "head",
-          "kind": "const",
-          "start": 117,
-          "end": 117
-        },
-        {
-          "name": "previewHtml",
-          "kind": "function",
-          "start": 119,
+          "start": 114,
           "end": 126
         },
         {
-          "name": "detailHtml",
+          "name": "cardOf",
           "kind": "function",
           "start": 128,
           "end": 133
         },
         {
+          "name": "head",
+          "kind": "const",
+          "start": 135,
+          "end": 135
+        },
+        {
+          "name": "previewHtml",
+          "kind": "function",
+          "start": 137,
+          "end": 144
+        },
+        {
+          "name": "detailHtml",
+          "kind": "function",
+          "start": 146,
+          "end": 151
+        },
+        {
+          "name": "pageHtml",
+          "kind": "function",
+          "start": 153,
+          "end": 158
+        },
+        {
           "name": "entryName",
           "kind": "function",
-          "start": 135,
-          "end": 141
+          "start": 160,
+          "end": 166
         },
         {
           "name": "entryIds",
           "kind": "function",
-          "start": 143,
-          "end": 147
+          "start": 168,
+          "end": 172
         }
       ]
     },
@@ -8120,12 +8167,78 @@
       ]
     },
     {
+      "id": "client.ui.resource-page-nav",
+      "path": "client/src/ui/resources/pageNav.ts",
+      "group": "client/ui/resources",
+      "lines": 43,
+      "owns": "the field guide's detail-page history: a stack of opened entries, Back, and the breadcrumb trail for the page on top (no DOM)",
+      "needs": "entryCards (View, entryName), resourceIndex (category labels), resourceData",
+      "events": "",
+      "invariants": [
+        {
+          "text": "opening the page already on top changes nothing; Back pops one page and an empty stack means the grid",
+          "test": "client/src/ui/resources/pageNav.test.ts"
+        },
+        {
+          "text": "a breadcrumb starts at the view, a resource adds its category, and the last crumb is the entry itself",
+          "test": "client/src/ui/resources/pageNav.test.ts"
+        }
+      ],
+      "extend": "a new view needs its label in VIEW_LABEL",
+      "exports": [
+        "Crumb",
+        "Page",
+        "VIEW_LABEL",
+        "crumbsOf",
+        "popPage",
+        "pushPage"
+      ],
+      "sections": [
+        {
+          "name": "Page",
+          "kind": "interface",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "VIEW_LABEL",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "pushPage",
+          "kind": "function",
+          "start": 18,
+          "end": 24
+        },
+        {
+          "name": "popPage",
+          "kind": "function",
+          "start": 26,
+          "end": 30
+        },
+        {
+          "name": "Crumb",
+          "kind": "interface",
+          "start": 32,
+          "end": 33
+        },
+        {
+          "name": "crumbsOf",
+          "kind": "function",
+          "start": 35,
+          "end": 43
+        }
+      ]
+    },
+    {
       "id": "client.ui.resource-dictionary",
       "path": "client/src/ui/resources/resourceDictionary.ts",
       "group": "client/ui/resources",
-      "lines": 180,
-      "owns": "the field guide's Resources tab shell: the search box, the Resources / Rocks / Enemies / Systems icon grids, category chips, a small preview on mouseover or focus, and an extended-details drawer on click with a way back",
-      "needs": "resourceGrid, entryCards (the tiles and the two card levels), guideChips (the chips and their CSS), resourceFocus (a pending link), ../escape, DOM (wireResources only)",
+      "lines": 208,
+      "owns": "the field guide's Resources tab shell: the search box, the Resources / Rocks / Enemies / Systems icon grids, category chips with icons, a small preview on mouseover or focus, and a full detail page on click (history, Back, breadcrumbs, Esc) in place of the grid",
+      "needs": "resourceGrid, entryCards (the tiles, the preview and the page), pageNav (history, crumbs), categoryIcons, guideChips (the chips and their CSS), resourceFocus (a pending link), ../escape, DOM (wireResources only)",
       "events": "",
       "invariants": [
         {
@@ -8133,8 +8246,8 @@
           "test": "client/src/ui/resources/resourceDictionary.test.ts"
         },
         {
-          "text": "a data-go chip in the drawer opens that entry, Back returns to the one before, Esc closes the drawer",
-          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+          "text": "a data-go chip on a page opens that entry, Back returns to the one before or to the grid as it was, Esc does the same",
+          "test": "client/src/ui/resources/pageNav.test.ts"
         }
       ],
       "extend": "a new view is one grid function, one entry in VIEWS and one data-go prefix",
@@ -8148,38 +8261,38 @@
         {
           "name": "VIEWS",
           "kind": "const",
-          "start": 20,
-          "end": 25
+          "start": 22,
+          "end": 27
         },
         {
           "name": "lastDeps",
           "kind": "let",
-          "start": 27,
-          "end": 28
+          "start": 29,
+          "end": 30
         },
         {
           "name": "state",
           "kind": "const",
-          "start": 29,
-          "end": 29
+          "start": 31,
+          "end": 31
         },
         {
           "name": "RESOURCE_CSS",
           "kind": "const",
-          "start": 31,
-          "end": 51
+          "start": 33,
+          "end": 58
         },
         {
           "name": "resourcesHtml",
           "kind": "function",
-          "start": 53,
-          "end": 69
+          "start": 60,
+          "end": 76
         },
         {
           "name": "wireResources",
           "kind": "function",
-          "start": 71,
-          "end": 180
+          "start": 78,
+          "end": 208
         }
       ]
     },
@@ -8187,7 +8300,7 @@
       "id": "client.ui.resource-grid",
       "path": "client/src/ui/resources/resourceGrid.ts",
       "group": "client/ui/resources",
-      "lines": 62,
+      "lines": 63,
       "owns": "the four icon-grid views (Resources by category, Rocks, Enemies, Systems): one tile per entry, an icon with a small name under it, no rows and no hint text",
       "needs": "resourceData (entries, source index), guideChips (the icons), entryCards (View), ../escape",
       "events": "",
@@ -8213,38 +8326,38 @@
         {
           "name": "GRID_CSS",
           "kind": "const",
-          "start": 16,
-          "end": 29
+          "start": 17,
+          "end": 30
         },
         {
           "name": "tile",
           "kind": "function",
-          "start": 31,
-          "end": 33
+          "start": 32,
+          "end": 34
         },
         {
           "name": "resourceGridHtml",
           "kind": "function",
-          "start": 35,
-          "end": 44
+          "start": 36,
+          "end": 45
         },
         {
           "name": "rockGridHtml",
           "kind": "function",
-          "start": 46,
-          "end": 49
+          "start": 47,
+          "end": 50
         },
         {
           "name": "enemyGridHtml",
           "kind": "function",
-          "start": 51,
-          "end": 54
+          "start": 52,
+          "end": 55
         },
         {
           "name": "systemGridHtml",
           "kind": "function",
-          "start": 56,
-          "end": 62
+          "start": 57,
+          "end": 63
         }
       ]
     },
