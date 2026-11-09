@@ -23,7 +23,7 @@ export const WING_RANGE = 3000;
 /** Per wingmate in range: damage and mining yield */
 export const WING_BONUS = 0.08;
 /** Members this close share a kill */
-const SHARE_RANGE = 8000;
+export const SHARE_RANGE = 8000;
 const INVITE_MS = 60_000;
 /** Members' positions go to the party in steps this big (the map and the rally need no more), so a party that is only flying is not resent twice a second */
 const POS_STEP = 1000;
