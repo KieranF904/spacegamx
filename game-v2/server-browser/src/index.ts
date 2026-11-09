@@ -17,7 +17,10 @@ import { InboxRoutes } from './inbox/routes.js';
 import { ActivityRoutes } from './activity/routes.js';
 import { FriendRoutes } from './friends/routes.js';
 import { BodyError, clientIp, readJson } from './accounts/request.js';
-import { MAX_SERVERS, listing, parseHeartbeat, type ServerEntry } from './servers.js';
+import { MAX_SERVERS, parseHeartbeat, type ServerEntry } from './servers.js';
+import { loadDefs } from './regions/defs.js';
+import { askedProtocol, filterByProtocol, latestVersion, mergeServers } from './regions/merge.js';
+import { UpdateRoutes } from './update/schedule.js';
 
 // ============================================
 // CONFIGURATION
@@ -209,17 +212,21 @@ async function handleRegister(req: http.IncomingMessage, res: http.ServerRespons
     }
     
     // (Each heartbeat tells the server which accounts are gone, so it deletes their profiles)
-    sendJson(res, 200, { ok: true, deletedAccounts: accounts.deletedAccounts() });
+    sendJson(res, 200, { ok: true, deletedAccounts: accounts.deletedAccounts(), update: updates.schedule.forHeartbeat() });
   } catch (err) {
     logEvent('register error', { error: String(err) });
     sendJson(res, bodyStatus(err), { ok: false, error: 'Invalid request' });
   }
 }
 
-function handleList(res: http.ServerResponse): void {
+function handleList(res: http.ServerResponse, query: string): void {
   cleanup();
-  const list = Array.from(servers.values()).map((s) => listing(s, process.env.NODE_ENV === 'production'));
-  sendJson(res, 200, { servers: list });
+  // (The defined servers merged with who's heartbeating; ?protocol=N keeps only the servers that client can talk to)
+  const all = mergeServers(serverDefs, Array.from(servers.values()), process.env.NODE_ENV === 'production');
+  const { servers: list, hidden } = filterByProtocol(all, askedProtocol(query));
+  // (`latest`: the newest build any server runs, so an older client can ask its player to reload; `update`: ms until a scheduled restart)
+  const update = updates.schedule.forHeartbeat();
+  sendJson(res, 200, { servers: list, hidden, latest: latestVersion(all), ...(update ? { update } : {}) });
 }
 
 async function handleStats(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
@@ -533,6 +540,10 @@ const accounts = await AccountRoutes.create(sendJson, parseJson, getClientIp);
 // The player inbox: messages from admins to accounts, kept beside them (see inbox/routes.ts)
 const inbox = await InboxRoutes.create(accounts.users, sendJson, parseJson, getClientIp, { adminSecret: accounts.secret, dataDir: DATA_DIR });
 // Friends, friend requests and the saved status, per account: the game servers read and change them (see friends/routes.ts)
+// The scheduled game-server update (see update/schedule.ts): set by an admin, learnt by the servers in their heartbeat answer
+const updates = UpdateRoutes.create(DATA_DIR, sendJson, parseJson, accounts.secret);
+// The game servers defined here (data/servers.json), so a sleeping one is listed too (see regions/)
+const serverDefs = loadDefs(DATA_DIR);
 const friends = await FriendRoutes.create(accounts.users, sendJson, parseJson, { adminSecret: accounts.secret, dataDir: DATA_DIR });
 accounts.onAccountDeleted = (id) => { inbox.forgetUser(id); void friends.forgetUser(id); };
 // The player activity feed: game servers send it, the website's admin panel reads it (see activity/routes.ts)
@@ -559,6 +570,7 @@ const server = http.createServer(async (req, res) => {
     if (await activity.handle(req, res, url)) return;
     if (await inbox.handle(req, res, url)) return;
     if (await friends.handle(req, res, url)) return;
+    if (await updates.handle(req, res, url)) return;
     if (await accounts.handle(req, res, url)) return;
 
     // Server registration (from game servers)
@@ -569,7 +581,7 @@ const server = http.createServer(async (req, res) => {
     
     // Server list (for clients)
     if (req.method === 'GET' && url === '/list') {
-      handleList(res);
+      handleList(res, req.url?.split('?')[1] || '');
       return;
     }
     

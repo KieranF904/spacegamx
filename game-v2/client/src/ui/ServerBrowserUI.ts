@@ -14,6 +14,7 @@ import sunRun from './join/sun-run.jpg';
 import planet from './join/planet.jpg';
 import boss from './join/boss.jpg';
 import { esc } from './escape';
+import { LIST_QUERY, needsReload, reloadBar } from '../network/versionCheck';
 
 export interface ServerInfo {
   host: string;
@@ -24,6 +25,9 @@ export interface ServerInfo {
   players: number;
   secure: boolean;
   ping?: number;
+  /** From the lobby's definitions: asleep (an on-demand server that wakes on connect) or offline; a plain heartbeat is online */
+  status?: 'online' | 'asleep' | 'offline';
+  note?: string;
 }
 
 /** One development news item (newest first in news.json) */
@@ -41,6 +45,8 @@ export class ServerBrowserUI {
   private visible = false;
   private servers: ServerInfo[] = [];
   private loading = false;
+  /** The lobby says a newer build than this page's is running: show the reload bar */
+  private stale = false;
 
   // Server browser URL (override with VITE_BROWSER_URL at build/dev time)
   private browserUrl = LOBBY_URL;
@@ -228,6 +234,7 @@ export class ServerBrowserUI {
 
     this.panel.innerHTML = `
       <div class="join-wrap">
+        <div class="version-slot"></div>
         <div class="inbox-slot-banner"></div>
         <div class="join-box">
           <h1 class="join-title">SPACE GAME</h1>
@@ -253,7 +260,7 @@ export class ServerBrowserUI {
         <button class="join-main-btn" ${main && !this.loading ? '' : 'disabled'}>
           ${main || this.loading ? 'Join' : 'Server offline'}
           <span class="join-mail-badge" hidden></span>
-          <small class="join-server">${this.loading ? 'Finding the server…' : main ? esc(main.name) : 'Try again in a minute'}</small>
+          <small class="join-server">${this.loading ? 'Finding the server…' : main ? esc(main.name) + (main.status === 'asleep' ? ' (waking up)' : '') : 'Try again in a minute'}</small>
         </button>
 
         <div class="inbox-slot"></div>
@@ -267,6 +274,7 @@ export class ServerBrowserUI {
       </div>
     `;
 
+    if (this.stale) this.panel.querySelector('.version-slot')?.replaceWith(reloadBar());
     this.panel.querySelector('.inbox-slot-banner')?.replaceWith(this.inbox.banner);
     this.panel.querySelector('.inbox-slot')?.replaceWith(this.inbox.box);
     this.showMailBadge();
@@ -290,7 +298,9 @@ export class ServerBrowserUI {
   }
 
   private getSortedServers(): ServerInfo[] {
-    return [...this.servers].sort((a, b) => (a.ping ?? 9999) - (b.ping ?? 9999));
+    // (Awake servers first, then by ping: a sleeping one has no ping to speak of until it wakes)
+    const rank = (s: ServerInfo) => (s.status === 'offline' ? 2 : s.status === 'asleep' ? 1 : 0);
+    return [...this.servers].sort((a, b) => rank(a) - rank(b) || (a.ping ?? 9999) - (b.ping ?? 9999));
   }
 
   private setupEventListeners(): void {
@@ -329,9 +339,10 @@ export class ServerBrowserUI {
     }];
 
     try {
-      const response = await fetch(`${this.browserUrl}/list`);
+      const response = await fetch(`${this.browserUrl}/list${LIST_QUERY}`);
       if (!response.ok) throw new Error(`Server browser error (${response.status})`);
       const data = await response.json();
+      this.stale = needsReload(data.latest);
       this.servers = Array.isArray(data.servers) && data.servers.length > 0 ? data.servers : fallbackServers;
     } catch {
       this.servers = fallbackServers;

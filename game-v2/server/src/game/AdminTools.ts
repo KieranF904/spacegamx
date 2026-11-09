@@ -121,6 +121,7 @@ const HELP = [
   '/credits n [name] · /xp n [name] · /give item [n] [name] · /skillpoints n [name] · /codex [name] id|all|clear (records)',
   '/spawn [faction] [ship ...] [xN] (near you) · /boss id · /clear [radius] (destroy hostiles) · /clearpods · /event raid|salvage|siege',
   '/announce text · /who · F2: admin panel · F3: teleport to the cursor · /tutorial (training yard: reset, step id, leave)',
+  '/update minutes|cancel (schedule a server restart for an update: warnings at 15/5/1 min; none: the schedule)',
   '/mail name|everyone [subject |] text (to their inbox on the join screen: a banner until read)',
   '/contributor name on|off (the contributor rank: map notes, F6) · /contributors (who has it)',
   '/freebuild [on|off] (dev servers: place any part in the hangar, nothing taken)',

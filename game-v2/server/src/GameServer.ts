@@ -158,6 +158,8 @@ export class GameServer implements ServerCtx {
   scene: 'sectors' | 'empty';
   everyoneAdmin: boolean;
   guestAdmin: boolean;
+  /** Set by server/src/update when a restart is a minute away: the message every new sign-in is refused with */
+  joinGate: (() => string | null) | null = null;
   /** Admins may build for free in the hangar (AdminTools `freebuild`) */
   freeBuildAllowed: boolean;
   /** The dev server's start system (opts.devStart), by number; -1: pilots start in Sol and come back where they left off */

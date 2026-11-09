@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 490,
+      "lines": 492,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -145,86 +145,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 74,
-          "end": 128
+          "start": 75,
+          "end": 129
         },
         {
           "name": "Msg",
-          "kind": "type",
-          "start": 130,
-          "end": 130
-        },
-        {
-          "name": "Handler",
           "kind": "type",
           "start": 131,
           "end": 131
         },
         {
-          "name": "Handlers",
+          "name": "Handler",
           "kind": "type",
           "start": 132,
-          "end": 134
+          "end": 132
+        },
+        {
+          "name": "Handlers",
+          "kind": "type",
+          "start": 133,
+          "end": 135
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 136,
-          "end": 154
+          "start": 137,
+          "end": 155
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 156,
-          "end": 160
+          "start": 157,
+          "end": 161
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 162,
-          "end": 207
+          "start": 163,
+          "end": 208
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 209,
-          "end": 220
+          "start": 210,
+          "end": 221
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 222,
-          "end": 240
+          "start": 223,
+          "end": 241
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 242,
-          "end": 276
+          "start": 243,
+          "end": 277
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 278,
-          "end": 295
+          "start": 279,
+          "end": 296
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 297,
-          "end": 480
+          "start": 298,
+          "end": 482
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 482,
-          "end": 483
+          "start": 484,
+          "end": 485
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 485,
-          "end": 490
+          "start": 487,
+          "end": 492
         }
       ]
     },
@@ -9643,7 +9643,7 @@
       "id": "protocol",
       "path": "common/src/network/protocol.ts",
       "group": "common/network",
-      "lines": 79,
+      "lines": 80,
       "owns": "the protocol version pin, the wire-table summary, and the re-export of every message family",
       "needs": "protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files",
       "events": "",
@@ -9670,32 +9670,32 @@
         {
           "name": "PROTOCOL_VERSION",
           "kind": "const",
-          "start": 46,
-          "end": 58
+          "start": 47,
+          "end": 59
         },
         {
           "name": "PROTOCOL_WIRE_HASH",
           "kind": "const",
-          "start": 59,
-          "end": 60
+          "start": 60,
+          "end": 61
         },
         {
           "name": "PROTOCOL_MISMATCH_CLOSE",
           "kind": "const",
-          "start": 61,
-          "end": 62
+          "start": 62,
+          "end": 63
         },
         {
           "name": "PROTOCOL_MISMATCH_REASON",
           "kind": "const",
-          "start": 63,
-          "end": 63
+          "start": 64,
+          "end": 64
         },
         {
           "name": "wireTables",
           "kind": "function",
-          "start": 65,
-          "end": 79
+          "start": 66,
+          "end": 80
         }
       ]
     },
@@ -10351,6 +10351,44 @@
           "kind": "type",
           "start": 44,
           "end": 44
+        }
+      ]
+    },
+    {
+      "id": "protocol.update",
+      "path": "common/src/network/updateProtocol.ts",
+      "group": "common/network",
+      "lines": 17,
+      "owns": "the server-update notice: how long until the server restarts for an update",
+      "needs": "nothing",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the server types the client handles itself are exactly the pinned set",
+          "test": "client/src/app/serverMessages.test.ts"
+        },
+        {
+          "text": "every server type is pinned by name",
+          "test": "server/src/golden/structure.test.ts"
+        }
+      ],
+      "extend": "a new message is an interface plus a member of UpdateServerMessage, then its entry in client/src/app/serverMessages.ts and the golden pins",
+      "exports": [
+        "ServerUpdateMessage",
+        "UpdateServerMessage"
+      ],
+      "sections": [
+        {
+          "name": "ServerUpdateMessage",
+          "kind": "interface",
+          "start": 10,
+          "end": 15
+        },
+        {
+          "name": "UpdateServerMessage",
+          "kind": "type",
+          "start": 17,
+          "end": 17
         }
       ]
     },
@@ -11622,7 +11660,7 @@
       "id": "protocol.server-union",
       "path": "common/src/network/protocol/serverMessage.ts",
       "group": "common/network/protocol",
-      "lines": 124,
+      "lines": 126,
       "owns": "the ServerMessage union over every family",
       "needs": "every server message family file",
       "events": "",
@@ -11640,8 +11678,8 @@
         {
           "name": "ServerMessage",
           "kind": "type",
-          "start": 23,
-          "end": 124
+          "start": 24,
+          "end": 126
         }
       ]
     },
@@ -14366,7 +14404,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 812,
+      "lines": 814,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -14394,7 +14432,233 @@
           "name": "GameServer",
           "kind": "class",
           "start": 147,
-          "end": 812
+          "end": 814
+        }
+      ]
+    },
+    {
+      "id": "lobby.regions.defs",
+      "path": "server-browser/src/regions/defs.ts",
+      "group": "server-browser/regions",
+      "lines": 80,
+      "owns": "the game servers the lobby DEFINES (one per region/host), loaded from data/servers.json or LOBBY_SERVERS_JSON",
+      "needs": "node fs/path",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a bad entry is skipped with a message, never fatal; none given means the old behaviour (only heartbeats list)",
+          "test": "server-browser/src/regions/regions.test.ts"
+        }
+      ],
+      "extend": "a new field a server has is one line in ServerDef and one in parseDefs",
+      "exports": [
+        "ServerDef",
+        "ServerKind",
+        "loadDefs",
+        "parseDefs"
+      ],
+      "sections": [
+        {
+          "name": "ServerKind",
+          "kind": "type",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "ServerDef",
+          "kind": "interface",
+          "start": 15,
+          "end": 30
+        },
+        {
+          "name": "ID",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "HOST",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "parseDefs",
+          "kind": "function",
+          "start": 35,
+          "end": 67
+        },
+        {
+          "name": "loadDefs",
+          "kind": "function",
+          "start": 69,
+          "end": 80
+        }
+      ]
+    },
+    {
+      "id": "lobby.regions.merge",
+      "path": "server-browser/src/regions/merge.ts",
+      "group": "server-browser/regions",
+      "lines": 73,
+      "owns": "the server list a client sees: defined servers merged with live heartbeats, filtered by protocol, and the newest version known",
+      "needs": "regions/defs, servers (ServerEntry, listing)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a defined server with no heartbeat is listed asleep (on-demand) or offline (always-on)",
+          "test": "server-browser/src/regions/regions.test.ts"
+        },
+        {
+          "text": "only servers whose protocol matches the asker's are offered; no protocol asked means no filtering",
+          "test": "server-browser/src/regions/regions.test.ts"
+        },
+        {
+          "text": "with no definitions the list is the heartbeats alone, as before",
+          "test": "server-browser/src/regions/regions.test.ts"
+        }
+      ],
+      "extend": "a new status is a member of ServerStatus and a branch in mergeServers",
+      "exports": [
+        "ASLEEP_NOTE",
+        "ListedServer",
+        "OFFLINE_NOTE",
+        "ServerStatus",
+        "askedProtocol",
+        "filterByProtocol",
+        "latestVersion",
+        "mergeServers"
+      ],
+      "sections": [
+        {
+          "name": "ServerStatus",
+          "kind": "type",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "ListedServer",
+          "kind": "type",
+          "start": 16,
+          "end": 24
+        },
+        {
+          "name": "ASLEEP_NOTE",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "OFFLINE_NOTE",
+          "kind": "const",
+          "start": 27,
+          "end": 27
+        },
+        {
+          "name": "mergeServers",
+          "kind": "function",
+          "start": 29,
+          "end": 52
+        },
+        {
+          "name": "filterByProtocol",
+          "kind": "function",
+          "start": 54,
+          "end": 59
+        },
+        {
+          "name": "latestVersion",
+          "kind": "function",
+          "start": 61,
+          "end": 66
+        },
+        {
+          "name": "askedProtocol",
+          "kind": "function",
+          "start": 68,
+          "end": 73
+        }
+      ]
+    },
+    {
+      "id": "lobby.update.schedule",
+      "path": "server-browser/src/update/schedule.ts",
+      "group": "server-browser/update",
+      "lines": 110,
+      "owns": "the one scheduled update (a time every awake game server restarts at), kept in <dataDir>/update.json, and its admin routes",
+      "needs": "accounts/utils (safeEqual), node fs/path/http",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the admin routes answer only to LOBBY_ADMIN_SECRET",
+          "test": "server-browser/src/update/update.test.ts"
+        },
+        {
+          "text": "a schedule is forgotten a short while after its time, so a server that wakes late isn't restarted",
+          "test": "server-browser/src/update/update.test.ts"
+        },
+        {
+          "text": "what servers are told is the time LEFT, so their clocks needn't agree with the lobby's",
+          "test": "server-browser/src/update/update.test.ts"
+        }
+      ],
+      "extend": "a new admin action is a case in UpdateRoutes.handle",
+      "exports": [
+        "GRACE_MS",
+        "MAX_AHEAD_MS",
+        "MIN_AHEAD_MS",
+        "Scheduled",
+        "UpdateRoutes",
+        "UpdateSchedule"
+      ],
+      "sections": [
+        {
+          "name": "GRACE_MS",
+          "kind": "const",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "MAX_AHEAD_MS",
+          "kind": "const",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "MIN_AHEAD_MS",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "Scheduled",
+          "kind": "interface",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "UpdateSchedule",
+          "kind": "class",
+          "start": 23,
+          "end": 70
+        },
+        {
+          "name": "Json",
+          "kind": "type",
+          "start": 72,
+          "end": 72
+        },
+        {
+          "name": "Body",
+          "kind": "type",
+          "start": 73,
+          "end": 73
+        },
+        {
+          "name": "UpdateRoutes",
+          "kind": "class",
+          "start": 75,
+          "end": 110
         }
       ]
     },
@@ -21026,6 +21290,173 @@
           "kind": "const",
           "start": 35,
           "end": 38
+        }
+      ]
+    },
+    {
+      "id": "server.update.countdown",
+      "path": "server/src/update/UpdateCountdown.ts",
+      "group": "server/update",
+      "lines": 116,
+      "owns": "the countdown to a scheduled server update: announcements at 15 / 5 / 1 minutes, the join block in the last minute, the save and clean exit at the time",
+      "needs": "an UpdateHost (clock, say, banner, exit); learns the schedule from the lobby's heartbeat answer",
+      "events": "",
+      "invariants": [
+        {
+          "text": "each of 15 / 5 / 1 minutes is announced once, a late schedule announces only what is still ahead",
+          "test": "server/src/update/countdown.test.ts"
+        },
+        {
+          "text": "new sign-ins are refused from 1 minute before",
+          "test": "server/src/update/countdown.test.ts"
+        },
+        {
+          "text": "at the time it exits once, through the host (which saves everyone first)",
+          "test": "server/src/update/countdown.test.ts"
+        },
+        {
+          "text": "a schedule that is gone from the lobby's answer is a cancellation; a failed heartbeat changes nothing",
+          "test": "server/src/update/countdown.test.ts"
+        }
+      ],
+      "extend": "another warning is one more number in MILESTONES_MS",
+      "exports": [
+        "BANNER_EVERY_MS",
+        "JOIN_BLOCK_MS",
+        "JOIN_REFUSED",
+        "MILESTONES_MS",
+        "UPDATE_EXIT_CODE",
+        "UpdateCountdown",
+        "UpdateHost",
+        "span"
+      ],
+      "sections": [
+        {
+          "name": "MILESTONES_MS",
+          "kind": "const",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "JOIN_BLOCK_MS",
+          "kind": "const",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "BANNER_EVERY_MS",
+          "kind": "const",
+          "start": 15,
+          "end": 16
+        },
+        {
+          "name": "UPDATE_EXIT_CODE",
+          "kind": "const",
+          "start": 17,
+          "end": 18
+        },
+        {
+          "name": "JOIN_REFUSED",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "UpdateHost",
+          "kind": "interface",
+          "start": 21,
+          "end": 30
+        },
+        {
+          "name": "span",
+          "kind": "function",
+          "start": 32,
+          "end": 36
+        },
+        {
+          "name": "UpdateCountdown",
+          "kind": "class",
+          "start": 38,
+          "end": 116
+        }
+      ]
+    },
+    {
+      "id": "server.update.install",
+      "path": "server/src/update/install.ts",
+      "group": "server/update",
+      "lines": 85,
+      "owns": "wiring the update countdown into a running server: its host (chat, banner, exit), the heartbeat's identity fields, the /update admin command, the lobby call",
+      "needs": "GameServer, net/ClientConnection, common/network (PROTOCOL_VERSION), update/UpdateCountdown",
+      "events": "",
+      "invariants": [
+        {
+          "text": "with no lobby answer or no schedule nothing happens: a one-server setup behaves as before",
+          "test": "server/src/update/countdown.test.ts"
+        },
+        {
+          "text": "/update asks the lobby (behind LOBBY_ADMIN_SECRET); the game server never schedules by itself",
+          "test": "server/src/update/countdown.test.ts"
+        }
+      ],
+      "extend": "a new /update word is a branch in updateAdmin",
+      "exports": [
+        "LobbyLink",
+        "buildId",
+        "heartbeatIdentity",
+        "installUpdate",
+        "installUpdateAdmin",
+        "lobbyUpdate",
+        "updateHost"
+      ],
+      "sections": [
+        {
+          "name": "buildId",
+          "kind": "function",
+          "start": 15,
+          "end": 18
+        },
+        {
+          "name": "heartbeatIdentity",
+          "kind": "function",
+          "start": 20,
+          "end": 23
+        },
+        {
+          "name": "updateHost",
+          "kind": "function",
+          "start": 25,
+          "end": 34
+        },
+        {
+          "name": "LobbyLink",
+          "kind": "interface",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "lobbyUpdate",
+          "kind": "function",
+          "start": 38,
+          "end": 51
+        },
+        {
+          "name": "USAGE",
+          "kind": "const",
+          "start": 53,
+          "end": 53
+        },
+        {
+          "name": "installUpdateAdmin",
+          "kind": "function",
+          "start": 55,
+          "end": 76
+        },
+        {
+          "name": "installUpdate",
+          "kind": "function",
+          "start": 78,
+          "end": 85
         }
       ]
     }
