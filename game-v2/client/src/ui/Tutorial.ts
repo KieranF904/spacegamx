@@ -188,8 +188,9 @@ export class Tutorial {
     this.arrow.style.display = 'none';
   }
 
-  /** Replay it (menu) */
+  /** Replay it (menu). Never on a server that runs the training yard */
   restart(): void {
+    if (getTutorialState()) return;
     try { localStorage.removeItem(DONE_KEY); } catch { /* ignore */ }
     this.active = true;
     this.go(0);

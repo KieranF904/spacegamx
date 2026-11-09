@@ -136,8 +136,13 @@ export class TutorialUI {
     this.markers.setHidden(hidden);
     if (!s || s.left) { this.markers.draw(null); this.glow.clear(); return; }
     // The card by the window the pilot is in (the station, the hold, the hangar, the map), or at the top; the glowing controls follow the page
-    this.panel.place(cardHidden ? null : findAnchor(this.find));
     if (this.frame % 15 === 0) this.glow.refresh();
+    // (clear of the controls the step points at: the card's own key caps glow too, and are no reason to move)
+    const avoid = this.glow.litNow().filter((e) => !this.panel.contains(e) && e.getClientRects().length > 0).map((e) => {
+      const r = e.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    });
+    if (!cardHidden) this.panel.place(findAnchor(this.find), avoid);
     this.markers.draw(s);
     // (The control mode can change with a key: the card's keys follow it)
     if (this.d.helm() !== this.helmShown) { this.helmShown = this.d.helm(); this.showCard(); }

@@ -66,7 +66,8 @@ export interface TutorialStepDef {
   title: string;
   /** One or two short lines; key names are written as `{action}` and filled in by the client from the pilot's bindings */
   lines: TutorialLine[];
-  /** Multi-target steps: what the card's counter calls the targets ("Rings" -> "Rings 2/3"); counts `trigger.objects` as the server reports them done */
+  /** What the card's counter calls the step's targets ("Rings" -> "Rings 2/3"): `trigger.objects` as the server reports them done,
+   * or on a collecting step what was taken of `trigger.count` (the state's `got`: "Ore 12/20") */
   counter?: string;
   trigger: TutorialTrigger;
   /** Objects the client highlights (arrow/ring) while this is the current step */

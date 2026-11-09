@@ -167,7 +167,8 @@ export class ToastUI {
 
   constructor() {
     this.root = document.createElement('div');
-    this.root.style.cssText = 'position: fixed; top: 122px; left: 50%; transform: translateX(-50%); z-index: 3500; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;';
+    // (--toast-top: the training card, while it sits at the top of the screen, moves them under it: ui/tutorial/TutorialPanel.ts)
+    this.root.style.cssText = 'position: fixed; top: var(--toast-top, 122px); left: 50%; transform: translateX(-50%); z-index: 3500; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;';
     document.body.appendChild(this.root);
   }
 

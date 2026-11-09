@@ -9,7 +9,10 @@
 
 import { esc } from '../escape';
 import { LeaveFlow, type PanelModel } from './tutorialModel';
-import { cardPosition, type CardAnchor } from './placement';
+import { cardPosition, type CardAnchor, type Rect } from './placement';
+
+/** A card whose top is above this (px) sits where the game's toasts are: they move under it */
+const TOAST_BAND = 160;
 
 let styled = false;
 function injectStyles(): void {
@@ -21,7 +24,7 @@ function injectStyles(): void {
   padding: 10px 14px 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(16, 30, 52, 0.94), rgba(8, 16, 30, 0.94));
   border: 1px solid rgba(251, 191, 36, 0.55); box-shadow: 0 0 26px rgba(251, 191, 36, 0.12), 0 10px 34px rgba(0,0,0,0.5);
   color: #e5ecf7; font: 13px 'Segoe UI', system-ui, sans-serif; line-height: 1.45; }
-.tp[hidden], .tp-toast[hidden], .tp-grad[hidden] { display: none; }
+.tp[hidden], .tp-done[hidden], .tp-grad[hidden] { display: none; }
 .tp-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2.5px; color: #fbbf24; }
 .tp-t { margin: 3px 0 4px; font: 700 16px 'Segoe UI', sans-serif; color: #fff; }
 .tp-l { margin: 2px 0; color: #cfd8e6; }
@@ -40,9 +43,9 @@ function injectStyles(): void {
 .tp button.go:hover, .tp-grad button.go:hover { background: #fbbf24; color: #1a1205; }
 .tp button.warn { border-color: rgba(248, 113, 113, 0.7); color: #fecaca; }
 .tp button.leave { border-color: transparent; color: #8394ad; padding: 3px 6px; }
-.tp-toast { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 2610; padding: 6px 16px; border-radius: 999px; pointer-events: none;
-  background: rgba(10, 40, 28, 0.94); border: 1px solid rgba(74, 222, 128, 0.7); color: #bbf7d0; font: 600 13px 'Segoe UI', sans-serif; animation: tpToast 2.6s ease-out forwards; }
-@keyframes tpToast { 0% { opacity: 0; transform: translate(-50%, -8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+.tp-done { position: absolute; top: 7px; right: 10px; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 10px; border-radius: 999px; pointer-events: none;
+  background: rgba(10, 40, 28, 0.94); border: 1px solid rgba(74, 222, 128, 0.7); color: #bbf7d0; font: 600 11px 'Segoe UI', sans-serif; animation: tpToast 2.6s ease-out forwards; }
+@keyframes tpToast { 0% { opacity: 0; transform: translateY(-4px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 .tp-grad { position: fixed; inset: 0; z-index: 2200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 6, 14, 0.78); }
 .tp-grad > div { width: min(420px, 100%); box-sizing: border-box; padding: 22px 24px; border-radius: 14px; text-align: center; color: #e5ecf7; font: 14px 'Segoe UI', system-ui, sans-serif;
   background: linear-gradient(180deg, rgba(16, 30, 52, 0.98), rgba(8, 16, 30, 0.98)); border: 1px solid rgba(251, 191, 36, 0.6); box-shadow: 0 0 40px rgba(251, 191, 36, 0.18); }
@@ -50,10 +53,11 @@ function injectStyles(): void {
 .tp-grad p { margin: 4px 0; color: #cfd8e6; }
 .tp-grad ul { list-style: none; margin: 12px 0 16px; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); text-align: left; max-height: 40vh; overflow: auto; }
 .tp-grad li { padding: 1px 0; }
+.tp-grad p.tp-sub { margin: -6px 0 14px; font-size: 12px; color: #8fa0b8; }
 .tp-grad button { padding: 7px 26px; font-size: 14px; }
-/* Over a window (the station's, the hold), the hangar or the map: the same card, moved right above (or under, or inside the top of) it, above its veil; it glides there */
+/* Over a window (the station's, the hold), the hangar or the map: the same card, moved by it (placement.ts), above its veil; it glides there */
 .tp.anch { z-index: 2600; }
-@media (prefers-reduced-motion: reduce) { .tp { transition: none; } .tp-toast { animation: none; } .tp-bar > i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tp { transition: none; } .tp-done { animation: none; } .tp-bar > i { transition: none; } }
 `;
   document.head.appendChild(css);
 }
@@ -68,7 +72,10 @@ export interface PanelDeps {
 
 export class TutorialPanel {
   private card = document.createElement('div');
+  /** The card's contents (rebuilt on a change) and its "step done" pill (kept across rebuilds, in the card's corner) */
+  private body = document.createElement('div');
   private toastEl = document.createElement('div');
+  private toastTimer = 0;
   private grad = document.createElement('div');
   private flow: LeaveFlow;
   private model: PanelModel | null = null;
@@ -86,12 +93,13 @@ export class TutorialPanel {
     this.card.hidden = true;
     this.card.setAttribute('role', 'region');
     this.card.setAttribute('aria-label', 'Training');
-    this.toastEl.className = 'tp-toast';
+    this.toastEl.className = 'tp-done';
     this.toastEl.hidden = true;
     this.toastEl.setAttribute('role', 'status');
+    this.card.append(this.body, this.toastEl);
     this.grad.className = 'tp-grad';
     this.grad.hidden = true;
-    document.body.append(this.card, this.toastEl, this.grad);
+    document.body.append(this.card, this.grad);
     this.card.addEventListener('click', (e) => this.click(e));
     this.grad.addEventListener('click', (e) => this.click(e));
   }
@@ -114,22 +122,39 @@ export class TutorialPanel {
   /** The reset on a new connection */
   reset(): void { this.flow.reset(); this.set(null, []); }
 
-  /** Hide behind full-screen views (the map, the hangar, the menu) */
+  /** Hide behind full-screen views (the menu) */
   setHidden(hidden: boolean): void {
     this.card.style.visibility = hidden ? 'hidden' : 'visible';
+    if (hidden || this.card.hidden) { this.toastsAt(null); this.placed = ''; }
+  }
+
+  /** Is this element part of the card (its own key caps glow, and are no control to keep clear of)? */
+  contains(el: Element): boolean { return this.card.contains(el); }
+
+  /**
+   * The game's toasts (ToastUI) drop below the card while it sits at the top of the screen, so neither covers the other:
+   * `--toast-top` on the page root, or the toasts' own spot (null)
+   */
+  private toastsAt(cardBottom: number | null): void {
+    const root = document.documentElement.style;
+    if (cardBottom === null) root.removeProperty('--toast-top');
+    else root.setProperty('--toast-top', `${Math.round(cardBottom + 8)}px`);
   }
 
   /**
    * Over a window, the hangar or the map the card sits by it (placement.ts); otherwise at its usual top-centre spot.
    * Called each frame: it only touches the page when the spot changes
    */
-  place(anchor: CardAnchor | null): void {
-    if (this.card.hidden) return;
+  place(anchor: CardAnchor | null, avoid: readonly Rect[] = []): void {
+    if (this.card.hidden) { this.toastsAt(null); return; }
     const w = this.card.offsetWidth, h = this.card.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
-    const key = `${w}|${h}|${vw}|${vh}|${anchor ? `${anchor.mode}|${anchor.rect.left}|${anchor.rect.top}|${anchor.rect.width}|${anchor.rect.height}` : ''}`;
+    const r = (q: Rect) => `${Math.round(q.left)},${Math.round(q.top)},${Math.round(q.width)},${Math.round(q.height)}`;
+    const key = `${w}|${h}|${vw}|${vh}|${anchor ? `${anchor.mode}|${r(anchor.rect)}` : ''}|${avoid.map(r).join(';')}`;
     if (key === this.placed) return;
     this.placed = key;
-    const { x, y } = cardPosition(anchor, { w, h }, { w: vw, h: vh });
+    const { x, y } = cardPosition(anchor, { w, h }, { w: vw, h: vh }, avoid);
+    // (a card at the top of the screen pushes the game's toasts down under it)
+    this.toastsAt(y < TOAST_BAND ? y + h : null);
     // (the first spot is taken at once, with no glide from the corner)
     if (!this.positioned) this.card.style.transition = 'none';
     this.card.style.setProperty('--tx', `${Math.round(x)}px`);
@@ -138,15 +163,18 @@ export class TutorialPanel {
     if (!this.positioned) { void this.card.offsetWidth; this.card.style.transition = ''; this.positioned = true; }
   }
 
+  /** "Done: <step>" in the card's top corner for a moment (part of the card, so it never covers its title or a window) */
   toast(text: string): void {
-    this.toastEl.textContent = `Done: ${text}`;
+    this.toastEl.textContent = `✓ Done: ${text}`;
+    this.toastEl.title = this.toastEl.textContent;
     this.toastEl.hidden = false;
     // Restart the animation for back-to-back toasts
     this.toastEl.style.animation = 'none';
     void this.toastEl.offsetWidth;
     this.toastEl.style.animation = '';
     this.d.sound('scan_ping', 0.5);
-    window.setTimeout(() => { this.toastEl.hidden = true; }, 2700);
+    window.clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => { this.toastEl.hidden = true; }, 2700);
   }
 
   private render(): void {
@@ -158,8 +186,8 @@ export class TutorialPanel {
     if (m.graduate) {
       this.card.hidden = true;
       this.grad.hidden = false;
-      this.grad.innerHTML = `<div role="dialog" aria-label="Training complete"><h2>Training complete</h2><p>You know the whole loop. Your starter pack is waiting:</p>
-        <ul>${this.pack.map((l) => `<li>${esc(l)}</li>`).join('')}</ul><button class="go" data-a="enter">Enter Sol</button></div>`;
+      this.grad.innerHTML = `<div role="dialog" aria-label="Training complete"><h2>Training complete</h2><p>You know the whole loop. Here is your starter pack:</p>
+        <ul>${this.pack.map((l) => `<li>${esc(l)}</li>`).join('')}</ul><p class="tp-sub">It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.</p><button class="go" data-a="enter">Enter Sol</button></div>`;
       this.grad.querySelector<HTMLButtonElement>('[data-a="enter"]')?.focus();
       return;
     }
@@ -167,7 +195,7 @@ export class TutorialPanel {
     if (this.card.hidden) { this.placed = ''; this.positioned = false; }
     this.card.hidden = false;
     const confirm = this.flow.phase === 'confirm', sent = this.flow.phase === 'sent';
-    this.card.innerHTML = `<div class="tp-h"><span>TRAINING · ${m.n} / ${m.total}</span></div>
+    this.body.innerHTML = `<div class="tp-h"><span>TRAINING · ${m.n} / ${m.total}</span></div>
       <div class="tp-t">${esc(m.title)}</div>
       ${m.lines.map((l) => `<div class="tp-l">${l}</div>`).join('')}
       ${m.counter ? `<div class="tp-ct${m.counter.done >= m.counter.total ? ' full' : ''}" role="status">${esc(m.counter.label)} ${m.counter.done}/${m.counter.total}</div>` : ''}

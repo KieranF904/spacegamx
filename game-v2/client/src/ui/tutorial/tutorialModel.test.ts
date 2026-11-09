@@ -36,6 +36,14 @@ describe('tutorial panel', () => {
     expect(fillKeys('Press {powerFlow} <b>', keyOf)).toBe('Press <kbd>U</kbd> &lt;b&gt;');
   });
 
+  it('the mining card counts the ore the server says was taken ("Ore 12/20"), capped, and 0 before any', () => {
+    const mine = data.steps.find((s) => s.trigger.kind === 'collect')!;
+    const total = mine.trigger.count!;
+    expect(counterOf(st(mine.id), mine)).toEqual({ label: 'Ore', done: 0, total });
+    expect(counterOf({ ...st(mine.id), got: 12 }, mine)).toEqual({ label: 'Ore', done: 12, total });
+    expect(counterOf({ ...st(mine.id), got: total + 5 }, mine)!.done).toBe(total);
+  });
+
   it('every step line of the data renders', () => {
     for (const s of data.steps) expect(panelModel(st(s.id), data, keyOf)!.lines.length).toBeGreaterThan(0);
   });

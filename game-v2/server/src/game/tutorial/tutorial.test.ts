@@ -44,6 +44,30 @@ function yard(names = ['ann', 'bo'], tutorial = true) {
 }
 
 describe('the training yard', () => {
+  it('a new trainee starts with empty storage (the starter pack comes on leaving); a server without the yard keeps the usual kit', () => {
+    const w = yard(['ann']);
+    expect(w.pilots[0].profile().storage).toEqual([]);
+    const plain = yard(['bo'], false);
+    expect(plain.pilots[0].profile().storage.length).toBeGreaterThan(0);
+  });
+
+  it('a trainee who dies comes back in the yard, at the same step', async () => {
+    const w = yard(['ann']);
+    const a = w.pilots[0];
+    w.tut.completeStep(a.conn, 'welcome');
+    w.put(a.pid, w.center.x - 5000, w.center.y);
+    bitecs.addComponent(w.server.world, Dead, a.pid);
+    a.t.send({ type: 'respawn' } as never);
+    await new Promise((r) => setTimeout(r, 0));
+    w.step(2);
+    // (a new ship: the connection's entity)
+    const now = a.conn.playerId;
+    expect(now).not.toBe(a.pid);
+    expect(InSystem.systemId[now]).toBe(w.server.gameData.getSystemNum('vesta_yard'));
+    expect(w.dist(now)).toBeLessThan(w.data.yard.spawnRadius + 50);
+    expect(a.profile().tutorial.step).toBe('rings');
+  });
+
   it('puts new pilots in the Vesta yard system, and tells each its state', () => {
     const w = yard();
     expect(w.data.yard.system).toBe('vesta_yard');

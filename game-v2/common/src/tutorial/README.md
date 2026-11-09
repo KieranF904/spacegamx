@@ -4,9 +4,9 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard in its own
 
 ## Data: `data/tutorial.json` (shapes in `types.ts`, checked by `validateTutorialData`, run by the server's data validation)
 - `yard`: system, station id (`data/stations.json`, `tutorial: true`), `center` (the station; objects are offsets from it), `spawnRadius`, `leash` (the soft wall trainees are stopped at; a pilot who has left is turned out wherever they are in the yard), `stopSpeed`/`stopTicks` (a stop).
-- `steps[]`: `id, title, lines[1-2] (with {action} key names), trigger {kind, objects?, panel?, item?, count?}, targets?, grant?`. First is `welcome`, last `graduate`.
+- `steps[]`: `id, title, lines[1-2] (with {action} key names), trigger {kind, objects?, panel?, item?, count?}, targets?, grant?, counter?, highlight?` (`highlight`: selectors of the controls that glow, in order, until clicked; the card keeps clear of a glowing control). The power step checks a generator was built into the ship, not that its ports link (the starter ship has no free in port); its text says only that. First is `welcome`, last `graduate`.
 - `objects[]`: `id, kind (drone|ring|zone|exit), step, at (offset from yard.center), radius, hp?, label?`. `drone` is a real asteroid entity (fixed orbit, never lose hp, asteroid index `TUTORIAL_INDEX_BASE + position in objects`, told to clients as an `asteroidSpawn`); `ring`/`zone`/`exit` are markers (no entity; the client draws them).
-- `starterPack {credits, items}`: granted to storage on leaving.
+- `starterPack {credits, items}`: granted to storage on leaving. On a server that runs the yard a new pilot starts with empty storage (`starterFor`, server/src/gameServer/hosts/tutorial.ts): the steps hand out what each needs and the pack comes on leaving; other servers keep the usual kit.
 - `TutorialObjectDef`s have world position `objectPos(data, o)`.
 
 ## Saved state: `PlayerProfile.tutorial: TutorialProfile { step, done[], left, hits? }`
@@ -22,7 +22,7 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard in its own
   - `onEvent(pid, ev: TutorialEvent)`; `subscribe(fn(conn, ev))`; events emitted by the foundation: `objectBroken`, `ringPassed`, `zoneStopped`, `docked`, `jumped {x,y,exit?}`, plus `ack`/`panelOpened` from `tutorialReport`. Other modules report the rest through it: `collected` (pods taken into the hold), `refined` (StationServices), `partPlaced`/`powered` (Hangar saves).
   - `completeStep(conn, stepId)` (the engine's one way to advance; zeroes the next step's counters), `resetObjects(conn, step)`, `leave(conn)` (pack, home reset, exit, quests opened, state sent), `sendState(conn)`, `active(conn)`, `spawnFor(conn, resume)`, `objectOf/isBody/entityOf/def`.
   - `tick()` ('tutorial' entry in the world phase): rings/zones/jumps for trainees, the leash (a soft wall: stopped just inside, `tutorialEdge` asks the client to confirm Leave), a pilot who has left is turned out of the yard to Sol's start.
-- `TutorialSteps.advance(pid, ev)`: one case per trigger kind (`satisfied`); `entered` gives a step's grant and starts its counting over; the graduate card sends the pilot on by itself after 20 s.
+- `TutorialSteps.advance(pid, ev)`: one case per trigger kind (`satisfied`); `entered` gives a step's grant and starts its counting over; the graduate screen waits for the pilot's Enter Sol (a client that never answers is sent on after ten minutes). On a collecting step `tutorialState.got` is the ore so far (the card's "Ore 12/20").
 - The mining step counts the belt's ore (`trigger.items`) taken into the hold since the step began, or done once the hold has `count` of it (a reconnect never strands it); the card's mark points at the nearest belt rock.
 - A pilot sees only the objects of steps up to their own: later steps' drones, rings, zone and exit are not drawn at all (client `phaseOf`: hidden / live / ghost); a hit on a later step's drone counts nothing. They still collide (shared sim), but in that pilot's own view their shots and beams pass a hidden or ghosted drone, with no spark and no hover card, and a live drone sparks plainly, never like rock (`client/src/state/trainingBodies.ts`, written by TutorialUI).
 - The yard's station (`sol_station_yard`) and bodies exist only on a server with a tutorial. `GameData.getAllStations()` leaves the yard out.
@@ -30,5 +30,5 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard in its own
 
 ## Notes
 - A drone is an asteroid body, so the client draws a drone model where the asteroid for index `TUTORIAL_INDEX_BASE + i` is (hide the rock look); a system with no belt sends its bodies as `asteroidSpawn` on entry; shells stop on it like on a rock. Hits count for guns and mining beams.
-- The old client tour (`client/src/ui/Tutorial.ts`) never starts on a server that runs the yard (any `tutorialState` stops it); it still runs on servers without one (the dev Rockery start).
+- The old client tour (`client/src/ui/Tutorial.ts`) never starts on a server that runs the yard (any `tutorialState` stops it); it still runs on servers without one (the dev Rockery start), and only there does the field guide offer "Replay flight school".
 - The yard's bodies live in `vesta_yard`, so pilots in Sol (and anyone who has left) are never told of them.

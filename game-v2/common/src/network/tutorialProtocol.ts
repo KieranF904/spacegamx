@@ -30,10 +30,11 @@ export type TutorialClientMessage = ClientTutorialLeaveMessage | ClientTutorialR
 /**
  * This pilot's tutorial state: sent on join and whenever it changes, to that pilot alone. `step` is '' once `left`.
  * `broken`: the training objects this pilot has broken (drawn ghosted, with those of the steps in `done`).
- * `passed`: the rings of the current step this pilot has flown through this visit (the card's counter, the lit rings). The steps and
+ * `passed`: the rings of the current step this pilot has flown through this visit (the card's counter, the lit rings).
+ * `got`: on a collecting step, how much of it the pilot has so far (the card's "Ore 12/20"); absent on other steps. The steps and
  * the objects themselves are in data/tutorial.json, which the client bundles
  */
-export interface ServerTutorialStateMessage { type: 'tutorialState'; step: string; done: string[]; left: boolean; broken: string[]; passed: string[] }
+export interface ServerTutorialStateMessage { type: 'tutorialState'; step: string; done: string[]; left: boolean; broken: string[]; passed: string[]; got?: number }
 
 /**
  * The pilot reached the edge of the yard: the server has stopped them just inside. The client asks whether to leave

@@ -4,7 +4,7 @@
  * needs:      Tutorial (completeStep, leave, data, grant); npm: @space-game/common
  * invariants: a step only advances on an event of the pilot's own current step, and only by what its trigger in data/tutorial.json asks;
  *             a client report only ever completes an "opened" or acknowledge step, never anything that pays;
- *             the graduate step leaves on its own after a few seconds if the client does not acknowledge — server/src/game/tutorial/steps.test.ts
+ *             the graduate screen waits for the pilot's Enter Sol (only a client that never answers is sent on, after ten minutes) — server/src/game/tutorial/steps.test.ts
  * extend:     a new trigger kind is a member of TutorialTriggerKind (common/src/tutorial/types.ts) plus a case in `satisfied`;
  *             per-step setup (a grant, objects reset) is in `entered`; counting that must survive a reconnect belongs in the
  *             profile, the rest (rings passed, ore taken, panels seen) is per visit and starts over when the pilot logs back in
@@ -15,8 +15,8 @@ import type { TutorialEvent, TutorialStepDef, TutorialTrigger } from '@space-gam
 import type { PilotConn } from '../Pilots.js';
 import type { Tutorial } from './Tutorial.js';
 
-/** The graduate card waits this long for an acknowledgement before the pilot is sent on anyway */
-const GRADUATE_AFTER_TICKS = TICK_RATE * 20;
+/** The graduate screen waits for the pilot's Enter Sol; only a client that never answers is sent on, after this long */
+export const GRADUATE_AFTER_TICKS = TICK_RATE * 600;
 
 /** What a pilot has done toward the current step so far this visit */
 interface Progress { step: string; seen: Set<string>; n: number }
@@ -39,6 +39,17 @@ export class TutorialSteps {
     const p = this.progress.get(pid);
     const tr = this.tutorial.data.steps.find((s) => s.id === step)?.trigger;
     return p && p.step === step && tr?.kind === 'rings' ? [...p.seen] : [];
+  }
+
+  /** On a collecting step, how much the pilot has toward it (taken this visit, or held now, whichever is more; capped at the
+   *  count), for the tutorialState counter; undefined on any other step */
+  gotOf(pid: number, step: string): number | undefined {
+    const tr = this.tutorial.data.steps.find((s) => s.id === step)?.trigger;
+    if (tr?.kind !== 'collect') return undefined;
+    const conn = this.tutorial.pilotOf(pid);
+    const p = this.progress.get(pid);
+    const n = Math.max(p && p.step === step ? p.n : 0, conn ? this.tutorial.held(conn, tr.items) : 0);
+    return Math.min(tr.count ?? 1, n);
   }
 
   /** The pilot (entity `pid`) in the tutorial caused `ev`: advance their step if it is what the step waits for */
@@ -85,7 +96,10 @@ export class TutorialSteps {
         p.n += ev.n;
         // (or the hold has that much of it now: ore taken before a reconnect still counts, so a hold too full for another
         // `count` never strands the step)
-        return p.n >= (tr.count ?? 1) || this.tutorial.held(conn, tr.items) >= (tr.count ?? 1);
+        if (p.n >= (tr.count ?? 1) || this.tutorial.held(conn, tr.items) >= (tr.count ?? 1)) return true;
+        // (the card's counter moves on)
+        this.tutorial.sendState(conn);
+        return false;
       case 'panel': {
         if (ev.kind !== 'panelOpened') return false;
         const want = tr.panels ?? (tr.panel ? [tr.panel] : []);
