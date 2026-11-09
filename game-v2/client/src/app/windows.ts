@@ -28,6 +28,7 @@ import { TradeWindow } from '../ui/TradeWindow';
 import { TargetUI } from '../ui/TargetUI';
 import { OpsUI } from '../ui/OpsUI';
 import { Tutorial } from '../ui/Tutorial';
+import { TutorialUI } from '../ui/tutorial/TutorialUI';
 import { PingUI } from '../ui/PingUI';
 import { RibbonPopup } from '../ui/RibbonPopup';
 import { QuestClient } from '../ui/QuestUI';
@@ -128,6 +129,8 @@ export interface WindowSet {
   ribbonPopup: RibbonPopup;
   pingUI: PingUI;
   tutorial: Tutorial;
+  /** The training-yard lesson (card, markers, ghosts) */
+  tutorialUI: TutorialUI;
   killFeedUI: KillFeedUI;
   playerStatsUI: PlayerStatsUI;
   systemMapUI: SystemMapUI;
@@ -319,6 +322,23 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       trainingDrone: () => host.network.send({ type: 'trainingDrone' }),
       kills: () => host.sessionKills,
       jumpPhase: () => host.shipClient.localJump().phase,
+    });
+    w.tutorialUI = new TutorialUI({
+      state: host.state,
+      send: (m) => host.network.send(m),
+      worldToScreen: (x, y) => host.renderer.worldToScreen(x, y),
+      setTrainingLook: (id, look) => host.renderer.setTrainingLook(id, look),
+      keyOf: (a) => boundKeyName(a, settings.data.bindings),
+      itemName: (id) => host.pilot.econ.items.get(id)?.name ?? id,
+      sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
+      panelsOpen: () => {
+        const tab = host.stationOpen ? w.stationWindow.value?.currentTab : '';
+        return {
+          hold: w.inventoryWindow.isOpen, hangar: host.shipClient.hangarOpen, map: w.systemMapUI.isOpen, guide: !!w.componentGuide.value?.isOpen,
+          bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator',
+        };
+      },
+      stopOldTour: () => w.tutorial.stop(),
     });
     w.killFeedUI = new KillFeedUI(uiOverlay);
     w.playerStatsUI = new PlayerStatsUI(uiOverlay);

@@ -10,6 +10,7 @@ import { EntityType } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
+import { inTutorialNow } from './tutorial/tutorialStore';
 
 const DONE_KEY = 'sg.tutorialDone';
 
@@ -173,9 +174,17 @@ export class Tutorial {
   maybeStart(isNew: boolean): void {
     let done = false;
     try { done = localStorage.getItem(DONE_KEY) === '1'; } catch { /* private window */ }
-    if (this.active || done || !isNew) return;
+    if (this.active || done || !isNew || inTutorialNow()) return;
     this.active = true;
     this.go(0);
+  }
+
+  /** End the tour now without marking it done (the training yard's lesson takes over) */
+  stop(): void {
+    if (!this.active) return;
+    this.active = false;
+    this.card.style.display = 'none';
+    this.arrow.style.display = 'none';
   }
 
   /** Replay it (menu) */

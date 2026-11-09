@@ -900,6 +900,7 @@ this.boostHudEl = document.getElementById('boostHud');
     const building = this.w.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
     this.w.buildSites?.update(1 / 60, building ? building.markers[0] : null);
     this.w.tutorial.update(blocked || this.localDead || this.w.playerStatsUI.isVisible());
+    this.w.tutorialUI.update(blocked || this.localDead);
     this.w.pingUI.setHidden(blocked);
     this.w.pingUI.update();
     // The hold above the chat: not while docked (the station's storage has it) or behind a full-screen view
@@ -1144,6 +1145,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
   private onDisconnected(info?: DisconnectInfo): void {
     console.log('Disconnected from server', info ?? '');
     this.loggedIn = false;
+    this.w.tutorialUI?.reset();
     this.loading?.cancel();
     
     if (info?.code === PROTOCOL_MISMATCH_CLOSE || this.versionMismatch) {
