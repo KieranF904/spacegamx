@@ -25,6 +25,17 @@ export function setTutorialState(m: ServerTutorialStateMessage): void {
   for (const fn of listeners) fn(m);
 }
 
+const edgeListeners = new Set<() => void>();
+
+/** The server stopped the pilot at the yard's edge: ask whether to leave (the message handler's call) */
+export function tutorialEdge(): void { for (const fn of edgeListeners) fn(); }
+
+/** Hear the yard's edge reached; returns the way to stop */
+export function onTutorialEdge(fn: () => void): () => void {
+  edgeListeners.add(fn);
+  return () => edgeListeners.delete(fn);
+}
+
 /** The latest state, or null before the server has sent one */
 export function getTutorialState(): ServerTutorialStateMessage | null { return current; }
 

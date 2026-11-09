@@ -143,7 +143,7 @@ export class SystemMapUI implements MapHost {
   constructor(container: HTMLElement, public state: GameState) {
     // Planet surfaces aren't on the galaxy map (but you can be on one)
     const all = (systemsFile as unknown as { systems: StarSystemData[] }).systems;
-    this.systems = all.filter((s) => !s.surface && !s.private && !s.pocket);
+    this.systems = all.filter((s) => !s.surface && !s.private && !s.pocket && !s.tutorial);
     this.byId = new Map(all.map((s) => [s.id, s]));
     [...new Set(this.systems.map((s) => s.sector ?? ''))].forEach((sec, i) => this.sectorColor.set(sec, SECTOR_COLORS[i % SECTOR_COLORS.length]));
     const r = seeded(7);

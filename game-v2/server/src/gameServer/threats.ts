@@ -13,6 +13,8 @@ export function threats(gs: GameServer): Record<string, number> {
   if (gs.threatCache) return gs.threatCache;
   const out: Record<string, number> = {};
   for (const sys of gs.gameData.getAllSystems()) {
+    // (The training yard has nothing to rate: not told to clients)
+    if (sys.tutorial) continue;
     const bands = gs.regionThreats()[sys.id];
     const r = sys.surface?.bastion ? gs.sieges.threat(sys) : bands ? bands[sys.regions![0].id] : gs.enemies.systemRating(sys.id);
     if (r > 0) out[sys.id] = Math.round(r);
@@ -25,7 +27,7 @@ export function regionThreats(gs: GameServer): Record<string, Record<string, num
   if (gs.regionThreatCache) return gs.regionThreatCache;
   const out: Record<string, Record<string, number>> = {};
   for (const sys of gs.gameData.getAllSystems()) {
-    if (!sys.regions?.length) continue;
+    if (!sys.regions?.length || sys.tutorial) continue;
     const bands: Record<string, number> = {};
     let inner = 0, last = 0;
     for (const g of sys.regions) {

@@ -1,12 +1,12 @@
 {
   "version": 1,
   "yard": {
-    "system": "sol",
+    "system": "vesta_yard",
     "station": "sol_station_yard",
-    "center": { "x": -22800, "y": 21000 },
+    "center": { "x": 4300, "y": -3000 },
     "spawnRadius": 1100,
-    "leash": 8500,
-    "keepOut": 10000,
+    "leash": 25000,
+    "keepOut": 30000,
     "stopSpeed": 0.4,
     "stopTicks": 45
   },
@@ -106,15 +106,15 @@
     }
   ],
   "objects": [
-    { "id": "ring_1", "kind": "ring", "step": "rings", "at": { "x": 2500, "y": 500 }, "radius": 260, "label": "1" },
-    { "id": "ring_2", "kind": "ring", "step": "rings", "at": { "x": 4500, "y": 2000 }, "radius": 260, "label": "2" },
-    { "id": "ring_3", "kind": "ring", "step": "rings", "at": { "x": 6500, "y": 500 }, "radius": 260, "label": "3" },
-    { "id": "stop_zone", "kind": "zone", "step": "brake", "at": { "x": 6500, "y": -2500 }, "radius": 420, "label": "Stop here" },
-    { "id": "drone_1", "kind": "drone", "step": "drones", "at": { "x": -3000, "y": -2000 }, "radius": 55, "hp": 160 },
-    { "id": "drone_2", "kind": "drone", "step": "drones", "at": { "x": -4200, "y": 0 }, "radius": 55, "hp": 160 },
-    { "id": "drone_3", "kind": "drone", "step": "drones", "at": { "x": -3000, "y": 2000 }, "radius": 55, "hp": 160 },
-    { "id": "training_rock", "kind": "rock", "step": "mine", "at": { "x": 0, "y": 4000 }, "radius": 80, "hp": 600, "drops": { "iron_ore": 8, "nickel_ore": 4 }, "chunks": 4, "label": "Training rock" },
-    { "id": "exit_marker", "kind": "exit", "step": "jump", "at": { "x": 0, "y": -6500 }, "radius": 700, "label": "Jump here" }
+    { "id": "ring_1", "kind": "ring", "step": "rings", "at": { "x": -2500, "y": -500 }, "radius": 260, "label": "1" },
+    { "id": "ring_2", "kind": "ring", "step": "rings", "at": { "x": -4500, "y": -2000 }, "radius": 260, "label": "2" },
+    { "id": "ring_3", "kind": "ring", "step": "rings", "at": { "x": -6500, "y": -500 }, "radius": 260, "label": "3" },
+    { "id": "stop_zone", "kind": "zone", "step": "brake", "at": { "x": -6500, "y": 2500 }, "radius": 420, "label": "Stop here" },
+    { "id": "drone_1", "kind": "drone", "step": "drones", "at": { "x": 2500, "y": -3500 }, "radius": 55, "hp": 160 },
+    { "id": "drone_2", "kind": "drone", "step": "drones", "at": { "x": -1500, "y": -4200 }, "radius": 55, "hp": 160 },
+    { "id": "drone_3", "kind": "drone", "step": "drones", "at": { "x": -3500, "y": -3000 }, "radius": 55, "hp": 160 },
+    { "id": "training_rock", "kind": "rock", "step": "mine", "at": { "x": -1800, "y": -1600 }, "radius": 80, "hp": 600, "drops": { "iron_ore": 8, "nickel_ore": 4 }, "chunks": 4, "label": "Training rock" },
+    { "id": "exit_marker", "kind": "exit", "step": "jump", "at": { "x": -9000, "y": -2000 }, "radius": 700, "label": "Jump here" }
   ],
   "starterPack": {
     "credits": 150,

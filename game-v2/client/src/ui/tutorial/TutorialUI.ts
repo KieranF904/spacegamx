@@ -12,7 +12,7 @@ import type { ClientMessage, ServerTutorialStateMessage, TutorialPanel } from '@
 import type { GameState } from '../../state/GameState';
 import { TutorialMarkers } from './TutorialMarkers';
 import { TutorialPanel as PanelView } from './TutorialPanel';
-import { leaveMessage, onTutorial, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
+import { leaveMessage, onTutorial, onTutorialEdge, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
 import { lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
 
 export interface TutorialUIDeps {
@@ -58,6 +58,8 @@ export class TutorialUI {
       station: () => this.yardStation(),
     });
     onTutorial((s) => this.onState(s));
+    // (The yard's edge: the card's own leave confirm, Leave / Stay)
+    onTutorialEdge(() => this.panel.askLeave());
   }
 
   /** The connection starts over */
