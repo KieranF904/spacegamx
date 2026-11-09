@@ -162,7 +162,8 @@
       "lastlight_siege": { "extends": ["the_maw", "siege"], "bar": 10 },
       "halcyon_foundry": { "extends": ["glasswater", "industrial"], "scale": "dorian", "brightness": 1000, "arp": { "pattern": [0, 4, 0, 7], "steps": 8, "level": 0.02, "octave": 1, "wave": "square", "chance": 1, "decay": 0.3 } },
       "homestead": { "extends": "sol", "bar": 10, "bells": 1.6, "brightness": 820, "arp": { "pattern": [0, 2, 4, 7, 4, 2], "steps": 12, "level": 0.03, "octave": 1, "wave": "triangle", "chance": 0.5, "decay": 1.8 } },
-      "sol_scrap_nest": { "extends": ["sol", "industrial"], "scale": "aeolian", "bells": 1, "bellOctave": 1, "brightness": 650, "arp": null }
+      "sol_scrap_nest": { "extends": ["sol", "industrial"], "scale": "aeolian", "bells": 1, "bellOctave": 1, "brightness": 650, "arp": null },
+      "gun_range": { "extends": ["sol", "industrial"], "scale": "mixolydian", "brightness": 760, "bells": 0.8, "reverb": 0.7, "arp": null }
     },
     "situations": {
       "docked": { "perc": null, "bass": null, "noise": null, "reverb": 0.8, "mul": { "brightness": 0.8, "bells": 0.6, "padLevel": 0.9, "swell": 0.5 } },

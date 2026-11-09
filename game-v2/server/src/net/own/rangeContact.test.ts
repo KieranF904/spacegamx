@@ -1,5 +1,6 @@
 /**
- * Its own ship flown into a pinned range dummy (the weapons range's giants: Enemies.spawnTarget, 100+ parts, pinned),
+ * Its own ship flown into a pinned giant (Enemies.spawnTarget, 100+ parts, then pinned here as the old weapons range's
+ * dummies were; siege structures, nests, caches and fixed bosses still are),
  * with its inputs going ahead of the snapshots as a real client's do (it predicts LEAD ticks past the newest one).
  *
  * The server leaves a pinned ship out of the client's own contact pass (common network/causes.ts isLeftOut): its
@@ -77,10 +78,12 @@ function ram(o: { giant: string; own: string; angle: number; offset: number; mov
   ships.respawnInPlace(A.pid, ships.library.get(o.own)!);
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
-  const en = server.enemies as unknown as { spawnTarget(n: number, t: object, x: number, y: number, a: number): number; setTargetMoving(e: number, to: object): void };
+  const en = server.enemies as unknown as { spawnTarget(n: number, t: object, x: number, y: number, a: number): number };
   // (Straight ahead of it: it flies north, the dummy's hull turned by `angle`)
   const g = en.spawnTarget(num, { ship: o.giant, faction: 'pirates' }, x0 + o.offset, y0 - 750, o.angle);
-  if (o.moving) en.setTargetMoving(g, { x: x0 + o.offset + 300, y: y0 - 750 });
+  // (Pinned, or let fly: a slow sweep across its spot)
+  if (o.moving) ships.setAutopilot(g, { x: x0 + o.offset + 300, y: y0 - 750, arriveRadius: 60 });
+  else ships.pin(g);
   for (let i = 0; i < 40; i++) step();
   fwd = true;
   // How far its drawn ship was from where the server had it on that tick, and how deep into the hull
