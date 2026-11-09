@@ -111,7 +111,7 @@ export class FieldShips implements FeatureInstance {
 
   constructor(private readonly host: FieldHost) {
     this.packs = packDefs(host.econ.items);
-    this.validateLoose = (bp) => host.ships.validate(bp, { mounting: false });
+    this.validateLoose = (bp) => host.ships.validate(bp, { mounting: false, devParts: true });
   }
 
   // ===================================================================== for package B and the integrator
@@ -750,8 +750,8 @@ export class FieldShips implements FeatureInstance {
     const live = new Map(fs.ship.blueprint.parts.map((p, i) => [p.uid, { p, ghost: fs.ship.ghost[i] }]));
     const standing = (u: number) => { const l = live.get(u); return !!l && !l.ghost; };
     const v: ValidationResult = this.host.ships.validate(target);
-    // (A part fitted before a weapon's mounting rules changed may stay as it is, as a saved ship does)
-    const errors = v.errors.filter((e) => !(e.code === 'badMounting' && e.uids.every(standing)));
+    // (A part fitted before a weapon's mounting rules changed, or a dev part an old ship holds, may stay as it is, as a saved ship does)
+    const errors = v.errors.filter((e) => !((e.code === 'badMounting' || e.code === 'exclusive') && e.uids.every(standing)));
     if (errors.length) return `That plan has problems: ${errors[0].message}`;
     if (this.host.freeBuild?.(fs.eid)) return null;
     const prof = this.host.profile(fs.eid);

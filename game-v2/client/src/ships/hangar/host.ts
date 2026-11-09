@@ -26,6 +26,8 @@ export interface HangarDeps {
   hangarState(): ServerHangarMessage | null;
   /** Can the pilot fabricate this item (licences) */
   canMake(id: string): boolean;
+  /** An admin (dev-only parts are in the palette for them: common/ships/devOnly.ts) */
+  admin?(): boolean;
   /** The pilot's level (what a locked model waits on) */
   level?(): number;
   /** Licences and recipes the pilot has learned (profile.recipes: the palette's gates, ui/componentGuide.ts) */

@@ -82,7 +82,7 @@ export interface MenuDeps {
   level?(): number;
   xp?(): number;
   icon?(id: string): string;
-  /** The component guide (the side panel's tab: the field guide's Ships page links to it) */
+  /** The component guide (the side panel's tab) */
   openComponents?(): void;
 }
 
@@ -192,7 +192,7 @@ export class GameMenuUI {
   private main: HTMLDivElement;
   private page: Page = 'main';
   private tab: SettingsTab = 'audio';
-  private guideTab: GuideTab = 'basics';
+  private guideTab: GuideTab = 'progress';
   private open_ = false;
   private listening: string | null = null;
   private notice = '';
@@ -378,7 +378,6 @@ export class GameMenuUI {
       <div class="fg-tabs">${GUIDE_TABS.map((t) => `<button class="fg-tab${t.id === this.guideTab ? ' on' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}</div>
       <div class="fg-body">${guideHtml(this.guideTab, { k, threats: () => this.deps.threats?.() ?? {}, myRating: () => this.deps.myRating?.() ?? 0, level: () => this.deps.level?.() ?? 1, xp: () => this.deps.xp?.() ?? 0, icon: (id) => this.deps.icon?.(id) ?? '' })}</div>`;
     panel.querySelector<HTMLButtonElement>('[data-a="tutorial"]')?.addEventListener('click', () => { this.close(); this.deps.replayTutorial?.(); });
-    for (const b of panel.querySelectorAll<HTMLElement>('[data-a="components"]')) b.addEventListener('click', () => this.choose('components'));
     for (const b of panel.querySelectorAll<HTMLElement>('[data-tab]')) b.onclick = () => { this.guideTab = b.dataset.tab as GuideTab; this.renderMain(); };
     wireGuideCharts(panel);
   }

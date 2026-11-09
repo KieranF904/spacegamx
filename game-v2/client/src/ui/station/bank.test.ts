@@ -124,14 +124,4 @@ describe('field guide wording', () => {
     for (const t of GUIDE_TABS) expect(guideHtml(t.id, deps).toLowerCase(), t.id).not.toMatch(/insurance|loaner|repair kit/);
   });
 
-  it('explains the repair bank, the field machines and the packs', () => {
-    expect(guideHtml('combat', deps)).toMatch(/repair bank/);
-    expect(guideHtml('combat', deps)).toMatch(/bare core/);
-    const ind = guideHtml('industry', deps);
-    expect(ind).toContain('Field machines');
-    expect(ind).toContain('Assembly Forge');
-    expect(ind).toContain('Field Refiner');
-    expect(ind).toContain('Material packs');
-    expect(ind).toContain('60% faster');
-  });
 });

@@ -50,6 +50,7 @@ export * from './warmth.js';
 export * from './wires.js';
 export * from './migrate.js';
 export * from './mounting.js';
+export * from './devOnly.js';
 // Gun shape rules: a model gun's barrel is fixed to its piece, facing follows the turn
 export * from './gunFacing.js';
 export * from './features/strafer/strafer.js';

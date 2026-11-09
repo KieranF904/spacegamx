@@ -187,7 +187,7 @@ export function nextMissing(b: BridgeCtx, eid: number, ship: ShipState): number 
  * Validate a blueprint against the catalog, the rules and the inventory stub. `mounting: false` for a saved ship
  * being loaded: one fitted before a weapon's mounting rules changed still flies (a refit must keep them).
  */
-export function validate(b: BridgeCtx, bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult {
+export function validate(b: BridgeCtx, bp: Blueprint, opts: { mounting?: boolean; devParts?: boolean } = {}): ValidationResult {
   return validateBlueprint(b.catalog, bp, b.tuning, b.inventory, opts);
 }
 

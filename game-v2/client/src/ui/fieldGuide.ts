@@ -1,24 +1,20 @@
 /**
  * The field guide (Escape → Field guide): a panel that fits the screen, with a
- * tab per topic and its own scroll bar. Sections carry an icon; the ships tab
- * links to the component guide (every part, its level and what it takes).
+ * tab per topic and its own scroll bar. Sections carry an icon.
  * "Progress" shows where you stand: your level, the unlock track (what each
  * level opens: models by family, materials, room; you marked on it), the five
  * tiers (the level each needs, their systems, moons and ores) and a chart of
- * what each level takes. "Tiers & scaling" is built from the game data: how a part's grade scales what it does (a
+ * what each level takes. "Tiers & scaling" is built from the game data: how a Mk grade scales what a part does (a
  * chart), how weapon size scales damage (a chart), every grade's material and
  * where its ore comes from, and the systems and siege moons by tier with
  * their threat against your ship.
  */
 
 import {
-  threatLevel, unlocks, xpToReach, GRADE_LEVEL, LEVEL_CAP, SKILL_POINT_CAP, jumpTuning, towTuning, unlockTrack, nextBuildUnlock, nextUnlockHint, materialUnlockName,
-  secondsToFreeze, warmthStage, BANK, FIELD, FAB_TIERS, REFINE_TIERS, SALVAGE, COMBAT_RULES, MINES, CLAMP, MAX_SHAPED, SHAPED_RETURN, SHAPED_IDLE, BOUNTY_WINDOW_MS, SECURE_HOLD, type FunctionDef, type ShipTuning, type TrackStep, type HazardRules,
+  unlocks, xpToReach, GRADE_LEVEL, LEVEL_CAP, SKILL_POINT_CAP, unlockTrack, nextBuildUnlock, nextUnlockHint, materialUnlockName,
+  BOUNTY_WINDOW_MS, type FunctionDef, type TrackStep, 
 } from '@space-game/common';
-import shipTuning from '../../../data/ships/tuning.json';
-import hazardData from '../../../data/hazards.json';
 import materialsData from '../../../data/ships/materials.json';
-import shipFunctions from '../../../data/ships/functions.json';
 import shipModels from '../../../data/ships/models.json';
 import recipesData from '../../../data/recipes.json';
 import factionsData from '../../../data/factions.json';
@@ -28,13 +24,9 @@ import { threatTag } from './threat';
 import { esc } from './escape';
 import { resourcesHtml, wireResources, RESOURCE_CSS } from './resources/resourceDictionary';
 
-export type GuideTab = 'basics' | 'combat' | 'ships' | 'industry' | 'progress' | 'tiers' | 'people' | 'resources';
+export type GuideTab = 'progress' | 'tiers' | 'people' | 'resources';
 
 export const GUIDE_TABS: { id: GuideTab; label: string }[] = [
-  { id: 'basics', label: 'Flying' },
-  { id: 'combat', label: 'Combat & danger' },
-  { id: 'ships', label: 'Ships & hangar' },
-  { id: 'industry', label: 'Mining & making' },
   { id: 'progress', label: 'Progress' },
   { id: 'tiers', label: 'Tiers & scaling' },
   { id: 'people', label: 'Jobs & pilots' },
@@ -85,11 +77,6 @@ export const GUIDE_CSS = `
 #game-menu .fg-wide { overflow-x: auto; }
 #game-menu .fg-cols h3 .ic { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 7px;
   background: rgba(125, 211, 252, 0.12); border: 1px solid rgba(125, 211, 252, 0.3); font-size: 12px; letter-spacing: 0; vertical-align: middle; }
-#game-menu .fg-link { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; padding: 12px 16px; margin: 8px 0 14px; border-radius: 10px;
-  background: linear-gradient(90deg, rgba(208, 97, 63, 0.18), rgba(9, 15, 28, 0.2)); border: 1px solid rgba(208, 97, 63, 0.4); }
-#game-menu .fg-link b { display: block; color: #fff; font-size: 14px; letter-spacing: 0.5px; }
-#game-menu .fg-link span { color: #a9b6c9; font-size: 12px; }
-#game-menu .fg-link > div { flex: 1; min-width: 220px; }
 #game-menu .fg-me { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; padding: 14px 16px; border-radius: 12px; margin: 12px 0 6px;
   background: linear-gradient(90deg, rgba(29, 94, 122, 0.35), rgba(9, 15, 28, 0.2)); border: 1px solid rgba(125, 211, 252, 0.25); }
 #game-menu .fg-me .lv { font: 700 34px 'Segoe UI', sans-serif; color: #fff; line-height: 1; }
@@ -124,28 +111,18 @@ export const GUIDE_CSS = `
 #game-menu .fg-chip.mat em { color: #fbbf24; }
 #game-menu .fg-chip.room { color: #a9b6c9; border-style: dashed; }` + RESOURCE_CSS;
 
-const JUMP = jumpTuning(shipTuning as unknown as ShipTuning);
-/** The Burst Strafer and the Tow Beam (common/src/ships/strafer.ts, tow.ts): their levels and numbers */
-const STRAFER = (shipModels as unknown as { models: FunctionDef[] }).models.find((m) => m.strafe);
-const TOW_MODEL = (shipModels as unknown as { models: FunctionDef[] }).models.find((m) => m.tow);
-const TOW = towTuning(shipTuning as unknown as ShipTuning);
-/** The Repair Beam and the Point Defence Turret (common/src/ships/features/support/support.ts): their levels and numbers */
-const MODEL_LEVEL = (id: string, or: number) => (shipModels as unknown as { models: FunctionDef[] }).models.find((m) => m.id === id)?.unlock?.level ?? or;
-const REPAIR_LEVEL = MODEL_LEVEL('utility_repair_beam', 17), PD_LEVEL = MODEL_LEVEL('point_defence_turret', 10);
-const SUPPORT_W = (shipTuning as unknown as ShipTuning).weapons ?? {};
-const MINE_BAY = (shipModels as unknown as { models: (FunctionDef & { mineBay?: { batch: number; capacity: number; cooldown: number } })[] }).models.find((m) => m.mineBay);
-const CLAMP_LEVEL = MODEL_LEVEL('docking_clamp', 4), CLAMP_HEAVY_LEVEL = MODEL_LEVEL('docking_clamp_heavy', 16);
-const PD_RANGE = SUPPORT_W.point_defence?.pointDefence?.range ?? 560;
-
-interface Material { id: string; name: string; grade: number; output: number; toughness: number; density: number; insulation?: number }
-const MATERIALS: Material[] = ((materialsData as unknown as { materials?: Material[] }).materials ?? (materialsData as unknown as Material[]));
+interface Material { id: string; name: string; grade: number; output: number; toughness: number; density: number; insulation?: number; exclusive?: string }
+/** Pilots' materials only: a boss's, and the dev-only Singularity (`exclusive`), are never listed */
+const MATERIALS: Material[] = ((materialsData as unknown as { materials?: Material[] }).materials ?? (materialsData as unknown as Material[])).filter((m) => !m.exclusive);
 /** One material per grade (the main line: alloy, steel, titanium, cobalt, neutronium) */
 const LADDER: Material[] = [1, 2, 3, 4, 5].map((g) => MATERIALS.filter((m) => m.grade === g).sort((a, b) => b.toughness - a.toughness)[0]).filter(Boolean);
 const PLATES = (recipesData as unknown as { parts: { plates: Record<string, string> } }).parts.plates;
 const REFINING = (recipesData as unknown as { refining: { id: string; inputs: Record<string, number>; out: number; time?: number }[] }).refining;
 const ITEM_NAMES: Record<string, string> = Object.fromEntries(((itemsData as unknown as { items: { id: string; name: string }[] }).items ?? []).map((i) => [i.id, i.name]));
 const itemName = (id: string) => ITEM_NAMES[id] ?? id.replace(/_/g, ' ');
-const SYSTEMS = ((systemsData as unknown as { systems: { id: string; name: string; danger?: number; siege?: unknown; grade?: number }[] }).systems);
+/** The public map's systems: no private (a pilot's station, the gun range), training, dev-only or boss-lair (pocket, cavern) system */
+const SYSTEMS = ((systemsData as unknown as { systems: { id: string; name: string; danger?: number; siege?: unknown; grade?: number; private?: boolean; tutorial?: boolean; exclusive?: string; pocket?: unknown; surface?: { kind?: string } }[] }).systems)
+  .filter((s) => !s.private && !s.tutorial && !s.exclusive && !s.pocket && s.surface?.kind !== 'cavern');
 const SYSTEM_GRADE = Object.fromEntries(Object.entries((factionsData as unknown as { spawns: Record<string, { grade?: number }> }).spawns ?? {}).map(([k, v]) => [k, v.grade ?? 1]));
 const SIEGE_GRADE: Record<string, number> = { selene_siege: 1, rimeholt_siege: 2, cinderhold_siege: 3, gloam_siege: 5, lastlight_siege: 4 };
 /** Where each grade's ore turns up */
@@ -164,10 +141,6 @@ const SERIES_COLORS = ['#0891d1', '#d97706', '#a855f7'];
 
 export function guideHtml(tab: GuideTab, d: GuideDeps): string {
   switch (tab) {
-    case 'basics': return basics(d);
-    case 'combat': return combat(d);
-    case 'ships': return ships(d);
-    case 'industry': return industry(d);
     case 'progress': return progress(d);
     case 'tiers': return tiers(d);
     case 'people': return people(d);
@@ -175,165 +148,17 @@ export function guideHtml(tab: GuideTab, d: GuideDeps): string {
   }
 }
 
-/** Cold (ships/warmth.ts): the numbers from hazards.json and the stages */
-function coldGuide(): string {
-  const w = (hazardData as unknown as HazardRules).warmth;
-  if (!w) return 'Cold systems slowly freeze a ship that stays away from heat.';
-  const numb = warmthStage(24);
-  // (The coldest system, by its rating)
-  const systems = ((systemsData as unknown as { systems?: unknown[] }).systems ?? []) as { name: string; hazardRatings?: Record<string, number> }[];
-  const coldest = systems.filter((s) => (s.hazardRatings?.cryo ?? 0) > 0).sort((a, b) => b.hazardRatings!.cryo - a.hazardRatings!.cryo)[0];
-  const insulators = MATERIALS.filter((m) => (m.insulation ?? 0) > 0).sort((a, b) => (b.insulation ?? 0) - (a.insulation ?? 0));
-  return `In a cold system, cold builds up on your ship while you're away from heat, and frost creeps in from the edges of your screen as your warmth runs down (the chip under the hazard warnings gives the number). `
-    + (coldest ? `In ${esc(coldest.name)} it takes about ${Math.round(secondsToFreeze(w, coldest.hazardRatings!.cryo, 0) / 60)} minutes from warm to frozen through.` : '')
-    + `<br><br>Below half warmth you're chilled: a warning. Below a quarter thrust and steering drop by ${Math.round((1 - numb.control) * 100)}%. `
-    + `Frozen through, your ship seizes up for ${Math.round(w.seizeTicks / 60)} seconds and comes out of it with a little warmth back.`
-    + `<br><br><b>Heat</b> brings it back: near a star, close by a station (docked is quickest), beside a ship that's on fire (yours counts), or near a lava world. Away from the cold it comes back by itself. Plan your routes from one warm spot to the next.`
-    + (insulators.length ? `<br><br><b>Insulation</b>: hulls of ${insulators.map((m) => `${m.name ?? m.id} (${Math.round((m.insulation ?? 0) * 100)}%)`).join(', ')} keep out that share of the cold, by how much of the hull they make. It only buys time: heat still matters.` : '')
-    + `<br><br>Frost weapons, and foes that hit with cold, take warmth off the same meter.`;
-}
-
 /** Each section's icon */
 const ICONS: Record<string, string> = {
-  Flying: '✈', 'Jump drive': '⤳', Bracing: '⚓', 'Cargo weight': '⚖', 'Getting around': '◎', Autopilot: '▶', Stations: '⌂', 'Training and the gun range': '◈', 'Docking clamps': '⚯', 'The info panel': 'ⓘ', Hazards: '☢', 'Cold and warmth': '❄',
-  Combat: '✦', Targets: '⌖', Repairs: '✚', 'Losing a ship': '↺', 'Danger & PvP': '⚠', 'Combat lock': '⏳', 'Weapon groups': '❶', 'Mine Bay': '✸', 'Shaped shields': '◠', Flak: '✺', 'Build view': '⬢', Feeds: '≋', Ratings: '◆', Sieges: '☾', 'Bosses & events': '☠', Salvage: '⚙',
-  'The hangar': '⬢', 'Build orders': '☰', Energy: 'ϟ', Engines: '▲', Scrapping: '♻',
-  Mining: '⛏', Refining: '♨', Fabricating: '⚒', 'Field machines': '⚙', 'Material packs': '▣', 'Markets & quartermasters': '¤', 'Your hold': '▤',
   Jobs: '★', People: '☺', 'Leaving Sol': '⬡', Operations: '⚑', 'Flying together': '⚇', 'Ribbons, rankings and the hunt': '✪',
 };
 const sec = (title: string, ...paras: string[]) =>
   `<section><h3>${ICONS[title] ? `<span class="ic">${ICONS[title]}</span>` : ''}${title}</h3>${paras.map((p) => (p.startsWith('<table') ? p : `<p>${p}</p>`)).join('')}</section>`;
 
-function basics({ k }: GuideDeps): string {
-  return `<div class="fg-cols">
-    ${sec('Flying', `Your ship turns to face the cursor and ${k('forward')}${k('left')}${k('backward')}${k('right')} push it around the screen. ${k('boost')} boosts: the engines push harder and draw on the battery (the ENERGY gauge) far faster. Afterburners boost hardest, plasma drives barely.`,
-      `<b>Helm</b> mode, if you want it (${k('helm')} switches, or pick it in Settings): ${k('left')}/${k('right')} turn, ${k('forward')}/${k('backward')} thrust along the nose, ${k('strafeLeft')}/${k('strafeRight')} strafe, and the view turns with your ship so its nose points up the screen.`,
-      `<b>The view</b> is its own choice too (${k('camera')} switches, or pick it in Settings): north up, or following your heading, with either controls. Mouse-steer with the view following your heading: the cursor stays on its spot in space while the view turns (move the mouse to turn), ${k('forward')}${k('left')}${k('backward')}${k('right')} push along your ship, and a click captures the mouse (Esc lets it go).`)}
-    ${sec('Jump drive', `The fastest way across a system: anything past about 15k is quicker by jump than by flying. ${k('jump')} spools the drive for ${(JUMP.chargeTicks / 60).toFixed(1)} seconds, however far you aim (the engines go quiet and you slow down, so it's a poor way out of a fight already on top of you), then flings you along your nose in a second or two; you come out still moving and coast to a stop where you aimed, or thrust on. Then it recharges, so on a long trip fly the stretch between jumps.`,
-      `<b>Range and recharge</b> come from the drive's coils against the size of the hull. The core has a coil of its own, about right for a small ship: some ${Math.round(JUMP.baseRange / 1000)}k and ${Math.round(JUMP.cooldownTicks / 60)} seconds. A bigger hull needs jump coils (a powered part) to match, or the drive reaches less and recharges slower, though it still works. More coil than the hull needs adds a little, less with each one, and the recharge never drops much below ${Math.round(Math.max(JUMP.minCooldownTicks, JUMP.cooldownTicks * JUMP.cooldownFloor) / 60)} seconds; better grades of coil do a little more. The hangar shows how your coils stand against your hull.`,
-      `You jump exactly as far as your cursor, however short, up to your drive's range. While you line it up, a ring round your ship shows how far it reaches and a reticle shows where you'll land. On the system map, aim at a station, gate or marker and brackets close round the reticle: it locks on, dropping you just short of it. The reticle turns red if you'd land in a star's heat or among hostiles. Press it again while spooling to abort; a soft chime says it's charged again.`,
-      `Near a star, inside its charging ring (☀ on the system map), the drive recharges ${1 + JUMP.solarCharge} times as fast and reaches ${Math.round((JUMP.solarRangeBoost - 1) * 100)}% further.`,
-      `<b>${JUMP.lodestoneName}s</b> (◈ on the map and edge markers) are huge bodies of grey stone, from about fifty kilometres to a few hundred across, and rarely more than a handful to a system. From a way off they look like lone rocks. Closer, pilots say, the faces are a touch too flat, the edges meet at the same angles, and the veins branch in the same pattern at every scale, glowing faintly on the side away from the star; they turn slowly and never slow down. Geologists call them a mineral formation; settlers say someone put them there. Nobody knows why a jump drive works better near one, but it does, so routes are built round them. Inside one's field the drive recharges ${1 + JUMP.lodestoneCharge} times as fast, and it stays primed: your next jump within ${Math.round(JUMP.lodestonePrimeTicks / 60)} seconds of leaving reaches ${Math.round((JUMP.lodestoneRangeBoost - 1) * 100)}% further. If you're also inside a star's charging ring, you get whichever boost is better, not both. A jump locked on to one drops you inside its field.`,
-      `Now and then a stretch of one goes dark, its veins dead and its faces fractured: a <b>scarred</b> ${JUMP.lodestoneShort.toLowerCase()} gives a drive about ${Math.round(JUMP.lodestoneScarredCharge * 100)}% of the usual help. Very rarely a whole one is lost, dead or shattered into a field of fragments, and gives nothing at all. People build on them anyway, and some have raiders camped by them.`)}
-    ${sec('Mending and point defence', `A <b>Repair Beam</b> (a utility turret, from level ${REPAIR_LEVEL}) mends other ships. Put your cursor on a damaged party member or ally and fire: a soft teal beam passes through anything it can't mend and stops on the first friendly hull, mending about ${Math.round(SUPPORT_W.repair?.heal ?? 42)} HP a second into the damaged parts nearest where it lands (sweep it over the hull to mend where it's worst). It can't mend your own ship, a destroyed part (that's a fabricator's or your repair bank's job) or a shield, and it does nothing to an enemy. It draws a lot of power while it's on. Mending a pilot counts as helping them: for a while after, you share their kills as their party does, and a boss they fight counts you among its winners.`,
-      `A <b>Point Defence Turret</b> (a weapon, from level ${PD_LEVEL}) fires on its own, whatever you're doing: it turns to the nearest missile, torpedo, mortar shell or seeker coming at you or near you (within about ${PD_RANGE}) and shoots it down, a little power a shot. A missile takes one hit, a torpedo three, a boss's seekers two. It never fires at ships, and it can't touch shells, beams or a boss's rings of shots: those are still yours to dodge. Several turrets cover each other; one alone lets the second missile of a salvo through.`)}
-    ${sec('Dodging and towing', `A <b>Burst Strafer</b> (an engine, from level ${STRAFER?.unlock?.level ?? 10}) gives no push for cruising at all: it dodges. Press ${k('dodge')} and the ship bursts the way you're steering (${k('forward')}/${k('left')}/${k('backward')}/${k('right')}, diagonals too; at the helm, forward, back and ${k('strafeLeft')}/${k('strafeRight')}) for ${((STRAFER?.strafe?.ticks ?? 12) / 60).toFixed(2)} seconds, with every strafer that can push that way. Hold nothing and it goes back the other way from your last dodge. A strafer pushes away from its nozzle, and a dodge gets each strafer's push along it: strafers facing all four ways dodge anywhere, a pair on the flanks mostly sideways. You can dodge again ${(((STRAFER?.strafe?.cooldown ?? 24)) / 60).toFixed(2)} seconds after the last one started (a press a little early waits for it): the chip over the jump gauge shows when it's ready.`,
-      `There are no charges: energy is the limit. Every burst draws a great deal for a moment (about ${Math.round(((STRAFER?.demand ?? 700) * (STRAFER?.strafe?.ticks ?? 12)) / 60)} a strafer firing straight out), from the strafer's own buffer, which refills over the power line into it. Dodge as often as it lets you and the line can't keep up (the chip says LOW POWER) unless a strong line or a store backs it: short of power a burst pushes that much less, and with almost none it doesn't fire. It's a push, so the heavier your ship (and the fuller your hold) the less a burst moves you: it's a light ship's part.`,
-      `A <b>Tow Beam</b> (a utility part, from level ${TOW_MODEL?.unlock?.level ?? 12}) takes hold of a wreck, debris or a loot pod: press ${k('tow')} with your cursor near it, within ${Math.round(TOW.range)} of your hull, and an amber tether pulls it along behind you. What you tow weighs on you like cargo: a big wreck slows you a lot. It never takes hold of a working ship. Fly it into a station's reach and it's salvaged: a wreck or debris is cut up for plate into your station storage (a derelict pays its salvage credits too), a pod's contents go into storage. The beam draws power only while it tows, and lets go if it runs short, if you jump, or if the tether's stretched too far. Press ${k('tow')} again to let go.`)}
-    ${sec('Docking clamps', `A <b>Docking Clamp</b> (from level ${CLAMP_LEVEL}; the two-cell Heavy one from level ${CLAMP_HEAVY_LEVEL}) locks two ships together. Line your clamp up with another pilot's clamp of the same size, mouth to mouth, close (about ${CLAMP.reach} units), nearly still and nose to nose. When it is lined up both of you see a prompt: both press ${k('dock')} within ${Math.round(CLAMP.pressWindow / 60)} seconds of each other.`,
-      `The two fly as one body. The pilot who pressed first steers, and either of you can ask to swap with ${k('clampSwap')} (the other presses it too). Each pilot keeps their own guns, mining lasers, fabricator and shields; only the steering pilot's movement keys move the pair. ${k('dock')} lets go, and so does a jump charge, a station berth, a destroyed clamp or either ship dying.`)}
-    ${sec('Cargo weight', `What's in your hold has mass, and you carry it: a full hold accelerates, turns and stops slower. The cargo panel shows the load and what it costs you (−18% thrust, say), and the hangar shows what a full hold of ore would. It's weighed against your ship, so a big hauler with strong engines minds the same load far less than a light fighter. Ore and metal are heavy, gems light, ammunition between. What's in station storage weighs nothing.`)}
-    ${sec('Getting around', `<b>Jump gates</b> link systems: fly in and press ${k('interact')}. Close to one, a card says where it goes, what it's like there against your ship and what it needs; the first time a gate leads somewhere deadly for your ship, it asks you to press again. <b>Rifts</b> pull you through the moment you touch them. Some systems need a licence (Jobs & pilots, Leaving Sol). ${k('map')} opens the galaxy and system maps; ${k('nav')} toggles the markers on the screen edge.`)}
-    ${sec('Autopilot', `${k('autopilot')} flies you to the job you're following, gate by gate if it's in another system, using the jump drive on long legs. Or open the map (${k('map')}) and click a station, gate, wreck or system; right-click anywhere in a system to fly to that point. Any flight key or a click takes back control.`,
-      `In flight, hold ${k('contextMenu')} and right-click anything (or open space) for what you can do with it: dock, travel through, land, hail, target, inspect, trade, fly there or jump there. A plain right-click is the right-hand guns and the mining laser, firing at once.`)}
-    ${sec('Stations', `Fly into a station's docking ring and press ${k('dock')}. While docked you're safe: your ship is inside. Stations have storage (shared between every station) and a market; most also have a refinery and a fabricator (the market and the Resources tab say where), and they post contracts. ${k('inventory')} shows your cargo; storage opens while you're docked.`)}
-    ${sec('Training and the gun range', `New pilots start in the <b>Vesta training yard</b>: rings, practice drones, a belt, your hold and a dock. Nothing there can hurt you, and you can leave training at any time (the card has a button); leaving sends you to Sol with a starter pack.`,
-      `Any station has a <b>Gun range</b>: open its Overview and press Gun range. You fly a range ship in a shared chamber and try any weapon you could fit, against idle drones, a soft-hulled hulk and a heavy Mammoth. Power and ammunition are free there. Your own ship waits untouched, nothing from the range comes back with you, and the door leads out.`)}
-    ${sec('The info panel', `Rest the cursor on anything (another pilot, a ship, an asteroid) and the panel at the bottom right reads it out: who they are and their ship, a hostile's faction and rating against yours, or roughly what ore a rock holds. It stays a moment after you move off.`)}
-    ${sec('Hazards', `Radiation, cold, darkness and low visibility make some systems harder to read. Black holes pull on everything; past the event horizon nothing survives. Watch for the red warning.`)}
-    ${sec('Cold and warmth', coldGuide())}
-  </div>`;
-}
-
-function combat({ k }: GuideDeps): string {
-  return `<div class="fg-cols">
-    ${sec('Combat', `Hold the mouse buttons to fire. Fixed guns swivel only 2° either way, so they fire once your nose is on target; turrets track the cursor on their own and only fire through gaps in your own hull. Collisions hurt both ships. Lasers, the Lance and the freeze beam are <b>held beams</b>: they burn only while you hold fire and the power lasts, and when your own ship runs short of power its beams sputter. The Glint is a pulse laser, a bolt of light on a beat.`,
-      `<b>Every gun fires one of five ways</b>, shown as a chip on its card and an arc around your crosshair. <b>Cycle</b>: fires on a fixed beat while held, and each shot's energy is drawn as it reloads. <b>Clip</b>: fires a few rounds fast, then reloads from energy when empty, or a second after you let go. <b>Charge</b>: hold to charge; it fires itself at full charge, then cools down, and if you let go early nothing fires. <b>Ammo</b>: fires rounds from your hold on a fixed beat, costs no energy, and when the crates run out it fires weak plain rounds (40% damage, no splash or special effects). <b>Beam</b>: burns energy every second you hold it, and some beams wind up or ramp up the longer they stay on. Point Defence fires on its own at incoming missiles and torpedoes.`,
-      `Parts fail in their own way. A destroyed core explodes and takes the ship with it; generators, thrusters and guns blow up a moment later and can set off their neighbours; armour and hull just break. Whatever is left without a core drifts off and slowly crumbles away.`)}
-    ${sec('Combat lock', `Deal or take damage and you are <b>locked</b> for ${COMBAT_RULES.lockSeconds} seconds (it renews with every hit; a chip counts it down). If you quit while locked, a signed-in pilot's ship stays in space for ${COMBAT_RULES.lockSeconds + COMBAT_RULES.lingerSeconds} seconds after the last hit, where it can still be shot at and destroyed. Join again within that time and you get the same ship back as it was, hold and all. Past that it is saved as it stands. Guests have nothing to save, so their ship goes at once.`)}
-    ${sec('Weapon groups', `Every weapon is in a group (1 to 4, several at once if you like; none set means group 1). Set them in the hangar (press 1-4 on a weapon) or in the build view; they are saved with the design. The left button fires one group, the right another, and each starts on <b>all</b>. ${k('groupPrev')} and ${k('groupNext')} cycle the left button (all, 1, 2, 3, 4), ${k('groupRight')} the right. With the right button on a group it no longer runs the mining lasers. The HUD shows both choices ("L: 2  R: all") and each gun's state. Settings > Gameplay can put the choice on the mouse wheel or the number keys.`)}
-    ${sec('Flak', `Flak shells burst where you aim, or sooner if they pass near a target, and throw fragments round the burst. So aim at the place, not the target: they go off at the cursor's distance. Flak is poor against armour (a low penetration), good for filling the air with fragments and clearing missiles and small ships.`)}
-    ${sec('Mine Bay', `A <b>Mine Bay</b> (a utility part, from level ${MODEL_LEVEL('mine_bay', 8)}) drops mines out of its open edge. ${k('dropMines')} drops a batch of ${MINE_BAY?.mineBay?.batch ?? 4} from a magazine of ${MINE_BAY?.mineBay?.capacity ?? 12}, with a ${((MINE_BAY?.mineBay?.cooldown ?? 120) / 60).toFixed(0)} second wait between drops. A mine arms after ${MINES.armTicks / 60} second, then goes off when a ship comes within ${MINES.triggerReach}: ${MINES.blastDamage} damage across ${MINES.blastRadius}, through shields and armour like any hit. It never goes off for you or your party, and it fizzles out after ${MINES.lifeTicks / 3600} minutes (you can have ${MINES.capPerPilot} out; more takes the oldest away). Your fabricator refills the magazine from the hold.`)}
-    ${sec('Shaped shields', `Shield parts are <b>shaped</b>: a Wall covers a line a little off the hull, an arc (Visor, Buckler, Shell) a slice in front of a gun. Each part has its own HP pool and refills at its own rate once it has gone unhit for about ${SHAPED_IDLE} seconds. A shot is stopped only if its path crosses the line or arc before it reaches the hull; the rest go on to the hull. A broken shield stays down for the part's delay and comes back at ${Math.round(SHAPED_RETURN * 100)}% of its HP. A ship uses at most ${MAX_SHAPED}. Ship-wide bubble shields (Deflector, Flicker Screen, Flash Screen, Bulwark Projector) are switched off on players' ships: the part stays but does nothing.`)}
-    ${sec('Armour & damage', `Damage isn't absolute. Every gun has a <b>penetration</b> (its grade, plus a bit for railguns, lances and torpedoes, less for flak and pulse lasers) and every block an <b>armour</b> (its grade, plus one for armour plate). Level, and a hit does full damage; a grade short, about half; two short, a quarter; three, a tenth. So a Mk I gun barely scratches Mk III plate: find a bigger gun, or the weak points.`,
-      `Guns deal kinetic, explosive, thermal, energy, cryo or exotic damage, and each material takes more or less of each: ceramic shrugs off heat but cracks under shells, insulated polymer turns energy but melts, steel shrugs off shells but conducts. Tooltips show a gun's damage type and penetration, and a block's armour and what it takes. Armour plate is heavy: it slows a ship down.`)}
-    ${sec('Build points', `How big a ship you can build is a budget of build points that grows as you level. Every cell costs a point at Mk I, 1.6 at Mk II, 2.5 at Mk III, 3.8 at Mk IV and 5.5 at Mk V, so a big Mk I ship and a small Mk III one cost about the same. A better gun is power-hungry too: a Mk II gun wants the output of nearly two Mk I generators. A ship built from a plan builds as designed.`)}
-    ${sec('Targets', `${k('targetNext')} cycles through hostiles nearby, nearest first; ${k('targetCursor')} targets the ship under the cursor. The target panel shows its hull, shield and core, and missiles lock on to it.`)}
-    ${sec('Repairs', `A station doesn't repair you for free. Parts mend three ways. A <b>fabricator</b> in your ship (or your core, slowly) repairs damaged parts and rebuilds lost ones from materials in your hold, wherever you are (Mining & making explains the machines). Within ${BANK.stationRange.toLocaleString()} of any station, your <b>repair bank's deposits</b> heal damaged parts and rebuild lost ones for you, nearest the core first. And a Repair Beam mends other pilots. Repairs of every kind pause for a few seconds after you take a hit.`)}
-    ${sec('Losing a ship', `Destroyed? You come back at home in the same design. Your core is always free. Your <b>repair bank</b> then pays for the rest at once, from the core outwards, out of its <b>free part</b>: a store of basic materials worth ${BANK.ships} starter ships that refills by itself (about ${Math.round(BANK.refillSeconds / 60)} minutes from empty to full; the half above one ship's worth also pays for repairs). Anything it couldn't pay stays as a planned part: your <b>deposits</b> rebuild those over time, anywhere, and your fabricator or core can build them too. Nothing is guaranteed: die again and again until the free part is empty and you come back as a bare core, rebuilt slowly as the bank refills.`,
-      `Your <b>wreck</b> holds your cargo, whatever your machines were holding and ${Math.round(SALVAGE * 100)}% of the minerals in the parts you had built. It's marked ⚑ on your screen and map: fly back and pick it up like any pod (with room in your hold). Your <b>secure hold</b> keeps your ${SECURE_HOLD.stacks} most valuable stacks (up to ${SECURE_HOLD.units} of each).`,
-      `The bank is the same at every station. Open the Repair bank tab at a station to see it and to put packs and refined materials in. What you put in stays in; it can't be taken out.`)}
-    ${sec('Danger & PvP', `Each system has a danger rating from 1 to 7 (the pips under your credits and on the map). Danger brings richer rock and tougher hostiles. In Void Sector and The Maw other pilots can attack you, and in Cinder Reach away from its station. Station rings are always safe.`,
-      `<b>Sol has bands of its own</b> (under the pips, and rings on the map). <b style="color:#5eead4">Inner Sol</b> is safe space: hostiles never come in after you, and a ship lost there keeps its whole hold. <b style="color:#fbbf24">Middle Sol</b>, past Jovan, is contested: smugglers in the Lanes, the Drift, the Graveyard of the Tenth and a Redtooth picket, about right for the first ship you build yourself. <b style="color:#f87171">The Reaches</b> out on the rim are hostile: veterans in better plate, the Tallyman, the Hollow Crown fortress and warbands, and a sparse belt of big, rich rocks. Farwatch, on the edge of the Reaches, repairs and resupplies you.`,
-      `Grey ships are passive: they leave you be unless someone shoots them. Red ones come for you.`,
-      `Hostiles come in from past your radar, out of gates (an amber ring spools up a few seconds first) or launched from their outposts, never out of nowhere beside you. They fight with their guns' real reach, close in fast if you out-range them, turn on whoever's hurting them and spread out to flank. Elites and bosses carry plate a grade above the ships around them; hurt a pack badly enough and the rest may run.`)}
-    ${sec('Ratings', `Your ship's <b>rating</b> (◆) weighs its firepower against its toughness. Systems, siege moons and enemies show theirs, coloured against yours: green is easy, then fair, hard, and red for deadly. The <b>Tiers & scaling</b> tab lists them all.`)}
-    ${sec('Sieges', `Siege moons (Selene, Rimeholt, Cinderhold, Gloam, Last Light) are fortresses to hold through the night. Build turrets on the pads between waves (repair, upgrade or replace them too); each round survived adds to your haul, with a bonus every fifth. Leave during the day by claiming it. Each moon is pitched at a tier: its turrets are built a grade above. Every moon is besieged its own way: Selene's Scrapborn come down three lanes, Rimeholt's out of the north, Cinderhold's from every side, Last Light's from two sides by turns, and Gloam's wraiths close in from nowhere. Nights come in fronts with more streaming in between, grow faster as they go, and some bring a <b>boss</b> (the day panel warns you). Out on the moon, <b>objectives</b> come up at night: hold a supply drop or burn out a nest for supplies and haul.`)}
-    ${sec('Bosses & events', `Bosses lair across the systems (☠ on the system map). They bring escorts, change tactics as they break, and telegraph their big attacks: when one starts glowing, get clear. Everyone who fights one gets the XP, credits and their own loot, sent to storage. A few of them, seldom, leave a rare part behind: the one part their legendary weapon cannot be made without.`,
-      `Raids on stations and freighter wrecks pop up while you play (✦ markers). Defend the station and it pays you; wreck cargo is anyone's. Out in Sol's Reaches, <b>warbands</b> make camp: break one up and everyone who fought it is paid a bounty. In Borealis, when the signal (pilots call it the heartbeat) <b>peaks</b> the Frost Brood burst out of the Curtain and scatter, and the rime they shed is anyone's.`)}
-    ${sec('Salvage', `Derelict hulks drift in most systems. Break a wreck's core and its salvage is yours: credits and XP. Another hulk is towed in a few minutes later.`)}
-  </div>`;
-}
 
 /** The player models (data/ships/models.json) */
 const MODELS: FunctionDef[] = (shipModels as unknown as { models: FunctionDef[] }).models;
 
-/** The ships tab's way to the component guide (every part's level, gate and cost; GameMenuUI wires data-a="components") */
-function componentsLink(d: GuideDeps): string {
-  return `<div class="fg-link"><div><b>Component guide</b><span>Every structure material and module: the level it opens at, what still gates it for you, what making it takes, and its full numbers.</span></div><button class="btn primary" data-a="components">Open it ${d.k('components')}</button></div>`;
-}
-
-function ships(d: GuideDeps): string {
-  return `<h3 style="margin-top:12px">Parts</h3><p class="muted">Structure is built from plate in its material; every module is a named model with its own size and numbers, learned at the level on it, and never earlier.</p>${componentsLink(d)}<div class="fg-cols">
-    ${sec('The hangar', `You have ${unlocks({ level: d.level() }).hangarSlots} hangar bays at your level (more open later): the ship you fly and the rest to build in. Place any part you know how to make, even ones you don't have yet. Saving puts in the parts you have; the rest stay in the design as <b>planned parts</b>, drawn faint: they are missing parts, built later by the station's orders or, in flight, by your ship's fabricator. A part that touches nothing is allowed too: it shows "not connected" and isn't built until something joins it. Fly any ship whose core is built. Pick a hull paint next to the ship's name: it's saved with the design, and everyone sees it.`,
-      `Click places, right-click removes, hold and drag to paint, middle-click picks a part up. R turns a part, F mirrors it, T cycles its facing. <b>M</b> turns on symmetry: every place, remove and turn is mirrored across the core's centre line. <b>Ctrl+Z</b> undoes and <b>Ctrl+Y</b> (or Ctrl+Shift+Z) redoes. <b>E</b> or <b>U</b> shows the power flow. Press 1-4 on a weapon for its groups. The switch by the ship's name flips between <b>Simple</b> (what a new pilot needs) and <b>Advanced</b> (every number); it is remembered.`,
-      `In the hangar, <b>Share</b> sends the design you're editing to your party; they find it under Load, in the <b>Shared with you</b> group.`)}
-    ${sec('Build view', `Press ${d.k('fieldBuild')} in flight to edit your ship's design while you fly: the view zooms in, the parts list opens at the side, and you click on the ship to place, right-click to take a part out (a standing part is marked for recycling) and save. Placing costs nothing; only building does. New parts are missing parts: your fabricator builds them from your hold, the same way it rebuilds parts shot off. The same keys as the hangar work (M symmetry, Ctrl+Z, Ctrl+Y, U power flow, weapon groups), and the same Simple and Advanced switch.`)}
-    ${sec('Build orders', `<b>Put it on order</b> and the hangar refines your ore, fabricates the modules and fits everything as it's ready, wherever you are. The station's <b>Ships</b> tab shows what each ship still needs at a glance (what to gather) and, opened up, the full bill down to the ore: what's ready, what's being made, and what's waiting.`,
-      `Orders are worked first in line first: the first takes what it needs before the others. <b>⇧ Do first</b> moves one up, <b>⏸ Hold</b> stops it starting anything new (its jobs wait), and <b>Call off</b> stops it and gives its materials back. The refinery and fabricator list what orders are waiting on, and what for, and every job can be held, moved to the front or called off.`)}
-    ${sec('Energy', `Power travels along <b>ports</b>. Every power part has ports on its edges: generators have out ports, batteries, capacitors and the core have in and out, and guns, engines, shields and tools have in ports. Power crosses only where an out port faces an in port on a shared edge, one way, and never through hull or armour. So you lay the lines yourself: generator to what it feeds, with batteries, Conduits and Joiner or Splitter banks to carry, join and split. A port carries only its own rate. A part short of power works slower, never weaker: a gun fires less often, an engine pushes less.`,
-      `A store (Battery, Capacitor, Heavy Bank, Drive Cell) holds a charge and differs in how fast it takes it in and gives it out: a Capacitor gives out fast and holds little (the alpha strike), a Heavy Bank holds a lot and gives it slowly. A full store takes nothing, so the line behind it backs up and the generator's spare is wasted. A generator explodes when destroyed. Shoot out one cell on a line and everything past it goes dark. In flight the ENERGY gauge flashes and reads LOW POWER while something gets less than it asks. In the hangar the power view (E or U) draws each link and marks open and clashing ports; the Energy rows say how long a design keeps full power cruising, boosting and firing.`)}
-    ${sec('Feeds', `Some guns and engines take a <b>material</b> from a tank along pipes (Coolant, Overcharge and others): it changes what the part does, such as harder hits or a cooler gun. A Combiner puts a material onto a power line. A <b>Selector</b> sits between two tanks and passes one of them; ${d.k('feeds')} switches every Selector, and what is already in the lines runs out first. Tanks are refilled in the hangar.`)}
-    ${sec('Engines', `Ion thrusters are steady and efficient. Afterburners kick hard when you boost but drain the ship's energy fast, so give them a store or a strong line to draw on; plasma drives are big, powerful and hungry. Torch and Vernier engines cannot boost. Bigger engines give more thrust per cell.`)}
-    ${sec('Ammunition', `Only some guns fire from crates in your hold: Flak Burst, Lobber, Quake, Dart, Swarm, Hammerhead, Needle, Eel, Leviathan and the Demolition Launcher; with none left they fire plain rounds at a share of the damage. Cannons, the other railguns (Coilgun, Spear, Rail Driver) and the clip, charge and cycle guns need no ammo: they run on energy, so watch your power. Guns that do take crates also have special crates (sabot, incendiary, seekers...) that change their rounds. Make crates at a fabricator. A few crates are made for one enemy: <b>Quench Slugs</b> (railgun) are poor slugs on anything else but hit the Cinder Cult's ships, though not their great ones, two and a half times as hard. Forgemaster Hale teaches the pattern, and only your own station's armoury presses them (its Quench line).`,
-      `Each ship has a <b>loadout</b>, set in the hangar's AMMUNITION panel: how many of each crate to carry, and which opens first (★). Docking, launching and flying the ship top your hold up to it from storage, and say what's short (order more right there). Loadout crates stay aboard when you store, and are opened before any others.`)}
-    ${sec('Scrapping', `Scrap a ship (from its slot) or a module (from storage) for ${Math.round(SALVAGE * 100)}% of its minerals as ore and its components in full.`)}
-  </div>`;
-}
-
-const MACHINES = (shipModels as unknown as { models: (FunctionDef & { name: string; description?: string; machine?: { kind: 'fabricator' | 'refiner'; tier: number } })[] }).models
-  .filter((m) => m.machine).sort((a, b) => a.machine!.kind.localeCompare(b.machine!.kind) || a.machine!.tier - b.machine!.tier);
-
-/** The field machines, from the model data and the shared rules (common/src/econ/field/rules.ts) */
-function fieldMachines(): string[] {
-  const row = (m: (typeof MACHINES)[number]) => {
-    const t = m.machine!;
-    const rule = (t.kind === 'fabricator' ? FAB_TIERS : REFINE_TIERS)[t.tier];
-    return `<tr><td><b>${esc(m.name)}</b></td><td>Tier ${t.tier}</td><td>${(m.unlock?.level ?? 0) > 0 ? `Lv ${m.unlock!.level}` : 'start'}</td><td>up to Mk ${rule.gradeCap}</td><td>${rule.speed}x</td></tr>`;
-  };
-  const table = (kind: 'fabricator' | 'refiner') => `<table class="fg-t"><tr><th>${kind === 'fabricator' ? 'Fabricators' : 'Refiners'}</th><th>Tier</th><th>Opens</th><th>Makes</th><th>Speed</th></tr>${MACHINES.filter((m) => m.machine!.kind === kind).map(row).join('')}</table>`;
-  return [
-    `Fit a <b>fabricator</b> and a <b>refiner</b> (one of each at most) and your ship builds, repairs, refines and recycles from its own hold while it flies. Switch each on or off at any time, in a fight too. They draw more power than any other part, but only while they work, and share your power with guns and shields. Your core does the same, slowly and with no power: starter parts and the Field Fabricator only, so a stripped ship can always start over. A fabricator's speed is against a fabricator of tier 1; a refiner's is against a station's refinery.`,
-    table('fabricator'),
-    table('refiner'),
-    `<b>Building and repairing</b> take materials from your hold, with the same recipes as a station: damaged parts first, then missing ones, nearest the core first. A part is made and then attached, so a hold full of finished parts doesn't rebuild a ship in an instant. Making a part takes ${FIELD.fabSecondsPerCell} seconds a cell (at speed 1) plus its recipe time, and attaching it ${FIELD.attachSecondsPerCell} seconds a cell. Short of power, a machine works at the share it gets.`,
-    `<b>Recycling</b> breaks a standing part down slowly and gives back about ${Math.round(FIELD.recycleReturn * 100)}% of its materials, so moving a part in space is recycling plus rebuilding. If your hold is full, a finished item waits inside the machine, which stalls until there's room: nothing is lost.`,
-    `Save a <b>field plan</b> and the fabricator fills it in. Saving is free; only building costs.`,
-  ];
-}
-
-/** Material packs (data/items.json `pack`): what they are for */
-function packGuide(): string[] {
-  return [
-    `A pack is a crate of six refined materials, made at a station from your storage (the Repair bank tab, or the fabricator's Supplies). Packs stack like any item. There are several kinds, each covering a few materials: Hull, Wiring, Optics, Mechanism, Heavy Plate and Drive.`,
-    `<b>In the field</b> a pack in your hold pays just 1 unit of one of the materials it holds, so it's an expensive way to build. What you get is speed: work paid with packs goes ${Math.round(FIELD.packSpeed * 100)}% faster. Set the fabricator to use packs only for what your loose materials can't pay, or to use them first.`,
-    `<b>In your repair bank</b> a pack gives all of its materials to the part it's repairing, and any the part doesn't need is wasted. That makes the bank the best use for them.`,
-  ];
-}
-
-function industry({ k }: GuideDeps): string {
-  return `<div class="fg-cols">
-    ${sec('Mining', `Shoot asteroids and fly through the chunks to mine them. Guns crack soft rock; a mining laser (right mouse) cracks the hard ores and gems. Glowing seams hold gems; deadlier systems hold richer rock. Rest the cursor on a rock to see roughly what it holds; a scanner reads exact shares and finds seams.`)}
-    ${sec('Refining', `A refinery turns raw material into what you build with: plates, wire and lenses, but also ingots, panes, polymer, coolant, propellant, catalyst and more. Some recipes take other refined things (hardened steel is steel plate and chromite). Refining some ores leaves a trace of rarer metals. It takes a while and carries on while you're away (finished batches go to storage). Hull, armour and cargo holds are built straight from plate in the hangar. The Resources tab shows every recipe.`)}
-    ${sec('Fabricating', `The fabricator makes the modules: named models of weapons, generators, engines, shields and the like, each its own size and recipe. Small low-tier ones are made at once; bigger ones take time. Each model is learned at its level (Progress shows the track), and nothing teaches one earlier. The legendaries open at their level too, but each is made with a rare part from its boss, and bosses seldom leave one whole.`)}
-    ${sec('Field machines', ...fieldMachines())}
-    ${sec('Material packs', ...packGuide())}
-    ${sec('Markets & quartermasters', `Prices move. Every few hours each station wants a few goods badly and is glutted with others (shown at the top of the market), and selling a lot of one thing drives its price down there for a while. The market shows where else pays more, so hauling to the right station pays.`,
-      `Faction quartermasters sell kits, components and plate to pilots they know. Standing comes from that faction's jobs; every rank unlocks more stock and a better discount.`)}
-    ${sec('Your hold', `The panel above the chat shows what's in your hold and how full it is: new items flash, hover for an item's value, right-click to jettison, and click its title to fold it down to the fill bar. Outside safe space a 🔒 marks the stacks your secure hold would keep, <b style="color:#5eead4">LOAD</b> your ammunition loadout and <b style="color:#c4b5fd">UTIL</b> utility (packs and other consumables, and anything on the quick bar). Drag its top edge to make it taller; past that it scrolls. ${k('inventory')} opens the full cargo window. Hangar orders only use what's in storage: store ore when you dock.`,
-      `Docked, the station's Overview and the cargo window have quick storage buttons: <b>Store all but ammo & utility</b> (the safe one: it leaves ammunition, your loadout, utility and job items aboard), <b>Store ore & materials</b>, <b>Store loot</b> (components, artefacts, cut gems, modules), <b>Store everything</b> (click twice), and <b>Restock loadout</b>.`)}
-  </div>`;
-}
 
 function people({ k }: GuideDeps): string {
   return `<div class="fg-cols">
@@ -461,11 +286,10 @@ function levelChart(bars: { level: number; need: number; total: number }[], mine
 function tiers(d: GuideDeps): string {
   const mine = d.myRating();
   const threats = d.threats();
-  const x = LADDER.map((m) => `Mk ${['', 'I', 'II', 'III', 'IV', 'V'][m.grade]}`);
+  const x = LADDER.map((m) => `Mk ${MARK[m.grade]}`);
   const lines = [
     { name: 'Damage, shields, power out & draw', color: SERIES_COLORS[0], ys: LADDER.map((m) => m.output) },
     { name: 'Engine thrust', color: SERIES_COLORS[1], ys: LADDER.map((m) => Math.sqrt(m.output)) },
-    { name: 'Enemy pay & loot', color: SERIES_COLORS[2], ys: LADDER.map((m) => Math.pow(m.output, 1.6)) },
   ];
   const sizes = SIZES.map(([n, a]) => ({ label: n, value: Math.pow(a, WEAPON_SIZE_EXP), cells: a }));
 
@@ -473,34 +297,32 @@ function tiers(d: GuideDeps): string {
     const plate = PLATES[m.id];
     const r = REFINING.find((x) => x.id === plate);
     const ores = Object.keys(r?.inputs ?? {});
-    return `<tr><td><span class="fg-mk">Mk ${['', 'I', 'II', 'III', 'IV', 'V'][m.grade]}</span></td><td>${esc(m.name)}</td>`
+    return `<tr><td><span class="fg-mk">Mk ${MARK[m.grade]}</span></td><td>${esc(m.name)}</td>`
       + `<td class="n">×${m.output.toFixed(2)}</td><td class="n">${m.toughness}</td>`
       + `<td>${r ? Object.entries(r.inputs).map(([id, n]) => `${n} ${esc(itemName(id))}`).join(' + ') + ` → ${esc(itemName(plate))} <span class="muted">(${r.time ?? 2}s)</span>` : '—'}</td>`
       + `<td class="muted">${ores.map((o) => ORE_WHERE[o]).filter(Boolean).slice(0, 1).map(esc).join('')}</td></tr>`;
   }).join('');
 
+  // (Only the public map: SYSTEMS leaves out private, training, dev-only and boss-lair systems)
   const ladder = SYSTEMS.filter((s) => SYSTEM_GRADE[s.id] || SIEGE_GRADE[s.id])
     .map((s) => ({ s, grade: SYSTEM_GRADE[s.id] ?? SIEGE_GRADE[s.id], moon: !!SIEGE_GRADE[s.id], threat: threats[s.id] ?? 0 }))
     .sort((a, b) => (a.threat || a.grade * 20) - (b.threat || b.grade * 20));
-  const ladderRows = ladder.map(({ s, grade, moon, threat }) => {
-    const verdict = mine && threat ? threatLevel(mine, threat) : '';
-    return `<tr><td>${esc(s.name)}${moon ? ' <span class="muted">· siege moon</span>' : ''}</td><td><span class="fg-mk">Mk ${['', 'I', 'II', 'III', 'IV', 'V'][grade]}</span></td>`
-      + `<td class="n">${s.danger ?? '—'}</td><td>${threat ? threatTag(mine, threat, '◆') : '<span class="muted">—</span>'}</td>`
-      + `<td class="muted">${moon ? `Turrets built Mk ${['', 'I', 'II', 'III', 'IV', 'V'][Math.min(5, grade + 1)]}` : verdict === 'deadly' ? 'Not yet' : verdict === 'easy' ? 'Comfortable' : ''}</td></tr>`;
-  }).join('');
+  const ladderRows = ladder.map(({ s, grade, moon, threat }) =>
+    `<tr><td>${esc(s.name)}${moon ? ' <span class="muted">· siege moon</span>' : ''}</td><td><span class="fg-mk">Mk ${MARK[grade]}</span></td>`
+    + `<td class="n">${s.danger ?? '—'}</td><td>${threat ? threatTag(mine, threat, '◆') : '<span class="muted">—</span>'}</td></tr>`).join('');
 
   return `
-    <h3>Grades</h3>
-    <p>Everything you build comes in a grade, Mk I to Mk V, set by its material. A higher grade multiplies what a part does: a gun's damage, a shield's strength, a generator's output. It also draws that much more power, so better guns need better generators. Engines gain more gently. Each system's enemies are built at a grade too, and pay and drop more the higher it is.</p>
-    ${lineChart('How grade scales a part (× Mk I)', x, lines)}
-    <h3>Weapon size</h3>
-    <p>Bigger weapons hit harder than their size alone: damage grows as size<sup>1.15</sup>, so one Large gun outhits four Small ones (and draws power for its cells). Engines likewise give a little more thrust per cell as they grow.</p>
-    ${barChart('Weapon damage by size (× Small)', sizes)}
+    <h3>Mk grades</h3>
+    <p>Gear comes in grades, Mk I to Mk V, set by the material it is built from; a higher grade multiplies what a part does, and the power it draws.</p>
+    ${lineChart('How a grade scales a part (× Mk I)', x, lines)}
     <h3>Materials</h3>
-    <div class="fg-wide"><table class="fg-t"><thead><tr><th>Grade</th><th>Material</th><th class="n">Output</th><th class="n">HP / cell</th><th>Refining</th><th>Where the ore is</th></tr></thead><tbody>${gradeRows}</tbody></table></div>
+    <div class="fg-wide"><table class="fg-t"><thead><tr><th>Grade</th><th>Material</th><th class="n">Strength</th><th class="n">HP / cell</th><th>Made from</th><th>Where the ore is</th></tr></thead><tbody>${gradeRows}</tbody></table></div>
     <h3>Systems by tier</h3>
-    <p>Each system's hostiles are built at its grade; ◆ is the threat their packs (or a siege moon's waves) pose${mine ? `, coloured against your ship's rating of <b>${Math.round(mine)}</b>` : ''}. Work up the ladder as your ship's rating grows.</p>
-    <div class="fg-wide"><table class="fg-t"><thead><tr><th>System</th><th>Enemies</th><th class="n">Danger</th><th>Threat</th><th></th></tr></thead><tbody>${ladderRows}</tbody></table></div>`;
+    <p>Each system's enemies are built at its tier. ◆ is how dangerous they are${mine ? `, coloured against your ship's rating of <b>${Math.round(mine)}</b>` : ''}.</p>
+    <div class="fg-wide"><table class="fg-t"><thead><tr><th>System</th><th>Enemies</th><th class="n">Danger</th><th>Threat</th></tr></thead><tbody>${ladderRows}</tbody></table></div>
+    <h3>Weapon size</h3>
+    <p>A bigger weapon hits harder than its cells alone: one Large gun outhits four Small ones.</p>
+    ${barChart('Weapon damage by size (× Small)', sizes)}`;
 }
 
 // --- Charts: inline SVG, a hover readout on each (wired by wireGuideCharts)

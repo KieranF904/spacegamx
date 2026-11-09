@@ -79,7 +79,7 @@ function telemetryFile(file: string): (lines: string) => Promise<void> {
 
 const gameServer = new GameServer({
   // (in development, with the dev-only rock system: data/dev/rockery.json)
-  gameData: new GameData(DEV_MODE ? withDevData(readGameDataFiles(dataPath), dataPath) : readGameDataFiles(dataPath)),
+  gameData: new GameData(withDevData(readGameDataFiles(dataPath), dataPath)),
   userDB: userStore,
   adminServer,
   ships: createShipBridge(shipConfig),

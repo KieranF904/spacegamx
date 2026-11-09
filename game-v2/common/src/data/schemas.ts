@@ -467,6 +467,8 @@ export interface StarSystemData {
   instance?: { slots: number };
   /** Not on the galaxy map, reached only its own way (a pilot's station) */
   private?: boolean;
+  /** `"dev"`: a dev-only system (ships in production, listed to nobody, only an admin's warp reaches it; ships/devOnly.ts) */
+  exclusive?: string;
   /** The new-pilot training yard (game/tutorial): not on the galaxy map, no gate or descent leads here, only the tutorial puts a pilot in it (and Leave training takes them out) */
   tutorial?: boolean;
   /** A pocket of space reached from a spot in another system rather than by gate (a boss's nest; not on the galaxy map) */

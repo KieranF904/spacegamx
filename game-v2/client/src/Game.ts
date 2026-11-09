@@ -256,6 +256,7 @@ private perfMonitor: PerfMonitor | null = null;
       catalog: shipCatalog,
       pilot: this.pilot,
       grantAllParts: !!options.proto,
+      isAdmin: () => this.isAdmin,
       onDocked: () => this.w.stationWindow.use((w) => w.open()),
       stationOpen: () => this.stationOpen,
       onHangarBackToStation: () => this.w.stationWindow.use((w) => w.showAgain()),
