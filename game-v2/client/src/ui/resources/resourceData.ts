@@ -21,6 +21,7 @@ import functionsData from '../../../../data/ships/functions.json';
 import hintsData from '../../../../data/guideHints.json';
 import { buildResourceIndex, type GameData, type ResourceEntry } from './resourceIndex';
 import { buildSourceIndex, type SourceIndex } from './sourceIndex';
+import { buildLevels, type LevelIndex } from './levels';
 
 export const RESOURCE_DATA: GameData = {
   items: (itemsData as unknown as { items: GameData['items'] }).items,
@@ -30,6 +31,7 @@ export const RESOURCE_DATA: GameData = {
   stations: (stationsData as unknown as { stations: GameData['stations'] }).stations,
   bosses: (bossesData as unknown as { bosses: GameData['bosses'] }).bosses,
   factions: (factionsData as unknown as { factions: GameData['factions'] }).factions,
+  spawns: (factionsData as unknown as { spawns?: GameData['spawns'] }).spawns,
   quests: questsData as unknown as GameData['quests'],
   people: (peopleData as unknown as { people: GameData['people'] }).people,
   rules: rulesData as unknown as GameData['rules'],
@@ -50,4 +52,9 @@ let cached: ResourceEntry[] | undefined;
 /** The dictionary's entries (built on first use) */
 export function resourceEntries(): ResourceEntry[] {
   return (cached ??= buildResourceIndex(RESOURCE_DATA, sourceIndex()));
+}
+let cachedLevels: LevelIndex | undefined;
+/** The level each entry opens at (built on first use) */
+export function levelIndex(): LevelIndex {
+  return (cachedLevels ??= buildLevels(RESOURCE_DATA, sourceIndex()));
 }

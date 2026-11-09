@@ -9,10 +9,11 @@
  */
 
 import { esc } from '../escape';
-import { resourceEntries, sourceIndex } from './resourceData';
+import { levelIndex, RESOURCE_DATA, resourceEntries, sourceIndex } from './resourceData';
 import { CATEGORY_LABEL, SOURCE_LABEL, type ResourceEntry } from './resourceIndex';
 import { badge, chipList, enemyById, enemyChip, enemyIcon, itemChip, itemIcon, itemName, rockById, rockChip, rockIcon, systemChip, systemById, systemIcon, type ResourceDeps } from './guideChips';
 import type { Tier } from './tiers';
+import { isLocked, levelOf } from './levels';
 
 export type View = 'res' | 'rock' | 'enemy' | 'sys';
 
@@ -20,6 +21,8 @@ export const CARDS_CSS = `
 #game-menu .ec-head { display: flex; gap: 10px; align-items: center; }
 #game-menu .ec-head b { display: block; color: #fff; font-size: 14px; }
 #game-menu .ec-head > div > span { color: #8394ad; font-size: 11px; }
+#game-menu .ec-lock { color: #f59e0b; font-size: 11.5px; margin: 5px 0 0; }
+#game-menu .ec-lock.open { color: #6f8099; }
 #game-menu .ec-hint { color: #fbbf24; font-size: 12px; line-height: 1.35; margin: 6px 0 2px; opacity: 0.9; }
 #game-menu .ec-desc { color: #a9b6c9; font-size: 11.5px; line-height: 1.4; margin: 4px 0 2px; }
 #game-menu .ec-sec { margin-top: 9px; }
@@ -115,8 +118,9 @@ function sysCard(id: string, d: ResourceDeps, plain: boolean): Card | undefined 
   const s = systemById(id);
   if (!s) return undefined;
   const none = lines(['None'], 'dim');
+  const gateName = RESOURCE_DATA.quests.restricted?.[id]?.name;
   return {
-    icon: systemIcon(id), name: s.name, sub: `Danger ${s.danger}`, hint: '', desc: '',
+    icon: systemIcon(id), name: s.name, sub: `Danger ${s.danger}${gateName ? ` · needs ${gateName}` : ''}`, hint: '', desc: '',
     sections: [
       { label: 'Asteroids', html: s.rocks.length ? L(s.rocks.map((r) => rockChip(d, r.rock, r.tier, false, plain))) : none },
       { label: 'Resources here', html: s.items.length ? L(s.items.map((x) => itemChip(d, x.item, { tier: x.tier, plain }))) : none },
@@ -132,7 +136,14 @@ function cardOf(view: View, id: string, d: ResourceDeps, plain: boolean): Card |
   return sysCard(id, d, plain);
 }
 
-const head = (c: Card) => `<div class="ec-head"><span class="gc big">${c.icon}</span><div><b>${esc(c.name)}</b><span>${esc(c.sub)}</span></div></div>`;
+/** "Unlocks at level N" when the pilot is below it, a quiet "Opens at level N" when they are past it, nothing for no gate */
+export function levelNote(view: View, id: string, d: ResourceDeps): string {
+  const lv = levelOf(levelIndex(), view, id);
+  if (lv === undefined) return '';
+  return isLocked(lv, d.level?.()) ? `<div class="ec-lock">🔒 Unlocks at level ${lv}</div>` : `<div class="ec-lock open">Opens at level ${lv}</div>`;
+}
+
+const head = (c: Card, note = '') => `<div class="ec-head"><span class="gc big">${c.icon}</span><div><b>${esc(c.name)}</b><span>${esc(c.sub)}</span>${note}</div></div>`;
 
 /** The small card on mouseover: name, icon, the short hint and the first source row (a system shows its asteroids and enemies) */
 export function previewHtml(view: View, id: string, d: ResourceDeps): string {
@@ -140,21 +151,21 @@ export function previewHtml(view: View, id: string, d: ResourceDeps): string {
   if (!c) return '';
   const rows = view === 'sys' ? c.sections.filter((s) => s.label !== 'Resources here') : c.sections.slice(0, 1);
   const short = c.hint || (view === 'res' ? c.desc : '');
-  return `${head(c)}${short ? `<div class="ec-hint">${esc(short)}</div>` : ''}${rows.map((s) => sec(s.label, s.html)).join('')}<div class="ec-more">Click for everything</div>`;
+  return `${head(c, levelNote(view, id, d))}${short ? `<div class="ec-hint">${esc(short)}</div>` : ''}${rows.map((s) => sec(s.label, s.html)).join('')}<div class="ec-more">Click for everything</div>`;
 }
 
 /** The extended details drawer content: every section, icons open their entries */
 export function detailHtml(view: View, id: string, d: ResourceDeps): string {
   const c = cardOf(view, id, d, false);
   if (!c) return '';
-  return `${head(c)}${c.hint ? `<div class="ec-hint">${esc(c.hint)}</div>` : ''}${c.desc ? `<div class="ec-desc">${esc(c.desc)}</div>` : ''}${c.sections.map((s) => sec(s.label, s.html)).join('')}`;
+  return `${head(c, levelNote(view, id, d))}${c.hint ? `<div class="ec-hint">${esc(c.hint)}</div>` : ''}${c.desc ? `<div class="ec-desc">${esc(c.desc)}</div>` : ''}${c.sections.map((s) => sec(s.label, s.html)).join('')}`;
 }
 
 /** The full detail PAGE for one entry: a big icon, name and hint, then every section laid out in a grid; icons open other pages */
 export function pageHtml(view: View, id: string, d: ResourceDeps): string {
   const c = cardOf(view, id, d, false);
   if (!c) return '';
-  return `<div class="pg-head"><span class="gc huge">${c.icon}</span><div><h2>${esc(c.name)}</h2><span class="pg-sub">${esc(c.sub)}</span>${c.hint ? `<div class="ec-hint">${esc(c.hint)}</div>` : ''}</div></div>${c.desc ? `<div class="ec-desc pg-desc">${esc(c.desc)}</div>` : ''}<div class="pg-secs">${c.sections.map((s) => `<section class="pg-sec"><h3>${esc(s.label)}</h3>${s.html}</section>`).join('')}</div>`;
+  return `<div class="pg-head"><span class="gc huge">${c.icon}</span><div><h2>${esc(c.name)}</h2><span class="pg-sub">${esc(c.sub)}</span>${levelNote(view, id, d)}${c.hint ? `<div class="ec-hint">${esc(c.hint)}</div>` : ''}</div></div>${c.desc ? `<div class="ec-desc pg-desc">${esc(c.desc)}</div>` : ''}<div class="pg-secs">${c.sections.map((s) => `<section class="pg-sec"><h3>${esc(s.label)}</h3>${s.html}</section>`).join('')}</div>`;
 }
 
 /** The name of an entry (the Back control says where it goes) */

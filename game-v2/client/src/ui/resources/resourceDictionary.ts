@@ -62,7 +62,7 @@ export function resourcesHtml(d: ResourceDeps): string {
   lastDeps = d;
   const entries = resourceEntries();
   const cats = [['all', 'All'] as const, ...CATEGORY_ORDER.filter((c) => entries.some((e) => e.category === c)).map((c) => [c, CATEGORY_LABEL[c]] as const)];
-  const grids: Record<View, string> = { res: resourceGridHtml(d), rock: rockGridHtml(d), enemy: enemyGridHtml(d), sys: systemGridHtml() };
+  const grids: Record<View, string> = { res: resourceGridHtml(d), rock: rockGridHtml(d), enemy: enemyGridHtml(d), sys: systemGridHtml(d) };
   return `<div class="rd" data-resources>
     <div class="rd-bar"><input type="search" placeholder="Search by name, place or use (try &quot;Void Sector&quot; or &quot;lens&quot;)" value="${esc(state.q)}" aria-label="Search the guide">
       <span class="rd-count" aria-live="polite"></span>
