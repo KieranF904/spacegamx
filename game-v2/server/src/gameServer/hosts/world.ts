@@ -13,6 +13,7 @@ import { hasAll, removeAll, Bag, lookFn } from '@space-game/common';
 import { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../../net/ClientConnection.js';
 import { stationQuery } from '../../game/Docking.js';
+import { stationsIn } from '../world.js';
 import { portalQuery } from '../../net/handlers/flight.js';
 import type { BodyState, MoveOrigin } from '@space-game/common';
 import { playerQuery } from '../../net/SnapshotBuilder.js';
@@ -130,16 +131,7 @@ export function createEventHost(gs: GameServer) {
     systemId: (num: number) => gs.gameData.getSystemByNum(num)?.id,
     systemName: (num: number) => gs.gameData.getSystemByNum(num)?.name ?? 'this system',
     players: alivePlayers,
-    stations: (num: number) => {
-      // (Stations are made with the world and never change: listed once per system)
-      let list = gs.namedStations.get(num);
-      if (!list) {
-        list = [...stationQuery(gs.world)].filter((st) => InSystem.systemId[st] === num)
-          .map((st) => { const d = gs.gameData.getStationByNum(Station.stationId[st]); return { eid: st, name: d?.name ?? 'the station', id: d?.id }; });
-        gs.namedStations.set(num, list);
-      }
-      return list;
-    },
+    stations: (num: number) => stationsIn(gs, num),
     openSpace: (num: number, which?: number) => {
       const sys = gs.gameData.getSystemByNum(num);
       const belt = sys?.asteroidBelt;

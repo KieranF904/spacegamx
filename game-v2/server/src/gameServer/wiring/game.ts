@@ -26,7 +26,7 @@ import { Trade } from '../../game/Trade.js';
 import { Market } from '../../game/Market.js';
 import { Achievements } from '../../game/Achievements.js';
 import type { ClientConnection } from '../../net/ClientConnection.js';
-import { Docking, stationQuery } from '../../game/Docking.js';
+import { Docking } from '../../game/Docking.js';
 import { Derelicts } from '../../game/Derelicts.js';
 import { SimPass } from '../../sim/SystemClocks.js';
 import { DERELICT_LOG_RANGE } from '../shared.js';
@@ -34,7 +34,7 @@ import { GameServerOptions } from '../options.js';
 import { createBossHost } from '../hosts/boss.js';
 import { releaseUsedTraces } from '../hosts/mining.js';
 import { starterFor } from '../hosts/tutorial.js';
-import { createStation, createPortal } from '../world.js';
+import { createStation, createPortal, stationsIn } from '../world.js';
 import { devStartSpot } from '../session.js';
 import { releaseControls, tick } from '../loop.js';
 import type { GameServer } from '../../GameServer.js';
@@ -132,7 +132,7 @@ export function warmthDeps(gs: GameServer): ConstructorParameters<typeof Warmth>
     systemNum: (eid) => InSystem.systemId[eid],
     position: (eid) => ({ x: Position.x[eid], y: Position.y[eid] }),
     docked: (eid) => gs.dockedShips.has(eid),
-    stations: (eid) => [...stationQuery(gs.world)].filter((st) => InSystem.systemId[st] === InSystem.systemId[eid]).map((st) => ({ x: Position.x[st], y: Position.y[st], radius: Radius.value[st] })),
+    stations: (eid) => stationsIn(gs, InSystem.systemId[eid]).map(({ eid: st }) => ({ x: Position.x[st], y: Position.y[st], radius: Radius.value[st] })),
     toast: (conn, text, kind) => gs.pilots.toast(conn as ClientConnection, text, kind),
     tick: () => gs.currentTick,
   };

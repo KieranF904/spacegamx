@@ -7,7 +7,7 @@
  */
 
 import { hasComponent, entityExists } from 'bitecs';
-import { Player, Position, InSystem, Dead, PlayerProfile, setActiveShip, type ShipRecord } from '@space-game/common';
+import { Player, Position, InSystem, Dead, PlayerProfile, setActiveShip, type ShipRecord, coreOf } from '@space-game/common';
 import { cloneJson } from '@space-game/common';
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
 
@@ -101,7 +101,7 @@ export function applyShip(self: Pilots, s: Session): void {
   }
   const rec = s.profile.ship;
   // (The core always comes back, free)
-  const core = rec.blueprint.parts.find((q) => q.fn === 'core');
+  const core = coreOf(rec.blueprint.parts);
   if (core && rec.ghosts?.includes(core.uid)) rec.ghosts = rec.ghosts.filter((u) => u !== core.uid);
   const ghosts = new Set(rec.ghosts ?? []);
   self.ships.respawnInPlace(eid, rec.blueprint);

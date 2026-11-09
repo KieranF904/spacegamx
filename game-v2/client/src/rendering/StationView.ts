@@ -13,7 +13,7 @@
  */
 
 import { Container, Geometry, Graphics, Shader, Sprite, Text, TextStyle, Texture, UniformGroup } from 'pixi.js';
-import { STATION_DESIGNS, stationInteractRadius, STATION_WEAPONS } from '@space-game/common';
+import { mulberry32, STATION_DESIGNS, stationInteractRadius, STATION_WEAPONS } from '@space-game/common';
 import { Lighting, LitMesh } from './lighting/Lighting';
 import { buildStation, NavTip, StationLayout, turretLook } from './stationDesigns';
 import { stationBakeData } from './procedural';
@@ -33,15 +33,7 @@ const SWEEP = 0.6;
 /** How long a turret keeps on its target after its last shot (seconds) */
 const HOLD = 1.6;
 
-function rng(seed: number): () => number {
-  let a = (seed * 2654435761) >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), a | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+const rng = (seed: number): (() => number) => mulberry32(seed * 2654435761);
 
 interface Turret {
   x: number; y: number;

@@ -20,6 +20,7 @@
 import type { Bag } from './stacks.js';
 import type { Cond, Line } from './dialogue.js';
 import { dpow } from '../math/detTrig.js';
+import { hashString, mulberry32 } from '../math/rng.js';
 
 /**
  * Every step can end with a word from the quest's person (their `say` lines,
@@ -313,22 +314,6 @@ export function stepCount(s: QuestStep): number {
 /** Bounty boards change every this many ms */
 export const BOUNTY_WINDOW_MS = 30 * 60 * 1000;
 
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-function rng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 export interface BountyContext {
   station: { id: string; name: string; system: string };
   danger: number;
@@ -359,7 +344,7 @@ export function bountyDef(id: string, ctx: BountyContext): QuestDef | null {
   const m = /^bounty:([^:]+):(\d+):(\d+)$/.exec(id);
   if (!m) return null;
   const slot = Number(m[3]);
-  const r = rng(hash(id));
+  const r = mulberry32(hashString(id));
   const d = Math.max(1, ctx.danger);
   const fighting = ctx.factions.length > 0;
   const kinds = fighting ? ['kill', 'mine', 'salvage', 'deliver', 'parts'] : ['mine', 'deliver', 'parts'];
@@ -368,7 +353,7 @@ export function bountyDef(id: string, ctx: BountyContext): QuestDef | null {
   if (ctx.peers?.length) kinds.push('escort');
   kinds.push('defend');
   // Same offset for every slot in the window, so the slots never repeat a kind
-  const offset = Math.floor(rng(hash(`bounty:${m[1]}:${m[2]}`))() * kinds.length);
+  const offset = Math.floor(mulberry32(hashString(`bounty:${m[1]}:${m[2]}`))() * kinds.length);
   const kind = kinds[(offset + slot) % kinds.length];
   const base = { id, chain: 'bounty', giver: ctx.station.id, npc: `${ctx.station.name} contracts`, level: 1, repeatable: true };
   if (kind === 'courier') {
@@ -486,11 +471,11 @@ export function fleetDef(id: string, ctx: BountyContext): QuestDef | null {
   const m = /^fleet:([^:]+):(\d+):(\d+)$/.exec(id);
   if (!m) return null;
   const slot = Number(m[3]);
-  const r = rng(hash(id));
+  const r = mulberry32(hashString(id));
   const d = Math.max(1, ctx.danger);
   const kinds = ['uplink', 'siege'];
   if (ctx.peers?.length) kinds.push('convoy');
-  const offset = Math.floor(rng(hash(`fleet:${m[1]}:${m[2]}`))() * kinds.length);
+  const offset = Math.floor(mulberry32(hashString(`fleet:${m[1]}:${m[2]}`))() * kinds.length);
   const kind = kinds[(offset + slot) % kinds.length];
   const base = { id, chain: 'fleet', party: 2, giver: ctx.station.id, npc: `${ctx.station.name} operations`, level: 1, repeatable: true };
   if (kind === 'uplink') {

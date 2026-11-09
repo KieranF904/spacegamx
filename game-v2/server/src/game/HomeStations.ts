@@ -8,7 +8,7 @@
  * unloaded for the next pilot.
  */
 
-import { stationTable, trackStructure, type Blueprint, dcos, dsin } from '@space-game/common';
+import { stationTable, trackStructure, type Blueprint, dcos, dsin, TICK_RATE as SECOND } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 
 export interface HomeHost {
@@ -28,7 +28,6 @@ export interface HomeHost {
 }
 
 const SYSTEM = 'homestead';
-const SECOND = 60;
 /** Nobody in it this long, and a copy is unloaded */
 const EMPTY = 30 * SECOND;
 /** The dock at the middle, the gate out below it, the tracks' structures in a ring */

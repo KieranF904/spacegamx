@@ -30,7 +30,7 @@
  * that with live entities (stations orbit, ships move).
  */
 
-import { EntityType, StarSystemData, type ShipDerived } from '@space-game/common';
+import { EntityType, StarSystemData, mulberry32, type ShipDerived } from '@space-game/common';
 import { lodestoneLabel, lodestoneStop } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import { type AutoDest, type RouteView } from '../ships/Autopilot';
@@ -44,7 +44,7 @@ import { updateTooltip, destRows, injectStyles } from './systemMap/tooltip';
 import { drawRings, drawRegions, drawBelts, drawGravity, drawChargingRing, drawCentral, drawZones, drawPlanets, drawStructures, drawLodestones, drawPocketWays, drawNests, drawComets } from './systemMap/layersWorld';
 import { drawGhosts, drawHostiles, drawFreighters, drawDerelicts, drawYourWreck, drawStations, drawGates, drawPilots } from './systemMap/layersTraffic';
 import { drawBossLairs, drawRoute, drawPings, drawGuideMarks } from './systemMap/layersGuides';
-import { JUMP, SECTOR_COLORS, BODY_NAMES, seeded } from './systemMap/mapConsts';
+import { JUMP, SECTOR_COLORS, BODY_NAMES } from './systemMap/mapConsts';
 import type { View, Camera, Fit, Hit } from './systemMap/types';
 import { actionable } from './systemMap/types';
 import type { MapHost, MapScene } from './systemMap/host';
@@ -146,7 +146,7 @@ export class SystemMapUI implements MapHost {
     this.systems = all.filter((s) => !s.surface && !s.private && !s.pocket && !s.tutorial);
     this.byId = new Map(all.map((s) => [s.id, s]));
     [...new Set(this.systems.map((s) => s.sector ?? ''))].forEach((sec, i) => this.sectorColor.set(sec, SECTOR_COLORS[i % SECTOR_COLORS.length]));
-    const r = seeded(7);
+    const r = mulberry32(7);
     for (let i = 0; i < 420; i++) this.bgStars.push([r(), r(), 0.4 + r() * 1.3, 0.15 + r() * 0.6]);
 
     this.injectStyles();
@@ -667,7 +667,7 @@ export class SystemMapUI implements MapHost {
   beltDotsFor(key: string, seed: number, inner: number, outer: number, n: number): Float32Array {
     let dots = this.beltDots.get(key);
     if (dots) return dots;
-    const r = seeded(seed);
+    const r = mulberry32(seed);
     dots = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       const a = r() * Math.PI * 2, d = inner + (outer - inner) * r();

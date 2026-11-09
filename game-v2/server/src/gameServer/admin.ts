@@ -7,7 +7,7 @@
  */
 
 import { hasComponent, entityExists } from 'bitecs';
-import { Position, Velocity, Player, Station, InSystem, Dead, dhypot } from '@space-game/common';
+import { Position, Velocity, Player, Station, InSystem, Dead, dhypot, coreIndex } from '@space-game/common';
 import { FactionsFile } from '../game/Enemies.js';
 import { BossesFile } from '../game/Bosses.js';
 import { type AdminConn, type AdminHost } from '../game/AdminTools.js';
@@ -51,7 +51,7 @@ export function createAdminHost(gs: GameServer): AdminHost {
     heal: (c) => { if (alive(c.playerId)) gs.ships.repair(c.playerId); },
     destroy: (c) => {
       const ship = gs.ships.get(c.playerId);
-      const core = ship?.blueprint.parts.findIndex((p) => p.fn === 'core') ?? -1;
+      const core = coreIndex(ship?.blueprint.parts);
       if (ship && core >= 0) gs.ships.damagePartFraction(c.playerId, core, 1);
     },
     addCredits: (c, n) => gs.pilots.addCredits(C(c), n),
@@ -87,7 +87,7 @@ export function createAdminHost(gs: GameServer): AdminHost {
       for (const eid of hostilesIn(sysNum(system))) {
         if (at && dhypot(Position.x[eid] - at.x, Position.y[eid] - at.y) > at.radius) continue;
         const ship = gs.ships.get(eid);
-        const core = ship?.blueprint.parts.findIndex((p) => p.fn === 'core') ?? -1;
+        const core = coreIndex(ship?.blueprint.parts);
         if (explode && ship && core >= 0) gs.ships.damagePartFraction(eid, core, 1);
         else gs.ships.removeShip(eid);
         n++;

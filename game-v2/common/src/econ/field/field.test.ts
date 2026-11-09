@@ -10,7 +10,7 @@ import {
   CORE_TIER, FIELD, canFabricate, canRefine, fabWork, attachWork, jobTicks, jobEu, recycleReturn, repairBill, repairWork, scaleBill, refineGrade, tierRule,
 } from './rules.js';
 import { bankPay, fieldPay, packDefs, packShare } from './packs.js';
-import { nextFieldTarget, nextRearm, payCoreOutward, placeFinished, recycleCandidates, joinDepths, type FieldPartView } from './order.js';
+import { nextFieldTarget, nextRearm, payCoreOutward, placeFinished, recycleCandidates, joinDepths, coreOutwards, type FieldPartView } from './order.js';
 import { BANK, bankCap, bankFill, bankFullIn, cleanBank, depositable, freeSpare, freeWhole, newBank, refillBank, spendDeposits, spendFree } from './bank.js';
 import { jobAt, jobFraction, stepJob, type FieldJob } from './jobs.js';
 import { cleanFieldRecord } from './record.js';
@@ -311,5 +311,20 @@ describe('field fabrication: rearming Mine Bays', () => {
   it('magazines are saved with the record, cleaned', () => {
     expect(cleanFieldRecord({ mines: { 5: 8, 9: 0, x: 3, 7: 2.7, 8: 'a', 11: 500 } })).toEqual({ field: { mines: { 5: 8, 7: 2, 11: 64 } } });
     expect(cleanFieldRecord({ mines: [] })).toEqual({});
+  });
+});
+
+describe('core-outwards ordering', () => {
+  it('matches the old queue.shift walk, unjoined parts last', () => {
+    // a small graph: 0-1, 0-2, 1-3, 2-3, 3-4, and 5 alone
+    const adj = [[1, 2], [0, 3], [0, 3], [1, 2, 4], [3], []];
+    const parts = [10, 11, 12, 13, 14, 15].map((uid) => ({ uid }));
+    const dist = new Map<number, number>([[0, 0]]);
+    const queue = [0];
+    while (queue.length) { const i = queue.shift()!; for (const j of adj[i]) if (!dist.has(j)) { dist.set(j, dist.get(i)! + 1); queue.push(j); } }
+    const input = [15, 14, 13, 12, 11, 10];
+    const want = [...input].sort((a, b) => (dist.get(a - 10) ?? 999) - (dist.get(b - 10) ?? 999));
+    expect(coreOutwards(input, parts, adj, 0)).toEqual(want);
+    expect(want).toEqual([10, 12, 11, 13, 14, 15]);
   });
 });

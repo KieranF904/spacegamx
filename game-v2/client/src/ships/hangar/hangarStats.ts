@@ -6,7 +6,7 @@
  * extend:     a new section is one html function here, appended in renderStats()
  */
 
-import { Bag, ShipTuning, ShipDerived, ghostBill, SALVAGE, buildPoints, loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES } from '@space-game/common';
+import { Bag, ShipTuning, ShipDerived, ghostBill, SALVAGE, buildPoints, loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, coreOf } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
 import { gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../../settings/Settings';
@@ -85,7 +85,7 @@ export function buildHtml(host: HangarHost): string {
           <button data-act="all" style="${btnCss('#2f6f4f')}" title="Refine your ore, fabricate the modules and fit everything, as far as your materials go">Put it on order</button></div>`;
   }
   if (host.slot !== hs.active) {
-    const core = rec.blueprint.parts.find((q) => q.fn === 'core');
+    const core = coreOf(rec.blueprint.parts);
     const flyable = !!core && !ghosts.has(core.uid) && !rec.lost;
     html += `<div style="display:flex; gap:5px; margin-bottom:12px">
       <button data-act="fly" style="${btnCss(flyable ? '#2f6f4f' : '#2a3346')}" ${flyable ? '' : `disabled title="${rec.lost ? 'Being rebuilt: fly it once it\'s whole' : 'Build its core first'}"`}>Fly host ship</button>

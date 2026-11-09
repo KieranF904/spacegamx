@@ -3,7 +3,7 @@
  * a piece alone. Pure (common only): what they are is decided here, the page just draws them.
  */
 
-import { attachSide, createShipState, mountingOf, placeGeometry, rebuild, type Blueprint, type Catalog, type PlacedPart, type ShipState, type ShipTuning, type Side } from '@space-game/common';
+import { attachSide, createShipState, mountingOf, placeGeometry, rebuild, type Blueprint, type Catalog, type PlacedPart, type ShipState, type ShipTuning, type Side, coreIndex } from '@space-game/common';
 import type { AssetRef } from './assets';
 
 const STEP: Record<Side, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -89,7 +89,7 @@ export function usesBespoke(catalog: Catalog, bp: Blueprint): boolean {
 /** A ship to show: as the game makes it, but held together from its biggest piece when it has no core (a model, block or piece) */
 export function viewerShip(catalog: Catalog, tuning: ShipTuning, id: number, bp: Blueprint): ShipState {
   const ship = createShipState(catalog, tuning, id, bp, 0);
-  if (!bp.parts.some((q) => q.fn === 'core')) {
+  if (coreIndex(bp.parts) < 0) {
     ship.derived = rebuild({ catalog, tuning, blueprint: ship.blueprint, hp: ship.hp, maxHp: ship.maxHp, detached: ship.detached, rootMode: 'largest' });
   }
   // (flames are a look here: an engine with no power to push gets a token push along its facing, so it can burn)

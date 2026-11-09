@@ -4,7 +4,7 @@
  * in the material's colour, marked with what they do.
  */
 
-import { isWeaponFn, lookFn, placeGeometry, type Economy, type ItemDef, type PlacedPart } from '@space-game/common';
+import { hashString, mulberry32, isWeaponFn, lookFn, placeGeometry, type Economy, type ItemDef, type PlacedPart } from '@space-game/common';
 import { ENGINE_FNS, drawDecor2d } from '../ships/partDecor';
 import { pictureSheet } from '../assets/pictureSheet';
 import { pictureData } from '../assets/gameData';
@@ -13,23 +13,6 @@ const SIZE = 64;
 /** What it draws, by version (assetCache.ts): bump it whenever the icons change */
 export const ITEM_ICONS_VERSION = 2;
 const cache = pictureSheet<string>('itemIcons', ITEM_ICONS_VERSION, pictureData);
-
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
-function rng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function shade(hex: string, k: number): string {
   const v = parseInt(hex.replace('#', ''), 16);
@@ -53,7 +36,7 @@ export function itemIcon(econ: Economy, id: string): string {
 
 function draw(g: CanvasRenderingContext2D, d: ItemDef, econ: Economy): void {
   const col = d.color || '#9aa4b2';
-  const r = rng(hash(d.id));
+  const r = mulberry32(hashString(d.id));
   switch (d.category) {
     case 'mineral': {
       // A lumpy rock with lit facets

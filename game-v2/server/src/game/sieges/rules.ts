@@ -4,7 +4,10 @@
  * `sieges` merges over, and the siege's text (data/strings.json overrides).
  */
 
-export const SECOND = 60;
+import { TICK_RATE } from '@space-game/common';
+
+/** Ticks in a second */
+export const SECOND = TICK_RATE;
 export const BASTION = 'siege_bastion';
 
 export interface SiegeTurretDef {

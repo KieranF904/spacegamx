@@ -16,6 +16,7 @@
  */
 
 import type { Bag } from './stacks.js';
+import { hashString } from '../math/rng.js';
 
 /** Where someone can be found: docked at a station, or at a point in a system (a planet's surface is a system of its own) */
 export type PersonPlace = { station: string } | { system: string; x: number; y: number; label?: string };
@@ -161,8 +162,7 @@ export interface CondContext {
 
 /** A fixed roll in [0, 1) for a key */
 function rollOf(key: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  let h = hashString(key);
   h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15;
   return (h >>> 0) / 4294967296;
 }

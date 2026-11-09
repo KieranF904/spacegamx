@@ -13,7 +13,9 @@ import type { Blueprint } from '../ships/types.js';
 import type { Catalog } from '../ships/catalog.js';
 import { placeGeometry, computeJoins } from '../ships/grid.js';
 import { partItemId } from './items.js';
+import { coreOutwards } from './field/order.js';
 import type { Bag } from './stacks.js';
+import { coreIndex } from '../ships/coreIndex.js';
 
 
 export interface DesignAllocation {
@@ -39,7 +41,7 @@ function adjacency(catalog: Catalog, bp: Blueprint): number[][] {
 function allocateDesign(catalog: Catalog, bp: Blueprint, take: (itemId: string, uid: number) => boolean): DesignAllocation {
   const installed = new Set<number>();
   const used: Bag = {};
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   const order: number[] = [];
   if (core >= 0) {
     const adj = adjacency(catalog, bp);
@@ -77,7 +79,7 @@ export function unreachableUids(catalog: Catalog, bp: Blueprint): Set<number> {
   const hit = looseCache.get(bp.parts);
   if (hit && hit.n === bp.parts.length) return hit.uids;
   const uids = new Set<number>();
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   if (core >= 0) {
     const adj = adjacency(catalog, bp);
     const seen = new Set<number>([core]);
@@ -99,7 +101,7 @@ export function buildableGhosts(catalog: Catalog, bp: Blueprint, ghosts: readonl
 /** Ghost parts (uids) that join the built structure now, core outwards */
 export function installableGhosts(catalog: Catalog, bp: Blueprint, ghosts: number[], structural: (index: number) => boolean): number[] {
   const g = new Set(ghosts);
-  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(bp.parts);
   if (core < 0) return [];
   if (g.has(bp.parts[core].uid)) return [bp.parts[core].uid];
   const adj = adjacency(catalog, bp);
@@ -109,14 +111,7 @@ export function installableGhosts(catalog: Catalog, bp: Blueprint, ghosts: numbe
     if (adj[i].some((j) => !g.has(bp.parts[j].uid) && structural(j))) out.push(p.uid);
   });
   // Core outwards: order by join distance from the core
-  const dist = new Map<number, number>([[core, 0]]);
-  const queue = [core];
-  while (queue.length) {
-    const i = queue.shift()!;
-    for (const j of adj[i]) if (!dist.has(j)) { dist.set(j, dist.get(i)! + 1); queue.push(j); }
-  }
-  const idx = new Map(bp.parts.map((p, i) => [p.uid, i]));
-  return out.sort((a, b) => (dist.get(idx.get(a)!) ?? 999) - (dist.get(idx.get(b)!) ?? 999));
+  return coreOutwards(out, bp.parts, adj, core);
 }
 
 /** The part items a slot's ghosts still need */

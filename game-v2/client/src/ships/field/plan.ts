@@ -15,10 +15,8 @@
  * Each edit falls away by itself once the live ship shows it (`settle`), so after a save the view simply catches up.
  * A save sends the TARGET: the working design without the parts marked for recycling.
  */
-import {
-  placeGeometry, overlapsAny, computeJoins, facingProblem, geomContainsPoint, floodFill, partNeedsFacing, gunFacing, hasFixedBarrel,
-  mountingOf, partMountingProblems, validateBlueprint, SIDES, nextFreeUid,
-} from '@space-game/common';
+import { placeGeometry, overlapsAny, computeJoins, facingProblem, geomContainsPoint, floodFill, partNeedsFacing, gunFacing, hasFixedBarrel,
+  mountingOf, partMountingProblems, validateBlueprint, SIDES, nextFreeUid, coreIndex } from '@space-game/common';
 import type { Blueprint, Catalog, PlacedGeom, PlacedPart, ShipTuning, Side, Vec2, BlueprintError } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
 
@@ -103,7 +101,7 @@ export function summary(live: LiveDesign, e: BuildEdits): EditSummary {
  */
 export function unjoinedUids(catalog: Catalog, w: WorkingDesign, geoms: readonly PlacedGeom[] = geomsOf(catalog, w.bp.parts)): Set<number> {
   const parts = w.bp.parts;
-  const core = parts.findIndex((p) => p.fn === 'core');
+  const core = coreIndex(parts);
   const out = new Set<number>();
   if (core < 0) return out;
   const reached = floodFill(parts.length, computeJoins(geoms as PlacedGeom[]), core, (k) => !w.marked.has(parts[k].uid));
@@ -266,7 +264,7 @@ export function removePart(catalog: Catalog, live: LiveDesign, e: BuildEdits, i:
   const gone = new Set<number>([p.uid]);
   // What the rest of the target can still reach from the core without it
   const parts = w.bp.parts.filter((q) => !w.marked.has(q.uid));
-  const core = parts.findIndex((q) => q.fn === 'core');
+  const core = coreIndex(parts);
   if (core >= 0) {
     const at = parts.findIndex((q) => q.uid === p.uid);
     const reached = floodFill(parts.length, computeJoins(geomsOf(catalog, parts)), core, (k) => k !== at);

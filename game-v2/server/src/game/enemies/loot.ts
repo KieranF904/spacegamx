@@ -8,11 +8,9 @@
 
 import { Position, Velocity, InSystem, Bag, ShipState, partItemId, gradeReward, placeCost, migratePartItem, dhypot } from '@space-game/common';
 import type { Enemies } from '../Enemies.js';
+import { SHARE_RANGE } from '../Party.js';
 import * as populations from './populations.js';
 import * as steering from './steering.js';
-
-/** Party members this close to a kill share it */
-const PARTY_SHARE_RANGE = 8000;
 
 /** An enemy ship was destroyed: pay the killer (and helpers), drop loot */
 export function onDestroyed(self: Enemies, eid: number, killer: number | undefined, ship: ShipState | undefined): void {
@@ -45,13 +43,13 @@ export function onDestroyed(self: Enemies, eid: number, killer: number | undefin
   for (const p of self.host.players(num)) {
     if (p === killer) continue;
     const d = dhypot(Position.x[p] - x, Position.y[p] - y);
-    if (party.has(p) && d < PARTY_SHARE_RANGE) {
+    if (party.has(p) && d < SHARE_RANGE) {
       self.host.reward(p, Math.round(pay.xp * k * 0.75), Math.round(pay.credits * k * 0.4), true, label);
       self.host.questKill(p, e.type, e.faction);
       continue;
     }
     // (Support credit: whoever kept the killer flying shares the kill's pay as its party does, not its job steps)
-    if (support.has(p) && d < PARTY_SHARE_RANGE) {
+    if (support.has(p) && d < SHARE_RANGE) {
       self.host.reward(p, Math.round(pay.xp * k * 0.75), Math.round(pay.credits * k * 0.4), true, label);
       continue;
     }

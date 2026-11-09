@@ -17,6 +17,7 @@ import { floodFill } from './facing.js';
 import { partMaterial } from './grades.js';
 import { type PartCircles, type TurretFrame, type TurretRays, castTurret, partCircles, turretFrame } from './turret.js';
 import { type CellMap, cellMap, engineExhaust } from './mounting.js';
+import { coreIndex } from './coreIndex.js';
 
 export interface DesignInfo {
   readonly catalog: Catalog;
@@ -89,7 +90,7 @@ export function newDesign(catalog: Catalog, bp: Blueprint): DesignInfo {
     mats: parts.map((p) => partMaterial(catalog, p)!),
     area: geoms.map((g) => g.area),
     joins: computeJoins(geoms),
-    core: parts.findIndex((p) => p.fn === 'core'),
+    core: coreIndex(parts),
     parts,
     placed: [...parts],
     keys,

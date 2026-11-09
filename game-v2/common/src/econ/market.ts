@@ -17,6 +17,7 @@ import { unlocks } from './unlocks.js';
 import { registeredFunction } from '../ships/blueprint.js';
 import type { FunctionDef } from '../ships/types.js';
 import type { Outpost } from './outpost.js';
+import { hashString } from '../math/rng.js';
 
 /** What a station pays for an item (its demand raises or lowers the base) */
 export function sellPrice(items: ItemCatalog, id: string, demand: Record<string, number> = {}): number {
@@ -149,12 +150,6 @@ export function saleTotal(items: ItemCatalog, id: string, n: number, demand: num
   return total;
 }
 
-function mhash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
 /**
  * This cycle's shifts at a station: a few goods it wants (pays 35-80% more) and
  * a couple it's glutted with (pays 25-40% less). The same for everyone.
@@ -165,7 +160,7 @@ export function marketShift(stationId: string, nowMs: number, items: ItemCatalog
   const pick = (salt: string, n: number, taken: Set<string>) => {
     const out: string[] = [];
     for (let i = 0; out.length < n && i < 40; i++) {
-      const id = pool[mhash(`${stationId}:${cycle}:${salt}:${i}`) % pool.length];
+      const id = pool[hashString(`${stationId}:${cycle}:${salt}:${i}`) % pool.length];
       if (!taken.has(id)) { taken.add(id); out.push(id); }
     }
     return out;
@@ -173,8 +168,8 @@ export function marketShift(stationId: string, nowMs: number, items: ItemCatalog
   const taken = new Set<string>();
   const wanted: Record<string, number> = {};
   const glut: Record<string, number> = {};
-  for (const id of pick('want', 3, taken)) wanted[id] = 1.35 + (mhash(`${stationId}:${cycle}:w:${id}`) % 46) / 100;
-  for (const id of pick('glut', 2, taken)) glut[id] = 0.6 + (mhash(`${stationId}:${cycle}:g:${id}`) % 16) / 100;
+  for (const id of pick('want', 3, taken)) wanted[id] = 1.35 + (hashString(`${stationId}:${cycle}:w:${id}`) % 46) / 100;
+  for (const id of pick('glut', 2, taken)) glut[id] = 0.6 + (hashString(`${stationId}:${cycle}:g:${id}`) % 16) / 100;
   return { wanted, glut };
 }
 

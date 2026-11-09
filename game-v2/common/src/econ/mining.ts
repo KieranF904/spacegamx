@@ -8,6 +8,7 @@
 import type { Bag } from './stacks.js';
 import type { TraceDef } from './traces.js';
 import { dpow } from '../math/detTrig.js';
+import { hashString, mulberry32 } from '../math/rng.js';
 
 export interface MiningTable {
   respawnSeconds: number;
@@ -115,23 +116,6 @@ export interface Composition {
   stage?: { at: number; of: number };
 }
 
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
-function rng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /**
  * @param key anything unique and stable per asteroid (system + index + spawn tick)
  * @param tier the system's danger tier (1 safe .. 7 deadly)
@@ -140,13 +124,13 @@ function rng(seed: number): () => number {
 export function asteroidComposition(table: MiningTable, type: string, key: string, size: number, tier: number, stage?: number): Composition {
   const t = table.types[type] ?? table.types.asteroid_metal;
   const d = table.danger[String(Math.max(1, Math.min(7, tier)))] ?? { seamChance: 0, boost: {} };
-  const r = rng(hash(`${type}:${key}`));
+  const r = mulberry32(hashString(`${type}:${key}`));
   // Ore weights: the type's mix, boosted by danger, each jittered a little per rock
   const ores: Bag = {};
   let total = 0;
   // Most outliers are a great lump of the common stuff (rolled apart, so ordinary rocks keep their mixes)
   const o = stage !== undefined ? table.outliers : undefined;
-  const lump = !!o && rng(hash(`outlier:${type}:${key}`))() < o.common;
+  const lump = !!o && mulberry32(hashString(`outlier:${type}:${key}`))() < o.common;
   for (const [id, w] of Object.entries(t.ores)) {
     const v = w * (d.boost[id] ?? 1) * (0.7 + 0.6 * r()) * (lump ? o!.boost[id] ?? o!.rare : 1);
     ores[id] = v;

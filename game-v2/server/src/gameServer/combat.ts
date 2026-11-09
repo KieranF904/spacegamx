@@ -6,9 +6,9 @@
  * extend:      a new kind of hit goes into collisionSystem beside the existing cases
  */
 
-import { addEntity, addComponent, hasComponent } from 'bitecs';
-import { Position, Velocity, Radius, Health, Lifetime, Player, Projectile, Bullet, Asteroid, NetworkSync, InSystem, Dead, OwnedBy, WeaponType, BULLET_SPEED, BULLET_DAMAGE, BLASTER_LIFE_TICKS, dcos, dhypot, dsin } from '@space-game/common';
-import { EntityType, EffectType, getAsteroidPolygon, asteroidSpin, segmentNearCircle, segmentIntersectT, pointInPolygon, hashString, mulberry32 } from '@space-game/common';
+import { addComponent, hasComponent } from 'bitecs';
+import { Position, Velocity, Radius, Health, Lifetime, Player, Projectile, Asteroid, InSystem, Dead, dhypot } from '@space-game/common';
+import { EntityType, EffectType, getAsteroidPolygon, asteroidSpin, segmentNearCircle, segmentIntersectT, pointInPolygon } from '@space-game/common';
 import { rayTerrain } from '@space-game/common';
 import { activity } from '../activity/index.js';
 import { SimPass } from '../sim/SystemClocks.js';
@@ -17,62 +17,6 @@ import { KIND_OF_TYPE, NO_ROCKS } from './shared.js';
 import { perfMetrics } from './perf.js';
 import { forgetAsteroid } from './asteroids.js';
 import type { GameServer } from '../GameServer.js';
-
-export function fireCannon(gs: GameServer, shooterEid: number, x: number, y: number, angle: number, item: any, systemId: number, spawnOffset = 30,
-  shape: { speedScale: number; sizeScale: number; turret: boolean } = { speedScale: 1, sizeScale: 1, turret: false }): void {
-  const eid = addEntity(gs.world);
-  addComponent(gs.world, Position, eid);
-  addComponent(gs.world, Velocity, eid);
-  addComponent(gs.world, Radius, eid);
-  addComponent(gs.world, Projectile, eid);
-  addComponent(gs.world, Bullet, eid);
-  addComponent(gs.world, Lifetime, eid);
-  addComponent(gs.world, InSystem, eid);
-  addComponent(gs.world, NetworkSync, eid);
-  addComponent(gs.world, OwnedBy, eid);
-  
-  // Seeded randomization using tick + entity ID for deterministic 1% variance
-  const rng = mulberry32(hashString(`bullet:${gs.currentTick}:${eid}`));
-  const angleVariance = (rng() - 0.5) * 0.02 * Math.PI; // ~1% angle variance (±1 degree)
-  const speedVariance = 0.99 + rng() * 0.02; // 99-101% speed variance
-  
-  const speed = BULLET_SPEED * (item.speed || 1) * shape.speedScale * speedVariance;
-  const damage = BULLET_DAMAGE * (item.damage || 1);
-  const finalAngle = angle + angleVariance;
-  
-  // Spawn slightly ahead of player (modular ships pass their muzzle and offset 0)
-  const spawnX = x + dcos(angle) * spawnOffset;
-  const spawnY = y + dsin(angle) * spawnOffset;
-  
-  Position.x[eid] = spawnX;
-  Position.y[eid] = spawnY;
-  
-  // Add player velocity to bullet
-  Velocity.x[eid] = dcos(finalAngle) * speed + Velocity.x[shooterEid] * 0.3;
-  Velocity.y[eid] = dsin(finalAngle) * speed + Velocity.y[shooterEid] * 0.3;
-  
-  Radius.value[eid] = 5 * shape.sizeScale;
-  Projectile.ownerId[eid] = shooterEid;
-  Projectile.sizeScale[eid] = shape.sizeScale;
-  Projectile.turret[eid] = shape.turret ? 1 : 0;
-  const tool = gs.gameData.miningTable.tools[shape.turret ? 'turret' : 'fixed'];
-  Projectile.miningYield[eid] = tool.yield;
-  Projectile.miningHardness[eid] = tool.hardness;
-  Projectile.damage[eid] = damage;
-  Projectile.weaponType[eid] = WeaponType.Cannon;
-  Projectile.tier[eid] = item.tier || 1;
-  Projectile.spawnTick[eid] = gs.currentTick;
-  Projectile.spawnX[eid] = spawnX;
-  Projectile.spawnY[eid] = spawnY;
-  Projectile.endTick[eid] = 0;
-  // (no gun a client knows: its hits go the old way, confirmed hits. A reused entity id would otherwise keep the last shell's)
-  Projectile.gun[eid] = -1;
-  Bullet.speed[eid] = speed;
-  // Slower shells live longer, so the range stays the same
-  Lifetime.remaining[eid] = Math.round(BLASTER_LIFE_TICKS / shape.speedScale);
-  InSystem.systemId[eid] = systemId;
-  OwnedBy.ownerId[eid] = shooterEid;
-}
 
 export function weaponSystem(gs: GameServer): void {
   // (Each pilot's gun lane after its guns: what other clients step of them, net/guns/GunNet.ts)

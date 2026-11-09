@@ -6,14 +6,14 @@
  * extend:     a new scenery layer is one function here, called from SystemMapUI.drawSystem
  */
 
-import { planetPosition, moonOffset, cometPosition, solarRingRadius } from '@space-game/common';
+import { hashString, planetPosition, moonOffset, cometPosition, solarRingRadius } from '@space-game/common';
 import { lodestonePosition, lodestoneLabel, lodestoneSize, lodestoneLive, lodestoneFieldRadius } from '@space-game/common';
 import { nestPosition, pocketsFrom } from '@space-game/common';
 import { drawStructure } from '../mapStructures';
 import { settings } from '../../settings/Settings';
 import { boundKeyName } from '../../input/keybindings';
 import type { MapHost, MapScene } from './host';
-import { JUMP, LODE_COLOR, LODE_DEAD, FACTIONS, REGION_STYLE, PLANET_COLORS, hash, niceStep, fmtDist } from './mapConsts';
+import { JUMP, LODE_COLOR, LODE_DEAD, FACTIONS, REGION_STYLE, PLANET_COLORS, niceStep, fmtDist } from './mapConsts';
 
 export function drawRings(_host: MapHost, sc: MapScene): void {
   const { ctx, cam, S, w, h, ox, oy } = sc;
@@ -73,7 +73,7 @@ export function drawBelts(host: MapHost, sc: MapScene): void {
     ctx.arc(ox, oy, b.inner * S, 0, Math.PI * 2, true);
     ctx.fill();
     // (positions worked out once per system; all of a belt's rocks in one fill)
-    const dots = host.beltDotsFor(`${host.state.systemId}:${k}:${b.inner}:${b.outer}`, hash(host.state.systemId) + k, b.inner, b.outer, b.dots);
+    const dots = host.beltDotsFor(`${host.state.systemId}:${k}:${b.inner}:${b.outer}`, hashString(host.state.systemId) + k, b.inner, b.outer, b.dots);
     ctx.fillStyle = 'rgba(190, 180, 165, 0.45)';
     ctx.beginPath();
     for (let i = 0; i < dots.length; i += 3) {

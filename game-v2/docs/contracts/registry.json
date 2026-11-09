@@ -16682,9 +16682,9 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 724,
+      "lines": 100,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
-      "needs": "@space-game/common (data shapes, tables, dictionary), GameDataFiles; browser-safe: no Node imports",
+      "needs": "validate/* (one validator per data file, shared context), GameDataFiles; browser-safe: no Node imports",
       "events": "",
       "invariants": [
         {
@@ -16696,7 +16696,7 @@
           "test": "server/src/data/validateGameData.test.ts"
         }
       ],
-      "extend": "a new data file is a shape spec in validateShapes.ts and its ids a cross-reference check inside validateGameData",
+      "extend": "a new data file is a shape spec in validateShapes.ts and a validate<File> function in validate/, called below",
       "exports": [
         "DataProblem",
         "ShipDataFiles",
@@ -16707,64 +16707,22 @@
       ],
       "sections": [
         {
-          "name": "ShipDataFiles",
-          "kind": "interface",
-          "start": 41,
-          "end": 49
-        },
-        {
-          "name": "ValidateOptions",
-          "kind": "interface",
-          "start": 51,
-          "end": 59
-        },
-        {
-          "name": "entries",
-          "kind": "const",
-          "start": 61,
-          "end": 62
-        },
-        {
-          "name": "keysOf",
-          "kind": "const",
-          "start": 63,
-          "end": 63
-        },
-        {
-          "name": "str",
-          "kind": "const",
-          "start": 64,
-          "end": 64
-        },
-        {
-          "name": "closest",
-          "kind": "function",
-          "start": 66,
-          "end": 76
-        },
-        {
-          "name": "editDistance",
-          "kind": "function",
-          "start": 78,
-          "end": 91
-        },
-        {
           "name": "validateGameData",
           "kind": "function",
-          "start": 93,
-          "end": 695
+          "start": 51,
+          "end": 71
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 697,
-          "end": 703
+          "start": 73,
+          "end": 79
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 705,
-          "end": 724
+          "start": 81,
+          "end": 100
         }
       ]
     },
@@ -17004,6 +16962,450 @@
       ]
     },
     {
+      "id": "validate.achievements",
+      "path": "server/src/data/validate/achievements.ts",
+      "group": "server/data/validate",
+      "lines": 18,
+      "owns": "achievements.json: ribbon stats and boss ribbons resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateAchievements"
+      ],
+      "sections": [
+        {
+          "name": "validateAchievements",
+          "kind": "function",
+          "start": 12,
+          "end": 18
+        }
+      ]
+    },
+    {
+      "id": "validate.bosses",
+      "path": "server/src/data/validate/bosses.ts",
+      "group": "server/data/validate",
+      "lines": 32,
+      "owns": "bosses.json: lairs, designs and loot resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateBosses"
+      ],
+      "sections": [
+        {
+          "name": "validateBosses",
+          "kind": "function",
+          "start": 13,
+          "end": 32
+        }
+      ]
+    },
+    {
+      "id": "validate.codex",
+      "path": "server/src/data/validate/codex.ts",
+      "group": "server/data/validate",
+      "lines": 17,
+      "owns": "codex.json: what each record waits for, and the records bosses give",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateCodex"
+      ],
+      "sections": [
+        {
+          "name": "validateCodex",
+          "kind": "function",
+          "start": 12,
+          "end": 17
+        }
+      ]
+    },
+    {
+      "id": "validate.context",
+      "path": "server/src/data/validate/context.ts",
+      "group": "server/data/validate",
+      "lines": 221,
+      "owns": "what every per-file validator shares: the id indexes of the data files, the reference helpers (ref, item, cond, lines...), the shape pass and the closest-id hint",
+      "needs": "@space-game/common (default asteroid tables, part ids), validateShapes (Ctx, shapes); browser-safe: no Node imports",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, with and without the ship files",
+          "test": "server/src/data/validateGameData.test.ts"
+        },
+        {
+          "text": "a dangling id is reported once, with a \"did you mean\"",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new index or reference helper is built in createContext and added to its return",
+      "exports": [
+        "ShipDataFiles",
+        "V",
+        "ValidateOptions",
+        "checkShapes",
+        "closest",
+        "createContext",
+        "entries",
+        "keysOf",
+        "str"
+      ],
+      "sections": [
+        {
+          "name": "ShipDataFiles",
+          "kind": "interface",
+          "start": 14,
+          "end": 22
+        },
+        {
+          "name": "ValidateOptions",
+          "kind": "interface",
+          "start": 24,
+          "end": 26
+        },
+        {
+          "name": "entries",
+          "kind": "const",
+          "start": 28,
+          "end": 29
+        },
+        {
+          "name": "keysOf",
+          "kind": "const",
+          "start": 30,
+          "end": 30
+        },
+        {
+          "name": "str",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "closest",
+          "kind": "function",
+          "start": 33,
+          "end": 43
+        },
+        {
+          "name": "editDistance",
+          "kind": "function",
+          "start": 45,
+          "end": 58
+        },
+        {
+          "name": "checkShapes",
+          "kind": "function",
+          "start": 60,
+          "end": 85
+        },
+        {
+          "name": "createContext",
+          "kind": "function",
+          "start": 87,
+          "end": 219
+        },
+        {
+          "name": "V",
+          "kind": "type",
+          "start": 221,
+          "end": 221
+        }
+      ]
+    },
+    {
+      "id": "validate.factions",
+      "path": "server/src/data/validate/factions.ts",
+      "group": "server/data/validate",
+      "lines": 64,
+      "owns": "factions.json: ranks, rules, station defence and ship plans resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateFactions"
+      ],
+      "sections": [
+        {
+          "name": "validateFactions",
+          "kind": "function",
+          "start": 13,
+          "end": 64
+        }
+      ]
+    },
+    {
+      "id": "validate.items",
+      "path": "server/src/data/validate/items.ts",
+      "group": "server/data/validate",
+      "lines": 20,
+      "owns": "items.json: quest, codex and part references resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateItems"
+      ],
+      "sections": [
+        {
+          "name": "validateItems",
+          "kind": "function",
+          "start": 12,
+          "end": 20
+        }
+      ]
+    },
+    {
+      "id": "validate.mining",
+      "path": "server/src/data/validate/mining.ts",
+      "group": "server/data/validate",
+      "lines": 49,
+      "owns": "mining.json: fields, types and their items resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateMining"
+      ],
+      "sections": [
+        {
+          "name": "validateMining",
+          "kind": "function",
+          "start": 13,
+          "end": 49
+        }
+      ]
+    },
+    {
+      "id": "validate.people",
+      "path": "server/src/data/validate/people.ts",
+      "group": "server/data/validate",
+      "lines": 31,
+      "owns": "people.json: places, moves, topics and the quests people give resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validatePeople"
+      ],
+      "sections": [
+        {
+          "name": "validatePeople",
+          "kind": "function",
+          "start": 12,
+          "end": 31
+        }
+      ]
+    },
+    {
+      "id": "validate.quests",
+      "path": "server/src/data/validate/quests.ts",
+      "group": "server/data/validate",
+      "lines": 100,
+      "owns": "quests.json: steps, rewards, offers and restricted systems resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateQuests"
+      ],
+      "sections": [
+        {
+          "name": "validateQuests",
+          "kind": "function",
+          "start": 12,
+          "end": 100
+        }
+      ]
+    },
+    {
+      "id": "validate.recipes",
+      "path": "server/src/data/validate/recipes.ts",
+      "group": "server/data/validate",
+      "lines": 34,
+      "owns": "recipes.json: refining and craft recipes resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateRecipes"
+      ],
+      "sections": [
+        {
+          "name": "validateRecipes",
+          "kind": "function",
+          "start": 12,
+          "end": 34
+        }
+      ]
+    },
+    {
+      "id": "validate.shipdata",
+      "path": "server/src/data/validate/shipData.ts",
+      "group": "server/data/validate",
+      "lines": 44,
+      "owns": "the ship data files (functions, materials, pieces, tuning, inventory, plans): ids and the wire dictionary",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateShipData"
+      ],
+      "sections": [
+        {
+          "name": "validateShipData",
+          "kind": "function",
+          "start": 13,
+          "end": 44
+        }
+      ]
+    },
+    {
+      "id": "validate.stations",
+      "path": "server/src/data/validate/stations.ts",
+      "group": "server/data/validate",
+      "lines": 20,
+      "owns": "stations.json: market goods and station turrets resolve",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateStations"
+      ],
+      "sections": [
+        {
+          "name": "validateStations",
+          "kind": "function",
+          "start": 12,
+          "end": 20
+        }
+      ]
+    },
+    {
+      "id": "validate.systems",
+      "path": "server/src/data/validate/systems.ts",
+      "group": "server/data/validate",
+      "lines": 141,
+      "owns": "systems.json: portals, rifts, stations, surfaces, pockets, arenas, gun ranges, dens, planets",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateSystems"
+      ],
+      "sections": [
+        {
+          "name": "validateSystems",
+          "kind": "function",
+          "start": 13,
+          "end": 141
+        }
+      ]
+    },
+    {
+      "id": "validate.tutorial",
+      "path": "server/src/data/validate/tutorial.ts",
+      "group": "server/data/validate",
+      "lines": 21,
+      "owns": "tutorial.json: the training yard resolves against the real ids",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling reference is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for this file goes in the function below",
+      "exports": [
+        "validateTutorial"
+      ],
+      "sections": [
+        {
+          "name": "validateTutorial",
+          "kind": "function",
+          "start": 12,
+          "end": 21
+        }
+      ]
+    },
+    {
       "id": "server.enemies",
       "path": "server/src/game/Enemies.ts",
       "group": "server/game",
@@ -17150,7 +17552,7 @@
       "id": "server.repair-bank.sessions",
       "path": "server/src/game/RepairBank.ts",
       "group": "server/game",
-      "lines": 479,
+      "lines": 477,
       "owns": "the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live ship, and the `repairBank` message",
       "needs": "RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed); npm: bitecs",
       "events": "hangarChanged when a part is built in",
@@ -17177,38 +17579,38 @@
         {
           "name": "ClaimCheck",
           "kind": "type",
-          "start": 39,
-          "end": 40
+          "start": 37,
+          "end": 38
         },
         {
           "name": "RepairBanks",
           "kind": "class",
-          "start": 42,
-          "end": 291
+          "start": 40,
+          "end": 289
         },
         {
           "name": "BankSession",
           "kind": "interface",
-          "start": 293,
-          "end": 304
+          "start": 291,
+          "end": 302
         },
         {
           "name": "BankConn",
           "kind": "interface",
-          "start": 306,
-          "end": 307
+          "start": 304,
+          "end": 305
         },
         {
           "name": "BankHost",
           "kind": "interface",
-          "start": 309,
-          "end": 328
+          "start": 307,
+          "end": 326
         },
         {
           "name": "BankSessions",
           "kind": "class",
-          "start": 330,
-          "end": 479
+          "start": 328,
+          "end": 477
         }
       ]
     },
@@ -17243,7 +17645,7 @@
       "id": "server.enemies.loot",
       "path": "server/src/game/enemies/loot.ts",
       "group": "server/game/enemies",
-      "lines": 80,
+      "lines": 78,
       "owns": "a hostile's death: pay the killer, party and helpers, roll the loot table and salvage parts",
       "needs": "Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering; npm: @space-game/common",
       "events": "",
@@ -17259,16 +17661,10 @@
       ],
       "sections": [
         {
-          "name": "PARTY_SHARE_RANGE",
-          "kind": "const",
-          "start": 14,
-          "end": 15
-        },
-        {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 17,
-          "end": 80
+          "start": 15,
+          "end": 78
         }
       ]
     },
@@ -18793,7 +19189,7 @@
       "id": "server.gameserver.combat",
       "path": "server/src/gameServer/combat.ts",
       "group": "server/gameServer",
-      "lines": 352,
+      "lines": 296,
       "owns": "the weapon, projectile and collision passes of a tick, shot walls and rock damage",
       "needs": "GameServer (type), gameServer/spatialGrid, game/Weapons; npm: @space-game/common, bitecs",
       "events": "",
@@ -18807,7 +19203,6 @@
       "exports": [
         "blowStuck",
         "collisionSystem",
-        "fireCannon",
         "hurtAsteroid",
         "projectileSystem",
         "shotWall",
@@ -18815,46 +19210,40 @@
       ],
       "sections": [
         {
-          "name": "fireCannon",
-          "kind": "function",
-          "start": 21,
-          "end": 75
-        },
-        {
           "name": "weaponSystem",
           "kind": "function",
-          "start": 77,
-          "end": 80
+          "start": 21,
+          "end": 24
         },
         {
           "name": "projectileSystem",
           "kind": "function",
-          "start": 82,
-          "end": 92
+          "start": 26,
+          "end": 36
         },
         {
           "name": "shotWall",
           "kind": "function",
-          "start": 94,
-          "end": 114
+          "start": 38,
+          "end": 58
         },
         {
           "name": "hurtAsteroid",
           "kind": "function",
-          "start": 116,
-          "end": 175
+          "start": 60,
+          "end": 119
         },
         {
           "name": "blowStuck",
           "kind": "function",
-          "start": 177,
-          "end": 185
+          "start": 121,
+          "end": 129
         },
         {
           "name": "collisionSystem",
           "kind": "function",
-          "start": 187,
-          "end": 352
+          "start": 131,
+          "end": 296
         }
       ]
     },
@@ -19841,7 +20230,7 @@
       "id": "server.gameserver.world",
       "path": "server/src/gameServer/world.ts",
       "group": "server/gameServer",
-      "lines": 149,
+      "lines": 162,
       "owns": "building the starting world: stations, rifts, portals",
       "needs": "GameServer (type), data/GameData; npm: @space-game/common, bitecs",
       "events": "",
@@ -19856,32 +20245,39 @@
         "createPortal",
         "createRift",
         "createStation",
-        "initializeWorld"
+        "initializeWorld",
+        "stationsIn"
       ],
       "sections": [
         {
           "name": "initializeWorld",
           "kind": "function",
-          "start": 16,
-          "end": 60
+          "start": 17,
+          "end": 61
+        },
+        {
+          "name": "stationsIn",
+          "kind": "function",
+          "start": 63,
+          "end": 72
         },
         {
           "name": "createStation",
           "kind": "function",
-          "start": 62,
-          "end": 112
+          "start": 74,
+          "end": 125
         },
         {
           "name": "createRift",
           "kind": "function",
-          "start": 114,
-          "end": 131
+          "start": 127,
+          "end": 144
         },
         {
           "name": "createPortal",
           "kind": "function",
-          "start": 133,
-          "end": 149
+          "start": 146,
+          "end": 162
         }
       ]
     },
@@ -20267,7 +20663,7 @@
       "id": "server.gameserver.hosts.world",
       "path": "server/src/gameServer/hosts/world.ts",
       "group": "server/gameServer/hosts",
-      "lines": 268,
+      "lines": 260,
       "owns": "host adapters for operations, events, mobs and enemies",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -20288,26 +20684,26 @@
         {
           "name": "createOpsHost",
           "kind": "function",
-          "start": 23,
-          "end": 109
+          "start": 24,
+          "end": 110
         },
         {
           "name": "createEventHost",
           "kind": "function",
-          "start": 111,
-          "end": 176
+          "start": 112,
+          "end": 168
         },
         {
           "name": "createMobHost",
           "kind": "function",
-          "start": 178,
-          "end": 202
+          "start": 170,
+          "end": 194
         },
         {
           "name": "createEnemyHost",
           "kind": "function",
-          "start": 204,
-          "end": 268
+          "start": 196,
+          "end": 260
         }
       ]
     },
