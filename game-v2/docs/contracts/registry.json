@@ -614,7 +614,7 @@
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",
-      "lines": 1184,
+      "lines": 1210,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
       "needs": "GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
@@ -636,20 +636,60 @@
         {
           "name": "FADE",
           "kind": "const",
-          "start": 66,
-          "end": 67
+          "start": 69,
+          "end": 70
         },
         {
           "name": "PAN_MARGIN",
           "kind": "const",
-          "start": 68,
-          "end": 69
+          "start": 71,
+          "end": 72
         },
         {
           "name": "Renderer",
           "kind": "class",
-          "start": 71,
-          "end": 1184
+          "start": 74,
+          "end": 1210
+        }
+      ]
+    },
+    {
+      "id": "client.rendering.training-look",
+      "path": "client/src/rendering/TrainingLook.ts",
+      "group": "client/rendering",
+      "lines": 40,
+      "owns": "how a training-yard body is drawn in place of its batch rock: a practice drone (a small hexagonal craft), or a ghost (a faded grey outline of a drone or a rock whose lesson this pilot has done)",
+      "needs": "pixi Graphics, common getAsteroidPolygon",
+      "events": "",
+      "invariants": [
+        {
+          "text": "which look a body gets is decided by lookFor",
+          "test": "client/src/ui/tutorial/tutorialModel.test.ts"
+        }
+      ],
+      "extend": "a new look is a member of TrainingLook (tutorialModel.ts) and a case here; Renderer.setTrainingLook applies it",
+      "exports": [
+        "TRAINING_LABEL",
+        "drawTrainingLook"
+      ],
+      "sections": [
+        {
+          "name": "TRAINING_LABEL",
+          "kind": "const",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "GHOST",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "drawTrainingLook",
+          "kind": "function",
+          "start": 18,
+          "end": 40
         }
       ]
     },
@@ -7735,10 +7775,272 @@
       ]
     },
     {
+      "id": "client.ui.tutorial.markers",
+      "path": "client/src/ui/tutorial/TutorialMarkers.ts",
+      "group": "client/ui/tutorial",
+      "lines": 156,
+      "owns": "the lesson's world-space marks, drawn on one pointer-transparent canvas over the game: rings, the stop zone and the exit marker (bright for this step, faint for later ones), a pulse on the current step's targets, and a screen-edge arrow towards a target that is off screen",
+      "needs": "tutorialModel (markerStyle, arrowTargets, edgeArrow), the renderer's worldToScreen, common objectPos",
+      "events": "",
+      "invariants": [
+        {
+          "text": "what is bright, faint or hidden is decided in tutorialModel.ts",
+          "test": "client/src/ui/tutorial/tutorialModel.test.ts"
+        }
+      ],
+      "extend": "a new kind of mark is a case in draw(); its rule is a function in tutorialModel.ts",
+      "exports": [
+        "MarkerDeps",
+        "TutorialMarkers"
+      ],
+      "sections": [
+        {
+          "name": "MarkerDeps",
+          "kind": "interface",
+          "start": 15,
+          "end": 20
+        },
+        {
+          "name": "AMBER",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "BLUE",
+          "kind": "const",
+          "start": 23,
+          "end": 23
+        },
+        {
+          "name": "TutorialMarkers",
+          "kind": "class",
+          "start": 25,
+          "end": 156
+        }
+      ]
+    },
+    {
+      "id": "client.ui.tutorial.panel",
+      "path": "client/src/ui/tutorial/TutorialPanel.ts",
+      "group": "client/ui/tutorial",
+      "lines": 157,
+      "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
+      "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "all decisions are in tutorialModel.ts; this only draws a PanelModel and forwards clicks",
+          "test": "client/src/ui/tutorial/tutorialModel.test.ts"
+        }
+      ],
+      "extend": "a new element is drawn from a field of PanelModel; the controller (TutorialUI) feeds it",
+      "exports": [
+        "PanelDeps",
+        "TutorialPanel"
+      ],
+      "sections": [
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 14,
+          "end": 54
+        },
+        {
+          "name": "PanelDeps",
+          "kind": "interface",
+          "start": 56,
+          "end": 62
+        },
+        {
+          "name": "TutorialPanel",
+          "kind": "class",
+          "start": 64,
+          "end": 157
+        }
+      ]
+    },
+    {
+      "id": "client.ui.tutorial.ui",
+      "path": "client/src/ui/tutorial/TutorialUI.ts",
+      "group": "client/ui/tutorial",
+      "lines": 122,
+      "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, ghost/drone looks for the training bodies, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
+      "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, the game's entities, a send function, a renderer hook",
+      "events": "",
+      "invariants": [
+        {
+          "text": "step text, targets and rules come from the server's state and data/tutorial.json, never hardcoded here",
+          "test": "client/src/ui/tutorial/tutorialModel.test.ts"
+        }
+      ],
+      "extend": "a new panel to report is an entry in `panelsOpen` (Game wiring) and in common TUTORIAL_PANELS",
+      "exports": [
+        "TutorialUI",
+        "TutorialUIDeps"
+      ],
+      "sections": [
+        {
+          "name": "TutorialUIDeps",
+          "kind": "interface",
+          "start": 18,
+          "end": 31
+        },
+        {
+          "name": "SAME_PLACE",
+          "kind": "const",
+          "start": 33,
+          "end": 34
+        },
+        {
+          "name": "TutorialUI",
+          "kind": "class",
+          "start": 36,
+          "end": 122
+        }
+      ]
+    },
+    {
+      "id": "client.ui.tutorial.model",
+      "path": "client/src/ui/tutorial/tutorialModel.ts",
+      "group": "client/ui/tutorial",
+      "lines": 138,
+      "owns": "the lesson UI's decisions, as pure functions of the server's tutorialState and data/tutorial.json: what the instruction panel shows, which training objects are drawn ghosted (and how), which markers light up, where a screen-edge arrow sits, the leave-confirm flow, the step-done toast, the graduate screen's pack list",
+      "needs": "common ServerTutorialStateMessage, TutorialData and the object defs (types only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "no DOM, no store, no renderer: every function runs from a state",
+          "test": "client/src/ui/tutorial/tutorialModel.test.ts"
+        }
+      ],
+      "extend": "a new thing the lesson shows is a function here (tested), drawn by TutorialPanel / TutorialMarkers",
+      "exports": [
+        "LeaveFlow",
+        "MarkerStyle",
+        "PanelModel",
+        "TrainingLook",
+        "arrowTargets",
+        "edgeArrow",
+        "fillKeys",
+        "isGhosted",
+        "lookFor",
+        "markerStyle",
+        "newlyDone",
+        "packLines",
+        "panelModel",
+        "risingPanels"
+      ],
+      "sections": [
+        {
+          "name": "State",
+          "kind": "type",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "TrainingLook",
+          "kind": "type",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "isGhosted",
+          "kind": "function",
+          "start": 19,
+          "end": 22
+        },
+        {
+          "name": "lookFor",
+          "kind": "function",
+          "start": 24,
+          "end": 29
+        },
+        {
+          "name": "MarkerStyle",
+          "kind": "type",
+          "start": 31,
+          "end": 32
+        },
+        {
+          "name": "markerStyle",
+          "kind": "function",
+          "start": 34,
+          "end": 38
+        },
+        {
+          "name": "arrowTargets",
+          "kind": "function",
+          "start": 40,
+          "end": 49
+        },
+        {
+          "name": "FIXED_KEYS",
+          "kind": "const",
+          "start": 51,
+          "end": 52
+        },
+        {
+          "name": "fillKeys",
+          "kind": "function",
+          "start": 54,
+          "end": 57
+        },
+        {
+          "name": "PanelModel",
+          "kind": "interface",
+          "start": 59,
+          "end": 73
+        },
+        {
+          "name": "panelModel",
+          "kind": "function",
+          "start": 75,
+          "end": 91
+        },
+        {
+          "name": "newlyDone",
+          "kind": "function",
+          "start": 93,
+          "end": 97
+        },
+        {
+          "name": "packLines",
+          "kind": "function",
+          "start": 99,
+          "end": 106
+        },
+        {
+          "name": "LeaveFlow",
+          "kind": "class",
+          "start": 108,
+          "end": 121
+        },
+        {
+          "name": "edgeArrow",
+          "kind": "function",
+          "start": 123,
+          "end": 133
+        },
+        {
+          "name": "risingPanels",
+          "kind": "function",
+          "start": 135,
+          "end": 138
+        }
+      ]
+    },
+    {
       "id": "client.ui.tutorial.store",
       "path": "client/src/ui/tutorial/tutorialStore.ts",
       "group": "client/ui/tutorial",
-      "lines": 57,
+      "lines": 58,
       "owns": "this pilot's tutorial state as the server last sent it (`tutorialState`), and sending the two tutorial messages (leave, report); the lesson's UI reads and writes only through here",
       "needs": "common ServerTutorialStateMessage, TutorialData (data/tutorial.json, bundled)",
       "events": "",
@@ -7765,80 +8067,80 @@
         {
           "name": "tutorialData",
           "kind": "const",
-          "start": 13,
-          "end": 14
+          "start": 14,
+          "end": 15
         },
         {
           "name": "Listener",
           "kind": "type",
-          "start": 16,
-          "end": 16
+          "start": 17,
+          "end": 17
         },
         {
           "name": "current",
           "kind": "let",
-          "start": 18,
-          "end": 18
-        },
-        {
-          "name": "listeners",
-          "kind": "const",
           "start": 19,
           "end": 19
         },
         {
+          "name": "listeners",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
           "name": "setTutorialState",
           "kind": "function",
-          "start": 21,
-          "end": 25
+          "start": 22,
+          "end": 26
         },
         {
           "name": "getTutorialState",
           "kind": "function",
-          "start": 27,
-          "end": 28
+          "start": 28,
+          "end": 29
         },
         {
           "name": "inTutorialNow",
           "kind": "function",
-          "start": 30,
-          "end": 31
+          "start": 31,
+          "end": 32
         },
         {
           "name": "onTutorial",
           "kind": "function",
-          "start": 33,
-          "end": 38
+          "start": 34,
+          "end": 39
         },
         {
           "name": "currentStep",
           "kind": "function",
-          "start": 40,
-          "end": 43
+          "start": 41,
+          "end": 44
         },
         {
           "name": "ghosted",
           "kind": "function",
-          "start": 45,
-          "end": 48
+          "start": 46,
+          "end": 49
         },
         {
           "name": "resetTutorial",
           "kind": "function",
-          "start": 50,
-          "end": 51
+          "start": 51,
+          "end": 52
         },
         {
           "name": "leaveMessage",
           "kind": "function",
-          "start": 53,
-          "end": 54
+          "start": 54,
+          "end": 55
         },
         {
           "name": "reportMessage",
           "kind": "function",
-          "start": 55,
-          "end": 57
+          "start": 56,
+          "end": 58
         }
       ]
     },

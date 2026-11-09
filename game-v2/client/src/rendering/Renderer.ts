@@ -42,6 +42,9 @@ import { TerrainView } from './TerrainView';
 import { terrainFor } from './terrainData';
 import { MobView } from './MobView';
 import { drawAsteroid, AsteroidSeams } from './AsteroidLook';
+import type { AsteroidRock } from './AsteroidLook';
+import { drawTrainingLook, TRAINING_LABEL } from './TrainingLook';
+import type { TrainingLook } from '../ui/tutorial/tutorialModel';
 import { RiftShader } from './RiftShader';
 import { StationShot, StationView } from './StationView';
 import { CentralBodyShaders } from './CentralBodyShaders';
@@ -108,6 +111,9 @@ export class Renderer {
   /** Single-body enemies (data/mobs.json) */
   private mobs = new Map<number, MobView>();
   private asteroidSeams = new Map<number, AsteroidSeams>();
+  /** Training-yard bodies drawn another way (a drone, a ghost) instead of in the rock batch, and each rock's own object to put it back */
+  private trainingLooks = new Map<number, TrainingLook>();
+  private rockObjs = new Map<number, AsteroidRock>();
   /** Asteroids just struck (when, how hard): a white flash and a little jolt */
   private rockHits = new Map<number, { at: number; strength: number }>();
   private seamTime = 0;
@@ -705,6 +711,7 @@ export class Renderer {
         this.fadingIn.delete(id);
         this.tags.delete(id);
         this.rocks.remove(id);
+        this.rockObjs.delete(id);
         const type = this.typeOf.get(id);
         this.typeOf.delete(id);
         if (container.visible && (type === EntityType.Station || type === EntityType.Portal || type === EntityType.DroppedItem)) {
@@ -766,7 +773,9 @@ export class Renderer {
         {
           const { rock, seams } = drawAsteroid(container, id, data?.[0] || 30, this.state.entities.get(id)?.composition, this.sys.data?.visuals?.greyseam);
           const at = this.state.entities.get(id);
-          this.rocks.add(id, rock, at?.x ?? 0, at?.y ?? 0);
+          this.rockObjs.set(id, rock);
+          if (this.trainingLooks.has(id)) container.addChild(drawTrainingLook(this.trainingLooks.get(id)!, id, data?.[0] || 30));
+          else this.rocks.add(id, rock, at?.x ?? 0, at?.y ?? 0);
           if (seams) this.asteroidSeams.set(id, seams);
         }
         break;
@@ -929,6 +938,23 @@ export class Renderer {
   /** (Through the view's roll; not the shake) */
   screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
     return screenToWorld(screenX, screenY, this.pose(), this.app.screen.width, this.app.screen.height);
+  }
+
+  /** Draw a training-yard body as a drone or a ghost (null: as a normal rock); applies now if the body is on screen, else when it is made */
+  setTrainingLook(id: number, look: TrainingLook | null): void {
+    if (this.trainingLooks.get(id) === look || (look === null && !this.trainingLooks.has(id))) return;
+    if (look) this.trainingLooks.set(id, look); else this.trainingLooks.delete(id);
+    const container = this.entityGraphics.get(id);
+    const rock = this.rockObjs.get(id);
+    if (!container || !rock) return;
+    container.getChildByLabel(TRAINING_LABEL)?.destroy();
+    const at = this.state.entities.get(id);
+    if (look) {
+      this.rocks.remove(id);
+      container.addChild(drawTrainingLook(look, id, at?.data?.[0] || 30));
+    } else {
+      this.rocks.add(id, rock, at?.x ?? 0, at?.y ?? 0);
+    }
   }
 
   worldToScreen(worldX: number, worldY: number): { x: number; y: number } {

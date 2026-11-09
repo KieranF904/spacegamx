@@ -7,8 +7,9 @@
  * extend:     the lesson's card and markers (client/src/ui/tutorial/*) subscribe with `onTutorial`
  */
 
-import type { ServerTutorialStateMessage, TutorialData, TutorialObjectDef, TutorialStepDef } from '@space-game/common';
+import type { ClientTutorialReportMessage, TutorialPanel, ServerTutorialStateMessage, TutorialData, TutorialObjectDef, TutorialStepDef } from '@space-game/common';
 import tutorialJson from '../../../../data/tutorial.json';
+import { isGhosted } from './tutorialModel';
 
 /** The lesson's data, as the server runs it (steps, objects with positions, the yard) */
 export const tutorialData = tutorialJson as unknown as TutorialData;
@@ -44,7 +45,7 @@ export function currentStep(): TutorialStepDef | undefined {
 
 /** Should this training object be drawn ghosted for this pilot (its step done, or broken by them)? */
 export function ghosted(o: TutorialObjectDef): boolean {
-  return !!current && !current.left && (current.done.includes(o.step) || current.broken.includes(o.id));
+  return isGhosted(o, current);
 }
 
 /** Fresh client state on a new connection */
@@ -52,6 +53,6 @@ export function resetTutorial(): void { current = null; }
 
 /** The two client messages, sent through whatever the Game sends with */
 export function leaveMessage(): { type: 'tutorialLeave' } { return { type: 'tutorialLeave' }; }
-export function reportMessage(kind: 'ack' | 'panel', extra: { step?: string; panel?: string } = {}): { type: 'tutorialReport'; kind: 'ack' | 'panel'; step?: string; panel?: never } {
-  return { type: 'tutorialReport', kind, ...extra } as { type: 'tutorialReport'; kind: 'ack' | 'panel'; step?: string; panel?: never };
+export function reportMessage(kind: 'ack' | 'panel', extra: { step?: string; panel?: TutorialPanel } = {}): ClientTutorialReportMessage {
+  return { type: 'tutorialReport', kind, ...extra };
 }
