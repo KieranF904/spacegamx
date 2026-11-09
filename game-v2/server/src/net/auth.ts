@@ -37,6 +37,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     conn.ws.close?.(PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON);
     return;
   }
+  if (gated(ctx, conn)) return;
   conn.joined = true;
   if (msg.token) {
     // Authenticated join - validate token
@@ -89,7 +90,16 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
   });
 }
 
+/** A server update is about to restart us (server/src/update): no new sign-ins. True if it refused this one */
+function gated(ctx: ServerCtx, conn: ClientConnection): boolean {
+  const why = ctx.joinGate?.();
+  if (!why) return false;
+  rejectAuth(ctx, conn, why);
+  return true;
+}
+
 export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
+  if (gated(ctx, conn)) return;
   const result = await ctx.userDB.login(msg.username, msg.password, conn.address);
   if (result.success) {
     conn.username = result.user.username;
@@ -151,6 +161,7 @@ export function rejectAuth(ctx: ServerCtx, conn: ClientConnection, error: string
 }
 
 export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
+  if (gated(ctx, conn)) return;
   const result = await ctx.userDB.register(msg.username, msg.email, msg.password, conn.address);
   if (result.success) {
     conn.username = result.user.username;

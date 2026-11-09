@@ -23,6 +23,7 @@ import { installRockeryTools } from './bots/rockeryTools.js';
 import { activity } from './activity/index.js';
 import { LobbyFriends } from './game/social/LobbyFriends.js';
 import { LobbyRankings } from './game/rankings/RankingsBackend.js';
+import { heartbeatIdentity, installUpdate } from './update/install.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -190,6 +191,10 @@ process.on('uncaughtException', (e) => {
   void shutdown('uncaughtException', 1);
 });
 
+// A scheduled update (the lobby tells us in the heartbeat answer): warnings, a join block, then save everyone and exit
+// with UPDATE_EXIT_CODE so the process manager starts the new build (systemd Restart=always)
+const updates = installUpdate(gameServer, { url: BROWSER_URL, secret: LOBBY_ADMIN_SECRET }, (code) => shutdown('update', code));
+
 // Register with server browser
 async function registerWithBrowser() {
   // In production nginx takes the game's socket on 443 (TLS) and passes it to PORT on 127.0.0.1
@@ -208,13 +213,17 @@ async function registerWithBrowser() {
         players: gameServer.getPlayerCount(),
         secure: !DEV_MODE,
         version: '2.0.0',
-        adminPort: ADMIN_PORT
+        adminPort: ADMIN_PORT,
+        // (Who this is and what it runs: the lobby matches it to its definition, and offers it only to clients on this protocol)
+        ...heartbeatIdentity()
       })
     });
     if (response.ok) {
       console.log('✓ Registered with server browser');
       // Accounts deleted at the lobby: their profiles go here
-      const body = await response.json().catch(() => null) as { deletedAccounts?: unknown } | null;
+      const body = await response.json().catch(() => null) as { deletedAccounts?: unknown; update?: { inMs: number } } | null;
+      // The lobby's schedule for a server update (none: nothing, or called off): see update/UpdateCountdown.ts
+      if (body) updates.onLobby(body.update);
       if (Array.isArray(body?.deletedAccounts)) void gameServer.forgetAccounts(body.deletedAccounts.map(Number));
     } else {
       console.log(`⚠ Browser registration failed: ${response.status}`);

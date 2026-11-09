@@ -14,6 +14,7 @@ import type { MinesServerMessage } from '../minesProtocol.js';
 import type { ClampServerMessage } from '../clampProtocol.js';
 import type { TutorialServerMessage } from '../tutorialProtocol.js';
 import type { CombatServerMessage } from '../combatProtocol.js';
+import type { UpdateServerMessage } from '../updateProtocol.js';
 import type { ServerOwnSyncMessage } from '../../sim/ownStep.js';
 import type { ServerGunSyncMessage } from '../../sim/otherGuns.js';
 import type { ServerPullsMessage } from '../../sim/pullFields.js';
@@ -94,7 +95,8 @@ export type ServerMessage =
   | MinesServerMessage
   | ClampServerMessage
   | TutorialServerMessage
-  | CombatServerMessage;
+  | CombatServerMessage
+  | UpdateServerMessage;
 
 /**
  * The ships of a client's system it doesn't have in view (further than the

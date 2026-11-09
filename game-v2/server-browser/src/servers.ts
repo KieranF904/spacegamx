@@ -14,6 +14,12 @@ export interface ServerEntry {
   version: string;
   lastSeen: number;
   adminPort?: number;
+  /** The id it is defined under in the lobby's servers.json (SERVER_ID), if any */
+  id?: string;
+  /** The wire protocol it runs (common PROTOCOL_VERSION): clients are only offered servers that match theirs */
+  protocol?: number;
+  /** Its build (git commit or package version) */
+  build?: string;
 }
 
 /** Most servers listed at once (a heartbeat from a new one past this is refused until some go stale) */
@@ -55,6 +61,9 @@ export function parseHeartbeat(body: Record<string, any>, fromIp: string): Omit<
     secure: Boolean(body.secure),
     version: text(body.version, '1.0.0', 32),
     adminPort,
+    ...(typeof body.serverId === 'string' && /^[a-z0-9][a-z0-9_-]{0,31}$/.test(body.serverId) ? { id: body.serverId } : {}),
+    ...(Number.isInteger(Number(body.protocol)) && Number(body.protocol) > 0 && Number(body.protocol) < 1_000_000 ? { protocol: Number(body.protocol) } : {}),
+    ...(body.build ? { build: text(body.build, '', 40) } : {}),
   };
 }
 
@@ -73,6 +82,9 @@ export function listing(s: ServerEntry, production: boolean): Omit<ServerEntry, 
     players: s.players,
     secure: s.secure,
     version: s.version,
+    ...(s.id !== undefined ? { id: s.id } : {}),
+    ...(s.protocol !== undefined ? { protocol: s.protocol } : {}),
+    ...(s.build !== undefined ? { build: s.build } : {}),
     ...(production || s.adminPort === undefined ? {} : { adminPort: s.adminPort }),
   };
 }
