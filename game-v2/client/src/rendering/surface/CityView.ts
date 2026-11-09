@@ -7,6 +7,7 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
+import { mulberry32 } from '@space-game/common';
 import { LitGeometry } from '../lighting/LitGeometry';
 import { Lighting, LitMesh } from '../lighting/Lighting';
 
@@ -16,15 +17,7 @@ const ROOFS = [0x9aa2ac, 0x8a929c, 0xb4bac2, 0x7d858f, 0xa7a196, 0x8f8a80];
 const GLASS = [0x4f6f8f, 0x3f5f7f, 0x5a7d9c];
 const PARK = 0x4c7a3a;
 
-function rng(seed: number): () => number {
-  let a = (seed * 2654435761) >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), a | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+const rng = (seed: number): (() => number) => mulberry32(seed * 2654435761);
 
 export interface CitySpec { name: string; x: number; y: number; radius: number; pylons: { x: number; y: number }[] }
 

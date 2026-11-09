@@ -29,7 +29,7 @@ import type { Quests } from './Quests.js';
 import type { PilotConn } from './Pilots.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 import type { ServerMessage, OpView, OpMarkerView, QuestStep, QuestTarget } from '@space-game/common';
-import { datan2, dcos, dhypot, dsin } from '@space-game/common';
+import { datan2, dcos, dhypot, dsin, hashString } from '@space-game/common';
 
 export interface OpsHost {
   tick(): number;
@@ -250,12 +250,6 @@ export const OPS_STRINGS = {
   'construct.done': '{label} complete',
 };
 
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
 export class Operations {
   private insts = new Map<string, Inst>();
   /** Scans in progress: pilot → wreck and how long they've held on it */
@@ -418,7 +412,7 @@ export class Operations {
 
   /** A course's rings: a winding line out from its start, the same every time for this job */
   private ringsOf(quest: string, step: Extract<QuestStep, { type: 'course' }>): { x: number; y: number }[] {
-    let h = hash(quest), a = (h % 6283) / 1000;
+    let h = hashString(quest), a = (h % 6283) / 1000;
     const out: { x: number; y: number }[] = [];
     let x = step.x, y = step.y;
     for (let i = 0; i < step.rings; i++) {
@@ -568,7 +562,7 @@ export class Operations {
     const near = step.type === 'escort' ? step.from : step.type === 'defend' || step.type === 'uplink' ? step.near : '';
     const st = this.host.station(near);
     if (!st) return null;
-    const a = (hash(quest) % 6283) / 1000;
+    const a = (hashString(quest) % 6283) / 1000;
     const inst: Inst = {
       key, quest, kind, title, system: st.system, phase: 'waiting', site: { x: st.x, y: st.y }, ward: -1, wardName: '', raiders: [],
       wave: 0, waves: step.type === 'defend' ? step.waves : 0, nextWave: 0,
@@ -621,7 +615,7 @@ export class Operations {
       const ang = datan2(to.y - from.y, to.x - from.x);
       inst.wardName = step.ward ?? this.t('ops.escort.freighterName', {
         kind: size > 1 ? this.t('ops.escort.heavyFreighter') : this.t('ops.escort.freighter'),
-        name: E.freighterNames[hash(inst.quest) % E.freighterNames.length],
+        name: E.freighterNames[hashString(inst.quest) % E.freighterNames.length],
       });
       inst.ward = this.host.spawnWard('freighter', inst.system, from.x + dcos(ang) * E.launchDistance, from.y + dsin(ang) * E.launchDistance, ang, inst.wardName);
       inst.totalDist = dhypot(to.x - from.x, to.y - from.y);

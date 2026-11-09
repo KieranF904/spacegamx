@@ -10,6 +10,8 @@
  * and each recipe says how much of the shared reverb it sends to.
  */
 
+import { hashString, mulberry32 } from '@space-game/common';
+
 const SR = 44100;
 
 type Rand = () => number;
@@ -21,24 +23,6 @@ type Recipe = {
   reverb?: number;
   build(ctx: OfflineAudioContext, out: AudioNode, rnd: Rand): void;
 };
-
-/** Seeded random (mulberry32) */
-function rng(seed: number): Rand {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
 
 /** White or brown (deep, rumbly) noise, peak-normalised */
 function noiseBuffer(ctx: BaseAudioContext, seconds: number, rnd: Rand, color: 'white' | 'brown' = 'white'): AudioBuffer {
@@ -638,7 +622,7 @@ function loopBuffer(ctx: BaseAudioContext, kind: 'engine' | 'boost'): AudioBuffe
   const n = seconds * SR;
   const buf = ctx.createBuffer(1, n, SR);
   const d = buf.getChannelData(0);
-  const r = rng(kind === 'engine' ? 61 : 67);
+  const r = mulberry32(kind === 'engine' ? 61 : 67);
   const white = () => { const w = new Float32Array(n); for (let i = 0; i < n; i++) w[i] = r() * 2 - 1; return w; };
   const w1 = white(), w2 = white();
   if (kind === 'engine') {
@@ -685,7 +669,7 @@ export async function renderSfx(ctx: BaseAudioContext): Promise<Map<string, Audi
         const off = new OfflineAudioContext(1, Math.ceil(recipe.duration * SR), SR);
         const master = off.createGain();
         master.connect(off.destination);
-        recipe.build(off, master, rng(hash(id) + v * 7919));
+        recipe.build(off, master, mulberry32(hashString(id) + v * 7919));
         const buf = await off.startRendering();
         // Layers can stack past full scale; keep each effect just under it
         const d = buf.getChannelData(0);
@@ -712,7 +696,7 @@ export function reverbImpulse(ctx: BaseAudioContext, seconds = 2.4): AudioBuffer
   const pre = Math.floor(0.012 * ctx.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
     const d = buf.getChannelData(ch);
-    const r = rng(101 + ch);
+    const r = mulberry32(101 + ch);
     let y = 0;
     for (let i = pre; i < n; i++) {
       const t = (i - pre) / ctx.sampleRate;

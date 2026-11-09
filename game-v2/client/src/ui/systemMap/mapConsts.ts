@@ -1,6 +1,6 @@
 /** The map's data and small helpers: factions, lodestone colours, boss lairs, planet names, step and distance maths */
 
-import { StarSystemData, type SystemRegionData, type HazardRules } from '@space-game/common';
+import { StarSystemData, hashString, mulberry32, type SystemRegionData, type HazardRules } from '@space-game/common';
 import { jumpTuning, type ShipTuning } from '@space-game/common';
 import factionsFile from '../../../../data/factions.json';
 import shipTuning from '../../../../data/ships/tuning.json';
@@ -52,22 +52,6 @@ export const HAZARD_NAMES: Record<string, string> = {
   cold: 'Cold', radiation: 'Radiation', low_visibility: 'Low visibility', darkness: 'Darkness', gravitational_anomalies: 'Gravity well',
 };
 export const BODY_NAMES: Record<string, string> = { sun: 'Star', black_hole: 'Black hole', pulsar: 'Pulsar', binary: 'Binary star', none: 'None' };
-
-export function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
-export function seeded(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), a | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 export function hexToHue(hex: string): number {
   const v = parseInt(hex.replace('#', ''), 16);
