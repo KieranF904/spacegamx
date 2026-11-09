@@ -9,6 +9,7 @@ import { Blueprint, Catalog, Economy, Bag, PlacedPart, PlacedGeom, Side, ShipTun
 import { type LoadTestResult } from '@space-game/common';
 import { type PowerReport } from '../wireEdit';
 import { PortsGrid } from '../portsGrid';
+import type { FlowCanvasLayer } from '../build/powerFlowView';
 import { HangarLitView } from '../HangarLitView';
 import { type PartTipCtx } from '../partTip';
 
@@ -76,6 +77,10 @@ export interface HangarHost {
   slot: number;
   mountingBroken: Map<number, MountingProblem[]>;
   ports: PortsGrid;
+  /** The power flow overlay's animated layer (pulses, ticks, crosses) */
+  flow: FlowCanvasLayer;
+  /** Turn the power flow overlay on or off (and remember it) */
+  setEnergy(on: boolean): void;
   mouse: Vec2 | null;
   paletteHover: { fn: string; piece: string; material: string } | null;
   handTurn(): { rot: 0 | 1 | 2 | 3; flip: boolean };

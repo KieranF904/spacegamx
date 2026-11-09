@@ -4,7 +4,7 @@
  * (HangarPalette, by import: the hangar's own list) opens at the side, and the mouse builds on the ship itself:
  *
  *   left click   place the part in hand (hold: along the path)   right click   take a part out (a standing part: mark it for recycling)
- *   middle click pick a part up                 R turn · F mirror · T facing · Esc or the build key closes
+ *   middle click pick a part up                 R turn · F mirror · T facing · U power flow · Esc or the build key closes
  *
  * There is no plan apart from the blueprint: a part the blueprint has and the ship hasn't is missing (planned or shot
  * off), drawn as the real part, faded, and built by the fabricator. Built parts are the ship itself (the game draws
@@ -27,6 +27,8 @@ import { groupOfKey } from '../weaponGroups/editor';
 import { drawPartArt } from '../build/partArt';
 import { drawFacingMark, drawShieldCover } from '../build/buildMarks';
 import type { FieldDeps } from './bridge';
+import { FieldFlow } from './fieldFlow';
+import { FLOW_KEY } from '../build/powerFlowView';
 import {
   addPart, candidate, hasEdits, noEdits, partAtPoint, placementProblem, planChanged, planTarget, removePart, replacePart, settle, summary,
   targetErrors, unjoinedText, unjoinedUids, working, type BuildEdits, type LiveDesign, type WorkingDesign,
@@ -81,7 +83,9 @@ export class FieldOverlay {
   private noteBad = false;
   private cache: { key: unknown[]; w: WorkingDesign; geoms: PlacedGeom[]; unjoined: Set<number> } | null = null;
 
-  constructor(private deps: FieldDeps) {}
+  private flow: FieldFlow;
+
+  constructor(private deps: FieldDeps) { this.flow = new FieldFlow(deps); }
 
   // ---------------------------------------------------------------- open and close
 
@@ -192,6 +196,7 @@ export class FieldOverlay {
       else if (a === 'reset') this.undo();
       else if (a === 'clear') this.clear();
     });
+    this.flow.mount(root.querySelector<HTMLElement>('.fo-foot')!);
     this.palWrap = root.querySelector<HTMLDivElement>('.fo-pal')!;
     this.noteEl = root.querySelector<HTMLElement>('.fo-note')!;
     this.saveBtn = root.querySelector<HTMLButtonElement>('[data-a="save"]')!;
@@ -403,6 +408,7 @@ export class FieldOverlay {
       else { this.hand.empty = true; this.pal?.render(); this.say('Hand emptied: Esc again closes.'); }
       return true;
     }
+    if (code === FLOW_KEY) { this.say(this.flow.toggle() ? 'Power flow on: it shows the design as it would run once built.' : 'Power flow off.'); return true; }
     if (groupOfKey(code)) return this.groupKey(code);
     // (R / F / T over a part already in the design turn that part; elsewhere they act on the hand, below)
     if (TURN_KEYS[code] && this.turnPlaced(code)) return true;
@@ -537,6 +543,7 @@ export class FieldOverlay {
       drawFacingMark(g, p, geoms[i], toScreen, ctx.cs); // (the hangar's colours: guns warm, the rest cool)
       drawShieldCover(g, p, geoms[i], toScreen, ctx.cs, 0.35);
     });
+    this.flow.draw(g, at, ctx.cs, w, geoms);
     const live = this.deps.ship();
     if (live) drawFieldGroups(g, live, (uid) => geoms[w.bp.parts.findIndex((q) => q.uid === uid)], at, ctx.cs);
     if (this.mouse && this.near(this.gridAt(this.mouse.x, this.mouse.y) ?? [1e9, 1e9])) {

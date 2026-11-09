@@ -1652,7 +1652,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 847,
+      "lines": 856,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1671,26 +1671,26 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 66,
-          "end": 67
+          "start": 68,
+          "end": 69
         },
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 70,
-          "end": 70
+          "start": 72,
+          "end": 72
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 71,
-          "end": 72
+          "start": 73,
+          "end": 74
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 74,
-          "end": 847
+          "start": 76,
+          "end": 856
         }
       ]
     },
@@ -2046,6 +2046,307 @@
           "kind": "function",
           "start": 111,
           "end": 114
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-power-flow",
+      "path": "client/src/ships/build/powerFlow.ts",
+      "group": "client/ships/build",
+      "lines": 146,
+      "owns": "the power flow overlay's data for a design, shared by the hangar and the world build view: the line each link draws and how hard it is carrying, a marker per port (and a tick or cross for how it meets), the parts that get less power than they draw, and where the moving pulses sit on a line at a time",
+      "needs": "common portsView / PS_* port states (the ports core's own link resolution), PortsLoadResult (its flows), SIDE_NORMAL; portsReport (which consumers nothing feeds)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "it reads the ports core's links and the load test's flows and adds no routing rule of its own",
+          "test": "client/src/ships/build/powerFlow.test.ts"
+        },
+        {
+          "text": "a link with a good meeting gets a tick, an out facing nothing, an in with no source or a clash gets a cross",
+          "test": "client/src/ships/build/powerFlow.test.ts"
+        },
+        {
+          "text": "pulses stay on their line and move with time",
+          "test": "client/src/ships/build/powerFlow.test.ts"
+        }
+      ],
+      "extend": "a new thing to flag is one more PortMark kind in portMarks(); how it is drawn is powerFlowView.ts",
+      "exports": [
+        "FlowSegment",
+        "MarkKind",
+        "PartTint",
+        "PortMark",
+        "PowerFlow",
+        "edgeAt",
+        "glyphAt",
+        "portTriangle",
+        "powerFlow",
+        "pulsesOn"
+      ],
+      "sections": [
+        {
+          "name": "DEPTH",
+          "kind": "const",
+          "start": 18,
+          "end": 19
+        },
+        {
+          "name": "FlowSegment",
+          "kind": "interface",
+          "start": 21,
+          "end": 37
+        },
+        {
+          "name": "MarkKind",
+          "kind": "type",
+          "start": 39,
+          "end": 39
+        },
+        {
+          "name": "PortMark",
+          "kind": "interface",
+          "start": 40,
+          "end": 51
+        },
+        {
+          "name": "PartTint",
+          "kind": "interface",
+          "start": 53,
+          "end": 58
+        },
+        {
+          "name": "PowerFlow",
+          "kind": "interface",
+          "start": 60,
+          "end": 68
+        },
+        {
+          "name": "glyphAt",
+          "kind": "function",
+          "start": 70,
+          "end": 74
+        },
+        {
+          "name": "edgeAt",
+          "kind": "function",
+          "start": 76,
+          "end": 80
+        },
+        {
+          "name": "portTriangle",
+          "kind": "function",
+          "start": 82,
+          "end": 89
+        },
+        {
+          "name": "powerFlow",
+          "kind": "function",
+          "start": 91,
+          "end": 134
+        },
+        {
+          "name": "pulsesOn",
+          "kind": "function",
+          "start": 136,
+          "end": 146
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-power-flow-pref",
+      "path": "client/src/ships/build/powerFlowPref.ts",
+      "group": "client/ships/build",
+      "lines": 34,
+      "owns": "the one remembered choice of the power flow overlay (on or off), shared by the hangar and the world build view",
+      "needs": "browser localStorage (optional: blocked storage just means the choice is not kept)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the default is off, and a blocked or broken store reads as off",
+          "test": "client/src/ships/build/powerFlow.test.ts"
+        }
+      ],
+      "extend": "none; a second power-flow setting would be another key here",
+      "exports": [
+        "loadPowerFlow",
+        "savePowerFlow"
+      ],
+      "sections": [
+        {
+          "name": "KEY",
+          "kind": "const",
+          "start": 9,
+          "end": 9
+        },
+        {
+          "name": "Store",
+          "kind": "type",
+          "start": 11,
+          "end": 11
+        },
+        {
+          "name": "safeStorage",
+          "kind": "function",
+          "start": 13,
+          "end": 19
+        },
+        {
+          "name": "loadPowerFlow",
+          "kind": "function",
+          "start": 21,
+          "end": 28
+        },
+        {
+          "name": "savePowerFlow",
+          "kind": "function",
+          "start": 30,
+          "end": 34
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build-power-flow-view",
+      "path": "client/src/ships/build/powerFlowView.ts",
+      "group": "client/ships/build",
+      "lines": 233,
+      "owns": "drawing the power flow overlay (powerFlow.ts) onto a canvas (the hangar's animated layer) or a pixi Graphics (the world build view), through one small sink, plus the legend words both editors show",
+      "needs": "powerFlow.ts (the data), PlacedGeom outlines; npm: pixi.js (type only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the layers are independent (the hangar's own overlay already draws the lines and port glyphs, so it asks for pulses and verdicts only)",
+          "test": "client/src/ships/build/powerFlow.test.ts"
+        },
+        {
+          "text": "the animated canvas layer runs its frame loop only while it has something to show",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new thing drawn is a FlowSink call in drawFlow(); a new target (another renderer) is one more FlowSink",
+      "exports": [
+        "ALL_LAYERS",
+        "CanvasFlowView",
+        "FLOW_COLORS",
+        "FLOW_KEY",
+        "FlowCanvasLayer",
+        "FlowFrame",
+        "FlowLayers",
+        "FlowSink",
+        "canvasSink",
+        "drawFlow",
+        "flowLegend",
+        "flowLegendHtml",
+        "pixiSink"
+      ],
+      "sections": [
+        {
+          "name": "FlowSink",
+          "kind": "interface",
+          "start": 17,
+          "end": 23
+        },
+        {
+          "name": "FlowLayers",
+          "kind": "interface",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "FLOW_KEY",
+          "kind": "const",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "ALL_LAYERS",
+          "kind": "const",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "FLOW_COLORS",
+          "kind": "const",
+          "start": 30,
+          "end": 32
+        },
+        {
+          "name": "portColor",
+          "kind": "function",
+          "start": 34,
+          "end": 39
+        },
+        {
+          "name": "drawFlow",
+          "kind": "function",
+          "start": 41,
+          "end": 74
+        },
+        {
+          "name": "portGlyph",
+          "kind": "function",
+          "start": 76,
+          "end": 82
+        },
+        {
+          "name": "tick",
+          "kind": "function",
+          "start": 84,
+          "end": 91
+        },
+        {
+          "name": "cross",
+          "kind": "function",
+          "start": 93,
+          "end": 102
+        },
+        {
+          "name": "css",
+          "kind": "const",
+          "start": 104,
+          "end": 104
+        },
+        {
+          "name": "CanvasFlowView",
+          "kind": "interface",
+          "start": 106,
+          "end": 106
+        },
+        {
+          "name": "canvasSink",
+          "kind": "function",
+          "start": 108,
+          "end": 132
+        },
+        {
+          "name": "pixiSink",
+          "kind": "function",
+          "start": 134,
+          "end": 157
+        },
+        {
+          "name": "flowLegend",
+          "kind": "function",
+          "start": 159,
+          "end": 167
+        },
+        {
+          "name": "flowLegendHtml",
+          "kind": "function",
+          "start": 169,
+          "end": 174
+        },
+        {
+          "name": "FlowFrame",
+          "kind": "interface",
+          "start": 176,
+          "end": 177
+        },
+        {
+          "name": "FlowCanvasLayer",
+          "kind": "class",
+          "start": 179,
+          "end": 233
         }
       ]
     },
@@ -3058,6 +3359,33 @@
       ]
     },
     {
+      "id": "client.ships.field-flow",
+      "path": "client/src/ships/field/fieldFlow.ts",
+      "group": "client/ships/field",
+      "lines": 74,
+      "owns": "the world build view's power flow overlay: its on/off state (remembered), the design's flow worked out once per edit, the drawing in the world, and the toggle button and legend in the build panel",
+      "needs": "build/powerFlow (data), build/powerFlowView (drawing), build/powerFlowPref (the remembered choice), common createShipState / portsLoadTestCached (the whole design as built); WorkingDesign from plan.ts; npm: pixi.js (type only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "it shows the working design as it would run once every planned part is built (labelled \"as designed\")",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "FieldOverlay calls mount() once, toggle() on the key, draw() each frame; nothing else",
+      "exports": [
+        "FieldFlow"
+      ],
+      "sections": [
+        {
+          "name": "FieldFlow",
+          "kind": "class",
+          "start": 18,
+          "end": 74
+        }
+      ]
+    },
+    {
       "id": "client.ship.fx",
       "path": "client/src/ships/fx/ShipFx.ts",
       "group": "client/ships/fx",
@@ -3574,7 +3902,7 @@
       "id": "client.hangar.draw",
       "path": "client/src/ships/hangar/hangarDraw.ts",
       "group": "client/ships/hangar",
-      "lines": 206,
+      "lines": 211,
       "owns": "one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost",
       "needs": "HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common",
       "events": "",
@@ -3599,7 +3927,7 @@
           "name": "draw",
           "kind": "function",
           "start": 30,
-          "end": 206
+          "end": 211
         }
       ]
     },
@@ -3901,7 +4229,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 140,
+      "lines": 145,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -3921,20 +4249,20 @@
         {
           "name": "HangarDeps",
           "kind": "interface",
-          "start": 15,
-          "end": 51
+          "start": 16,
+          "end": 52
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 53,
-          "end": 53
+          "start": 54,
+          "end": 54
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 55,
-          "end": 140
+          "start": 56,
+          "end": 145
         }
       ]
     },
