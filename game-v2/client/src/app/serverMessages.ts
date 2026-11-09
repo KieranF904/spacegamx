@@ -31,6 +31,7 @@ import { devFeeds } from './devFeeds';
 import { setBank } from '../ui/station/bankStore';
 import { setTutorialState, tutorialEdge } from '../ui/tutorial/tutorialStore';
 import { showHitTick } from '../ui/HitTick';
+import { setCombatLock } from '../ui/CombatLockUI';
 import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
@@ -368,6 +369,8 @@ const TABLE: Handlers = {
     h.audio.playUI('craft_done', 0.5);
   },
   repairBank: (_h, msg) => { setBank(msg); },
+  // (Quitting now would leave the ship in space: the HUD counts the lock down, ui/CombatLockUI.ts)
+  combatLock: (_h, msg) => { setCombatLock(msg.left); },
   tutorialState: (_h, msg) => { setTutorialState(msg); },
   tutorialEdge: () => { tutorialEdge(); },
   minesLaid: (h, msg) => { mineClient.laid(msg, h.state.playerId); },

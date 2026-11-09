@@ -14,7 +14,7 @@ import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ClientConnection } from '../net/ClientConnection.js';
 import { activity } from '../activity/index.js';
 import { stationQuery } from '../game/Docking.js';
-import { LINGER_COMBAT_TICKS, LINGER_TICKS } from './shared.js';
+import { startLinger, reinhabit, tellCombatLocks } from './combatLock.js';
 import type { GameServer } from '../GameServer.js';
 
 /**
@@ -120,13 +120,8 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
       gs.guard('close', () => gs.contrib.forget(conn));
       gs.guard('close', () => gs.ammo.forget(conn));
       const eid = conn.playerId;
-      const alive = hasComponent(gs.world, Player, eid) && !hasComponent(gs.world, Dead, eid);
-      // Leaving mid-fight doesn't save you: the ship stays put (hands off the controls) for a while
-      if (alive && conn.userId !== null && gs.currentTick - gs.ships.lastDamagedTick(eid) < LINGER_COMBAT_TICKS) {
-        gs.releaseControls(eid);
-        gs.lingering.set(eid, { conn, until: gs.currentTick + LINGER_TICKS });
-        return;
-      }
+      // Leaving mid-fight doesn't save you: the ship stays put (hands off the controls) for a while (combatLock.ts)
+      if (startLinger(gs, conn)) return;
       gs.pilots.detach(conn).catch((e) => gs.fault('detach', e));
       if (hasComponent(gs.world, Player, eid)) addComponent(gs.world, Dead, eid);
     },
@@ -224,6 +219,8 @@ export async function loginPilot(gs: GameServer, conn: ClientConnection, userId:
     if (hasComponent(gs.world, Player, eid) && !hasComponent(gs.world, Dead, eid)) addComponent(gs.world, Dead, eid);
     gs.rejectAuth(other, 'You signed in somewhere else, so this session has ended.');
   }
+  // (Back inside the time their ship lingers: it is theirs again as it was, combatLock.ts)
+  if (reinhabit(gs, conn, userId)) return;
   for (const [eid, l] of [...gs.lingering]) {
     if (l.conn.userId !== userId) continue;
     gs.lingering.delete(eid);
@@ -235,6 +232,7 @@ export async function loginPilot(gs: GameServer, conn: ClientConnection, userId:
 
 /** Ships left in space by players who quit mid-fight: saved and removed once the time is up */
 export function lingerSystem(gs: GameServer): void {
+  tellCombatLocks(gs);
   for (const [eid, l] of [...gs.lingering]) {
     const dead = !hasComponent(gs.world, Player, eid) || hasComponent(gs.world, Dead, eid);
     if (!dead && gs.currentTick < l.until) continue;

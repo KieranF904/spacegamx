@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 490,
+      "lines": 493,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -145,86 +145,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 74,
-          "end": 128
+          "start": 75,
+          "end": 129
         },
         {
           "name": "Msg",
-          "kind": "type",
-          "start": 130,
-          "end": 130
-        },
-        {
-          "name": "Handler",
           "kind": "type",
           "start": 131,
           "end": 131
         },
         {
-          "name": "Handlers",
+          "name": "Handler",
           "kind": "type",
           "start": 132,
-          "end": 134
+          "end": 132
+        },
+        {
+          "name": "Handlers",
+          "kind": "type",
+          "start": 133,
+          "end": 135
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 136,
-          "end": 154
+          "start": 137,
+          "end": 155
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 156,
-          "end": 160
+          "start": 157,
+          "end": 161
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 162,
-          "end": 207
+          "start": 163,
+          "end": 208
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 209,
-          "end": 220
+          "start": 210,
+          "end": 221
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 222,
-          "end": 240
+          "start": 223,
+          "end": 241
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 242,
-          "end": 276
+          "start": 243,
+          "end": 277
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 278,
-          "end": 295
+          "start": 279,
+          "end": 296
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 297,
-          "end": 480
+          "start": 298,
+          "end": 483
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 482,
-          "end": 483
+          "start": 485,
+          "end": 486
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 485,
-          "end": 490
+          "start": 488,
+          "end": 493
         }
       ]
     },
@@ -6827,6 +6827,64 @@
       ]
     },
     {
+      "id": "client.ui.combat-lock",
+      "path": "client/src/ui/CombatLockUI.ts",
+      "group": "client/ui",
+      "lines": 48,
+      "owns": "the \"In combat 12 s\" HUD badge: quitting while it shows leaves the ship in space (server combatLock message)",
+      "needs": "DOM (optional: with none every call does nothing)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the badge shows exactly while the server says the lock is on, counting down locally",
+          "test": "client/src/ui/combatLock.test.ts"
+        }
+      ],
+      "extend": "the text is `combatLabel`; the lock itself is the server's (gameServer/combatLock.ts)",
+      "exports": [
+        "combatLabel",
+        "setCombatLock"
+      ],
+      "sections": [
+        {
+          "name": "endAt",
+          "kind": "let",
+          "start": 9,
+          "end": 9
+        },
+        {
+          "name": "el",
+          "kind": "let",
+          "start": 10,
+          "end": 10
+        },
+        {
+          "name": "timer",
+          "kind": "let",
+          "start": 11,
+          "end": 11
+        },
+        {
+          "name": "combatLabel",
+          "kind": "function",
+          "start": 13,
+          "end": 17
+        },
+        {
+          "name": "paint",
+          "kind": "function",
+          "start": 19,
+          "end": 36
+        },
+        {
+          "name": "setCombatLock",
+          "kind": "function",
+          "start": 38,
+          "end": 48
+        }
+      ]
+    },
+    {
       "id": "client.system-map",
       "path": "client/src/ui/SystemMapUI.ts",
       "group": "client/ui",
@@ -8645,6 +8703,40 @@
       ]
     },
     {
+      "id": "protocol.combat",
+      "path": "common/src/network/combatProtocol.ts",
+      "group": "common/network",
+      "lines": 20,
+      "owns": "the combat lock told to a signed-in pilot: how long quitting would still leave their ship in space (JSON)",
+      "needs": "nothing (type-only); re-exported through protocol.ts (ServerMessage)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the server types the client handles itself are exactly the pinned set",
+          "test": "client/src/app/serverMessages.test.ts"
+        }
+      ],
+      "extend": "a new message is an interface plus a member of CombatServerMessage; then its entry in client/src/app/serverMessages.ts and the golden pin (server/src/golden/serverMessages.json)",
+      "exports": [
+        "CombatServerMessage",
+        "ServerCombatLockMessage"
+      ],
+      "sections": [
+        {
+          "name": "ServerCombatLockMessage",
+          "kind": "interface",
+          "start": 10,
+          "end": 18
+        },
+        {
+          "name": "CombatServerMessage",
+          "kind": "type",
+          "start": 20,
+          "end": 20
+        }
+      ]
+    },
+    {
       "id": "protocol.contributor",
       "path": "common/src/network/contributorProtocol.ts",
       "group": "common/network",
@@ -9643,7 +9735,7 @@
       "id": "protocol",
       "path": "common/src/network/protocol.ts",
       "group": "common/network",
-      "lines": 79,
+      "lines": 80,
       "owns": "the protocol version pin, the wire-table summary, and the re-export of every message family",
       "needs": "protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files",
       "events": "",
@@ -9670,32 +9762,32 @@
         {
           "name": "PROTOCOL_VERSION",
           "kind": "const",
-          "start": 46,
-          "end": 58
+          "start": 47,
+          "end": 59
         },
         {
           "name": "PROTOCOL_WIRE_HASH",
           "kind": "const",
-          "start": 59,
-          "end": 60
+          "start": 60,
+          "end": 61
         },
         {
           "name": "PROTOCOL_MISMATCH_CLOSE",
           "kind": "const",
-          "start": 61,
-          "end": 62
+          "start": 62,
+          "end": 63
         },
         {
           "name": "PROTOCOL_MISMATCH_REASON",
           "kind": "const",
-          "start": 63,
-          "end": 63
+          "start": 64,
+          "end": 64
         },
         {
           "name": "wireTables",
           "kind": "function",
-          "start": 65,
-          "end": 79
+          "start": 66,
+          "end": 80
         }
       ]
     },
@@ -11622,7 +11714,7 @@
       "id": "protocol.server-union",
       "path": "common/src/network/protocol/serverMessage.ts",
       "group": "common/network/protocol",
-      "lines": 124,
+      "lines": 126,
       "owns": "the ServerMessage union over every family",
       "needs": "every server message family file",
       "events": "",
@@ -11640,8 +11732,8 @@
         {
           "name": "ServerMessage",
           "kind": "type",
-          "start": 23,
-          "end": 124
+          "start": 24,
+          "end": 126
         }
       ]
     },
@@ -14864,7 +14956,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 683,
+      "lines": 703,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -14952,7 +15044,7 @@
           "name": "Pilots",
           "kind": "class",
           "start": 134,
-          "end": 683
+          "end": 703
         }
       ]
     },
@@ -16212,6 +16304,90 @@
       ]
     },
     {
+      "id": "server.gameserver.combat-lock",
+      "path": "server/src/gameServer/combatLock.ts",
+      "group": "server/gameServer",
+      "lines": 107,
+      "owns": "the combat lock (dealing or taking damage lately), a pilot's ship lingering after they quit in it, taking that same ship back on rejoining, and telling the pilot's HUD how long the lock has left",
+      "needs": "GameServer (type), @space-game/common, CombatClock (gs.combat), ShipBridge lastDamagedTick, Pilots.adopt; npm: bitecs",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a pilot who quits inside the lock leaves a live ship that rejoining takes back whole (same entity)",
+          "test": "server/src/gameServer/combatLock.test.ts"
+        },
+        {
+          "text": "the linger runs from the last combat event, and shutdown saves lingering ships as they are (Pilots.saveAll walks every session, a lingering one included)",
+          "test": "server/src/gameServer/combatLock.test.ts"
+        }
+      ],
+      "extend": "the numbers are COMBAT_RULES; a new kind of combat event feeds gs.combat (hosts/ship.ts notifyDamage)",
+      "exports": [
+        "COMBAT_RULES",
+        "combatLeft",
+        "lastCombatTick",
+        "reinhabit",
+        "startLinger",
+        "tellCombatLocks"
+      ],
+      "sections": [
+        {
+          "name": "COMBAT_RULES",
+          "kind": "const",
+          "start": 18,
+          "end": 24
+        },
+        {
+          "name": "ticks",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "lastCombatTick",
+          "kind": "function",
+          "start": 28,
+          "end": 31
+        },
+        {
+          "name": "combatLeft",
+          "kind": "function",
+          "start": 33,
+          "end": 36
+        },
+        {
+          "name": "isLive",
+          "kind": "const",
+          "start": 38,
+          "end": 39
+        },
+        {
+          "name": "startLinger",
+          "kind": "function",
+          "start": 41,
+          "end": 51
+        },
+        {
+          "name": "reinhabit",
+          "kind": "function",
+          "start": 53,
+          "end": 85
+        },
+        {
+          "name": "toldAt",
+          "kind": "const",
+          "start": 87,
+          "end": 87
+        },
+        {
+          "name": "tellCombatLocks",
+          "kind": "function",
+          "start": 89,
+          "end": 107
+        }
+      ]
+    },
+    {
       "id": "server.gameserver.faults",
       "path": "server/src/gameServer/faults.ts",
       "group": "server/gameServer",
@@ -16535,7 +16711,7 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 306,
+      "lines": 304,
       "owns": "connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
@@ -16566,55 +16742,55 @@
           "name": "connect",
           "kind": "function",
           "start": 20,
-          "end": 134
+          "end": 129
         },
         {
           "name": "createPlayer",
           "kind": "function",
-          "start": 136,
-          "end": 190
+          "start": 131,
+          "end": 185
         },
         {
           "name": "placePlayer",
           "kind": "function",
-          "start": 192,
-          "end": 209
+          "start": 187,
+          "end": 204
         },
         {
           "name": "loginPilot",
           "kind": "function",
-          "start": 211,
-          "end": 234
+          "start": 206,
+          "end": 231
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 236,
-          "end": 245
+          "start": 233,
+          "end": 243
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 247,
-          "end": 261
+          "start": 245,
+          "end": 259
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 263,
-          "end": 276
+          "start": 261,
+          "end": 274
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 278,
-          "end": 293
+          "start": 276,
+          "end": 291
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 295,
-          "end": 306
+          "start": 293,
+          "end": 304
         }
       ]
     },
@@ -16622,7 +16798,7 @@
       "id": "server.gameserver.shared",
       "path": "server/src/gameServer/shared.ts",
       "group": "server/gameServer",
-      "lines": 69,
+      "lines": 64,
       "owns": "module constants and queries shared by the gameServer modules",
       "needs": "bitecs, common",
       "events": "",
@@ -16637,8 +16813,6 @@
         "DERELICT_LOG_RANGE",
         "INPUT_TIMEOUT_TICKS",
         "KIND_OF_TYPE",
-        "LINGER_COMBAT_TICKS",
-        "LINGER_TICKS",
         "LOOP_SPIN_MS",
         "MEMORY_GATE_MOUTH",
         "NO_ROCKS",
@@ -16775,34 +16949,22 @@
           "end": 55
         },
         {
-          "name": "LINGER_COMBAT_TICKS",
-          "kind": "const",
-          "start": 57,
-          "end": 58
-        },
-        {
-          "name": "LINGER_TICKS",
-          "kind": "const",
-          "start": 59,
-          "end": 60
-        },
-        {
           "name": "scheduleImmediate",
           "kind": "const",
-          "start": 62,
-          "end": 64
+          "start": 57,
+          "end": 59
         },
         {
           "name": "LOOP_SPIN_MS",
           "kind": "const",
-          "start": 65,
-          "end": 66
+          "start": 60,
+          "end": 61
         },
         {
           "name": "NO_ROCKS",
           "kind": "const",
-          "start": 68,
-          "end": 69
+          "start": 63,
+          "end": 64
         }
       ]
     },

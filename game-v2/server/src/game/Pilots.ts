@@ -300,6 +300,26 @@ export class Pilots {
     this.devStash.delete(conn);
   }
 
+  /**
+   * A signed-in pilot came back to the ship they left in space (their old connection's session, kept while it lingered):
+   * the session moves to the new connection as it is (nothing loaded, the ship untouched) and the client is told it all
+   */
+  adopt(from: PilotConn, to: PilotConn): boolean {
+    const s = this.sessions.get(from);
+    if (!s) return false;
+    this.sessions.delete(from);
+    this.sessions.delete(to);
+    s.conn = to;
+    s.loading = false;
+    s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;
+    this.sessions.set(to, s);
+    this.sendProfile(to);
+    this.sendItems(to);
+    this.sendBank(s, true);
+    this.emit(to, { type: 'login' });
+    return true;
+  }
+
   /** Dev tool: pilots flying a library ship (devShip): the ship record (and slot) they really have, to be put back */
   devStash = new Map<PilotConn, { rec: ShipRecord; slot: number }>();
 
