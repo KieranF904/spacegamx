@@ -1761,7 +1761,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 912,
+      "lines": 916,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1799,7 +1799,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 84,
-          "end": 912
+          "end": 916
         }
       ]
     },
@@ -8341,7 +8341,7 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 193,
+      "lines": 221,
       "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
@@ -8358,28 +8358,34 @@
       ],
       "sections": [
         {
+          "name": "TOAST_BAND",
+          "kind": "const",
+          "start": 14,
+          "end": 15
+        },
+        {
           "name": "styled",
           "kind": "let",
-          "start": 14,
-          "end": 14
+          "start": 17,
+          "end": 17
         },
         {
           "name": "injectStyles",
           "kind": "function",
-          "start": 15,
-          "end": 59
+          "start": 18,
+          "end": 63
         },
         {
           "name": "PanelDeps",
           "kind": "interface",
-          "start": 61,
-          "end": 67
+          "start": 65,
+          "end": 71
         },
         {
           "name": "TutorialPanel",
           "kind": "class",
-          "start": 69,
-          "end": 193
+          "start": 73,
+          "end": 221
         }
       ]
     },
@@ -8387,7 +8393,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 182,
+      "lines": 187,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
@@ -8419,7 +8425,7 @@
           "name": "TutorialUI",
           "kind": "class",
           "start": 41,
-          "end": 182
+          "end": 187
         }
       ]
     },
@@ -8427,7 +8433,7 @@
       "id": "client.ui.tutorial.glow",
       "path": "client/src/ui/tutorial/glow.ts",
       "group": "client/ui/tutorial",
-      "lines": 118,
+      "lines": 121,
       "owns": "making the UI controls a tutorial step names glow (a pulsing amber outline) until the pilot clicks them: finds them by selector, picks which stage is up, follows controls that render later, and cleans up on a step change or leave",
       "needs": "a GlowHost (the DOM: find, mark, clicks, changes), the document for the real host",
       "events": "",
@@ -8455,31 +8461,31 @@
           "name": "Glow",
           "kind": "class",
           "start": 22,
-          "end": 74
+          "end": 77
         },
         {
           "name": "GLOW_CLASS",
           "kind": "const",
-          "start": 76,
-          "end": 76
+          "start": 79,
+          "end": 79
         },
         {
           "name": "styled",
           "kind": "let",
-          "start": 78,
-          "end": 78
+          "start": 81,
+          "end": 81
         },
         {
           "name": "injectStyles",
           "kind": "function",
-          "start": 79,
-          "end": 89
+          "start": 82,
+          "end": 92
         },
         {
           "name": "domGlowHost",
           "kind": "function",
-          "start": 91,
-          "end": 118
+          "start": 94,
+          "end": 121
         }
       ]
     },
@@ -8487,13 +8493,13 @@
       "id": "client.ui.tutorial.placement",
       "path": "client/src/ui/tutorial/placement.ts",
       "group": "client/ui/tutorial",
-      "lines": 81,
-      "owns": "where the instruction card sits: its usual top-centre spot, or right above (or just under, or just inside) the window the pilot is looking at, clamped to the screen; and finding that window's rect",
+      "lines": 114,
+      "owns": "where the instruction card sits: its usual top-centre spot, or by the window the pilot is looking at (above, under, beside, or over its bottom edge on a short screen), clear of the controls the step points at, clamped to the screen; and finding that window's rect",
       "needs": "nothing (pure math; the DOM lookup takes a document-like object)",
       "events": "",
       "invariants": [
         {
-          "text": "the card never covers the anchor's top edge when there is room above it; it always stays inside the viewport",
+          "text": "the card never covers a window's top edge (title, tabs, close) while there is room above, under or beside it; it never covers a glowing control while another spot fits; it always stays inside the viewport",
           "test": "client/src/ui/tutorial/placement.test.ts"
         }
       ],
@@ -8517,86 +8523,92 @@
         {
           "name": "Rect",
           "kind": "interface",
-          "start": 10,
-          "end": 10
+          "start": 12,
+          "end": 12
         },
         {
           "name": "Size",
           "kind": "interface",
-          "start": 11,
-          "end": 11
+          "start": 13,
+          "end": 13
         },
         {
           "name": "AnchorMode",
           "kind": "type",
-          "start": 12,
-          "end": 13
+          "start": 14,
+          "end": 15
         },
         {
           "name": "CardAnchor",
           "kind": "interface",
-          "start": 14,
-          "end": 14
-        },
-        {
-          "name": "CARD_MARGIN",
-          "kind": "const",
           "start": 16,
           "end": 16
         },
         {
+          "name": "CARD_MARGIN",
+          "kind": "const",
+          "start": 18,
+          "end": 18
+        },
+        {
           "name": "CARD_GAP",
           "kind": "const",
-          "start": 17,
-          "end": 17
+          "start": 19,
+          "end": 19
         },
         {
           "name": "HOME_TOP",
           "kind": "const",
-          "start": 18,
-          "end": 19
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "hits",
+          "kind": "function",
+          "start": 23,
+          "end": 26
         },
         {
           "name": "cardPosition",
           "kind": "function",
-          "start": 21,
-          "end": 37
+          "start": 28,
+          "end": 70
         },
         {
           "name": "AnchorEl",
           "kind": "interface",
-          "start": 39,
-          "end": 44
+          "start": 72,
+          "end": 77
         },
         {
           "name": "AnchorKind",
           "kind": "interface",
-          "start": 46,
-          "end": 46
+          "start": 79,
+          "end": 79
         },
         {
           "name": "ANCHORS",
           "kind": "const",
-          "start": 48,
-          "end": 53
+          "start": 81,
+          "end": 86
         },
         {
           "name": "findAnchor",
           "kind": "function",
-          "start": 55,
-          "end": 65
+          "start": 88,
+          "end": 98
         },
         {
           "name": "domFind",
           "kind": "function",
-          "start": 67,
-          "end": 77
+          "start": 100,
+          "end": 110
         },
         {
           "name": "sameRect",
           "kind": "function",
-          "start": 79,
-          "end": 81
+          "start": 112,
+          "end": 114
         }
       ]
     },
@@ -8604,7 +8616,7 @@
       "id": "client.ui.tutorial.model",
       "path": "client/src/ui/tutorial/tutorialModel.ts",
       "group": "client/ui/tutorial",
-      "lines": 218,
+      "lines": 222,
       "owns": "the lesson UI's decisions, as pure functions of the server's tutorialState and data/tutorial.json: what the instruction panel shows, which training objects are drawn ghosted (and how), which markers light up, where a screen-edge arrow sits, the leave-confirm flow, the step-done toast, the graduate screen's pack list",
       "needs": "common ServerTutorialStateMessage, TutorialData and the object defs (types only)",
       "events": "",
@@ -8706,109 +8718,109 @@
           "name": "counterOf",
           "kind": "function",
           "start": 67,
-          "end": 72
+          "end": 76
         },
         {
           "name": "targetGained",
           "kind": "function",
-          "start": 74,
-          "end": 79
+          "start": 78,
+          "end": 83
         },
         {
           "name": "pointsAtStation",
           "kind": "function",
-          "start": 81,
-          "end": 84
+          "start": 85,
+          "end": 88
         },
         {
           "name": "pointsAtBelt",
           "kind": "function",
-          "start": 86,
-          "end": 89
+          "start": 90,
+          "end": 93
         },
         {
           "name": "arrowTargets",
           "kind": "function",
-          "start": 91,
-          "end": 103
+          "start": 95,
+          "end": 107
         },
         {
           "name": "FIXED_KEYS",
           "kind": "const",
-          "start": 105,
-          "end": 106
+          "start": 109,
+          "end": 110
         },
         {
           "name": "KEY_GROUPS",
           "kind": "const",
-          "start": 107,
-          "end": 108
+          "start": 111,
+          "end": 112
         },
         {
           "name": "fillKeys",
           "kind": "function",
-          "start": 110,
-          "end": 114
+          "start": 114,
+          "end": 118
         },
         {
           "name": "lineText",
           "kind": "function",
-          "start": 116,
-          "end": 119
+          "start": 120,
+          "end": 123
         },
         {
           "name": "PanelModel",
           "kind": "interface",
-          "start": 121,
-          "end": 137
+          "start": 125,
+          "end": 141
         },
         {
           "name": "panelModel",
           "kind": "function",
-          "start": 139,
-          "end": 156
+          "start": 143,
+          "end": 160
         },
         {
           "name": "newlyDone",
           "kind": "function",
-          "start": 158,
-          "end": 162
+          "start": 162,
+          "end": 166
         },
         {
           "name": "packLines",
           "kind": "function",
-          "start": 164,
-          "end": 171
+          "start": 168,
+          "end": 175
         },
         {
           "name": "LeaveFlow",
           "kind": "class",
-          "start": 173,
-          "end": 186
+          "start": 177,
+          "end": 190
         },
         {
           "name": "edgeArrow",
           "kind": "function",
-          "start": 188,
-          "end": 198
+          "start": 192,
+          "end": 202
         },
         {
           "name": "ringArrow",
           "kind": "function",
-          "start": 200,
-          "end": 208
+          "start": 204,
+          "end": 212
         },
         {
           "name": "distLabel",
           "kind": "function",
-          "start": 210,
-          "end": 213
+          "start": 214,
+          "end": 217
         },
         {
           "name": "risingPanels",
           "kind": "function",
-          "start": 215,
-          "end": 218
+          "start": 219,
+          "end": 222
         }
       ]
     },
@@ -11289,7 +11301,7 @@
       "id": "protocol.tutorial",
       "path": "common/src/network/tutorialProtocol.ts",
       "group": "common/network",
-      "lines": 44,
+      "lines": 45,
       "owns": "the training yard's messages: leave (skip or graduate), report (an acknowledgement or an opened panel), and the pilot's own tutorial state",
       "needs": "type-only import of tutorial/types (TutorialPanel)",
       "events": "",
@@ -11335,19 +11347,19 @@
           "name": "ServerTutorialStateMessage",
           "kind": "interface",
           "start": 30,
-          "end": 36
+          "end": 37
         },
         {
           "name": "ServerTutorialEdgeMessage",
           "kind": "interface",
-          "start": 38,
-          "end": 42
+          "start": 39,
+          "end": 43
         },
         {
           "name": "TutorialServerMessage",
           "kind": "type",
-          "start": 44,
-          "end": 44
+          "start": 45,
+          "end": 45
         }
       ]
     },
@@ -15227,7 +15239,7 @@
       "id": "common.tutorial.types",
       "path": "common/src/tutorial/types.ts",
       "group": "common/tutorial",
-      "lines": 151,
+      "lines": 152,
       "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
       "needs": "nothing (leaf module)",
       "events": "",
@@ -15298,67 +15310,67 @@
           "name": "TutorialStepDef",
           "kind": "interface",
           "start": 64,
-          "end": 82
+          "end": 83
         },
         {
           "name": "TutorialYardDef",
           "kind": "interface",
-          "start": 84,
-          "end": 98
+          "start": 85,
+          "end": 99
         },
         {
           "name": "TutorialPackDef",
           "kind": "interface",
-          "start": 100,
-          "end": 103
+          "start": 101,
+          "end": 104
         },
         {
           "name": "TutorialData",
           "kind": "interface",
-          "start": 105,
-          "end": 111
+          "start": 106,
+          "end": 112
         },
         {
           "name": "TUTORIAL_INDEX_BASE",
           "kind": "const",
-          "start": 113,
-          "end": 114
+          "start": 114,
+          "end": 115
         },
         {
           "name": "TUTORIAL_ROCK_TYPE",
           "kind": "const",
-          "start": 115,
-          "end": 116
+          "start": 116,
+          "end": 117
         },
         {
           "name": "TUTORIAL_FIRST_STEP",
           "kind": "const",
-          "start": 117,
-          "end": 118
+          "start": 118,
+          "end": 119
         },
         {
           "name": "TutorialProfile",
           "kind": "interface",
-          "start": 120,
-          "end": 128
+          "start": 121,
+          "end": 129
         },
         {
           "name": "TutorialEvent",
           "kind": "type",
-          "start": 130,
-          "end": 147
+          "start": 131,
+          "end": 148
         },
         {
           "name": "TUTORIAL_PANELS",
           "kind": "const",
-          "start": 149,
-          "end": 150
+          "start": 150,
+          "end": 151
         },
         {
           "name": "TutorialPanel",
           "kind": "type",
-          "start": 151,
-          "end": 151
+          "start": 152,
+          "end": 152
         }
       ]
     },
@@ -17788,7 +17800,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 408,
+      "lines": 409,
       "owns": "the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps",
       "events": "",
@@ -17826,7 +17838,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 407
+          "end": 408
         }
       ]
     },
@@ -17834,18 +17846,19 @@
       "id": "server.game.tutorial.steps",
       "path": "server/src/game/tutorial/TutorialSteps.ts",
       "group": "server/game/tutorial",
-      "lines": 145,
+      "lines": 159,
       "owns": "the step engine: which event advances which step, what a step grants when it starts, and the graduation",
       "needs": "Tutorial (completeStep, leave, data, grant); npm: @space-game/common",
       "events": "",
       "invariants": [
         {
-          "text": "a step only advances on an event of the pilot's own current step, and only by what its trigger in data/tutorial.json asks; a client report only ever completes an \"opened\" or acknowledge step, never anything that pays; the graduate step leaves on its own after a few seconds if the client does not acknowledge",
+          "text": "a step only advances on an event of the pilot's own current step, and only by what its trigger in data/tutorial.json asks; a client report only ever completes an \"opened\" or acknowledge step, never anything that pays; the graduate screen waits for the pilot's Enter Sol (only a client that never answers is sent on, after ten minutes)",
           "test": "server/src/game/tutorial/steps.test.ts"
         }
       ],
       "extend": "a new trigger kind is a member of TutorialTriggerKind (common/src/tutorial/types.ts) plus a case in `satisfied`; per-step setup (a grant, objects reset) is in `entered`; counting that must survive a reconnect belongs in the profile, the rest (rings passed, ore taken, panels seen) is per visit and starts over when the pilot logs back in",
       "exports": [
+        "GRADUATE_AFTER_TICKS",
         "TutorialSteps"
       ],
       "sections": [
@@ -17865,7 +17878,7 @@
           "name": "TutorialSteps",
           "kind": "class",
           "start": 24,
-          "end": 145
+          "end": 159
         }
       ]
     },
@@ -19388,8 +19401,8 @@
       "id": "server.gameserver.hosts.tutorial",
       "path": "server/src/gameServer/hosts/tutorial.ts",
       "group": "server/gameServer/hosts",
-      "lines": 60,
-      "owns": "the host adapter for the training yard and its start-up (built only when the server runs a tutorial), and the admin /tutorial command",
+      "lines": 76,
+      "owns": "the host adapter for the training yard and its start-up (built only when the server runs a tutorial), a trainee's starting kit (empty storage: the pack comes on leaving), and the admin /tutorial command",
       "needs": "GameServer (type), game/tutorial/Tutorial, gameServer/asteroids (createTrainingBody); npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -19402,26 +19415,40 @@
       "exports": [
         "createTutorialHost",
         "installTutorialAdmin",
-        "setupTutorial"
+        "runsTutorial",
+        "setupTutorial",
+        "starterFor"
       ],
       "sections": [
         {
           "name": "createTutorialHost",
           "kind": "function",
-          "start": 15,
-          "end": 32
+          "start": 17,
+          "end": 34
+        },
+        {
+          "name": "runsTutorial",
+          "kind": "function",
+          "start": 36,
+          "end": 39
+        },
+        {
+          "name": "starterFor",
+          "kind": "function",
+          "start": 41,
+          "end": 48
         },
         {
           "name": "setupTutorial",
           "kind": "function",
-          "start": 34,
-          "end": 40
+          "start": 50,
+          "end": 56
         },
         {
           "name": "installTutorialAdmin",
           "kind": "function",
-          "start": 42,
-          "end": 60
+          "start": 58,
+          "end": 76
         }
       ]
     },
@@ -19477,7 +19504,7 @@
       "id": "server.gameserver.wiring.game",
       "path": "server/src/gameServer/wiring/game.ts",
       "group": "server/gameServer/wiring",
-      "lines": 303,
+      "lines": 305,
       "owns": "constructor argument objects for the game modules (weapons, market, services, hazards, homes, bosses support, social, trade and more)",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -19512,110 +19539,110 @@
         {
           "name": "dockingDeps",
           "kind": "function",
-          "start": 41,
-          "end": 56
+          "start": 42,
+          "end": 57
         },
         {
           "name": "pilotsOpts",
           "kind": "function",
-          "start": 58,
-          "end": 66
+          "start": 59,
+          "end": 68
         },
         {
           "name": "weaponsDeps",
           "kind": "function",
-          "start": 68,
-          "end": 84
+          "start": 70,
+          "end": 86
         },
         {
           "name": "marketDeps",
           "kind": "function",
-          "start": 86,
-          "end": 94
+          "start": 88,
+          "end": 96
         },
         {
           "name": "servicesDeps",
           "kind": "function",
-          "start": 96,
-          "end": 114
+          "start": 98,
+          "end": 116
         },
         {
           "name": "hazardsDeps",
           "kind": "function",
-          "start": 116,
-          "end": 124
+          "start": 118,
+          "end": 126
         },
         {
           "name": "warmthDeps",
           "kind": "function",
-          "start": 126,
-          "end": 137
+          "start": 128,
+          "end": 139
         },
         {
           "name": "homesDeps",
           "kind": "function",
-          "start": 139,
-          "end": 165
+          "start": 141,
+          "end": 167
         },
         {
           "name": "arenaGatesDeps",
           "kind": "function",
-          "start": 167,
-          "end": 178
+          "start": 169,
+          "end": 180
         },
         {
           "name": "recoveryDeps",
           "kind": "function",
-          "start": 180,
-          "end": 190
+          "start": 182,
+          "end": 192
         },
         {
           "name": "bossDevDeps",
           "kind": "function",
-          "start": 192,
-          "end": 211
+          "start": 194,
+          "end": 213
         },
         {
           "name": "densDeps",
           "kind": "function",
-          "start": 213,
-          "end": 227
+          "start": 215,
+          "end": 229
         },
         {
           "name": "contribDeps",
           "kind": "function",
-          "start": 229,
-          "end": 240
+          "start": 231,
+          "end": 242
         },
         {
           "name": "codexDeps",
           "kind": "function",
-          "start": 242,
-          "end": 254
+          "start": 244,
+          "end": 256
         },
         {
           "name": "achievementsDeps",
           "kind": "function",
-          "start": 256,
-          "end": 262
+          "start": 258,
+          "end": 264
         },
         {
           "name": "socialDeps",
           "kind": "function",
-          "start": 264,
-          "end": 272
+          "start": 266,
+          "end": 274
         },
         {
           "name": "derelictsDeps",
           "kind": "function",
-          "start": 274,
-          "end": 289
+          "start": 276,
+          "end": 291
         },
         {
           "name": "tradeDeps",
           "kind": "function",
-          "start": 291,
-          "end": 303
+          "start": 293,
+          "end": 305
         }
       ]
     },

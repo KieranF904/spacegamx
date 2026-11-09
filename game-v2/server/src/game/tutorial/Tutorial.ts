@@ -309,7 +309,8 @@ export class Tutorial {
   sendState(conn: PilotConn): void {
     const t = this.pilots.get(conn)?.tutorial;
     if (!t) return;
-    this.host.send(conn, { type: 'tutorialState', step: t.left ? '' : t.step, done: [...t.done], left: t.left, broken: t.left ? [] : brokenIds(t, this.data), passed: t.left ? [] : this.steps.passedOf(conn.playerId, t.step) });
+    const got = t.left ? undefined : this.steps.gotOf(conn.playerId, t.step);
+    this.host.send(conn, { type: 'tutorialState', step: t.left ? '' : t.step, done: [...t.done], left: t.left, broken: t.left ? [] : brokenIds(t, this.data), passed: t.left ? [] : this.steps.passedOf(conn.playerId, t.step), ...(got !== undefined ? { got } : {}) });
   }
 
   // ------------------------------------------------------------ the tick

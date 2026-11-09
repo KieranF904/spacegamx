@@ -33,6 +33,7 @@ import { DERELICT_LOG_RANGE } from '../shared.js';
 import { GameServerOptions } from '../options.js';
 import { createBossHost } from '../hosts/boss.js';
 import { releaseUsedTraces } from '../hosts/mining.js';
+import { starterFor } from '../hosts/tutorial.js';
 import { createStation, createPortal } from '../world.js';
 import { devStartSpot } from '../session.js';
 import { releaseControls, tick } from '../loop.js';
@@ -57,7 +58,8 @@ export function dockingDeps(gs: GameServer): ConstructorParameters<typeof Dockin
 
 export function pilotsOpts(gs: GameServer, opts: GameServerOptions): ConstructorParameters<typeof Pilots>[4] {
   return {
-    starter: gs.starterKit(),
+    // (a server that runs the training yard starts new pilots with empty storage: the starter pack comes on leaving it)
+    starter: starterFor(gs, opts),
     guestShips: process.env.NODE_ENV !== 'production' ? opts.guestShips : undefined,
     spawn: gs.devStartNum >= 0 ? (eid) => devStartSpot(gs, eid) : undefined,
     autosaveMs: 30_000,

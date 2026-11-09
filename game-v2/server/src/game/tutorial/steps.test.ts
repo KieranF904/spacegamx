@@ -12,6 +12,7 @@ import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
+import { GRADUATE_AFTER_TICKS } from './TutorialSteps.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -91,6 +92,8 @@ describe('the step engine', () => {
     const w = yard();
     const a = w.pilots[0];
     const p = a.profile();
+    // a trainee starts with nothing in storage: each step hands out what it needs, the pack comes at the end
+    expect(p.storage).toEqual([]);
     // it all happens in the Vesta yard system, and the walk ends in Sol
     expect(w.data.yard.system).toBe('vesta_yard');
     expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('vesta_yard'));
@@ -142,6 +145,8 @@ describe('the step engine', () => {
     expect(w.data.steps.find((s) => s.id === 'mine')!.trigger.count).toBe(20);
     mineChunk(w, a, { ice: 6, silicate: 8, iron_ore: 8 });
     expect(stepOf(a)).toBe('mine');
+    // (the card's counter: what counts of it, so far)
+    expect(a.state().got).toBe(16);
     mineChunk(w, a, { nickel_ore: 4 });
     expectStep('hold');
 
@@ -216,16 +221,18 @@ describe('the step engine', () => {
     expect(seen).toEqual(w.data.steps.map((x) => x.id));
   });
 
-  it('the graduate card sends the pilot on by itself if the client never answers', () => {
+  it('the graduate screen waits for the pilot; only a client that never answers is sent on, much later', () => {
     const w = yard();
     const a = w.pilots[0];
     w.tut.completeStep(a.conn, 'welcome');
     a.profile().tutorial.step = 'jump';
     w.tut.completeStep(a.conn, 'jump');
     expect(stepOf(a)).toBe('graduate');
-    w.step(TICK_RATE * 10);
+    w.step(TICK_RATE * 30);
     expect(a.profile().tutorial.left).toBe(false);
-    w.step(TICK_RATE * 11);
+    // (ten minutes on: the server's tick moved on rather than stepped through)
+    (w.server as unknown as { currentTick: number }).currentTick += GRADUATE_AFTER_TICKS;
+    w.step(2);
     expect(a.profile().tutorial.left).toBe(true);
   });
 
