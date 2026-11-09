@@ -82,3 +82,6 @@ export function toDoor(def: GunRangeDef, p: Pilot): void {
 export function kill(p: Pilot): void {
   Health.current[p.conn.playerId] = 0;
 }
+
+/** The range's heavy target (the Redtooth Mammoth), the far one */
+export const heavyOf = (def: GunRangeDef) => def.targets.find((t) => t.ship === 'giant_mammoth')!;

@@ -11,7 +11,7 @@ import { onGunRangeState, type RangeMessageHost } from './rangeMessages';
 
 const IN: ServerGunRangeStateMessage = {
   type: 'gunRangeState', in: true, weapon: 'cannon_pip', options: ['cannon_pip', 'laser_pulse'], station: 'Sol Central Station',
-  door: { x: -3000, y: 0, reach: 420 }, target: { id: 12, x: 1900, y: 0 },
+  door: { x: -3000, y: 0, reach: 420 }, targets: [{ id: 12, x: 1900, y: 0, label: "Mammoth" }],
 };
 
 afterEach(() => resetRangeState());

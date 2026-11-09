@@ -1,7 +1,7 @@
 /**
  * @contract client.gun-range.state
  * owns:       the client's copy of this pilot's gun range state (the last gunRangeState): in or out, the weapon flown, the
- *             weapons on offer, the door, the target's entity and the station to go back to; `inGunRange()` for the code
+ *             weapons on offer, the door, the targets' entities and the station to go back to; `inGunRange()` for the code
  *             that behaves differently in there (keys, HUD, ammo shown)
  * needs:      @space-game/common (ServerGunRangeStateMessage, GunRangeDef type), rendering/terrainData (gunRangeFor)
  * invariants: in only between an `in: true` state and the next `in: false` (or a reset on disconnect) — client/src/ui/gunRange/rangeState.test.ts
@@ -23,13 +23,13 @@ export interface RangeView {
   options: readonly string[];
   /** Where X takes you out, and how near */
   door: { x: number; y: number; reach: number } | null;
-  /** The target's entity (-1 while it is down) and its spot */
-  target: { id: number; x: number; y: number } | null;
+  /** Each target: its entity (-1 while it is down), its spot and its name */
+  targets: readonly { id: number; x: number; y: number; label: string }[];
   /** The station they came from (its name) */
   station: string;
 }
 
-const OUT: RangeView = { in: false, weapon: '', options: [], door: null, target: null, station: '' };
+const OUT: RangeView = { in: false, weapon: '', options: [], door: null, targets: [], station: '' };
 let view: RangeView = OUT;
 let version = 0;
 const listeners = new Set<(v: RangeView) => void>();
@@ -55,7 +55,7 @@ export function setRangeState(msg: ServerGunRangeStateMessage): { entered: boole
   view = msg.in
     ? {
       in: true, weapon: msg.weapon ?? view.weapon, options: msg.options ?? view.options,
-      door: msg.door ?? view.door, target: msg.target ?? view.target, station: msg.station ?? view.station,
+      door: msg.door ?? view.door, targets: msg.targets ?? view.targets, station: msg.station ?? view.station,
     }
     : { ...OUT, station: msg.station ?? '' };
   version++;

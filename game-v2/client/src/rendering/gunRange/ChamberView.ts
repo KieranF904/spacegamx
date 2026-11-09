@@ -2,8 +2,8 @@
  * @contract client.rendering.gun-range-chamber
  * owns:       how the gun range's chamber looks (systems.json `gunRange`, common gunRange/layout.ts): the station's dark
  *             beyond, the floor as a grid of panels with the firing lane and its distance marks, the rectangular wall all
- *             round (its face, ribs and lamps), the exit door in it with its EXIT sign and the zone X works in, the target's
- *             rings, light pools from the ceiling, and the lamps as lights on the ships
+ *             round (its face, ribs and lamps), the exit door in it with its EXIT sign and the zone X works in, the targets'
+ *             rings and names, light pools from the ceiling, and the lamps as lights on the ships
  * needs:      pixi.js, common gunRange layout (chamberBox, chamberWalls, rangeDoor), lighting/Lighting, fxTextures (softDot)
  * invariants: the wall is drawn on the same pieces the shared terrain collides with (chamberWalls), and the door zone with the
  *             server's reach — client/src/rendering/terrainData.test.ts
@@ -38,7 +38,7 @@ export class ChamberView {
   private readonly hint: Text;
   private key = '';
   private readonly light: (L: Lighting) => void;
-  /** The floor's words (distance marks, TARGET), drawn over the floor */
+  /** The floor's words (distance marks, the targets' names), drawn over the floor */
   private readonly labels: Text[] = [];
 
   constructor(private readonly def: GunRangeDef, private readonly lighting: Lighting, private readonly keyName: () => string) {
@@ -62,7 +62,7 @@ export class ChamberView {
     // The firing lane: from the door to the target, its edges dashed, a mark every 500 m
     const n = [door.nx, door.ny], side = [-door.ny, door.nx];
     const at = (d: number, s: number): [number, number] => [door.x + n[0] * d + side[0] * s, door.y + n[1] * d + side[1] * s];
-    const tgt = def.target, laneLen = Math.max(0, (tgt.x - door.x) * n[0] + (tgt.y - door.y) * n[1]);
+    const laneLen = Math.max(0, ...def.targets.map((t) => (t.x - door.x) * n[0] + (t.y - door.y) * n[1] - t.ring));
     const lane = 260;
     for (const s of [-lane, lane]) {
       for (let d = 500; d < laneLen - 700; d += 120) {
@@ -83,15 +83,17 @@ export class ChamberView {
       }
     }
 
-    // The target's rings and cross on the floor
-    for (const [r, a] of [[700, 0.35], [1000, 0.2]] as const) g.circle(tgt.x, tgt.y, r).stroke({ width: 14, color: COL.target, alpha: a });
-    g.moveTo(tgt.x - 1150, tgt.y).lineTo(tgt.x + 1150, tgt.y).stroke({ width: 8, color: COL.target, alpha: 0.18 });
-    g.moveTo(tgt.x, tgt.y - 1150).lineTo(tgt.x, tgt.y + 1150).stroke({ width: 8, color: COL.target, alpha: 0.18 });
-    {
-      const label = new Text({ text: 'TARGET', style: TARGET });
-      label.anchor.set(0.5);
-      label.position.set(tgt.x, tgt.y + 1080);
-      label.alpha = 0.5;
+    // Each target's rings and cross on the floor (sized to it), and its name under them
+    for (const tgt of def.targets) {
+      const r = tgt.ring, k = Math.max(0.35, Math.min(1, r / 700)), w = Math.max(5, 14 * k);
+      for (const [m, a] of [[1, 0.35], [1.43, 0.2]] as const) g.circle(tgt.x, tgt.y, r * m).stroke({ width: w, color: COL.target, alpha: a });
+      g.moveTo(tgt.x - r * 1.65, tgt.y).lineTo(tgt.x + r * 1.65, tgt.y).stroke({ width: w * 0.6, color: COL.target, alpha: 0.18 });
+      g.moveTo(tgt.x, tgt.y - r * 1.65).lineTo(tgt.x, tgt.y + r * 1.65).stroke({ width: w * 0.6, color: COL.target, alpha: 0.18 });
+      const label = new Text({ text: tgt.label.toUpperCase(), style: TARGET });
+      label.anchor.set(0.5, 0);
+      label.scale.set(Math.max(0.5, k * 0.75));
+      label.position.set(tgt.x, tgt.y + r * 1.43 + 40);
+      label.alpha = 0.55;
       this.labels.push(label);
     }
 

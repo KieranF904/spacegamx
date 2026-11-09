@@ -3632,7 +3632,14 @@
         "wall": 400,
         "door": { "wall": "W", "along": 0, "width": 360, "reach": 420 },
         "spawn": { "x": -2550, "y": 0, "angle": 0 },
-        "target": { "ship": "giant_mammoth", "faction": "redtooth", "grade": 1, "x": 1900, "y": 0, "angle": 3.14159, "respawnSeconds": 5, "keepRadius": 120 }
+        "targets": [
+          { "label": "Drone · weak", "ship": "helios_drone", "faction": "helios", "grade": 1, "hp": 0.5, "ring": 170, "x": -1500, "y": -750, "angle": 3.14159, "respawnSeconds": 3, "keepRadius": 60 },
+          { "label": "Drone · weak", "ship": "helios_drone", "faction": "helios", "grade": 1, "hp": 0.5, "ring": 170, "x": -1500, "y": 750, "angle": 3.14159, "respawnSeconds": 3, "keepRadius": 60 },
+          { "label": "Drone · weak", "ship": "helios_drone", "faction": "helios", "grade": 1, "hp": 0.5, "ring": 170, "x": -500, "y": -1050, "angle": 3.14159, "respawnSeconds": 3, "keepRadius": 60 },
+          { "label": "Drone · weak", "ship": "helios_drone", "faction": "helios", "grade": 1, "hp": 0.5, "ring": 170, "x": -500, "y": 1050, "angle": 3.14159, "respawnSeconds": 3, "keepRadius": 60 },
+          { "label": "Hulk · weak hull", "ship": "giant_midden", "faction": "scrapborn", "grade": 1, "hp": 0.4, "ring": 560, "x": 800, "y": -900, "angle": 3.14159, "respawnSeconds": 6, "keepRadius": 120 },
+          { "label": "Mammoth · heavy", "ship": "giant_mammoth", "faction": "redtooth", "grade": 1, "ring": 700, "x": 1900, "y": 0, "angle": 3.14159, "respawnSeconds": 5, "keepRadius": 120 }
+        ]
       }
     }
   ]

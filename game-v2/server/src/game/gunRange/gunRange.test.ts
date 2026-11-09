@@ -1,13 +1,13 @@
 /**
  * The gun range (game/gunRange): in from any berth, a cheat ship with the chosen weapon (each mount kind firing), a live
- * target that takes real damage and comes back, out at the door with X (or by dying, or disconnecting) docked where they
- * came from in their own ship, and nothing else allowed in there.
+ * target that takes real damage and comes back, out at the door with X (or by disconnecting) docked where they came
+ * from in their own ship, dying there a respawn at the door in the same cheat ship, and nothing else allowed in there.
  */
 
 import { describe, it, expect } from 'vitest';
 import * as bitecs from 'bitecs';
 import { InSystem, Position, Velocity, Player, Dead, Rotation, buildCheatShip, insideChamber } from '@space-game/common';
-import { boot, signIn, join, dock, run, lastState, fireAt, toDoor, kill, S } from './gunRange.testkit.js';
+import { boot, signIn, join, dock, run, lastState, fireAt, toDoor, kill, heavyOf, settle, S } from './gunRange.testkit.js';
 import { RANGE_GATE, passesInRange } from './messageGate.js';
 import { RangeTarget } from './target.js';
 
@@ -76,29 +76,85 @@ describe('gun range: in and out', () => {
     expect(S(server).ammo.isFree(a.conn)).toBe(false);
   }, 60_000);
 
-  it('dying in the range: no wreck, no loss; the respawn is back in the berth in their own ship', async () => {
-    const { server, num } = boot();
+  it('dying in the range: no wreck, no loss; the respawn is back at the door in the same cheat ship and weapon', async () => {
+    const { server, num, def } = boot();
     const a = await signIn(server, 'dies', 31);
     run(server, 3);
     const st = dock(server, a);
     run(server, 2);
     const own = JSON.stringify(S(server).pilots.get(a.conn).ship.blueprint);
-    const deaths = S(server).pilots.get(a.conn).stats.deaths ?? 0;
+    const p0 = S(server).pilots.get(a.conn), deaths = p0.stats.deaths ?? 0, bank = JSON.stringify(p0.bank ?? null), cargo = JSON.stringify(p0.cargo);
     a.link.receive({ type: 'gunRangeEnter' } as any);
     run(server, 2);
+    const first = lastState(a).weapon;
+    a.link.receive({ type: 'gunRangeWeapon', model: lastState(a).options.find((o: string) => o !== first) } as any);
+    run(server, 2);
+    const ship0 = JSON.stringify(S(server).ships.get(a.conn.playerId).blueprint);
+    const weapon = lastState(a).weapon;
     kill(a);
     run(server, 3);
     expect(bitecs.hasComponent(S(server).world, Player, a.conn.playerId) && !bitecs.hasComponent(S(server).world, Dead, a.conn.playerId)).toBe(false);
-    expect(S(server).pilots.isFrozen(a.conn)).toBe(false);
-    expect(S(server).pilots.get(a.conn).stats.deaths ?? 0).toBe(deaths);
-    expect(S(server).pilots.get(a.conn).wreck).toBeUndefined();
+    // (The real profile stays frozen: no wreck, no death counted, no bank spent, no cargo lost)
+    expect(S(server).pilots.isFrozen(a.conn)).toBe(true);
+    expect(server.gunRange.isVisitor(a.conn)).toBe(true);
+    for (let i = 0; i < 3; i++) {
+      a.link.receive({ type: 'respawn' } as any);
+      run(server, 3);
+      const eid = a.conn.playerId, at = def.spawn;
+      expect(InSystem.systemId[eid]).toBe(num);
+      expect(Math.hypot(Position.x[eid] - at.x, Position.y[eid] - at.y)).toBeLessThan(500);
+      expect(a.conn.docked).toBeNull();
+      expect(JSON.stringify(S(server).ships.get(eid).blueprint)).toBe(ship0);
+      expect(S(server).ships.get(eid).blueprint.range).toBe(true);
+      expect(lastState(a)).toMatchObject({ in: true, weapon });
+      expect(S(server).ammo.isFree(a.conn)).toBe(true);
+      expect(S(server).pilots.isFrozen(a.conn)).toBe(true);
+      // Still a working gun
+      const from = server.currentTick;
+      for (let t = 0; t < 120; t++) { fireAt(a, def.targets[0].x, def.targets[0].y); server.step(); }
+      fireAt(a, 0, 0, false);
+      expect(S(server).ships.lastFiredTick(eid)).toBeGreaterThan(from);
+      kill(a);
+      run(server, 3);
+    }
+    const p1 = S(server).pilots.realProfile(a.conn);
+    expect(p1.stats.deaths ?? 0).toBe(deaths);
+    expect(p1.wreck).toBeUndefined();
+    expect(JSON.stringify(p1.bank ?? null)).toBe(bank);
+    expect(JSON.stringify(p1.cargo)).toBe(cargo);
+    // Only the door takes them back: their own ship, docked where they came from
     a.link.receive({ type: 'respawn' } as any);
-    run(server, 2);
+    run(server, 3);
+    toDoor(def, a);
+    a.link.receive({ type: 'interact' } as any);
+    run(server, 3);
     const eid = a.conn.playerId;
     expect(InSystem.systemId[eid]).not.toBe(num);
     expect(a.conn.docked?.station).toBe(st);
     expect(JSON.stringify(S(server).ships.get(eid).blueprint)).toBe(own);
     expect(server.gunRange.isVisitor(a.conn)).toBe(false);
+    expect(S(server).ammo.isFree(a.conn)).toBe(false);
+  }, 120_000);
+
+  it('dead and disconnecting in the range: the real profile is back and nothing was lost', async () => {
+    const { server, store } = boot();
+    const a = await signIn(server, 'dc', 32);
+    run(server, 3);
+    dock(server, a);
+    run(server, 3);
+    S(server).pilots.saveNow(a.conn);
+    await settle();
+    const before = JSON.stringify((await store.load(32)).ship);
+    a.link.receive({ type: 'gunRangeEnter' } as any);
+    run(server, 2);
+    kill(a);
+    run(server, 3);
+    a.link.close();
+    run(server, 3);
+    await settle();
+    expect(JSON.stringify((await store.load(32)).ship)).toBe(before);
+    expect(server.gunRange.isVisitor(a.conn)).toBe(false);
+    expect(S(server).pilots.isFrozen(a.conn)).toBe(false);
   }, 60_000);
 
   it('a guest can use it too, and anyone moved out of the range some other way is taken out properly', async () => {
@@ -152,8 +208,8 @@ describe('gun range: the weapon picker and the guns', () => {
       // Face the target and hold the trigger: shells, a beam, or (support) the beam lights
       Rotation.angle[eid] = 0;
       const from = server.currentTick;
-      for (let i = 0; i < 240; i++) { fireAt(a, def.target.x, def.target.y); server.step(); }
-      fireAt(a, def.target.x, def.target.y, false);
+      for (let i = 0; i < 240; i++) { fireAt(a, heavyOf(def).x, heavyOf(def).y); server.step(); }
+      fireAt(a, heavyOf(def).x, heavyOf(def).y, false);
       run(server, 2);
       expect(S(server).ships.lastFiredTick(eid), model).toBeGreaterThan(from);
     }
@@ -165,7 +221,7 @@ describe('gun range: the weapon picker and the guns', () => {
     expect(lastState(a).weapon).toBe(was);
   }, 120_000);
 
-  it('the target takes real damage from the range ship, never fires, pays nothing, and comes back after it dies', async () => {
+  it('every target stands in the chamber, unpinned and clear of the walls, never fires, stays put, and gives nothing', async () => {
     const { server, def, num } = boot();
     const a = await signIn(server, 'shooter', 51);
     run(server, 3);
@@ -173,46 +229,106 @@ describe('gun range: the weapon picker and the guns', () => {
     run(server, 2);
     a.link.receive({ type: 'gunRangeEnter' } as any);
     run(server, 3);
-    const target = lastState(a).target.id;
-    expect(target).toBeGreaterThanOrEqual(0);
-    expect(InSystem.systemId[target]).toBe(num);
-    expect(S(server).ships.isPinned(target)).toBe(false);
-    // (It fits the chamber, clear of the walls, and stands well off the door)
-    const r = S(server).ships.get(target).derived.radius;
-    expect(insideChamber(def, def.target.x, def.target.y, r + 100)).toBe(true);
-    expect(Math.hypot(def.target.x - def.spawn.x, def.target.y - def.spawn.y)).toBeGreaterThan(r + 1500);
+    const ts: { id: number; x: number; y: number; label: string }[] = lastState(a).targets;
+    expect(ts).toHaveLength(def.targets.length);
+    expect(ts.map((t) => t.label)).toEqual(def.targets.map((t) => t.label));
+    expect(def.targets.map((t) => t.label)).toEqual(expect.arrayContaining(['Drone · weak', 'Hulk · weak hull', 'Mammoth · heavy']));
+    expect(new Set(ts.map((t) => t.id)).size).toBe(ts.length);
     const p = S(server).pilots.realProfile(a.conn), xp = p.xp, credits = p.credits;
-    const hp0 = S(server).ships.integrity(target);
-    a.link.receive({ type: 'gunRangeWeapon', model: 'cannon_pip' } as any);
-    run(server, 1);
-    const eid = a.conn.playerId;
-    // (Close in, facing it)
-    Position.x[eid] = def.target.x - 900; Position.y[eid] = def.target.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; Rotation.angle[eid] = 0;
-    for (let i = 0; i < 600; i++) { fireAt(a, def.target.x, def.target.y); server.step(); }
-    fireAt(a, 0, 0, false);
-    expect(S(server).ships.integrity(target)).toBeLessThan(hp0);
-    // Never fires back: nothing of its in flight
-    expect(S(server).ships.lastFiredTick(target)).toBe(-Infinity);
-    // Destroyed: nothing paid, and it comes back
-    S(server).ships.removeShip(target);
+    ts.forEach((t, i) => {
+      const d = def.targets[i];
+      expect(t.id, d.label).toBeGreaterThanOrEqual(0);
+      expect(InSystem.systemId[t.id]).toBe(num);
+      expect(S(server).ships.isPinned(t.id)).toBe(false);
+      expect(S(server).ships.get(t.id).blueprint.range).toBeUndefined();
+      // (It fits the chamber, clear of the walls, and stands well off the door)
+      const r = S(server).ships.get(t.id).derived.radius;
+      expect(insideChamber(def, d.x, d.y, r + 100), d.label).toBe(true);
+      expect(Math.hypot(d.x - def.spawn.x, d.y - def.spawn.y), d.label).toBeGreaterThan(r + 600);
+      // (No shield: a low-level gun reaches its hull)
+      expect(S(server).ships.get(t.id).blueprint.parts.some((q: any) => q.fn === 'shield'), d.label).toBe(false);
+    });
+    // Standing: still where they were put after a long while, and nobody has fired a shot
+    run(server, 1200);
+    ts.forEach((t, i) => {
+      expect(Math.hypot(Position.x[t.id] - def.targets[i].x, Position.y[t.id] - def.targets[i].y), def.targets[i].label).toBeLessThan(def.targets[i].keepRadius + 5);
+      expect(S(server).ships.lastFiredTick(t.id)).toBe(-Infinity);
+    });
+    // They keep clear of each other while standing
+    for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+      const r = S(server).ships.get(ts[i].id).derived.radius + S(server).ships.get(ts[j].id).derived.radius;
+      expect(Math.hypot(Position.x[ts[i].id] - Position.x[ts[j].id], Position.y[ts[i].id] - Position.y[ts[j].id])).toBeGreaterThan(r + 50);
+    }
+    // The hulk is big and soft: more parts than the drone by far, each with a fraction of the heavy's HP (its faction's scrapborn hull)
+    const by = (label: string) => ts.findIndex((t) => t.label === label);
+    const parts = (i: number) => S(server).ships.get(ts[i].id).blueprint.parts.length;
+    const hull = (i: number) => Math.max(...S(server).ships.get(ts[i].id).maxHp);
+    expect(parts(by('Hulk · weak hull'))).toBeGreaterThan(parts(by('Drone · weak')) * 5);
+    expect(hull(by('Hulk · weak hull'))).toBeLessThan(hull(by('Mammoth · heavy')) / 2);
+    // Destroyed (as a kill would be): nothing paid, each comes back whole after its pause, the others undisturbed
+    const gone = ts.map((t) => t.id);
+    ts.forEach((t) => S(server).ships.removeShip(t.id));
     run(server, 2);
-    expect(lastState(a).target.id).toBe(-1);
-    run(server, def.target.respawnSeconds * 60 + 5);
-    expect(lastState(a).target.id).toBeGreaterThanOrEqual(0);
+    expect(lastState(a).targets.map((t: any) => t.id)).toEqual(ts.map(() => -1));
+    run(server, Math.max(...def.targets.map((t) => t.respawnSeconds)) * 60 + 10);
+    const back: { id: number }[] = lastState(a).targets;
+    expect(back.every((t) => t.id >= 0)).toBe(true);
+    expect(S(server).ships.integrity(back[0].id)).toBe(1);
+    expect(gone.length).toBe(back.length);
     expect(S(server).pilots.realProfile(a.conn).xp).toBe(xp);
     expect(S(server).pilots.realProfile(a.conn).credits).toBe(credits);
-    // Nobody in: put away
+    // One at a time: only the one destroyed is down in the meantime
+    S(server).ships.removeShip(back[0].id);
+    run(server, 2);
+    expect(lastState(a).targets.map((t: any) => t.id >= 0)).toEqual(back.map((_, i) => i !== 0));
+    // Nobody in: all put away
     toDoor(def, a);
     a.link.receive({ type: 'interact' } as any);
     run(server, 3);
     expect(server.gunRange.busy()).toBe(false);
-  }, 120_000);
+  }, 180_000);
+
+  it('a Pip takes a drone down in a handful of shots, chews the weak hulk, and the Mammoth shrugs it off', async () => {
+    const { server, def } = boot();
+    const a = await signIn(server, 'pip', 52);
+    run(server, 3);
+    dock(server, a);
+    run(server, 2);
+    a.link.receive({ type: 'gunRangeEnter' } as any);
+    run(server, 3);
+    a.link.receive({ type: 'gunRangeWeapon', model: 'cannon_pip' } as any);
+    run(server, 1);
+    const eid = a.conn.playerId, ts: { id: number }[] = lastState(a).targets;
+    const idx = (label: string) => def.targets.findIndex((t) => t.label === label);
+    const burst = (i: number, ticks: number) => {
+      const d = def.targets[i], id = ts[i].id;
+      Position.x[eid] = d.x - 450 - d.ring; Position.y[eid] = d.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; Rotation.angle[eid] = 0;
+      let n = 0;
+      for (let t = 0; t < ticks && S(server).ships.has(id) && S(server).ships.integrity(id) > 0; t++) { fireAt(a, d.x, d.y); server.step(); n++; }
+      fireAt(a, 0, 0, false);
+      return n;
+    };
+    // A drone: Pip fires every 20 ticks, so ticks/20 is shots
+    const d0 = ts[idx('Drone · weak')].id;
+    const ticks = burst(idx('Drone · weak'), 900);
+    expect(S(server).ships.has(d0) && S(server).ships.integrity(d0) > 0, 'drone still up').toBe(false);
+    expect(Math.ceil(ticks / 20)).toBeLessThanOrEqual(12);
+    // The hulk loses a good share of its hull in the same 10 seconds; the Mammoth hardly any
+    const hulk = ts[idx('Hulk · weak hull')].id, mam = ts[idx('Mammoth · heavy')].id;
+    const h0 = S(server).ships.integrity(hulk), m0 = S(server).ships.integrity(mam);
+    burst(idx('Hulk · weak hull'), 600);
+    const hulkLost = h0 - S(server).ships.integrity(hulk);
+    burst(idx('Mammoth · heavy'), 600);
+    const mamLost = m0 - S(server).ships.integrity(mam);
+    expect(hulkLost).toBeGreaterThan(0);
+    expect(hulkLost).toBeGreaterThan(mamLost * 3);
+  }, 180_000);
 });
 
-describe('gun range: the target keeps its spot', () => {
+describe('gun range: a target keeps its spot', () => {
   it('pushed off it, it is flown home and let go there', () => {
     let at = { x: 0, y: 0 }, steer: unknown = 'none', alive = true;
-    const t = new RangeTarget({ spawn: () => 7, alive: () => alive, remove: () => {}, steer: (_e, to) => { steer = to; }, where: () => at }, { ship: 's', faction: 'f', x: 0, y: 0, angle: 0, respawnSeconds: 2, keepRadius: 100 });
+    const t = new RangeTarget({ spawn: () => 7, alive: () => alive, remove: () => {}, steer: (_e, to) => { steer = to; }, where: () => at }, { label: 'T', ship: 's', faction: 'f', ring: 100, x: 0, y: 0, angle: 0, respawnSeconds: 2, keepRadius: 100 });
     expect(t.tick(15, true)).toBe(true);
     expect(t.eid).toBe(7);
     at = { x: 250, y: 0 };

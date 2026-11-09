@@ -1,11 +1,11 @@
 /**
  * @contract server.gun-range.target
- * owns:       the gun range's one target: standing while anyone is in the range, put away when nobody is, back whole a
+ * owns:       one of the gun range's targets: standing while anyone is in the range, put away when nobody is, back whole a
  *             few seconds after it is destroyed, and flown back to its spot when it has been pushed off it
  * needs:      TargetHost (spawn, alive, remove, steer, where); npm: @space-game/common (dhypot, GunRangeTargetDef)
  * invariants: it comes back after respawnSeconds and is gone while the range is empty; pushed beyond keepRadius it is
  *             steered home and let go near its spot — server/src/game/gunRange/gunRange.test.ts
- * extend:     a second target is a second RangeTarget (the range ticks each)
+ * extend:     another target is another entry of systems.json gunRange.targets (GunRange makes a RangeTarget for each and ticks them)
  *
  * The target is a live ship (Enemies.spawnTarget: no AI, never fires, pays nothing), not pinned: shots, beams and
  * collisions treat it as every client's prediction treats any ship. It holds still by itself (no controls: CTL.hold, and

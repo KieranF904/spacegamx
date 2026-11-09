@@ -19,10 +19,9 @@ import * as persist from './persist.js';
 export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x: number, y: number, vx: number, vy: number, cause: Record<string, unknown> = {}): void {
   const s = self.sessions.get(conn);
   if (!s) return;
-  // The gun range's cheat ship lost: nothing dropped, salvaged or counted; the real profile back as it was, and the range
-  // brings them back to their station (pilots/freeze.ts, game/gunRange)
+  // The gun range's cheat ship lost: nothing dropped, salvaged or counted, and the real profile stays frozen as it was; the
+  // respawn flies the same cheat ship again at the range's door (pilots/freeze.ts, game/gunRange)
   if (self.frozen.has(conn)) {
-    self.thaw(conn, false);
     self.onFrozenDeath?.(conn);
     return;
   }
