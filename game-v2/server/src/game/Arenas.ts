@@ -13,7 +13,7 @@
 
 import type { StarSystemData } from '@space-game/common';
 import type { PilotConn } from './Pilots.js';
-import { datan2, mulberry32 } from '@space-game/common';
+import { datan2, mulberry32, TICK_RATE as SECOND } from '@space-game/common';
 
 export interface ArenaHost {
   tick(): number;
@@ -33,7 +33,6 @@ export interface ArenaHost {
   removeBoss(eid: number): void;
 }
 
-const SECOND = 60;
 /** After the kill, this long before everyone's lifted out */
 const LIFT = 8 * SECOND;
 /** Nobody down there this long and the copy is cleared */

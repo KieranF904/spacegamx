@@ -17,7 +17,7 @@
  * Events are rolled once a minute per occupied system, with a cooldown.
  */
 
-import { Position, Bag, ServerMessage, mulberry32, dcos, dhypot, dsin } from '@space-game/common';
+import { Position, Bag, ServerMessage, mulberry32, dcos, dhypot, dsin, TICK_RATE as SECOND } from '@space-game/common';
 import type { Enemies, FactionsFile } from './Enemies.js';
 import { PayoutDice, type Dice } from './payoutDice.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
@@ -185,7 +185,6 @@ export const EVENT_STRINGS = {
   'events.peak.over': 'The peak has passed. The Brood drift back to the Curtain.',
 };
 
-const SECOND = 60;
 
 export class Events {
   private live = new Map<number, WorldEvent>();

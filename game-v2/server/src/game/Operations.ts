@@ -29,7 +29,7 @@ import type { Quests } from './Quests.js';
 import type { PilotConn } from './Pilots.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 import type { ServerMessage, OpView, OpMarkerView, QuestStep, QuestTarget } from '@space-game/common';
-import { datan2, dcos, dhypot, dsin, hashString } from '@space-game/common';
+import { datan2, dcos, dhypot, dsin, hashString, TICK_RATE as SECOND } from '@space-game/common';
 
 export interface OpsHost {
   tick(): number;
@@ -129,7 +129,6 @@ interface Inst {
 }
 
 const STEP = 15;
-const SECOND = 60;
 
 /** Operation tuning (data/rules.json `operations`; these are the defaults) */
 export interface OpsRules {

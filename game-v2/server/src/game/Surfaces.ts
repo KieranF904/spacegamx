@@ -18,7 +18,7 @@
  * past the pocket's edge and you're back beside the way in.
  */
 
-import { moonOffset, planetPosition, pocketAt, pocketExit, type PlanetData, type ServerMessage, type StarSystemData, datan2, dcos, dhypot, dsin, mulberry32 } from '@space-game/common';
+import { moonOffset, planetPosition, pocketAt, pocketExit, type PlanetData, type ServerMessage, type StarSystemData, datan2, dcos, dhypot, dsin, mulberry32, TICK_RATE as SECOND } from '@space-game/common';
 import type { PilotConn } from './Pilots.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 
@@ -50,7 +50,6 @@ export interface SurfaceHost {
   announce(num: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad'): void;
 }
 
-const SECOND = 60;
 const PYLON = 'city_pylon';
 
 /** Surface and city-siege tuning (data/rules.json `surfaces`; these are the defaults) */
