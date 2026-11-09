@@ -7,19 +7,25 @@
  */
 
 import type { ProfileStore } from './ProfileStore.js';
+import { LEASE_MS, type LeaseResult, type ProfileLeases } from './lease.js';
 
-interface PgPool {
+export interface PgPool {
   query(sql: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
   end(): Promise<void>;
 }
 
-export class PostgresProfileStore implements ProfileStore {
+export class PostgresProfileStore implements ProfileStore, ProfileLeases {
   private constructor(private pool: PgPool) {}
 
   static async create(connectionString: string): Promise<PostgresProfileStore> {
     const moduleName = 'pg';
     const pg: any = await import(moduleName);
-    const store = new PostgresProfileStore(new pg.Pool({ connectionString }) as PgPool);
+    return PostgresProfileStore.setup(new pg.Pool({ connectionString }) as PgPool);
+  }
+
+  /** Make the tables (if missing) on a pool */
+  static async setup(pool: PgPool): Promise<PostgresProfileStore> {
+    const store = new PostgresProfileStore(pool);
     // Same definition as schema.sql, so a database set up before profiles existed still works
     await store.pool.query(`CREATE TABLE IF NOT EXISTS profiles (
       user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -32,7 +38,40 @@ export class PostgresProfileStore implements ProfileStore {
       data       JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
+    await store.pool.query(`CREATE TABLE IF NOT EXISTS profile_leases (
+      user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      holder     TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL
+    )`);
     return store;
+  }
+
+  // One game server per account: a row says who holds it and until when (the database's clock, so servers need not agree on the time)
+
+  async claimLease(userId: number, serverId: string, ttlMs = LEASE_MS): Promise<LeaseResult> {
+    // (One statement: the insert or the takeover happens only if the row is free, ours or expired)
+    const r = await this.pool.query(
+      `INSERT INTO profile_leases (user_id, holder, expires_at) VALUES ($1, $2, now() + $3 * interval '1 millisecond')
+       ON CONFLICT (user_id) DO UPDATE SET holder = EXCLUDED.holder, expires_at = EXCLUDED.expires_at
+       WHERE profile_leases.holder = EXCLUDED.holder OR profile_leases.expires_at < now()
+       RETURNING holder`,
+      [userId, serverId, ttlMs]);
+    if (r.rows.length) return { ok: true };
+    const cur = await this.pool.query('SELECT holder FROM profile_leases WHERE user_id = $1', [userId]);
+    return { ok: false, holder: String(cur.rows[0]?.holder ?? 'another server') };
+  }
+
+  async renewLeases(userIds: number[], serverId: string, ttlMs = LEASE_MS): Promise<number[]> {
+    if (!userIds.length) return [];
+    const r = await this.pool.query(
+      `UPDATE profile_leases SET expires_at = now() + $3 * interval '1 millisecond'
+       WHERE user_id = ANY($1) AND holder = $2 RETURNING user_id`,
+      [userIds, serverId, ttlMs]);
+    return r.rows.map((row) => Number(row.user_id));
+  }
+
+  async releaseLease(userId: number, serverId: string): Promise<void> {
+    await this.pool.query('DELETE FROM profile_leases WHERE user_id = $1 AND holder = $2', [userId, serverId]);
   }
 
   async load(userId: number): Promise<unknown | null> {

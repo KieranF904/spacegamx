@@ -18,11 +18,17 @@ import { promises as fs, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { ProfileStore } from './ProfileStore.js';
 import { writeFileDurable } from './durableWrite.js';
+import { LocalLeases, type ProfileLeases } from './lease.js';
 
 /** Daily copies kept of each profile */
 export const BACKUP_DAYS = 7;
 
 export class JsonProfileStore implements ProfileStore {
+  /** One server owns this folder, so leases only live in memory */
+  private leases = new LocalLeases();
+  claimLease: ProfileLeases['claimLease'] = (u, s, t) => this.leases.claimLease(u, s, t);
+  renewLeases: ProfileLeases['renewLeases'] = (u, s, t) => this.leases.renewLeases(u, s, t);
+  releaseLease: ProfileLeases['releaseLease'] = (u, s) => this.leases.releaseLease(u, s);
   private writing = new Map<number, Promise<void>>();
   private pending = new Map<number, string>();
   /** The day each account was last backed up (this run) */

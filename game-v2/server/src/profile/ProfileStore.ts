@@ -11,7 +11,9 @@
  * store never needs to know the profile's shape or version.
  */
 
-export interface ProfileStore {
+import { LocalLeases, type ProfileLeases } from './lease.js';
+
+export interface ProfileStore extends Partial<ProfileLeases> {
   /** The saved document, or null for an account that has never played */
   load(userId: number): Promise<unknown | null>;
   save(userId: number, profile: unknown): Promise<void>;
@@ -26,6 +28,10 @@ export interface ProfileStore {
 
 /** Keeps nothing (guests, tests, proto mode) */
 export class MemoryProfileStore implements ProfileStore {
+  private leases = new LocalLeases();
+  claimLease: ProfileLeases['claimLease'] = (u, s, t) => this.leases.claimLease(u, s, t);
+  renewLeases: ProfileLeases['renewLeases'] = (u, s, t) => this.leases.renewLeases(u, s, t);
+  releaseLease: ProfileLeases['releaseLease'] = (u, s) => this.leases.releaseLease(u, s);
   private docs = new Map<number, string>();
   async load(userId: number): Promise<unknown | null> {
     const d = this.docs.get(userId);

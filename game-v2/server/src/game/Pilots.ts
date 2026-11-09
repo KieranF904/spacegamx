@@ -32,6 +32,8 @@ import { RepairBanks, BankSessions } from './RepairBank.js';
 import * as cargo from './pilots/cargo.js';
 import * as death from './pilots/death.js';
 import * as persist from './pilots/persist.js';
+import * as lease from './pilots/lease.js';
+import type { LeaseResult } from '../profile/lease.js';
 
 /** What Pilots needs to know about a connection */
 export interface PilotConn {
@@ -89,6 +91,11 @@ export interface PilotsOptions {
   spawn?: (eid: number) => { system: number; x: number; y: number };
   death?: Partial<DeathRules>;
   autosaveMs: number;
+  /** This game server's id for the profile lease (default: SERVER_ID, else hostname:port) */
+  serverId?: string;
+  /** Profile lease length and renewal interval (defaults in profile/lease.ts) */
+  leaseMs?: number;
+  leaseRenewMs?: number;
   /** Clock for autosave and craft jobs (wall time) */
   now?: () => number;
 }
@@ -133,6 +140,9 @@ export { xpToReach };
 
 export class Pilots {
   /** @internal shared with pilots/*.ts */ sessions = new Map<PilotConn, Session>();
+  /** @internal pilots/lease.ts */ leaseAt = new Map<number, number>();
+  /** @internal pilots/lease.ts */ leasesRenewedAt = 0;
+  /** @internal pilots/lease.ts */ leasesRenewing = false;
   /** @internal */ now: () => number;
   private listeners: ((conn: PilotConn, ev: PilotEvent) => void)[] = [];
 
@@ -289,15 +299,24 @@ export class Pilots {
     this.emit(conn, { type: 'login' });
   }
 
-  /** Disconnected: capture where they are and save */
+  /** Take the account for this game server (one server per account at a time); refused while another holds it */
+  claimLease(userId: number): Promise<LeaseResult> { return lease.claim(this, userId); }
+
+  releaseLease(userId: number): Promise<void> { return lease.release(this, userId); }
+
+  /** Disconnected: capture where they are and save (twice if the first try fails), then give the account up to other servers */
   async detach(conn: PilotConn): Promise<void> {
     const s = this.sessions.get(conn);
     if (!s) return;
     this.sessions.delete(conn);
-    if (s.loading) return;
+    const userId = conn.userId;
+    if (s.loading) { if (userId !== null) await lease.release(this, userId); return; }
     persist.capture(this, s);
     await persist.save(this, s);
+    if (s.dirty && userId !== null) await persist.save(this, s);
     this.devStash.delete(conn);
+    // (A save that failed keeps the lease: it runs out by itself, and no other server loads the stale profile meanwhile)
+    if (userId !== null && !s.dirty) await lease.release(this, userId);
   }
 
   /** Dev tool: pilots flying a library ship (devShip): the ship record (and slot) they really have, to be put back */
@@ -339,12 +358,15 @@ export class Pilots {
       gone.push(s.conn);
     }
     await this.store.delete(userId);
+    await lease.release(this, userId);
     return gone;
   }
 
   /** Save every account (shutdown) */
   async saveAll(): Promise<void> {
     await Promise.all([...this.sessions.values()].filter((s) => !s.loading).map((s) => { persist.capture(this, s); return persist.save(this, s); }));
+    // (Shutting down: the accounts are free for another server at once)
+    await Promise.all([...this.sessions.values()].filter((s) => !s.dirty && s.conn.userId !== null).map((s) => this.store.releaseLease?.(s.conn.userId!, lease.serverId(this)).catch(() => {})));
   }
 
   get(conn: PilotConn): PlayerProfile | undefined {
@@ -372,6 +394,7 @@ export class Pilots {
       }
     }
     this.banking.tick(now);
+    lease.renewDue(this);
   }
 
   /** Save soon (after something important: a trade, a refit, a turn-in) */

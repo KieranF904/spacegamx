@@ -124,6 +124,7 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
       // Leaving mid-fight doesn't save you: the ship stays put (hands off the controls) for a while
       if (alive && conn.userId !== null && gs.currentTick - gs.ships.lastDamagedTick(eid) < LINGER_COMBAT_TICKS) {
         gs.releaseControls(eid);
+        gs.pilots.saveNow(conn); // (saved where they sit now: a server suspended or lost before the linger ends still has it)
         gs.lingering.set(eid, { conn, until: gs.currentTick + LINGER_TICKS });
         return;
       }
@@ -230,7 +231,20 @@ export async function loginPilot(gs: GameServer, conn: ClientConnection, userId:
     await gs.pilots.detach(l.conn);
     if (hasComponent(gs.world, Player, eid)) addComponent(gs.world, Dead, eid);
   }
+  if (!(await claimProfile(gs, conn, userId))) return;
   await gs.pilots.login(conn, userId);
+}
+
+/** One game server per account: refused (and signed out) while another region still holds this pilot */
+async function claimProfile(gs: GameServer, conn: ClientConnection, userId: number): Promise<boolean> {
+  const lease = await gs.pilots.claimLease(userId);
+  if (lease.ok) {
+    if (!gs.clients.has(conn.ws)) { await gs.pilots.releaseLease(userId); return false; } // (left while claiming)
+    return true;
+  }
+  conn.userId = null; // (a stranger's connection: closing it must not save over the other server's profile)
+  gs.rejectAuth(conn, "You're still in another region; try again in a moment.");
+  return false;
 }
 
 /** Ships left in space by players who quit mid-fight: saved and removed once the time is up */
