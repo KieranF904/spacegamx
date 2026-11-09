@@ -38,7 +38,7 @@ export type TutorialTriggerKind =
   | 'zoneStop'       // stopped inside the zone in `objects[0]`
   | 'objectsBroken'  // every object in `objects` broken (for this pilot)
   | 'collect'        // `count` ore taken into the hold
-  | 'panel'          // the client opened `panel` (hold, hangar, bank, guide, map ...)
+  | 'panel'          // the client opened `panel`, or every one of `panels` (hold, hangar, bank, guide, map ...)
   | 'docked'         // docked at the yard station
   | 'refined'        // refined `item` once
   | 'partPlaced'     // placed one part in the hangar
@@ -50,6 +50,8 @@ export interface TutorialTrigger {
   kind: TutorialTriggerKind;
   objects?: string[];
   panel?: string;
+  /** Several panels, all to be opened (in any order) */
+  panels?: string[];
   item?: string;
   count?: number;
 }
@@ -126,6 +128,7 @@ export type TutorialEvent =
   // ---- reported by the client (tutorialReport) or seen by other modules
   | { kind: 'ack'; step: string }
   | { kind: 'panelOpened'; panel: string }
+  /** Ore went through the refinery and the plate came out (`item`: the first ore used) */
   | { kind: 'refined'; item: string }
   | { kind: 'partPlaced'; fn?: string }
   | { kind: 'powered' }

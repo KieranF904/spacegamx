@@ -107,7 +107,7 @@ export function servicesDeps(gs: GameServer, opts: GameServerOptions): Construct
     delivered: (conn) => gs.hangar?.fill(conn),
     cancelled: (conn, job) => gs.hangar?.jobCancelled(conn, job),
     jobsChanged: (conn) => gs.hangar?.send(conn),
-    refined: (conn, used) => releaseUsedTraces(gs, conn, used),
+    refined: (conn, used) => { releaseUsedTraces(gs, conn, used); gs.tutorial?.refined(conn as ClientConnection, used); },
     station: (id) => gs.gameData.getStation(id) ?? null,
     stationsWith: (service) => gs.gameData.getAllStations().filter((st) => st.services.includes(service as never)),
   };

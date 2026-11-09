@@ -57,7 +57,10 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
     if (!Array.isArray(s.lines) || s.lines.length < 1 || s.lines.length > 2 || s.lines.some((l) => typeof l !== 'string')) err(`${p}.lines`, 'expected one or two strings');
     const t = s.trigger;
     if (!isObj(t) || !TRIGGERS.includes(t.kind as string)) err(`${p}.trigger.kind`, `expected one of ${TRIGGERS.join(', ')}`);
-    else if (t.kind === 'panel' && !TUTORIAL_PANELS.includes(t.panel as never)) err(`${p}.trigger.panel`, `expected one of ${TUTORIAL_PANELS.join(', ')}`);
+    else if (t.kind === 'panel') {
+      const list = Array.isArray(t.panels) ? t.panels : [t.panel];
+      if (!list.length || list.some((x) => !TUTORIAL_PANELS.includes(x as never))) err(`${p}.trigger.panel`, `expected one of ${TUTORIAL_PANELS.join(', ')} (or a list in panels)`);
+    }
     for (const [k, n] of Object.entries(isObj(s.grant) ? s.grant : {})) {
       if (!isNum(n) || n <= 0) err(`${p}.grant.${k}`, 'expected a positive number');
       else if (refs.item && !refs.item(k)) err(`${p}.grant.${k}`, `unknown item "${k}"`);

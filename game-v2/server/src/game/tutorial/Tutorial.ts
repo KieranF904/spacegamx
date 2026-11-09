@@ -10,7 +10,7 @@
  *             `onEvent`; a new step is data (data/tutorial.json) plus a case in TutorialSteps
  */
 
-import { Position, Velocity, InSystem, EffectType, dhypot, dcos, dsin, objectLive, objectBroken, brokenIds, objectPos, inTutorial, leftTutorial, nextStep, TUTORIAL_PANELS, TUTORIAL_INDEX_BASE } from '@space-game/common';
+import { Position, Velocity, InSystem, EffectType, registeredFunction, dhypot, dcos, dsin, objectLive, objectBroken, brokenIds, objectPos, inTutorial, leftTutorial, nextStep, TUTORIAL_PANELS, TUTORIAL_INDEX_BASE } from '@space-game/common';
 import type { TutorialData, TutorialProfile, TutorialObjectDef, TutorialEvent, ServerMessage, ClientTutorialReportMessage, Bag } from '@space-game/common';
 import type { PilotConn, Pilots } from '../Pilots.js';
 import type { LootPods } from '../LootPods.js';
@@ -56,7 +56,13 @@ export class Tutorial {
     this.data = host.data;
     this.steps = new TutorialSteps(this);
     // A pilot who joins is told where they stand
-    pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.sendState(conn); });
+    // (A pilot coming back to a step starts it over: the objects they broke ahead of it are whole again, nothing is granted twice)
+    pilots.onEvent((conn, ev) => {
+      if (ev.type !== 'login') return;
+      const t = this.stateOf(conn);
+      if (t && !t.left) this.steps.entered(conn, t.step, false);
+      this.sendState(conn);
+    });
   }
 
   // ------------------------------------------------------------ the yard's bodies
@@ -197,9 +203,47 @@ export class Tutorial {
     if (!t.done.includes(id)) t.done.push(id);
     const next = nextStep(this.data, id);
     t.step = next ?? id;
-    if (next) this.resetObjects(conn, next);
     this.pilots.markDirty(conn);
+    if (next) this.steps.entered(conn, next, true);
     this.sendState(conn);
+  }
+
+  /** Put a step's grant in the pilot's storage */
+  grant(conn: PilotConn, items: Bag): void {
+    this.pilots.give(conn, { ...items }, { toStorage: true, source: 'tutorial', quiet: true });
+    this.pilots.toast(conn, 'Training gear added to your storage.', 'info');
+    this.pilots.sendItems(conn);
+  }
+
+  /** The server tick (the step engine's timers) */
+  nowTick(): number { return this.host.tick(); }
+
+  /** Forget which markers the pilot is inside, so one they stand in counts when its step comes */
+  rearm(pid: number): void { this.clearPilot(pid); }
+
+  // ------------------------------------------------------------ what other modules saw
+
+  /** The pilot's hold took in items (a pod's contents): the mining lesson counts them */
+  collected(conn: PilotConn, taken: Bag): void {
+    if (!this.active(conn)) return;
+    for (const [item, n] of Object.entries(taken)) if (n > 0) this.onEvent(conn.playerId, { kind: 'collected', item, n });
+  }
+
+  /** Ore finished going through the refinery (`used`: ore id -> units) */
+  refined(conn: PilotConn, used: Bag): void {
+    if (!this.active(conn)) return;
+    const item = Object.keys(used)[0];
+    if (item) this.onEvent(conn.playerId, { kind: 'refined', item });
+  }
+
+  /**
+   * A hangar save added parts to a design. `built`: the part was paid for (not a ghost). Placing any part is the hangar
+   * lesson; a built part that makes power is the power lesson. Only the active ship counts (it is the one that flies).
+   */
+  partsPlaced(conn: PilotConn, parts: { fn: string; built: boolean }[]): void {
+    if (!this.active(conn) || !parts.length) return;
+    this.onEvent(conn.playerId, { kind: 'partPlaced', fn: parts[0].fn });
+    if (parts.some((q) => q.built && (registeredFunction(q.fn)?.produce ?? 0) > 0)) this.onEvent(conn.playerId, { kind: 'powered' });
   }
 
   // ------------------------------------------------------------ leaving
@@ -215,6 +259,7 @@ export class Tutorial {
     const done = p.tutorial.done;
     p.tutorial = leftTutorial(done);
     this.clearPilot(conn.playerId);
+    this.steps.forget(conn.playerId);
     p.home = this.host.starterHome();
     this.pilots.give(conn, { ...pack.items }, { toStorage: true, source: 'tutorial', quiet: true });
     if (pack.credits > 0) this.pilots.addCredits(conn, pack.credits);
@@ -251,6 +296,7 @@ export class Tutorial {
 
   /** Once a tick: markers, jumps, and the yard's boundary */
   tick(): void {
+    this.steps.tick();
     const y = this.data.yard;
     const system = this.host.systemNum(y.system);
     const now = this.host.tick();
@@ -322,6 +368,6 @@ export class Tutorial {
   }
 
   /** A pilot's connection ended: forget the per-pilot bookkeeping */
-  forget(conn: PilotConn): void { this.clearPilot(conn.playerId); }
+  forget(conn: PilotConn): void { this.clearPilot(conn.playerId); this.steps.forget(conn.playerId); }
 }
 

@@ -13638,7 +13638,7 @@
       "id": "common.tutorial.data",
       "path": "common/src/tutorial/data.ts",
       "group": "common/tutorial",
-      "lines": 120,
+      "lines": 123,
       "owns": "validateTutorialData: every problem in a parsed data/tutorial.json, as readable lines",
       "needs": "types",
       "events": "",
@@ -13694,7 +13694,7 @@
           "name": "validateTutorialData",
           "kind": "function",
           "start": 27,
-          "end": 120
+          "end": 123
         }
       ]
     },
@@ -13818,7 +13818,7 @@
       "id": "common.tutorial.types",
       "path": "common/src/tutorial/types.ts",
       "group": "common/tutorial",
-      "lines": 137,
+      "lines": 140,
       "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
       "needs": "nothing (leaf module)",
       "events": "",
@@ -13876,73 +13876,73 @@
           "name": "TutorialTrigger",
           "kind": "interface",
           "start": 49,
-          "end": 55
+          "end": 57
         },
         {
           "name": "TutorialStepDef",
           "kind": "interface",
-          "start": 57,
-          "end": 67
+          "start": 59,
+          "end": 69
         },
         {
           "name": "TutorialYardDef",
           "kind": "interface",
-          "start": 69,
-          "end": 85
+          "start": 71,
+          "end": 87
         },
         {
           "name": "TutorialPackDef",
           "kind": "interface",
-          "start": 87,
-          "end": 90
+          "start": 89,
+          "end": 92
         },
         {
           "name": "TutorialData",
           "kind": "interface",
-          "start": 92,
-          "end": 98
+          "start": 94,
+          "end": 100
         },
         {
           "name": "TUTORIAL_INDEX_BASE",
-          "kind": "const",
-          "start": 100,
-          "end": 101
-        },
-        {
-          "name": "TUTORIAL_ROCK_TYPE",
           "kind": "const",
           "start": 102,
           "end": 103
         },
         {
-          "name": "TUTORIAL_FIRST_STEP",
+          "name": "TUTORIAL_ROCK_TYPE",
           "kind": "const",
           "start": 104,
           "end": 105
         },
         {
+          "name": "TUTORIAL_FIRST_STEP",
+          "kind": "const",
+          "start": 106,
+          "end": 107
+        },
+        {
           "name": "TutorialProfile",
           "kind": "interface",
-          "start": 107,
-          "end": 115
+          "start": 109,
+          "end": 117
         },
         {
           "name": "TutorialEvent",
           "kind": "type",
-          "start": 117,
-          "end": 133
+          "start": 119,
+          "end": 136
         },
         {
           "name": "TUTORIAL_PANELS",
           "kind": "const",
-          "start": 135,
-          "end": 136
+          "start": 138,
+          "end": 139
         },
         {
           "name": "TutorialPanel",
           "kind": "type",
-          "start": 137,
-          "end": 137
+          "start": 140,
+          "end": 140
         }
       ]
     },
@@ -15487,7 +15487,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 327,
+      "lines": 373,
       "owns": "the training yard: its stationary rocks and drones, each pilot's own damage counters on them, owner-only drops, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), LootPods (private pods), common/tutorial, TutorialSteps",
       "events": "",
@@ -15519,7 +15519,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 326
+          "end": 372
         }
       ]
     },
@@ -15527,26 +15527,38 @@
       "id": "server.game.tutorial.steps",
       "path": "server/src/game/tutorial/TutorialSteps.ts",
       "group": "server/game/tutorial",
-      "lines": 37,
-      "owns": "the step engine: which event advances which step (a STUB: only the welcome acknowledgement and graduating)",
-      "needs": "Tutorial (completeStep, leave, data); npm: @space-game/common",
+      "lines": 135,
+      "owns": "the step engine: which event advances which step, what a step grants when it starts, and the graduation",
+      "needs": "Tutorial (completeStep, leave, data, grant); npm: @space-game/common",
       "events": "",
       "invariants": [
         {
-          "text": "a step only advances on an event of the pilot's own current step; the order is data/tutorial.json's",
-          "test": "server/src/game/tutorial/tutorial.test.ts"
+          "text": "a step only advances on an event of the pilot's own current step, and only by what its trigger in data/tutorial.json asks; a client report only ever completes an \"opened\" or acknowledge step, never anything that pays; the graduate step leaves on its own after a few seconds if the client does not acknowledge",
+          "test": "server/src/game/tutorial/steps.test.ts"
         }
       ],
-      "extend": "a case in `advance` per trigger kind in common/src/tutorial/types.ts (TutorialTriggerKind): read the pilot's current step's `trigger` from data, check the event satisfies it (counting where it takes several: rings, objectsBroken, collect), then `tutorial.completeStep(conn, step)`. Entering a step is `completeStep` of the one before it; give the step's `grant` and call `resetObjects` there if the step needs them",
+      "extend": "a new trigger kind is a member of TutorialTriggerKind (common/src/tutorial/types.ts) plus a case in `satisfied`; per-step setup (a grant, objects reset) is in `entered`; counting that must survive a reconnect belongs in the profile, the rest (rings passed, ore taken, panels seen) is per visit and starts over when the pilot logs back in",
       "exports": [
         "TutorialSteps"
       ],
       "sections": [
         {
+          "name": "GRADUATE_AFTER_TICKS",
+          "kind": "const",
+          "start": 18,
+          "end": 19
+        },
+        {
+          "name": "Progress",
+          "kind": "interface",
+          "start": 21,
+          "end": 22
+        },
+        {
           "name": "TutorialSteps",
           "kind": "class",
-          "start": 15,
-          "end": 37
+          "start": 24,
+          "end": 135
         }
       ]
     },
@@ -16829,7 +16841,7 @@
       "id": "server.gameserver.hosts.places",
       "path": "server/src/gameServer/hosts/places.ts",
       "group": "server/gameServer/hosts",
-      "lines": 369,
+      "lines": 370,
       "owns": "host adapters for surfaces, sieges, pods and system memory, plus lod observers and body names",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -16867,37 +16879,37 @@
           "name": "createPodHost",
           "kind": "function",
           "start": 178,
-          "end": 210
+          "end": 211
         },
         {
           "name": "lodObservers",
           "kind": "function",
-          "start": 212,
-          "end": 243
+          "start": 213,
+          "end": 244
         },
         {
           "name": "whereIs",
           "kind": "function",
-          "start": 245,
-          "end": 252
+          "start": 246,
+          "end": 253
         },
         {
           "name": "createMemoryHost",
           "kind": "function",
-          "start": 254,
-          "end": 339
+          "start": 255,
+          "end": 340
         },
         {
           "name": "deathCause",
           "kind": "function",
-          "start": 341,
-          "end": 355
+          "start": 342,
+          "end": 356
         },
         {
           "name": "namedBody",
           "kind": "function",
-          "start": 357,
-          "end": 369
+          "start": 358,
+          "end": 370
         }
       ]
     },

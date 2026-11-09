@@ -396,7 +396,7 @@ export class GameServer implements ServerCtx {
       stationAt: (conn) => this.services.stationAt(conn),
       stationName: (id) => this.gameData.getStation(id)?.name ?? id,
     }, this.pilots, this.gameData.stationFile);
-    this.hangar = new Hangar({ send: (conn, msg) => this.send((conn as ClientConnection).ws, msg), now: opts.clock ?? (() => Date.now()), freeBuild: (conn) => this.freeBuild(conn as ClientConnection) },
+    this.hangar = new Hangar({ send: (conn, msg) => this.send((conn as ClientConnection).ws, msg), now: opts.clock ?? (() => Date.now()), freeBuild: (conn) => this.freeBuild(conn as ClientConnection), placed: (conn, parts) => this.tutorial?.partsPlaced(conn as ClientConnection, parts) },
       this.pilots, this.ships, this.econ, this.ships.catalog, this.services);
     this.hangar.gems = this.gameData.gemsFile;
     this.pilots.onEvent((conn, ev) => {

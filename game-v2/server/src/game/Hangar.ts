@@ -42,6 +42,8 @@ export interface HangarHost {
   now(): number;
   /** Free build is on for them (a dev server's admin): their hangar shows it */
   freeBuild?(conn: PilotConn): boolean;
+  /** A save of the active ship's design added parts (`built`: paid for, not a ghost): the training yard's lessons watch this */
+  placed?(conn: PilotConn, parts: { fn: string; built: boolean }[]): void;
 }
 
 type PartState = 'intact' | 'wrecked' | 'ghost';
@@ -236,6 +238,10 @@ export class Hangar {
     this.fill(conn);
     this.pilots.saveNow(conn);
     this.send(conn);
+    if (slot === p.activeSlot && this.host.placed) {
+      const added = bp.parts.filter((q) => !oldPart.has(q.uid) || partItemId(oldPart.get(q.uid)!) !== partItemId(q));
+      if (added.length) this.host.placed(conn, added.map((q) => ({ fn: q.fn, built: state.get(q.uid) !== 'ghost' })));
+    }
     return [];
   }
 
