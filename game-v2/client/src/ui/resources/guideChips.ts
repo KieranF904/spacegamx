@@ -18,6 +18,8 @@ export interface ResourceDeps {
   /** An item's icon (a data URL; '' if there's none) */
   icon(id: string): string;
   /** A ship design's silhouette (a data URL), for enemy thumbnails; absent in tests */
+  /** The player's level, for the locked marks on tiles (absent: nothing shows locked) */
+  level?(): number;
   shipIcon?(parts: { piece: string; rot: number; flip: boolean; x: number; y: number }[], size?: number): string;
 }
 

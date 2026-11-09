@@ -84,7 +84,11 @@ export interface GameData {
   stations: { id: string; name: string; system: string; market?: { sells?: string[] } }[];
   bosses: Record<string, { name: string; system: string; faction?: string; design?: string; loot?: DropRow[] }>;
   factions: Record<string, { name: string; color?: string; ships?: Record<string, unknown>; loot?: DropRow[] }>;
+  /** data/factions.json `spawns`: each system's grade (1..5), which sets the level it opens at (levels.ts) */
+  spawns?: Record<string, { grade?: number }>;
   quests: {
+    /** Systems that need a licence or clearance to enter (name and hint), by system id */
+    restricted?: Record<string, { name: string; hint?: string }>;
     reputations: Record<string, { name: string; vendor?: { stock?: { item: string; rank: number }[] } }>;
     quests: { id: string; name: string; giver?: string; person?: string; level?: number; rewards?: { items?: Bag; recipes?: string[] } }[];
   };
