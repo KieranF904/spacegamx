@@ -121,9 +121,11 @@ export function hurtAsteroid(gs: GameServer, proj: number, hitAsteroid: number, 
   const systemId = InSystem.systemId[proj];
   const ax = Position.x[hitAsteroid];
   const ay = Position.y[hitAsteroid];
-  Asteroid.hp[hitAsteroid] -= damage;
+  // A training rock or drone (game/tutorial): the hit is counted for this pilot alone; the body takes nothing and yields nothing
+  const training = !!gs.tutorial?.hit(hitAsteroid, ownerId, damage);
+  if (!training) Asteroid.hp[hitAsteroid] -= damage;
   // Any weapon mines soft rock, keeping little of it (mining tools crack harder rock and keep all they work: Mining.extract)
-  if (Projectile.miningYield[proj] > 0) {
+  if (!training && Projectile.miningYield[proj] > 0) {
     const nl = dhypot(hitX - ax, hitY - ay) || 1;
     // (A mining tool's shot, a mining charge, keeps all it works; any other is a gun's: Mining.extract)
     const tools = gs.gameData.miningTable.tools as unknown as Record<string, { mining?: boolean }>;

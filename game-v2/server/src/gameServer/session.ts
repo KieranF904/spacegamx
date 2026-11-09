@@ -114,6 +114,7 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
       gs.net.lazy.delete(ws);
       gs.guard('close', () => gs.party.remove(conn));
       gs.guard('close', () => gs.social.leave(conn));
+      gs.guard('close', () => gs.tutorial?.forget(conn));
       gs.guard('close', () => gs.trade.remove(conn));
       gs.guard('close', () => gs.admin.forget(conn));
       gs.guard('close', () => gs.contrib.forget(conn));

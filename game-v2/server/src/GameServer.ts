@@ -24,6 +24,7 @@ import { Hazards } from './game/Hazards.js';
 import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
 import { HomeStations } from './game/HomeStations.js';
+import type { Tutorial } from './game/tutorial/Tutorial.js';
 import { LootPods } from './game/LootPods.js';
 import { ServerFeatures } from './ships/features/host.js';
 import { SERVER_FEATURES } from './ships/features/index.js';
@@ -94,6 +95,7 @@ import { createOpsHost, createEventHost, createMobHost, createEnemyHost } from '
 import { createSurfaceHost, createSiegeHost, createPodHost, createMemoryHost, deathCause, namedBody } from './gameServer/hosts/places.js';
 import { createBossHost, moveFx, moveShot } from './gameServer/hosts/boss.js';
 import { createMiningHost, mineBeam, isGas, beamAsteroid } from './gameServer/hosts/mining.js';
+import { setupTutorial } from './gameServer/hosts/tutorial.js';
 import { createShipHost } from './gameServer/hosts/ship.js';
 import { createAdminHost, setupAdminHandlers } from './gameServer/admin.js';
 import { initializeWorld } from './gameServer/world.js';
@@ -241,6 +243,8 @@ export class GameServer implements ServerCtx {
   warmth!: Warmth;
   outpost?: Outpost;
   homes!: HomeStations;
+  /** The training yard for new pilots (game/tutorial); none unless the server runs one (GameServerOptions.tutorial) */
+  tutorial?: Tutorial;
   weapons: Weapons;
   readonly enemies: Enemies;
   /** Story, chains and bounties */
@@ -368,6 +372,7 @@ export class GameServer implements ServerCtx {
     const profileStore = opts.profileStore ?? new MemoryProfileStore();
     this.pilots = new Pilots(createPilotHost(this), this.econ, this.ships, profileStore, pilotsOpts(this, opts));
     this.pilots.telemetry = new Telemetry(opts.telemetry ?? null, opts.clock);
+    this.tutorial = setupTutorial(this, opts);
     // (The field machines tell the bank which parts they hold, and a death empties them into the wreck)
     const field = this.features.get('machines') as unknown as FieldShips | undefined;
     if (field) this.pilots.fieldHooks = { isClaimed: (eid, uid) => field.isClaimed(eid, uid), machineContents: (eid) => field.machineContents(eid, true) };
@@ -391,7 +396,7 @@ export class GameServer implements ServerCtx {
       stationAt: (conn) => this.services.stationAt(conn),
       stationName: (id) => this.gameData.getStation(id)?.name ?? id,
     }, this.pilots, this.gameData.stationFile);
-    this.hangar = new Hangar({ send: (conn, msg) => this.send((conn as ClientConnection).ws, msg), now: opts.clock ?? (() => Date.now()), freeBuild: (conn) => this.freeBuild(conn as ClientConnection) },
+    this.hangar = new Hangar({ send: (conn, msg) => this.send((conn as ClientConnection).ws, msg), now: opts.clock ?? (() => Date.now()), freeBuild: (conn) => this.freeBuild(conn as ClientConnection), placed: (conn, parts) => this.tutorial?.partsPlaced(conn as ClientConnection, parts) },
       this.pilots, this.ships, this.econ, this.ships.catalog, this.services);
     this.hangar.gems = this.gameData.gemsFile;
     this.pilots.onEvent((conn, ev) => {

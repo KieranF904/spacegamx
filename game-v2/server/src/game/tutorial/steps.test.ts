@@ -1,0 +1,352 @@
+/**
+ * The step engine on a real GameServer over LocalTransport: a fake client walks all fourteen steps, a pilot can leave at
+ * every one of them, and the client's reports can only complete the steps that are about opening something
+ */
+import { describe, it, expect } from 'vitest';
+import { join } from 'path';
+import * as bitecs from 'bitecs';
+import { Position, Velocity, TICK_RATE, ServerMessage, TutorialData, Blueprint, objectPos, countOf } from '@space-game/common';
+import { GameServer } from '../../GameServer.js';
+import { GameData } from '../../data/GameData.js';
+import { LocalTransport } from '../../net/LocalTransport.js';
+import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
+import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
+import { createShipBridge } from '../../proto/createProtoServer.js';
+
+const dataDir = join(__dirname, '../../../../data');
+const files = readGameDataFiles(dataDir);
+const shipConfig = loadShipConfigCached(dataDir);
+
+function yard(names = ['ann']) {
+  (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
+  const clock = { t: 1_000_000 };
+  const server = new GameServer({
+    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
+    scene: 'sectors', autoStart: false, tutorial: true, ships: createShipBridge(shipConfig), clock: () => clock.t,
+  });
+  const pilots = names.map((n) => {
+    const t = new LocalTransport(server);
+    const got: ServerMessage[] = [];
+    t.onMessage = (m) => got.push(m);
+    t.connect();
+    t.send({ type: 'join', username: n } as never);
+    const pid = t.getPlayerId();
+    const conn = server.pilots.connOf(pid)!;
+    const state = () => got.filter((m) => m.type === 'tutorialState').pop() as Extract<ServerMessage, { type: 'tutorialState' }>;
+    return { t, got, pid, conn, profile: () => server.pilots.get(conn)!, state };
+  });
+  const step = (n = 1) => { for (let i = 0; i < n; i++) { clock.t += 1000 / TICK_RATE; server.step(); } };
+  const tut = server.tutorial!;
+  const data: TutorialData = server.gameData.tutorialFile!;
+  const put = (pid: number, x: number, y: number) => { server.ships.teleport(pid, x, y); Position.x[pid] = x; Position.y[pid] = y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
+  const at = (id: string) => objectPos(data, tut.def(id)!);
+  return { server, pilots, step, tut, data, put, at, clock };
+}
+type World = ReturnType<typeof yard>;
+type Pilot = World['pilots'][number];
+
+const stepOf = (p: Pilot) => p.profile().tutorial.step;
+const stored = (p: Pilot, id: string) => countOf(p.profile().storage, id);
+
+/** A hull cell (or another part) bolted onto the pilot's design wherever it joins and validates */
+function withPart(w: World, p: Pilot, fn: string, piece: string, material: string, uid: number): Blueprint {
+  const bp = JSON.parse(JSON.stringify(w.server.ships.get(p.pid)!.blueprint)) as Blueprint;
+  const spots: [number, number, number][] = [];
+  for (const base of bp.parts) for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) if (dx || dy) spots.push([base.x + dx, base.y + dy, Math.abs(dx) + Math.abs(dy)]);
+  spots.sort((m, n) => m[2] - n[2]);
+  for (const [x, y] of spots) {
+    const cand = { uid, piece, fn, material, x, y, rot: 0, flip: false };
+    const test = { ...bp, parts: [...bp.parts, cand] } as Blueprint;
+    if (w.server.ships.validate(test).ok) { bp.parts.push(cand as never); return bp; }
+  }
+  throw new Error('no place for the part: ' + JSON.stringify(w.server.ships.validate({ ...bp, parts: [...bp.parts, { uid, piece, fn, material, x: 0, y: 0, rot: 0, flip: false } as never] } as Blueprint).errors) + JSON.stringify(bp.parts.slice(0, 3)));
+}
+
+/** Break a drone or rock for a pilot (their own counter) */
+const smash = (w: World, p: Pilot, id: string) => w.tut.hit(w.tut.entityOf(id)!, p.pid, w.tut.def(id)!.hp!);
+
+/** Take the ore a pilot's broken rock threw off */
+function scoop(w: World, p: Pilot, rockId: string): void {
+  const at = w.at(rockId);
+  for (const pod of w.server.pods.near(w.server.gameData.getSystemNum(w.data.yard.system), at.x, at.y, 400)) {
+    w.put(p.pid, Position.x[pod], Position.y[pod]);
+    w.step(40);
+  }
+}
+
+describe('the step engine', () => {
+  it('has fourteen steps, each with a real binding name and one or two short lines', () => {
+    const w = yard();
+    expect(w.data.steps.map((s) => s.id)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
+    const actions = new Set(['forward', 'backward', 'fire', 'inventory', 'dock', 'components', 'map', 'jump']);
+    for (const s of w.data.steps) {
+      expect(s.lines.length).toBeGreaterThanOrEqual(1);
+      expect(s.lines.length).toBeLessThanOrEqual(2);
+      for (const l of s.lines) for (const m of l.matchAll(/\{(\w+)\}/g)) expect(actions.has(m[1])).toBe(true);
+    }
+  });
+
+  it('a fake client walks the whole tutorial, step by step, and ends in Sol with the starter pack', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    const p = a.profile();
+    const pack = w.data.starterPack;
+    const seen: string[] = [stepOf(a)];
+    const expectStep = (id: string) => { expect(stepOf(a)).toBe(id); seen.push(id); expect(a.state()).toMatchObject({ step: id, left: false }); };
+    w.step(2);
+
+    // 1 welcome: nothing but an acknowledgement moves it
+    w.step(60);
+    expect(stepOf(a)).toBe('welcome');
+    a.t.send({ type: 'tutorialReport', kind: 'ack', step: 'welcome' } as never);
+    w.step(1);
+    expectStep('rings');
+
+    // 2 rings: all three, in any order, each once
+    for (const id of ['ring_3', 'ring_1']) { const r = w.at(id); w.put(a.pid, r.x, r.y); w.step(3); }
+    expect(stepOf(a)).toBe('rings');
+    const r2 = w.at('ring_2'); w.put(a.pid, r2.x, r2.y); w.step(3);
+    expectStep('brake');
+
+    // 3 brake: stop in the zone
+    const z = w.at('stop_zone'); w.put(a.pid, z.x, z.y);
+    w.step(w.data.yard.stopTicks + 5);
+    expectStep('drones');
+
+    // 4 drones: all three broken (for this pilot)
+    smash(w, a, 'drone_1'); smash(w, a, 'drone_2');
+    expect(stepOf(a)).toBe('drones');
+    smash(w, a, 'drone_3');
+    expectStep('mine');
+    expect(a.state().broken).toEqual(['drone_1', 'drone_2', 'drone_3']);
+
+    // 5 mine: break the rock, fly through the chunks
+    smash(w, a, 'training_rock');
+    expect(stepOf(a)).toBe('mine');
+    scoop(w, a, 'training_rock');
+    expectStep('hold');
+
+    // 6 hold
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'hold' } as never);
+    w.step(1);
+    expectStep('dock');
+
+    // 7 dock at the yard station
+    w.put(a.pid, w.data.yard.center.x + 700, w.data.yard.center.y);
+    w.step(2);
+    a.t.send({ type: 'dock' } as never);
+    w.step(2);
+    expect(a.conn.docked).toBeTruthy();
+    expectStep('refine');
+    expect(stored(a, 'iron_ore')).toBeGreaterThanOrEqual(4);
+
+    // 8 refine: queued, then the plate comes out
+    const plate0 = stored(a, 'alloy_plate');
+    a.t.send({ type: 'refine', recipe: 'alloy_plate', batches: 1 } as never);
+    expect(stepOf(a)).toBe('refine');
+    w.step(TICK_RATE * 4);
+    expect(stored(a, 'alloy_plate')).toBeGreaterThan(plate0);
+    expectStep('hangar');
+
+    // 9 hangar: one new hull cell on the ship
+    a.t.send({ type: 'shipEdit', blueprint: withPart(w, a, 'hull', 'sq', 'alloy', 200) } as never);
+    w.step(1);
+    expect((a.got.filter((m) => m.type === 'shipEditResult').pop() as { ok: boolean }).ok).toBe(true);
+    expectStep('power');
+    // (the step handed out a Cell Reactor to place)
+    expect(stored(a, 'part:alloy:power_cell_reactor:sq')).toBe(1);
+
+    // 10 power: a generator built into the ship
+    a.t.send({ type: 'shipEdit', blueprint: withPart(w, a, 'power_cell_reactor', 'sq', 'alloy', 201) } as never);
+    w.step(1);
+    expect(a.got.filter((m) => m.type === 'shipEditResult').pop()).toMatchObject({ ok: true });
+    expect(stored(a, 'part:alloy:power_cell_reactor:sq')).toBe(0);
+    expectStep('bank');
+
+    // 11 the repair bank tab
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'bank' } as never);
+    w.step(1);
+    expectStep('guide');
+
+    // 12 the field guide and the system map, both
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'map' } as never);
+    w.step(1);
+    expect(stepOf(a)).toBe('guide');
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'guide' } as never);
+    w.step(1);
+    expectStep('jump');
+
+    // 13 jump: finishing a jump inside the exit marker (the jump drive itself is the flight code's; here its finish is told)
+    a.t.send({ type: 'undock' } as never);
+    w.step(2);
+    const ex = w.at('exit_marker');
+    w.tut.onEvent(a.pid, { kind: 'jumped', x: ex.x, y: ex.y, exit: 'exit_marker' });
+    expectStep('graduate');
+
+    // 14 graduate: the client acknowledges and the pilot leaves for Sol with the pack
+    const storage0 = Object.fromEntries(p.storage.map((s) => [s.id, s.n]));
+    const credits0 = p.credits;
+    a.t.send({ type: 'tutorialReport', kind: 'ack', step: 'graduate' } as never);
+    w.step(2);
+    expect(p.tutorial.left).toBe(true);
+    expect(p.tutorial.done).toEqual(w.data.steps.slice(0, -1).map((s) => s.id));
+    expect(a.state()).toMatchObject({ step: '', left: true });
+    for (const [k, n] of Object.entries(pack.items)) expect(stored(a, k)).toBe((storage0[k] ?? 0) + n);
+    expect(p.credits).toBe(credits0 + pack.credits);
+    expect(Math.hypot(Position.x[a.pid] - w.data.yard.center.x, Position.y[a.pid] - w.data.yard.center.y)).toBeGreaterThan(w.data.yard.keepOut);
+    expect(seen).toEqual(w.data.steps.map((x) => x.id));
+  });
+
+  it('the graduate card sends the pilot on by itself if the client never answers', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    w.tut.completeStep(a.conn, 'welcome');
+    a.profile().tutorial.step = 'jump';
+    w.tut.completeStep(a.conn, 'jump');
+    expect(stepOf(a)).toBe('graduate');
+    w.step(TICK_RATE * 10);
+    expect(a.profile().tutorial.left).toBe(false);
+    w.step(TICK_RATE * 11);
+    expect(a.profile().tutorial.left).toBe(true);
+  });
+
+  it('a pilot can leave at every one of the fourteen steps and gets the pack once', () => {
+    const w = yard(Array.from({ length: 14 }, (_, i) => `p${i}`));
+    const ids = w.data.steps.map((s) => s.id);
+    w.pilots.forEach((p, i) => { p.profile().tutorial.step = ids[i]; p.profile().tutorial.done = ids.slice(0, i); });
+    w.step(2);
+    const before = w.pilots.map((p) => ({ plate: stored(p, 'alloy_plate'), wire: stored(p, 'copper_wire'), credits: p.profile().credits }));
+    w.pilots.forEach((p, i) => {
+      p.t.send({ type: 'tutorialLeave' } as never);
+      w.step(2);
+      const t = p.profile().tutorial;
+      expect(t.left).toBe(true);
+      expect(t.done).toEqual(ids.slice(0, i));
+      expect(stored(p, 'alloy_plate')).toBe(before[i].plate + w.data.starterPack.items.alloy_plate);
+      expect(stored(p, 'copper_wire')).toBe(before[i].wire + w.data.starterPack.items.copper_wire);
+      expect(p.profile().credits).toBe(before[i].credits + w.data.starterPack.credits);
+      expect(p.state()).toMatchObject({ step: '', left: true });
+      expect(Math.hypot(Position.x[p.pid] - w.data.yard.center.x, Position.y[p.pid] - w.data.yard.center.y)).toBeGreaterThan(w.data.yard.keepOut);
+      p.t.send({ type: 'tutorialLeave' } as never);
+      w.step(1);
+      expect(stored(p, 'alloy_plate')).toBe(before[i].plate + w.data.starterPack.items.alloy_plate);
+    });
+  });
+
+  it('leaving while docked at the yard station lets the pilot out into Sol', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    w.put(a.pid, w.data.yard.center.x + 700, w.data.yard.center.y);
+    w.step(2);
+    a.t.send({ type: 'dock' } as never);
+    w.step(2);
+    expect(a.conn.docked).toBeTruthy();
+    a.t.send({ type: 'tutorialLeave' } as never);
+    w.step(3);
+    expect(a.conn.docked).toBeFalsy();
+    expect(a.profile().tutorial.left).toBe(true);
+  });
+
+  it('events for another step, and the client reporting the wrong thing, move nothing', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    w.tut.completeStep(a.conn, 'welcome');
+    expect(stepOf(a)).toBe('rings');
+    // a panel report, a wrong acknowledgement and an unknown panel cannot finish a flying step
+    for (const m of [{ kind: 'panel', panel: 'hold' }, { kind: 'panel', panel: 'nonsense' }, { kind: 'ack', step: 'rings' }, { kind: 'ack' }, { kind: 'panel' }]) {
+      a.t.send({ type: 'tutorialReport', ...m } as never);
+      w.step(1);
+      expect(stepOf(a)).toBe('rings');
+    }
+    // other steps' deeds do not count ahead of time
+    smash(w, a, 'drone_1');
+    w.tut.onEvent(a.pid, { kind: 'docked', station: w.data.yard.station });
+    w.tut.onEvent(a.pid, { kind: 'partPlaced' });
+    w.tut.onEvent(a.pid, { kind: 'powered' });
+    w.tut.onEvent(a.pid, { kind: 'refined', item: 'iron_ore' });
+    w.tut.onEvent(a.pid, { kind: 'collected', item: 'iron_ore', n: 99 });
+    expect(stepOf(a)).toBe('rings');
+    // a jump that does not end in the marker, a dock elsewhere
+    a.profile().tutorial.step = 'jump';
+    w.tut.onEvent(a.pid, { kind: 'jumped', x: 0, y: 0 });
+    expect(stepOf(a)).toBe('jump');
+    a.profile().tutorial.step = 'dock';
+    w.tut.onEvent(a.pid, { kind: 'docked', station: 'sol_station_central' });
+    expect(stepOf(a)).toBe('dock');
+    // a panel report only finishes the step that asks for that panel
+    a.profile().tutorial.step = 'bank';
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'hold' } as never);
+    w.step(1);
+    expect(stepOf(a)).toBe('bank');
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'bank' } as never);
+    w.step(1);
+    expect(stepOf(a)).toBe('guide');
+  });
+
+  it('drones broken ahead of their step are whole again when it comes, and ore from the rock is counted per pilot', () => {
+    const w = yard(['ann', 'bo']);
+    const [a, b] = w.pilots;
+    smash(w, a, 'drone_1');
+    expect(a.profile().tutorial.hits?.drone_1).toBeGreaterThan(0);
+    w.tut.completeStep(a.conn, 'welcome');
+    w.tut.completeStep(a.conn, 'rings');
+    w.tut.completeStep(a.conn, 'brake');
+    expect(stepOf(a)).toBe('drones');
+    expect(a.profile().tutorial.hits).toBeUndefined();
+    expect(a.state().broken).toEqual([]);
+    // b's progress is its own
+    expect(stepOf(b)).toBe('welcome');
+  });
+
+  it('coming back to a step starts its objects over, and grants are not repeated', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    const p = a.profile();
+    p.tutorial.step = 'hangar';
+    p.tutorial.done = w.data.steps.slice(0, 8).map((s) => s.id);
+    w.tut.completeStep(a.conn, 'hangar');
+    expect(stepOf(a)).toBe('power');
+    expect(stored(a, 'part:alloy:power_cell_reactor:sq')).toBe(1);
+    w.tut.steps.entered(a.conn, 'power', false);
+    expect(stored(a, 'part:alloy:power_cell_reactor:sq')).toBe(1);
+    // the rock, broken but not collected before a disconnect, is whole again on return
+    p.tutorial.step = 'mine';
+    p.tutorial.done = ['welcome', 'rings', 'brake', 'drones'];
+    smash(w, a, 'training_rock');
+    expect(p.tutorial.hits?.training_rock).toBeGreaterThan(0);
+    w.tut.steps.entered(a.conn, 'mine', false);
+    expect(p.tutorial.hits?.training_rock).toBeUndefined();
+  });
+
+  it('ore is taken only by its owner and counts for the mining step', () => {
+    const w = yard(['ann', 'bo']);
+    const [a, b] = w.pilots;
+    for (const p of [a, b]) { p.profile().tutorial.step = 'mine'; p.profile().tutorial.done = ['welcome', 'rings', 'brake', 'drones']; }
+    smash(w, a, 'training_rock');
+    // b sits on the chunks: nothing; a's step does not move on b's account
+    scoop(w, b, 'training_rock');
+    expect(stepOf(b)).toBe('mine');
+    expect(stepOf(a)).toBe('mine');
+    scoop(w, a, 'training_rock');
+    expect(stepOf(a)).toBe('hold');
+    expect(stepOf(b)).toBe('mine');
+  });
+
+  it('the multi-panel step needs both panels, in either order, and a left pilot is ignored', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    a.profile().tutorial.step = 'guide';
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'guide' } as never);
+    w.step(1);
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'guide' } as never);
+    w.step(1);
+    expect(stepOf(a)).toBe('guide');
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'map' } as never);
+    w.step(1);
+    expect(stepOf(a)).toBe('jump');
+    w.tut.leave(a.conn);
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'map' } as never);
+    w.step(1);
+    expect(a.profile().tutorial).toMatchObject({ step: '', left: true });
+  });
+});

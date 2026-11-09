@@ -234,6 +234,8 @@ export function buildTickSystems(gs: GameServer): readonly TickSystem[] {
     { name: 'hazards', phase: 'world', run: () => gs.hazards.tick() },
     { name: 'warmth', phase: 'world', run: () => gs.warmth.tick() },
     { name: 'homes', phase: 'world', run: () => gs.homes.tick() },
+    // (The training yard: markers, jumps and the boundary. Only on a server that runs one)
+    { name: 'tutorial', phase: 'world', when: () => !!gs.tutorial, run: () => gs.tutorial!.tick() },
     { name: 'watchComet', phase: 'world', run: () => watchComet(gs) },
     // (per-client entries guard each client themselves)
     { name: 'outpost', phase: 'world', every: 60, when: () => !!gs.outpost, perClient: true, run: () => {

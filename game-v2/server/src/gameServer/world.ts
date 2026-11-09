@@ -21,7 +21,8 @@ export function initializeWorld(gs: GameServer): void {
     // Create stations
     for (const stationId of system.stations) {
       const stationData = gs.gameData.getStation(stationId);
-      if (stationData) {
+      // (The training yard's station exists only on a server that runs the tutorial)
+      if (stationData && (!stationData.tutorial || gs.tutorial)) {
         createStation(gs, stationData, systemNum);
       }
     }
@@ -50,6 +51,8 @@ export function initializeWorld(gs: GameServer): void {
     createAsteroids(gs, system, systemNum);
   }
   
+  // The training yard's rocks and drones (after the belts: nothing already made changes its id)
+  gs.tutorial?.build();
   // Every belt filed: the orbit timetable trimmed to what's in it
   gs.asteroidOrbits.settle();
   gs.derelictsMod.spawnPersonCraft();

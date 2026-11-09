@@ -35,6 +35,7 @@ import type { Docking } from '../game/Docking.js';
 import type { Enemies } from '../game/Enemies.js';
 import type { Surfaces } from '../game/Surfaces.js';
 import type { HomeStations } from '../game/HomeStations.js';
+import type { Tutorial } from '../game/tutorial/Tutorial.js';
 import type { SnapshotBuilder } from './SnapshotBuilder.js';
 import type { ServerFeatures } from '../ships/features/host.js';
 
@@ -116,6 +117,8 @@ export interface ServerCtx {
   readonly enemies: Enemies;
   readonly surfaces: Surfaces;
   readonly homes: HomeStations;
+  /** The training yard (game/tutorial): none when the server runs without a tutorial */
+  readonly tutorial?: Tutorial;
   /** A fresh player ship entity (respawn) */
   createPlayer(): number;
   /** Put a pilot's ship in a system at a point (respawn's rally) */

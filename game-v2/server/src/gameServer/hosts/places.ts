@@ -198,6 +198,7 @@ export function createPodHost(gs: GameServer): PodHost {
       const pc = gs.lingering.get(eid)?.conn ?? gs.pilots.connOf(eid);
       if (!pc) return items;
       const left = gs.pilots.give(pc, items, { source, at });
+      if (gs.tutorial) gs.tutorial.collected(pc as never, Object.fromEntries(Object.entries(items).map(([id, n]) => [id, n - (left[id] ?? 0)])));
       gs.broadcastToSystem(InSystem.systemId[eid], { type: 'effect', effectType: EffectType.PickupItem, x: Math.round(at.x), y: Math.round(at.y), targetX: Math.round(Position.x[eid]), targetY: Math.round(Position.y[eid]), entityId: eid });
       return left;
     },

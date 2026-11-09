@@ -720,6 +720,21 @@
         },
         "note": "Directorate procurement: fair prices."
       }
+    },
+    {
+      "id": "sol_station_yard",
+      "name": "Vesta Training Yard",
+      "description": "A training station off Vesta where new pilots learn the work. It stays where it is.",
+      "system": "sol",
+      "position": { "x": -22800, "y": 21000 },
+      "radius": 500,
+      "sprite": "station_medium",
+      "design": "outpost",
+      "dockingRadius": 700,
+      "services": ["repair", "storage", "refinery", "fabricator"],
+      "repairCostPerHp": 0,
+      "refuelCostPerUnit": 0,
+      "tutorial": true
     }
   ]
 }

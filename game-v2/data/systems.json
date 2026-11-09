@@ -83,7 +83,8 @@
         "sol_station_sentinel",
         "sol_station_farwatch",
         "sol_station_ark",
-        "sol_station_helios"
+        "sol_station_helios",
+        "sol_station_yard"
       ],
       "planets": [
         {

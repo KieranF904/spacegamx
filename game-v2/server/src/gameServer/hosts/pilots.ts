@@ -79,6 +79,7 @@ export function createQuestHost(gs: GameServer) {
   return {
     send: (conn: unknown, msg: ServerMessage) => gs.send((conn as ClientConnection).ws, msg),
     now: gs.clock,
+    holdStarters: (conn: unknown) => gs.tutorial?.active(conn as ClientConnection) ?? false,
     stationAt: (conn: unknown) => stationAt(conn as ClientConnection),
     where: (conn: unknown) => whereIs(gs, conn as ClientConnection),
     enterArena: (conn: unknown, arena: string, boss: string) => gs.arenas.enter(conn as ClientConnection, arena, boss),

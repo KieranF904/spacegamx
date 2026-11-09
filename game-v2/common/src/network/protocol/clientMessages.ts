@@ -13,6 +13,7 @@ import type { FieldClientMessage } from '../fieldProtocol.js';
 import type { WeaponGroupsClientMessage } from '../weaponGroupsProtocol.js';
 import type { MinesClientMessage } from '../minesProtocol.js';
 import type { ClampClientMessage } from '../clampProtocol.js';
+import type { TutorialClientMessage } from '../tutorialProtocol.js';
 import type { HitReport } from '../hits.js';
 import type { OwnCheck } from '../ownTick.js';
 import type { Blueprint } from '../../ships/types.js';
@@ -224,7 +225,8 @@ export type ClientMessage =
   | FieldClientMessage
   | WeaponGroupsClientMessage
   | MinesClientMessage
-  | ClampClientMessage;
+  | ClampClientMessage
+  | TutorialClientMessage;
 
 /**
  * Dev tool (map click): jump to a system, optionally to a spot in it. Only

@@ -31,6 +31,8 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || undefined;
 const ADMIN_PORT = parseInt(process.env.ADMIN_PORT || '3005', 10);
 const DEV_MODE = process.env.NODE_ENV !== 'production';
+// The training yard for new pilots (game/tutorial): on in production; on the dev server only with TUTORIAL=1 (it then replaces the dev Rockery start); TUTORIAL=0 turns it off anywhere
+const TUTORIAL_ON = process.env.TUTORIAL ? process.env.TUTORIAL === '1' : !DEV_MODE;
 const SERVER_NAME = process.env.SERVER_NAME || 'Local dev';
 const SERVER_REGION = process.env.SERVER_REGION || 'local';
 const BROWSER_URL = process.env.BROWSER_URL || 'http://localhost:8787';
@@ -93,7 +95,8 @@ const gameServer = new GameServer({
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
   // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)
-  devStart: DEV_MODE ? 'dev_rockery' : undefined,
+  devStart: DEV_MODE && !TUTORIAL_ON ? 'dev_rockery' : undefined,
+  tutorial: TUTORIAL_ON,
   // ...and find these designs in their hangar (data/ships/blueprints/dev/guest-*.json)
   guestShips: DEV_MODE ? devGuestShips(dataPath) as never : undefined,
   // Where new pilots die and what they get done in their first hour (data/telemetry/, kept between deploys)

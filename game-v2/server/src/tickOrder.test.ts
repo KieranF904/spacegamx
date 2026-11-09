@@ -44,6 +44,7 @@ const FROZEN: [name: string, phase: string, gate?: string][] = [
   ['hazards', 'world'],
   ['warmth', 'world'],
   ['homes', 'world'],
+  ['tutorial', 'world'],
   ['watchComet', 'world'],
   ['outpost', 'world', 'every60 perClient'],
   ['pilots', 'world'],

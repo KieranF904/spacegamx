@@ -35,6 +35,7 @@ export function readGameDataFiles(dataPath: string): GameDataFiles {
     ...(existsSync(join(dataPath, 'station.json')) ? { station: read('station.json') } : {}),
     ...(existsSync(join(dataPath, 'codex.json')) ? { codex: read('codex.json') } : {}),
     ...(existsSync(join(dataPath, 'mobs.json')) ? { mobs: read('mobs.json') } : {}),
+    ...(existsSync(join(dataPath, 'tutorial.json')) ? { tutorial: read('tutorial.json') } : {}),
     ...(existsSync(join(dataPath, 'terrain')) ? { terrain: Object.fromEntries(readdirSync(join(dataPath, 'terrain')).filter((f) => f.endsWith('.json')).map((f) => [f.slice(0, -5), read(`terrain/${f}`)])) } : {}),
   };
 }

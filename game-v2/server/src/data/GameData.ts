@@ -31,6 +31,7 @@ import {
   GemsFile,
   StationFile,
   setStationTable,
+  type TutorialData,
 } from '@space-game/common';
 import { checkGameData } from './validateGameData.js';
 import type { RulesFile, StringsFile } from './rules.js';
@@ -44,6 +45,8 @@ export interface GameDataFiles {
   bosses?: unknown;
   /** Single-body enemies (data/mobs.json) */
   mobs?: unknown;
+  /** The training yard: steps, objects, the starter pack (data/tutorial.json; none: no tutorial) */
+  tutorial?: TutorialData;
   /** Surfaces' rock, by surface id (data/terrain/<id>.json) */
   terrain?: Record<string, TerrainFile>;
   systems: SystemsFile;
@@ -79,6 +82,8 @@ export class GameData {
   readonly factionsFile: unknown;
   readonly bossesFile: unknown;
   readonly mobsFile: unknown;
+  /** The training yard's data (data/tutorial.json), if loaded */
+  readonly tutorialFile: TutorialData | undefined;
   private terrainFiles: Record<string, TerrainFile>;
   private terrains = new Map<string, Terrain>();
   private systems: Map<string, StarSystemData> = new Map();
@@ -114,6 +119,7 @@ export class GameData {
     this.factionsFile = files.factions;
     this.bossesFile = files.bosses ?? { rules: { creditRange: 5000, creditWindowTicks: 3600, barRange: 7000 }, bosses: {} };
     this.mobsFile = files.mobs ?? { mobs: {} };
+    this.tutorialFile = files.tutorial;
     this.terrainFiles = files.terrain ?? {};
     this.loadItems(files.items);
     this.loadSystems(files.systems);
@@ -243,8 +249,9 @@ export class GameData {
     return this.stationIdToNum.get(id) ?? 0;
   }
 
+  /** Every station but the training yard's (a station of the tutorial is its own thing: `getStation(id)` still finds it) */
   getAllStations(): StationData[] {
-    return Array.from(this.stations.values());
+    return Array.from(this.stations.values()).filter((s) => !s.tutorial);
   }
 
 

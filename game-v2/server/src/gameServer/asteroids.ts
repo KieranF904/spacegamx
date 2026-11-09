@@ -8,7 +8,7 @@
 
 import { addEntity, addComponent, hasComponent } from 'bitecs';
 import { Position, Velocity, Radius, Health, Asteroid, NetworkSync, InSystem, Dead, ASTEROID_SEED, asteroidParamsAt, beltTotal, calcAsteroidPosition, calcOrbitStateRaw, OrbitType } from '@space-game/common';
-import { EntityType } from '@space-game/common';
+import { EntityType, TUTORIAL_ROCK_TYPE, datan2, dhypot } from '@space-game/common';
 import { asteroidQuery } from './shared.js';
 import type { GameServer } from '../GameServer.js';
 
@@ -72,6 +72,44 @@ export function createAsteroid(gs: GameServer, system: any, systemNum: number, i
   });
   if (params.outlier) gs.asteroidStageById.set(eid, { stage: 0, wholeSize: size });
   gs.mining.register(eid, systemNum, i, params.definitionId || 'asteroid_metal', `${systemId}:${i}:${spawnTick}`, size, system.danger ?? 1, params.outlier ? { stage: 0, wholeSize: size } : undefined);
+  return eid;
+}
+
+/** A training body's hp: never reached (the training counters are per pilot: game/tutorial/Tutorial.ts) */
+const TRAINING_HP = 1_000_000;
+
+/**
+ * A rock or drone of the training yard: a real asteroid in the shared sim that never moves (a fixed orbit), never loses
+ * hp and never breaks, so every pilot collides with it alike. Told to clients like a regrown rock (asteroidSpawn on
+ * entering the system), by an index above any belt's (TUTORIAL_INDEX_BASE + its place in data/tutorial.json).
+ */
+export function createTrainingBody(gs: GameServer, systemNum: number, index: number, size: number, x: number, y: number): number {
+  const eid = addEntity(gs.world);
+  for (const c of [Position, Velocity, Radius, Asteroid, Health, InSystem, NetworkSync]) addComponent(gs.world, c, eid);
+  Radius.value[eid] = size;
+  Asteroid.size[eid] = size;
+  Asteroid.hp[eid] = Asteroid.maxHp[eid] = Health.current[eid] = Health.max[eid] = TRAINING_HP;
+  Asteroid.resourceType[eid] = 0;
+  Asteroid.resourceAmount[eid] = 0;
+  Asteroid.orbitType[eid] = OrbitType.Fixed;
+  Asteroid.semiMajorAxis[eid] = dhypot(x, y);
+  Asteroid.eccentricity[eid] = 0;
+  Asteroid.argPeriapsis[eid] = datan2(y, x);
+  Asteroid.meanAnomaly0[eid] = 0;
+  Asteroid.epochTick[eid] = 0;
+  Asteroid.wobblePhase[eid] = 0;
+  Velocity.x[eid] = Velocity.y[eid] = 0;
+  InSystem.systemId[eid] = systemNum;
+  gs.asteroidIndexById.set(eid, index);
+  gs.asteroidTypeById.set(eid, TUTORIAL_ROCK_TYPE);
+  gs.asteroidOrbits.add(eid, systemNum, {
+    semiMajorAxis: Asteroid.semiMajorAxis[eid], eccentricity: 0, argPeriapsis: Asteroid.argPeriapsis[eid],
+    meanAnomaly0: 0, epochTick: 0, size, fixed: true,
+  });
+  gs.placeAsteroid(eid);
+  const ids = gs.asteroidIdsBySystem.get(systemNum);
+  if (ids) ids.push(eid);
+  gs.respawnedAsteroids.add(eid);
   return eid;
 }
 
