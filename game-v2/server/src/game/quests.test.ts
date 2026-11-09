@@ -257,7 +257,10 @@ describe('quests: nothing is forced', () => {
     expect(countOf(profile().storage, 'pack_hull')).toBeGreaterThanOrEqual(2);
     // A toast, not a conversation; the Prospector job is a new lead, and Vance offers it when you talk to him
     expect(view(last)).toBeNull();
-    expect(got.some((m) => m.type === 'toast' && /Job complete: .*\+30 cr.*New work in your log/.test(m.text))).toBe(true);
+    // The client's reward screen gets the name, outro and rewards (questStep with `done`); the toast only points at the log
+    const done = got.find((m) => m.type === 'questStep' && m.done);
+    expect(done && done.type === 'questStep' && done.done).toMatchObject({ name: expect.any(String), rewards: { credits: 30 } });
+    expect(got.some((m) => m.type === 'toast' && /New work in your log/.test(m.text))).toBe(true);
     const lead = last('quests')!.leads.find((l) => l.id === 'main_02')!;
     expect(lead.fresh).toBe(true);
     expect(last('quests')!.finished.find((f) => f.id === 'main_01')?.outro).toBeTruthy();

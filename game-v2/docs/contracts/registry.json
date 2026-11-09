@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 495,
+      "lines": 497,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -212,19 +212,19 @@
           "name": "TABLE",
           "kind": "const",
           "start": 299,
-          "end": 485
+          "end": 487
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 487,
-          "end": 488
+          "start": 489,
+          "end": 490
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 490,
-          "end": 495
+          "start": 492,
+          "end": 497
         }
       ]
     },
@@ -6959,7 +6959,7 @@
       "id": "client.ui.combat-lock",
       "path": "client/src/ui/CombatLockUI.ts",
       "group": "client/ui",
-      "lines": 48,
+      "lines": 51,
       "owns": "the \"In combat 12 s\" HUD badge: quitting while it shows leaves the ship in space (server combatLock message)",
       "needs": "DOM (optional: with none every call does nothing)",
       "events": "",
@@ -6972,6 +6972,7 @@
       "extend": "the text is `combatLabel`; the lock itself is the server's (gameServer/combatLock.ts)",
       "exports": [
         "combatLabel",
+        "inCombat",
         "setCombatLock"
       ],
       "sections": [
@@ -7006,10 +7007,16 @@
           "end": 36
         },
         {
-          "name": "setCombatLock",
+          "name": "inCombat",
           "kind": "function",
           "start": 38,
-          "end": 48
+          "end": 39
+        },
+        {
+          "name": "setCombatLock",
+          "kind": "function",
+          "start": 41,
+          "end": 51
         }
       ]
     },
@@ -7750,6 +7757,163 @@
       ]
     },
     {
+      "id": "client.ui.rewards.screen",
+      "path": "client/src/ui/rewards/RewardScreen.ts",
+      "group": "client/ui/rewards",
+      "lines": 186,
+      "owns": "the reward screen's DOM, in two forms: a modal (backdrop, waits for its button: the tutorial's graduate screen) and a compact card (slides in at the top centre, folds to a \"View\" pill in combat or after a while: finished jobs)",
+      "needs": "rewardModel (RewardLine, CardLife), escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the compact card never takes the keyboard from typing and never blocks the game behind it; the modal waits for its button",
+          "test": "client/src/ui/rewards/rewardModel.test.ts"
+        }
+      ],
+      "extend": "a new line kind is drawn from RewardLine (rewardModel.ts); callers pass the lines, this knows no quest or tutorial data",
+      "exports": [
+        "RewardDeps",
+        "RewardScreen",
+        "RewardShowOptions",
+        "linesHtml"
+      ],
+      "sections": [
+        {
+          "name": "RewardShowOptions",
+          "kind": "interface",
+          "start": 13,
+          "end": 27
+        },
+        {
+          "name": "RewardDeps",
+          "kind": "interface",
+          "start": 29,
+          "end": 34
+        },
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 37,
+          "end": 77
+        },
+        {
+          "name": "linesHtml",
+          "kind": "function",
+          "start": 79,
+          "end": 86
+        },
+        {
+          "name": "RewardScreen",
+          "kind": "class",
+          "start": 88,
+          "end": 186
+        }
+      ]
+    },
+    {
+      "id": "client.ui.rewards.model",
+      "path": "client/src/ui/rewards/rewardModel.ts",
+      "group": "client/ui/rewards",
+      "lines": 94,
+      "owns": "what the reward screen lists (a quest's RewardView or the tutorial's starter pack as lines with icon, name and count), the short outro, and the compact card's open/pill/gone state machine (no DOM)",
+      "needs": "common RewardView; an item namer and icon function passed in",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a card opened in combat starts as a pill and one open when combat starts folds at once; an open card folds on its own after a while",
+          "test": "client/src/ui/rewards/rewardModel.test.ts"
+        }
+      ],
+      "extend": "a new kind of reward is a RewardKind and a branch of `questRewardLines`",
+      "exports": [
+        "CARD_OPEN_MS",
+        "CARD_PILL_MS",
+        "CardLife",
+        "CardState",
+        "KIND_GLYPH",
+        "RewardKind",
+        "RewardLine",
+        "RewardNames",
+        "packRewardLines",
+        "questRewardLines",
+        "shortOutro"
+      ],
+      "sections": [
+        {
+          "name": "RewardKind",
+          "kind": "type",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "RewardLine",
+          "kind": "interface",
+          "start": 14,
+          "end": 22
+        },
+        {
+          "name": "KIND_GLYPH",
+          "kind": "const",
+          "start": 24,
+          "end": 25
+        },
+        {
+          "name": "RewardNames",
+          "kind": "interface",
+          "start": 27,
+          "end": 30
+        },
+        {
+          "name": "questRewardLines",
+          "kind": "function",
+          "start": 32,
+          "end": 44
+        },
+        {
+          "name": "packRewardLines",
+          "kind": "function",
+          "start": 46,
+          "end": 52
+        },
+        {
+          "name": "shortOutro",
+          "kind": "function",
+          "start": 54,
+          "end": 63
+        },
+        {
+          "name": "CARD_OPEN_MS",
+          "kind": "const",
+          "start": 65,
+          "end": 66
+        },
+        {
+          "name": "CARD_PILL_MS",
+          "kind": "const",
+          "start": 67,
+          "end": 68
+        },
+        {
+          "name": "CardState",
+          "kind": "type",
+          "start": 70,
+          "end": 70
+        },
+        {
+          "name": "CardLife",
+          "kind": "class",
+          "start": 72,
+          "end": 94
+        }
+      ]
+    },
+    {
       "id": "client.ui.station-shared",
       "path": "client/src/ui/station/shared.ts",
       "group": "client/ui/station",
@@ -8341,7 +8505,7 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 221,
+      "lines": 216,
       "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
@@ -8360,32 +8524,32 @@
         {
           "name": "TOAST_BAND",
           "kind": "const",
-          "start": 14,
-          "end": 15
+          "start": 16,
+          "end": 17
         },
         {
           "name": "styled",
           "kind": "let",
-          "start": 17,
-          "end": 17
+          "start": 19,
+          "end": 19
         },
         {
           "name": "injectStyles",
           "kind": "function",
-          "start": 18,
-          "end": 63
+          "start": 20,
+          "end": 56
         },
         {
           "name": "PanelDeps",
           "kind": "interface",
-          "start": 65,
-          "end": 71
+          "start": 58,
+          "end": 64
         },
         {
           "name": "TutorialPanel",
           "kind": "class",
-          "start": 73,
-          "end": 221
+          "start": 66,
+          "end": 216
         }
       ]
     },
@@ -8393,7 +8557,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 187,
+      "lines": 190,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
@@ -8412,20 +8576,20 @@
         {
           "name": "TutorialUIDeps",
           "kind": "interface",
-          "start": 21,
-          "end": 36
+          "start": 22,
+          "end": 39
         },
         {
           "name": "SAME_PLACE",
           "kind": "const",
-          "start": 38,
-          "end": 39
+          "start": 41,
+          "end": 42
         },
         {
           "name": "TutorialUI",
           "kind": "class",
-          "start": 41,
-          "end": 187
+          "start": 44,
+          "end": 190
         }
       ]
     },
@@ -9671,7 +9835,7 @@
       "id": "protocol.econ",
       "path": "common/src/network/econProtocol.ts",
       "group": "common/network",
-      "lines": 433,
+      "lines": 437,
       "owns": "the player-economy messages: profile and its deltas, cargo and storage, loot, item actions, quests and builds; every action is a request the server checks",
       "needs": "type-only imports of econ/stacks, econ/quests and other econ shapes",
       "events": "",
@@ -9970,151 +10134,151 @@
           "name": "ServerQuestStepMessage",
           "kind": "interface",
           "start": 357,
-          "end": 362
-        },
-        {
-          "name": "ClientQuestBoardMessage",
-          "kind": "interface",
-          "start": 364,
-          "end": 365
-        },
-        {
-          "name": "ClientQuestAcceptMessage",
-          "kind": "interface",
-          "start": 366,
           "end": 366
         },
         {
-          "name": "ClientQuestAbandonMessage",
-          "kind": "interface",
-          "start": 367,
-          "end": 367
-        },
-        {
-          "name": "ClientQuestSeenMessage",
+          "name": "ClientQuestBoardMessage",
           "kind": "interface",
           "start": 368,
           "end": 369
         },
         {
-          "name": "ClientCodexReadMessage",
+          "name": "ClientQuestAcceptMessage",
           "kind": "interface",
           "start": 370,
+          "end": 370
+        },
+        {
+          "name": "ClientQuestAbandonMessage",
+          "kind": "interface",
+          "start": 371,
           "end": 371
         },
         {
-          "name": "ClientTalkMessage",
+          "name": "ClientQuestSeenMessage",
           "kind": "interface",
           "start": 372,
           "end": 373
         },
         {
-          "name": "ClientSkillUpMessage",
+          "name": "ClientCodexReadMessage",
           "kind": "interface",
           "start": 374,
-          "end": 379
+          "end": 375
+        },
+        {
+          "name": "ClientTalkMessage",
+          "kind": "interface",
+          "start": 376,
+          "end": 377
+        },
+        {
+          "name": "ClientSkillUpMessage",
+          "kind": "interface",
+          "start": 378,
+          "end": 383
         },
         {
           "name": "ServerStationMessage",
           "kind": "interface",
-          "start": 381,
-          "end": 404
+          "start": 385,
+          "end": 408
         },
         {
           "name": "ClientStationOpenMessage",
-          "kind": "interface",
-          "start": 406,
-          "end": 407
-        },
-        {
-          "name": "ClientRefineMessage",
-          "kind": "interface",
-          "start": 408,
-          "end": 409
-        },
-        {
-          "name": "ClientCraftMessage",
           "kind": "interface",
           "start": 410,
           "end": 411
         },
         {
-          "name": "ClientGemCutMessage",
+          "name": "ClientRefineMessage",
           "kind": "interface",
           "start": 412,
           "end": 413
         },
         {
-          "name": "ClientGemSocketMessage",
+          "name": "ClientCraftMessage",
           "kind": "interface",
           "start": 414,
           "end": 415
         },
         {
-          "name": "ClientGemUnsocketMessage",
+          "name": "ClientGemCutMessage",
           "kind": "interface",
           "start": 416,
-          "end": 416
+          "end": 417
+        },
+        {
+          "name": "ClientGemSocketMessage",
+          "kind": "interface",
+          "start": 418,
+          "end": 419
+        },
+        {
+          "name": "ClientGemUnsocketMessage",
+          "kind": "interface",
+          "start": 420,
+          "end": 420
         },
         {
           "name": "ClientDesignSaveMessage",
           "kind": "interface",
-          "start": 417,
-          "end": 418
+          "start": 421,
+          "end": 422
         },
         {
           "name": "ClientDesignDeleteMessage",
           "kind": "interface",
-          "start": 419,
-          "end": 419
+          "start": 423,
+          "end": 423
         },
         {
           "name": "ClientOutpostCharterMessage",
           "kind": "interface",
-          "start": 420,
-          "end": 421
+          "start": 424,
+          "end": 425
         },
         {
           "name": "ClientOutpostUpgradeMessage",
           "kind": "interface",
-          "start": 422,
-          "end": 422
+          "start": 426,
+          "end": 426
         },
         {
           "name": "ClientFabOrderMessage",
           "kind": "interface",
-          "start": 423,
-          "end": 424
+          "start": 427,
+          "end": 428
         },
         {
           "name": "ClientFabOrderCancelMessage",
           "kind": "interface",
-          "start": 425,
-          "end": 425
-        },
-        {
-          "name": "ClientDevStationMessage",
-          "kind": "interface",
-          "start": 426,
-          "end": 427
-        },
-        {
-          "name": "ClientAmmoPreferMessage",
-          "kind": "interface",
-          "start": 428,
+          "start": 429,
           "end": 429
         },
         {
-          "name": "ClientMarketSellMessage",
+          "name": "ClientDevStationMessage",
           "kind": "interface",
           "start": 430,
           "end": 431
         },
         {
-          "name": "ClientMarketBuyMessage",
+          "name": "ClientAmmoPreferMessage",
           "kind": "interface",
           "start": 432,
           "end": 433
+        },
+        {
+          "name": "ClientMarketSellMessage",
+          "kind": "interface",
+          "start": 434,
+          "end": 435
+        },
+        {
+          "name": "ClientMarketBuyMessage",
+          "kind": "interface",
+          "start": 436,
+          "end": 437
         }
       ]
     },

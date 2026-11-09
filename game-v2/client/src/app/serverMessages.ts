@@ -418,6 +418,8 @@ const TABLE: Handlers = {
   bossWindow: (h, msg) => { h.bossUI.window(msg); },
   bossDev: (_h, msg) => { devFeeds.bossDev?.(msg); },
   questStep: (h, msg) => {
+    // (A finished job: the reward screen, ui/rewards)
+    if (msg.done) { h.quests.jobDone(msg.done); return; }
     h.quests.stepDone(msg.text);
     h.toasts.show(`Next: ${msg.text}`, 'info');
   },

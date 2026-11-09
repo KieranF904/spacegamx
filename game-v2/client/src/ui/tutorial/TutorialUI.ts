@@ -10,12 +10,13 @@
 import { EntityType, TUTORIAL_PANELS, objectPos } from '@space-game/common';
 import type { ClientMessage, ServerTutorialStateMessage, TutorialPanel } from '@space-game/common';
 import type { GameState } from '../../state/GameState';
+import { packRewardLines } from '../rewards/rewardModel';
 import { TutorialMarkers } from './TutorialMarkers';
 import { TutorialPanel as PanelView } from './TutorialPanel';
 import { Glow, domGlowHost } from './glow';
 import { domFind, findAnchor } from './placement';
 import { leaveMessage, onTutorial, onTutorialEdge, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
-import { lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
+import { lookFor, newlyDone, targetGained, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
 import { clearTrainingBodies, setTrainingBody } from '../../state/trainingBodies';
 
 export interface TutorialUIDeps {
@@ -28,6 +29,8 @@ export interface TutorialUIDeps {
   /** The pilot is flying in helm mode (nose-relative keys), not mouse-steer */
   helm(): boolean;
   itemName(id: string): string;
+  /** An item's icon (an image URL), for the graduate screen */
+  itemIcon?(id: string): string;
   sound(id: string, v?: number): void;
   /** Which of the reportable panels are open right now */
   panelsOpen(): Partial<Record<TutorialPanel, boolean>>;
@@ -97,7 +100,7 @@ export class TutorialUI {
   /** The instruction card for the state and the control mode now */
   private showCard(): void {
     const s = this.cur;
-    this.panel.set(s ? panelModel(s, tutorialData, this.d.keyOf, this.d.helm()) : null, packLines(tutorialData, (id) => this.d.itemName(id)));
+    this.panel.set(s ? panelModel(s, tutorialData, this.d.keyOf, this.d.helm()) : null, packRewardLines(tutorialData.starterPack, { item: (id) => this.d.itemName(id), icon: this.d.itemIcon }));
   }
 
   /** The yard station (the dock step's mark): the station body nearest the yard's centre, as the client sees it */

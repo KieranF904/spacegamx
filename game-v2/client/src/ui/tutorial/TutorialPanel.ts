@@ -8,6 +8,8 @@
  */
 
 import { esc } from '../escape';
+import { RewardScreen } from '../rewards/RewardScreen';
+import type { RewardLine } from '../rewards/rewardModel';
 import { LeaveFlow, type PanelModel } from './tutorialModel';
 import { cardPosition, type CardAnchor, type Rect } from './placement';
 
@@ -24,7 +26,7 @@ function injectStyles(): void {
   padding: 10px 14px 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(16, 30, 52, 0.94), rgba(8, 16, 30, 0.94));
   border: 1px solid rgba(251, 191, 36, 0.55); box-shadow: 0 0 26px rgba(251, 191, 36, 0.12), 0 10px 34px rgba(0,0,0,0.5);
   color: #e5ecf7; font: 13px 'Segoe UI', system-ui, sans-serif; line-height: 1.45; }
-.tp[hidden], .tp-done[hidden], .tp-grad[hidden] { display: none; }
+.tp[hidden], .tp-done[hidden] { display: none; }
 .tp-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 2.5px; color: #fbbf24; }
 .tp-t { margin: 3px 0 4px; font: 700 16px 'Segoe UI', sans-serif; color: #fff; }
 .tp-l { margin: 2px 0; color: #cfd8e6; }
@@ -36,25 +38,16 @@ function injectStyles(): void {
 .tp-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); transition: width 0.4s; }
 .tp-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
 .tp-row .q { flex: 1; color: #fca5a5; }
-.tp button, .tp-grad button { all: unset; cursor: pointer; padding: 3px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); color: #d6deeb; font: 600 12px 'Segoe UI', sans-serif; }
-.tp button:hover, .tp-grad button:hover { background: rgba(255,255,255,0.1); color: #fff; }
-.tp button:focus-visible, .tp-grad button:focus-visible { outline: 2px solid #6cc8ff; outline-offset: 1px; }
-.tp button.go, .tp-grad button.go { background: #f59e0b; border-color: #f59e0b; color: #1a1205; }
-.tp button.go:hover, .tp-grad button.go:hover { background: #fbbf24; color: #1a1205; }
+.tp button { all: unset; cursor: pointer; padding: 3px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); color: #d6deeb; font: 600 12px 'Segoe UI', sans-serif; }
+.tp button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.tp button:focus-visible { outline: 2px solid #6cc8ff; outline-offset: 1px; }
+.tp button.go { background: #f59e0b; border-color: #f59e0b; color: #1a1205; }
+.tp button.go:hover { background: #fbbf24; color: #1a1205; }
 .tp button.warn { border-color: rgba(248, 113, 113, 0.7); color: #fecaca; }
 .tp button.leave { border-color: transparent; color: #8394ad; padding: 3px 6px; }
 .tp-done { position: absolute; top: 7px; right: 10px; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 10px; border-radius: 999px; pointer-events: none;
   background: rgba(10, 40, 28, 0.94); border: 1px solid rgba(74, 222, 128, 0.7); color: #bbf7d0; font: 600 11px 'Segoe UI', sans-serif; animation: tpToast 2.6s ease-out forwards; }
 @keyframes tpToast { 0% { opacity: 0; transform: translateY(-4px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
-.tp-grad { position: fixed; inset: 0; z-index: 2200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 6, 14, 0.78); }
-.tp-grad > div { width: min(420px, 100%); box-sizing: border-box; padding: 22px 24px; border-radius: 14px; text-align: center; color: #e5ecf7; font: 14px 'Segoe UI', system-ui, sans-serif;
-  background: linear-gradient(180deg, rgba(16, 30, 52, 0.98), rgba(8, 16, 30, 0.98)); border: 1px solid rgba(251, 191, 36, 0.6); box-shadow: 0 0 40px rgba(251, 191, 36, 0.18); }
-.tp-grad h2 { margin: 0 0 6px; font: 700 22px 'Segoe UI', sans-serif; color: #fbbf24; letter-spacing: 1px; }
-.tp-grad p { margin: 4px 0; color: #cfd8e6; }
-.tp-grad ul { list-style: none; margin: 12px 0 16px; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); text-align: left; max-height: 40vh; overflow: auto; }
-.tp-grad li { padding: 1px 0; }
-.tp-grad p.tp-sub { margin: -6px 0 14px; font-size: 12px; color: #8fa0b8; }
-.tp-grad button { padding: 7px 26px; font-size: 14px; }
 /* Over a window (the station's, the hold), the hangar or the map: the same card, moved by it (placement.ts), above its veil; it glides there */
 .tp.anch { z-index: 2600; }
 @media (prefers-reduced-motion: reduce) { .tp { transition: none; } .tp-done { animation: none; } .tp-bar > i { transition: none; } }
@@ -76,10 +69,10 @@ export class TutorialPanel {
   private body = document.createElement('div');
   private toastEl = document.createElement('div');
   private toastTimer = 0;
-  private grad = document.createElement('div');
+  private grad: RewardScreen;
   private flow: LeaveFlow;
   private model: PanelModel | null = null;
-  private pack: string[] = [];
+  private pack: RewardLine[] = [];
   /** What is drawn now, so an unchanged state does not rebuild (and drop a click in flight) */
   private shown = '';
   /** The last spot worked out (an unchanged one is not set again) and whether the card has had its first */
@@ -97,15 +90,13 @@ export class TutorialPanel {
     this.toastEl.hidden = true;
     this.toastEl.setAttribute('role', 'status');
     this.card.append(this.body, this.toastEl);
-    this.grad.className = 'tp-grad';
-    this.grad.hidden = true;
-    document.body.append(this.card, this.grad);
+    this.grad = new RewardScreen({ sound: (id, v) => d.sound(id, v) });
+    document.body.append(this.card);
     this.card.addEventListener('click', (e) => this.click(e));
-    this.grad.addEventListener('click', (e) => this.click(e));
   }
 
   /** Show this card (null hides everything); `pack` is the graduate screen's list */
-  set(model: PanelModel | null, pack: string[]): void {
+  set(model: PanelModel | null, pack: RewardLine[]): void {
     this.model = model;
     this.pack = pack;
     if (!model) this.flow.reset();
@@ -179,19 +170,24 @@ export class TutorialPanel {
 
   private render(): void {
     const m = this.model;
-    const key = m ? `${m.stepId}|${this.flow.phase}|${m.progress}|${m.counter ? m.counter.done : ''}|${m.lines.join('~')}|${this.pack.join('~')}` : '';
+    const key = m ? `${m.stepId}|${this.flow.phase}|${m.progress}|${m.counter ? m.counter.done : ''}|${m.lines.join('~')}|${this.pack.map((l) => `${l.count ?? ''}${l.label}`).join('~')}` : '';
     if (key === this.shown) return;
     this.shown = key;
-    if (!m) { this.card.hidden = true; this.grad.hidden = true; return; }
+    if (!m) { this.card.hidden = true; this.grad.hide(); return; }
     if (m.graduate) {
       this.card.hidden = true;
-      this.grad.hidden = false;
-      this.grad.innerHTML = `<div role="dialog" aria-label="Training complete"><h2>Training complete</h2><p>You know the whole loop. Here is your starter pack:</p>
-        <ul>${this.pack.map((l) => `<li>${esc(l)}</li>`).join('')}</ul><p class="tp-sub">It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.</p><button class="go" data-a="enter">Enter Sol</button></div>`;
-      this.grad.querySelector<HTMLButtonElement>('[data-a="enter"]')?.focus();
+      this.grad.show({
+        mode: 'modal', title: 'Training complete', intro: 'You know the whole loop. Here is your starter pack:', lines: this.pack,
+        note: 'It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.', button: 'Enter Sol',
+        onClose: () => {
+          this.flow.enter();
+          // (If the server never answers, the button comes back)
+          window.setTimeout(() => { this.flow.reset(); this.render(); }, 6000);
+        },
+      });
       return;
     }
-    this.grad.hidden = true;
+    this.grad.hide();
     if (this.card.hidden) { this.placed = ''; this.positioned = false; }
     this.card.hidden = false;
     const confirm = this.flow.phase === 'confirm', sent = this.flow.phase === 'sent';
@@ -212,7 +208,6 @@ export class TutorialPanel {
     else if (a === 'ask') this.flow.ask();
     else if (a === 'no') this.flow.cancel();
     else if (a === 'yes') this.flow.confirm();
-    else if (a === 'enter') this.flow.enter();
     // (If the server never answers, the buttons come back)
     if (this.flow.phase === 'sent') window.setTimeout(() => { this.flow.reset(); this.render(); }, 6000);
     this.d.sound('ui_click', 0.4);
