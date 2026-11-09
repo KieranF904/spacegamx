@@ -10,6 +10,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from './loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { COMBAT_RULES } from '../gameServer/combatLock.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -253,7 +254,8 @@ describe('saved progress', () => {
     s.t.disconnect();
     s.server.step();
     expect(bitecs.hasComponent(world, (await import('@space-game/common')).Dead, s.pid)).toBe(false);
-    for (let i = 0; i < 60 * 21; i++) s.server.step();
+    // (It lingers until lock + linger seconds after the last combat event: combatLock.ts)
+    for (let i = 0; i < 60 * (COMBAT_RULES.lockSeconds + COMBAT_RULES.lingerSeconds + 1); i++) s.server.step();
     expect(bitecs.hasComponent(world, (await import('@space-game/common')).Dead, s.pid) || !bitecs.entityExists(world, s.pid)).toBe(true);
     await settle();
     expect(await store.load(7)).not.toBeNull();

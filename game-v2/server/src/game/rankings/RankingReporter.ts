@@ -63,7 +63,7 @@ export class RankingReporter {
   /** Send what's waiting (one batch; `force`: now, whatever the pace, as at shutdown). Never throws */
   async flush(force = false): Promise<void> {
     const t = this.now();
-    const wait = this.failures ? Math.min(MAX_BACKOFF_MS, SEND_MS * 2 ** this.failures) : SEND_MS;
+    const wait = this.failures ? Math.min(MAX_BACKOFF_MS, SEND_MS * (1 << Math.min(this.failures, 20))) : SEND_MS;
     if (!force && t - this.lastSend < wait) return;
     if (!this.inflight) {
       if (!this.pending.size) return;
