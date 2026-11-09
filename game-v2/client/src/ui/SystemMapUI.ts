@@ -43,7 +43,7 @@ import { drawJump, landingDanger, drawYou, label, placeLabels, drawLabel } from 
 import { updateTooltip, destRows, injectStyles } from './systemMap/tooltip';
 import { drawRings, drawRegions, drawBelts, drawGravity, drawChargingRing, drawCentral, drawZones, drawPlanets, drawStructures, drawLodestones, drawPocketWays, drawNests, drawComets } from './systemMap/layersWorld';
 import { drawGhosts, drawHostiles, drawFreighters, drawDerelicts, drawYourWreck, drawStations, drawGates, drawPilots } from './systemMap/layersTraffic';
-import { drawBossLairs, drawRoute, drawPings } from './systemMap/layersGuides';
+import { drawBossLairs, drawRoute, drawPings, drawGuideMarks } from './systemMap/layersGuides';
 import { JUMP, SECTOR_COLORS, BODY_NAMES, seeded } from './systemMap/mapConsts';
 import type { View, Camera, Fit, Hit } from './systemMap/types';
 import { actionable } from './systemMap/types';
@@ -724,6 +724,7 @@ export class SystemMapUI implements MapHost {
     drawBossLairs(this, sc);
     drawRoute(this, sc);
     drawPings(this, sc);
+    drawGuideMarks(sc);
     // You: a pulsing beacon with your heading and velocity, drawn last so nothing covers it
     this.notesOverlay?.(ctx, sx, sy, S, w, h);
     if (me) this.drawJump(ctx, me, sx, sy, S, time);

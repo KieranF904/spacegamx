@@ -73,14 +73,14 @@
       "title": "Place a part",
       "lines": ["Click Open hangar on the station's Overview tab.", "Pick Hull on the left, click next to your ship, then Save."],
       "trigger": { "kind": "partPlaced" },
-      "highlight": [".sgw-tab[data-tab=\"overview\"]","[data-tut=\"open-hangar\"]",".hp-pick[data-part*=\":hull:\"]"]
+      "highlight": [".sgw-tab[data-tab=\"overview\"]","[data-tut=\"open-hangar\"]",".hp-row:has(> .hp-pick[data-part*=\":hull:\"])","[data-tut=\"hangar-save\"][data-added*=\":hull:\"]"]
     },
     {
       "id": "power",
       "title": "Add a generator",
       "lines": ["On the Power tab, place the Cell Reactor we gave you, then Save.", "Press {powerFlow} to see power flow: an out port must meet an in port."],
       "trigger": { "kind": "powered" },
-      "highlight": ["[data-tut=\"open-hangar\"]",".hp-tab[data-tab=\"power\"]","[data-part*=\":power_cell_reactor:\"]"],
+      "highlight": ["[data-tut=\"open-hangar\"]",".hp-tab[data-tab=\"power\"]",".hp-row:has(> .hp-pick[data-part*=\":power_cell_reactor:\"])","[data-tut=\"hangar-save\"][data-added*=\":power_cell_reactor:\"]"],
       "grant": { "part:alloy:power_cell_reactor:sq": 1 }
     },
     {
@@ -100,7 +100,7 @@
     {
       "id": "jump",
       "title": "Jump to the marker",
-      "lines": ["Zoom out with the mouse wheel until you see the Jump here marker.", "Put the cursor in it and press {jump} to jump there."],
+      "lines": ["Zoom out with the wheel, or press {map}, to see the Jump here ring.", "Put the cursor inside the ring and press {jump} to jump there."],
       "trigger": { "kind": "jumped", "objects": ["exit_marker"] },
       "highlight": [".gm-close"],
       "targets": ["exit_marker"]
