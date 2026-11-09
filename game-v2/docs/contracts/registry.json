@@ -9786,9 +9786,9 @@
       "id": "protocol.combat",
       "path": "common/src/network/combatProtocol.ts",
       "group": "common/network",
-      "lines": 20,
-      "owns": "the combat lock told to a signed-in pilot: how long quitting would still leave their ship in space (JSON)",
-      "needs": "nothing (type-only); re-exported through protocol.ts (ServerMessage)",
+      "lines": 29,
+      "owns": "the combat lock told to a signed-in pilot: how long quitting would still leave their ship in space (JSON), and the lock's numbers (COMBAT_RULES), which the server enforces and the field guide quotes",
+      "needs": "nothing; re-exported through protocol.ts (ServerMessage)",
       "events": "",
       "invariants": [
         {
@@ -9798,21 +9798,28 @@
       ],
       "extend": "a new message is an interface plus a member of CombatServerMessage; then its entry in client/src/app/serverMessages.ts and the golden pin (server/src/golden/serverMessages.json)",
       "exports": [
+        "COMBAT_RULES",
         "CombatServerMessage",
         "ServerCombatLockMessage"
       ],
       "sections": [
         {
+          "name": "COMBAT_RULES",
+          "kind": "const",
+          "start": 11,
+          "end": 17
+        },
+        {
           "name": "ServerCombatLockMessage",
           "kind": "interface",
-          "start": 10,
-          "end": 18
+          "start": 19,
+          "end": 27
         },
         {
           "name": "CombatServerMessage",
           "kind": "type",
-          "start": 20,
-          "end": 20
+          "start": 29,
+          "end": 29
         }
       ]
     },
@@ -18409,7 +18416,7 @@
       "id": "server.gameserver.combat-lock",
       "path": "server/src/gameServer/combatLock.ts",
       "group": "server/gameServer",
-      "lines": 107,
+      "lines": 102,
       "owns": "the combat lock (dealing or taking damage lately), a pilot's ship lingering after they quit in it, taking that same ship back on rejoining, and telling the pilot's HUD how long the lock has left",
       "needs": "GameServer (type), @space-game/common, CombatClock (gs.combat), ShipBridge lastDamagedTick, Pilots.adopt; npm: bitecs",
       "events": "",
@@ -18423,7 +18430,7 @@
           "test": "server/src/gameServer/combatLock.test.ts"
         }
       ],
-      "extend": "the numbers are COMBAT_RULES; a new kind of combat event feeds gs.combat (hosts/ship.ts notifyDamage)",
+      "extend": "the numbers are COMBAT_RULES (common/network/combatProtocol.ts); a new kind of combat event feeds gs.combat (hosts/ship.ts notifyDamage)",
       "exports": [
         "COMBAT_RULES",
         "combatLeft",
@@ -18434,58 +18441,52 @@
       ],
       "sections": [
         {
-          "name": "COMBAT_RULES",
-          "kind": "const",
-          "start": 18,
-          "end": 24
-        },
-        {
           "name": "ticks",
           "kind": "const",
-          "start": 26,
-          "end": 26
+          "start": 21,
+          "end": 21
         },
         {
           "name": "lastCombatTick",
+          "kind": "function",
+          "start": 23,
+          "end": 26
+        },
+        {
+          "name": "combatLeft",
           "kind": "function",
           "start": 28,
           "end": 31
         },
         {
-          "name": "combatLeft",
-          "kind": "function",
-          "start": 33,
-          "end": 36
-        },
-        {
           "name": "isLive",
           "kind": "const",
-          "start": 38,
-          "end": 39
+          "start": 33,
+          "end": 34
         },
         {
           "name": "startLinger",
           "kind": "function",
-          "start": 41,
-          "end": 51
+          "start": 36,
+          "end": 46
         },
         {
           "name": "reinhabit",
           "kind": "function",
-          "start": 53,
-          "end": 85
+          "start": 48,
+          "end": 80
         },
         {
           "name": "toldAt",
           "kind": "const",
-          "start": 87,
-          "end": 87
+          "start": 82,
+          "end": 82
         },
         {
           "name": "tellCombatLocks",
           "kind": "function",
-          "start": 89,
-          "end": 107
+          "start": 84,
+          "end": 102
         }
       ]
     },
