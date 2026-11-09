@@ -7763,16 +7763,170 @@
       ]
     },
     {
+      "id": "client.ui.resource-cards",
+      "path": "client/src/ui/resources/entryCards.ts",
+      "group": "client/ui/resources",
+      "lines": 147,
+      "owns": "the two levels of detail for a guide entry (resource, rock, enemy or system): a small PREVIEW (icon, name, the short hint and the one most important source row) and the EXTENDED details (every section, icons that open other entries), as escaped HTML",
+      "needs": "resourceData (entries, source index), guideChips (the chips and the icons), tiers, ../escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "chances and shares only ever show as tier pips and words, never a number or percentage",
+          "test": "client/src/ui/resources/entryCards.test.ts"
+        },
+        {
+          "text": "every icon in the extended details that has an entry is a data-go button, the preview has none (it is not clickable)",
+          "test": "client/src/ui/resources/entryCards.test.ts"
+        },
+        {
+          "text": "a system, rock, enemy and resource list each other (a rock card lists its systems, a system card its rocks)",
+          "test": "client/src/ui/resources/entryCards.test.ts"
+        }
+      ],
+      "extend": "a new section is one more push in the matching card function here",
+      "exports": [
+        "CARDS_CSS",
+        "View",
+        "detailHtml",
+        "entryIds",
+        "entryName",
+        "previewHtml"
+      ],
+      "sections": [
+        {
+          "name": "View",
+          "kind": "type",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "CARDS_CSS",
+          "kind": "const",
+          "start": 19,
+          "end": 30
+        },
+        {
+          "name": "ORDER",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "byTier",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "sec",
+          "kind": "const",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "lines",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "Card",
+          "kind": "interface",
+          "start": 37,
+          "end": 38
+        },
+        {
+          "name": "MAX",
+          "kind": "const",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "OTHER",
+          "kind": "const",
+          "start": 41,
+          "end": 41
+        },
+        {
+          "name": "L",
+          "kind": "const",
+          "start": 42,
+          "end": 42
+        },
+        {
+          "name": "resCard",
+          "kind": "function",
+          "start": 44,
+          "end": 69
+        },
+        {
+          "name": "rockCard",
+          "kind": "function",
+          "start": 71,
+          "end": 81
+        },
+        {
+          "name": "enemyCard",
+          "kind": "function",
+          "start": 83,
+          "end": 94
+        },
+        {
+          "name": "sysCard",
+          "kind": "function",
+          "start": 96,
+          "end": 108
+        },
+        {
+          "name": "cardOf",
+          "kind": "function",
+          "start": 110,
+          "end": 115
+        },
+        {
+          "name": "head",
+          "kind": "const",
+          "start": 117,
+          "end": 117
+        },
+        {
+          "name": "previewHtml",
+          "kind": "function",
+          "start": 119,
+          "end": 126
+        },
+        {
+          "name": "detailHtml",
+          "kind": "function",
+          "start": 128,
+          "end": 133
+        },
+        {
+          "name": "entryName",
+          "kind": "function",
+          "start": 135,
+          "end": 141
+        },
+        {
+          "name": "entryIds",
+          "kind": "function",
+          "start": 143,
+          "end": 147
+        }
+      ]
+    },
+    {
       "id": "client.ui.resource-chips",
       "path": "client/src/ui/resources/guideChips.ts",
       "group": "client/ui/resources",
-      "lines": 102,
-      "owns": "the guide's icon chips (item, rock, enemy; tier pips; \"+n\" overflow) as escaped HTML, and the CSS they share",
+      "lines": 121,
+      "owns": "the guide's icon chips (item, rock, enemy, system; tier pips; \"+n\" overflow) as escaped HTML, and the CSS they share",
       "needs": "../escape, resourceData (names, colours), sourceIndex, tiers, thumbnails; ResourceDeps from the host",
       "events": "",
       "invariants": [
         {
-          "text": "a chip that opens an entry is a real button carrying data-go=\"res|rock|enemy:<id>\" with an aria-label, so it works by keyboard",
+          "text": "a chip that opens an entry is a real button carrying data-go=\"res|rock|enemy|sys:<id>\" with an aria-label, so it works by keyboard",
           "test": "client/src/ui/resources/resourceDictionary.test.ts"
         },
         {
@@ -7789,10 +7943,16 @@
         "dash",
         "enemyById",
         "enemyChip",
+        "enemyIcon",
         "itemChip",
+        "itemIcon",
         "itemName",
         "rockById",
-        "rockChip"
+        "rockChip",
+        "rockIcon",
+        "systemById",
+        "systemChip",
+        "systemIcon"
       ],
       "sections": [
         {
@@ -7850,70 +8010,112 @@
           "end": 31
         },
         {
-          "name": "itemName",
-          "kind": "const",
+          "name": "sysMap",
+          "kind": "let",
           "start": 32,
           "end": 32
         },
         {
-          "name": "CHIPS_CSS",
+          "name": "systemById",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "itemName",
           "kind": "const",
           "start": 34,
-          "end": 54
+          "end": 34
+        },
+        {
+          "name": "CHIPS_CSS",
+          "kind": "const",
+          "start": 36,
+          "end": 59
         },
         {
           "name": "chip",
           "kind": "function",
-          "start": 56,
-          "end": 65
+          "start": 61,
+          "end": 70
         },
         {
           "name": "swatch",
           "kind": "const",
-          "start": 67,
-          "end": 67
+          "start": 72,
+          "end": 72
         },
         {
           "name": "img",
           "kind": "const",
-          "start": 68,
-          "end": 68
+          "start": 73,
+          "end": 73
+        },
+        {
+          "name": "itemIcon",
+          "kind": "const",
+          "start": 75,
+          "end": 76
+        },
+        {
+          "name": "rockIcon",
+          "kind": "const",
+          "start": 77,
+          "end": 77
+        },
+        {
+          "name": "enemyIcon",
+          "kind": "const",
+          "start": 78,
+          "end": 78
+        },
+        {
+          "name": "systemIcon",
+          "kind": "const",
+          "start": 79,
+          "end": 80
         },
         {
           "name": "itemChip",
           "kind": "function",
-          "start": 70,
-          "end": 73
+          "start": 82,
+          "end": 85
         },
         {
           "name": "rockChip",
           "kind": "function",
-          "start": 75,
-          "end": 81
+          "start": 87,
+          "end": 93
         },
         {
           "name": "enemyChip",
           "kind": "function",
-          "start": 83,
-          "end": 87
+          "start": 95,
+          "end": 99
+        },
+        {
+          "name": "systemChip",
+          "kind": "function",
+          "start": 101,
+          "end": 106
         },
         {
           "name": "badge",
           "kind": "function",
-          "start": 89,
-          "end": 92
+          "start": 108,
+          "end": 111
         },
         {
           "name": "dash",
           "kind": "const",
-          "start": 94,
-          "end": 94
+          "start": 113,
+          "end": 113
         },
         {
           "name": "chipList",
           "kind": "function",
-          "start": 96,
-          "end": 102
+          "start": 115,
+          "end": 121
         }
       ]
     },
@@ -7921,21 +8123,21 @@
       "id": "client.ui.resource-dictionary",
       "path": "client/src/ui/resources/resourceDictionary.ts",
       "group": "client/ui/resources",
-      "lines": 137,
-      "owns": "the field guide's Resources tab shell: the search box, the Resources / Rocks / Enemies views, category chips, and the click-through between them with a way back",
-      "needs": "resourceTable, sourcePanes, guideChips (the pieces and their CSS), resourceFocus (a pending link), ../escape, DOM (wireResources only)",
+      "lines": 180,
+      "owns": "the field guide's Resources tab shell: the search box, the Resources / Rocks / Enemies / Systems icon grids, category chips, a small preview on mouseover or focus, and an extended-details drawer on click with a way back",
+      "needs": "resourceGrid, entryCards (the tiles and the two card levels), guideChips (the chips and their CSS), resourceFocus (a pending link), ../escape, DOM (wireResources only)",
       "events": "",
       "invariants": [
         {
-          "text": "search, chips and views only hide things, they never re-render, so the box keeps focus while typing",
+          "text": "search, chips and views only hide tiles, they never re-render, so the box keeps focus while typing",
           "test": "client/src/ui/resources/resourceDictionary.test.ts"
         },
         {
-          "text": "a data-go chip opens that rock, enemy or resource, highlights it, and Back returns to where you were",
+          "text": "a data-go chip in the drawer opens that entry, Back returns to the one before, Esc closes the drawer",
           "test": "client/src/ui/resources/resourceDictionary.test.ts"
         }
       ],
-      "extend": "a new view is one pane html function, one entry in VIEWS and one data-go prefix",
+      "extend": "a new view is one grid function, one entry in VIEWS and one data-go prefix",
       "exports": [
         "RESOURCE_CSS",
         "ResourceDeps",
@@ -7944,40 +8146,105 @@
       ],
       "sections": [
         {
-          "name": "View",
-          "kind": "type",
-          "start": 20,
-          "end": 20
-        },
-        {
           "name": "VIEWS",
           "kind": "const",
-          "start": 21,
+          "start": 20,
           "end": 25
         },
         {
-          "name": "state",
-          "kind": "const",
+          "name": "lastDeps",
+          "kind": "let",
           "start": 27,
           "end": 28
         },
         {
+          "name": "state",
+          "kind": "const",
+          "start": 29,
+          "end": 29
+        },
+        {
           "name": "RESOURCE_CSS",
           "kind": "const",
-          "start": 30,
-          "end": 44
+          "start": 31,
+          "end": 51
         },
         {
           "name": "resourcesHtml",
           "kind": "function",
-          "start": 46,
-          "end": 61
+          "start": 53,
+          "end": 69
         },
         {
           "name": "wireResources",
           "kind": "function",
-          "start": 63,
-          "end": 137
+          "start": 71,
+          "end": 180
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-grid",
+      "path": "client/src/ui/resources/resourceGrid.ts",
+      "group": "client/ui/resources",
+      "lines": 62,
+      "owns": "the four icon-grid views (Resources by category, Rocks, Enemies, Systems): one tile per entry, an icon with a small name under it, no rows and no hint text",
+      "needs": "resourceData (entries, source index), guideChips (the icons), entryCards (View), ../escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one tile per entry, carrying data-view-of, data-id, data-cat and the search text",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        },
+        {
+          "text": "a system tile exists only for a public system",
+          "test": "client/src/ui/resources/sourceIndex.test.ts"
+        }
+      ],
+      "extend": "a new view is one function here returning a grid and one entry in VIEWS in resourceDictionary.ts",
+      "exports": [
+        "GRID_CSS",
+        "enemyGridHtml",
+        "resourceGridHtml",
+        "rockGridHtml",
+        "systemGridHtml"
+      ],
+      "sections": [
+        {
+          "name": "GRID_CSS",
+          "kind": "const",
+          "start": 16,
+          "end": 29
+        },
+        {
+          "name": "tile",
+          "kind": "function",
+          "start": 31,
+          "end": 33
+        },
+        {
+          "name": "resourceGridHtml",
+          "kind": "function",
+          "start": 35,
+          "end": 44
+        },
+        {
+          "name": "rockGridHtml",
+          "kind": "function",
+          "start": 46,
+          "end": 49
+        },
+        {
+          "name": "enemyGridHtml",
+          "kind": "function",
+          "start": 51,
+          "end": 54
+        },
+        {
+          "name": "systemGridHtml",
+          "kind": "function",
+          "start": 56,
+          "end": 62
         }
       ]
     },
@@ -7985,7 +8252,7 @@
       "id": "client.ui.resource-index",
       "path": "client/src/ui/resources/resourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 314,
+      "lines": 317,
       "owns": "the resource dictionary's entries: one per ore, gem, refined material, component, pack, ammo crate, cut gem and drop, each with how to get it and what it is used for, derived from the game data",
       "needs": "common/ (FIELD only), sourceIndex + tiers, the data/*.json shapes in GameData below (no I/O, no DOM)",
       "events": "",
@@ -8098,249 +8365,139 @@
           "name": "GameData",
           "kind": "interface",
           "start": 64,
-          "end": 99
+          "end": 102
         },
         {
           "name": "cap",
           "kind": "const",
-          "start": 101,
-          "end": 101
+          "start": 104,
+          "end": 104
         },
         {
           "name": "plural",
           "kind": "const",
-          "start": 102,
-          "end": 102
+          "start": 105,
+          "end": 105
         },
         {
           "name": "secs",
           "kind": "const",
-          "start": 103,
-          "end": 103
+          "start": 106,
+          "end": 106
         },
         {
           "name": "some",
           "kind": "function",
-          "start": 104,
-          "end": 107
+          "start": 107,
+          "end": 110
         },
         {
           "name": "CATEGORY_OF",
           "kind": "const",
-          "start": 109,
-          "end": 111
+          "start": 112,
+          "end": 114
         },
         {
           "name": "categoryOf",
           "kind": "function",
-          "start": 112,
-          "end": 115
+          "start": 115,
+          "end": 118
         },
         {
           "name": "Ctx",
           "kind": "interface",
-          "start": 117,
-          "end": 125
+          "start": 120,
+          "end": 128
         },
         {
           "name": "makeCtx",
           "kind": "function",
-          "start": 127,
-          "end": 140
+          "start": 130,
+          "end": 143
         },
         {
           "name": "SourceFn",
           "kind": "type",
-          "start": 142,
-          "end": 142
+          "start": 145,
+          "end": 145
         },
         {
           "name": "mined",
           "kind": "const",
-          "start": 144,
-          "end": 168
+          "start": 147,
+          "end": 171
         },
         {
           "name": "seam",
           "kind": "const",
-          "start": 170,
-          "end": 178
+          "start": 173,
+          "end": 181
         },
         {
           "name": "trace",
           "kind": "const",
-          "start": 180,
-          "end": 188
+          "start": 183,
+          "end": 191
         },
         {
           "name": "refine",
           "kind": "const",
-          "start": 190,
-          "end": 193
+          "start": 193,
+          "end": 196
         },
         {
           "name": "fabricate",
           "kind": "const",
-          "start": 195,
-          "end": 202
+          "start": 198,
+          "end": 205
         },
         {
           "name": "cut",
           "kind": "const",
-          "start": 204,
-          "end": 210
+          "start": 207,
+          "end": 213
         },
         {
           "name": "drop",
           "kind": "const",
-          "start": 212,
-          "end": 222
+          "start": 215,
+          "end": 225
         },
         {
           "name": "bought",
           "kind": "const",
-          "start": 224,
-          "end": 235
+          "start": 227,
+          "end": 238
         },
         {
           "name": "questReward",
           "kind": "const",
-          "start": 237,
-          "end": 252
+          "start": 240,
+          "end": 255
         },
         {
           "name": "salvage",
           "kind": "const",
-          "start": 254,
-          "end": 260
+          "start": 257,
+          "end": 263
         },
         {
           "name": "SOURCES",
           "kind": "const",
-          "start": 262,
-          "end": 264
+          "start": 265,
+          "end": 267
         },
         {
           "name": "usedFor",
           "kind": "function",
-          "start": 266,
-          "end": 298
+          "start": 269,
+          "end": 301
         },
         {
           "name": "buildResourceIndex",
           "kind": "function",
-          "start": 300,
-          "end": 314
-        }
-      ]
-    },
-    {
-      "id": "client.ui.resource-table",
-      "path": "client/src/ui/resources/resourceTable.ts",
-      "group": "client/ui/resources",
-      "lines": 65,
-      "owns": "the Resources view: one table row per resource, an icon chip per source in its Mined, Dropped by, Made from, Sold at, Rewards and Used for columns",
-      "needs": "resourceData (entries), guideChips (the chips), ../escape",
-      "events": "",
-      "invariants": [
-        {
-          "text": "one row per entry, carrying data-id, data-cat and the search text",
-          "test": "client/src/ui/resources/resourceDictionary.test.ts"
-        },
-        {
-          "text": "an empty column shows a dash, not blank",
-          "test": "client/src/ui/resources/resourceDictionary.test.ts"
-        }
-      ],
-      "extend": "a new column is one cell function here and one header in COLUMNS",
-      "exports": [
-        "TABLE_CSS",
-        "resourceTableHtml"
-      ],
-      "sections": [
-        {
-          "name": "TABLE_CSS",
-          "kind": "const",
-          "start": 16,
-          "end": 29
-        },
-        {
-          "name": "TIER_ORDER",
-          "kind": "const",
-          "start": 31,
-          "end": 31
-        },
-        {
-          "name": "Cell",
-          "kind": "type",
-          "start": 33,
-          "end": 33
-        },
-        {
-          "name": "mined",
-          "kind": "const",
-          "start": 35,
-          "end": 35
-        },
-        {
-          "name": "dropped",
-          "kind": "const",
-          "start": 36,
-          "end": 36
-        },
-        {
-          "name": "madeFrom",
-          "kind": "const",
-          "start": 37,
-          "end": 40
-        },
-        {
-          "name": "soldAt",
-          "kind": "const",
-          "start": 41,
-          "end": 41
-        },
-        {
-          "name": "rewards",
-          "kind": "const",
-          "start": 42,
-          "end": 42
-        },
-        {
-          "name": "OTHER_GLYPH",
-          "kind": "const",
-          "start": 43,
-          "end": 44
-        },
-        {
-          "name": "other",
-          "kind": "const",
-          "start": 45,
-          "end": 45
-        },
-        {
-          "name": "usedIn",
-          "kind": "const",
-          "start": 46,
-          "end": 46
-        },
-        {
-          "name": "COLUMNS",
-          "kind": "const",
-          "start": 48,
-          "end": 51
-        },
-        {
-          "name": "rowHtml",
-          "kind": "function",
-          "start": 53,
-          "end": 59
-        },
-        {
-          "name": "resourceTableHtml",
-          "kind": "function",
-          "start": 61,
-          "end": 65
+          "start": 303,
+          "end": 317
         }
       ]
     },
@@ -8348,7 +8505,7 @@
       "id": "client.ui.resource-sources",
       "path": "client/src/ui/resources/sourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 121,
+      "lines": 173,
       "owns": "the guide's source side of the resource index: every rock (what it yields, where it is found), every enemy and boss (what it drops, where it is found), and per item the icon-chip columns (mined, dropped, made from, sold at, rewards, used in)",
       "needs": "the GameData shape from resourceIndex.ts (type only), tiers (no I/O, no DOM)",
       "events": "",
@@ -8370,7 +8527,9 @@
         "Recipe",
         "RockEntry",
         "SourceIndex",
+        "SystemEntry",
         "buildSourceIndex",
+        "isPublicSystem",
         "rockSystemMap"
       ],
       "sections": [
@@ -8381,123 +8540,100 @@
           "end": 13
         },
         {
-          "name": "RockEntry",
+          "name": "SystemEntry",
           "kind": "interface",
           "start": 14,
-          "end": 22
+          "end": 21
         },
         {
-          "name": "EnemyEntry",
+          "name": "RockEntry",
           "kind": "interface",
-          "start": 23,
-          "end": 29
-        },
-        {
-          "name": "Recipe",
-          "kind": "interface",
-          "start": 30,
+          "start": 22,
           "end": 30
         },
         {
-          "name": "ItemColumns",
+          "name": "EnemyEntry",
           "kind": "interface",
           "start": 31,
           "end": 39
         },
         {
-          "name": "SourceIndex",
+          "name": "Recipe",
           "kind": "interface",
           "start": 40,
           "end": 40
         },
         {
+          "name": "ItemColumns",
+          "kind": "interface",
+          "start": 41,
+          "end": 51
+        },
+        {
+          "name": "SourceIndex",
+          "kind": "interface",
+          "start": 52,
+          "end": 52
+        },
+        {
+          "name": "TIER_RANK",
+          "kind": "const",
+          "start": 54,
+          "end": 54
+        },
+        {
+          "name": "better",
+          "kind": "const",
+          "start": 55,
+          "end": 55
+        },
+        {
+          "name": "isPublicSystem",
+          "kind": "function",
+          "start": 57,
+          "end": 60
+        },
+        {
           "name": "rockSystemMap",
           "kind": "function",
-          "start": 42,
-          "end": 56
+          "start": 62,
+          "end": 76
         },
         {
           "name": "cap",
           "kind": "const",
-          "start": 58,
-          "end": 58
+          "start": 78,
+          "end": 78
         },
         {
           "name": "sum",
           "kind": "const",
-          "start": 59,
-          "end": 59
+          "start": 79,
+          "end": 79
         },
         {
           "name": "rocks",
           "kind": "function",
-          "start": 61,
-          "end": 72
+          "start": 81,
+          "end": 92
         },
         {
           "name": "enemies",
           "kind": "function",
-          "start": 74,
-          "end": 97
+          "start": 94,
+          "end": 117
+        },
+        {
+          "name": "systems",
+          "kind": "function",
+          "start": 119,
+          "end": 143
         },
         {
           "name": "buildSourceIndex",
           "kind": "function",
-          "start": 99,
-          "end": 121
-        }
-      ]
-    },
-    {
-      "id": "client.ui.resource-sources-view",
-      "path": "client/src/ui/resources/sourcePanes.ts",
-      "group": "client/ui/resources",
-      "lines": 50,
-      "owns": "the Rocks and Enemies views: one row per rock or enemy with its picture, where it is found, and an icon chip per resource it yields or drops (a tier on each, no numbers)",
-      "needs": "resourceData (the source index), guideChips (the chips), ../escape",
-      "events": "",
-      "invariants": [
-        {
-          "text": "a row carries data-id and its search text; every yield or drop chip opens that resource",
-          "test": "client/src/ui/resources/resourceDictionary.test.ts"
-        }
-      ],
-      "extend": "a new source kind is one more list function here, one more pane in resourceDictionary.ts",
-      "exports": [
-        "PANES_CSS",
-        "enemiesHtml",
-        "rocksHtml"
-      ],
-      "sections": [
-        {
-          "name": "PANES_CSS",
-          "kind": "const",
-          "start": 13,
-          "end": 23
-        },
-        {
-          "name": "LEGEND",
-          "kind": "const",
-          "start": 25,
-          "end": 25
-        },
-        {
-          "name": "row",
-          "kind": "function",
-          "start": 27,
-          "end": 31
-        },
-        {
-          "name": "rocksHtml",
-          "kind": "function",
-          "start": 33,
-          "end": 41
-        },
-        {
-          "name": "enemiesHtml",
-          "kind": "function",
-          "start": 43,
-          "end": 50
+          "start": 145,
+          "end": 173
         }
       ]
     },

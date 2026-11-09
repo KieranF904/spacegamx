@@ -9,7 +9,7 @@
  */
 
 import { FIELD } from '@space-game/common';
-import { buildSourceIndex, rockSystemMap, type ItemColumns, type SourceIndex } from './sourceIndex';
+import { buildSourceIndex, isPublicSystem, rockSystemMap, type ItemColumns, type SourceIndex } from './sourceIndex';
 import { TIER_LABEL, tierOf } from './tiers';
 
 /** The categories the dictionary filters by (ship parts are generated and left out) */
@@ -77,7 +77,10 @@ export interface GameData {
     seams: { gem: string; hardness: number; minTier: number; weight: number }[];
     traces: Record<string, { from: string[]; per100: number[]; megaOnly?: boolean }>;
   };
-  systems: { id: string; name: string; danger: number; asteroidField?: string; asteroidBelt?: { extra?: { field?: string }[] }; nests?: { faction?: string }[] }[];
+  systems: {
+    id: string; name: string; danger: number; sector?: string; starColor?: string; asteroidField?: string; asteroidBelt?: { extra?: { field?: string }[] }; nests?: { faction?: string }[];
+    private?: boolean; tutorial?: boolean; gunRange?: unknown; surface?: unknown; instance?: unknown;
+  }[];
   stations: { id: string; name: string; system: string; market?: { sells?: string[] } }[];
   bosses: Record<string, { name: string; system: string; faction?: string; design?: string; loot?: DropRow[] }>;
   factions: Record<string, { name: string; color?: string; ships?: Record<string, unknown>; loot?: DropRow[] }>;
@@ -170,7 +173,7 @@ const mined: SourceFn = (c, it) => {
 const seam: SourceFn = (c, it) => {
   const s = c.d.mining.seams.find((x) => x.gem === it.id);
   if (!s) return [];
-  const where = c.d.systems.filter((x) => x.danger >= s.minTier && x.asteroidField);
+  const where = c.d.systems.filter((x) => isPublicSystem(x) && x.danger >= s.minTier && x.asteroidField);
   return [{
     kind: 'seam', text: `Gem seams in belt rock, hardness ${s.hardness}, in systems of danger ${s.minTier} and up (more seams the higher the danger)`,
     where: where.sort((a, b) => a.danger - b.danger).map((x) => `${x.name} (danger ${x.danger})`),
@@ -307,7 +310,7 @@ export function buildResourceIndex(d: GameData, src: SourceIndex = buildSourceIn
     const sources = SOURCES.flatMap((f) => f(c, it)).sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
     out.push({
       id: it.id, name: it.name, category, color: it.color, rarity: it.rarity, value: it.value, description: it.description,
-      sources, usedFor: usedFor(c, it), hint: d.hints[it.id], cols: src.columns.get(it.id) ?? { mined: [], dropped: [], madeFrom: [], soldAt: [], rewards: [], usedIn: [] }, notObtainable: sources.length === 0,
+      sources, usedFor: usedFor(c, it), hint: d.hints[it.id], cols: src.columns.get(it.id) ?? { mined: [], dropped: [], madeFrom: [], soldAt: [], rewards: [], usedIn: [], systems: [] }, notObtainable: sources.length === 0,
     });
   }
   return out.sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category));
