@@ -247,6 +247,12 @@ export class GameMenuUI {
     }, 500);
   }
 
+  /** Open the field guide on a tab (e.g. a link to the Resources entry of an item) */
+  openGuide(tab: GuideTab): void {
+    this.guideTab = tab;
+    if (this.open_) { this.page = 'guide'; this.render(); } else this.open('guide');
+  }
+
   close(): void {
     if (!this.open_) return;
     this.stopListening();

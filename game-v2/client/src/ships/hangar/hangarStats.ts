@@ -19,6 +19,8 @@ import { itemIcon } from '../../ui/itemIcons';
 import { shipSummary, designFields, ShipSummary, BIGGER_IS_BETTER, jumpRatioNote } from '../shipSummary';
 import type { HangarHost } from './host';
 import { btnCss } from './hangarWidgets';
+import { stationCost } from '../build/planCost';
+import { stationReadoutHtml, bindResourceLinks } from '../build/planCostView';
 
 /** The build panel: what host slot still needs, and buttons to make it */
 export function buildHtml(host: HangarHost): string {
@@ -67,6 +69,9 @@ export function buildHtml(host: HangarHost): string {
       html += `<div style="display:flex; justify-content:space-between; gap:6px"><span>${n} × ${label}</span>${status}</div>`;
     }
     html += `</div>`;
+    // What the rest takes against storage and the hold, and about how long the station needs (short materials link to the field guide)
+    const cost = stationReadoutHtml(stationCost(econ, need, (id) => host.deps.have(id), coming, (id) => host.deps.canMake(id)), (id) => econ.items.name(id));
+    if (cost) html += `<div data-plancost style="${font} font-size:11px; line-height:1.5; color:#c4cfde; margin-bottom:6px">${cost}</div>`;
     if (Object.keys(materials).length) {
       html += `<div style="${font} font-size:11px; color:#8ea0bd; margin-bottom:4px">Fabricating the rest takes:</div>
         <div style="${font} font-size:11px; white-space:normal; margin-bottom:6px">${costHtml(econ, materials, (id) => host.deps.have(id))}</div>`;
@@ -137,6 +142,7 @@ export function ammoHtml(host: HangarHost): string {
 }
 
 export function bindBuildButtons(host: HangarHost): void {
+  bindResourceLinks(host.stats);
   const act = (a: string, fn: () => void) => { const b = host.stats.querySelector<HTMLButtonElement>(`[data-act="${a}"]`); if (b) b.onclick = fn; };
   // Ammunition: a crate more or fewer, the one that opens first, an order for what's short
   const load = host.deps.hangarState()?.slots[host.slot]?.loadout ?? {};

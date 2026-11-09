@@ -2050,6 +2050,176 @@
       ]
     },
     {
+      "id": "client.ships.plan-cost",
+      "path": "client/src/ships/build/planCost.ts",
+      "group": "client/ships/build",
+      "lines": 143,
+      "owns": "what a build plan needs against what is in the hold (and what packs cover), the shortfall, and a build-time estimate; the same for a hangar slot against storage",
+      "needs": "@space-game/common (econ field rules, packs, recipes)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "needs, shortfalls and times come from the server's own rules (fieldBuildInputs, fabWork, attachWork, jobTicks)",
+          "test": "client/src/ships/build/planCost.test.ts"
+        },
+        {
+          "text": "parts the fabricator tier can't make add no time and are counted apart",
+          "test": "client/src/ships/build/planCost.test.ts"
+        }
+      ],
+      "extend": "a new stall reason is one more branch in stallNotes",
+      "exports": [
+        "CostLine",
+        "CostReadout",
+        "FieldCostOpts",
+        "StationReadout",
+        "durationText",
+        "emptyReadout",
+        "planCost",
+        "stallNotes",
+        "stationCost",
+        "withMachine"
+      ],
+      "sections": [
+        {
+          "name": "CostLine",
+          "kind": "interface",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "CostReadout",
+          "kind": "interface",
+          "start": 15,
+          "end": 29
+        },
+        {
+          "name": "FieldCostOpts",
+          "kind": "interface",
+          "start": 31,
+          "end": 38
+        },
+        {
+          "name": "emptyReadout",
+          "kind": "const",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "planCost",
+          "kind": "function",
+          "start": 42,
+          "end": 72
+        },
+        {
+          "name": "stallNotes",
+          "kind": "function",
+          "start": 74,
+          "end": 83
+        },
+        {
+          "name": "withMachine",
+          "kind": "function",
+          "start": 85,
+          "end": 88
+        },
+        {
+          "name": "durationText",
+          "kind": "function",
+          "start": 90,
+          "end": 98
+        },
+        {
+          "name": "StationReadout",
+          "kind": "interface",
+          "start": 100,
+          "end": 108
+        },
+        {
+          "name": "stationCost",
+          "kind": "function",
+          "start": 110,
+          "end": 143
+        }
+      ]
+    },
+    {
+      "id": "client.ships.plan-cost-view",
+      "path": "client/src/ships/build/planCostView.ts",
+      "group": "client/ships/build",
+      "lines": 63,
+      "owns": "the words and the small DOM for the plan-cost readout shared by the world build view and the hangar: needs against the hold, what is short (each a link to its Resources entry), the time",
+      "needs": "planCost (the numbers), ../../ui/escape, ../../ui/resources/resourceFocus (the link target); DOM (bindResourceLinks only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every name is escaped",
+          "test": "client/src/ships/build/planCost.test.ts"
+        },
+        {
+          "text": "a short material is a link carrying its item id",
+          "test": "client/src/ships/build/planCost.test.ts"
+        }
+      ],
+      "extend": "a new line is one more piece in fieldReadoutHtml / stationReadoutHtml",
+      "exports": [
+        "bindResourceLinks",
+        "fieldReadoutHtml",
+        "resLink",
+        "stationReadoutHtml"
+      ],
+      "sections": [
+        {
+          "name": "Name",
+          "kind": "type",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "LINK_STYLE",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "resLink",
+          "kind": "function",
+          "start": 17,
+          "end": 20
+        },
+        {
+          "name": "lower",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "shortList",
+          "kind": "function",
+          "start": 24,
+          "end": 27
+        },
+        {
+          "name": "fieldReadoutHtml",
+          "kind": "function",
+          "start": 29,
+          "end": 40
+        },
+        {
+          "name": "stationReadoutHtml",
+          "kind": "function",
+          "start": 42,
+          "end": 50
+        },
+        {
+          "name": "bindResourceLinks",
+          "kind": "function",
+          "start": 52,
+          "end": 63
+        }
+      ]
+    },
+    {
       "id": "client.damage.ambient",
       "path": "client/src/ships/damage/ambient.ts",
       "group": "client/ships/damage",
@@ -3752,7 +3922,7 @@
       "id": "client.hangar.stats",
       "path": "client/src/ships/hangar/hangarStats.ts",
       "group": "client/ships/hangar",
-      "lines": 427,
+      "lines": 433,
       "owns": "the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems",
       "needs": "HangarHost (deps, derived, bp, errors), shipSummary, portsReport; npm: @space-game/common",
       "events": "",
@@ -3776,62 +3946,62 @@
         {
           "name": "buildHtml",
           "kind": "function",
-          "start": 23,
-          "end": 87
+          "start": 25,
+          "end": 92
         },
         {
           "name": "ammoHtml",
           "kind": "function",
-          "start": 89,
-          "end": 137
+          "start": 94,
+          "end": 142
         },
         {
           "name": "bindBuildButtons",
           "kind": "function",
-          "start": 139,
-          "end": 164
+          "start": 144,
+          "end": 170
         },
         {
           "name": "powerHtml",
           "kind": "function",
-          "start": 166,
-          "end": 224
+          "start": 172,
+          "end": 230
         },
         {
           "name": "portsHtml",
           "kind": "function",
-          "start": 226,
-          "end": 239
+          "start": 232,
+          "end": 245
         },
         {
           "name": "summaryHtml",
           "kind": "function",
-          "start": 241,
-          "end": 315
+          "start": 247,
+          "end": 321
         },
         {
           "name": "renderStats",
           "kind": "function",
-          "start": 317,
-          "end": 369
+          "start": 323,
+          "end": 375
         },
         {
           "name": "energyRuns",
           "kind": "const",
-          "start": 371,
-          "end": 381
+          "start": 377,
+          "end": 387
         },
         {
           "name": "ENERGY_ROW_SECONDS",
           "kind": "const",
-          "start": 382,
-          "end": 382
+          "start": 388,
+          "end": 388
         },
         {
           "name": "energyHtml",
           "kind": "function",
-          "start": 384,
-          "end": 427
+          "start": 390,
+          "end": 433
         }
       ]
     },
@@ -5325,7 +5495,7 @@
       "id": "client.ui.resource-dictionary",
       "path": "client/src/ui/resources/resourceDictionary.ts",
       "group": "client/ui/resources",
-      "lines": 111,
+      "lines": 121,
       "owns": "the field guide's Resources tab: a searchable, filterable list of every resource item, rows that open to how to get it and what it is for",
       "needs": "resourceData (the entries), ../escape (esc), DOM (wireResources only)",
       "events": "",
@@ -5350,38 +5520,38 @@
         {
           "name": "ResourceDeps",
           "kind": "interface",
-          "start": 14,
-          "end": 18
+          "start": 15,
+          "end": 19
         },
         {
           "name": "state",
           "kind": "const",
-          "start": 20,
-          "end": 21
+          "start": 21,
+          "end": 22
         },
         {
           "name": "RESOURCE_CSS",
           "kind": "const",
-          "start": 23,
-          "end": 55
+          "start": 24,
+          "end": 56
         },
         {
           "name": "rowHtml",
           "kind": "function",
-          "start": 57,
-          "end": 75
+          "start": 58,
+          "end": 76
         },
         {
           "name": "resourcesHtml",
           "kind": "function",
-          "start": 77,
-          "end": 88
+          "start": 78,
+          "end": 89
         },
         {
           "name": "wireResources",
           "kind": "function",
-          "start": 90,
-          "end": 111
+          "start": 91,
+          "end": 121
         }
       ]
     },
