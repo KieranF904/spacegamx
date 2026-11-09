@@ -7,19 +7,22 @@
  *             gets there, with a reward; rare ones make the news. Kept in the
  *             profile's stats as ach:<id> (and visited systems as sys:<id>).
  *   Rankings  weekly and all-time boards of the RANKED stats, for registered
- *             pilots, saved as a game-wide document in the profile store.
+ *             pilots. Kept by the lobby (one row per account, every server's pilots
+ *             ranked together): this reports changes to it (game/rankings).
  *   News      a galaxy-wide feed: boss kills, fleet ops, levels, rare ribbons,
  *             the week's hunt. New arrivals hear the last few.
  */
 
 import {
-  ServerMessage, RibbonDef, RibbonsFile, ribbonValue, ribbonKey, weekOf, weekEndsIn, RANKED, RankRow,
+  ServerMessage, RibbonDef, RibbonsFile, ribbonValue, ribbonKey, weekEndsIn, RANKED,
 } from '@space-game/common';
 import type { Pilots, PilotConn, PilotEvent } from './Pilots.js';
 import type { ProfileStore } from '../profile/ProfileStore.js';
+import type { RankingsBackend } from './rankings/RankingsBackend.js';
+import { RankingReporter } from './rankings/RankingReporter.js';
+import { migrateRankings } from './rankings/rankingsMigration.js';
 
-/** The rankings document in the profile store */
-export const RANKINGS_DOC = 'rankings';
+export { RANKINGS_DOC } from './rankings/rankingsMigration.js';
 const NEWS_KEEP = 12;
 
 export interface AchievementsHost {
@@ -29,33 +32,20 @@ export interface AchievementsHost {
   now(): number;
 }
 
-interface Board { name: string; v: Record<string, number> }
-interface RankingsDoc { week: number; weekly: Record<string, Board>; allTime: Record<string, Board> }
-
 export class Achievements {
   readonly defs: RibbonDef[];
   private news: { text: string; kind: string; at: number }[] = [];
-  private ranks: RankingsDoc;
-  private ranksDirty = false;
-  private lastSave = 0;
+  /** Rankings changes on their way to the lobby (none without one: a server with no lobby ranks nobody) */
+  private reporter: RankingReporter | null;
+  /** The old per-server rankings document, moved to the lobby once (resolves when done; tests wait on it) */
+  readonly migrated: Promise<unknown>;
 
-  constructor(private host: AchievementsHost, private pilots: Pilots, file: RibbonsFile | undefined, private store: ProfileStore) {
+  constructor(private host: AchievementsHost, private pilots: Pilots, file: RibbonsFile | undefined, store: ProfileStore,
+    private backend?: RankingsBackend, serverName = 'Game Server') {
     this.defs = file?.ribbons ?? [];
-    this.ranks = { week: weekOf(host.now()), weekly: {}, allTime: {} };
-    void this.load();
+    this.reporter = backend ? new RankingReporter(backend, serverName, () => host.now()) : null;
+    this.migrated = backend ? migrateRankings(store, backend, () => host.now()).catch((e) => console.error('[Rankings] migration failed:', e)) : Promise.resolve();
     pilots.onEvent((conn, ev) => this.onEvent(conn, ev));
-  }
-
-  private async load(): Promise<void> {
-    try {
-      const doc = (await this.store.loadDoc(RANKINGS_DOC)) as RankingsDoc | null;
-      if (doc && typeof doc === 'object' && doc.weekly && doc.allTime) {
-        this.ranks = { week: doc.week, weekly: doc.weekly, allTime: { ...doc.allTime, ...this.ranks.allTime } };
-        for (const [k, b] of Object.entries(this.ranks.weekly)) if (!doc.weekly[k]) this.ranks.weekly[k] = b;
-      }
-    } catch (e) {
-      console.error('[Achievements] could not load rankings:', e);
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -148,75 +138,39 @@ export class Achievements {
     if (conn.userId === null || !RANKED.some((r) => r.key === key)) return;
     const p = this.pilots.get(conn);
     if (!p) return;
-    this.roll();
-    const id = String(conn.userId);
-    const w = (this.ranks.weekly[id] ??= { name: conn.username, v: {} });
-    w.name = conn.username;
-    w.v[key] = (w.v[key] ?? 0) + n;
-    const a = (this.ranks.allTime[id] ??= { name: conn.username, v: {} });
-    a.name = conn.username;
-    a.v[key] = p.stats[key] ?? 0;
-    this.ranksDirty = true;
+    this.reporter?.add(conn.userId, key, n, p.stats[key] ?? 0);
   }
 
-  /** A registered pilot logs in: their all-time totals go on the boards (from before rankings existed, too) */
+  /** A registered pilot logs in: their all-time totals go to the lobby (from before rankings existed, too) */
   private seed(conn: PilotConn): void {
     const p = this.pilots.get(conn);
-    if (conn.userId === null || !p) return;
+    if (conn.userId === null || !p || !this.reporter) return;
     const v: Record<string, number> = {};
     for (const r of RANKED) if (p.stats[r.key]) v[r.key] = p.stats[r.key];
-    if (!Object.keys(v).length) return;
-    this.ranks.allTime[String(conn.userId)] = { name: conn.username, v };
-    this.ranksDirty = true;
+    if (Object.keys(v).length) this.reporter.seed(conn.userId, v);
   }
 
-  /** The account was deleted: off the boards */
+  /** The account was deleted: nothing more to report (the lobby takes it off the boards itself) */
   forget(userId: number): void {
-    const id = String(userId);
-    if (!(id in this.ranks.weekly) && !(id in this.ranks.allTime)) return;
-    delete this.ranks.weekly[id];
-    delete this.ranks.allTime[id];
-    this.ranksDirty = true;
+    this.reporter?.forget(userId);
   }
 
-  /** A new week: the weekly boards start again */
-  private roll(): void {
-    const week = weekOf(this.host.now());
-    if (week !== this.ranks.week) {
-      this.ranks.week = week;
-      this.ranks.weekly = {};
-      this.ranksDirty = true;
-    }
-  }
-
+  /** The Rankings tab, for clients that ask this server (the game client reads the lobby itself: network/rankings.ts) */
   rankings(conn: PilotConn): void {
-    this.roll();
-    const id = conn.userId === null ? null : String(conn.userId);
-    const top = (boards: Record<string, Board>, key: string): { rows: RankRow[]; you: number; rank: number } => {
-      const all = Object.entries(boards).filter(([, b]) => (b.v[key] ?? 0) > 0).sort((x, y) => (y[1].v[key] ?? 0) - (x[1].v[key] ?? 0));
-      const i = id ? all.findIndex(([k]) => k === id) : -1;
-      return { rows: all.slice(0, 10).map(([, b]) => ({ name: b.name, value: Math.round(b.v[key] ?? 0) })), you: i >= 0 ? all[i][1].v[key] ?? 0 : 0, rank: i + 1 };
-    };
-    this.host.send(conn, {
-      type: 'rankings', weekEndsIn: weekEndsIn(this.host.now()),
-      boards: RANKED.map((r) => {
-        const w = top(this.ranks.weekly, r.key), a = top(this.ranks.allTime, r.key);
-        return { key: r.key, label: r.label, weekly: w.rows, allTime: a.rows, you: id ? { weekly: Math.round(w.you), allTime: Math.round(a.you), weeklyRank: w.rank, allTimeRank: a.rank } : undefined };
-      }),
-    });
+    void (async () => {
+      const view = await this.backend?.view();
+      this.host.send(conn, {
+        type: 'rankings',
+        weekEndsIn: view?.weekEndsIn ?? weekEndsIn(this.host.now()),
+        boards: view?.boards ?? RANKED.map((r) => ({ key: r.key, label: r.label, weekly: [], allTime: [] })),
+      });
+    })();
   }
 
-  /** Now and then (and at shutdown): save the boards */
+  /** Now and then (and at shutdown): send what changed to the lobby */
   async save(force = false): Promise<void> {
-    const now = this.host.now();
-    if (!this.ranksDirty || (!force && now - this.lastSave < 60_000)) return;
-    this.ranksDirty = false;
-    this.lastSave = now;
-    try {
-      await this.store.saveDoc(RANKINGS_DOC, this.ranks);
-    } catch (e) {
-      this.ranksDirty = true; // (tried again next time)
-      console.error('[Achievements] could not save rankings:', e);
-    }
+    if (!this.reporter) return;
+    await this.migrated;
+    await this.reporter.flush(force);
   }
 }

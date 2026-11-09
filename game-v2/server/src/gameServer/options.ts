@@ -14,6 +14,7 @@ import { type RangeConfig } from '../game/WeaponsRange.js';
 import { type TelemetryWriter } from '../game/Telemetry.js';
 import { type ContribStore } from '../game/ContributorNotes.js';
 import type { FriendsBackend } from '../game/social/FriendsBackend.js';
+import type { RankingsBackend } from '../game/rankings/RankingsBackend.js';
 import { type WorldStore } from '../game/SystemMemory.js';
 import { type ProfileStore } from '../profile/ProfileStore.js';
 import type { AdminServer } from '../AdminServer.js';
@@ -42,6 +43,10 @@ export interface GameServerOptions {
   profileStore?: ProfileStore;
   /** Where friends and status are kept, per account (index.ts: the lobby, LobbyFriends; default: in memory, MemoryFriends) */
   friends?: FriendsBackend;
+  /** Where ranked stats go (index.ts: the lobby, LobbyRankings; default: nowhere, a server with no lobby ranks nobody) */
+  rankings?: RankingsBackend;
+  /** This server's name, as the lobby knows it (rankings reports; default: Game Server) */
+  serverName?: string;
   /** Wall clock (ms) for autosave and fabricator jobs; tests pass a fake one */
   clock?: () => number;
   /** Allow the map's click-to-warp for everyone (dev servers, proto). Admins can always use it. */

@@ -22,6 +22,7 @@ import { BotManager } from './bots/index.js';
 import { installRockeryTools } from './bots/rockeryTools.js';
 import { activity } from './activity/index.js';
 import { LobbyFriends } from './game/social/LobbyFriends.js';
+import { LobbyRankings } from './game/rankings/RankingsBackend.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -84,6 +85,9 @@ const gameServer = new GameServer({
   profileStore,
   // Friends and status live per account in the lobby, so they follow the account to every server (game/social).
   // Without the lobby's secret they're kept in memory only (lost at restart)
+  // Rankings are central too: every pilot's ranked stats are reported to the lobby, which ranks all servers together
+  rankings: LOBBY_ADMIN_SECRET ? new LobbyRankings(BROWSER_URL, LOBBY_ADMIN_SECRET) : undefined,
+  serverName: SERVER_NAME,
   friends: LOBBY_ADMIN_SECRET ? new LobbyFriends(BROWSER_URL, LOBBY_ADMIN_SECRET) : undefined,
   devTeleport: DEV_MODE,
   // The dev weapons range (data/dev/range.json; never in production: GameServer refuses it there too)

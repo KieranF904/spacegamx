@@ -14491,6 +14491,287 @@
       ]
     },
     {
+      "id": "lobby.rankings.board",
+      "path": "server-browser/src/rankings/board.ts",
+      "group": "server-browser/rankings",
+      "lines": 111,
+      "owns": "the ranking rules: what a ranked stat is, how a game server's report and an old rankings document merge into a pilot's row, and how rows become the boards clients see (pure: no I/O, the clock is given)",
+      "needs": "nothing (the lobby has no common dependency, so BOARDS repeats common/econ/ribbons RANKED)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a stat only ever goes up in a row (all time: max of what's there and what's reported)",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        },
+        {
+          "text": "weekly reports are added, so any number of servers sum",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        },
+        {
+          "text": "a row from an earlier week shows no weekly numbers",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        },
+        {
+          "text": "BOARDS matches common RANKED",
+          "test": "server/src/game/rankings/rankings.test.ts"
+        }
+      ],
+      "extend": "a new ranked stat is one entry in BOARDS (and in common RANKED)",
+      "exports": [
+        "BOARDS",
+        "BoardRow",
+        "BoardView",
+        "RankRecord",
+        "Stats",
+        "TOP",
+        "VALUE_MAX",
+        "applyImport",
+        "applyReport",
+        "buildView",
+        "cleanStats",
+        "emptyRecord",
+        "rolled",
+        "sameRecord",
+        "weekEndsIn",
+        "weekOf"
+      ],
+      "sections": [
+        {
+          "name": "BOARDS",
+          "kind": "const",
+          "start": 13,
+          "end": 20
+        },
+        {
+          "name": "WEEK_MS",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "EPOCH_MONDAY",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "weekOf",
+          "kind": "const",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "weekEndsIn",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "TOP",
+          "kind": "const",
+          "start": 28,
+          "end": 29
+        },
+        {
+          "name": "VALUE_MAX",
+          "kind": "const",
+          "start": 30,
+          "end": 30
+        },
+        {
+          "name": "Stats",
+          "kind": "type",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "RankRecord",
+          "kind": "interface",
+          "start": 34,
+          "end": 41
+        },
+        {
+          "name": "BoardRow",
+          "kind": "interface",
+          "start": 43,
+          "end": 43
+        },
+        {
+          "name": "BoardView",
+          "kind": "interface",
+          "start": 44,
+          "end": 47
+        },
+        {
+          "name": "KEYS",
+          "kind": "const",
+          "start": 49,
+          "end": 49
+        },
+        {
+          "name": "cleanStats",
+          "kind": "function",
+          "start": 51,
+          "end": 60
+        },
+        {
+          "name": "emptyRecord",
+          "kind": "function",
+          "start": 62,
+          "end": 64
+        },
+        {
+          "name": "rolled",
+          "kind": "function",
+          "start": 66,
+          "end": 69
+        },
+        {
+          "name": "applyReport",
+          "kind": "function",
+          "start": 71,
+          "end": 78
+        },
+        {
+          "name": "applyImport",
+          "kind": "function",
+          "start": 80,
+          "end": 87
+        },
+        {
+          "name": "sameRecord",
+          "kind": "function",
+          "start": 89,
+          "end": 91
+        },
+        {
+          "name": "buildView",
+          "kind": "function",
+          "start": 93,
+          "end": 111
+        }
+      ]
+    },
+    {
+      "id": "lobby.rankings.routes",
+      "path": "server-browser/src/rankings/routes.ts",
+      "group": "server-browser/rankings",
+      "lines": 225,
+      "owns": "the lobby's rankings: game servers report each pilot's ranked stats, the lobby keeps one row per account and makes the weekly and all-time boards; clients read them here",
+      "needs": "UserStore (accounts exist, sessions), RankingStore, board.ts rules, accounts/RateLimiter + utils",
+      "events": "",
+      "invariants": [
+        {
+          "text": "only a caller with LOBBY_ADMIN_SECRET may report or import",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        },
+        {
+          "text": "servers reporting for the same pilot add up, and a batch sent twice counts once",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        },
+        {
+          "text": "an import is idempotent",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        },
+        {
+          "text": "accounts that don't exist (or were deleted) never get a row",
+          "test": "server-browser/src/rankings/rankings.test.ts"
+        }
+      ],
+      "extend": "a new ranked stat is one entry in board.ts BOARDS; a new route is one case in handle()",
+      "exports": [
+        "BATCHES_KEPT",
+        "IMPORT_LIMIT",
+        "IMPORT_MAX",
+        "REPORTS_PER_MIN",
+        "REPORT_MAX",
+        "RankingRoutes",
+        "VIEWS_PER_MIN",
+        "VIEW_CACHE_MS",
+        "createRankingStore"
+      ],
+      "sections": [
+        {
+          "name": "Json",
+          "kind": "type",
+          "start": 39,
+          "end": 39
+        },
+        {
+          "name": "Body",
+          "kind": "type",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "Pool",
+          "kind": "type",
+          "start": 41,
+          "end": 41
+        },
+        {
+          "name": "REPORT_MAX",
+          "kind": "const",
+          "start": 43,
+          "end": 43
+        },
+        {
+          "name": "REPORTS_PER_MIN",
+          "kind": "const",
+          "start": 44,
+          "end": 44
+        },
+        {
+          "name": "IMPORT_LIMIT",
+          "kind": "const",
+          "start": 45,
+          "end": 45
+        },
+        {
+          "name": "IMPORT_MAX",
+          "kind": "const",
+          "start": 46,
+          "end": 46
+        },
+        {
+          "name": "VIEWS_PER_MIN",
+          "kind": "const",
+          "start": 47,
+          "end": 47
+        },
+        {
+          "name": "BATCHES_KEPT",
+          "kind": "const",
+          "start": 48,
+          "end": 49
+        },
+        {
+          "name": "VIEW_CACHE_MS",
+          "kind": "const",
+          "start": 50,
+          "end": 51
+        },
+        {
+          "name": "createRankingStore",
+          "kind": "function",
+          "start": 53,
+          "end": 60
+        },
+        {
+          "name": "userIdOf",
+          "kind": "const",
+          "start": 62,
+          "end": 65
+        },
+        {
+          "name": "RankingRoutes",
+          "kind": "class",
+          "start": 67,
+          "end": 225
+        }
+      ]
+    },
+    {
       "id": "server.bots.task-registry",
       "path": "server/src/bots/tasks/registry.ts",
       "group": "server/bots/tasks",
@@ -15975,6 +16256,135 @@
       ]
     },
     {
+      "id": "server.rankings.reporter",
+      "path": "server/src/game/rankings/RankingReporter.ts",
+      "group": "server/game/rankings",
+      "lines": 84,
+      "owns": "collecting pilots' ranked-stat changes and sending them to the lobby in batches (retried, never lost on a failed send, never counted twice)",
+      "needs": "RankingsBackend, a clock, common weekOf",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a batch that failed is sent again unchanged (same id) before anything newer",
+          "test": "server/src/game/rankings/rankings.test.ts"
+        },
+        {
+          "text": "sends are at most one per SEND_MS, backing off up to MAX_BACKOFF_MS while the lobby is down",
+          "test": "server/src/game/rankings/rankings.test.ts"
+        },
+        {
+          "text": "at most MAX_PLAYERS pilots wait at once (a long outage can't grow it)",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "nothing: Achievements feeds it (add, seed, forget)",
+      "exports": [
+        "BATCH_MAX",
+        "MAX_BACKOFF_MS",
+        "MAX_PLAYERS",
+        "RankingReporter",
+        "SEND_MS"
+      ],
+      "sections": [
+        {
+          "name": "SEND_MS",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "MAX_BACKOFF_MS",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "BATCH_MAX",
+          "kind": "const",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "MAX_PLAYERS",
+          "kind": "const",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "RankingReporter",
+          "kind": "class",
+          "start": 20,
+          "end": 84
+        }
+      ]
+    },
+    {
+      "id": "server.rankings.backend",
+      "path": "server/src/game/rankings/RankingsBackend.ts",
+      "group": "server/game/rankings",
+      "lines": 89,
+      "owns": "where ranked stats go: the lobby (server-browser/src/rankings), which keeps one row per account and makes the boards for every game server; the game server only reports changes and never ranks anyone itself",
+      "needs": "fetch (the lobby's /admin/rankings/* behind LOBBY_ADMIN_SECRET, /rankings/view), common ServerRankingsMessage",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a report that wasn't taken is sent again with the same batch id, so the lobby counts it once",
+          "test": "server/src/game/rankings/rankings.test.ts"
+        },
+        {
+          "text": "nothing here throws into the game: a lobby that's down is `false` / null",
+          "test": "server/src/game/rankings/rankings.test.ts"
+        }
+      ],
+      "extend": "another place to keep rankings is another implementation of RankingsBackend (index.ts picks it)",
+      "exports": [
+        "LobbyRankings",
+        "RankBatch",
+        "RankPlayerReport",
+        "RankStats",
+        "RankingsBackend",
+        "RankingsImport"
+      ],
+      "sections": [
+        {
+          "name": "RankStats",
+          "kind": "type",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "RankPlayerReport",
+          "kind": "interface",
+          "start": 14,
+          "end": 15
+        },
+        {
+          "name": "RankBatch",
+          "kind": "interface",
+          "start": 17,
+          "end": 25
+        },
+        {
+          "name": "RankingsImport",
+          "kind": "interface",
+          "start": 27,
+          "end": 32
+        },
+        {
+          "name": "RankingsBackend",
+          "kind": "interface",
+          "start": 34,
+          "end": 41
+        },
+        {
+          "name": "LobbyRankings",
+          "kind": "class",
+          "start": 43,
+          "end": 89
+        }
+      ]
+    },
+    {
       "id": "server.sieges.objectives",
       "path": "server/src/game/sieges/objectives/index.ts",
       "group": "server/game/sieges",
@@ -16647,7 +17057,7 @@
       "id": "server.gameserver.options",
       "path": "server/src/gameServer/options.ts",
       "group": "server/gameServer",
-      "lines": 68,
+      "lines": 73,
       "owns": "the GameServer constructor options",
       "needs": "types only; npm: @space-game/common",
       "events": "",
@@ -16665,8 +17075,8 @@
         {
           "name": "GameServerOptions",
           "kind": "interface",
-          "start": 21,
-          "end": 68
+          "start": 22,
+          "end": 73
         }
       ]
     },

@@ -9,12 +9,13 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import type { RankBatch, RankingsBackend } from './rankings/RankingsBackend.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
 
-function world(clock = { t: Date.UTC(2026, 9, 21, 12) }, store = new MemoryProfileStore()) {
+function world(clock = { t: Date.UTC(2026, 9, 21, 12) }, store = new MemoryProfileStore(), rankings?: RankingsBackend) {
   resetGlobals();
   const server = new GameServer({
     gameData: new GameData(files),
@@ -24,6 +25,7 @@ function world(clock = { t: Date.UTC(2026, 9, 21, 12) }, store = new MemoryProfi
     ships: createShipBridge(loadShipConfigCached(dataDir)),
     clock: () => clock.t,
     profileStore: store,
+    rankings,
   });
   const pilot = (name: string) => {
     const t = new LocalTransport(server);
@@ -79,35 +81,51 @@ describe('ribbons', () => {
 });
 
 describe('rankings', () => {
-  it('registered pilots are ranked weekly and all time; a new week starts the weekly boards again', async () => {
-    const w = world();
+  /** A lobby stand-in that keeps what the server reports */
+  function lobby() {
+    const batches: RankBatch[] = [];
+    const backend: RankingsBackend = {
+      report: async (b) => { batches.push(structuredClone(b)); return true; },
+      importDoc: async () => {},
+      view: async () => ({ weekEndsIn: 5, boards: [{ key: 'earned', label: 'Credits earned', weekly: [{ name: 'Zed', value: 9 }], allTime: [] }] }),
+    };
+    return { batches, backend };
+  }
+
+  it('registered pilots are reported to the lobby (weekly changes, all-time totals) and the game server keeps no boards', async () => {
+    const l = lobby();
+    const w = world(undefined, undefined, l.backend);
     (w.a.conn as any).userId = 11;
     (w.b.conn as any).userId = 12;
     w.server.pilots.bumpStat(w.a.conn, 'earned', 500);
+    w.server.pilots.bumpStat(w.a.conn, 'earned', 100);
     w.server.pilots.bumpStat(w.b.conn, 'earned', 900);
-    w.a.send({ type: 'rankings' });
-    let r = [...w.a.got].reverse().find((m) => m.type === 'rankings') as any;
-    const earned = r.boards.find((b: any) => b.key === 'earned');
-    expect(earned.weekly.map((x: any) => x.name)).toEqual(['Bree', 'Ash']);
-    expect(earned.you.weeklyRank).toBe(2);
-    // Saved, and back after a restart
     await w.server.achievements.save(true);
-    expect(await w.store.loadDoc('rankings')).toBeTruthy();
-    // Next week: the weekly board is empty, all time remembers
-    w.clock.t += 8 * 24 * 3600 * 1000;
-    w.a.send({ type: 'rankings' });
-    r = [...w.a.got].reverse().find((m) => m.type === 'rankings') as any;
-    const e2 = r.boards.find((b: any) => b.key === 'earned');
-    expect(e2.weekly).toEqual([]);
-    expect(e2.allTime.length).toBe(2);
+    expect(l.batches.length).toBe(1);
+    const byId = Object.fromEntries(l.batches[0].players.map((p) => [p.userId, p]));
+    expect(byId[11]).toMatchObject({ weekly: { earned: 600 }, allTime: { earned: 600 } });
+    expect(byId[12]).toMatchObject({ weekly: { earned: 900 }, allTime: { earned: 900 } });
+    expect(l.batches[0].week).toBe(weekOf(w.clock.t));
+    // Nothing new: nothing sent. And no rankings document is written by the game server any more
+    await w.server.achievements.save(true);
+    expect(l.batches.length).toBe(1);
+    expect(await w.store.loadDoc('rankings')).toBeNull();
   });
 
-  it('guests are not ranked', () => {
-    const w = world();
-    w.server.pilots.bumpStat(w.a.conn, 'kills', 3);
+  it('the Rankings tab is answered from the lobby', async () => {
+    const w = world(undefined, undefined, lobby().backend);
     w.a.send({ type: 'rankings' });
+    await new Promise((r) => setTimeout(r, 0));
     const r = [...w.a.got].reverse().find((m) => m.type === 'rankings') as any;
-    expect(r.boards.find((b: any) => b.key === 'kills').weekly).toEqual([]);
+    expect(r.boards[0].weekly).toEqual([{ name: 'Zed', value: 9 }]);
+  });
+
+  it('guests are not reported', async () => {
+    const l = lobby();
+    const w = world(undefined, undefined, l.backend);
+    w.server.pilots.bumpStat(w.a.conn, 'kills', 3);
+    await w.server.achievements.save(true);
+    expect(l.batches).toEqual([]);
   });
 });
 
