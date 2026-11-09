@@ -78,7 +78,7 @@ import shipTuning from '../../data/ships/tuning.json';
 import miningTable from '../../data/mining.json';
 import './app/rockTables';
 import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
-import { itemIcon } from './ui/itemIcons';
+import { itemIcon, shipIcon } from './ui/itemIcons';
 import { LoadingFlow } from './app/loadingFlow';
 import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, DEFAULT_CAPS } from '@space-game/common';
 import { inGunRange, resetRangeState } from './ui/gunRange/rangeState';
@@ -599,6 +599,7 @@ this.boostHudEl = document.getElementById('boostHud');
       level: () => this.pilot.profile?.level ?? this.state.level,
       xp: () => this.pilot.profile?.xp ?? this.state.xp,
       icon: (id) => itemIcon(this.pilot.econ, id),
+      shipIcon: (parts, size) => shipIcon(this.pilot.econ, parts, size),
       openComponents: () => this.w.hub.open('components'),
     });
   }

@@ -53,6 +53,8 @@ export interface GuideDeps {
   xp(): number;
   /** An item's icon (a data URL; '' if there's none) */
   icon(id: string): string;
+  /** A ship design's silhouette (the Resources tab's enemy pictures) */
+  shipIcon?(parts: { piece: string; rot: number; flip: boolean; x: number; y: number }[], size?: number): string;
 }
 
 export const GUIDE_CSS = `

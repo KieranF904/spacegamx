@@ -20,6 +20,7 @@ import modelsData from '../../../../data/ships/models.json';
 import functionsData from '../../../../data/ships/functions.json';
 import hintsData from '../../../../data/guideHints.json';
 import { buildResourceIndex, type GameData, type ResourceEntry } from './resourceIndex';
+import { buildSourceIndex, type SourceIndex } from './sourceIndex';
 
 export const RESOURCE_DATA: GameData = {
   items: (itemsData as unknown as { items: GameData['items'] }).items,
@@ -40,8 +41,13 @@ export const RESOURCE_DATA: GameData = {
   hints: (hintsData as unknown as { hints: Record<string, string> }).hints,
 };
 
+let cachedSources: SourceIndex | undefined;
+/** The rocks, enemies and per-item columns (built on first use) */
+export function sourceIndex(): SourceIndex {
+  return (cachedSources ??= buildSourceIndex(RESOURCE_DATA));
+}
 let cached: ResourceEntry[] | undefined;
 /** The dictionary's entries (built on first use) */
 export function resourceEntries(): ResourceEntry[] {
-  return (cached ??= buildResourceIndex(RESOURCE_DATA));
+  return (cached ??= buildResourceIndex(RESOURCE_DATA, sourceIndex()));
 }
