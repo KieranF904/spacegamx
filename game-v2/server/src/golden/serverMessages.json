@@ -33,6 +33,7 @@
   "friendRequest",
   "friends",
   "gained",
+  "gunRangeState",
   "gunSync",
   "hangar",
   "hitFix",

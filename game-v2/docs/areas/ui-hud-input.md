@@ -31,6 +31,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 | `ui/PerfMonitor.ts` | 355 | FPS/frame breakdown overlay |
 | `ui/LoginUI.ts`, `loginBody.ts`, `ServerBrowserUI.ts` | 706/164/613 | Sign-in screen, rotating Sol body picker (pure, tested), lobby server list |
 | `ui/AdminPanel.ts`, `ContributorPanel.ts`, `AdminGive.ts`, `DebugUI.ts`, `RenderTuningPanel.ts`, `DevShipPanel.ts` | | Admin/contributor/dev tools (by rank, or dev builds) |
+| `ui/gunRange/` (`rangeState`, `rangeMessages`, `GunRangeHud`, `pickerModel`, `rangeKeys`, `stationButton`; tests beside them) | | The gun range's client side: state, banner, target bar, door prompt, weapon picker, the keys it takes. See docs/areas/weapons.md "Gun range" |
 | `ui/domWrite.ts` | | `setText/setHtml/...`: DOM writes that skip when unchanged. Use in per-frame code |
 | `input/keybindings.ts` | | Declarative `ACTIONS: ActionDef[]` (id, label, category, default `key`, `alt`, `hint`, `rebindable:false`), `RESERVED_KEYS`, `keyName()`, `boundKeyName(actionId, bindings)` |
 | `input/InputManager.ts` | 223 | Keyboard/mouse/wheel; translates a bound key to the action's default code; `raw` mode (hangar/menu); `onKeyPressed`, `onMouseButton`, `onCapture`, zoom |

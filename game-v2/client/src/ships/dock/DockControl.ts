@@ -77,6 +77,16 @@ export class DockControl {
     this.h.sound?.('undock');
   }
 
+  /**
+   * Out of the berth by the server's hand, not ours (the gun range took the ship: client ui/gunRange): nothing sent and
+   * the ship left where the server put it
+   */
+  leftBerth(): void {
+    this.docked = false;
+    this.dockPending = false;
+    this.berth = null;
+  }
+
   /** The station whose docking ring we're inside, if any. (The server checks again when we dock.) */
   stationInRange(): InterpolatedEntity | null {
     const me = this.h.state.entities.get(this.h.state.playerId);

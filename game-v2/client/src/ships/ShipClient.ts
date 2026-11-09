@@ -78,6 +78,7 @@ import { handleShipMessage, type ShipMessageHost } from './messages/ShipMessages
 import { wireRendererHooks } from './wiring/rendererHooks';
 import { makeHangar } from './wiring/hangarFactory';
 import { makeFeatures, mountFieldFor, type FeatureWiringHost } from './wiring/featuresWiring';
+import { inGunRange } from '../ui/gunRange/rangeState';
 
 export interface ShipClientOptions {
   catalog: Catalog;
@@ -683,6 +684,8 @@ export class ShipClient {
   }
   /** Leave the berth (station screen closed) */
   undock(): void { this.dock.undock(); }
+  /** Out of the berth by the server's hand (the gun range): nothing sent */
+  leftBerth(): void { this.dock.leftBerth(); }
   /** The station whose docking ring we're inside, if any. (The server checks again when we dock.) */
   stationInRange(): InterpolatedEntity | null { return this.dock.stationInRange(); }
   isDocked(): boolean { return this.dock.isDocked(); }
@@ -745,7 +748,7 @@ export class ShipClient {
     this.lastFrame = now;
     const me = state.entities.get(state.playerId);
     fx.jumpFx?.update(dt, {
-      hidden: this.hangarOpen || !this.store.get(state.playerId), latched: jc.jumpLatched,
+      hidden: this.hangarOpen || !this.store.get(state.playerId) || inGunRange(), latched: jc.jumpLatched,
       aiming: jc.jumpAiming(), aimDist: jc.jumpLocked()?.dist ?? jc.jumpAimInfo.sent ?? jc.jumpAimInfo.dist, aimLabel: jc.jumpAimInfo.label,
       reach: jc.jumpReach(), landing: jc.jumpAiming() ? jc.jumpLanding() : null, field: me ? jc.gaugeField() : undefined, danger: jc.jumpAiming() ? jc.jumpDanger() : null,
     });

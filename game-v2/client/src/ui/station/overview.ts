@@ -1,7 +1,7 @@
 /**
  * Station tab: Overview.
  *
- * Owns: the Your ship status, hangar and cargo buttons, quick sell and quick store, the people here, the services list, and the job list that ticks along under it.
+ * Owns: the Your ship status, hangar, cargo and gun range buttons, quick sell and quick store, the people here, the services list, and the job list that ticks along under it.
  * Needs: StationCtx (the pilot, the station message, send/sound, the jobs ticker).
  * Extend: add a block to render(); the job list is any element with data-jobs (see jobs.ts).
  */
@@ -14,6 +14,7 @@ import { storeControls } from '../storeControls';
 import { boundKeyName } from '../../input/keybindings';
 import { settings } from '../../settings/Settings';
 import { esc, DOCK_FEES } from './shared';
+import { gunRangeButton } from '../gunRange/stationButton';
 import type { StationCtx } from './shared';
 
 export class OverviewTab {
@@ -56,7 +57,7 @@ export class OverviewTab {
     inv.className = 'sgw-btn';
     inv.textContent = `Cargo & storage (${boundKeyName('inventory', settings.data.bindings)})`;
     inv.onclick = () => this.d.openInventory();
-    row.append(hangar, inv);
+    row.append(hangar, inv, gunRangeButton((m) => this.d.send(m), (id, v) => this.d.sound(id, v)));
     left.append(row);
 
     // Quick sell: cargo full of ore? one click

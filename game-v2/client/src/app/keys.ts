@@ -35,6 +35,8 @@ import type { ProtoHooks } from '../Game';
 import { settings } from '../settings/Settings';
 import { viewMode } from '../input/viewMode';
 import { groupKey } from '../ships/weaponGroups/keys';
+import { inGunRange } from '../ui/gunRange/rangeState';
+import { rangeKey } from '../ui/gunRange/rangeKeys';
 
 /** What the key handlers read from the game (Game supplies it as getters, so late-built windows resolve at use) */
 export interface KeyHost {
@@ -67,6 +69,8 @@ export interface KeyHost {
   readonly network: { send(msg: any): void };
   readonly input: InputManager;
   readonly renderer: Renderer;
+  /** The gun range's HUD (its weapon picker folds on the inventory key in there) */
+  readonly gunRangeHud?: { toggle(): void };
   toggleAutopilotToObjective(): void;
   showSystemMessage(text: string, color?: string): void;
 }
@@ -232,6 +236,15 @@ export function handleKey(h: KeyHost, code: string): void {
   if (h.autopilot.active && FLIGHT_KEYS.has(code) && !h.shipClient.hangarOpen) h.autopilot.cancel('Autopilot off');
   // ...and calls off a menu jump
   if (h.context.jumpMark() && FLIGHT_KEYS.has(code) && !h.shipClient.hangarOpen) h.context.cancel('Jump cancelled');
+  // In the gun range: some keys do something else there, or nothing (ui/gunRange/rangeKeys.ts)
+  if (h.loggedIn && inGunRange()) {
+    const r = rangeKey(code, { digitGroups: settings.data.gameplay.digitGroups });
+    if (r) {
+      if ('fold' in r) h.gunRangeHud?.toggle();
+      else h.showSystemMessage(r.say, '#f2d24b');
+      return;
+    }
+  }
   if (Object.hasOwn(PRE_KEYS, code) && PRE_KEYS[code](h, code)) return;
   if (h.loggedIn && h.shipClient.onKey(code)) return;
   if (Object.hasOwn(POST_KEYS, code)) POST_KEYS[code](h, code);

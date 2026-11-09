@@ -80,6 +80,7 @@ import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
 import { itemIcon } from './ui/itemIcons';
 import { LoadingFlow } from './app/loadingFlow';
 import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, DEFAULT_CAPS } from '@space-game/common';
+import { inGunRange, resetRangeState } from './ui/gunRange/rangeState';
 
 /** Proto mode (npm run proto): in-process server, no login, no prediction. */
 export interface ProtoHooks {
@@ -727,6 +728,7 @@ this.boostHudEl = document.getElementById('boostHud');
       get systemMapUI() { return g.w.systemMapUI; },
       get navMarkers() { return g.w.navMarkers; },
       get siegePanel() { return g.siegePanel; },
+      get gunRangeHud() { return g.w.gunRangeHud; },
       get regionUI() { return g.regionUI; },
       get audio() { return g.audio; },
       get network() { return g.network; },
@@ -893,13 +895,14 @@ this.boostHudEl = document.getElementById('boostHud');
     const windowOpen = this.stationOpen || this.w.inventoryWindow.isOpen || this.w.tradeWindow.isOpen || this.w.quests.log.isOpen;
     this.w.targetUI.setHidden(blocked);
     this.w.targetUI.update();
+    this.w.gunRangeHud.update(blocked || this.localDead);
     this.w.infoPanel.update(!blocked && !windowOpen && !this.localDead);
     this.w.opsUI.setHidden(blocked);
     this.w.opsUI.update(this.w.bossUI.visible);
     // A construct job's site, while a piece is going on: the constructor beam
     const building = this.w.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
     this.w.buildSites?.update(1 / 60, building ? building.markers[0] : null);
-    this.w.tutorial.update(blocked || this.localDead || this.w.playerStatsUI.isVisible());
+    this.w.tutorial.update(blocked || this.localDead || this.w.playerStatsUI.isVisible() || inGunRange());
     // (the training card stays up over the hangar: its part and generator steps are done there)
     this.w.tutorialUI.update(blocked || this.localDead, !this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen || this.localDead);
     this.w.pingUI.setHidden(blocked);
@@ -908,8 +911,9 @@ this.boostHudEl = document.getElementById('boostHud');
     {
       const me = this.state.entities.get(this.state.playerId);
       // The side panel on top of it: hidden behind the menu or the map; over the station or the hangar only when its key calls it up
-      this.w.hub.update(!this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen ? 'off' : blocked || this.stationOpen || !me ? 'covered' : 'on');
-      this.w.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.world.currentSystem(), me.renderX, me.renderY));
+      // (In the gun range the weapon picker has its place: ui/gunRange)
+      this.w.hub.update(!this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen ? 'off' : blocked || this.stationOpen || !me || inGunRange() ? 'covered' : 'on');
+      this.w.cargoPanel.update(blocked || this.stationOpen || !me || inGunRange(), !!me && !inSafeSpace(this.world.currentSystem(), me.renderX, me.renderY));
     }
     this.chargeGauge.update(this.shipClient.laserCharge(), this.loggedIn && !this.shipClient.hangarOpen);
     // The weapon ring round the cursor: your gun groups' clips, charges, spin and ammo
@@ -1147,6 +1151,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     console.log('Disconnected from server', info ?? '');
     this.loggedIn = false;
     this.w.tutorialUI?.reset();
+    resetRangeState();
     this.loading?.cancel();
     
     if (info?.code === PROTOCOL_MISMATCH_CLOSE || this.versionMismatch) {

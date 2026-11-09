@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 492,
+      "lines": 495,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -145,86 +145,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 75,
-          "end": 129
+          "start": 76,
+          "end": 130
         },
         {
           "name": "Msg",
-          "kind": "type",
-          "start": 131,
-          "end": 131
-        },
-        {
-          "name": "Handler",
           "kind": "type",
           "start": 132,
           "end": 132
         },
         {
-          "name": "Handlers",
+          "name": "Handler",
           "kind": "type",
           "start": 133,
-          "end": 135
+          "end": 133
+        },
+        {
+          "name": "Handlers",
+          "kind": "type",
+          "start": 134,
+          "end": 136
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 137,
-          "end": 155
+          "start": 138,
+          "end": 156
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 157,
-          "end": 161
+          "start": 158,
+          "end": 162
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 163,
-          "end": 208
+          "start": 164,
+          "end": 209
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 210,
-          "end": 221
+          "start": 211,
+          "end": 222
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 223,
-          "end": 241
+          "start": 224,
+          "end": 242
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 243,
-          "end": 277
+          "start": 244,
+          "end": 278
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 279,
-          "end": 296
+          "start": 280,
+          "end": 297
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 298,
-          "end": 482
+          "start": 299,
+          "end": 485
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 484,
-          "end": 485
+          "start": 487,
+          "end": 488
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 487,
-          "end": 492
+          "start": 490,
+          "end": 495
         }
       ]
     },
@@ -614,7 +614,7 @@
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",
-      "lines": 1211,
+      "lines": 1223,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
       "needs": "GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
@@ -636,20 +636,20 @@
         {
           "name": "FADE",
           "kind": "const",
-          "start": 69,
-          "end": 70
+          "start": 72,
+          "end": 73
         },
         {
           "name": "PAN_MARGIN",
           "kind": "const",
-          "start": 71,
-          "end": 72
+          "start": 74,
+          "end": 75
         },
         {
           "name": "Renderer",
           "kind": "class",
-          "start": 74,
-          "end": 1211
+          "start": 77,
+          "end": 1223
         }
       ]
     },
@@ -690,6 +690,75 @@
           "kind": "function",
           "start": 17,
           "end": 36
+        }
+      ]
+    },
+    {
+      "id": "client.rendering.gun-range-chamber",
+      "path": "client/src/rendering/gunRange/ChamberView.ts",
+      "group": "client/rendering/gunRange",
+      "lines": 216,
+      "owns": "how the gun range's chamber looks (systems.json `gunRange`, common gunRange/layout.ts): the station's dark beyond, the floor as a grid of panels with the firing lane and its distance marks, the rectangular wall all round (its face, ribs and lamps), the exit door in it with its EXIT sign and the zone X works in, the target's rings, light pools from the ceiling, and the lamps as lights on the ships",
+      "needs": "pixi.js, common gunRange layout (chamberBox, chamberWalls, rangeDoor), lighting/Lighting, fxTextures (softDot)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the wall is drawn on the same pieces the shared terrain collides with (chamberWalls), and the door zone with the server's reach",
+          "test": "client/src/rendering/terrainData.test.ts"
+        }
+      ],
+      "extend": "a new thing in the chamber is a draw step in the constructor (static: drawn once, never redrawn)",
+      "exports": [
+        "ChamberView"
+      ],
+      "sections": [
+        {
+          "name": "PANEL",
+          "kind": "const",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "COL",
+          "kind": "const",
+          "start": 23,
+          "end": 27
+        },
+        {
+          "name": "hash",
+          "kind": "const",
+          "start": 29,
+          "end": 29
+        },
+        {
+          "name": "SIGN",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "SIGN_SMALL",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "MARK",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "TARGET",
+          "kind": "const",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "ChamberView",
+          "kind": "class",
+          "start": 36,
+          "end": 216
         }
       ]
     },
@@ -1738,7 +1807,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 764,
+      "lines": 767,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -1765,14 +1834,14 @@
         {
           "name": "ShipClientOptions",
           "kind": "interface",
-          "start": 82,
-          "end": 118
+          "start": 83,
+          "end": 119
         },
         {
           "name": "ShipClient",
           "kind": "class",
-          "start": 120,
-          "end": 764
+          "start": 121,
+          "end": 767
         }
       ]
     },
@@ -3976,7 +4045,7 @@
       "id": "client.ship.dock",
       "path": "client/src/ships/dock/DockControl.ts",
       "group": "client/ships/dock",
-      "lines": 173,
+      "lines": 183,
       "owns": "docking at a station: the dock request/answer, the berth, undocking, the dock and planet and repair hints",
       "needs": "DockHost (state, tuning, store, send, showMessage, sound, hangarOpen, openHangar, refreshShip, stationOpen, onDocked); npm: @space-game/common",
       "events": "",
@@ -4006,7 +4075,7 @@
           "name": "DockControl",
           "kind": "class",
           "start": 36,
-          "end": 173
+          "end": 183
         }
       ]
     },
@@ -5695,7 +5764,7 @@
       "id": "client.ship.readouts",
       "path": "client/src/ships/hud/ShipReadouts.ts",
       "group": "client/ships/hud",
-      "lines": 206,
+      "lines": 208,
       "owns": "the numbers the HUD and menus read off your ship: weapon ring groups, gun and laser charge, status-panel input, rating, acceleration, menu ship info",
       "needs": "ReadoutsHost (state, store, catalog, tuning, pilot, features, thrustCommand, helm, localJump, jump, jumpReach), RingModel, common rateShip",
       "events": "",
@@ -5718,14 +5787,14 @@
         {
           "name": "ReadoutsHost",
           "kind": "interface",
-          "start": 21,
-          "end": 33
+          "start": 22,
+          "end": 34
         },
         {
           "name": "ShipReadouts",
           "kind": "class",
-          "start": 35,
-          "end": 206
+          "start": 36,
+          "end": 208
         }
       ]
     },
@@ -6995,6 +7064,324 @@
           "kind": "function",
           "start": 9,
           "end": 15
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.hud",
+      "path": "client/src/ui/gunRange/GunRangeHud.ts",
+      "group": "client/ui/gunRange",
+      "lines": 311,
+      "owns": "the gun range's HUD: the banner (GUN RANGE · weapons fully powered), the target's hull bar, the door prompt (\"Press X to leave the range\" in the door zone, common atRangeDoor) and the weapon picker (the weapons on offer with the hangar's icons, names, mount badges and class filter icons; the one flown highlighted; a click or Enter swaps it: gunRangeWeapon), in the left column where the side panel goes (the target is east: the aim stays clear); the job tracker and the quick bar put away while in",
+      "needs": "./rangeState, ./pickerModel, common (atRangeDoor, Catalog, ShipTuning), ui/itemIcons, ships/modelCards (mountBadge), ships/hangar/filterIcons, ui/domWrite, ui/escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "nothing shows outside the range; the door prompt shows by the server's own door rule",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        },
+        {
+          "text": "the picker sends only weapons on offer, and never the one already flown",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new HUD piece is an element built in the constructor and drawn in update()",
+      "exports": [
+        "GunRangeHud",
+        "GunRangeHudHost"
+      ],
+      "sections": [
+        {
+          "name": "GunRangeHudHost",
+          "kind": "interface",
+          "start": 28,
+          "end": 47
+        },
+        {
+          "name": "STYLE",
+          "kind": "const",
+          "start": 49,
+          "end": 100
+        },
+        {
+          "name": "WANT",
+          "kind": "const",
+          "start": 102,
+          "end": 103
+        },
+        {
+          "name": "ROLE_LABEL",
+          "kind": "const",
+          "start": 105,
+          "end": 105
+        },
+        {
+          "name": "GunRangeHud",
+          "kind": "class",
+          "start": 107,
+          "end": 305
+        },
+        {
+          "name": "el",
+          "kind": "function",
+          "start": 307,
+          "end": 311
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.picker-model",
+      "path": "client/src/ui/gunRange/pickerModel.ts",
+      "group": "client/ui/gunRange",
+      "lines": 67,
+      "owns": "the gun range weapon picker's rows: each weapon on offer with its name, role (the hangar palette's weapon classes: direct, burst, beam, guided, area, support), mount (fixed, turret, side), Mk grade and item icon id; the role filter (the classes present, in the palette's order) and the keyboard's next row",
+      "needs": "@space-game/common (Catalog, ShipTuning, mountingOf, partMount, partItemId), ships/paletteFilters (weaponRole, subsOf)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every option the server sent is a row, in its order, and nothing else",
+          "test": "client/src/ui/gunRange/pickerModel.test.ts"
+        },
+        {
+          "text": "the role filter offers only roles that have a row, in the palette's order",
+          "test": "client/src/ui/gunRange/pickerModel.test.ts"
+        }
+      ],
+      "extend": "a new thing shown on a row is a field of PickerRow, filled in pickerRows",
+      "exports": [
+        "ALL_ROLES",
+        "PickerRow",
+        "filterRows",
+        "nextRow",
+        "pickerRows",
+        "rolesPresent"
+      ],
+      "sections": [
+        {
+          "name": "PickerRow",
+          "kind": "interface",
+          "start": 15,
+          "end": 26
+        },
+        {
+          "name": "ALL_ROLES",
+          "kind": "const",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "pickerRows",
+          "kind": "function",
+          "start": 30,
+          "end": 44
+        },
+        {
+          "name": "rolesPresent",
+          "kind": "function",
+          "start": 46,
+          "end": 50
+        },
+        {
+          "name": "filterRows",
+          "kind": "function",
+          "start": 52,
+          "end": 55
+        },
+        {
+          "name": "nextRow",
+          "kind": "function",
+          "start": 57,
+          "end": 67
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.keys",
+      "path": "client/src/ui/gunRange/rangeKeys.ts",
+      "group": "client/ui/gunRange",
+      "lines": 33,
+      "owns": "which keys do something else, or nothing, in the gun range: the inventory key folds the weapon picker; the build view, fabricator, refiner, dock / hangar, jump and quick bar keys are refused with a line saying why",
+      "needs": "nothing (pure); app/keys.ts runs it after the modal chain while inGunRange()",
+      "events": "",
+      "invariants": [
+        {
+          "text": "flying, firing, groups, targeting, the map, chat, respawn and X (the door) are never taken",
+          "test": "client/src/ui/gunRange/rangeKeys.test.ts"
+        }
+      ],
+      "extend": "a new key the range takes is one entry in RANGE_KEYS",
+      "exports": [
+        "RangeKey",
+        "rangeKey"
+      ],
+      "sections": [
+        {
+          "name": "RangeKey",
+          "kind": "type",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "NO_BUILD",
+          "kind": "const",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "RANGE_KEYS",
+          "kind": "const",
+          "start": 15,
+          "end": 24
+        },
+        {
+          "name": "QUICK",
+          "kind": "const",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "rangeKey",
+          "kind": "function",
+          "start": 29,
+          "end": 33
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.messages",
+      "path": "client/src/ui/gunRange/rangeMessages.ts",
+      "group": "client/ui/gunRange",
+      "lines": 35,
+      "owns": "what the client does with gunRangeState: the range state kept (./rangeState), and on going in the station screen put away and the berth let go (the server took the ship out of it); a refusal shown",
+      "needs": "./rangeState, common ServerGunRangeStateMessage; the host's station window, ship client and toasts",
+      "events": "",
+      "invariants": [
+        {
+          "text": "going in never sends anything (the server has already unberthed the pilot)",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        }
+      ],
+      "extend": "a new reaction to the range's state is a line in onGunRangeState",
+      "exports": [
+        "RangeMessageHost",
+        "onGunRangeState"
+      ],
+      "sections": [
+        {
+          "name": "RangeMessageHost",
+          "kind": "interface",
+          "start": 16,
+          "end": 21
+        },
+        {
+          "name": "onGunRangeState",
+          "kind": "function",
+          "start": 23,
+          "end": 35
+        }
+      ]
+    },
+    {
+      "id": "client.gun-range.state",
+      "path": "client/src/ui/gunRange/rangeState.ts",
+      "group": "client/ui/gunRange",
+      "lines": 83,
+      "owns": "the client's copy of this pilot's gun range state (the last gunRangeState): in or out, the weapon flown, the weapons on offer, the door, the target's entity and the station to go back to; `inGunRange()` for the code that behaves differently in there (keys, HUD, ammo shown)",
+      "needs": "@space-game/common (ServerGunRangeStateMessage, GunRangeDef type), rendering/terrainData (gunRangeFor)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "in only between an `in: true` state and the next `in: false` (or a reset on disconnect)",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        },
+        {
+          "text": "the chamber is the systems.json one for the system you are in (the same def the server's walls come from)",
+          "test": "client/src/ui/gunRange/rangeState.test.ts"
+        }
+      ],
+      "extend": "a new thing the client keeps about the range is a field of RangeView, filled in setRangeState",
+      "exports": [
+        "RangeView",
+        "chamberOf",
+        "inGunRange",
+        "onRangeState",
+        "rangeState",
+        "rangeVersion",
+        "resetRangeState",
+        "setRangeState"
+      ],
+      "sections": [
+        {
+          "name": "RangeView",
+          "kind": "interface",
+          "start": 18,
+          "end": 30
+        },
+        {
+          "name": "OUT",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "view",
+          "kind": "let",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "version",
+          "kind": "let",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "listeners",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "rangeState",
+          "kind": "function",
+          "start": 37,
+          "end": 40
+        },
+        {
+          "name": "inGunRange",
+          "kind": "function",
+          "start": 42,
+          "end": 45
+        },
+        {
+          "name": "rangeVersion",
+          "kind": "function",
+          "start": 47,
+          "end": 50
+        },
+        {
+          "name": "setRangeState",
+          "kind": "function",
+          "start": 52,
+          "end": 64
+        },
+        {
+          "name": "resetRangeState",
+          "kind": "function",
+          "start": 66,
+          "end": 72
+        },
+        {
+          "name": "onRangeState",
+          "kind": "function",
+          "start": 74,
+          "end": 78
+        },
+        {
+          "name": "chamberOf",
+          "kind": "function",
+          "start": 80,
+          "end": 83
         }
       ]
     },
