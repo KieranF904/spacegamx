@@ -11,6 +11,7 @@ import { EntityType, getAsteroidPolygon, localToWorldDir, standing } from '@spac
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
+import { inertBody } from '../state/trainingBodies';
 import { SurfaceProbe, type SurfaceNormal } from '../rendering/weapons/impactAim';
 
 const probe = new SurfaceProbe();
@@ -54,6 +55,8 @@ export function hitSurface(source: ShipSource, state: GameState, x: number, y: n
     if (Math.abs(e.renderX - x) > size + back || Math.abs(e.renderY - y) > size + back) continue;
     // (shells pass through gas pockets: the server's isGas)
     if (GAS_TYPES.has(e.composition?.type ?? '')) continue;
+    // (a training drone this pilot is not on, or done with: state/trainingBodies.ts)
+    if (inertBody(e.id)) continue;
     const poly = getAsteroidPolygon(e.id, e.renderX, e.renderY, size, e.renderAngle);
     for (let k = 0; k < poly.length; k++) {
       const p = poly[k], q = poly[(k + 1) % poly.length];

@@ -9,6 +9,7 @@ import { cameraView } from '../rendering/cameraView';
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { EntityType, Economy } from '@space-game/common';
 import type { GameState } from '../state/GameState';
+import { isTrainingBody } from '../state/trainingBodies';
 import type { ShipSource } from './ShipStore';
 
 const STYLE = new TextStyle({ fontFamily: 'Segoe UI, sans-serif', fontSize: 15, fill: 0xd9f4ff, stroke: { color: 0x02060c, width: 4 }, lineHeight: 18 });
@@ -55,7 +56,7 @@ export class ScannerFx {
         g.circle(me.renderX, me.renderY, range * k).stroke({ color: 0x80cbc4, width: 6 / Math.max(0.2, zoom), alpha: 0.6 * (1 - k) });
       }
       const near = [...this.state.entities.values()]
-        .filter((e) => e.type === EntityType.Asteroid && e.composition)
+        .filter((e) => e.type === EntityType.Asteroid && e.composition && !isTrainingBody(e.id))
         .map((e) => ({ e, d: Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) }))
         .filter((x) => x.d < range)
         .sort((a, b) => a.d - b.d)

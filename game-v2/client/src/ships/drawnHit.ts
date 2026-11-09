@@ -15,6 +15,7 @@ import { EntityType, castParts, getAsteroidPolygon, shapedReachWorld, shapedStop
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
+import { inertBody } from '../state/trainingBodies';
 import type { DrawnHit } from '../rendering/weapons/WeaponFx';
 
 /** The shield bubble DamageFx draws round a ship: its radius */
@@ -98,6 +99,8 @@ export class DrawnWorld {
       const size = e.data?.[0] ?? 30, cx = e.renderX, cy = e.renderY;
       if (cx + size < minX || cx - size > maxX || cy + size < minY || cy - size > maxY) continue;
       if (GAS_TYPES.has(e.composition?.type ?? '')) continue;
+      // (a training drone this pilot is not on, or done with: their shots pass it, state/trainingBodies.ts)
+      if (inertBody(e.id)) continue;
       const u = Math.max(0, Math.min(1, ((cx - x0) * dx + (cy - y0) * dy) / len2));
       const ex = x0 + dx * u - cx, ey = y0 + dy * u - cy;
       if (ex * ex + ey * ey > size * size * 1.5) continue;

@@ -138,11 +138,11 @@ describe('the step engine', () => {
     expectStep('mine');
     expect(a.state().broken).toEqual(['drone_1', 'drone_2', 'drone_3']);
 
-    // 5 mine: the yard's belt, 20 of its ore (silicate and the like do not count)
+    // 5 mine: the yard's belt, 20 of what its rocks give (silicate too: it comes off the same rock; ice and the like do not count)
     expect(w.data.steps.find((s) => s.id === 'mine')!.trigger.count).toBe(20);
-    mineChunk(w, a, { silicate: 8, iron_ore: 12 });
+    mineChunk(w, a, { ice: 6, silicate: 8, iron_ore: 8 });
     expect(stepOf(a)).toBe('mine');
-    mineChunk(w, a, { nickel_ore: 4, iron_ore: 4 });
+    mineChunk(w, a, { nickel_ore: 4 });
     expectStep('hold');
 
     // 6 hold
@@ -349,6 +349,20 @@ describe('the step engine', () => {
     mineChunk(w, a, { copper_ore: 8 });
     expect(stepOf(a)).toBe('hold');
     expect(stepOf(b)).toBe('mine');
+  });
+
+  it('ore already in the hold counts toward the mining step (a reconnect or a fuller hold never strands it)', () => {
+    const w = yard();
+    const a = w.pilots[0];
+    const p = a.profile();
+    p.tutorial.step = 'mine';
+    p.tutorial.done = ['welcome', 'rings', 'brake', 'drones'];
+    // 18 ore taken before a reconnect: this visit's count starts over, the hold still has it
+    p.cargo.push({ id: 'iron_ore', n: 18 });
+    mineChunk(w, a, { iron_ore: 1 });
+    expect(stepOf(a)).toBe('mine');
+    mineChunk(w, a, { silicate: 1 });
+    expect(stepOf(a)).toBe('hold');
   });
 
   it('the multi-panel step needs both panels, in either order, and a left pilot is ignored', () => {

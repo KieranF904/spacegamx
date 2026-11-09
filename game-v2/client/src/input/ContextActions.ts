@@ -43,6 +43,7 @@ import {
   type ContextTarget, type ContextKind, type TargetFacts, type MenuOption, type DriveFacts,
 } from './contextClick';
 import { esc } from '../ui/escape';
+import { isTrainingBody } from '../state/trainingBodies';
 
 type JumpPhase = 'ready' | 'charging' | 'burn' | 'cooldown';
 
@@ -532,7 +533,8 @@ export class ContextActions {
     for (const e of state.entities.values()) {
       if (e.id === state.playerId) continue;
       const ship = e.type === EntityType.ShipBody || e.type === EntityType.Player;
-      const rock = e.type === EntityType.Asteroid;
+      // (a training drone is no rock to mine: state/trainingBodies.ts)
+      const rock = e.type === EntityType.Asteroid && !isTrainingBody(e.id);
       const pod = e.type === EntityType.DroppedItem;
       if (!ship && !rock && !pod) continue;
       const size = ship ? h.shipRadius(e.id) : rock ? e.data?.[0] ?? 30 : 20;

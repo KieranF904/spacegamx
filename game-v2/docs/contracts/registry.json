@@ -5645,7 +5645,7 @@
       "id": "client.ship.strike-fx",
       "path": "client/src/ships/hits/StrikeFx.ts",
       "group": "client/ships/hits",
-      "lines": 109,
+      "lines": 111,
       "owns": "where a shell is seen to strike: shield ripples, plain-hit looks, mining strikes on rock and the progress ring towards your next drop",
       "needs": "StrikeFxHost (state, store, scene, damageFx, shellModel, sound), MiningProgress, common gunShell",
       "events": "",
@@ -5668,26 +5668,26 @@
         {
           "name": "MINE_TICK_EVERY",
           "kind": "const",
-          "start": 23,
-          "end": 24
+          "start": 24,
+          "end": 25
         },
         {
           "name": "KIND_OF_TYPE",
           "kind": "const",
-          "start": 25,
-          "end": 26
+          "start": 26,
+          "end": 27
         },
         {
           "name": "StrikeFxHost",
           "kind": "interface",
-          "start": 28,
-          "end": 36
+          "start": 29,
+          "end": 37
         },
         {
           "name": "StrikeFx",
           "kind": "class",
-          "start": 38,
-          "end": 109
+          "start": 39,
+          "end": 111
         }
       ]
     },
@@ -6827,6 +6827,66 @@
       ]
     },
     {
+      "id": "client.state.training-bodies",
+      "path": "client/src/state/trainingBodies.ts",
+      "group": "client/state",
+      "lines": 36,
+      "owns": "which asteroid entities are the training yard's practice drones, and whether each is inert for this pilot (a later step's, hidden, or one they are done with, ghosted): the lesson UI writes it, hit drawing and hover read it",
+      "needs": "nothing (a map of entity id -> look)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "an inert body is never struck in this pilot's view (shells and beams pass, no spark, no hover card); a live drone shows plain sparks, never a mining strike",
+          "test": "client/src/ui/tutorial/tutorialModel.test.ts"
+        }
+      ],
+      "extend": "a new look is a member of TrainingLook (client/src/ui/tutorial/tutorialModel.ts)",
+      "exports": [
+        "clearTrainingBodies",
+        "inertBody",
+        "isTrainingBody",
+        "setTrainingBody"
+      ],
+      "sections": [
+        {
+          "name": "Look",
+          "kind": "type",
+          "start": 11,
+          "end": 12
+        },
+        {
+          "name": "looks",
+          "kind": "const",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "setTrainingBody",
+          "kind": "function",
+          "start": 16,
+          "end": 20
+        },
+        {
+          "name": "clearTrainingBodies",
+          "kind": "function",
+          "start": 22,
+          "end": 23
+        },
+        {
+          "name": "isTrainingBody",
+          "kind": "function",
+          "start": 25,
+          "end": 26
+        },
+        {
+          "name": "inertBody",
+          "kind": "function",
+          "start": 28,
+          "end": 36
+        }
+      ]
+    },
+    {
       "id": "client.ui.combat-lock",
       "path": "client/src/ui/CombatLockUI.ts",
       "group": "client/ui",
@@ -7838,7 +7898,7 @@
       "group": "client/ui/tutorial",
       "lines": 220,
       "owns": "the lesson's world-space marks, drawn on one pointer-transparent canvas over the game: rings, the stop zone and the exit marker (bright for this step; later steps' are not drawn), a pulse on the current step's targets, and a screen-edge arrow towards a target that is off screen (also the nearest belt rock on the mining step)",
-      "needs": "tutorialModel (markerStyle, arrowTargets, edgeArrow), the renderer's worldToScreen, common objectPos",
+      "needs": "tutorialModel (markerStyle, arrowTargets, edgeArrow, ringArrow), the renderer's worldToScreen, common objectPos",
       "events": "",
       "invariants": [
         {
@@ -7894,7 +7954,7 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 167,
+      "lines": 178,
       "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
@@ -7920,19 +7980,19 @@
           "name": "injectStyles",
           "kind": "function",
           "start": 14,
-          "end": 56
+          "end": 62
         },
         {
           "name": "PanelDeps",
           "kind": "interface",
-          "start": 58,
-          "end": 64
+          "start": 64,
+          "end": 70
         },
         {
           "name": "TutorialPanel",
           "kind": "class",
-          "start": 66,
-          "end": 167
+          "start": 72,
+          "end": 178
         }
       ]
     },
@@ -7940,7 +8000,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 164,
+      "lines": 176,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, the game's entities, a send function, a renderer hook",
       "events": "",
@@ -7959,20 +8019,20 @@
         {
           "name": "TutorialUIDeps",
           "kind": "interface",
-          "start": 18,
-          "end": 33
+          "start": 19,
+          "end": 36
         },
         {
           "name": "SAME_PLACE",
           "kind": "const",
-          "start": 35,
-          "end": 36
+          "start": 38,
+          "end": 39
         },
         {
           "name": "TutorialUI",
           "kind": "class",
-          "start": 38,
-          "end": 164
+          "start": 41,
+          "end": 176
         }
       ]
     },
@@ -7980,7 +8040,7 @@
       "id": "client.ui.tutorial.model",
       "path": "client/src/ui/tutorial/tutorialModel.ts",
       "group": "client/ui/tutorial",
-      "lines": 203,
+      "lines": 218,
       "owns": "the lesson UI's decisions, as pure functions of the server's tutorialState and data/tutorial.json: what the instruction panel shows, which training objects are drawn ghosted (and how), which markers light up, where a screen-edge arrow sits, the leave-confirm flow, the step-done toast, the graduate screen's pack list",
       "needs": "common ServerTutorialStateMessage, TutorialData and the object defs (types only)",
       "events": "",
@@ -7999,6 +8059,7 @@
         "TrainingLook",
         "arrowTargets",
         "counterOf",
+        "distLabel",
         "doneTargets",
         "edgeArrow",
         "fillKeys",
@@ -8012,6 +8073,7 @@
         "phaseOf",
         "pointsAtBelt",
         "pointsAtStation",
+        "ringArrow",
         "risingPanels",
         "targetGained"
       ],
@@ -8167,10 +8229,22 @@
           "end": 198
         },
         {
-          "name": "risingPanels",
+          "name": "ringArrow",
           "kind": "function",
           "start": 200,
-          "end": 203
+          "end": 208
+        },
+        {
+          "name": "distLabel",
+          "kind": "function",
+          "start": 210,
+          "end": 213
+        },
+        {
+          "name": "risingPanels",
+          "kind": "function",
+          "start": 215,
+          "end": 218
         }
       ]
     },
@@ -14177,7 +14251,7 @@
       "id": "common.tutorial.data",
       "path": "common/src/tutorial/data.ts",
       "group": "common/tutorial",
-      "lines": 118,
+      "lines": 117,
       "owns": "validateTutorialData: every problem in a parsed data/tutorial.json, as readable lines",
       "needs": "types",
       "events": "",
@@ -14233,7 +14307,7 @@
           "name": "validateTutorialData",
           "kind": "function",
           "start": 27,
-          "end": 118
+          "end": 117
         }
       ]
     },
@@ -14357,7 +14431,7 @@
       "id": "common.tutorial.types",
       "path": "common/src/tutorial/types.ts",
       "group": "common/tutorial",
-      "lines": 147,
+      "lines": 145,
       "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
       "needs": "nothing (leaf module)",
       "events": "",
@@ -14434,61 +14508,61 @@
           "name": "TutorialYardDef",
           "kind": "interface",
           "start": 78,
-          "end": 94
+          "end": 92
         },
         {
           "name": "TutorialPackDef",
           "kind": "interface",
-          "start": 96,
-          "end": 99
+          "start": 94,
+          "end": 97
         },
         {
           "name": "TutorialData",
           "kind": "interface",
-          "start": 101,
-          "end": 107
+          "start": 99,
+          "end": 105
         },
         {
           "name": "TUTORIAL_INDEX_BASE",
+          "kind": "const",
+          "start": 107,
+          "end": 108
+        },
+        {
+          "name": "TUTORIAL_ROCK_TYPE",
           "kind": "const",
           "start": 109,
           "end": 110
         },
         {
-          "name": "TUTORIAL_ROCK_TYPE",
+          "name": "TUTORIAL_FIRST_STEP",
           "kind": "const",
           "start": 111,
           "end": 112
         },
         {
-          "name": "TUTORIAL_FIRST_STEP",
-          "kind": "const",
-          "start": 113,
-          "end": 114
-        },
-        {
           "name": "TutorialProfile",
           "kind": "interface",
-          "start": 116,
-          "end": 124
+          "start": 114,
+          "end": 122
         },
         {
           "name": "TutorialEvent",
           "kind": "type",
-          "start": 126,
-          "end": 143
+          "start": 124,
+          "end": 141
         },
         {
           "name": "TUTORIAL_PANELS",
           "kind": "const",
-          "start": 145,
-          "end": 146
+          "start": 143,
+          "end": 144
         },
         {
           "name": "TutorialPanel",
           "kind": "type",
-          "start": 147,
-          "end": 147
+          "start": 145,
+          "end": 145
         }
       ]
     },
@@ -16721,7 +16795,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 401,
+      "lines": 408,
       "owns": "the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps",
       "events": "",
@@ -16759,7 +16833,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 400
+          "end": 407
         }
       ]
     },
@@ -16767,7 +16841,7 @@
       "id": "server.game.tutorial.steps",
       "path": "server/src/game/tutorial/TutorialSteps.ts",
       "group": "server/game/tutorial",
-      "lines": 143,
+      "lines": 145,
       "owns": "the step engine: which event advances which step, what a step grants when it starts, and the graduation",
       "needs": "Tutorial (completeStep, leave, data, grant); npm: @space-game/common",
       "events": "",
@@ -16798,7 +16872,7 @@
           "name": "TutorialSteps",
           "kind": "class",
           "start": 24,
-          "end": 143
+          "end": 145
         }
       ]
     },
@@ -18536,7 +18610,7 @@
       "id": "server.gameserver.wiring.net",
       "path": "server/src/gameServer/wiring/net.ts",
       "group": "server/gameServer/wiring",
-      "lines": 178,
+      "lines": 177,
       "owns": "constructor argument objects for the network modules (features, replication, lod, crowd, clocks, snapshots, own checks, bodies)",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -18592,19 +18666,19 @@
           "name": "snapshotDeps",
           "kind": "function",
           "start": 120,
-          "end": 158
+          "end": 157
         },
         {
           "name": "ownChecksDeps",
           "kind": "function",
-          "start": 160,
-          "end": 167
+          "start": 159,
+          "end": 166
         },
         {
           "name": "bodiesDeps",
           "kind": "function",
-          "start": 169,
-          "end": 178
+          "start": 168,
+          "end": 177
         }
       ]
     },
@@ -18695,7 +18769,7 @@
       "id": "server.snapshot",
       "path": "server/src/net/SnapshotBuilder.ts",
       "group": "server/net",
-      "lines": 588,
+      "lines": 580,
       "owns": "the snapshot round: every SNAPSHOT_RATE, one snapshot per client, assembled in a fixed order from the snapshot/ modules (rows, own row, debris hold, replication, fire, structure, removals), then map dots and pops",
       "needs": "SnapshotHost (GameServer builds one, once), snapshot/{rows, ownRow, shipStructure, debrisHold, frameParts, mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet; npm: bitecs",
       "events": "",
@@ -18734,13 +18808,13 @@
           "name": "SnapshotHost",
           "kind": "interface",
           "start": 73,
-          "end": 124
+          "end": 122
         },
         {
           "name": "SnapshotBuilder",
           "kind": "class",
-          "start": 126,
-          "end": 588
+          "start": 124,
+          "end": 580
         }
       ]
     },

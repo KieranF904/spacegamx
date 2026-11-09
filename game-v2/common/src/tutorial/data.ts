@@ -37,9 +37,8 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
   else {
     for (const k of ['system', 'station'] as const) if (typeof y[k] !== 'string') err(`yard.${k}`, 'expected a string');
     if (!isPt(y.center)) err('yard.center', 'expected {x, y}');
-    for (const k of ['spawnRadius', 'leash', 'keepOut', 'stopSpeed', 'stopTicks'] as const) if (!isNum(y[k]) || (y[k] as number) <= 0) err(`yard.${k}`, 'expected a positive number');
+    for (const k of ['spawnRadius', 'leash', 'stopSpeed', 'stopTicks'] as const) if (!isNum(y[k]) || (y[k] as number) <= 0) err(`yard.${k}`, 'expected a positive number');
     if (isNum(y.spawnRadius) && isNum(y.leash) && y.spawnRadius >= y.leash) err('yard.spawnRadius', 'must be inside the leash');
-    if (isNum(y.keepOut) && isNum(y.leash) && y.keepOut < y.leash) err('yard.keepOut', 'must reach past the leash');
     if (typeof y.system === 'string' && refs.systems && !refs.systems.has(y.system)) err('yard.system', `unknown system "${y.system}"`);
     if (typeof y.station === 'string' && typeof y.system === 'string' && refs.stations && refs.stations.get(y.station) !== y.system) err('yard.station', `"${y.station}" is not a station of ${y.system}`);
   }

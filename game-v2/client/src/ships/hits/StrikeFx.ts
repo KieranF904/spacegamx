@@ -17,6 +17,7 @@ import { MiningProgress } from '../MiningProgress';
 import { shapedStruck } from '../features/zoneshield';
 import { strikeRolls } from '../../rendering/weapons/MiningStrikeFx';
 import { rockMaterial } from '../../rendering/rocks/RockMaterials';
+import { isTrainingBody } from '../../state/trainingBodies';
 import factionsData from '../../../../data/factions.json';
 import miningTable from '../../../../data/mining.json';
 
@@ -62,7 +63,8 @@ export class StrikeFx {
     if (rockAt?.type === EntityType.Asteroid) {
       // A hit that mines rolls for ore on the server (Mining.extract): a mining strike, rock dust and grit off the face
       // (nothing's sent for it, so it plays whatever the roll); one that can't mine there, a shell's plain sparks
-      if (strikeRolls(kind, rockAt.composition?.hardness)) {
+      // (a training drone yields nothing: a shell's plain sparks, never a mining strike, state/trainingBodies.ts)
+      if (!isTrainingBody(target) && strikeRolls(kind, rockAt.composition?.hardness)) {
         this.h.scene()?.miningStrike(x, y, x - rockAt.renderX, y - rockAt.renderY, rockMaterial(rockAt.composition));
         // Your own: the work it did towards your next drop (MiningProgress), and a light tick
         if (owner === this.h.state.playerId && this.miningProgress) {

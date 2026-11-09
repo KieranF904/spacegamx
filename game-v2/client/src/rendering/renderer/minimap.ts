@@ -20,7 +20,7 @@ export interface MinimapHost {
   cameraAngle(): number;
   sysData(): StarSystemData | undefined;
   wayIns(): NestData[];
-  /** A body the lesson hides from this pilot (a training rock or drone of a step they have not reached) */
+  /** A body the lesson hides from this pilot (a training drone of a step they have not reached) */
   hiddenBody(id: number): boolean;
 }
 

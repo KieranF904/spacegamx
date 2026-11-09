@@ -83,10 +83,8 @@ export interface TutorialYardDef {
   center: TutorialPoint;
   /** New pilots appear this far from the centre, at an angle taken from their ship id */
   spawnRadius: number;
-  /** Past this distance from the centre a trainee is turned back */
+  /** Past this distance from the centre a trainee is stopped (a soft wall) and asked whether to leave */
   leash: number;
-  /** A pilot who has left is kept this far from the centre */
-  keepOut: number;
   /** Slower than this (units a tick) inside a zone counts as stopped... */
   stopSpeed: number;
   /** ...for this many ticks */

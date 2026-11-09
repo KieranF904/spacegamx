@@ -3,14 +3,14 @@
  * owns:       the lesson's world-space marks, drawn on one pointer-transparent canvas over the game: rings, the stop zone and the
  *             exit marker (bright for this step; later steps' are not drawn), a pulse on the current step's targets, and a
  *             screen-edge arrow towards a target that is off screen (also the nearest belt rock on the mining step)
- * needs:      tutorialModel (markerStyle, arrowTargets, edgeArrow), the renderer's worldToScreen, common objectPos
+ * needs:      tutorialModel (markerStyle, arrowTargets, edgeArrow, ringArrow), the renderer's worldToScreen, common objectPos
  * invariants: what is bright, faint or hidden is decided in tutorialModel.ts — client/src/ui/tutorial/tutorialModel.test.ts
  * extend:     a new kind of mark is a case in draw(); its rule is a function in tutorialModel.ts
  */
 
 import { objectPos } from '@space-game/common';
 import type { ServerTutorialStateMessage, TutorialData, TutorialObjectDef } from '@space-game/common';
-import { arrowTargets, edgeArrow, markerStyle, pointsAtBelt, pointsAtStation } from './tutorialModel';
+import { arrowTargets, distLabel, edgeArrow, markerStyle, pointsAtBelt, pointsAtStation, ringArrow } from './tutorialModel';
 
 export interface MarkerDeps {
   data: TutorialData;
@@ -79,7 +79,7 @@ export class TutorialMarkers {
       const sp = this.d.worldToScreen(p.x, p.y);
       const a = edgeArrow(sp.x, sp.y, w, h, 46);
       if (a.onScreen) this.pointer(ctx, sp.x, sp.y - this.screenRadius(o) - 14 - Math.sin(t * 4) * 4, o.label);
-      else this.edge(ctx, a, me ? Math.hypot(p.x - me.x, p.y - me.y) : 0, o.label);
+      else this.edge(ctx, ringArrow(sp.x, sp.y, w, h), me ? Math.hypot(p.x - me.x, p.y - me.y) : 0, o.label);
     }
     // The mining step: the nearest rock of the yard's belt
     const rock = pointsAtBelt(step) ? this.d.nearestRock() : null;
@@ -88,7 +88,7 @@ export class TutorialMarkers {
       const a = edgeArrow(sp.x, sp.y, w, h, 46);
       const rs = Math.max(20, Math.hypot(this.d.worldToScreen(rock.x + rock.radius, rock.y).x - sp.x, this.d.worldToScreen(rock.x + rock.radius, rock.y).y - sp.y));
       if (a.onScreen) this.pointer(ctx, sp.x, sp.y - rs - 14 - Math.sin(t * 4) * 4, 'Mine here');
-      else this.edge(ctx, a, me ? Math.hypot(rock.x - me.x, rock.y - me.y) : 0, 'Belt');
+      else this.edge(ctx, ringArrow(sp.x, sp.y, w, h), me ? Math.hypot(rock.x - me.x, rock.y - me.y) : 0, 'Belt');
     }
     // The dock step: the yard station is no training object, so it is marked from its own position
     const st = pointsAtStation(step) ? this.d.station() : null;
@@ -97,7 +97,7 @@ export class TutorialMarkers {
       const a = edgeArrow(sp.x, sp.y, w, h, 46);
       const rs = Math.max(30, Math.hypot(this.d.worldToScreen(st.x + st.radius, st.y).x - sp.x, this.d.worldToScreen(st.x + st.radius, st.y).y - sp.y));
       if (a.onScreen) this.pointer(ctx, sp.x, sp.y - rs - 14 - Math.sin(t * 4) * 4, 'Yard station');
-      else this.edge(ctx, a, me ? Math.hypot(st.x - me.x, st.y - me.y) : 0, 'Yard station');
+      else this.edge(ctx, ringArrow(sp.x, sp.y, w, h), me ? Math.hypot(st.x - me.x, st.y - me.y) : 0, 'Yard station');
     }
   }
 
@@ -211,7 +211,7 @@ export class TutorialMarkers {
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur = 4;
-      const text = [label, dist > 0 ? `${Math.round(dist / 10) * 10}` : ''].filter(Boolean).join(' · ');
+      const text = [label, dist > 0 ? distLabel(dist) : ''].filter(Boolean).join(' · ');
       // Inward of the arrow
       ctx.fillText(text, a.x - Math.cos(a.angle) * 34, a.y - Math.sin(a.angle) * 22 + 4);
       ctx.restore();

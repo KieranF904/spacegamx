@@ -140,7 +140,6 @@ export function snapshotDeps(gs: GameServer): ConstructorParameters<typeof Snaps
     replication: gs.replication,
     mobs: gs.mobs,
     pods: gs.pods,
-    podKey: (eid) => { const pc = gs.pilots.connOf(eid); return pc ? gs.pilots.keyOf(pc) : undefined; },
     features: gs.features,
     personCraft: gs.personCraft,
     wards: gs.wards,

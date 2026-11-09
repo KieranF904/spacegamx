@@ -17,6 +17,7 @@
 
 import { EntityType, ServerPilotInfoMessage, ClientMessage } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
+import { isTrainingBody } from '../state/trainingBodies';
 import miningTable from '../../../data/mining.json';
 import { esc, isShip, shipKind, shipSubHtml, shipBarsHtml, distText } from './shipReadout';
 
@@ -166,7 +167,8 @@ export class InfoPanel {
     }
     if (best < 0) {
       for (const e of this.d.state.entities.values()) {
-        if (e.type !== EntityType.Asteroid || !e.composition) continue;
+        // (not a training drone: it has no ore to tell, state/trainingBodies.ts)
+        if (e.type !== EntityType.Asteroid || !e.composition || isTrainingBody(e.id)) continue;
         const dx = e.renderX - m.x, dy = e.renderY - m.y, r = (e.data?.[0] ?? 30) + 12;
         if (Math.abs(dx) > r || Math.abs(dy) > r) continue;
         const d = Math.hypot(dx, dy) - (r - 12);

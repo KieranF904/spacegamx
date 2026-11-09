@@ -15,6 +15,7 @@ import { bubbleRadius, circleEntry, shieldOf } from './drawnHit';
 import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
+import { inertBody } from '../state/trainingBodies';
 import {
   EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL, mineFalloff,
   type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition, type PortsLayout, type PortsState,
@@ -586,6 +587,8 @@ export class MiningBeamFx {
       if (e.type !== EntityType.Asteroid) continue;
       if (e.renderX < minX || e.renderX > maxX || e.renderY < minY || e.renderY > maxY) continue;
       if (GAS_TYPES.has(e.composition?.type ?? '') !== gas) continue;
+      // (a training drone this pilot is not on, or done with: their beam passes it, state/trainingBodies.ts)
+      if (inertBody(e.id)) continue;
       const poly = getAsteroidPolygon(e.id, e.renderX, e.renderY, e.data?.[0] ?? 30, e.renderAngle);
       for (let i = 0; i < poly.length; i++) {
         const p1 = poly[i], p2 = poly[(i + 1) % poly.length];

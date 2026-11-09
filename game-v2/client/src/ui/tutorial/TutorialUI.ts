@@ -14,6 +14,7 @@ import { TutorialMarkers } from './TutorialMarkers';
 import { TutorialPanel as PanelView } from './TutorialPanel';
 import { leaveMessage, onTutorial, onTutorialEdge, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
 import { lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
+import { clearTrainingBodies, setTrainingBody } from '../../state/trainingBodies';
 
 export interface TutorialUIDeps {
   state: GameState;
@@ -30,6 +31,8 @@ export interface TutorialUIDeps {
   panelsOpen(): Partial<Record<TutorialPanel, boolean>>;
   /** End the old flight-school tour (it must not run beside this one) */
   stopOldTour(): void;
+  /** A window is up over the game (the station's, the hold) or the hangar: the card moves to a strip along the bottom, above it */
+  windowOpen(): boolean;
 }
 
 /** A training body is matched to its entity by place: the yard is stationary */
@@ -70,13 +73,15 @@ export class TutorialUI {
     this.prevPanels = {};
     this.entityOf.clear();
     this.applied.clear();
+    clearTrainingBodies();
     this.panel.reset();
   }
 
   private onState(s: ServerTutorialStateMessage): void {
     const prev = this.cur;
     this.cur = s;
-    if (!s.left) this.d.stopOldTour();
+    // (A server that runs the yard teaches there: the old flight-school tour never runs beside it, nor after it)
+    this.d.stopOldTour();
     for (const t of newlyDone(prev, s, tutorialData)) this.panel.toast(t);
     if (targetGained(prev, s, tutorialData)) this.d.sound('scan_ping', 0.6);
     // A new step: whatever panel is already open counts again
@@ -117,10 +122,14 @@ export class TutorialUI {
     return best;
   }
 
-  /** Each frame; `hidden`: behind a full-screen view */
-  update(hidden: boolean): void {
+  /**
+   * Each frame; `hidden`: the world is behind a full-screen view (the markers go); `cardHidden`: so is the card (the
+   * map, the menu). The card stays up over the hangar, where the part and generator steps are done
+   */
+  update(hidden: boolean, cardHidden = hidden): void {
     const s = this.cur;
-    this.panel.setHidden(hidden);
+    this.panel.setHidden(cardHidden);
+    this.panel.setLow(this.d.windowOpen());
     this.markers.setHidden(hidden);
     if (!s || s.left) { this.markers.draw(null); return; }
     this.markers.draw(s);
@@ -145,6 +154,7 @@ export class TutorialUI {
       let id = this.entityOf.get(o.id);
       const known = id !== undefined ? this.d.state.entities.get(id) : undefined;
       if (!known || known.type !== EntityType.Asteroid) {
+        if (id !== undefined) setTrainingBody(id, null);
         id = undefined;
         this.entityOf.delete(o.id);
         this.applied.delete(o.id);
@@ -159,6 +169,8 @@ export class TutorialUI {
       if (this.applied.has(o.id) && this.applied.get(o.id) === look) continue;
       this.applied.set(o.id, look);
       this.d.setTrainingLook(id!, look);
+      // (hits and hover read it: an inert drone is passed by this pilot's shots and has no hover card)
+      setTrainingBody(id!, look);
     }
   }
 }

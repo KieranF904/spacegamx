@@ -83,7 +83,9 @@ export class TutorialSteps {
       case 'collect':
         if (ev.kind !== 'collected' || (tr.items && !tr.items.includes(ev.item))) return false;
         p.n += ev.n;
-        return p.n >= (tr.count ?? 1);
+        // (or the hold has that much of it now: ore taken before a reconnect still counts, so a hold too full for another
+        // `count` never strands the step)
+        return p.n >= (tr.count ?? 1) || this.tutorial.held(conn, tr.items) >= (tr.count ?? 1);
       case 'panel': {
         if (ev.kind !== 'panelOpened') return false;
         const want = tr.panels ?? (tr.panel ? [tr.panel] : []);
