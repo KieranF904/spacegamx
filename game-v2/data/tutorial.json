@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "yard": {
+    "system": "sol",
+    "station": "sol_station_yard",
+    "center": { "x": -22800, "y": 21000 },
+    "spawnRadius": 1100,
+    "leash": 8500,
+    "keepOut": 10000,
+    "stopSpeed": 0.4,
+    "stopTicks": 45
+  },
+  "steps": [
+    {
+      "id": "welcome",
+      "title": "Welcome to the yard",
+      "lines": ["This is the Vesta training yard. Nothing here can hurt you.", "Follow the cards. You can leave any time from the menu."],
+      "trigger": { "kind": "ack" }
+    },
+    {
+      "id": "rings",
+      "title": "Fly through the rings",
+      "lines": ["Thrust with {forward}, steer with the mouse.", "Fly through the three marked rings."],
+      "trigger": { "kind": "rings", "objects": ["ring_1", "ring_2", "ring_3"] },
+      "targets": ["ring_1", "ring_2", "ring_3"]
+    },
+    {
+      "id": "brake",
+      "title": "Stop in the zone",
+      "lines": ["Ships keep moving until you slow them. Thrust back with {backward}.", "Come to a stop inside the marked zone."],
+      "trigger": { "kind": "zoneStop", "objects": ["stop_zone"] },
+      "targets": ["stop_zone"]
+    },
+    {
+      "id": "drones",
+      "title": "Shoot the practice drones",
+      "lines": ["Aim with the mouse and fire with {fire}.", "The drones do not shoot back. Break all three."],
+      "trigger": { "kind": "objectsBroken", "objects": ["drone_1", "drone_2", "drone_3"] },
+      "targets": ["drone_1", "drone_2", "drone_3"]
+    },
+    {
+      "id": "mine",
+      "title": "Mine your rock",
+      "lines": ["Shoot the training rock until it breaks.", "Then fly through the chunks to scoop up the ore."],
+      "trigger": { "kind": "collect", "count": 6 },
+      "targets": ["training_rock"]
+    },
+    {
+      "id": "hold",
+      "title": "Open your hold",
+      "lines": ["Press {inventory} to see what you carry.", "Ore you mine goes into the hold."],
+      "trigger": { "kind": "panel", "panel": "hold" }
+    },
+    {
+      "id": "dock",
+      "title": "Dock at the yard",
+      "lines": ["Fly into the station's docking ring and press {dock}."],
+      "trigger": { "kind": "docked" }
+    },
+    {
+      "id": "refine",
+      "title": "Refine your ore",
+      "lines": ["Open the refinery tab and turn ore into plate.", "Plate is what ship parts are made of."],
+      "trigger": { "kind": "refined" }
+    },
+    {
+      "id": "hangar",
+      "title": "Place a part",
+      "lines": ["Open the hangar and place one part on your ship."],
+      "trigger": { "kind": "partPlaced" }
+    },
+    {
+      "id": "power",
+      "title": "Add a generator",
+      "lines": ["Place a generator and wire it in.", "Press {powerFlow} to see the power flow."],
+      "trigger": { "kind": "powered" }
+    },
+    {
+      "id": "bank",
+      "title": "The repair bank",
+      "lines": ["The bank holds materials that rebuild damaged parts.", "Open its tab to see what it has."],
+      "trigger": { "kind": "panel", "panel": "bank" }
+    },
+    {
+      "id": "guide",
+      "title": "Field guide and map",
+      "lines": ["Press {components} for the field guide, then {map} for the system map."],
+      "trigger": { "kind": "panel", "panel": "map" }
+    },
+    {
+      "id": "jump",
+      "title": "Jump to the marker",
+      "lines": ["Aim at the exit marker and press {jump} to spool the jump drive."],
+      "trigger": { "kind": "jumped", "objects": ["exit_marker"] },
+      "targets": ["exit_marker"]
+    },
+    {
+      "id": "graduate",
+      "title": "Ready to fly",
+      "lines": ["That is the whole loop. You get a starter pack, and Sol is open to you."],
+      "trigger": { "kind": "graduate" }
+    }
+  ],
+  "objects": [
+    { "id": "ring_1", "kind": "ring", "step": "rings", "at": { "x": 2500, "y": 500 }, "radius": 260, "label": "1" },
+    { "id": "ring_2", "kind": "ring", "step": "rings", "at": { "x": 4500, "y": 2000 }, "radius": 260, "label": "2" },
+    { "id": "ring_3", "kind": "ring", "step": "rings", "at": { "x": 6500, "y": 500 }, "radius": 260, "label": "3" },
+    { "id": "stop_zone", "kind": "zone", "step": "brake", "at": { "x": 6500, "y": -2500 }, "radius": 420, "label": "Stop here" },
+    { "id": "drone_1", "kind": "drone", "step": "drones", "at": { "x": -3000, "y": -2000 }, "radius": 55, "hp": 160 },
+    { "id": "drone_2", "kind": "drone", "step": "drones", "at": { "x": -4200, "y": 0 }, "radius": 55, "hp": 160 },
+    { "id": "drone_3", "kind": "drone", "step": "drones", "at": { "x": -3000, "y": 2000 }, "radius": 55, "hp": 160 },
+    { "id": "training_rock", "kind": "rock", "step": "mine", "at": { "x": 0, "y": 4000 }, "radius": 80, "hp": 600, "drops": { "iron_ore": 8, "nickel_ore": 4 }, "chunks": 4, "label": "Training rock" },
+    { "id": "exit_marker", "kind": "exit", "step": "jump", "at": { "x": 0, "y": -6500 }, "radius": 700, "label": "Jump here" }
+  ],
+  "starterPack": {
+    "credits": 150,
+    "items": {
+      "alloy_plate": 10,
+      "copper_wire": 6,
+      "steel_plate": 4,
+      "pack_hull": 2,
+      "pack_wiring": 2,
+      "boost_cell": 2,
+      "iron_ore": 20,
+      "nickel_ore": 10
+    }
+  }
+}

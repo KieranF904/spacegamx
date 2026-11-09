@@ -668,6 +668,8 @@ export interface StationData {
   refuelCostPerUnit: number;
   /** Outer-ring stations: credits a berth costs pilots of DOCK_FEE_LEVEL and up */
   dockingFee?: number;
+  /** The training yard's station (data/tutorial.json): pilots who have left the tutorial never see or reach it */
+  tutorial?: boolean;
 }
 
 /** Pilot level from which outer-ring stations charge their docking fee */

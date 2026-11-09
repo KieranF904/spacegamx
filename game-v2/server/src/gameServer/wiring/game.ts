@@ -51,6 +51,7 @@ export function dockingDeps(gs: GameServer): ConstructorParameters<typeof Dockin
     clock: gs.clock,
     releaseControls: (eid) => gs.releaseControls(eid),
     berthed: (eid) => gs.features.onBerthed(eid),
+    docked: (conn, station) => gs.tutorial?.docked(conn, station),
   };
 }
 

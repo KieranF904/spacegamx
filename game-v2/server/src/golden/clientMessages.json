@@ -96,6 +96,8 @@
   "tradeRequest",
   "tradeRespond",
   "trainingDrone",
+  "tutorialLeave",
+  "tutorialReport",
   "undock",
   "vendorBuy",
   "vendorOpen",

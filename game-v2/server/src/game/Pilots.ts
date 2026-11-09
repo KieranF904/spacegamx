@@ -180,6 +180,9 @@ export class Pilots {
   /** Where deaths and first-hour milestones are written down (Telemetry.ts) */
   telemetry: Telemetry | null = null;
 
+  /** The training yard (game/tutorial): where a pilot still in the tutorial appears (`resume`: where they left off in it, else a fresh spot by the station); none: not in it */
+  tutorialSpawn?: (conn: PilotConn, resume: boolean) => { system: number; x: number; y: number } | null;
+
   /** One line of telemetry about this pilot; `once`: only the first time it happens to them */
   track(conn: PilotConn, ev: string, extra: Record<string, unknown> = {}, once = false): void {
     const s = this.sessions.get(conn);
@@ -230,6 +233,9 @@ export class Pilots {
     this.sessions.set(conn, s);
     this.bank.ensure(s.profile, this.now());
     persist.applyProfile(this, s, false);
+    // (A guest's ship is where the world put it, beside Sol Central; in the tutorial that is the yard instead)
+    const yard = this.tutorialSpawn?.(conn, false);
+    if (yard) this.host.place(conn, yard.system, yard.x, yard.y);
     this.sendBank(s, true);
     this.emit(conn, { type: 'login' });
   }
@@ -590,6 +596,8 @@ export class Pilots {
     const sess = 'profile' in s ? s : this.sessions.get(s);
     if (!sess) return null;
     if (this.opts.spawn) return this.opts.spawn(sess.conn.playerId);
+    const yard = this.tutorialSpawn?.(sess.conn, false);
+    if (yard) return yard;
     const st = this.host.stationEntity(sess.profile.home) >= 0 ? this.host.stationEntity(sess.profile.home) : this.host.stationEntity(this.opts.starter.home);
     if (st < 0) {
       const p = this.opts.starter.position;

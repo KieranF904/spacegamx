@@ -41,6 +41,8 @@ export interface DockingHost {
   releaseControls(eid: number): void;
   /** A pilot berthed (the part features' onBerthed) */
   berthed?(eid: number): void;
+  /** A pilot berthed at a station, by data id (the training yard's lesson) */
+  docked?(conn: ClientConnection, station: string): void;
 }
 
 export class Docking {
@@ -55,6 +57,7 @@ export class Docking {
   private readonly clock: () => number;
   private readonly releaseControls: (eid: number) => void;
   private readonly berthed: (eid: number) => void;
+  private readonly docked: (conn: ClientConnection, station: string) => void;
 
   /** Docked ships (inside a station): invulnerable, untouchable, unseen by hostiles */
   readonly dockedShips = new Set<number>();
@@ -71,6 +74,7 @@ export class Docking {
     this.clock = host.clock;
     this.releaseControls = host.releaseControls;
     this.berthed = host.berthed ?? (() => {});
+    this.docked = host.docked ?? (() => {});
   }
 
   /** The station this player is close enough to dock at, or -1. */
@@ -112,6 +116,7 @@ export class Docking {
     this.ammo.restock(conn, { report: true, quiet: true });
     if (sd) this.pilots.bumpStat(conn, `dock:${sd.id}`);
     if (sd) activity.dock(conn, sd.name);
+    if (sd) this.docked(conn, sd.id);
     if (sd) this.quests.rumourAt(conn, sd.id, sd.system, Math.floor(this.clock() / 86_400_000));
     reply(true, sd?.name ?? 'Station');
   }

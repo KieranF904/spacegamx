@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 487,
+      "lines": 489,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -145,86 +145,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 73,
-          "end": 127
+          "start": 74,
+          "end": 128
         },
         {
           "name": "Msg",
-          "kind": "type",
-          "start": 129,
-          "end": 129
-        },
-        {
-          "name": "Handler",
           "kind": "type",
           "start": 130,
           "end": 130
         },
         {
-          "name": "Handlers",
+          "name": "Handler",
           "kind": "type",
           "start": 131,
-          "end": 133
+          "end": 131
+        },
+        {
+          "name": "Handlers",
+          "kind": "type",
+          "start": 132,
+          "end": 134
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 135,
-          "end": 153
+          "start": 136,
+          "end": 154
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 155,
-          "end": 159
+          "start": 156,
+          "end": 160
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 161,
-          "end": 206
+          "start": 162,
+          "end": 207
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 208,
-          "end": 219
+          "start": 209,
+          "end": 220
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 221,
-          "end": 239
+          "start": 222,
+          "end": 240
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 241,
-          "end": 275
+          "start": 242,
+          "end": 276
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 277,
-          "end": 294
+          "start": 278,
+          "end": 295
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 296,
-          "end": 477
+          "start": 297,
+          "end": 479
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 479,
-          "end": 480
+          "start": 481,
+          "end": 482
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 482,
-          "end": 487
+          "start": 484,
+          "end": 489
         }
       ]
     },
@@ -7735,6 +7735,114 @@
       ]
     },
     {
+      "id": "client.ui.tutorial.store",
+      "path": "client/src/ui/tutorial/tutorialStore.ts",
+      "group": "client/ui/tutorial",
+      "lines": 57,
+      "owns": "this pilot's tutorial state as the server last sent it (`tutorialState`), and sending the two tutorial messages (leave, report); the lesson's UI reads and writes only through here",
+      "needs": "common ServerTutorialStateMessage, TutorialData (data/tutorial.json, bundled)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "none beyond the message's own",
+          "test": "client/src/app/serverMessages.test.ts"
+        }
+      ],
+      "extend": "the lesson's card and markers (client/src/ui/tutorial/*) subscribe with `onTutorial`",
+      "exports": [
+        "currentStep",
+        "getTutorialState",
+        "ghosted",
+        "inTutorialNow",
+        "leaveMessage",
+        "onTutorial",
+        "reportMessage",
+        "resetTutorial",
+        "setTutorialState",
+        "tutorialData"
+      ],
+      "sections": [
+        {
+          "name": "tutorialData",
+          "kind": "const",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "Listener",
+          "kind": "type",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "current",
+          "kind": "let",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "listeners",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "setTutorialState",
+          "kind": "function",
+          "start": 21,
+          "end": 25
+        },
+        {
+          "name": "getTutorialState",
+          "kind": "function",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "inTutorialNow",
+          "kind": "function",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "onTutorial",
+          "kind": "function",
+          "start": 33,
+          "end": 38
+        },
+        {
+          "name": "currentStep",
+          "kind": "function",
+          "start": 40,
+          "end": 43
+        },
+        {
+          "name": "ghosted",
+          "kind": "function",
+          "start": 45,
+          "end": 48
+        },
+        {
+          "name": "resetTutorial",
+          "kind": "function",
+          "start": 50,
+          "end": 51
+        },
+        {
+          "name": "leaveMessage",
+          "kind": "function",
+          "start": 53,
+          "end": 54
+        },
+        {
+          "name": "reportMessage",
+          "kind": "function",
+          "start": 55,
+          "end": 57
+        }
+      ]
+    },
+    {
       "id": "bodies.registry",
       "path": "common/src/bodies/registry.ts",
       "group": "common/bodies",
@@ -9133,7 +9241,7 @@
       "id": "protocol",
       "path": "common/src/network/protocol.ts",
       "group": "common/network",
-      "lines": 78,
+      "lines": 79,
       "owns": "the protocol version pin, the wire-table summary, and the re-export of every message family",
       "needs": "protocol/{clientMessages,serverCore,serverMessage,mapProtocol,worldProtocol,shipProtocol,inputBinary,compact,snapshotCodec,serverFrame}, the per-feature *Protocol.ts files",
       "events": "",
@@ -9160,32 +9268,32 @@
         {
           "name": "PROTOCOL_VERSION",
           "kind": "const",
-          "start": 45,
-          "end": 57
+          "start": 46,
+          "end": 58
         },
         {
           "name": "PROTOCOL_WIRE_HASH",
           "kind": "const",
-          "start": 58,
-          "end": 59
+          "start": 59,
+          "end": 60
         },
         {
           "name": "PROTOCOL_MISMATCH_CLOSE",
           "kind": "const",
-          "start": 60,
-          "end": 61
+          "start": 61,
+          "end": 62
         },
         {
           "name": "PROTOCOL_MISMATCH_REASON",
           "kind": "const",
-          "start": 62,
-          "end": 62
+          "start": 63,
+          "end": 63
         },
         {
           "name": "wireTables",
           "kind": "function",
-          "start": 64,
-          "end": 78
+          "start": 65,
+          "end": 79
         }
       ]
     },
@@ -9779,6 +9887,65 @@
       ]
     },
     {
+      "id": "protocol.tutorial",
+      "path": "common/src/network/tutorialProtocol.ts",
+      "group": "common/network",
+      "lines": 37,
+      "owns": "the training yard's messages: leave (skip or graduate), report (an acknowledgement or an opened panel), and the pilot's own tutorial state",
+      "needs": "type-only import of tutorial/types (TutorialPanel)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every client-sent type here is one the server dispatches, and the set of dispatched types is pinned by name",
+          "test": "server/src/golden/structure.test.ts"
+        },
+        {
+          "text": "the server types the client handles itself are exactly the pinned set",
+          "test": "client/src/app/serverMessages.test.ts"
+        }
+      ],
+      "extend": "a new message is an interface plus a member of this area's client / server union below; then its handler (server/src/net/handlers/modules.ts) or its entry in client/src/app/serverMessages.ts, and the golden pins",
+      "exports": [
+        "ClientTutorialLeaveMessage",
+        "ClientTutorialReportMessage",
+        "ServerTutorialStateMessage",
+        "TutorialClientMessage",
+        "TutorialServerMessage"
+      ],
+      "sections": [
+        {
+          "name": "ClientTutorialLeaveMessage",
+          "kind": "interface",
+          "start": 17,
+          "end": 18
+        },
+        {
+          "name": "ClientTutorialReportMessage",
+          "kind": "interface",
+          "start": 20,
+          "end": 24
+        },
+        {
+          "name": "TutorialClientMessage",
+          "kind": "type",
+          "start": 26,
+          "end": 28
+        },
+        {
+          "name": "ServerTutorialStateMessage",
+          "kind": "interface",
+          "start": 30,
+          "end": 35
+        },
+        {
+          "name": "TutorialServerMessage",
+          "kind": "type",
+          "start": 37,
+          "end": 37
+        }
+      ]
+    },
+    {
       "id": "protocol.weapon-groups",
       "path": "common/src/network/weaponGroupsProtocol.ts",
       "group": "common/network",
@@ -9973,7 +10140,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 332,
+      "lines": 334,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -10027,206 +10194,206 @@
         {
           "name": "ClientInputMessage",
           "kind": "interface",
-          "start": 24,
-          "end": 62
+          "start": 25,
+          "end": 63
         },
         {
           "name": "BodyCheck",
           "kind": "interface",
-          "start": 64,
-          "end": 68
+          "start": 65,
+          "end": 69
         },
         {
           "name": "ClientPingMessage",
           "kind": "interface",
-          "start": 70,
-          "end": 73
+          "start": 71,
+          "end": 74
         },
         {
           "name": "ClientMapViewMessage",
           "kind": "interface",
-          "start": 75,
-          "end": 79
+          "start": 76,
+          "end": 80
         },
         {
           "name": "ClientChatMessage",
           "kind": "interface",
-          "start": 81,
-          "end": 84
+          "start": 82,
+          "end": 85
         },
         {
           "name": "ClientInteractMessage",
           "kind": "interface",
-          "start": 86,
-          "end": 89
+          "start": 87,
+          "end": 90
         },
         {
           "name": "ClientDropItemMessage",
           "kind": "interface",
-          "start": 91,
-          "end": 95
+          "start": 92,
+          "end": 96
         },
         {
           "name": "ClientPickupMessage",
           "kind": "interface",
-          "start": 97,
-          "end": 100
+          "start": 98,
+          "end": 101
         },
         {
           "name": "ClientBuyMessage",
           "kind": "interface",
-          "start": 102,
-          "end": 107
+          "start": 103,
+          "end": 108
         },
         {
           "name": "ClientSellMessage",
           "kind": "interface",
-          "start": 109,
-          "end": 114
+          "start": 110,
+          "end": 115
         },
         {
           "name": "ClientRepairMessage",
           "kind": "interface",
-          "start": 116,
-          "end": 119
+          "start": 117,
+          "end": 120
         },
         {
           "name": "ClientRefuelMessage",
           "kind": "interface",
-          "start": 121,
-          "end": 124
+          "start": 122,
+          "end": 125
         },
         {
           "name": "ClientWarpMessage",
           "kind": "interface",
-          "start": 127,
-          "end": 130
+          "start": 128,
+          "end": 131
         },
         {
           "name": "ClientRespawnMessage",
           "kind": "interface",
-          "start": 132,
-          "end": 136
+          "start": 133,
+          "end": 137
         },
         {
           "name": "ClientTrainingDroneMessage",
           "kind": "interface",
-          "start": 138,
-          "end": 141
+          "start": 139,
+          "end": 142
         },
         {
           "name": "ClientJoinMessage",
           "kind": "interface",
-          "start": 143,
-          "end": 151
+          "start": 144,
+          "end": 152
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 153,
-          "end": 160
+          "start": 154,
+          "end": 161
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 162,
-          "end": 165
+          "start": 163,
+          "end": 166
         },
         {
           "name": "ClientAuthLoginMessage",
           "kind": "interface",
-          "start": 167,
-          "end": 171
+          "start": 168,
+          "end": 172
         },
         {
           "name": "ClientAuthRegisterMessage",
           "kind": "interface",
-          "start": 173,
-          "end": 178
+          "start": 174,
+          "end": 179
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 180,
-          "end": 184
+          "start": 181,
+          "end": 185
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 186,
-          "end": 227
+          "start": 187,
+          "end": 229
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 229,
-          "end": 238
+          "start": 231,
+          "end": 240
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 240,
-          "end": 247
+          "start": 242,
+          "end": 249
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 249,
-          "end": 256
+          "start": 251,
+          "end": 258
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 258,
-          "end": 268
+          "start": 260,
+          "end": 270
         },
         {
           "name": "ClientDevRangeMessage",
           "kind": "interface",
-          "start": 270,
-          "end": 279
+          "start": 272,
+          "end": 281
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 281,
-          "end": 295
+          "start": 283,
+          "end": 297
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 297,
-          "end": 302
+          "start": 299,
+          "end": 304
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 304,
-          "end": 307
+          "start": 306,
+          "end": 309
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 309,
-          "end": 311
+          "start": 311,
+          "end": 313
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 313,
-          "end": 320
+          "start": 315,
+          "end": 322
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 322,
-          "end": 325
+          "start": 324,
+          "end": 327
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 327,
-          "end": 331
+          "start": 329,
+          "end": 333
         }
       ]
     },
@@ -11046,7 +11213,7 @@
       "id": "protocol.server-union",
       "path": "common/src/network/protocol/serverMessage.ts",
       "group": "common/network/protocol",
-      "lines": 122,
+      "lines": 124,
       "owns": "the ServerMessage union over every family",
       "needs": "every server message family file",
       "events": "",
@@ -11064,8 +11231,8 @@
         {
           "name": "ServerMessage",
           "kind": "type",
-          "start": 22,
-          "end": 122
+          "start": 23,
+          "end": 124
         }
       ]
     },
@@ -13468,10 +13635,322 @@
       ]
     },
     {
+      "id": "common.tutorial.data",
+      "path": "common/src/tutorial/data.ts",
+      "group": "common/tutorial",
+      "lines": 120,
+      "owns": "validateTutorialData: every problem in a parsed data/tutorial.json, as readable lines",
+      "needs": "types",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data/tutorial.json has no problems (also run by the server's data validation)",
+          "test": "common/src/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "a new field in TutorialData gets a check here",
+      "exports": [
+        "TutorialRefs",
+        "validateTutorialData"
+      ],
+      "sections": [
+        {
+          "name": "TutorialRefs",
+          "kind": "interface",
+          "start": 11,
+          "end": 18
+        },
+        {
+          "name": "KINDS",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "TRIGGERS",
+          "kind": "const",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "isObj",
+          "kind": "const",
+          "start": 23,
+          "end": 23
+        },
+        {
+          "name": "isNum",
+          "kind": "const",
+          "start": 24,
+          "end": 24
+        },
+        {
+          "name": "isPt",
+          "kind": "const",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "validateTutorialData",
+          "kind": "function",
+          "start": 27,
+          "end": 120
+        }
+      ]
+    },
+    {
+      "id": "common.tutorial",
+      "path": "common/src/tutorial/index.ts",
+      "group": "common/tutorial",
+      "lines": 10,
+      "owns": "the tutorial's shared surface: types, saved-state helpers and the data validator (see README.md)",
+      "needs": "types, state, data",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real tutorial data validates",
+          "test": "common/src/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "export a new tutorial module here",
+      "exports": [
+        "*"
+      ],
+      "sections": []
+    },
+    {
+      "id": "common.tutorial.state",
+      "path": "common/src/tutorial/state.ts",
+      "group": "common/tutorial",
+      "lines": 77,
+      "owns": "a pilot's saved tutorial progress: a fresh one, a tolerant copy of a saved one, and \"is this object live for them\"",
+      "needs": "types (TutorialProfile, TutorialObjectDef, TutorialData)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "an existing profile (one saved before the tutorial) is always `left`",
+          "test": "common/src/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "a new per-pilot field goes in TutorialProfile, cleanTutorial and (if the client shows it) the tutorialState message",
+      "exports": [
+        "brokenIds",
+        "cleanTutorial",
+        "inTutorial",
+        "leftTutorial",
+        "newTutorial",
+        "nextStep",
+        "objectBroken",
+        "objectLive",
+        "objectPos",
+        "stepIds"
+      ],
+      "sections": [
+        {
+          "name": "newTutorial",
+          "kind": "function",
+          "start": 12,
+          "end": 15
+        },
+        {
+          "name": "leftTutorial",
+          "kind": "function",
+          "start": 17,
+          "end": 20
+        },
+        {
+          "name": "rec",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
+          "name": "cleanTutorial",
+          "kind": "function",
+          "start": 24,
+          "end": 36
+        },
+        {
+          "name": "inTutorial",
+          "kind": "function",
+          "start": 38,
+          "end": 41
+        },
+        {
+          "name": "objectBroken",
+          "kind": "function",
+          "start": 43,
+          "end": 46
+        },
+        {
+          "name": "objectLive",
+          "kind": "function",
+          "start": 48,
+          "end": 56
+        },
+        {
+          "name": "brokenIds",
+          "kind": "function",
+          "start": 58,
+          "end": 61
+        },
+        {
+          "name": "objectPos",
+          "kind": "function",
+          "start": 63,
+          "end": 66
+        },
+        {
+          "name": "stepIds",
+          "kind": "function",
+          "start": 68,
+          "end": 71
+        },
+        {
+          "name": "nextStep",
+          "kind": "function",
+          "start": 73,
+          "end": 77
+        }
+      ]
+    },
+    {
+      "id": "common.tutorial.types",
+      "path": "common/src/tutorial/types.ts",
+      "group": "common/tutorial",
+      "lines": 137,
+      "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
+      "needs": "nothing (leaf module)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the data passes validateTutorialData",
+          "test": "common/src/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "a new step is an entry in data/tutorial.json; a new trigger kind is a member of TutorialTriggerKind plus a case in server/src/game/tutorial/TutorialSteps.ts; a new event is a member of TutorialEvent",
+      "exports": [
+        "TUTORIAL_FIRST_STEP",
+        "TUTORIAL_INDEX_BASE",
+        "TUTORIAL_PANELS",
+        "TUTORIAL_ROCK_TYPE",
+        "TutorialData",
+        "TutorialEvent",
+        "TutorialObjectDef",
+        "TutorialObjectKind",
+        "TutorialPackDef",
+        "TutorialPanel",
+        "TutorialPoint",
+        "TutorialProfile",
+        "TutorialStepDef",
+        "TutorialTrigger",
+        "TutorialTriggerKind",
+        "TutorialYardDef"
+      ],
+      "sections": [
+        {
+          "name": "TutorialObjectKind",
+          "kind": "type",
+          "start": 11,
+          "end": 12
+        },
+        {
+          "name": "TutorialPoint",
+          "kind": "interface",
+          "start": 14,
+          "end": 15
+        },
+        {
+          "name": "TutorialObjectDef",
+          "kind": "interface",
+          "start": 17,
+          "end": 33
+        },
+        {
+          "name": "TutorialTriggerKind",
+          "kind": "type",
+          "start": 35,
+          "end": 47
+        },
+        {
+          "name": "TutorialTrigger",
+          "kind": "interface",
+          "start": 49,
+          "end": 55
+        },
+        {
+          "name": "TutorialStepDef",
+          "kind": "interface",
+          "start": 57,
+          "end": 67
+        },
+        {
+          "name": "TutorialYardDef",
+          "kind": "interface",
+          "start": 69,
+          "end": 85
+        },
+        {
+          "name": "TutorialPackDef",
+          "kind": "interface",
+          "start": 87,
+          "end": 90
+        },
+        {
+          "name": "TutorialData",
+          "kind": "interface",
+          "start": 92,
+          "end": 98
+        },
+        {
+          "name": "TUTORIAL_INDEX_BASE",
+          "kind": "const",
+          "start": 100,
+          "end": 101
+        },
+        {
+          "name": "TUTORIAL_ROCK_TYPE",
+          "kind": "const",
+          "start": 102,
+          "end": 103
+        },
+        {
+          "name": "TUTORIAL_FIRST_STEP",
+          "kind": "const",
+          "start": 104,
+          "end": 105
+        },
+        {
+          "name": "TutorialProfile",
+          "kind": "interface",
+          "start": 107,
+          "end": 115
+        },
+        {
+          "name": "TutorialEvent",
+          "kind": "type",
+          "start": 117,
+          "end": 133
+        },
+        {
+          "name": "TUTORIAL_PANELS",
+          "kind": "const",
+          "start": 135,
+          "end": 136
+        },
+        {
+          "name": "TutorialPanel",
+          "kind": "type",
+          "start": 137,
+          "end": 137
+        }
+      ]
+    },
+    {
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 806,
+      "lines": 811,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -13498,8 +13977,8 @@
         {
           "name": "GameServer",
           "kind": "class",
-          "start": 145,
-          "end": 806
+          "start": 147,
+          "end": 811
         }
       ]
     },
@@ -13560,7 +14039,7 @@
       "id": "server.data.game-data",
       "path": "server/src/data/GameData.ts",
       "group": "server/data",
-      "lines": 259,
+      "lines": 266,
       "owns": "loading and indexing the game data JSON files into GameData",
       "needs": "@space-game/common data shapes and terrain builders",
       "events": "",
@@ -13579,14 +14058,14 @@
         {
           "name": "GameDataFiles",
           "kind": "interface",
-          "start": 38,
-          "end": 70
+          "start": 39,
+          "end": 73
         },
         {
           "name": "GameData",
           "kind": "class",
-          "start": 72,
-          "end": 259
+          "start": 75,
+          "end": 266
         }
       ]
     },
@@ -13594,7 +14073,7 @@
       "id": "server.data.disk-loader",
       "path": "server/src/data/loadGameDataFromDisk.ts",
       "group": "server/data",
-      "lines": 44,
+      "lines": 45,
       "owns": "Node-only reading of the data JSON files from a directory into GameDataFiles",
       "needs": "fs, path, GameData.ts (GameDataFiles)",
       "events": "",
@@ -13614,13 +14093,13 @@
           "name": "readGameDataFiles",
           "kind": "function",
           "start": 17,
-          "end": 40
+          "end": 41
         },
         {
           "name": "loadGameDataFromDisk",
           "kind": "function",
-          "start": 42,
-          "end": 44
+          "start": 43,
+          "end": 45
         }
       ]
     },
@@ -13628,7 +14107,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 1252,
+      "lines": 1261,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "@space-game/common (data shapes, tables, dictionary), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -13902,19 +14381,19 @@
           "name": "validateGameData",
           "kind": "function",
           "start": 644,
-          "end": 1223
+          "end": 1232
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 1225,
-          "end": 1231
+          "start": 1234,
+          "end": 1240
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 1233,
-          "end": 1252
+          "start": 1242,
+          "end": 1261
         }
       ]
     },
@@ -13969,7 +14448,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 675,
+      "lines": 683,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -14057,7 +14536,7 @@
           "name": "Pilots",
           "kind": "class",
           "start": 134,
-          "end": 675
+          "end": 683
         }
       ]
     },
@@ -14863,7 +15342,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 125,
+      "lines": 128,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -14901,37 +15380,37 @@
           "name": "applyProfile",
           "kind": "function",
           "start": 55,
-          "end": 73
+          "end": 76
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 75,
-          "end": 92
+          "start": 78,
+          "end": 95
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 94,
-          "end": 102
+          "start": 97,
+          "end": 105
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 104,
-          "end": 108
+          "start": 107,
+          "end": 111
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 110,
-          "end": 117
+          "start": 113,
+          "end": 120
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 119,
-          "end": 125
+          "start": 122,
+          "end": 128
         }
       ]
     },
@@ -15005,6 +15484,73 @@
       ]
     },
     {
+      "id": "server.game.tutorial",
+      "path": "server/src/game/tutorial/Tutorial.ts",
+      "group": "server/game/tutorial",
+      "lines": 327,
+      "owns": "the training yard: its stationary rocks and drones, each pilot's own damage counters on them, owner-only drops, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
+      "needs": "TutorialHost, Pilots (profiles, give, toast), LootPods (private pods), common/tutorial, TutorialSteps",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one pilot's hits never touch another's counter; the shared bodies never change (no hp loss, no movement); a pilot who has left is never placed in, or left in, the yard",
+          "test": "server/src/game/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "a new thing that happens in the yard is a TutorialEvent (common/tutorial/types.ts) emitted through `onEvent`; a new step is data (data/tutorial.json) plus a case in TutorialSteps",
+      "exports": [
+        "Tutorial",
+        "TutorialHost"
+      ],
+      "sections": [
+        {
+          "name": "TutorialHost",
+          "kind": "interface",
+          "start": 19,
+          "end": 37
+        },
+        {
+          "name": "BOUNDARY_COOLDOWN",
+          "kind": "const",
+          "start": 39,
+          "end": 40
+        },
+        {
+          "name": "Tutorial",
+          "kind": "class",
+          "start": 42,
+          "end": 326
+        }
+      ]
+    },
+    {
+      "id": "server.game.tutorial.steps",
+      "path": "server/src/game/tutorial/TutorialSteps.ts",
+      "group": "server/game/tutorial",
+      "lines": 37,
+      "owns": "the step engine: which event advances which step (a STUB: only the welcome acknowledgement and graduating)",
+      "needs": "Tutorial (completeStep, leave, data); npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a step only advances on an event of the pilot's own current step; the order is data/tutorial.json's",
+          "test": "server/src/game/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "a case in `advance` per trigger kind in common/src/tutorial/types.ts (TutorialTriggerKind): read the pilot's current step's `trigger` from data, check the event satisfies it (counting where it takes several: rings, objectsBroken, collect), then `tutorial.completeStep(conn, step)`. Entering a step is `completeStep` of the one before it; give the step's `grant` and call `resetObjects` there if the step needs them",
+      "exports": [
+        "TutorialSteps"
+      ],
+      "sections": [
+        {
+          "name": "TutorialSteps",
+          "kind": "class",
+          "start": 15,
+          "end": 37
+        }
+      ]
+    },
+    {
       "id": "server.gameserver.admin",
       "path": "server/src/gameServer/admin.ts",
       "group": "server/gameServer",
@@ -15070,7 +15616,7 @@
       "id": "server.gameserver.asteroids",
       "path": "server/src/gameServer/asteroids.ts",
       "group": "server/gameServer",
-      "lines": 208,
+      "lines": 246,
       "owns": "creating, breaking, respawning and announcing asteroids and their ids",
       "needs": "GameServer (type), common asteroid helpers; npm: bitecs",
       "events": "",
@@ -15087,6 +15633,7 @@
         "asteroidSpawnData",
         "createAsteroid",
         "createAsteroids",
+        "createTrainingBody",
         "forgetAsteroid",
         "placeAsteroid",
         "respawnAsteroid",
@@ -15106,46 +15653,58 @@
           "end": 76
         },
         {
+          "name": "TRAINING_HP",
+          "kind": "const",
+          "start": 78,
+          "end": 79
+        },
+        {
+          "name": "createTrainingBody",
+          "kind": "function",
+          "start": 81,
+          "end": 114
+        },
+        {
           "name": "shedAsteroid",
           "kind": "function",
-          "start": 78,
-          "end": 117
+          "start": 116,
+          "end": 155
         },
         {
           "name": "respawnAsteroid",
           "kind": "function",
-          "start": 119,
-          "end": 124
+          "start": 157,
+          "end": 162
         },
         {
           "name": "announceAsteroid",
           "kind": "function",
-          "start": 126,
-          "end": 134
+          "start": 164,
+          "end": 172
         },
         {
           "name": "asteroidSpawnData",
           "kind": "function",
-          "start": 136,
-          "end": 145
+          "start": 174,
+          "end": 183
         },
         {
           "name": "forgetAsteroid",
           "kind": "function",
-          "start": 147,
-          "end": 157
+          "start": 185,
+          "end": 195
         },
         {
           "name": "placeAsteroid",
           "kind": "function",
-          "start": 159,
-          "end": 177
+          "start": 197,
+          "end": 215
         },
         {
           "name": "asteroidDeathSystem",
           "kind": "function",
-          "start": 179,
-          "end": 208
+          "start": 217,
+          "end": 246
         }
       ]
     },
@@ -15153,7 +15712,7 @@
       "id": "server.gameserver.combat",
       "path": "server/src/gameServer/combat.ts",
       "group": "server/gameServer",
-      "lines": 350,
+      "lines": 352,
       "owns": "the weapon, projectile and collision passes of a tick, shot walls and rock damage",
       "needs": "GameServer (type), gameServer/spatialGrid, game/Weapons; npm: @space-game/common, bitecs",
       "events": "",
@@ -15202,19 +15761,19 @@
           "name": "hurtAsteroid",
           "kind": "function",
           "start": 116,
-          "end": 173
+          "end": 175
         },
         {
           "name": "blowStuck",
           "kind": "function",
-          "start": 175,
-          "end": 183
+          "start": 177,
+          "end": 185
         },
         {
           "name": "collisionSystem",
           "kind": "function",
-          "start": 185,
-          "end": 350
+          "start": 187,
+          "end": 352
         }
       ]
     },
@@ -15256,7 +15815,7 @@
       "id": "server.gameserver.loop",
       "path": "server/src/gameServer/loop.ts",
       "group": "server/gameServer",
-      "lines": 292,
+      "lines": 294,
       "owns": "the real-time loop, one step, the guarded tick table and its per-tick passes",
       "needs": "GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks; npm: @space-game/common, bitecs",
       "events": "",
@@ -15322,13 +15881,13 @@
           "name": "buildTickSystems",
           "kind": "function",
           "start": 195,
-          "end": 266
+          "end": 268
         },
         {
           "name": "tick",
           "kind": "function",
-          "start": 268,
-          "end": 292
+          "start": 270,
+          "end": 294
         }
       ]
     },
@@ -15426,7 +15985,7 @@
       "id": "server.gameserver.options",
       "path": "server/src/gameServer/options.ts",
       "group": "server/gameServer",
-      "lines": 66,
+      "lines": 68,
       "owns": "the GameServer constructor options",
       "needs": "types only; npm: @space-game/common",
       "events": "",
@@ -15445,7 +16004,7 @@
           "name": "GameServerOptions",
           "kind": "interface",
           "start": 21,
-          "end": 66
+          "end": 68
         }
       ]
     },
@@ -15542,7 +16101,7 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 305,
+      "lines": 306,
       "owns": "connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
@@ -15573,55 +16132,55 @@
           "name": "connect",
           "kind": "function",
           "start": 20,
-          "end": 133
+          "end": 134
         },
         {
           "name": "createPlayer",
           "kind": "function",
-          "start": 135,
-          "end": 189
+          "start": 136,
+          "end": 190
         },
         {
           "name": "placePlayer",
           "kind": "function",
-          "start": 191,
-          "end": 208
+          "start": 192,
+          "end": 209
         },
         {
           "name": "loginPilot",
           "kind": "function",
-          "start": 210,
-          "end": 233
+          "start": 211,
+          "end": 234
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 235,
-          "end": 244
+          "start": 236,
+          "end": 245
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 246,
-          "end": 260
+          "start": 247,
+          "end": 261
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 262,
-          "end": 275
+          "start": 263,
+          "end": 276
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 277,
-          "end": 292
+          "start": 278,
+          "end": 293
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 294,
-          "end": 305
+          "start": 295,
+          "end": 306
         }
       ]
     },
@@ -16036,7 +16595,7 @@
       "id": "server.gameserver.world",
       "path": "server/src/gameServer/world.ts",
       "group": "server/gameServer",
-      "lines": 146,
+      "lines": 149,
       "owns": "building the starting world: stations, rifts, portals",
       "needs": "GameServer (type), data/GameData; npm: @space-game/common, bitecs",
       "events": "",
@@ -16058,25 +16617,25 @@
           "name": "initializeWorld",
           "kind": "function",
           "start": 16,
-          "end": 57
+          "end": 60
         },
         {
           "name": "createStation",
           "kind": "function",
-          "start": 59,
-          "end": 109
+          "start": 62,
+          "end": 112
         },
         {
           "name": "createRift",
           "kind": "function",
-          "start": 111,
-          "end": 128
+          "start": 114,
+          "end": 131
         },
         {
           "name": "createPortal",
           "kind": "function",
-          "start": 130,
-          "end": 146
+          "start": 133,
+          "end": 149
         }
       ]
     },
@@ -16132,7 +16691,7 @@
       "id": "server.gameserver.hosts.mining",
       "path": "server/src/gameServer/hosts/mining.ts",
       "group": "server/gameServer/hosts",
-      "lines": 185,
+      "lines": 189,
       "owns": "host adapter for mining and beams, comets and site exits",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -16171,43 +16730,43 @@
           "name": "mineBeam",
           "kind": "function",
           "start": 72,
-          "end": 111
+          "end": 113
         },
         {
           "name": "arrivalEffect",
           "kind": "function",
-          "start": 113,
-          "end": 116
+          "start": 115,
+          "end": 118
         },
         {
           "name": "siteExit",
           "kind": "function",
-          "start": 118,
-          "end": 128
+          "start": 120,
+          "end": 130
         },
         {
           "name": "isGas",
           "kind": "function",
-          "start": 130,
-          "end": 134
+          "start": 132,
+          "end": 136
         },
         {
           "name": "cometNow",
           "kind": "function",
-          "start": 136,
-          "end": 141
+          "start": 138,
+          "end": 143
         },
         {
           "name": "watchComet",
           "kind": "function",
-          "start": 143,
-          "end": 152
+          "start": 145,
+          "end": 154
         },
         {
           "name": "beamAsteroid",
           "kind": "function",
-          "start": 154,
-          "end": 185
+          "start": 156,
+          "end": 189
         }
       ]
     },
@@ -16215,7 +16774,7 @@
       "id": "server.gameserver.hosts.pilots",
       "path": "server/src/gameServer/hosts/pilots.ts",
       "group": "server/gameServer/hosts",
-      "lines": 204,
+      "lines": 205,
       "owns": "host adapters for pilots, quests, party, people and arenas",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -16244,25 +16803,25 @@
           "name": "createQuestHost",
           "kind": "function",
           "start": 71,
-          "end": 152
+          "end": 153
         },
         {
           "name": "createPartyHost",
           "kind": "function",
-          "start": 154,
-          "end": 174
+          "start": 155,
+          "end": 175
         },
         {
           "name": "createPeopleHost",
           "kind": "function",
-          "start": 176,
-          "end": 187
+          "start": 177,
+          "end": 188
         },
         {
           "name": "createArenaHost",
           "kind": "function",
-          "start": 189,
-          "end": 204
+          "start": 190,
+          "end": 205
         }
       ]
     },
@@ -16370,6 +16929,40 @@
       ]
     },
     {
+      "id": "server.gameserver.hosts.tutorial",
+      "path": "server/src/gameServer/hosts/tutorial.ts",
+      "group": "server/gameServer/hosts",
+      "lines": 40,
+      "owns": "the host adapter for the training yard and its start-up (built only when the server runs a tutorial)",
+      "needs": "GameServer (type), game/tutorial/Tutorial, gameServer/asteroids (createTrainingBody); npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a server without the tutorial option (or with a dev start) builds nothing: no yard station, no bodies, no hooks",
+          "test": "server/src/game/tutorial/tutorial.test.ts"
+        }
+      ],
+      "extend": "a new thing the yard needs from the server is a member of TutorialHost and a line here",
+      "exports": [
+        "createTutorialHost",
+        "setupTutorial"
+      ],
+      "sections": [
+        {
+          "name": "createTutorialHost",
+          "kind": "function",
+          "start": 15,
+          "end": 32
+        },
+        {
+          "name": "setupTutorial",
+          "kind": "function",
+          "start": 34,
+          "end": 40
+        }
+      ]
+    },
+    {
       "id": "server.gameserver.hosts.world",
       "path": "server/src/gameServer/hosts/world.ts",
       "group": "server/gameServer/hosts",
@@ -16421,7 +17014,7 @@
       "id": "server.gameserver.wiring.game",
       "path": "server/src/gameServer/wiring/game.ts",
       "group": "server/gameServer/wiring",
-      "lines": 302,
+      "lines": 303,
       "owns": "constructor argument objects for the game modules (weapons, market, services, hazards, homes, bosses support, social, trade and more)",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -16457,109 +17050,109 @@
           "name": "dockingDeps",
           "kind": "function",
           "start": 41,
-          "end": 55
+          "end": 56
         },
         {
           "name": "pilotsOpts",
           "kind": "function",
-          "start": 57,
-          "end": 65
+          "start": 58,
+          "end": 66
         },
         {
           "name": "weaponsDeps",
           "kind": "function",
-          "start": 67,
-          "end": 83
+          "start": 68,
+          "end": 84
         },
         {
           "name": "marketDeps",
           "kind": "function",
-          "start": 85,
-          "end": 93
+          "start": 86,
+          "end": 94
         },
         {
           "name": "servicesDeps",
           "kind": "function",
-          "start": 95,
-          "end": 113
+          "start": 96,
+          "end": 114
         },
         {
           "name": "hazardsDeps",
           "kind": "function",
-          "start": 115,
-          "end": 123
+          "start": 116,
+          "end": 124
         },
         {
           "name": "warmthDeps",
           "kind": "function",
-          "start": 125,
-          "end": 136
+          "start": 126,
+          "end": 137
         },
         {
           "name": "homesDeps",
           "kind": "function",
-          "start": 138,
-          "end": 164
+          "start": 139,
+          "end": 165
         },
         {
           "name": "arenaGatesDeps",
           "kind": "function",
-          "start": 166,
-          "end": 177
+          "start": 167,
+          "end": 178
         },
         {
           "name": "recoveryDeps",
           "kind": "function",
-          "start": 179,
-          "end": 189
+          "start": 180,
+          "end": 190
         },
         {
           "name": "bossDevDeps",
           "kind": "function",
-          "start": 191,
-          "end": 210
+          "start": 192,
+          "end": 211
         },
         {
           "name": "densDeps",
           "kind": "function",
-          "start": 212,
-          "end": 226
+          "start": 213,
+          "end": 227
         },
         {
           "name": "contribDeps",
           "kind": "function",
-          "start": 228,
-          "end": 239
+          "start": 229,
+          "end": 240
         },
         {
           "name": "codexDeps",
           "kind": "function",
-          "start": 241,
-          "end": 253
+          "start": 242,
+          "end": 254
         },
         {
           "name": "achievementsDeps",
           "kind": "function",
-          "start": 255,
-          "end": 261
+          "start": 256,
+          "end": 262
         },
         {
           "name": "socialDeps",
           "kind": "function",
-          "start": 263,
-          "end": 271
+          "start": 264,
+          "end": 272
         },
         {
           "name": "derelictsDeps",
           "kind": "function",
-          "start": 273,
-          "end": 288
+          "start": 274,
+          "end": 289
         },
         {
           "name": "tradeDeps",
           "kind": "function",
-          "start": 290,
-          "end": 302
+          "start": 291,
+          "end": 303
         }
       ]
     },
@@ -16567,7 +17160,7 @@
       "id": "server.gameserver.wiring.net",
       "path": "server/src/gameServer/wiring/net.ts",
       "group": "server/gameServer/wiring",
-      "lines": 177,
+      "lines": 178,
       "owns": "constructor argument objects for the network modules (features, replication, lod, crowd, clocks, snapshots, own checks, bodies)",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -16623,19 +17216,19 @@
           "name": "snapshotDeps",
           "kind": "function",
           "start": 120,
-          "end": 157
+          "end": 158
         },
         {
           "name": "ownChecksDeps",
           "kind": "function",
-          "start": 159,
-          "end": 166
+          "start": 160,
+          "end": 167
         },
         {
           "name": "bodiesDeps",
           "kind": "function",
-          "start": 168,
-          "end": 177
+          "start": 169,
+          "end": 178
         }
       ]
     },
@@ -16726,7 +17319,7 @@
       "id": "server.snapshot",
       "path": "server/src/net/SnapshotBuilder.ts",
       "group": "server/net",
-      "lines": 580,
+      "lines": 588,
       "owns": "the snapshot round: every SNAPSHOT_RATE, one snapshot per client, assembled in a fixed order from the snapshot/ modules (rows, own row, debris hold, replication, fire, structure, removals), then map dots and pops",
       "needs": "SnapshotHost (GameServer builds one, once), snapshot/{rows, ownRow, shipStructure, debrisHold, frameParts, mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet; npm: bitecs",
       "events": "",
@@ -16765,13 +17358,13 @@
           "name": "SnapshotHost",
           "kind": "interface",
           "start": 73,
-          "end": 122
+          "end": 124
         },
         {
           "name": "SnapshotBuilder",
           "kind": "class",
-          "start": 124,
-          "end": 580
+          "start": 126,
+          "end": 588
         }
       ]
     },
@@ -17039,7 +17632,7 @@
       "id": "server.net.handlers.modules",
       "path": "server/src/net/handlers/modules.ts",
       "group": "server/net/handlers",
-      "lines": 181,
+      "lines": 188,
       "owns": "client messages that only forward to one game module: party, trade, market, items, gems, quests, stations, sieges, contributor notes, admin",
       "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx; @space-game/common",
       "events": "",
@@ -17064,7 +17657,7 @@
           "name": "registerModuleHandlers",
           "kind": "function",
           "start": 23,
-          "end": 181
+          "end": 188
         }
       ]
     },

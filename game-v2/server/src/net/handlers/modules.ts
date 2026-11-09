@@ -178,4 +178,11 @@ export function registerModuleHandlers(t: HandlerRegistry): void {
   t.on('siege', (ctx, conn, msg) => {
     ctx.sieges.handle(conn, msg, conn.playerId);
   });
+  // The training yard (game/tutorial): leaving (the client has confirmed with the pilot), and what only the client sees
+  t.on('tutorialLeave', (ctx, conn) => {
+    ctx.tutorial?.leave(conn);
+  });
+  t.on('tutorialReport', (ctx, conn, msg) => {
+    ctx.tutorial?.report(conn, { type: 'tutorialReport', kind: msg.kind === 'panel' ? 'panel' : 'ack', step: typeof msg.step === 'string' ? msg.step : undefined, panel: typeof msg.panel === 'string' ? (msg.panel as never) : undefined });
+  });
 }

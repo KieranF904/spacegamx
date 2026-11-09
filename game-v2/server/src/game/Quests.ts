@@ -45,6 +45,8 @@ export interface QuestHost {
   now(): number;
   /** The station the pilot is at (in range or docked), by data id */
   stationAt(conn: PilotConn): string | null;
+  /** In the tutorial: the beginner jobs are not handed out yet */
+  holdStarters?(conn: PilotConn): boolean;
   systemOf(conn: PilotConn): string | undefined;
   /** Where the pilot is flying (system id and position), for visit steps */
   where?(conn: PilotConn): { system: string; x: number; y: number } | null;
@@ -335,7 +337,8 @@ export class Quests {
     const window = Math.floor(this.host.now() / BOUNTY_WINDOW_MS);
     p.quests.done = p.quests.done.filter((id) => !Quests.generated(id) || Number(id.split(':')[2]) >= window - 1);
     // Beginner jobs are known from the start
-    for (const q of this.defs.values()) if (q.starter && !p.quests.known.includes(q.id)) this.markNew(p, q.id);
+    // (A pilot in the tutorial hears of them once they leave it: Tutorial.leave runs this again)
+    if (!this.host.holdStarters?.(conn)) for (const q of this.defs.values()) if (q.starter && !p.quests.known.includes(q.id)) this.markNew(p, q.id);
     // Rewards added to jobs after a pilot finished them (plans, licences): hand them over now
     const owed = { plans: [] as string[], recipes: [] as string[], licences: [] as string[] };
     for (const id of p.quests.done) {

@@ -61,7 +61,10 @@ export function applyProfile(self: Pilots, s: Session, placeShip: boolean): void
   if (placeShip && hasComponent(self.host.world, Player, eid) && !hasComponent(self.host.world, Dead, eid)) {
     applyShip(self, s);
     const sys = self.host.systemNum(profile.position.system);
-    if (!self.opts.spawn && sys >= 0 && self.host.safeToAppear(sys, profile.position.x, profile.position.y)) {
+    const yard = self.tutorialSpawn?.(conn, true);
+    if (yard) {
+      self.host.place(conn, yard.system, yard.x, yard.y);
+    } else if (!self.opts.spawn && sys >= 0 && self.host.safeToAppear(sys, profile.position.x, profile.position.y)) {
       self.host.place(conn, sys, profile.position.x, profile.position.y);
     } else {
       const at = self.homePoint(s);

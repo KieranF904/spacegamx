@@ -33,7 +33,7 @@
 import { BRAIN_IDS } from '../game/brains/ids.js';
 import {
   FN_NAMES, WEAPON_KIND_TYPE, WEAPON_MOD_NUMBERS, DICTIONARY, DAMAGE_TYPES, DEFAULT_ASTEROID_FIELDS, DEFAULT_ASTEROIDS, parsePartItemId, MINERAL_FAMILIES, MATERIAL_TRAITS, HAZARDS, UNLOCK_KEYS,
-  nestReach, safeRadius, CODEX_TABS, MAX_DRIVE, PLANET_LOOK_FIELDS, STAR_PLASMA_FIELDS, type Blueprint, type CatalogFiles, type ShipTuning, type InventoryStub, dhypot,
+  validateTutorialData, nestReach, safeRadius, CODEX_TABS, MAX_DRIVE, PLANET_LOOK_FIELDS, STAR_PLASMA_FIELDS, type Blueprint, type CatalogFiles, type ShipTuning, type InventoryStub, dhypot,
 } from '@space-game/common';
 import type { GameDataFiles } from './GameData.js';
 
@@ -426,7 +426,7 @@ const SHAPES: Record<string, Spec> = {
       dockingRadius: 'number', 'orbit?': obj({ orbitType: 'number', semiMajorAxis: 'number', eccentricity: 'number', argPeriapsis: 'number', meanAnomaly0: 'number', 'epochTick?': 'number' }),
       services: arr(oneOf(...STATION_SERVICES)), 'shop?': 'any',
       'market?': obj({ sells: 'string[]', demand: rec('number'), 'note?': 'string' }),
-      repairCostPerHp: 'number', refuelCostPerUnit: 'number', 'dockingFee?': 'number',
+      repairCostPerHp: 'number', refuelCostPerUnit: 'number', 'dockingFee?': 'number', 'tutorial?': 'boolean',
     })),
   }),
   'systems.json': strict({
@@ -1186,6 +1186,15 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
     if (typeof r?.stat === 'string' && r.stat.startsWith('boss:')) ref('achievements.json', `ribbons[${i}].stat`, 'boss', bosses, r.stat.slice(5));
   });
 
+
+  // tutorial.json (the training yard: common/src/tutorial/data.ts)
+  const tutorialFile = (f as { tutorial?: { yard?: { station?: string } } }).tutorial;
+  if (tutorialFile !== undefined) {
+    const refs = { item: (id: string) => itemRows.has(id) || id.startsWith('part:'), systems: new Set(systems.keys()), stations: new Map([...stations].map(([id, st]) => [id, str(st?.system) ?? ''] as [string, string])) };
+    for (const msg of validateTutorialData(tutorialFile, refs)) c.err('', msg, 'tutorial.json');
+    const ys = tutorialFile?.yard?.station;
+    if (ys && stations.get(ys) && !stations.get(ys).tutorial) c.err('yard.station', `station "${ys}" must be marked tutorial: true in stations.json`, 'tutorial.json');
+  }
 
   // ships
   if (ships) {

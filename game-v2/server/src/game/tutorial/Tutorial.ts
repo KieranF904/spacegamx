@@ -1,0 +1,327 @@
+/**
+ * @contract server.game.tutorial
+ * owns:       the training yard: its stationary rocks and drones, each pilot's own damage counters on them, owner-only
+ *             drops, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else
+ *             kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState
+ * needs:      TutorialHost, Pilots (profiles, give, toast), LootPods (private pods), common/tutorial, TutorialSteps
+ * invariants: one pilot's hits never touch another's counter; the shared bodies never change (no hp loss, no movement);
+ *             a pilot who has left is never placed in, or left in, the yard — server/src/game/tutorial/tutorial.test.ts
+ * extend:     a new thing that happens in the yard is a TutorialEvent (common/tutorial/types.ts) emitted through
+ *             `onEvent`; a new step is data (data/tutorial.json) plus a case in TutorialSteps
+ */
+
+import { Position, Velocity, InSystem, EffectType, dhypot, dcos, dsin, objectLive, objectBroken, brokenIds, objectPos, inTutorial, leftTutorial, nextStep, TUTORIAL_PANELS, TUTORIAL_INDEX_BASE } from '@space-game/common';
+import type { TutorialData, TutorialProfile, TutorialObjectDef, TutorialEvent, ServerMessage, ClientTutorialReportMessage, Bag } from '@space-game/common';
+import type { PilotConn, Pilots } from '../Pilots.js';
+import type { LootPods } from '../LootPods.js';
+import { TutorialSteps } from './TutorialSteps.js';
+
+export interface TutorialHost {
+  readonly data: TutorialData;
+  tick(): number;
+  send(conn: PilotConn, msg: ServerMessage): void;
+  systemNum(id: string): number;
+  /** Pilots flying right now (alive, in the world) */
+  flying(): Iterable<{ conn: PilotConn; eid: number }>;
+  /** Move a pilot (any system, at rest) */
+  travel(conn: PilotConn, system: number, x: number, y: number): void;
+  isJumping(eid: number): boolean;
+  /** Let a docked pilot out (before moving them) */
+  undock(conn: PilotConn): void;
+  /** A stationary rock/drone body in the shared sim at (x, y): its entity */
+  createBody(index: number, def: TutorialObjectDef, x: number, y: number): number;
+  /** The starter home station a graduate gets back (Sol Central) */
+  starterHome(): string;
+  /** A graduate's beginner jobs are handed out now (Quests.onLogin again) */
+  openStarters(conn: PilotConn): void;
+}
+
+/** Spacing, in ticks, between boundary reminders to one pilot */
+const BOUNDARY_COOLDOWN = 180;
+
+export class Tutorial {
+  readonly data: TutorialData;
+  readonly steps: TutorialSteps;
+  /** Training bodies by entity, and the entity of each object id */
+  private readonly byEid = new Map<number, TutorialObjectDef>();
+  private readonly eidOf = new Map<string, number>();
+  private readonly listeners: ((conn: PilotConn, ev: TutorialEvent) => void)[] = [];
+  /** Per pilot entity: the markers they are inside now, the zones stopped in (ticks), whether the last tick was mid-jump */
+  private readonly inside = new Map<number, Set<string>>();
+  private readonly stopped = new Map<number, Map<string, number>>();
+  private readonly jumping = new Set<number>();
+  private readonly nudged = new Map<number, number>();
+
+  constructor(private readonly host: TutorialHost, private readonly pilots: Pilots, private readonly pods: LootPods) {
+    this.data = host.data;
+    this.steps = new TutorialSteps(this);
+    // A pilot who joins is told where they stand
+    pilots.onEvent((conn, ev) => { if (ev.type === 'login') this.sendState(conn); });
+  }
+
+  // ------------------------------------------------------------ the yard's bodies
+
+  /** Make the stationary rocks and drones (the world's start, after the yard's system has its asteroids). Idempotent */
+  build(): void {
+    if (this.byEid.size) return;
+    this.data.objects.forEach((o, i) => {
+      if (o.kind !== 'rock' && o.kind !== 'drone') return;
+      const at = objectPos(this.data, o);
+      const eid = this.host.createBody(TUTORIAL_INDEX_BASE + i, o, at.x, at.y);
+      if (eid < 0) return;
+      this.byEid.set(eid, o);
+      this.eidOf.set(o.id, eid);
+    });
+  }
+
+  /** The training object a body is, if it is one */
+  objectOf(eid: number): TutorialObjectDef | undefined { return this.byEid.get(eid); }
+  isBody(eid: number): boolean { return this.byEid.has(eid); }
+  entityOf(objectId: string): number | undefined { return this.eidOf.get(objectId); }
+  def(id: string): TutorialObjectDef | undefined { return this.data.objects.find((o) => o.id === id); }
+
+  // ------------------------------------------------------------ who is in training
+
+  /** The connection of a pilot entity */
+  pilotOf(pid: number): PilotConn | undefined { return this.pilots.connOf(pid); }
+  /** A pilot's saved tutorial progress */
+  stateOf(conn: PilotConn): TutorialProfile | undefined { return this.pilots.get(conn)?.tutorial; }
+
+  /** Is this pilot in the tutorial now? */
+  active(conn: PilotConn): boolean {
+    return inTutorial(this.pilots.get(conn)?.tutorial);
+  }
+
+  /** Where a pilot in the tutorial appears: where they left off in the yard (`resume`) or a fresh spot by its station; none if they are not in it */
+  spawnFor(conn: PilotConn, resume: boolean): { system: number; x: number; y: number } | null {
+    const p = this.pilots.get(conn);
+    if (!p || !inTutorial(p.tutorial)) return null;
+    const y = this.data.yard, system = this.host.systemNum(y.system);
+    if (system < 0) return null;
+    if (resume && p.position.system === y.system && dhypot(p.position.x - y.center.x, p.position.y - y.center.y) <= y.leash) return { system, x: p.position.x, y: p.position.y };
+    const a = (conn.playerId * 2.399) % (Math.PI * 2);
+    return { system, x: y.center.x + dcos(a) * y.spawnRadius, y: y.center.y + dsin(a) * y.spawnRadius };
+  }
+
+  // ------------------------------------------------------------ hits
+
+  /**
+   * A shot or beam from `shooter` hit a body. Returns true when the body is a training object: the caller then does
+   * nothing else to it (no hp loss, no mining), the damage having been counted here for that pilot alone.
+   */
+  hit(eid: number, shooter: number, damage: number): boolean {
+    const o = this.byEid.get(eid);
+    if (!o) return false;
+    const conn = this.pilots.connOf(shooter);
+    const p = conn && this.pilots.get(conn);
+    if (!conn || !p || !(damage > 0) || !o.hp || !objectLive(p.tutorial, o)) return true;
+    const hits = (p.tutorial.hits ??= {});
+    hits[o.id] = Math.min(o.hp, (hits[o.id] ?? 0) + damage);
+    this.pilots.markDirty(conn);
+    if (objectBroken(p.tutorial, o)) this.broke(conn, o);
+    return true;
+  }
+
+  /** The pilot's counter on an object reached its hp: it breaks for them alone */
+  private broke(conn: PilotConn, o: TutorialObjectDef): void {
+    const eid = this.eidOf.get(o.id);
+    if (eid === undefined) return;
+    const at = objectPos(this.data, o);
+    const system = this.host.systemNum(this.data.yard.system);
+    // The break is shown to them only
+    this.host.send(conn, { type: 'effect', effectType: EffectType.AsteroidBreak, x: Math.round(at.x), y: Math.round(at.y), data: [o.radius, 30] });
+    const key = this.pilots.keyOf(conn);
+    if (o.drops && key) {
+      const chunks = Math.max(1, o.chunks ?? 1);
+      for (let k = 0; k < chunks; k++) {
+        const bag: Bag = {};
+        for (const [item, n] of Object.entries(o.drops)) {
+          const share = Math.floor(n / chunks) + (k < n % chunks ? 1 : 0);
+          if (share > 0) bag[item] = share;
+        }
+        const a = (k / chunks) * Math.PI * 2 + 0.6;
+        const pod = this.pods.spawnChunk(system, at.x + dcos(a) * (o.radius + 20), at.y + dsin(a) * (o.radius + 20), dcos(a) * 3, dsin(a) * 3, bag, conn.playerId);
+        if (pod >= 0) this.pods.keepPrivate(pod, key);
+      }
+    }
+    this.sendState(conn);
+    this.onEvent(conn.playerId, { kind: 'objectBroken', object: o.id, step: o.step });
+  }
+
+  /** Zero this pilot's counters on a step's objects (the step engine does it when a step starts, so objects they broke ahead of time can be done properly) */
+  resetObjects(conn: PilotConn, step: string): void {
+    const t = this.pilots.get(conn)?.tutorial;
+    if (!t?.hits) return;
+    for (const o of this.data.objects) if (o.step === step) delete t.hits[o.id];
+    if (!Object.keys(t.hits).length) delete t.hits;
+    this.pilots.markDirty(conn);
+  }
+
+  // ------------------------------------------------------------ events
+
+  /** Hear every event (the step engine and other modules) */
+  subscribe(fn: (conn: PilotConn, ev: TutorialEvent) => void): void { this.listeners.push(fn); }
+
+  /** Something happened to a pilot in the yard. Ignored for pilots not in the tutorial */
+  onEvent(pid: number, ev: TutorialEvent): void {
+    const conn = this.pilots.connOf(pid);
+    if (!conn || !this.active(conn)) return;
+    this.steps.advance(pid, ev);
+    for (const fn of this.listeners) fn(conn, ev);
+  }
+
+  /** The pilot docked (Docking.handleDock) */
+  docked(conn: PilotConn, station: string): void {
+    this.onEvent(conn.playerId, { kind: 'docked', station });
+  }
+
+  /** The client reported something only it can see (tutorialReport) */
+  report(conn: PilotConn, msg: ClientTutorialReportMessage): void {
+    const t = this.pilots.get(conn)?.tutorial;
+    if (!t || t.left) return;
+    if (msg.kind === 'ack') {
+      if (msg.step !== undefined && msg.step !== t.step) return;
+      this.onEvent(conn.playerId, { kind: 'ack', step: t.step });
+    } else if (msg.kind === 'panel' && typeof msg.panel === 'string' && (TUTORIAL_PANELS as readonly string[]).includes(msg.panel)) {
+      this.onEvent(conn.playerId, { kind: 'panelOpened', panel: msg.panel });
+    }
+  }
+
+  // ------------------------------------------------------------ steps
+
+  /** Mark a step done and move the pilot on to the next (the step engine's one way to advance) */
+  completeStep(conn: PilotConn, id: string): void {
+    const p = this.pilots.get(conn);
+    if (!p || p.tutorial.left || p.tutorial.step !== id) return;
+    const t = p.tutorial;
+    if (!t.done.includes(id)) t.done.push(id);
+    const next = nextStep(this.data, id);
+    t.step = next ?? id;
+    if (next) this.resetObjects(conn, next);
+    this.pilots.markDirty(conn);
+    this.sendState(conn);
+  }
+
+  // ------------------------------------------------------------ leaving
+
+  /**
+   * Leave training: skip at any step, or graduate. Grants the starter pack, sends the pilot to Sol's normal start and
+   * marks them left for good (the yard is then unreachable for them). Does nothing for a pilot who has already left.
+   */
+  leave(conn: PilotConn): boolean {
+    const p = this.pilots.get(conn);
+    if (!p || p.tutorial.left) return false;
+    const pack = this.data.starterPack;
+    const done = p.tutorial.done;
+    p.tutorial = leftTutorial(done);
+    this.clearPilot(conn.playerId);
+    p.home = this.host.starterHome();
+    this.pilots.give(conn, { ...pack.items }, { toStorage: true, source: 'tutorial', quiet: true });
+    if (pack.credits > 0) this.pilots.addCredits(conn, pack.credits);
+    if (conn.docked) this.host.undock(conn);
+    const spot = this.pilots.homePoint(conn);
+    if (spot) this.host.travel(conn, spot.system, spot.x, spot.y);
+    this.host.openStarters(conn);
+    this.pilots.toast(conn, 'You have left training. Your starter pack is in storage, and Sol is open.', 'good');
+    this.pilots.markDirty(conn);
+    this.pilots.sendProfile(conn);
+    this.pilots.sendItems(conn);
+    this.sendState(conn);
+    this.pilots.saveNow(conn);
+    return true;
+  }
+
+  private clearPilot(eid: number): void {
+    this.inside.delete(eid);
+    this.stopped.delete(eid);
+    this.jumping.delete(eid);
+    this.nudged.delete(eid);
+  }
+
+  // ------------------------------------------------------------ state
+
+  /** This pilot's tutorial state, to them alone */
+  sendState(conn: PilotConn): void {
+    const t = this.pilots.get(conn)?.tutorial;
+    if (!t) return;
+    this.host.send(conn, { type: 'tutorialState', step: t.left ? '' : t.step, done: [...t.done], left: t.left, broken: t.left ? [] : brokenIds(t, this.data) });
+  }
+
+  // ------------------------------------------------------------ the tick
+
+  /** Once a tick: markers, jumps, and the yard's boundary */
+  tick(): void {
+    const y = this.data.yard;
+    const system = this.host.systemNum(y.system);
+    const now = this.host.tick();
+    for (const { conn, eid } of this.host.flying()) {
+      if (InSystem.systemId[eid] !== system) { this.clearPilot(eid); continue; }
+      const px = Position.x[eid], py = Position.y[eid];
+      const d = dhypot(px - y.center.x, py - y.center.y);
+      const p = this.pilots.get(conn);
+      if (!p) continue;
+      if (!inTutorial(p.tutorial)) {
+        // A pilot who has left (or never was in it) is kept out of the yard
+        if (d < y.keepOut && !conn.docked) this.turnAway(conn, eid, now, true);
+        continue;
+      }
+      if (d > y.leash) { this.turnAway(conn, eid, now, false); continue; }
+      if (conn.docked) continue;
+      this.markers(conn, eid, px, py);
+      this.jumps(conn, eid, px, py);
+    }
+  }
+
+  private turnAway(conn: PilotConn, eid: number, now: number, out: boolean): void {
+    if ((this.nudged.get(eid) ?? -Infinity) > now - BOUNDARY_COOLDOWN) return;
+    this.nudged.set(eid, now);
+    const spot = out ? this.pilots.homePoint(conn) : this.spawnFor(conn, false);
+    if (!spot) return;
+    this.host.travel(conn, spot.system, spot.x, spot.y);
+    this.pilots.toast(conn, out ? 'The training yard is closed to you.' : 'That is the edge of the training area. Back to the yard.', 'info');
+  }
+
+  /** Rings passed and zones stopped in */
+  private markers(conn: PilotConn, eid: number, px: number, py: number): void {
+    const t = this.pilots.get(conn)!.tutorial;
+    let inside = this.inside.get(eid);
+    if (!inside) this.inside.set(eid, (inside = new Set()));
+    const speed = dhypot(Velocity.x[eid], Velocity.y[eid]);
+    for (const o of this.data.objects) {
+      if (o.kind !== 'ring' && o.kind !== 'zone') continue;
+      const at = objectPos(this.data, o);
+      const within = dhypot(px - at.x, py - at.y) <= o.radius && objectLive(t, o);
+      if (!within) { inside.delete(o.id); this.stopped.get(eid)?.delete(o.id); continue; }
+      if (o.kind === 'ring') {
+        if (!inside.has(o.id)) { inside.add(o.id); this.onEvent(eid, { kind: 'ringPassed', ring: o.id, step: o.step }); }
+        continue;
+      }
+      // A zone: slow enough for long enough, once per visit
+      let zs = this.stopped.get(eid);
+      if (!zs) this.stopped.set(eid, (zs = new Map()));
+      if (speed >= this.data.yard.stopSpeed) { zs.set(o.id, 0); inside.delete(o.id); continue; }
+      if (inside.has(o.id)) continue;
+      const n = (zs.get(o.id) ?? 0) + 1;
+      zs.set(o.id, n);
+      if (n >= this.data.yard.stopTicks) { inside.add(o.id); this.onEvent(eid, { kind: 'zoneStopped', zone: o.id, step: o.step }); }
+    }
+  }
+
+  /** A jump finishing (the burn ending) */
+  private jumps(conn: PilotConn, eid: number, px: number, py: number): void {
+    const burning = this.host.isJumping(eid);
+    if (burning) { this.jumping.add(eid); return; }
+    if (!this.jumping.delete(eid)) return;
+    let exit: string | undefined;
+    for (const o of this.data.objects) {
+      if (o.kind !== 'exit') continue;
+      const at = objectPos(this.data, o);
+      if (dhypot(px - at.x, py - at.y) <= o.radius) exit = o.id;
+    }
+    this.onEvent(eid, { kind: 'jumped', x: Math.round(px), y: Math.round(py), exit });
+  }
+
+  /** A pilot's connection ended: forget the per-pilot bookkeeping */
+  forget(conn: PilotConn): void { this.clearPilot(conn.playerId); }
+}
+

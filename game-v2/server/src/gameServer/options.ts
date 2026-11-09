@@ -52,6 +52,8 @@ export interface GameServerOptions {
   freeBuild?: boolean;
   /** Every pilot joins and respawns in this system (the dev Rockery, `dev_rockery`), whatever their profile says: the dev server only. Refused outright under NODE_ENV=production. */
   devStart?: string;
+  /** The training yard for new pilots (data/tutorial.json): off unless asked, so tests and benches start beside Sol Central as before; index.ts turns it on (TUTORIAL=0 turns it off). Ignored when `devStart` is set */
+  tutorial?: boolean;
   /** Where pilots' deaths and milestones are written (Telemetry.ts); none: not recorded */
   telemetry?: TelemetryWriter;
   /** Where contributor notes and ranks are kept (contribFileStore: data/contributor); none: in memory */

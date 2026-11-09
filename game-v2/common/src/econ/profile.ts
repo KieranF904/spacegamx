@@ -28,6 +28,8 @@ import { designUpdateShips, fingerprint, type DesignUpdate, type DesignUpdateRep
 import type { ShipTuning } from '../ships/tuning.js';
 import { cleanBank, type RepairBank } from './field/bank.js';
 import { cleanFieldRecord, type FieldRecord } from './field/record.js';
+import { newTutorial, cleanTutorial } from '../tutorial/state.js';
+import type { TutorialProfile } from '../tutorial/types.js';
 
 /** An order at the fabricator: `n` of `item`, `made` so far */
 export interface FabOrder { id: number; item: string; n: number; made: number }
@@ -211,6 +213,8 @@ export interface PlayerProfile {
   notices?: ProfileNotice[];
   /** The repair bank (econ/field/bank.ts; docs/design/field-fabrication.md): absent until the server first fills it */
   bank?: RepairBank;
+  /** The training yard (common/src/tutorial): a new pilot starts in it; a profile saved before it is `left` (never enters) */
+  tutorial: TutorialProfile;
   createdAt: string;
   updatedAt: string;
 }
@@ -268,6 +272,7 @@ export function newProfile(kit: StarterKit, now = new Date().toISOString()): Pla
     home: kit.home,
     stats: {},
     codex: { found: [], fresh: [] },
+    tutorial: newTutorial(),
     createdAt: now,
     updatedAt: now,
   };
@@ -419,6 +424,8 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     ...cleanOutpost(r.outpost),
     codex: cleanCodex(r.codex),
     ...cleanNotices(r.notices),
+    // (a save from before the tutorial is a pilot who has left it: existing pilots never enter the yard)
+    tutorial: cleanTutorial(r.tutorial),
     ...((b) => (b ? { bank: b } : {}))(cleanBank(r.bank)),
     ...(Array.isArray(r.fabOrders) ? { fabOrders: (r.fabOrders as FabOrder[]).filter((o) => o && typeof o.item === 'string' && typeof o.n === 'number').map((o) => ({ id: num(o.id, 0), item: o.item, n: Math.floor(o.n), made: Math.floor(num(o.made, 0)) })) } : {}),
     ...(Array.isArray(r.designs) ? { designs: (r.designs as unknown[]).map((b) => (b && typeof b === 'object' && Array.isArray((b as Blueprint).parts) && typeof (b as Blueprint).name === 'string' ? (b as Blueprint) : null)) } : {}),
