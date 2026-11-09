@@ -15,7 +15,7 @@
 import {
   ClientMessage, QuestView, QuestTarget, RewardView, SKILLS, SKILL_POINT_CAP, skillValue, repRank, REP_RANKS, VendorDef,
   RibbonsFile, ServerRibbonsMessage, ServerRankingsMessage,
-  ServerQuestsMessage, ServerQuestBoardMessage, QuestLead, PersonView,
+  ServerQuestsMessage, ServerQuestBoardMessage, ServerQuestStepMessage, QuestLead, PersonView,
   CODEX_TABS, CODEX_TAB_NAMES, type CodexView, type CodexTab, type ServerCodexMessage,
 } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
@@ -26,6 +26,10 @@ import { setText, setStyle } from './domWrite';
 import { boundKeyName } from '../input/keybindings';
 import { esc } from './escape';
 import { fetchRankings } from '../network/rankings';
+import { RewardScreen } from './rewards/RewardScreen';
+import { questRewardLines, shortOutro } from './rewards/rewardModel';
+import { itemIcon } from './itemIcons';
+import { inCombat } from './CombatLockUI';
 
 /** The key an action is bound to now (for the hints) */
 const keyOf = (id: string) => boundKeyName(id, settings.data.bindings);
@@ -304,6 +308,18 @@ export class QuestClient {
   markSeen(): void {
     if (this.freshCount()) this.d.send({ type: 'questSeen' });
   }
+
+  /** A job finished: its rewards on the reward screen's compact card (folds to a "View" pill in combat) */
+  jobDone(j: NonNullable<ServerQuestStepMessage['done']>): void {
+    const econ = this.d.pilot.econ;
+    this.rewards ??= new RewardScreen({ sound: this.d.sound, inCombat: () => inCombat() });
+    this.rewards.show({
+      mode: 'card', kicker: 'JOB COMPLETE', title: j.name, intro: shortOutro(j.outro),
+      lines: questRewardLines(j.rewards, { item: (id) => econ.items.name(id), icon: (id) => itemIcon(econ, id) }),
+      button: 'Done',
+    });
+  }
+  private rewards?: RewardScreen;
 
   stepDone(text: string): void {
     this.d.sound('scan_ping', 0.35);

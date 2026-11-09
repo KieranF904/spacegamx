@@ -12,6 +12,7 @@ import shipTuning from '../../../data/ships/tuning.json';
 import questsData from '../../../data/quests.json';
 import systemsDataForMenu from '../../../data/systems.json';
 import { Autopilot, type AutoDest } from '../ships/Autopilot';
+import { itemIcon } from '../ui/itemIcons';
 import { InventoryWindow } from '../ui/InventoryWindow';
 import { PilotHud, ToastUI } from '../ui/PilotHud';
 import { CargoPanelUI } from '../ui/CargoPanelUI';
@@ -338,6 +339,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       keyOf: (a) => boundKeyName(a, settings.data.bindings),
       helm: () => host.shipClient.helmMode(),
       itemName: (id) => host.pilot.econ.items.get(id)?.name ?? id,
+      itemIcon: (id) => itemIcon(host.pilot.econ, id),
       sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
       panelsOpen: () => {
         const tab = host.stationOpen ? w.stationWindow.value?.currentTab : '';

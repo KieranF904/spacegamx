@@ -575,7 +575,13 @@ export class Quests {
     this.pay(conn, p, q);
     const r = q.rewards;
     const paid = [r.credits ? `+${r.credits.toLocaleString()} cr` : '', r.xp ? `+${r.xp.toLocaleString()} XP` : ''].filter(Boolean).join(' · ');
-    this.pilots.toast(conn, `Job complete: ${q.name}${paid ? ` (${paid})` : ''}${next ? '. New work in your log (L)' : ''}`, 'good');
+    // A story or guild job gets the client's reward screen; repeatable pay (bounties, fleet operations) stays a toast
+    if (Quests.generated(q.id) || q.repeatable) {
+      this.pilots.toast(conn, `Job complete: ${q.name}${paid ? ` (${paid})` : ''}${next ? '. New work in your log (L)' : ''}`, 'good');
+      return;
+    }
+    this.host.send(conn, { type: 'questStep', id: q.id, text: '', done: { name: q.name, chain: q.chain, outro: q.outro, giver: this.who(q).name, rewards: this.rewardView(q.rewards) } });
+    if (next) this.pilots.toast(conn, 'New work in your log (L)', 'info');
   }
 
   /** Jobs (people's) whose prerequisites this one finished: into the log as new leads. How many. */

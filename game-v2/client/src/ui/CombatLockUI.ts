@@ -35,6 +35,9 @@ function paint(now: number): void {
   if (el.textContent !== text) el.textContent = text;
 }
 
+/** Is the combat lock on now? */
+export function inCombat(now: number = Date.now()): boolean { return endAt > now; }
+
 /** The server's word: `leftMs` until quitting is safe again (0: now) */
 export function setCombatLock(leftMs: number, now: number = Date.now()): void {
   endAt = leftMs > 0 ? now + leftMs : 0;

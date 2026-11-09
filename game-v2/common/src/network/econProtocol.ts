@@ -19,7 +19,7 @@
  */
 
 import type { Stack, Bag } from '../econ/stacks.js';
-import type { QuestView, QuestLead, BuildView } from '../econ/quests.js';
+import type { QuestView, QuestLead, BuildView, RewardView } from '../econ/quests.js';
 import type { PersonView, TalkView } from '../econ/dialogue.js';
 import type { CodexView } from '../econ/codex.js';
 import type { Blueprint } from '../ships/types.js';
@@ -354,11 +354,15 @@ export interface ServerCodexMessage {
   all?: boolean;
 }
 
-/** A quest moved on to its next step */
+/**
+ * A quest moved on to its next step. A finished job (not a generated bounty or operation: those stay a toast) comes as the same
+ * message with `done` set and no step text: its name, the giver's outro and what it paid, for the reward screen
+ */
 export interface ServerQuestStepMessage {
   type: 'questStep';
   id: string;
   text: string;
+  done?: { name: string; chain: string; outro?: string; giver?: string; rewards: RewardView };
 }
 
 /** Ask for the board of the station you're at */
