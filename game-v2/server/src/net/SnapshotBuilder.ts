@@ -359,7 +359,9 @@ export class SnapshotBuilder {
         // (A ship a body it runs reads, keyframed now: the body's ship goes again too, Replication.forClient)
         bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined, conn.debrisLive,
         // (Contact pairs it finds itself: since its last snapshot, the window it works them out over)
-        conn.lastSnapshotSentTick);
+        conn.lastSnapshotSentTick,
+        // (Which ships it was told were pinned, on their first sync: its contact pass takes them so, contactsFor.ts)
+        (id) => { const s = conn.shipSynced.get(id); return s && s.ship === this.ships.bodies.get(id) ? !!s.pinned : undefined; });
       // (...and their sparks it draws itself: the rest go now, Replication.contactFxFor)
       for (const m of this.replication.contactFxFor(conn, playerSystemId, rep.found ?? null, this.currentTick)) {
         if (!fartherThan(m.x - px, m.y - py, FX_NEAR)) this.send(conn.ws, m);

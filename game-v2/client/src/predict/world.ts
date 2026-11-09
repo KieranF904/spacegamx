@@ -30,7 +30,7 @@ export interface PtHost {
   candidates(): Iterable<number>;
   /** The structure a ship flew tick t with (default its current one) */
   derivedAt?(id: number, t: number): ShipDerived | null | undefined;
-  /** Is this ship known to be pinned (it doesn't give in a contact: the server said so when your own ship touched it)? */
+  /** Is this ship pinned (it doesn't give in a contact: its first shipSync said so, ShipStore.pinned)? */
   pinned?(id: number): boolean;
 }
 

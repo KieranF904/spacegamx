@@ -12,6 +12,7 @@ import { floodFill, partMount } from './blueprint.js';
 import { ShipTuning, partHealth } from './tuning.js';
 import { type TurretRays, type TurretWindow, castTurret } from './turret.js';
 import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
+import { hullOf, type ShipHull } from './contact.js';
 import { fnOutput, isEngine, partDemand, partGrade, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
 import { netJoins, wireNetworks } from './wires.js';
 import { groupsGone } from './groups.js';
@@ -209,6 +210,8 @@ export interface ShipDerived {
   jumpRatio: number;
   /** Bounding radius about the centre of mass, world units */
   radius: number;
+  /** Its hull for contacts with rock (terrain.ts collideTerrainHull): the alive parts' pieces about the centre of mass */
+  hull?: ShipHull;
   /**
    * What the ship is made of, by share of its intact cells: each material
    * trait's share (0..1), and the hazard tolerance its materials add up to
@@ -321,15 +324,20 @@ const AS_BUILT = new WeakMap<object, Pick<ShipDerived, typeof RIGID[number]>>();
 const RIGID = ['mass', 'com', 'inertia', 'fullMass', 'fullInertia', 'drive', 'boostFactor', 'boostDrain', 'thrusters', 'maxThrust', 'maneuverForce', 'maxTorque', 'radius'] as const;
 
 export function rebuild(input: RebuildInput): ShipDerived {
-  const d = rebuildAsIs(input), bp = input.blueprint;
-  if (!bp.rigid || input.rootMode !== 'core') return d;
-  let whole = AS_BUILT.get(bp);
-  if (!whole) {
-    const n = bp.parts.length, full = rebuildAsIs({ ...input, hp: [...input.maxHp], detached: new Array(n).fill(false), ghost: undefined, memo: undefined });
-    whole = Object.fromEntries(RIGID.map((k) => [k, full[k]])) as Pick<ShipDerived, typeof RIGID[number]>;
-    AS_BUILT.set(bp, whole);
+  const bp = input.blueprint;
+  let d = rebuildAsIs(input);
+  if (bp.rigid && input.rootMode === 'core') {
+    let whole = AS_BUILT.get(bp);
+    if (!whole) {
+      const n = bp.parts.length, full = rebuildAsIs({ ...input, hp: [...input.maxHp], detached: new Array(n).fill(false), ghost: undefined, memo: undefined });
+      whole = Object.fromEntries(RIGID.map((k) => [k, full[k]])) as Pick<ShipDerived, typeof RIGID[number]>;
+      AS_BUILT.set(bp, whole);
+    }
+    d = { ...d, ...whole };
   }
-  return { ...d, ...whole };
+  // (Its hull against rock, about the centre of mass it flies with)
+  d.hull = hullOf(designOf(input.catalog, bp).geoms, d.alive, d.com, input.tuning.cellSize);
+  return d;
 }
 
 /** What holds together: the joins between intact parts, the root, what's still joined to it, and the groups that aren't */

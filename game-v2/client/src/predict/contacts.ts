@@ -5,7 +5,7 @@
  * (sorted by id; no debris, none massless or mid-jump) through the one pair finder (common sim/c-contactCache.ts
  * contactPairs, cached per tick in a ContactPairCache: found once a tick, found again only for ticks a re-step
  * stepped again), each pair in the pass's order from the bodies as earlier pairs left them, its push worked out with
- * common ships/contact.ts (contactPieces, contactPair: polygon pieces, the deepest overlap, mass shares, restitution),
+ * common ships/contact.ts (pairPieces, contactPair: polygon pieces, the deepest overlap, mass shares, restitution),
  * and every body the pass moved rounded as the server's tick end rounds it. With the same states before the pass, the
  * same states after it: collisions between predicted ships are no correction.
  *
@@ -15,7 +15,7 @@
  * CircleContacts is the stand-in the fake-transport tests use (and Stage 4's model): circles, mass-shared push.
  */
 import {
-  CONTACT_BIG_BODY, ContactPairCache, contactJumping, contactPair, contactPairs, contactPieces, dhypot, quantizeShipBody,
+  CONTACT_BIG_BODY, ContactPairCache, contactJumping, contactPair, contactPairs, pairPieces, dhypot, quantizeShipBody,
   type ContactEntry, type ContactPiece, type ContactPair, type PlacedGeom, type ReplicaState, type ShipTuning, type SimEvent, type Vec2,
 } from '@space-game/common';
 import type { PtBody, PtContacts } from './ptst';
@@ -69,22 +69,18 @@ export class RealContacts implements PtContacts {
     this.cur = [];
     this.stats.pairs += pairs.length;
     const cs = this.tuning.cellSize, restitution = this.tuning.collision?.restitution ?? 0.3;
-    // (A small body's pieces kept for the pass until it's pushed; a big one's only those near the other: the server's)
+    // (A small body's pieces kept for the pass until it's pushed; a big one's only those that could reach the other: the
+    // server's, common ships/contact.ts pairPieces)
     const pieces = new Map<number, ContactPiece[]>();
-    const piecesOf = (id: number, sh: PtShape, o: PtBody, osh: PtShape) => {
-      const b = by.get(id)!.s.body;
-      if (sh.big) return contactPieces(sh.geom, sh.alive, sh.com, cs, b, { x: o.s.body.x, y: o.s.body.y, r: osh.radius });
-      let p = pieces.get(id);
-      if (!p) pieces.set(id, (p = contactPieces(sh.geom, sh.alive, sh.com, cs, b)));
-      return p;
-    };
     const moved = new Set<PtBody>();
     for (const [ia, ib] of pairs) {
       const A = by.get(ia), B = by.get(ib), sa = shapes.get(ia), sb = shapes.get(ib);
       if (!A || !B || !sa || !sb) continue;
       const a0 = A.s.body, b0 = B.s.body;
       if (dhypot(b0.x - a0.x, b0.y - a0.y) > sa.radius + sb.radius) continue;
-      const pa = piecesOf(ia, sa, B, sb), pb = piecesOf(ib, sb, A, sa);
+      const [pa, pb] = pairPieces(sa, a0, sb, b0, cs, sa.big ? undefined : pieces.get(ia), sb.big ? undefined : pieces.get(ib));
+      if (!sa.big) pieces.set(ia, pa);
+      if (!sb.big) pieces.set(ib, pb);
       const a = { x: a0.x, y: a0.y, vx: a0.vx, vy: a0.vy }, b = { x: b0.x, y: b0.y, vx: b0.vx, vy: b0.vy };
       const res = contactPair(pa, pb, a, b, sa.pinned ? 0 : 1 / sa.mass, sb.pinned ? 0 : 1 / sb.mass, restitution);
       if (!res) continue;

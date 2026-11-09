@@ -112,13 +112,34 @@ export function settleContacts(events: readonly CauseEvent[], tick: number, shad
   }
 }
 
+/**
+ * A shadow's body before each of its worked causes on a tick, as far as asked: at[k] after the first k rows (null: one
+ * couldn't be worked out). A boss ground on by forty ships settles forty contacts with it, each its body before that
+ * one: worked out a row at a time once, not every prefix again (the same rows on the same body, in the same order)
+ */
+const MIDS = new WeakMap<WorkedCauses, { pre: FlightBody; at: (FlightBody | null)[] }>();
+
 /** A shadow's body on this tick just before the cause at `seq`: before the tick's causes, then the ones before it */
 function midOf(o: ContactOther, tick: number, seq: number): FlightBody | null {
   if (o.preTick !== tick || o.workedTick !== tick || !o.worked) return o.body;
-  const w = o.worked, body = { ...o.pre! }, rows: number[][] = [];
-  for (let i = 0; i < w.rows.length; i++) if (w.seqs[i] < seq) rows.push(w.rows[i]);
-  if (rows.length && !applyCauseRows(body, rows, w.env)) return null;
-  return body;
+  const w = o.worked, pre = o.pre!;
+  // (The rows before it: the first n when they're in step order, as they are; else worked out on their own)
+  let n = 0, prefix = true;
+  for (let i = 0; i < w.rows.length; i++) if (w.seqs[i] < seq) { if (i !== n) prefix = false; n++; }
+  if (!prefix) {
+    const body = { ...pre }, rows: number[][] = [];
+    for (let i = 0; i < w.rows.length; i++) if (w.seqs[i] < seq) rows.push(w.rows[i]);
+    return applyCauseRows(body, rows, w.env) ? body : null;
+  }
+  let m = MIDS.get(w);
+  if (!m || m.pre !== pre) MIDS.set(w, (m = { pre, at: [{ ...pre }] }));
+  while (m.at.length <= n) {
+    const k = m.at.length, was = m.at[k - 1];
+    const body = was ? { ...was } : null;
+    m.at.push(body && applyCauseRows(body, [w.rows[k - 1]], w.env) ? body : null);
+  }
+  const b = m.at[n];
+  return b ? { ...b } : null;
 }
 
 /**

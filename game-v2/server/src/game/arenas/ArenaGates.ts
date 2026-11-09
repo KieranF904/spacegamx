@@ -12,7 +12,7 @@
  * Who is inside an arena (`present`) is what the boss counts as its pilots (personal attacks, recovery).
  */
 
-import { Position, Velocity, InSystem, GATE, insideArena, nearGate, passPoint, terrainRadius, type ArenaDef } from '@space-game/common';
+import { Position, Velocity, InSystem, GATE, insideArena, nearGate, passPoint, type ArenaDef } from '@space-game/common';
 import type { CombatClock } from './CombatClock.js';
 
 export interface GatesHost {
@@ -86,7 +86,8 @@ export class ArenaGates {
       const wait = this.leaveWait(eid);
       if (wait > 0) { this.host.toast(eid, `In combat: ${(wait / 60).toFixed(1)} s before you can leave`, 'warn'); return true; }
     }
-    this.pass(eid, a, inward, terrainRadius(r));
+    // (Clear of the barrier by its whole reach: rock and barrier stop its hull, not a circle, terrain.ts)
+    this.pass(eid, a, inward, r);
     return true;
   }
 

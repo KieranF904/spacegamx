@@ -8,6 +8,8 @@
  *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
  *             the server step, the client prediction and the replica agree bit for bit on the golden scenarios —
  *             server/src/golden/parity.test.ts
+ *             a contact is real part pieces overlapping (a big body placed near the other), never a bounding circle —
+ *             common/src/ships/contact.test.ts
  * extend:     a new per-tick body behaviour is a step in tick() with its place in the golden tick order
  */
 
@@ -26,11 +28,11 @@ import {
   Position, Velocity, stepShaped, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  chargeTotal, shieldShare, contactPieces, contactPair, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
+  chargeTotal, shieldShare, contactPieces, contactPair, pairPieces, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
   ContactPairCache, contactPairs, cloneCharge, gunStateOf, type ContactPair, type HazardState, type OwnExtras,
   type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
-import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
+import { K, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
 import { readPilotInput } from './inputs.js';
 import { dhypot } from '@space-game/common';
@@ -489,20 +491,20 @@ export function resolveContacts(ctx: BridgeCtx): void {
   const pairs = cache.pairs(tick);
 
   const pieces = new Map<number, ContactPiece[]>();
-  // A small body's pieces are kept for the pass (until it's pushed); a big one's (a boss's) are only those near the other body
-  const piecesOf = (eid: number, ship: ShipState, other: number, os: ShipState) => {
-    if (ship.blueprint.parts.length > BIG_BODY) return ctx.worldPieces(eid, ship, { x: Position.x[other], y: Position.y[other], r: os.derived.radius });
-    let p = pieces.get(eid);
-    if (!p) { p = ctx.worldPieces(eid, ship); pieces.set(eid, p); }
-    return p;
-  };
+  const cs = ctx.tuning.cellSize;
   for (let k = 0; k < pairs.length; k++) {
     const [ea, eb] = pairs[k];
     const A = ctx.bodies.get(ea), B = ctx.bodies.get(eb);
     if (!A || !B) continue;
     const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
     if (dhypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
-    const pa = piecesOf(ea, A, eb, B), pb = piecesOf(eb, B, ea, A);
+    // A small body's pieces are kept for the pass (until it's pushed); a big one's (a boss's) are only those that could
+    // reach the other (common ships/contact.ts pairPieces)
+    const shapeA = ownShape(A, ctx.geometry(A)), shapeB = ownShape(B, ctx.geometry(B));
+    const [pa, pb] = pairPieces(shapeA, { x: Position.x[ea], y: Position.y[ea], angle: Rotation.angle[ea] }, shapeB, { x: Position.x[eb], y: Position.y[eb], angle: Rotation.angle[eb] }, cs,
+      shapeA.big ? undefined : pieces.get(ea), shapeB.big ? undefined : pieces.get(eb));
+    if (!shapeA.big) pieces.set(ea, pa);
+    if (!shapeB.big) pieces.set(eb, pb);
     // Pinned structures don't give: whatever hits them takes all the push
     const pinA = ctx.pinned.has(ea), pinB = ctx.pinned.has(eb);
     const invA = pinA ? 0 : 1 / A.derived.mass, invB = pinB ? 0 : 1 / B.derived.mass;
@@ -520,7 +522,7 @@ export function resolveContacts(ctx: BridgeCtx): void {
     Velocity.x[eb] = b.vx; Velocity.y[eb] = b.vy;
     // Both pushed: their clients work the push out (a pilot's own ship, CAPS.OWN_SIM, network/ownTick.ts; any ship a
     // client holds, CAPS.CAUSES, network/causes.ts), told whom each touched
-    const shapeA = ownShape(A, ctx.geometry(A)), shapeB = ownShape(B, ctx.geometry(B)), seq = ctx.ownCauses.next();
+    const seq = ctx.ownCauses.next();
     ctx.ownCauses.add(ea, { kind: 1, other: eb, flags: (pinB ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinA ? CONTACT_FLAG.SELF_PINNED : 0), pre: preB, self: shapeA, otherShape: shapeB, otherRebuilds: B.rebuilds, seq });
     ctx.ownCauses.add(eb, { kind: 1, other: ea, flags: CONTACT_FLAG.SECOND | (pinA ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinB ? CONTACT_FLAG.SELF_PINNED : 0), pre: preA, self: shapeB, otherShape: shapeA, otherRebuilds: A.rebuilds, seq });
     const { nx, ny, at, partsA, partsB } = res;

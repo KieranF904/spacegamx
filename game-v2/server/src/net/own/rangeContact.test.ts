@@ -3,11 +3,12 @@
  * dummies were; siege structures, nests, caches and fixed bosses still are),
  * with its inputs going ahead of the snapshots as a real client's do (it predicts LEAD ticks past the newest one).
  *
- * The server leaves a pinned ship out of the client's own contact pass (common network/causes.ts isLeftOut): its
- * pairs come as CONTACT rows, worked out on the tick layer with the real part geometry. Past the newest snapshot (the
- * prediction, what is drawn) nothing was told yet: the own layer predicts the contact itself (OwnTick.predictAhead),
- * from the same contact maths against the other's last known state, so the ship drawn stops at the hull instead of
- * sinking into it until the snapshot comes. Where it predicts right, the snapshot confirms it to the bit.
+ * A pinned ship's first shipSync says so (`pinned`, client ShipStore.pinned), so the client's own contact pass takes it
+ * as the server's does (it doesn't give), worked out on the tick layer with the real part geometry: no records. Past the
+ * newest snapshot (the prediction, what is drawn) nothing was told yet: the own layer predicts the contact itself
+ * (OwnTick.predictAhead), from the same contact maths against the other's last known state (a pinned one's however
+ * old: it stays put), so the ship drawn stops at the hull instead of sinking into it until the snapshot comes. Where it
+ * predicts right, the snapshot confirms it to the bit: against a pinned hull, from the very first touch.
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
@@ -47,8 +48,18 @@ function ram(o: { giant: string; own: string; angle: number; offset: number; mov
   fa.snapshot = (s) => {
     oSnap(s);
     if (s.ships?.some((k) => k[0] === A.pid)) got.keyframes++;
-    const st = A.reps.at(A.pid, s.tick)?.body, r = truth.get(s.tick);
-    if (A.own.on && st && r) { got.checked++; if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3]) got.off++; }
+    // (Held against the server's ship once that tick's truth is noted: a snapshot can come inside the step that ends it)
+    const st = A.reps.at(A.pid, s.tick)?.body;
+    if (A.own.on && st) snaps.push([s.tick, st.x, st.y, st.vx, st.vy]);
+  };
+  const snaps: number[][] = [];
+  const held = () => {
+    for (const [t, x, y, vx, vy] of snaps) {
+      const r = truth.get(t);
+      if (!r) continue;
+      got.checked++;
+      if (x !== r[0] || y !== r[1] || vx !== r[2] || vy !== r[3]) got.off++;
+    }
   };
   let seq = 1, fwd = false;
   let chk: ReturnType<FakeHitsClient['own']['takeCheck']>;
@@ -98,6 +109,7 @@ function ram(o: { giant: string; own: string; angle: number; offset: number; mov
     if (e > 0.01) missed++;
     worst = Math.max(worst, e);
   }
+  held();
   return { server, A, got, worst, missed, compared, touched: server.replication.ownStats.contact, dist: Math.hypot(Position.x[g] - Position.x[A.pid], Position.y[g] - Position.y[A.pid]) };
 }
 
@@ -110,11 +122,12 @@ describe('its own ship against a pinned range dummy (the weapons range)', () => 
       // (the tick layer: the server's ship to the bit at every snapshot, no keyframe of it past its first)
       expect(r.got.checked).toBeGreaterThan(50);
       expect(r.got.off).toBe(0);
-      // (the prediction: pressing on into the hull, its ship drawn where the server then had it, bar the first touch,
-      // before it knows the dummy is pinned. Without it, drawn as far as 50-130 units into the hull, most ticks off)
+      // (the prediction: pressing on into the hull, its ship drawn where the server then had it on every tick, the first
+      // touch included: it knows the dummy is pinned from its sync. Without it, drawn as far as 50-130 units into the
+      // hull, most ticks off; learning it at the first touch, that touch off by up to 11)
       expect(r.compared).toBeGreaterThan(300);
-      expect(r.missed).toBeLessThan(r.compared / 20);
-      expect(r.worst).toBeLessThan(6);
+      expect(r.missed).toBe(0);
+      expect(r.worst).toBe(0);
     }, 120_000);
   }
 

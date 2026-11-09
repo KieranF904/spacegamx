@@ -1,9 +1,10 @@
 /**
  * Terrain: a surface's rock (data/terrain/<surface>.json), solid scenery in
- * world units. Ships can't fly through it (collideTerrain, run inside the
+ * world units. Ships can't fly through it (collideTerrainHull, run inside the
  * shared physics step, so the server, a pilot's own prediction and everyone's
- * replicas push a ship out of it alike), and shots, beams and drones are
- * stopped by it (rayTerrain, insideTerrain).
+ * replicas push a ship out of it alike: its hull's real pieces against the
+ * rock's, no circle), and shots, beams and drones are stopped by it
+ * (rayTerrain, insideTerrain).
  *
  * Each rock is a simple polygon; it's split into convex pieces, and the
  * pieces are filed in a coarse grid so a ship only tests the rock near it.
@@ -12,7 +13,8 @@
 
 import type { Vec2 } from './ships/types.js';
 import { convexDecompose, normalizePolygon } from './ships/geometry.js';
-import { dhypot } from './math/detTrig.js';
+import type { ShipHull } from './ships/contact.js';
+import { dcos, dhypot, dsin } from './math/detTrig.js';
 
 export interface TerrainFile {
   _comment?: string;
@@ -62,7 +64,11 @@ export interface TerrainFile {
   };
 }
 
-interface Piece { pts: number[]; x0: number; y0: number; x1: number; y1: number }
+interface Piece {
+  pts: Float64Array; x0: number; y0: number; x1: number; y1: number;
+  /** Per edge (from corner i to i + 1): 1 if it's the rock's face, 0 if another piece lies against it (a seam inside the rock) */
+  face: Uint8Array;
+}
 
 export interface Terrain {
   /** Each rock as given (for drawing) */
@@ -86,7 +92,7 @@ export function buildTerrain(file: TerrainFile): Terrain {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       const pts: number[] = [];
       for (const [x, y] of c) { pts.push(x, y); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-      const k = pieces.push({ pts, x0, y0, x1, y1 }) - 1;
+      const k = pieces.push({ pts: Float64Array.from(pts), x0, y0, x1, y1, face: new Uint8Array(c.length) }) - 1;
       for (let cx = Math.floor(x0 / CELL); cx <= Math.floor(x1 / CELL); cx++) {
         for (let cy = Math.floor(y0 / CELL); cy <= Math.floor(y1 / CELL); cy++) {
           const list = grid.get(key(cx, cy));
@@ -95,6 +101,16 @@ export function buildTerrain(file: TerrainFile): Terrain {
       }
     }
   }
+  // (The seams: an edge two pieces share (a convex split's diagonal, mass triangles side by side) is inside the rock, and
+  // no way out of it: pushing a hull across a seam only puts it into the piece beyond)
+  const edge = (P: Piece, i: number) => {
+    const n = P.pts.length / 2, j = (i + 1) % n, r = (v: number) => Math.round(v * 1000);
+    const a = r(P.pts[i * 2]) + ',' + r(P.pts[i * 2 + 1]), b = r(P.pts[j * 2]) + ',' + r(P.pts[j * 2 + 1]);
+    return a < b ? a + ';' + b : b + ';' + a;
+  };
+  const uses = new Map<string, number>();
+  for (const P of pieces) for (let i = 0; i < P.face.length; i++) { const e = edge(P, i); uses.set(e, (uses.get(e) ?? 0) + 1); }
+  for (const P of pieces) for (let i = 0; i < P.face.length; i++) P.face[i] = uses.get(edge(P, i))! > 1 ? 0 : 1;
   return { rocks: file.rocks, file, pieces, grid };
 }
 
@@ -168,6 +184,115 @@ export function collideTerrain(body: { x: number; y: number; vx: number; vy: num
   return hit;
 }
 
+/**
+ * A hull's piece (`hn` corners from H[ho]) into a rock piece: clear if any edge of either separates them (SAT); else
+ * the way out, through one of the rock's faces: the face the hull's piece is least far behind, and how far (a seam is
+ * no way out, and nor is the far side of the rock: each face is left only outwards). Its depth and the face's outward
+ * unit normal; a piece with no face (deep in the rock) by the least overlap of all its edges. Null if clear
+ */
+function intoRock(H: Float64Array, ho: number, hn: number, P: Piece): { depth: number; nx: number; ny: number } | null {
+  const R = P.pts, rn = R.length / 2;
+  let area = 0;
+  for (let i = 0; i < rn; i++) { const j = (i + 1) % rn; area += R[i * 2] * R[j * 2 + 1] - R[j * 2] * R[i * 2 + 1]; }
+  const sgn = area >= 0 ? 1 : -1;
+  let best = Infinity, bx = 0, by = 0, any = Infinity, ax0 = 0, ay0 = 0;
+  for (let k = 0; k < 2; k++) {
+    const A = k === 0 ? H : R, o = k === 0 ? ho : 0, n = k === 0 ? hn : rn;
+    for (let i = 0; i < n; i++) {
+      const p = o + i * 2, q = o + ((i + 1) % n) * 2;
+      let ax = A[q + 1] - A[p + 1], ay = A[p] - A[q];
+      const len = Math.sqrt(ax * ax + ay * ay);
+      if (len < 1e-12) continue;
+      ax /= len; ay /= len;
+      let hmin = Infinity, hmax = -Infinity, rmin = Infinity, rmax = -Infinity;
+      for (let j = 0, m = ho; j < hn; j++, m += 2) { const d = H[m] * ax + H[m + 1] * ay; if (d < hmin) hmin = d; if (d > hmax) hmax = d; }
+      for (let j = 0, m = 0; j < rn; j++, m += 2) { const d = R[m] * ax + R[m + 1] * ay; if (d < rmin) rmin = d; if (d > rmax) rmax = d; }
+      const overlap = Math.min(hmax, rmax) - Math.max(hmin, rmin);
+      if (overlap <= 0) return null;
+      if (overlap < any) { const flip = (hmin + hmax) / 2 > (rmin + rmax) / 2; any = overlap; ax0 = flip ? ax : -ax; ay0 = flip ? ay : -ay; }
+      if (k === 1 && P.face[i]) {
+        // (Out through this face: its outward normal, and how far the hull's piece lies behind it)
+        const ox = ax * sgn, oy = ay * sgn, off = R[p] * ox + R[p + 1] * oy;
+        let lo = Infinity;
+        for (let j = 0, m = ho; j < hn; j++, m += 2) { const d = H[m] * ox + H[m + 1] * oy; if (d < lo) lo = d; }
+        const depth = off - lo;
+        if (depth < best) { best = depth; bx = ox; by = oy; }
+      }
+    }
+  }
+  return best < Infinity ? { depth: best, nx: bx, ny: by } : { depth: any, nx: ax0, ny: ay0 };
+}
+
+/** A hull placed at a pose (collideTerrainHull): its corners, and each piece's box [x0, y0, x1, y1] (scratch, reused) */
+let HULL = new Float64Array(256), BOX = new Float64Array(64);
+
+/**
+ * Push a ship out of the rock by its hull (ShipDerived.hull: its alive parts' real pieces, not a circle), and take away
+ * the part of its velocity going into it (a little bounce). True if it touched. Rock near enough to matter is what
+ * lies within its bounding radius (`radius`); for each such piece, the hull's piece deepest into it pushes the ship
+ * out along the way out of it. A few passes (being pushed out of one piece may push it into the next). Run inside the
+ * physics step, before the body's rounded: the same on every side
+ */
+export function collideTerrainHull(body: { x: number; y: number; vx: number; vy: number; angle: number }, hull: ShipHull, radius: number, t: Terrain | null | undefined): boolean {
+  if (!t || !t.pieces.length || !hull.n.length) return false;
+  let hit = false, placed = false;
+  const n = hull.n, lp = hull.pts;
+  let hx0 = 0, hy0 = 0, hx1 = 0, hy1 = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    const rocks = near(t, body.x, body.y, body.x, body.y, radius);
+    if (!rocks.length) break;
+    if (!placed) {
+      // (Placed once, as contacts place pieces (ships/contact.ts); each push then moves it with the body)
+      placed = true;
+      if (HULL.length < lp.length) HULL = new Float64Array(lp.length * 2);
+      if (BOX.length < n.length * 4) BOX = new Float64Array(n.length * 8);
+      const phi = body.angle + Math.PI / 2, c = dcos(phi), s = dsin(phi), px = body.x, py = body.y;
+      hx0 = hy0 = Infinity; hx1 = hy1 = -Infinity;
+      for (let q = 0, k = 0; q < n.length; q++) {
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+        for (let j = 0; j < n[q]; j++, k += 2) {
+          const lx = lp[k], ly = lp[k + 1];
+          const wx = px + lx * c - ly * s, wy = py + lx * s + ly * c;
+          HULL[k] = wx; HULL[k + 1] = wy;
+          if (wx < x0) x0 = wx;
+          if (wx > x1) x1 = wx;
+          if (wy < y0) y0 = wy;
+          if (wy > y1) y1 = wy;
+        }
+        BOX[q * 4] = x0; BOX[q * 4 + 1] = y0; BOX[q * 4 + 2] = x1; BOX[q * 4 + 3] = y1;
+        if (x0 < hx0) hx0 = x0;
+        if (y0 < hy0) hy0 = y0;
+        if (x1 > hx1) hx1 = x1;
+        if (y1 > hy1) hy1 = y1;
+      }
+    }
+    let moved = false;
+    for (const r of rocks) {
+      const P = t.pieces[r];
+      if (P.x1 < hx0 || P.x0 > hx1 || P.y1 < hy0 || P.y0 > hy1) continue;
+      // The hull's piece deepest into this rock, and the way out of it
+      let depth = 0, nx = 0, ny = 0;
+      for (let q = 0, k = 0; q < n.length; k += n[q] * 2, q++) {
+        if (BOX[q * 4 + 2] < P.x0 || BOX[q * 4] > P.x1 || BOX[q * 4 + 3] < P.y0 || BOX[q * 4 + 1] > P.y1) continue;
+        const pen = intoRock(HULL, k, n[q], P);
+        if (pen && pen.depth > depth) { depth = pen.depth; nx = pen.nx; ny = pen.ny; }
+      }
+      if (!(depth > 0)) continue;
+      // Out of it, the hull moved with the body
+      const dx = nx * depth, dy = ny * depth;
+      body.x += dx; body.y += dy;
+      for (let k = 0; k < lp.length; k += 2) { HULL[k] += dx; HULL[k + 1] += dy; }
+      for (let q = 0; q < n.length; q++) { BOX[q * 4] += dx; BOX[q * 4 + 2] += dx; BOX[q * 4 + 1] += dy; BOX[q * 4 + 3] += dy; }
+      hx0 += dx; hx1 += dx; hy0 += dy; hy1 += dy;
+      const vn = body.vx * nx + body.vy * ny;
+      if (vn < 0) { body.vx -= nx * vn * 1.2; body.vy -= ny * vn * 1.2; }
+      hit = moved = true;
+    }
+    if (!moved) break;
+  }
+  return hit;
+}
+
 /** How far along (x0, y0) → (x1, y1) it first meets rock: 0..1, or 1 when it's clear */
 export function rayTerrain(t: Terrain | null | undefined, x0: number, y0: number, x1: number, y1: number): number {
   if (!t || !t.pieces.length) return 1;
@@ -204,5 +329,8 @@ export function insideTerrain(t: Terrain | null | undefined, x: number, y: numbe
   return false;
 }
 
-/** A ship's collision circle against terrain: most of its bounding radius (its outline is ragged, its middle solid) */
+/**
+ * Most of a ship's bounding radius: a circle for keeping clear of rock (where to put a ship, an arena gate's far side)
+ * and for a body with no hull. Contact with rock is by the hull (collideTerrainHull)
+ */
 export const terrainRadius = (shipRadius: number) => Math.max(20, shipRadius * 0.72);

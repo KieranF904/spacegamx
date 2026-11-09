@@ -173,7 +173,9 @@ export class ShipStructure {
         const kept: number[] | undefined = next.kept, at: number | undefined = next.at;
         // (Its shells' damage multiplier: on a new ship's sync when it isn't 1, then whenever it changed)
         const dmg = this.ships.damageMulOf(id), hadDmg = fresh ? 1 : (synced?.dmg ?? 1);
-        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg };
+        // (Pinned as it spawned, told on a new ship's sync: the client's contact pass takes it so, contactsFor.ts)
+        const pinned = fresh ? this.ships.isPinned(id) : !!synced?.pinned;
+        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg, pinned };
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;
@@ -204,6 +206,7 @@ export class ShipStructure {
           born: fresh && ship.kind === 'debris' ? ship.spawnTick : undefined,
           aloof: fresh && ship.kind === 'debris' && this.ships.debrisNet.intangible.has(id) ? 1 : undefined,
           dmg: dmg !== hadDmg ? dmg : undefined,
+          pinned: fresh && pinned ? 1 : undefined,
         });
       }
       if (!hps_ || !synced) continue;

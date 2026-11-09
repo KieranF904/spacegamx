@@ -29,7 +29,7 @@ import type { FlightBody } from '../ships/flight.js';
 import type { PlacedGeom } from '../ships/grid.js';
 import type { Vec2 } from '../ships/types.js';
 import { quantizeShipBody, quantizeShipValue, SHIP_PRECISION } from '../ships/physics.js';
-import { contactPieces, contactPair, recentreShift, type ContactBody } from '../ships/contact.js';
+import { pairPieces, contactPair, recentreShift, type ContactBody } from '../ships/contact.js';
 import { dpow, dhypot } from '../math/detTrig.js';
 import { hpChecksum, CONFIRM } from './hits.js';
 
@@ -136,8 +136,8 @@ export function applyCauseRows(body: FlightBody, rows: readonly (readonly number
         const ob = flags & CONTACT_FLAG.STATE ? { x: r[3], y: r[4], angle: r[5], vx: r[6], vy: r[7] } : { ...o.body };
         // (A candidate it found itself: the pass skips one whose centres are further apart than both reaches)
         if (flags & CONTACT_FLAG.CHECK && (flags & CONTACT_FLAG.SECOND ? dhypot(body.x - ob.x, body.y - ob.y) : dhypot(ob.x - body.x, ob.y - body.y)) > (flags & CONTACT_FLAG.SECOND ? o.shape.radius + self.radius : self.radius + o.shape.radius)) break;
-        const ps = contactPieces(self.geom, self.alive, self.com, env.cellSize, body, self.big ? { x: ob.x, y: ob.y, r: o.shape.radius } : undefined);
-        const po = contactPieces(o.shape.geom, o.shape.alive, o.shape.com, env.cellSize, ob, o.shape.big ? { x: body.x, y: body.y, r: self.radius } : undefined);
+        // (A big body only where it could reach the other: the same contact, contact.ts pairPieces)
+        const [ps, po] = pairPieces(self, body, o.shape, ob, env.cellSize);
         const invS = flags & CONTACT_FLAG.SELF_PINNED ? 0 : 1 / self.mass, invO = flags & CONTACT_FLAG.OTHER_PINNED ? 0 : 1 / o.shape.mass;
         if (flags & CONTACT_FLAG.SECOND) contactPair(po, ps, ob, body, invO, invS, env.restitution);
         else contactPair(ps, po, body, ob, invS, invO, env.restitution);

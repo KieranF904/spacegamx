@@ -24,8 +24,8 @@ import { OWN_CAUSE, CONTACT_FLAG } from './ownTick.js';
 /**
  * A CONTACT record naming one ship twice, [ago, 1, id, id, 0], is no contact: the ship is LEFT OUT of this client's
  * own contact pass for the snapshot's whole window (CAPS.CONTACTS), its pairs come as records. The server leaves out a
- * ship it can't vouch the client has as its contact pass had it (pinned, rebuilt where the client lacks the structure,
- * pulled after the pass, or out of the pass while the client would take it)
+ * ship it can't vouch the client has as its contact pass had it (pinned where its sync didn't say so, rebuilt where the
+ * client lacks the structure, pulled after the pass, or out of the pass while the client would take it)
  */
 export function isLeftOut(r: readonly number[]): boolean {
   return r[1] === OWN_CAUSE.CONTACT && r[2] === r[3];

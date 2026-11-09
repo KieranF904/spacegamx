@@ -113,6 +113,12 @@ export interface ServerShipSyncMessage {
    * after it changed: hits by its guns are worked out with it (ShipState.dmg, hitRules.ts gunShell)
    */
   dmg?: number;
+  /**
+   * Pinned (1: it doesn't give in a contact, all the push is the other's: a siege structure, a nest, people's craft, a
+   * crust cache, a fixed boss), on a new ship's sync. A ship is pinned as it spawns and stays so, so a client's own
+   * contact pass takes it as the server's does from the first touch (server net/causes/contactsFor.ts)
+   */
+  pinned?: number;
 }
 
 /** Part HP changes between rebuilds (visual only: the client doesn't rebuild on these) */
