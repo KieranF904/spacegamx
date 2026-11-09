@@ -8,7 +8,6 @@
  *             at most MAX_PLAYERS pilots wait at once (a long outage can't grow it) — none pinned
  * extend:     nothing: Achievements feeds it (add, seed, forget)
  */
-import { randomUUID } from 'node:crypto';
 import { weekOf } from '@space-game/common';
 import type { RankBatch, RankPlayerReport, RankStats, RankingsBackend } from './RankingsBackend.js';
 
@@ -73,7 +72,7 @@ export class RankingReporter {
         players.push(p);
         this.pending.delete(id);
       }
-      this.inflight = { server: this.server, batch: randomUUID(), week: weekOf(t), players };
+      this.inflight = { server: this.server, batch: globalThis.crypto.randomUUID(), week: weekOf(t), players };
     }
     this.lastSend = t;
     const batch = this.inflight;

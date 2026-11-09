@@ -39,6 +39,7 @@ export const resolve = join;
 
 // os, url, zlib
 export const tmpdir = (): string => '/tmp';
+export const hostname = (): string => 'browser';
 export const fileURLToPath = (u: string | URL): string => new URL(String(u)).pathname;
 export const createDeflateRaw = refuse('createDeflateRaw');
 export const constants = {};
