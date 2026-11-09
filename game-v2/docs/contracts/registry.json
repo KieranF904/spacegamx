@@ -614,7 +614,7 @@
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",
-      "lines": 1223,
+      "lines": 742,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
       "needs": "GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
@@ -634,22 +634,10 @@
       ],
       "sections": [
         {
-          "name": "FADE",
-          "kind": "const",
-          "start": 72,
-          "end": 73
-        },
-        {
-          "name": "PAN_MARGIN",
-          "kind": "const",
-          "start": 74,
-          "end": 75
-        },
-        {
           "name": "Renderer",
           "kind": "class",
-          "start": 77,
-          "end": 1223
+          "start": 60,
+          "end": 742
         }
       ]
     },
@@ -759,6 +747,87 @@
           "kind": "class",
           "start": 36,
           "end": 218
+        }
+      ]
+    },
+    {
+      "id": "client.render.background",
+      "path": "client/src/rendering/renderer/background.ts",
+      "group": "client/rendering/renderer",
+      "lines": 154,
+      "owns": "Renderer's backdrop pass: the sky, surface and city, terrain, the star and central bodies, ship shadows",
+      "needs": "Renderer (its fields, as the first argument), SkyRenderer, SurfaceRenderer, SunRenderer, Lighting; npm: pixi.js, @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "behaviour is the one it had inside Renderer",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new backdrop layer is a step in renderBackground",
+      "exports": [
+        "drawShadows",
+        "renderBackground",
+        "setCity",
+        "starBody"
+      ],
+      "sections": [
+        {
+          "name": "renderBackground",
+          "kind": "function",
+          "start": 26,
+          "end": 107
+        },
+        {
+          "name": "starBody",
+          "kind": "function",
+          "start": 109,
+          "end": 116
+        },
+        {
+          "name": "drawShadows",
+          "kind": "function",
+          "start": 118,
+          "end": 130
+        },
+        {
+          "name": "setCity",
+          "kind": "function",
+          "start": 132,
+          "end": 154
+        }
+      ]
+    },
+    {
+      "id": "client.render.camera-step",
+      "path": "client/src/rendering/renderer/cameraStep.ts",
+      "group": "client/rendering/renderer",
+      "lines": 60,
+      "owns": "Renderer's per-frame camera: pan limits, roll onto the helm heading, follow smoothing, screen shake",
+      "needs": "Renderer (its fields, as the first argument), cameraView, PanControl",
+      "events": "",
+      "invariants": [
+        {
+          "text": "behaviour is the one it had inside Renderer",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "camera maths lives in cameraView.ts; this is the per-frame application of it",
+      "exports": [
+        "updateCamera"
+      ],
+      "sections": [
+        {
+          "name": "PAN_MARGIN",
+          "kind": "const",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "updateCamera",
+          "kind": "function",
+          "start": 15,
+          "end": 60
         }
       ]
     },
@@ -888,6 +957,101 @@
           "kind": "function",
           "start": 95,
           "end": 114
+        }
+      ]
+    },
+    {
+      "id": "client.render.entity-views",
+      "path": "client/src/rendering/renderer/entityViews.ts",
+      "group": "client/rendering/renderer",
+      "lines": 252,
+      "owns": "Renderer's per-frame entity pass: make, place, fade and dispose each entity's graphics, and the asteroid hit flash",
+      "needs": "Renderer (its fields, as the first argument), GameState, entityParts, the entity views (rocks, stations, rifts, pods, mobs); npm: pixi.js, @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "behaviour is the one it had inside Renderer",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new entity kind's graphics is a case in createEntityGraphics",
+      "exports": [
+        "animateRockHit",
+        "createEntityGraphics",
+        "disposeEntity",
+        "radiusOf",
+        "renderEntities"
+      ],
+      "sections": [
+        {
+          "name": "FADE",
+          "kind": "const",
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "renderEntities",
+          "kind": "function",
+          "start": 23,
+          "end": 136
+        },
+        {
+          "name": "disposeEntity",
+          "kind": "function",
+          "start": 138,
+          "end": 150
+        },
+        {
+          "name": "radiusOf",
+          "kind": "function",
+          "start": 152,
+          "end": 163
+        },
+        {
+          "name": "createEntityGraphics",
+          "kind": "function",
+          "start": 165,
+          "end": 233
+        },
+        {
+          "name": "animateRockHit",
+          "kind": "function",
+          "start": 235,
+          "end": 252
+        }
+      ]
+    },
+    {
+      "id": "client.render.frame-effects",
+      "path": "client/src/rendering/renderer/frameEffects.ts",
+      "group": "client/rendering/renderer",
+      "lines": 68,
+      "owns": "Renderer's per-frame animation of effects, gates, rifts, pods and stations, and the lights the renderer itself adds",
+      "needs": "Renderer (its fields, as the first argument), WeaponFx, Lighting; npm: pixi.js, @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "behaviour is the one it had inside Renderer",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new animated scene object is a loop in updateEffects; a new light is a case in collectLights",
+      "exports": [
+        "collectLights",
+        "updateEffects"
+      ],
+      "sections": [
+        {
+          "name": "updateEffects",
+          "kind": "function",
+          "start": 14,
+          "end": 48
+        },
+        {
+          "name": "collectLights",
+          "kind": "function",
+          "start": 50,
+          "end": 68
         }
       ]
     },
@@ -1761,7 +1925,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 924,
+      "lines": 759,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1780,26 +1944,20 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 76,
-          "end": 77
-        },
-        {
-          "name": "DEFAULT_FACING",
-          "kind": "const",
-          "start": 80,
-          "end": 80
+          "start": 75,
+          "end": 76
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 81,
-          "end": 82
+          "start": 79,
+          "end": 80
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 84,
-          "end": 924
+          "start": 82,
+          "end": 759
         }
       ]
     },
@@ -5249,6 +5407,130 @@
           "kind": "function",
           "start": 30,
           "end": 221
+        }
+      ]
+    },
+    {
+      "id": "client.hangar.edit",
+      "path": "client/src/ships/hangar/hangarEdit.ts",
+      "group": "client/ships/hangar",
+      "lines": 188,
+      "owns": "the hangar's grid editing: the part in hand as a candidate, placement rules, place, pick up, paint-drag, remove, new design",
+      "needs": "HangarUI (its fields, as the first argument), hangar/hangarAids, common ship geometry and mounting; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the hangar edits a copy of the blueprint until Save",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new placement rule is a case in placementProblem",
+      "exports": [
+        "candidate",
+        "candidateMounting",
+        "dragTo",
+        "newBlueprint",
+        "onHull",
+        "partAt",
+        "pickFacing",
+        "pickUp",
+        "place",
+        "placementProblem",
+        "remove",
+        "startDrag",
+        "stopDrag",
+        "turnPlaced"
+      ],
+      "sections": [
+        {
+          "name": "DEFAULT_FACING",
+          "kind": "const",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "candidate",
+          "kind": "function",
+          "start": 19,
+          "end": 31
+        },
+        {
+          "name": "pickFacing",
+          "kind": "function",
+          "start": 33,
+          "end": 53
+        },
+        {
+          "name": "placementProblem",
+          "kind": "function",
+          "start": 55,
+          "end": 81
+        },
+        {
+          "name": "candidateMounting",
+          "kind": "function",
+          "start": 83,
+          "end": 86
+        },
+        {
+          "name": "place",
+          "kind": "function",
+          "start": 88,
+          "end": 100
+        },
+        {
+          "name": "partAt",
+          "kind": "function",
+          "start": 102,
+          "end": 105
+        },
+        {
+          "name": "turnPlaced",
+          "kind": "function",
+          "start": 107,
+          "end": 121
+        },
+        {
+          "name": "pickUp",
+          "kind": "function",
+          "start": 123,
+          "end": 132
+        },
+        {
+          "name": "startDrag",
+          "kind": "function",
+          "start": 134,
+          "end": 139
+        },
+        {
+          "name": "stopDrag",
+          "kind": "function",
+          "start": 141,
+          "end": 145
+        },
+        {
+          "name": "dragTo",
+          "kind": "function",
+          "start": 147,
+          "end": 156
+        },
+        {
+          "name": "remove",
+          "kind": "function",
+          "start": 158,
+          "end": 171
+        },
+        {
+          "name": "onHull",
+          "kind": "function",
+          "start": 173,
+          "end": 177
+        },
+        {
+          "name": "newBlueprint",
+          "kind": "function",
+          "start": 179,
+          "end": 188
         }
       ]
     },
@@ -14450,9 +14732,9 @@
       "id": "power.ports-core",
       "path": "common/src/ships/power/ports.ts",
       "group": "common/ships/power",
-      "lines": 1173,
-      "owns": "the ports energy core: layout built per rebuild, per-tick offer / accept / apply across shared edges, feed layer (tanks, pipes, selectors, combiners), integer eu",
-      "needs": "common/ships types, tuning, catalog (transformPoint, SIDE_NORMAL), grades, power/units",
+      "lines": 410,
+      "owns": "the ports energy core's tick: per-tick offer / accept / apply across shared edges, feed layer (tanks, pipes, selectors, combiners), guns' gates, beams, mining; re-exports portsTypes / portsBuild / portsState / portsWire",
+      "needs": "portsTypes, portsState, common/ships types",
       "events": "",
       "invariants": [
         {
@@ -14466,19 +14748,26 @@
       ],
       "extend": "a new port consumer is a part kind constant (P_*) with a case in buildPortsLayout and portsTick; mechanics first, no ship-level routing",
       "exports": [
+        "*",
         "EdgeSpec",
         "FeedDef",
         "MACHINE_FAB",
+        "MACHINE_REF",
         "MAT_UNIT",
         "PF_AUG",
         "PF_LATCH",
         "PF_LIT",
         "PF_MASK",
         "PF_SEL",
-        "PORTS_ROW",
-        "PORTS_SLOT_LAYOUT",
+        "P_GEN",
         "P_INERT",
-        "PartFrame",
+        "P_PIPE",
+        "P_RELAY",
+        "P_SELECTOR",
+        "P_TANK",
+        "P_THRUSTER",
+        "P_TOOL",
+        "P_WEAPON",
         "PortSpec",
         "PortsControls",
         "PortsLayout",
@@ -14486,22 +14775,17 @@
         "PortsState",
         "PortsWeaponInput",
         "TK_ENGINE",
-        "buildPortsLayout",
+        "TK_GYRO",
+        "TK_STRAFER",
         "createPortsState",
         "effCap",
         "effShot",
         "effThrust",
-        "frameOf",
         "fullPorts",
-        "isPortsRow",
         "machineBit",
         "matOf",
-        "packPorts",
-        "placeEdge",
         "portsBeamStep",
         "portsDamageMul",
-        "portsDigest",
-        "portsFed",
         "portsGauge",
         "portsGaugePct",
         "portsGunReady",
@@ -14517,8 +14801,6 @@
         "portsPieceSpike",
         "portsPiecesHeld",
         "portsShotAugmented",
-        "portsSig",
-        "portsSlotEnd",
         "portsSpace",
         "portsSpendShot",
         "portsSwitchFeeds",
@@ -14527,567 +14809,700 @@
         "portsTick",
         "remapPorts",
         "remapPortsByIndex",
-        "setPortsMachine",
-        "unpackPortsInto"
+        "setPortsMachine"
+      ],
+      "sections": [
+        {
+          "name": "PortsControls",
+          "kind": "interface",
+          "start": 45,
+          "end": 57
+        },
+        {
+          "name": "sOffer",
+          "kind": "let",
+          "start": 58,
+          "end": 58
+        },
+        {
+          "name": "sList",
+          "kind": "let",
+          "start": 59,
+          "end": 59
+        },
+        {
+          "name": "grow",
+          "kind": "function",
+          "start": 60,
+          "end": 66
+        },
+        {
+          "name": "portsThrustFrac",
+          "kind": "function",
+          "start": 67,
+          "end": 68
+        },
+        {
+          "name": "portsThrustMul",
+          "kind": "function",
+          "start": 69,
+          "end": 69
+        },
+        {
+          "name": "portsInflow",
+          "kind": "function",
+          "start": 70,
+          "end": 71
+        },
+        {
+          "name": "portsLinkSend",
+          "kind": "function",
+          "start": 72,
+          "end": 73
+        },
+        {
+          "name": "waterfill",
+          "kind": "function",
+          "start": 75,
+          "end": 81
+        },
+        {
+          "name": "portsSpace",
+          "kind": "function",
+          "start": 82,
+          "end": 83
+        },
+        {
+          "name": "spaceOf",
+          "kind": "function",
+          "start": 84,
+          "end": 91
+        },
+        {
+          "name": "supplyNet",
+          "kind": "let",
+          "start": 92,
+          "end": 93
+        },
+        {
+          "name": "supplyOf",
+          "kind": "function",
+          "start": 94,
+          "end": 102
+        },
+        {
+          "name": "drawMat",
+          "kind": "function",
+          "start": 103,
+          "end": 112
+        },
+        {
+          "name": "accepts",
+          "kind": "const",
+          "start": 113,
+          "end": 113
+        },
+        {
+          "name": "takeOver",
+          "kind": "function",
+          "start": 115,
+          "end": 124
+        },
+        {
+          "name": "portsTick",
+          "kind": "function",
+          "start": 126,
+          "end": 247
+        },
+        {
+          "name": "portsThrustersFree",
+          "kind": "function",
+          "start": 249,
+          "end": 260
+        },
+        {
+          "name": "portsGunReady",
+          "kind": "function",
+          "start": 262,
+          "end": 268
+        },
+        {
+          "name": "lastAug",
+          "kind": "let",
+          "start": 269,
+          "end": 269
+        },
+        {
+          "name": "portsShotAugmented",
+          "kind": "function",
+          "start": 270,
+          "end": 271
+        },
+        {
+          "name": "portsSpendShot",
+          "kind": "function",
+          "start": 272,
+          "end": 283
+        },
+        {
+          "name": "portsDamageMul",
+          "kind": "function",
+          "start": 284,
+          "end": 288
+        },
+        {
+          "name": "portsBeamStep",
+          "kind": "function",
+          "start": 289,
+          "end": 313
+        },
+        {
+          "name": "portsPiecesHeld",
+          "kind": "function",
+          "start": 314,
+          "end": 326
+        },
+        {
+          "name": "portsPiecePhase",
+          "kind": "function",
+          "start": 327,
+          "end": 330
+        },
+        {
+          "name": "portsPieceLit",
+          "kind": "function",
+          "start": 331,
+          "end": 334
+        },
+        {
+          "name": "portsPieceSpike",
+          "kind": "function",
+          "start": 335,
+          "end": 339
+        },
+        {
+          "name": "piecesStep",
+          "kind": "function",
+          "start": 340,
+          "end": 353
+        },
+        {
+          "name": "pieceSpend",
+          "kind": "function",
+          "start": 354,
+          "end": 363
+        },
+        {
+          "name": "pieceBurn",
+          "kind": "function",
+          "start": 364,
+          "end": 370
+        },
+        {
+          "name": "portsMineStep",
+          "kind": "function",
+          "start": 371,
+          "end": 394
+        },
+        {
+          "name": "portsMinePhase",
+          "kind": "function",
+          "start": 395,
+          "end": 398
+        },
+        {
+          "name": "portsMineStop",
+          "kind": "function",
+          "start": 399,
+          "end": 402
+        },
+        {
+          "name": "portsSwitchFeeds",
+          "kind": "function",
+          "start": 403,
+          "end": 406
+        },
+        {
+          "name": "portsPurge",
+          "kind": "function",
+          "start": 407,
+          "end": 410
+        }
+      ]
+    },
+    {
+      "id": "power.ports-build",
+      "path": "common/src/ships/power/portsBuild.ts",
+      "group": "common/ships/power",
+      "lines": 421,
+      "owns": "building a PortsLayout from a ship's parts (buildPortsLayout), its signature and which parts power reaches",
+      "needs": "portsTypes, common/ships catalog, grades, power/units",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the reference ships feed every consumer",
+          "test": "common/src/ships/power/ports.test.ts"
+        }
+      ],
+      "extend": "a new port consumer's layout case is in buildPortsLayout",
+      "exports": [
+        "PartFrame",
+        "buildPortsLayout",
+        "frameOf",
+        "placeEdge",
+        "portsFed",
+        "portsSig"
+      ],
+      "sections": [
+        {
+          "name": "SIDE_ORDER",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "OPP",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "PartFrame",
+          "kind": "interface",
+          "start": 18,
+          "end": 23
+        },
+        {
+          "name": "frameOf",
+          "kind": "function",
+          "start": 24,
+          "end": 31
+        },
+        {
+          "name": "placeEdge",
+          "kind": "function",
+          "start": 32,
+          "end": 42
+        },
+        {
+          "name": "buildPortsLayout",
+          "kind": "function",
+          "start": 44,
+          "end": 392
+        },
+        {
+          "name": "portsFed",
+          "kind": "function",
+          "start": 394,
+          "end": 410
+        },
+        {
+          "name": "portsSig",
+          "kind": "function",
+          "start": 412,
+          "end": 421
+        }
+      ]
+    },
+    {
+      "id": "power.ports-state",
+      "path": "common/src/ships/power/portsState.ts",
+      "group": "common/ships/power",
+      "lines": 101,
+      "owns": "PortsState creation and remaps, gauges, field machine switches and a part's effective stats under its material",
+      "needs": "portsTypes",
+      "events": "",
+      "invariants": [
+        {
+          "text": "remaps keep what a kept part held",
+          "test": "common/src/ships/power/ports.test.ts"
+        }
+      ],
+      "extend": "a new material-shaped stat is an eff* beside effShot",
+      "exports": [
+        "W",
+        "createPortsState",
+        "effCap",
+        "effCycle",
+        "effDamage",
+        "effDischarge",
+        "effRest",
+        "effShot",
+        "effSteady",
+        "effThrust",
+        "fullPorts",
+        "matOf",
+        "portsGauge",
+        "portsGaugePct",
+        "portsMachineEu",
+        "portsMachinePart",
+        "remapPorts",
+        "remapPortsByIndex",
+        "setPortsMachine"
+      ],
+      "sections": [
+        {
+          "name": "createPortsState",
+          "kind": "function",
+          "start": 11,
+          "end": 14
+        },
+        {
+          "name": "fullPorts",
+          "kind": "function",
+          "start": 15,
+          "end": 22
+        },
+        {
+          "name": "remapPorts",
+          "kind": "function",
+          "start": 23,
+          "end": 41
+        },
+        {
+          "name": "remapPortsByIndex",
+          "kind": "function",
+          "start": 42,
+          "end": 68
+        },
+        {
+          "name": "portsGauge",
+          "kind": "function",
+          "start": 69,
+          "end": 69
+        },
+        {
+          "name": "portsGaugePct",
+          "kind": "function",
+          "start": 70,
+          "end": 70
+        },
+        {
+          "name": "portsMachinePart",
+          "kind": "function",
+          "start": 71,
+          "end": 75
+        },
+        {
+          "name": "setPortsMachine",
+          "kind": "function",
+          "start": 76,
+          "end": 80
+        },
+        {
+          "name": "portsMachineEu",
+          "kind": "function",
+          "start": 81,
+          "end": 82
+        },
+        {
+          "name": "matOf",
+          "kind": "function",
+          "start": 84,
+          "end": 90
+        },
+        {
+          "name": "W",
+          "kind": "const",
+          "start": 91,
+          "end": 91
+        },
+        {
+          "name": "effShot",
+          "kind": "const",
+          "start": 92,
+          "end": 92
+        },
+        {
+          "name": "effDamage",
+          "kind": "const",
+          "start": 93,
+          "end": 93
+        },
+        {
+          "name": "effCycle",
+          "kind": "const",
+          "start": 94,
+          "end": 94
+        },
+        {
+          "name": "effDischarge",
+          "kind": "const",
+          "start": 95,
+          "end": 95
+        },
+        {
+          "name": "effRest",
+          "kind": "const",
+          "start": 96,
+          "end": 96
+        },
+        {
+          "name": "effSteady",
+          "kind": "const",
+          "start": 97,
+          "end": 97
+        },
+        {
+          "name": "effCap",
+          "kind": "const",
+          "start": 98,
+          "end": 99
+        },
+        {
+          "name": "effThrust",
+          "kind": "function",
+          "start": 100,
+          "end": 101
+        }
+      ]
+    },
+    {
+      "id": "power.ports-types",
+      "path": "common/src/ships/power/portsTypes.ts",
+      "group": "common/ships/power",
+      "lines": 236,
+      "owns": "the ports core's constants (roles, flags, rates) and the PortsLayout / PortsState shapes",
+      "needs": "common/ships types, tuning",
+      "events": "",
+      "invariants": [
+        {
+          "text": "layout and state shapes are the ones the tick, wire and hangar read",
+          "test": "common/src/ships/power/ports.test.ts"
+        }
+      ],
+      "extend": "a new part role is a P_* constant here, with its case in portsBuild and ports",
+      "exports": [
+        "BOOST_DRAW",
+        "EdgeSpec",
+        "FeedDef",
+        "MACHINE_FAB",
+        "MAT_RATE",
+        "MAT_UNIT",
+        "PF_AUG",
+        "PF_LATCH",
+        "PF_LIT",
+        "PF_MASK",
+        "PF_SEL",
+        "P_INERT",
+        "PortSpec",
+        "PortsLayout",
+        "PortsLayoutInput",
+        "PortsState",
+        "PortsWeaponInput",
+        "TK_ENGINE",
+        "TOUCH_LINE_HOLDS",
+        "TOUCH_LINE_RATE",
+        "TPS",
+        "machineBit"
       ],
       "sections": [
         {
           "name": "TK_ENGINE",
           "kind": "const",
-          "start": 33,
-          "end": 35
+          "start": 12,
+          "end": 14
         },
         {
           "name": "MACHINE_FAB",
           "kind": "const",
-          "start": 36,
-          "end": 42
+          "start": 15,
+          "end": 21
         },
         {
           "name": "machineBit",
           "kind": "const",
-          "start": 43,
-          "end": 43
+          "start": 22,
+          "end": 22
         },
         {
           "name": "P_INERT",
           "kind": "const",
-          "start": 44,
-          "end": 44
+          "start": 23,
+          "end": 23
         },
         {
           "name": "PF_LATCH",
           "kind": "const",
-          "start": 45,
-          "end": 47
+          "start": 24,
+          "end": 26
         },
         {
           "name": "PF_LIT",
           "kind": "const",
-          "start": 48,
-          "end": 49
+          "start": 27,
+          "end": 28
         },
         {
           "name": "PF_SEL",
           "kind": "const",
-          "start": 50,
-          "end": 51
+          "start": 29,
+          "end": 30
         },
         {
           "name": "PF_AUG",
           "kind": "const",
-          "start": 52,
-          "end": 53
+          "start": 31,
+          "end": 32
         },
         {
           "name": "PF_MASK",
           "kind": "const",
-          "start": 54,
-          "end": 54
+          "start": 33,
+          "end": 33
         },
         {
           "name": "MAT_UNIT",
           "kind": "const",
-          "start": 56,
-          "end": 57
+          "start": 35,
+          "end": 36
         },
         {
           "name": "MAT_RATE",
           "kind": "const",
-          "start": 58,
-          "end": 59
+          "start": 37,
+          "end": 38
         },
         {
           "name": "BOOST_DRAW",
           "kind": "const",
-          "start": 60,
-          "end": 60
+          "start": 39,
+          "end": 39
         },
         {
           "name": "TOUCH_LINE_RATE",
           "kind": "const",
-          "start": 61,
-          "end": 62
+          "start": 40,
+          "end": 41
         },
         {
           "name": "TOUCH_LINE_HOLDS",
           "kind": "const",
-          "start": 63,
-          "end": 63
+          "start": 42,
+          "end": 42
         },
         {
           "name": "TPS",
           "kind": "const",
-          "start": 64,
-          "end": 65
+          "start": 43,
+          "end": 44
         },
         {
           "name": "PortSpec",
           "kind": "interface",
-          "start": 67,
-          "end": 67
+          "start": 46,
+          "end": 46
         },
         {
           "name": "EdgeSpec",
           "kind": "interface",
-          "start": 68,
-          "end": 68
+          "start": 47,
+          "end": 47
         },
         {
           "name": "FeedDef",
           "kind": "interface",
-          "start": 69,
-          "end": 79
+          "start": 48,
+          "end": 58
         },
         {
           "name": "PortsWeaponInput",
           "kind": "interface",
-          "start": 81,
-          "end": 81
+          "start": 60,
+          "end": 60
         },
         {
           "name": "PortsLayoutInput",
           "kind": "interface",
-          "start": 82,
-          "end": 94
+          "start": 61,
+          "end": 73
         },
         {
           "name": "PortsLayout",
           "kind": "interface",
-          "start": 96,
-          "end": 235
+          "start": 75,
+          "end": 214
         },
         {
           "name": "PortsState",
           "kind": "interface",
-          "start": 237,
-          "end": 257
-        },
+          "start": 216,
+          "end": 236
+        }
+      ]
+    },
+    {
+      "id": "power.ports-wire",
+      "path": "common/src/ships/power/portsWire.ts",
+      "group": "common/ships/power",
+      "lines": 60,
+      "owns": "packing and reading the pilot row's ports slot, and the state digest",
+      "needs": "portsTypes, portsState",
+      "events": "",
+      "invariants": [
         {
-          "name": "SIDE_ORDER",
-          "kind": "const",
-          "start": 259,
-          "end": 259
-        },
-        {
-          "name": "OPP",
-          "kind": "const",
-          "start": 260,
-          "end": 260
-        },
-        {
-          "name": "PartFrame",
-          "kind": "interface",
-          "start": 262,
-          "end": 267
-        },
-        {
-          "name": "frameOf",
-          "kind": "function",
-          "start": 268,
-          "end": 275
-        },
-        {
-          "name": "placeEdge",
-          "kind": "function",
-          "start": 276,
-          "end": 286
-        },
-        {
-          "name": "buildPortsLayout",
-          "kind": "function",
-          "start": 288,
-          "end": 636
-        },
-        {
-          "name": "portsFed",
-          "kind": "function",
-          "start": 638,
-          "end": 654
-        },
-        {
-          "name": "portsSig",
-          "kind": "function",
-          "start": 656,
-          "end": 665
-        },
-        {
-          "name": "createPortsState",
-          "kind": "function",
-          "start": 667,
-          "end": 670
-        },
-        {
-          "name": "fullPorts",
-          "kind": "function",
-          "start": 671,
-          "end": 678
-        },
-        {
-          "name": "remapPorts",
-          "kind": "function",
-          "start": 679,
-          "end": 697
-        },
-        {
-          "name": "remapPortsByIndex",
-          "kind": "function",
-          "start": 698,
-          "end": 724
-        },
-        {
-          "name": "portsGauge",
-          "kind": "function",
-          "start": 725,
-          "end": 725
-        },
-        {
-          "name": "portsGaugePct",
-          "kind": "function",
-          "start": 726,
-          "end": 726
-        },
-        {
-          "name": "portsMachinePart",
-          "kind": "function",
-          "start": 727,
-          "end": 731
-        },
-        {
-          "name": "setPortsMachine",
-          "kind": "function",
-          "start": 732,
-          "end": 736
-        },
-        {
-          "name": "portsMachineEu",
-          "kind": "function",
-          "start": 737,
-          "end": 738
-        },
-        {
-          "name": "matOf",
-          "kind": "function",
-          "start": 740,
-          "end": 746
-        },
-        {
-          "name": "W",
-          "kind": "const",
-          "start": 747,
-          "end": 747
-        },
-        {
-          "name": "effShot",
-          "kind": "const",
-          "start": 748,
-          "end": 748
-        },
-        {
-          "name": "effDamage",
-          "kind": "const",
-          "start": 749,
-          "end": 749
-        },
-        {
-          "name": "effCycle",
-          "kind": "const",
-          "start": 750,
-          "end": 750
-        },
-        {
-          "name": "effDischarge",
-          "kind": "const",
-          "start": 751,
-          "end": 751
-        },
-        {
-          "name": "effRest",
-          "kind": "const",
-          "start": 752,
-          "end": 752
-        },
-        {
-          "name": "effSteady",
-          "kind": "const",
-          "start": 753,
-          "end": 753
-        },
-        {
-          "name": "effCap",
-          "kind": "const",
-          "start": 754,
-          "end": 755
-        },
-        {
-          "name": "effThrust",
-          "kind": "function",
-          "start": 756,
-          "end": 757
-        },
-        {
-          "name": "PortsControls",
-          "kind": "interface",
-          "start": 759,
-          "end": 771
-        },
-        {
-          "name": "sOffer",
-          "kind": "let",
-          "start": 772,
-          "end": 772
-        },
-        {
-          "name": "sList",
-          "kind": "let",
-          "start": 773,
-          "end": 773
-        },
-        {
-          "name": "grow",
-          "kind": "function",
-          "start": 774,
-          "end": 780
-        },
-        {
-          "name": "portsThrustFrac",
-          "kind": "function",
-          "start": 781,
-          "end": 782
-        },
-        {
-          "name": "portsThrustMul",
-          "kind": "function",
-          "start": 783,
-          "end": 783
-        },
-        {
-          "name": "portsInflow",
-          "kind": "function",
-          "start": 784,
-          "end": 785
-        },
-        {
-          "name": "portsLinkSend",
-          "kind": "function",
-          "start": 786,
-          "end": 787
-        },
-        {
-          "name": "waterfill",
-          "kind": "function",
-          "start": 789,
-          "end": 795
-        },
-        {
-          "name": "portsSpace",
-          "kind": "function",
-          "start": 796,
-          "end": 797
-        },
-        {
-          "name": "spaceOf",
-          "kind": "function",
-          "start": 798,
-          "end": 805
-        },
-        {
-          "name": "supplyNet",
-          "kind": "let",
-          "start": 806,
-          "end": 807
-        },
-        {
-          "name": "supplyOf",
-          "kind": "function",
-          "start": 808,
-          "end": 816
-        },
-        {
-          "name": "drawMat",
-          "kind": "function",
-          "start": 817,
-          "end": 826
-        },
-        {
-          "name": "accepts",
-          "kind": "const",
-          "start": 827,
-          "end": 827
-        },
-        {
-          "name": "takeOver",
-          "kind": "function",
-          "start": 829,
-          "end": 838
-        },
-        {
-          "name": "portsTick",
-          "kind": "function",
-          "start": 840,
-          "end": 961
-        },
-        {
-          "name": "portsThrustersFree",
-          "kind": "function",
-          "start": 963,
-          "end": 974
-        },
-        {
-          "name": "portsGunReady",
-          "kind": "function",
-          "start": 976,
-          "end": 982
-        },
-        {
-          "name": "lastAug",
-          "kind": "let",
-          "start": 983,
-          "end": 983
-        },
-        {
-          "name": "portsShotAugmented",
-          "kind": "function",
-          "start": 984,
-          "end": 985
-        },
-        {
-          "name": "portsSpendShot",
-          "kind": "function",
-          "start": 986,
-          "end": 997
-        },
-        {
-          "name": "portsDamageMul",
-          "kind": "function",
-          "start": 998,
-          "end": 1002
-        },
-        {
-          "name": "portsBeamStep",
-          "kind": "function",
-          "start": 1003,
-          "end": 1027
-        },
-        {
-          "name": "portsPiecesHeld",
-          "kind": "function",
-          "start": 1028,
-          "end": 1040
-        },
-        {
-          "name": "portsPiecePhase",
-          "kind": "function",
-          "start": 1041,
-          "end": 1044
-        },
-        {
-          "name": "portsPieceLit",
-          "kind": "function",
-          "start": 1045,
-          "end": 1048
-        },
-        {
-          "name": "portsPieceSpike",
-          "kind": "function",
-          "start": 1049,
-          "end": 1053
-        },
-        {
-          "name": "piecesStep",
-          "kind": "function",
-          "start": 1054,
-          "end": 1067
-        },
-        {
-          "name": "pieceSpend",
-          "kind": "function",
-          "start": 1068,
-          "end": 1077
-        },
-        {
-          "name": "pieceBurn",
-          "kind": "function",
-          "start": 1078,
-          "end": 1084
-        },
-        {
-          "name": "portsMineStep",
-          "kind": "function",
-          "start": 1085,
-          "end": 1108
-        },
-        {
-          "name": "portsMinePhase",
-          "kind": "function",
-          "start": 1109,
-          "end": 1112
-        },
-        {
-          "name": "portsMineStop",
-          "kind": "function",
-          "start": 1113,
-          "end": 1116
-        },
-        {
-          "name": "portsSwitchFeeds",
-          "kind": "function",
-          "start": 1117,
-          "end": 1120
-        },
-        {
-          "name": "portsPurge",
-          "kind": "function",
-          "start": 1121,
-          "end": 1124
-        },
+          "text": "the slot layout is in the wire hash",
+          "test": "common/src/network/wireDictionary.test.ts"
+        }
+      ],
+      "extend": "a change to the slot is a protocol bump (PORTS_SLOT_LAYOUT)",
+      "exports": [
+        "PORTS_ROW",
+        "PORTS_SLOT_LAYOUT",
+        "isPortsRow",
+        "packPorts",
+        "portsDigest",
+        "portsSlotEnd",
+        "unpackPortsInto"
+      ],
+      "sections": [
         {
           "name": "PORTS_SLOT_LAYOUT",
           "kind": "const",
-          "start": 1126,
-          "end": 1128
+          "start": 12,
+          "end": 14
         },
         {
           "name": "PORTS_ROW",
           "kind": "const",
-          "start": 1129,
-          "end": 1129
+          "start": 15,
+          "end": 15
         },
         {
           "name": "FLAGS",
           "kind": "const",
-          "start": 1130,
-          "end": 1130
+          "start": 16,
+          "end": 16
         },
         {
           "name": "packPorts",
           "kind": "function",
-          "start": 1131,
-          "end": 1141
+          "start": 17,
+          "end": 27
         },
         {
           "name": "portsSlotEnd",
           "kind": "function",
-          "start": 1142,
-          "end": 1146
+          "start": 28,
+          "end": 32
         },
         {
           "name": "isPortsRow",
           "kind": "const",
-          "start": 1147,
-          "end": 1147
+          "start": 33,
+          "end": 33
         },
         {
           "name": "unpackPortsInto",
           "kind": "function",
-          "start": 1148,
-          "end": 1164
+          "start": 34,
+          "end": 50
         },
         {
           "name": "portsDigest",
           "kind": "function",
-          "start": 1165,
-          "end": 1173
+          "start": 51,
+          "end": 59
         }
       ]
     },
@@ -15603,7 +16018,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 817,
+      "lines": 761,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -15630,8 +16045,8 @@
         {
           "name": "GameServer",
           "kind": "class",
-          "start": 148,
-          "end": 817
+          "start": 121,
+          "end": 761
         }
       ]
     },
@@ -16267,7 +16682,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 1281,
+      "lines": 724,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "@space-game/common (data shapes, tables, dictionary), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -16281,7 +16696,7 @@
           "test": "server/src/data/validateGameData.test.ts"
         }
       ],
-      "extend": "a new data file is a shape spec in the tables and its ids a cross-reference check inside validateGameData",
+      "extend": "a new data file is a shape spec in validateShapes.ts and its ids a cross-reference check inside validateGameData",
       "exports": [
         "DataProblem",
         "ShipDataFiles",
@@ -16292,268 +16707,299 @@
       ],
       "sections": [
         {
-          "name": "DataProblem",
-          "kind": "interface",
-          "start": 40,
-          "end": 47
-        },
-        {
           "name": "ShipDataFiles",
           "kind": "interface",
-          "start": 49,
-          "end": 58
+          "start": 41,
+          "end": 49
         },
         {
           "name": "ValidateOptions",
           "kind": "interface",
-          "start": 60,
-          "end": 66
-        },
-        {
-          "name": "Fields",
-          "kind": "type",
-          "start": 68,
-          "end": 69
-        },
-        {
-          "name": "Spec",
-          "kind": "type",
-          "start": 70,
-          "end": 77
-        },
-        {
-          "name": "arr",
-          "kind": "const",
-          "start": 79,
-          "end": 79
-        },
-        {
-          "name": "rec",
-          "kind": "const",
-          "start": 80,
-          "end": 80
-        },
-        {
-          "name": "obj",
-          "kind": "const",
-          "start": 81,
-          "end": 81
-        },
-        {
-          "name": "strict",
-          "kind": "const",
-          "start": 82,
-          "end": 83
-        },
-        {
-          "name": "oneOf",
-          "kind": "const",
-          "start": 84,
-          "end": 84
-        },
-        {
-          "name": "Ctx",
-          "kind": "class",
-          "start": 86,
-          "end": 91
-        },
-        {
-          "name": "isObj",
-          "kind": "const",
-          "start": 93,
-          "end": 93
-        },
-        {
-          "name": "typeName",
-          "kind": "const",
-          "start": 94,
-          "end": 94
-        },
-        {
-          "name": "join",
-          "kind": "const",
-          "start": 95,
-          "end": 95
-        },
-        {
-          "name": "check",
-          "kind": "function",
-          "start": 97,
-          "end": 153
-        },
-        {
-          "name": "ITEM_CATEGORIES",
-          "kind": "const",
-          "start": 155,
-          "end": 155
-        },
-        {
-          "name": "RARITIES",
-          "kind": "const",
-          "start": 156,
-          "end": 156
-        },
-        {
-          "name": "STATION_SERVICES",
-          "kind": "const",
-          "start": 157,
-          "end": 157
-        },
-        {
-          "name": "KNOWN_STATS",
-          "kind": "const",
-          "start": 158,
-          "end": 159
-        },
-        {
-          "name": "lookSpec",
-          "kind": "const",
-          "start": 161,
-          "end": 174
-        },
-        {
-          "name": "plasmaSpec",
-          "kind": "const",
-          "start": 176,
-          "end": 196
-        },
-        {
-          "name": "lootSpec",
-          "kind": "const",
-          "start": 198,
-          "end": 198
-        },
-        {
-          "name": "behaviourSpec",
-          "kind": "const",
-          "start": 199,
-          "end": 199
-        },
-        {
-          "name": "condSpec",
-          "kind": "const",
-          "start": 201,
-          "end": 221
-        },
-        {
-          "name": "LINE_KINDS",
-          "kind": "const",
-          "start": 223,
-          "end": 235
-        },
-        {
-          "name": "lineSpec",
-          "kind": "const",
-          "start": 236,
-          "end": 241
-        },
-        {
-          "name": "linesSpec",
-          "kind": "const",
-          "start": 242,
-          "end": 242
-        },
-        {
-          "name": "STEP_FIELDS",
-          "kind": "const",
-          "start": 244,
-          "end": 271
-        },
-        {
-          "name": "stepSpec",
-          "kind": "const",
-          "start": 272,
-          "end": 277
-        },
-        {
-          "name": "rewardsSpec",
-          "kind": "const",
-          "start": 279,
-          "end": 282
-        },
-        {
-          "name": "questSpec",
-          "kind": "const",
-          "start": 284,
-          "end": 288
-        },
-        {
-          "name": "placeSpec",
-          "kind": "const",
-          "start": 290,
-          "end": 290
-        },
-        {
-          "name": "SHAPES",
-          "kind": "const",
-          "start": 292,
-          "end": 498
-        },
-        {
-          "name": "SHIP_SHAPES",
-          "kind": "const",
-          "start": 500,
-          "end": 609
-        },
-        {
-          "name": "blueprintSpec",
-          "kind": "const",
-          "start": 611,
-          "end": 615
-        },
-        {
-          "name": "list",
-          "kind": "const",
-          "start": 617,
-          "end": 618
+          "start": 51,
+          "end": 59
         },
         {
           "name": "entries",
           "kind": "const",
-          "start": 619,
-          "end": 619
+          "start": 61,
+          "end": 62
         },
         {
           "name": "keysOf",
           "kind": "const",
-          "start": 620,
-          "end": 620
+          "start": 63,
+          "end": 63
         },
         {
           "name": "str",
           "kind": "const",
-          "start": 621,
-          "end": 621
+          "start": 64,
+          "end": 64
         },
         {
           "name": "closest",
           "kind": "function",
-          "start": 623,
-          "end": 633
+          "start": 66,
+          "end": 76
         },
         {
           "name": "editDistance",
           "kind": "function",
-          "start": 635,
-          "end": 648
+          "start": 78,
+          "end": 91
         },
         {
           "name": "validateGameData",
           "kind": "function",
-          "start": 650,
-          "end": 1252
+          "start": 93,
+          "end": 695
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 1254,
-          "end": 1260
+          "start": 697,
+          "end": 703
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 1262,
-          "end": 1281
+          "start": 705,
+          "end": 724
+        }
+      ]
+    },
+    {
+      "id": "server.data.validate-shapes",
+      "path": "server/src/data/validateShapes.ts",
+      "group": "server/data",
+      "lines": 572,
+      "owns": "the shape pass of load-time data validation: a tiny schema language (Spec) and one spec per data file",
+      "needs": "@space-game/common (tables, dictionary), game/brains ids; browser-safe: no Node imports",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no shape errors",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new data file is a spec in SHAPES (or SHIP_SHAPES), its id wired in validateGameData's FILE_KEYS",
+      "exports": [
+        "Ctx",
+        "DataProblem",
+        "KNOWN_STATS",
+        "SHAPES",
+        "SHIP_SHAPES",
+        "blueprintSpec",
+        "check",
+        "isObj",
+        "join",
+        "list",
+        "typeName"
+      ],
+      "sections": [
+        {
+          "name": "DataProblem",
+          "kind": "interface",
+          "start": 14,
+          "end": 26
+        },
+        {
+          "name": "Fields",
+          "kind": "type",
+          "start": 28,
+          "end": 29
+        },
+        {
+          "name": "Spec",
+          "kind": "type",
+          "start": 30,
+          "end": 37
+        },
+        {
+          "name": "arr",
+          "kind": "const",
+          "start": 39,
+          "end": 39
+        },
+        {
+          "name": "rec",
+          "kind": "const",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "obj",
+          "kind": "const",
+          "start": 41,
+          "end": 41
+        },
+        {
+          "name": "strict",
+          "kind": "const",
+          "start": 42,
+          "end": 43
+        },
+        {
+          "name": "oneOf",
+          "kind": "const",
+          "start": 44,
+          "end": 44
+        },
+        {
+          "name": "Ctx",
+          "kind": "class",
+          "start": 46,
+          "end": 51
+        },
+        {
+          "name": "list",
+          "kind": "const",
+          "start": 53,
+          "end": 53
+        },
+        {
+          "name": "isObj",
+          "kind": "const",
+          "start": 54,
+          "end": 54
+        },
+        {
+          "name": "typeName",
+          "kind": "const",
+          "start": 55,
+          "end": 55
+        },
+        {
+          "name": "join",
+          "kind": "const",
+          "start": 56,
+          "end": 56
+        },
+        {
+          "name": "check",
+          "kind": "function",
+          "start": 58,
+          "end": 114
+        },
+        {
+          "name": "ITEM_CATEGORIES",
+          "kind": "const",
+          "start": 116,
+          "end": 116
+        },
+        {
+          "name": "RARITIES",
+          "kind": "const",
+          "start": 117,
+          "end": 117
+        },
+        {
+          "name": "STATION_SERVICES",
+          "kind": "const",
+          "start": 118,
+          "end": 118
+        },
+        {
+          "name": "KNOWN_STATS",
+          "kind": "const",
+          "start": 119,
+          "end": 120
+        },
+        {
+          "name": "lookSpec",
+          "kind": "const",
+          "start": 122,
+          "end": 135
+        },
+        {
+          "name": "plasmaSpec",
+          "kind": "const",
+          "start": 137,
+          "end": 157
+        },
+        {
+          "name": "lootSpec",
+          "kind": "const",
+          "start": 159,
+          "end": 159
+        },
+        {
+          "name": "behaviourSpec",
+          "kind": "const",
+          "start": 160,
+          "end": 160
+        },
+        {
+          "name": "condSpec",
+          "kind": "const",
+          "start": 162,
+          "end": 182
+        },
+        {
+          "name": "LINE_KINDS",
+          "kind": "const",
+          "start": 184,
+          "end": 196
+        },
+        {
+          "name": "lineSpec",
+          "kind": "const",
+          "start": 197,
+          "end": 202
+        },
+        {
+          "name": "linesSpec",
+          "kind": "const",
+          "start": 203,
+          "end": 203
+        },
+        {
+          "name": "STEP_FIELDS",
+          "kind": "const",
+          "start": 205,
+          "end": 232
+        },
+        {
+          "name": "stepSpec",
+          "kind": "const",
+          "start": 233,
+          "end": 238
+        },
+        {
+          "name": "rewardsSpec",
+          "kind": "const",
+          "start": 240,
+          "end": 243
+        },
+        {
+          "name": "questSpec",
+          "kind": "const",
+          "start": 245,
+          "end": 249
+        },
+        {
+          "name": "placeSpec",
+          "kind": "const",
+          "start": 251,
+          "end": 251
+        },
+        {
+          "name": "SHAPES",
+          "kind": "const",
+          "start": 253,
+          "end": 459
+        },
+        {
+          "name": "SHIP_SHAPES",
+          "kind": "const",
+          "start": 461,
+          "end": 570
+        },
+        {
+          "name": "blueprintSpec",
+          "kind": "const",
+          "start": 572,
+          "end": 572
         }
       ]
     },
@@ -18521,6 +18967,67 @@
           "kind": "function",
           "start": 25,
           "end": 28
+        }
+      ]
+    },
+    {
+      "id": "server.gameserver.hooks",
+      "path": "server/src/gameServer/hooks.ts",
+      "group": "server/gameServer",
+      "lines": 65,
+      "owns": "the small hooks GameServer's constructor installs: feature messages joining the table, pilots' login events, the station a connection is at, the error log tail",
+      "needs": "GameServer (type); npm: @space-game/common, bitecs",
+      "events": "",
+      "invariants": [
+        {
+          "text": "called in constructor order, each where it was inline",
+          "test": "server/src/golden/frameHash.test.ts"
+        }
+      ],
+      "extend": "a new login-time hook is a pilots.onEvent in installLoginHooks",
+      "exports": [
+        "installHangarLogin",
+        "installSocialLogin",
+        "joinFeatureMessages",
+        "stationAtConn",
+        "trackErrors"
+      ],
+      "sections": [
+        {
+          "name": "MAX_ERRORS",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "joinFeatureMessages",
+          "kind": "function",
+          "start": 17,
+          "end": 25
+        },
+        {
+          "name": "stationAtConn",
+          "kind": "function",
+          "start": 27,
+          "end": 35
+        },
+        {
+          "name": "installHangarLogin",
+          "kind": "function",
+          "start": 37,
+          "end": 44
+        },
+        {
+          "name": "installSocialLogin",
+          "kind": "function",
+          "start": 46,
+          "end": 54
+        },
+        {
+          "name": "trackErrors",
+          "kind": "function",
+          "start": 56,
+          "end": 65
         }
       ]
     },

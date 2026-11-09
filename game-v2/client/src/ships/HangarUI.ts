@@ -44,15 +44,14 @@
 import { DragPaint } from './build/dragPaint';
 import { bindBuildKeys } from './build/buildKeys';
 import { HangarAids } from './hangar/hangarAids';
-import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, overlapsAny, facingProblem, geomContainsPoint, validateBlueprint, nextFreeUid, partNeedsFacing, gunFacing, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, wireCells, cellKey, mountingOf, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
+import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, validateBlueprint, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
 import { loadTest, type LoadTestResult } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
-import { powerReport, pruneWires, type PowerReport } from './wireEdit';
+import { powerReport, type PowerReport } from './wireEdit';
 import { PortsGrid } from './portsGrid';
 import { HangarPalette, type PaletteSel } from './HangarPalette';
 import { groupOfKey, groupsSaid, hangarGroupKey } from './weaponGroups/editor';
 import { esc } from '../ui/escape';
-import { modelLock } from './modelCards';
 import { HangarLitView } from './HangarLitView';
 import { saveBlueprint } from './blueprintApi';
 import { PART_TIP_CSS, type PartTipCtx } from './partTip';
@@ -66,18 +65,17 @@ import { feedPreview, drawFeedPreview, drawWindow, drawPower, drawBanks, boltGly
 import { draw } from './hangar/hangarDraw';
 import { buildHtml, ammoHtml, bindBuildButtons, powerHtml, portsHtml, summaryHtml, renderStats } from './hangar/hangarStats';
 import { refreshLoadList, loadSelected, designKey, toggleDesigns, renderDesigns, saveDesign, deleteDesign, loadDesign } from './hangar/hangarDesigns';
-import { TURN_KEYS, escapeStep, partUnder, tryTurn } from './build/editPlaced';
+import { TURN_KEYS, escapeStep } from './build/editPlaced';
 import { tipCtx, showTip, hideTip, gridTip } from './hangar/hangarTips';
-import { ruleText } from './hangar/hangarTips';
 import { makeDeltaHover, syncDelta } from './hangar/hangarDelta';
 import type { StatDelta } from './build/statDelta';
+import { candidate, placementProblem, candidateMounting, place, partAt, turnPlaced, pickUp, startDrag, stopDrag, dragTo, remove, newBlueprint } from './hangar/hangarEdit';
 export type { HangarDeps };
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
 
 
-const DEFAULT_FACING: Record<string, Side> = { thruster: 'S', weapon: 'N', miner: 'N' };
 /** What a save would change: the parts, the paint, the wiring (absent: auto-wired) */
 const designSig = (bp: Blueprint) => JSON.stringify(bp.parts) + (bp.paint ?? '') + (bp.wires ? JSON.stringify(bp.wires) : '~');
 
@@ -95,11 +93,11 @@ export class HangarUI implements HangarHost {
   errors: BlueprintError[] = [];
   /** Parts (uids) the core doesn't hold on to: planned only, never built until something joins them */
   unreachable: ReadonlySet<number> = new Set();
-  private sel: PaletteSel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0, flip: false, facing: 'auto' };
+  sel: PaletteSel = { piece: 'sq', fn: 'hull', material: 'alloy', rot: 0, flip: false, facing: 'auto' };
   /** Placed guns breaking their mounting rules, by part index (refresh) */
   mountingBroken = new Map<number, MountingProblem[]>();
   /** The part palette (HangarPalette.ts) */
-  private pal: HangarPalette;
+  pal: HangarPalette;
   /** Folded sections under the palette (overlays) */
   private folded = { overlays: true };
   view = { cx: 1, cy: 1, px: 40 };
@@ -213,7 +211,7 @@ export class HangarUI implements HangarHost {
       this.nameInput, this.paintInput, unpaint,
       this.aids.undoBtn, this.aids.redoBtn, this.aids.symBtn,
       this.loadSelect,
-      button('New', () => this.newBlueprint()),
+      button('New', () => newBlueprint(this)),
       this.designBtn,
       save,
       button('Share', () => { this.deps.send({ type: 'shareDesign', blueprint: clone(this.bp) }); this.status('sent to your party'); }),
@@ -283,18 +281,18 @@ export class HangarUI implements HangarHost {
       }
       this.mouse = this.toGrid(e);
       this.mouseClient = { x: e.clientX, y: e.clientY };
-      this.dragTo(e, this.mouse);
+      dragTo(this, e, this.mouse);
       this.ports.hover(this.overlays.energy ? this.derived : null, this.mouse);
       this.draw();
       this.gridTip(e);
     });
     window.addEventListener('mouseup', (e) => {
-      if (this.drag && e.button === this.drag.button) this.stopDrag();
+      if (this.drag && e.button === this.drag.button) stopDrag(this);
       if (e.button !== 1 || !this.pan) return;
       const pan = this.pan;
       this.pan = null;
       this.canvas.style.cursor = 'crosshair';
-      if (!pan.moved) this.pickUp(pan.at);
+      if (!pan.moved) pickUp(this, pan.at);
     });
     this.canvas.addEventListener('mouseleave', () => { this.mouse = null; this.mouseClient = null; this.draw(); this.hideTip(); });
     this.canvas.addEventListener('mousedown', (e) => {
@@ -303,11 +301,11 @@ export class HangarUI implements HangarHost {
       if (e.button === 0) {
         const painting = !this.sel.empty;
         if (painting) this.aids.beginDrag();
-        this.place(g);
-        if (painting) this.startDrag(0, g);
+        place(this, g);
+        if (painting) startDrag(this, 0, g);
       }
       if (e.button === 1) { e.preventDefault(); this.pan = { x: e.clientX, y: e.clientY, cx: this.view.cx, cy: this.view.cy, at: g, moved: false }; }
-      if (e.button === 2) { this.aids.beginDrag(); this.remove(g); this.startDrag(2, g); }
+      if (e.button === 2) { this.aids.beginDrag(); remove(this, g); startDrag(this, 2, g); }
     });
     // (Middle-click picks a part up, middle-drag pans: no autoscroll, no paste)
     this.canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
@@ -400,7 +398,7 @@ export class HangarUI implements HangarHost {
 
   close(launch: Blueprint | null): void {
     this.isOpen = false;
-    this.stopDrag();
+    stopDrag(this);
     this.flow.hide();
     this.hideTip();
     this.deltaHover.clear();
@@ -417,12 +415,12 @@ export class HangarUI implements HangarHost {
   handleKey(code: string): boolean {
     if (!this.isOpen) return false;
     // (R / F / T over a part already placed turn that part; elsewhere they act on the hand, below)
-    if (TURN_KEYS[code] && this.turnPlaced(code)) { this.draw(); return true; }
+    if (TURN_KEYS[code] && turnPlaced(this, code)) { this.draw(); return true; }
     if (code === 'KeyR') this.sel.rot = ((this.sel.rot + 1) % 4) as Rot;
     else if (code === 'KeyF') this.sel.flip = !this.sel.flip;
     else if (code === 'KeyE' || code === FLOW_KEY) { this.setEnergy(!this.overlays.energy); this.renderStats(); }
     // (1-4 on the weapon under the mouse: its weapon groups, ships/weaponGroups/editor.ts)
-    else if (groupOfKey(code)) { const p = hangarGroupKey(code, this.bp, this.derived, this.mouse ? this.partAt(this.mouse) : -1); if (p) this.status(groupsSaid(p)); }
+    else if (groupOfKey(code)) { const p = hangarGroupKey(code, this.bp, this.derived, this.mouse ? partAt(this, this.mouse) : -1); if (p) this.status(groupsSaid(p)); }
     else if (code === 'KeyT') {
       // (A gun's barrel is fixed to its piece: R turns it, there is no facing to cycle)
       if (hasFixedBarrel(this.deps.catalog, this.sel.fn)) { this.status('A gun fires out of one side of its piece: turn it with R'); return true; }
@@ -446,179 +444,16 @@ export class HangarUI implements HangarHost {
   // Editing
   // -------------------------------------------------------------------------
 
-  candidate(g: Vec2): PlacedPart | null {
-    if (this.sel.empty) return null;
-    const uid = nextFreeUid(this.bp);
-    if (uid < 0) return null;
-    // (A model is always made of its own material)
-    const fd = this.deps.catalog.functions.get(this.sel.fn);
-    const p: PlacedPart = {
-      uid, piece: this.sel.piece, fn: this.sel.fn, material: fd?.model && fd.material ? fd.material : this.sel.material,
-      x: Math.floor(g[0]), y: Math.floor(g[1]), rot: this.sel.rot, flip: this.sel.flip,
-    };
-    if (partNeedsFacing(p.fn)) p.facing = gunFacing(this.deps.catalog, p) ?? this.pickFacing(p);
-    return p;
-  }
+  candidate(g: Vec2): PlacedPart | null { return candidate(this, g); }
 
-  /** Explicit facing, or the first side with a free straight edge (preferring the function's usual side). */
-  private pickFacing(p: PlacedPart): Side {
-    if (this.sel.facing !== 'auto') return this.sel.facing;
-    const g = placeGeometry(this.deps.catalog, p);
-    const all = [...this.geoms, g];
-    const pref = DEFAULT_FACING[p.fn] ?? 'N';
-    const order = [pref, ...SIDES.filter((s) => s !== pref)];
-    // (Free, or for a Diode joined: partFacingRule)
-    const free = (side: Side) => !facingProblem(p.fn, all, all.length - 1, side);
-    // A weapon with mounting rules: the first side it fires out of that keeps them all (bolted on where it must be,
-    // its barrel clear), else the first free one, so the preview shows what's wrong
-    if (mountingOf(this.deps.catalog, p.fn)?.rules) {
-      for (const side of order) {
-        if (!free(side)) continue;
-        const q = { ...p, facing: side };
-        if (!partMountingProblems(this.deps.catalog, [...this.geoms, placeGeometry(this.deps.catalog, q)], all.length - 1).length) return side;
-      }
-    }
-    for (const side of order) if (free(side)) return side;
-    return pref;
-  }
+  placementProblem(p: PlacedPart): string | null { return placementProblem(this, p); }
 
-  /** Why a candidate can't go here, or null if it can. */
-  placementProblem(p: PlacedPart): string | null {
-    const fn = this.deps.catalog.functions.get(p.fn)!;
-    if (fn.pieces !== '*' && !fn.pieces.includes(p.piece)) return `${p.fn} can't go on ${p.piece}`;
-    const id = partItemId(p);
-    // (One you have still needs its licence to fit, as the server checks; free build needs neither)
-    if (!this.free && !this.deps.canMake(id)) {
-      const lock = fn.model ? modelLock(fn, false, this.deps.level?.() ?? 1, this.deps.econ.items.all()).why : '';
-      return `${this.remaining(id) > 0 ? "you aren't licensed to fit" : "you can't make"} ${this.deps.econ.items.name(id)} yet${lock ? `: ${lock.charAt(0).toLowerCase()}${lock.slice(1)}` : ''}`;
-    }
-    const g = placeGeometry(this.deps.catalog, p);
-    if (overlapsAny(g, this.geoms)) return 'overlaps another part';
-    // It must point out of a free straight edge (T or the Facing buttons pick another side)
-    // (A Diode's instead must touch a part: power leaves by it)
-    if (p.facing) {
-      const why = facingProblem(p.fn, [...this.geoms, g], this.geoms.length, p.facing as Side);
-      const fix = hasFixedBarrel(this.deps.catalog, p.fn) ? 'turn it (R)' : 'press T for another side';
-      if (why === 'noEdge') return `no straight edge facing ${p.facing} on this piece: ${fix}`;
-      if (why === 'blocked') return `its ${p.facing} edge is blocked: ${fix}`;
-      if (why === 'notJoined') return `its ${p.facing} edge (where power leaves) must touch a part: ${fix}`;
-    }
-    // (A part that joins nothing may be planned: it shows "not connected" and builds once something joins it)
-    // Its mounting rules (always: free build skips ownership, never these)
-    const broken = this.candidateMounting(p, g);
-    if (broken.length) return broken.map((m) => ruleText(m)).join('; ');
-    return null;
-  }
+  candidateMounting(p: PlacedPart, g = placeGeometry(this.deps.catalog, p)): MountingProblem[] { return candidateMounting(this, p, g); }
 
-  /** The mounting rules a part in hand would break where it is (common partMountingProblems) */
-  candidateMounting(p: PlacedPart, g = placeGeometry(this.deps.catalog, p)): MountingProblem[] {
-    return this.geoms.length ? partMountingProblems(this.deps.catalog, [...this.geoms, g], this.geoms.length) : [];
-  }
-
-  private place(g: Vec2): void {
-    // (An empty hand: a click on a placed part picks it up, as middle-click does; on an empty cell it does nothing)
-    if (this.sel.empty) return this.pickUp(g);
-    const p = this.candidate(g);
-    if (!p) return this.status('blueprint is full (255 parts)');
-    const problem = this.placementProblem(p);
-    if (problem) return this.status(problem);
-    this.aids.edit(() => {
-      this.bp.parts.push(p);
-      this.refresh();
-      this.aids.placeMirror(p);
-    });
-  }
-
-  partAt(g: Vec2): number {
-    for (let i = this.geoms.length - 1; i >= 0; i--) if (geomContainsPoint(this.geoms[i], g[0], g[1])) return i;
-    return -1;
-  }
-
-  /** R / F / T with the mouse over a placed part: turn, mirror or re-face that part in place (build/editPlaced.ts). False: no part there */
-  private turnPlaced(code: string): boolean {
-    const i = this.mouse ? partUnder(this.deps.catalog, this.bp.parts, this.mouse) : -1;
-    if (i < 0 || !this.mouse) return false;
-    const r = tryTurn(this.deps.catalog, this.bp.parts, i, TURN_KEYS[code], this.mouse);
-    if ('problem' in r) { this.status(r.problem); return true; }
-    this.aids.edit(() => {
-      this.bp.parts[i] = r.part;
-      const note = this.aids.followTurn(i, this.mouse!);
-      if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
-      this.status(r.said + note);
-      this.refresh();
-    });
-    return true;
-  }
-
-  /** Middle-click: put the part under the cursor in hand, exactly as it's placed (piece, function, material, turn, mirror, facing) */
-  private pickUp(g: Vec2): void {
-    const i = this.partAt(g);
-    if (i < 0) return;
-    const p = this.bp.parts[i];
-    this.sel = { piece: p.piece, fn: p.fn, material: p.material, rot: p.rot, flip: p.flip, facing: p.facing ? (p.facing as Side) : 'auto' };
-    this.status(`picked up: ${this.deps.econ.items.name(partItemId(p))}`);
-    this.pal.showInHand();
-    this.draw();
-  }
+  partAt(g: Vec2): number { return partAt(this, g); }
 
   /** A held left/right button: the cells the cursor has passed since the press are placed on / taken out, each once */
-  private drag: { button: 0 | 2; paint: DragPaint } | null = null;
-
-  /** (the mirror of the cell pressed counts as visited too) */
-  private startDrag(button: 0 | 2, g: Vec2): void {
-    const paint = new DragPaint(g), m = this.aids.mirrorOf(g);
-    if (m) paint.mark(m);
-    this.drag = { button, paint };
-  }
-
-  /** The held button is up: the drag's edits close as one undo step */
-  private stopDrag(): void {
-    this.drag = null;
-    this.aids.endDrag();
-  }
-
-  private dragTo(e: MouseEvent, g: Vec2): void {
-    const d = this.drag;
-    if (!d) return;
-    if (!(e.buttons & (d.button === 0 ? 1 : 2))) { this.stopDrag(); return; }
-    for (const at of d.paint.visit(g)) {
-      const m = this.aids.mirrorOf(at);
-      if (m) d.paint.mark(m);
-      if (d.button === 0) this.place(at); else this.remove(at);
-    }
-  }
-
-  private remove(g: Vec2, mirrored = false): void {
-    const i = this.partAt(g);
-    if (i < 0) return;
-    this.aids.edit(() => {
-      // (What it held on to stays, planned and not connected, until something joins it again)
-      this.bp.parts = this.bp.parts.filter((_, k) => k !== i);
-      // (wire laid over what's gone goes with it)
-      if (this.bp.wires) this.bp.wires = pruneWires(this.bp.wires, this.onHull());
-      this.refresh();
-      // (symmetry: the part across the centre line goes too)
-      const m = mirrored ? null : this.aids.mirrorOf(g);
-      if (m) this.remove(m, true);
-    });
-  }
-
-  /** Is a cell under one of the design's parts (where saved wire stays) */
-  private onHull(): (x: number, y: number) => boolean {
-    const cells = wireCells(this.deps.catalog, this.bp, this.bp.parts.map((p) => placeGeometry(this.deps.catalog, p)));
-    return (x, y) => cells.has(cellKey(x, y));
-  }
-
-  private newBlueprint(): void {
-    this.aids.edit(() => {
-      this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, power: 'ports', parts: [
-        { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
-      ] };
-    });
-    this.plan = undefined;
-    this.recenter();
-    this.refresh();
-  }
+  drag: { button: 0 | 2; paint: DragPaint } | null = null;
 
   /** Plans the pilot can load (all of them when everything is free), smallest first */
   plans(): { file: string; bp: Blueprint }[] {
