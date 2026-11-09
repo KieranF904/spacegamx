@@ -7,7 +7,7 @@ import { computeJoins, placeGeometry } from '../../ships/grid.js';
 import { Economy } from '../economy.js';
 import { partItemId } from '../items.js';
 import {
-  CORE_TIER, FIELD, canFabricate, canRefine, fabWork, attachWork, jobTicks, jobEu, recycleReturn, repairBill, scaleBill, refineGrade, tierRule,
+  CORE_TIER, FIELD, canFabricate, canRefine, fabWork, attachWork, jobTicks, jobEu, recycleReturn, repairBill, repairWork, scaleBill, refineGrade, tierRule,
 } from './rules.js';
 import { bankPay, fieldPay, packDefs, packShare } from './packs.js';
 import { nextFieldTarget, nextRearm, payCoreOutward, placeFinished, recycleCandidates, joinDepths, type FieldPartView } from './order.js';
@@ -93,6 +93,13 @@ describe('field rules: work, costs and time', () => {
     const small = repairBill(econ, part('cannon_pip'), 0.05);
     expect(Object.values(small).reduce((s, n) => s + n, 0)).toBe(1);
     expect(repairBill(econ, part('cannon_pip'), 1)).toEqual(scaleBill(econ.recipes.partInputs(part('cannon_pip')), FIELD.repairCost));
+  });
+
+  it("mending the core is free (the bank cap leaves its inputs out) and takes an ordinary part's time", () => {
+    const core = part('core', 'alloy', 'rect2');
+    expect(repairBill(econ, core, 1)).toEqual({});
+    expect(repairWork(econ, core, 0.5)).toBeGreaterThan(0);
+    expect(repairWork(econ, core, 0.5)).toBeLessThan(fabWork(econ, core) * FIELD.repairTime * 0.5);
   });
 });
 

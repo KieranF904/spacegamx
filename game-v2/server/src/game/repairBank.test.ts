@@ -210,6 +210,25 @@ describe('a death', () => {
   });
 });
 
+describe('a damaged core and a death', () => {
+  it('respawns with the core at full health: the core always comes back free', () => {
+    const w = world();
+    const ship = w.ships.get(w.pid)!;
+    const core = ship.blueprint.parts.findIndex((q) => q.fn === 'core');
+    w.ships.damagePartFraction(w.pid, core, 0.6);
+    w.server.step();
+    expect(ship.hp[core]).toBeLessThan(ship.maxHp[core]);
+    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
+    expect(w.profile().ship.hp).toEqual({});
+    w.server.pilots.reapplyShip(w.conn);
+    w.server.step();
+    const live = w.ships.get(w.pid)!;
+    const c = live.blueprint.parts.findIndex((q) => q.fn === 'core');
+    expect(live.derived.alive[c]).toBe(true);
+    expect(live.hp[c]).toBeCloseTo(live.maxHp[c], 3);
+  });
+});
+
 describe('deposits rebuild over time', () => {
   it('a part at a time at a fabricator\'s pace (fabricate + attach), core outward, never instantly', () => {
     const w = world();
@@ -374,6 +393,43 @@ describe('passing a station', () => {
     expect(total(p.bank!.deposits)).toBeLessThan(before);
     expect(total(p.bank!.deposits)).toBeGreaterThan(before - 8);
   }, 120_000);
+
+  it('the core is mended near a station like any part, free: an empty bank and no deposits still heal it', () => {
+    const w = world();
+    dock(w.server, w.pid);
+    const p = w.profile();
+    p.bank!.free = {};
+    p.bank!.deposits = {};
+    const ship = w.ships.get(w.pid)!;
+    const core = ship.blueprint.parts.findIndex((q) => q.fn === 'core');
+    w.ships.damagePartFraction(w.pid, core, 0.5);
+    run(w, 2);
+    const hp0 = ship.hp[core];
+    expect(hp0).toBeLessThan(ship.maxHp[core] * 0.6);
+    run(w, w.ships.tuning.repair!.combatPauseTicks + 60 * 12);
+    expect(ship.hp[core]).toBeCloseTo(ship.maxHp[core], 3);
+    expect(total(p.bank!.deposits)).toBe(0);
+    expect(total(freeWhole(p.bank!))).toBe(0);
+  }, 120_000);
+
+  it('a whole damaged starter ship is mended near a station, every part of its design, core included', () => {
+    const w = world();
+    dock(w.server, w.pid);
+    const p = w.profile();
+    p.bank!.free = {};
+    p.bank!.deposits = { alloy_plate: 400, copper_wire: 400 };
+    const ship = w.ships.get(w.pid)!;
+    ship.blueprint.parts.forEach((_, i) => w.ships.damagePartFraction(w.pid, i, 0.4));
+    run(w, 2);
+    expect(ship.hp.some((h, i) => h < ship.maxHp[i] - 1e-6)).toBe(true);
+    run(w, w.ships.tuning.repair!.combatPauseTicks + 60 * 40);
+    const live = w.ships.get(w.pid)!;
+    expect(live.blueprint.parts.length).toBeGreaterThan(1);
+    live.blueprint.parts.forEach((q, i) => {
+      expect(live.derived.alive[i], q.fn).toBe(true);
+      expect(live.hp[i], q.fn).toBeCloseTo(live.maxHp[i], 3);
+    });
+  }, 180_000);
 
   it('a hit pauses the repair', () => {
     const w = world();

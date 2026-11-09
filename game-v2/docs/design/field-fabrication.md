@@ -168,7 +168,7 @@ Worked examples (from the data):
 | Refill | Empty to full in **30 min**. Each item refills at its own cap's pace (`refillBank`, by the wall clock). Fractional units are spent only whole |
 | Spare for repairs | The whole units above 75% of the cap (`freeSpare`). Only repairs and rebuilds of the ship's own design use it, never new plan parts |
 | Deposits | Packs, refined materials and components (`depositable`). Never ore, parts or ammunition. Never withdrawn |
-| Passing a station | Within **1500** of any station: deposits heal damaged parts at **10% HP/s** and rebuild a missing part every **2 s**, nearest the core first |
+| Passing a station | Within **1500** of any station: deposits heal damaged parts at **10% HP/s** and rebuild a missing part every **2 s**, nearest the core first. **Healing the core is free** (`repairBill` of a core is empty, as the cap leaves its inputs out), at a station and in the field (the fabricator or the core's own, timed as an ordinary part of its size) |
 | After a respawn | Deposits rebuild the parts the free part didn't cover, **anywhere**, at a Field Fabricator's pace (speed 1, attach included), until the ship is whole or the deposits can't pay |
 
 ---

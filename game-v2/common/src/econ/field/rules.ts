@@ -105,7 +105,8 @@ export function attachWork(catalog: Catalog, p: { piece: string }): number {
 
 /** Work seconds to repair a damaged part (missing: the share of its HP gone, 0..1) */
 export function repairWork(econ: Economy, p: { fn: string; material: string; piece: string }, missing: number): number {
-  return fabWork(econ, p) * FIELD.repairTime * clamp01(missing);
+  // (The core's mending is timed as an ordinary part of its size: its own build time is a hull's six times over)
+  return fabWork(econ, p.fn === 'core' ? { ...p, fn: 'hull' } : p) * FIELD.repairTime * clamp01(missing);
 }
 
 /** Work seconds to recycle a part */
@@ -137,7 +138,8 @@ export function recycleReturn(econ: Economy, p: { fn: string; material: string; 
 /** What repairing a damaged part takes: FIELD.repairCost x the HP share missing of its inputs, at least one unit */
 export function repairBill(econ: Economy, p: { fn: string; material: string; piece: string }, missing: number): Bag {
   const m = clamp01(missing);
-  if (m <= 0) return {};
+  // (The core's repair is free: it always comes back free, and the bank's cap leaves its inputs out, so nothing could pay)
+  if (m <= 0 || p.fn === 'core') return {};
   const inputs = fieldBuildInputs(econ, p);
   const out = scaleBill(inputs, FIELD.repairCost * m);
   if (Object.keys(out).length) return out;
