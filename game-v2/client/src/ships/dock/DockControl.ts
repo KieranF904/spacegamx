@@ -53,6 +53,7 @@ export class DockControl {
     this.dockHint.style.cssText = `position: fixed; left: 50%; bottom: 152px; transform: translateX(-50%); display: none;
       padding: 7px 16px; border-radius: 999px; background: rgba(8, 16, 30, 0.85); border: 1px solid rgba(125, 211, 252, 0.6);
       color: #cfe9ff; font: 14px 'Segoe UI', system-ui, sans-serif; letter-spacing: 0.5px; pointer-events: none; z-index: 900;`;
+    this.dockHint.dataset.tut = 'dock-hint';
     document.body.appendChild(this.dockHint);
     this.repairHint = document.createElement('div');
     this.repairHint.style.cssText = this.dockHint.style.cssText;

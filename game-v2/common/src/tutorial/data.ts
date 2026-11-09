@@ -54,6 +54,7 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
     else stepIdSet.add(s.id);
     if (typeof s.title !== 'string') err(`${p}.title`, 'expected a string');
     if (!Array.isArray(s.lines) || s.lines.length < 1 || s.lines.length > 2 || s.lines.some((l) => !(typeof l === 'string' || (isObj(l) && typeof l.screen === 'string' && typeof l.helm === 'string')))) err(`${p}.lines`, 'expected one or two lines: a string, or {screen, helm}');
+    if (s.highlight !== undefined && (!Array.isArray(s.highlight) || s.highlight.some((h) => typeof h !== 'string' || !h.trim()))) err(`${p}.highlight`, 'expected a list of CSS selectors');
     const t = s.trigger;
     if (!isObj(t) || !TRIGGERS.includes(t.kind as string)) err(`${p}.trigger.kind`, `expected one of ${TRIGGERS.join(', ')}`);
     else if (t.kind === 'panel') {

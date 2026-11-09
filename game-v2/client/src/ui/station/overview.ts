@@ -50,6 +50,7 @@ export class OverviewTab {
     row.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap;';
     const hangar = document.createElement('button');
     hangar.className = 'sgw-btn primary';
+    hangar.dataset.tut = 'open-hangar';
     hangar.textContent = 'Open hangar';
     hangar.onclick = () => this.d.openHangar();
     if (this.d.quests.currentHint() === 'hangar') hangar.classList.add('hint');

@@ -49,51 +49,59 @@
       "id": "hold",
       "title": "Open your hold",
       "lines": ["Press {inventory} to see what you carry.", "Ore you mine goes into the hold."],
-      "trigger": { "kind": "panel", "panel": "hold" }
+      "trigger": { "kind": "panel", "panel": "hold" },
+      "highlight": [".tp kbd"]
     },
     {
       "id": "dock",
       "title": "Dock at the yard",
       "lines": ["Fly into the yard station's docking ring, then press {dock}."],
-      "trigger": { "kind": "docked" }
+      "trigger": { "kind": "docked" },
+      "highlight": [".tp kbd, [data-tut=\"dock-hint\"]"]
     },
     {
       "id": "refine",
       "title": "Refine your ore",
       "lines": ["Open the Refinery tab and refine some ore into plate.", "Plate is what ship parts are made of."],
       "trigger": { "kind": "refined" },
+      "highlight": ["[data-tab=\"refinery\"]","[data-key^=\"refine:\"]:not(.off)"],
       "grant": { "iron_ore": 4, "nickel_ore": 2 }
     },
     {
       "id": "hangar",
       "title": "Place a part",
       "lines": ["On the station's Overview tab, click Open hangar.", "Place one hull cell on your ship, then click Save."],
-      "trigger": { "kind": "partPlaced" }
+      "trigger": { "kind": "partPlaced" },
+      "highlight": ["[data-tut=\"open-hangar\"]","[data-part*=\":hull:\"]"]
     },
     {
       "id": "power",
       "title": "Add a generator",
       "lines": ["Place the Cell Reactor we gave you on your ship, then save.", "Press {powerFlow} in the hangar to watch the power flow."],
       "trigger": { "kind": "powered" },
+      "highlight": ["[data-tut=\"open-hangar\"]",".hp-tab[data-tab=\"power\"]","[data-part*=\":power_cell_reactor:\"]"],
       "grant": { "part:alloy:power_cell_reactor:sq": 1 }
     },
     {
       "id": "bank",
       "title": "The repair bank",
       "lines": ["The repair bank holds materials that rebuild damaged parts.", "Open the station's Repair bank tab to see it."],
-      "trigger": { "kind": "panel", "panel": "bank" }
+      "trigger": { "kind": "panel", "panel": "bank" },
+      "highlight": ["[data-tab=\"bank\"]"]
     },
     {
       "id": "guide",
       "title": "Component guide and map",
       "lines": ["Leave the station with {dock}.", "Press {components} for the component guide, then {map} for the map."],
-      "trigger": { "kind": "panel", "panels": ["guide", "map"] }
+      "trigger": { "kind": "panel", "panels": ["guide", "map"] },
+      "highlight": [".tp kbd, .hub-tab[data-tab=\"components\"]"]
     },
     {
       "id": "jump",
       "title": "Jump to the marker",
       "lines": ["Zoom out with the mouse wheel until you can see the exit marker.", "Put the cursor in it and press {jump} to jump there."],
       "trigger": { "kind": "jumped", "objects": ["exit_marker"] },
+      "highlight": [".gm-close"],
       "targets": ["exit_marker"]
     },
     {

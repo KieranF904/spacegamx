@@ -2,7 +2,7 @@
  * @contract client.ui.tutorial.ui
  * owns:       wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the
  *             training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour
- * needs:      tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, the game's entities, a send function, a renderer hook
+ * needs:      tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook
  * invariants: step text, targets and rules come from the server's state and data/tutorial.json, never hardcoded here — client/src/ui/tutorial/tutorialModel.test.ts
  * extend:     a new panel to report is an entry in `panelsOpen` (Game wiring) and in common TUTORIAL_PANELS
  */
@@ -12,6 +12,8 @@ import type { ClientMessage, ServerTutorialStateMessage, TutorialPanel } from '@
 import type { GameState } from '../../state/GameState';
 import { TutorialMarkers } from './TutorialMarkers';
 import { TutorialPanel as PanelView } from './TutorialPanel';
+import { Glow, domGlowHost } from './glow';
+import { domFind, findAnchor } from './placement';
 import { leaveMessage, onTutorial, onTutorialEdge, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
 import { lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
 import { clearTrainingBodies, setTrainingBody } from '../../state/trainingBodies';
@@ -31,8 +33,6 @@ export interface TutorialUIDeps {
   panelsOpen(): Partial<Record<TutorialPanel, boolean>>;
   /** End the old flight-school tour (it must not run beside this one) */
   stopOldTour(): void;
-  /** A window is up over the game (the station's, the hold) or the hangar: the card moves to a strip along the bottom, above it */
-  windowOpen(): boolean;
 }
 
 /** A training body is matched to its entity by place: the yard is stationary */
@@ -47,6 +47,8 @@ export class TutorialUI {
   private applied = new Map<string, TrainingLook | null>();
   private frame = 0;
   private helmShown = false;
+  private glow = new Glow(domGlowHost());
+  private find = domFind();
 
   constructor(private d: TutorialUIDeps) {
     this.panel = new PanelView({
@@ -75,6 +77,7 @@ export class TutorialUI {
     this.applied.clear();
     clearTrainingBodies();
     this.panel.reset();
+    this.glow.clear();
   }
 
   private onState(s: ServerTutorialStateMessage): void {
@@ -88,6 +91,7 @@ export class TutorialUI {
     if (!prev || prev.step !== s.step) this.prevPanels = {};
     this.showCard();
     this.looks();
+    this.glow.set(s.left ? '' : s.step, s.left ? undefined : tutorialData.steps.find((x) => x.id === s.step)?.highlight);
   }
 
   /** The instruction card for the state and the control mode now */
@@ -129,9 +133,11 @@ export class TutorialUI {
   update(hidden: boolean, cardHidden = hidden): void {
     const s = this.cur;
     this.panel.setHidden(cardHidden);
-    this.panel.setLow(this.d.windowOpen());
     this.markers.setHidden(hidden);
-    if (!s || s.left) { this.markers.draw(null); return; }
+    if (!s || s.left) { this.markers.draw(null); this.glow.clear(); return; }
+    // The card by the window the pilot is in (the station, the hold, the hangar, the map), or at the top; the glowing controls follow the page
+    this.panel.place(cardHidden ? null : findAnchor(this.find));
+    if (this.frame % 15 === 0) this.glow.refresh();
     this.markers.draw(s);
     // (The control mode can change with a key: the card's keys follow it)
     if (this.d.helm() !== this.helmShown) { this.helmShown = this.d.helm(); this.showCard(); }
