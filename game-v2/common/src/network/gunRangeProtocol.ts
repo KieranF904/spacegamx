@@ -27,7 +27,8 @@ export type GunRangeClientMessage = ClientGunRangeEnterMessage | ClientGunRangeW
  * This pilot's gun range state, to them alone: on going in, on each weapon change, when the target goes down or comes
  * back, and `in: false` once they are out (back docked at `station`, or refused going in: `error` says why).
  * `door` is where X takes you out (common atRangeDoor has the same rule; the chamber itself is systems.json `gunRange`),
- * `target` the target's entity (-1 while it is down).
+ * `targets` each target in the def's order: its entity (-1 while it is down), its spot and its name. Dying in the range sends
+ * no `in: false`: the respawn is back at the door (a state again).
  */
 export interface ServerGunRangeStateMessage {
   type: 'gunRangeState';
@@ -37,7 +38,7 @@ export interface ServerGunRangeStateMessage {
   /** Every weapon model this pilot may pick (common gunRangeOptions) */
   options?: string[];
   door?: { x: number; y: number; reach: number };
-  target?: { id: number; x: number; y: number };
+  targets?: { id: number; x: number; y: number; label: string }[];
   /** The station they came from and go back to (its name) */
   station?: string;
   /** Going in was refused: why */

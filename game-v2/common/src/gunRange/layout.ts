@@ -1,9 +1,9 @@
 /**
  * @contract common.gun-range.layout
  * owns:       the gun range's chamber (systems.json `gunRange`): its walls as solid terrain pieces, the exit door and the zone
- *             X works in, where a pilot comes in, and where the target stands
+ *             X works in, where a pilot comes in, and where the targets stand
  * needs:      terrain.ts (TerrainFile), ships/types (Vec2), math/detTrig
- * invariants: the walls close the chamber all round, and the door zone, the spawn and the target spot are inside it —
+ * invariants: the walls close the chamber all round, and the door zone, the spawn and the target spots are inside it —
  *             common/src/gunRange/layout.test.ts
  *             the server's terrain (data/GameData.ts) and the client's (rendering/terrainData.ts) take the same walls from
  *             the same def — common/src/gunRange/layout.test.ts
@@ -11,8 +11,8 @@
  *
  * The gun range (server game/gunRange) is one shared indoor chamber on a station: a rectangle of open floor with a solid
  * wall all round it (terrain `walls`, so collideTerrain, rayTerrain and insideTerrain stop ships and shots at it on the
- * server and in every client's prediction alike, with no check of its own), the exit door in one wall, and one big target
- * at the far end. The door is part of the wall (closed): a pilot leaves by flying up to it and pressing interact.
+ * server and in every client's prediction alike, with no check of its own), the exit door in one wall, and its targets spread
+ * down it (near drones, a weak-hulled hulk, the heavy mammoth far off). The door is part of the wall (closed): a pilot leaves by flying up to it and pressing interact.
  * Pure and deterministic: plain arithmetic on the def's numbers, so every engine builds the same bits.
  */
 
@@ -22,12 +22,18 @@ import { dhypot } from '../math/detTrig.js';
 
 export type RangeWall = 'N' | 'E' | 'S' | 'W';
 
-/** The target the range keeps standing (an enemy design, data/ships/blueprints/enemy): never fires, pays nothing */
+/** A target the range keeps standing (an enemy design, data/ships/blueprints/enemy): never fires, pays nothing */
 export interface GunRangeTargetDef {
+  /** What the floor and the HUD call it ("Drone · weak") */
+  label: string;
   /** Enemy design id (data/ships/blueprints/enemy), its faction (factions.json) and Mk grade */
   ship: string;
   faction: string;
   grade?: number;
+  /** Its parts' HP as a share of the design's (the way a boss's hull is scaled): below 1 is a soft target */
+  hp?: number;
+  /** The radius of the rings drawn round its spot on the floor (world units) */
+  ring: number;
   /** Where it stands (world units) and the way it faces (radians) */
   x: number;
   y: number;
@@ -38,7 +44,7 @@ export interface GunRangeTargetDef {
   keepRadius: number;
 }
 
-/** systems.json `gunRange`: the chamber, its door, the spawn and the target */
+/** systems.json `gunRange`: the chamber, its door, the spawn and the targets */
 export interface GunRangeDef {
   /** The chamber's open floor: a rectangle `width` x `height` centred on `centre` */
   centre: { x: number; y: number };
@@ -50,7 +56,8 @@ export interface GunRangeDef {
   door: { wall: RangeWall; along?: number; width: number; reach: number };
   /** Where a pilot comes in (just inside the door), facing `angle` (radians) */
   spawn: { x: number; y: number; angle: number };
-  target: GunRangeTargetDef;
+  /** Near to far: each its own ship, never firing, paying nothing, and back whole on its own clock */
+  targets: GunRangeTargetDef[];
 }
 
 /** The inner rectangle's edges */

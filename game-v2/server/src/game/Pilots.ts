@@ -368,7 +368,7 @@ export class Pilots {
   isFrozen(conn: PilotConn): boolean { return this.frozen.has(conn); }
   /** The real profile of a frozen pilot (read only: never change it), else their profile */
   realProfile(conn: PilotConn): PlayerProfile | undefined { return this.frozen.get(conn) ?? this.get(conn); }
-  /** A frozen pilot's ship was destroyed (the gun range brings them back to their station): set by the range */
+  /** A frozen pilot's ship was destroyed (nothing is lost; the gun range flies them again at its door on the respawn): set by the range */
   onFrozenDeath?: (conn: PilotConn) => void;
 
   /**

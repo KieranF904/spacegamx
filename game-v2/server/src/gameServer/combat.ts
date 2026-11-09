@@ -329,7 +329,7 @@ export function collisionSystem(gs: GameServer): void {
       const systemId = InSystem.systemId[player];
       const pc = gs.lingering.get(player)?.conn ?? gs.pilots.connOf(player);
       if (pc) gs.pilots.onDestroyed(pc, systemId, Position.x[player], Position.y[player], Velocity.x[player], Velocity.y[player], gs.deathCause(player));
-      if (pc && activity.on) activity.death(pc, gs.deathCause(player), gs.pilots.connOf(gs.ships.lastHitter(player))?.username);
+      if (pc && activity.on && !gs.pilots.isFrozen(pc)) activity.death(pc, gs.deathCause(player), gs.pilots.connOf(gs.ships.lastHitter(player))?.username);
 
       gs.broadcastToSystem(systemId, {
         type: 'death',

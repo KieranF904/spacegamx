@@ -74,7 +74,7 @@ export function createGunRangeHost(gs: GameServer): GunRangeHost {
     target: {
       spawn: (t) => {
         const r = range();
-        return r ? gs.enemies.spawnTarget(r.num, { ship: t.ship, faction: t.faction, grade: t.grade }, t.x, t.y, t.angle) : -1;
+        return r ? gs.enemies.spawnTarget(r.num, { ship: t.ship, faction: t.faction, grade: t.grade, hp: t.hp }, t.x, t.y, t.angle) : -1;
       },
       alive: (eid) => gs.ships.has(eid) && gs.enemies.isTarget(eid),
       remove: (eid) => { if (gs.ships.has(eid)) gs.ships.removeShip(eid); },

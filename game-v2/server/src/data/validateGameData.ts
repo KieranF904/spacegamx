@@ -451,7 +451,7 @@ const SHAPES: Record<string, Spec> = {
         centre: 'xy', width: 'number', height: 'number', wall: 'number',
         door: strict({ wall: oneOf('N', 'E', 'S', 'W'), 'along?': 'number', width: 'number', reach: 'number' }),
         spawn: strict({ x: 'number', y: 'number', angle: 'number' }),
-        target: strict({ ship: 'string', faction: 'string', 'grade?': 'number', x: 'number', y: 'number', angle: 'number', respawnSeconds: 'number', keepRadius: 'number' }),
+        targets: arr(strict({ label: 'string', ship: 'string', faction: 'string', 'grade?': 'number', 'hp?': 'number', ring: 'number', x: 'number', y: 'number', angle: 'number', respawnSeconds: 'number', keepRadius: 'number' })),
       }),
       'pocket?': strict({
         entrance: strict({ system: 'string', x: 'number', y: 'number', radius: 'number', name: 'string', 'look?': strict({ kind: oneOf('dig', 'scrap', 'den', 'roost', 'sift', 'shrine', 'knot', 'dock'), faction: 'string', 'scale?': 'number' }) }),
@@ -855,13 +855,17 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
       }
       // The gun range: a private, empty system; its spawn and target on the chamber's floor, its target a real faction's
       const gr = s?.gunRange;
-      if (isObj(gr) && isObj(gr.spawn) && isObj(gr.target) && isObj(gr.centre)) {
+      if (isObj(gr) && isObj(gr.spawn) && Array.isArray(gr.targets) && isObj(gr.centre)) {
         if (!s.private) c.err(`${P}.gunRange`, 'a gun range must be `private` (never on the galaxy map, reached only from a station)', F);
         if (list(s.portals).length || list(s.stations).length) c.err(`${P}.gunRange`, 'a gun range has no gates and no stations of its own', F);
         const inside = (x: number, y: number) => Math.abs(x - gr.centre.x) < gr.width / 2 && Math.abs(y - gr.centre.y) < gr.height / 2;
         if (!inside(gr.spawn.x, gr.spawn.y)) c.err(`${P}.gunRange.spawn`, 'outside the chamber', F);
-        if (!inside(gr.target.x, gr.target.y)) c.err(`${P}.gunRange.target`, 'outside the chamber', F);
-        faction(F, `${P}.gunRange.target.faction`, gr.target.faction);
+        if (!gr.targets.length) c.err(`${P}.gunRange.targets`, 'a gun range needs at least one target', F);
+        gr.targets.forEach((t: any, k: number) => {
+          if (!isObj(t)) return;
+          if (!inside(t.x, t.y)) c.err(`${P}.gunRange.targets[${k}]`, 'outside the chamber', F);
+          faction(F, `${P}.gunRange.targets[${k}].faction`, t.faction);
+        });
       }
       // A den's features: its vents' cycle takes each vent once; a cache's crust is a material, its loot items
       list(s?.den).forEach((d, j) => {

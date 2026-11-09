@@ -697,8 +697,8 @@
       "id": "client.rendering.gun-range-chamber",
       "path": "client/src/rendering/gunRange/ChamberView.ts",
       "group": "client/rendering/gunRange",
-      "lines": 216,
-      "owns": "how the gun range's chamber looks (systems.json `gunRange`, common gunRange/layout.ts): the station's dark beyond, the floor as a grid of panels with the firing lane and its distance marks, the rectangular wall all round (its face, ribs and lamps), the exit door in it with its EXIT sign and the zone X works in, the target's rings, light pools from the ceiling, and the lamps as lights on the ships",
+      "lines": 218,
+      "owns": "how the gun range's chamber looks (systems.json `gunRange`, common gunRange/layout.ts): the station's dark beyond, the floor as a grid of panels with the firing lane and its distance marks, the rectangular wall all round (its face, ribs and lamps), the exit door in it with its EXIT sign and the zone X works in, the targets' rings and names, light pools from the ceiling, and the lamps as lights on the ships",
       "needs": "pixi.js, common gunRange layout (chamberBox, chamberWalls, rangeDoor), lighting/Lighting, fxTextures (softDot)",
       "events": "",
       "invariants": [
@@ -758,7 +758,7 @@
           "name": "ChamberView",
           "kind": "class",
           "start": 36,
-          "end": 216
+          "end": 218
         }
       ]
     },
@@ -7071,8 +7071,8 @@
       "id": "client.gun-range.hud",
       "path": "client/src/ui/gunRange/GunRangeHud.ts",
       "group": "client/ui/gunRange",
-      "lines": 311,
-      "owns": "the gun range's HUD: the banner (GUN RANGE · weapons fully powered), the target's hull bar, the door prompt (\"Press X to leave the range\" in the door zone, common atRangeDoor) and the weapon picker (the weapons on offer with the hangar's icons, names, mount badges and class filter icons; the one flown highlighted; a click or Enter swaps it: gunRangeWeapon), in the left column where the side panel goes (the target is east: the aim stays clear); the job tracker and the quick bar put away while in",
+      "lines": 323,
+      "owns": "the gun range's HUD: the banner (GUN RANGE · weapons fully powered), the hull bar of the target you last hit (else the nearest), the door prompt (\"Press X to leave the range\" in the door zone, common atRangeDoor) and the weapon picker (the weapons on offer with the hangar's icons, names, mount badges and class filter icons; the one flown highlighted; a click or Enter swaps it: gunRangeWeapon), in the left column where the side panel goes (the target is east: the aim stays clear); the job tracker and the quick bar put away while in",
       "needs": "./rangeState, ./pickerModel, common (atRangeDoor, Catalog, ShipTuning), ui/itemIcons, ships/modelCards (mountBadge), ships/hangar/filterIcons, ui/domWrite, ui/escape",
       "events": "",
       "invariants": [
@@ -7119,13 +7119,13 @@
           "name": "GunRangeHud",
           "kind": "class",
           "start": 107,
-          "end": 305
+          "end": 317
         },
         {
           "name": "el",
           "kind": "function",
-          "start": 307,
-          "end": 311
+          "start": 319,
+          "end": 323
         }
       ]
     },
@@ -7286,7 +7286,7 @@
       "path": "client/src/ui/gunRange/rangeState.ts",
       "group": "client/ui/gunRange",
       "lines": 83,
-      "owns": "the client's copy of this pilot's gun range state (the last gunRangeState): in or out, the weapon flown, the weapons on offer, the door, the target's entity and the station to go back to; `inGunRange()` for the code that behaves differently in there (keys, HUD, ammo shown)",
+      "owns": "the client's copy of this pilot's gun range state (the last gunRangeState): in or out, the weapon flown, the weapons on offer, the door, the targets' entities and the station to go back to; `inGunRange()` for the code that behaves differently in there (keys, HUD, ammo shown)",
       "needs": "@space-game/common (ServerGunRangeStateMessage, GunRangeDef type), rendering/terrainData (gunRangeFor)",
       "events": "",
       "invariants": [
@@ -9212,13 +9212,13 @@
       "id": "common.gun-range.layout",
       "path": "common/src/gunRange/layout.ts",
       "group": "common/gunRange",
-      "lines": 101,
-      "owns": "the gun range's chamber (systems.json `gunRange`): its walls as solid terrain pieces, the exit door and the zone X works in, where a pilot comes in, and where the target stands",
+      "lines": 108,
+      "owns": "the gun range's chamber (systems.json `gunRange`): its walls as solid terrain pieces, the exit door and the zone X works in, where a pilot comes in, and where the targets stand",
       "needs": "terrain.ts (TerrainFile), ships/types (Vec2), math/detTrig",
       "events": "",
       "invariants": [
         {
-          "text": "the walls close the chamber all round, and the door zone, the spawn and the target spot are inside it",
+          "text": "the walls close the chamber all round, and the door zone, the spawn and the target spots are inside it",
           "test": "common/src/gunRange/layout.test.ts"
         },
         {
@@ -9249,55 +9249,55 @@
           "name": "GunRangeTargetDef",
           "kind": "interface",
           "start": 25,
-          "end": 39
+          "end": 45
         },
         {
           "name": "GunRangeDef",
           "kind": "interface",
-          "start": 41,
-          "end": 54
+          "start": 47,
+          "end": 61
         },
         {
           "name": "chamberBox",
           "kind": "function",
-          "start": 56,
-          "end": 59
+          "start": 63,
+          "end": 66
         },
         {
           "name": "rect",
           "kind": "const",
-          "start": 61,
-          "end": 61
+          "start": 68,
+          "end": 68
         },
         {
           "name": "chamberWalls",
           "kind": "function",
-          "start": 63,
-          "end": 72
+          "start": 70,
+          "end": 79
         },
         {
           "name": "withGunRange",
           "kind": "function",
-          "start": 74,
-          "end": 78
+          "start": 81,
+          "end": 85
         },
         {
           "name": "rangeDoor",
           "kind": "function",
-          "start": 80,
-          "end": 89
+          "start": 87,
+          "end": 96
         },
         {
           "name": "atRangeDoor",
           "kind": "function",
-          "start": 91,
-          "end": 95
+          "start": 98,
+          "end": 102
         },
         {
           "name": "insideChamber",
           "kind": "function",
-          "start": 97,
-          "end": 101
+          "start": 104,
+          "end": 108
         }
       ]
     },
@@ -10420,7 +10420,7 @@
       "id": "protocol.gun-range",
       "path": "common/src/network/gunRangeProtocol.ts",
       "group": "common/network",
-      "lines": 47,
+      "lines": 48,
       "owns": "the gun range's messages: going in from a station, picking the weapon, and the pilot's own range state",
       "needs": "nothing (plain shapes)",
       "events": "",
@@ -10461,13 +10461,13 @@
           "name": "ServerGunRangeStateMessage",
           "kind": "interface",
           "start": 26,
-          "end": 45
+          "end": 46
         },
         {
           "name": "GunRangeServerMessage",
           "kind": "type",
-          "start": 47,
-          "end": 47
+          "start": 48,
+          "end": 48
         }
       ]
     },
@@ -16042,7 +16042,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 1277,
+      "lines": 1281,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "@space-game/common (data shapes, tables, dictionary), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -16316,19 +16316,19 @@
           "name": "validateGameData",
           "kind": "function",
           "start": 650,
-          "end": 1248
+          "end": 1252
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 1250,
-          "end": 1256
+          "start": 1254,
+          "end": 1260
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 1258,
-          "end": 1277
+          "start": 1262,
+          "end": 1281
         }
       ]
     },
@@ -17104,17 +17104,17 @@
       "id": "server.gun-range",
       "path": "server/src/game/gunRange/GunRange.ts",
       "group": "server/game/gunRange",
-      "lines": 245,
-      "owns": "the gun range: going in from any station (the pilot's own ship and profile set aside, a cheat ship flown), picking its weapon, leaving at the door with X, and the ways out that aren't the door (death, a disconnect, being moved out); the target's upkeep; each visitor's gunRangeState",
+      "lines": 254,
+      "owns": "the gun range: going in from any station (the pilot's own ship and profile set aside, a cheat ship flown), picking its weapon, leaving at the door with X, and the ways out that aren't the door (death, a disconnect, being moved out); dying in it (the respawn is back at the door in the same cheat ship); the targets' upkeep; each visitor's gunRangeState",
       "needs": "GunRangeHost, Pilots (freeze, thaw, swapFrozenShip, realProfile, onFrozenDeath), Ammo (setFree), common gunRange (layout, buildCheatShip, gunRangeOptions), ./target",
-      "events": "Pilots.onFrozenDeath (the cheat ship destroyed)",
+      "events": "Pilots.onFrozenDeath (the cheat ship destroyed: the profile stays frozen, nothing is lost)",
       "invariants": [
         {
           "text": "the real profile is never changed by anything done in the range, and its saves are byte for byte the profile as it went in but for the timestamps",
           "test": "server/src/game/gunRange/isolation.test.ts"
         },
         {
-          "text": "a pilot leaves docked at the station they came from with their own ship as it was; dying or disconnecting there takes them back too; nobody but a visitor stays in the range",
+          "text": "a pilot leaves docked at the station they came from with their own ship as it was, by the door, or on a disconnect; dying there is no way out: the respawn is at the door in the same cheat ship and weapon; nobody but a visitor stays in the range",
           "test": "server/src/game/gunRange/gunRange.test.ts"
         }
       ],
@@ -17128,26 +17128,26 @@
         {
           "name": "RangeBerth",
           "kind": "interface",
-          "start": 28,
-          "end": 35
+          "start": 30,
+          "end": 37
         },
         {
           "name": "GunRangeHost",
           "kind": "interface",
-          "start": 37,
-          "end": 71
+          "start": 39,
+          "end": 73
         },
         {
           "name": "Visit",
           "kind": "interface",
-          "start": 73,
-          "end": 81
+          "start": 75,
+          "end": 83
         },
         {
           "name": "GunRange",
           "kind": "class",
-          "start": 83,
-          "end": 245
+          "start": 85,
+          "end": 254
         }
       ]
     },
@@ -17196,7 +17196,7 @@
       "path": "server/src/game/gunRange/target.ts",
       "group": "server/game/gunRange",
       "lines": 86,
-      "owns": "the gun range's one target: standing while anyone is in the range, put away when nobody is, back whole a few seconds after it is destroyed, and flown back to its spot when it has been pushed off it",
+      "owns": "one of the gun range's targets: standing while anyone is in the range, put away when nobody is, back whole a few seconds after it is destroyed, and flown back to its spot when it has been pushed off it",
       "needs": "TargetHost (spawn, alive, remove, steer, where); npm: @space-game/common (dhypot, GunRangeTargetDef)",
       "events": "",
       "invariants": [
@@ -17205,7 +17205,7 @@
           "test": "server/src/game/gunRange/gunRange.test.ts"
         }
       ],
-      "extend": "a second target is a second RangeTarget (the range ticks each)",
+      "extend": "another target is another entry of systems.json gunRange.targets (GunRange makes a RangeTarget for each and ticks them)",
       "exports": [
         "RangeTarget",
         "TargetHost"
@@ -17372,7 +17372,7 @@
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
-      "lines": 127,
+      "lines": 126,
       "owns": "what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return",
       "needs": "Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common",
       "events": "",
@@ -17394,25 +17394,25 @@
           "name": "onDestroyed",
           "kind": "function",
           "start": 13,
-          "end": 91
+          "end": 90
         },
         {
           "name": "wreckRecovered",
           "kind": "function",
-          "start": 93,
-          "end": 102
+          "start": 92,
+          "end": 101
         },
         {
           "name": "sendWreck",
           "kind": "function",
-          "start": 104,
-          "end": 113
+          "start": 103,
+          "end": 112
         },
         {
           "name": "showNotices",
           "kind": "function",
-          "start": 115,
-          "end": 127
+          "start": 114,
+          "end": 126
         }
       ]
     },

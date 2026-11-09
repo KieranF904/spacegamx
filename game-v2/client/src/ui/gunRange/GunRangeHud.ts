@@ -1,6 +1,6 @@
 /**
  * @contract client.gun-range.hud
- * owns:       the gun range's HUD: the banner (GUN RANGE · weapons fully powered), the target's hull bar, the door prompt
+ * owns:       the gun range's HUD: the banner (GUN RANGE · weapons fully powered), the hull bar of the target you last hit (else the nearest), the door prompt
  *             ("Press X to leave the range" in the door zone, common atRangeDoor) and the weapon picker (the weapons on
  *             offer with the hangar's icons, names, mount badges and class filter icons; the one flown highlighted; a click
  *             or Enter swaps it: gunRangeWeapon), in the left column where the side panel goes (the target is east: the
@@ -111,6 +111,9 @@ export class GunRangeHud {
   private readonly targetName: HTMLElement;
   private readonly targetPct: HTMLElement;
   private readonly targetBar: HTMLElement;
+  /** Each target's hull share last frame (by its place in the list), and the one that last lost some or went down */
+  private readonly seen = new Map<number, number>();
+  private lastHit = -1;
   private readonly door: HTMLDivElement;
   private readonly pick: HTMLDivElement;
   private readonly head: HTMLButtonElement;
@@ -138,7 +141,7 @@ export class GunRangeHud {
     this.banner = el('div', 'gr-banner');
     this.chip = el('div', 'gr-chip');
     this.target = el('div', 'gr-target');
-    this.target.innerHTML = '<div class="h"><span>TARGET · <b></b></span><span></span></div><div class="bar"><i></i></div>';
+    this.target.innerHTML = '<div class="h"><span><b></b></span><span></span></div><div class="bar"><i></i></div>';
     this.targetName = this.target.querySelector('b')!;
     this.targetPct = this.target.querySelector('.h > span:last-child')!;
     this.targetBar = this.target.querySelector('i')!;
@@ -191,7 +194,7 @@ export class GunRangeHud {
       document.body.classList.toggle('in-gun-range', show);
       setStyle(this.banner, 'display', show ? 'flex' : 'none');
       setStyle(this.pick, 'display', show ? 'flex' : 'none');
-      if (!show) setStyle(this.door, 'display', 'none');
+      if (!show) { setStyle(this.door, 'display', 'none'); this.seen.clear(); this.lastHit = -1; }
     }
     if (!show || !def) return;
     if (--this.placeIn <= 0) {
@@ -205,14 +208,23 @@ export class GunRangeHud {
     }
     setHtml(this.chip, '<b>Gun range</b> · <span>weapons fully powered · ammo unlimited</span>');
     // The target's hull
-    const t = st.target, hull = t && t.id >= 0 ? this.h.hull(t.id) : null;
+    const me0 = this.h.me();
+    let near = -1, nearD = Infinity;
+    st.targets.forEach((t, i) => {
+      const h = t.id >= 0 ? this.h.hull(t.id) : null, k = h && h.max > 0 ? h.hp / h.max : 0, was = this.seen.get(i);
+      if (was !== undefined && k < was - 1e-4) this.lastHit = i;
+      this.seen.set(i, k);
+      const d = me0 ? Math.hypot(t.x - me0.x, t.y - me0.y) : 0;
+      if (d < nearD) { nearD = d; near = i; }
+    });
+    const t = st.targets[this.lastHit >= 0 && this.lastHit < st.targets.length ? this.lastHit : near], hull = t && t.id >= 0 ? this.h.hull(t.id) : null;
     if (hull && hull.max > 0) {
       const k = Math.max(0, Math.min(1, hull.hp / hull.max));
-      setText(this.targetName, hull.name);
+      setText(this.targetName, t.label);
       setText(this.targetPct, `${Math.ceil(k * 100)}%`);
       setStyle(this.targetBar, 'transform', `scaleX(${k.toFixed(3)})`);
     } else {
-      setText(this.targetName, 'down');
+      setText(this.targetName, `${t?.label ?? 'Target'} · down`);
       setText(this.targetPct, 'back in a moment');
       setStyle(this.targetBar, 'transform', 'scaleX(0)');
     }

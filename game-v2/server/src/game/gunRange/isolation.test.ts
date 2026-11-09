@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { InSystem, Position, Rotation, Velocity } from '@space-game/common';
-import { boot, signIn, dock, run, settle, lastState, fireAt, toDoor, kill, S } from './gunRange.testkit.js';
+import { boot, signIn, dock, run, settle, lastState, fireAt, toDoor, kill, heavyOf, S } from './gunRange.testkit.js';
 
 /** A saved profile, but for what may change: when it was saved, and where (the station they came from, as it moves) */
 const strip = (p: any) => { const { updatedAt: _u, position, ...rest } = p; return { ...rest, system: position?.system }; };
@@ -37,14 +37,14 @@ describe('gun range: nothing leaks into the real game', () => {
     run(server, 3);
     expect(InSystem.systemId[a.conn.playerId]).toBe(num);
     const eid = a.conn.playerId;
-    Position.x[eid] = def.target.x - 900; Position.y[eid] = def.target.y; Velocity.x[eid] = 0; Rotation.angle[eid] = 0;
+    Position.x[eid] = heavyOf(def).x - 900; Position.y[eid] = heavyOf(def).y; Velocity.x[eid] = 0; Rotation.angle[eid] = 0;
     for (const model of ['cannon_pip', 'railgun_needle', 'missile_dart', 'laser_glint']) {
       a.link.receive({ type: 'gunRangeWeapon', model } as any);
-      for (let i = 0; i < 120; i++) { fireAt(a, def.target.x, def.target.y); server.step(); }
+      for (let i = 0; i < 120; i++) { fireAt(a, heavyOf(def).x, heavyOf(def).y); server.step(); }
     }
     fireAt(a, 0, 0, false);
     // The target destroyed (as a kill would): no XP, credits or loot
-    const target = lastState(a).target.id;
+    const target = lastState(a).targets.at(-1).id;
     if (target >= 0) S(server).ships.removeShip(target);
     run(server, 3);
 
@@ -67,10 +67,26 @@ describe('gun range: nothing leaks into the real game', () => {
     await settle();
     expect(strip(await store.load(77))).toEqual(before);
 
-    // ---- die: back docked, own ship
+    // ---- die: back in the range at the door, the same cheat ship and weapon; the saved profile unchanged
+    const weapon = lastState(a).weapon, rangeShip = JSON.stringify(S(server).ships.get(a.conn.playerId).blueprint);
     kill(a);
     run(server, 3);
+    pilots.saveNow(a.conn);
+    await settle();
+    expect(strip(await store.load(77))).toEqual(before);
     a.link.receive({ type: 'respawn' } as any);
+    run(server, 3);
+    expect(InSystem.systemId[a.conn.playerId]).toBe(num);
+    expect(lastState(a)).toMatchObject({ in: true, weapon });
+    expect(JSON.stringify(S(server).ships.get(a.conn.playerId).blueprint)).toBe(rangeShip);
+    expect(pilots.isFrozen(a.conn)).toBe(true);
+    expect(pilots.give(a.conn, { nickel_ore: 9 })).toEqual({ nickel_ore: 9 });
+    pilots.saveNow(a.conn);
+    await settle();
+    expect(strip(await store.load(77))).toEqual(before);
+    // ---- the door: back docked, own ship
+    toDoor(def, a);
+    a.link.receive({ type: 'interact' } as any);
     run(server, 3);
     expect(InSystem.systemId[a.conn.playerId]).not.toBe(num);
     pilots.saveNow(a.conn);
