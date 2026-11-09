@@ -23,7 +23,7 @@ import { workable, otherBefore } from './workable.js';
  * causes of what moved it besides its inputs (it steps it itself), a keyframe only when it can't have it otherwise.
  * `since`: its last snapshot's tick, the window it finds contact pairs over itself (net/causes/contactsFor.ts)
  */
-export function forClient(rep: ReplicationCore, systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, live?: ReadonlySet<number>, since?: number): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
+export function forClient(rep: ReplicationCore, systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, live?: ReadonlySet<number>, since?: number, pins?: (id: number) => boolean | undefined): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
   const ships: KeyframeRow[] = [];
   const ctl: ControlRow[] = [];
   const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[]; found?: ContactWindow } = {};
@@ -100,7 +100,7 @@ export function forClient(rep: ReplicationCore, systemId: number, self: number, 
   }
   // (CAPS.CONTACTS: the window's contacts it finds itself, between ships it held before and holds in step: neither
   // as own rows nor as records, net/causes/contactsFor.ts)
-  const found = before && since !== undefined ? contactsFound(rep, systemId, self, before, known, ships, snapshotTick, since, mine, view, held, synced, kept) : null;
+  const found = before && since !== undefined ? contactsFound(rep, systemId, self, before, known, ships, snapshotTick, since, mine, view, held, synced, kept, pins) : null;
   // (Pull fields' pulls it works out itself: a puller it held before this snapshot, in view, not keyframed now, its
   // clients' replica of it the real ship as the tick began. A tick whose pulls aren't all so is told whole)
   const pulls = rep.ships.pulls;
@@ -196,7 +196,7 @@ export function forClient(rep: ReplicationCore, systemId: number, self: number, 
  * held before this snapshot and holds in step through it (no keyframe now, still in view, in this system, ships; its
  * own when it steps it, CAPS.OWN_SIM)
  */
-export function contactsFound(rep: ReplicationCore, systemId: number, self: number, before: ReadonlySet<number>, known: ReadonlyMap<number, number>, ships: KeyframeRow[], snapshotTick: number, since: number, mine: Shadow | undefined, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, kept?: Kept): ContactWindow {
+export function contactsFound(rep: ReplicationCore, systemId: number, self: number, before: ReadonlySet<number>, known: ReadonlyMap<number, number>, ships: KeyframeRow[], snapshotTick: number, since: number, mine: Shadow | undefined, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, kept?: Kept, pins?: (id: number) => boolean | undefined): ContactWindow {
   const keyed = new Set(ships.map((k) => k[0]));
   const take = new Set<number>();
   for (const id of before) {
@@ -213,6 +213,7 @@ export function contactsFound(rep: ReplicationCore, systemId: number, self: numb
       const now = rep.ships.get(id)?.rebuilds;
       return now === rb && (synced?.(id) === now || id === self || !!view?.has(id));
     },
+    toldPinned: pins,
   });
   rep.contactStats.windows++;
   rep.contactStats.leftOut += w.leftOut.length;

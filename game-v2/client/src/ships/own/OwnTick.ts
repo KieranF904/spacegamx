@@ -125,8 +125,6 @@ export class OwnTick implements OwnTimeline {
   private sel = 0;
   /** Its contacts predicted past the newest snapshot, by tick (ownAhead.ts: stepped again from each snapshot) */
   private readonly ahead = new Map<number, CauseRow[]>();
-  /** Ships the server said were pinned when its ship last touched them (OTHER_PINNED): a predicted contact takes them so */
-  private readonly pinned = new Set<number>();
 
   constructor(private readonly host: OwnTickHost) {}
 
@@ -148,7 +146,6 @@ export class OwnTick implements OwnTimeline {
     this.seed = null;
     this.sel = 0;
     this.ahead.clear();
-    this.pinned.clear();
     this.host.reps.setOwn(id, this);
   }
 
@@ -178,7 +175,7 @@ export class OwnTick implements OwnTimeline {
     this.synced.clear(); this.hazTold.clear();
     this.seed = null;
     this.sel = 0;
-    this.ahead.clear(); this.pinned.clear();
+    this.ahead.clear();
     this.cursors.clear();
   }
 
@@ -398,7 +395,6 @@ export class OwnTick implements OwnTimeline {
       if (r[1] === OWN_CAUSE.CONTACT) {
         const os = this.host.store.get(r[2]);
         if (os) this.kept.set(t + ':' + r[2], os);
-        if (r[3] & CONTACT_FLAG.OTHER_PINNED) this.pinned.add(r[2]); else this.pinned.delete(r[2]);
       }
       if (r[1] === OWN_CAUSE.CONTACT && r[3] & CONTACT_FLAG.OTHER_BEFORE) {
         const d = this.othersBefore.get(r[2]);
@@ -413,7 +409,6 @@ export class OwnTick implements OwnTimeline {
     this.othersBefore.clear();
     // (What it predicted up to here is the snapshot's now; ids gone from its view needn't be remembered)
     for (const k of [...this.ahead.keys()]) if (k <= m.tick) this.ahead.delete(k);
-    for (const id of m.removed ?? []) this.pinned.delete(id);
     for (const mp of [this.touched, this.kept] as Map<string, unknown>[]) if (mp.size > 64) for (const k of [...mp.keys()]) if (Number(k.split(':')[0]) < m.tick - KEEP_TICKS) mp.delete(k);
     if (this.causes.size > 64) for (const t of [...this.causes.keys()]) if (t < m.tick - KEEP_TICKS) this.causes.delete(t);
     if (earliest <= m.tick) this.host.reps.rewind(self, earliest);
@@ -491,15 +486,15 @@ export class OwnTick implements OwnTimeline {
     if (!applyOwnCauses(body, rows.map((r) => r.row), ahead ? this.aheadEnv(t) : this.env(t))) this.stats.failed++;
   }
 
-  /** Did the server say ship `id` was pinned when its ship last touched it (the PT layer's pass takes it so: predict/world.ts)? */
+  /** Is ship `id` pinned (its first shipSync said so: ShipStore.pinned; the PT layer's pass takes it so, predict/world.ts)? */
   pinnedOther(id: number): boolean {
-    return this.pinned.has(id);
+    return !!this.host.store.pinned?.(id);
   }
 
   /** Its contacts on tick t past the newest snapshot, predicted (ownAhead.ts) and kept for rowsAt until a snapshot covers t */
   private predictAhead(t: number, body: FlightBody): void {
     const d = this.derived(t);
-    const rows = d && d.mass > 0 ? aheadContacts(this.host, t, body, d.radius, (id) => this.pinned.has(id)) : undefined;
+    const rows = d && d.mass > 0 ? aheadContacts(this.host, t, body, d.radius, (id) => this.pinnedOther(id)) : undefined;
     if (rows) { this.ahead.set(t, rows); this.stats.ahead += rows.length; } else this.ahead.delete(t);
   }
 

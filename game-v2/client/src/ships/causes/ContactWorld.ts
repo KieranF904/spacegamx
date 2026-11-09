@@ -9,8 +9,9 @@
  *
  * Which ships: those it holds from before the snapshot's window (none keyframed in it), ships not debris, not docked,
  * not mid-jump, with their structure for that tick; less those the snapshot names as gone, out of view, or left out (a
- * CONTACT record naming one ship twice: pinned, rebuilt where it lacks the structure, pulled after the pass). The server
- * works out the same set for it (server net/causes/contactsFor.ts) and tells it the rest.
+ * CONTACT record naming one ship twice: rebuilt where it lacks the structure, pulled after the pass, pinned where it
+ * wasn't told so). The server works out the same set for it (server net/causes/contactsFor.ts) and tells it the rest.
+ * A pinned ship (its first shipSync said so: ShipStore.pinned) is in the pass as any other, and doesn't give.
  *
  * A tick's pairs are found once (sim foundation 1C: common sim/c-contactCache.ts, the server's pass finds its own by the
  * same function) and kept with each ship's rows (memo). A ship stepped again from a tick (a late control row, a
@@ -24,7 +25,7 @@
  * a ship stepped there is stepped again from the window when the next snapshot begins.
  */
 import {
-  CONTACT_BIG_BODY, CONTACT_FLAG, OWN_CAUSE, ReplicaMode, ContactPairCache, contactJumping, contactFxDue, contactLive, contactPairs, contactPieces, contactPair,
+  CONTACT_BIG_BODY, CONTACT_FLAG, OWN_CAUSE, ReplicaMode, ContactPairCache, contactJumping, contactFxDue, contactLive, contactPairs, pairPieces, contactPair,
   isLeftOut, pairPlace, dhypot,
   type ContactEntry, type ContactPair, type CauseRow, type FlightBody, type OwnShape, type ReplicaRewinds, type ServerSnapshotMessage, type ShipDerived,
   type ShipReplicaSet, type ShipTuning,
@@ -373,10 +374,13 @@ export class ContactWorld implements ReplicaRewinds {
         const l = m.live.get(a);
         if (l) l.push(b); else m.live.set(a, [b]);
       };
+      const pinned = (id: number) => !!this.host.store.pinned?.(id);
       for (const [a, b] of pairs) {
         const place = pairPlace(a, b);
-        put(a, [OWN_CAUSE.CONTACT, b, CONTACT_FLAG.CHECK], place);
-        put(b, [OWN_CAUSE.CONTACT, a, CONTACT_FLAG.CHECK | CONTACT_FLAG.SECOND], place);
+        // (A pinned side doesn't give: the flags its told rows would have, network/causes.ts causesByShip)
+        const pa = pinned(a), pb = pinned(b);
+        put(a, [OWN_CAUSE.CONTACT, b, CONTACT_FLAG.CHECK | (pb ? CONTACT_FLAG.OTHER_PINNED : 0) | (pa ? CONTACT_FLAG.SELF_PINNED : 0)], place);
+        put(b, [OWN_CAUSE.CONTACT, a, CONTACT_FLAG.CHECK | CONTACT_FLAG.SECOND | (pa ? CONTACT_FLAG.OTHER_PINNED : 0) | (pb ? CONTACT_FLAG.SELF_PINNED : 0)], place);
         const ea = byId.get(a), eb = byId.get(b);
         if (!ea || !eb || contactLive(ea, eb)) { link(a, b); link(b, a); }
       }
@@ -420,9 +424,9 @@ export class ContactWorld implements ReplicaRewinds {
     if (dhypot(bb.x - ba.x, bb.y - ba.y) > da.radius + db.radius) return null;
     const shape = (s: typeof sa, d: ShipDerived): OwnShape => ({ geom: store.geometry(s), alive: d.alive, com: d.com, mass: d.mass, radius: d.radius, big: s.blueprint.parts.length > CONTACT_BIG_BODY });
     const A = shape(sa, da), B = shape(sb, db), cs = tuning.cellSize;
-    const pa = contactPieces(A.geom, A.alive, A.com, cs, ba, A.big ? { x: bb.x, y: bb.y, r: B.radius } : undefined);
-    const pb = contactPieces(B.geom, B.alive, B.com, cs, bb, B.big ? { x: ba.x, y: ba.y, r: A.radius } : undefined);
-    const res = contactPair(pa, pb, { ...ba }, { ...bb }, 1 / A.mass, 1 / B.mass, tuning.collision?.restitution ?? 0.3);
+    const [pa, pb] = pairPieces(A, ba, B, bb, cs);
+    const invA = store.pinned?.(a) ? 0 : 1 / A.mass, invB = store.pinned?.(b) ? 0 : 1 / B.mass;
+    const res = contactPair(pa, pb, { ...ba }, { ...bb }, invA, invB, tuning.collision?.restitution ?? 0.3);
     return res ? { closing: res.closing, nx: res.nx, ny: res.ny, at: [res.at[0], res.at[1]] } : null;
   }
 }

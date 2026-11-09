@@ -9,7 +9,8 @@
  * A ship is left out (a CONTACT record naming it twice: common network/causes.ts isLeftOut) when the client could take
  * it differently from the server's pass:
  *   - out of the pass here while the client would take it (another reason than docking: a jump, no mass)
- *   - pinned (it doesn't give; the client can't know): only when it has a candidate pair among them
+ *   - pinned (it doesn't give) where the client wasn't told so (its first shipSync says it: `toldPinned`), or told so
+ *     where it isn't: only when it has a candidate pair among them
  *   - its structure that tick not one the client has (a rebuild since that the client can't reach back for)
  *   - pulled after the pass began (pulls are before it everywhere else: the client puts them there)
  * Its pairs then come as records, as before.
@@ -32,6 +33,11 @@ export interface ContactWindowHost {
   structOk(id: number, rebuilds: number, t: number): boolean;
   /** Each ship's causes this window (contacts, pulls) */
   events(id: number): readonly CauseEvent[] | undefined;
+  /**
+   * Was the client told ship `id` is pinned (its sync's `pinned`)? Undefined: it can't say (not synced as the ship it is
+   * now), and a pinned ship is left out. Absent: no client knows, every pinned ship is left out
+   */
+  toldPinned?(id: number): boolean | undefined;
 }
 
 export interface ContactWindow {
@@ -70,12 +76,15 @@ export function contactWindow(h: ContactWindowHost): ContactWindow {
       if (i < 0) { if (!h.docked(id)) out.add(id); continue; }
       if (!h.structOk(id, L.rebuilds[i], t)) out.add(id);
     }
-    if (L.pinned.length) {
+    // (A pair's side the client takes otherwise pinned or not than the pass had it)
+    if (L.pinned.length || h.toldPinned) {
+      const told = h.toldPinned;
+      const differs = (id: number) => { const p = L.pinned.includes(id), k = told?.(id); return k === undefined ? p : k !== p; };
       for (let k = 0; k < L.pairs.length; k += 2) {
         const a = L.pairs[k], b = L.pairs[k + 1];
         if (!held.has(a) || !held.has(b)) continue;
-        if (L.pinned.includes(a)) out.add(a);
-        if (L.pinned.includes(b)) out.add(b);
+        if (differs(a)) out.add(a);
+        if (differs(b)) out.add(b);
       }
     }
   }

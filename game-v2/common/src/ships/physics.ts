@@ -13,7 +13,7 @@ import { FRICTION, BOOST_FACTOR, WORLD_SIZE } from '../constants.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { stepFlight, FlightBody, FlightControls, GravityWell, type FlightConstants } from './flight.js';
-import { collideTerrain, terrainRadius, type Terrain } from '../terrain.js';
+import { collideTerrain, collideTerrainHull, terrainRadius, type Terrain } from '../terrain.js';
 import { dpow } from '../math/detTrig.js';
 
 export const SHIP_FLIGHT_CONSTANTS = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
@@ -54,8 +54,11 @@ export function stepShipPhysics(
 ): { charge: Charge; isBoosting: boolean; power: number; ctlPower: number; aimHeld: boolean } {
   const k = gravity || jumpBoost !== 1 || hazard ? { ...SHIP_FLIGHT_CONSTANTS, gravity, jumpBoost, hazard } : SHIP_FLIGHT_CONSTANTS;
   const res = stepFlight(body, input, derived, tuning, boost, k);
-  // A surface's rock: pushed out of it, alike on every side (terrain.ts)
-  if (terrain) collideTerrain(body, terrainRadius(derived.radius), terrain);
+  // A surface's rock: pushed out of it by its hull, alike on every side (terrain.ts; a body with no hull, by a circle)
+  if (terrain) {
+    if (derived.hull) collideTerrainHull(body, derived.hull, derived.radius, terrain);
+    else collideTerrain(body, terrainRadius(derived.radius), terrain);
+  }
   quantizeShipBody(body);
   // (The charge comes back rounded alike on server and client: energy.ts)
   return { charge: res.charge, isBoosting: res.isBoosting, power: res.power, ctlPower: res.ctlPower, aimHeld: res.aimHeld };

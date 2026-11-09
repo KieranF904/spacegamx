@@ -13,8 +13,8 @@
  * kept: every snapshot steps those ticks again from what it says (OwnTick.onSnapshot), and where the prediction was
  * right that is the same state.
  *
- * Whether the other gives: a ship the server said was pinned when this ship last touched it (OTHER_PINNED, OwnTick's
- * pinned set) takes none of the push; any other by the mass shares, as the server's pass.
+ * Whether the other gives: a pinned ship (its first shipSync said so: ShipStore.pinned) takes none of the push, from
+ * the first touch; any other by the mass shares, as the server's pass.
  */
 import {
   CONTACT_FLAG, OWN_CAUSE, ReplicaMode, contactJumping, dhypot, pairPlace,
@@ -29,7 +29,10 @@ export interface AheadHost {
   self(): number;
 }
 
-/** Ticks at most another ship's last known state is carried on (past that it isn't predicted against) */
+/**
+ * Ticks at most another ship's last known state is carried on (past that it isn't predicted against). A pinned one is
+ * carried any length: it stays where it was (a quiet stretch sends few snapshots, and its hull is still there)
+ */
 const CARRY_TICKS = 60;
 
 /**
@@ -49,8 +52,8 @@ export function aheadContacts(h: AheadHost, t: number, body: FlightBody, reach: 
     const ship = store.get(id), d = ship?.kind === 'ship' ? store.derivedAt?.(id, t) ?? ship.derived : undefined;
     if (!d || !(d.mass > 0) || reps.clampPartner(id, t) === self) continue;
     // (As this client last had it, at t or before: no ship is stepped here, it's part way through its own ship's step)
-    const last = reps.lastOf(id);
-    if (last === undefined || t - last > CARRY_TICKS) continue;
+    const last = reps.lastOf(id), pin = pinned(id);
+    if (last === undefined || (t - last > CARRY_TICKS && !pin)) continue;
     const k = Math.min(t, last), st = reps.ring.get(id, k);
     if (!st) continue;
     const b = st.body, dt = t - k;
@@ -58,7 +61,7 @@ export function aheadContacts(h: AheadHost, t: number, body: FlightBody, reach: 
     const x = b.x + b.vx * dt, y = b.y + b.vy * dt;
     // (The pass's candidates: centres within both reaches)
     if (dhypot(x - body.x, y - body.y) > reach + d.radius) continue;
-    const flags = CONTACT_FLAG.STATE | CONTACT_FLAG.CHECK | (id < self ? CONTACT_FLAG.SECOND : 0) | (pinned(id) ? CONTACT_FLAG.OTHER_PINNED : 0);
+    const flags = CONTACT_FLAG.STATE | CONTACT_FLAG.CHECK | (id < self ? CONTACT_FLAG.SECOND : 0) | (pin ? CONTACT_FLAG.OTHER_PINNED : 0);
     (out ??= []).push({ seq: pairPlace(self, id), row: [OWN_CAUSE.CONTACT, id, flags, x, y, b.angle + b.angVel * dt, b.vx, b.vy] });
   }
   return out?.sort((a, b) => a.seq - b.seq);

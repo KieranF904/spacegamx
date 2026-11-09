@@ -394,3 +394,41 @@ export function convexPenetration(a: Vec2[], b: Vec2[]): { depth: number; nx: nu
   }
   return { depth: best, nx: bx, ny: by };
 }
+
+/**
+ * convexPenetration on flat corners (x, y interleaved): polygon `a` is `an` corners from A[ao], `b` likewise; the same
+ * axes, sums and order, so the same numbers (ships/contact.ts places pieces so, terrain.ts holds rock so)
+ */
+export function penetrationFlat(A: Float64Array, ao: number, an: number, B: Float64Array, bo: number, bn: number): { depth: number; nx: number; ny: number } | null {
+  let best = Infinity, bx = 0, by = 0;
+  for (let k = 0; k < 2; k++) {
+    const P = k === 0 ? A : B, po = k === 0 ? ao : bo, pn = k === 0 ? an : bn;
+    for (let i = 0; i < pn; i++) {
+      const p = po + i * 2, q = po + ((i + 1) % pn) * 2;
+      let ax = P[q + 1] - P[p + 1], ay = P[p] - P[q];
+      const len = Math.sqrt(ax * ax + ay * ay); // (not Math.hypot: the same bits in every engine, ships/debris.ts)
+      if (len < 1e-12) continue;
+      ax /= len; ay /= len;
+      let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
+      for (let j = 0, m = ao; j < an; j++, m += 2) {
+        const d = A[m] * ax + A[m + 1] * ay;
+        if (d < amin) amin = d;
+        if (d > amax) amax = d;
+      }
+      for (let j = 0, m = bo; j < bn; j++, m += 2) {
+        const d = B[m] * ax + B[m + 1] * ay;
+        if (d < bmin) bmin = d;
+        if (d > bmax) bmax = d;
+      }
+      const overlap = Math.min(amax, bmax) - Math.max(amin, bmin);
+      if (overlap <= 0) return null;
+      if (overlap < best) {
+        best = overlap;
+        const flip = (amin + amax) / 2 > (bmin + bmax) / 2;
+        bx = flip ? -ax : ax;
+        by = flip ? -ay : ay;
+      }
+    }
+  }
+  return { depth: best, nx: bx, ny: by };
+}

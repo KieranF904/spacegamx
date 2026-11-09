@@ -73,7 +73,7 @@ export const PACKED_FIELDS: Record<string, { code: number; fields: readonly Pack
     fields: [['w'], ['n', 0, 5], ['a'], ['a'], ['d', 1, 8, PK_KEYS.PD_X], ['d', 1, 8, PK_KEYS.PD_Y], ['n', 1, 4], ['n', 1, 4], ['n', 1, 5]],
   },
   contact: { code: PK.CONTACT, fields: [['d', 2, 9, PK_KEYS.CON_X], ['d', 2, 9, PK_KEYS.CON_Y], ['n', 2, 5], ['n', 2, 5], ['n', 2, 5]] },
-  shipSync: { code: PK.SHIP_SYNC, fields: [['w'], ['a'], ['l', 1, 5], ['l', 0, 3], ['n', 0, 3], ['a'], ['a'], ['p'], ['a'], ['a'], ['a'], ['a'], ['a'], ['l', 1, 5]] },
+  shipSync: { code: PK.SHIP_SYNC, fields: [['w'], ['a'], ['l', 1, 5], ['l', 0, 3], ['n', 0, 3], ['a'], ['a'], ['p'], ['a'], ['a'], ['a'], ['a'], ['a'], ['l', 1, 5], ['n', 0, 1]] },
   playerState: { code: PK.PLAYER_STATE, fields: [['n', 0, 6], ['n', 0, 6], ['n', 0, 6], ['n', 0, 6], ['n', 0, 6], ['n', 0, 3], ['n', 0, 6], ['a']] },
   // (id, t, z, w, keep: the tick as the step from the last gunSync's, w from t; z the lane state's numbers: sim/otherGuns.ts packGunSync)
   gunSync: { code: PK.GUN_SYNC, fields: [['w'], ['d', 0, 4, PK_KEYS.GUN_T], ['l', 0, 4], ['d', 0, 3, PK_KEYS.GUN_T], ['n', 0, 1]] },

@@ -379,10 +379,10 @@ describe('the Pyreclast', () => {
     const others = [join('second').pid, join('third').pid];
     for (const q of others) { server['admin'].god.add(server.pilots.connOf(q) as any); }
     const weapons = server['weapons'], spawn = weapons.spawn.bind(weapons);
-    const seekers: number[] = [], rings: { a: number; heading: number }[] = [];
+    const seekers: number[] = [], rings: { a: number; heading: number; tick: number }[] = [];
     weapons.spawn = (owner: number, kind: string, x: number, y: number, a: number, k: number, shape: any, ...rest: any[]) => {
       if (owner === eid && kind === 'heart_seeker') seekers.push(shape?.target);
-      if (owner === eid && kind === 'heart_spark' && brainOf(server, eid).moveName === 'ring') rings.push({ a, heading: Rotation.angle[eid] });
+      if (owner === eid && kind === 'heart_spark' && brainOf(server, eid).moveName === 'ring') rings.push({ a, heading: Rotation.angle[eid], tick: server.getTick() });
       return (spawn as any)(owner, kind, x, y, a, k, shape, ...rest);
     };
     const warned: number[] = [], beams: number[] = [];
@@ -404,9 +404,13 @@ describe('the Pyreclast', () => {
     const rd = (a: number) => Math.round(a * 10) / 10 + 0;
     expect(warned.slice(0, 7).map(rd)).toEqual([0, -0.3, 0.3, -0.6, 0.6, -0.9, 0.9]);
     expect(beams.slice(0, 7).map(rd)).toEqual([0, -0.3, 0.3, -0.6, 0.6, -0.9, 0.9]);
-    // Every ring's gaps at its nose and its tail: no spark within 15 degrees of either
-    expect(rings.length).toBeGreaterThan(80);
-    for (const s of rings) {
+    // Every ring's gaps at its nose and its tail: no spark within 15 degrees of either (a ring is its sparks thrown on one
+    // tick: a harassing spark while it flares isn't one)
+    const per = new Map<number, number>();
+    for (const s of rings) per.set(s.tick, (per.get(s.tick) ?? 0) + 1);
+    const thrown = rings.filter((s) => per.get(s.tick)! >= 20);
+    expect(thrown.length).toBeGreaterThan(80);
+    for (const s of thrown) {
       const off = Math.abs(Math.atan2(Math.sin(s.a - s.heading), Math.cos(s.a - s.heading)));
       expect(off > 0.26 && off < Math.PI - 0.26).toBe(true);
     }

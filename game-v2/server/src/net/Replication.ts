@@ -108,8 +108,8 @@ export class Replication implements ReplicationCore {
    * One client's share: keyframes for ships it's new to or behind on, control changes and causes for the rest
    * (replication/forClient.ts). `known` is the client's ship → keyframe version; `since` its last snapshot's tick
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, live?: ReadonlySet<number>, since?: number): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
-    return forClient(this, systemId, self, known, snapshotTick, view, held, synced, bodies, kept, readers, live, since);
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, live?: ReadonlySet<number>, since?: number, pins?: (id: number) => boolean | undefined): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
+    return forClient(this, systemId, self, known, snapshotTick, view, held, synced, bodies, kept, readers, live, since, pins);
   }
 
   /** Its bodied shadow's keyframe version (CAPS.BODIES clients' known version of it), or undefined: not flown by its body */

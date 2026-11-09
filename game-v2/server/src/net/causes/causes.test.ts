@@ -22,9 +22,9 @@ const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
-interface Seen { held: number; keyframes: number; entries: number; records: number; checked: number; off: number; offTicks: number; lastOff: number }
+interface Seen { held: number; keyframes: number; entries: number; records: number; checked: number; off: number; offTicks: number; lastOff: number; pinOut: number }
 
-function fight(dropAt = -1, hurtEvery = 45) {
+function fight(dropAt = -1, hurtEvery = 45, pin = false) {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -50,6 +50,9 @@ function fight(dropAt = -1, hurtEvery = 45) {
     ships.setAutopilot(d, { x: x0 + 930, y: y0, arriveRadius: 10 });
     dummies.push(d);
   }
+  // (Two of them built into the ground, as siege structures, nests and fixed bosses are: the rest grind against them)
+  const pins = new Set(pin ? [dummies[1], dummies[4]] : []);
+  for (const d of pins) ships.pin(d);
   const hauler = ships.spawnDummy(bp('hauler'), x0 - 1200, y0, 0.3, sys);
   // Only this fight's ships in the system: the world's are taken away as they come. (A Helios Drone at the docks the
   // clients started by, the client's target there and so in its view however far, grinding on a packmate out of view:
@@ -81,6 +84,8 @@ function fight(dropAt = -1, hurtEvery = 45) {
       // (Ships' keyframes: a piece of debris shot or blasted before its confirmation goes in full, keyframe and all)
       if (on()) for (const k of s.ships ?? []) if (k[0] !== f.pid && ships.get(k[0])?.kind !== 'debris') { if (held.has(k[0])) seen.keyframes++; else seen.entries++; }
       if (on()) seen.records += s.causes?.length ?? 0;
+      // (A pinned ship left out of its own pass: a CONTACT record naming it twice)
+      if (on()) for (const r of s.causes ?? []) if (r[1] === 1 && r[2] === r[3] && pins.has(r[2])) seen.pinOut++;
       o(s);
       if (!on()) { last = s.tick; return; }
       const keyed = new Set((s.ships ?? []).map((k) => k[0]));
@@ -98,13 +103,13 @@ function fight(dropAt = -1, hurtEvery = 45) {
     };
   };
   let measuring = false;
-  const a: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0, lastOff: -1 };
-  const b: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0, lastOff: -1 };
+  const a: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0, lastOff: -1, pinOut: 0 };
+  const b: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0, lastOff: -1, pinOut: 0 };
   // Its own check (with every ship it holds, CAPS.CAUSES) as each input would carry it
   const checks = (server as unknown as { ownChecks: { check(c: unknown, k: unknown): void; stats: { agreed: number; bodyOff: number } } }).ownChecks;
   watch(A, a, () => measuring);
   watch(B, b, () => measuring);
-  const pairs = { compared: 0, with: 0, differ: 0, ticks: 0, once: 0, found: 0 };
+  const pairs = { compared: 0, with: 0, differ: 0, ticks: 0, once: 0, found: 0, pinned: 0 };
   const pairsSeen = new Set<number>();
   for (let i = 0; i < 900; i++) {
     const t = server.getTick();
@@ -132,6 +137,7 @@ function fight(dropAt = -1, hurtEvery = 45) {
       for (let k = 0; k < theirs.pairs.length; k += 2) if (took.has(theirs.pairs[k]) && took.has(theirs.pairs[k + 1])) want.push(theirs.pairs[k], theirs.pairs[k + 1]);
       pairs.compared++;
       pairs.with += mine.pairs.length ? 1 : 0;
+      for (const [p, q] of mine.pairs) if (pins.has(p) || pins.has(q)) pairs.pinned++;
       if (JSON.stringify(mine.pairs.flat()) !== JSON.stringify(want)) pairs.differ++;
     }
   }
@@ -211,5 +217,19 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(found.pairs.differ).toBe(0);
     expect(found.pairs.once).toBeGreaterThan(found.pairs.ticks * 0.9);
     expect(found.pairs.found).toBeLessThan(found.pairs.ticks * 1.2);
+  }, 240_000);
+
+  it('pinned ships among them: its own pass takes them as the server does (told so on their first sync), never left out', () => {
+    const found = fight(-1, 45, true);
+    if (process.env.CONTACTS_DEBUG) console.log('PINNED', JSON.stringify({ a: found.a, contacts: found.contacts, pairs: found.pairs }));
+    expect(found.client?.failed).toBe(0);
+    expect(found.checks.bodyOff).toBe(0);
+    expect(found.a.offTicks).toBe(0);
+    expect(found.b.offTicks).toBe(0);
+    // (the pinned two were ground on, and those pairs it found itself: no record leaving either out)
+    expect(found.pairs.pinned).toBeGreaterThan(50);
+    expect(found.a.pinOut).toBe(0);
+    expect(found.pairs.differ).toBe(0);
+    expect(found.contacts.found).toBeGreaterThan(50);
   }, 240_000);
 });

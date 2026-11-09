@@ -25,6 +25,8 @@ export interface StructSource {
   geometry(ship: ShipState): PlacedGeom[];
   derivedAt?(id: number, t: number): ShipDerived | undefined;
   rebuildAt?(id: number, t: number): { from: Vec2; to: Vec2 } | null | undefined;
+  /** Is ship `id` pinned (it doesn't give in a contact: its first shipSync said so)? */
+  pinned?(id: number): boolean;
 }
 
 /** A ship as it was on a tick, for the hits struck then (ShipStore.asOf) */
@@ -50,6 +52,8 @@ export class ShipStore implements ShipSource, StructSource {
   private structs = new Map<number, { at: number; derived: ShipDerived }[]>();
   /** Debris only to be seen (a boss's shed plates): it knocks nothing */
   readonly aloof = new Set<number>();
+  /** Ships the server said are pinned (a new ship's sync `pinned`: built into the ground, a fixed boss): they don't give */
+  private readonly pins = new Set<number>();
   /**
    * Each ship as it was before its latest rebuild syncs (one a sync of a ship it had, stamped with its rebuild's tick:
    * CAPS.STRUCTS), oldest first: its structure, detached and ghost parts, and its HP then, as a view over the ship
@@ -62,6 +66,10 @@ export class ShipStore implements ShipSource, StructSource {
 
   get(id: number): ShipState | undefined {
     return this.bodies.get(id);
+  }
+
+  pinned(id: number): boolean {
+    return this.pins.has(id);
   }
 
   geometry(ship: ShipState): PlacedGeom[] {
@@ -122,6 +130,8 @@ export class ShipStore implements ShipSource, StructSource {
     if (msg.born !== undefined) ship.spawnTick = msg.born;
     if (msg.aloof) this.aloof.add(msg.id);
     else if (!sameShape) this.aloof.delete(msg.id);
+    // (Pinned or not: a new ship's sync (design or blueprint: the server's first of it) says; later ones keep it)
+    if (msg.design !== undefined || msg.blueprint) { if (msg.pinned) this.pins.add(msg.id); else this.pins.delete(msg.id); }
     this.bodies.set(msg.id, ship);
     this.noteStruct(msg.id, msg.at, ship.derived, !sameShape, before);
     return wasAlive && ship.kind === 'ship' ? ship.derived.alive.map((a, i) => (a && !wasAlive[i] ? i : -1)).filter((i) => i >= 0) : [];
@@ -147,7 +157,7 @@ export class ShipStore implements ShipSource, StructSource {
   prune(alive: (id: number) => boolean, now: number, graceMs = 2000): void {
     for (const id of this.bodies.keys()) {
       if (alive(id)) this.lastSeen.set(id, now);
-      else if (now - (this.lastSeen.get(id) ?? now) > graceMs) { this.bodies.delete(id); this.lastSeen.delete(id); }
+      else if (now - (this.lastSeen.get(id) ?? now) > graceMs) { this.bodies.delete(id); this.lastSeen.delete(id); this.pins.delete(id); }
       else if (!this.lastSeen.has(id)) this.lastSeen.set(id, now);
     }
   }
@@ -162,6 +172,7 @@ export class ShipStore implements ShipSource, StructSource {
     this.structs.clear();
     this.befores.clear();
     this.aloof.clear();
+    this.pins.clear();
   }
 
   remove(id: number): void {
@@ -170,6 +181,7 @@ export class ShipStore implements ShipSource, StructSource {
     this.structs.delete(id);
     this.befores.delete(id);
     this.aloof.delete(id);
+    this.pins.delete(id);
   }
 
   private noteStruct(id: number, at: number | undefined, derived: ShipDerived, fresh: boolean, before?: ShipDerived): void {
