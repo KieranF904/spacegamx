@@ -150,6 +150,7 @@
           "halcyon": { "pad": "sine", "brightness": 1300, "bellTone": "chime" }
         }
       },
+      "vesta_yard": { "extends": "sol", "brightness": 900 },
       "terra_nova_surface": { "extends": "sol", "pad": "triangle", "brightness": 1100, "bells": 2.6, "bellTone": "chime", "perc": [{ "kind": "tom", "pattern": "x.......x.......", "level": 0.2, "pitch": 1.2 }] },
       "selene_siege": { "extends": ["sol", "siege"], "scale": "dorian" },
       "glacia_surface": { "extends": "borealis", "bells": 2, "bar": 12, "noise": { "wind": 0.4 } },

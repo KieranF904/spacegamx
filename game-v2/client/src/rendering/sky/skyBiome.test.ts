@@ -14,7 +14,7 @@ describe('sky biomes', () => {
     const kinds = Object.fromEntries((systemsData as { systems: (Sys & { surface?: unknown })[] }).systems.filter((s) => !s.surface && !(s as { private?: boolean }).private && !(s as { pocket?: unknown }).pocket).map((s) => [s.id, pickBiome(s.id, hintsOf(s))]));
     expect(kinds).toEqual({
       sol: 'band', borealis: 'cluster', nebula_prime: 'emission', void_sector: 'void',
-      cinder_reach: 'ember', the_maw: 'abyss', glasswater: 'remnant', ashfall: 'ember',
+      cinder_reach: 'ember', the_maw: 'abyss', glasswater: 'remnant', ashfall: 'ember', vesta_yard: 'band',
     });
   });
 
