@@ -10,7 +10,7 @@
  *             `onEvent`; a new step is data (data/tutorial.json) plus a case in TutorialSteps
  */
 
-import { Position, Velocity, InSystem, EffectType, registeredFunction, dhypot, dcos, dsin, objectLive, objectBroken, brokenIds, objectPos, inTutorial, leftTutorial, nextStep, TUTORIAL_PANELS, TUTORIAL_INDEX_BASE } from '@space-game/common';
+import { Position, Velocity, InSystem, EffectType, registeredFunction, dhypot, dcos, dsin, objectLive, objectBroken, brokenIds, objectPos, inTutorial, leftTutorial, newTutorial, nextStep, TUTORIAL_PANELS, TUTORIAL_INDEX_BASE } from '@space-game/common';
 import type { TutorialData, TutorialProfile, TutorialObjectDef, TutorialEvent, ServerMessage, ClientTutorialReportMessage, Bag } from '@space-game/common';
 import type { PilotConn, Pilots } from '../Pilots.js';
 import type { LootPods } from '../LootPods.js';
@@ -271,6 +271,28 @@ export class Tutorial {
     this.pilots.markDirty(conn);
     this.pilots.sendProfile(conn);
     this.pilots.sendItems(conn);
+    this.sendState(conn);
+    this.pilots.saveNow(conn);
+    return true;
+  }
+
+  /**
+   * Put a pilot back into training (the admin `/tutorial reset|step` command, for re-testing): at the first step, or at
+   * `at` with every step before it marked done. Moves them to the yard. False: no such step, or no profile/yard.
+   */
+  restart(conn: PilotConn, at?: string): boolean {
+    const p = this.pilots.get(conn);
+    const steps = this.data.steps;
+    const i = at ? steps.findIndex((s) => s.id === at) : 0;
+    if (!p || i < 0 || !steps.length) return false;
+    p.tutorial = { ...newTutorial(), step: steps[i].id, done: steps.slice(0, i).map((s) => s.id) };
+    this.clearPilot(conn.playerId);
+    this.steps.forget(conn.playerId);
+    if (conn.docked) this.host.undock(conn);
+    const spot = this.spawnFor(conn, false);
+    if (spot) this.host.travel(conn, spot.system, spot.x, spot.y);
+    this.steps.entered(conn, steps[i].id, true);
+    this.pilots.markDirty(conn);
     this.sendState(conn);
     this.pilots.saveNow(conn);
     return true;

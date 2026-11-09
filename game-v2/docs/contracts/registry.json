@@ -14252,7 +14252,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 811,
+      "lines": 812,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -14280,7 +14280,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 147,
-          "end": 811
+          "end": 812
         }
       ]
     },
@@ -15789,7 +15789,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 373,
+      "lines": 395,
       "owns": "the training yard: its stationary rocks and drones, each pilot's own damage counters on them, owner-only drops, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), LootPods (private pods), common/tutorial, TutorialSteps",
       "events": "",
@@ -15821,7 +15821,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 372
+          "end": 394
         }
       ]
     },
@@ -17246,8 +17246,8 @@
       "id": "server.gameserver.hosts.tutorial",
       "path": "server/src/gameServer/hosts/tutorial.ts",
       "group": "server/gameServer/hosts",
-      "lines": 40,
-      "owns": "the host adapter for the training yard and its start-up (built only when the server runs a tutorial)",
+      "lines": 60,
+      "owns": "the host adapter for the training yard and its start-up (built only when the server runs a tutorial), and the admin /tutorial command",
       "needs": "GameServer (type), game/tutorial/Tutorial, gameServer/asteroids (createTrainingBody); npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -17259,6 +17259,7 @@
       "extend": "a new thing the yard needs from the server is a member of TutorialHost and a line here",
       "exports": [
         "createTutorialHost",
+        "installTutorialAdmin",
         "setupTutorial"
       ],
       "sections": [
@@ -17273,6 +17274,12 @@
           "kind": "function",
           "start": 34,
           "end": 40
+        },
+        {
+          "name": "installTutorialAdmin",
+          "kind": "function",
+          "start": 42,
+          "end": 60
         }
       ]
     },

@@ -197,6 +197,31 @@ describe('the training yard', () => {
     expect(w.tut.spawnFor(b.conn, false)).not.toBeNull();
   });
 
+  it('an admin /tutorial reset and /tutorial step put a left pilot back in the yard; a non-admin cannot', () => {
+    const w = yard(['ann', 'bo']);
+    const [a, b] = w.pilots;
+    a.t.send({ type: 'tutorialLeave' } as never);
+    b.t.send({ type: 'tutorialLeave' } as never);
+    w.step(2);
+    expect(w.dist(a.pid)).toBeGreaterThan(20000);
+    (a.conn as unknown as { isAdmin: boolean }).isAdmin = true;
+    a.t.send({ type: 'chat', text: '/tutorial reset' } as never);
+    w.step(2);
+    expect(a.profile().tutorial).toMatchObject({ step: 'welcome', done: [], left: false });
+    expect(w.dist(a.pid)).toBeLessThan(w.data.yard.spawnRadius + 50);
+    const state = a.got.filter((m) => m.type === 'tutorialState').pop() as Extract<ServerMessage, { type: 'tutorialState' }>;
+    expect(state).toMatchObject({ step: 'welcome', left: false });
+    a.t.send({ type: 'chat', text: '/tutorial step power' } as never);
+    w.step(2);
+    const ids = w.data.steps.map((s) => s.id);
+    expect(a.profile().tutorial).toMatchObject({ step: 'power', done: ids.slice(0, ids.indexOf('power')), left: false });
+    // (the step's grant, the Cell Reactor, came with it)
+    expect(a.profile().storage.some((s) => s.id === 'part:alloy:power_cell_reactor:sq')).toBe(true);
+    b.t.send({ type: 'chat', text: '/tutorial reset' } as never);
+    w.step(2);
+    expect(b.profile().tutorial.left).toBe(true);
+  });
+
   it('a pilot who has left is not hurt by, and does not hurt, training bodies', () => {
     const w = yard();
     const a = w.pilots[0];

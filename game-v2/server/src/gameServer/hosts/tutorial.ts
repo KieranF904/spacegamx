@@ -1,6 +1,6 @@
 /**
  * @contract server.gameserver.hosts.tutorial
- * owns:       the host adapter for the training yard and its start-up (built only when the server runs a tutorial)
+ * owns:       the host adapter for the training yard and its start-up (built only when the server runs a tutorial), and the admin /tutorial command
  * needs:      GameServer (type), game/tutorial/Tutorial, gameServer/asteroids (createTrainingBody); npm: @space-game/common
  * invariants: a server without the tutorial option (or with a dev start) builds nothing: no yard station, no bodies, no hooks — server/src/game/tutorial/tutorial.test.ts
  * extend:     a new thing the yard needs from the server is a member of TutorialHost and a line here
@@ -37,4 +37,24 @@ export function setupTutorial(gs: GameServer, opts: GameServerOptions): Tutorial
   const tutorial = new Tutorial(createTutorialHost(gs), gs.pilots, gs.pods);
   gs.pilots.tutorialSpawn = (conn, resume) => tutorial.spawnFor(conn, resume);
   return tutorial;
+}
+
+/**
+ * The admin `/tutorial` chat command (admins only: on the dev server every guest is one), for re-testing the yard:
+ * `reset` (back to the first step, in the yard), `step <id>` (start at that step, the ones before it done),
+ * `leave` (skip out with the starter pack), and no word: where you are and the step ids
+ */
+export function installTutorialAdmin(gs: GameServer): void {
+  const t = gs.tutorial;
+  if (!t) return;
+  const ids = () => t.data.steps.map((s) => s.id).join(', ');
+  gs.admin.extensions.set('tutorial', (c, words) => {
+    const conn = c as unknown as ClientConnection;
+    const sub = (words[0] ?? '').toLowerCase();
+    if (sub === 'reset' || sub === 'restart') return t.restart(conn) ? { ok: true, text: 'Training reset: back to the first step at the yard' } : { ok: false, text: 'No pilot to reset' };
+    if (sub === 'step') return t.restart(conn, words[1]) ? { ok: true, text: `Training at step "${words[1]}"` } : { ok: false, text: `Usage: /tutorial step <id> (${ids()})` };
+    if (sub === 'leave') return t.leave(conn) ? { ok: true, text: 'Left training' } : { ok: false, text: 'Not in training' };
+    const s = t.stateOf(conn);
+    return { ok: true, text: `Training: ${!s ? 'no profile' : s.left ? 'left' : `at "${s.step}", done ${s.done.length}/${t.data.steps.length}`}\n/tutorial reset · /tutorial step <id> · /tutorial leave\nSteps: ${ids()}` };
+  });
 }

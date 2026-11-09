@@ -95,7 +95,7 @@ import { createOpsHost, createEventHost, createMobHost, createEnemyHost } from '
 import { createSurfaceHost, createSiegeHost, createPodHost, createMemoryHost, deathCause, namedBody } from './gameServer/hosts/places.js';
 import { createBossHost, moveFx, moveShot } from './gameServer/hosts/boss.js';
 import { createMiningHost, mineBeam, isGas, beamAsteroid } from './gameServer/hosts/mining.js';
-import { setupTutorial } from './gameServer/hosts/tutorial.js';
+import { setupTutorial, installTutorialAdmin } from './gameServer/hosts/tutorial.js';
 import { createShipHost } from './gameServer/hosts/ship.js';
 import { createAdminHost, setupAdminHandlers } from './gameServer/admin.js';
 import { initializeWorld } from './gameServer/world.js';
@@ -421,6 +421,7 @@ export class GameServer implements ServerCtx {
     this.events = new Events(createEventHost(this), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile, this.payout);
     this.party = new Party(createPartyHost(this));
     this.admin = new AdminTools(createAdminHost(this));
+    installTutorialAdmin(this);
     this.contrib = new ContributorNotes<ClientConnection>(contribDeps(this), opts.contributorStore ?? null, opts.clock);
     this.surfaces = new Surfaces(createSurfaceHost(this), this.gameData.rulesFile.surfaces, this.gameData.stringsFile);
     this.sieges = new Sieges(createSiegeHost(this), this.gameData.rulesFile.sieges, this.gameData.stringsFile);
