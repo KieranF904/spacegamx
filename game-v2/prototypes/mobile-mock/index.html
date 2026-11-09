@@ -30,6 +30,14 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 #zoneL { left: 0; width: 44%; }
 #zoneR { left: 44%; right: 0; }
 
+/* zoned helm: the left strip's blend, turn at top and bottom, strafe in the middle */
+#bands { left: 0; top: 0; bottom: 0; width: 44%; pointer-events: none; display: none;
+  background: linear-gradient(180deg, rgba(255,176,74,.10) 0%, rgba(255,176,74,.02) 30%, rgba(127,214,250,.08) 50%, rgba(255,176,74,.02) 70%, rgba(255,176,74,.10) 100%); }
+#bands.show { display: block; }
+#bands span { position: absolute; left: calc(var(--sl) + 14px); font: 600 11px/1 var(--display); letter-spacing: .16em; text-transform: uppercase; color: rgba(217,222,230,.38); }
+#bands .t { top: calc(var(--st) + 26%); } #bands .m { top: 50%; color: rgba(127,214,250,.5); } #bands .b { bottom: calc(var(--sb) + 26%); }
+#blendTag { font: 500 10px/1 var(--mono); color: var(--amber-hot); position: absolute; left: 50%; top: -16px; transform: translateX(-50%); white-space: nowrap; }
+
 /* HUD */
 #hud { left: calc(var(--sl) + 10px); top: calc(var(--st) + 8px); display: flex; gap: 6px; align-items: flex-start; pointer-events: none; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(3px); }
@@ -116,6 +124,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 <canvas id="c"></canvas>
 
 <div id="ui">
+  <div id="bands"><span class="t">Turn</span><span class="m">Strafe</span><span class="b">Turn</span></div>
   <div id="zoneL" class="zone"></div>
   <div id="zoneR" class="zone"></div>
 
@@ -144,6 +153,7 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
       <button data-s="twin" aria-pressed="true">Twin stick</button>
       <button data-s="tap" aria-pressed="false">Tap aim</button>
       <button data-s="helm" aria-pressed="false">Helm</button>
+      <button data-s="zoned" aria-pressed="false">Zoned</button>
     </div>
     <p id="explain"></p>
   </div>
@@ -231,6 +241,7 @@ const SCHEMES = {
   twin: { label: 'Twin stick', text: 'Left stick flies. Right stick aims and fires; push farther to aim farther.' },
   tap:  { label: 'Tap aim', text: 'Left stick flies. Tap an enemy to lock it and auto-fire. Hold empty space to fire there.' },
   helm: { label: 'Helm', text: 'The view turns with your ship, nose up. Left stick turns and thrusts. Hold the right side to fire ahead.' },
+  zoned: { label: 'Zoned', text: 'Nose up. Left stick: up/down thrusts; sideways strafes near the middle of the strip, turns near its top and bottom (set where your thumb lands).' },
 };
 let scheme = 'twin';
 const GROUPS = ['All', '1', '2', '3'];
@@ -259,22 +270,33 @@ function placeGhosts() {
     g.style.width = g.style.height = d + 'px';
     g.style.left = x + 'px'; g.style.top = (H - SAFE.b - d - pad) + 'px';
   }
-  gR.querySelector('b').textContent = scheme === 'helm' ? 'Fire' : 'Aim';
+  gR.querySelector('b').textContent = noseUp() ? 'Fire' : 'Aim';
   gR.style.display = scheme === 'tap' ? 'none' : '';
 }
 function setStick(s, e, zone) {
   // floating: the base appears where the thumb lands (kept on screen), the knob follows
   const d = SR + 6;
   s.ox = clamp(e.clientX, SAFE.l + d, W - SAFE.r - d); s.oy = clamp(e.clientY, SAFE.t + d, H - SAFE.b - d);
+  if (s === L) s.blend = blendAt(e.clientY);
   s.el.style.display = ''; (s === L ? gL : gR).style.visibility = 'hidden';
   s.el.style.left = (s.ox - SR) + 'px'; s.el.style.top = (s.oy - SR) + 'px';
   moveStick(s, e);
+}
+/** Zoned: how much sideways push turns (1) rather than strafes (0), from where the thumb landed on the strip: a smooth
+ *  blend, strafe in the middle third, turning by the top and bottom (fixed until the thumb lifts, so drift can't swap it) */
+function blendAt(y) {
+  const top = SAFE.t, bot = H - SAFE.b, mid = (top + bot) / 2;
+  const u = clamp((Math.abs(y - mid) / ((bot - top) / 2) - 0.18) / 0.62, 0, 1);
+  return u * u * (3 - 2 * u);
 }
 function moveStick(s, e) {
   let dx = e.clientX - s.ox, dy = e.clientY - s.oy; const len = Math.hypot(dx, dy);
   if (len > SR) { dx = dx / len * SR; dy = dy / len * SR; }
   s.x = dx / SR; s.y = dy / SR; s.mag = Math.min(1, len / SR); s.ang = Math.atan2(dy, dx);
   s.knob.style.transform = `translate(${dx}px,${dy}px)`;
+  if (s === L && scheme === 'zoned') { let tag = s.el.querySelector('#blendTag'); if (!tag) { tag = document.createElement('div'); tag.id = 'blendTag'; s.el.appendChild(tag); }
+    const b = s.blend ?? 0; tag.textContent = b < .08 ? 'strafe' : b > .92 ? 'turn' : Math.round(b * 100) + '% turn'; }
+  else s.el.querySelector('#blendTag')?.remove();
 }
 function endStick(s) {
   s.id = null; s.x = s.y = s.mag = 0; s.el.style.display = 'none'; s.knob.style.transform = ''; (s === L ? gL : gR).style.visibility = '';
@@ -298,7 +320,7 @@ zoneR.addEventListener('pointerdown', (e) => {
   e.preventDefault(); if (blocked()) return;
   if (scheme === 'twin') {
     if (R.id !== null) return; R.id = e.pointerId; zoneR.setPointerCapture(e.pointerId); setStick(R, e);
-  } else if (scheme === 'helm') {
+  } else if (noseUp()) {
     if (rightId !== null) return; rightId = e.pointerId; rightFire = true; zoneR.setPointerCapture(e.pointerId); gR.classList.add('on');
   } else {
     if (tap.id !== null) return; tap.id = e.pointerId; tap.sx = e.clientX; tap.sy = e.clientY; zoneR.setPointerCapture(e.pointerId);
@@ -380,7 +402,8 @@ $('#undock').addEventListener('pointerdown', (e) => { e.preventDefault(); docked
 function dodge() {
   if (ship.dodgeCd > 0 || docked || deadT > 0) return;
   let dx = L.x, dy = L.y; const m = Math.hypot(dx, dy);
-  if (scheme === 'helm' || m < .2) { dx = Math.cos(ship.a); dy = Math.sin(ship.a); } else { dx /= m; dy /= m; }
+  if (scheme === 'zoned' && m >= .2) { const f = -L.y / m, st = L.x / m * (1 - (L.blend ?? 0)) || 0, c = Math.cos(ship.a), sn = Math.sin(ship.a); dx = c * f - sn * st; dy = sn * f + c * st; const k = Math.hypot(dx, dy) || 1; dx /= k; dy /= k; }
+  else if (scheme === 'helm' || m < .2) { dx = Math.cos(ship.a); dy = Math.sin(ship.a); } else { dx /= m; dy /= m; }
   ship.vx += dx * 560; ship.vy += dy * 560; ship.dodgeCd = 1.4; ship.inv = .3; ship.ghost = .35;
   if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) { /* not supported */ }
 }
@@ -388,7 +411,8 @@ function dodge() {
 /* ---------- camera ---------- */
 const w2s = (x, y) => ({ x: W / 2 + (x - ship.x) * S, y: H / 2 + (y - ship.y) * S });
 /** Helm: the world is drawn turned so the ship's nose points up the screen (the world layer is rotated about the centre) */
-const camRot = () => scheme === 'helm' ? -(ship.a + Math.PI / 2) : 0;
+const noseUp = () => scheme === 'helm' || scheme === 'zoned';
+const camRot = () => noseUp() ? -(ship.a + Math.PI / 2) : 0;
 const s2w = (x, y) => ({ x: ship.x + (x - W / 2) / S, y: ship.y + (y - H / 2) / S });
 
 /* ---------- sim ---------- */
@@ -408,7 +432,14 @@ function update(dt) {
   let thrustX = 0, thrustY = 0, wantAng = ship.a;
   firing = false; aiming = false;
 
-  if (scheme === 'helm') {
+  if (scheme === 'zoned') {
+    const on = L.mag > .12 ? 1 : 0, b = L.blend ?? 0;
+    ship.a += L.x * b * 3.4 * dt * on;
+    const f = -L.y * on, fk = f >= 0 ? f : f * .4, st = L.x * (1 - b) * on * .8;   // strafing a little weaker than the main drive
+    const c = Math.cos(ship.a), sn = Math.sin(ship.a);
+    thrustX = c * fk - sn * st; thrustY = sn * fk + c * st;
+    wantAng = ship.a; aimAng = ship.a; aimDist = 520; firing = rightFire; aiming = false;
+  } else if (scheme === 'helm') {
     ship.a += L.x * 3.4 * dt * (L.mag > .12 ? 1 : 0);
     const f = -L.y * (L.mag > .12 ? 1 : 0);
     const k = f >= 0 ? f : f * .4;
@@ -546,7 +577,7 @@ function draw(now) {
     const ex = sp.x + Math.cos(aimAng) * aimDist * S, ey = sp.y + Math.sin(aimAng) * aimDist * S;
     ctx.strokeStyle = 'rgba(255,176,74,.35)'; ctx.lineWidth = 1; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
     ctx.strokeStyle = '#ffb04a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ex, ey, 9, 0, TAU); ctx.moveTo(ex - 15, ey); ctx.lineTo(ex - 5, ey); ctx.moveTo(ex + 5, ey); ctx.lineTo(ex + 15, ey); ctx.moveTo(ex, ey - 15); ctx.lineTo(ex, ey - 5); ctx.moveTo(ex, ey + 5); ctx.lineTo(ex, ey + 15); ctx.stroke();
-  } else if (scheme === 'helm') {
+  } else if (noseUp()) {
     ctx.strokeStyle = 'rgba(255,176,74,.22)'; ctx.setLineDash([3, 8]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(sp.x + Math.cos(ship.a) * 520 * S, sp.y + Math.sin(ship.a) * 520 * S); ctx.stroke(); ctx.setLineDash([]);
   }
   // drones
@@ -566,7 +597,7 @@ function draw(now) {
   // ship
   if (deadT <= 0) {
     if (ship.ghost > 0) { ctx.globalAlpha = .3; for (let i = 1; i < 4; i++) shipAt(sp.x - ship.vx * S * .02 * i, sp.y - ship.vy * S * .02 * i, ship.a); ctx.globalAlpha = 1; }
-    const th = Math.hypot(ship.vx, ship.vy) > 20 && (L.mag > .12 || hold.boost || (scheme === 'helm' && L.y < -.1));
+    const th = Math.hypot(ship.vx, ship.vy) > 20 && (L.mag > .12 || hold.boost || (noseUp() && L.y < -.1));
     if (th) { ctx.fillStyle = hold.boost ? '#ffd9a0' : '#7fd6fa'; ctx.save(); ctx.translate(sp.x, sp.y); ctx.rotate(ship.a); ctx.beginPath(); ctx.moveTo(-9 * S * 1.4, 0); ctx.lineTo(-(16 + Math.random() * 8) * S * 1.4, 0); ctx.lineTo(-9 * S * 1.4, 3); ctx.lineTo(-9 * S * 1.4, -3); ctx.fill(); ctx.restore(); }
     shipAt(sp.x, sp.y, ship.a);
     if (ship.shield > 0) { ctx.strokeStyle = `rgba(127,214,250,${.4 + .3 * Math.sin(now * .02)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sp.x, sp.y, 26 * S * 1.2, 0, TAU); ctx.stroke(); }
@@ -623,7 +654,7 @@ function tabBody() {
 function setScheme(s) {
   scheme = s; releaseAll(); lock = null;
   document.querySelectorAll('#schemes button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.s === s)));
-  $('#explain').textContent = SCHEMES[s].text; placeGhosts(); zoneR.style.left = s === 'tap' ? '30%' : '44%'; zoneL.style.width = s === 'tap' ? '30%' : '44%';
+  $('#explain').textContent = SCHEMES[s].text; $('#bands').classList.toggle('show', s === 'zoned'); placeGhosts(); zoneR.style.left = s === 'tap' ? '30%' : '44%'; zoneL.style.width = s === 'tap' ? '30%' : '44%';
 }
 document.querySelectorAll('#schemes button').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); setScheme(b.dataset.s); }));
 $('#panelBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); const o = $('#panel').classList.toggle('open'); $('#panelBtn').setAttribute('aria-pressed', String(o)); if (o) tabBody(); });
@@ -667,7 +698,7 @@ requestAnimationFrame(frame);
 // small hook for scripted screenshots: fake held sticks so the controls show in use
 window.__demo = (k) => {
   const f = (s, x, y, ox, oy) => { s.ox = ox; s.oy = oy; s.el.style.display = ''; s.el.style.left = (ox - SR) + 'px'; s.el.style.top = (oy - SR) + 'px'; s.id = -9; moveStick(s, { clientX: ox + x * SR, clientY: oy + y * SR }); };
-  f(L, .6, -.5, SAFE.l + 100, H - 100);
+  if (scheme === 'zoned') { L.blend = blendAt(H / 2); f(L, .8, -.2, SAFE.l + 100, H / 2); } else f(L, .6, -.5, SAFE.l + 100, H - 100);
   if (scheme === 'twin') f(R, .8, -.3, W - SAFE.r - 110, H - 100);
   if (k) { hold.mine = true; }
 };
