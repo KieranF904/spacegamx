@@ -16249,7 +16249,7 @@
       "id": "server.gameserver.loop",
       "path": "server/src/gameServer/loop.ts",
       "group": "server/gameServer",
-      "lines": 294,
+      "lines": 296,
       "owns": "the real-time loop, one step, the guarded tick table and its per-tick passes",
       "needs": "GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks; npm: @space-game/common, bitecs",
       "events": "",
@@ -16278,50 +16278,50 @@
         {
           "name": "step",
           "kind": "function",
-          "start": 29,
-          "end": 42
+          "start": 30,
+          "end": 43
         },
         {
           "name": "snapshotRound",
           "kind": "function",
-          "start": 44,
-          "end": 48
+          "start": 45,
+          "end": 49
         },
         {
           "name": "ownPasses",
           "kind": "function",
-          "start": 50,
-          "end": 78
+          "start": 51,
+          "end": 79
         },
         {
           "name": "gameLoop",
           "kind": "function",
-          "start": 80,
-          "end": 149
+          "start": 81,
+          "end": 151
         },
         {
           "name": "drainInputQueue",
           "kind": "function",
-          "start": 151,
-          "end": 188
+          "start": 153,
+          "end": 190
         },
         {
           "name": "releaseControls",
           "kind": "function",
-          "start": 190,
-          "end": 193
+          "start": 192,
+          "end": 195
         },
         {
           "name": "buildTickSystems",
           "kind": "function",
-          "start": 195,
-          "end": 268
+          "start": 197,
+          "end": 270
         },
         {
           "name": "tick",
           "kind": "function",
-          "start": 270,
-          "end": 294
+          "start": 272,
+          "end": 296
         }
       ]
     },
@@ -17022,6 +17022,47 @@
           "kind": "function",
           "start": 78,
           "end": 105
+        }
+      ]
+    },
+    {
+      "id": "server.gameserver.wake-gap",
+      "path": "server/src/gameServer/wakeGap.ts",
+      "group": "server/gameServer",
+      "lines": 33,
+      "owns": "what the loop does when the wall clock jumps (a Fly machine suspended and resumed, a laptop slept)",
+      "needs": "TICK_MS from @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a gap over WAKE_GAP_MS is never simulated: the tick counter jumps by the gap's ticks, so tick-based timers (boss respawns, nests, world memory's world tick) advance by wall clock as for an empty system",
+          "test": "server/src/gameServer/wakeGap.test.ts"
+        }
+      ],
+      "extend": "none",
+      "exports": [
+        "WAKE_GAP_MS",
+        "WakeGapHost",
+        "skipWakeGap"
+      ],
+      "sections": [
+        {
+          "name": "WAKE_GAP_MS",
+          "kind": "const",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "WakeGapHost",
+          "kind": "interface",
+          "start": 16,
+          "end": 20
+        },
+        {
+          "name": "skipWakeGap",
+          "kind": "function",
+          "start": 22,
+          "end": 33
         }
       ]
     },

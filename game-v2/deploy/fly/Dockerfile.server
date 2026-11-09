@@ -1,0 +1,38 @@
+# syntax = docker/dockerfile:1
+# Regional game server image (Fly.io). Build context: game-v2/ (see deploy/fly/fly.server.toml and scripts/deploy/regions.mjs).
+# Same code and data as the VPS server; runtime data (accounts, ships, world memory) never goes in the image.
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-alpine AS build
+WORKDIR /app
+ENV NODE_ENV=development
+
+COPY common/package*.json ./common/
+COPY server/package*.json ./server/
+WORKDIR /app/common
+RUN npm install
+COPY common/tsconfig.json ./
+COPY common/src ./src
+RUN npm run build
+
+WORKDIR /app/server
+RUN npm install && mkdir -p node_modules/@space-game && ln -sfn /app/common node_modules/@space-game/common
+COPY server/tsconfig.json ./
+COPY server/src ./src
+RUN npm run build
+
+FROM node:${NODE_VERSION}-alpine AS production
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/common/dist ./common/dist
+COPY --from=build /app/common/package.json ./common/
+COPY --from=build /app/server/dist ./server/dist
+COPY --from=build /app/server/package.json ./server/
+COPY data ./data
+
+WORKDIR /app/common
+RUN npm install --omit=dev
+WORKDIR /app/server
+RUN npm install --omit=dev && mkdir -p node_modules/@space-game && ln -sfn /app/common node_modules/@space-game/common
+
+EXPOSE 3000
+CMD ["node", "dist/index.js"]
