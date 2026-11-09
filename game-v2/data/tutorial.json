@@ -6,7 +6,6 @@
     "center": { "x": 4300, "y": -3000 },
     "spawnRadius": 1100,
     "leash": 25000,
-    "keepOut": 30000,
     "stopSpeed": 0.4,
     "stopTicks": 45
   },
@@ -14,7 +13,7 @@
     {
       "id": "welcome",
       "title": "Welcome to the yard",
-      "lines": ["This is the Vesta training yard. Nothing here can hurt you.", "Follow the cards. You can leave any time from the menu."],
+      "lines": ["This is the Vesta training yard. Nothing here can hurt you.", "Follow these cards, or press Leave training at any time."],
       "trigger": { "kind": "ack" }
     },
     {
@@ -28,7 +27,7 @@
     {
       "id": "brake",
       "title": "Stop in the zone",
-      "lines": [{"screen": "There is no brake: push against your drift with {wasd} until you stop.", "helm": "There is no brake: thrust against your drift with {backward} until you stop."}, "Come to a stop inside the marked zone."],
+      "lines": [{"screen": "Let go to glide to a stop. Push back with {wasd} to stop sooner.", "helm": "Let go to glide to a stop. Thrust back with {backward} to stop sooner."}, "Come to a stop inside the marked zone."],
       "trigger": { "kind": "zoneStop", "objects": ["stop_zone"] },
       "targets": ["stop_zone"]
     },
@@ -43,8 +42,8 @@
     {
       "id": "mine",
       "title": "Mine the belt",
-      "lines": ["Shoot a rock in the belt around Vesta until it breaks.", "Then fly through the chunks to scoop up 20 ore."],
-      "trigger": { "kind": "collect", "count": 20, "items": ["iron_ore", "nickel_ore", "copper_ore", "leestone_ore"] }
+      "lines": ["Shoot a rock in the belt around Vesta: chunks of ore break off.", "Fly through the chunks to scoop up 20 ore."],
+      "trigger": { "kind": "collect", "count": 20, "items": ["iron_ore", "nickel_ore", "silicate", "copper_ore", "leestone_ore"] }
     },
     {
       "id": "hold",
@@ -61,39 +60,39 @@
     {
       "id": "refine",
       "title": "Refine your ore",
-      "lines": ["Open the refinery tab and turn ore into plate.", "Plate is what ship parts are made of."],
+      "lines": ["Open the Refinery tab and refine some ore into plate.", "Plate is what ship parts are made of."],
       "trigger": { "kind": "refined" },
       "grant": { "iron_ore": 4, "nickel_ore": 2 }
     },
     {
       "id": "hangar",
       "title": "Place a part",
-      "lines": ["Press {dock} at the station to open the hangar.", "Place one hull cell on your ship and save."],
+      "lines": ["On the station's Overview tab, click Open hangar.", "Place one hull cell on your ship, then click Save."],
       "trigger": { "kind": "partPlaced" }
     },
     {
       "id": "power",
       "title": "Add a generator",
-      "lines": ["In the hangar, place the Cell Reactor we gave you beside your core.", "Press {powerFlow} in the editor to watch the power flow."],
+      "lines": ["Place the Cell Reactor we gave you on your ship, then save.", "Press {powerFlow} in the hangar to watch the power flow."],
       "trigger": { "kind": "powered" },
       "grant": { "part:alloy:power_cell_reactor:sq": 1 }
     },
     {
       "id": "bank",
       "title": "The repair bank",
-      "lines": ["The bank holds materials that rebuild damaged parts.", "Open its tab to see what it has."],
+      "lines": ["The repair bank holds materials that rebuild damaged parts.", "Open the station's Repair bank tab to see it."],
       "trigger": { "kind": "panel", "panel": "bank" }
     },
     {
       "id": "guide",
-      "title": "Field guide and map",
-      "lines": ["Press {components} for the component guide, then {map} for the system map."],
+      "title": "Component guide and map",
+      "lines": ["Leave the station with {dock}.", "Press {components} for the component guide, then {map} for the map."],
       "trigger": { "kind": "panel", "panels": ["guide", "map"] }
     },
     {
       "id": "jump",
       "title": "Jump to the marker",
-      "lines": ["Put the cursor on the exit marker and press {jump}.", "The drive spools up, then flings you there."],
+      "lines": ["Zoom out with the mouse wheel until you can see the exit marker.", "Put the cursor in it and press {jump} to jump there."],
       "trigger": { "kind": "jumped", "objects": ["exit_marker"] },
       "targets": ["exit_marker"]
     },
@@ -112,7 +111,7 @@
     { "id": "drone_1", "kind": "drone", "step": "drones", "at": { "x": 2500, "y": -3500 }, "radius": 55, "hp": 160 },
     { "id": "drone_2", "kind": "drone", "step": "drones", "at": { "x": -1500, "y": -4200 }, "radius": 55, "hp": 160 },
     { "id": "drone_3", "kind": "drone", "step": "drones", "at": { "x": -3500, "y": -3000 }, "radius": 55, "hp": 160 },
-    { "id": "exit_marker", "kind": "exit", "step": "jump", "at": { "x": -9000, "y": -2000 }, "radius": 700, "label": "Jump here" }
+    { "id": "exit_marker", "kind": "exit", "step": "jump", "at": { "x": 1700, "y": -1200 }, "radius": 700, "label": "Jump here" }
   ],
   "starterPack": {
     "credits": 150,

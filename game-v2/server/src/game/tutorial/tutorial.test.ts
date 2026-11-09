@@ -90,9 +90,10 @@ describe('the training yard', () => {
       expect(Math.hypot(p.x - at.x, p.y - at.y)).toBeGreaterThan(planet.radius + o.radius);
       expect(Math.hypot(p.x - w.center.x, p.y - w.center.y)).toBeLessThan(w.data.yard.leash / 2);
     }
-    // the exit marker is far enough for a jump-drive jump
+    // the exit marker is far enough to want the jump drive, near enough to find with a little zooming out
     const exit = objectPos(w.data, w.tut.def('exit_marker')!);
-    expect(Math.hypot(exit.x - w.center.x, exit.y - w.center.y)).toBeGreaterThan(5000);
+    expect(Math.hypot(exit.x - w.center.x, exit.y - w.center.y)).toBeGreaterThan(1500);
+    expect(Math.hypot(exit.x - w.center.x, exit.y - w.center.y)).toBeLessThan(4500);
     // the rocks and drones are all in the yard system, none in Sol
     const solNum = gd.getSystemNum('sol'), yardNum = gd.getSystemNum('vesta_yard');
     for (const id of ['drone_1', 'drone_2', 'drone_3']) expect(InSystem.systemId[w.eid(id)]).toBe(yardNum);
@@ -268,7 +269,7 @@ describe('the training yard', () => {
     // B, still in training, is untouched
     expect(b.profile().tutorial.left).toBe(false);
     expect(w.dist(b.pid)).toBeLessThan(w.data.yard.leash);
-    // A is put back on the surface (an admin teleport, say): turned away to Sol
+    // A is put back in the yard (an admin teleport, say): turned away to Sol
     w.server.travelTo(a.conn, w.server.gameData.getSystemNum('vesta_yard'), w.center.x + 1500, w.center.y, false);
     w.step(3);
     expect(InSystem.systemId[a.pid]).toBe(w.server.gameData.getSystemNum('sol'));

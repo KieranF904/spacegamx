@@ -220,6 +220,13 @@ export class Tutorial {
     for (const [item, n] of Object.entries(taken)) if (n > 0) this.onEvent(conn.playerId, { kind: 'collected', item, n });
   }
 
+  /** How many of `items` (anything, if none are named) the pilot has in the hold */
+  held(conn: PilotConn, items?: string[]): number {
+    let n = 0;
+    for (const s of this.pilots.get(conn)?.cargo ?? []) if (!items || items.includes(s.id)) n += s.n;
+    return n;
+  }
+
   /** Ore finished going through the refinery (`used`: ore id -> units) */
   refined(conn: PilotConn, used: Bag): void {
     if (!this.active(conn)) return;
@@ -240,7 +247,7 @@ export class Tutorial {
   // ------------------------------------------------------------ leaving
 
   /**
-   * Leave training: skip at any step, or graduate. Grants the starter pack, sends the pilot up from Vesta's surface to Sol's normal start (beside Sol Central) and
+   * Leave training: skip at any step, or graduate. Grants the starter pack, moves the pilot out of the yard to Sol's normal start (beside Sol Central) and
    * marks them left for good (the yard is then unreachable for them). Does nothing for a pilot who has already left.
    */
   leave(conn: PilotConn): boolean {

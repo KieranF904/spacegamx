@@ -95,8 +95,6 @@ export interface SnapshotHost {
   readonly replication: Replication;
   readonly mobs: Mobs;
   readonly pods: LootPods;
-  /** Whose a pilot is for pods kept for one pilot (their account key: Pilots.keyOf) */
-  podKey?(eid: number): string | undefined;
   readonly features: ServerFeatures;
   /** People's craft (out of every fight) and wards (on the pilots' side), by name: a ship row's side */
   readonly personCraft: ReadonlyMap<number, string>;
@@ -141,8 +139,6 @@ export class SnapshotBuilder {
   private readonly blocks: BlockStore | null;
   private readonly crowd: CrowdControl | null;
   private readonly gunNet: GunNet | null;
-  private readonly pods: LootPods;
-  private readonly podKey: ((eid: number) => string | undefined) | undefined;
   /** Other ships' shells clients work out themselves from their gun lanes, named by shot id (net/guns/GunNet.ts) */
   readonly otherShotLog = new OwnShotLog();
   /** Pilots' own shells they work out themselves, named by shot id (CAPS.SHOT_IDS: snapshot/ownShots.ts) */
@@ -188,8 +184,6 @@ export class SnapshotBuilder {
     this.blocks = host.blocks ?? null;
     this.crowd = host.crowd ?? null;
     this.gunNet = host.gunNet ?? null;
-    this.pods = host.pods;
-    this.podKey = host.podKey;
     this.ticks = ticks;
     this.focus = new FocusCells({
       bodies: () => this.ships.bodies.keys(),
@@ -423,8 +417,6 @@ export class SnapshotBuilder {
         }
         if ((r.kind === 'projectile' || r.kind === 'mob') && fartherThan(r.x - px, r.y - py, SNAP_PROJECTILE_RANGE)) continue;
         if (r.kind === 'pod' && fartherThan(r.x - px, r.y - py, SNAP_POD_RANGE)) continue;
-        // (a pod private to another pilot, a tutorial drop: never sent)
-        if (r.kind === 'pod' && this.pods.hasPrivate && !this.pods.visibleTo(r.id, this.podKey?.(conn.playerId))) continue;
         if (r.id === conn.playerId && self) {
           // Its own ship: only when its prediction needs correcting, its status changed (its warmth too), or now and then
           newStates.set(r.id, 'self');

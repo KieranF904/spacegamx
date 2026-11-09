@@ -95,7 +95,7 @@ export function mineBeam(gs: GameServer, eid: number, x: number, y: number, angl
   const hx = x + (x1 - x) * best, hy = y + (y1 - y) * best;
   damage *= mineFalloff(best * range, full);
   if (damage <= 0) return best;
-  // A training rock or drone (game/tutorial): counted for this pilot alone, the body untouched
+  // A training drone (game/tutorial): counted for this pilot alone, the body untouched
   if (gs.tutorial?.hit(hit, eid, damage)) return best;
   Asteroid.hp[hit] -= damage;
   const nl = dhypot(hx - Position.x[hit], hy - Position.y[hit]) || 1;
@@ -173,7 +173,7 @@ export function beamAsteroid(gs: GameServer, eid: number, x: number, y: number, 
   }
   if (hit < 0) return 1;
   const hx = x + (x1 - x) * best, hy = y + (y1 - y) * best;
-  // A training rock or drone (game/tutorial): counted for this pilot alone, the body untouched
+  // A training drone (game/tutorial): counted for this pilot alone, the body untouched
   if (gs.tutorial?.hit(hit, eid, damage)) return best;
   Asteroid.hp[hit] -= damage;
   const nl = dhypot(hx - Position.x[hit], hy - Position.y[hit]) || 1;

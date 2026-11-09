@@ -62,24 +62,6 @@ export class LootPods {
     if (this.contents.has(eid)) this.kept.set(eid, { key, until: untilTick });
   }
 
-  /** Pods only one pilot can see or take (tutorial drops): eid -> account key */
-  private privateTo = new Map<number, string>();
-
-  /** Only `key`'s pilot can take this pod, and only they are sent it (it never expires early; its life is the pod's) */
-  keepPrivate(eid: number, key: string): void {
-    if (!this.contents.has(eid)) return;
-    this.privateTo.set(eid, key);
-  }
-
-  /** Is anything private right now (a snapshot skips the per-pod check when not) */
-  get hasPrivate(): boolean { return this.privateTo.size > 0; }
-
-  /** May the pilot `key` be sent this pod? (Everyone may, unless it is private to someone else) */
-  visibleTo(eid: number, key: string | undefined): boolean {
-    const owner = this.privateTo.get(eid);
-    return owner === undefined || owner === key;
-  }
-
   /** A pod's drift anchor: clients are sent this once, not its every position (null: not settled yet) */
   anchor(eid: number): PodAnchor | null {
     return this.anchors.get(eid) ?? null;
@@ -207,8 +189,6 @@ export class LootPods {
         if (d >= PULL_RANGE || d >= best || roomOf(p) < 1) continue;
         const ig = this.ignore.get(eid);
         if (ig && ig.eid === p && this.ticks < ig.until) continue;
-        const own = this.privateTo.get(eid);
-        if (own !== undefined && this.host.keyOf?.(p) !== own) continue;
         const kept = this.kept.get(eid);
         if (kept && (this.host.tick?.() ?? this.ticks) < kept.until && this.host.keyOf?.(p) !== kept.key) continue;
         best = d; target = p;
@@ -239,7 +219,7 @@ export class LootPods {
       Velocity.y[eid] += (dy / d) * pull + (Velocity.y[target] - Velocity.y[eid]) * 0.08;
     }
     for (const eid of [...this.contents.keys()]) {
-      if (!entityExists(w, eid) || hasComponent(w, Dead, eid)) { this.contents.delete(eid); this.ignore.delete(eid); this.minedBy.delete(eid); this.anchors.delete(eid); this.kept.delete(eid); this.privateTo.delete(eid); continue; }
+      if (!entityExists(w, eid) || hasComponent(w, Dead, eid)) { this.contents.delete(eid); this.ignore.delete(eid); this.minedBy.delete(eid); this.anchors.delete(eid); this.kept.delete(eid); continue; }
       // Still where its anchor's drift puts it? If anything else moved it (a pull, a bounce, a blast), anchor again
       const tick = this.host.tick?.() ?? this.ticks;
       const a = this.anchors.get(eid);
