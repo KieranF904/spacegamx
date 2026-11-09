@@ -5,7 +5,7 @@
  * against the one you saved).
  */
 
-import { Blueprint, Catalog, ShipTuning, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, bestDodge, describeFn } from '@space-game/common';
+import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, bestDodge, describeFn } from '@space-game/common';
 import { summaryFields, type SummaryField } from './describe';
 
 export interface ShipSummary {
@@ -48,6 +48,11 @@ export const BIGGER_IS_BETTER: Record<keyof Omit<ShipSummary, 'power' | 'energy'
 };
 
 export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy, bp: Blueprint): ShipSummary | null {
+  return shipSummaryWithDerived(catalog, tuning, econ, bp)?.summary ?? null;
+}
+
+/** The summary and the derived ship it was read from (one derive for both: the stat-delta preview wants the power too) */
+export function shipSummaryWithDerived(catalog: Catalog, tuning: ShipTuning, econ: Economy, bp: Blueprint): { summary: ShipSummary; derived: ShipDerived } | null {
   let ship;
   try {
     ship = createShipState(catalog, tuning, 0, bp, 0);
@@ -76,7 +81,7 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
   const rebuild = Object.entries(raw).filter(([id]) => econ.items.get(id)?.category === 'mineral')
     .reduce((t, [id, n]) => t + buyPrice(econ.items, id) * n * (1 - SALVAGE), 0);
   const jt = jumpTuning(tuning);
-  return {
+  const summary: ShipSummary = {
     rating: rateShip(catalog, tuning, ship).rating,
     parts: bp.parts.length,
     mass: d.mass,
@@ -102,6 +107,7 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
     tow: d.fx?.tow?.power ?? 0,
     rebuild,
   };
+  return { summary, derived: d };
 }
 
 /** The headline facts of the part features a design uses (one per feature key; none until a feature describes itself): rows after the fixed ones */

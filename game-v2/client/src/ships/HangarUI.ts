@@ -36,6 +36,7 @@
  * (rules still apply), and saving takes nothing.
  *
  * Click: place (empty hand: pick up) · Esc: empty the hand, then close · R/F/T over a placed part turn that part · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
+ * Hover: a part in hand over a cell it fits, or a placed part, shows a card at the cursor and +/- beside the stats: what placing / removing it changes
  * Wheel: zoom · arrow keys: pan · Tab: keyboard into the palette · Esc / H: close
  */
 
@@ -61,6 +62,8 @@ import { refreshLoadList, loadSelected, designKey, toggleDesigns, renderDesigns,
 import { TURN_KEYS, escapeStep, partUnder, tryTurn } from './build/editPlaced';
 import { tipCtx, showTip, hideTip, gridTip, partTip } from './hangar/hangarTips';
 import { ruleText } from './hangar/hangarTips';
+import { makeDeltaHover, syncDelta } from './hangar/hangarDelta';
+import type { StatDelta } from './build/statDelta';
 export type { HangarDeps };
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
@@ -94,6 +97,9 @@ export class HangarUI implements HangarHost {
   /** A middle-button drag in progress: where it started (screen, view, grid), and whether it's moved enough to be a pan */
   private pan: { x: number; y: number; cx: number; cy: number; at: Vec2; moved: boolean } | null = null;
   mouse: Vec2 | null = null;
+  mouseClient: { x: number; y: number } | null = null;
+  deltaNow: StatDelta | null = null;
+  deltaHover = makeDeltaHover(this);
   /** The part the mouse is over in the parts list (for the shield cover preview, hangarMarks.ts) */
   paletteHover: { fn: string; piece: string; material: string } | null = null;
   overlays: Record<Overlay, boolean> = { energy: true, connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
@@ -255,6 +261,7 @@ export class HangarUI implements HangarHost {
         if (pan.moved) { this.view.cx = pan.cx - dx / this.view.px; this.view.cy = pan.cy - dy / this.view.px; this.draw(); return; }
       }
       this.mouse = this.toGrid(e);
+      this.mouseClient = { x: e.clientX, y: e.clientY };
       this.dragTo(e, this.mouse);
       this.ports.hover(this.overlays.energy ? this.derived : null, this.mouse);
       this.draw();
@@ -268,7 +275,7 @@ export class HangarUI implements HangarHost {
       this.canvas.style.cursor = 'crosshair';
       if (!pan.moved) this.pickUp(pan.at);
     });
-    this.canvas.addEventListener('mouseleave', () => { this.mouse = null; this.draw(); this.hideTip(); });
+    this.canvas.addEventListener('mouseleave', () => { this.mouse = null; this.mouseClient = null; this.draw(); this.hideTip(); });
     this.canvas.addEventListener('mousedown', (e) => {
       const g = this.toGrid(e);
       // (an empty hand's click picks a part up: no paint drag follows it)
@@ -362,6 +369,7 @@ export class HangarUI implements HangarHost {
   close(launch: Blueprint | null): void {
     this.isOpen = false;
     this.hideTip();
+    this.deltaHover.clear();
     this.toggleDesigns(false);
     this.root.style.display = 'none';
     this.lit.setOpen(false);
@@ -822,7 +830,7 @@ export class HangarUI implements HangarHost {
     return [(e.clientX - r.left - r.width / 2) / this.view.px + this.view.cx, (e.clientY - r.top - r.height / 2) / this.view.px + this.view.cy];
   }
 
-  draw(): void { return draw(this); }
+  draw(): void { syncDelta(this); return draw(this); }
 
   feedPreviewKey = '';
   feedPreviewFor: ShipDerived | null = null;

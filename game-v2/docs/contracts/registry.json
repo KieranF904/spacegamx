@@ -1652,7 +1652,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 847,
+      "lines": 855,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1671,26 +1671,26 @@
         {
           "name": "LOAD_TEST_SECONDS",
           "kind": "const",
-          "start": 66,
-          "end": 67
+          "start": 69,
+          "end": 70
         },
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 70,
-          "end": 70
+          "start": 73,
+          "end": 73
         },
         {
           "name": "designSig",
           "kind": "const",
-          "start": 71,
-          "end": 72
+          "start": 74,
+          "end": 75
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 74,
-          "end": 847
+          "start": 77,
+          "end": 855
         }
       ]
     },
@@ -2046,6 +2046,267 @@
           "kind": "function",
           "start": 111,
           "end": 114
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build.stat-delta",
+      "path": "client/src/ships/build/statDelta.ts",
+      "group": "client/ships/build",
+      "lines": 213,
+      "owns": "what placing the part in hand, or removing the part under the cursor, would change on the ship: mass, acceleration, top speed, turn, power made against drawn, shield, hull, firepower, build points and cost; the memo that keeps hovering cheap; which change the cursor means (changeFor). Pure: designs in, numbers and tones out",
+      "needs": "shipSummary (the hangar's own derivation, one derive per design), common validateBlueprint / buildPoints / buyPrice (npm: @space-game/common); no DOM, no editor state",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a part that joins nothing (not connected) lists no ship stat, only build points and cost",
+          "test": "client/src/ships/build/statDelta.test.ts"
+        },
+        {
+          "text": "better and worse follow each stat's direction (a lighter ship is better, extra mass amber)",
+          "test": "client/src/ships/build/statDelta.test.ts"
+        },
+        {
+          "text": "the same design and change are derived once, then served from the memo",
+          "test": "client/src/ships/build/statDelta.test.ts"
+        },
+        {
+          "text": "a change that does nothing visible lists no line",
+          "test": "client/src/ships/build/statDelta.test.ts"
+        }
+      ],
+      "extend": "a new stat is one entry in STATS below (how to read it from a Measure, its direction and its text)",
+      "exports": [
+        "Change",
+        "DeltaCache",
+        "DeltaLine",
+        "Measure",
+        "STATS",
+        "StatCtx",
+        "StatDelta",
+        "Tone",
+        "applied",
+        "changeFor",
+        "changeKey",
+        "diffMeasures",
+        "flowOf",
+        "measure"
+      ],
+      "sections": [
+        {
+          "name": "StatCtx",
+          "kind": "interface",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "Change",
+          "kind": "type",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "Measure",
+          "kind": "interface",
+          "start": 24,
+          "end": 34
+        },
+        {
+          "name": "Tone",
+          "kind": "type",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "DeltaLine",
+          "kind": "interface",
+          "start": 38,
+          "end": 46
+        },
+        {
+          "name": "StatDelta",
+          "kind": "interface",
+          "start": 48,
+          "end": 60
+        },
+        {
+          "name": "MINUS",
+          "kind": "const",
+          "start": 62,
+          "end": 62
+        },
+        {
+          "name": "signed",
+          "kind": "function",
+          "start": 64,
+          "end": 67
+        },
+        {
+          "name": "StatDef",
+          "kind": "interface",
+          "start": 69,
+          "end": 77
+        },
+        {
+          "name": "sum",
+          "kind": "const",
+          "start": 79,
+          "end": 79
+        },
+        {
+          "name": "STATS",
+          "kind": "const",
+          "start": 81,
+          "end": 93
+        },
+        {
+          "name": "BILL_KEYS",
+          "kind": "const",
+          "start": 95,
+          "end": 96
+        },
+        {
+          "name": "measure",
+          "kind": "function",
+          "start": 98,
+          "end": 107
+        },
+        {
+          "name": "flowOf",
+          "kind": "function",
+          "start": 109,
+          "end": 114
+        },
+        {
+          "name": "applied",
+          "kind": "function",
+          "start": 116,
+          "end": 119
+        },
+        {
+          "name": "diffMeasures",
+          "kind": "function",
+          "start": 121,
+          "end": 140
+        },
+        {
+          "name": "lineOf",
+          "kind": "function",
+          "start": 142,
+          "end": 155
+        },
+        {
+          "name": "changeFor",
+          "kind": "function",
+          "start": 157,
+          "end": 163
+        },
+        {
+          "name": "changeKey",
+          "kind": "function",
+          "start": 165,
+          "end": 170
+        },
+        {
+          "name": "DeltaCache",
+          "kind": "class",
+          "start": 172,
+          "end": 213
+        }
+      ]
+    },
+    {
+      "id": "client.ships.build.stat-delta-view",
+      "path": "client/src/ships/build/statDeltaView.ts",
+      "group": "client/ships/build",
+      "lines": 135,
+      "owns": "showing a StatDelta: the small card that follows the cursor, the +/- chips beside each stat in a stats panel, and the controller that keeps both current as the hovered cell, the hand or the design changes (debounced when a derive is slow)",
+      "needs": "statDelta (the numbers), ui/escape; DOM",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a stats panel opts in by putting <span data-sd=\"KEY\"> beside a stat; chips fill and clear without rebuilding the panel",
+          "test": "none pinned"
+        },
+        {
+          "text": "the card is hidden whenever there is no change under the cursor",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a stat gets a chip by emitting a data-sd span with its STATS key in the panel's html",
+      "exports": [
+        "DeltaCard",
+        "DeltaHover",
+        "HoverIn",
+        "applyChips",
+        "cardHtml"
+      ],
+      "sections": [
+        {
+          "name": "COLOR",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "AMBER",
+          "kind": "const",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "lineColor",
+          "kind": "const",
+          "start": 19,
+          "end": 19
+        },
+        {
+          "name": "applyChips",
+          "kind": "function",
+          "start": 21,
+          "end": 34
+        },
+        {
+          "name": "cardHtml",
+          "kind": "function",
+          "start": 36,
+          "end": 49
+        },
+        {
+          "name": "CARD_CSS",
+          "kind": "const",
+          "start": 51,
+          "end": 52
+        },
+        {
+          "name": "DeltaCard",
+          "kind": "class",
+          "start": 54,
+          "end": 71
+        },
+        {
+          "name": "SLOW_MS",
+          "kind": "const",
+          "start": 73,
+          "end": 74
+        },
+        {
+          "name": "SETTLE_MS",
+          "kind": "const",
+          "start": 75,
+          "end": 75
+        },
+        {
+          "name": "HoverIn",
+          "kind": "interface",
+          "start": 77,
+          "end": 87
+        },
+        {
+          "name": "DeltaHover",
+          "kind": "class",
+          "start": 89,
+          "end": 135
         }
       ]
     },
@@ -3058,6 +3319,47 @@
       ]
     },
     {
+      "id": "client.field.delta",
+      "path": "client/src/ships/field/fieldDelta.ts",
+      "group": "client/ships/field",
+      "lines": 41,
+      "owns": "the world build view's stat-delta card: which change the cursor means on the working design (the hand's part here, or the part under the cursor taken out), measured on the design the fabricator would build (planTarget)",
+      "needs": "plan.ts (planTarget, partAtPoint, WorkingDesign), build/statDelta, build/statDeltaView, FieldDeps' catalog / tuning / econ",
+      "events": "",
+      "invariants": [
+        {
+          "text": "derives only when the cell, the hand or the working design changes",
+          "test": "client/src/ships/build/statDelta.test.ts"
+        }
+      ],
+      "extend": "none: the stats it lists are build/statDelta.ts STATS",
+      "exports": [
+        "FieldDeltaIn",
+        "makeFieldDelta",
+        "syncFieldDelta"
+      ],
+      "sections": [
+        {
+          "name": "FieldDeltaIn",
+          "kind": "interface",
+          "start": 14,
+          "end": 24
+        },
+        {
+          "name": "makeFieldDelta",
+          "kind": "function",
+          "start": 26,
+          "end": 28
+        },
+        {
+          "name": "syncFieldDelta",
+          "kind": "function",
+          "start": 30,
+          "end": 41
+        }
+      ]
+    },
+    {
       "id": "client.ship.fx",
       "path": "client/src/ships/fx/ShipFx.ts",
       "group": "client/ships/fx",
@@ -3495,6 +3797,40 @@
       ]
     },
     {
+      "id": "client.hangar.delta",
+      "path": "client/src/ships/hangar/hangarDelta.ts",
+      "group": "client/ships/hangar",
+      "lines": 32,
+      "owns": "the hangar's stat-delta preview: which change the cursor means (the part in hand here, or the part under it removed), the card at the cursor, and the +/- chips in the stats panel (build/statDelta.ts, statDeltaView.ts)",
+      "needs": "HangarHost (bp, mouse, candidate, placementProblem, partAt, stats, deps); build/statDelta, build/statDeltaView",
+      "events": "",
+      "invariants": [
+        {
+          "text": "derives only when the cell, the hand or the design changes",
+          "test": "client/src/ships/build/statDelta.test.ts"
+        }
+      ],
+      "extend": "a stat shown in the panel is one data-sd span in hangarStats.ts and an entry in statDelta.ts STATS",
+      "exports": [
+        "makeDeltaHover",
+        "syncDelta"
+      ],
+      "sections": [
+        {
+          "name": "makeDeltaHover",
+          "kind": "function",
+          "start": 13,
+          "end": 16
+        },
+        {
+          "name": "syncDelta",
+          "kind": "function",
+          "start": 18,
+          "end": 32
+        }
+      ]
+    },
+    {
       "id": "client.hangar.designs",
       "path": "client/src/ships/hangar/hangarDesigns.ts",
       "group": "client/ships/hangar",
@@ -3752,7 +4088,7 @@
       "id": "client.hangar.stats",
       "path": "client/src/ships/hangar/hangarStats.ts",
       "group": "client/ships/hangar",
-      "lines": 427,
+      "lines": 430,
       "owns": "the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems",
       "needs": "HangarHost (deps, derived, bp, errors), shipSummary, portsReport; npm: @space-game/common",
       "events": "",
@@ -3776,62 +4112,62 @@
         {
           "name": "buildHtml",
           "kind": "function",
-          "start": 23,
-          "end": 87
+          "start": 24,
+          "end": 88
         },
         {
           "name": "ammoHtml",
           "kind": "function",
-          "start": 89,
-          "end": 137
+          "start": 90,
+          "end": 138
         },
         {
           "name": "bindBuildButtons",
           "kind": "function",
-          "start": 139,
-          "end": 164
+          "start": 140,
+          "end": 165
         },
         {
           "name": "powerHtml",
           "kind": "function",
-          "start": 166,
-          "end": 224
+          "start": 167,
+          "end": 225
         },
         {
           "name": "portsHtml",
           "kind": "function",
-          "start": 226,
-          "end": 239
+          "start": 227,
+          "end": 240
         },
         {
           "name": "summaryHtml",
           "kind": "function",
-          "start": 241,
-          "end": 315
+          "start": 242,
+          "end": 317
         },
         {
           "name": "renderStats",
           "kind": "function",
-          "start": 317,
-          "end": 369
+          "start": 319,
+          "end": 372
         },
         {
           "name": "energyRuns",
           "kind": "const",
-          "start": 371,
-          "end": 381
+          "start": 374,
+          "end": 384
         },
         {
           "name": "ENERGY_ROW_SECONDS",
           "kind": "const",
-          "start": 382,
-          "end": 382
+          "start": 385,
+          "end": 385
         },
         {
           "name": "energyHtml",
           "kind": "function",
-          "start": 384,
-          "end": 427
+          "start": 387,
+          "end": 430
         }
       ]
     },
@@ -3901,7 +4237,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 140,
+      "lines": 146,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -3921,20 +4257,20 @@
         {
           "name": "HangarDeps",
           "kind": "interface",
-          "start": 15,
-          "end": 51
+          "start": 17,
+          "end": 53
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 53,
-          "end": 53
+          "start": 55,
+          "end": 55
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 55,
-          "end": 140
+          "start": 57,
+          "end": 146
         }
       ]
     },

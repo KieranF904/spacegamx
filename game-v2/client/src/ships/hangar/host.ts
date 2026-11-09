@@ -11,6 +11,8 @@ import { type PowerReport } from '../wireEdit';
 import { PortsGrid } from '../portsGrid';
 import { HangarLitView } from '../HangarLitView';
 import { type PartTipCtx } from '../partTip';
+import type { DeltaHover } from '../build/statDeltaView';
+import type { StatDelta } from '../build/statDelta';
 
 export interface HangarDeps {
   catalog: Catalog;
@@ -77,6 +79,10 @@ export interface HangarHost {
   mountingBroken: Map<number, MountingProblem[]>;
   ports: PortsGrid;
   mouse: Vec2 | null;
+  /** The cursor on screen, and what placing / removing under it would change (hangarDelta.ts) */
+  mouseClient: { x: number; y: number } | null;
+  deltaHover: DeltaHover;
+  deltaNow: StatDelta | null;
   paletteHover: { fn: string; piece: string; material: string } | null;
   handTurn(): { rot: 0 | 1 | 2 | 3; flip: boolean };
   stats: HTMLDivElement;
