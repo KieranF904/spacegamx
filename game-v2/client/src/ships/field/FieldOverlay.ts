@@ -20,6 +20,8 @@
 import { DragPaint } from '../build/dragPaint';
 import { bindBuildKeys } from '../build/buildKeys';
 import { FieldAids } from './fieldAids';
+import { bindResourceLinks } from '../build/planCostView';
+import { fieldCostHtml } from './fieldCost';
 import { placeGeometry, partItemId, hasFixedBarrel } from '@space-game/common';
 import type { Graphics } from 'pixi.js';
 import type { PlacedGeom, PlacedPart, ShipState, Side, Vec2 } from '@space-game/common';
@@ -55,6 +57,8 @@ const STYLE = `
 .fo-head b { flex: 1; letter-spacing: 0.4px; color: #e5ecf7; }
 .fo-pal { flex: 1; min-height: 0; overflow: hidden; }
 .fo-foot { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.fo-cost { color: #c4cfde; font-size: 11px; line-height: 1.45; margin-bottom: 4px; }
+.fo-cost:empty { display: none; }
 .fo-note { color: #8ea0bd; font-size: 11px; line-height: 1.4; min-height: 15px; }
 .fo-note.bad { color: #fca5a5; }
 .fo-btns { display: flex; gap: 6px; }
@@ -77,6 +81,7 @@ export class FieldOverlay {
   private palWrap?: HTMLDivElement;
   private pal: HangarPalette | null = null;
   private noteEl?: HTMLElement;
+  private costEl?: HTMLElement;
   private saveBtn?: HTMLButtonElement;
   private clearBtn?: HTMLButtonElement;
   private mouse: { x: number; y: number } | null = null;
@@ -229,7 +234,7 @@ export class FieldOverlay {
     root.dataset.hudAvoid = '1';
     root.innerHTML = `<div class="fo-head"><b>Build</b><button class="fo-btn" data-a="close" style="flex:none">Close</button></div>
       <div class="fo-pal"></div>
-      <div class="fo-foot"><div class="fo-note"></div>
+      <div class="fo-foot"><div class="fo-cost"></div><div class="fo-note"></div>
         <div class="fo-btns"><button class="fo-btn" data-a="undo" title="Undo the last edit (Ctrl+Z)">Undo</button><button class="fo-btn" data-a="redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)">Redo</button><button class="fo-btn" data-a="sym" title="Symmetry (M): every place, remove and turn is repeated across the ship's centre line">Mirror</button></div>
         <div class="fo-btns"><button class="fo-btn go" data-a="save">Save</button><button class="fo-btn" data-a="reset" title="Throw away every unsaved edit (Undo brings them back)">Reset edits</button><button class="fo-btn" data-a="clear" title="Drop every missing part (planned or lost) from the design and stop recycling: the ship as it stands">As it stands</button></div></div>`;
     root.addEventListener('click', (e) => {
@@ -245,6 +250,8 @@ export class FieldOverlay {
     this.flow.mount(root.querySelector<HTMLElement>('.fo-foot')!);
     this.palWrap = root.querySelector<HTMLDivElement>('.fo-pal')!;
     this.noteEl = root.querySelector<HTMLElement>('.fo-note')!;
+    this.costEl = root.querySelector<HTMLElement>('.fo-cost')!;
+    bindResourceLinks(this.costEl);
     this.saveBtn = root.querySelector<HTMLButtonElement>('[data-a="save"]')!;
     this.clearBtn = root.querySelector<HTMLButtonElement>('[data-a="clear"]')!;
     this.aids.bind(root.querySelector<HTMLButtonElement>('[data-a="undo"]')!, root.querySelector<HTMLButtonElement>('[data-a="redo"]')!, root.querySelector<HTMLButtonElement>('[data-a="sym"]')!);
@@ -480,6 +487,7 @@ export class FieldOverlay {
 
   private edited(): void {
     this.rev++;
+    this.costTick = 0;
   }
 
   /** A key the view uses while open (the feature's onKey): true if it took it */
@@ -563,6 +571,8 @@ export class FieldOverlay {
     if (this.pal && ++this.frames % 15 === 0 && this.pal.stale()) this.pal.render();
   }
   private frames = 0;
+  private costHtml = '';
+  private costTick = 0;
 
   private footer(): void {
     const live = this.live();
@@ -578,6 +588,11 @@ export class FieldOverlay {
     const text = [this.note, sum && `Unsaved: ${sum}.`, unjoinedText(loose.size), hovered].filter(Boolean).join(' ');
     if (this.noteEl.textContent !== text) this.noteEl.textContent = text;
     this.noteEl.classList.toggle('bad', this.noteBad);
+    if (this.costEl) {
+      // (Looked at every few frames: the hold and the machine move as you fly. Only a changed text touches the DOM, so a click on a link lands)
+      const html = v && this.costTick++ % 10 === 0 ? fieldCostHtml(this.deps, v.w, loose) : this.costHtml;
+      if (html !== this.costHtml || this.costEl.innerHTML === '') { this.costHtml = html; this.costEl.innerHTML = html; }
+    }
   }
 
   /** The tooltip for a not-connected part under the mouse ('' if none) */

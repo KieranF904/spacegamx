@@ -9,6 +9,7 @@
 
 import { esc } from '../escape';
 import { resourceEntries } from './resourceData';
+import { takePendingResource } from './resourceFocus';
 import { CATEGORY_LABEL, CATEGORY_ORDER, SOURCE_LABEL, type ResourceCategory, type ResourceEntry } from './resourceIndex';
 
 /** What the dictionary needs from the guide */
@@ -61,7 +62,7 @@ function rowHtml(e: ResourceEntry, d: ResourceDeps): string {
   const sources = e.notObtainable
     ? '<p class="rd-none">No way to get this yet.</p>'
     : `<ul>${e.sources.map((s) => `<li><b>${esc(SOURCE_LABEL[s.kind])}</b> ${esc(s.text)}${s.where ? `<div class="rd-where">${s.where.map(esc).join(' · ')}</div>` : ''}</li>`).join('')}</ul>`;
-  return `<details class="rd-row" data-cat="${e.category}" data-q="${esc(hay)}">
+  return `<details class="rd-row" data-id="${esc(e.id)}" data-cat="${e.category}" data-q="${esc(hay)}">
     <summary><span class="rd-ic">${icon ? `<img src="${esc(icon)}" alt="">` : `<i style="background:${esc(e.color)}"></i>`}</span>
       <span class="rd-name">${esc(e.name)}</span><span class="rd-desc">${esc(e.description)}</span>
       <span class="rd-ways">${ways.map((w) => `<span class="rd-way">${esc(w)}</span>`).join('')}</span></summary>
@@ -108,4 +109,13 @@ export function wireResources(root: HTMLElement): void {
   input.addEventListener('input', () => { state.q = input.value; apply(); });
   for (const b of box.querySelectorAll<HTMLElement>('[data-rcat]')) b.addEventListener('click', () => { state.cat = b.dataset.rcat as ResourceCategory | 'all'; apply(); });
   apply();
+  // (Sent here by a link elsewhere: clear the filters, open that row and bring it into view)
+  const want = takePendingResource();
+  const row = want ? rows.find((r) => r.dataset.id === want) : undefined;
+  if (row) {
+    state.q = ''; state.cat = 'all'; input.value = '';
+    apply();
+    (row as HTMLDetailsElement).open = true;
+    row.scrollIntoView?.({ block: 'center' });
+  }
 }

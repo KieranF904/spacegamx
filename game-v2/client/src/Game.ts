@@ -2,6 +2,7 @@
  * Game - Main client orchestrator
  */
 
+import { setResourceOpener } from './ui/resources/resourceFocus';
 import { ChatPanel } from './ui/ChatPanel';
 import { WorldQueries } from './app/worldQueries';
 import { StaffPanels } from './app/staffPanels';
@@ -392,6 +393,7 @@ this.boostHudEl = document.getElementById('boostHud');
     this.serverBrowserUI = new ServerBrowserUI(uiOverlay);
     this.w = buildWindows(this.windowHost, uiOverlay);
     this.createMenu();
+    setResourceOpener(() => this.menu.openGuide('resources'));
     settings.subscribe((s) => this.applySettings(s));
     window.addEventListener('blur', () => { this.windowFocused = false; this.applyVolume(settings.data); });
     window.addEventListener('focus', () => { this.windowFocused = true; this.applyVolume(settings.data); });
