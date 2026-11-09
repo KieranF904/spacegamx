@@ -44,6 +44,7 @@ export class RefineryTab {
         if (n <= 0 || (n === max && (max === 1 || max === 10))) continue;
         const btn = document.createElement('button');
         btn.className = 'sgw-btn' + (n === max ? ' primary' : '');
+        btn.dataset.key = `refine:${r.id}:${n === max ? 'max' : n}`;
         btn.textContent = n === max ? `Max (${max})` : `×${n}`;
         if (n > max) btn.classList.add('off');
         btn.title = `${n * r.out} × ${econ.items.name(r.id)}: ${fmt((r.time ?? 2) * n)}`;

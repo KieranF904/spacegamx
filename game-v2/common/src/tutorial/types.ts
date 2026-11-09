@@ -73,6 +73,12 @@ export interface TutorialStepDef {
   targets?: string[];
   /** Items granted when the step starts (so the lesson has what it needs) */
   grant?: Record<string, number>;
+  /**
+   * UI controls the step needs, in the order the pilot meets them: each entry is a CSS selector (list) the client makes glow
+   * until clicked (prefer the stable data-tab / data-key / data-tut attributes). Of the entries not yet clicked, the last one whose
+   * control is on screen glows; `.tp kbd` is the card's own key caps
+   */
+  highlight?: string[];
 }
 
 export interface TutorialYardDef {

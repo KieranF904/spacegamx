@@ -1761,7 +1761,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 911,
+      "lines": 912,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1799,7 +1799,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 84,
-          "end": 911
+          "end": 912
         }
       ]
     },
@@ -4045,7 +4045,7 @@
       "id": "client.ship.dock",
       "path": "client/src/ships/dock/DockControl.ts",
       "group": "client/ships/dock",
-      "lines": 183,
+      "lines": 184,
       "owns": "docking at a station: the dock request/answer, the berth, undocking, the dock and planet and repair hints",
       "needs": "DockHost (state, tuning, store, send, showMessage, sound, hangarOpen, openHangar, refreshShip, stationOpen, onDocked); npm: @space-game/common",
       "events": "",
@@ -4075,7 +4075,7 @@
           "name": "DockControl",
           "kind": "class",
           "start": 36,
-          "end": 183
+          "end": 184
         }
       ]
     },
@@ -8341,7 +8341,7 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 178,
+      "lines": 193,
       "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
@@ -8360,26 +8360,26 @@
         {
           "name": "styled",
           "kind": "let",
-          "start": 13,
-          "end": 13
+          "start": 14,
+          "end": 14
         },
         {
           "name": "injectStyles",
           "kind": "function",
-          "start": 14,
-          "end": 62
+          "start": 15,
+          "end": 59
         },
         {
           "name": "PanelDeps",
           "kind": "interface",
-          "start": 64,
-          "end": 70
+          "start": 61,
+          "end": 67
         },
         {
           "name": "TutorialPanel",
           "kind": "class",
-          "start": 72,
-          "end": 178
+          "start": 69,
+          "end": 193
         }
       ]
     },
@@ -8387,9 +8387,9 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 176,
+      "lines": 182,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
-      "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, the game's entities, a send function, a renderer hook",
+      "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
       "invariants": [
         {
@@ -8406,7 +8406,7 @@
         {
           "name": "TutorialUIDeps",
           "kind": "interface",
-          "start": 19,
+          "start": 21,
           "end": 36
         },
         {
@@ -8419,7 +8419,184 @@
           "name": "TutorialUI",
           "kind": "class",
           "start": 41,
-          "end": 176
+          "end": 182
+        }
+      ]
+    },
+    {
+      "id": "client.ui.tutorial.glow",
+      "path": "client/src/ui/tutorial/glow.ts",
+      "group": "client/ui/tutorial",
+      "lines": 118,
+      "owns": "making the UI controls a tutorial step names glow (a pulsing amber outline) until the pilot clicks them: finds them by selector, picks which stage is up, follows controls that render later, and cleans up on a step change or leave",
+      "needs": "a GlowHost (the DOM: find, mark, clicks, changes), the document for the real host",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a stage clicked once stays done for the step; of the stages not done, the last one with a control on screen glows; nothing glows after clear() or a step change; the glow class is removed from every control it was put on",
+          "test": "client/src/ui/tutorial/glow.test.ts"
+        }
+      ],
+      "extend": "a step names its controls in data/tutorial.json (`highlight`); the target buttons carry data-tab / data-key / data-tut",
+      "exports": [
+        "GLOW_CLASS",
+        "Glow",
+        "GlowHost",
+        "domGlowHost"
+      ],
+      "sections": [
+        {
+          "name": "GlowHost",
+          "kind": "interface",
+          "start": 11,
+          "end": 20
+        },
+        {
+          "name": "Glow",
+          "kind": "class",
+          "start": 22,
+          "end": 74
+        },
+        {
+          "name": "GLOW_CLASS",
+          "kind": "const",
+          "start": 76,
+          "end": 76
+        },
+        {
+          "name": "styled",
+          "kind": "let",
+          "start": 78,
+          "end": 78
+        },
+        {
+          "name": "injectStyles",
+          "kind": "function",
+          "start": 79,
+          "end": 89
+        },
+        {
+          "name": "domGlowHost",
+          "kind": "function",
+          "start": 91,
+          "end": 118
+        }
+      ]
+    },
+    {
+      "id": "client.ui.tutorial.placement",
+      "path": "client/src/ui/tutorial/placement.ts",
+      "group": "client/ui/tutorial",
+      "lines": 81,
+      "owns": "where the instruction card sits: its usual top-centre spot, or right above (or just under, or just inside) the window the pilot is looking at, clamped to the screen; and finding that window's rect",
+      "needs": "nothing (pure math; the DOM lookup takes a document-like object)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the card never covers the anchor's top edge when there is room above it; it always stays inside the viewport",
+          "test": "client/src/ui/tutorial/placement.test.ts"
+        }
+      ],
+      "extend": "a new kind of anchor is one entry in ANCHORS (selector, which element's rect, mode)",
+      "exports": [
+        "ANCHORS",
+        "AnchorEl",
+        "AnchorMode",
+        "CARD_GAP",
+        "CARD_MARGIN",
+        "CardAnchor",
+        "HOME_TOP",
+        "Rect",
+        "Size",
+        "cardPosition",
+        "domFind",
+        "findAnchor",
+        "sameRect"
+      ],
+      "sections": [
+        {
+          "name": "Rect",
+          "kind": "interface",
+          "start": 10,
+          "end": 10
+        },
+        {
+          "name": "Size",
+          "kind": "interface",
+          "start": 11,
+          "end": 11
+        },
+        {
+          "name": "AnchorMode",
+          "kind": "type",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "CardAnchor",
+          "kind": "interface",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "CARD_MARGIN",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "CARD_GAP",
+          "kind": "const",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "HOME_TOP",
+          "kind": "const",
+          "start": 18,
+          "end": 19
+        },
+        {
+          "name": "cardPosition",
+          "kind": "function",
+          "start": 21,
+          "end": 37
+        },
+        {
+          "name": "AnchorEl",
+          "kind": "interface",
+          "start": 39,
+          "end": 44
+        },
+        {
+          "name": "AnchorKind",
+          "kind": "interface",
+          "start": 46,
+          "end": 46
+        },
+        {
+          "name": "ANCHORS",
+          "kind": "const",
+          "start": 48,
+          "end": 53
+        },
+        {
+          "name": "findAnchor",
+          "kind": "function",
+          "start": 55,
+          "end": 65
+        },
+        {
+          "name": "domFind",
+          "kind": "function",
+          "start": 67,
+          "end": 77
+        },
+        {
+          "name": "sameRect",
+          "kind": "function",
+          "start": 79,
+          "end": 81
         }
       ]
     },
@@ -14870,7 +15047,7 @@
       "id": "common.tutorial.data",
       "path": "common/src/tutorial/data.ts",
       "group": "common/tutorial",
-      "lines": 117,
+      "lines": 118,
       "owns": "validateTutorialData: every problem in a parsed data/tutorial.json, as readable lines",
       "needs": "types",
       "events": "",
@@ -14926,7 +15103,7 @@
           "name": "validateTutorialData",
           "kind": "function",
           "start": 27,
-          "end": 117
+          "end": 118
         }
       ]
     },
@@ -15050,7 +15227,7 @@
       "id": "common.tutorial.types",
       "path": "common/src/tutorial/types.ts",
       "group": "common/tutorial",
-      "lines": 145,
+      "lines": 151,
       "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
       "needs": "nothing (leaf module)",
       "events": "",
@@ -15121,67 +15298,67 @@
           "name": "TutorialStepDef",
           "kind": "interface",
           "start": 64,
-          "end": 76
+          "end": 82
         },
         {
           "name": "TutorialYardDef",
           "kind": "interface",
-          "start": 78,
-          "end": 92
+          "start": 84,
+          "end": 98
         },
         {
           "name": "TutorialPackDef",
           "kind": "interface",
-          "start": 94,
-          "end": 97
+          "start": 100,
+          "end": 103
         },
         {
           "name": "TutorialData",
           "kind": "interface",
-          "start": 99,
-          "end": 105
+          "start": 105,
+          "end": 111
         },
         {
           "name": "TUTORIAL_INDEX_BASE",
           "kind": "const",
-          "start": 107,
-          "end": 108
+          "start": 113,
+          "end": 114
         },
         {
           "name": "TUTORIAL_ROCK_TYPE",
           "kind": "const",
-          "start": 109,
-          "end": 110
+          "start": 115,
+          "end": 116
         },
         {
           "name": "TUTORIAL_FIRST_STEP",
           "kind": "const",
-          "start": 111,
-          "end": 112
+          "start": 117,
+          "end": 118
         },
         {
           "name": "TutorialProfile",
           "kind": "interface",
-          "start": 114,
-          "end": 122
+          "start": 120,
+          "end": 128
         },
         {
           "name": "TutorialEvent",
           "kind": "type",
-          "start": 124,
-          "end": 141
+          "start": 130,
+          "end": 147
         },
         {
           "name": "TUTORIAL_PANELS",
           "kind": "const",
-          "start": 143,
-          "end": 144
+          "start": 149,
+          "end": 150
         },
         {
           "name": "TutorialPanel",
           "kind": "type",
-          "start": 145,
-          "end": 145
+          "start": 151,
+          "end": 151
         }
       ]
     },

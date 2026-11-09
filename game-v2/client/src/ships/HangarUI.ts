@@ -250,6 +250,7 @@ export class HangarUI implements HangarHost {
     this.canvas.style.cssText = 'width: 100%; height: 100%; display: block; cursor: crosshair;';
     const canvasWrap = document.createElement('div');
     canvasWrap.style.cssText = 'position: relative; overflow: hidden;';
+    canvasWrap.dataset.tut = 'hangar-view';
     // Layers: the grid (and turret arcs) under, the ship lit as in flight (WebGL), the editor's marks over (and the mouse)
     this.grid = document.createElement('canvas');
     this.grid.style.cssText = 'position:absolute; left:0; top:0; width:100%; height:100%; display:block; pointer-events:none;';

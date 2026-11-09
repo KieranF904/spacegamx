@@ -903,8 +903,8 @@ this.boostHudEl = document.getElementById('boostHud');
     const building = this.w.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
     this.w.buildSites?.update(1 / 60, building ? building.markers[0] : null);
     this.w.tutorial.update(blocked || this.localDead || this.w.playerStatsUI.isVisible() || inGunRange());
-    // (the training card stays up over the hangar: its part and generator steps are done there)
-    this.w.tutorialUI.update(blocked || this.localDead, !this.loggedIn || this.w.systemMapUI.isOpen || this.menu.isOpen || this.localDead);
+    // (the training card stays up over the hangar and the map, by them: the part, generator and map steps are done there)
+    this.w.tutorialUI.update(blocked || this.localDead, !this.loggedIn || this.menu.isOpen || this.localDead);
     this.w.pingUI.setHidden(blocked);
     this.w.pingUI.update();
     // The hold above the chat: not while docked (the station's storage has it) or behind a full-screen view

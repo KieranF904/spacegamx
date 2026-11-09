@@ -86,6 +86,7 @@ export class StationWindow {
     for (const [id, label] of [['overview', 'Overview'], ['ships', 'Ships'], ['contracts', 'Contracts'], ['market', 'Market'], ['vendors', 'Quartermasters'], ['refinery', 'Refinery'], ['fabricator', 'Fabricator'], ['bank', 'Repair bank'], ['outpost', 'Your station']] as [Tab, string][]) {
       const b = document.createElement('button');
       b.className = 'sgw-tab';
+      b.dataset.tab = id;
       b.textContent = label;
       b.onclick = () => {
         this.tab = id;

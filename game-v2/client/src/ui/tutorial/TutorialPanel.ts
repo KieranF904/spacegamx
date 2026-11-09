@@ -9,6 +9,7 @@
 
 import { esc } from '../escape';
 import { LeaveFlow, type PanelModel } from './tutorialModel';
+import { cardPosition, type CardAnchor } from './placement';
 
 let styled = false;
 function injectStyles(): void {
@@ -16,7 +17,7 @@ function injectStyles(): void {
   styled = true;
   const css = document.createElement('style');
   css.textContent = `
-.tp { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2100; width: min(440px, calc(100vw - 32px)); box-sizing: border-box;
+.tp { position: fixed; top: 0; left: 0; transform: translate(var(--tx, 0px), var(--ty, 10px)); transition: transform 0.22s ease-out; z-index: 2100; width: min(440px, calc(100vw - 32px)); box-sizing: border-box;
   padding: 10px 14px 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(16, 30, 52, 0.94), rgba(8, 16, 30, 0.94));
   border: 1px solid rgba(251, 191, 36, 0.55); box-shadow: 0 0 26px rgba(251, 191, 36, 0.12), 0 10px 34px rgba(0,0,0,0.5);
   color: #e5ecf7; font: 13px 'Segoe UI', system-ui, sans-serif; line-height: 1.45; }
@@ -50,13 +51,9 @@ function injectStyles(): void {
 .tp-grad ul { list-style: none; margin: 12px 0 16px; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.05); text-align: left; max-height: 40vh; overflow: auto; }
 .tp-grad li { padding: 1px 0; }
 .tp-grad button { padding: 7px 26px; font-size: 14px; }
-/* Over a window (the station's, the hold) or the hangar: a strip along the bottom, above the window's veil, so the card stays readable without covering its tabs */
-.tp.low { top: auto; bottom: 8px; z-index: 2600; width: min(640px, calc(100vw - 32px)); padding: 6px 12px; }
-.tp.low .tp-h, .tp.low .tp-bar { display: none; }
-.tp.low .tp-t { display: inline; margin: 0 8px 0 0; font-size: 13px; }
-.tp.low .tp-l, .tp.low .tp-ct { display: inline; margin: 0 6px 0 0; }
-.tp.low .tp-row { float: right; margin: 0 0 0 8px; }
-@media (prefers-reduced-motion: reduce) { .tp-toast { animation: none; } .tp-bar > i { transition: none; } }
+/* Over a window (the station's, the hold), the hangar or the map: the same card, moved right above (or under, or inside the top of) it, above its veil; it glides there */
+.tp.anch { z-index: 2600; }
+@media (prefers-reduced-motion: reduce) { .tp { transition: none; } .tp-toast { animation: none; } .tp-bar > i { transition: none; } }
 `;
   document.head.appendChild(css);
 }
@@ -78,6 +75,9 @@ export class TutorialPanel {
   private pack: string[] = [];
   /** What is drawn now, so an unchanged state does not rebuild (and drop a click in flight) */
   private shown = '';
+  /** The last spot worked out (an unchanged one is not set again) and whether the card has had its first */
+  private placed = '';
+  private positioned = false;
 
   constructor(private d: PanelDeps) {
     injectStyles();
@@ -119,9 +119,23 @@ export class TutorialPanel {
     this.card.style.visibility = hidden ? 'hidden' : 'visible';
   }
 
-  /** Over a window (the station's, the hold) or the hangar: the card as a strip along the bottom, above it */
-  setLow(low: boolean): void {
-    this.card.classList.toggle('low', low);
+  /**
+   * Over a window, the hangar or the map the card sits by it (placement.ts); otherwise at its usual top-centre spot.
+   * Called each frame: it only touches the page when the spot changes
+   */
+  place(anchor: CardAnchor | null): void {
+    if (this.card.hidden) return;
+    const w = this.card.offsetWidth, h = this.card.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    const key = `${w}|${h}|${vw}|${vh}|${anchor ? `${anchor.mode}|${anchor.rect.left}|${anchor.rect.top}|${anchor.rect.width}|${anchor.rect.height}` : ''}`;
+    if (key === this.placed) return;
+    this.placed = key;
+    const { x, y } = cardPosition(anchor, { w, h }, { w: vw, h: vh });
+    // (the first spot is taken at once, with no glide from the corner)
+    if (!this.positioned) this.card.style.transition = 'none';
+    this.card.style.setProperty('--tx', `${Math.round(x)}px`);
+    this.card.style.setProperty('--ty', `${Math.round(y)}px`);
+    this.card.classList.toggle('anch', !!anchor);
+    if (!this.positioned) { void this.card.offsetWidth; this.card.style.transition = ''; this.positioned = true; }
   }
 
   toast(text: string): void {
@@ -150,6 +164,7 @@ export class TutorialPanel {
       return;
     }
     this.grad.hidden = true;
+    if (this.card.hidden) { this.placed = ''; this.positioned = false; }
     this.card.hidden = false;
     const confirm = this.flow.phase === 'confirm', sent = this.flow.phase === 'sent';
     this.card.innerHTML = `<div class="tp-h"><span>TRAINING · ${m.n} / ${m.total}</span></div>
