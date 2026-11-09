@@ -136,8 +136,8 @@ describe('field fabricator: rebuilding a lost part', () => {
     expect(d).toMatchObject({ kind: 'fabricator', item: partItemId(pip), to: 'ship', uid: 1 });
     // The record follows the live ship
     expect(w.prof.ship.blueprint.parts.length).toBe(w.ship().blueprint.parts.length);
-    w.run(2);
-    expect(w.fabView().drawing).toBe(false);
+    // (The blast that took the Pip also scratched the core: the machine mends that, free, then rests)
+    expect(until(w, () => !w.fabView().drawing, 3000)).toBeGreaterThan(0);
   });
 
   it('at half power it takes twice as long; switched off it draws nothing and stands still', () => {
@@ -199,6 +199,30 @@ describe('field fabricator: rebuilding a lost part', () => {
     expect(v.job!.need + v.job!.attachNeed).toBe(ticks);
     const took = until(w, () => w.alive(2), 5000);
     expect(Math.abs(took - ticks)).toBeLessThanOrEqual(3);
+  });
+
+  it('a damaged core is mended in the field, free, by the core\'s own slow fabricator (no fabricator part, no hold)', () => {
+    const w = world(design({ fabricator: false }));
+    const core = w.idx(0);
+    w.ships.damagePartFraction(w.pid, core, 0.5);
+    w.run(2);
+    expect(w.ship().hp[core]).toBeLessThan(w.ship().maxHp[core] * 0.6);
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    w.run(1);
+    expect(w.fabView()).toMatchObject({ tier: 0, uid: -1, drawing: true });
+    const took = until(w, () => w.ship().hp[core] >= w.ship().maxHp[core] - 1e-6, 6000);
+    expect(took).toBeGreaterThan(0);
+    expect(w.prof.cargo).toEqual([]);
+  });
+
+  it('a damaged core is mended by a fabricator part too', () => {
+    const w = world(design());
+    const core = w.idx(0);
+    w.ships.damagePartFraction(w.pid, core, 0.5);
+    w.run(2);
+    w.send({ type: 'machine', kind: 'fabricator', on: true });
+    const took = until(w, () => w.ship().hp[core] >= w.ship().maxHp[core] - 1e-6, 6000);
+    expect(took).toBeGreaterThan(0);
   });
 
   it("refuses what is past the machine's grade and says so", () => {

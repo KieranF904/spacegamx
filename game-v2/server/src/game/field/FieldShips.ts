@@ -366,11 +366,11 @@ export class FieldShips implements FeatureInstance {
       const core = p.fn === 'core';
       return {
         alive,
-        missing: alive && !core && ship.maxHp[i] > 0 ? Math.max(0, 1 - ship.hp[i] / ship.maxHp[i]) : 0,
+        missing: alive && ship.maxHp[i] > 0 ? Math.max(0, 1 - ship.hp[i] / ship.maxHp[i]) : 0,
         wanted: !alive && !core && !rc.has(p.uid),
         recycle: alive && rc.has(p.uid),
         blocked: false,
-        makeable: canFabricate(cat, tier, p),
+        makeable: core || canFabricate(cat, tier, p), // (the core is mended, never made: its repair is free)
       };
     });
   }
