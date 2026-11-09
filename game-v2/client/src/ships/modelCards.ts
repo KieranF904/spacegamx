@@ -153,7 +153,7 @@ export function mountBadge(catalog: Catalog, p: { fn: string; mount?: Mount }): 
 
 /** A flak shell that ends at the aim point (weaponMods.set.endAtAim) bursts there, or sooner near a target: read from the data, so it stays true */
 function aimBurstNote(fn: FunctionDef): string {
-  if (!(fn.weaponMods?.set as { endAtAim?: boolean } | undefined)?.endAtAim) return '';
+  if ((fn as { weapon?: string }).weapon !== 'flak' || !(fn.weaponMods?.set as { endAtAim?: boolean } | undefined)?.endAtAim) return '';
   return `bursts at your aim distance, or sooner near a target${fn.fire?.model === 'ammo' ? ' · ammo' : ''}`;
 }
 

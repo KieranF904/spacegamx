@@ -27,7 +27,7 @@ Small
 Small · Square
 
 == tradeOff ==
-bursts near what it passes · ammo
+bursts at your aim distance, or sooner near a target · ammo
 
 == keyStats ==
 26 dmg/s · reach 1,700 · ammo
