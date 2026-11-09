@@ -31,12 +31,12 @@ button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 #zoneR { left: 44%; right: 0; }
 
 /* zoned helm: the left strip's blend, turn at top and bottom, strafe in the middle */
-#bands { left: calc(var(--sl) + 8px); top: calc(var(--st) + 8px); bottom: calc(var(--sb) + 8px); width: min(40%, 230px); pointer-events: none; display: none; border-radius: 40px;
-  border: 1px solid rgba(127,214,250,.16);
+#bands { pointer-events: none; display: none; border-radius: 50%;
+  border: 1.5px solid rgba(127,214,250,.35);
   background: linear-gradient(180deg, rgba(255,176,74,.16) 0%, rgba(255,176,74,.05) 22%, rgba(127,214,250,.10) 27.5%, rgba(127,214,250,.10) 72.5%, rgba(255,176,74,.05) 78%, rgba(255,176,74,.16) 100%); }
 #bands.show { display: block; }
 #bands span { position: absolute; left: calc(var(--sl) + 14px); font: 600 11px/1 var(--display); letter-spacing: .16em; text-transform: uppercase; color: rgba(217,222,230,.38); }
-#bands span { left: 14px; } #bands .t { top: 9%; } #bands .m { top: 50%; color: rgba(127,214,250,.55); } #bands .b { bottom: 9%; }
+#bands span { left: 50%; transform: translateX(-50%); font-size: 10px; } #bands .t { top: 9%; } #bands .m { top: calc(50% - 5px); color: rgba(127,214,250,.6); } #bands .b { bottom: 9%; }
 /* zoned: the ability bar moves off the strip, to the right half */
 body.zoned #abil { left: auto; right: calc(var(--sr) + 10px); transform: none; flex-wrap: wrap; justify-content: flex-end; max-width: 54%; }
 #blendTag { font: 500 10px/1 var(--mono); color: var(--amber-hot); position: absolute; left: 50%; top: -16px; transform: translateX(-50%); white-space: nowrap; }
@@ -244,7 +244,7 @@ const SCHEMES = {
   twin: { label: 'Twin stick', text: 'Left stick flies. Right stick aims and fires; push farther to aim farther.' },
   tap:  { label: 'Tap aim', text: 'Left stick flies. Tap an enemy to lock it and auto-fire. Hold empty space to fire there.' },
   helm: { label: 'Helm', text: 'The view turns with your ship, nose up. Left stick turns and thrusts. Hold the right side to fire ahead.' },
-  zoned: { label: 'Zoned', text: 'Nose up. Left stick: up/down thrusts; sideways strafes near the middle of the strip, turns near its top and bottom (set where your thumb lands).' },
+  zoned: { label: 'Zoned', text: 'Nose up. Up/down thrusts. Sideways strafes if your thumb lands mid-pad, turns if it lands near the top or bottom.' },
 };
 let scheme = 'twin';
 const GROUPS = ['All', '1', '2', '3'];
@@ -271,8 +271,15 @@ function placeGhosts() {
   const d = SR * 2, pad = 20;
   for (const [g, x] of [[gL, SAFE.l + pad + 10], [gR, W - SAFE.r - pad - 10 - d]]) {
     g.style.width = g.style.height = d + 'px';
-    g.style.left = x + 'px'; g.style.top = (g === gL && scheme === 'zoned' ? (H - d) / 2 : H - SAFE.b - d - pad) + 'px';
+    g.style.left = x + 'px'; g.style.top = (H - SAFE.b - d - pad) + 'px';
+    g.style.borderRadius = '50%';
   }
+  // zoned: an upright ellipse, about one and a half sticks tall, in the Move ghost's place
+  PAD.rx = SR * 1.05; PAD.ry = SR * 1.65;
+  PAD.x = SAFE.l + pad + 10 + SR; PAD.y = H - SAFE.b - pad - PAD.ry;
+  const bd = $('#bands');
+  Object.assign(bd.style, { left: (PAD.x - PAD.rx) + 'px', top: (PAD.y - PAD.ry) + 'px', width: PAD.rx * 2 + 'px', height: PAD.ry * 2 + 'px' });
+  gL.style.display = scheme === 'zoned' ? 'none' : '';
   gR.querySelector('b').textContent = noseUp() ? 'Fire' : 'Aim';
   gR.style.display = scheme === 'tap' ? 'none' : '';
 }
@@ -286,10 +293,10 @@ function setStick(s, e, zone) {
   moveStick(s, e);
 }
 /** Zoned: how much sideways push turns (1) rather than strafes (0), from where the thumb landed on the strip: a smooth
- *  blend, strafe over the middle ~45% of the strip, turning by its top and bottom ~8% (fixed until the thumb lifts, so drift can't swap it) */
+ *  blend over the pad (an upright ellipse holding the whole range), strafe over its middle ~45%, turning by its top and bottom (fixed until the thumb lifts, so drift can't swap it) */
+const PAD = { x: 0, y: 0, rx: 0, ry: 0 };
 function blendAt(y) {
-  const top = SAFE.t, bot = H - SAFE.b, mid = (top + bot) / 2;
-  const u = clamp((Math.abs(y - mid) / ((bot - top) / 2) - 0.45) / 0.47, 0, 1);
+  const u = clamp((Math.abs(y - PAD.y) / PAD.ry - 0.45) / 0.47, 0, 1);
   return u * u * (3 - 2 * u);
 }
 function moveStick(s, e) {
@@ -702,7 +709,7 @@ requestAnimationFrame(frame);
 // small hook for scripted screenshots: fake held sticks so the controls show in use
 window.__demo = (k) => {
   const f = (s, x, y, ox, oy) => { s.ox = ox; s.oy = oy; s.el.style.display = ''; s.el.style.left = (ox - SR) + 'px'; s.el.style.top = (oy - SR) + 'px'; s.id = -9; moveStick(s, { clientX: ox + x * SR, clientY: oy + y * SR }); };
-  if (scheme === 'zoned') { L.blend = blendAt(H / 2); f(L, .8, -.2, SAFE.l + 100, H / 2); } else f(L, .6, -.5, SAFE.l + 100, H - 100);
+  if (scheme === 'zoned') { L.blend = blendAt(PAD.y); f(L, .8, -.2, PAD.x, PAD.y); } else f(L, .6, -.5, SAFE.l + 100, H - 100);
   if (scheme === 'twin') f(R, .8, -.3, W - SAFE.r - 110, H - 100);
   if (k) { hold.mine = true; }
 };
