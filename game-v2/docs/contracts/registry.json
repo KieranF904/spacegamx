@@ -7763,24 +7763,179 @@
       ]
     },
     {
-      "id": "client.ui.resource-dictionary",
-      "path": "client/src/ui/resources/resourceDictionary.ts",
+      "id": "client.ui.resource-chips",
+      "path": "client/src/ui/resources/guideChips.ts",
       "group": "client/ui/resources",
-      "lines": 121,
-      "owns": "the field guide's Resources tab: a searchable, filterable list of every resource item, rows that open to how to get it and what it is for",
-      "needs": "resourceData (the entries), ../escape (esc), DOM (wireResources only)",
+      "lines": 102,
+      "owns": "the guide's icon chips (item, rock, enemy; tier pips; \"+n\" overflow) as escaped HTML, and the CSS they share",
+      "needs": "../escape, resourceData (names, colours), sourceIndex, tiers, thumbnails; ResourceDeps from the host",
       "events": "",
       "invariants": [
         {
-          "text": "search and the category chips only hide rows, they never re-render, so the box keeps focus while typing",
+          "text": "a chip that opens an entry is a real button carrying data-go=\"res|rock|enemy:<id>\" with an aria-label, so it works by keyboard",
           "test": "client/src/ui/resources/resourceDictionary.test.ts"
         },
         {
-          "text": "every row's text is escaped",
+          "text": "a chip shows a tier by pips and a word in its tooltip, never a number",
           "test": "client/src/ui/resources/resourceDictionary.test.ts"
         }
       ],
-      "extend": "a new filter is one more data-attribute on a row (rowHtml) and one more check in apply()",
+      "extend": "a new chip kind is one function here that returns chipHtml(...)",
+      "exports": [
+        "CHIPS_CSS",
+        "ResourceDeps",
+        "badge",
+        "chipList",
+        "dash",
+        "enemyById",
+        "enemyChip",
+        "itemChip",
+        "itemName",
+        "rockById",
+        "rockChip"
+      ],
+      "sections": [
+        {
+          "name": "ResourceDeps",
+          "kind": "interface",
+          "start": 16,
+          "end": 22
+        },
+        {
+          "name": "ITEM",
+          "kind": "const",
+          "start": 24,
+          "end": 24
+        },
+        {
+          "name": "entryIds",
+          "kind": "let",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "hasEntry",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "ROCKS",
+          "kind": "const",
+          "start": 27,
+          "end": 27
+        },
+        {
+          "name": "ENEMIES",
+          "kind": "const",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "rockMap",
+          "kind": "let",
+          "start": 29,
+          "end": 29
+        },
+        {
+          "name": "rockById",
+          "kind": "const",
+          "start": 30,
+          "end": 30
+        },
+        {
+          "name": "enemyById",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "itemName",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "CHIPS_CSS",
+          "kind": "const",
+          "start": 34,
+          "end": 54
+        },
+        {
+          "name": "chip",
+          "kind": "function",
+          "start": 56,
+          "end": 65
+        },
+        {
+          "name": "swatch",
+          "kind": "const",
+          "start": 67,
+          "end": 67
+        },
+        {
+          "name": "img",
+          "kind": "const",
+          "start": 68,
+          "end": 68
+        },
+        {
+          "name": "itemChip",
+          "kind": "function",
+          "start": 70,
+          "end": 73
+        },
+        {
+          "name": "rockChip",
+          "kind": "function",
+          "start": 75,
+          "end": 81
+        },
+        {
+          "name": "enemyChip",
+          "kind": "function",
+          "start": 83,
+          "end": 87
+        },
+        {
+          "name": "badge",
+          "kind": "function",
+          "start": 89,
+          "end": 92
+        },
+        {
+          "name": "dash",
+          "kind": "const",
+          "start": 94,
+          "end": 94
+        },
+        {
+          "name": "chipList",
+          "kind": "function",
+          "start": 96,
+          "end": 102
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-dictionary",
+      "path": "client/src/ui/resources/resourceDictionary.ts",
+      "group": "client/ui/resources",
+      "lines": 137,
+      "owns": "the field guide's Resources tab shell: the search box, the Resources / Rocks / Enemies views, category chips, and the click-through between them with a way back",
+      "needs": "resourceTable, sourcePanes, guideChips (the pieces and their CSS), resourceFocus (a pending link), ../escape, DOM (wireResources only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "search, chips and views only hide things, they never re-render, so the box keeps focus while typing",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        },
+        {
+          "text": "a data-go chip opens that rock, enemy or resource, highlights it, and Back returns to where you were",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        }
+      ],
+      "extend": "a new view is one pane html function, one entry in VIEWS and one data-go prefix",
       "exports": [
         "RESOURCE_CSS",
         "ResourceDeps",
@@ -7789,40 +7944,40 @@
       ],
       "sections": [
         {
-          "name": "ResourceDeps",
-          "kind": "interface",
-          "start": 15,
-          "end": 19
+          "name": "View",
+          "kind": "type",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "VIEWS",
+          "kind": "const",
+          "start": 21,
+          "end": 25
         },
         {
           "name": "state",
           "kind": "const",
-          "start": 21,
-          "end": 22
+          "start": 27,
+          "end": 28
         },
         {
           "name": "RESOURCE_CSS",
           "kind": "const",
-          "start": 24,
-          "end": 56
-        },
-        {
-          "name": "rowHtml",
-          "kind": "function",
-          "start": 58,
-          "end": 76
+          "start": 30,
+          "end": 44
         },
         {
           "name": "resourcesHtml",
           "kind": "function",
-          "start": 78,
-          "end": 89
+          "start": 46,
+          "end": 61
         },
         {
           "name": "wireResources",
           "kind": "function",
-          "start": 91,
-          "end": 121
+          "start": 63,
+          "end": 137
         }
       ]
     },
@@ -7830,9 +7985,9 @@
       "id": "client.ui.resource-index",
       "path": "client/src/ui/resources/resourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 322,
+      "lines": 314,
       "owns": "the resource dictionary's entries: one per ore, gem, refined material, component, pack, ammo crate, cut gem and drop, each with how to get it and what it is used for, derived from the game data",
-      "needs": "common/ (FIELD only), the data/*.json shapes in GameData below (no I/O, no DOM)",
+      "needs": "common/ (FIELD only), sourceIndex + tiers, the data/*.json shapes in GameData below (no I/O, no DOM)",
       "events": "",
       "invariants": [
         {
@@ -7864,224 +8019,616 @@
         {
           "name": "ResourceCategory",
           "kind": "type",
-          "start": 13,
-          "end": 14
+          "start": 15,
+          "end": 16
         },
         {
           "name": "CATEGORY_LABEL",
           "kind": "const",
-          "start": 16,
-          "end": 18
+          "start": 18,
+          "end": 20
         },
         {
           "name": "CATEGORY_ORDER",
+          "kind": "const",
+          "start": 21,
+          "end": 21
+        },
+        {
+          "name": "SourceKind",
+          "kind": "type",
+          "start": 23,
+          "end": 23
+        },
+        {
+          "name": "SOURCE_LABEL",
+          "kind": "const",
+          "start": 24,
+          "end": 27
+        },
+        {
+          "name": "KIND_ORDER",
+          "kind": "const",
+          "start": 28,
+          "end": 28
+        },
+        {
+          "name": "ResourceSource",
+          "kind": "interface",
+          "start": 30,
+          "end": 35
+        },
+        {
+          "name": "ResourceEntry",
+          "kind": "interface",
+          "start": 37,
+          "end": 54
+        },
+        {
+          "name": "Bag",
+          "kind": "type",
+          "start": 56,
+          "end": 56
+        },
+        {
+          "name": "ItemRow",
+          "kind": "interface",
+          "start": 57,
+          "end": 60
+        },
+        {
+          "name": "RockType",
+          "kind": "interface",
+          "start": 61,
+          "end": 61
+        },
+        {
+          "name": "DropRow",
+          "kind": "interface",
+          "start": 62,
+          "end": 62
+        },
+        {
+          "name": "Named",
+          "kind": "interface",
+          "start": 63,
+          "end": 63
+        },
+        {
+          "name": "GameData",
+          "kind": "interface",
+          "start": 64,
+          "end": 99
+        },
+        {
+          "name": "cap",
+          "kind": "const",
+          "start": 101,
+          "end": 101
+        },
+        {
+          "name": "plural",
+          "kind": "const",
+          "start": 102,
+          "end": 102
+        },
+        {
+          "name": "secs",
+          "kind": "const",
+          "start": 103,
+          "end": 103
+        },
+        {
+          "name": "some",
+          "kind": "function",
+          "start": 104,
+          "end": 107
+        },
+        {
+          "name": "CATEGORY_OF",
+          "kind": "const",
+          "start": 109,
+          "end": 111
+        },
+        {
+          "name": "categoryOf",
+          "kind": "function",
+          "start": 112,
+          "end": 115
+        },
+        {
+          "name": "Ctx",
+          "kind": "interface",
+          "start": 117,
+          "end": 125
+        },
+        {
+          "name": "makeCtx",
+          "kind": "function",
+          "start": 127,
+          "end": 140
+        },
+        {
+          "name": "SourceFn",
+          "kind": "type",
+          "start": 142,
+          "end": 142
+        },
+        {
+          "name": "mined",
+          "kind": "const",
+          "start": 144,
+          "end": 168
+        },
+        {
+          "name": "seam",
+          "kind": "const",
+          "start": 170,
+          "end": 178
+        },
+        {
+          "name": "trace",
+          "kind": "const",
+          "start": 180,
+          "end": 188
+        },
+        {
+          "name": "refine",
+          "kind": "const",
+          "start": 190,
+          "end": 193
+        },
+        {
+          "name": "fabricate",
+          "kind": "const",
+          "start": 195,
+          "end": 202
+        },
+        {
+          "name": "cut",
+          "kind": "const",
+          "start": 204,
+          "end": 210
+        },
+        {
+          "name": "drop",
+          "kind": "const",
+          "start": 212,
+          "end": 222
+        },
+        {
+          "name": "bought",
+          "kind": "const",
+          "start": 224,
+          "end": 235
+        },
+        {
+          "name": "questReward",
+          "kind": "const",
+          "start": 237,
+          "end": 252
+        },
+        {
+          "name": "salvage",
+          "kind": "const",
+          "start": 254,
+          "end": 260
+        },
+        {
+          "name": "SOURCES",
+          "kind": "const",
+          "start": 262,
+          "end": 264
+        },
+        {
+          "name": "usedFor",
+          "kind": "function",
+          "start": 266,
+          "end": 298
+        },
+        {
+          "name": "buildResourceIndex",
+          "kind": "function",
+          "start": 300,
+          "end": 314
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-table",
+      "path": "client/src/ui/resources/resourceTable.ts",
+      "group": "client/ui/resources",
+      "lines": 65,
+      "owns": "the Resources view: one table row per resource, an icon chip per source in its Mined, Dropped by, Made from, Sold at, Rewards and Used for columns",
+      "needs": "resourceData (entries), guideChips (the chips), ../escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one row per entry, carrying data-id, data-cat and the search text",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        },
+        {
+          "text": "an empty column shows a dash, not blank",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        }
+      ],
+      "extend": "a new column is one cell function here and one header in COLUMNS",
+      "exports": [
+        "TABLE_CSS",
+        "resourceTableHtml"
+      ],
+      "sections": [
+        {
+          "name": "TABLE_CSS",
+          "kind": "const",
+          "start": 16,
+          "end": 29
+        },
+        {
+          "name": "TIER_ORDER",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "Cell",
+          "kind": "type",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "mined",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "dropped",
+          "kind": "const",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "madeFrom",
+          "kind": "const",
+          "start": 37,
+          "end": 40
+        },
+        {
+          "name": "soldAt",
+          "kind": "const",
+          "start": 41,
+          "end": 41
+        },
+        {
+          "name": "rewards",
+          "kind": "const",
+          "start": 42,
+          "end": 42
+        },
+        {
+          "name": "OTHER_GLYPH",
+          "kind": "const",
+          "start": 43,
+          "end": 44
+        },
+        {
+          "name": "other",
+          "kind": "const",
+          "start": 45,
+          "end": 45
+        },
+        {
+          "name": "usedIn",
+          "kind": "const",
+          "start": 46,
+          "end": 46
+        },
+        {
+          "name": "COLUMNS",
+          "kind": "const",
+          "start": 48,
+          "end": 51
+        },
+        {
+          "name": "rowHtml",
+          "kind": "function",
+          "start": 53,
+          "end": 59
+        },
+        {
+          "name": "resourceTableHtml",
+          "kind": "function",
+          "start": 61,
+          "end": 65
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-sources",
+      "path": "client/src/ui/resources/sourceIndex.ts",
+      "group": "client/ui/resources",
+      "lines": 121,
+      "owns": "the guide's source side of the resource index: every rock (what it yields, where it is found), every enemy and boss (what it drops, where it is found), and per item the icon-chip columns (mined, dropped, made from, sold at, rewards, used in)",
+      "needs": "the GameData shape from resourceIndex.ts (type only), tiers (no I/O, no DOM)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a rock's yields and an item's mined column agree, as do an enemy's drops and an item's dropped column",
+          "test": "client/src/ui/resources/sourceIndex.test.ts"
+        },
+        {
+          "text": "no chance or share leaves this file as a number, only as a tier",
+          "test": "client/src/ui/resources/sourceIndex.test.ts"
+        }
+      ],
+      "extend": "a new column is one more list on ItemColumns, filled in buildSourceIndex, and one cell in resourceTable.ts",
+      "exports": [
+        "EnemyEntry",
+        "ItemColumns",
+        "Place",
+        "Recipe",
+        "RockEntry",
+        "SourceIndex",
+        "buildSourceIndex",
+        "rockSystemMap"
+      ],
+      "sections": [
+        {
+          "name": "Place",
+          "kind": "interface",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "RockEntry",
+          "kind": "interface",
+          "start": 14,
+          "end": 22
+        },
+        {
+          "name": "EnemyEntry",
+          "kind": "interface",
+          "start": 23,
+          "end": 29
+        },
+        {
+          "name": "Recipe",
+          "kind": "interface",
+          "start": 30,
+          "end": 30
+        },
+        {
+          "name": "ItemColumns",
+          "kind": "interface",
+          "start": 31,
+          "end": 39
+        },
+        {
+          "name": "SourceIndex",
+          "kind": "interface",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "rockSystemMap",
+          "kind": "function",
+          "start": 42,
+          "end": 56
+        },
+        {
+          "name": "cap",
+          "kind": "const",
+          "start": 58,
+          "end": 58
+        },
+        {
+          "name": "sum",
+          "kind": "const",
+          "start": 59,
+          "end": 59
+        },
+        {
+          "name": "rocks",
+          "kind": "function",
+          "start": 61,
+          "end": 72
+        },
+        {
+          "name": "enemies",
+          "kind": "function",
+          "start": 74,
+          "end": 97
+        },
+        {
+          "name": "buildSourceIndex",
+          "kind": "function",
+          "start": 99,
+          "end": 121
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-sources-view",
+      "path": "client/src/ui/resources/sourcePanes.ts",
+      "group": "client/ui/resources",
+      "lines": 50,
+      "owns": "the Rocks and Enemies views: one row per rock or enemy with its picture, where it is found, and an icon chip per resource it yields or drops (a tier on each, no numbers)",
+      "needs": "resourceData (the source index), guideChips (the chips), ../escape",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a row carries data-id and its search text; every yield or drop chip opens that resource",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        }
+      ],
+      "extend": "a new source kind is one more list function here, one more pane in resourceDictionary.ts",
+      "exports": [
+        "PANES_CSS",
+        "enemiesHtml",
+        "rocksHtml"
+      ],
+      "sections": [
+        {
+          "name": "PANES_CSS",
+          "kind": "const",
+          "start": 13,
+          "end": 23
+        },
+        {
+          "name": "LEGEND",
+          "kind": "const",
+          "start": 25,
+          "end": 25
+        },
+        {
+          "name": "row",
+          "kind": "function",
+          "start": 27,
+          "end": 31
+        },
+        {
+          "name": "rocksHtml",
+          "kind": "function",
+          "start": 33,
+          "end": 41
+        },
+        {
+          "name": "enemiesHtml",
+          "kind": "function",
+          "start": 43,
+          "end": 50
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-thumbs",
+      "path": "client/src/ui/resources/thumbnails.ts",
+      "group": "client/ui/resources",
+      "lines": 73,
+      "owns": "the small pictures the guide's source icons use: a rock drawn from its type (outline, ore colour, hardness rim) and an enemy's ship silhouette from its blueprint, each drawn on first view and cached",
+      "needs": "common/ (getAsteroidPolygon, hashString), the enemy blueprints (data/ships/blueprints/enemy), a ship-silhouette drawer from the host (ResourceDeps.shipIcon), DOM canvas (nothing is drawn without one)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a thumbnail is drawn at most once per id; with no canvas or no blueprint it returns '' and the view shows a colour swatch",
+          "test": "client/src/ui/resources/resourceDictionary.test.ts"
+        }
+      ],
+      "extend": "a new kind of source icon is one more function here and one more chip kind in guideChips.ts",
+      "exports": [
+        "enemyThumb",
+        "rockThumb"
+      ],
+      "sections": [
+        {
+          "name": "Parts",
+          "kind": "type",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "Bp",
+          "kind": "interface",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "blueprintFiles",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "BLUEPRINTS",
+          "kind": "const",
+          "start": 16,
+          "end": 16
+        },
+        {
+          "name": "SIZE",
+          "kind": "const",
+          "start": 18,
+          "end": 18
+        },
+        {
+          "name": "cache",
           "kind": "const",
           "start": 19,
           "end": 19
         },
         {
-          "name": "SourceKind",
-          "kind": "type",
+          "name": "mix",
+          "kind": "function",
           "start": 21,
-          "end": 21
-        },
-        {
-          "name": "SOURCE_LABEL",
-          "kind": "const",
-          "start": 22,
           "end": 25
         },
         {
-          "name": "KIND_ORDER",
+          "name": "rockThumb",
+          "kind": "function",
+          "start": 27,
+          "end": 60
+        },
+        {
+          "name": "enemyThumb",
+          "kind": "function",
+          "start": 62,
+          "end": 73
+        }
+      ]
+    },
+    {
+      "id": "client.ui.resource-tiers",
+      "path": "client/src/ui/resources/tiers.ts",
+      "group": "client/ui/resources",
+      "lines": 26,
+      "owns": "the guide's coarse Low / Medium / High tiers for drop chances and rock yield shares (the guide never shows a percentage), and the one table of thresholds",
+      "needs": "nothing (pure)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a value maps to the highest tier whose floor it reaches; tiers only ever go Low, Medium, High",
+          "test": "client/src/ui/resources/sourceIndex.test.ts"
+        }
+      ],
+      "extend": "retune a threshold in TIER_FLOORS; a new measured thing is one more row there",
+      "exports": [
+        "TIER_FLOORS",
+        "TIER_LABEL",
+        "TIER_PIPS",
+        "Tier",
+        "tierOf"
+      ],
+      "sections": [
+        {
+          "name": "Tier",
+          "kind": "type",
+          "start": 9,
+          "end": 9
+        },
+        {
+          "name": "TIER_LABEL",
           "kind": "const",
-          "start": 26,
+          "start": 10,
+          "end": 10
+        },
+        {
+          "name": "TIER_PIPS",
+          "kind": "const",
+          "start": 11,
+          "end": 12
+        },
+        {
+          "name": "TIER_FLOORS",
+          "kind": "const",
+          "start": 14,
+          "end": 21
+        },
+        {
+          "name": "tierOf",
+          "kind": "function",
+          "start": 23,
           "end": 26
-        },
-        {
-          "name": "ResourceSource",
-          "kind": "interface",
-          "start": 28,
-          "end": 33
-        },
-        {
-          "name": "ResourceEntry",
-          "kind": "interface",
-          "start": 35,
-          "end": 50
-        },
-        {
-          "name": "Bag",
-          "kind": "type",
-          "start": 52,
-          "end": 52
-        },
-        {
-          "name": "ItemRow",
-          "kind": "interface",
-          "start": 53,
-          "end": 56
-        },
-        {
-          "name": "RockType",
-          "kind": "interface",
-          "start": 57,
-          "end": 57
-        },
-        {
-          "name": "DropRow",
-          "kind": "interface",
-          "start": 58,
-          "end": 58
-        },
-        {
-          "name": "Named",
-          "kind": "interface",
-          "start": 59,
-          "end": 59
-        },
-        {
-          "name": "GameData",
-          "kind": "interface",
-          "start": 60,
-          "end": 95
-        },
-        {
-          "name": "cap",
-          "kind": "const",
-          "start": 97,
-          "end": 97
-        },
-        {
-          "name": "pct",
-          "kind": "const",
-          "start": 98,
-          "end": 98
-        },
-        {
-          "name": "plural",
-          "kind": "const",
-          "start": 99,
-          "end": 99
-        },
-        {
-          "name": "secs",
-          "kind": "const",
-          "start": 100,
-          "end": 100
-        },
-        {
-          "name": "some",
-          "kind": "function",
-          "start": 101,
-          "end": 104
-        },
-        {
-          "name": "CATEGORY_OF",
-          "kind": "const",
-          "start": 106,
-          "end": 108
-        },
-        {
-          "name": "categoryOf",
-          "kind": "function",
-          "start": 109,
-          "end": 112
-        },
-        {
-          "name": "Ctx",
-          "kind": "interface",
-          "start": 114,
-          "end": 122
-        },
-        {
-          "name": "makeCtx",
-          "kind": "function",
-          "start": 124,
-          "end": 147
-        },
-        {
-          "name": "SourceFn",
-          "kind": "type",
-          "start": 149,
-          "end": 149
-        },
-        {
-          "name": "mined",
-          "kind": "const",
-          "start": 151,
-          "end": 175
-        },
-        {
-          "name": "seam",
-          "kind": "const",
-          "start": 177,
-          "end": 185
-        },
-        {
-          "name": "trace",
-          "kind": "const",
-          "start": 187,
-          "end": 196
-        },
-        {
-          "name": "refine",
-          "kind": "const",
-          "start": 198,
-          "end": 201
-        },
-        {
-          "name": "fabricate",
-          "kind": "const",
-          "start": 203,
-          "end": 210
-        },
-        {
-          "name": "cut",
-          "kind": "const",
-          "start": 212,
-          "end": 218
-        },
-        {
-          "name": "drop",
-          "kind": "const",
-          "start": 220,
-          "end": 230
-        },
-        {
-          "name": "bought",
-          "kind": "const",
-          "start": 232,
-          "end": 243
-        },
-        {
-          "name": "questReward",
-          "kind": "const",
-          "start": 245,
-          "end": 260
-        },
-        {
-          "name": "salvage",
-          "kind": "const",
-          "start": 262,
-          "end": 268
-        },
-        {
-          "name": "SOURCES",
-          "kind": "const",
-          "start": 270,
-          "end": 272
-        },
-        {
-          "name": "usedFor",
-          "kind": "function",
-          "start": 274,
-          "end": 306
-        },
-        {
-          "name": "buildResourceIndex",
-          "kind": "function",
-          "start": 308,
-          "end": 322
         }
       ]
     },

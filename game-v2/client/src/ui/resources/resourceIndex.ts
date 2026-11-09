@@ -1,7 +1,7 @@
 /**
  * @contract client.ui.resource-index
  * owns:       the resource dictionary's entries: one per ore, gem, refined material, component, pack, ammo crate, cut gem and drop, each with how to get it and what it is used for, derived from the game data
- * needs:      common/ (FIELD only), the data/*.json shapes in GameData below (no I/O, no DOM)
+ * needs:      common/ (FIELD only), sourceIndex + tiers, the data/*.json shapes in GameData below (no I/O, no DOM)
  * invariants: every ore, refined, component, pack and ammo item has an entry, and an entry with no known source is marked notObtainable — client/src/ui/resources/resourceIndex.test.ts
  *             a mined ore lists the systems whose belts hold a rock that drops it — client/src/ui/resources/resourceIndex.test.ts
  *             a refined item lists its recipe — client/src/ui/resources/resourceIndex.test.ts
@@ -9,6 +9,8 @@
  */
 
 import { FIELD } from '@space-game/common';
+import { buildSourceIndex, rockSystemMap, type ItemColumns, type SourceIndex } from './sourceIndex';
+import { TIER_LABEL, tierOf } from './tiers';
 
 /** The categories the dictionary filters by (ship parts are generated and left out) */
 export type ResourceCategory = 'ore' | 'refined' | 'component' | 'pack' | 'ammo' | 'gem' | 'drop';
@@ -43,6 +45,8 @@ export interface ResourceEntry {
   sources: ResourceSource[];
   usedFor: string[];
   hint?: string;
+  /** The icon-chip columns (sourceIndex.ts) */
+  cols: ItemColumns;
   /** No source in the data yet (shown as such, never silently empty) */
   notObtainable: boolean;
 }
@@ -54,7 +58,7 @@ interface ItemRow {
   id: string; name: string; category: string; rarity: string; value: number; color: string; description: string;
   pack?: Bag; trace?: boolean; quest?: string; socket?: { type: string; level: number }; ammoFor?: { weapon: string; rounds: number };
 }
-interface RockType { hardness: number; ores: Bag; name?: string; traceBoost?: Bag }
+interface RockType { hardness: number; ores: Bag; name?: string; traceBoost?: Bag; gas?: boolean }
 interface DropRow { item: string; chance: number; min: number; max: number }
 interface Named { id: string; name: string }
 export interface GameData {
@@ -73,10 +77,10 @@ export interface GameData {
     seams: { gem: string; hardness: number; minTier: number; weight: number }[];
     traces: Record<string, { from: string[]; per100: number[]; megaOnly?: boolean }>;
   };
-  systems: { id: string; name: string; danger: number; asteroidField?: string; asteroidBelt?: { extra?: { field?: string }[] } }[];
+  systems: { id: string; name: string; danger: number; asteroidField?: string; asteroidBelt?: { extra?: { field?: string }[] }; nests?: { faction?: string }[] }[];
   stations: { id: string; name: string; system: string; market?: { sells?: string[] } }[];
-  bosses: Record<string, { name: string; system: string; loot?: DropRow[] }>;
-  factions: Record<string, { name: string; loot?: DropRow[] }>;
+  bosses: Record<string, { name: string; system: string; faction?: string; design?: string; loot?: DropRow[] }>;
+  factions: Record<string, { name: string; color?: string; ships?: Record<string, unknown>; loot?: DropRow[] }>;
   quests: {
     reputations: Record<string, { name: string; vendor?: { stock?: { item: string; rank: number }[] } }>;
     quests: { id: string; name: string; giver?: string; person?: string; level?: number; rewards?: { items?: Bag; recipes?: string[] } }[];
@@ -95,7 +99,6 @@ export interface GameData {
 // --- Small helpers
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
-const pct = (p: number) => `${p < 1 ? '<1' : p < 10 ? p.toFixed(1).replace(/\.0$/, '') : Math.round(p)}%`;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const secs = (t: number) => (t >= 120 ? `${Math.round(t / 60)} min` : `${t} s`);
 /** "a, b, c and 4 more" */
@@ -124,17 +127,7 @@ interface Ctx {
 function makeCtx(d: GameData): Ctx {
   const names = new Map(d.items.map((i) => [i.id, i.name]));
   const sys = new Map(d.systems.map((s) => [s.id, s]));
-  const rockSystems = new Map<string, { id: string; name: string; danger: number }[]>();
-  for (const s of d.systems) {
-    const fields = [s.asteroidField, ...(s.asteroidBelt?.extra ?? []).map((e) => e.field)].filter((f): f is string => !!f);
-    const seen = new Set<string>();
-    for (const f of fields) for (const rock of Object.keys(d.mining.fields[f] ?? {})) {
-      if (seen.has(rock)) continue;
-      seen.add(rock);
-      (rockSystems.get(rock) ?? rockSystems.set(rock, []).get(rock)!).push({ id: s.id, name: s.name, danger: s.danger });
-    }
-  }
-  for (const list of rockSystems.values()) list.sort((a, b) => a.danger - b.danger || a.name.localeCompare(b.name));
+  const rockSystems = rockSystemMap(d);
   return {
     d,
     name: (id) => names.get(id) ?? cap(id),
@@ -157,10 +150,10 @@ const mined: SourceFn = (c, it) => {
     if (!w) continue;
     const where = c.rockSystems.get(rockId);
     if (!where?.length) continue;
-    const share = (w / Object.values(rock.ores).reduce((a, b) => a + b, 0)) * 100;
+    const share = w / Object.values(rock.ores).reduce((a, b) => a + b, 0);
     out.push({
       share,
-      src: { kind: 'mined', text: `${rock.name ?? cap(rockId)}: ${pct(share)} of its ore${rock.hardness > 1 ? ` (hardness ${rock.hardness} rock)` : ''}`, where: where.map((s) => `${s.name} (danger ${s.danger})`) },
+      src: { kind: 'mined', text: `${rock.name ?? cap(rockId)}: ${TIER_LABEL[tierOf('rock', share)]} share of its ore${rock.hardness > 1 ? ` (hardness ${rock.hardness} rock)` : ''}`, where: where.map((s) => `${s.name} (danger ${s.danger})`) },
     });
   }
   if (!out.length) return [];
@@ -188,10 +181,9 @@ const trace: SourceFn = (c, it) => {
   const t = c.d.mining.traces[it.id];
   if (!t) return [];
   const first = t.per100.findIndex((v) => v > 0);
-  const best = Math.max(...t.per100);
   return [{
     kind: 'trace',
-    text: `Never a rock of its own: some turns up when you refine ${some(t.from.map(c.name), 4)}${t.megaOnly ? ' (only ore from Neutron Slugs)' : ''}${first >= 0 ? `, if it was mined in a system of danger ${first} or more: up to about ${best} per 100 ore` : ''}. Station refinery upgrades raise the rate`,
+    text: `Never a rock of its own: some turns up when you refine ${some(t.from.map(c.name), 4)}${t.megaOnly ? ' (only ore from Neutron Slugs)' : ''}${first >= 0 ? `, if it was mined in a system of danger ${first} or more` : ''}. Station refinery upgrades raise the rate`,
   }];
 };
 
@@ -220,13 +212,13 @@ const cut: SourceFn = (c, it) => {
 const drop: SourceFn = (c, it) => {
   const rows: { chance: number; line: string }[] = [];
   const add = (who: string, loot: DropRow[] | undefined, where?: string) => {
-    for (const l of loot ?? []) if (l.item === it.id) rows.push({ chance: l.chance, line: `${who}${where ? ` (${where})` : ''}: ${pct(l.chance * 100)} for ${l.min === l.max ? l.min : `${l.min}-${l.max}`}` });
+    for (const l of loot ?? []) if (l.item === it.id) rows.push({ chance: l.chance, line: `${who}${where ? ` (${where})` : ''}: ${TIER_LABEL[tierOf('drop', l.chance)]} chance, ${l.min === l.max ? l.min : `${l.min}-${l.max}`}` });
   };
   for (const b of Object.values(c.d.bosses)) add(b.name, b.loot, c.system(b.system));
   for (const f of Object.values(c.d.factions)) add(`${f.name} (any ship)`, f.loot);
   if (!rows.length) return [];
   rows.sort((a, b) => b.chance - a.chance);
-  return [{ kind: 'drop', text: 'Dropped by these when you help bring them down (chance, amount)', where: rows.map((r) => r.line) }];
+  return [{ kind: 'drop', text: 'Dropped by these when you help bring them down (chance tier, amount)', where: rows.map((r) => r.line) }];
 };
 
 const bought: SourceFn = (c, it) => {
@@ -306,7 +298,7 @@ function usedFor(c: Ctx, it: ItemRow): string[] {
 // --- The index
 
 /** One entry per resource item, in the item catalogue's order within each category */
-export function buildResourceIndex(d: GameData): ResourceEntry[] {
+export function buildResourceIndex(d: GameData, src: SourceIndex = buildSourceIndex(d)): ResourceEntry[] {
   const c = makeCtx(d);
   const out: ResourceEntry[] = [];
   for (const it of d.items) {
@@ -315,7 +307,7 @@ export function buildResourceIndex(d: GameData): ResourceEntry[] {
     const sources = SOURCES.flatMap((f) => f(c, it)).sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
     out.push({
       id: it.id, name: it.name, category, color: it.color, rarity: it.rarity, value: it.value, description: it.description,
-      sources, usedFor: usedFor(c, it), hint: d.hints[it.id], notObtainable: sources.length === 0,
+      sources, usedFor: usedFor(c, it), hint: d.hints[it.id], cols: src.columns.get(it.id) ?? { mined: [], dropped: [], madeFrom: [], soldAt: [], rewards: [], usedIn: [] }, notObtainable: sources.length === 0,
     });
   }
   return out.sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category));
