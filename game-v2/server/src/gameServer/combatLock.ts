@@ -7,21 +7,16 @@
  *             server/src/gameServer/combatLock.test.ts
  *             the linger runs from the last combat event, and shutdown saves lingering ships as they are (Pilots.saveAll
  *             walks every session, a lingering one included) — server/src/gameServer/combatLock.test.ts
- * extend:     the numbers are COMBAT_RULES; a new kind of combat event feeds gs.combat (hosts/ship.ts notifyDamage)
+ * extend:     the numbers are COMBAT_RULES (common/network/combatProtocol.ts); a new kind of combat event feeds gs.combat (hosts/ship.ts notifyDamage)
  */
 
 import { hasComponent, entityExists, addComponent } from 'bitecs';
-import { Player, Dead, TICK_RATE, PROTOCOL_VERSION } from '@space-game/common';
+import { Player, Dead, TICK_RATE, PROTOCOL_VERSION, COMBAT_RULES } from '@space-game/common';
 import type { ClientConnection } from '../net/ClientConnection.js';
 import type { GameServer } from '../GameServer.js';
 
-/** Tunable: seconds a pilot stays locked after their last hit dealt or taken, and how long past that lock their ship lingers */
-export const COMBAT_RULES = {
-  lockSeconds: 15,
-  lingerSeconds: 20,
-  /** The HUD is re-told at most this often while a fight keeps renewing the lock */
-  tellEverySeconds: 1,
-};
+// (The numbers live in common/network/combatProtocol.ts, which the field guide quotes too)
+export { COMBAT_RULES };
 
 const ticks = (seconds: number): number => Math.round(seconds * TICK_RATE);
 
