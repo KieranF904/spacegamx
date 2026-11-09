@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { TutorialData } from '@space-game/common';
 import tutorialJson from '../../../../data/tutorial.json';
-import { LeaveFlow, arrowTargets, edgeArrow, fillKeys, isGhosted, lookFor, markerStyle, newlyDone, packLines, panelModel, risingPanels } from './tutorialModel';
+import { LeaveFlow, arrowTargets, counterOf, edgeArrow, fillKeys, isGhosted, lineText, lookFor, markerStyle, newlyDone, packLines, panelModel, pointsAtStation, risingPanels, targetGained } from './tutorialModel';
 
 const data = tutorialJson as unknown as TutorialData;
 const obj = (id: string) => data.objects.find((o) => o.id === id)!;
-const st = (step: string, done: string[] = [], broken: string[] = []) => ({ step, done, left: false, broken });
+const st = (step: string, done: string[] = [], broken: string[] = [], passed: string[] = []) => ({ step, done, left: false, broken, passed });
 const keyOf = (a: string) => ({ forward: 'W', backward: 'S', fire: 'LMB' } as Record<string, string>)[a] ?? a.toUpperCase();
 
 describe('tutorial panel', () => {
@@ -127,5 +127,66 @@ describe('toast, pack, panel reports, arrows', () => {
     const b = edgeArrow(500, -900, 1000, 600, 40);
     expect(b.y).toBeCloseTo(40, 5);
     expect(edgeArrow(400, 200, 1000, 600, 40).onScreen).toBe(true);
+  });
+});
+
+describe('tutorial control-mode lines and chips', () => {
+  const keys = (a: string) => ({ forward: 'W', left: 'A', backward: 'S', right: 'D', fire: 'Left click' } as Record<string, string>)[a] ?? a;
+  it('picks the line variant for the control mode', () => {
+    const l = { screen: 'screen text', helm: 'helm text' };
+    expect(lineText(l, false)).toBe('screen text');
+    expect(lineText(l, true)).toBe('helm text');
+    expect(lineText('plain', true)).toBe('plain');
+  });
+  it('the rings and brake cards read right for each mode', () => {
+    const screen = panelModel(st('rings'), data, keys, false)!.lines[0];
+    const helm = panelModel(st('rings'), data, keys, true)!.lines[0];
+    expect(screen).toContain('<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>');
+    expect(screen).toContain('face the cursor');
+    expect(helm).toContain('<kbd>A</kbd> and <kbd>D</kbd>');
+    expect(helm).not.toContain('face the cursor');
+    expect(panelModel(st('brake'), data, keys, false)!.lines[0]).toContain('<kbd>S</kbd>');
+    expect(panelModel(st('brake'), data, keys, true)!.lines[0]).toContain('thrust against your drift with <kbd>S</kbd>');
+  });
+  it('key chips follow rebinding', () => {
+    expect(fillKeys('Move {wasd}', (a) => ({ forward: '↑', left: '←', backward: '↓', right: '→' } as Record<string, string>)[a])).toBe('Move <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>');
+  });
+  it('no step mentions a bare "W key" and every line has no more than 14 words', () => {
+    for (const s of data.steps) for (const l of s.lines) for (const t of typeof l === 'string' ? [l] : [l.screen, l.helm]) {
+      expect(t).not.toMatch(/\bW key\b/);
+      expect(t.replace(/\{[a-zA-Z]+\}/g, 'K').split(/\s+/).length).toBeLessThanOrEqual(14);
+    }
+  });
+});
+
+describe('tutorial multi-target progress', () => {
+  const step = data.steps.find((x) => x.id === 'rings')!;
+  it('counts rings passed and drones broken', () => {
+    expect(counterOf(st('rings'), step)).toEqual({ label: 'Rings', done: 0, total: 3 });
+    expect(counterOf(st('rings', [], [], ['ring_1', 'ring_2']), step)!.done).toBe(2);
+    const drones = data.steps.find((x) => x.id === 'drones')!;
+    expect(counterOf(st('drones', [], ['drone_1']), drones)).toEqual({ label: 'Drones', done: 1, total: 3 });
+    expect(counterOf(st('brake'), data.steps.find((x) => x.id === 'brake'))).toBeNull();
+    expect(panelModel(st('rings', [], [], ['ring_1']), data, keyOf)!.counter).toEqual({ label: 'Rings', done: 1, total: 3 });
+  });
+  it('lights the next ring, ticks the passed ones, and the arrow follows the next', () => {
+    const s0 = st('rings'), s1 = st('rings', [], [], ['ring_1']);
+    expect(markerStyle(obj('ring_1'), s0, step)).toBe('active');
+    expect(markerStyle(obj('ring_2'), s0, step)).toBe('upcoming');
+    expect(markerStyle(obj('ring_1'), s1, step)).toBe('passed');
+    expect(markerStyle(obj('ring_2'), s1, step)).toBe('active');
+    expect(arrowTargets(data, s0, step).map((o) => o.id)).toEqual(['ring_1']);
+    expect(arrowTargets(data, s1, step).map((o) => o.id)).toEqual(['ring_2']);
+    expect(arrowTargets(data, st('rings', [], [], ['ring_1', 'ring_2', 'ring_3']), step)).toEqual([]);
+  });
+  it('a gained target (not a finished step) is what chimes', () => {
+    expect(targetGained(st('rings'), st('rings', [], [], ['ring_1']), data)).toBe(true);
+    expect(targetGained(st('rings', [], [], ['ring_1']), st('rings', [], [], ['ring_1']), data)).toBe(false);
+    expect(targetGained(st('rings', [], [], ['ring_1', 'ring_2']), st('brake', ['rings']), data)).toBe(false);
+    expect(targetGained(st('drones'), st('drones', [], ['drone_2']), data)).toBe(true);
+  });
+  it('only the dock step points at the station', () => {
+    expect(pointsAtStation(data.steps.find((x) => x.id === 'dock'))).toBe(true);
+    expect(pointsAtStation(step)).toBe(false);
   });
 });

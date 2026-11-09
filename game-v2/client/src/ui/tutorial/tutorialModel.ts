@@ -8,10 +8,10 @@
  * extend:     a new thing the lesson shows is a function here (tested), drawn by TutorialPanel / TutorialMarkers
  */
 
-import type { ServerTutorialStateMessage, TutorialData, TutorialObjectDef, TutorialStepDef } from '@space-game/common';
+import type { ServerTutorialStateMessage, TutorialData, TutorialLine, TutorialObjectDef, TutorialStepDef } from '@space-game/common';
 import { esc } from '../escape';
 
-type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'>;
+type State = Pick<ServerTutorialStateMessage, 'step' | 'done' | 'left' | 'broken'> & { passed?: string[] };
 
 /** How the renderer draws a training body: a live practice drone, or a ghost (faded, grey) of a drone or rock */
 export type TrainingLook = 'drone' | 'droneGhost' | 'rockGhost';
@@ -28,20 +28,59 @@ export function lookFor(o: TutorialObjectDef, s: State | null): TrainingLook | n
   return null;
 }
 
-/** active: this step's target; upcoming: a later step's (faint); null: not drawn (its step is done) */
-export type MarkerStyle = 'active' | 'upcoming' | null;
+/** active: the target to go for now; passed: a ring of this step already flown through (green, ticked); upcoming: a later target or step's (faint); null: not drawn (its step is done) */
+export type MarkerStyle = 'active' | 'passed' | 'upcoming' | null;
+
+/** Which of the step's targets are done: rings the server counted as passed, drones broken (a hit-to-break step has no other progress) */
+export function doneTargets(s: State | null, step: TutorialStepDef | undefined): string[] {
+  if (!s || s.left || !step) return [];
+  const objs = step.trigger.objects ?? [];
+  if (step.trigger.kind === 'rings') return objs.filter((id) => s.passed?.includes(id));
+  if (step.trigger.kind === 'objectsBroken') return objs.filter((id) => s.broken.includes(id));
+  return [];
+}
+
+/** The next ring to fly through: the first of the step's targets not yet passed (rings go in the order the data lists them) */
+function nextRing(s: State, step: TutorialStepDef): string | undefined {
+  return (step.targets ?? []).find((id) => !s.passed?.includes(id));
+}
 
 export function markerStyle(o: TutorialObjectDef, s: State | null, step: TutorialStepDef | undefined): MarkerStyle {
   if (!s || s.left || (o.kind !== 'ring' && o.kind !== 'zone' && o.kind !== 'exit')) return null;
   if (s.done.includes(o.step)) return null;
-  return step?.targets?.includes(o.id) ? 'active' : 'upcoming';
+  if (!step?.targets?.includes(o.id)) return 'upcoming';
+  if (step.trigger.kind !== 'rings') return 'active';
+  if (s.passed?.includes(o.id)) return 'passed';
+  return nextRing(s, step) === o.id ? 'active' : 'upcoming';
+}
+
+/** The card's counter for a multi-target step ("Rings 2/3"), or null for a step without one */
+export function counterOf(s: State | null, step: TutorialStepDef | undefined): { label: string; done: number; total: number } | null {
+  if (!step?.counter) return null;
+  const total = step.trigger.objects?.length ?? 0;
+  return total > 1 ? { label: step.counter, done: doneTargets(s, step).length, total } : null;
+}
+
+/** Did the pilot just get one more target done on the same step (the chime and burst; a finished step has its own toast)? */
+export function targetGained(prev: State | null, next: State, data: TutorialData): boolean {
+  if (!prev || prev.step !== next.step || next.left) return false;
+  const step = data.steps.find((x) => x.id === next.step);
+  return doneTargets(next, step).length > doneTargets(prev, step).length;
+}
+
+/** Does this step point at the yard station (the dock step: the station is no training object, so the data has no target for it)? */
+export function pointsAtStation(step: TutorialStepDef | undefined): boolean {
+  return step?.trigger.kind === 'docked';
 }
 
 /** The objects the current step points at that are still live for this pilot (the arrow's targets) */
 export function arrowTargets(data: TutorialData, s: State | null, step: TutorialStepDef | undefined): TutorialObjectDef[] {
   if (!s || s.left || !step?.targets) return [];
   const out: TutorialObjectDef[] = [];
+  // A ring step points at the next ring only; the others point at everything still to do
+  const rings = step.trigger.kind === 'rings', only = rings ? nextRing(s, step) : undefined;
   for (const id of step.targets) {
+    if (rings && id !== only) continue;
     const o = data.objects.find((x) => x.id === id);
     if (o && !isGhosted(o, s)) out.push(o);
   }
@@ -50,10 +89,18 @@ export function arrowTargets(data: TutorialData, s: State | null, step: Tutorial
 
 /** Key names the lines may use that are not bindable actions */
 const FIXED_KEYS: Record<string, string> = { powerFlow: 'U' };
+/** One placeholder standing for several key caps: the four move keys */
+const KEY_GROUPS: Record<string, string[]> = { wasd: ['forward', 'left', 'backward', 'right'] };
 
 /** A line with `{action}` filled in as key caps from the pilot's bindings; everything else escaped */
 export function fillKeys(line: string, keyOf: (action: string) => string): string {
-  return esc(line).replace(/\{([a-zA-Z0-9]+)\}/g, (_m, a: string) => `<kbd>${esc(FIXED_KEYS[a] ?? keyOf(a))}</kbd>`);
+  const cap = (a: string) => `<kbd>${esc(FIXED_KEYS[a] ?? keyOf(a))}</kbd>`;
+  return esc(line).replace(/\{([a-zA-Z0-9]+)\}/g, (_m, a: string) => (KEY_GROUPS[a] ? KEY_GROUPS[a].map(cap).join('') : cap(a)));
+}
+
+/** The text of a line for the pilot's control mode (`helm`: the nose-relative controls; otherwise mouse-steer) */
+export function lineText(line: TutorialLine, helm: boolean): string {
+  return typeof line === 'string' ? line : helm ? line.helm : line.screen;
 }
 
 export interface PanelModel {
@@ -64,6 +111,8 @@ export interface PanelModel {
   title: string;
   /** HTML (escaped, key caps in <kbd>) */
   lines: string[];
+  /** "Rings 2/3" for a multi-target step */
+  counter: { label: string; done: number; total: number } | null;
   /** Done steps over all steps, 0..1 */
   progress: number;
   /** The welcome card's Continue button */
@@ -73,7 +122,7 @@ export interface PanelModel {
 }
 
 /** What the card shows, or null when it is not shown (not in the lesson, or a step the data does not know) */
-export function panelModel(s: State | null, data: TutorialData, keyOf: (action: string) => string): PanelModel | null {
+export function panelModel(s: State | null, data: TutorialData, keyOf: (action: string) => string, helm = false): PanelModel | null {
   if (!s || s.left) return null;
   const i = data.steps.findIndex((x) => x.id === s.step);
   if (i < 0) return null;
@@ -83,7 +132,8 @@ export function panelModel(s: State | null, data: TutorialData, keyOf: (action: 
     n: i + 1,
     total: data.steps.length,
     title: st.title,
-    lines: st.lines.map((l) => fillKeys(l, keyOf)),
+    lines: st.lines.map((l) => fillKeys(lineText(l, helm), keyOf)),
+    counter: counterOf(s, st),
     progress: Math.min(1, s.done.length / Math.max(1, data.steps.length)),
     canContinue: st.trigger.kind === 'ack',
     graduate: st.trigger.kind === 'graduate',

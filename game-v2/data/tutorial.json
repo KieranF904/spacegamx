@@ -20,14 +20,15 @@
     {
       "id": "rings",
       "title": "Fly through the rings",
-      "lines": ["Thrust with {forward}, steer with the mouse.", "Fly through the three marked rings."],
+      "lines": [{"screen": "Move with {wasd}. Your ship turns to face the cursor.", "helm": "Turn with {left} and {right}, thrust with {forward}. Thrust goes where the nose points."}, "Fly through all three glowing rings."],
+      "counter": "Rings",
       "trigger": { "kind": "rings", "objects": ["ring_1", "ring_2", "ring_3"] },
       "targets": ["ring_1", "ring_2", "ring_3"]
     },
     {
       "id": "brake",
       "title": "Stop in the zone",
-      "lines": ["Ships keep moving until you slow them. Thrust back with {backward}.", "Come to a stop inside the marked zone."],
+      "lines": [{"screen": "There is no brake: push against your drift with {wasd} until you stop.", "helm": "There is no brake: thrust against your drift with {backward} until you stop."}, "Come to a stop inside the marked zone."],
       "trigger": { "kind": "zoneStop", "objects": ["stop_zone"] },
       "targets": ["stop_zone"]
     },
@@ -35,6 +36,7 @@
       "id": "drones",
       "title": "Shoot the practice drones",
       "lines": ["Aim with the mouse and fire with {fire}.", "The drones do not shoot back. Break all three."],
+      "counter": "Drones",
       "trigger": { "kind": "objectsBroken", "objects": ["drone_1", "drone_2", "drone_3"] },
       "targets": ["drone_1", "drone_2", "drone_3"]
     },
@@ -54,7 +56,7 @@
     {
       "id": "dock",
       "title": "Dock at the yard",
-      "lines": ["Fly into the station's docking ring and press {dock}."],
+      "lines": ["Fly into the yard station's docking ring, then press {dock}."],
       "trigger": { "kind": "docked" }
     },
     {
@@ -73,7 +75,7 @@
     {
       "id": "power",
       "title": "Add a generator",
-      "lines": ["In the hangar editor, place the Cell Reactor we gave you next to your core.", "Press U in the editor to watch the power flow."],
+      "lines": ["In the hangar, place the Cell Reactor we gave you beside your core.", "Press {powerFlow} in the editor to watch the power flow."],
       "trigger": { "kind": "powered" },
       "grant": { "part:alloy:power_cell_reactor:sq": 1 }
     },
@@ -86,20 +88,20 @@
     {
       "id": "guide",
       "title": "Field guide and map",
-      "lines": ["Press {components} for the field guide, then {map} for the system map."],
+      "lines": ["Press {components} for the component guide, then {map} for the system map."],
       "trigger": { "kind": "panel", "panels": ["guide", "map"] }
     },
     {
       "id": "jump",
       "title": "Jump to the marker",
-      "lines": ["Aim at the exit marker and press {jump} to spool the jump drive."],
+      "lines": ["Put the cursor on the exit marker and press {jump}.", "The drive spools up, then flings you there."],
       "trigger": { "kind": "jumped", "objects": ["exit_marker"] },
       "targets": ["exit_marker"]
     },
     {
       "id": "graduate",
       "title": "Ready to fly",
-      "lines": ["That is the whole loop. You get a starter pack, and Sol is open to you."],
+      "lines": ["That is the whole loop. Take your starter pack into Sol."],
       "trigger": { "kind": "graduate" }
     }
   ],

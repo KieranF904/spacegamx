@@ -10,22 +10,29 @@
 
 import { objectPos } from '@space-game/common';
 import type { ServerTutorialStateMessage, TutorialData, TutorialObjectDef } from '@space-game/common';
-import { arrowTargets, edgeArrow, markerStyle } from './tutorialModel';
+import { arrowTargets, edgeArrow, markerStyle, pointsAtStation } from './tutorialModel';
 
 export interface MarkerDeps {
   data: TutorialData;
   worldToScreen(x: number, y: number): { x: number; y: number };
   /** The pilot's ship, world position */
   me(): { x: number; y: number } | null;
+  /** The yard station, world position and body radius (the dock step points at it) */
+  station(): { x: number; y: number; radius: number } | null;
 }
 
 const AMBER = '251, 191, 36';
 const BLUE = '125, 211, 252';
+const GREEN = '74, 222, 128';
+/** A burst on a ring just flown through lasts this long (s) */
+const BURST_S = 0.8;
 
 export class TutorialMarkers {
   private cv = document.createElement('canvas');
   private ctx = this.cv.getContext('2d');
   private hidden = false;
+  private passedSeen = new Set<string>();
+  private bursts: { id: string; t0: number }[] = [];
 
   constructor(private d: MarkerDeps) {
     this.cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2050;';
@@ -47,12 +54,21 @@ export class TutorialMarkers {
     if (this.cv.width !== Math.round(w * dpr) || this.cv.height !== Math.round(h * dpr)) { this.cv.width = Math.round(w * dpr); this.cv.height = Math.round(h * dpr); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    if (!s || s.left) return;
+    if (!s || s.left) { this.passedSeen.clear(); this.bursts = []; return; }
     const step = this.d.data.steps.find((x) => x.id === s.step);
     const t = performance.now() / 1000;
+    // A ring newly passed bursts once (a fresh step starts the count over without bursting)
+    const now = new Set(s.passed ?? []);
+    for (const id of now) if (!this.passedSeen.has(id) && this.passedSeen.size + 1 === now.size) this.bursts.push({ id, t0: t });
+    this.passedSeen = now;
+    this.bursts = this.bursts.filter((b) => t - b.t0 < BURST_S);
     for (const o of this.d.data.objects) {
       const style = markerStyle(o, s, step);
-      if (style) this.mark(ctx, o, style === 'active', t);
+      if (style) this.mark(ctx, o, style, t);
+    }
+    for (const b of this.bursts) {
+      const o = this.d.data.objects.find((x) => x.id === b.id);
+      if (o) this.burst(ctx, o, (t - b.t0) / BURST_S);
     }
     // Arrows to this step's targets that are off screen (and a bobbing one over those on screen)
     const me = this.d.me();
@@ -63,6 +79,29 @@ export class TutorialMarkers {
       if (a.onScreen) this.pointer(ctx, sp.x, sp.y - this.screenRadius(o) - 14 - Math.sin(t * 4) * 4, o.label);
       else this.edge(ctx, a, me ? Math.hypot(p.x - me.x, p.y - me.y) : 0, o.label);
     }
+    // The dock step: the yard station is no training object, so it is marked from its own position
+    const st = pointsAtStation(step) ? this.d.station() : null;
+    if (st) {
+      const sp = this.d.worldToScreen(st.x, st.y);
+      const a = edgeArrow(sp.x, sp.y, w, h, 46);
+      const rs = Math.max(30, Math.hypot(this.d.worldToScreen(st.x + st.radius, st.y).x - sp.x, this.d.worldToScreen(st.x + st.radius, st.y).y - sp.y));
+      if (a.onScreen) this.pointer(ctx, sp.x, sp.y - rs - 14 - Math.sin(t * 4) * 4, 'Yard station');
+      else this.edge(ctx, a, me ? Math.hypot(st.x - me.x, st.y - me.y) : 0, 'Yard station');
+    }
+  }
+
+  /** The small flash on a ring just passed: an expanding green ring and a tick */
+  private burst(ctx: CanvasRenderingContext2D, o: TutorialObjectDef, k: number): void {
+    const p = objectPos(this.d.data, o);
+    const c = this.d.worldToScreen(p.x, p.y);
+    const r = this.screenRadius(o);
+    ctx.save();
+    ctx.strokeStyle = `rgba(${GREEN}, ${0.9 * (1 - k)})`;
+    ctx.lineWidth = 4 * (1 - k) + 1;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r * (0.8 + 0.7 * k), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private screenRadius(o: TutorialObjectDef): number {
@@ -71,16 +110,17 @@ export class TutorialMarkers {
     return Math.max(10, Math.hypot(b.x - a.x, b.y - a.y));
   }
 
-  private mark(ctx: CanvasRenderingContext2D, o: TutorialObjectDef, active: boolean, t: number): void {
+  private mark(ctx: CanvasRenderingContext2D, o: TutorialObjectDef, style: 'active' | 'passed' | 'upcoming', t: number): void {
+    const active = style === 'active', passed = style === 'passed';
     const p = objectPos(this.d.data, o);
     const c = this.d.worldToScreen(p.x, p.y);
     const r = this.screenRadius(o);
     if (c.x < -r || c.y < -r || c.x > window.innerWidth + r || c.y > window.innerHeight + r) return;
-    const col = o.kind === 'zone' ? BLUE : AMBER;
+    const col = passed ? GREEN : o.kind === 'zone' ? BLUE : AMBER;
     const pulse = active ? 0.55 + 0.35 * Math.sin(t * 3) : 0;
     ctx.save();
-    ctx.lineWidth = active ? 3 : 1.5;
-    ctx.strokeStyle = `rgba(${col}, ${active ? 0.55 + pulse * 0.4 : 0.22})`;
+    ctx.lineWidth = active ? 3 : passed ? 2.5 : 1.5;
+    ctx.strokeStyle = `rgba(${col}, ${active ? 0.55 + pulse * 0.4 : passed ? 0.7 : 0.22})`;
     if (o.kind === 'zone' || o.kind === 'exit') ctx.setLineDash([14, 10]);
     ctx.beginPath();
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
@@ -95,7 +135,20 @@ export class TutorialMarkers {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-    if (o.label && (active || r > 40)) {
+    if (passed) {
+      // A tick in the middle
+      ctx.setLineDash([]);
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = `rgba(${GREEN}, 0.9)`;
+      const u = Math.min(r * 0.3, 26);
+      ctx.beginPath();
+      ctx.moveTo(c.x - u, c.y + u * 0.05);
+      ctx.lineTo(c.x - u * 0.3, c.y + u * 0.7);
+      ctx.lineTo(c.x + u, c.y - u * 0.7);
+      ctx.stroke();
+    } else if (o.label && (active || r > 40)) {
       ctx.setLineDash([]);
       ctx.fillStyle = `rgba(${col}, ${active ? 0.95 : 0.4})`;
       ctx.font = `700 ${active ? 15 : 12}px 'Segoe UI', sans-serif`;

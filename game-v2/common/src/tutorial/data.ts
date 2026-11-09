@@ -54,7 +54,7 @@ export function validateTutorialData(raw: unknown, refs: TutorialRefs = {}): str
     else if (stepIdSet.has(s.id)) err(`${p}.id`, `duplicate step "${s.id}"`);
     else stepIdSet.add(s.id);
     if (typeof s.title !== 'string') err(`${p}.title`, 'expected a string');
-    if (!Array.isArray(s.lines) || s.lines.length < 1 || s.lines.length > 2 || s.lines.some((l) => typeof l !== 'string')) err(`${p}.lines`, 'expected one or two strings');
+    if (!Array.isArray(s.lines) || s.lines.length < 1 || s.lines.length > 2 || s.lines.some((l) => !(typeof l === 'string' || (isObj(l) && typeof l.screen === 'string' && typeof l.helm === 'string')))) err(`${p}.lines`, 'expected one or two lines: a string, or {screen, helm}');
     const t = s.trigger;
     if (!isObj(t) || !TRIGGERS.includes(t.kind as string)) err(`${p}.trigger.kind`, `expected one of ${TRIGGERS.join(', ')}`);
     else if (t.kind === 'panel') {

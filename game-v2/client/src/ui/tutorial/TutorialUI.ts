@@ -13,7 +13,7 @@ import type { GameState } from '../../state/GameState';
 import { TutorialMarkers } from './TutorialMarkers';
 import { TutorialPanel as PanelView } from './TutorialPanel';
 import { leaveMessage, onTutorial, reportMessage, resetTutorial, tutorialData } from './tutorialStore';
-import { lookFor, newlyDone, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
+import { lookFor, newlyDone, targetGained, packLines, panelModel, risingPanels, type TrainingLook } from './tutorialModel';
 
 export interface TutorialUIDeps {
   state: GameState;
@@ -22,6 +22,8 @@ export interface TutorialUIDeps {
   setTrainingLook(id: number, look: TrainingLook | null): void;
   /** The key an action is bound to, as text */
   keyOf(action: string): string;
+  /** The pilot is flying in helm mode (nose-relative keys), not mouse-steer */
+  helm(): boolean;
   itemName(id: string): string;
   sound(id: string, v?: number): void;
   /** Which of the reportable panels are open right now */
@@ -41,6 +43,7 @@ export class TutorialUI {
   private entityOf = new Map<string, number>();
   private applied = new Map<string, TrainingLook | null>();
   private frame = 0;
+  private helmShown = false;
 
   constructor(private d: TutorialUIDeps) {
     this.panel = new PanelView({
@@ -52,6 +55,7 @@ export class TutorialUI {
       data: tutorialData,
       worldToScreen: (x, y) => d.worldToScreen(x, y),
       me: () => { const e = d.state.entities.get(d.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
+      station: () => this.yardStation(),
     });
     onTutorial((s) => this.onState(s));
   }
@@ -71,10 +75,29 @@ export class TutorialUI {
     this.cur = s;
     if (!s.left) this.d.stopOldTour();
     for (const t of newlyDone(prev, s, tutorialData)) this.panel.toast(t);
+    if (targetGained(prev, s, tutorialData)) this.d.sound('scan_ping', 0.6);
     // A new step: whatever panel is already open counts again
     if (!prev || prev.step !== s.step) this.prevPanels = {};
-    this.panel.set(panelModel(s, tutorialData, this.d.keyOf), packLines(tutorialData, (id) => this.d.itemName(id)));
+    this.showCard();
     this.looks();
+  }
+
+  /** The instruction card for the state and the control mode now */
+  private showCard(): void {
+    const s = this.cur;
+    this.panel.set(s ? panelModel(s, tutorialData, this.d.keyOf, this.d.helm()) : null, packLines(tutorialData, (id) => this.d.itemName(id)));
+  }
+
+  /** The yard station (the dock step's mark): the station body nearest the yard's centre, as the client sees it */
+  private yardStation(): { x: number; y: number; radius: number } | null {
+    const c = tutorialData.yard.center;
+    let best: { x: number; y: number; radius: number } | null = null, bd = tutorialData.yard.leash;
+    for (const e of this.d.state.entities.values()) {
+      if (e.type !== EntityType.Station) continue;
+      const d = Math.hypot(e.renderX - c.x, e.renderY - c.y);
+      if (d < bd) { bd = d; best = { x: e.renderX, y: e.renderY, radius: e.stationRadius ?? 500 }; }
+    }
+    return best;
   }
 
   /** Each frame; `hidden`: behind a full-screen view */
@@ -84,6 +107,8 @@ export class TutorialUI {
     this.markers.setHidden(hidden);
     if (!s || s.left) { this.markers.draw(null); return; }
     this.markers.draw(s);
+    // (The control mode can change with a key: the card's keys follow it)
+    if (this.d.helm() !== this.helmShown) { this.helmShown = this.d.helm(); this.showCard(); }
     // Panels: report each one as it opens
     const now: Record<string, boolean> = {};
     const open = this.d.panelsOpen();

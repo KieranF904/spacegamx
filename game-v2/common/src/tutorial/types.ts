@@ -56,11 +56,19 @@ export interface TutorialTrigger {
   count?: number;
 }
 
+/**
+ * One line of a step's card: plain text, or one text per control mode (`screen`: mouse-steer, WASD push the ship around the
+ * screen; `helm`: A/D turn, W/S thrust along the nose). Either may use `{action}` key placeholders and `{wasd}` (the four move keys)
+ */
+export type TutorialLine = string | { screen: string; helm: string };
+
 export interface TutorialStepDef {
   id: string;
   title: string;
   /** One or two short lines; key names are written as `{action}` and filled in by the client from the pilot's bindings */
-  lines: string[];
+  lines: TutorialLine[];
+  /** Multi-target steps: what the card's counter calls the targets ("Rings" -> "Rings 2/3"); counts `trigger.objects` as the server reports them done */
+  counter?: string;
   trigger: TutorialTrigger;
   /** Objects the client highlights (arrow/ring) while this is the current step */
   targets?: string[];

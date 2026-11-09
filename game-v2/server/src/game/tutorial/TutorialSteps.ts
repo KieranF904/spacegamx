@@ -34,6 +34,13 @@ export class TutorialSteps {
     return p;
   }
 
+  /** The rings of `step` this pilot has passed this visit (for the tutorialState counter) */
+  passedOf(pid: number, step: string): string[] {
+    const p = this.progress.get(pid);
+    const tr = this.tutorial.data.steps.find((s) => s.id === step)?.trigger;
+    return p && p.step === step && tr?.kind === 'rings' ? [...p.seen] : [];
+  }
+
   /** The pilot (entity `pid`) in the tutorial caused `ev`: advance their step if it is what the step waits for */
   advance(pid: number, ev: TutorialEvent): void {
     const conn = this.tutorial.pilotOf(pid);
@@ -64,7 +71,8 @@ export class TutorialSteps {
       case 'rings':
         if (ev.kind !== 'ringPassed' || !objects.includes(ev.ring)) return false;
         p.seen.add(ev.ring);
-        return objects.every((o) => p.seen.has(o));
+        if (!objects.every((o) => p.seen.has(o))) { this.tutorial.sendState(conn); return false; }
+        return true;
       case 'zoneStop':
         return ev.kind === 'zoneStopped' && ev.zone === objects[0];
       case 'objectsBroken': {

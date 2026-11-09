@@ -78,11 +78,11 @@ describe('the step engine', () => {
   it('has fourteen steps, each with a real binding name and one or two short lines', () => {
     const w = yard();
     expect(w.data.steps.map((s) => s.id)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
-    const actions = new Set(['forward', 'backward', 'fire', 'inventory', 'dock', 'components', 'map', 'jump']);
+    const actions = new Set(['forward', 'backward', 'left', 'right', 'wasd', 'powerFlow', 'fire', 'inventory', 'dock', 'components', 'map', 'jump']);
     for (const s of w.data.steps) {
       expect(s.lines.length).toBeGreaterThanOrEqual(1);
       expect(s.lines.length).toBeLessThanOrEqual(2);
-      for (const l of s.lines) for (const m of l.matchAll(/\{(\w+)\}/g)) expect(actions.has(m[1])).toBe(true);
+      for (const l of s.lines.flatMap((x) => (typeof x === 'string' ? [x] : [x.screen, x.helm]))) for (const m of l.matchAll(/\{(\w+)\}/g)) expect(actions.has(m[1])).toBe(true);
     }
   });
 
@@ -105,8 +105,10 @@ describe('the step engine', () => {
     // 2 rings: all three, in any order, each once
     for (const id of ['ring_3', 'ring_1']) { const r = w.at(id); w.put(a.pid, r.x, r.y); w.step(3); }
     expect(stepOf(a)).toBe('rings');
+    expect(a.state().passed).toEqual(['ring_3', 'ring_1']);
     const r2 = w.at('ring_2'); w.put(a.pid, r2.x, r2.y); w.step(3);
     expectStep('brake');
+    expect(a.state().passed).toEqual([]);
 
     // 3 brake: stop in the zone
     const z = w.at('stop_zone'); w.put(a.pid, z.x, z.y);
