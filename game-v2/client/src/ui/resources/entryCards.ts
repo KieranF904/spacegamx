@@ -1,6 +1,6 @@
 /**
  * @contract client.ui.resource-cards
- * owns:       the two levels of detail for a guide entry (resource, rock, enemy or system): a small PREVIEW (icon, name, the short hint and the one most important source row) and the EXTENDED details (every section, icons that open other entries), as escaped HTML
+ * owns:       the levels of detail for a guide entry (resource, rock, enemy or system): a small PREVIEW (icon, name, the short hint and the one most important source row), the EXTENDED details block and the full detail PAGE (big icon, every section, icons that open other entries), as escaped HTML
  * needs:      resourceData (entries, source index), guideChips (the chips and the icons), tiers, ../escape
  * invariants: chances and shares only ever show as tier pips and words, never a number or percentage — client/src/ui/resources/entryCards.test.ts
  *             every icon in the extended details that has an entry is a data-go button, the preview has none (it is not clickable) — client/src/ui/resources/entryCards.test.ts
@@ -27,7 +27,25 @@ export const CARDS_CSS = `
 #game-menu .ec-line { color: #c4cfde; font-size: 11.5px; line-height: 1.4; padding: 1px 0; }
 #game-menu .ec-line.dim { color: #8394ad; }
 #game-menu .ec-sec .gl { gap: 4px; }
-#game-menu .ec-more { color: #6f8099; font-size: 10.5px; margin-top: 8px; }`;
+#game-menu .ec-more { color: #6f8099; font-size: 10.5px; margin-top: 8px; }
+#game-menu .pg-head { display: flex; gap: 16px; align-items: center; margin: 4px 0 10px; }
+#game-menu .pg-head h2 { margin: 0; color: #fff; font: 700 22px 'Segoe UI', sans-serif; }
+#game-menu .pg-head .pg-sub { color: #8394ad; font-size: 13px; }
+#game-menu .pg-head .ec-hint { font-size: 13.5px; margin-top: 6px; max-width: 60ch; }
+#game-menu .gc.huge { width: 76px; height: 76px; border-radius: 14px; }
+#game-menu .gc.huge img { width: 64px; height: 64px; }
+#game-menu .gc.huge i { width: 22px; height: 22px; }
+#game-menu .gc.huge i.sun { width: 38px; height: 38px; box-shadow: 0 0 18px 4px rgba(255, 220, 140, 0.35); }
+#game-menu .pg-desc { font-size: 13px; max-width: 70ch; margin: 0 0 6px; }
+#game-menu .pg-secs { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+#game-menu .pg-sec { padding: 10px 12px 12px; border-radius: 10px; background: rgba(4, 8, 16, 0.45); border: 1px solid rgba(140, 170, 220, 0.12); }
+#game-menu .pg-sec > h3 { margin: 0 0 8px; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 1.4px; text-transform: uppercase; color: #8394ad; }
+#game-menu .pg-sec .gl { gap: 6px; }
+#game-menu .pg-sec .gc { width: 38px; height: 38px; }
+#game-menu .pg-sec .gc img { width: 30px; height: 30px; }
+#game-menu .pg-sec .gc.txt { width: auto; height: 32px; font-size: 12.5px; }
+#game-menu .pg-sec .gc.more, #game-menu .pg-sec .gc.badge { font-size: 13px; }
+#game-menu .pg-sec .ec-line { font-size: 12.5px; }`;
 
 const ORDER: Record<Tier, number> = { high: 0, medium: 1, low: 2 };
 const byTier = <T extends { tier: Tier }>(a: T[]) => [...a].sort((x, y) => ORDER[x.tier] - ORDER[y.tier]);
@@ -130,6 +148,13 @@ export function detailHtml(view: View, id: string, d: ResourceDeps): string {
   const c = cardOf(view, id, d, false);
   if (!c) return '';
   return `${head(c)}${c.hint ? `<div class="ec-hint">${esc(c.hint)}</div>` : ''}${c.desc ? `<div class="ec-desc">${esc(c.desc)}</div>` : ''}${c.sections.map((s) => sec(s.label, s.html)).join('')}`;
+}
+
+/** The full detail PAGE for one entry: a big icon, name and hint, then every section laid out in a grid; icons open other pages */
+export function pageHtml(view: View, id: string, d: ResourceDeps): string {
+  const c = cardOf(view, id, d, false);
+  if (!c) return '';
+  return `<div class="pg-head"><span class="gc huge">${c.icon}</span><div><h2>${esc(c.name)}</h2><span class="pg-sub">${esc(c.sub)}</span>${c.hint ? `<div class="ec-hint">${esc(c.hint)}</div>` : ''}</div></div>${c.desc ? `<div class="ec-desc pg-desc">${esc(c.desc)}</div>` : ''}<div class="pg-secs">${c.sections.map((s) => `<section class="pg-sec"><h3>${esc(s.label)}</h3>${s.html}</section>`).join('')}</div>`;
 }
 
 /** The name of an entry (the Back control says where it goes) */

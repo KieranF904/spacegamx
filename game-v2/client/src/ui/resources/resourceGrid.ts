@@ -9,6 +9,7 @@
 
 import { esc } from '../escape';
 import { resourceEntries, sourceIndex } from './resourceData';
+import { categoryIcon } from './categoryIcons';
 import { CATEGORY_LABEL, CATEGORY_ORDER } from './resourceIndex';
 import { enemyIcon, itemIcon, itemName, rockIcon, systemIcon, type ResourceDeps } from './guideChips';
 import type { View } from './entryCards';
@@ -16,7 +17,7 @@ import type { View } from './entryCards';
 export const GRID_CSS = `
 #game-menu .rg-group { margin: 0 0 12px; }
 #game-menu .rg-group[hidden] { display: none; }
-#game-menu .rg-group > h4 { margin: 8px 0 6px; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #6f8099; }
+#game-menu .rg-group > h4 { display: flex; align-items: center; gap: 6px; margin: 8px 0 6px; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #6f8099; }
 #game-menu .rg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
 #game-menu .rg-tile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 7px 3px 6px; border-radius: 9px; border: 1px solid rgba(140, 170, 220, 0.12); background: rgba(4, 8, 16, 0.45); text-align: center; }
 #game-menu .rg-tile[hidden] { display: none; }
@@ -39,7 +40,7 @@ export function resourceGridHtml(d: ResourceDeps): string {
     const es = all.filter((e) => e.category === c);
     if (!es.length) return '';
     const hay = (e: (typeof es)[number]) => [e.name, e.id, e.description, CATEGORY_LABEL[e.category], ...e.sources.flatMap((s) => [s.text, ...(s.where ?? [])]), ...e.usedFor, e.hint ?? ''].join(' ');
-    return `<section class="rg-group" data-group="${c}"><h4>${esc(CATEGORY_LABEL[c])}</h4><div class="rg-grid">${es.map((e) => tile('res', e.id, itemIcon(d, e.id), e.name, hay(e), e.category)).join('')}</div></section>`;
+    return `<section class="rg-group" data-group="${c}"><h4>${categoryIcon(c, 15)}${esc(CATEGORY_LABEL[c])}</h4><div class="rg-grid">${es.map((e) => tile('res', e.id, itemIcon(d, e.id), e.name, hay(e), e.category)).join('')}</div></section>`;
   }).join('');
 }
 

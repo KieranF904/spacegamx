@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { RESOURCE_DATA, resourceEntries, sourceIndex } from './resourceData';
-import { detailHtml, entryIds, previewHtml, type View } from './entryCards';
+import { detailHtml, entryIds, pageHtml, previewHtml, type View } from './entryCards';
 import { isPublicSystem } from './sourceIndex';
 
 const deps = { icon: () => '' };
@@ -72,8 +72,8 @@ describe('cards', () => {
 
   it('shows tiers and never a percentage or a chance number', () => {
     // (an item's own description and hint may quote a stat; chances and shares are what must stay tiers)
-    const noDesc = (x: string) => x.replace(/<div class="ec-(?:desc|hint)">.*?<\/div>/g, '');
-    for (const v of VIEWS) for (const id of entryIds(v)) for (const h of [noDesc(detailHtml(v, id, deps)), noDesc(previewHtml(v, id, deps))]) {
+    const noDesc = (x: string) => x.replace(/<div class="ec-(?:desc|hint)[^"]*">.*?<\/div>/g, '');
+    for (const v of VIEWS) for (const id of entryIds(v)) for (const h of [noDesc(detailHtml(v, id, deps)), noDesc(previewHtml(v, id, deps)), noDesc(pageHtml(v, id, deps))]) {
       expect(h, `${v} ${id}`).not.toMatch(/\d\s*%|per 100|chance:? ?\d/i);
       for (const m of h.matchAll(/(?:title|aria-label)="([^"]*)"/g)) expect(m[1], `${v} ${id}`).not.toMatch(/\d\s*%/);
     }
