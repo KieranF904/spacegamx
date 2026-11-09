@@ -56,6 +56,8 @@ export interface PaletteHost {
   remaining(id: string): number;
   /** Licensed to fit / fabricate it (the server's check) */
   canMake(id: string): boolean;
+  /** An admin: dev-only materials are in the palette (and free to place) */
+  admin?(): boolean;
   /** Cargo + storage count of an item */
   have(id: string): number;
   level(): number;
@@ -241,7 +243,7 @@ export class HangarPalette {
       s.textContent = STYLE;
       document.head.appendChild(s);
     }
-    this.guide = guideRows(h.catalog, PLATES);
+    this.guide = guideRows(h.catalog, PLATES, { admin: h.admin?.() ?? false });
     this.rows = paletteRows(h.catalog, this.guide);
     this.root = document.createElement('div');
     this.root.className = 'hp';

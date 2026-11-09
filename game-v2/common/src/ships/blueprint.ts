@@ -9,6 +9,7 @@ import type { ShipTuning } from './tuning.js';
 import { PlacedGeom, computeJoins, facingEdges, findOverlaps, geomContainsPoint, isEdgeFree, placeGeometry } from './grid.js';
 import { partMaterial } from './grades.js';
 import { cleanWires } from './wires.js';
+import { isDevOnly } from './devOnly.js';
 import { checkMounting } from './mounting.js';
 import { MAX_GROUPS } from './groups.js';
 import { cleanWeaponGroups } from './weaponGroups.js';
@@ -69,6 +70,11 @@ export interface ValidateOptions {
    * design or a refit must keep them.
    */
   mounting?: boolean;
+  /**
+   * Let dev-only parts (`exclusive: "dev"`, ships/devOnly.ts) stand: an admin's new design, or a saved ship being loaded
+   * (a non-admin's old ship that holds one keeps flying; their new designs and refits may not place more).
+   */
+  devParts?: boolean;
 }
 
 /**
@@ -104,8 +110,8 @@ export function validateBlueprint(
     if (!fn) err('unknownFunction', [p.uid], `unknown function "${p.fn}"`);
     if (!mat) err('unknownMaterial', [p.uid], `unknown material "${p.material}"`);
     // The game's own ships' parts (bosses', factions'), and designs' own shapes, are never a pilot's
-    if (mat?.exclusive) err('exclusive', [p.uid], `"${p.material}" isn't for pilots' ships`);
-    if (piece?.bespoke || fn?.exclusive) err('exclusive', [p.uid], `${piece?.bespoke ? `"${p.piece}"` : `"${p.fn}"`} isn't for pilots' ships`);
+    if (mat?.exclusive && !(opts.devParts && isDevOnly(mat))) err('exclusive', [p.uid], `"${p.material}" isn't for pilots' ships`);
+    if (piece?.bespoke || (fn?.exclusive && !(opts.devParts && isDevOnly(fn)))) err('exclusive', [p.uid], `${piece?.bespoke ? `"${p.piece}"` : `"${p.fn}"`} isn't for pilots' ships`);
     if (fn?.model && fn.material !== p.material) err('unknownMaterial', [p.uid], `a ${fn.name ?? p.fn} is made of ${fn.material}, not "${p.material}"`);
     if (piece && fn && fn.pieces !== '*' && !fn.pieces.includes(p.piece)) {
       err('functionNotAllowed', [p.uid], `"${p.fn}" can't go on a "${p.piece}"`);
@@ -165,7 +171,8 @@ export function validateBlueprint(
       if (list.length > owned) err('notOwned', list, `uses ${list.length} × ${piece}, owns ${owned}`);
     }
     for (const p of bp.parts) {
-      if (!inventory.materials.includes(p.material)) err('materialNotOwned', [p.uid], `material "${p.material}" not owned`);
+      // (An admin's dev-only material is owned by no one: it is theirs to place)
+      if (!inventory.materials.includes(p.material) && !(opts.devParts && isDevOnly(catalog.materials.get(p.material)))) err('materialNotOwned', [p.uid], `material "${p.material}" not owned`);
     }
   }
 

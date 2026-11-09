@@ -1,6 +1,6 @@
 /**
  * The field guide renders every tab, and Progress carries the unlock track
- * (you marked on it) and Ships a link to the component guide.
+ * (you marked on it).
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -31,9 +31,16 @@ describe('field guide', () => {
     expect(html.indexOf('fg-step you')).toBeLessThan(html.indexOf('<em>Cannon</em>Twinlink'));
   });
 
-  it('Ships links to the component guide', () => {
-    const html = guideHtml('ships', deps(12));
-    expect(html).toContain('data-a="components"');
-    expect(html).toContain('<kbd>components</kbd>');
+  it('Tiers & scaling lists pilots gear and public systems only: no dev material, no private, training, dev or boss-lair system', () => {
+    const threats = { sol: 10, vesta_yard: 5, gun_range: 5, dev_rockery: 5, ashfall_cavern: 80, sol_scrap_nest: 9, homestead: 5 };
+    const html = guideHtml('tiers', { ...deps(12), threats: () => threats });
+    for (const hidden of ['Singularity', 'Dev ', 'Rockery', 'Gun Range', 'Vesta', 'Your Station', 'Scrap Mother', 'Cavern']) expect(html, hidden).not.toContain(hidden);
+    // (Dev Singularity would read x60 on the grade chart and table)
+    expect(html).not.toContain('×60');
+    expect(html).toContain('Sol System');
+    expect(html).toContain('Mk grades');
+    expect(html).toContain('Weapon size');
+    // (Five grades, one material each)
+    expect(html.match(/<span class="fg-mk">Mk [IV]+<\/span><\/td><td>/g)?.length).toBe(5);
   });
 });

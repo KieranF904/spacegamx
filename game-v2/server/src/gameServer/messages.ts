@@ -8,7 +8,7 @@
  */
 
 import { hasComponent } from 'bitecs';
-import { Position, Player, Portal, InSystem, Dead, dhypot } from '@space-game/common';
+import { Position, Player, Portal, InSystem, Dead, dhypot, isDevOnly } from '@space-game/common';
 import { ClientMessage } from '@space-game/common';
 import { portsSwitchFeeds } from '@space-game/common';
 import { stationTable } from '@space-game/common';
@@ -145,6 +145,8 @@ export function handleDevTeleport(gs: GameServer, conn: ClientConnection, msg: {
   }
   const system = gs.gameData.getSystem(msg.systemId);
   if (!system || !hasComponent(gs.world, Player, conn.playerId) || hasComponent(gs.world, Dead, conn.playerId)) return;
+  // (A dev-only system (the Rockery) is an admin's alone, even on a server where the map warp is open to all)
+  if (isDevOnly(system) && !conn.isAdmin) return;
   // (The gun range is gone into from a station only, in its own ship: game/gunRange)
   if (system.gunRange) { gs.pilots.toast(conn, "The gun range is reached from any station's Gun range button", "warn"); return; }
   const systemNum = gs.gameData.getSystemNum(system.id);

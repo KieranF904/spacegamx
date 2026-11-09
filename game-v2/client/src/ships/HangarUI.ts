@@ -239,6 +239,7 @@ export class HangarUI implements HangarHost {
       hoverPart: (p) => { if (p?.fn === this.paletteHover?.fn && p?.piece === this.paletteHover?.piece) return; this.paletteHover = p; this.draw(); },
       remaining: (id) => this.remaining(id),
       canMake: (id) => this.deps.canMake(id),
+      admin: () => this.deps.admin?.() ?? false,
       have: (id) => this.deps.have(id),
       level: () => this.deps.level?.() ?? 1,
       learned: () => this.deps.learned?.() ?? [],

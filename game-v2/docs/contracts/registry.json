@@ -1925,7 +1925,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 759,
+      "lines": 760,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -1957,7 +1957,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 82,
-          "end": 759
+          "end": 760
         }
       ]
     },
@@ -1965,7 +1965,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 781,
+      "lines": 783,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -1993,13 +1993,13 @@
           "name": "ShipClientOptions",
           "kind": "interface",
           "start": 83,
-          "end": 119
+          "end": 121
         },
         {
           "name": "ShipClient",
           "kind": "class",
-          "start": 121,
-          "end": 781
+          "start": 123,
+          "end": 783
         }
       ]
     },
@@ -5852,7 +5852,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 153,
+      "lines": 155,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -5873,19 +5873,19 @@
           "name": "HangarDeps",
           "kind": "interface",
           "start": 19,
-          "end": 55
+          "end": 57
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 57,
-          "end": 57
+          "start": 59,
+          "end": 59
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 59,
-          "end": 153
+          "start": 61,
+          "end": 155
         }
       ]
     },
@@ -14177,6 +14177,58 @@
       ]
     },
     {
+      "id": "common.ships.dev-only",
+      "path": "common/src/ships/devOnly.ts",
+      "group": "common/ships",
+      "lines": 30,
+      "owns": "the dev-only flag (`exclusive: \"dev\"` on a material, function, model or system): what it is and who may use it",
+      "needs": "Catalog, Blueprint (types only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "dev parts ship in production data, are listed to nobody, and only an admin's design may hold one",
+          "test": "server/src/game/devParts.test.ts"
+        },
+        {
+          "text": "a boss's exclusive ('boss') is never a dev part: no one builds it",
+          "test": "server/src/game/devParts.test.ts"
+        }
+      ],
+      "extend": "a new dev-only thing is `\"exclusive\": \"dev\"` in its data file; nothing here changes",
+      "exports": [
+        "DEV_EXCLUSIVE",
+        "isDevOnly",
+        "isDevPartId",
+        "usesDevParts"
+      ],
+      "sections": [
+        {
+          "name": "DEV_EXCLUSIVE",
+          "kind": "const",
+          "start": 13,
+          "end": 14
+        },
+        {
+          "name": "isDevOnly",
+          "kind": "function",
+          "start": 16,
+          "end": 19
+        },
+        {
+          "name": "usesDevParts",
+          "kind": "function",
+          "start": 21,
+          "end": 24
+        },
+        {
+          "name": "isDevPartId",
+          "kind": "function",
+          "start": 26,
+          "end": 30
+        }
+      ]
+    },
+    {
       "id": "ships.function-registry",
       "path": "common/src/ships/functionRegistry.ts",
       "group": "common/ships",
@@ -20051,7 +20103,7 @@
       "id": "server.gameserver.messages",
       "path": "server/src/gameServer/messages.ts",
       "group": "server/gameServer",
-      "lines": 226,
+      "lines": 228,
       "owns": "the client message table and the dev message handlers (teleport, spawn), chat and input forwarding",
       "needs": "GameServer (type), net/dispatch, net/handlers/*; npm: @space-game/common, bitecs",
       "events": "",
@@ -20089,37 +20141,37 @@
           "name": "handleDevTeleport",
           "kind": "function",
           "start": 137,
-          "end": 165
+          "end": 167
         },
         {
           "name": "handleDevSpawn",
           "kind": "function",
-          "start": 167,
-          "end": 176
+          "start": 169,
+          "end": 178
         },
         {
           "name": "handleChat",
           "kind": "function",
-          "start": 178,
-          "end": 211
+          "start": 180,
+          "end": 213
         },
         {
           "name": "handleInput",
           "kind": "function",
-          "start": 213,
-          "end": 216
+          "start": 215,
+          "end": 218
         },
         {
           "name": "applyInputToEntity",
           "kind": "function",
-          "start": 218,
-          "end": 221
+          "start": 220,
+          "end": 223
         },
         {
           "name": "recordSelfHashes",
           "kind": "function",
-          "start": 223,
-          "end": 226
+          "start": 225,
+          "end": 228
         }
       ]
     },
@@ -20613,9 +20665,9 @@
       "id": "server.gameserver.threats",
       "path": "server/src/gameServer/threats.ts",
       "group": "server/gameServer",
-      "lines": 43,
+      "lines": 44,
       "owns": "threat ratings of systems and regions for maps and HUD",
-      "needs": "GameServer (type), game/Enemies",
+      "needs": "GameServer (type), game/Enemies, @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -20632,14 +20684,14 @@
         {
           "name": "threats",
           "kind": "function",
-          "start": 11,
-          "end": 23
+          "start": 12,
+          "end": 24
         },
         {
           "name": "regionThreats",
           "kind": "function",
-          "start": 25,
-          "end": 43
+          "start": 26,
+          "end": 44
         }
       ]
     },

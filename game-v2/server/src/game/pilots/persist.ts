@@ -96,7 +96,7 @@ export function applyShip(self: Pilots, s: Session): void {
   const bp = s.profile.ship.blueprint;
   // (a borrowed dev ship flies as it is: an enemy's design needn't pass a pilot's rules. A saved ship needn't keep
   // weapons' mounting rules made since it was fitted: it flies, its hangar flagging what to fix)
-  if (!self.devStash.has(s.conn) && !self.frozen.has(s.conn) && !self.ships.validate(bp, { mounting: false }).ok) {
+  if (!self.devStash.has(s.conn) && !self.frozen.has(s.conn) && !self.ships.validate(bp, { mounting: false, devParts: true }).ok) {
     setActiveShip(s.profile, { blueprint: cloneJson(self.opts.starter.blueprint), hp: {}, ghosts: [], plan: self.opts.starter.planFile });
   }
   const rec = s.profile.ship;

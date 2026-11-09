@@ -1,6 +1,6 @@
 /**
  * Dev-only data (temporary): the systems in data/dev/*.json (rockery.json, a tiny system packed with every rock type),
- * merged into the game data only when the server runs in development (index.ts). The client merges the rockery's rock
+ * merged into the game data on every server, production too (index.ts); each is `exclusive: "dev"` (ships/devOnly.ts): hidden from every listing, reached only by an admin. The client merges the rockery's rock
  * field in its dev build (Game.ts), so both place the same rocks. A file's `system` is added to the systems; its
  * optional `field` (and `outliers`) to the mining table. (The old dev weapons range is now the gun range: game/gunRange.)
  */

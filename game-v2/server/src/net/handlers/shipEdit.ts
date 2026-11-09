@@ -14,7 +14,7 @@
  * first). The docking itself (berths, who is inside a station) lives in game/Docking.ts.
  */
 import { hasComponent } from 'bitecs';
-import { Player, Dead, repRank, fixModelMaterials, parseBlueprint, type Blueprint } from '@space-game/common';
+import { Player, Dead, repRank, fixModelMaterials, parseBlueprint, usesDevParts, type Blueprint } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import type { HandlerRegistry } from '../dispatch.js';
 import type { ServerCtx } from '../ServerCtx.js';
@@ -44,7 +44,7 @@ export function registerShipEditHandlers(t: HandlerRegistry): void {
   t.on('designSave', (ctx, conn, msg) => {
     let bp: Blueprint;
     try { bp = clientBlueprint(ctx, msg.blueprint); } catch { return; }
-    if (!ctx.ships.validate(bp).ok) { ctx.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); return; }
+    if (!ctx.ships.validate(bp, { devParts: conn.isAdmin }).ok) { ctx.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); return; }
     ctx.hangar.saveDesign(conn, Math.floor(Number(msg.slot)), bp);
   });
   t.on('dock', (ctx, conn, msg) => {
@@ -107,7 +107,7 @@ export function handleShareDesign(ctx: ServerCtx, conn: ClientConnection, raw: u
   } catch {
     return ctx.pilots.toast(conn, "That isn't a ship design", 'warn');
   }
-  if (!ctx.ships.validate(bp).ok) return ctx.pilots.toast(conn, 'Fix the design first: it has problems', 'warn');
+  if (!ctx.ships.validate(bp, { devParts: conn.isAdmin }).ok) return ctx.pilots.toast(conn, 'Fix the design first: it has problems', 'warn');
   const others = ctx.party.members(conn).filter((m) => m !== conn) as ClientConnection[];
   if (!others.length) return ctx.pilots.toast(conn, 'Share designs with your party: invite someone first (P)', 'warn');
   for (const m of others) ctx.send(m.ws, { type: 'sharedDesign', from: conn.username, blueprint: bp });
@@ -127,11 +127,11 @@ export function handleShipEdit(ctx: ServerCtx, conn: ClientConnection, raw: unkn
   } catch {
     return reply(false, ['not a blueprint']);
   }
-  const result = ctx.ships.validate(bp);
+  const result = ctx.ships.validate(bp, { devParts: conn.isAdmin });
   if (!result.ok) return reply(false, result.errors.map((e) => e.message));
   // Parts the pilot has are built in; the rest become ghosts (proto mode hands out everything)
   const profile = ctx.pilots.get(conn);
-  const errors = ctx.hangar.save(conn, profile?.activeSlot ?? 0, bp, { grantAll: ctx.freeBuild(conn) });
+  const errors = ctx.hangar.save(conn, profile?.activeSlot ?? 0, bp, { grantAll: ctx.freeBuild(conn) || (conn.isAdmin && usesDevParts(ctx.ships.catalog, bp)) });
   if (errors.length) return reply(false, errors);
   conn.blueprint = bp;
   reply(true, []);
@@ -149,9 +149,9 @@ export function handleSlotSave(ctx: ServerCtx, conn: ClientConnection, msg: { sl
   } catch {
     return reply(false, ['not a blueprint']);
   }
-  const result = ctx.ships.validate(bp);
+  const result = ctx.ships.validate(bp, { devParts: conn.isAdmin });
   if (!result.ok) return reply(false, result.errors.map((e) => e.message));
   const plan = typeof msg.plan === 'string' && ctx.ships.library.has(msg.plan) && ctx.pilots.knowsPlan(conn, msg.plan) ? msg.plan : undefined;
-  const errors = ctx.hangar.save(conn, Math.floor(Number(msg.slot)), bp, { plan, grantAll: ctx.freeBuild(conn) });
+  const errors = ctx.hangar.save(conn, Math.floor(Number(msg.slot)), bp, { plan, grantAll: ctx.freeBuild(conn) || (conn.isAdmin && usesDevParts(ctx.ships.catalog, bp)) });
   reply(errors.length === 0, errors);
 }

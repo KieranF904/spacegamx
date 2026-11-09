@@ -8,7 +8,7 @@
  */
 
 import {
-  JOB_MATERIALS, MATERIAL_LEVEL, partItemId, STARTER_MATERIALS,
+  isDevOnly, JOB_MATERIALS, MATERIAL_LEVEL, partItemId, STARTER_MATERIALS,
   type Bag, type Catalog, type FunctionDef, type ItemDef,
 } from '@space-game/common';
 import { defaultShape, shapesOf } from './componentShapes';
@@ -57,7 +57,7 @@ export const STRUCTURE_FNS = ['hull', 'armor', 'cargo'];
  * Every buildable component: each model (not legacy, not a boss's), each
  * material a pilot can build structure in (one with a plate), and the core
  */
-export function guideRows(catalog: Catalog, plates: Record<string, string>): CompRow[] {
+export function guideRows(catalog: Catalog, plates: Record<string, string>, opts: { admin?: boolean } = {}): CompRow[] {
   const rows: CompRow[] = [];
   for (const fn of catalog.functions.values()) {
     if (!fn.model) continue;
@@ -66,7 +66,8 @@ export function guideRows(catalog: Catalog, plates: Record<string, string>): Com
     rows.push({ id: fn.id, tab, name: fn.name ?? fn.id, level: fn.unlock?.level ?? null, order: fn.fabOrder ?? 0, fn: fn.id, material: fn.material ?? 'alloy', piece: defaultShape(shapesOf(catalog, fn)), kind: 'model' });
   }
   for (const m of catalog.materials.values()) {
-    if (m.exclusive || !plates[m.id]) continue;
+    // (A dev-only material is an admin's: no plate, no level, listed to no one else)
+    if (isDevOnly(m) ? !opts.admin : m.exclusive || !plates[m.id]) continue;
     rows.push({ id: `structure:${m.id}`, tab: 'structure', name: `${m.name ?? m.id} structure`, level: MATERIAL_LEVEL[m.id] ?? null, order: 10 + (m.grade ?? 1), fn: 'hull', material: m.id, piece: 'sq', kind: 'structure' });
   }
   if (catalog.functions.has('core')) rows.push({ id: 'core', tab: 'structure', name: 'Ship core', level: 0, order: 0, fn: 'core', material: 'alloy', piece: 'sq', kind: 'core' });

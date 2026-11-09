@@ -87,6 +87,8 @@ export interface ShipClientOptions {
   pilot: PilotState;
   /** Proto mode: every part is free in the hangar */
   grantAllParts?: boolean;
+  /** An admin: dev-only parts (`exclusive: "dev"`) are in the hangar and free to place for them, and nobody else */
+  isAdmin?(): boolean;
   /** Docked at a station: open the station screen (without this, docking opens the hangar) */
   onDocked?(station: string): void;
   /** Is the station screen open (closing the hangar then returns to it instead of undocking) */

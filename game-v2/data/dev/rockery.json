@@ -1,6 +1,7 @@
 {
-  "_comment": "DEV ONLY (temporary): a tiny system packed with every rock type, at every size, for comparing how asteroids look. Loaded by the server only in development (server/src/data/devData.ts) and by the client only in a Vite dev build (client/src/Game.ts); production never reads this file. Reach it with the system map's warp or devTeleport to `dev_rockery`.",
+  "_comment": "DEV ONLY (temporary): a tiny system packed with every rock type, at every size, for comparing how asteroids look. Dev-only (`exclusive: dev`): loaded by the server everywhere (server/src/data/devData.ts) so it ships in production, but listed to nobody and reached only by an admin's map warp or devTeleport to `dev_rockery`; the client merges its rock field only in a Vite dev build (client/src/Game.ts).",
   "system": {
+    "exclusive": "dev",
     "id": "dev_rockery",
     "name": "Rockery (dev)",
     "description": "Dev only: every kind of rock, packed close.",

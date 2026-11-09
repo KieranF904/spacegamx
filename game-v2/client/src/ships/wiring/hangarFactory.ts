@@ -1,4 +1,4 @@
-import { partItemId, type Blueprint, type Catalog, type ClientMessage, type ShipTuning } from '@space-game/common';
+import { partItemId, isDevPartId, type Blueprint, type Catalog, type ClientMessage, type ShipTuning } from '@space-game/common';
 import type { GameState } from '../../state/GameState';
 import type { PilotState } from '../../econ/clientEcon';
 import { Lazy } from '../../lazy';
@@ -11,6 +11,8 @@ export interface HangarOpts {
   tuning: ShipTuning;
   pilot: PilotState;
   grantAllParts?: boolean;
+  /** An admin: dev-only parts (`exclusive: "dev"`) are in the hangar and free to place for them, and nobody else */
+  isAdmin?(): boolean;
   state: GameState;
   send(msg: ClientMessage): void;
   stationOpen?(): boolean;
@@ -48,7 +50,8 @@ export function makeHangar(opts: HangarOpts, h: HangarHost): Lazy<HangarUI> {
       return bag;
     },
     hangarState: () => opts.pilot.hangar,
-    canMake: (id) => opts.pilot.canMake(id),
+    canMake: (id) => opts.pilot.canMake(id) || (!!opts.isAdmin?.() && isDevPartId(opts.catalog, id)),
+    admin: () => !!opts.isAdmin?.(),
     level: () => opts.pilot.profile?.level ?? 1,
     learned: () => opts.pilot.profile?.recipes ?? [],
     have: (id) => opts.pilot.count(id),

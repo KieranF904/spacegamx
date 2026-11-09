@@ -556,7 +556,7 @@ export class ShipBridge {
   /** The missing part (not a ghost) that joins the structure, nearest the core */
   private nextMissing(eid: number, ship: ShipState): number { return rbd.nextMissing(this.ctx, eid, ship); }
 
-  validate(bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult { return rbd.validate(this.ctx, bp, opts); }
+  validate(bp: Blueprint, opts: { mounting?: boolean; devParts?: boolean } = {}): ValidationResult { return rbd.validate(this.ctx, bp, opts); }
 
   /** Hangar save: swap the ship's blueprint and respawn in place at full HP. */
   respawnInPlace(eid: number, bp: Blueprint): void { return rbd.respawnInPlace(this.ctx, eid, bp); }
