@@ -17243,7 +17243,7 @@
       "id": "server.enemies.loot",
       "path": "server/src/game/enemies/loot.ts",
       "group": "server/game/enemies",
-      "lines": 80,
+      "lines": 78,
       "owns": "a hostile's death: pay the killer, party and helpers, roll the loot table and salvage parts",
       "needs": "Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering; npm: @space-game/common",
       "events": "",
@@ -17259,16 +17259,10 @@
       ],
       "sections": [
         {
-          "name": "PARTY_SHARE_RANGE",
-          "kind": "const",
-          "start": 14,
-          "end": 15
-        },
-        {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 17,
-          "end": 80
+          "start": 15,
+          "end": 78
         }
       ]
     },
@@ -19834,7 +19828,7 @@
       "id": "server.gameserver.world",
       "path": "server/src/gameServer/world.ts",
       "group": "server/gameServer",
-      "lines": 149,
+      "lines": 162,
       "owns": "building the starting world: stations, rifts, portals",
       "needs": "GameServer (type), data/GameData; npm: @space-game/common, bitecs",
       "events": "",
@@ -19849,32 +19843,39 @@
         "createPortal",
         "createRift",
         "createStation",
-        "initializeWorld"
+        "initializeWorld",
+        "stationsIn"
       ],
       "sections": [
         {
           "name": "initializeWorld",
           "kind": "function",
-          "start": 16,
-          "end": 60
+          "start": 17,
+          "end": 61
+        },
+        {
+          "name": "stationsIn",
+          "kind": "function",
+          "start": 63,
+          "end": 72
         },
         {
           "name": "createStation",
           "kind": "function",
-          "start": 62,
-          "end": 112
+          "start": 74,
+          "end": 125
         },
         {
           "name": "createRift",
           "kind": "function",
-          "start": 114,
-          "end": 131
+          "start": 127,
+          "end": 144
         },
         {
           "name": "createPortal",
           "kind": "function",
-          "start": 133,
-          "end": 149
+          "start": 146,
+          "end": 162
         }
       ]
     },
@@ -20260,7 +20261,7 @@
       "id": "server.gameserver.hosts.world",
       "path": "server/src/gameServer/hosts/world.ts",
       "group": "server/gameServer/hosts",
-      "lines": 268,
+      "lines": 260,
       "owns": "host adapters for operations, events, mobs and enemies",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -20281,26 +20282,26 @@
         {
           "name": "createOpsHost",
           "kind": "function",
-          "start": 23,
-          "end": 109
+          "start": 24,
+          "end": 110
         },
         {
           "name": "createEventHost",
           "kind": "function",
-          "start": 111,
-          "end": 176
+          "start": 112,
+          "end": 168
         },
         {
           "name": "createMobHost",
           "kind": "function",
-          "start": 178,
-          "end": 202
+          "start": 170,
+          "end": 194
         },
         {
           "name": "createEnemyHost",
           "kind": "function",
-          "start": 204,
-          "end": 268
+          "start": 196,
+          "end": 260
         }
       ]
     },

@@ -11,6 +11,7 @@ import { Position, Radius, Station, Portal, NetworkSync, InSystem, calcAsteroidP
 import { RiftData } from '@space-game/common';
 import { RIFT_TRIGGER_RADIUS } from './shared.js';
 import { createAsteroids } from './asteroids.js';
+import { stationQuery } from '../game/Docking.js';
 import type { GameServer } from '../GameServer.js';
 
 export function initializeWorld(gs: GameServer): void {
@@ -59,7 +60,19 @@ export function initializeWorld(gs: GameServer): void {
   console.log('World initialized');
 }
 
+/** The named stations of a system, listed once and kept (createStation clears the list when one is added); positions are read live (stations may orbit) */
+export function stationsIn(gs: GameServer, num: number): { eid: number; name: string; id?: string }[] {
+  let list = gs.namedStations.get(num);
+  if (!list) {
+    list = [...stationQuery(gs.world)].filter((st) => InSystem.systemId[st] === num)
+      .map((st) => { const d = gs.gameData.getStationByNum(Station.stationId[st]); return { eid: st, name: d?.name ?? 'the station', id: d?.id }; });
+    gs.namedStations.set(num, list);
+  }
+  return list;
+}
+
 export function createStation(gs: GameServer, data: any, systemNum: number): number {
+  gs.namedStations.clear();
   const eid = addEntity(gs.world);
   addComponent(gs.world, Position, eid);
   addComponent(gs.world, Radius, eid);
