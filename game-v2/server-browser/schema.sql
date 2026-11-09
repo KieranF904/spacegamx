@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Which game server holds an account right now (one at a time across regions); see server/src/profile/lease.ts.
+-- A server renews its pilots' rows every ~30 s; one that stops (crash, suspend) is stale after ~90 s.
+CREATE TABLE IF NOT EXISTS profile_leases (
+    user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    holder     TEXT NOT NULL,              -- the game server's SERVER_ID
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
 -- Game-wide documents (the rankings), by name; the game server creates this too if it is missing.
 CREATE TABLE IF NOT EXISTS game_docs (
     key        TEXT PRIMARY KEY,

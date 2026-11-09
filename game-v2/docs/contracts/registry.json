@@ -14864,7 +14864,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 683,
+      "lines": 706,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -14897,62 +14897,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 36,
-          "end": 42
+          "start": 38,
+          "end": 44
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 44,
-          "end": 67
+          "start": 46,
+          "end": 69
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 69,
-          "end": 80
+          "start": 71,
+          "end": 82
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 82,
-          "end": 82
+          "start": 84,
+          "end": 84
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 84,
-          "end": 94
+          "start": 86,
+          "end": 101
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 96,
-          "end": 97
+          "start": 103,
+          "end": 104
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 99,
-          "end": 117
+          "start": 106,
+          "end": 124
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 119,
-          "end": 120
+          "start": 126,
+          "end": 127
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 122,
-          "end": 132
+          "start": 129,
+          "end": 139
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 134,
-          "end": 683
+          "start": 141,
+          "end": 706
         }
       ]
     },
@@ -15755,6 +15755,58 @@
       ]
     },
     {
+      "id": "server.pilots.lease",
+      "path": "server/src/game/pilots/lease.ts",
+      "group": "server/game/pilots",
+      "lines": 58,
+      "owns": "holding the profile lease for each logged-in pilot: claim at login, renew while on, release on leaving",
+      "needs": "Pilots (sessions, store, opts, now), ProfileStore (optional lease methods), profile/lease",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a pilot's lease is kept only while some session of their account is on this server",
+          "test": "server/src/game/pilots/lease.test.ts"
+        },
+        {
+          "text": "a lease whose save failed is not released (it expires instead, so no server loads a stale profile)",
+          "test": "server/src/game/pilots/lease.test.ts"
+        }
+      ],
+      "extend": "none: the lease rules live in profile/lease.ts, this only calls them at the right moments",
+      "exports": [
+        "claim",
+        "release",
+        "renewDue",
+        "serverId"
+      ],
+      "sections": [
+        {
+          "name": "serverId",
+          "kind": "function",
+          "start": 13,
+          "end": 15
+        },
+        {
+          "name": "claim",
+          "kind": "function",
+          "start": 17,
+          "end": 28
+        },
+        {
+          "name": "release",
+          "kind": "function",
+          "start": 30,
+          "end": 40
+        },
+        {
+          "name": "renewDue",
+          "kind": "function",
+          "start": 42,
+          "end": 58
+        }
+      ]
+    },
+    {
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
@@ -16535,7 +16587,7 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 306,
+      "lines": 320,
       "owns": "connecting, creating and placing a player, logging a pilot in, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
@@ -16566,55 +16618,61 @@
           "name": "connect",
           "kind": "function",
           "start": 20,
-          "end": 134
+          "end": 135
         },
         {
           "name": "createPlayer",
           "kind": "function",
-          "start": 136,
-          "end": 190
+          "start": 137,
+          "end": 191
         },
         {
           "name": "placePlayer",
           "kind": "function",
-          "start": 192,
-          "end": 209
+          "start": 193,
+          "end": 210
         },
         {
           "name": "loginPilot",
           "kind": "function",
-          "start": 211,
-          "end": 234
+          "start": 212,
+          "end": 236
+        },
+        {
+          "name": "claimProfile",
+          "kind": "function",
+          "start": 238,
+          "end": 248
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 236,
-          "end": 245
+          "start": 250,
+          "end": 259
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 247,
-          "end": 261
+          "start": 261,
+          "end": 275
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 263,
-          "end": 276
+          "start": 277,
+          "end": 290
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 278,
-          "end": 293
+          "start": 292,
+          "end": 307
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 295,
-          "end": 306
+          "start": 309,
+          "end": 320
         }
       ]
     },
@@ -19166,6 +19224,72 @@
           "kind": "function",
           "start": 151,
           "end": 180
+        }
+      ]
+    },
+    {
+      "id": "server.profile.lease",
+      "path": "server/src/profile/lease.ts",
+      "group": "server/profile",
+      "lines": 60,
+      "owns": "the profile lease: which game server holds an account right now (types, the in-process table, the server id)",
+      "needs": "ProfileStore implementers (JsonProfileStore, MemoryProfileStore, PostgresProfileStore); npm: os",
+      "events": "",
+      "invariants": [
+        {
+          "text": "one holder per account at a time; a holder that stops renewing loses it after LEASE_MS",
+          "test": "server/src/profile/lease.test.ts"
+        },
+        {
+          "text": "a server may always re-claim an account it holds itself",
+          "test": "server/src/profile/lease.test.ts"
+        }
+      ],
+      "extend": "another backend implements ProfileLeases (claimLease, renewLeases, releaseLease) on its store",
+      "exports": [
+        "LEASE_MS",
+        "LEASE_RENEW_MS",
+        "LeaseResult",
+        "LocalLeases",
+        "ProfileLeases",
+        "serverIdFromEnv"
+      ],
+      "sections": [
+        {
+          "name": "LEASE_MS",
+          "kind": "const",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "LEASE_RENEW_MS",
+          "kind": "const",
+          "start": 14,
+          "end": 15
+        },
+        {
+          "name": "LeaseResult",
+          "kind": "type",
+          "start": 17,
+          "end": 17
+        },
+        {
+          "name": "ProfileLeases",
+          "kind": "interface",
+          "start": 19,
+          "end": 27
+        },
+        {
+          "name": "serverIdFromEnv",
+          "kind": "function",
+          "start": 29,
+          "end": 32
+        },
+        {
+          "name": "LocalLeases",
+          "kind": "class",
+          "start": 34,
+          "end": 60
         }
       ]
     },
