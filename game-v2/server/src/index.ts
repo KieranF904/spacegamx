@@ -201,7 +201,7 @@ async function registerWithBrowser() {
   try {
     const response = await fetch(`${BROWSER_URL}/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(LOBBY_ADMIN_SECRET ? { Authorization: `Bearer ${LOBBY_ADMIN_SECRET}` } : {}) },
       body: JSON.stringify({
         host: PUBLIC_HOST,
         port: publicPort,
