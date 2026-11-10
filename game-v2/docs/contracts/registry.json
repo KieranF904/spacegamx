@@ -19728,7 +19728,7 @@
       "id": "server.pilots.lease",
       "path": "server/src/game/pilots/lease.ts",
       "group": "server/game/pilots",
-      "lines": 58,
+      "lines": 59,
       "owns": "holding the profile lease for each logged-in pilot: claim at login, renew while on, release on leaving",
       "needs": "Pilots (sessions, store, opts, now), ProfileStore (optional lease methods), profile/lease",
       "events": "",
@@ -19739,6 +19739,10 @@
         },
         {
           "text": "a lease whose save failed is not released (it expires instead, so no server loads a stale profile)",
+          "test": "server/src/game/pilots/lease.test.ts"
+        },
+        {
+          "text": "a save is refused while another server holds the lease (a server that lost it can't write over it)",
           "test": "server/src/game/pilots/lease.test.ts"
         }
       ],
@@ -19753,26 +19757,26 @@
         {
           "name": "serverId",
           "kind": "function",
-          "start": 13,
-          "end": 15
+          "start": 14,
+          "end": 16
         },
         {
           "name": "claim",
           "kind": "function",
-          "start": 17,
-          "end": 28
+          "start": 18,
+          "end": 29
         },
         {
           "name": "release",
           "kind": "function",
-          "start": 30,
-          "end": 40
+          "start": 31,
+          "end": 41
         },
         {
           "name": "renewDue",
           "kind": "function",
-          "start": 42,
-          "end": 58
+          "start": 43,
+          "end": 59
         }
       ]
     },
@@ -19780,7 +19784,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 188,
+      "lines": 190,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -19810,74 +19814,74 @@
         {
           "name": "holdsRangeShip",
           "kind": "function",
-          "start": 15,
-          "end": 18
+          "start": 16,
+          "end": 19
         },
         {
           "name": "save",
           "kind": "function",
-          "start": 20,
-          "end": 39
+          "start": 21,
+          "end": 41
         },
         {
           "name": "capture",
           "kind": "function",
-          "start": 41,
-          "end": 69
+          "start": 43,
+          "end": 71
         },
         {
           "name": "applyProfile",
           "kind": "function",
-          "start": 71,
-          "end": 92
+          "start": 73,
+          "end": 94
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 94,
-          "end": 112
+          "start": 96,
+          "end": 114
         },
         {
           "name": "flyLoaner",
           "kind": "function",
-          "start": 114,
-          "end": 128
+          "start": 116,
+          "end": 130
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 130,
-          "end": 138
+          "start": 132,
+          "end": 140
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 140,
-          "end": 144
+          "start": 142,
+          "end": 146
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 146,
-          "end": 153
+          "start": 148,
+          "end": 155
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 155,
-          "end": 161
+          "start": 157,
+          "end": 163
         },
         {
           "name": "chosen",
           "kind": "function",
-          "start": 163,
-          "end": 176
+          "start": 165,
+          "end": 178
         },
         {
           "name": "keepSavedShip",
           "kind": "function",
-          "start": 178,
-          "end": 188
+          "start": 180,
+          "end": 190
         }
       ]
     },

@@ -4,6 +4,7 @@
  * needs:      Pilots (sessions, store, opts, now), ProfileStore (optional lease methods), profile/lease
  * invariants: a pilot's lease is kept only while some session of their account is on this server — server/src/game/pilots/lease.test.ts
  *             a lease whose save failed is not released (it expires instead, so no server loads a stale profile) — server/src/game/pilots/lease.test.ts
+ *             a save is refused while another server holds the lease (a server that lost it can't write over it) — server/src/game/pilots/lease.test.ts
  * extend:     none: the lease rules live in profile/lease.ts, this only calls them at the right moments
  */
 

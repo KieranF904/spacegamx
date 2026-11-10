@@ -11,6 +11,7 @@ import { hasComponent, entityExists } from 'bitecs';
 import { Player, Position, InSystem, Dead, PlayerProfile, type ShipRecord, coreOf, addTo } from '@space-game/common';
 import { cloneJson } from '@space-game/common';
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
+import * as lease from './lease.js';
 
 /** Does this profile hold a gun range cheat ship anywhere (never to be saved: Blueprint.range) */
 export function holdsRangeShip(p: PlayerProfile): boolean {
@@ -31,7 +32,8 @@ export async function save(self: Pilots, s: Session): Promise<void> {
   s.dirty = false;
   s.profile.updatedAt = new Date(self.now()).toISOString();
   try {
-    await self.store.save(s.conn.userId, persistable(self, s.conn, s.profile));
+    // (Fenced by the lease: a server that lost the account can't write over the one that took it)
+    await self.store.save(s.conn.userId, persistable(self, s.conn, s.profile), lease.serverId(self));
   } catch (e) {
     s.dirty = true;
     console.error(`[Pilots] save failed for ${s.conn.userId}:`, e);
