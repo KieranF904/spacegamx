@@ -1,16 +1,17 @@
 /**
  * @contract client.ui.resource-grid
- * owns:       the four icon-grid views (Resources by category, Rocks, Enemies, Systems): one tile per entry sorted by the level it opens at then name (levels.ts), an icon with a small name under it, a lock badge and "Lv N" on a tile the player is too low for, no rows and no hint text
- * needs:      resourceData (entries, source index, levels), levels, guideChips (the icons), entryCards (View), ../escape
+ * owns:       the four icon-grid views (Resources by category, Rocks, Enemies, Systems): one tile per entry in the most-commonly-met-first order (commonness.ts), an icon with a small name under it, a lock badge and "Lv N" on a tile the player is too low for, no rows and no hint text
+ * needs:      resourceData (entries, source index, levels, commonness), levels, commonness, guideChips (the icons), entryCards (View), ../escape
  * invariants: one tile per entry, carrying data-view-of, data-id, data-cat and the search text — client/src/ui/resources/resourceDictionary.test.ts
  *             a system tile exists only for a public system — client/src/ui/resources/sourceIndex.test.ts
- *             tiles in every group run by level ascending then name, and a tile is locked (dimmed, lock badge) exactly when its level is above the player's — client/src/ui/resources/levels.test.ts
+ *             tiles in every group run in commonness order (commonness.ts), and a tile is locked (dimmed, lock badge) exactly when its level is above the player's — client/src/ui/resources/levels.test.ts
  * extend:     a new view is one function here returning a grid and one entry in VIEWS in resourceDictionary.ts
  */
 
 import { esc } from '../escape';
-import { levelIndex, resourceEntries, sourceIndex } from './resourceData';
-import { isLocked, levelOf, sortByLevel, type LevelView } from './levels';
+import { commonnessIndex, levelIndex, resourceEntries, sourceIndex } from './resourceData';
+import { isLocked, levelOf, type LevelView } from './levels';
+import { sortByCommonness } from './commonness';
 import { categoryIcon } from './categoryIcons';
 import { CATEGORY_LABEL, CATEGORY_ORDER } from './resourceIndex';
 import { enemyIcon, itemIcon, itemName, rockIcon, systemIcon, type ResourceDeps } from './guideChips';
@@ -42,13 +43,13 @@ function tile(d: ResourceDeps, view: View, id: string, icon: string, name: strin
   const label = locked ? `${name} (unlocks at level ${lv})` : name;
   return `<button type="button" class="rg-tile${locked ? ' locked' : ''}" data-view-of="${view}" data-id="${esc(id)}" data-cat="${esc(cat)}" data-q="${esc(q.toLowerCase())}"${lv === undefined ? '' : ` data-level="${lv}"`} aria-label="${esc(label)}"><span class="gc big">${icon}</span>${badge}<span class="rg-name rd-name">${esc(name)}</span>${sub ? `<span class="rg-sub">${esc(sub)}</span>` : ''}</button>`;
 }
-const lvOf = (view: LevelView) => (e: { id: string }) => levelOf(levelIndex(), view, e.id);
+const ordered = <T extends { id: string }>(view: LevelView, items: T[], name: (t: T) => string) => sortByCommonness(commonnessIndex(), levelIndex(), view, items, name);
 
 /** Resources, grouped by category */
 export function resourceGridHtml(d: ResourceDeps): string {
   const all = resourceEntries();
   return CATEGORY_ORDER.map((c) => {
-    const es = sortByLevel(all.filter((e) => e.category === c), lvOf('res'), (e) => e.name);
+    const es = ordered('res', all.filter((e) => e.category === c), (e) => e.name);
     if (!es.length) return '';
     const hay = (e: (typeof es)[number]) => [e.name, e.id, e.description, CATEGORY_LABEL[e.category], ...e.sources.flatMap((s) => [s.text, ...(s.where ?? [])]), ...e.usedFor, e.hint ?? ''].join(' ');
     return `<section class="rg-group" data-group="${c}"><h4>${categoryIcon(c, 15)}${esc(CATEGORY_LABEL[c])}</h4><div class="rg-grid">${es.map((e) => tile(d, 'res', e.id, itemIcon(d, e.id), e.name, hay(e), e.category)).join('')}</div></section>`;
@@ -56,12 +57,12 @@ export function resourceGridHtml(d: ResourceDeps): string {
 }
 
 export function rockGridHtml(d: ResourceDeps): string {
-  const tiles = sortByLevel(sourceIndex().rocks, lvOf('rock'), (r) => r.name).map((r) => tile(d, 'rock', r.id, rockIcon(d, r.id), r.name, [r.name, r.id, ...r.systems.map((s) => s.name), ...r.yields.map((y) => itemName(y.item))].join(' ')));
+  const tiles = ordered('rock', sourceIndex().rocks, (r) => r.name).map((r) => tile(d, 'rock', r.id, rockIcon(d, r.id), r.name, [r.name, r.id, ...r.systems.map((s) => s.name), ...r.yields.map((y) => itemName(y.item))].join(' ')));
   return `<section class="rg-group"><div class="rg-grid">${tiles.join('')}</div></section>`;
 }
 
 export function enemyGridHtml(d: ResourceDeps): string {
-  const tiles = sortByLevel(sourceIndex().enemies, lvOf('enemy'), (e) => e.name).map((e) => tile(d, 'enemy', e.id, enemyIcon(d, e.id), e.name, [e.name, e.id, e.faction, e.kind, ...e.where, ...e.drops.map((x) => itemName(x.item))].join(' ')));
+  const tiles = ordered('enemy', sourceIndex().enemies, (e) => e.name).map((e) => tile(d, 'enemy', e.id, enemyIcon(d, e.id), e.name, [e.name, e.id, e.faction, e.kind, ...e.where, ...e.drops.map((x) => itemName(x.item))].join(' ')));
   return `<section class="rg-group"><div class="rg-grid">${tiles.join('')}</div></section>`;
 }
 
@@ -69,6 +70,6 @@ export function systemGridHtml(d: ResourceDeps): string {
   const ix = sourceIndex();
   const rockName = (id: string) => ix.rocks.find((r) => r.id === id)?.name ?? id;
   const enemyName = (id: string) => ix.enemies.find((e) => e.id === id)?.name ?? id;
-  const tiles = sortByLevel(ix.systems, lvOf('sys'), (s) => s.name).map((s) => tile(d, 'sys', s.id, systemIcon(s.id), s.name, [s.name, s.sector.replace(/_/g, ' '), ...s.rocks.map((r) => rockName(r.rock)), ...s.items.map((x) => itemName(x.item)), ...s.enemies.map(enemyName)].join(' '), '', `Danger ${s.danger}`));
+  const tiles = ordered('sys', ix.systems, (s) => s.name).map((s) => tile(d, 'sys', s.id, systemIcon(s.id), s.name, [s.name, s.sector.replace(/_/g, ' '), ...s.rocks.map((r) => rockName(r.rock)), ...s.items.map((x) => itemName(x.item)), ...s.enemies.map(enemyName)].join(' '), '', `Danger ${s.danger}`));
   return `<section class="rg-group"><div class="rg-grid">${tiles.join('')}</div></section>`;
 }
