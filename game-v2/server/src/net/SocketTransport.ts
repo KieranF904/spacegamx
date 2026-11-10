@@ -97,6 +97,18 @@ export class SocketTransport {
     });
 
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
+    // Silent sockets (a vanished network, a dead tab) are reaped: ping every 30 s, drop any that never answered the last one
+    const alive = new WeakSet<WebSocket>();
+    this.wss.on('connection', (ws) => { alive.add(ws); ws.on('pong', () => alive.add(ws)); });
+    const reaper = setInterval(() => {
+      for (const ws of this.wss.clients) {
+        if (!alive.has(ws)) { ws.terminate(); continue; }
+        alive.delete(ws);
+        try { ws.ping(); } catch { /* closing */ }
+      }
+    }, 30_000);
+    reaper.unref();
+    this.wss.on('close', () => clearInterval(reaper));
     // (Without these an error event has no listener and is thrown: the whole server would go down)
     this.wss.on('error', (e) => console.error('[Socket] server error:', e));
     this.httpServer.on('clientError', (_e, sock) => { try { sock.destroy(); } catch { /* gone */ } });

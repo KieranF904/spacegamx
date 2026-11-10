@@ -144,6 +144,7 @@ async function sendPushoverNotification(title: string, message: string, priority
     await fetch('https://api.pushover.net/1/messages.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10_000),
       body: JSON.stringify({
         token: PUSHOVER_APP_TOKEN,
         user: PUSHOVER_USER_KEY,

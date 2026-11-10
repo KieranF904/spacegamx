@@ -58,7 +58,13 @@ export function trackErrors(gs: GameServer): void {
   const origConsoleError = console.error;
   console.error = (...args: any[]) => {
     origConsoleError.apply(console, args);
-    const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+    // (An Error stringifies to {}: its stack says more; anything circular or unprintable falls back to String)
+    const show = (a: unknown): string => {
+      if (typeof a === 'string') return a;
+      if (a instanceof Error) return a.stack ?? `${a.name}: ${a.message}`;
+      try { return JSON.stringify(a) ?? String(a); } catch { return String(a); }
+    };
+    const msg = args.map(show).join(' ');
     gs.recentErrors.push(`[${new Date().toISOString()}] ${msg}`);
     if (gs.recentErrors.length > MAX_ERRORS) gs.recentErrors.shift();
   };

@@ -22,6 +22,7 @@ RestartSec=3
 CPUWeight=100
 MemoryHigh=256M
 MemoryMax=384M
+Environment=NODE_OPTIONS=--max-old-space-size=200
 # Files it makes (accounts): not readable by other users
 UMask=0027
 NoNewPrivileges=true
