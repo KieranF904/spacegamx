@@ -3,7 +3,7 @@
  * owns:       effects that go on over time: burning parts, wrecked boss pieces smoking, a boss's charging glow, embers off
  *             crumbling debris and glints over ships being repaired
  * needs:      DamageCtx (particles, ships, sound, clock), common isRuined
- * invariants: a burn ends when its time is up or its part is gone — none pinned
+ * invariants: a burn ends when its time is up or its part is gone — client/src/ships/damage/shieldsAmbient.test.ts
  * extend:     a new lingering effect is one member below, called from DamageFx.update
  */
 

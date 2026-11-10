@@ -2,8 +2,8 @@
  * @contract client.ship.hit-flow
  * owns:       the order in which a frame's confirmed and client-found hits are searched, handed out and corrected around each snapshot
  * needs:      HitFlowHost (hits, selfHits, ownShells, otherGuns, guides, bodies, moves, store, state); npm: @space-game/common
- * invariants: the snapshot window is searched once, before anything that reads HP — none pinned
- *             hits found here are worked out before the told ones, as the server orders them — none pinned
+ * invariants: the snapshot window is searched once, before anything that reads HP — client/src/ships/hits/HitFlow.test.ts
+ *             hits found here are worked out before the told ones, as the server orders them — client/src/ships/hits/HitFlow.test.ts
  * extend:     a new hit-related server message is one more call to findHits() before it reads HP
  */
 

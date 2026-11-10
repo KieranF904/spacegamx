@@ -3,7 +3,7 @@
  * owns:       the world spots the lesson wants shown on the system map and the minimap (the training yard's "Jump here" ring): the
  *             lesson UI writes the list each frame, the map layer and the radar read it
  * needs:      nothing
- * invariants: empty unless a lesson step is pointing at a spot — none pinned
+ * invariants: empty unless a lesson step is pointing at a spot — client/src/state/asteroidGuideState.test.ts
  * extend:     a new kind of spot is a field on GuideMark and a case in the map layer (ui/systemMap/layersGuides.ts)
  */
 

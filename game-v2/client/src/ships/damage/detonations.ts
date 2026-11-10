@@ -3,8 +3,8 @@
  * owns:       what each kind of warhead, burst or bolt looks, sounds and shakes like where it goes off (the server's detonation
  *             message names the kind)
  * needs:      DamageCtx (particles, sound, shake, delayed actions), damage/flakBurst (a flak burst's fragments)
- * invariants: a kind with no entry below is drawn as a missile's fireball — none pinned
- *             a hive's blast is a missile's at 0.7 of its radius — none pinned
+ * invariants: a kind with no entry below is drawn as a missile's fireball — client/src/ships/damage/detonations.test.ts
+ *             a hive's blast is a missile's at 0.7 of its radius — client/src/ships/damage/detonations.test.ts
  * extend:     a new kind of detonation is one function below and one line in KINDS
  */
 

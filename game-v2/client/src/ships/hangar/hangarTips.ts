@@ -2,7 +2,7 @@
  * @contract client.hangar.tips
  * owns:       the hangar's grid part tooltips: when they show and what they say (the parts list has its own hover card: build/partHoverCard.ts)
  * needs:      HangarHost (tip, tipKey, tipGen, deps), partTip.ts; npm: @space-game/common
- * invariants: tooltip contents rebuild only when the key changes — none pinned
+ * invariants: tooltip contents rebuild only when the key changes — client/src/ships/hangar/hangarViews.test.ts
  * extend:     a new tooltip source is one function here, calling showTip with its key
  */
 

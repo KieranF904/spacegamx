@@ -4,7 +4,7 @@
  *             points, and the once-per-cell rule for one held-button drag
  * needs:      common Vec2 (a type only)
  * invariants: a cell is handed out at most once per drag, in path order, and a fast drag skips none — client/src/ships/build/dragPaint.test.ts
- *             it only walks cells; whether a part can go or be taken there stays with each editor's own rules — none pinned
+ *             it only walks cells; whether a part can go or be taken there stays with each editor's own rules — client/src/ships/build/buildViews.test.ts
  * extend:     an editor starts a DragPaint on mouse down (after acting on the clicked cell) and calls visit() on each mouse move
  */
 

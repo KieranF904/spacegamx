@@ -2,7 +2,7 @@
  * @contract client.hangar.host
  * owns:       HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)
  * needs:      common ship types, PortsGrid, HangarLitView
- * invariants: modules reach the editor only through this interface — none pinned
+ * invariants: modules reach the editor only through this interface — client/src/ships/hangar/hangarViews.test.ts
  * extend:     a member a new module needs is added to HangarHost, and made public in HangarUI
  */
 import { Blueprint, Catalog, Economy, Bag, PlacedPart, PlacedGeom, Side, ShipTuning, ShipDerived, Vec2, BlueprintError, TurretWindow, ClientMessage, ServerHangarMessage, ShipState, type MountingProblem } from '@space-game/common';

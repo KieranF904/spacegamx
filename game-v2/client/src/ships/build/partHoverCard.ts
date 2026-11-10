@@ -4,8 +4,8 @@
  *             name, size and mount, one sentence, three numbers, cost and lock, and a "More…" section holding the long tooltip rows
  * needs:      build/partCard (numbers, sentence, placement), build/detailMode, gunPreview (GunPlan, GunPreview, gunArt), partTip, modelCards, ui/componentKit;
  *             DOM; the palette's styles for .hp-mat chips
- * invariants: one card and one preview per list, made on the first hover; the preview stops when the card hides — none pinned
- *             "More…" starts open in Advanced and closed in Simple; Shift or a click flips it — none pinned
+ * invariants: one card and one preview per list, made on the first hover; the preview stops when the card hides — client/src/ships/build/buildViews.test.ts
+ *             "More…" starts open in Advanced and closed in Simple; Shift or a click flips it — client/src/ships/build/buildViews.test.ts
  * extend:     a new part kind's numbers are in build/partCard.ts; a new card section is one function here, appended in render()
  */
 

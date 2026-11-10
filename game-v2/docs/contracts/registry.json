@@ -2137,7 +2137,7 @@
       "invariants": [
         {
           "text": "a frame runs delayed actions, ambient effects, anchors, then draws particles, shields, ripples, charges",
-          "test": "none pinned"
+          "test": "client/src/ships/DamageFx.test.ts"
         }
       ],
       "extend": "a new announced effect is a function in damage/events.ts (or a kind in damage/detonations.ts) and one forwarding method here",
@@ -2170,8 +2170,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the hangar edits a copy of the blueprint until Save",
-          "test": "none pinned"
+          "text": "the hangar loads a cloneJson copy of the stored design and edits only that until Save",
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new panel or overlay is a module under hangar/ taking HangarHost; add the members it needs to hangar/host.ts",
@@ -2204,8 +2204,8 @@
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
       "invariants": [
         {
-          "text": "hits are searched once per snapshot window, before anything that reads HP",
-          "test": "none pinned"
+          "text": "hits are searched once per snapshot window, before anything that reads HP (HitFlow.findHits, called from here before the HP check)",
+          "test": "client/src/ships/hits/HitFlow.test.ts"
         },
         {
           "text": "your own ship is stepped on its tick layer only (own/OwnTick), never here",
@@ -2251,7 +2251,7 @@
         },
         {
           "text": "damage and the hit flash are data the hull shader reads: taking hits builds nothing",
-          "test": "none pinned"
+          "test": "client/src/ships/ShipRenderer.test.ts"
         }
       ],
       "extend": "a new per-ship visual is a field on BodyView (render/viewTypes.ts) drawn in update(), or a new module under ships/render/",
@@ -2343,7 +2343,7 @@
         },
         {
           "text": "marks only draw, never change a design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a part kind with a direction but no `facing` is one more case in facingMark(); a canvas drawer reuses facingMark / coverPolyline",
@@ -2557,7 +2557,7 @@
       "invariants": [
         {
           "text": "the switch shows the stored mode and follows changes made elsewhere",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "none",
@@ -2594,7 +2594,7 @@
         },
         {
           "text": "it only walks cells; whether a part can go or be taken there stays with each editor's own rules",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "an editor starts a DragPaint on mouse down (after acting on the clicked cell) and calls visit() on each mouse move",
@@ -2936,11 +2936,11 @@
       "invariants": [
         {
           "text": "one card and one preview per list, made on the first hover; the preview stops when the card hides",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         },
         {
           "text": "\"More…\" starts open in Advanced and closed in Simple; Shift or a click flips it",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "a new part kind's numbers are in build/partCard.ts; a new card section is one function here, appended in render()",
@@ -3178,7 +3178,7 @@
         },
         {
           "text": "marks only draw, never change a design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a new kind of port is one more case in portMarks(); a canvas or pixi drawer reuses PortMark.poly and PORT_COLOR",
@@ -3405,7 +3405,7 @@
         },
         {
           "text": "the animated canvas layer runs its frame loop only while it has something to show",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "a new thing drawn is a FlowSink call in drawFlow(); a new target (another renderer) is one more FlowSink",
@@ -3753,11 +3753,11 @@
       "invariants": [
         {
           "text": "a stats panel opts in by putting <span data-sd=\"KEY\"> beside a stat; chips fill and clear without rebuilding the panel",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         },
         {
           "text": "the card is hidden whenever there is no change under the cursor",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "a stat gets a chip by emitting a data-sd span with its STATS key in the panel's html",
@@ -3969,7 +3969,7 @@
       "invariants": [
         {
           "text": "a burn ends when its time is up or its part is gone",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         }
       ],
       "extend": "a new lingering effect is one member below, called from DamageFx.update",
@@ -4036,11 +4036,11 @@
       "invariants": [
         {
           "text": "a kind with no entry below is drawn as a missile's fireball",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/detonations.test.ts"
         },
         {
           "text": "a hive's blast is a missile's at 0.7 of its radius",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/detonations.test.ts"
         }
       ],
       "extend": "a new kind of detonation is one function below and one line in KINDS",
@@ -4194,7 +4194,7 @@
       "invariants": [
         {
           "text": "a boss's death is nine blasts across its hull then one huge one",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/detonations.test.ts"
         }
       ],
       "extend": "a new announced effect is one function below and one forwarding method on DamageFx",
@@ -4262,8 +4262,8 @@
           "test": "client/src/ships/damage/flakBurst.test.ts"
         },
         {
-          "text": "nothing here changes a hit or a blast; it only draws what the server's detonation already says",
-          "test": "none pinned"
+          "text": "nothing here changes a hit or a blast: the fragment plan is pure and the ship search only reads the drawn world",
+          "test": "client/src/ships/damage/flakBurstShips.test.ts"
         }
       ],
       "extend": "a new quality tier is one more row of FRAGMENT_TIERS",
@@ -4339,7 +4339,7 @@
       "invariants": [
         {
           "text": "a crumbling part throttles its sound",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         }
       ],
       "extend": "a new kind of part is one case in partDestroyed and a function below",
@@ -4422,11 +4422,11 @@
       "invariants": [
         {
           "text": "the live list is capped by setQuality and the lower tiers drop a share of the small particles",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/particles.test.ts"
         },
         {
           "text": "a chunk's hot edge is stroked once and parked for the next chunk when it cools",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/particles.test.ts"
         }
       ],
       "extend": "a new particle kind is one member of P.kind, one helper below and one case in draw",
@@ -4477,11 +4477,11 @@
       "invariants": [
         {
           "text": "a shield's drop that a shell's ripple already sounded is not sounded again within RIPPLE_HEARD_MS",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         },
         {
           "text": "a ripple lives 18 frames and rides the ship's frame",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         }
       ],
       "extend": "a new shield look is a ShieldLook field (shieldLooks.ts) drawn in drawShields",
@@ -4518,7 +4518,7 @@
         },
         {
           "text": "undock puts the ship back where it came in",
-          "test": "none pinned"
+          "test": "client/src/ships/dock/DockControl.test.ts"
         }
       ],
       "extend": "a new hint line is one more branch in updateHints",
@@ -4985,7 +4985,7 @@
         },
         {
           "text": "a step the live ship has since made moot falls away (the history is dropped when edits settle)",
-          "test": "none pinned"
+          "test": "client/src/ships/field/fieldViews.test.ts"
         }
       ],
       "extend": "a new kind of edit in the view runs inside aids.edit() so it is undoable",
@@ -5081,7 +5081,7 @@
       "invariants": [
         {
           "text": "it shows the working design as it would run once every planned part is built (labelled \"as designed\")",
-          "test": "none pinned"
+          "test": "client/src/ships/field/fieldViews.test.ts"
         }
       ],
       "extend": "FieldOverlay calls mount() once, toggle() on the key, draw() each frame; nothing else",
@@ -5108,11 +5108,11 @@
       "invariants": [
         {
           "text": "what glows is added as a bloom source",
-          "test": "none pinned"
+          "test": "client/src/ships/fx/ShipFx.test.ts"
         },
         {
           "text": "the local jump charge sound is cut on abort",
-          "test": "none pinned"
+          "test": "client/src/ships/fx/ShipFx.test.ts"
         }
       ],
       "extend": "a new effect layer is one more field and one more line in init",
@@ -5152,7 +5152,7 @@
       "invariants": [
         {
           "text": "only a block whose HP changed is redrawn",
-          "test": "none pinned"
+          "test": "client/src/ships/gunPreview/blockArt.test.ts"
         }
       ],
       "extend": "a new damage look is one change in drawBlock",
@@ -5418,11 +5418,11 @@
       "invariants": [
         {
           "text": "a fire event's shells are rebuilt exactly as the server spawned them",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/FireShells.test.ts"
         },
         {
           "text": "tell codes (TELL_*) never build shells",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/FireShells.test.ts"
         }
       ],
       "extend": "a new fire-event tell is one more `if (ammo === TELL_X)` branch in fromFire",
@@ -5463,11 +5463,11 @@
       "invariants": [
         {
           "text": "point defence turns to its last intercept and rests after 900 ms",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/TurretVisuals.test.ts"
         },
         {
           "text": "your own ship with prediction on is skipped (its guns are stepped on the tick layer)",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/TurretVisuals.test.ts"
         }
       ],
       "extend": "a new gimbal rule is one more branch in stepTurrets",
@@ -5616,7 +5616,7 @@
       "invariants": [
         {
           "text": "a save or delete that would lose a design asks first",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new load source is one case in loadSelected() and one option group in refreshLoadList()",
@@ -5691,8 +5691,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "layer order is grid, turret arcs, parts, mounting, groups, overlays, ghost",
-          "test": "none pinned"
+          "text": "layer order is grid, turret arcs, parts, placed marks, mounting, groups, overlays, ghost",
+          "test": "client/src/ships/hangar/hangarDraw.test.ts"
         }
       ],
       "extend": "a new overlay is one block in draw() and one toggle in HangarHost.overlays",
@@ -5724,8 +5724,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the hangar edits a copy of the blueprint until Save",
-          "test": "none pinned"
+          "text": "editing changes only ui.bp (the editor's copy), never the design it was cloned from",
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new placement rule is a case in placementProblem",
@@ -5846,7 +5846,7 @@
         },
         {
           "text": "marks only draw, never change the design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a new kind of mark is one function here, called from hangarDraw.ts draw()",
@@ -5917,7 +5917,7 @@
       "invariants": [
         {
           "text": "marks only draw, never change the design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a new grid mark is one function here, called from hangarDraw.ts draw()",
@@ -5958,7 +5958,7 @@
       "invariants": [
         {
           "text": "renderStats rebuilds the panel and rebinds its buttons",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new section is one html function here, appended in renderStats()",
@@ -6033,7 +6033,7 @@
       "invariants": [
         {
           "text": "every row carries its data-sd span, so the stat-delta chips fill in as in Advanced",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a stat kept in Simple is one row here and one key in build/simpleStats.ts",
@@ -6060,7 +6060,7 @@
       "invariants": [
         {
           "text": "tooltip contents rebuild only when the key changes",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new tooltip source is one function here, calling showTip with its key",
@@ -6115,7 +6115,7 @@
       "invariants": [
         {
           "text": "modules reach the editor only through this interface",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a member a new module needs is added to HangarHost, and made public in HangarUI",
@@ -6214,11 +6214,11 @@
       "invariants": [
         {
           "text": "the snapshot window is searched once, before anything that reads HP",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/HitFlow.test.ts"
         },
         {
           "text": "hits found here are worked out before the told ones, as the server orders them",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/HitFlow.test.ts"
         }
       ],
       "extend": "a new hit-related server message is one more call to findHits() before it reads HP",
@@ -6259,11 +6259,11 @@
       "invariants": [
         {
           "text": "a hit that cannot mine shows plain sparks",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/StrikeFx.test.ts"
         },
         {
           "text": "only your own working hits tick and add progress",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/StrikeFx.test.ts"
         }
       ],
       "extend": "a new hit look is one more branch in struck()",
@@ -6309,11 +6309,11 @@
       "invariants": [
         {
           "text": "the status record and ring records are reused between calls",
-          "test": "none pinned"
+          "test": "client/src/ships/hud/ShipReadouts.test.ts"
         },
         {
           "text": "ring groups come off the predicted gun state",
-          "test": "none pinned"
+          "test": "client/src/ships/hud/ShipReadouts.test.ts"
         }
       ],
       "extend": "a new HUD readout is one more method here, fed from the ship record",
@@ -6351,7 +6351,7 @@
         },
         {
           "text": "a charge under way keeps the aim it was locked with",
-          "test": "none pinned"
+          "test": "client/src/ships/jump/JumpControl.test.ts"
         }
       ],
       "extend": "a new system-wide flight field is one more field set in onSystemInfo and read by replicaEnv",
@@ -6424,12 +6424,12 @@
       "events": "",
       "invariants": [
         {
-          "text": "each tick's events are drawn once",
-          "test": "none pinned"
+          "text": "each event OwnTick hands out is drawn once (OwnTick.takeEvents presents each tick once)",
+          "test": "client/src/ships/own/OwnPresent.test.ts"
         },
         {
           "text": "no volley is drawn while berthed",
-          "test": "none pinned"
+          "test": "client/src/ships/own/OwnPresent.test.ts"
         }
       ],
       "extend": "a new own-ship gun event kind is one more branch in presentOwn",
@@ -6487,7 +6487,7 @@
       "invariants": [
         {
           "text": "the drive has the engines while charging or burning (idle command)",
-          "test": "none pinned"
+          "test": "client/src/ships/own/thrustCommand.test.ts"
         }
       ],
       "extend": "a new control scheme is one more branch on helm / noseThrust",
@@ -6521,7 +6521,7 @@
       "invariants": [
         {
           "text": "a gun too small on screen is neither drawn nor turned",
-          "test": "none pinned"
+          "test": "client/src/ships/render/GunDrawer.test.ts"
         }
       ],
       "extend": "a new per-gun visual state is one more branch in animate()",
@@ -6559,7 +6559,7 @@
         },
         {
           "text": "a design changed in place drops a stale worker answer",
-          "test": "none pinned"
+          "test": "client/src/ships/render/HullDrawer.test.ts"
         }
       ],
       "extend": "a new kind of per-view mesh is built in drawHull and freed in disposeFrame",
@@ -6592,8 +6592,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "values only; changing one changes the look of every ship",
-          "test": "none pinned"
+          "text": "values and text styles only, no functions or state",
+          "test": "client/src/ships/render/renderValues.test.ts"
         }
       ],
       "extend": "a new draw constant is added here and imported where used",
@@ -6780,7 +6780,7 @@
       "invariants": [
         {
           "text": "a look is destroyed only when no ship uses it and the idle cache is full",
-          "test": "none pinned"
+          "test": "client/src/ships/render/gunLooks.test.ts"
         }
       ],
       "extend": "a new shared gun-look helper is added here",
@@ -7021,11 +7021,11 @@
       "invariants": [
         {
           "text": "the nearest muzzle to the shot takes the kick",
-          "test": "none pinned"
+          "test": "client/src/ships/render/muzzle.test.ts"
         },
         {
           "text": "twin barrels take turns (view.salvo)",
-          "test": "none pinned"
+          "test": "client/src/ships/render/muzzle.test.ts"
         }
       ],
       "extend": "a new muzzle query is one more exported function here",
@@ -7065,8 +7065,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "a view holds drawn state only; nothing here is decided by gameplay",
-          "test": "none pinned"
+          "text": "types only (no runtime code); a view holds drawn state, nothing gameplay decides",
+          "test": "client/src/ships/render/renderValues.test.ts"
         }
       ],
       "extend": "a new per-ship drawn thing is one more field on BodyView",
@@ -7111,7 +7111,7 @@
         },
         {
           "text": "a ship docked to yours is placed at your draw tick",
-          "test": "none pinned"
+          "test": "client/src/ships/replicas/ReplicaPlacement.test.ts"
         }
       ],
       "extend": "a new per-pilot data column is one more entry in placeReplica's data row",
@@ -7179,7 +7179,7 @@
       "invariants": [
         {
           "text": "a rock's first position is its orbit position at the current tick, not (0, 0)",
-          "test": "none pinned"
+          "test": "client/src/state/asteroidGuideState.test.ts"
         }
       ],
       "extend": "a new way asteroids arrive is one more exported function here and one delegating method on GameState",
@@ -7267,7 +7267,7 @@
       "invariants": [
         {
           "text": "empty unless a lesson step is pointing at a spot",
-          "test": "none pinned"
+          "test": "client/src/state/asteroidGuideState.test.ts"
         }
       ],
       "extend": "a new kind of spot is a field on GuideMark and a case in the map layer (ui/systemMap/layersGuides.ts)",
@@ -7575,14 +7575,14 @@
       "id": "client.system-map",
       "path": "client/src/ui/SystemMapUI.ts",
       "group": "client/ui",
-      "lines": 776,
+      "lines": 771,
       "owns": "the map overlay shell: views, camera, input, hits and hover, the frame loop",
       "needs": "systemMap/* modules (layers, galaxyView, marks, tooltip) through the MapHost interface, GameState; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
-          "text": "each frame rebuilds hits from the layers, in draw order",
-          "test": "none pinned"
+          "text": "the hover is the nearest of the hits the layers push each frame in draw order (nearestHit)",
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new system-view layer is one function in systemMap/layers*.ts, called from drawSystem; a new tooltip case goes in systemMap/tooltip.ts",
@@ -7594,7 +7594,7 @@
           "name": "SystemMapUI",
           "kind": "class",
           "start": 52,
-          "end": 776
+          "end": 771
         }
       ]
     },
@@ -7640,7 +7640,7 @@
         },
         {
           "text": "the picker sends only weapons on offer, and never the one already flown",
-          "test": "none pinned"
+          "test": "client/src/ui/gunRange/gunRangeHud.test.ts"
         }
       ],
       "extend": "a new HUD piece is an element built in the constructor and drawn in update()",
@@ -7953,8 +7953,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the panel sizes, folds and places itself around its tabs",
-          "test": "none pinned"
+          "text": "tabs keep their registration order and unique ids, and the panel names no tab (its sizing and placing is hubLayout's)",
+          "test": "client/src/ui/hub/hub.test.ts"
         }
       ],
       "extend": "a new tab is a module in ui/hub/tabs/ giving a HubTab and one register line in app/windows.ts; the panel names no tab",
@@ -9461,8 +9461,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the repair bank tab behaves as its store says",
-          "test": "none pinned"
+          "text": "the repair bank tab (the 'bank' Tab id) is drawn from its store's last report",
+          "test": "client/src/ui/station/bank.test.ts"
         }
       ],
       "extend": "a new tab id goes in Tab, a new shared need on StationCtx (built once in StationWindow.ts), and a new tab is a module under ui/station/ plus a line in StationWindow's tab list and render()",
@@ -9580,7 +9580,7 @@
       "invariants": [
         {
           "text": "one hit per system, pushed as it is drawn",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new galaxy mark is one block in drawGalaxy",
@@ -9627,7 +9627,7 @@
       "invariants": [
         {
           "text": "modules reach the map only through this interface",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a member a new layer needs is added to MapHost, and made public in SystemMapUI",
@@ -9661,7 +9661,7 @@
       "invariants": [
         {
           "text": "drawn over the scenery and traffic, under your own ship",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new guide layer is one function here, called from SystemMapUI.drawSystem",
@@ -9708,8 +9708,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "layers push hits in draw order, so later ones win ties",
-          "test": "none pinned"
+          "text": "layers push hits in draw order; the hover takes the nearest, an earlier hit keeping an exact tie (nearestHit)",
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new traffic layer is one function here, called from SystemMapUI.drawSystem",
@@ -9784,8 +9784,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "layers push hits in draw order, so later ones win ties",
-          "test": "none pinned"
+          "text": "layers push hits in draw order; the hover takes the nearest, an earlier hit keeping an exact tie (nearestHit)",
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new scenery layer is one function here, called from SystemMapUI.drawSystem",
@@ -9896,7 +9896,7 @@
       "invariants": [
         {
           "text": "label priority decides who keeps a spot",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new kind of mark is one function here",
@@ -9958,7 +9958,7 @@
       "invariants": [
         {
           "text": "the tooltip shows the nearest hit's details",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new hit kind is one case in updateTooltip",

@@ -4,7 +4,7 @@
  *             faint and bright under the mouse) and shaped-shield cover (in hand, hovered in the parts list, fitted ones faint)
  * needs:      HangarHost (geoms, ctx, mouse, view, paletteHover, handTurn), ships/build/buildMarks and portMarks geometry; npm: @space-game/common
  * invariants: the cover drawn is the one shaped.ts derives — client/src/ships/build/buildMarks.test.ts
- *             marks only draw, never change the design — none pinned
+ *             marks only draw, never change the design — client/src/ships/hangar/marksPure.test.ts
  * extend:     a new kind of mark is one function here, called from hangarDraw.ts draw()
  */
 

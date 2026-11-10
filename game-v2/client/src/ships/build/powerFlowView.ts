@@ -5,7 +5,7 @@
  * needs:      powerFlow.ts (the data), PlacedGeom outlines; npm: pixi.js (type only)
  * invariants: the layers are independent (the hangar's own overlay already draws the lines and port glyphs, so it asks for
  *             pulses and verdicts only) — client/src/ships/build/powerFlow.test.ts
- *             the animated canvas layer runs its frame loop only while it has something to show — none pinned
+ *             the animated canvas layer runs its frame loop only while it has something to show — client/src/ships/build/buildViews.test.ts
  * extend:     a new thing drawn is a FlowSink call in drawFlow(); a new target (another renderer) is one more FlowSink
  */
 

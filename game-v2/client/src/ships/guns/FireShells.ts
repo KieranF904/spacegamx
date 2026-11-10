@@ -2,8 +2,8 @@
  * @contract client.ship.fire-shells
  * owns:       other ships' fire events turned into shells, charge tells and sounds, plus the look (model, damage) each shell was fired with
  * needs:      FireShellsHost (store, state, tuning, own.firePose, replicas.preAt, gunFeel, otherGuns.built, beamFx), common rebuildVolley/partWeaponDef
- * invariants: a fire event's shells are rebuilt exactly as the server spawned them — none pinned
- *             tell codes (TELL_*) never build shells — none pinned
+ * invariants: a fire event's shells are rebuilt exactly as the server spawned them — client/src/ships/guns/FireShells.test.ts
+ *             tell codes (TELL_*) never build shells — client/src/ships/guns/FireShells.test.ts
  * extend:     a new fire-event tell is one more `if (ammo === TELL_X)` branch in fromFire
  */
 

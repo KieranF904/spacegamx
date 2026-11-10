@@ -2,8 +2,8 @@
  * @contract client.ship.turret-visuals
  * owns:       the look-only gimbal steps for turrets and fixed guns on ships whose guns this client does not step, and point-defence aim
  * needs:      TurretVisualsHost (store, state, tuning, localAim), common stepTurretAim/stepFixedGunAim/stepPointDefenceAim
- * invariants: point defence turns to its last intercept and rests after 900 ms — none pinned
- *             your own ship with prediction on is skipped (its guns are stepped on the tick layer) — none pinned
+ * invariants: point defence turns to its last intercept and rests after 900 ms — client/src/ships/guns/TurretVisuals.test.ts
+ *             your own ship with prediction on is skipped (its guns are stepped on the tick layer) — client/src/ships/guns/TurretVisuals.test.ts
  * extend:     a new gimbal rule is one more branch in stepTurrets
  */
 

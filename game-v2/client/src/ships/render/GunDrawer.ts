@@ -2,7 +2,7 @@
  * @contract client.ship.render.gun-drawer
  * owns:       turret heads and fixed barrels each frame: aim easing, recoil, heat, tint under light and damage, cracks and state-driven decor
  * needs:      GunDrawHost (catalog, geometry, renderer zoom/ventPuff, playerId, light level), gunDecor turretHead, gunAnim, turretEase; npm: @space-game/common, pixi.js
- * invariants: a gun too small on screen is neither drawn nor turned — none pinned
+ * invariants: a gun too small on screen is neither drawn nor turned — client/src/ships/render/GunDrawer.test.ts
  * extend:     a new per-gun visual state is one more branch in animate()
  */
 

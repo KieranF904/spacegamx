@@ -3,8 +3,8 @@
  * owns:       showing a StatDelta: the small card that follows the cursor, the +/- chips beside each stat in a stats panel, and
  *             the controller that keeps both current as the hovered cell, the hand or the design changes (debounced when a derive is slow)
  * needs:      statDelta (the numbers), build/detailMode and simpleStats (Simple shows five stats), ui/escape; DOM
- * invariants: a stats panel opts in by putting <span data-sd="KEY"> beside a stat; chips fill and clear without rebuilding the panel — none pinned
- *             the card is hidden whenever there is no change under the cursor — none pinned
+ * invariants: a stats panel opts in by putting <span data-sd="KEY"> beside a stat; chips fill and clear without rebuilding the panel — client/src/ships/build/buildViews.test.ts
+ *             the card is hidden whenever there is no change under the cursor — client/src/ships/build/buildViews.test.ts
  * extend:     a stat gets a chip by emitting a data-sd span with its STATS key in the panel's html
  */
 
