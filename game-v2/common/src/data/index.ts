@@ -8,7 +8,6 @@ export * from './registries.js';
 // Definitions
 export * from './definitions/index.js';
 export * from './definitions/AsteroidDefinition.js';
-export * from './definitions/SunShaderDefs.js';
 
 // Registries
 export * from './registries/index.js';

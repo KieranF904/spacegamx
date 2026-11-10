@@ -62,7 +62,7 @@ function worley(x: number, y: number, z: number, cells: number, seed: number): [
 /**
  * Periodic Worley F2 - F1 from a 4³ search about the point (every feature within 1.5 cells), so F2 is right even where
  * the nearest points are sparse (a 3³ search misses it there, and the field jumps along the cells' faces). The planet
- * shader's fine level (planetProto.ts crackAt) is this, line for line.
+ * shader's fine level (planetLook.ts crackAt) is this, line for line.
  */
 function worleyEdge(x: number, y: number, z: number, cells: number, seed: number): number {
   const ix = Math.floor(x - 0.5), iy = Math.floor(y - 0.5), iz = Math.floor(z - 0.5);
@@ -108,7 +108,7 @@ export function planetNoiseData(size = PLANET_NOISE_SIZE): Uint8Array {
 const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
 
 /**
- * The crack channel's candidates (the planet shader's fine level, planetProto.ts crackAt): for each of 8x8x8 sub-cells
+ * The crack channel's candidates (the planet shader's fine level, planetLook.ts crackAt): for each of 8x8x8 sub-cells
  * of every Worley cell of the A channel (5 cells a tile, so 40³, periodic), the cells (up to 16, nearest first; 4.5
  * on average, more than 16 in one sub-cell in 64000) whose points can be the nearest, or count toward the soft second
  * nearest, anywhere in that sub-cell. The shader then visits just those, not a 4x4x4 search: the same exact field
@@ -117,7 +117,7 @@ const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
  */
 export const CRACK_SLOTS = 16;
 export const CRACK_CELLS_PER_CELL = 8;
-/** How far past the nearest point a point still counts (planetProto.ts: the most a look reads, CRACK_CAP 0.2, in cells, plus 4 K) */
+/** How far past the nearest point a point still counts (planetLook.ts: the most a look reads, CRACK_CAP 0.2, in cells, plus 4 K) */
 export const CRACK_REACH = 0.2 * 0.6 + 4 * 0.025;
 export function planetCrackCells(stats?: { overflow: number; most: number }): Uint8Array {
   const cells = 5, R = CRACK_CELLS_PER_CELL, N = cells * R;

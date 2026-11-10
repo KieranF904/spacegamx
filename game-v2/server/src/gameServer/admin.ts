@@ -1,7 +1,7 @@
 /**
  * @contract server.gameserver.admin
- * owns:       the admin host and the admin server hooks, admin stats and perf metrics
- * needs:      GameServer (type), game/AdminTools, AdminServer; npm: @space-game/common, bitecs
+ * owns:       the admin host, admin stats and perf metrics
+ * needs:      GameServer (type), game/AdminTools; npm: @space-game/common, bitecs
  * invariants: behaviour is unchanged from the class it was split from — none pinned
  * extend:      a new admin command is an AdminHost member here
  */
@@ -118,79 +118,8 @@ export function createAdminHost(gs: GameServer): AdminHost {
   };
 }
 
-export function setupAdminHandlers(gs: GameServer): void {
-  if (!gs.adminServer) return;
-  
-  gs.adminServer.onEvent((event, data) => {
-    switch (event) {
-      case 'configChange':
-        // Config changes are handled by reading from adminServer.getConfig()
-        console.log('🔧 Config updated via admin panel');
-        break;
-        
-      case 'reload':
-        // Hot reload data files
-        console.log('🔧 Hot reloading data files...');
-        // Could re-initialize GameData here
-        break;
-        
-      case 'killAll':
-        // Kill all enemies in specified system
-        adminKillAllEnemies(gs, data?.systemId);
-        break;
-        
-      case 'teleportPlayer':
-        // Teleport a player
-        adminTeleportPlayer(gs, data.playerId, data.x, data.y, data.systemId);
-        break;
-    }
-  });
-}
-
-export function adminKillAllEnemies(gs: GameServer, systemId?: string): void {
-  const systemNum = systemId ? gs.gameData.getSystemNum(systemId) : -1;
-  let killed = 0;
-  for (const eid of [...gs.ships.bodies.keys()]) {
-    if (!gs.enemies.info(eid) || (systemNum >= 0 && InSystem.systemId[eid] !== systemNum)) continue;
-    gs.ships.removeShip(eid);
-    killed++;
-  }
-  console.log(`🔧 Admin: Removed ${killed} hostiles`);
-}
-
-export function adminTeleportPlayer(gs: GameServer, playerId: number, x: number, y: number, systemId?: string): void {
-  if (!hasComponent(gs.world, Player, playerId)) {
-    console.log(`🔧 Admin: Player ${playerId} not found`);
-    return;
-  }
-  
-  // Connected players go through the normal travel path (system info, entity resend)
-  const conn = [...gs.clients.values()].find((c) => c.playerId === playerId);
-  if (conn) {
-    const systemNum = systemId ? gs.gameData.getSystemNum(systemId) : InSystem.systemId[playerId];
-    gs.travelTo(conn, systemNum, x, y, false);
-    console.log(`🔧 Admin: Teleported player ${playerId} to (${x}, ${y})`);
-    return;
-  }
-  
-  Position.x[playerId] = x;
-  Position.y[playerId] = y;
-  Velocity.x[playerId] = 0;
-  Velocity.y[playerId] = 0;
-  
-  if (systemId) {
-    const systemNum = gs.gameData.getSystemNum(systemId);
-    InSystem.systemId[playerId] = systemNum;
-  }
-  
-  console.log(`🔧 Admin: Teleported player ${playerId} to (${x}, ${y})`);
-}
-
 /**
- * Handle HTTP auth requests (register, login, validate)
- */
-/**
- * Report stats to admin server (call from game loop)
+ * Report stats to the admin clients (call from game loop)
  */
 export function reportAdminStats(gs: GameServer, tickTime: number): void {
   // Track tick time history
@@ -202,13 +131,6 @@ export function reportAdminStats(gs: GameServer, tickTime: number): void {
   entityCount += playerQuery(gs.world).length;
   entityCount += projectileQuery(gs.world).length;
   entityCount += asteroidQuery(gs.world).length;
-  
-  gs.adminServer?.updateStats({
-    tick: gs.currentTick,
-    playerCount: gs.clients.size,
-    entityCount,
-    tickTime,
-  });
   
   // Send detailed admin stats to admin clients every ~60 ticks (~1 second)
   if (gs.currentTick % 60 === 0) {

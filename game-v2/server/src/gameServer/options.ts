@@ -16,12 +16,10 @@ import type { FriendsBackend } from '../game/social/FriendsBackend.js';
 import type { RankingsBackend } from '../game/rankings/RankingsBackend.js';
 import { type WorldStore } from '../game/SystemMemory.js';
 import { type ProfileStore } from '../profile/ProfileStore.js';
-import type { AdminServer } from '../AdminServer.js';
 
 export interface GameServerOptions {
   gameData: GameData;
   userDB: UserStore;
-  adminServer?: AdminServer | null;
   /** 'sectors' loads every star system (normal play). 'empty' spawns nothing but players. */
   scene?: 'sectors' | 'empty';
   /** Start the real-time loop immediately (default true). Tests and replays drive step() instead. */

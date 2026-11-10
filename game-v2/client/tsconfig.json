@@ -17,6 +17,6 @@
       "@space-game/common": ["../common/src/index.ts"]
     }
   },
-  "include": ["src/**/*", "tools/**/*"],
-  "exclude": ["node_modules", "dist", "tools/sunlab"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

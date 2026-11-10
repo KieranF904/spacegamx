@@ -5,7 +5,7 @@
  * particles, the HUD's overlays and the maps redrawn less often), so a slow processor gains from Auto stepping down.
  */
 
-import type { PlanetDetail } from '../rendering/planet-proto/planetProto';
+import type { PlanetDetail } from '../rendering/planetView/planetLook';
 
 export type QualitySetting = 'auto' | 'low' | 'medium' | 'high';
 export type QualityTier = 'low' | 'medium' | 'high';
@@ -30,7 +30,7 @@ export interface QualityProfile {
    * same program as High and Medium, so Auto stepping down mid-flight compiles nothing (docs/rendering/sun-sky-prototypes.md)
    */
   sunScale: number;
-  /** How finely planets are drawn (planet-proto/planetProto.ts): fine (cracks worked out exactly), standard, lite */
+  /** How finely planets are drawn (planetView/planetLook.ts): fine (cracks worked out exactly), standard, lite */
   planetDetail: PlanetDetail;
   /** Share of the small effect particles spawned (sparks, smoke and dust: the renderer's, weapons' and damage's) */
   particles: number;

@@ -1,11 +1,11 @@
 /**
  * A planet, moon or brown dwarf as drawn in the game (docs/rendering/planet-prototypes.md): one shaderQuad with the
- * planet fragment (planetProto.ts) at the quality tier's detail, its look's uniforms and the planets' textures. Every
+ * planet fragment (planetLook.ts) at the quality tier's detail, its look's uniforms and the planets' textures. Every
  * live quad follows the detail level: setPlanetDetail swaps their programs (each compiled ahead: planetPrograms).
  */
 import type { GlProgram, Shader } from 'pixi.js';
 import { createShaderQuad, shaderQuadProgram, type ShaderQuad, type UniformDef } from '../shaderQuad';
-import { lookFor, planetFragment, planetProtoUniforms, PLANET_DETAILS, type BodyIn, type PlanetDetail } from './planetProto';
+import { lookFor, planetFragment, planetLookUniforms, PLANET_DETAILS, type BodyIn, type PlanetDetail } from './planetLook';
 import { planetTextures } from './planetTextures';
 
 /** The look's uniforms as shaderQuad's (floats, vec2, vec3) */
@@ -18,7 +18,7 @@ function defs(u: Record<string, number | number[]>): Record<string, UniformDef> 
 }
 
 /** The uniforms' names and types (the same for every body), for the programs */
-const SHAPE = defs(planetProtoUniforms(lookFor({ id: '', kind: 'rocky' }, 0), 'rocky', 0, 1.3));
+const SHAPE = defs(planetLookUniforms(lookFor({ id: '', kind: 'rocky' }, 0), 'rocky', 0, 1.3));
 
 /** The program for a detail level */
 export function planetProgram(detail: PlanetDetail): GlProgram {
@@ -51,7 +51,7 @@ export const planetDetail = (): PlanetDetail => detailNow;
  */
 export function planetQuad(body: BodyIn, seed: number, radius: number, extent: number, detail?: PlanetDetail): ShaderQuad {
   const { noise, crack } = planetTextures();
-  const u = defs(planetProtoUniforms(lookFor(body, seed), body.kind, seed, extent));
+  const u = defs(planetLookUniforms(lookFor(body, seed), body.kind, seed, extent));
   const quad = createShaderQuad(planetFragment(detail ?? detailNow), u, radius * extent, { uNoise: noise, uCrack: crack });
   if (detail) return quad;
   for (const q of live) if (q.mesh.destroyed) live.delete(q);

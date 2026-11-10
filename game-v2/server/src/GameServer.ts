@@ -83,7 +83,6 @@ import { CrowdControl } from './net/crowd/CrowdControl.js';
 import { SystemClocks } from './sim/SystemClocks.js';
 import { GunNet } from './net/guns/GunNet.js';
 import { SnapshotBuilder, type RoundSkip, projectileQuery } from './net/SnapshotBuilder.js';
-import type { AdminServer } from './AdminServer.js';
 import { RemovalSet } from './gameServer/shared.js';
 import { SpatialGrid } from './gameServer/spatialGrid.js';
 import { perfMetrics } from './gameServer/perf.js';
@@ -97,7 +96,7 @@ import { createMiningHost, mineBeam, isGas, beamAsteroid } from './gameServer/ho
 import { setupTutorial, installTutorialAdmin } from './gameServer/hosts/tutorial.js';
 import { setupGunRange } from './gameServer/hosts/gunRange.js';
 import { createShipHost } from './gameServer/hosts/ship.js';
-import { createAdminHost, setupAdminHandlers } from './gameServer/admin.js';
+import { createAdminHost } from './gameServer/admin.js';
 import { initializeWorld } from './gameServer/world.js';
 import { joinFeatureMessages, stationAtConn, installHangarLogin, installSocialLogin, trackErrors } from './gameServer/hooks.js';
 import { asteroidSpawnData, placeAsteroid } from './gameServer/asteroids.js';
@@ -292,7 +291,6 @@ export class GameServer implements ServerCtx {
   readonly clocks: SystemClocks | null;
 
   // Admin server for dev tools
-  adminServer: AdminServer | null = null;
   
   // User database for auth
   userDB: UserStore;
@@ -315,7 +313,6 @@ export class GameServer implements ServerCtx {
     // (what flies by the waypoint law: homing shells and mobs)
     this.guides = new GuideNet({ tick: () => this.currentTick, sources: () => [this.weapons, this.mobs], systemOf: (eid) => InSystem.systemId[eid] });
     this.gameData = opts.gameData;
-    this.adminServer = opts.adminServer || null;
     this.userDB = opts.userDB;
     this.scene = opts.scene ?? 'sectors';
     this.everyoneAdmin = opts.everyoneAdmin ?? false;
@@ -418,11 +415,6 @@ this.devTeleport = opts.devTeleport ?? false;
     this.gunNet = new GunNet({ tick: () => this.currentTick, ships: () => this.ships, env: (eid) => this.replicaEnv(InSystem.systemId[eid]) });
     // The snapshot path (net/SnapshotBuilder.ts): built once, after every module it reads
     this.snapshots = new SnapshotBuilder(snapshotDeps(this), this);
-
-    // Hook up admin server events
-    if (this.adminServer) {
-      setupAdminHandlers(this);
-    }
 
     // Initialize world (the empty scene has no stations, NPCs, portals or asteroids)
     if (this.scene === 'sectors') {

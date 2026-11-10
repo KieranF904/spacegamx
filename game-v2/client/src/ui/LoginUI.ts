@@ -18,7 +18,7 @@ import systemsData from '../../../data/systems.json';
 import { LoginBody, loginBodyForVisit } from './loginBody';
 import { SkyRenderer, skyPrograms } from '../rendering/sky/SkyRenderer';
 import { skyBiome, type BiomeHints } from '../rendering/sky/skyBiome';
-import { attachVolumeUploads } from '../rendering/planet-proto/planetTextures';
+import { attachVolumeUploads } from '../rendering/planetView/planetTextures';
 import { esc } from './escape';
 
 export class LoginUI {

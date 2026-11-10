@@ -1,6 +1,6 @@
 /**
  * Node's built-ins, for the browser build only (vite.config.ts aliases fs, fs/promises, path, os, url, zlib and crypto here
- * when building). The client bundles server code for the sandbox and replays, and some of it imports these by name;
+ * when building). The client bundles server code for proto mode and replays, and some of it imports these by name;
  * Vite's own stand-in has no named exports, so the build would fail. In the browser nothing reads or writes files:
  * reads find nothing and writes are refused.
  */

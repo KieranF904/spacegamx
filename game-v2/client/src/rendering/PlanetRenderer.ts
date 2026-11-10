@@ -1,8 +1,8 @@
 /**
  * Planets and moons: scenery on slow orbits (positions from the shared planetPosition(), driven by the server tick, so
- * everyone sees them in the same place). Each is one shader quad (planet-proto/planetQuad.ts: a lit sphere with each
+ * everyone sees them in the same place). Each is one shader quad (planetView/planetQuad.ts: a lit sphere with each
  * kind's surface or cloud deck, an atmosphere with real thickness, rings with the planet's shadow; the look is data,
- * planet-proto/planetProto.ts, with a planet's own `look` from systems.json). The light comes from the system centre.
+ * planetView/planetLook.ts, with a planet's own `look` from systems.json). The light comes from the system centre.
  * Drawn at the quality tier's detail (planetDetail); hidden until the planets' noise is in (planetTexturesReady).
  */
 
@@ -10,9 +10,9 @@ import { Container, Text, TextStyle } from 'pixi.js';
 import { PlanetData, PlanetKind, planetPosition, moonOffset } from '@space-game/common';
 import type { ShaderQuad } from './shaderQuad';
 import { cameraView } from './cameraView';
-import { planetQuad } from './planet-proto/planetQuad';
-import { planetTexturesReady } from './planet-proto/planetTextures';
-import type { BodyIn } from './planet-proto/planetProto';
+import { planetQuad } from './planetView/planetQuad';
+import { planetTexturesReady } from './planetView/planetTextures';
+import type { BodyIn } from './planetView/planetLook';
 
 const DEFAULT_HUE: Record<PlanetKind, number> = { rocky: 28, desert: 36, ice: 200, gas: 30, lava: 14, ocean: 210, toxic: 85 };
 

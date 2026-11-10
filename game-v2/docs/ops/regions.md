@@ -56,7 +56,7 @@ One account plays on one server at a time: a profile lease (Postgres `profile_le
   `auto_stop_machines='suspend'`, `min_machines_running=0`, a 1 GB-ish volume for the world memory).
 - `scripts/deploy/regions.mjs`: build once, same image to every region, then the VPS. Dry run unless `--apply`.
 - Server env: `SERVER_REGION`, `SERVER_NAME`, `PUBLIC_HOST`, `BROWSER_URL` (= `LOBBY_URL`), `USER_STORE_BACKEND=postgres`;
-  secrets `DATABASE_URL`, `LOBBY_ADMIN_SECRET`, `ADMIN_SERVER_PASSWORD`.
+  secrets `DATABASE_URL`, `LOBBY_ADMIN_SECRET`.
   `SERVER_ID` (lobby definition id, heartbeat id, profile-lease holder) and `BUILD_ID` are set per app by the script.
 - Wake-up: after a suspend/resume the loop skips a gap over 2 s (`server/src/gameServer/wakeGap.ts`): no catch-up ticks; the tick
   counter jumps, so boss/nest timers and world memory advance by wall clock like an empty system. Logged as `[Loop] woke after ...`.
@@ -65,7 +65,7 @@ One account plays on one server at a time: a profile lease (Postgres `profile_le
 
 ## Add a region
 1. `fly apps create spacegame-<id>`; `fly volumes create spacegame_world -a spacegame-<id> -r <region> -n 1 -s 1`.
-2. `fly secrets set -a spacegame-<id> DATABASE_URL=... LOBBY_ADMIN_SECRET=... ADMIN_SERVER_PASSWORD=...`.
+2. `fly secrets set -a spacegame-<id> DATABASE_URL=... LOBBY_ADMIN_SECRET=...`.
 3. Let the app reach VPS Postgres (VPS steps, Kieran approves each): either TLS on Postgres (server cert, `hostssl` line in
    `pg_hba.conf` limited to Fly egress IPs, ufw rule for 5432 from those IPs) or a WireGuard tunnel (`fly wireguard create`, peer on the VPS,
    Postgres listening on the tunnel address only). Prefer WireGuard: nothing public. Use `sslmode=require` either way.

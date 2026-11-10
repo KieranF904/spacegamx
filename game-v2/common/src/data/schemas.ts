@@ -100,7 +100,7 @@ export interface RiftData {
 export type PlanetKind = 'rocky' | 'desert' | 'ice' | 'gas' | 'lava' | 'ocean' | 'toxic';
 
 /**
- * How each field of a planet's `look` is shaped (client/src/rendering/planet-proto/planetProto.ts PlanetLook, which
+ * How each field of a planet's `look` is shaped (client/src/rendering/planetView/planetLook.ts PlanetLook, which
  * documents what each does): `rgb` a colour as three numbers 0..1, `vec3` three numbers, `pal` three colours.
  */
 export const PLANET_LOOK_FIELDS = {

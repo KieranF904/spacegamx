@@ -31,7 +31,7 @@ import type { PlanetData, PlanetKind, PlanetLookData } from '@space-game/common'
 
 export const PLANET_KIND_INDEX: Record<PlanetKind | 'dwarf', number> = { rocky: 0, desert: 1, ice: 2, gas: 3, lava: 4, ocean: 5, toxic: 6, dwarf: 7 };
 
-/** The fragment body (uniforms declared by shaderQuadProgram from `planetProtoUniforms`, plus uNoise here) */
+/** The fragment body (uniforms declared by shaderQuadProgram from `planetLookUniforms`, plus uNoise here) */
 export const PLANET_PROTO_FRAG = /* glsl */ `
   uniform highp sampler3D uNoise;
   const float PI = 3.14159265;
@@ -873,7 +873,7 @@ export function planetFragment(detail: PlanetDetail): string {
 }
 
 /** The look as the prototype shader's uniforms (all floats and vec2/vec3: shaderQuad's UniformDef types) */
-export function planetProtoUniforms(look: PlanetLook, kind: PlanetKind | 'dwarf', seed: number, extent: number): Record<string, number | number[]> {
+export function planetLookUniforms(look: PlanetLook, kind: PlanetKind | 'dwarf', seed: number, extent: number): Record<string, number | number[]> {
   return {
     uTime: 0, uKind: PLANET_KIND_INDEX[kind], uSeed: [seed % 97, (seed * 7) % 89], uLight: [1, 0], uLightAmt: 1, uPR: 1 / extent,
     uSpin: look.spin,
@@ -885,6 +885,6 @@ export function planetProtoUniforms(look: PlanetLook, kind: PlanetKind | 'dwarf'
 }
 
 /** The uniform declarations for the body (as shaderQuadProgram writes them) */
-export function planetProtoDecls(u: Record<string, number | number[]>): string {
+export function planetLookDecls(u: Record<string, number | number[]>): string {
   return Object.entries(u).map(([k, v]) => `uniform ${typeof v === 'number' ? 'float' : v.length === 2 ? 'vec2' : 'vec3'} ${k};`).join('\n');
 }

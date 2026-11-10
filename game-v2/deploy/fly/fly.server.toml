@@ -1,6 +1,6 @@
 # On-demand regional game server. Not deployed by hand: scripts/deploy/regions.mjs passes --app and --primary-region
 # per region (the lobby's server definitions, data/lobby/servers.json; example deploy/fly/servers.example.json). Secrets are set per app, never here:
-#   fly secrets set -a <app> DATABASE_URL=... LOBBY_ADMIN_SECRET=... ADMIN_SERVER_PASSWORD=...
+#   fly secrets set -a <app> DATABASE_URL=... LOBBY_ADMIN_SECRET=...
 # See docs/ops/regions.md.
 app = 'spacegame-game-template'
 primary_region = 'syd'
@@ -12,7 +12,6 @@ primary_region = 'syd'
 [env]
   NODE_ENV = 'production'
   PORT = '3000'
-  ADMIN_PORT = '3005'
   USER_STORE_BACKEND = 'postgres'
   # (regions.mjs overrides these per app with --env, plus BUILD_ID. SERVER_ID must match the lobby definition: it is
   # the heartbeat id and the profile-lease holder. The server reads BROWSER_URL; LOBBY_URL is for scripts/lobby-update.mjs)
