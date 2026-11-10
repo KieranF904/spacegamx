@@ -28,7 +28,7 @@ import { stationReadoutHtml, bindResourceLinks } from '../build/planCostView';
 export function buildHtml(host: HangarHost): string {
   const hs = host.deps.hangarState();
   const rec = hs?.slots[host.slot];
-  if (!hs || host.grantAll) return '';
+  if (!hs) return '';
   const econ = host.deps.econ;
   let html = `<div style="color:#ffb547; font-weight:bold; margin-bottom:6px; font-family:'Segoe UI',sans-serif">BUILD</div>`;
   if (host.unsaved) {
@@ -101,7 +101,7 @@ export function buildHtml(host: HangarHost): string {
 export function ammoHtml(host: HangarHost): string {
   const hs = host.deps.hangarState();
   const rec = hs?.slots[host.slot];
-  if (!hs || !rec || host.grantAll) return '';
+  if (!hs || !rec) return '';
   const { catalog, tuning, econ } = host.deps;
   const kinds = loadoutKinds(catalog, tuning, rec.blueprint);
   if (!kinds.length) return '';

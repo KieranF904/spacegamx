@@ -86,7 +86,7 @@ export function draw(host: HangarHost): void {
   ctx.clearRect(0, 0, w, h);
 
   // Parts (ghosts: not built yet, drawn faint and dashed; new since the last save: dashed amber)
-  const { ghosts, fresh } = host.grantAll ? { ghosts: new Set<number>(), fresh: new Set<number>() } : host.ghostInfo();
+  const { ghosts, fresh } = host.ghostInfo();
   const wrecked = new Set(host.deps.hangarState()?.slots[host.slot]?.wrecked ?? []);
   host.geoms.forEach((g) => {
     const p = g.part;

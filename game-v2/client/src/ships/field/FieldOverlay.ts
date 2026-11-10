@@ -285,7 +285,6 @@ export class FieldOverlay {
       free: () => true,
       fieldBuild: true,
       freeBuild: () => false,
-      grantAll: () => false,
       hideTip: () => {},
     });
     this.palWrap.appendChild(this.pal.root);

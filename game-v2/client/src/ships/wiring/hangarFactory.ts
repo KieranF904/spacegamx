@@ -58,7 +58,6 @@ export function makeHangar(opts: HangarOpts, h: HangarHost): Lazy<HangarUI> {
     send: (m) => opts.send(m),
     knownPlans: () => opts.pilot.profile?.plans ?? ['sparrow-t'],
     sharedDesigns: () => h.shared,
-    grantAll: false,
     getBlueprint: () => h.store.get(opts.state.playerId)?.blueprint ?? h.lastBlueprint() ?? { name: 'New ship', catalogVersion: opts.catalog.version, parts: [] },
     liveShip: () => h.store.get(opts.state.playerId),
     // (refreshes as the server reports saves, fitted parts and finished jobs)

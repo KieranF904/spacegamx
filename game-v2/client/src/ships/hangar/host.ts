@@ -43,8 +43,6 @@ export interface HangarDeps {
   knownPlans(): string[];
   /** Designs party members sent you (newest first) */
   sharedDesigns?(): { from: string; blueprint: Blueprint }[];
-  /** Proto/admin: every part is free */
-  grantAll: boolean;
   /** The blueprint the player is flying now */
   getBlueprint(): Blueprint;
   /** The ship you're flying (its parts' HP now) */
@@ -73,7 +71,6 @@ export interface HangarHost {
   errors: BlueprintError[];
   /** Parts (uids) the core doesn't hold on to: planned only, drawn faded and dashed */
   unreachable: ReadonlySet<number>;
-  grantAll: boolean;
   slot: number;
   mountingBroken: Map<number, MountingProblem[]>;
   ports: PortsGrid;

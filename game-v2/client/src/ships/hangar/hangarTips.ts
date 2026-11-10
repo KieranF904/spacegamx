@@ -47,7 +47,7 @@ export function gridTip(host: HangarHost, e: MouseEvent): void {
   const i = host.mouse ? host.partAt(host.mouse) : -1;
   if (i < 0) return host.hideTip();
   const p = host.bp.parts[i];
-  const { ghosts, fresh } = host.grantAll ? { ghosts: new Set<number>(), fresh: new Set<number>() } : host.ghostInfo();
+  const { ghosts, fresh } = host.ghostInfo();
   const hs = host.deps.hangarState();
   const rec = hs?.slots[host.slot];
   const isNew = fresh.has(p.uid) && hs !== null;
