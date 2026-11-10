@@ -20251,7 +20251,7 @@
         },
         {
           "text": "at most MAX_PLAYERS pilots wait at once (a long outage can't grow it)",
-          "test": "none pinned"
+          "test": "server/src/game/wreckKeep.test.ts"
         }
       ],
       "extend": "nothing: Achievements feeds it (add, seed, forget)",
@@ -20979,7 +20979,7 @@
       "invariants": [
         {
           "text": "every client message type has one handler — golden clientMessages.json dev handlers refuse without devTeleport or admin",
-          "test": "none pinned"
+          "test": "server/src/game/devGate.test.ts"
         }
       ],
       "extend": "a new message type is registered in buildMessageHandlers (or in its net/handlers/* file)",
