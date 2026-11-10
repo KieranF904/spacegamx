@@ -30,7 +30,7 @@ describe('message dispatch', () => {
     });
     const pinned: string[] = JSON.parse(readFileSync(join(__dirname, '../golden/clientMessages.json'), 'utf8'));
     expect(server.handledMessageTypes().sort()).toEqual(pinned);
-    expect(server.handledMessageTypes().length).toBe(105);
+    expect(server.handledMessageTypes().length).toBe(103);
   }, 120_000);
 
   it('drops non-messages, pre-join messages and limited ones; unknown types fall through silently', () => {
@@ -67,7 +67,7 @@ describe('message dispatch', () => {
   });
 
   it('keeps the constants and refuses a second handler for a type', () => {
-    expect([...PRE_JOIN].sort()).toEqual(['authLogin', 'authRegister', 'join', 'ping']);
+    expect([...PRE_JOIN].sort()).toEqual(['join', 'ping']);
     expect(MAX_INPUTS_PER_TICK).toBe(16);
     const reg = new HandlerRegistry();
     reg.on('ping', () => {});

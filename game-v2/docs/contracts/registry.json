@@ -13167,7 +13167,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 329,
+      "lines": 314,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -13183,8 +13183,6 @@
         "CURSOR_DIST_MAX",
         "CURSOR_DIST_STEP",
         "ClientAdminMessage",
-        "ClientAuthLoginMessage",
-        "ClientAuthRegisterMessage",
         "ClientBuyMessage",
         "ClientChatMessage",
         "ClientDevBossMessage",
@@ -13326,94 +13324,82 @@
           "end": 172
         },
         {
-          "name": "ClientAuthLoginMessage",
+          "name": "ClientStateHashMessage",
           "kind": "interface",
           "start": 174,
           "end": 178
         },
         {
-          "name": "ClientAuthRegisterMessage",
-          "kind": "interface",
-          "start": 180,
-          "end": 185
-        },
-        {
-          "name": "ClientStateHashMessage",
-          "kind": "interface",
-          "start": 187,
-          "end": 191
-        },
-        {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 193,
-          "end": 235
+          "start": 180,
+          "end": 220
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 237,
-          "end": 246
+          "start": 222,
+          "end": 231
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 248,
-          "end": 255
+          "start": 233,
+          "end": 240
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 257,
-          "end": 264
+          "start": 242,
+          "end": 249
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 266,
-          "end": 276
+          "start": 251,
+          "end": 261
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 278,
-          "end": 292
+          "start": 263,
+          "end": 277
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 294,
-          "end": 299
+          "start": 279,
+          "end": 284
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 301,
-          "end": 304
+          "start": 286,
+          "end": 289
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 306,
-          "end": 308
+          "start": 291,
+          "end": 293
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 310,
-          "end": 317
+          "start": 295,
+          "end": 302
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 319,
-          "end": 322
+          "start": 304,
+          "end": 307
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 324,
-          "end": 328
+          "start": 309,
+          "end": 313
         }
       ]
     },
@@ -17134,7 +17120,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 761,
+      "lines": 755,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -17161,8 +17147,8 @@
         {
           "name": "GameServer",
           "kind": "class",
-          "start": 121,
-          "end": 761
+          "start": 120,
+          "end": 755
         }
       ]
     },
@@ -22049,7 +22035,7 @@
       "id": "server.net.limits",
       "path": "server/src/net/MessageLimits.ts",
       "group": "server/net",
-      "lines": 112,
+      "lines": 109,
       "owns": "per-connection token-bucket rate limits for expensive or player-reaching client messages",
       "needs": "nothing imported; a WeakMap keyed by connection",
       "events": "",
@@ -22075,19 +22061,19 @@
           "name": "MESSAGE_LIMITS",
           "kind": "const",
           "start": 24,
-          "end": 77
+          "end": 74
         },
         {
           "name": "Bucket",
           "kind": "class",
-          "start": 79,
-          "end": 90
+          "start": 76,
+          "end": 87
         },
         {
           "name": "MessageLimiter",
           "kind": "class",
-          "start": 92,
-          "end": 112
+          "start": 89,
+          "end": 109
         }
       ]
     },

@@ -61,20 +61,6 @@ export class SocketTransport {
         return;
       }
 
-      // Auth endpoints
-      if (req.method === 'POST' && req.url === '/auth/register') {
-        this.server.handleHttpAuth(req, res, 'register', clientAddress(req));
-        return;
-      }
-      if (req.method === 'POST' && req.url === '/auth/login') {
-        this.server.handleHttpAuth(req, res, 'login', clientAddress(req));
-        return;
-      }
-      if (req.method === 'POST' && req.url === '/auth/validate') {
-        this.server.handleHttpAuth(req, res, 'validate');
-        return;
-      }
-
       res.writeHead(404);
       res.end();
     });

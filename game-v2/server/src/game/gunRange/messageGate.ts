@@ -25,8 +25,8 @@ export const RANGE_GATE = {
   chat: 'pass', whisper: 'pass', setStatus: 'pass', friendRequest: 'pass', friendRespond: 'pass', friendRemove: 'pass',
   partyInvite: 'pass', partyRespond: 'pass', partyLeave: 'pass', partyKick: 'pass', partyPromote: 'pass', mapPing: 'pass',
   pilotInfo: 'pass', rankings: 'pass', ribbons: 'pass',
-  // Signing in or out of an account swaps the profile under the range: leave first
-  join: 'refuse', authLogin: 'refuse', authRegister: 'refuse',
+  // Joining swaps the profile under the range: leave first
+  join: 'refuse',
   // Building, the hangar and the station (there is none in the range, and nothing built here may last)
   shipEdit: 'refuse', dock: 'refuse', undock: 'refuse', stationOpen: 'refuse', slotBuild: 'refuse', slotClear: 'refuse', slotFly: 'refuse',
   slotLoadout: 'refuse', slotOrder: 'refuse', slotSave: 'refuse', designSave: 'refuse', designDelete: 'refuse', shareDesign: 'refuse',

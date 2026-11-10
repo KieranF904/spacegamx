@@ -1,8 +1,6 @@
 [
   "admin",
   "ammoPrefer",
-  "authLogin",
-  "authRegister",
   "bankDeposit",
   "bossDevTool",
   "chat",

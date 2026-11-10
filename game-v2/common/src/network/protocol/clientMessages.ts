@@ -171,19 +171,6 @@ export interface ClientPackedResyncMessage {
   type: 'packedResync';
 }
 
-export interface ClientAuthLoginMessage {
-  type: 'authLogin';
-  username: string;
-  password: string;
-}
-
-export interface ClientAuthRegisterMessage {
-  type: 'authRegister';
-  username: string;
-  email: string;
-  password: string;
-}
-
 export interface ClientStateHashMessage {
   type: 'stateHash';
   tick: number;
@@ -207,8 +194,6 @@ export type ClientMessage =
   | ClientWarpMessage
   | ClientRespawnMessage
   | ClientJoinMessage
-  | ClientAuthLoginMessage
-  | ClientAuthRegisterMessage
   | ClientStateHashMessage
   | ClientHpResyncMessage
   | ClientPackedResyncMessage

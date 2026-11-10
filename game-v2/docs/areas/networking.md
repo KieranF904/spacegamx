@@ -14,13 +14,13 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | common/src/network/cursorState.ts | 86 | 13-bit aim quantisation, `packCursorWeaponState` (= pilot row `data[0]`) |
 | common/src/network/stateHash.ts | 38 | `computeStateHash` (client/server desync check) |
 | common/src/network/Transport.ts | 47 | `ClientTransport`, `ClientSocket`, `ClientLink`, `DisconnectInfo` |
-| server/src/net/SocketTransport.ts | 191 | HTTP (/health, /auth/*) + `ws` server; per-IP cap 16 sockets, 512 KB max message, 8 MB buffered cap, permessage-deflate, bad-frame log throttle |
+| server/src/net/SocketTransport.ts | 191 | HTTP (/health) + `ws` server; per-IP cap 16 sockets, 512 KB max message, 8 MB buffered cap, permessage-deflate, bad-frame log throttle |
 | server/src/net/LocalTransport.ts | 62 | in-process transport for proto mode and tests (real encode/decode, synchronous) |
 | server/src/net/Replication.ts | 183 | a server shadow per ship, stepped with the controls clients know; mismatch => keyframe version bump |
 | server/src/net/MessageLimits.ts | 76 | `MESSAGE_LIMITS` token buckets per message type, `MessageLimiter` |
 | client/src/network/NetworkManager.ts | 158 | browser WebSocket: reconnect back-off, `decodeServerFrame`, per-message error isolation, traffic counters |
 | scripts/wire/sync.mjs, bump.mjs | | the two wire tools (below) |
-| server/src/net/auth.ts | 199 | join, authLogin, authRegister and the HTTP auth endpoints (`registerAuthHandlers`, `handleHttpAuth`); the guest-name rules |
+| server/src/net/auth.ts | 199 | join (`registerAuthHandlers`); the guest-name rules |
 | server/src/net/handlers/modules.ts, shipEdit.ts, flight.ts | 170 / 145 / 256 | the message families registered by `registerModuleHandlers` (forwards to one module), `registerShipEditHandlers` (dock, ship edit, pilot info) and `registerFlightHandlers` (input queueing, ping, stateHash and the self-hash record, interact, respawn, target, tow, mapView, trainingDrone) |
 | server/src/net/dispatch.ts | 55 | the client message registry (`HandlerRegistry`, `dispatch`): pre-join gate, per-type rate limit, handler call. Handlers are registered in `GameServer.buildMessageHandlers()`, which calls the family registrars: `registerModuleHandlers` (net/handlers/modules.ts), `registerAuthHandlers` (net/auth.ts), `registerShipEditHandlers` (net/handlers/shipEdit.ts), `registerFlightHandlers` (net/handlers/flight.ts) |
 | server/src/net/SnapshotBuilder.ts | 828 | the snapshot path (`SnapshotBuilder`, built once from a `SnapshotHost`): `sendSnapshots`, `systemRows` (the pilot row), `sendShipUpdates`, `rowKey`/`internKey`, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo`; `SnapRow`, `designHash` (`hpWire` is common hitRules.ts), the player/projectile/pod queries |
@@ -399,7 +399,7 @@ and a third client; no follower keyframes; the breaks).
   in the crowd bench's packed table.
 - Protocol 28: client-detected hits (`hitFix` in `COMPACT`, the input's `hitReport` tail before any debris acks, `netCaps`). A rule for what the client finds itself must be the same on both sides (`HitLedger.unfindable` and `SelfHits.detect`), or the chains part and the server corrects.
 - Protocol 26 moved `ignite`, `detonation`, `intercept`, `bossTelegraph`, `pong`, `bossBeam`, `bossCharge`, `bossBlow` into `COMPACT`. `asteroidSeed` sends `ids` and `indices` as `[start, count, ...]` runs (`packRanges`/`unpackRanges`, network/ranges.ts; unpacked in client/src/app/serverMessages.ts).
-- The server never trusts a client message: validate shape, clamp, ignore junk. Before join only `join, ping, authLogin, authRegister` are accepted (`PRE_JOIN` in net/dispatch.ts).
+- The server never trusts a client message: validate shape, clamp, ignore junk. Before join only `join, ping` are accepted (`PRE_JOIN` in net/dispatch.ts).
 - Inputs are queued (cap `MAX_INPUTS_PER_TICK`=16 a tick) and applied at the tick boundary.
 - Row values are quantised the same on both sides (`quantizeShipValue`) so prediction replays match.
 - Tick 60 Hz, snapshots 20 Hz (`SNAPSHOT_RATE`, common/src/constants.ts). `LAZY_TYPES` effects may wait `LAZY_TICKS` (2) to ride the next frame.
@@ -421,7 +421,7 @@ and a third client; no follower keyframes; the breaks).
 - `npx vitest run server/src/net` : replication/keyframes (`replication.test.ts`), lodestones, ship view, socket limits (`socketTransport.test.ts`), confirmed hits (`hits/confirmedHits.test.ts`, `selfHits.test.ts`: every client's HP, damage, fires, impacts, detonations and removals against the server's own record of the fight, `hits/serverTruth.testkit.ts`; the fight is server/src/testkits/hitsFight.testkit.ts). Test clients are full caps: `hits/fakeHitsClient.testkit.ts`; a cross-check compares with the server's ground truth, never with another client.
 - `npx vitest run server/src/proto server/src/game/robustness.test.ts` : transport and hostile input.
 - `npx vitest run common/src/guidance server/src/net/guides` : homing shells and mobs on the tick layer (CAPS.WAYPOINTS): derived, sent, a drift caught; a volley of mines as LAUNCH rows (CAPS.LAUNCHES), counted against the server's own launches.
-- Bandwidth bench: `cd server && npm run bench:net` (server/src/bench/netBench.ts).
+- Bandwidth benches: `cd server && npm run bench:crowd` or `bench:table` (server/src/bench/crowdBench.ts, netTable.ts).
 - `npx vitest run server/src/net/cells client/src/ships/cells common/src/network/cells.test.ts` : the focus grid and ships away (leaving and coming back after 2.5 s and 40 s with only what changed, HP changed and a ship destroyed while away, let go by age, the 19 km edge, cell borders, jumps, a new system; both ends' lists agree).
 - `npx vitest run server/src/net/causes server/src/net/own server/src/net/decisions server/src/net/debris server/src/net/crowd` : causes, the own ship, bodies and AI pilots, debris lives, crowd fallbacks; every held ship exact at every snapshot. causes.test.ts also runs a client finding its own contact pairs (CAPS.CONTACTS).
 - `npx vitest run server/src/net/decisions/moves.test.ts` : bodies' moves on the client (CAPS.MOVES): every telegraph and beam a pilot was sent or worked out is one the server put out, every shell it made one the server spawned (Scrap Mother, Pyreclast, custom enemies).
