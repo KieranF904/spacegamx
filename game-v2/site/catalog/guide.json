@@ -219,7 +219,7 @@
    "tradeOff": "light and quick",
    "family": "Cannons",
    "size": "Small · Square",
-   "keyNumbers": "56 dmg/s · reach 7,200 · cycle · draws 8",
+   "keyNumbers": "54 dmg/s · reach 7,182 · cycle · draws 8",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only"
@@ -246,10 +246,10 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "the ship's pool: holds and gives quickly",
+   "tradeOff": "a store: holds and gives quickly",
    "family": "Batteries",
    "size": "Small · Square",
-   "keyNumbers": "holds 200 · gives 600/s",
+   "keyNumbers": "holds 200",
    "cost": {
     "alloy_plate": 1,
     "copper_wire": 2
@@ -275,12 +275,38 @@
    "tradeOff": "A power line",
    "family": "Relays",
    "size": "Small · Square",
-   "keyNumbers": "holds 10 · gives 200/s · power line",
+   "keyNumbers": "holds 10 · power line",
    "cost": {
     "alloy_plate": 1,
     "copper_wire": 1
    },
    "seconds": 0
+  },
+  {
+   "id": "fabricator_field",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Field Fabricator",
+   "level": 0,
+   "order": 109,
+   "fn": "fabricator_field",
+   "material": "alloy",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/fabricator_field.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a second while it works",
+   "family": "Fabricators",
+   "size": "Medium · Panel",
+   "keyNumbers": "1x speed · up to Mk II · draws 40 working",
+   "cost": {
+    "alloy_plate": 4,
+    "copper_wire": 4
+   },
+   "seconds": 40
   },
   {
    "id": "engine_vernier",
@@ -336,12 +362,66 @@
    "seconds": 50
   },
   {
+   "id": "shield_spark_wall",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Spark Wall",
+   "level": 2,
+   "order": 106,
+   "fn": "shield_spark_wall",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/shield_spark_wall.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Two cells of flat shield just off the hull",
+   "family": "Shield walls",
+   "size": "Small · Square",
+   "keyNumbers": "40 HP wall · 14 a second once unhit for 1.2 s; down 1.5 s when broken, back at 25% · draws 10 · 45 hp · armour 1",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "shield_emitter": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "shield_visor",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Visor",
+   "level": 2,
+   "order": 109,
+   "fn": "shield_visor",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/shield_visor.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tight 60 degree arc in front of a gun",
+   "family": "Shield arcs",
+   "size": "Small · Square",
+   "keyNumbers": "45 HP arc · 16 a second once unhit for 1.2 s; down 1.2 s when broken, back at 25% · draws 11 · 45 hp · armour 1",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "shield_emitter": 1
+   },
+   "seconds": 0
+  },
+  {
    "id": "power_corner",
    "tab": "power",
    "kind": "model",
    "name": "Corner Conduit",
    "level": 2,
-   "order": 114,
+   "order": 120,
    "fn": "power_corner",
    "material": "alloy",
    "piece": "sq",
@@ -354,7 +434,7 @@
    "tradeOff": "A power line that turns",
    "family": "Relays",
    "size": "Small · Square",
-   "keyNumbers": "holds 10 · gives 200/s · power line",
+   "keyNumbers": "holds 10 · power line",
    "cost": {
     "alloy_plate": 1,
     "copper_wire": 2,
@@ -450,10 +530,10 @@
     "h": 70
    },
    "licence": false,
-   "tradeOff": "a stream of small shells",
+   "tradeOff": "a steady stream of shells",
    "family": "Autocannons",
    "size": "Small · Square",
-   "keyNumbers": "43 dmg/s · reach 5,400 · cycle · draws 12",
+   "keyNumbers": "44 dmg/s · reach 5,394 · cycle · draws 12",
    "mounting": [
     "Turret, 270°",
     "Bolts on any side"
@@ -464,6 +544,60 @@
     "scrap_electronics": 1
    },
    "seconds": 0
+  },
+  {
+   "id": "refiner_field",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Field Refiner",
+   "level": 3,
+   "order": 112,
+   "fn": "refiner_field",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/refiner_field.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Refines ore in your hold while you fly, up to Mk II materials, at 0",
+   "family": "Refiners",
+   "size": "Small · Square",
+   "keyNumbers": "0.4x speed · up to Mk II · draws 20 working",
+   "cost": {
+    "alloy_plate": 3,
+    "copper_wire": 2,
+    "coolant": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "shield_guard_wall",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Guard Wall",
+   "level": 4,
+   "order": 107,
+   "fn": "shield_guard_wall",
+   "material": "alloy",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/shield_guard_wall.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Three cells wide, one out",
+   "family": "Shield walls",
+   "size": "Medium · Panel",
+   "keyNumbers": "75 HP wall · 12 a second once unhit for 1.2 s; down 2.2 s when broken, back at 25% · draws 16 · 90 hp · armour 1",
+   "cost": {
+    "alloy_plate": 2,
+    "copper_wire": 2,
+    "shield_emitter": 1
+   },
+   "seconds": 40
   },
   {
    "id": "flak_burst",
@@ -481,7 +615,7 @@
     "h": 68
    },
    "licence": false,
-   "tradeOff": "bursts near what it passes · ammo",
+   "tradeOff": "bursts at your aim distance, or sooner near a target · ammo",
    "family": "Flak",
    "size": "Small · Square",
    "keyNumbers": "26 dmg/s · reach 1,700 · ammo",
@@ -494,6 +628,34 @@
     "alloy_plate": 2,
     "copper_wire": 1,
     "scrap_electronics": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "shield_buckler",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Buckler",
+   "level": 4,
+   "order": 110,
+   "fn": "shield_buckler",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/shield_buckler.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A small 90 degree arc close to the hull",
+   "family": "Shield arcs",
+   "size": "Small · Square",
+   "keyNumbers": "60 HP arc · 13 a second once unhit for 1.2 s; down 2 s when broken, back at 25% · draws 13 · 45 hp · armour 1",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "shield_emitter": 1,
+    "capacitor_cell": 1
    },
    "seconds": 0
   },
@@ -516,11 +678,37 @@
    "tradeOff": "A one-way power line",
    "family": "Relays",
    "size": "Small · Square",
-   "keyNumbers": "holds 10 · gives 200/s · one way",
+   "keyNumbers": "holds 10 · one way",
    "cost": {
     "alloy_plate": 1,
     "copper_wire": 2,
     "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
+   "id": "docking_clamp",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Docking Clamp",
+   "level": 4,
+   "order": 116,
+   "fn": "docking_clamp",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/docking_clamp.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A clamp on its open edge",
+   "family": "Docking Clamps",
+   "size": "Small · Square",
+   "keyNumbers": "one-cell clamp",
+   "cost": {
+    "alloy_plate": 2,
+    "servo_motor": 1
    },
    "seconds": 0
   },
@@ -669,7 +857,7 @@
    "tradeOff": "slow heavy shell, punches plate",
    "family": "Cannons",
    "size": "Medium · Panel",
-   "keyNumbers": "69 dmg/s · reach 5,700 · cycle · draws 10",
+   "keyNumbers": "88 dmg/s · reach 5,700 · cycle · draws 10",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only",
@@ -725,10 +913,10 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines",
+   "tradeOff": "a small store that gives its power in a rush, for guns and beams",
    "family": "Capacitors",
    "size": "Small · Square",
-   "keyNumbers": "holds 160 (guns) · gives 2,000/s by touch",
+   "keyNumbers": "holds 160",
    "cost": {
     "composite_sheet": 1,
     "capacitor_cell": 1
@@ -844,11 +1032,38 @@
    "tradeOff": "A battery that joins two lines into one",
    "family": "Batteries",
    "size": "Medium · Panel",
-   "keyNumbers": "holds 300 · gives 180/s",
+   "keyNumbers": "holds 300",
    "cost": {
     "steel_plate": 3,
     "capacitor_cell": 2,
     "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "shield_shell",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Shell",
+   "level": 8,
+   "order": 111,
+   "fn": "shield_shell",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/shield_shell.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A 120 degree arc that wraps most of a side",
+   "family": "Shield arcs",
+   "size": "Medium · Panel",
+   "keyNumbers": "160 HP arc · 8 a second once unhit for 1.2 s; down 3.5 s when broken, back at 25% · draws 22 · 113 hp · armour 1",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 3,
+    "shield_emitter": 2
    },
    "seconds": 40
   },
@@ -871,7 +1086,196 @@
    "tradeOff": "A battery that splits one line into two",
    "family": "Batteries",
    "size": "Medium · Panel",
-   "keyNumbers": "holds 300 · gives 90/s",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_joiner_elbow",
+   "tab": "power",
+   "kind": "model",
+   "name": "Elbow Joiner Bank",
+   "level": 8,
+   "order": 113,
+   "fn": "power_joiner_elbow",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_joiner_elbow.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that joins two lines into one around a corner",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_joiner_end",
+   "tab": "power",
+   "kind": "model",
+   "name": "End Joiner Bank",
+   "level": 8,
+   "order": 114,
+   "fn": "power_joiner_end",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_joiner_end.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that joins two lines from its two ends",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_joiner_cross",
+   "tab": "power",
+   "kind": "model",
+   "name": "Cross Joiner Bank",
+   "level": 8,
+   "order": 115,
+   "fn": "power_joiner_cross",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_joiner_cross.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that joins a line from its back and one from its front into one",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "mine_bay",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Mine Bay",
+   "level": 8,
+   "order": 115,
+   "fn": "mine_bay",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/mine_bay.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Drops a batch of 4 proximity mines out of its open edge on a key press, from a magazine of 12 the fabricator refills",
+   "family": "Mine Bays",
+   "size": "Medium · Panel",
+   "keyNumbers": "4 mines a drop · each mine hits for up to 140 across 110 m",
+   "cost": {
+    "steel_plate": 2,
+    "copper_wire": 2,
+    "servo_motor": 1
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_splitter_elbow",
+   "tab": "power",
+   "kind": "model",
+   "name": "Elbow Splitter Bank",
+   "level": 8,
+   "order": 116,
+   "fn": "power_splitter_elbow",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_elbow.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that splits one line in two, one straight on and one round a corner",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_splitter_tee",
+   "tab": "power",
+   "kind": "model",
+   "name": "Tee Splitter Bank",
+   "level": 8,
+   "order": 117,
+   "fn": "power_splitter_tee",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_tee.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that splits a line from its end to its front and back",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_splitter_end",
+   "tab": "power",
+   "kind": "model",
+   "name": "End Splitter Bank",
+   "level": 8,
+   "order": 118,
+   "fn": "power_splitter_end",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_end.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A battery that splits one line out of its two ends",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
    "cost": {
     "steel_plate": 3,
     "capacitor_cell": 2,
@@ -1053,10 +1457,10 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "touching Drive Cells form a bank that feeds the engines and strafers it touches first",
+   "tradeOff": "a bigger store for the engines and strafers",
    "family": "Drive cells",
    "size": "Small · Square",
-   "keyNumbers": "holds 320 (engines) · gives 1,400/s by touch",
+   "keyNumbers": "holds 320",
    "cost": {
     "steel_plate": 1,
     "copper_wire": 2,
@@ -1110,7 +1514,7 @@
    "tradeOff": "steady bursts that strip shields",
    "family": "Pulse guns",
    "size": "Small · Square",
-   "keyNumbers": "54 dmg/s · reach 5,040 · cycle · draws 12",
+   "keyNumbers": "56 dmg/s · reach 5,040 · cycle · draws 12",
    "mounting": [
     "Turret, 220°",
     "Bolts on any side"
@@ -1129,7 +1533,7 @@
    "kind": "model",
    "name": "Passthrough",
    "level": 10,
-   "order": 116,
+   "order": 122,
    "fn": "power_passthrough",
    "material": "alloy",
    "piece": "sq",
@@ -1142,7 +1546,7 @@
    "tradeOff": "A power line with a pipe through it, side to side",
    "family": "Relays",
    "size": "Small · Square",
-   "keyNumbers": "holds 10 · gives 200/s · power line",
+   "keyNumbers": "holds 10 · power line",
    "cost": {
     "alloy_plate": 1,
     "copper_wire": 2,
@@ -1156,7 +1560,7 @@
    "kind": "model",
    "name": "Feed Pipe",
    "level": 10,
-   "order": 117,
+   "order": 123,
    "fn": "feed_pipe",
    "material": "alloy",
    "piece": "sq",
@@ -1257,7 +1661,7 @@
    "tradeOff": "soaks hits before the hull",
    "family": "Shields",
    "size": "Small · Square",
-   "keyNumbers": "shield 40 · refills 8/s after 3 s · draws 16",
+   "keyNumbers": "56 hp · armour 1",
    "cost": {
     "steel_plate": 1,
     "copper_wire": 2,
@@ -1456,10 +1860,10 @@
     "h": 81
    },
    "licence": false,
-   "tradeOff": "the only cannon turret: 16 rounds, then a short reload",
+   "tradeOff": "the only cannon turret: 8 heavy rounds, then a short reload",
    "family": "Cannons",
    "size": "Medium · Panel",
-   "keyNumbers": "62 dmg/s · reach 7,200 · clip 16 · 1.5s reload · draws 8",
+   "keyNumbers": "60 dmg/s · reach 7,192 · clip 8 · 1.3s reload · draws 8",
    "mounting": [
     "Turret, 180°",
     "Bolts on any side"
@@ -1526,6 +1930,34 @@
    "seconds": 0
   },
   {
+   "id": "shield_rampart",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Rampart",
+   "level": 12,
+   "order": 108,
+   "fn": "shield_rampart",
+   "material": "steel",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/shield_rampart.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "Five cells of deep flat shield, two out",
+   "family": "Shield walls",
+   "size": "Large · Block",
+   "keyNumbers": "260 HP wall · 9 a second once unhit for 1.2 s; down 4.5 s when broken, back at 25% · draws 30 · 226 hp · armour 2",
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 4,
+    "shield_emitter": 2,
+    "power_coupling": 1
+   },
+   "seconds": 120
+  },
+  {
    "id": "utility_tow_beam",
    "tab": "utility",
    "kind": "model",
@@ -1554,12 +1986,68 @@
    "seconds": 60
   },
   {
+   "id": "fabricator_bay",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Fabrication Bay",
+   "level": 12,
+   "order": 110,
+   "fn": "fabricator_bay",
+   "material": "steel",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/fabricator_bay.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "Builds and repairs parts from your hold 1",
+   "family": "Fabricators",
+   "size": "Large · Block",
+   "keyNumbers": "1.6x speed · up to Mk III · draws 70 working",
+   "cost": {
+    "steel_plate": 4,
+    "copper_wire": 6,
+    "servo_motor": 2,
+    "power_coupling": 1
+   },
+   "seconds": 120
+  },
+  {
+   "id": "refiner_bay",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Refinery Bay",
+   "level": 12,
+   "order": 113,
+   "fn": "refiner_bay",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/refiner_bay.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Refines ore in your hold up to Mk III materials, at 0",
+   "family": "Refiners",
+   "size": "Medium · Panel",
+   "keyNumbers": "0.7x speed · up to Mk III · draws 35 working",
+   "cost": {
+    "steel_plate": 3,
+    "copper_wire": 4,
+    "crystal_lens": 1,
+    "coolant": 2
+   },
+   "seconds": 60
+  },
+  {
    "id": "power_combiner",
    "tab": "power",
    "kind": "model",
    "name": "Combiner",
    "level": 12,
-   "order": 115,
+   "order": 121,
    "fn": "power_combiner",
    "material": "steel",
    "piece": "sq",
@@ -1572,7 +2060,7 @@
    "tradeOff": "Joins a feed to a power line",
    "family": "Relays",
    "size": "Small · Square",
-   "keyNumbers": "holds 10 · gives 150/s · power line",
+   "keyNumbers": "holds 10 · power line",
    "cost": {
     "steel_plate": 2,
     "power_coupling": 1,
@@ -1664,7 +2152,7 @@
    "tradeOff": "no slow refill, back whole after a break",
    "family": "Shields",
    "size": "Small · Square",
-   "keyNumbers": "shield 36 · back in 4 s · draws 16",
+   "keyNumbers": "56 hp · armour 2",
    "cost": {
     "steel_plate": 1,
     "copper_wire": 2,
@@ -1725,7 +2213,7 @@
    "tradeOff": "a hose: hard to dodge, harder to power",
    "family": "Autocannons",
    "size": "Medium · Panel",
-   "keyNumbers": "80 dmg/s · reach 5,400 · cycle · spins up · draws 21",
+   "keyNumbers": "83 dmg/s · reach 5,400 · cycle · spins up · draws 22",
    "mounting": [
     "Turret, 240°",
     "Bolts on from behind only"
@@ -1772,7 +2260,7 @@
    "kind": "model",
    "name": "Surge Cell",
    "level": 14,
-   "order": 113,
+   "order": 119,
    "fn": "power_surge_cell",
    "material": "composite",
    "piece": "sq",
@@ -1785,7 +2273,7 @@
    "tradeOff": "A fast cell",
    "family": "Capacitors",
    "size": "Small · Square",
-   "keyNumbers": "holds 120 · gives 300/s",
+   "keyNumbers": "holds 120",
    "cost": {
     "steel_plate": 1,
     "capacitor_cell": 2,
@@ -1913,12 +2401,39 @@
    "seconds": 60
   },
   {
+   "id": "docking_clamp_heavy",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Heavy Docking Clamp",
+   "level": 16,
+   "order": 117,
+   "fn": "docking_clamp_heavy",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/docking_clamp_heavy.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ships",
+   "family": "Docking Clamps",
+   "size": "Medium · Panel",
+   "keyNumbers": "2-cell clamp",
+   "cost": {
+    "steel_plate": 4,
+    "servo_motor": 2,
+    "power_coupling": 1
+   },
+   "seconds": 60
+  },
+  {
    "id": "feed_selector",
    "tab": "power",
    "kind": "model",
    "name": "Selector",
    "level": 16,
-   "order": 118,
+   "order": 124,
    "fn": "feed_selector",
    "material": "steel",
    "piece": "sq",
@@ -1945,7 +2460,7 @@
    "kind": "model",
    "name": "Catalyst Tank",
    "level": 16,
-   "order": 125,
+   "order": 131,
    "fn": "feed_tank_catalyst",
    "material": "steel",
    "piece": "sq",
@@ -2073,16 +2588,44 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "puts 10 a second into each bank it touches, no wires",
-   "family": "Bank chargers",
+   "tradeOff": "an old charger the ports core no longer uses: makes and moves no power",
+   "family": "Old chargers",
    "size": "Small · Square",
-   "keyNumbers": "+10/s into each bank it touches",
+   "keyNumbers": "67 hp · armour 2",
    "cost": {
     "titanium_plate": 1,
     "coil_winding": 2,
     "capacitor_cell": 1
    },
    "seconds": 0
+  },
+  {
+   "id": "shield_half_dome",
+   "tab": "shields",
+   "kind": "model",
+   "name": "Half-dome",
+   "level": 18,
+   "order": 112,
+   "fn": "shield_half_dome",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/shield_half_dome.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "A 180 degree dome over one end",
+   "family": "Shield arcs",
+   "size": "Large · Block",
+   "keyNumbers": "320 HP arc · 6 a second once unhit for 1.2 s; down 5.5 s when broken, back at 25% · draws 36 · 269 hp · armour 2",
+   "cost": {
+    "titanium_plate": 4,
+    "copper_wire": 4,
+    "shield_emitter": 3,
+    "power_coupling": 1
+   },
+   "seconds": 120
   },
   {
    "id": "laser_cutter",
@@ -2123,7 +2666,7 @@
    "kind": "model",
    "name": "Coolant Tank",
    "level": 18,
-   "order": 120,
+   "order": 126,
    "fn": "feed_tank_coolant",
    "material": "steel",
    "piece": "sq",
@@ -2149,7 +2692,7 @@
    "kind": "model",
    "name": "Flux Salts Tank",
    "level": 18,
-   "order": 122,
+   "order": 128,
    "fn": "feed_tank_flux",
    "material": "steel",
    "piece": "sq",
@@ -2175,7 +2718,7 @@
    "kind": "model",
    "name": "Reaction Mass Tank",
    "level": 18,
-   "order": 126,
+   "order": 132,
    "fn": "feed_tank_reaction",
    "material": "steel",
    "piece": "sq",
@@ -2247,7 +2790,7 @@
    "tradeOff": "thin and cheap, back in a second",
    "family": "Shields",
    "size": "Small · Round",
-   "keyNumbers": "shield 16 · refills 16/s after 1 s · draws 5",
+   "keyNumbers": "44 hp · armour 2",
    "cost": {
     "steel_plate": 1,
     "copper_wire": 2,
@@ -2369,7 +2912,7 @@
    "tradeOff": "deep but slow: endurance, not alpha strikes",
    "family": "Batteries",
    "size": "Large · Block",
-   "keyNumbers": "holds 1,800 · gives 600/s",
+   "keyNumbers": "holds 1,800",
    "cost": {
     "titanium_plate": 4,
     "capacitor_cell": 4,
@@ -2411,7 +2954,7 @@
    "kind": "model",
    "name": "Overcharge Tank",
    "level": 20,
-   "order": 119,
+   "order": 125,
    "fn": "feed_tank_overcharge",
    "material": "steel",
    "piece": "sq",
@@ -2437,7 +2980,7 @@
    "kind": "model",
    "name": "Lens Fluid Tank",
    "level": 20,
-   "order": 124,
+   "order": 130,
    "fn": "feed_tank_lens",
    "material": "steel",
    "piece": "sq",
@@ -2631,10 +3174,10 @@
     "h": 100
    },
    "licence": false,
-   "tradeOff": "five slugs in a cone, close range · no ammo",
+   "tradeOff": "three heavy slugs in a cone, close range · no ammo",
    "family": "Railguns",
    "size": "Medium · Panel",
-   "keyNumbers": "89 dmg/s · reach 2,700 · cycle · draws 16",
+   "keyNumbers": "83 dmg/s · reach 2,700 · cycle · draws 16",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only",
@@ -2653,7 +3196,7 @@
    "kind": "model",
    "name": "Damping Gel Tank",
    "level": 22,
-   "order": 121,
+   "order": 127,
    "fn": "feed_tank_damping",
    "material": "steel",
    "piece": "sq",
@@ -2664,32 +3207,6 @@
    },
    "licence": false,
    "tradeOff": "A tank of Damping Gel",
-   "family": "Feed",
-   "size": "Small · Square",
-   "keyNumbers": "66 hp · armour 3",
-   "cost": {
-    "steel_plate": 2,
-    "insulated_polymer": 1
-   },
-   "seconds": 50
-  },
-  {
-   "id": "feed_tank_burstgel",
-   "tab": "power",
-   "kind": "model",
-   "name": "Burst Gel Tank",
-   "level": 22,
-   "order": 127,
-   "fn": "feed_tank_burstgel",
-   "material": "steel",
-   "piece": "sq",
-   "art": {
-    "src": "/static/img/parts/feed_tank_burstgel.webp",
-    "w": 56,
-    "h": 61
-   },
-   "licence": false,
-   "tradeOff": "A tank of Burst Gel",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 3",
@@ -2729,6 +3246,32 @@
     "cinder_ember": 1
    },
    "seconds": 80
+  },
+  {
+   "id": "feed_tank_burstgel",
+   "tab": "power",
+   "kind": "model",
+   "name": "Burst Gel Tank",
+   "level": 22,
+   "order": 133,
+   "fn": "feed_tank_burstgel",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_burstgel.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "A tank of Burst Gel",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
   },
   {
    "id": "power_overclock_reactor",
@@ -2774,10 +3317,10 @@
     "h": 70
    },
    "licence": false,
-   "tradeOff": "accurate, a little slower",
+   "tradeOff": "fast, accurate needles in short bursts",
    "family": "Autocannons",
    "size": "Small · Square",
-   "keyNumbers": "36 dmg/s · reach 5,400 · clip 12 · 1.2s reload · draws 14",
+   "keyNumbers": "33 dmg/s · reach 5,368 · clip 6 · 1.0s reload · draws 14",
    "mounting": [
     "Turret, 200°",
     "Bolts on any side"
@@ -2788,6 +3331,34 @@
     "targeting_chip": 1
    },
    "seconds": 50
+  },
+  {
+   "id": "fabricator_forge",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Assembly Forge",
+   "level": 24,
+   "order": 111,
+   "fn": "fabricator_forge",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/fabricator_forge.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "Builds and repairs any part from your hold 2",
+   "family": "Fabricators",
+   "size": "Large · Block",
+   "keyNumbers": "2.5x speed · any grade · draws 110 working",
+   "cost": {
+    "titanium_plate": 6,
+    "servo_motor": 3,
+    "power_coupling": 2,
+    "targeting_chip": 1
+   },
+   "seconds": 200
   },
   {
    "id": "mortar_quake",
@@ -2821,12 +3392,40 @@
    "seconds": 100
   },
   {
+   "id": "refiner_forge",
+   "tab": "utility",
+   "kind": "model",
+   "name": "Smelter Forge",
+   "level": 24,
+   "order": 114,
+   "fn": "refiner_forge",
+   "material": "titanium",
+   "piece": "block2",
+   "art": {
+    "src": "/static/img/parts/refiner_forge.webp",
+    "w": 90,
+    "h": 95
+   },
+   "licence": false,
+   "tradeOff": "Refines any ore in your hold at a station's pace, drawing 55 a second while it works",
+   "family": "Refiners",
+   "size": "Large · Block",
+   "keyNumbers": "1x speed · any grade · draws 55 working",
+   "cost": {
+    "titanium_plate": 4,
+    "copper_wire": 4,
+    "reactor_core": 1,
+    "coolant": 2
+   },
+   "seconds": 200
+  },
+  {
    "id": "feed_tank_accelerant",
    "tab": "power",
    "kind": "model",
    "name": "Accelerant Tank",
    "level": 24,
-   "order": 123,
+   "order": 129,
    "fn": "feed_tank_accelerant",
    "material": "steel",
    "piece": "sq",
@@ -2865,7 +3464,7 @@
    "tradeOff": "dumps a clip of bolts into shields, barely scratches hull",
    "family": "Pulse guns",
    "size": "Medium · Panel",
-   "keyNumbers": "40 dmg/s · reach 5,040 · clip 12 · 1.5s reload · draws 13",
+   "keyNumbers": "39 dmg/s · reach 5,088 · clip 6 · 1.0s reload · draws 13",
    "mounting": [
     "Turret, 120°",
     "Bolts on from behind only"
@@ -2962,7 +3561,7 @@
    "tradeOff": "deep, slow to refill",
    "family": "Shields",
    "size": "Large · Block",
-   "keyNumbers": "shield 240 · refills 20/s after 4 s · draws 77",
+   "keyNumbers": "314 hp · armour 3",
    "cost": {
     "titanium_plate": 4,
     "copper_wire": 4,
@@ -3053,10 +3652,10 @@
     "h": 147
    },
    "licence": false,
-   "tradeOff": "semi-auto rifle: six shots, then a 1.5 s reload",
+   "tradeOff": "semi-auto rifle: four heavy shots, then a 1.5 s reload",
    "family": "Railguns",
    "size": "Large · Block",
-   "keyNumbers": "96 dmg/s · reach 9,000 · clip 6 · 1.5s reload · draws 19",
+   "keyNumbers": "104 dmg/s · reach 9,000 · clip 4 · 1.5s reload · draws 19",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only",
@@ -3526,7 +4125,7 @@
    "tradeOff": "ends a fight, slow · ammo",
    "family": "Torpedoes",
    "size": "Large · Block",
-   "keyNumbers": "229 dmg/s · reach 8,580 · ammo",
+   "keyNumbers": "229 dmg/s · reach 3,430 · ammo",
    "mounting": [
     "Fixed: aims with the ship",
     "Bolts on from behind only",
@@ -3848,11 +4447,13 @@
   "void_pearl": "/static/img/items/void_pearl.webp",
   "maw_fragment": "/static/img/items/maw_fragment.webp",
   "ancient_relic": "/static/img/items/ancient_relic.webp",
-  "repair_kit": "/static/img/items/repair_kit.webp",
-  "field_repair_kit": "/static/img/items/field_repair_kit.webp",
-  "nanite_repair_kit": "/static/img/items/nanite_repair_kit.webp",
+  "pack_hull": "/static/img/items/pack_hull.webp",
+  "pack_wiring": "/static/img/items/pack_wiring.webp",
+  "pack_optics": "/static/img/items/pack_optics.webp",
+  "pack_mechanism": "/static/img/items/pack_mechanism.webp",
+  "pack_heavy": "/static/img/items/pack_heavy.webp",
+  "pack_drive": "/static/img/items/pack_drive.webp",
   "boost_cell": "/static/img/items/boost_cell.webp",
-  "insurance_bond": "/static/img/items/insurance_bond.webp",
   "scanner_charge": "/static/img/items/scanner_charge.webp",
   "railgun_slugs": "/static/img/items/railgun_slugs.webp",
   "flak_canisters": "/static/img/items/flak_canisters.webp",
