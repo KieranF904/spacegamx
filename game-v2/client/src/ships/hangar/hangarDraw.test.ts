@@ -34,7 +34,7 @@ describe('layer order is grid, turret arcs, parts, placed marks, mounting, group
       isOpen: true, canvas: { clientWidth: 400, clientHeight: 300, width: 400, height: 300 }, grid: { width: 400, height: 300, getContext: () => gridCtx },
       view: { px: 20, cx: 0, cy: 0 }, lit: { setView() {} }, ctx: sink(), aids: { axisX: () => null }, errors: [], unreachable: new Set(),
       derived: { ...ship.derived, weapons: ship.derived.weapons.filter((w) => w.window).slice(0, 1) }, overlays: { arcs: true, connectors: false, joins: false, energy: true, thrust: false, com: false },
-      grantAll: true, geoms, bp: ship.blueprint, deps: { catalog: bridge.catalog, tuning: bridge.tuning, hangarState: () => null },
+      ghostInfo: () => ({ ghosts: new Set<number>(), fresh: new Set<number>() }), geoms, bp: ship.blueprint, deps: { catalog: bridge.catalog, tuning: bridge.tuning, hangarState: () => null },
       mountingBroken: new Map([[0, []]]), mouse: [1, 1],
       drawWindow: (w: { open?: unknown }, _sx: unknown, _sy: unknown, alpha: number) => log.push(alpha === 1 ? 'arcs' : 'ghostArc'),
       drawMounting: (_g: unknown, _b: unknown, _sx: unknown, _sy: unknown, all: boolean) => log.push(all ? 'ghostMount' : 'mounting'),
