@@ -7803,6 +7803,85 @@
       ]
     },
     {
+      "id": "client.ui.resource-commonness",
+      "path": "client/src/ui/resources/commonness.ts",
+      "group": "client/ui/resources",
+      "lines": 144,
+      "owns": "the one \"most commonly met first\" order of the field guide grids (Resources within a category, Rocks, Enemies, Systems), computed from game data in buildCommonness below",
+      "needs": "common/ (MATERIAL_LEVEL), the GameData shape (type only), the source index and the level index (no I/O, no DOM)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a resource ranks by how early a pilot meets it (lowest system level among its sources, a Low-chance drop / refining trace / boss drop / quartermaster-rank sale counting later than ordinary mining), then by how widely it is used (low-level uses weigh more), then level gate, then name",
+          "test": "client/src/ui/resources/commonness.test.ts"
+        },
+        {
+          "text": "a rock ranks by its best belt (early system, big share of the belt) then how many systems hold it; a boss ranks after its faction's ordinary entry; a system ranks by level, then danger",
+          "test": "client/src/ui/resources/commonness.test.ts"
+        },
+        {
+          "text": "the order is a pure function of the data (same data, same order)",
+          "test": "client/src/ui/resources/commonness.test.ts"
+        }
+      ],
+      "extend": "a new kind of source is one more row in LATE and one more candidate in meetOf; a new kind of use is one more line of uses in buildCommonness",
+      "exports": [
+        "CommonnessIndex",
+        "buildCommonness",
+        "sortByCommonness"
+      ],
+      "sections": [
+        {
+          "name": "LATE",
+          "kind": "const",
+          "start": 17,
+          "end": 22
+        },
+        {
+          "name": "NEVER",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "lvl",
+          "kind": "const",
+          "start": 26,
+          "end": 26
+        },
+        {
+          "name": "weight",
+          "kind": "const",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "min",
+          "kind": "const",
+          "start": 29,
+          "end": 29
+        },
+        {
+          "name": "CommonnessIndex",
+          "kind": "interface",
+          "start": 31,
+          "end": 38
+        },
+        {
+          "name": "buildCommonness",
+          "kind": "function",
+          "start": 40,
+          "end": 126
+        },
+        {
+          "name": "sortByCommonness",
+          "kind": "function",
+          "start": 128,
+          "end": 144
+        }
+      ]
+    },
+    {
       "id": "client.ui.resource-cards",
       "path": "client/src/ui/resources/entryCards.ts",
       "group": "client/ui/resources",
@@ -8402,9 +8481,9 @@
       "id": "client.ui.resource-grid",
       "path": "client/src/ui/resources/resourceGrid.ts",
       "group": "client/ui/resources",
-      "lines": 74,
-      "owns": "the four icon-grid views (Resources by category, Rocks, Enemies, Systems): one tile per entry sorted by the level it opens at then name (levels.ts), an icon with a small name under it, a lock badge and \"Lv N\" on a tile the player is too low for, no rows and no hint text",
-      "needs": "resourceData (entries, source index, levels), levels, guideChips (the icons), entryCards (View), ../escape",
+      "lines": 75,
+      "owns": "the four icon-grid views (Resources by category, Rocks, Enemies, Systems): one tile per entry in the most-commonly-met-first order (commonness.ts), an icon with a small name under it, a lock badge and \"Lv N\" on a tile the player is too low for, no rows and no hint text",
+      "needs": "resourceData (entries, source index, levels, commonness), levels, commonness, guideChips (the icons), entryCards (View), ../escape",
       "events": "",
       "invariants": [
         {
@@ -8416,7 +8495,7 @@
           "test": "client/src/ui/resources/sourceIndex.test.ts"
         },
         {
-          "text": "tiles in every group run by level ascending then name, and a tile is locked (dimmed, lock badge) exactly when its level is above the player's",
+          "text": "tiles in every group run in commonness order (commonness.ts), and a tile is locked (dimmed, lock badge) exactly when its level is above the player's",
           "test": "client/src/ui/resources/levels.test.ts"
         }
       ],
@@ -8432,44 +8511,44 @@
         {
           "name": "GRID_CSS",
           "kind": "const",
-          "start": 19,
-          "end": 36
+          "start": 20,
+          "end": 37
         },
         {
           "name": "tile",
           "kind": "function",
-          "start": 38,
-          "end": 44
+          "start": 39,
+          "end": 45
         },
         {
-          "name": "lvOf",
+          "name": "ordered",
           "kind": "const",
-          "start": 45,
-          "end": 45
+          "start": 46,
+          "end": 46
         },
         {
           "name": "resourceGridHtml",
           "kind": "function",
-          "start": 47,
-          "end": 56
+          "start": 48,
+          "end": 57
         },
         {
           "name": "rockGridHtml",
           "kind": "function",
-          "start": 58,
-          "end": 61
+          "start": 59,
+          "end": 62
         },
         {
           "name": "enemyGridHtml",
           "kind": "function",
-          "start": 63,
-          "end": 66
+          "start": 64,
+          "end": 67
         },
         {
           "name": "systemGridHtml",
           "kind": "function",
-          "start": 68,
-          "end": 74
+          "start": 69,
+          "end": 75
         }
       ]
     },

@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { GRADE_LEVEL, MATERIAL_LEVEL } from '@space-game/common';
 import { RESOURCE_DATA, levelIndex, sourceIndex } from './resourceData';
 import { isLocked, levelOf, sortByLevel, systemLevel } from './levels';
-import { enemyGridHtml, resourceGridHtml, rockGridHtml, systemGridHtml } from './resourceGrid';
+import { resourceGridHtml, systemGridHtml } from './resourceGrid';
 import { pageHtml, previewHtml } from './entryCards';
 
 const lv = levelIndex();
@@ -52,8 +52,8 @@ describe('sorting', () => {
     expect(sortByLevel(a, (x) => x.l, (x) => x.n).map((x) => x.n)).toEqual(['z', 'c', 'a', 'b']);
   });
 
-  it('every grid group runs ascending by level', () => {
-    const grids = [resourceGridHtml(deps(1)), rockGridHtml(deps(1)), enemyGridHtml(deps(1)), systemGridHtml(deps(1))];
+  it('the system grid runs ascending by level (the others run by commonness, commonness.test.ts)', () => {
+    const grids = [systemGridHtml(deps(1))];
     for (const html of grids) for (const group of html.split('<section').slice(1)) {
       const ls = tilesOf(group).map((t) => t.level);
       expect(ls.length).toBeGreaterThan(0);

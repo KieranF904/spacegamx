@@ -22,6 +22,7 @@ import hintsData from '../../../../data/guideHints.json';
 import { buildResourceIndex, type GameData, type ResourceEntry } from './resourceIndex';
 import { buildSourceIndex, type SourceIndex } from './sourceIndex';
 import { buildLevels, type LevelIndex } from './levels';
+import { buildCommonness, type CommonnessIndex } from './commonness';
 
 export const RESOURCE_DATA: GameData = {
   items: (itemsData as unknown as { items: GameData['items'] }).items,
@@ -57,4 +58,9 @@ let cachedLevels: LevelIndex | undefined;
 /** The level each entry opens at (built on first use) */
 export function levelIndex(): LevelIndex {
   return (cachedLevels ??= buildLevels(RESOURCE_DATA, sourceIndex()));
+}
+let cachedCommonness: CommonnessIndex | undefined;
+/** The most-common-first order keys (built on first use) */
+export function commonnessIndex(): CommonnessIndex {
+  return (cachedCommonness ??= buildCommonness(RESOURCE_DATA, sourceIndex(), levelIndex()));
 }
