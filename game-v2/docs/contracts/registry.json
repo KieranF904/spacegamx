@@ -18956,9 +18956,9 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 801,
+      "lines": 686,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
-      "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
+      "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, lease, freeze, guests}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
       "invariants": [
         {
@@ -18989,62 +18989,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 41,
-          "end": 50
+          "start": 42,
+          "end": 51
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 52,
-          "end": 77
+          "start": 53,
+          "end": 78
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 79,
-          "end": 90
+          "start": 80,
+          "end": 91
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 92,
-          "end": 92
+          "start": 93,
+          "end": 93
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 94,
-          "end": 109
+          "start": 95,
+          "end": 110
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 111,
-          "end": 112
+          "start": 112,
+          "end": 113
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 114,
-          "end": 133
+          "start": 115,
+          "end": 134
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 135,
-          "end": 136
+          "start": 136,
+          "end": 137
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 138,
-          "end": 148
+          "start": 139,
+          "end": 149
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 150,
-          "end": 801
+          "start": 151,
+          "end": 686
         }
       ]
     },
@@ -20328,6 +20328,65 @@
           "kind": "function",
           "start": 205,
           "end": 215
+        }
+      ]
+    },
+    {
+      "id": "server.pilots.session",
+      "path": "server/src/game/pilots/session.ts",
+      "group": "server/game/pilots",
+      "lines": 153,
+      "owns": "a connection's session lifecycle: attach as a guest, login (load or start the saved profile), resume a kept guest, detach (save, release), adopt (a lingering session moves to a new connection)",
+      "needs": "Pilots (sessions, store, bank, banking, guests, frozen, devStash, opts, host), pilots/{cargo, death, persist, lease}; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a profile that fails to load or migrate is never saved over (the session stays `loading`)",
+          "test": "server/src/game/pilots/guests.test.ts"
+        },
+        {
+          "text": "a disconnect saves twice if the first try fails, and keeps the lease if a save failed",
+          "test": "server/src/game/pilots/lease.test.ts"
+        }
+      ],
+      "extend": "none: the rules each step applies live in pilots/*.ts and profile/; this is the order they run in",
+      "exports": [
+        "adopt",
+        "attach",
+        "detach",
+        "login",
+        "resumeGuest"
+      ],
+      "sections": [
+        {
+          "name": "attach",
+          "kind": "function",
+          "start": 17,
+          "end": 32
+        },
+        {
+          "name": "login",
+          "kind": "function",
+          "start": 34,
+          "end": 81
+        },
+        {
+          "name": "resumeGuest",
+          "kind": "function",
+          "start": 83,
+          "end": 112
+        },
+        {
+          "name": "detach",
+          "kind": "function",
+          "start": 114,
+          "end": 130
+        },
+        {
+          "name": "adopt",
+          "kind": "function",
+          "start": 132,
+          "end": 153
         }
       ]
     },

@@ -22,7 +22,7 @@ Everything hostile and pilotless: faction packs and nests (Enemies.ts), single-b
 | server/src/game/bosses/Lifecycle.ts | ~210 | dormant -> waking -> active -> recovering -> healing -> sleeping, tick-stamped (`bossLife`) |
 | server/src/game/brains/fightRules.ts | ~190 | `FightRules` on `StagedBrain`: windows (`signature`), personal attacks (`personal`, `DECISION.PERSONAL`), the cause for the damage log |
 | server/src/game/enemies/recovery.ts | ~80 | every enemy heals out of combat (30 s, then 2 min), lost parts regrown at the end |
-| server/src/game/bosses/stageHp.ts, server/src/bench/motherFight.ts | ~25, ~85 | `stageHp` (each stage's deciding HP); the Scrap Mother's measured fight length (`npx tsx src/bench/motherFight.ts`, from server/) |
+| server/src/game/bosses/stageHp.ts | ~25 | `stageHp` (each stage's deciding HP) |
 | client/src/ships/bossTells.ts | ~170 | light tells on a boss's hull (glows, puffs, chimes), faint lanes, the crane's arm: `bossTelegraph`/`bossBeam` kinds BossFx hands it |
 | scripts/terrain/scrap_nest.mjs, client/src/rendering/DenDressing.ts | | the Nest Rock (data/terrain/sol_scrap_nest.json: outlines, floor, palette, dressing); its lamps, cables, veins, belts, plates, rust |
 | server/src/game/dev/bossDev.ts | ~260 | the boss tools (`bossDevTool`, dev servers and admins, never production; client `DevBossPanel`, Shift+F9) |
@@ -62,7 +62,7 @@ Everything hostile and pilotless: faction packs and nests (Enemies.ts), single-b
 - Boss fights: `npx vitest run server/src/game/scrapMother.test.ts server/src/game/pyreclast.test.ts` (use `--pool=forks --no-file-parallelism` if flaky).
 - Sieges (also hostile AI): sieges.test.ts, siegeProfiles.test.ts. Data: any test calling `validateGameData`.
 - After editing common/: `npm run build:common`.
-- Bullet-hell cost: server/src/bench/bulletHellBench.ts (docs/audits/boss-bullet-hell.md).
+- Bullet-hell cost: docs/audits/boss-bullet-hell.md (its bench is gone).
 
 ## Gotchas
 - Dev-server boss stills: use native `npm run render`, not a browser; shoot.mjs only for live-fight shots.

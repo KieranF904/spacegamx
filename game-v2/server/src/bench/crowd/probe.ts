@@ -10,6 +10,7 @@ import type { GameServer } from '../../GameServer.js';
 import { controlsFor, inputKey, type Ctl } from './world.js';
 import { PtStLayer } from '../../../../client/src/predict/ptst.js';
 import { ReplicaPtWorld } from '../../../../client/src/predict/world.js';
+const wireSize = (m: unknown): number => { const e = encodeMessage(m as ClientMessage); return typeof e === 'string' ? e.length : e.byteLength; };
 
 export type Pose = Float64Array;
 /** The server's ship poses, every tick of the last 32, shared by all probes */
@@ -135,14 +136,14 @@ export class Probe {
       }
       if (this.measuring) {
         const id = m.id ?? m.bodyId, t = m.type === 'debrisSplit' || (id !== undefined && (m.kind === 'debris' || server.getShips().get(id)?.kind === 'debris')) ? (m.type === 'shipSync' ? (m.blueprint ? 'shipSync+bp' : m.hp ? 'shipSync+new' : 'shipSync+re') : m.type) + ':debris' : m.type;
-        const n = encodeMessage(m).length;
+        const n = wireSize(m);
         this.sub[t] = (this.sub[t] ?? 0) + n;
         // (A snapshot's share for debris: what it would be without the pieces' keyframes, rows and removals)
         if (m.type === 'snapshot') {
           const deb = (id: number) => server.getShips().get(id)?.kind === 'debris' || this.debrisSeen.has(id);
           for (const k of m.ships ?? []) if (server.getShips().get(k[0])?.kind === 'debris') this.debrisSeen.add(k[0]);
           const bare = { ...m, ships: m.ships?.filter((k: number[]) => !deb(k[0])), entities: m.entities?.filter((e: { id: number }) => !deb(e.id)), removed: m.removed?.filter((id: number) => !deb(id)), out: m.out?.filter((id: number) => !deb(id)) };
-          this.sub['snapshot:debris'] = (this.sub['snapshot:debris'] ?? 0) + n - encodeMessage(bare).length;
+          this.sub['snapshot:debris'] = (this.sub['snapshot:debris'] ?? 0) + n - wireSize(bare);
         }
       }
       return oHandle(m);

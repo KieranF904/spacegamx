@@ -1,7 +1,7 @@
 /**
  * @contract server.pilots
  * owns:       each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts
- * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs
+ * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, lease, freeze, guests}; npm: @space-game/common, bitecs
  * events:     PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings
  * invariants: guests are never saved with the accounts: a guest with a key is kept a while by it (pilots/guests.ts) — server/src/game/pilots/guests.test.ts
  *             a death puts the same design back, the bank paying for the rebuild — server/src/game/repairBank.test.ts
@@ -25,7 +25,7 @@
 
 import type { Telemetry } from './Telemetry.js';
 import { IWorld } from 'bitecs';
-import { xpToReach, LEVEL_CAP, unlocks, levelUnlockNames, nextUnlockHint, giveSkillPoints, addStanding, Position, InSystem, Economy, PlayerProfile, ServerProfileMessage, diffProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint, newProfile, migrateProfile, setActiveShip, SECURE_HOLD, hasAll, ShipRecord, SALVAGE, type PlacedPart, refundRetiredSkills, DOCK_FEE_LEVEL, dcos, dsin } from '@space-game/common';
+import { xpToReach, LEVEL_CAP, unlocks, levelUnlockNames, nextUnlockHint, giveSkillPoints, addStanding, Position, InSystem, Economy, PlayerProfile, ServerProfileMessage, diffProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint, setActiveShip, SECURE_HOLD, hasAll, ShipRecord, SALVAGE, type PlacedPart, DOCK_FEE_LEVEL, dcos, dsin } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { cloneJson } from '@space-game/common';
 import type { ProfileStore } from '../profile/ProfileStore.js';
@@ -35,6 +35,7 @@ import * as death from './pilots/death.js';
 import * as persist from './pilots/persist.js';
 import * as lease from './pilots/lease.js';
 import * as freezer from './pilots/freeze.js';
+import * as session from './pilots/session.js';
 import { GuestKeep } from './pilots/guests.js';
 import type { LeaseResult } from '../profile/lease.js';
 
@@ -161,7 +162,7 @@ export class Pilots {
   /** The repair bank's rules on a profile (RepairBank.ts) */
   readonly bank: RepairBanks;
   /** The bank of the pilots in play: deposits, repairs paid from it, the message (RepairBank.ts) */
-  private readonly banking: BankSessions<Session>;
+  /** @internal pilots/session.ts */ readonly banking: BankSessions<Session>;
 
   /** What the field machines (feature `machines`) tell the bank: wired by the game once they exist */
   fieldHooks: {
@@ -249,101 +250,17 @@ export class Pilots {
   // ---------------------------------------------------------------------------
 
   /** A new connection plays as a guest until it logs in */
-  attach(conn: PilotConn): void {
-    const s: Session = { conn, profile: newProfile(this.opts.starter), dirty: false, lastSave: this.now(), atStation: false };
-    for (const bp of this.opts.guestShips ?? []) {
-      const slot = s.profile.hangar.indexOf(null);
-      if (slot >= 0) s.profile.hangar[slot] = { blueprint: cloneJson(bp), hp: {}, ghosts: [] };
-    }
-    this.sessions.set(conn, s);
-    this.bank.ensure(s.profile, this.now());
-    persist.applyProfile(this, s, false);
-    // (A guest's ship is where the world put it, beside Sol Central; in the tutorial that is the yard instead)
-    const yard = this.tutorialSpawn?.(conn, false);
-    if (yard) this.host.place(conn, yard.system, yard.x, yard.y);
-    this.sendBank(s, true);
-    this.emit(conn, { type: 'login' });
-  }
+  attach(conn: PilotConn): void { return session.attach(this, conn); }
 
   /** Logged in: load (or start) their saved profile and put them back where they were */
-  async login(conn: PilotConn, userId: number): Promise<void> {
-    let raw: unknown = null;
-    const before = this.sessions.get(conn);
-    // Until it's loaded, the profile in hand (a guest's) mustn't be saved over theirs
-    if (before) before.loading = true;
-    let failed = false;
-    try {
-      raw = await this.store.load(userId);
-    } catch (e) {
-      failed = true;
-      console.error(`[Pilots] could not load profile ${userId}:`, e);
-    } finally {
-      if (before) before.loading = false;
-    }
-    const s = this.sessions.get(conn);
-    if (!s || conn.userId !== userId) return; // left (or switched account) while loading
-    // A save we couldn't read isn't an empty one: never start them afresh over it
-    if (failed) { s.loading = true; this.toast(conn, 'Your save could not be loaded right now: progress this session will not be saved. Try reconnecting.', 'bad'); return; }
-    // A save we can't make sense of is kept as it is (never saved over), like one we couldn't read
-    let profile: PlayerProfile;
-    try {
-      // (A save older than OLDEST_PROFILE_VERSION throws: logged below, and kept as it is)
-      profile = raw
-        ? migrateProfile(raw, this.opts.starter, this.econ.ships, { econ: this.econ })
-        : newProfile(this.opts.starter);
-    } catch (e) {
-      s.loading = true;
-      console.error(`[Pilots] could not migrate profile ${userId}:`, e);
-      this.toast(conn, 'Your save could not be loaded right now: progress this session will not be saved. Try reconnecting.', 'bad');
-      return;
-    }
-    s.profile = profile;
-    // (An upgraded save is written back at once: a migration never runs twice)
-    s.dirty = !raw || (raw as { version?: unknown }).version !== profile.version;
-    if (cargo.structureToMaterials(this, s.profile)) s.dirty = true;
-    if (refundRetiredSkills(s.profile)) s.dirty = true;
-    // The repair bank: made full at a first login, refilled to now; the free part pays for what a lost ship is owed
-    if (!s.profile.bank) s.dirty = true;
-    this.bank.ensure(s.profile, this.now());
-    this.banking.payOwedFree(s);
-    persist.applyProfile(this, s, true);
-    this.sendBank(s, true);
-    death.sendWreck(this, s);
-    if (!raw) this.toast(conn, 'Welcome, pilot. Your Sparrow is fuelled and ready at Sol Central.', 'good');
-    death.showNotices(this, s);
-    this.emit(conn, { type: 'login' });
-  }
+  login(conn: PilotConn, userId: number): Promise<void> { return session.login(this, conn, userId); }
 
   /**
    * A guest joined with their browser's key (conn.guestId): the pilot kept under it, if any, is theirs again as they left
    * it (their ship, hold, place and tutorial step: what a signed-in pilot's login loads from their save). False: none
    * kept (a new guest: the fresh profile they were given stands), or they left or signed in meanwhile
    */
-  async resumeGuest(conn: PilotConn): Promise<boolean> {
-    const id = conn.guestId;
-    if (!id) return false;
-    const kept = await this.guests.take(id);
-    const s = this.sessions.get(conn);
-    if (!kept || !s || s.loading || conn.userId !== null || conn.guestId !== id) return false;
-    let profile: PlayerProfile;
-    try {
-      profile = migrateProfile(kept.profile, this.opts.starter, this.econ.ships, { econ: this.econ });
-    } catch (e) {
-      console.error(`[Pilots] could not migrate a kept guest profile (${conn.username}):`, e);
-      return false;
-    }
-    s.profile = profile;
-    s.dirty = false;
-    s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;
-    if (cargo.structureToMaterials(this, s.profile)) s.dirty = true;
-    if (refundRetiredSkills(s.profile)) s.dirty = true;
-    this.bank.ensure(s.profile, this.now());
-    persist.applyProfile(this, s, true);
-    this.sendBank(s, true);
-    death.sendWreck(this, s);
-    this.emit(conn, { type: 'login' });
-    return true;
-  }
+  resumeGuest(conn: PilotConn): Promise<boolean> { return session.resumeGuest(this, conn); }
 
   /** Take the account for this game server (one server per account at a time); refused while another holds it */
   claimLease(userId: number): Promise<LeaseResult> { return lease.claim(this, userId); }
@@ -351,45 +268,13 @@ export class Pilots {
   releaseLease(userId: number): Promise<void> { return lease.release(this, userId); }
 
   /** Disconnected: capture where they are and save (twice if the first try fails), then give the account up to other servers */
-  async detach(conn: PilotConn): Promise<void> {
-    const s = this.sessions.get(conn);
-    if (!s) return;
-    this.sessions.delete(conn);
-    const userId = conn.userId;
-    if (s.loading) { if (userId !== null) await lease.release(this, userId); return; }
-    // (Gone from the gun range: the real profile back first, as it was, so that is what's saved)
-    const real = this.frozen.get(conn);
-    if (real) { this.frozen.delete(conn); s.profile = real; }
-    persist.capture(this, s);
-    await persist.save(this, s);
-    if (s.dirty && userId !== null) await persist.save(this, s);
-    this.devStash.delete(conn);
-    // (A save that failed keeps the lease: it runs out by itself, and no other server loads the stale profile meanwhile)
-    if (userId !== null && !s.dirty) await lease.release(this, userId);
-  }
+  detach(conn: PilotConn): Promise<void> { return session.detach(this, conn); }
 
   /**
    * A signed-in pilot came back to the ship they left in space (their old connection's session, kept while it lingered):
    * the session moves to the new connection as it is (nothing loaded, the ship untouched) and the client is told it all
    */
-  adopt(from: PilotConn, to: PilotConn): boolean {
-    const s = this.sessions.get(from);
-    if (!s) return false;
-    this.sessions.delete(from);
-    this.sessions.delete(to);
-    const frozen = this.frozen.get(from);
-    this.frozen.delete(from);
-    if (frozen) this.frozen.set(to, frozen);
-    s.conn = to;
-    s.loading = false;
-    s.profileSent = undefined; s.itemsKey = undefined; s.bankSent = undefined;
-    this.sessions.set(to, s);
-    this.sendProfile(to);
-    this.sendItems(to);
-    this.sendBank(s, true);
-    this.emit(to, { type: 'login' });
-    return true;
-  }
+  adopt(from: PilotConn, to: PilotConn): boolean { return session.adopt(this, from, to); }
 
   /** Dev tool: pilots flying a library ship (devShip): the ship record (and slot) they really have, to be put back */
   devStash = new Map<PilotConn, { rec: ShipRecord; slot: number }>();

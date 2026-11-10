@@ -15,13 +15,10 @@ Dev-only bots that fly a task on the real server and keep stats: a framework to 
 | `server/src/bots/rockeryTools.ts` | the `/rockery` chat command behind the client's Sim tools panel (F7): drones, a still dummy, 1-4 random-flight bot players. How to use: ops-tools.md, "Sim tools" |
 | `server/src/bots/tasks/rockStrategies.ts` | the rock-picking strategies for mine-and-deposit (`strategy=nearest|metal|taenite-on-sight|needs|value`, `skip=k`): pure functions, one line to register a new one |
 | `server/src/bots/stats/BotStats.ts`, `targets.ts` | trips, phases, rates, JSON lines and the table; ore cost of a target in minutes of the loop |
-| `server/src/bench/playerBot.ts` | the accelerated bench (no real time) |
-| `server/src/bench/miningSims.ts` | strategy x Taenite on/off x starting-variation runs on the bench; writes the table for docs/audits/mining-sims-*.md |
 
 Seams used in the rest of the server: `GameServer.afterTick` (hooks run at the end of each main tick), `AdminTools.extensions` (the `/bot` command), `GameServer.pods` and `.mining` made public.
 
 ## Running it
-- **Bench** (the main tool): `cd server && npx tsx src/bench/playerBot.ts [minutes=30]`. Env: `DRIVER=client|npc|both`, `BOTS=n`, `TASK=name`, `MODE=store|sell`, `OPTS="dockWait=10 standoff=0.55 ..."`, `STATS=<dir>`, `QUIET=1`, `SEED`. 60 game minutes take about 40-60 s wall for the client driver and about 5 s for the NPC. It prints the table, the ore cost of a Mk I mining laser and a whole Prospector in minutes of the loop, and writes JSON lines to `server/stats/bots/` (gitignored: one `trip` line per trip and a closing `summary`).
 - **Dev server**: as an admin in chat `/bot spawn mine-and-deposit [n] [client|npc] [key=value ...]`, `/bot list`, `/bot stats [id]`, `/bot stop [id|all]`, `/bot tasks`; or start with `BOTS=mine-and-deposit:1:npc,mine-and-deposit:1:client`. The client bot is an ordinary player with a ship; the NPC bot an ordinary AI-style ship.
 - Tests: `npx vitest run server/src/bots` (task state machine with a fake driver, stats accounting, and one full trip per driver on a test server).
 
