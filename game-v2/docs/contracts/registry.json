@@ -272,8 +272,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "every tick number is stepped exactly once, up to the server's estimated tick",
-          "test": "none pinned"
+          "text": "every tick number is stepped exactly once, up to the server's estimated tick (at most 4 a frame)",
+          "test": "client/src/app/tickDriver.test.ts"
         }
       ],
       "extend": "none (the tick order is fixed)",
@@ -3988,8 +3988,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "a delayed action runs on the first update at or after its time",
-          "test": "none pinned"
+          "text": "a delayed action runs once, on the first update at or after its time",
+          "test": "client/src/ships/damage/context.test.ts"
         }
       ],
       "extend": "a shared capability for every effect is one member here",
@@ -7375,11 +7375,11 @@
       "invariants": [
         {
           "text": "shake is trauma squared, so small knocks stay small",
-          "test": "none pinned"
+          "test": "client/src/state/screenShake.test.ts"
         },
         {
-          "text": "the offset follows time-based noise, the same at any frame rate",
-          "test": "none pinned"
+          "text": "the offset follows time-based noise, the same at any frame rate; trauma drains by at most 0.1 s a frame",
+          "test": "client/src/state/screenShake.test.ts"
         }
       ],
       "extend": "none (tune SHAKE_* below)",
