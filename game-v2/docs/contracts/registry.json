@@ -611,6 +611,245 @@
       ]
     },
     {
+      "id": "client.predict.kind.bodies",
+      "path": "client/src/predict/kinds/bodiesKind.ts",
+      "group": "client/predict/kinds",
+      "lines": 122,
+      "owns": "PT bookkeeping for bodies the replica layer flies from their decisions (bosses): hash by tick, confirm against ST, ease the drawn pose",
+      "needs": "@space-game/common, ptKinds (PtKind, PtEase), a BodiesKindHost (ids, at)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a body whose recorded hash misses ST is re-read to the PT head once, never stepped on the PT layer itself",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new kind of body is a host ids() source; the kind itself is registered in worldKinds.ts at order 10",
+      "exports": [
+        "BodiesKind",
+        "BodiesKindHost"
+      ],
+      "sections": [
+        {
+          "name": "BodiesKindHost",
+          "kind": "interface",
+          "start": 23,
+          "end": 30
+        },
+        {
+          "name": "Track",
+          "kind": "interface",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "BodiesKind",
+          "kind": "class",
+          "start": 34,
+          "end": 122
+        }
+      ]
+    },
+    {
+      "id": "client.predict.kind.guides",
+      "path": "client/src/predict/kinds/guidesKind.ts",
+      "group": "client/predict/kinds",
+      "lines": 132,
+      "owns": "homing shells and mobs on the PT timeline: forks GuideRunner runs from ST and steps the copy to the PT head",
+      "needs": "@space-game/common (guideHash, GuideBody), GuideRunner (GuideFork), ptKinds, a GuidesKindHost",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a hash miss at the confirmed tick re-forks from ST once and eases the drawn place",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a change to the waypoint law belongs in common/guidance, not here; the kind is registered in worldKinds.ts",
+      "exports": [
+        "GuidesKind",
+        "GuidesKindHost"
+      ],
+      "sections": [
+        {
+          "name": "GuidesKindHost",
+          "kind": "interface",
+          "start": 23,
+          "end": 32
+        },
+        {
+          "name": "Track",
+          "kind": "interface",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "poseOf",
+          "kind": "const",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "GuidesKind",
+          "kind": "class",
+          "start": 38,
+          "end": 132
+        }
+      ]
+    },
+    {
+      "id": "client.predict.kind.moves",
+      "path": "client/src/predict/kinds/movesKind.ts",
+      "group": "client/predict/kinds",
+      "lines": 285,
+      "owns": "bodies' moves (boss attacks) on the PT timeline: a MoveRunner fork per body, looks queued to the body's draw tick, shells drawn ahead",
+      "needs": "@space-game/common, MoveRunner (TimedMoveMsg), ptKinds (hash helpers)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a miss against ST re-forks from c - FORK_BACK and steps to the head once; looks already shown are not shown twice",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new move look or shell type is handled where the MoveRunner outputs it; the kind is registered in worldKinds.ts",
+      "exports": [
+        "FORK_BACK",
+        "MovesKind",
+        "MovesKindHost"
+      ],
+      "sections": [
+        {
+          "name": "FORK_BACK",
+          "kind": "const",
+          "start": 33,
+          "end": 34
+        },
+        {
+          "name": "VERIFY_TICKS",
+          "kind": "const",
+          "start": 35,
+          "end": 36
+        },
+        {
+          "name": "PARTIAL_GAP",
+          "kind": "const",
+          "start": 37,
+          "end": 38
+        },
+        {
+          "name": "MovesKindHost",
+          "kind": "interface",
+          "start": 40,
+          "end": 56
+        },
+        {
+          "name": "Out",
+          "kind": "interface",
+          "start": 58,
+          "end": 58
+        },
+        {
+          "name": "Fork",
+          "kind": "interface",
+          "start": 59,
+          "end": 59
+        },
+        {
+          "name": "msgKey",
+          "kind": "const",
+          "start": 61,
+          "end": 61
+        },
+        {
+          "name": "shellKey",
+          "kind": "const",
+          "start": 62,
+          "end": 62
+        },
+        {
+          "name": "outHash",
+          "kind": "const",
+          "start": 63,
+          "end": 69
+        },
+        {
+          "name": "MovesKind",
+          "kind": "class",
+          "start": 71,
+          "end": 285
+        }
+      ]
+    },
+    {
+      "id": "client.predict.kind.shells",
+      "path": "client/src/predict/kinds/shellsKind.ts",
+      "group": "client/predict/kinds",
+      "lines": 194,
+      "owns": "other ships' shells on the PT timeline: their guns stepped from inputs, records drawn as predicted shells and taken back when wrong",
+      "needs": "@space-game/common (sim/otherGuns lanes), PtStLayer, ptKinds",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a tick whose lane records changed has its drawn shells taken back and the new ones drawn",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "gun behaviour lives in common sim/otherGuns.ts; the kind is registered in worldKinds.ts",
+      "exports": [
+        "ShellsKind",
+        "ShellsKindHost"
+      ],
+      "sections": [
+        {
+          "name": "ShellsKindHost",
+          "kind": "interface",
+          "start": 33,
+          "end": 53
+        },
+        {
+          "name": "Drawn",
+          "kind": "interface",
+          "start": 55,
+          "end": 55
+        },
+        {
+          "name": "Held",
+          "kind": "interface",
+          "start": 56,
+          "end": 63
+        },
+        {
+          "name": "SIM_FIELDS",
+          "kind": "const",
+          "start": 65,
+          "end": 65
+        },
+        {
+          "name": "SIM_ENV",
+          "kind": "const",
+          "start": 66,
+          "end": 66
+        },
+        {
+          "name": "RECS",
+          "kind": "const",
+          "start": 67,
+          "end": 67
+        },
+        {
+          "name": "keyOf",
+          "kind": "const",
+          "start": 68,
+          "end": 70
+        },
+        {
+          "name": "ShellsKind",
+          "kind": "class",
+          "start": 72,
+          "end": 194
+        }
+      ]
+    },
+    {
       "id": "client.render.renderer",
       "path": "client/src/rendering/Renderer.ts",
       "group": "client/rendering",

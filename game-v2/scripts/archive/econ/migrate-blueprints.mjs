@@ -8,9 +8,9 @@
 import { readFileSync, readdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { loadCatalog, parseBlueprint, serializeBlueprint, validateBlueprint, migrateBlueprint, migratePartItem } from '../../common/dist/index.js';
+import { loadCatalog, parseBlueprint, serializeBlueprint, validateBlueprint, migrateBlueprint, migratePartItem } from '../../../common/dist/index.js';
 
-const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../data');
+const DATA = join(dirname(fileURLToPath(import.meta.url)), '../../../data');
 const read = (f) => JSON.parse(readFileSync(join(DATA, f), 'utf8'));
 const tuning = read('ships/tuning.json');
 const catalog = loadCatalog({ pieces: read('ships/pieces.json'), functions: read('ships/functions.json'), materials: read('ships/materials.json'), models: read('ships/models.json') }, { overlapShrink: tuning.overlapShrink });

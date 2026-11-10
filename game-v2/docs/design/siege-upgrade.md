@@ -8,7 +8,7 @@ hours of agent time (several lanes at once). Server authority stays: the client 
 
 Code read: `server/src/game/Sieges.ts` (1001 lines, rules + profiles + run loop), `server/src/GameServer.ts`
 `createSiegeHost` (turret controller, hostile spawning), `server/src/game/Surfaces.ts` (descend), `client/src/ui/SiegePanel.ts`,
-`client/src/rendering/surface/BastionView.ts`, `surfaceLooks.ts`, `Renderer.setNight`, the `siege` / `siegeState` /
+`client/src/rendering/surface/siege/BastionView.ts`, `surfaceLooks.ts`, `Renderer.setNight`, the `siege` / `siegeState` /
 `objective` messages in `common/src/network/protocol.ts`, `sieges.test.ts`, `siegeProfiles.test.ts`, `data/rules.json`
 `sieges`, `data/systems.json` bastions.
 

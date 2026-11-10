@@ -341,7 +341,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 
 ## Implemented: Repair Beam and Point Defence Turret (§5 #6, #7)
 
-*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/support.ts`; docs/areas/ship-parts.md has the map.*
+*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/features/support/support.ts`; docs/areas/ship-parts.md has the map.*
 
 - **Repair Beam** (`utility_repair_beam`, utility, level 17, Mk II steel, 1×2, turret 240°): held on the fire key and
   aimed at the cursor like any turret (so a Warden points at who needs it; its other guns' shots pass through friends
@@ -351,7 +351,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
   while on (about two Cell Reactors); no heat. **Decisions:** it never mends a destroyed part (stations and repair kits
   rebuild), its own ship or a shield; no auto-targeting (the cursor is how every turret aims, and a client can't know a
   friend's exact damage to predict an auto-pick).
-- **Support credit** (open question 7, answered "yes" as the default): `server/src/game/Support.ts` notes who mended
+- **Support credit** (open question 7, answered "yes" as the default): `server/src/ships/features/support/Support.ts` notes who mended
   whom. A pilot who mended another at least 15 HP within the last 20 s is their supporter: an enemy the supported pilot
   kills pays its supporters nearby as it pays the killer's party (75% XP, 40% credits; not its job steps), and a boss
   counts the supporters of everyone it credits among its winners. The same hook (`supporters(target, now)`) is where
@@ -370,7 +370,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 
 ## Implemented: Burst Strafer and Tow Beam (§5 #1, #8)
 
-*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/strafer.ts`, `tow.ts`,
+*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/features/strafer/strafer.ts`, `tow.ts`,
 `server/src/ships/features/tow/Towing.ts`; docs/areas/ship-parts.md has the map.*
 
 - *Superseded the same day by the rework below ("Burst Strafer rework"); kept as it was first built.*
@@ -409,7 +409,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 
 *Kieran: "lackluster and very restricted"; "the user should be able to use it as they like with a short cooldown, it
 should be stronger and use more energy; rather than forcing this recharge thing, they need to compensate with their
-energy system". Code: `common/src/ships/strafer.ts`, `flight.ts`; protocol 16.*
+energy system". Code: `common/src/ships/features/strafer/strafer.ts`, `flight.ts`; protocol 16.*
 
 - **Any way.** A press dodges the way the movement keys ask (WASD on screen, diagonals too; forward/back/Q/E at the
   helm), worked out inside the shared step from the inputs of that tick and quantised to one of 32 ship-local ways, so

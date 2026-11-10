@@ -4,10 +4,10 @@
 //   npx vite-node scripts/merge-thrusters.ts [--write]
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { loadCatalog, parseBlueprint, serializeBlueprint, validateBlueprint, placeGeometry, SIDE_NORMAL, type Blueprint, type PlacedPart, type Rot, type Side } from '../common/src/index';
-import { loadShipConfigFromDisk } from '../server/src/ships/loadShipConfig';
+import { loadCatalog, parseBlueprint, serializeBlueprint, validateBlueprint, placeGeometry, SIDE_NORMAL, type Blueprint, type PlacedPart, type Rot, type Side } from '../../common/src/index';
+import { loadShipConfigFromDisk } from '../../server/src/ships/loadShipConfig';
 
-const data = join(__dirname, '../data');
+const data = join(__dirname, '../../data');
 const raw = loadShipConfigFromDisk(data);
 const catalog = loadCatalog(raw.catalog, { overlapShrink: raw.tuning.overlapShrink });
 const write = process.argv.includes('--write');

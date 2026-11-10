@@ -5,10 +5,10 @@
 //   npx vite-node scripts/add-batteries.ts
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { createShipState, parseBlueprint, serializeBlueprint, validateBlueprint, loadCatalog, energyTuning, type Blueprint } from '../common/src/index';
-import { loadShipConfigFromDisk } from '../server/src/ships/loadShipConfig';
+import { createShipState, parseBlueprint, serializeBlueprint, validateBlueprint, loadCatalog, energyTuning, type Blueprint } from '../../common/src/index';
+import { loadShipConfigFromDisk } from '../../server/src/ships/loadShipConfig';
 
-const data = join(__dirname, '../data');
+const data = join(__dirname, '../../data');
 const raw = loadShipConfigFromDisk(data);
 const catalog = loadCatalog(raw.catalog, { overlapShrink: raw.tuning.overlapShrink });
 const et = energyTuning(raw.tuning);

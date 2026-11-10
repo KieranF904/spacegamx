@@ -1,4 +1,11 @@
 /**
+ * @contract client.predict.kind.moves
+ * owns:       bodies' moves (boss attacks) on the PT timeline: a MoveRunner fork per body, looks queued to the body's draw tick, shells drawn ahead
+ * needs:      @space-game/common, MoveRunner (TimedMoveMsg), ptKinds (hash helpers)
+ * invariants: a miss against ST re-forks from c - FORK_BACK and steps to the head once; looks already shown are not shown twice — none pinned
+ * extend:     a new move look or shell type is handled where the MoveRunner outputs it; the kind is registered in worldKinds.ts
+ */
+/**
  * Bodies' moves on the PT timeline (boss attacks, custom enemies' moves: telegraphs, beams, windows, their straight
  * shells). The snapshots' MoveRunner (ST) works each body's moves out through the confirmed tick; this kind keeps a
  * fork of each body's moves (MoveRunner with `from`/`only`) stepped on to the PT head, so a move's looks are drawn

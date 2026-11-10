@@ -469,7 +469,7 @@ Where the packages meet (each side writes its half; integration wires them):
 - New: `server/src/game/RepairBank.ts` (per pilot: fill at login, refill, `spare`, `spendSpare`, `deposit`, respawn
   rule, the deposit rebuild after a respawn, passing-by repair), `server/src/net/handlers/bank.ts` (`bankDeposit`,
   `devBank` refused unless the server is a dev server: use the same flag `freeBuild` or `shipEditAnywhere` use, never
-  production), `common/src/econ/fieldUpdate.ts` (v6) and its test, and `scripts/econ/retireKits.mjs` (a one-off rewrite of
+  production), `common/src/econ/fieldUpdate.ts` (v6) and its test, and `scripts/archive/econ/retireKits.mjs` (a one-off rewrite of
   drops, vendors and quest rewards; run it and commit the data).
 - Edits:
   - `server/src/game/Pilots.ts`: `onDestroyed` without loaners and insurance; no `grantStarterBonds`; the kit branch of
