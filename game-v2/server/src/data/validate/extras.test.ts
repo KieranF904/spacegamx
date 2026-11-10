@@ -37,4 +37,16 @@ describe('validate.extras', () => {
     expect(p.some((x) => x.file === 'terrain' && x.path === 'nowhere')).toBe(true);
     expect(p.some((x) => x.file === 'mobs.json' && x.path === 'mobs.scrap_mite.blast')).toBe(true);
   });
+
+  it('catches a malformed terrain outline', () => {
+    const p = problems((f) => { f.terrain.ashfall_surface.rocks[0] = [[0, 0], [1, 1]]; f.terrain.ashfall_surface.rocks[1][0] = [1]; });
+    expect(p.some((x) => x.file === 'terrain/ashfall_surface.json' && x.path === 'rocks[0]')).toBe(true);
+    expect(p.some((x) => x.file === 'terrain/ashfall_surface.json' && x.path === 'rocks[1][0]')).toBe(true);
+  });
+
+  it('catches a siege roster naming a missing design, and a bastion naming no profile', () => {
+    const p = problems((f) => { f.rules.sieges.profiles.selene.roster[0].ship = 'scrap_mitee'; f.systems.systems.find((x: any) => x.id === 'selene_siege').surface.bastion.profile = 'nowhere'; });
+    expect(p.some((x) => x.file === 'rules.json' && x.path === 'sieges.profiles.selene.roster[0].ship' && /did you mean "scrap_mite"/.test(x.message))).toBe(true);
+    expect(p.some((x) => x.file === 'systems.json' && /bastion\.profile$/.test(x.path) && /unknown siege profile "nowhere"/.test(x.message))).toBe(true);
+  });
 });

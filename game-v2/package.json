@@ -24,6 +24,7 @@
     "panels:index": "node scripts/panels-index.mjs",
     "render-daemon": "node scripts/render/daemon.mjs",
     "render": "node scripts/render/render.mjs",
+    "data:validate": "vite-node scripts/validate-data.ts",
     "wire:sync": "node scripts/wire/sync.mjs",
     "wire:bump": "node scripts/wire/bump.mjs",
     "features:gen": "node scripts/features/gen.mjs",

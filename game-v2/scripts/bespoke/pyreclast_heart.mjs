@@ -16,6 +16,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'fs';
+import { compactJson } from '../lib/compactJson.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -247,6 +248,6 @@ for (const p of pieces) {
 
 const pieceFile = { _comment:'The Pyreclast\'s heart (its third stage). Written by scripts/bespoke/pyreclast_heart.mjs: edit that, not this.', pieces };
 const design = { name: 'Pyreclast Heart', catalogVersion: 1, paint: '#2a201c', parts };
-writeFileSync(join(root, 'data/ships/bespoke/pyreclast_heart.json'), JSON.stringify(pieceFile, null, 1) + '\n');
+writeFileSync(join(root, 'data/ships/bespoke/pyreclast_heart.json'), compactJson(pieceFile));
 writeFileSync(join(root, 'data/ships/blueprints/enemy/pyreclast_heart.json'), JSON.stringify(design, null, 1) + '\n');
 console.log(`${pieces.length} pieces`);

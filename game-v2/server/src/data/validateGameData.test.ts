@@ -25,6 +25,11 @@ describe('game data validation', () => {
     expect(formatProblems(errors(problems))).toBe('');
   });
 
+  it('the real data validates clean: no warnings but functions not yet in the wire dictionary (a protocol bump)', () => {
+    const rest = validateGameData(files, { ships }).filter((p) => !(p.level === 'warning' && p.file === 'ships/functions.json' && p.message.includes('wire DICTIONARY')));
+    expect(formatProblems(rest)).toBe('');
+  });
+
   it('the real data passes without the ship files too (GameData on its own)', () => {
     expect(formatProblems(errors(validateGameData(files)))).toBe('');
   });
