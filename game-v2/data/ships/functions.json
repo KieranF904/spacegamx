@@ -2,6 +2,8 @@
   "functions": [
     {
       "id": "core",
+      "hullKind": "core",
+      "statusFull": true,
       "name": "Core",
       "rarity": "rare",
       "description": "The ship's heart: steering, power routing and the jump drive. Every ship needs exactly one.",
@@ -24,6 +26,7 @@
     },
     {
       "id": "hull",
+      "hullKind": "plating",
       "name": "Hull",
       "rarity": "common",
       "description": "Structure. Holds the ship together.",
@@ -35,6 +38,7 @@
     },
     {
       "id": "armor",
+      "hullKind": "armour",
       "name": "Armour",
       "rarity": "common",
       "description": "Heavy plating: soaks far more damage than hull, and one grade harder to get through. Heavy, though: it slows the ship.",
@@ -53,6 +57,8 @@
     },
     {
       "id": "generator",
+      "hullKind": "energy",
+      "hotGlow": true,
       "touch": "gen",
       "legacy": true,
       "name": "Generator",
@@ -82,6 +88,7 @@
     },
     {
       "id": "conduit",
+      "hotGlow": true,
       "touch": "relay",
       "legacy": true,
       "name": "Conduit",
@@ -95,6 +102,7 @@
     },
     {
       "id": "thruster",
+      "pointing": "S",
       "touch": "in",
       "legacy": true,
       "name": "Ion Thruster",
@@ -126,6 +134,7 @@
     },
     {
       "id": "afterburner",
+      "pointing": "S",
       "touch": "in",
       "legacy": true,
       "name": "Afterburner",
@@ -155,6 +164,7 @@
     },
     {
       "id": "plasma_drive",
+      "pointing": "S",
       "touch": "in",
       "legacy": true,
       "name": "Plasma Drive",
@@ -185,6 +195,7 @@
     },
     {
       "id": "miner",
+      "pointing": "N",
       "touch": "in",
       "legacy": true,
       "name": "Mining Laser",
@@ -210,6 +221,8 @@
     },
     {
       "id": "battery",
+      "hullKind": "energy",
+      "statusFull": true,
       "touch": "relay",
       "legacy": true,
       "name": "Battery",
@@ -240,6 +253,8 @@
     },
     {
       "id": "drive_battery",
+      "hullKind": "energy",
+      "statusFull": true,
       "touch": "relay",
       "legacy": true,
       "name": "Drive Battery",
@@ -270,6 +285,8 @@
     },
     {
       "id": "weapon_battery",
+      "hullKind": "energy",
+      "statusFull": true,
       "touch": "relay",
       "legacy": true,
       "name": "Weapon Battery",
@@ -350,6 +367,7 @@
     },
     {
       "id": "cargo",
+      "hullKind": "plating",
       "name": "Cargo Hold",
       "rarity": "common",
       "description": "Hold space for ore and loot.",
@@ -580,6 +598,7 @@
     },
     {
       "id": "shield",
+      "hullKind": "energy",
       "touch": "in",
       "legacy": true,
       "name": "Shield Generator",
@@ -748,6 +767,7 @@
     },
     {
       "id": "jumpcoil",
+      "hullKind": "jump",
       "touch": "in",
       "legacy": true,
       "name": "Jump Coil",
@@ -940,6 +960,7 @@
     },
     {
       "id": "siphon",
+      "pointing": "N",
       "touch": "in",
       "legacy": true,
       "name": "Gas Siphon",
@@ -966,6 +987,8 @@
     },
     {
       "id": "molten_plate",
+      "hullKind": "armour",
+      "hotGlow": true,
       "name": "Veined Plate",
       "exclusive": "boss",
       "description": "Armour run through with molten channels: as tough as plate, and it carries power like a conduit.",
@@ -979,6 +1002,7 @@
     },
     {
       "id": "dash_coil",
+      "hotGlow": true,
       "name": "Dash Coil",
       "exclusive": "boss",
       "description": "A boss's coil: it dumps its charge into the hull in one kick, throwing the whole ship sideways. Fewer coils, shorter dashes; none, no dashes.",
@@ -994,6 +1018,7 @@
     },
     {
       "id": "brood_bay",
+      "hotGlow": true,
       "name": "Brood Bay",
       "exclusive": "boss",
       "description": "A launch bay that sends out waves of drones.",
@@ -1029,6 +1054,7 @@
     {"id": "bone_frame", "name": "Bone Frame", "exclusive": "boss", "description": "A boss's cast skeleton under its carapace: it holds its wings together.", "color": "#2a2331", "glow": "#ff7a2a", "decor": "none", "pieces": "*", "hpScale": 0.5, "armour": 0.6, "massScale": 0.2},
     {
       "id": "pyre_lance",
+      "hotGlow": true,
       "name": "Pyre Lance",
       "exclusive": "boss",
       "ability": "lance",
@@ -1041,6 +1067,7 @@
     },
     {
       "id": "magma_mortar",
+      "hotGlow": true,
       "name": "Magma Mortar",
       "exclusive": "boss",
       "ability": "mortar",
@@ -1053,6 +1080,7 @@
     },
     {
       "id": "heat_vent",
+      "hotGlow": true,
       "name": "Heat Vent",
       "exclusive": "boss",
       "ability": "vent",

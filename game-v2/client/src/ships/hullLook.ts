@@ -17,10 +17,12 @@
 import { BufferImageSource, Texture } from 'pixi.js';
 import type { Catalog, PlacedGeom } from '@space-game/common';
 import { HULL_ROWS, HULL_TILE } from './hullTextures';
+import { shipFunction } from './shipFunctionData';
 
 /** By what a part does: 0 plating, 1 armour, 2 machinery, 3 core, 4 plain hardware (decor), 5 energy parts, 6 jump coils */
-const ENERGY_FNS = new Set(['generator', 'battery', 'drive_battery', 'weapon_battery', 'shield']);
-export const hullKind = (fn: string) => (fn === 'core' ? 3 : fn === 'armor' || fn === 'molten_plate' ? 1 : fn === 'hull' || fn === 'cargo' ? 0 : ENERGY_FNS.has(fn) ? 5 : fn === 'jumpcoil' ? 6 : 2);
+const HULL_KIND = { plating: 0, armour: 1, core: 3, energy: 5, jump: 6 } as const;
+/** (A function's `hullKind` in functions.json; absent: machinery) */
+export const hullKind = (fn: string) => { const k = shipFunction(fn)?.hullKind; return k ? HULL_KIND[k] : 2; };
 
 /** Per kind: highlight strength, shininess, own light, panel relief */
 export const KIND_LOOK = new Float32Array([0.32, 18, 0, 1, 0.14, 9, 0, 1, 0.24, 14, 0, 0.9, 0.35, 30, 0.8, 0.8, 0.22, 16, 0, 0, 0.24, 14, 0.45, 0.9, 0.24, 14, 0.4, 0.9]);

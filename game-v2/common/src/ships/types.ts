@@ -279,6 +279,16 @@ export interface FunctionDef {
   dynamo?: number;
   /** Must point a facing edge out (engines and weapons do anyway: this is for the rest, e.g. mining lasers) */
   facing?: boolean;
+  /** The edge a part of this function (or family) is drawn pointing by default, where it has no weapon: 'S' engines' exhaust, 'N' mining lasers and the like (viewer/builders.ts defaultFacing) */
+  pointing?: 'N' | 'S';
+  /** What a part does, for how its hull is finished (client hullLook hullKind). Absent: machinery */
+  hullKind?: 'plating' | 'armour' | 'core' | 'energy' | 'jump';
+  /** Its own glow rides how hot the ship runs (boss machinery: client hullBuild) */
+  hotGlow?: boolean;
+  /** Legacy stores and the core: the status panel shows the part's own gauge full (client shipStatus readParts) */
+  statusFull?: boolean;
+  /** Plating that reacts to a shot on the unshielded hull: 'sparks' (reactive) or 'chips' (spaced) (client damage/shields platingHit) */
+  platingHit?: 'sparks' | 'chips';
   /**
    * Energy routing (docs/design/energy-routing-impl.md §1.1; power/layout.ts): a Diode. A relay that passes power one
    * way only, out of its `facing` edge into the part across it; every other part touching it may only feed it

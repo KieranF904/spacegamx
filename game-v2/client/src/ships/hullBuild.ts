@@ -9,6 +9,7 @@ import { pointInConvex, type Catalog, type PieceDetail, type PlacedGeom, type Sh
 import { LitGeometry } from '../rendering/lighting/LitGeometry';
 import { ShipGeometry, type ShipHull } from '../rendering/lighting/ShipBatch';
 import { HULL_MAT, bakeHull, gradeOfMaterial, hullKind } from './hullLook';
+import { shipFunction } from './shipFunctionData';
 import { ENGINE_FNS, decorOf } from './partDecor';
 import { functionColor, mix } from './shipColors';
 import { carve, drawDetail } from './bespokeRelief';
@@ -33,7 +34,6 @@ export interface HullBuild { hull: ShipHull; barrels: BarrelSpec[] }
  * with what it needs (ShipGeometry `dep`: layered), so as parts go the shader drops them and bares what was under
  */
 /** Parts that carry power: on the game's own ships' materials they glow the more (HULL_MAT `hot`) */
-const POWERED = new Set(['conduit', 'generator', 'dash_coil', 'brood_bay', 'pyre_lance', 'magma_mortar', 'heat_vent', 'molten_plate']);
 
 export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState, cs: number, tint?: number, whole = false): HullBuild {
   const g = new ShipGeometry(), far = new ShipGeometry(), barrels: BarrelSpec[] = [], parts: [number, number][] = [];
@@ -114,7 +114,7 @@ export function buildHull(catalog: Catalog, geoms: PlacedGeom[], ship: ShipState
     const tone = 0.92 + 0.16 * ((((Math.sin(geom.centroid[0] * 12.9898 + geom.centroid[1] * 78.233) * 43758.5453) % 1) + 1) % 1);
     // Its own colour of glow (negative: the shader takes it from grade's colour slots), stronger where power runs
     // (one that doesn't glow still carries its colour, for its cracks and a wreck's seams: a trace of it)
-    const emit = own?.emit && !debris ? Math.max(1e-3, own.glow * (POWERED.has(part.fn) ? own.hot ?? 1 : 1)) : 0;
+    const emit = own?.emit && !debris ? Math.max(1e-3, own.glow * (shipFunction(part.fn)?.hotGlow ? own.hot ?? 1 : 1)) : 0;
     const look = {
       // (the game's own ships' parts look as their material does, whatever they are: no kind's own glow)
       kind: own ? (part.fn === 'core' ? 3 : 0) : hullKind(part.fn), tone,
