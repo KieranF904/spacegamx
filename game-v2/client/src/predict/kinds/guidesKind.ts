@@ -1,4 +1,11 @@
 /**
+ * @contract client.predict.kind.guides
+ * owns:       homing shells and mobs on the PT timeline: forks GuideRunner runs from ST and steps the copy to the PT head
+ * needs:      @space-game/common (guideHash, GuideBody), GuideRunner (GuideFork), ptKinds, a GuidesKindHost
+ * invariants: a hash miss at the confirmed tick re-forks from ST once and eases the drawn place — none pinned
+ * extend:     a change to the waypoint law belongs in common/guidance, not here; the kind is registered in worldKinds.ts
+ */
+/**
  * Homing shells and mobs (mites, seekers: GuideRunner's runs) on the PT timeline. The snapshots step each to the
  * confirmed tick (ST); this kind copies each run there (GuideRunner.fork) and steps the copy on to the PT head by the
  * shared waypoint law, its target read off the replica layer at those ticks (your own ship: its prediction; another

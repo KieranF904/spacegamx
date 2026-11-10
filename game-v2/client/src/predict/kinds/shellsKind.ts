@@ -1,4 +1,11 @@
 /**
+ * @contract client.predict.kind.shells
+ * owns:       other ships' shells on the PT timeline: their guns stepped from inputs, records drawn as predicted shells and taken back when wrong
+ * needs:      @space-game/common (sim/otherGuns lanes), PtStLayer, ptKinds
+ * invariants: a tick whose lane records changed has its drawn shells taken back and the new ones drawn — none pinned
+ * extend:     gun behaviour lives in common sim/otherGuns.ts; the kind is registered in worldKinds.ts
+ */
+/**
  * Other ships' shells on the PT timeline (C3, the default, and C2): what other ships' guns fire ahead of the snapshots,
  * drawn on the tick they fire, where the ship is drawn (its PT pose at its draw tick), instead of a round trip late.
  *
