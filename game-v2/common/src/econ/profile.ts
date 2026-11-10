@@ -13,6 +13,7 @@ import { cloneJson } from '../math/basic.js';
 import { migrateGunFacings } from '../ships/gunFacing.js';
 import { modelLicensed } from './market.js';
 import { Stack, Bag, cleanStacks, addTo } from './stacks.js';
+import { retireWireSpools } from './retiredWire.js';
 import { levelAt } from './levels.js';
 import { retireSchematics } from './retired.js';
 import { unlocks } from './unlocks.js';
@@ -447,6 +448,8 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
   }
   // The schematics are retired: held ones go (a legendary one as its artefact), and the licences they taught (econ/retired.ts)
   retireSchematics(out);
+  // The wire spool is retired too: any held is paid back as credits (econ/retiredWire.ts)
+  retireWireSpools(out);
   // Models (v4)
   if (was < 4) {
     if (!catalog) { out.version = Math.min(was, 3); return out; }

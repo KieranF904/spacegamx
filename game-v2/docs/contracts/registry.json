@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 497,
+      "lines": 493,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -145,86 +145,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 76,
-          "end": 130
+          "start": 75,
+          "end": 128
         },
         {
           "name": "Msg",
           "kind": "type",
-          "start": 132,
-          "end": 132
+          "start": 130,
+          "end": 130
         },
         {
           "name": "Handler",
           "kind": "type",
-          "start": 133,
-          "end": 133
+          "start": 131,
+          "end": 131
         },
         {
           "name": "Handlers",
           "kind": "type",
-          "start": 134,
-          "end": 136
+          "start": 132,
+          "end": 134
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 138,
-          "end": 156
+          "start": 136,
+          "end": 154
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 158,
-          "end": 162
+          "start": 156,
+          "end": 160
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 164,
-          "end": 209
+          "start": 162,
+          "end": 207
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 211,
-          "end": 222
+          "start": 209,
+          "end": 220
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 224,
-          "end": 242
+          "start": 222,
+          "end": 240
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 244,
-          "end": 278
+          "start": 242,
+          "end": 276
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 280,
-          "end": 297
+          "start": 278,
+          "end": 295
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 299,
-          "end": 487
+          "start": 297,
+          "end": 483
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 489,
-          "end": 490
+          "start": 485,
+          "end": 486
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 492,
-          "end": 497
+          "start": 488,
+          "end": 493
         }
       ]
     },
@@ -10102,7 +10102,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 202,
+      "lines": 198,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
@@ -10122,19 +10122,19 @@
           "name": "TutorialUIDeps",
           "kind": "interface",
           "start": 23,
-          "end": 40
+          "end": 38
         },
         {
           "name": "SAME_PLACE",
           "kind": "const",
-          "start": 42,
-          "end": 43
+          "start": 40,
+          "end": 41
         },
         {
           "name": "TutorialUI",
           "kind": "class",
-          "start": 45,
-          "end": 202
+          "start": 43,
+          "end": 198
         }
       ]
     },

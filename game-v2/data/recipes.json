@@ -905,18 +905,6 @@
       },
       "time": 90,
       "starter": true
-    },
-    {
-      "id": "wire_spool",
-      "out": {
-        "wire_spool": 1
-      },
-      "inputs": {
-        "copper_wire": 4,
-        "insulated_polymer": 1
-      },
-      "time": 0,
-      "starter": true
     }
   ],
   "models": {
