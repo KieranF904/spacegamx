@@ -3,7 +3,7 @@
  * owns:       the client message table and the dev message handlers (teleport, spawn), chat and input forwarding
  * needs:      GameServer (type), net/dispatch, net/handlers/*; npm: @space-game/common, bitecs
  * invariants: every client message type has one handler — golden clientMessages.json
- *             dev handlers refuse without devTeleport or admin — none pinned
+ *             dev handlers refuse without devTeleport or admin — server/src/game/devGate.test.ts
  * extend:      a new message type is registered in buildMessageHandlers (or in its net/handlers/* file)
  */
 

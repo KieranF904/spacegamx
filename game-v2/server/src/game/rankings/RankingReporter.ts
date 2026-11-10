@@ -5,7 +5,7 @@
  * needs:      RankingsBackend, a clock, common weekOf
  * invariants: a batch that failed is sent again unchanged (same id) before anything newer — server/src/game/rankings/rankings.test.ts
  *             sends are at most one per SEND_MS, backing off up to MAX_BACKOFF_MS while the lobby is down — server/src/game/rankings/rankings.test.ts
- *             at most MAX_PLAYERS pilots wait at once (a long outage can't grow it) — none pinned
+ *             at most MAX_PLAYERS pilots wait at once (a long outage can't grow it) — server/src/game/wreckKeep.test.ts
  * extend:     nothing: Achievements feeds it (add, seed, forget)
  */
 import { weekOf } from '@space-game/common';
