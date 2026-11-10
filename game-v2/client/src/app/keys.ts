@@ -15,14 +15,14 @@ import type { StationWindow } from '../ui/StationWindow';
 import type { TradeWindow } from '../ui/TradeWindow';
 import type { SocialUI } from '../ui/SocialUI';
 import type { QuestClient } from '../ui/QuestUI';
-import type { GameMenuUI } from '../ui/GameMenuUI';
+import type { MenuFacade } from '../ui/menuLazy';
 import type { DialogueUI } from '../ui/DialogueUI';
 import type { QuickBar } from '../ui/QuickBar';
 import type { InfoPanel } from '../ui/InfoPanel';
 import type { PingUI } from '../ui/PingUI';
 import type { TargetUI } from '../ui/TargetUI';
 import type { PlayerStatsUI } from '../ui/PlayerStatsUI';
-import type { SystemMapUI } from '../ui/SystemMapUI';
+import type { SystemMap } from '../ui/systemMapLazy';
 import type { NavMarkersUI } from '../ui/NavMarkersUI';
 import type { RegionUI } from '../ui/RegionUI';
 import type { AudioManager } from '../audio/AudioManager';
@@ -41,7 +41,7 @@ import { rangeKey } from '../ui/gunRange/rangeKeys';
 export interface KeyHost {
   readonly loggedIn: boolean;
   readonly stationOpen: boolean;
-  readonly menu: GameMenuUI;
+  readonly menu: MenuFacade;
   readonly dialogue: DialogueUI;
   /** The side panel on the HUD (Social, Party, Pilot, Components) */
   readonly hub: HubPanel;
@@ -58,7 +58,7 @@ export interface KeyHost {
   readonly pingUI: PingUI;
   readonly targetUI: TargetUI;
   readonly playerStatsUI: PlayerStatsUI;
-  readonly systemMapUI: SystemMapUI;
+  readonly systemMapUI: SystemMap;
   readonly navMarkers: NavMarkersUI | null;
   /** A moon siege's panel: focus fire (true if it took the key) */
   readonly siegePanel?: { focus(): boolean };
@@ -188,7 +188,7 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
   KeyM: (h) => {
     if (!h.loggedIn) return false;
     h.systemMapUI.toggle();
-    h.audio.playUI(h.systemMapUI.isOpen ? 'ui_open' : 'ui_close', 0.7);
+    h.audio.playUI(h.systemMapUI.isOpen || !h.systemMapUI.loaded ? 'ui_open' : 'ui_close', 0.7);
     return true;
   },
   // N key - toggle navigation markers

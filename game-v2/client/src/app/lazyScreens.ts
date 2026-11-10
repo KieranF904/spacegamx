@@ -6,7 +6,7 @@
 import { ShipTuning } from '@space-game/common';
 import shipTuning from '../../../data/ships/tuning.json';
 import { Lazy, prefetchIdle } from '../lazy';
-import { fieldGuide } from '../ui/GameMenuUI';
+import { fieldGuide } from '../ui/fieldGuideLazy';
 import { itemIcon } from '../ui/itemIcons';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
@@ -101,5 +101,5 @@ export function makeGunRangeHud(host: WindowHost, w: WindowSet): Lazy<GunRangeHu
 
 /** Fetches the split-out screens in idle time once past the sign-in screen, so none waits when first opened */
 export function prefetchScreens(host: WindowHost, w: WindowSet): void {
-  void prefetchIdle([() => w.stationWindow.load(), () => host.shipClient.hangar.load(), () => w.componentGuide.load(), () => fieldGuide.load(), () => loadField()]);
+  void prefetchIdle([() => w.stationWindow.load(), () => w.systemMapUI.load(), () => host.menu.load(), () => host.shipClient.hangar.load(), () => w.componentGuide.load(), () => fieldGuide.load(), () => loadField()]);
 }

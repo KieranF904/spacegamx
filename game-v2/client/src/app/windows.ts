@@ -37,7 +37,7 @@ import { ContextActions } from '../input/ContextActions';
 import { GuideUI } from '../ui/GuideUI';
 import { BossUI } from '../ui/BossUI';
 import { QuickBar } from '../ui/QuickBar';
-import { SystemMapUI } from '../ui/SystemMapUI';
+import { makeSystemMap, type SystemMap } from '../ui/systemMapLazy';
 import { ObjectiveBanner } from '../ui/ObjectiveBanner';
 import { HubPanel } from '../ui/hub/HubPanel';
 import { socialTab } from '../ui/hub/tabs/socialTab';
@@ -47,7 +47,8 @@ import { componentsTab } from '../ui/hub/tabs/componentsTab';
 import { fabTab } from '../ui/hub/tabs/fabTab';
 import { boundKeyName } from '../input/keybindings';
 import { settings } from '../settings/Settings';
-import type { GameMenuUI, MenuPilotInfo } from '../ui/GameMenuUI';
+import type { MenuPilotInfo } from '../ui/GameMenuUI';
+import type { MenuFacade } from '../ui/menuLazy';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ComponentGuideUI } from '../ui/ComponentGuideUI';
 import type { StationWindow } from '../ui/StationWindow';
@@ -85,7 +86,7 @@ export interface WindowHost {
   readonly localDead: boolean;
   readonly jumpZoom: number;
   readonly stationOpen: boolean;
-  readonly menu: GameMenuUI;
+  readonly menu: MenuFacade;
   readonly adminPanel: AdminPanel | null;
   objective(): QuestTarget | null;
   flyTo(dest: AutoDest, note?: string): void;
@@ -132,7 +133,7 @@ export interface WindowSet {
   tutorialUI: Lazy<TutorialUI>;
   killFeedUI: KillFeedUI;
   playerStatsUI: PlayerStatsUI;
-  systemMapUI: SystemMapUI;
+  systemMapUI: SystemMap;
   farMarkers: FarZoomMarkers;
   /** Public chat over pilots' ships (ui/bubbles) */
   chatBubbles: ChatBubbles;
@@ -315,7 +316,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.tutorialUI = makeTutorialUI(host, w);
     w.killFeedUI = new KillFeedUI(uiOverlay);
     w.playerStatsUI = new PlayerStatsUI(uiOverlay);
-    w.systemMapUI = new SystemMapUI(uiOverlay, host.state);
+    w.systemMapUI = makeSystemMap(() => import('../ui/SystemMapUI').then(({ SystemMapUI }) => new SystemMapUI(uiOverlay, host.state)));
     w.systemMapUI.onFlyTo = (dest) => host.flyTo(dest);
     w.systemMapUI.wreck = () => (host.wreck && host.wreck.until > Date.now() ? host.wreck : null);
     w.systemMapUI.jump = () => ({ aiming: host.shipClient.jumpAiming(), phase: host.shipClient.localJump().phase, reach: host.shipClient.jumpReach() });
