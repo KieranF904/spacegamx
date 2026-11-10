@@ -19939,7 +19939,7 @@
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
-      "lines": 133,
+      "lines": 149,
       "owns": "what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return",
       "needs": "Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common",
       "events": "",
@@ -19947,6 +19947,10 @@
         {
           "text": "a wreck is only for its pilot for wreckMinutes",
           "test": "server/src/game/pilots/death.test.ts"
+        },
+        {
+          "text": "a destroyed loaner costs its pilot's cargo as any death does, but not the loaner or the saved ship",
+          "test": "server/src/game/pilots/loaner.test.ts"
         }
       ],
       "extend": "a new loss or notice is a step in onDestroyed / showNotices",
@@ -19960,26 +19964,38 @@
         {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 13,
-          "end": 97
+          "start": 14,
+          "end": 86
+        },
+        {
+          "name": "leaveWreck",
+          "kind": "function",
+          "start": 88,
+          "end": 100
+        },
+        {
+          "name": "loanerLost",
+          "kind": "function",
+          "start": 102,
+          "end": 113
         },
         {
           "name": "wreckRecovered",
           "kind": "function",
-          "start": 99,
-          "end": 108
+          "start": 115,
+          "end": 124
         },
         {
           "name": "sendWreck",
           "kind": "function",
-          "start": 110,
-          "end": 119
+          "start": 126,
+          "end": 135
         },
         {
           "name": "showNotices",
           "kind": "function",
-          "start": 121,
-          "end": 133
+          "start": 137,
+          "end": 149
         }
       ]
     },

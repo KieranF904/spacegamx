@@ -142,7 +142,7 @@ export function applyShip(self: Pilots, s: Session): void {
  * The saved ship fails the ship rules (a data edit since it was built): it stays in its hangar slot exactly as saved, and
  * a loaner (the starter) flies in its place. The loaner is the profile's ship only in memory: persistable writes the saved
  * record back, so nothing of the pilot's is replaced, and a later fix to the data gives them their ship back as it was.
- * A refit of that slot or flying another ship ends the loan (Hangar.ts); losing the loaner costs nothing (death.ts).
+ * A refit of that slot or flying another ship ends the loan (Hangar.ts); losing the loaner costs only the pilot's cargo, as in any death (death.ts).
  */
 function flyLoaner(self: Pilots, s: Session, errors: string[]): void {
   const p = s.profile, saved = p.ship;
