@@ -17,16 +17,16 @@
  *   dodgeDir    the way of the current (or last) dodge, ship-local: 1..DODGE_DIRS (0 / absent: never dodged)
  *
  * Energy: while a burst runs, each strafer pushing that way draws its `demand` × how much of its push goes that way,
- * from the Drive Cell bank it touches first, then the ship's Output (energy.ts PowerUse.extra, the flight hook in index.ts). Short of it,
+ * from its own buffer, filled over its ports (power/ports.ts TK_STRAFER; energy.ts PowerUse.extra, the flight hook in index.ts). Short of it,
  * the burst pushes that much less; a burst that gets under DODGE_MIN_SHARE on its first tick is refused (the impulse hook, index.ts:
  * the counter goes straight to the end of its cooldown, so it's ready again as soon as the control's let go). Spamming
- * it browns the ship out unless it has the Drive Cells, batteries and generation to back it.
+ * it runs the buffers dry unless their lines bring enough to back it.
  * Mass matters: the push is a force, so a heavy ship barely moves (index.ts).
  */
 
 import type { ShipDerived } from '../../rebuild.js';
 import type { Vec2 } from '../../types.js';
-import { FULL_CHARGE, PILOT_ROW, bankHeld, chargeGroupsEnd, poolHeld, type Charge } from '../../energy.js';
+import { PILOT_ROW, chargeGroupsEnd, type Charge } from '../../energy.js';
 import { datan2, dcos, dhypot, dsin } from '../../../math/detTrig.js';
 
 /** One strafer's push (ship-local force vector, x right, y back; as an engine's thrust: world units of acceleration × mass) */
@@ -166,78 +166,50 @@ export function refuseDodge(body: { dodge?: number }, s: StrafeInfo): void {
   body.dodge = dodgeCooldown(s);
 }
 
-// (A ports ship's ask, by part: module scratch, read by powerTick in the same tick)
+// (The ask, by part: module scratch, read by powerTick in the same tick)
 let portsAsk = new Float64Array(0);
 
 /**
- * What a burst along `dir` asks of each feed group (per second: energy.ts PowerUse.extra), or undefined. A ports ship's
- * is by part (power/ports.ts): each strafer pushing that way burns that share of its burn, from its own buffer (module
- * scratch: good until the next call)
+ * What a burst along `dir` asks (energy.ts PowerUse.extra), by part (power/ports.ts): each strafer pushing that way burns
+ * that share of its burn, from its own buffer; undefined when none does (module scratch: good until the next call)
  */
 export function dodgeLoad(d: ShipDerived, dir: number): ArrayLike<number> | undefined {
   const s = d.fx?.strafe;
-  if (d.ports) {
-    if (!s || !dir) return undefined;
-    const u = dodgeVec(dir), n = d.ports.n;
-    if (portsAsk.length < n) portsAsk = new Float64Array(n);
-    portsAsk.fill(0);
-    let any = false;
-    for (const p of s.parts) { const k = shareAlong(p, u); if (k > 0) { portsAsk[p.part] = k; any = true; } }
-    return any ? portsAsk : undefined;
-  }
-  const L = d.power;
-  if (!L || !s || !dir) return undefined;
-  const u = dodgeVec(dir);
-  const out = new Array<number>(L.feeds.length).fill(0);
+  if (!s || !dir) return undefined;
+  const u = dodgeVec(dir), n = d.ports.n;
+  if (portsAsk.length < n) portsAsk = new Float64Array(n);
+  portsAsk.fill(0);
   let any = false;
-  for (const p of s.parts) {
-    const f = L.feedOf[p.part], k = shareAlong(p, u);
-    if (f >= 0 && k > 0) { out[f] += L.draw[p.part] * k; any = true; }
-  }
-  return any ? out : undefined;
+  for (const p of s.parts) { const k = shareAlong(p, u); if (k > 0) { portsAsk[p.part] = k; any = true; } }
+  return any ? portsAsk : undefined;
 }
 
 /** Energy one burst along `dir` costs (every strafer pushing that way, by how much of it goes that way), for readouts */
 export function burstEnergy(d: ShipDerived, dir: number): number {
-  const L = d.power, s = d.fx?.strafe, P = d.ports;
+  const s = d.fx?.strafe, P = d.ports;
   if (!s || !dir) return 0;
   const u = dodgeVec(dir);
   let e = 0;
-  // (A ports strafer burns its burn (eu a tick) for the burst's ticks)
-  if (P) { for (const p of s.parts) e += (P.burn[p.part] * shareAlong(p, u) * s.ticks) / 256; return e; }
-  if (!L) return 0;
-  for (const p of s.parts) e += (L.draw[p.part] * shareAlong(p, u) * s.ticks) / 60;
+  // (A strafer burns its burn (eu a tick) for the burst's ticks)
+  for (const p of s.parts) e += (P.burn[p.part] * shareAlong(p, u) * s.ticks) / 256;
   return e;
 }
 
 /**
- * Roughly how much of a burst along `dir` the ship could pay for now (0..1, for the HUD): what the Drive Cell banks its
- * strafers touch hold, the ship's pool, and its spare generation over the burst, against the burst's energy. (The burst
- * itself is settled tick by tick in powerTick.)
+ * Roughly how much of a burst along `dir` the ship could pay for now (0..1, for the HUD): what the strafers pushing that
+ * way hold in their buffers, and what their lines bring over the burst, against the burst's energy. (The burst itself
+ * is settled tick by tick in powerTick.)
  */
 export function dodgeAffordable(d: ShipDerived, c: Charge | undefined, dir: number): number {
-  const L = d.power, s = d.fx?.strafe, P = d.ports;
+  const s = d.fx?.strafe, P = d.ports;
   const need = burstEnergy(d, dir);
-  if (P) {
-    // (A ports ship: what the strafers pushing that way hold in their buffers, and what their lines bring over the burst)
-    if (!s || need <= EPS) return 1;
-    const e = c?.e, u = dodgeVec(dir);
-    let have = 0;
-    for (const p of s.parts) {
-      const k = shareAlong(p, u);
-      if (k > 0) have += k * ((e && e.held.length === P.n ? e.held[p.part] : P.cap[p.part]) + P.rate[p.part] * s.ticks) / 256;
-    }
-    return Math.max(0, Math.min(1, have / need));
-  }
-  if (!L || !s || !d.energy || need <= EPS) return 1;
-  const ch = c ?? FULL_CHARGE;
-  const banks = new Set<number>();
+  if (!s || need <= EPS) return 1;
+  const e = c?.e, u = dodgeVec(dir);
+  let have = 0;
   for (const p of s.parts) {
-    const f = L.feedOf[p.part];
-    if (f >= 0) for (const b of L.feeds[f].banks) banks.add(b);
+    const k = shareAlong(p, u);
+    if (k > 0) have += k * ((e && e.held.length === P.n ? e.held[p.part] : P.cap[p.part]) + P.rate[p.part] * s.ticks) / 256;
   }
-  let have = poolHeld(d, ch) + (L.spare * s.ticks) / 60;
-  for (const b of banks) have += bankHeld(d, ch, b);
   return Math.max(0, Math.min(1, have / need));
 }
 

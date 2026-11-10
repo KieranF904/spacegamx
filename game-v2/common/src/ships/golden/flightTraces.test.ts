@@ -18,7 +18,7 @@ import type { FlightBody, FlightControls } from '../flight.js';
 import { jumpTuning, jumpBurnAt } from '../flight.js';
 import { stepShipPhysics } from '../physics.js';
 import { pilotJumpStep, NO_FIELDS } from '../jumpFields.js';
-import { FULL_CHARGE, gunLoad, chargeTotal, type Charge } from '../energy.js';
+import { FULL_CHARGE, type Charge } from '../energy.js';
 import { quantizeCargo } from '../load.js';
 import { towLoad, towTuning } from '../features/tow/tow.js';
 import { ReplicaMode } from '../replica.js';
@@ -40,7 +40,7 @@ function controlsOf(t: Scenario['script'][number]): FlightControls {
   };
 }
 
-const seen = new Map<string, { rows: number[][]; low: number }>();
+const seen = new Map<string, { rows: number[][]; low: number; power: number }>();
 
 function fly(sc: Scenario) {
   const ship = createShipState(catalog, tuning, 1, sc.ship(), 0);
@@ -51,22 +51,25 @@ function fly(sc: Scenario) {
   let charge: Charge = FULL_CHARGE;
   let prime = 0;
   const rows: number[][] = [], charges: number[][] = [];
-  let low = 100;
+  // (The lowest a strafer's buffer got, as a share of full; and the engines' lowest share of their power)
+  let low = 1, power = 1;
+  const strafer = d.fx?.strafe?.parts[0]?.part ?? -1;
   sc.script.forEach((t, i) => {
     const tick = i + 1;
     if (sc.tow && i >= sc.tow.from) { ship.tow = 2; body.cargo = quantizeCargo((sc.cargo ?? 0) + towed); }
     let res!: ReturnType<typeof stepShipPhysics>;
     prime = pilotJumpStep(body, prime, NO_FIELDS, tick, d.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-      res = stepShipPhysics(body, controlsOf(t), d, tuning, { charge, drainRate: 1, load: gunLoad(ship, tick), tick }, null, rangeBoost, undefined, null);
+      res = stepShipPhysics(body, controlsOf(t), d, tuning, { charge, drainRate: 1, tick }, null, rangeBoost, undefined, null);
     });
     charge = res.charge;
     rows.push(bodyRow(body));
     charges.push(chargeRow(charge));
-    low = Math.min(low, chargeTotal(d, charge));
+    if (strafer >= 0 && charge.e) low = Math.min(low, charge.e.held[strafer] / d.ports.cap[strafer]);
+    power = Math.min(power, res.power);
   });
   const last = rows[rows.length - 1];
   // (Not pinned: what the sanity check below reads)
-  seen.set(sc.name, { rows, low });
+  seen.set(sc.name, { rows, low, power });
   return {
     ticks: rows.length,
     trace: hashRows(rows),
@@ -91,8 +94,9 @@ describe('golden flight traces (the shared pilot step, scripted)', () => {
     const col = (rows: number[][], f: (typeof BODY_FIELDS)[number]) => rows.map((r) => r[BODY_FIELDS.indexOf(f)]);
     const ways = run('strafer-every-way');
     expect(new Set(col(ways.rows, 'dodgeDir')).size).toBeGreaterThan(6);
-    expect(run('strafer-energy-short').low).toBeLessThan(5);
-    expect(run('plain-thrust-turn').low).toBe(100);
+    expect(run('strafer-energy-short').low).toBeLessThan(0.05);
+    if (process.env.TRACE_POWER) for (const s of SCENARIOS) console.log(s.name, run(s.name).power);
+    expect(run('plain-thrust-turn').power).toBe(1);
     expect(Math.max(...col(run('tow').rows, 'cargo'))).toBeGreaterThan(0);
     expect(col(run('heavy-cargo').rows, 'cargo').every((c) => c === 6)).toBe(true);
     const jt = jumpTuning(tuning);

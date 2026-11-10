@@ -59,7 +59,7 @@ describe('shipgen roles', () => {
 
   it('enforces the pilot level band with the game licensing', () => {
     const starter = roles.find((r) => r.id === 'starter')!;
-    const wren = ship('dev/review-wren');
+    const wren = ship('samples/review-wren');
     const fusion = legend.entries.find((e) => e.fn === 'power_fusion_plant')!;
     const bad: Blueprint = { ...wren, parts: wren.parts.map((p, i) => (i === wren.parts.findIndex((q) => q.fn === 'power_cell_reactor') ? { ...p, fn: fusion.fn, material: fusion.material } : p)) };
     expect(briefCheck(ctx, bad, { ...starter, example: undefined }).unmet.join(' ')).toMatch(/above the pilot level band[^]*Fusion Plant/);

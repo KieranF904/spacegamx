@@ -23,7 +23,7 @@ const job = (over: Partial<FieldJob> = {}): FieldJob => ({
 });
 const machine = (over: Partial<MachineView> = {}): MachineView => ({ kind: 'fabricator', tier: 1, uid: 4, on: true, drawing: true, ...over });
 /** The own ship's predicted charge: only its machine counters matter here */
-const chargeWith = (fab: number, ref = 0): Charge => ({ g: 0, b: [], e: { machEu: Float64Array.from([0, fab, ref]) } as unknown as Charge['e'] });
+const chargeWith = (fab: number, ref = 0): Charge => ({ e: { machEu: Float64Array.from([0, fab, ref]) } as unknown as Charge['e'] });
 
 describe('field state copy', () => {
   it('applies fieldState and fieldDone', () => {

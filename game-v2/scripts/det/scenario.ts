@@ -27,7 +27,7 @@
 
 import {
   loadCatalog, createShipState, rebuildShip, repairShip, stepShipPhysics, stepGuns, volleyShells, steerToward, castParts,
-  blueprintGeometry, deriveShellHit, gunShell, worldToLocalDir, gunLoad, FULL_CHARGE, mulberry32, getAsteroidPolygon,
+  blueprintGeometry, deriveShellHit, gunShell, worldToLocalDir, FULL_CHARGE, mulberry32, getAsteroidPolygon,
   raycastPolygon, asteroidSpin, replicaAngle, quantizeReplicaAngle, ReplicaMode, parseBlueprint,
   dsin, dcos, datan2, dhypot, dexp, dlog, dpow, dsinh, dcosh, dtanh, dasinh,
   partGroups, computeJoins, deriveSplit, stepDebrisWorld, SHIP_FLIGHT_CONSTANTS, calcOrbitStateRaw, OrbitType, makeAsteroidParams,
@@ -55,7 +55,7 @@ export interface DetResult {
   ms: number;
 }
 
-export const SHIPS = ['fixtures/corsair.json', 'fixtures/hammerhead.json', 'fixtures/lancer.json', 'arrow.json', 'fixtures/bastion.json', 'sparrow-t.json'];
+export const SHIPS = ['bulwark.json', 'hauler.json', 'sunspear.json', 'arrow.json', 'hauler.json', 'sparrow-t.json'];
 
 // ---- hashing: FNV-1a over a double's bits (-0 as 0), no allocation per value
 const F = new Float64Array(1);
@@ -142,7 +142,7 @@ export function runScenario(data: DetData, ticks = 1200): DetResult {
         jump: p.jumpAt >= 0 && tick >= p.jumpAt && tick < p.jumpAt + 95, jumpDist: 900,
       };
       if (controls.jump && tick === p.jumpAt) stats.jumps++;
-      const res = stepShipPhysics(p.body, controls, p.ship.derived, tuning, { charge: p.charge, drainRate: 1, load: gunLoad(p.ship, tick), tick });
+      const res = stepShipPhysics(p.body, controls, p.ship.derived, tuning, { charge: p.charge, drainRate: 1, tick });
       p.charge = res.charge;
       // ---- guns: what fires this tick, and its shells
       const pose = { x: p.body.x, y: p.body.y, angle: p.body.angle };

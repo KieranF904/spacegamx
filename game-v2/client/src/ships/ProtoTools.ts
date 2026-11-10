@@ -98,13 +98,6 @@ export class ProtoTools {
     html += `<div>rebuilds      ${bridge.stats.rebuildCount}</div>`;
     html += `<div>parts         ${alive} / ${ship.blueprint.parts.length}</div>`;
     html += `<div>debris        ${bridge.stats.debrisCount}</div>`;
-    html += `<div style="margin-top:4px;color:#aaa">satisfaction</div>`;
-    ship.blueprint.parts.forEach((p, i) => {
-      if (!(bridge.catalog.functions.get(p.fn)?.demand)) return;
-      const s = d.alive[i] ? d.satisfaction[i] : 0;
-      const color = s >= 0.999 ? '#4ade80' : s > 0.5 ? '#f2d24b' : '#f87171';
-      html += `<div>  ${p.fn.padEnd(8)} #${String(p.uid).padEnd(3)} <span style="color:${color}">${d.alive[i] ? Math.round(s * 100) + '%' : 'gone'}</span></div>`;
-    });
     if (this.replayResult) html += `<div style="margin-top:4px">${this.replayResult}</div>`;
     body.innerHTML = html;
   }

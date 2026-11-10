@@ -6,31 +6,28 @@
  *   Isotope Pile      dull green, slow and calm
  *   Fusion Plant      white-gold core inside a slowly turning ring; red flicker when damaged
  *   Overclock Reactor fast, jittery red-white pulse
- *   Battery           a green charge bar (the ship pool's charge)
+ *   Battery           a green charge bar
  *   Heavy Bank        four dim bars that fill one after another
- *   Capacitor         amber straps to the parts it feeds; an arc to them while it's discharging
- *   Drive Cell        the same in blue
- *   Pulse Dynamo      a violet ring spinning, with small arcs to the bank it charges
+ *   Pulse Dynamo      a violet ring spinning
  *   Rustjaw's Hive    a honeycomb of seven cells, one lit per clip round held; the next to regrow breathes
  *
- * Charge is only known for your own ship (the pilot row: state.charge); other ships show their parts full. The banks'
- * glow by charge on the parts themselves is ShipRenderer.drawBankGlow.
+ * Charge is only known for your own ship (the pilot row: state.charge); other ships show their parts nearly full.
  */
 
 import { Graphics, type Container } from 'pixi.js';
 import type { Charge, PlacedGeom, ShipState } from '@space-game/common';
 import './utilityLooks';
 
-type Kind = 'coil' | 'heavycoil' | 'cell' | 'pile' | 'fusion' | 'overclock' | 'battery' | 'bank' | 'cap' | 'drive' | 'dynamo' | 'hive';
+type Kind = 'coil' | 'heavycoil' | 'cell' | 'pile' | 'fusion' | 'overclock' | 'battery' | 'bank' | 'dynamo' | 'hive';
 const KINDS: Record<string, Kind> = {
   utility_jump_coil: 'coil', utility_heavy_coil: 'heavycoil', power_cell_reactor: 'cell', power_isotope_pile: 'pile', power_fusion_plant: 'fusion', power_overclock_reactor: 'overclock',
-  power_battery: 'battery', power_heavy_bank: 'bank', power_capacitor: 'cap', power_drive_cell: 'drive', power_pulse_dynamo: 'dynamo', legendary_hive: 'hive',
+  power_battery: 'battery', power_heavy_bank: 'bank', power_pulse_dynamo: 'dynamo', legendary_hive: 'hive',
 };
 
 interface Item { i: number; kind: Kind; x: number; y: number; r: number; seed: number; w: number; h: number }
-interface View { g: Graphics; ship: ShipState | null; rebuilds: number; items: Item[]; lastB: number[]; arcUntil: number[]; visible: boolean }
+interface View { g: Graphics; ship: ShipState | null; rebuilds: number; items: Item[]; visible: boolean }
 
-const AMBER = 0xf59e0b, BLUE = 0x3b82f6, VIOLET = 0xb57cff, RED = 0xff3b30;
+const VIOLET = 0xb57cff, RED = 0xff3b30;
 
 /** Is a flicker "on" this moment (fast, irregular) */
 const flick = (t: number, seed: number): boolean => Math.sin(t * 0.083 + seed) * Math.sin(t * 0.047 + seed * 1.7) > -0.25;
@@ -46,7 +43,7 @@ export class PartFx {
     if (!v) {
       const g = new Graphics();
       g.blendMode = 'add';
-      v = { g, ship: null, rebuilds: -1, items: [], lastB: [], arcUntil: [], visible: false };
+      v = { g, ship: null, rebuilds: -1, items: [], visible: false };
       this.views.set(c, v);
     }
     if (ship !== v.ship || ship.rebuilds !== v.rebuilds) {
@@ -66,8 +63,8 @@ export class PartFx {
     if (!v.items.length || ship.kind !== 'ship') { if (v.g.visible) { v.g.visible = false; v.g.clear(); } return; }
     v.g.visible = true;
     const g = v.g.clear(), t = now / 1000, d = ship.derived;
-    const byPart = (i: number): Item | undefined => { for (const it of v!.items) if (it.i === i) return it; return undefined; };
-    const pool = charge ? Math.max(0, Math.min(1, charge.g / 100)) : 0.85;
+    // (The bar reads full on your own ship, nearly full on others')
+    const pool = charge ? 1 : 0.85;
 
     for (const it of v.items) {
       if (!d.alive[it.i]) continue;
@@ -150,39 +147,6 @@ export class PartFx {
         default: break;
       }
     }
-
-    // Banks: straps to what they feed (a faint line, brighter with charge), an arc while one's discharging
-    const L = d.power;
-    if (L && L.banks.length) {
-      for (let k = 0; k < L.banks.length; k++) {
-        const B = L.banks[k], col = B.kind === 'drive' ? BLUE : AMBER;
-        const pct = charge ? Math.max(0, Math.min(1, (charge.b[k] ?? 100) / 100)) : 1;
-        const last = v.lastB[k];
-        if (charge) {
-          if (last !== undefined && (charge.b[k] ?? 100) < last - 0.05) v.arcUntil[k] = now + 260;
-          v.lastB[k] = charge.b[k] ?? 100;
-        }
-        const from = B.parts.length ? byPart(B.parts[0]) : undefined;
-        if (from) {
-          const arcing = (v.arcUntil[k] ?? 0) > now;
-          for (let n = 0, nn = B.feeds.length + B.shields.length; n < nn; n++) {
-            const fi = n < B.feeds.length ? B.feeds[n] : B.shields[n - B.feeds.length];
-            const to = byPartOrCentroid(v.items, geoms, d.com, cs, fi);
-            if (!to) continue;
-            g.moveTo(from.x, from.y).lineTo(to[0], to[1]).stroke({ color: col, width: Math.max(1.2, cs * 0.06), alpha: 0.08 + 0.3 * pct });
-            if (arcing) jag(g, from.x, from.y, to[0], to[1], now, fi, col, cs);
-          }
-        }
-        // the Dynamos charging it
-        if (from && (!charge || pct < 0.999)) {
-          for (const di of B.dynamos) {
-            const dy = byPart(di);
-            if (!dy || !d.alive[di] || Math.floor(now / 140 + di) % 3 === 0) continue;
-            jag(g, dy.x, dy.y, from.x, from.y, now, di, VIOLET, cs);
-          }
-        }
-      }
-    }
   }
 }
 
@@ -200,24 +164,4 @@ const HEX = new Array<number>(12).fill(0);
 function hexPoints(x: number, y: number, r: number): number[] {
   for (let i = 0; i < 6; i++) { HEX[i * 2] = x + Math.cos(i * 1.0472) * r; HEX[i * 2 + 1] = y + Math.sin(i * 1.0472) * r; }
   return HEX;
-}
-
-/** A consumer's centroid in the ship's frame */
-function byPartOrCentroid(items: Item[], geoms: PlacedGeom[], com: [number, number], cs: number, i: number): [number, number] | null {
-  for (const it of items) if (it.i === i) return [it.x, it.y];
-  const g = geoms[i];
-  return g ? [(g.centroid[0] - com[0]) * cs, (g.centroid[1] - com[1]) * cs] : null;
-}
-
-/** A short jagged bolt, its shape fixed for ~50 ms at a time */
-function jag(g: Graphics, x0: number, y0: number, x1: number, y1: number, now: number, seed: number, color: number, cs: number): void {
-  const bucket = Math.floor(now / 50), dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
-  const N = 4;
-  g.moveTo(x0, y0);
-  for (let s = 1; s < N; s++) {
-    const f = s / N, h = Math.sin((bucket * 12.9898 + seed * 78.233 + s * 37.719) * 43758.5453);
-    const o = (h - Math.floor(h) - 0.5) * cs * 0.5;
-    g.lineTo(x0 + dx * f + nx * o, y0 + dy * f + ny * o);
-  }
-  g.lineTo(x1, y1).stroke({ color, width: Math.max(1.2, cs * 0.07), alpha: 0.85 });
 }

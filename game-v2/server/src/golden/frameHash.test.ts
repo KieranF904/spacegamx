@@ -2,10 +2,12 @@
  * Golden whole-server frame hash (refactor safety net, Stage 0).
  *
  * A full 'sectors' GameServer runs in-process with four scripted pilots for 900 ticks:
- *   strafer  - the F9 dev ship with Burst Strafers (test-strafer): thrust, turns, dodges every way, fires
- *   tug      - the F9 Tow Beam hauler (test-tow-hauler) with ore in its hold, towing a Corsair wreck
- *   striker  - the F9 striker (test-surge-striker: Pulse Dynamos charging a Capacitor bank, Rail Driver, Flash Screen), firing
+ *   strafer  - the Sparrow with Burst Strafers every way (common golden testData strafersEveryWay): thrust, turns, dodges every way, fires
+ *   tug      - the Sparrow with a Tow Beam (golden testData TOW_BEAM) and ore in its hold, towing a Bulwark wreck
+ *   striker  - the dev Breacher (dev/ports-breacher: four Hammers), firing
  *   sparrow  - a stock Sparrow (sparrow-t) flying and firing alongside
+ * (Until 2026-11-10 the first three were the pool-era F9 dev ships test-strafer, test-tow-hauler and test-surge-striker,
+ * and the wreck the pool-era Corsair: removed with the pool core, and the pins moved once with them)
  * Every 100 ticks it records, per pilot, a running SHA-256 of every raw frame the server sent that pilot (the
  * bytes on the wire, in order) plus the frame count, and a SHA-256 of a canonical dump of the server's world:
  * every ECS entity's gameplay components, every ShipBridge ship state and charge, and each pilot's profile.
@@ -43,8 +45,9 @@ import {
   Position, Velocity, Rotation, Radius, Health, Lifetime, Player, Input, Boost, Inventory, Projectile, Bullet, Laser,
   Pulse, MiningShot, AI, Enemy, NPC, Asteroid, Station, Portal, DroppedItem, Dead, OwnedBy, InSystem,
   encodeMessage, decodeMessage, ServerFrameReader, parseBlueprint,
-  type ClientMessage, type ClientSocket, type Blueprint,
+  type ClientMessage, type ClientSocket, type Blueprint, type PlacedPart,
 } from '@space-game/common';
+import { TOW_BEAM, strafersEveryWay } from '../../../common/src/ships/golden/testData.js';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
@@ -102,15 +105,16 @@ function fixtures(): { specs: PilotSpec[]; corsair: Blueprint; shipCfg: ReturnTy
   const shipCfg = loadShipConfigCached(dataDir);
   const dev = shipCfg.dev ?? {};
   const bp = (f: string) => parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints', f), 'utf-8'));
-  for (const id of ['test-strafer', 'test-tow-hauler', 'test-surge-striker']) if (!dev[id]) throw new Error(`dev ship ${id} missing`);
+  if (!dev['ports-breacher']) throw new Error('dev ship ports-breacher missing');
+  const sparrow = bp('sparrow-t.json');
   return {
     shipCfg,
-    corsair: bp('fixtures/corsair.json'),
+    corsair: bp('bulwark.json'),
     specs: [
-      { name: 'strafer', bp: dev['test-strafer'], dx: 0, dy: 0 },
-      { name: 'tug', bp: dev['test-tow-hauler'], dx: 500, dy: 0 },
-      { name: 'striker', bp: dev['test-surge-striker'], dx: 0, dy: 500 },
-      { name: 'sparrow', bp: bp('sparrow-t.json'), dx: 500, dy: 500 },
+      { name: 'strafer', bp: strafersEveryWay(), dx: 0, dy: 0 },
+      { name: 'tug', bp: { ...sparrow, parts: [...sparrow.parts, TOW_BEAM as PlacedPart] }, dx: 500, dy: 0 },
+      { name: 'striker', bp: dev['ports-breacher'], dx: 0, dy: 500 },
+      { name: 'sparrow', bp: sparrow, dx: 500, dy: 500 },
     ],
   };
 }
@@ -247,7 +251,8 @@ function scenario(): Result {
     pilots.forEach((p, i) => {
       p.send({ type: 'input', seq: p.seq++, tick: 0, targetTick: next, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, ...controls(i, t) });
     });
-    if (t === 120) { tug.send({ type: 'input', seq: tug.seq++, tick: 0, targetTick: next, ...controls(1, t), targetAngle: Math.PI, cursorDist: 300 }); tug.send({ type: 'tow', on: true }); }
+    // (The wreck brought back beside the tug first: the light tug has flown off from where it was spawned)
+    if (t === 120) { Position.x[wreck] = Position.x[tug.pid] - 300; Position.y[wreck] = Position.y[tug.pid]; Velocity.x[wreck] = 0; Velocity.y[wreck] = 0; tug.send({ type: 'input', seq: tug.seq++, tick: 0, targetTick: next, ...controls(1, t), targetAngle: Math.PI, cursorDist: 300 }); tug.send({ type: 'tow', on: true }); }
     if (t === 700) tug.send({ type: 'tow', on: false });
     server.step();
     if (ships.get(tug.pid)?.tow !== undefined) probes.towTicks++;

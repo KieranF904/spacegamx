@@ -1,9 +1,8 @@
-// What one part does in the power core, read from a one-part layout (power/layout.ts), so the legend's numbers are the
+// What one part does in shipgen's touch-routed power model, read from a one-part layout (energyLayout.ts), so the legend's numbers are the
 // core's own: a new store, generator or consumer kind shows up with no edit here.
 import type { Blueprint, FunctionDef, Side } from '../../../common/src/ships/index';
-import {
-  GUN_BEAM, GUN_CLIP, ROLE_DYNAMO, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, fromEu, partNeedsFacing,
-} from '../../../common/src/ships/index';
+import { fromEu, partNeedsFacing } from '../../../common/src/ships/index';
+import { GUN_BEAM, GUN_CLIP, ROLE_DYNAMO, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON } from './energyLayout';
 import type { ShipgenContext } from './context';
 import { shipEnergy } from './sim';
 import { pieceShapes } from './shapes';

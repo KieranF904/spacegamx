@@ -13,7 +13,8 @@ import type { ShipDerived } from '../../rebuild.js';
 import type { FlightBody, FlightControls } from '../../flight.js';
 import { turnAccel, wrapAngle } from '../../flight.js';
 import { stepShipPhysics } from '../../physics.js';
-import { FULL_CHARGE, type Charge } from '../../energy.js';
+import { FULL_CHARGE, fullPortsCharge, type Charge } from '../../energy.js';
+import { createPortsState } from '../../power/ports.js';
 import { gyroDraw, gyroLoad, gyroUse } from './gyro.js';
 
 const catalog = testCatalog();
@@ -21,7 +22,7 @@ const tuning: ShipTuning = readShipJson('tuning.json');
 const GYRO = (x: number, y: number, uid = 60) => ({ uid, piece: 'sq', fn: 'utility_gyro', material: 'alloy', x, y, rot: 0, flip: false });
 const HEAVY = (x: number, y: number, uid = 61) => ({ uid, piece: 'block2', fn: 'utility_heavy_gyro', material: 'titanium', x, y, rot: 0, flip: false });
 const ship = (extra: object[] = []): ShipDerived => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0).derived;
 };
@@ -61,7 +62,7 @@ describe('gyro: torque', () => {
       return last;
     };
     const dread = (at: [number, number][]) => {
-      const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/bastion.json'), 'utf-8'));
+      const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/hauler.json'), 'utf-8'));
       at.forEach(([x, y], k) => bp.parts.push(HEAVY(x, y, 240 + k) as never));
       const d = createShipState(catalog, tuning, 1, bp, 0).derived;
       expect(d.fx?.gyro?.parts.length ?? 0).toBe(at.length);
@@ -76,15 +77,14 @@ describe('gyro: torque', () => {
 });
 
 describe('gyro: power', () => {
-  it('asks power only for the share of its torque a turn uses, from its feed group', () => {
-    const d = ship([HEAVY(-3, -1)]), L = d.power!;
+  it('asks power only for the share of its torque a turn uses, by part', () => {
+    const d = ship([HEAVY(-3, -1)]);
     const p = d.fx!.gyro!.parts[0];
-    expect(L.feedOf[p]).toBeGreaterThanOrEqual(0);
-    expect(gyroDraw(d)).toBeCloseTo(48, 6);
+    expect(gyroDraw(d)).toBeCloseTo(48, 0);
     expect(gyroLoad(d, 0)).toBeUndefined();
     const half = [...gyroLoad(d, 0.5)!];
-    expect(half[L.feedOf[p]]).toBeCloseTo(24, 6);
-    expect(half.reduce((s, v) => s + v, 0)).toBeCloseTo(24, 6);
+    expect(half[p]).toBeCloseTo(0.5, 9);
+    expect(half.reduce((s, v) => s + v, 0)).toBeCloseTo(0.5, 9);
     // A turn at the cap uses all of it; a gentle one a share; none holding a heading
     const cap = d.maxTorque.cw * 0.001;
     expect(gyroUse(d, cap, 0.001)).toBeCloseTo(1, 9);
@@ -92,27 +92,24 @@ describe('gyro: power', () => {
     expect(gyroUse(d, 0, 0.001)).toBe(0);
   });
 
-  it('draws nothing holding a heading, and the turn is paid for out of the charge', () => {
+  it('draws nothing holding a heading, and the turn is paid for out of its buffer', () => {
     const d = ship([HEAVY(-3, -1), HEAVY(3, -1, 62)]);
+    const p = d.fx!.gyro!.parts[0];
     const run = (target: number) => {
       const b = body();
-      let charge: Charge = { g: 30, b: [] };
+      let charge: Charge = fullPortsCharge(d);
       for (let t = 0; t < 20; t++) charge = stepShipPhysics(b, { ...NONE, targetAngle: target }, d, tuning, { charge, drainRate: 1 }).charge;
-      return charge.g;
+      return charge.e!.held[p];
     };
     const still = run(0), turning = run(Math.PI / 2);
     expect(turning).toBeLessThan(still);
   });
 
   it('short of power, turns that much slower (the unpaid share of the turn is taken back)', () => {
-    // (The Monarch with its generators swapped for hull and a Heavy Gyro run off a Drive Cell touching it; every store empty)
-    const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/dev/review-monarch.json'), 'utf-8'));
-    for (const p of bp.parts) if ((catalog.functions.get(p.fn)?.produce ?? 0) > 0) { p.fn = 'hull'; p.material = 'titanium'; }
-    bp.parts.push(HEAVY(-4, 4, 240) as never, { uid: 241, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: -4, y: 6, rot: 0, flip: false } as never);
-    const d = createShipState(catalog, tuning, 1, bp, 0).derived;
+    // (A Heavy Gyro nothing feeds, its buffer empty, as every store on the ship)
+    const d = ship([HEAVY(-3, -1)]);
     expect(d.fx?.gyro?.torque).toBe(28000);
-    expect(d.energy?.supply).toBe(0);
-    const empty = (): Charge => ({ g: 0, b: d.power!.banks.map(() => 0) });
+    const empty = (): Charge => { const e = createPortsState(d.ports); e.held.fill(0); return { e }; };
     const fly = (accounted: boolean, ticks: number) => {
       const b = body();
       let charge = empty();

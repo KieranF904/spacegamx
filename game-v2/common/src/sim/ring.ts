@@ -59,7 +59,6 @@ export function shipHash(s: Readonly<SimShipState>): number {
   h = num(h, s.accounted ? 1 : 0);
   if (s.accounted) {
     const c = s.charge;
-    h = num(h, c.g); h = arr(h, c.b); h = arr(h, c.eng); h = arr(h, c.gun);
     if (c.e) { h = arr(h, c.e.held); h = arr(h, c.e.amt); h = arr(h, c.e.closed); h = arr(h, c.e.aug); h = arr(h, c.e.flags); h = arr(h, c.e.mat); h = arr(h, c.e.sat); h = num(h, c.e.shieldSat); h = num(h, c.e.gauge); }
   }
   const g = s.guns;

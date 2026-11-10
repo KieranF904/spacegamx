@@ -4,7 +4,6 @@ Mk II · Square · 1 cell
 Hull · mass67 hp · 1.0
 Armour · build2 · 1.6 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Charges10/s into each Capacitor or Drive Cell bank it touches (no wires; it powers nothing itself)
 
 == partStats (stats rows) ==
 GradeMk II

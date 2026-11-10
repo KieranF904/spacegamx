@@ -45,7 +45,7 @@ describe('jump coils against the hull', () => {
   });
 
   it('coils never change the charge: every jump charges the same 3 s', () => {
-    for (const f of ['fixtures/sparrow-t', 'fixtures/lancer', 'fixtures/bastion', 'ark-tender']) {
+    for (const f of ['sparrow-t', 'sunspear', 'hauler', 'ark-tender']) {
       const d = derive(load(f));
       expect(jumpChargeNeed(d.jumpRange, jt), f).toBe(180);
     }

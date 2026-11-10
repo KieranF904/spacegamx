@@ -48,3 +48,11 @@ export function loadContext(dataDir = DATA_DIR): ShipgenContext {
   cache.set(dataDir, ctx);
   return ctx;
 }
+
+/**
+ * A design's file by its id: a path under data/ships/blueprints (no .json), or `samples/<name>`: shipgen's own sample
+ * designs (data/shipgen/samples: the review ships, kept for the tools and their tests when they left the game)
+ */
+export function shipFile(dataDir: string, path: string): string {
+  return path.startsWith('samples/') ? join(dataDir, 'shipgen', `${path}.json`) : join(dataDir, 'ships/blueprints', `${path}.json`);
+}

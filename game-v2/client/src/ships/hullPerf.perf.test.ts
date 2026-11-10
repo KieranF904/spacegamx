@@ -7,8 +7,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
 import { Container } from 'pixi.js';
-import { readFileSync } from 'fs';
-import { blueprintGeometry, createShipState, loadCatalog, parseBlueprint, rebuildShip, type Blueprint, type ShipState } from '@space-game/common';
+import { blueprintGeometry, createShipState, loadCatalog, rebuildShip, type Blueprint, type ShipState } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { buildHull } from './hullBuild';
 import { fromWire, runHullJob, type DesignCache } from './hullWire';
@@ -20,8 +19,7 @@ import { turretHead } from './gunDecor';
 vi.mock('pixi.js', async (orig) => ({ ...(await orig<typeof import('pixi.js')>()), GlProgram: class { destroy(): void {} } }));
 
 const cfg = loadShipConfigFromDisk(join(__dirname, '../../../data')) as ReturnType<typeof loadShipConfigFromDisk> & { library: Record<string, Blueprint>; enemies: Record<string, Blueprint> };
-// (The Bastion Dreadnought left the library with the pool core; its hull is still the big-hull case here: the pool-era fixture)
-cfg.library.bastion = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/fixtures/bastion.json'), 'utf-8'));
+// (The big-hull case: the Sunspear, the library's largest gunship, since the Bastion Dreadnought left with the pool core)
 const catalog = loadCatalog(cfg.catalog as never, { overlapShrink: cfg.tuning.overlapShrink });
 const tuning = cfg.tuning, cs = tuning.cellSize;
 
@@ -45,7 +43,7 @@ const fields = ['pos', 'nrm', 'col', 'idx', 'part', 'kind', 'tone', 'hullMat', '
 describe('hull build cost', () => {
   const designs: [string, Blueprint, boolean][] = [
     ['sparrow-t', cfg.library['sparrow-t'], false],
-    ['bastion', cfg.library['bastion'], false],
+    ['sunspear', cfg.library['sunspear'], false],
     ['boss_scrap_mother (whole)', cfg.enemies.boss_scrap_mother, true],
     ['pyreclast (whole)', cfg.enemies.pyreclast, true],
   ];
@@ -83,7 +81,7 @@ describe('hull build cost', () => {
     const lighting = new Lighting(new Container());
     const batch = new ShipBatch(lighting, cs);
     const hullOf = (bp: Blueprint, whole: boolean): ShipHull => { const s = shipOf(bp); return buildHull(catalog, blueprintGeometry(catalog, s.blueprint), s, cs, undefined, whole).hull; };
-    const boss = hullOf(cfg.enemies.pyreclast, true), dread = hullOf(cfg.library['bastion'], false);
+    const boss = hullOf(cfg.enemies.pyreclast, true), dread = hullOf(cfg.library['sunspear'], false);
     const small = [cfg.library['sparrow-t'], cfg.enemies.pirate_raider, cfg.enemies.pirate_gunship, cfg.enemies.pirate_skiff].map((bp) => hullOf(bp, false));
     const scene: [number, ShipHull][] = [[1, boss], [2, dread], ...Array.from({ length: 20 }, (_, k) => [10 + k, small[k % small.length]] as [number, ShipHull])];
     for (const [id, h] of scene) { batch.track(id, id * 50, 0); batch.set(id, h, 400); }
@@ -103,7 +101,7 @@ describe('hull build cost', () => {
     expect(copied).toBe(scene.slice(2).reduce((n, [, h]) => n + h.full.vertexCount, 0) + small[0].full.vertexCount);
     // The dreadnought loses a part (a new hull): only its own chunk
     const c0 = batch.stats.copied;
-    batch.set(2, hullOf(cfg.library['bastion'], false), 400);
+    batch.set(2, hullOf(cfg.library['sunspear'], false), 400);
     batch.begin(); for (const [id] of scene) batch.place(id, id * 50, 0, 0, 1); batch.end(1);
     console.log(`[hullPerf] the dreadnought loses a part: vertices copied before ${beforeAll + v(small[0])}, now ${batch.stats.copied - c0}`);
     // Zoomed far out: the far versions merged once, then not again
@@ -118,7 +116,7 @@ describe('hull build cost', () => {
   });
 
   it('a fleet of one design shares its gun looks', () => {
-    const ship = shipOf(cfg.library['bastion']), geoms = blueprintGeometry(catalog, ship.blueprint);
+    const ship = shipOf(cfg.library['sunspear']), geoms = blueprintGeometry(catalog, ship.blueprint);
     const turrets = ship.derived.weapons.filter((w) => w.window).length;
     const barrels = buildHull(catalog, geoms, ship, cs).barrels.length;
     const looks = new Set(ship.derived.weapons.filter((w) => w.window).map((w) => `${ship.blueprint.parts[w.part].fn}|${w.window!.barrel}|${geoms[w.part].area}`));
@@ -129,12 +127,5 @@ describe('hull build cost', () => {
     const contextsBefore = graphicsBefore, contextsNow = (looks.size + barrels) * 3;
     console.log(`[hullPerf] ${fleet} dreadnoughts (${turrets} turrets, ${barrels} fixed barrels each): Graphics before ${graphicsBefore}, now ${graphicsNow} (+ cracks on hurt guns); GraphicsContexts built before ${contextsBefore}, now at most ${contextsNow}`);
     expect(turrets + barrels).toBeGreaterThan(0);
-    // Wires: before, a wired ship's two Graphics (one additive) inside its own container broke the batch twice; now every
-    // ship's are in two shared layers (one switch to additive and back for them all)
-    const wired: [string, number][] = [
-      ...['sparrow-t', 'bastion'].map((n): [string, number] => [n, shipOf(cfg.library[n]).derived.wires.length]),
-      ...['pyreclast', 'pirate_raider', 'pirate_gunship', 'pirate_skiff'].map((n): [string, number] => [n, shipOf(cfg.enemies[n]).derived.wires.length]),
-    ];
-    console.log(`[hullPerf] wire segments by design: ${wired.map(([n, w]) => `${n} ${w}`).join(', ')}`);
   });
 });

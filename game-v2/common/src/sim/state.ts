@@ -58,7 +58,7 @@ export interface GunState {
   minePaid?: number;
   mineUntil?: number;
   mineShare?: number;
-  /** Tow Beam: the entity towed (gunLoad draws for it) */
+  /** Tow Beam: the entity towed */
   tow?: number;
   /** A pilot's aim distance as its guns last stepped on it (ships/guns.ts distDue) */
   heldDist?: number;
@@ -176,9 +176,7 @@ function clonePorts(e: PortsState): PortsState {
 }
 
 export function cloneCharge(c: Charge): Charge {
-  const out: Charge = { g: c.g, b: [...c.b] };
-  if (c.eng) out.eng = [...c.eng];
-  if (c.gun) out.gun = [...c.gun];
+  const out: Charge = {};
   if (c.e) out.e = clonePorts(c.e);
   if (c.row) out.row = Array.from(c.row);
   return out;

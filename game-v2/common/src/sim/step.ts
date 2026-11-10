@@ -34,7 +34,7 @@ import { jumpTuning, withSlowed, stepDrift, CTL_NO_BOOST, CTL_POWER_MASK, CTL_SH
 import { pilotJumpStep } from '../ships/jumpFields.js';
 import { withEmp } from '../ships/hazards.js';
 import { withNumb, warmthStage, type WarmthStage } from '../ships/warmth.js';
-import { gunLoadTick, FULL_CHARGE } from '../ships/energy.js';
+import { FULL_CHARGE } from '../ships/energy.js';
 import { stepDebrisBody } from '../ships/debris.js';
 import { ReplicaMode } from '../ships/replicaControls.js';
 import { cloneSimShip, type SimShipState } from './state.js';
@@ -143,7 +143,7 @@ export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: 
       const accounted = pilot && s.accounted;
       const jt = jumpTuning(env.tuning);
       s.jumpPrime = pilotJumpStep(body, s.jumpPrime, env.fields, t, d.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-        const energy = accounted ? { charge: s.charge, drainRate: 1, load: gunLoadTick(gunLoadOf(s), t), tick: t }
+        const energy = accounted ? { charge: s.charge, drainRate: 1, tick: t }
           // (A replica: no stores, the engines' power replayed from the authority's bits; pilotless: full charge)
           : pilot ? { charge: FULL_CHARGE, drainRate: 0, replay: input.bits } : { charge: FULL_CHARGE, drainRate: 0 };
         if (clamp && clamp.kind !== 'push') { stepClamped(clamp, s, controls, accounted, energy, input.bits, env, rangeBoost, hazard, out); return; }

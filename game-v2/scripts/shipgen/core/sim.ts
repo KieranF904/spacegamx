@@ -1,11 +1,11 @@
-// Runs a design on the touch-routed power core (common/src/ships/power), as the review ships were checked: every gun on
+// Runs a design on shipgen's touch-routed power model (energyLayout.ts, energyTick.ts), as the review ships were checked: every gun on
 // the trigger, engines pushing, tools at full, for N seconds. Each run is paired with an ideal one (the same graph with
 // unlimited generation and relays), so a percentage is "of what this part could do", whatever its firing model.
-import type { Blueprint, EnergyLayout, EnergyLayoutInput, ShipDerived } from '../../../common/src/ships/index';
+import type { Blueprint, ShipDerived } from '../../../common/src/ships/index';
+import { createShipState, isEngine } from '../../../common/src/ships/index';
 import {
-  GUN_BEAM, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, blueprintEnergyInput, buildEnergyLayout,
-  createShipState, isEngine,
-} from '../../../common/src/ships/index';
+  type EnergyLayout, type EnergyLayoutInput, GUN_BEAM, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, blueprintEnergyInput, buildEnergyLayout,
+} from './energyLayout';
 import { beamStep, energyTick, givesLeft, gunReady, spendShot, thrustFrac, thrustMul } from './energyTick';
 import { createEnergyState } from './energyState';
 import type { ShipgenContext } from './context';
@@ -14,11 +14,11 @@ export interface ShipEnergy {
   derived: ShipDerived;
   input: EnergyLayoutInput;
   L: EnergyLayout;
-  /** Each weapon part's beat (ticks), as rebuild has it without the old flow's satisfaction */
+  /** Each weapon part's beat (ticks), as rebuild has it */
   interval: Map<number, number>;
 }
 
-/** A design's energy layout, built from its rebuild by the power core's own builder (power/blueprint.ts) */
+/** A design's energy layout, built from its rebuild (energyLayout.ts blueprintEnergyInput) */
 export function shipEnergy(ctx: ShipgenContext, bp: Blueprint): ShipEnergy {
   const { catalog, tuning } = ctx;
   const d = createShipState(catalog, tuning, 1, bp, 0).derived;

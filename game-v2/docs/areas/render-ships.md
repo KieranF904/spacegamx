@@ -48,7 +48,7 @@ How a ship looks on screen: the whole-hull geometry build (in a worker), the lit
 6. **Stills for a panel**: render before, change, render after with identical flags (see Tests).
 
 ## Tests
-- `npx vitest run client/src/ships` (hullPerf, rigidHull, partPresentation, modelCards, wireEdit, sides...) and `npx vitest run client/src/viewer`.
+- `npx vitest run client/src/ships` (hullPerf, rigidHull, partPresentation, modelCards, sides...) and `npx vitest run client/src/viewer`.
 - Stills (no browser, 15-30 ms): `npm run render -- ship:sparrow-t --zoom 2 --flames 0.8 --out shot.png`; `boss:<name> --light dark --heat 0.8 --damage 0.4`; `sheet:models`; `--list <q>`, `--status`, `--stop`. Needs `pip install moderngl pillow numpy`. Service on 127.0.0.1:5311. Full flags: DEVELOPMENT.md "Asset viewer and renders" (lines ~176-250).
 - Live-game shots: `node scripts/boss-shots/shoot.mjs http://localhost:5273/ <prefix> @steps.json` (`GPU=1`); needs game server 3000 and Vite 5273 running. One headless browser at a time, always closed, kill what you start by PID, no tests alongside.
 - Viewer in a browser: http://localhost:5273/viewer.html?asset=ship:sparrow-t&zoom=2 (every setting is a URL param).

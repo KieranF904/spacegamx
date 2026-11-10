@@ -59,7 +59,7 @@ export function buildShot(weapon: WeaponInfo, ship: ShipState, pose: ShipPose, t
     y,
     angle: datan2(dy, dx),
     // Grade and size: a bigger, better gun throws bigger, faster, harder shells
-    damageScale: Math.max(weapon.satisfaction, tuning.flow.minWeaponSatisfaction) * (weapon.strength ?? 1),
+    damageScale: weapon.strength ?? 1,
     // (A legacy fixed gun's shells are slower and bigger: tuning.fixedGun. A model's are its own, its weaponMods)
     speedScale: (weapon.mount === 'fixed' && !weapon.model ? tuning.fixedGun?.speedScale ?? 1 : 1) * dpow(weapon.size ?? 1, 0.12),
     sizeScale: (weapon.mount === 'fixed' && !weapon.model ? tuning.fixedGun?.sizeScale ?? 1 : 1) * Math.sqrt(weapon.size ?? 1),

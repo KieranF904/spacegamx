@@ -37,7 +37,7 @@ export interface Scenario {
   /** Hold mass, flown as cargo from the start (load.ts units). Parity: `cargoOre` iron ore in the pilot's hold gives it */
   cargo?: number;
   cargoOre?: number;
-  /** Towing a Corsair wreck `wreckDist` to the pilot's left, the beam switched on before tick `from` (0-based) */
+  /** Towing a wreck (testData corsair) `wreckDist` to the pilot's left, the beam switched on before tick `from` (0-based) */
   tow?: { from: number; wreckDist: number };
   /** Ticks (0-based, after the step) whose state a reconciling client / a keyframe replays from */
   replayAt?: number[];
@@ -51,15 +51,18 @@ export interface Scenario {
 const UP = -Math.PI / 2;
 
 const blueprint = (file: string): Blueprint => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints', file), 'utf-8'));
-const sparrow = () => blueprint('fixtures/sparrow-t.json');
+const sparrow = () => blueprint('sparrow-t.json');
 const withParts = (bp: Blueprint, parts: object[]): Blueprint => ({ ...bp, parts: [...bp.parts, ...(parts as PlacedPart[])] });
 
-/** A strafer on the right flank (dodges the ship left), one on the left (dodges it right), a Tow Beam under the nose */
+/** A strafer on the right flank (dodges the ship left), one on the left (dodges it right), a Tow Beam ahead of the left reactor, beam out to the left */
 export const RIGHT_FLANK = { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' };
 export const LEFT_FLANK = { uid: 61, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: -2, y: 0, rot: 0, flip: false, facing: 'W' };
-export const TOW_BEAM = { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -1, y: 3, rot: 0, flip: false, facing: 'S' };
+export const TOW_BEAM = { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -2, y: -1, rot: 0, flip: false, facing: 'W' };
 
-/** The bank test ship: two Afterburners, one with a Drive Cell against it (it boosts on its bank first, the other on the pool: circuits.ts) */
+/**
+ * The boost test ship: a reactor, two Afterburners and a Drive Cell (once the pool core's bank test ship: one engine
+ * boosting on the bank, the other on the pool). On the ports core, boosting long runs the engines' buffers short
+ */
 function driveBankShip(): Blueprint {
   const p = (uid: number, piece: string, fn: string, x: number, y: number, material: string, extra: Partial<PlacedPart> = {}): PlacedPart =>
     ({ uid, piece, fn, material, x, y, rot: 0 as Rot, flip: false, ...extra });
@@ -96,7 +99,17 @@ const flyAbout = (): ScriptTick[] => script(
   [45, {}, -2.9],
 );
 
-/** A dodge every way the dev test ship can (strafers all round), a press in the cooldown, one held through, the helm's */
+/**
+ * The starter with strafers every way (what the old dev Test Strafer had): two at the nose (facing N: push back), two at
+ * the tail in place of its side hull and armour (facing S: push forward), one each flank
+ */
+export function strafersEveryWay(): Blueprint {
+  const bp = sparrow();
+  const S = (uid: number, x: number, y: number, facing: string) => ({ uid, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x, y, rot: 0, flip: false, facing });
+  return withParts({ ...bp, parts: bp.parts.filter((q) => !(q.x === -1 && q.y >= 1) && !(q.x === 2 && q.y >= 1)) }, [S(63, -1, -1, 'N'), S(64, 2, -1, 'N'), S(65, -1, 1, 'S'), S(66, 2, 1, 'S'), RIGHT_FLANK, LEFT_FLANK]);
+}
+
+/** A dodge every way the strafers-every-way ship can, a press in the cooldown, one held through, the helm's */
 const dodgeEveryWay = (): ScriptTick[] => {
   const dodge = (keys: Keys, aim: Segment[2] = UP, hold = 3): Segment[] => [[hold, { ...keys, dodge: true }, aim], [26 - hold, keys, aim]];
   return script(
@@ -150,11 +163,7 @@ const towScript = (): ScriptTick[] => script(
   [3, { left: true, dodge: true }, -0.4], [40, {}, -0.4],
 );
 
-/**
- * Boosting long: the pool runs short (the unbanked engine browns out) while the banked one boosts on. (Since proportional
- * sharing, 2026-11-04, the Drive Cell asks the Output for its intake while it isn't full, so it refills from the pool as
- * it drains: the pool runs dry sooner and the bank lasts the script)
- */
+/** Boosting long, turning, then boosting sideways: the engines' buffers run short and their lines refill them */
 const driveBankScript = (): ScriptTick[] => script(
   [450, { forward: true, boost: true }, UP],
   [30, { forward: true }, (i) => UP + i * 0.03],
@@ -173,10 +182,8 @@ const jumpScript = (): ScriptTick[] => script(
 export const SCENARIOS: Scenario[] = [
   { name: 'plain-thrust-turn', ship: sparrow, script: flyAbout(), replayAt: [77, 200], replicaDiverges: false },
   { name: 'heavy-cargo', ship: sparrow, script: flyAbout(), cargo: 6, cargoOre: 60, replayAt: [120], replicaDiverges: false },
-  // (The dev ship's flank strafers dodge on their Drive Cell banks first. Since proportional sharing (2026-11-04) the two
-  // banks refill from the pool at their intake while they dodge, so from about halfway the pool is dry and the dodges run
-  // short: the replica flies them on the share its control bits carry, flight.ts ctlOfShare)
-  { name: 'strafer-every-way', ship: () => blueprint('dev/test-strafer.json'), script: dodgeEveryWay(), replayAt: [12, 40, 200, 330], replicaDiverges: false },
+  // (Short of power a dodge runs short: the replica flies it on the share its control bits carry, flight.ts ctlOfShare)
+  { name: 'strafer-every-way', ship: strafersEveryWay, script: dodgeEveryWay(), replayAt: [12, 40, 200, 330], replicaDiverges: false },
   { name: 'strafer-replay', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), replayAt: [14, 47, 100], replicaDiverges: false },
   { name: 'strafer-heavy', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), cargo: 4, cargoOre: 40, replayAt: [47], replicaDiverges: false },
   { name: 'strafer-energy-short', ship: () => withParts(sparrow(), [RIGHT_FLANK]), script: dodgeTillDry(), replayAt: [501, 700], replicaDiverges: false },
@@ -185,8 +192,8 @@ export const SCENARIOS: Scenario[] = [
   { name: 'jump-burn', ship: sparrow, script: jumpScript(), replayAt: [95, 150], replicaDiverges: true },
 ];
 
-/** The Corsair (towed as a wreck) */
-export const corsair = () => blueprint('fixtures/corsair.json');
+/** The wreck towed (the Bulwark; once the pool-era Corsair, the name kept) */
+export const corsair = () => blueprint('bulwark.json');
 
 export const UPDATE_GOLDEN = process.env.UPDATE_GOLDEN === '1';
 
@@ -198,9 +205,9 @@ export function bodyRow(b: FlightBody): number[] {
 export const BODY_FIELDS = ['x', 'y', 'vx', 'vy', 'angle', 'angVel', 'jump', 'jumpScale', 'cargo', 'dodge', 'dodgeDir'] as const;
 
 export function chargeRow(c: Charge): number[] {
-  // (A ports ship: its parts' stores and buffers, summed, after the pool numbers, which it doesn't use)
+  // (Its parts' stores and buffers, summed, after a 100: the retired pool's slot, kept so the rows hash as they did)
   const e = c.e as { held: Int32Array } | undefined;
-  return e ? [c.g, ...c.b, e.held.reduce((a, b) => a + b, 0)] : [c.g, ...c.b];
+  return e ? [100, e.held.reduce((a, b) => a + b, 0)] : [100];
 }
 
 /** sha256 of the rows (numbers written exactly), first 16 hex digits */

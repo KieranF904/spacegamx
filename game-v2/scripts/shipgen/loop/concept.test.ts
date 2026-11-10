@@ -8,7 +8,7 @@ import { fakeLlm, fakeModel } from './fakeLlm';
 import { type RunOptions, run } from './run';
 
 const ctx = loadContext();
-const GOOD = blueprintToGrid(ctx, ship('dev/review-wren')).text;
+const GOOD = blueprintToGrid(ctx, ship('samples/review-wren')).text;
 const NO_CORE = GOOD.replace(/CA\s+ca/, '..   ..');
 const STARTER = { ...findRole(ctx, 'starter')!, example: undefined };
 const CONCEPT = ['concept:', 'name: Dart', 'size: small', 'silhouette: long needle nose, swept wings', 'layout: core amidships, reactor and battery on the centre line, guns paired at the nose, engines paired aft', 'character: A quick, spiky interceptor.', 'cells: 24', 'end'].join('\n');
@@ -47,7 +47,7 @@ describe('shipgen concept step', () => {
     const off = await go({ concept: false }, [GOOD]);
     expect(off.llm.requests.length).toBe(1);
     expect(off.ev.some((e) => e.type === 'concept')).toBe(false);
-    const { llm } = await go({ start: { bp: ship('dev/review-wren'), instruction: 'make it faster' } }, [GOOD], [fakeModel('fake')]);
+    const { llm } = await go({ start: { bp: ship('samples/review-wren'), instruction: 'make it faster' } }, [GOOD], [fakeModel('fake')]);
     expect(llm.requests.every((r) => !isConcept(r))).toBe(true);
   });
 

@@ -5,6 +5,7 @@ import { validateBlueprint, parseBlueprint } from '../ships/blueprint.js';
 import { createShipState } from '../ships/state.js';
 import { stepGuns } from '../ships/guns.js';
 import type { Charge } from '../ships/energy.js';
+import { createPortsState } from '../ships/power/ports.js';
 import { buildCheatShip, isRangeWeapon } from './cheatShip.js';
 import type { ShipTuning } from '../ships/tuning.js';
 import { readShipJson, testCatalog } from '../ships/testData.js';
@@ -31,7 +32,6 @@ describe('gun range cheat ship', () => {
     const ws = ship.derived.weapons.filter((w) => w.uid >= 0);
     expect(ws.length).toBe(1);
     expect(bp.parts.find((q) => q.uid === ws[0].uid)!.fn).toBe(id);
-    for (const w of ship.derived.weapons) expect(w.satisfaction).toBeGreaterThanOrEqual(0.99);
     expect(ship.derived.jumpRange).toBe(0);
   });
 
@@ -50,8 +50,10 @@ describe('gun range cheat ship', () => {
     const { range: _flag, ...plain } = bp;
     const burns = (b: typeof bp) => {
       const ship = createShipState(catalog, tuning, 1, b, 0);
-      // (No power at all: an empty store, and every feed group's share 0)
-      const charge: Charge = { g: 0, b: [], eng: [0, 0, 0, 0], gun: [0, 0, 0, 0] };
+      // (No power at all: every part of it empty, and nothing refilling it)
+      const e = createPortsState(ship.derived.ports);
+      e.held.fill(0);
+      const charge: Charge = { e };
       let n = 0;
       for (let t = 1; t <= 600; t++) {
         const r = stepGuns(ship, { x: 0, y: 0, angle: -Math.PI / 2 } as never, { firing: true, aimWorld: -Math.PI / 2, aimDist: 400, energy: { charge } }, t, tuning);

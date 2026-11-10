@@ -5,13 +5,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { createShipState, parseBlueprint, placeGeometry, shapedOf, SIDE_NORMAL, type PlacedPart, type Side, type ShipTuning } from '@space-game/common';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../../../common/src/ships/testData';
+import { parseBlueprint, placeGeometry, shapedAt, SIDE_NORMAL, type PlacedPart, type Side } from '@space-game/common';
+import { testCatalog, SHIP_DATA_DIR } from '../../../../common/src/ships/testData';
+import { designOf } from '../../../../common/src/ships/design';
 import { facingMark, shieldCover, coverPolyline, hasDirection } from './buildMarks';
 
 const catalog = testCatalog();
-const tuning: ShipTuning = readShipJson('tuning.json');
-const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
+const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
 
 const part = (fn: string, x: number, y: number, facing: Side): PlacedPart =>
   ({ uid: 60, piece: 'sq', fn, material: 'alloy', x, y, rot: 0, flip: false, facing }) as PlacedPart;
@@ -36,24 +36,25 @@ describe('facing marks', () => {
 });
 
 describe('shield cover', () => {
+  // (The shield as the game's derive works it out, shapedAt: on the ports core one power can't reach isn't up, so the
+  // rebuild's own list would drop this unfed one)
   const ship = (fn: string, side: Side) => {
     const bp = parseBlueprint(sparrow);
     const p = part(fn, side === 'W' ? -2 : 3, 0, side);
     bp.parts.push(p);
-    return { state: createShipState(catalog, tuning, 1, bp, 0), p };
+    const D = designOf(catalog, bp), i = bp.parts.length - 1;
+    return { real: shapedAt(D.fns[i], D.mats[i], i, D.mounts[i])!, p };
   };
 
   it('a wall shield covers the ends the game derives', () => {
-    const { state, p } = ship('shield_spark_wall', 'W');
-    const real = shapedOf(state)[0];
+    const { real, p } = ship('shield_spark_wall', 'W');
     const s = shieldCover(p, placeGeometry(catalog, p))!;
     expect([s.ax, s.ay, s.bx, s.by]).toEqual([real.ax, real.ay, real.bx, real.by]);
     expect(coverPolyline(s)).toEqual([[real.ax, real.ay], [real.bx, real.by]]);
   });
 
   it('an arc shield starts and ends on its radius, at its half span either side of the way out', () => {
-    const { state, p } = ship('shield_visor', 'W');
-    const real = shapedOf(state)[0];
+    const { real, p } = ship('shield_visor', 'W');
     const pts = coverPolyline(shieldCover(p, placeGeometry(catalog, p))!);
     const first = pts[0], last = pts[pts.length - 1];
     for (const [x, y] of pts) expect(Math.hypot(x - real.cx, y - real.cy)).toBeCloseTo(real.r, 9);

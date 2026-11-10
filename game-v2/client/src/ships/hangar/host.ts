@@ -6,8 +6,6 @@
  * extend:     a member a new module needs is added to HangarHost, and made public in HangarUI
  */
 import { Blueprint, Catalog, Economy, Bag, PlacedPart, PlacedGeom, Side, ShipTuning, ShipDerived, Vec2, BlueprintError, TurretWindow, ClientMessage, ServerHangarMessage, ShipState, type MountingProblem } from '@space-game/common';
-import { type LoadTestResult } from '@space-game/common';
-import { type PowerReport } from '../wireEdit';
 import { PortsGrid } from '../portsGrid';
 import type { FlowCanvasLayer } from '../build/powerFlowView';
 import { HangarLitView } from '../HangarLitView';
@@ -56,22 +54,18 @@ export interface HangarDeps {
   onClose(launch: Blueprint | null): void;
 }
 
-export type Overlay = 'energy' | 'connectors' | 'joins' | 'power' | 'com' | 'thrust' | 'arcs';
+export type Overlay = 'energy' | 'connectors' | 'joins' | 'com' | 'thrust' | 'arcs';
 
 /** What the hangar's split-out modules may use of the editor (HangarUI implements it) */
 export interface HangarHost {
   deps: HangarDeps;
-  feedPreviewKey: string;
   derived: ShipDerived | null;
-  feedPreviewFor: ShipDerived | null;
-  feedPreviewVal: { feeds: number[]; hint: string } | null;
   bp: Blueprint;
   /** Undo / redo and symmetry */
   readonly aids: HangarAids;
   ctx: CanvasRenderingContext2D;
   geoms: PlacedGeom[];
   view: { cx: number; cy: number; px: number };
-  power: PowerReport | null;
   overlays: Record<Overlay, boolean>;
   isOpen: boolean;
   canvas: HTMLCanvasElement;
@@ -109,8 +103,6 @@ export interface HangarHost {
   tipGen: number;
   ammoHtml(): string;
   bindBuildButtons(): void;
-  boltGlyph(cx: number, cy: number, r: number, color: string): void;
-  bothTest(): LoadTestResult | null;
   buildHtml(): string;
   candidate(g: Vec2): PlacedPart | null;
   candidateMounting(p: PlacedPart, g?: PlacedGeom): MountingProblem[];
@@ -119,13 +111,9 @@ export interface HangarHost {
   designKey(): string;
   designs(): (Blueprint | null)[];
   draw(): void;
-  drawBanks(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number, ring: number): void;
   drawFacing(g: PlacedGeom, side: Side, sx: (x: number) => number, sy: (y: number) => number): void;
-  drawFeedPreview(cand: PlacedPart, g: PlacedGeom, sx: (x: number) => number, sy: (y: number) => number): void;
   drawMounting(g: PlacedGeom, broken: MountingProblem[], sx: (x: number) => number, sy: (y: number) => number, all: boolean): void;
-  drawPower(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number): void;
   drawWindow(w: TurretWindow, sx: (x: number) => number, sy: (y: number) => number, alpha: number, ctx?: CanvasRenderingContext2D): void;
-  feedPreview(cand: PlacedPart): { feeds: number[]; hint: string } | null;
   readonly free: boolean;
   ghostInfo(): { ghosts: Set<number>; fresh: Set<number> };
   gridTip(e: MouseEvent): void;

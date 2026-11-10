@@ -1,11 +1,12 @@
 /**
  * rebuild(): the pure function that turns a blueprint plus per-part HP into
  * everything the simulation needs. Runs on spawn and when a ship is dirty,
- * never every tick. Effects like a starved weapon, a lopsided turn or a
- * severed wire all fall out of this; there is no special-case code.
+ * never every tick. Effects like a lopsided turn or a cut-off part all fall
+ * out of this; there is no special-case code. Power runs on the ports core
+ * (power/ports.ts): every design, whatever its `power` field says.
  */
 
-import type { Blueprint, FireSpec, FunctionDef, MaterialDef, Vec2, WeaponMods, WireSeg } from './types.js';
+import type { Blueprint, FireSpec, FunctionDef, MaterialDef, Vec2, WeaponMods } from './types.js';
 import type { Catalog } from './catalog.js';
 import { designOf, newDesign, wholeBuilt, turretFrameOf, wholeExhaust, wholeTurret, type DesignInfo } from './design.js';
 import { floodFill, partMount } from './blueprint.js';
@@ -14,12 +15,10 @@ import { type TurretRays, type TurretWindow, castTurret } from './turret.js';
 import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
 import { hullOf, type ShipHull } from './contact.js';
 import { fnOutput, isEngine, partDemand, partGrade, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
-import { netJoins, wireNetworks } from './wires.js';
 import { groupsGone } from './groups.js';
 import { gunRate } from './launch.js';
 import { type CellMap, cellMap, engineExhaust } from './mounting.js';
 import { type EnergyInfo, gunDrawFlatOut } from './energy.js';
-import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
 import { type PortsLayout, buildPortsLayout, portsFed } from './power/ports.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
@@ -48,7 +47,7 @@ export const MAX_TURN = 20;
 
 export interface ThrusterInfo {
   part: number;
-  /** Ship-local force (grid frame, forward = -y), already scaled by satisfaction */
+  /** Ship-local force (grid frame, forward = -y), already scaled by its exhaust */
   force: Vec2;
   /** Centroid, grid units */
   pos: Vec2;
@@ -65,7 +64,6 @@ export interface WeaponInfo {
   uid: number;
   /** Which weapon (tuning.weapons.<kind>): cannon, railgun, laser, flak, missile, lance, emp */
   kind: string;
-  satisfaction: number;
   /** Damage multiplier from its grade and size (ships/grades.ts): 1 for a base-size Mk I */
   strength: number;
   /** Size against the weapon's base size (1: base; 2: twice the cells) */
@@ -95,7 +93,6 @@ export interface MinerInfo {
   /** A gas siphon: it draws from gas pockets, and passes through rock */
   gas?: boolean;
   material: string;
-  satisfaction: number;
   /** Beam origin on the facing edge, grid units */
   muzzle: Vec2;
   /** Unit direction out of the facing edge, grid frame */
@@ -108,19 +105,9 @@ export interface LauncherInfo {
   mob: string;
   count: number;
   every: number;
-  satisfaction: number;
   /** Its mouth, and the way out, grid units / grid frame */
   muzzle: Vec2;
   dir: Vec2;
-}
-
-export interface FlowNetwork {
-  parts: number[];
-  supply: number;
-  demand: number;
-  delivered: number;
-  /** A generator is on it (its batteries count) */
-  powered: boolean;
 }
 
 export interface ShipDerived {
@@ -132,27 +119,10 @@ export interface ShipDerived {
   orphanGroups: number[][];
   /** Joins between intact parts */
   joins: [number, number][];
-  /** Joins between parts on the same power network */
-  flowJoins: [number, number][];
-  /** Power network per part (wires.ts), -1 for parts on none */
-  network: number[];
-  networks: FlowNetwork[];
-  /** The wires it runs on (its design's, or auto-wired: wires.ts), and per segment whether it's live and its network (-1 cut) */
-  wires: WireSeg[];
-  wireLive: boolean[];
-  wireNet: number[];
-  /**
-   * Per part: steady consumers get delivered / demand in [0, 1]; engines, guns
-   * and mining lasers draw on the battery instead (1 if their network has a
-   * generator or a battery, 0 if not: energy.ts); everything else 1
-   */
-  satisfaction: number[];
-  /** Battery, spare generator power, and what draws on it (energy.ts) */
+  /** What the stores hold, the generators make and the parts draw, for the hangar and ratings (energy.ts) */
   energy: EnergyInfo;
-  /** The power layout: the ship's pool (the core's store and the batteries), the Capacitor and Drive Cell banks and the feed groups (circuits.ts; energy.ts runs them) */
-  power?: PowerLayout;
-  /** The ports layout (power/ports.ts), for a design that says `power: 'ports'`: then `power` is absent and the ports core runs it */
-  ports?: PortsLayout;
+  /** The ports layout (power/ports.ts): how power moves through the parts' ports; energy.ts runs it every tick */
+  ports: PortsLayout;
   mass: number;
   /** Centre of mass, grid units */
   com: Vec2;
@@ -171,7 +141,7 @@ export interface ShipDerived {
   drive: number;
   /** A boss's turning (Blueprint `turn`): its turning acceleration × this, braking in time (flight.ts); absent, a ship's own */
   turn?: number;
-  /** While boosting: the engines' thrust multiplier, and how fast it drains the boost battery (× the usual), weighted by each engine's thrust */
+  /** While boosting: the engines' thrust multiplier (1: the ports core folds each engine's boost into its thrust share, energy.ts boostOf), and how hard boosting drains, weighted by each engine's draw (the hangar's figures) */
   boostFactor: number;
   boostDrain: number;
   thrusters: ThrusterInfo[];
@@ -276,28 +246,6 @@ export const CORE_CARGO = 30;
 
 const cross2 = (a: Vec2, b: Vec2) => a[0] * b[1] - a[1] * b[0];
 
-/**
- * Share supply between consumers: priority 1 first, then 2, then 3; within a
- * tier, in proportion to each consumer's draw. Returns what each one receives.
- */
-export function allocateFlow(supply: number, consumers: { draw: number; priority: number }[]): number[] {
-  const out = consumers.map(() => 0);
-  let remaining = supply;
-  for (const tier of [1, 2, 3]) {
-    const idx = consumers.map((c, i) => (c.priority === tier ? i : -1)).filter((i) => i >= 0);
-    const total = idx.reduce((s, i) => s + consumers[i].draw, 0);
-    if (total <= 0) continue;
-    if (remaining >= total) {
-      for (const i of idx) out[i] = consumers[i].draw;
-      remaining -= total;
-    } else {
-      for (const i of idx) out[i] = remaining * consumers[i].draw / total;
-      remaining = 0;
-    }
-  }
-  return out;
-}
-
 function components(count: number, joins: [number, number][], include: (i: number) => boolean): number[][] {
   const seen = new Array<boolean>(count).fill(false);
   const groups: number[][] = [];
@@ -400,63 +348,21 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     return rays.win;
   };
 
-  // 3. Power networks: what the live wires join, and what's plugged into a generator (wires.ts)
-  const wn = wireNetworks(catalog, blueprint, geoms, alive, joins);
-  const network = wn.network;
-  const flowJoins = netJoins(joins, network);
-
-  // 4. Power, per network
+  // 3. Power: what the generators make and the steady loads (not engines, guns, mining lasers or a `burst` feature's parts)
+  // ask, for the hangar and ratings (the ports core decides what each part gets, every tick)
   const area = D.area;
-  const satisfaction = new Array<number>(n).fill(1);
-  // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too, as a
-  // Tow Beam's and a Burst Strafer's)
+  // (Part features: which ones each part's function gives (features/plan.ts))
   const P = getPlan();
   const fxOf = P.features.length ? fns.map((fn) => featureBits(P, fn)) : undefined;
   const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i])
     || (fxOf !== undefined && (fxOf[i] & P.burstMask) !== 0);
-  // (Of those, the ones Drive Cell banks feed: engines, and burst 'engine' features (a Burst Strafer's); and the ones Capacitor
-  // banks feed: guns, beams and mining lasers. circuits.ts)
-  const engineLike = (i: number) => isEngine(fns[i]) || (fxOf !== undefined && (fxOf[i] & P.engineMask) !== 0);
-  const gunLike = (i: number) => !!fns[i].weapon || isMinerFn(fns[i]);
   const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
-  // (A burst consumer a bank of its kind touches runs on that bank whatever its network: circuits.ts)
-  const nearBank = new Array<boolean>(n).fill(false);
-  for (const [a, b] of joins) {
-    if (!alive[a] || !alive[b]) continue;
-    for (const [s, t] of [[a, b], [b, a]] as const) {
-      const k = bankKind(fns[s]);
-      if (k && (k === 'drive' ? engineLike(t) : gunLike(t))) nearBank[t] = true;
-    }
+  let totalSupply = 0, steadyDemand = 0;
+  for (let i = 0; i < n; i++) {
+    if (!alive[i]) continue;
+    if ((fns[i].produce ?? 0) > 0) totalSupply += partSupply(fns[i], area[i], mats[i]) * partHealth(hp[i], maxHp[i], tuning);
+    if ((fns[i].demand ?? 0) > 0 && !burst(i)) steadyDemand += partDemand(fns[i], area[i], mats[i]);
   }
-  let spare = 0, totalSupply = 0;
-  const networks: FlowNetwork[] = wn.nets.map((g) => {
-    let supply = 0, powered = false, stored = false;
-    for (const i of g) {
-      if ((fns[i].produce ?? 0) > 0) { powered = true; supply += partSupply(fns[i], area[i], mats[i]) * partHealth(hp[i], maxHp[i], tuning); }
-      // (Energy routing's relays, the Conduit and Diode, store nothing for the old flow: circuits.ts leaves them out of the pool)
-      if ((fns[i].store ?? 0) > 0 && !fns[i].relayOnly && !fns[i].oneWay) stored = true;
-    }
-    // Engines, guns and mining lasers draw on the battery (energy.ts): only steady loads share out the supply here
-    const consumers = g.filter((i) => (fns[i].demand ?? 0) > 0 && !burst(i));
-    const demands = consumers.map((i) => partDemand(fns[i], area[i], mats[i]));
-    const alloc = allocateFlow(supply, consumers.map((i, k) => ({ draw: demands[k], priority: fns[i].priority ?? 3 })));
-    let delivered = 0;
-    consumers.forEach((i, k) => {
-      satisfaction[i] = demands[k] > 0 ? Math.min(1, alloc[k] / demands[k]) : 0;
-      delivered += satisfaction[i] * demands[k];
-    });
-    // (They run while their network has a generator or a battery on it (the ship's pool pays), or a bank of their kind touches them)
-    for (const i of g) if (burst(i) && (fns[i].demand ?? 0) > 0) satisfaction[i] = powered || stored || nearBank[i] ? 1 : 0;
-    spare += Math.max(0, supply - delivered);
-    totalSupply += supply;
-    return { parts: g, supply, demand: demands.reduce((s, d) => s + d, 0), delivered, powered };
-  });
-  // Consumers on no network get nothing (but engines, guns and mining lasers a bank of their kind touches)
-  parts.forEach((_, i) => {
-    if (alive[i] && (fns[i].demand ?? 0) > 0 && network[i] < 0) satisfaction[i] = burst(i) && nearBank[i] ? 1 : 0;
-  });
-  // (A ports design has no networks: its ports core decides what each part gets, every tick; nothing is starved here)
-  if (blueprint.power === 'ports') parts.forEach((_, i) => { if (alive[i]) satisfaction[i] = 1; });
 
   // 5. Derived physics
   const cs = tuning.cellSize;
@@ -503,7 +409,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const thrusters: ThrusterInfo[] = [];
   const maxThrust = { forward: 0, back: 0, left: 0, right: 0 };
   let torqueCw = 0, torqueCcw = 0;
-  let thrustSum = 0, boostSum = 0, drainSum = 0, demandSum = 0;
+  let drainSum = 0, demandSum = 0;
   // (An engine keeps the share of its exhaust lanes the ship as it stands leaves clear: mounting.ts engineExhaust)
   let standing: CellMap | null = null;
   for (let i = 0; i < n; i++) {
@@ -512,9 +418,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     // (A lane only opens as parts go: an engine that was clear still is, RebuildMemo)
     const exhaust = !side || geoms[i].bespoke ? 1 : !input.fresh && (was ? was.exhaust.get(i) : wholeExhaust(D, i, side)) === 1 ? 1 : engineExhaust(geoms, i, side, standing ??= cellMap(geoms, (j) => alive[j])).share;
     exhaustOf.set(i, exhaust);
-    const mag = partThrust(catalog, fns[i], area[i], mats[i]) * satisfaction[i] * exhaust;
-    thrustSum += mag;
-    boostSum += mag * (fns[i].boost ?? 2.2);
+    const mag = partThrust(catalog, fns[i], area[i], mats[i]) * exhaust;
     // (The drain is weighted by what each engine draws, as the power tick adds it up engine by engine)
     const dem = partDemand(fns[i], area[i], mats[i]);
     demandSum += dem;
@@ -539,7 +443,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   for (let i = 0; i < n; i++) {
     if (!alive[i] || !fns[i].weapon || !mounts[i]) continue;
     const { at: muzzle, dir } = mounts[i]!;
-    const sat = satisfaction[i];
     // (A model's mount is its own; a legacy gun's its part's)
     const mount = partMount(catalog, parts[i]);
     // (A model is its own size, and its tier its grade)
@@ -548,7 +451,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     const grade = partGrade(catalog, parts[i]);
     // Its grade and size have their own rhythm too (a heavy shell loads slower: launch.ts gunRate). A legacy fixed
     // cannon loads slower (tuning.fixedGun); a model's interval is its own, mount and all (scripts/econ/models.mjs)
-    const interval = (fns[i].fireInterval ?? 10) * (mount === 'fixed' && !model && fns[i].weapon === 'cannon' ? tuning.fixedGun?.intervalScale ?? 1 : 1) / Math.max(sat, tuning.flow.minWeaponSatisfaction)
+    const interval = (fns[i].fireInterval ?? 10) * (mount === 'fixed' && !model && fns[i].weapon === 'cannon' ? tuning.fixedGun?.intervalScale ?? 1 : 1)
       / (mats[i].traits?.includes('conductive') ? CONDUCTIVE_RATE : 1) / Math.max(0.2, 1 + (parts[i].mods?.mul?.rate ?? 0)) / (model ? 1 : gunRate(tuning, fns[i].weapon!, grade, size));
     // Firing flat out it draws its demand: a shot is that much power for one interval (beams: per tick)
     const draw = partDemand(fns[i], area[i], mats[i]);
@@ -559,7 +462,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       part: i,
       uid: parts[i].uid,
       kind: fns[i].weapon!,
-      satisfaction: sat,
       strength: weaponStrength(catalog, fns[i], area[i], mats[i]),
       size,
       grade,
@@ -582,10 +484,9 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let shieldMax = 0, shieldRegen = 0, shieldDelayW = 0, coilCool = 1;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
-  // (A ports design's coils count once the layout says power reaches them: portsCoils, below)
+  // (Coils other than the core's count once the ports layout says power reaches them: portsCoils, below)
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
   const portsCoils: number[] = [], portsShields: number[] = [];
-  const onPorts = blueprint.power === 'ports';
   const miners: MinerInfo[] = [];
   const launchers: LauncherInfo[] = [];
   const dash = { speed: 0, cooldown: 0, coils: 0 };
@@ -593,44 +494,44 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   for (let i = 0; i < n; i++) {
     if (!alive[i]) continue;
     hullCells += area[i];
-    const coil = parts[i].fn === 'core' ? jt.coreCapacity : (fns[i].jumpCapacity ?? 0) * area[i] * satisfaction[i];
-    if (coil > 0 && onPorts && parts[i].fn !== 'core') portsCoils.push(i);
+    const coil = parts[i].fn === 'core' ? jt.coreCapacity : (fns[i].jumpCapacity ?? 0) * area[i];
+    if (coil > 0 && parts[i].fn !== 'core') portsCoils.push(i);
     else if (coil > 0) {
       const grade = partGrade(catalog, parts[i]);
       jumpCap += coilCapacity(coil, grade, jt);
       jumpGradeSum += coil * grade;
     }
     if ((fns[i].capacity ?? 0) > 0) cargoCapacity += fns[i].capacity! * area[i];
-    if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
-    if ((fns[i].shield ?? 0) > 0 && onPorts && !fns[i].flash) portsShields.push(i);
+    if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range!);
+    if ((fns[i].shield ?? 0) > 0 && !fns[i].flash) portsShields.push(i);
     else if ((fns[i].shield ?? 0) > 0) {
-      const cap = fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
+      // (A Flash Screen: its capacity counts as it stands, features/flash)
+      const cap = fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]);
       shieldMax += cap;
       // (its own refill, per cell; else the ship-wide tuning's share of what it holds)
       const sr = fns[i].shieldRegen, sd = fns[i].shieldDelay ?? tuning.shield?.regenDelayTicks ?? 0;
-      const rate = sr !== undefined ? sr * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i] : cap * (tuning.shield?.regenPerSecond ?? 0);
+      const rate = sr !== undefined ? sr * area[i] * fnOutput(fns[i], mats[i]) : cap * (tuning.shield?.regenPerSecond ?? 0);
       shieldRegen += rate;
       shieldDelayW += rate * sd;
     }
-    if ((fns[i].jumpCooldown ?? 1) < coilCool && satisfaction[i] > 0 && !onPorts) coilCool = fns[i].jumpCooldown!;
-    if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
+    if ((fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
       if (isEngine(fns[i])) engineDraw += draw;
       else if (isMinerFn(fns[i])) minerDraw += draw;
     }
     if (isMinerFn(fns[i]) && mounts[i]) {
       miners.push({
-        part: i, material: mats[i].id, satisfaction: satisfaction[i], ...(fns[i].siphon ? { gas: true } : {}),
+        part: i, material: mats[i].id, ...(fns[i].siphon ? { gas: true } : {}),
         muzzle: mounts[i]!.at, dir: mounts[i]!.dir,
       });
     }
     const ln = fns[i].launches;
     if (ln) {
       const m = mounts[i];
-      launchers.push({ part: i, mob: ln.mob, count: ln.count, every: ln.every, satisfaction: satisfaction[i], muzzle: m?.at ?? geoms[i].centroid, dir: m?.dir ?? [0, -1] });
+      launchers.push({ part: i, mob: ln.mob, count: ln.count, every: ln.every, muzzle: m?.at ?? geoms[i].centroid, dir: m?.dir ?? [0, -1] });
     }
     const ds = fns[i].dash;
-    if (ds && satisfaction[i] > 0) {
+    if (ds) {
       dash.coils++;
       dash.speed = Math.max(dash.speed, ds.speed);
       dash.cooldown = dash.cooldown ? Math.min(dash.cooldown, ds.cooldown) : ds.cooldown;
@@ -652,26 +553,17 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
         if (!derive) continue;
         const bit = 1 << f, mine: number[] = [];
         for (let i = 0; i < n; i++) if (alive[i] && (fxOf[i] & bit)) mine.push(i);
-        derive({ catalog, tuning, blueprint, fns, mats, area, geoms, mounts, alive, satisfaction, parts: mine, out: fxOut, turn: fxTurn });
+        derive({ catalog, tuning, blueprint, fns, mats, area, geoms, mounts, alive, parts: mine, out: fxOut, turn: fxTurn });
       }
     }
   }
 
-  // ---- The power layout (circuits.ts): the ship's pool and the banks, worked out here once, run by energy.ts every tick
+  // ---- The ports layout (power/ports.ts): power crosses only through the parts' ports; energy.ts runs it every tick
   const health = hp.map((h, i) => partHealth(h, maxHp[i], tuning));
-  // (A ports design runs on the ports core instead, power/ports.ts: power crosses only through the parts' ports, and the old
-  // layout is left out, so everything that reads `power` must do without it)
-  const ports = blueprint.power === 'ports'
-    ? buildPortsLayout({ parts, fns, area, mats, alive, cells: geoms.map((g) => g.cells), core: coreAlive ? root : -1, tuning, health, weapons: weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })) })
-    : undefined;
-  const power = ports ? undefined : powerLayout({ fns, area, mats, alive, joins, network, networks, burst, engine: engineLike, gun: gunLike, core: coreAlive, tuning, health });
-  const batteryMax = power ? power.pool.cap : ports!.gaugeMax / 256;
-  let driveMax = 0, weaponMax = 0;
-  if (power) for (const B of power.banks) if (B.kind === 'drive') driveMax += B.cap; else weaponMax += B.cap;
-  // ---- (end power layout)
+  const ports = buildPortsLayout({ parts, fns, area, mats, alive, cells: geoms.map((g) => g.cells), core: coreAlive ? root : -1, tuning, health, weapons: weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })) });
 
   // (A ports design's coils: those power reaches, through their in ports, count; one cut off is dead weight)
-  if (ports && portsCoils.length) {
+  if (portsCoils.length) {
     const fed = portsFed(ports);
     for (const i of portsCoils) {
       if (!fed[i]) continue;
@@ -682,7 +574,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
   }
   // (And its shields, by the same rule: one power can't reach adds nothing; one reached refills as it is fed, energy.ts shieldShare)
-  if (ports && portsShields.length) {
+  if (portsShields.length) {
     const fed = portsFed(ports);
     for (const i of portsShields) {
       if (!fed[i]) continue;
@@ -695,7 +587,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
   }
   // (Shaped shields by the same rule: one power cannot reach is not up; features/zoneshield)
-  if (ports && fxOut?.shaped) {
+  if (fxOut?.shaped) {
     const fed = portsFed(ports), up = fxOut.shaped.shields.filter((s) => fed[s.part]);
     if (up.length) fxOut.shaped.shields = up; else delete fxOut.shaped;
   }
@@ -707,16 +599,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     alive,
     orphanGroups,
     joins,
-    flowJoins,
-    network,
-    networks,
-    wires: wn.wires,
-    wireLive: wn.live,
-    wireNet: wn.segNet,
-    satisfaction,
-    energy: { max: Math.round(batteryMax), driveMax: Math.round(driveMax), weaponMax: Math.round(weaponMax), spare, supply: totalSupply, engineDraw, minerDraw, weaponDraw },
-    power,
-    ...(ports ? { ports } : {}),
+    energy: { max: Math.round(ports.gaugeMax / 256), supply: totalSupply, demand: steadyDemand, engineDraw, minerDraw, weaponDraw },
+    ports,
     mass,
     com,
     inertia: inertiaGrid * cs * cs,
@@ -724,7 +608,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     fullInertia: Math.max(inertiaGrid, fullInertiaGrid) * cs * cs,
     drive: driveFactor(mass, fullMass) * Math.max(0.1, Math.min(MAX_DRIVE, blueprint.drive ?? 1)),
     ...(blueprint.turn ? { turn: Math.max(0.1, Math.min(MAX_TURN, blueprint.turn)) } : {}),
-    boostFactor: ports ? 1 : thrustSum > 0 ? boostSum / thrustSum : 2.2,
+    boostFactor: 1,
     boostDrain: demandSum > 0 ? drainSum / demandSum : 1,
     thrusters,
     maxThrust,

@@ -91,7 +91,7 @@ export class ShipReadouts {
       guns: d.weapons.length,
       turrets: d.weapons.filter((w) => w.mount === 'turret').length,
       engines: d.thrusters.length,
-      power: { supply: d.networks.reduce((a, n) => a + n.supply, 0), demand: d.networks.reduce((a, n) => a + n.demand, 0) },
+      power: { supply: d.energy.supply, demand: d.energy.demand },
       controls: this.h.helm() ? 'helm' : 'mouse-steer',
       jump: {
         phase: ph.phase, progress: ph.progress,
@@ -161,13 +161,13 @@ export class ShipReadouts {
   private readonly statusLines: FeatureStatusLine[] = [];
 
   private readonly statusRec: StatusInput = {
-    ship: null, charge: { g: 100, b: [] }, shieldPct: 0, thrust: { on: false, boost: false }, tick: 0, tuning: {} as StatusInput['tuning'],
+    ship: null, charge: {}, shieldPct: 0, thrust: { on: false, boost: false }, tick: 0, tuning: {} as StatusInput['tuning'],
     groups: [], features: [], now: 0,
     nameOf: (fn) => this.h.catalog.functions.get(fn)?.name ?? fn,
   };
 
   private readonly ringSrc: RingSources = {
-    charge: { g: 100, b: [] },
+    charge: {},
     ammoOf: (kind) => {
       const item = this.h.tuning.weapons?.[kind]?.ammo?.item;
       // (The gun range's ammunition is unlimited, as the server's Ammo.setFree: nothing to count, never plain rounds)

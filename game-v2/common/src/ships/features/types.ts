@@ -24,8 +24,6 @@ import type { Catalog } from '../catalog.js';
 import type { ShipTuning, WeaponTuning } from '../tuning.js';
 import type { PlacedGeom, PartMount } from '../grid.js';
 import type { ShipDerived } from '../rebuild.js';
-import type { PowerLayout } from '../circuits.js';
-import type { GunLoadShip } from '../energy.js';
 import type { FlightBody, FlightControls, FlightConstants } from '../flight.js';
 
 /**
@@ -51,8 +49,6 @@ export interface DeriveCtx {
   mounts: readonly (PartMount | null)[];
   /** Connected to the root and intact */
   alive: readonly boolean[];
-  /** Per part, after the power networks (rebuild.ts step 4) */
-  satisfaction: readonly number[];
   /** The live parts this feature applies to, in part order */
   parts: readonly number[];
   /** Where the feature writes what it derived (`out.<its key>`) */
@@ -63,9 +59,6 @@ export interface DeriveCtx {
    */
   turn: { torque: number };
 }
-
-/** The ship a load() hook draws for: what energy.ts gunLoad gets */
-export type LoadShip = GunLoadShip;
 
 /**
  * Where a flight hook runs inside stepFlight (flight.ts), in tick order:
@@ -194,11 +187,10 @@ export interface PartFeature {
   applies(fn: FunctionDef): boolean;
   /** A global feature: every ship has it, part or not (applies() then only picks the parts its derive() sees) */
   global?: boolean;
-  /** Plan order: derive and load run lower first (ties by id) */
+  /** Plan order: derive and flight hooks run lower first (ties by id) */
   order: number;
-  /** It draws power by the tick while it works (as engines and guns do), not as a steady load at the rebuild. 'engine':
-   * and Drive Cell banks touching it feed it as they do engines (circuits.ts: a Burst Strafer's) */
-  burst?: boolean | 'engine';
+  /** It draws power by the tick while it works (as engines and guns do), not as a steady load (rebuild.ts leaves it out of `energy.demand`) */
+  burst?: boolean;
   /**
    * Weapon-kind roles (see WeaponRole). A feature that is only this has `applies: () => false`: no function of its
    * own to give a ship, so it never enters `derived.fxMask`.
@@ -206,8 +198,6 @@ export interface PartFeature {
   weapon?: readonly WeaponRole[];
   /** At the rebuild (rebuild.ts), after the cargo/scanner pass: write `c.out.<key>` */
   derive?(c: DeriveCtx): void;
-  /** Each tick (energy.ts gunLoad): add what it draws this tick, per feed group, to `out` (allocation-free) */
-  load?(ship: LoadShip, L: PowerLayout, out: number[]): void;
   /** Flight hooks (compiled per phase, called from stepFlight: FlightPhase) */
   flight?: readonly FlightHook[];
   /** What of a rebuild its flight hooks read, as text: replica.ts flightSignature folds it in, so a replica is re-keyed when it changes */

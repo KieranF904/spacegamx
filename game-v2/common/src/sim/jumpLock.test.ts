@@ -26,7 +26,7 @@ const jt = jumpTuning(tuning);
 const burnAt = jumpBurnAt(jt);
 const envAt = (t: number): SimEnv => ({ tick: t, tuning, gravity: null, fields: NO_FIELDS, terrain: null });
 const REPLICA_ENV = { gravity: null, central: null };
-const make = () => createShipState(catalog, tuning, 7, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8')), 0);
+const make = () => createShipState(catalog, tuning, 7, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8')), 0);
 const sim = (angle = 0): SimShipState => {
   const s = make();
   return newSimShip({ id: 7, derived: s.derived, ship: s, body: { x: 0, y: 0, vx: 0, vy: 0, angle, angVel: 0, jump: 0, cargo: 0 }, charge: FULL_CHARGE, accounted: true });

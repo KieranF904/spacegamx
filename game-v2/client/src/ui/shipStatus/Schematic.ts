@@ -4,7 +4,7 @@
  *   stores   a liquid level rising from the bottom (charge), in the store's colour
  *   weapons  a level for reload / charge / clip (full = ready), clip ticks, a flash on a shot, a lit beam glows
  *   engines  a glow while thrusting (white-hot boosting)
- *   gens     a soft pulse; shields a level glow; short of power: a red pulsing outline; dry / down: dimmed
+ *   gens     a soft pulse; shields a level glow; dry / down: dimmed
  * Drawn at the HUD's status rate (10 Hz) into a devicePixelRatio-sized canvas; the screen polygons are cached per
  * geometry, so a frame allocates nothing.
  */
@@ -18,7 +18,7 @@ export const LEGEND =
   'Tint: part health (green to red, dashed: lost).\n' +
   'Fill: stored charge, or a gun reloading / charging (full: ready).\n' +
   'Ticks: rounds in the clip.   Flash: a shot.   Glow: thrusting, a lit beam, a generator.\n' +
-  'Red pulsing outline: short of power.   Dim: out of ammo or shield down.\n' +
+  'Dim: out of ammo or shield down.\n' +
   'Blue filling: the part your fabricator is building (amber: repairing).   Orange dashed: being recycled.';
 
 /** Field work to show (client/src/ships/field/bridge.ts fieldHudMarks): the part being built or repaired (-1: none), how far, and parts being recycled */
@@ -116,11 +116,6 @@ export class Schematic {
       this.path(i);
       ctx.strokeStyle = 'rgba(10, 14, 24, 0.9)';
       ctx.lineWidth = 1; ctx.stroke();
-      if (ps?.brown) {
-        this.path(i);
-        ctx.strokeStyle = `rgba(255, 70, 70, ${0.55 + 0.45 * Math.sin(t * 9)})`;
-        ctx.lineWidth = 1.8; ctx.stroke();
-      }
       if (marks?.build === i) this.building(i, marks);
       if (marks?.recycle.has(i)) {
         this.path(i);

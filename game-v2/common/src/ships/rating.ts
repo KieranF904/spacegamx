@@ -76,15 +76,16 @@ export function rateShip(catalog: Catalog, tuning: ShipTuning, ship: ShipState, 
   const n = ship.blueprint.parts.length;
   const parts: PartScore[] = Array.from({ length: n }, () => ({ firepower: 0, toughness: 0, power: 0 }));
   let firepower = 0, toughness = 0;
-  // Guns fire as fast as the energy lasts: what the engines leave of the spare power, plus the general and weapon batteries over a fight's first twenty seconds or so
+  // Guns fire as fast as the energy lasts: what the engines leave of the spare power, plus the stores over a fight's first twenty seconds or so
   const e = d.energy;
-  const sustain = e && e.weaponDraw > 0 ? Math.max(0.25, Math.min(1, (Math.max(0, e.spare - e.engineDraw * 0.5) + (e.max + e.weaponMax) / 20) / e.weaponDraw)) : 1;
+  const spare = e ? Math.max(0, e.supply - e.demand) : 0;
+  const sustain = e && e.weaponDraw > 0 ? Math.max(0.25, Math.min(1, (Math.max(0, spare - e.engineDraw * 0.5) + e.max / 20) / e.weaponDraw)) : 1;
   for (const w of d.weapons) {
     // (What it gets through: against Mk I components; damage.ts)
     const p = ship.blueprint.parts[w.part];
     const def = partWeaponDef(tuning, w.kind, p, w);
     const pen = weaponHit(w.kind, def, partGrade(catalog, p)).pen;
-    const dps = baseWeaponDps(tuning, w.kind, w.interval, def, w.fire) * w.strength * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) * sustain * penetrationMul(pen - REF_ARMOUR, tuning);
+    const dps = baseWeaponDps(tuning, w.kind, w.interval, def, w.fire) * w.strength * sustain * penetrationMul(pen - REF_ARMOUR, tuning);
     parts[w.part].firepower += dps;
     firepower += dps;
   }
@@ -99,7 +100,7 @@ export function rateShip(catalog: Catalog, tuning: ShipTuning, ship: ShipState, 
     if (fn && (fn.produce ?? 0) > 0) parts[i].power = partSupply(fn, catalog.variants.get(p.piece)?.[0]?.area ?? 1, partMaterial(catalog, p));
     if (fn && (fn.shield ?? 0) > 0 && d.shieldMax > 0) {
       // What this shield generator adds to the ship's shield
-      const share = fn.shield! * (catalog.variants.get(p.piece)?.[0]?.area ?? 1) * fnOutput(fn, partMaterial(catalog, p)) * d.satisfaction[i];
+      const share = fn.shield! * (catalog.variants.get(p.piece)?.[0]?.area ?? 1) * fnOutput(fn, partMaterial(catalog, p));
       parts[i].toughness += share * SHIELD_WORTH;
       toughness += share * SHIELD_WORTH;
     }

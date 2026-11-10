@@ -2,7 +2,7 @@
  * Shared ships (the gallery): checking what the game sends, so the site only ever stores a drawable plan and
  * plain numbers. The contract is docs/game-integration.md, section 3.
  *
- *   POST /api/v1/ships    { userId, userName, name, plan, stats, power? }   (the game server's key)
+ *   POST /api/v1/ships    { userId, userName, name, plan, stats, power? }   (the game server's key; every ship is stored as 'ports')
  */
 
 import type { PlanPart, RenderData, ShipStats } from './catalog/types.js';
@@ -64,5 +64,5 @@ export function checkShip(body: Record<string, any>, render: RenderData | null):
   if (!plan.ok) return { ok: false, status: 400, error: plan.error };
   const stats = checkStats(body.stats);
   if (!stats) return { ok: false, status: 400, error: 'stats must have parts, cells, mass, hp, gen, draw, thrust, shield, cargo and guns { fixed, turret }' };
-  return { ok: true, value: { ownerId, ownerName, name, plan: plan.plan, stats, power: body.power === 'ports' ? 'ports' : 'pool' } };
+  return { ok: true, value: { ownerId, ownerName, name, plan: plan.plan, stats, power: 'ports' } };
 }

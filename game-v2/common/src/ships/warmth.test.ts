@@ -45,7 +45,7 @@ describe('warmth', () => {
   });
 
   it('insulating materials slow the cold by their share of the hull, and only buy time', () => {
-    const plain = ship('fixtures/sparrow-t'), polymer = ship('fixtures/sparrow-t', 'insulated_polymer'), ceramic = ship('fixtures/sparrow-t', 'ceramic_laminate');
+    const plain = ship('sparrow-t'), polymer = ship('sparrow-t', 'insulated_polymer'), ceramic = ship('sparrow-t', 'ceramic_laminate');
     expect(insulationOf(plain)).toBe(0);
     expect(insulationOf(polymer)).toBeGreaterThan(insulationOf(ceramic));
     expect(insulationOf(ceramic)).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ describe('warmth', () => {
   });
 
   it('guns never read warmth (rework 2026-11): no stage slows them', () => {
-    const s = createShipState(catalog, tuning, 1, blueprint('fixtures/sparrow-t'), 0);
+    const s = createShipState(catalog, tuning, 1, blueprint('sparrow-t'), 0);
     let n = 0;
     for (let t = 0; t < 600; t++) n += stepGuns(s, { x: 0, y: 0, angle: 0 }, { firing: true, aimDist: 0 }, t, tuning).shots.length;
     expect(n).toBeGreaterThan(0);

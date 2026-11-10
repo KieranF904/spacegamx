@@ -1,7 +1,7 @@
 /**
  * @contract client.ship.renderer
  * owns:       drawing modular ships and debris each frame: views per ship, hull slots, fades, labels, health bars, lights
- * needs:      ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,bankGlow,gunLooks,hullCaches}; npm: @space-game/common, pixi.js
+ * needs:      ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,gunLooks,hullCaches}; npm: @space-game/common, pixi.js
  * invariants: a hull is built once per design, parts attached, colouring and kind, and shared by every ship like it — client/src/ships/rigidHull.test.ts
  *             damage and the hit flash are data the hull shader reads: taking hits builds nothing — none pinned
  * extend:     a new per-ship visual is a field on BodyView (render/viewTypes.ts) drawn in update(), or a new module under ships/render/
@@ -40,7 +40,6 @@ import { flushGuns, clearBarrels, clearTurrets } from './render/gunLooks';
 import { HULLS, ASKED, DESIGN_NO, isRigid, hullKey } from './render/hullCaches';
 import { GunDrawer } from './render/GunDrawer';
 import { HullDrawer } from './render/HullDrawer';
-import { drawBankGlow } from './render/bankGlow';
 import { kickGun, spinAtGun, barrelTipOf } from './render/muzzle';
 import { flakMarks, type FlakMark } from './render/flakAim';
 
@@ -63,7 +62,6 @@ export class ShipRenderer {
   /** Hull building and fitting (render/HullDrawer.ts), and turret and barrel drawing (render/GunDrawer.ts) */
   private readonly hullDraw: HullDrawer;
   private readonly gunDraw: GunDrawer;
-  private readonly bankHost = { charge: () => this.state.charge, geometry: (s: ShipState) => this.bridge.geometry(s) };
 
   constructor(
     private bridge: ShipSource,
@@ -296,7 +294,6 @@ export class ShipRenderer {
       // Light on the ship (for its guns, which are tinted rather than lit per vertex)
       this.lighting.levelAt(entity.renderX, entity.renderY, this.lvl);
       this.gunDraw.drawTurrets(view, ship, cs, dt * 60);
-      drawBankGlow(this.bankHost, view, ship, cs, eid === this.state.playerId);
       this.partFx.draw(view.container, view.guns, ship, this.bridge.geometry(ship), cs, now, eid === this.state.playerId ? this.state.charge : null);
       this.updateLamps(view, ship, entity, dt);
       if (this.features?.hasDrawers) {

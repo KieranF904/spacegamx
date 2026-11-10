@@ -101,7 +101,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 - Proto mode (`?proto`, `ProtoHooks`) skips some windows (`if (!host.proto)` in app/windows.ts); keep both paths working.
 
 ## Related areas
-`hangar-ui` (HangarUI, component guide shared), `economy-quests` (Station/Trade/Quest content), `networking` (messages), `energy` (BankBars), `render-world` (Renderer, quality), `web-accounts` (LoginUI/ServerBrowserUI talk to the lobby), `flight` (input bundle), `ops-tools` (screenshot tools). Links: `docs/areas/<slug>.md`.
+`hangar-ui` (HangarUI, component guide shared), `economy-quests` (Station/Trade/Quest content), `networking` (messages), `energy` (the ports core), `render-world` (Renderer, quality), `web-accounts` (LoginUI/ServerBrowserUI talk to the lobby), `flight` (input bundle), `ops-tools` (screenshot tools). Links: `docs/areas/<slug>.md`.
 
 ## Notes (moved from DEVELOPMENT.md and the old engine-map)
 - **Escape menu** (`ui/GameMenuUI.ts`): Resume, galaxy map, Field guide, Settings (Audio, Display, Interface, Gameplay), Controls (every action rebindable; binding a used key swaps the two), Server (ping, jitter, pilots in system, copy address), Leave server and Log out (both confirm). Esc steps back a page, then closes; flight input is off while open, the sim keeps running. Pilot & ship (live readout of level, credits, core, mass, speed, turn rate, power, guns, jump drive; a dock button inside a docking ring) and the component guide moved to the side panel's Pilot and Components tabs (2026-11-06).

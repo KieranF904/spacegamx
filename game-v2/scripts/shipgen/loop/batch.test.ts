@@ -14,7 +14,7 @@ import { listSavedShips } from '../engine/ships';
 import { listWatchRuns } from '../engine/watch';
 
 const real = loadContext();
-const GOOD = blueprintToGrid(real, ship('dev/review-wren')).text;
+const GOOD = blueprintToGrid(real, ship('samples/review-wren')).text;
 const CONCEPTS = ['long needle nose', 'stubby brick', 'swept flying wing', 'arrowhead', 'twin booms'];
 
 // A data folder whose roles have no worked example (the Wren is the starter's example, and a copy of it is flagged) and a

@@ -10,7 +10,7 @@ import { briefLegend, briefCheck, check, findRole } from '../core/index';
 import type { Renderer } from './render';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const GOOD = blueprintToGrid(ctx, wren).text;
 // (The Wren is the starter role's worked example, so a copy of it is flagged: these tests use the role without one)
 const STARTER = { ...findRole(ctx, 'starter')!, example: undefined };

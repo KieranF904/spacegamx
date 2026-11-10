@@ -31,9 +31,9 @@
       "id": "client.app.hud-readouts",
       "path": "client/src/app/hudReadouts.ts",
       "group": "client/app",
-      "lines": 78,
-      "owns": "the top-HUD readouts each frame: boost bar, bank bars, XP bar and level (with their gain glow), credits, system name",
-      "needs": "HudHost (state, pilot, ship client, system names), BankBars, domWrite setText and setStyle",
+      "lines": 73,
+      "owns": "the top-HUD readouts each frame: boost bar, XP bar and level (with their gain glow), credits, system name",
+      "needs": "HudHost (state, pilot, ship client, system names), domWrite setText and setStyle",
       "events": "",
       "invariants": [
         {
@@ -50,14 +50,14 @@
         {
           "name": "HudHost",
           "kind": "interface",
-          "start": 15,
-          "end": 21
+          "start": 14,
+          "end": 20
         },
         {
           "name": "HudReadouts",
           "kind": "class",
-          "start": 23,
-          "end": 78
+          "start": 22,
+          "end": 73
         }
       ]
     },
@@ -2164,7 +2164,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 760,
+      "lines": 722,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -2181,22 +2181,16 @@
       ],
       "sections": [
         {
-          "name": "LOAD_TEST_SECONDS",
-          "kind": "const",
-          "start": 75,
-          "end": 76
-        },
-        {
           "name": "designSig",
           "kind": "const",
-          "start": 79,
-          "end": 80
+          "start": 71,
+          "end": 72
         },
         {
           "name": "HangarUI",
           "kind": "class",
-          "start": 82,
-          "end": 760
+          "start": 74,
+          "end": 722
         }
       ]
     },
@@ -2246,9 +2240,9 @@
       "id": "client.ship.renderer",
       "path": "client/src/ships/ShipRenderer.ts",
       "group": "client/ships",
-      "lines": 504,
+      "lines": 501,
       "owns": "drawing modular ships and debris each frame: views per ship, hull slots, fades, labels, health bars, lights",
-      "needs": "ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,bankGlow,gunLooks,hullCaches}; npm: @space-game/common, pixi.js",
+      "needs": "ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,gunLooks,hullCaches}; npm: @space-game/common, pixi.js",
       "events": "",
       "invariants": [
         {
@@ -2269,14 +2263,14 @@
         {
           "name": "FACTION_COLORS",
           "kind": "const",
-          "start": 47,
-          "end": 48
+          "start": 46,
+          "end": 47
         },
         {
           "name": "ShipRenderer",
           "kind": "class",
-          "start": 50,
-          "end": 504
+          "start": 49,
+          "end": 501
         }
       ]
     },
@@ -2778,7 +2772,7 @@
           "test": "client/src/ships/build/history.test.ts"
         }
       ],
-      "extend": "an editor snapshots its state (parts and wires, or its pending edits), records each edit with record(), wraps a drag in begin()/end()",
+      "extend": "an editor snapshots its state (its parts, or its pending edits), records each edit with record(), wraps a drag in begin()/end()",
       "exports": [
         "HISTORY_CAP",
         "History"
@@ -3579,7 +3573,7 @@
       "id": "client.ships.build.stat-delta",
       "path": "client/src/ships/build/statDelta.ts",
       "group": "client/ships/build",
-      "lines": 217,
+      "lines": 216,
       "owns": "what placing the part in hand, or removing the part under the cursor, would change on the ship: mass, acceleration, top speed, turn, power made against drawn, shield, hull, firepower, build points and cost; the memo that keeps hovering cheap; which change the cursor means (changeFor). Pure: designs in, numbers and tones out",
       "needs": "shipSummary (the hangar's own derivation, one derive per design), common validateBlueprint / buildPoints / buyPrice (npm: @space-game/common); no DOM, no editor state",
       "events": "",
@@ -3702,49 +3696,49 @@
           "name": "flowOf",
           "kind": "function",
           "start": 109,
-          "end": 114
+          "end": 113
         },
         {
           "name": "applied",
           "kind": "function",
-          "start": 116,
-          "end": 119
+          "start": 115,
+          "end": 118
         },
         {
           "name": "diffMeasures",
           "kind": "function",
-          "start": 121,
-          "end": 135
+          "start": 120,
+          "end": 134
         },
         {
           "name": "generatorsShort",
           "kind": "function",
-          "start": 137,
-          "end": 144
+          "start": 136,
+          "end": 143
         },
         {
           "name": "lineOf",
           "kind": "function",
-          "start": 146,
-          "end": 159
+          "start": 145,
+          "end": 158
         },
         {
           "name": "changeFor",
           "kind": "function",
-          "start": 161,
-          "end": 167
+          "start": 160,
+          "end": 166
         },
         {
           "name": "changeKey",
           "kind": "function",
-          "start": 169,
-          "end": 174
+          "start": 168,
+          "end": 173
         },
         {
           "name": "DeltaCache",
           "kind": "class",
-          "start": 176,
-          "end": 217
+          "start": 175,
+          "end": 216
         }
       ]
     },
@@ -5544,7 +5538,7 @@
       "id": "client.hangar.aids",
       "path": "client/src/ships/hangar/hangarAids.ts",
       "group": "client/ships/hangar",
-      "lines": 136,
+      "lines": 135,
       "owns": "the hangar's undo / redo history and symmetry mode: what a step is (the parts and the saved wiring), the toolbar buttons, the mirrored half of a place / remove / turn, and the axis line",
       "needs": "HangarHost (bp, deps, refresh, status), build/history, build/symmetry, build/symmetryTurn, build/buildKeys, hangar/hangarWidgets",
       "events": "",
@@ -5573,7 +5567,7 @@
           "name": "HangarAids",
           "kind": "class",
           "start": 22,
-          "end": 136
+          "end": 135
         }
       ]
     },
@@ -5691,7 +5685,7 @@
       "id": "client.hangar.draw",
       "path": "client/src/ships/hangar/hangarDraw.ts",
       "group": "client/ships/hangar",
-      "lines": 221,
+      "lines": 219,
       "owns": "one redraw of the hangar grid: the grid layer, the ship's marks and the part-in-hand ghost",
       "needs": "HangarHost, hangarOverlays, hangarMarks; npm: @space-game/common",
       "events": "",
@@ -5716,7 +5710,7 @@
           "name": "draw",
           "kind": "function",
           "start": 30,
-          "end": 221
+          "end": 219
         }
       ]
     },
@@ -5724,7 +5718,7 @@
       "id": "client.hangar.edit",
       "path": "client/src/ships/hangar/hangarEdit.ts",
       "group": "client/ships/hangar",
-      "lines": 188,
+      "lines": 178,
       "owns": "the hangar's grid editing: the part in hand as a candidate, placement rules, place, pick up, paint-drag, remove, new design",
       "needs": "HangarUI (its fields, as the first argument), hangar/hangarAids, common ship geometry and mounting; npm: @space-game/common",
       "events": "",
@@ -5740,7 +5734,6 @@
         "candidateMounting",
         "dragTo",
         "newBlueprint",
-        "onHull",
         "partAt",
         "pickFacing",
         "pickUp",
@@ -5755,92 +5748,86 @@
         {
           "name": "DEFAULT_FACING",
           "kind": "const",
-          "start": 17,
-          "end": 17
+          "start": 16,
+          "end": 16
         },
         {
           "name": "candidate",
           "kind": "function",
-          "start": 19,
-          "end": 31
+          "start": 18,
+          "end": 30
         },
         {
           "name": "pickFacing",
           "kind": "function",
-          "start": 33,
-          "end": 53
+          "start": 32,
+          "end": 52
         },
         {
           "name": "placementProblem",
           "kind": "function",
-          "start": 55,
-          "end": 81
+          "start": 54,
+          "end": 80
         },
         {
           "name": "candidateMounting",
           "kind": "function",
-          "start": 83,
-          "end": 86
+          "start": 82,
+          "end": 85
         },
         {
           "name": "place",
           "kind": "function",
-          "start": 88,
-          "end": 100
+          "start": 87,
+          "end": 99
         },
         {
           "name": "partAt",
           "kind": "function",
-          "start": 102,
-          "end": 105
+          "start": 101,
+          "end": 104
         },
         {
           "name": "turnPlaced",
           "kind": "function",
-          "start": 107,
-          "end": 121
+          "start": 106,
+          "end": 119
         },
         {
           "name": "pickUp",
           "kind": "function",
-          "start": 123,
-          "end": 132
+          "start": 121,
+          "end": 130
         },
         {
           "name": "startDrag",
           "kind": "function",
-          "start": 134,
-          "end": 139
+          "start": 132,
+          "end": 137
         },
         {
           "name": "stopDrag",
           "kind": "function",
-          "start": 141,
-          "end": 145
+          "start": 139,
+          "end": 143
         },
         {
           "name": "dragTo",
           "kind": "function",
-          "start": 147,
-          "end": 156
+          "start": 145,
+          "end": 154
         },
         {
           "name": "remove",
           "kind": "function",
-          "start": 158,
-          "end": 171
-        },
-        {
-          "name": "onHull",
-          "kind": "function",
-          "start": 173,
-          "end": 177
+          "start": 156,
+          "end": 167
         },
         {
           "name": "newBlueprint",
           "kind": "function",
-          "start": 179,
-          "end": 188
+          "start": 169,
+          "end": 178
         }
       ]
     },
@@ -5923,8 +5910,8 @@
       "id": "client.hangar.overlays",
       "path": "client/src/ships/hangar/hangarOverlays.ts",
       "group": "client/ships/hangar",
-      "lines": 302,
-      "owns": "the hangar grid's canvas marks: turret windows, power and bank overlay, mounting rules, facing arrows, feed preview",
+      "lines": 106,
+      "owns": "the hangar grid's canvas marks: turret windows, mounting rules, facing arrows",
       "needs": "HangarHost (geoms, derived, view, ctx, deps); npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -5935,63 +5922,28 @@
       ],
       "extend": "a new grid mark is one function here, called from hangarDraw.ts draw()",
       "exports": [
-        "boltGlyph",
-        "drawBanks",
         "drawFacing",
-        "drawFeedPreview",
         "drawMounting",
-        "drawPower",
-        "drawWindow",
-        "feedPreview"
+        "drawWindow"
       ],
       "sections": [
         {
-          "name": "feedPreview",
-          "kind": "function",
-          "start": 14,
-          "end": 42
-        },
-        {
-          "name": "drawFeedPreview",
-          "kind": "function",
-          "start": 44,
-          "end": 65
-        },
-        {
           "name": "drawWindow",
           "kind": "function",
-          "start": 67,
-          "end": 90
-        },
-        {
-          "name": "drawPower",
-          "kind": "function",
-          "start": 92,
-          "end": 149
-        },
-        {
-          "name": "drawBanks",
-          "kind": "function",
-          "start": 151,
-          "end": 220
-        },
-        {
-          "name": "boltGlyph",
-          "kind": "function",
-          "start": 222,
-          "end": 231
+          "start": 12,
+          "end": 35
         },
         {
           "name": "drawMounting",
           "kind": "function",
-          "start": 233,
-          "end": 286
+          "start": 37,
+          "end": 90
         },
         {
           "name": "drawFacing",
           "kind": "function",
-          "start": 288,
-          "end": 302
+          "start": 92,
+          "end": 106
         }
       ]
     },
@@ -5999,7 +5951,7 @@
       "id": "client.hangar.stats",
       "path": "client/src/ships/hangar/hangarStats.ts",
       "group": "client/ships/hangar",
-      "lines": 440,
+      "lines": 329,
       "owns": "the hangar's right-hand panel: build, ammunition, power and summary sections, details and problems",
       "needs": "HangarHost (deps, derived, bp, errors), shipSummary, portsReport, build/detailMode (Simple swaps power + ship sections for hangarStatsSimple); npm: @space-game/common",
       "events": "",
@@ -6023,62 +5975,50 @@
         {
           "name": "buildHtml",
           "kind": "function",
-          "start": 28,
-          "end": 95
+          "start": 27,
+          "end": 94
         },
         {
           "name": "ammoHtml",
           "kind": "function",
-          "start": 97,
-          "end": 145
+          "start": 96,
+          "end": 144
         },
         {
           "name": "bindBuildButtons",
           "kind": "function",
-          "start": 147,
-          "end": 173
+          "start": 146,
+          "end": 172
         },
         {
           "name": "powerHtml",
           "kind": "function",
-          "start": 175,
-          "end": 233
+          "start": 174,
+          "end": 178
         },
         {
           "name": "portsHtml",
           "kind": "function",
-          "start": 235,
-          "end": 248
+          "start": 180,
+          "end": 193
         },
         {
           "name": "summaryHtml",
           "kind": "function",
-          "start": 250,
-          "end": 325
+          "start": 195,
+          "end": 270
         },
         {
           "name": "renderStats",
           "kind": "function",
-          "start": 327,
-          "end": 382
-        },
-        {
-          "name": "energyRuns",
-          "kind": "const",
-          "start": 384,
-          "end": 394
-        },
-        {
-          "name": "ENERGY_ROW_SECONDS",
-          "kind": "const",
-          "start": 395,
-          "end": 395
+          "start": 272,
+          "end": 321
         },
         {
           "name": "energyHtml",
           "kind": "function",
-          "start": 397,
-          "end": 440
+          "start": 323,
+          "end": 329
         }
       ]
     },
@@ -6168,7 +6108,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 155,
+      "lines": 143,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -6188,20 +6128,20 @@
         {
           "name": "HangarDeps",
           "kind": "interface",
-          "start": 19,
-          "end": 57
+          "start": 17,
+          "end": 55
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 59,
-          "end": 59
+          "start": 57,
+          "end": 57
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 61,
-          "end": 155
+          "start": 59,
+          "end": 143
         }
       ]
     },
@@ -6639,40 +6579,6 @@
           "kind": "class",
           "start": 36,
           "end": 179
-        }
-      ]
-    },
-    {
-      "id": "client.ship.render.bank-glow",
-      "path": "client/src/ships/render/bankGlow.ts",
-      "group": "client/ships/render",
-      "lines": 49,
-      "owns": "the pilot's own Capacitor and Drive Cell members glowing by their bank's charge",
-      "needs": "BankGlowHost (charge, geometry), pixi Graphics; npm: @space-game/common, pixi.js",
-      "events": "",
-      "invariants": [
-        {
-          "text": "redrawn only when a bank's charge moves a step",
-          "test": "none pinned"
-        }
-      ],
-      "extend": "a new bank kind is one more colour in drawBankGlow",
-      "exports": [
-        "BankGlowHost",
-        "drawBankGlow"
-      ],
-      "sections": [
-        {
-          "name": "BankGlowHost",
-          "kind": "interface",
-          "start": 14,
-          "end": 17
-        },
-        {
-          "name": "drawBankGlow",
-          "kind": "function",
-          "start": 19,
-          "end": 49
         }
       ]
     },
@@ -7153,7 +7059,7 @@
       "id": "client.ship.render.view-types",
       "path": "client/src/ships/render/viewTypes.ts",
       "group": "client/ships/render",
-      "lines": 138,
+      "lines": 136,
       "owns": "the per-ship view records ShipRenderer keeps (BodyView, Turret, Barrel)",
       "needs": "pixi Container/Graphics/Sprite/Text, LitMesh, GunAnimSpec; npm: @space-game/common, pixi.js",
       "events": "",
@@ -7174,19 +7080,19 @@
           "name": "BodyView",
           "kind": "interface",
           "start": 14,
-          "end": 69
+          "end": 67
         },
         {
           "name": "Turret",
           "kind": "interface",
-          "start": 71,
-          "end": 105
+          "start": 69,
+          "end": 103
         },
         {
           "name": "Barrel",
           "kind": "interface",
-          "start": 107,
-          "end": 138
+          "start": 105,
+          "end": 136
         }
       ]
     },
@@ -15398,9 +15304,9 @@
       "id": "feature.flash.common",
       "path": "common/src/ships/features/flash/index.ts",
       "group": "common/ships/features",
-      "lines": 49,
+      "lines": 48,
       "owns": "the Flash Screen part feature, shared half: the shield points a rebuild derives for the Flash Screens",
-      "needs": "PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks, bank cost)",
+      "needs": "PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks)",
       "events": "",
       "invariants": [
         {
@@ -15421,7 +15327,7 @@
           "name": "feature",
           "kind": "const",
           "start": 26,
-          "end": 49
+          "end": 48
         }
       ]
     },
@@ -15429,7 +15335,7 @@
       "id": "feature.gyro.common",
       "path": "common/src/ships/features/gyro/index.ts",
       "group": "common/ships/features",
-      "lines": 97,
+      "lines": 96,
       "owns": "the Gyro and Heavy Gyro part feature, shared half: turn torque a rebuild derives and three flight hooks that draw power only while the ship turns",
       "needs": "PartFeature, FlightCtx (types.ts), flight.ts turnScale / wrapAngle, gyro/gyro.ts",
       "events": "flight hooks at preJump, thrustGate and impulse",
@@ -15476,7 +15382,7 @@
           "name": "feature",
           "kind": "const",
           "start": 60,
-          "end": 97
+          "end": 96
         }
       ]
     },
@@ -15501,7 +15407,6 @@
         "FLIGHT_PHASES",
         "FeaturePlan",
         "FlightEntry",
-        "LoadHook",
         "MAX_FEATURES",
         "PlanControl",
         "PlanInput",
@@ -15584,8 +15489,8 @@
       "id": "feature.plan",
       "path": "common/src/ships/features/plan.ts",
       "group": "common/ships/features",
-      "lines": 232,
-      "owns": "compiling FEATURES into the plan every shared call site reads: ordered derive / flight / load hooks, input bits, wire slots, weapon roles",
+      "lines": 224,
+      "owns": "compiling FEATURES into the plan every shared call site reads: ordered derive / flight hooks, input bits, wire slots, weapon roles",
       "needs": "FEATURES (registry.ts), types.ts, features.wire.json (the pinned manifest), common/ships/replica control bits",
       "events": "",
       "invariants": [
@@ -15604,7 +15509,6 @@
         "FLIGHT_PHASES",
         "FeaturePlan",
         "FlightEntry",
-        "LoadHook",
         "MAX_FEATURES",
         "PILOT_EXTRAS",
         "PlanControl",
@@ -15624,140 +15528,134 @@
         {
           "name": "PILOT_EXTRAS",
           "kind": "const",
-          "start": 33,
-          "end": 34
+          "start": 32,
+          "end": 33
         },
         {
           "name": "MAX_FEATURES",
           "kind": "const",
-          "start": 36,
-          "end": 37
+          "start": 35,
+          "end": 36
         },
         {
           "name": "CORE_CONTROLS",
           "kind": "const",
-          "start": 39,
-          "end": 40
+          "start": 38,
+          "end": 39
         },
         {
           "name": "FLIGHT_PHASES",
           "kind": "const",
-          "start": 42,
-          "end": 42
+          "start": 41,
+          "end": 41
         },
         {
           "name": "WireManifest",
           "kind": "interface",
-          "start": 44,
-          "end": 49
+          "start": 43,
+          "end": 48
         },
         {
           "name": "DeriveHook",
           "kind": "type",
+          "start": 50,
+          "end": 50
+        },
+        {
+          "name": "FlightEntry",
+          "kind": "interface",
           "start": 51,
           "end": 51
         },
         {
-          "name": "LoadHook",
-          "kind": "type",
+          "name": "PlanInput",
+          "kind": "interface",
           "start": 52,
           "end": 52
         },
         {
-          "name": "FlightEntry",
+          "name": "PlanReplica",
           "kind": "interface",
           "start": 53,
           "end": 53
         },
         {
-          "name": "PlanInput",
+          "name": "PlanWeaponRole",
           "kind": "interface",
           "start": 54,
-          "end": 54
-        },
-        {
-          "name": "PlanReplica",
-          "kind": "interface",
-          "start": 55,
           "end": 55
         },
         {
-          "name": "PlanWeaponRole",
+          "name": "PlanControl",
           "kind": "interface",
           "start": 56,
           "end": 57
         },
         {
-          "name": "PlanControl",
-          "kind": "interface",
-          "start": 58,
-          "end": 59
-        },
-        {
           "name": "FeaturePlan",
           "kind": "interface",
-          "start": 61,
-          "end": 89
+          "start": 59,
+          "end": 84
         },
         {
           "name": "fail",
           "kind": "const",
-          "start": 91,
-          "end": 91
+          "start": 86,
+          "end": 86
         },
         {
           "name": "compilePlan",
           "kind": "function",
-          "start": 93,
-          "end": 180
+          "start": 88,
+          "end": 172
         },
         {
           "name": "slotOf",
           "kind": "function",
-          "start": 182,
-          "end": 187
+          "start": 174,
+          "end": 179
         },
         {
           "name": "plan",
           "kind": "let",
-          "start": 189,
-          "end": 189
+          "start": 181,
+          "end": 181
         },
         {
           "name": "getPlan",
           "kind": "function",
-          "start": 191,
-          "end": 194
+          "start": 183,
+          "end": 186
         },
         {
           "name": "setPlanForTests",
           "kind": "function",
-          "start": 196,
-          "end": 199
+          "start": 188,
+          "end": 191
         },
         {
           "name": "featureBits",
           "kind": "function",
-          "start": 201,
-          "end": 207
+          "start": 193,
+          "end": 199
         },
         {
           "name": "featureList",
           "kind": "function",
-          "start": 209,
-          "end": 216
+          "start": 201,
+          "end": 208
         },
         {
           "name": "featureFacts",
           "kind": "function",
-          "start": 218,
-          "end": 225
+          "start": 210,
+          "end": 217
         },
         {
           "name": "weaponRole",
           "kind": "function",
-          "start": 227,
-          "end": 232
+          "start": 219,
+          "end": 224
         }
       ]
     },
@@ -15846,8 +15744,8 @@
       "id": "feature.tow.common",
       "path": "common/src/ships/features/tow/index.ts",
       "group": "common/ships/features",
-      "lines": 63,
-      "owns": "the Tow Beam part feature, shared half: what a rebuild derives, what it draws and what the UI says about it",
+      "lines": 52,
+      "owns": "the Tow Beam part feature, shared half: what a rebuild derives and what the UI says about it",
       "needs": "PartFeature, tow/tow.ts (towTuning)",
       "events": "",
       "invariants": [
@@ -15868,14 +15766,14 @@
         {
           "name": "n0",
           "kind": "const",
-          "start": 23,
-          "end": 23
+          "start": 22,
+          "end": 22
         },
         {
           "name": "feature",
           "kind": "const",
-          "start": 25,
-          "end": 63
+          "start": 24,
+          "end": 52
         }
       ]
     },
@@ -15883,7 +15781,7 @@
       "id": "feature.types",
       "path": "common/src/ships/features/types.ts",
       "group": "common/ships/features",
-      "lines": 220,
+      "lines": 210,
       "owns": "the shared half of the part-feature contract: PartFeature, its hook contexts, InputDef, Fact, FeatureDerived",
       "needs": "type-only imports from the ship model (blueprint, state, flight, energy); no values",
       "events": "",
@@ -15904,7 +15802,6 @@
         "FlightHook",
         "FlightPhase",
         "InputDef",
-        "LoadShip",
         "PartFeature",
         "ReplicaField",
         "ReplicaWhere",
@@ -15914,86 +15811,80 @@
         {
           "name": "FeatureDerived",
           "kind": "interface",
-          "start": 31,
-          "end": 36
+          "start": 29,
+          "end": 34
         },
         {
           "name": "ContractSpec",
           "kind": "interface",
-          "start": 38,
-          "end": 39
+          "start": 36,
+          "end": 37
         },
         {
           "name": "DeriveCtx",
           "kind": "interface",
-          "start": 41,
-          "end": 65
-        },
-        {
-          "name": "LoadShip",
-          "kind": "type",
-          "start": 67,
-          "end": 68
+          "start": 39,
+          "end": 61
         },
         {
           "name": "FlightPhase",
           "kind": "type",
-          "start": 70,
-          "end": 81
+          "start": 63,
+          "end": 74
         },
         {
           "name": "FlightCtx",
           "kind": "interface",
-          "start": 83,
-          "end": 113
+          "start": 76,
+          "end": 106
         },
         {
           "name": "FlightHook",
           "kind": "interface",
-          "start": 115,
-          "end": 120
+          "start": 108,
+          "end": 113
         },
         {
           "name": "InputDef",
           "kind": "interface",
-          "start": 122,
-          "end": 137
+          "start": 115,
+          "end": 130
         },
         {
           "name": "ReplicaWhere",
           "kind": "type",
-          "start": 139,
-          "end": 140
+          "start": 132,
+          "end": 133
         },
         {
           "name": "ReplicaField",
           "kind": "interface",
-          "start": 142,
-          "end": 148
+          "start": 135,
+          "end": 141
         },
         {
           "name": "Fact",
           "kind": "interface",
-          "start": 150,
-          "end": 166
+          "start": 143,
+          "end": 159
         },
         {
           "name": "DescribeCtx",
           "kind": "interface",
-          "start": 168,
-          "end": 176
+          "start": 161,
+          "end": 169
         },
         {
           "name": "WeaponRole",
           "kind": "interface",
-          "start": 178,
-          "end": 188
+          "start": 171,
+          "end": 181
         },
         {
           "name": "PartFeature",
           "kind": "interface",
-          "start": 190,
-          "end": 220
+          "start": 183,
+          "end": 210
         }
       ]
     },
@@ -16032,7 +15923,7 @@
       "id": "feature.zoneshield.common",
       "path": "common/src/ships/features/zoneshield/index.ts",
       "group": "common/ships/features",
-      "lines": 70,
+      "lines": 69,
       "owns": "the shaped shields part feature, shared half: each powered shield's line or arc, HP and refill (derived.fx.shaped), card facts and the wire slots for how full each is",
       "needs": "PartFeature, zoneshield/shaped.ts, grades.ts",
       "events": "",
@@ -16065,7 +15956,7 @@
           "name": "feature",
           "kind": "const",
           "start": 32,
-          "end": 70
+          "end": 69
         }
       ]
     },
@@ -16851,7 +16742,7 @@
       "id": "sim.state",
       "path": "common/src/sim/state.ts",
       "group": "common/sim",
-      "lines": 207,
+      "lines": 205,
       "owns": "the sim's state shapes and GUN_FIELDS: the one table of per-gun fields every copy, wire form and hash iterates",
       "needs": "common/ships ShipState and derived types",
       "events": "",
@@ -17020,19 +16911,19 @@
           "name": "cloneCharge",
           "kind": "function",
           "start": 178,
-          "end": 185
+          "end": 183
         },
         {
           "name": "cloneSimShip",
           "kind": "function",
-          "start": 187,
-          "end": 197
+          "start": 185,
+          "end": 195
         },
         {
           "name": "newSimShip",
           "kind": "function",
-          "start": 199,
-          "end": 207
+          "start": 197,
+          "end": 205
         }
       ]
     },
@@ -24848,7 +24739,7 @@
       "id": "server.ships.bridge.pilotless",
       "path": "server/src/ships/bridge/pilotless.ts",
       "group": "server/ships/bridge",
-      "lines": 133,
+      "lines": 130,
       "owns": "ships nobody pilots: AI pilot orders, the autopilot and the end-of-tick step that flies them",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
@@ -24908,55 +24799,55 @@
           "name": "stepPilotless",
           "kind": "function",
           "start": 77,
-          "end": 114
+          "end": 111
         },
         {
           "name": "PILOTLESS_VIEW",
           "kind": "const",
-          "start": 116,
-          "end": 117
+          "start": 113,
+          "end": 114
         },
         {
           "name": "PILOTLESS_IN",
           "kind": "const",
-          "start": 118,
-          "end": 118
+          "start": 115,
+          "end": 115
         },
         {
           "name": "PILOTLESS_FIELDS",
           "kind": "const",
-          "start": 119,
-          "end": 119
+          "start": 116,
+          "end": 116
         },
         {
           "name": "PILOTLESS_ENV",
           "kind": "const",
-          "start": 120,
-          "end": 120
+          "start": 117,
+          "end": 117
         },
         {
           "name": "PILOTLESS_EVENTS",
           "kind": "const",
-          "start": 121,
-          "end": 122
+          "start": 118,
+          "end": 119
         },
         {
           "name": "envEid",
           "kind": "let",
-          "start": 123,
-          "end": 123
+          "start": 120,
+          "end": 120
         },
         {
           "name": "pilotlessHazard",
           "kind": "const",
-          "start": 124,
-          "end": 124
+          "start": 121,
+          "end": 121
         },
         {
           "name": "pilotlessEnv",
           "kind": "function",
-          "start": 125,
-          "end": 133
+          "start": 122,
+          "end": 130
         }
       ]
     },
@@ -24964,7 +24855,7 @@
       "id": "server.ships.bridge.rebuild",
       "path": "server/src/ships/bridge/rebuild.ts",
       "group": "server/ships/bridge",
-      "lines": 449,
+      "lines": 443,
       "owns": "a ship's body coming and going: geometry cache, spawning, removal, rebuild after parts are lost, shedding and station repair",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
@@ -25012,139 +24903,139 @@
           "name": "spawnOn",
           "kind": "function",
           "start": 47,
-          "end": 65
+          "end": 59
         },
         {
           "name": "onPlayerCreated",
           "kind": "function",
-          "start": 67,
-          "end": 70
+          "start": 61,
+          "end": 64
         },
         {
           "name": "spawnDummy",
           "kind": "function",
-          "start": 72,
-          "end": 83
+          "start": 66,
+          "end": 77
         },
         {
           "name": "spawnWreck",
           "kind": "function",
-          "start": 85,
-          "end": 105
+          "start": 79,
+          "end": 99
         },
         {
           "name": "setSkills",
           "kind": "function",
-          "start": 107,
-          "end": 109
+          "start": 101,
+          "end": 103
         },
         {
           "name": "removeShip",
           "kind": "function",
-          "start": 111,
-          "end": 114
+          "start": 105,
+          "end": 108
         },
         {
           "name": "forget",
           "kind": "function",
-          "start": 116,
-          "end": 163
+          "start": 110,
+          "end": 157
         },
         {
           "name": "nextMissing",
           "kind": "function",
-          "start": 165,
-          "end": 184
+          "start": 159,
+          "end": 178
         },
         {
           "name": "validate",
           "kind": "function",
-          "start": 186,
-          "end": 192
+          "start": 180,
+          "end": 186
         },
         {
           "name": "respawnInPlace",
           "kind": "function",
-          "start": 194,
-          "end": 201
+          "start": 188,
+          "end": 195
         },
         {
           "name": "repair",
           "kind": "function",
-          "start": 203,
-          "end": 212
+          "start": 197,
+          "end": 206
         },
         {
           "name": "joinsOf",
           "kind": "function",
-          "start": 214,
-          "end": 219
+          "start": 208,
+          "end": 213
         },
         {
           "name": "partWorld",
           "kind": "function",
-          "start": 221,
-          "end": 223
+          "start": 215,
+          "end": 217
         },
         {
           "name": "decay",
           "kind": "function",
-          "start": 225,
-          "end": 238
+          "start": 219,
+          "end": 232
         },
         {
           "name": "repairStep",
           "kind": "function",
-          "start": 240,
-          "end": 298
+          "start": 234,
+          "end": 292
         },
         {
           "name": "noteRebuild",
           "kind": "function",
-          "start": 300,
-          "end": 303
+          "start": 294,
+          "end": 297
         },
         {
           "name": "markRebuild",
           "kind": "function",
-          "start": 305,
-          "end": 312
+          "start": 299,
+          "end": 306
         },
         {
           "name": "settle",
           "kind": "function",
-          "start": 314,
-          "end": 318
+          "start": 308,
+          "end": 312
         },
         {
           "name": "rebuildMarked",
           "kind": "function",
-          "start": 320,
-          "end": 323
+          "start": 314,
+          "end": 317
         },
         {
           "name": "rebuildNow",
           "kind": "function",
-          "start": 325,
-          "end": 399
+          "start": 319,
+          "end": 393
         },
         {
           "name": "shed",
           "kind": "function",
-          "start": 401,
-          "end": 420
+          "start": 395,
+          "end": 414
         },
         {
           "name": "spawnDebris",
           "kind": "function",
-          "start": 422,
-          "end": 442
+          "start": 416,
+          "end": 436
         },
         {
           "name": "removeBody",
           "kind": "function",
-          "start": 444,
-          "end": 449
+          "start": 438,
+          "end": 443
         }
       ]
     },
@@ -25550,7 +25441,7 @@
       "path": "server/src/ships/features/flash/index.ts",
       "group": "server/ships/features",
       "lines": 19,
-      "owns": "the Flash Screen world half entry: the wait after a break, the bank return and the bloom",
+      "owns": "the Flash Screen world half entry: the wait after a break and the bloom",
       "needs": "ServerFeature, Flash.ts",
       "events": "",
       "invariants": [

@@ -288,7 +288,7 @@ export function shipPage(ctx: PageCtx, c: Catalog, s: CatalogShip): SafeHtml {
       ['Parts', st.parts], ['Cells', num(st.cells, 1)], ['Mass', num(st.mass, 1)], ['HP', num(st.hp)],
       ['Guns', `${st.guns.fixed} fixed, ${st.guns.turret} turret`], ['Power made', `${num(st.gen)} E/s`], ['Power used', `${num(st.draw)} E/s`],
       ['Thrust', num(st.thrust, 1)], ['Shield', st.shield ? num(st.shield) : ''], ['Hold space', st.cargo ? num(st.cargo) : ''],
-      ['Power system', s.power === 'ports' ? 'Ports' : 'Pool and banks'],
+      ['Power system', 'Ports'],
     ])}
   </section>
 </div>

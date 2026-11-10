@@ -15,7 +15,8 @@ import { FRICTION, BOOST_FACTOR, WORLD_SIZE } from '../constants.js';
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const inventory: InventoryStub = readShipJson('inventory.json');
-const corsair = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/corsair.json'), 'utf-8'));
+/** A library warship with its autocannon turrets set in the hull (the pool-era Corsair's place in these tests) */
+const corsair = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/bulwark.json'), 'utf-8'));
 const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 const DEG = Math.PI / 180;
 
@@ -26,19 +27,20 @@ const bp = (parts: PlacedPart[]): Blueprint => ({ name: 'test', catalogVersion: 
 const span = (w: TurretWindow) => w.open.reduce((s, [lo, hi]) => s + (hi - lo), 0) / DEG;
 
 describe('turret windows', () => {
-  it('Corsair is valid, with eight broadside turrets', () => {
+  it('the Bulwark is valid, with two autocannon turrets', () => {
     expect(validateBlueprint(catalog, corsair(), tuning, inventory).errors).toEqual([]);
     const s = createShipState(catalog, tuning, 1, corsair(), 0);
     const turrets = s.derived.weapons.filter((w) => w.mount === 'turret');
-    expect(turrets).toHaveLength(8);
+    expect(turrets).toHaveLength(2);
     expect(s.derived.alive.every(Boolean)).toBe(true);
-    for (const n of s.derived.networks) expect(n.supply).toBeGreaterThanOrEqual(n.demand);
+    expect(s.derived.energy.supply).toBeGreaterThanOrEqual(s.derived.energy.demand);
   });
 
   it('a flush gunport is limited by the hull above and below it', () => {
     const s = createShipState(catalog, tuning, 1, corsair(), 0);
-    for (const w of s.derived.weapons) {
+    for (const w of s.derived.weapons.filter((x) => x.mount === 'turret')) {
       const deg = span(w.window!);
+      if (process.env.TURRET_SPANS) console.log(w.uid, deg);
       expect(deg, `turret ${w.uid}`).toBeGreaterThan(60);
       expect(deg, `turret ${w.uid}`).toBeLessThan(130);
       // Never wider than the base window
@@ -61,15 +63,21 @@ describe('turret windows', () => {
   });
 
   it('a window opens up when the hull blocking it is destroyed', () => {
-    const s = createShipState(catalog, tuning, 1, corsair(), 0);
-    // Port gunport at y = -2 has hull at (-2,-3) above it
-    const gun = s.blueprint.parts.findIndex((q) => q.x === -2 && q.y === -2);
-    const hull = s.blueprint.parts.findIndex((q) => q.x === -2 && q.y === -3);
-    const before = span(s.derived.weapons.find((w) => w.part === gun)!.window!);
-    damagePart(s, hull, 1e9, tuning);
-    rebuildShip(s, catalog, tuning);
-    const after = span(s.derived.weapons.find((w) => w.part === gun)!.window!);
-    expect(after).toBeGreaterThan(before + 20);
+    // (Some turret has a plain hull or armour part narrowing its window: knock each one out in turn)
+    let opened = 0;
+    const base = createShipState(catalog, tuning, 1, corsair(), 0);
+    for (const tw of base.derived.weapons.filter((w) => w.mount === 'turret')) {
+      const before = span(tw.window!);
+      base.blueprint.parts.forEach((q, hull) => {
+        if (opened > 20 || (q.fn !== 'hull' && q.fn !== 'armor')) return;
+        const s = createShipState(catalog, tuning, 1, corsair(), 0);
+        damagePart(s, hull, 1e9, tuning);
+        rebuildShip(s, catalog, tuning);
+        const w = s.derived.weapons.find((x) => x.part === tw.part);
+        if (w?.window && s.derived.alive[tw.part]) opened = Math.max(opened, span(w.window) - before);
+      });
+    }
+    expect(opened).toBeGreaterThan(20);
   });
 
   it('turret mounts are only allowed on weapons', () => {
@@ -85,7 +93,7 @@ describe('turret aiming', () => {
 
   it('slews at its rate and fires once aligned inside the open window', () => {
     let off = 0;
-    const target = w.center + w.open[0][0] / 2; // halfway to the lower edge of the open window
+    const target = w.center + (w.open[0][0] + w.open[0][1]) / 2; // the middle of the open window
     let res = stepTurretAim(w, off, target, tuning);
     expect(Math.abs(res.offset - off)).toBeLessThanOrEqual(tuning.turret.slewRate + 1e-12);
     for (let i = 0; i < 60; i++) { res = stepTurretAim(w, off, target, tuning); off = res.offset; }

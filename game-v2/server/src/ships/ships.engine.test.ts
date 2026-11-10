@@ -319,11 +319,13 @@ describe('destroyed parts, decay and station repair', () => {
 });
 
 describe('turrets and helm in the engine', () => {
-  const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/corsair.json'), 'utf-8'));
+  // (The Hauler: two turrets down each side, no fixed gun; the Drum: a turret at each front corner, its bow before them)
+  const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/hauler.json'), 'utf-8'));
+  const drum: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/drum.json'), 'utf-8'));
 
-  function broadside(targetAngle: number) {
+  function broadside(targetAngle: number, bp = corsair) {
     const { server, bridge, pid, input, run } = setup();
-    bridge!.respawnInPlace(pid, corsair);
+    bridge!.respawnInPlace(pid, bp);
     Rotation.angle[pid] = -Math.PI / 2; // nose up: port is -x, starboard +x
     input({ helm: true, fireLeft: true, targetAngle });
     run(90);
@@ -344,7 +346,7 @@ describe('turrets and helm in the engine', () => {
   });
 
   it('nothing fires dead ahead: no turret can see through the bow', () => {
-    const { shots } = broadside(-Math.PI / 2);
+    const { shots } = broadside(-Math.PI / 2, drum);
     expect(shots.length).toBe(0);
   });
 

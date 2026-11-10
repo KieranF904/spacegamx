@@ -25,7 +25,7 @@ import {
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
+const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
 /** The cursor grid's steps (cursorState.ts AIM_BITS = 13) */
 const AIM_STEPS = 8191;
 const envAt = (t: number): SimEnv => ({ tick: t, tuning, gravity: null, fields: NO_FIELDS, terrain: null });

@@ -3,7 +3,7 @@ import type { Blueprint } from '../../../common/src/ships/index';
 import { validateBlueprint } from '../../../common/src/ships/index';
 import { loadContext } from './context';
 import { blueprintToGrid, gridToBlueprint, mirrorLeft, partKey, coreAxis2 } from './grid';
-import { REVIEW_SHIPS, bundledShips, ship } from './testShips';
+import { SAMPLE_SHIPS, bundledShips, ship } from './testShips';
 
 const ctx = loadContext();
 const keys = (bp: Blueprint) => bp.parts.map((p) => partKey(ctx, p)).sort();
@@ -31,7 +31,7 @@ describe('shipgen grid', () => {
   }
 
   it('draws the review ships with legend codes only, nothing raw', () => {
-    for (const path of REVIEW_SHIPS) {
+    for (const path of SAMPLE_SHIPS) {
       const enc = blueprintToGrid(ctx, ship(path));
       expect(enc.raw, path).toEqual([]);
       expect(enc.book.own, path).toEqual([]);
@@ -71,7 +71,7 @@ describe('shipgen grid', () => {
   });
 
   it('reads a capital written for a 2-cell part\'s second cell as that cell (with a warning)', () => {
-    const two = blueprintToGrid(ctx, ship('dev/review-kestrel')).text;
+    const two = blueprintToGrid(ctx, ship('samples/review-kestrel')).text;
     // (some 2x1 or 2x2 part's small-letter cell written in capitals)
     const m = /\b([A-Z]{2})([\^>v<]?)( +)([a-z]{2})\b/.exec(two)!;
     expect(m[1].toLowerCase()).toBe(m[4]);
@@ -79,11 +79,11 @@ describe('shipgen grid', () => {
     const d = gridToBlueprint(ctx, sloppy);
     expect(d.errors).toEqual([]);
     expect(d.warnings.length).toBeGreaterThan(0);
-    expect(keys(d.bp!)).toEqual(keys(ship('dev/review-kestrel')));
+    expect(keys(d.bp!)).toEqual(keys(ship('samples/review-kestrel')));
   });
 
   it('mirrors a left half into the whole ship', () => {
-    for (const path of REVIEW_SHIPS) {
+    for (const path of SAMPLE_SHIPS) {
       const bp = ship(path), a2 = coreAxis2(ctx, bp);
       // (each review ship is mirror-symmetric about its core: its left half and centre line, mirrored, are the ship)
       const half: Blueprint = { ...bp, parts: bp.parts.filter((p) => p.x * 2 < a2) };

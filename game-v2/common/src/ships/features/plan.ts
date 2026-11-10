@@ -1,6 +1,6 @@
 /**
  * @contract feature.plan
- * owns:       compiling FEATURES into the plan every shared call site reads: ordered derive / flight / load hooks,
+ * owns:       compiling FEATURES into the plan every shared call site reads: ordered derive / flight hooks,
  *             input bits, wire slots, weapon roles
  * needs:      FEATURES (registry.ts), types.ts, features.wire.json (the pinned manifest), common/ships/replica
  *             control bits
@@ -24,8 +24,7 @@
  */
 
 import type { FunctionDef } from '../types.js';
-import type { DeriveCtx, DescribeCtx, Fact, FlightHook, FlightPhase, InputDef, LoadShip, PartFeature, ReplicaField, ReplicaWhere, WeaponRole } from './types.js';
-import type { PowerLayout } from '../circuits.js';
+import type { DeriveCtx, DescribeCtx, Fact, FlightHook, FlightPhase, InputDef, PartFeature, ReplicaField, ReplicaWhere, WeaponRole } from './types.js';
 import type { ShipDerived } from '../rebuild.js';
 import { FEATURES } from './registry.js'; // cycle-ok: read only inside getPlan(), never at module load; the features import the core that imports this file
 import WIRE from './features.wire.json' with { type: 'json' };
@@ -49,7 +48,6 @@ export interface WireManifest {
 }
 
 export type DeriveHook = (c: DeriveCtx) => void;
-export type LoadHook = (ship: LoadShip, L: PowerLayout, out: number[]) => void;
 export interface FlightEntry { feature: number; order: number; step: FlightHook['step'] }
 export interface PlanInput extends InputDef { feature: string }
 export interface PlanReplica extends ReplicaField { feature: string; slot: number }
@@ -65,13 +63,10 @@ export interface FeaturePlan {
   readonly globalMask: number;
   /** Features that draw by the tick (rebuild.ts burst) */
   readonly burstMask: number;
-  /** Of those, the ones Drive Cell banks feed as they do engines (burst: 'engine'; circuits.ts) */
-  readonly engineMask: number;
   /** Features with flight hooks (replica.ts flightSignature folds these in) */
   readonly flightMask: number;
   /** By feature number (undefined: none) */
   readonly derive: readonly (DeriveHook | undefined)[];
-  readonly load: readonly (LoadHook | undefined)[];
   /** Features with describe(), in plan order */
   readonly describe: readonly PartFeature[];
   /** Every weapon-kind role of every feature, in plan order (WeaponRole) */
@@ -102,7 +97,7 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
   }
   const features = Object.freeze([...list].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
   const byId = new Map(features.map((f, i) => [f.id, i] as const));
-  let globalMask = 0, burstMask = 0, engineMask = 0, flightMask = 0;
+  let globalMask = 0, burstMask = 0, flightMask = 0;
   const flight = Object.fromEntries(FLIGHT_PHASES.map((p) => [p, [] as FlightEntry[]])) as Record<FlightPhase, FlightEntry[]>;
   const inputs: PlanInput[] = [], replicate: PlanReplica[] = [], held: string[] = [], controls: PlanControl[] = [];
   const flightKeys: ((d: ShipDerived) => string)[] = [];
@@ -112,7 +107,6 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
     const bit = 1 << i;
     if (f.global) globalMask |= bit;
     if (f.burst) burstMask |= bit;
-    if (f.burst === 'engine') engineMask |= bit;
     if (f.flightKey) flightKeys.push(f.flightKey.bind(f));
     const roles = new Set<string>();
     for (const r of f.weapon ?? []) {
@@ -164,10 +158,8 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
     byId,
     globalMask,
     burstMask,
-    engineMask,
     flightMask,
     derive: Object.freeze(features.map((f) => f.derive?.bind(f))),
-    load: Object.freeze(features.map((f) => f.load?.bind(f))),
     describe: Object.freeze(features.filter((f) => f.describe)),
     weapons: Object.freeze(weapons),
     flight: Object.freeze(flight),

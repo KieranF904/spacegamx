@@ -7,7 +7,7 @@
  * every frame, so a frame allocates nothing.
  */
 
-import { BROWNOUT, PF_LIT, bankHeld, clipReloading, feedShare, gunSelected, inGroup, partWeaponGroups, portsMinePhase, portsPiecesHeld, rightFiresGuns, selLeft, selRight, GROUP_ALL, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
+import { PF_LIT, clipReloading, gunSelected, inGroup, partWeaponGroups, portsMinePhase, portsPiecesHeld, rightFiresGuns, selLeft, selRight, GROUP_ALL, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
 
 export interface RingGroup {
   /** The model (the part's function id) these guns are */
@@ -35,8 +35,6 @@ export interface RingGroup {
   rounds: number;
   /** A reload is under way (a regrowing clip: always while it is short of full) */
   reloading: boolean;
-  /** ...and it is waiting on power (the group's feed is short: pips go grey) */
-  starved: boolean;
   /** Charge gun charge, or a beam's windup, 0..1 (the fullest gun in the group) */
   charge: number;
   /** A charge gun cooling down after its shot, 0..1 left */
@@ -50,8 +48,6 @@ export interface RingGroup {
   /** Ammo guns: rounds left in the open crate (and crates aboard), -1 when the gun takes none */
   ammo: number;
   crates: number;
-  /** Fill of the bank feeding the group, 0..1 (-1: no bank feeds it) */
-  bank: number;
   /** The previous frame's charge (for the flash after a shot) */
   prevCharge: number;
   /** A beam in pieces (power/ports.ts; the group's first gun): its pieces (0: not one), whole pieces held, how full the next
@@ -103,7 +99,7 @@ export class RingModel {
       if (!g) {
         g = {
           fn, model: w.fire.model, kind: w.kind, wg: mask, dim: false, inLeft: true, showState: false, state: 0, parts: [], ws: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
-          rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
+          rounds: 0, reloading: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, prevCharge: 0,
           pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0, mine: false, minePhase: -1, mineFill: 1, mineBuffer: 1,
         };
         by.set(key, g);
@@ -118,7 +114,7 @@ export class RingModel {
       let g = by.get(key);
       if (!g) {
         g = {
-          fn, model: 'beam', kind: fn, wg: 1, dim: false, inLeft: false, showState: false, state: 0, parts: [], ws: [], clip: 0, rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
+          fn, model: 'beam', kind: fn, wg: 1, dim: false, inLeft: false, showState: false, state: 0, parts: [], ws: [], clip: 0, rounds: 0, reloading: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, prevCharge: 0,
           pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0, mine: true, minePhase: -1, mineFill: 1, mineBuffer: 1,
         };
         by.set(key, g);
@@ -154,8 +150,7 @@ export class RingModel {
       }
       g.dim = !gunSelected(g.wg, sel, hasMiners);
       g.inLeft = selLeft(sel) === GROUP_ALL || inGroup(g.wg, selLeft(sel));
-      let short = false;
-      let rounds = 0, n = 0, reloading = false, starved = false, charge = 0, cooling = 0, spin = 0, ready = 1, bank = -1;
+      let rounds = 0, n = 0, reloading = false, charge = 0, cooling = 0, spin = 0, ready = 1;
       for (let gi = 0; gi < g.parts.length; gi++) {
         const part = g.parts[gi], w = g.ws[gi];
         n++;
@@ -163,10 +158,7 @@ export class RingModel {
         if (f.model === 'clip') {
           rounds += ship.rounds[part] ?? 0;
           const regrowing = !!f.regrow && (ship.rounds[part] ?? 0) < (f.clip ?? 1);
-          if (clipReloading(ship, w) || regrowing) {
-            reloading = true;
-            if (feedShare(d, src.charge, part, 'gun') < BROWNOUT) starved = true;
-          }
+          if (clipReloading(ship, w) || regrowing) reloading = true;
         } else if (f.model === 'charge') {
           const c = Math.max(0, (ship.charge[part] ?? 0) / Math.max(1, f.charge ?? 60));
           if (c > charge) charge = c;
@@ -180,21 +172,15 @@ export class RingModel {
         if (f.model === 'cycle' || f.model === 'ammo' || f.model === 'auto') {
           ready = Math.min(ready, 1 - Math.min(1, Math.max(0, ship.cooldown[part] ?? 0) / Math.max(1, w.interval)));
         }
-        if (!d.ports && feedShare(d, src.charge, part, 'gun') < BROWNOUT) short = true;
-        const b = d.power?.bankOf[part] ?? -1;
-        const B = b >= 0 ? d.power!.banks[b] : null;
-        if (B && B.cap > 0) bank = Math.max(bank, Math.min(1, bankHeld(d, src.charge, b) / B.cap));
       }
       this.pieces(g, ship, src.charge);
       g.rounds = n ? rounds / n : 0;
       g.reloading = reloading;
-      g.starved = starved;
-      g.state = short || starved ? 2 : reloading || cooling > 0 ? 1 : 0;
+      g.state = reloading || cooling > 0 ? 1 : 0;
       g.charge = Math.min(1, charge);
       g.cooling = Math.min(1, cooling);
       g.spin = spin;
       g.ready = ready;
-      g.bank = bank;
       // The flash: full charge, and a fading burst after the shot (the charge dropping from near full with the gun cooling)
       if (charge >= 0.98 || (g.prevCharge > 0.85 && charge < 0.5 && cooling > 0.5)) g.flash = 1;
       else g.flash = Math.max(0, g.flash - FLASH_FRAME);

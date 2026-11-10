@@ -6,13 +6,12 @@ import { createShipState } from '../../state.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
 import type { ShipTuning } from '../../tuning.js';
 import { getPlan, featureFacts } from '../plan.js';
-import { gunLoad } from '../../energy.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const TOW_PART = { uid: 70, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -3, y: 0, rot: 0, flip: false, facing: 'W' };
 const sparrow = (extra: object[] = []) => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0);
 };
@@ -32,13 +31,6 @@ describe('the tow feature (registered)', () => {
     expect(d.tow).toBeUndefined();
     const plain = sparrow().derived;
     expect('fx' in plain || 'fxMask' in plain).toBe(false);
-  });
-
-  it('draws only while the server says it tows', () => {
-    const ship = sparrow([TOW_PART]);
-    const f = ship.derived.power!.feedOf[ship.derived.fx!.tow!.parts[0]];
-    expect(gunLoad(ship, 0)![f]).toBe(0);
-    expect(gunLoad({ ...ship, tow: 5 }, 0)![f]).toBeGreaterThan(0);
   });
 
   it('says what it tows, for the tooltip, the compact tooltip and the card', () => {

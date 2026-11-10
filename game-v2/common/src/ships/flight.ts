@@ -7,7 +7,7 @@
 import type { Vec2 } from './types.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
-import { capCharge, powerTick, thrustShare, type Charge } from './energy.js';
+import { powerTick, thrustShare, type Charge } from './energy.js';
 import { cargoThrust, cargoTurn } from './load.js';
 import type { FlightCtx } from './features/types.js';
 import type { FlightEntry } from './features/plan.js';
@@ -544,8 +544,8 @@ export function stepFlight(
   input: FlightControls,
   d: ShipDerived,
   tuning: ShipTuning,
-  /** The charge, whether it's accounted (drainRate 0: not), and what the guns and mining lasers draw this tick per feed group (energy.ts gunLoad) */
-  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number; replay?: number },
+  /** The charge, and whether it's accounted (drainRate 0: not) */
+  boost: { charge: Charge; drainRate: number; tick?: number; replay?: number },
   k: FlightConstants,
 ): FlightResult {
   const ft = tuning.flight;
@@ -687,25 +687,22 @@ export function stepFlight(
   let accel = 0;
   let charge = boost.charge;
   let isBoosting = false;
-  // The ship's power (energy.ts): thrusting, the engines draw first (their Drive Cell banks, then the ship's Output), then the
-  // guns and mining lasers (`boost.load`) and part features; what's left refills the stores. (drainRate 0: no accounting, as for
-  // pilotless ships)
+  // The ship's power (energy.ts, the ports core): the engines pushing the way asked burn, part features' thrusters what they
+  // ask, the tools draw, the stores refill. (drainRate 0: no accounting, as for pilotless ships)
   const thrusting = mag > 0 && d.mass > 0;
   let power = 1, canBoost = !!input.boost;
   if (boost.drainRate > 0 && d.energy) {
-    // A hazard that saps the batteries: they hold only so much
-    const cap = k.hazard ? Math.round(100 * k.hazard.cap * 1000) / 1000 : 100;
     const dir = thrusting ? worldToLocalDir([ix / mag, iy / mag], body.angle) : undefined;
-    // (A ports ship's engines burn only pushing the way asked; its features' thrusters by part: energy.ts PowerUse.extra)
+    // (The engines burn only pushing the way asked; features' thrusters by part: energy.ts PowerUse.extra)
     const extra = c.loads ? c.load : undefined;
-    const pt = powerTick(d, capCharge(d, boost.charge, cap), d.ports ? { thrusting, boosting: !!input.boost, dir, load: boost.load, extra } : { thrusting, boosting: !!input.boost, load: boost.load, extra }, tuning);
+    const pt = powerTick(d, boost.charge, { thrusting, boosting: !!input.boost, dir, extra });
     charge = pt.charge;
     // (Part features' shares on the replicated grid's steps, as the engines' power below: replicas are told it, ctlOfShare)
     const sh = pt.extra;
     if (sh) for (let x = 0; x < sh.length; x++) if (sh[x] !== undefined) sh[x] = quantizePower(sh[x]!);
     c.shares = sh;
     canBoost = pt.boost;
-    // (Each engine pushes on its own feed group's share: short of power, engines push that much less)
+    // (Each engine pushes on its own share of its burn: short of power, engines push that much less)
     if (dir) {
       const along = (body.vx * ix + body.vy * iy) / mag;
       power = thrustShare(d, charge, dir, (rated) => ratedFade(rated, along));

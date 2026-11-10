@@ -19,14 +19,14 @@
 
 import {
   Position, Velocity, Rotation, FRICTION, ReplicaMode, NO_FIELDS, stepShip, SimShipView,
-  powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
+  powerTick, FULL_CHARGE, type ShipState, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
 import { controllerInput } from './inputs.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 /** Reused each tick (powerTick reads it and keeps nothing) */
-const PILOTLESS_USE: { thrusting: boolean; boosting: boolean; load: ArrayLike<number> | undefined } = { thrusting: false, boosting: false, load: undefined };
+const PILOTLESS_USE = { thrusting: false, boosting: false };
 
 export function hasController(b: BridgeCtx, eid: number): boolean {
   return b.controllers.has(eid);
@@ -101,11 +101,8 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   b.writeBody(eid, ship, body);
   const pin = b.pinned.get(eid);
   if (pin) { Position.x[eid] = pin.x; Position.y[eid] = pin.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
-  // Pilotless ships have a battery too: spare power charges it, shots spend it
-  // (Its guns draw on the ship as they reload: energy.ts)
-  PILOTLESS_USE.load = gunLoadTick(ship, tick);
-  const energy = { charge: powerTick(ship.derived, b.chargeOf(eid), PILOTLESS_USE, b.tuning).charge };
-  PILOTLESS_USE.load = undefined;
+  // Pilotless ships have stores too: the generators refill them, shots spend them (energy.ts, the ports core)
+  const energy = { charge: powerTick(ship.derived, b.chargeOf(eid), PILOTLESS_USE).charge };
   const from = b.host.gunsRan ? b.fired.length : 0;
   b.fireWeapons(eid, ship, !!orders?.firing && !emp && !b.isJumping(ship), orders?.aim, orders?.aimDist ?? 0, orders?.target ?? -1, energy);
   b.charge.set(eid, energy.charge);

@@ -6,7 +6,7 @@
  *               and none of its pinned slots has been dropped, its inputs' control bits are pinned to it
  *   catalogue   every function it applies to is a player model with a recipe; every weapon role picks a weapon kind
  *   describe    facts have finite numbers, labels, valid tiers, unique keys, its own id, and repeat exactly
- *   energy      a burst feature's parts draw from a feed group, finite and not negative, and gunLoad stays finite
+ *   energy      a burst feature's parts are no steady load (energy.demand), and the ship's power tick stays finite
  *   parity      a fixture ship flown through stepShipPhysics and through replicaStep (the control bits a replica gets)
  *               stays bit for bit equal for the whole script, feature inputs included
  *   replicate   its keyframe and pilot-row slots round-trip at the pinned indices
@@ -27,7 +27,8 @@ import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../testData.js';
 import type { ShipTuning } from '../tuning.js';
 import type { FlightBody, FlightControls } from '../flight.js';
 import { stepShipPhysics } from '../physics.js';
-import { FULL_CHARGE, gunLoad, CHARGE_GROUPS_AT } from '../energy.js';
+import { FULL_CHARGE, CHARGE_GROUPS_AT, chargeTotal, fullPortsCharge, powerTick } from '../energy.js';
+import { partDemand } from '../grades.js';
 import { gunDef } from '../launch.js';
 import { CTL, ReplicaMode, controlBits, flightControls, replicaStep } from '../replica.js';
 import { gridAim } from '../../sim/a-adapt.js';
@@ -59,7 +60,7 @@ const FEATURES_DIR = __dirname;
 const W = WIRE as WireManifest;
 
 const ship = (extra: object[] = []) => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0);
 };
@@ -126,22 +127,26 @@ export function runPartContract(id: string, opts: PartContractOptions = {}): voi
       for (const fn of catalog.functions.values()) if (!feature.applies(fn)) expect(featureFacts({ catalog, tuning, fn }).filter((f) => f.feature === id), fn.id).toEqual([]);
     });
 
-    it('energy: a burst feature draws from a feed group, finitely; gunLoad stays finite', () => {
+    it('energy: a burst feature\'s parts are no steady load; the ship\'s power tick stays finite', () => {
       const s = ship(parts);
-      const d = s.derived, L = d.power!;
+      const d = s.derived;
       if (feature.burst) {
         expect(parts.length, 'a burst feature needs fixture parts').toBeGreaterThan(0);
+        const without = ship().derived.energy.demand;
         let seen = 0;
         const placed = s.blueprint.parts.map((p) => catalog.functions.get(p.fn)!);
         for (let i = 0; i < placed.length; i++) {
           if (!feature.applies(placed[i])) continue;
           seen++;
-          expect(L.feedOf[i], `part ${i} (${placed[i].id}) feed`).toBeGreaterThanOrEqual(0);
-          expect(Number.isFinite(L.draw[i]) && L.draw[i] >= 0, `part ${i} draw`).toBe(true);
+          const dem = partDemand(placed[i], 1, catalog.materials.get(placed[i].material ?? 'alloy')!);
+          expect(Number.isFinite(dem) && dem >= 0, `part ${i} draw`).toBe(true);
         }
         expect(seen).toBeGreaterThan(0);
+        expect(d.energy.demand, 'its parts are not a steady load').toBe(without);
       }
-      for (const tick of [0, 1, 30]) for (const v of gunLoad(s, tick) ?? []) expect(Number.isFinite(v) && v >= 0).toBe(true);
+      let c = fullPortsCharge(d);
+      for (let t = 0; t < 30; t++) c = powerTick(d, c, { thrusting: true, boosting: t % 2 === 0 }).charge;
+      expect(Number.isFinite(chargeTotal(d, c))).toBe(true);
     });
 
     it('parity: stepShipPhysics and replicaStep on the control bits agree bit for bit', () => {

@@ -29,7 +29,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, splitRebuild, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, BANK, seededRng, hashInts, hpWire, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
+  computeJoins, BANK, seededRng, hashInts, hpWire, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
@@ -48,14 +48,8 @@ export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' |
   const t0 = b.now();
   const ship = createShipState(b.catalog, b.tuning, eid, bp, b.host.getTick(), { kind, hp, angVel });
   b.noteRebuild(t0);
-  // A new ship on a body that had one (a refit, a swap): its stores start as full, all told, as the old one's were
-  const was = b.bodies.get(eid), had = b.charge.get(eid);
-  if (was && had && ship.derived.power) {
-    const p = chargeTotal(was.derived, had);
-    b.charge.set(eid, { g: p, b: ship.derived.power.banks.map(() => p) });
-  }
-  // (A ports ship's state: every part full; the old one's is no use to it)
-  if (ship.derived.ports) b.charge.set(eid, fullPortsCharge(ship.derived));
+  // (A new ship's state: every part full; an old one's on the body is no use to it)
+  b.charge.set(eid, fullPortsCharge(ship.derived));
   b.bodies.set(eid, ship);
   b.ungridded.add(eid);
   b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);

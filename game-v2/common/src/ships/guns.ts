@@ -23,7 +23,7 @@ import type { FireSpec, WeaponMods } from './types.js';
 import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from './shot.js';
 import { pointTurretAim, stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
-import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
+import { chargeGroupsEnd, type Charge } from './energy.js';
 import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 import { datan2, dcos, dsin } from '../math/detTrig.js';
@@ -378,11 +378,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   // (A gun range cheat ship's guns are always fully powered, types.ts Blueprint.range: its power goes unaccounted)
   const energy = ship.blueprint.range ? undefined : orders.energy;
   const pz: PortsLayout | undefined = ship.derived.ports && energy?.charge.e ? ship.derived.ports : undefined, E = energy?.charge.e as PortsState;
-  // Each gun's share of the power it asked for this tick (1 unaccounted, or with plenty)
-  const share = (w: WeaponInfo) => (energy && !pz ? feedShare(ship.derived, energy.charge, w.part, 'gun') : 1);
-  // (A beam short of power burns that share of the ticks, evenly spread)
+  // Each gun's timers run a whole tick a tick (the ports core gates each gun from its own buffer; unaccounted, guns run free)
+  const share = (_w: WeaponInfo) => 1;
   // (A beam in pieces burns a piece out whatever the trigger: `want` only decides whether the next follows)
-  const burns = (w: WeaponInfo, want: boolean) => { if (pz) return portsBeamStep(pz, E, w.part, want) > 0; const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
+  const burns = (w: WeaponInfo, want: boolean) => (pz ? portsBeamStep(pz, E, w.part, want) > 0 : true);
   const tell = (w: WeaponInfo, start: boolean) => {
     if (tells === NO_TELLS) tells = [];
     tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });

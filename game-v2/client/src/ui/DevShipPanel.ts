@@ -8,7 +8,7 @@
 
 interface Plan { name: string; parts: { fn: string }[]; group?: string }
 /** The order the groups are listed in (anything else after them) */
-const GROUPS = ['Ports energy', 'Library', 'Dev test ships'];
+const GROUPS = ['Library', 'Dev test ships'];
 
 /** What a ship carries that isn't just structure, for its row */
 const KIT_NAMES: Record<string, string> = {

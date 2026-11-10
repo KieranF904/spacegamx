@@ -107,7 +107,7 @@ function fly(d: ShipDerived, x: number, y: number, opts: Opts = {}) {
 const sparrow = ship('sparrow-t');
 /** The starter on the legacy thrusters it flew before (no rated speed): what the old timings were measured on */
 const sparrowUnrated = (() => {
-  const bp = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(__dirname, '../../../data/ships/blueprints/sparrow-t.json'), 'utf-8'));
   for (const q of bp.parts) if (q.fn === 'engine_ion_drive') q.fn = 'thruster';
   return createShipState(catalog, tuning, 1, bp, 0).derived;
 })();

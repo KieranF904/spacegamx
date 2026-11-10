@@ -21,13 +21,15 @@ import WIRE from '../features.wire.json' with { type: 'json' };
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const testStrafer = () => createShipState(catalog, tuning, 1, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/dev/test-strafer.json'), 'utf-8')), 0);
 const RIGHT_FLANK = { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' };
+const LEFT_FLANK = { ...RIGHT_FLANK, uid: 61, x: -2, facing: 'W' };
 const sparrow = (extra: object[] = []) => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0);
 };
+/** The starter with a strafer on each flank */
+const testStrafer = () => sparrow([RIGHT_FLANK, LEFT_FLANK]);
 const NONE: FlightControls = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: -Math.PI / 2 };
 const body = (o: Partial<FlightBody> = {}): FlightBody => ({ x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0, jump: 0, ...o });
 const K = { friction: 0.98, boostFactor: 2.2, worldSize: 1e6 };
@@ -35,13 +37,12 @@ const K = { friction: 0.98, boostFactor: 2.2, worldSize: 1e6 };
 afterEach(() => setPlanForTests(null));
 
 describe('the strafer feature (registered)', () => {
-  it('is in the plan after the Tow Beam: draws by the tick as an engine, two flight hooks, the dodge input and its pinned slots', () => {
+  it('is in the plan after the Tow Beam: draws by the tick, two flight hooks, the dodge input and its pinned slots', () => {
     const P = getPlan(), i = P.byId.get('strafer')!;
     expect(P.byId.get('tow')).toBe(0);
     expect(i).toBe(1);
     expect(P.burstMask & (1 << i)).not.toBe(0);
     // (Its own bits and hooks: a later feature, the Gyro's, has some of its own)
-    expect(P.engineMask & (1 << i)).toBe(1 << i);
     expect(P.flightMask & (1 << i)).toBe(1 << i);
     const mine = (l: readonly { feature: number }[]) => l.filter((e) => e.feature === i).map((e) => e.feature);
     expect(mine(P.flight.thrustGate)).toEqual([i]);
@@ -61,20 +62,6 @@ describe('the strafer feature (registered)', () => {
     setPlanForTests(compilePlan(FEATURES.filter((f) => f.id !== 'strafer')));
     const bare = testStrafer().derived;
     expect(bare.fx?.strafe).toBeUndefined();
-    // (Nor do its parts draw by the tick: no feed group for them)
-    expect(d.fx!.strafe!.parts.every((p) => d.power!.feedOf[p.part] >= 0)).toBe(true);
-    expect(d.fx!.strafe!.parts.every((p) => bare.power!.feedOf[p.part] < 0)).toBe(true);
-  });
-
-  it('Drive Cell banks feed it as they do engines (burst: engine), and Capacitor banks never do', () => {
-    const cell = { uid: 62, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: 3, y: -1, rot: 0, flip: false };
-    const cap = { ...cell, fn: 'power_capacitor', material: 'composite' };
-    const d = sparrow([RIGHT_FLANK, cell]).derived, c = sparrow([RIGHT_FLANK, cap]).derived;
-    const part = d.fx!.strafe!.parts[0].part;
-    expect(d.power!.banks[0].kind).toBe('drive');
-    expect(d.power!.banks[0].feeds).toEqual([part]);
-    expect(c.power!.banks[0].kind).toBe('cap');
-    expect(c.power!.banks[0].feeds).toEqual([]);
   });
 
   it('the flight signature carries its pushes (its flight key) and its feature bit', () => {
@@ -143,9 +130,9 @@ describe('the dodge input, end to end (every held input of the plan)', () => {
 });
 
 describe('no strafer special cases left in the shared call sites', () => {
-  it('rebuild, flight, energy, circuits and replica reach it only through the plan', () => {
+  it('rebuild, flight, energy and replica reach it only through the plan', () => {
     const SHIPS = join(__dirname, '../..');
-    for (const f of ['rebuild.ts', 'flight.ts', 'energy.ts', 'circuits.ts', 'replica.ts', 'flightInputs.ts']) {
+    for (const f of ['rebuild.ts', 'flight.ts', 'energy.ts', 'replica.ts', 'flightInputs.ts']) {
       const src = readFileSync(join(SHIPS, f), 'utf-8');
       expect(src.match(/\.strafe|stepDodge|dodgeLoad|strafeForce|StrafeInfo|strafer\.js'|use\.dodge|pt\.dodge|\.dodge = !!/g), f).toBeNull();
     }

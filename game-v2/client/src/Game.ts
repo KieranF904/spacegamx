@@ -62,7 +62,6 @@ import { ShipClient } from './ships/ShipClient';
 import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
 
-import { BankBars } from './ui/BankBars';
 import { WeaponRing } from './ui/WeaponRing';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
 import { SiegePanel } from './ui/SiegePanel';

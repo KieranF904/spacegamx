@@ -43,7 +43,7 @@ export function sharedShipPage(ctx: PageCtx, d: { catalog: Catalog | null; ship:
     ['Parts', String(st.parts)], ['Cells', num(st.cells, 1)], ['Mass', num(st.mass, 1)], ['HP', num(st.hp)],
     ['Guns', `${st.guns.fixed} fixed, ${st.guns.turret} turret`], ['Power made', `${num(st.gen)} E/s`], ['Power used', `${num(st.draw)} E/s`],
     ['Thrust', num(st.thrust, 1)], ...(st.shield ? [['Shield', num(st.shield)] as [string, string]] : []), ...(st.cargo ? [['Hold space', num(st.cargo)] as [string, string]] : []),
-    ['Power system', s.power === 'ports' ? 'Ports' : 'Pool and banks'],
+    ['Power system', 'Ports'],
   ];
   const body = html`
 <article class="wrap db-entry">

@@ -43,7 +43,7 @@ const FIREFOX = process.env.FIREFOX ?? findIn('firefox-', 'firefox/firefox.exe')
 
 // ---- the data the scenario needs, inlined as the virtual module det:data
 const readJson = (p) => JSON.parse(readFileSync(join(shipsDir, p), 'utf-8'));
-const { SHIPS } = { SHIPS: ['fixtures/corsair.json', 'fixtures/hammerhead.json', 'fixtures/lancer.json', 'arrow.json', 'fixtures/bastion.json', 'sparrow-t.json'] };
+const { SHIPS } = { SHIPS: ['bulwark.json', 'hauler.json', 'sunspear.json', 'arrow.json', 'hauler.json', 'sparrow-t.json'] };
 const data = {
   files: {
     pieces: readJson('pieces.json'), functions: readJson('functions.json'), materials: readJson('materials.json'), models: readJson('models.json'),

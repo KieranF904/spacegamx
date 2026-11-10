@@ -32,18 +32,6 @@ const ctx = (bp: Blueprint) => ({ catalog, tuning, econ, have: () => 0, canMake:
 const tip = (gun: string, bank: boolean) => partTipHtml(design(gun, bank).parts[1], ctx(design(gun, bank))).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 describe('gun tooltips in shots', () => {
-  it('a gun on a Capacitor bank says how many of its shots the bank covers, and which bank pays first', () => {
-    expect(tip('cannon_pip', true)).toMatch(/Bank covers [\d.]+ shots? \(Bank 1 pays first, then the ship\)/);
-    expect(tip('cannon_pip', false)).not.toMatch(/Bank covers/);
-  });
-
-  it('a clip gun counts reloads, a charge gun charges', () => {
-    const clip = [...catalog.functions.values()].find((f) => f.fire?.model === 'clip' && !f.fire.regrow && (f.fire.reloadE ?? 0) > 0 && f.weapon && f.id.startsWith('cannon'));
-    if (clip) expect(tip(clip.id, true)).toMatch(/Bank covers [\d.]+ reloads?/);
-    const ch = [...catalog.functions.values()].find((f) => f.fire?.model === 'charge' && (f.fire.chargeE ?? 0) > 0 && f.weapon);
-    if (ch) expect(tip(ch.id, true)).toMatch(/Bank covers [\d.]+ charges?/);
-  });
-
   it('every firing model has its chip, cycle and auto included', () => {
     const chips = new Set<string>();
     for (const f of catalog.functions.values()) if (f.weapon && f.fire && !f.fire.model.startsWith('x')) chips.add(`${f.fire.model}:${fireChip(f) !== ''}`);

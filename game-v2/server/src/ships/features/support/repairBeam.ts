@@ -22,7 +22,7 @@ export function repairBeam(b: WeaponBridge, eid: number, ship: ShipState, w: Wea
   }
   const wall = rayTerrain(b.host.terrainAt?.(eid), x, y, x1, y1);
   if (!hit || hit.t > wall) return wall;
-  const amount = ((def.heal ?? 0) / 60) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength;
+  const amount = ((def.heal ?? 0) / 60) * w.strength;
   const at = b.worldToGrid(hit.eid, hit.ship, x + (x1 - x) * hit.t, y + (y1 - y) * hit.t);
   const healed = repairAt(hit.ship, b.geometry(hit.ship), at[0], at[1], amount, b.tuning);
   if (healed > 0) b.host.onHeal?.(eid, hit.eid, healed);

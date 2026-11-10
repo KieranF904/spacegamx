@@ -9,7 +9,7 @@ import { type RunOptions, run } from './run';
 import { engineHelp, skeleton } from './staged';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const STARTER = { ...findRole(ctx, 'starter')!, example: undefined };
 const fb = (ev: ShipgenEvent[]) => ev.filter((e) => e.type === 'feedback').map((e) => (e.type === 'feedback' ? e.text : ''));
 

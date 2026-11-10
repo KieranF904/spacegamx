@@ -218,7 +218,7 @@ for (const f of libFiles) {
   ships.push({
     id, name: String(bp.name), stats,
     size: { w: Math.ceil(maxX) - ox, h: Math.ceil(maxY) - oy },
-    power: bp.power === 'ports' ? 'ports' : 'pool',
+    power: 'ports',
     // (Moved so the top left corner is the origin: a drawing needs no offset)
     plan: plan.map((p) => ({ ...p, x: p.x - ox, y: p.y - oy })),
   });

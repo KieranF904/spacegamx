@@ -16,6 +16,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
+import { targetFreighter } from '../../testkits/targetFreighter.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -117,8 +118,8 @@ function world() {
 
 function fight(ticks: number) {
   const w = world(), { ships, sys, x0, y0, server } = w;
-  // (The old unarmed, unshielded Hauler: a fixed target, whatever the world's freighters become)
-  const bp = ships.devDesigns['target-freighter'];
+  // (An unarmed, unshielded freighter: a fixed target, whatever the world's freighters become)
+  const bp = targetFreighter(ships);
   const haulers = [0, 1, 2].map((i) => ships.spawnDummy(bp, x0 + 700 + 260 * i, y0 - 150 + 170 * i, 0.4 * i, sys));
   // Parts shot away, a few at a time, seeded
   let r = 7;

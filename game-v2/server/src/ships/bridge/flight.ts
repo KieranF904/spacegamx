@@ -27,7 +27,7 @@ import { hasComponent, entityExists } from 'bitecs';
 import {
   Position, Velocity, stepShaped, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
-  controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
+  controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, quantizeCargo,
   chargeTotal, shieldShare, contactPieces, contactPair, pairPieces, quantizePull, addPull, CONTACT_FLAG, contactFxDue,
   ContactPairCache, contactPairs, cloneCharge, gunStateOf, type ContactPair, type HazardState, type OwnExtras,
   type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,

@@ -106,11 +106,10 @@ export function measure(ctx: StatCtx, bp: Blueprint): Measure {
   return { summary: full?.summary ?? null, ...flow, points: buildPoints(catalog, bp), cost };
 }
 
-/** Power made and drawn flat out, as the hangar's power panel counts them (ports design; else the older pools) */
+/** Power made and drawn flat out, as the hangar's power panel counts them (the ports layout) */
 export function flowOf(d: ShipDerived): { made: number; drawn: number; gens: number } {
   const L = d.ports;
-  if (L) return { made: L.supply, drawn: L.weaponDraw + L.engineDraw + L.strafeDraw + L.gyroDraw + L.shieldDraw, gens: L.gens.length };
-  return { made: d.networks.reduce((t, n) => t + n.supply, 0), drawn: d.networks.reduce((t, n) => t + n.demand, 0), gens: 0 };
+  return { made: L.supply, drawn: L.weaponDraw + L.engineDraw + L.strafeDraw + L.gyroDraw + L.shieldDraw, gens: L.gens.length };
 }
 
 /** The design with the change made */

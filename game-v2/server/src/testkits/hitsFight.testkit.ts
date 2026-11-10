@@ -15,6 +15,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { FakeHitsClient } from '../net/hits/fakeHitsClient.testkit.js';
+import { targetFreighter } from './targetFreighter.testkit.js';
 import { serverTruth, damageOff, removedBoth } from '../net/hits/serverTruth.testkit.js';
 import type { OwnHit } from '../../../client/src/ships/hits/ConfirmedHits.js';
 
@@ -41,7 +42,7 @@ export interface FightScenario {
   stack?: { dx: number; hpScale: number }[];
   /** A boss instead of a freighter */
   boss?: string;
-  /** The library Hauler as the target (its own fittings), not the old unarmed, unshielded dev freighter */
+  /** The library Hauler as the target (its own fittings), not the unarmed, unshielded target freighter (targetFreighter.testkit.ts) */
   hauler?: boolean;
   ticks?: number;
   /** The shooter throws away its hits on these shells (a forced mismatch) */
@@ -112,7 +113,7 @@ export function runFight(sc: FightScenario) {
   const place = (p: number, x: number, y: number) => { Position.x[p] = x; Position.y[p] = y; Velocity.x[p] = 0; Velocity.y[p] = 0; };
   place(A.pid, x0, y0);
   place(C.pid, x0 - 300, y0 - 400);
-  const kind = sc.hauler ? ships.library.get('hauler')! : ships.devDesigns['target-freighter'];
+  const kind = sc.hauler ? ships.library.get('hauler')! : targetFreighter(ships);
   const packIds = sc.pack ? server.enemies.spawnPack(num, { faction: 'pirates', ships: sc.pack }, x0 + 900, y0) : [];
   const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : sc.pack ? packIds[0] : ships.spawnDummy(kind, x0 + 700, y0, 0, num);
   if (sc.behind) ships.spawnDummy(kind, x0 + 1300, y0, 0, num);

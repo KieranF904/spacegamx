@@ -5,7 +5,7 @@
  * locked, why: the level it's learned at (nothing opens one earlier).
  */
 
-import { circuitTuning, coilCapacity, jumpTuning, partDischarge, partGrade, isWeaponFn, mountingOf, mountingWords, partMount, partStats, describeFn, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
+import { coilCapacity, jumpTuning, partGrade, isWeaponFn, mountingOf, mountingWords, partMount, partStats, describeFn, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
 import { chips } from './describe';
 import { sizeWordOf } from '../ui/componentShapes';
 
@@ -221,8 +221,6 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if ((fn.dynamo ?? 0) > 0) out.push(`+${n0(fn.dynamo!)}/s into each bank it touches`);
   if ((fn.store ?? 0) > 0) {
     out.push(`holds ${n0(fn.store! * st.area)}${fn.bank ? (fn.pool === 'drive' ? ' (engines)' : ' (guns)') : ''}`);
-    // (the most it gives a second; a bank member first into what its bank touches)
-    out.push(`gives ${n0(partDischarge(fn, st.area, catalog.materials.get(fn.material ?? 'alloy'), circuitTuning(tuning ?? ({} as ShipTuning))))}/s${fn.bank ? ' by touch' : ''}`);
   }
   if (st.shield) out.push(`shield ${n0(st.shield)}`);
   if (st.shield && fn.shieldRegen) out.push(`refills ${n0(fn.shieldRegen * st.area)}/s after ${(fn.shieldDelay ?? 0) / 60} s`);

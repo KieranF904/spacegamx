@@ -2,9 +2,8 @@
 // messages, pointed at grid cells); power is the touch-routed core run flat out (sim.ts); stats come from rebuild and the
 // recipes; taste is scores.ts. Nothing here knows a part by name.
 import type { Blueprint, PlacedPart } from '../../../common/src/ships/index';
-import {
-  ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, ROLE_GEN, ROLE_DYNAMO, blueprintGeometry, fromEu, isEngine, partMass, validateBlueprint,
-} from '../../../common/src/ships/index';
+import { blueprintGeometry, fromEu, isEngine, partMass, validateBlueprint } from '../../../common/src/ships/index';
+import { ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, ROLE_GEN, ROLE_DYNAMO } from './energyLayout';
 import { partItemId } from '../../../common/src/econ/index';
 import type { ShipgenContext } from './context';
 import { CodeBook, partAt } from './grid';

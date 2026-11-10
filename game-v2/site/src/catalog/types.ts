@@ -152,7 +152,7 @@ export interface CatalogShip {
   stats: ShipStats;
   /** Grid size in cells */
   size: { w: number; h: number };
-  /** 'ports' for designs on the newer power system */
+  /** Every design runs on the ports core ('pool' only in catalogs built before it was the only one) */
   power: 'ports' | 'pool';
   plan: PlanPart[];
   blurb?: string;

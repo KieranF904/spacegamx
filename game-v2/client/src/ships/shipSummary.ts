@@ -5,7 +5,7 @@
  * against the one you saved).
  */
 
-import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, bestDodge, describeFn } from '@space-game/common';
+import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, baseWeaponDps, partWeaponDef, bestDodge, describeFn } from '@space-game/common';
 import { summaryFields, type SummaryField } from './describe';
 
 export interface ShipSummary {
@@ -28,8 +28,8 @@ export interface ShipSummary {
   /** The coils' capacity over what the hull needs (1: just right) */
   jumpRatio: number;
   power: { supply: number; demand: number };
-  /** Battery and draws (energy.ts), for the hangar's energy readout */
-  energy: { max: number; driveMax: number; weaponMax: number; spare: number; engineDraw: number; weaponDraw: number; boostDraw: number };
+  /** What the stores hold full, and the generation the steady loads leave (energy.ts EnergyInfo), for the hangar's energy readout */
+  energy: { max: number; spare: number };
   guns: number;
   turrets: number;
   miners: number;
@@ -74,7 +74,7 @@ export function shipSummaryWithDerived(catalog: Catalog, tuning: ShipTuning, eco
   for (const w of d.weapons) {
     if (!tuning.weapons?.[w.kind]) continue;
     // Its own tuning (grade, size, gems), as the rating counts it: a pulse laser's pulses, a beam's heat-limited burn, a gun's shells
-    dps += baseWeaponDps(tuning, w.kind, w.interval, partWeaponDef(tuning, w.kind, bp.parts[w.part], w), w.fire) * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) * w.strength;
+    dps += baseWeaponDps(tuning, w.kind, w.interval, partWeaponDef(tuning, w.kind, bp.parts[w.part], w), w.fire) * w.strength;
   }
   // Losing it costs the minerals salvage doesn't bring back
   const raw = salvageOf(econ, econ.designParts(bp), 1);
@@ -95,11 +95,8 @@ export function shipSummaryWithDerived(catalog: Catalog, tuning: ShipTuning, eco
     jump: (d.jumpRange || jt.baseRange) / 1000,
     jumpCooldown: (d.jumpCooldown || jt.cooldownTicks) / 60,
     jumpRatio: d.jumpRatio ?? 1,
-    power: { supply: d.networks.reduce((t, n) => t + n.supply, 0), demand: d.networks.reduce((t, n) => t + n.demand, 0) },
-    energy: {
-      max: d.energy?.max ?? 0, driveMax: d.energy?.driveMax ?? 0, weaponMax: d.energy?.weaponMax ?? 0, spare: d.energy?.spare ?? 0, engineDraw: d.energy?.engineDraw ?? 0, weaponDraw: d.energy?.weaponDraw ?? 0,
-      boostDraw: (d.energy?.engineDraw ?? 0) * (1 + energyTuning(tuning).boostDraw * (d.boostDrain ?? 1)),
-    },
+    power: { supply: d.energy.supply, demand: d.energy.demand },
+    energy: { max: d.energy.max, spare: Math.max(0, d.energy.supply - d.energy.demand) },
     guns: d.weapons.length,
     turrets: d.weapons.filter((w) => w.mount === 'turret').length,
     miners: d.miners.length,

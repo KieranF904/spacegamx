@@ -5,7 +5,6 @@ Hull · mass113 hp · 1.4
 Armour · build2 · 1.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Holds10 energy
-Givesup to 150/s on to the parts it touches
 Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
 
 == partStats (stats rows) ==
@@ -29,7 +28,7 @@ Small · Square
 Joins a feed to a power line
 
 == keyStats ==
-holds 10 · gives 150/s · power line
+holds 10 · power line
 
 == mountBadge ==
 

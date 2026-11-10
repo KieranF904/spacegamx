@@ -4,9 +4,7 @@ Mk I · Square · 1 cell
 Hull · mass30 hp · 0.7
 Armour · build1 · 1 pts
 TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
-Holds (guns it touches)160 energy
-Givesup to 2,000/s first to the guns, beams, mining lasers and Flash Screens its bank touches; touching Capacitors are one bank
-Takesup to 40/s while not full, from the ship's Output; short of power, it shares by what it asks, so more raises its parts' share
+Holds160 energy
 
 == partStats (stats rows) ==
 GradeMk I
@@ -28,7 +26,7 @@ Small · Square
 touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines
 
 == keyStats ==
-holds 160 (guns) · gives 2,000/s by touch
+holds 160 (guns)
 
 == mountBadge ==
 

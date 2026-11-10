@@ -1,4 +1,9 @@
 /**
+ * Shipgen's own copy of the touch-routed power core's layout (it was common/src/ships/power/layout.ts, P1 of
+ * docs/design/energy-routing-impl.md, which nothing in the game ran; the game runs the ports core, power/ports.ts).
+ * Shipgen's checks, legend and prompt rules are built on it (with energyTick.ts / energyState.ts); moving them to the
+ * ports core is open (docs/areas/energy.md).
+ *
  * The energy graph (docs/design/energy-routing-impl.md §1.1, §2.2, with §0 D1: power moves only between parts that
  * touch). Built once a rebuild from the live parts, never per tick, never sent. tick.ts runs it.
  *
@@ -16,11 +21,10 @@
  * All lists are in part-index order, so two builds of one design are equal (and so are the server's and the pilot's).
  */
 
-import type { FireSpec, FunctionDef, MaterialDef } from '../types.js';
-import type { ShipTuning } from '../tuning.js';
-import { fnOutput, isEngine, partDemand, partSupply } from '../grades.js';
-import { type PlacedGeom, geomContainsPoint, mountOf } from '../grid.js';
-import { perTick, perTickUp, toEu } from './units.js';
+import type { Blueprint, Catalog, FireSpec, FunctionDef, MaterialDef, PlacedGeom, ShipTuning } from '../../../common/src/ships/index';
+import {
+  blueprintGeometry, createShipState, fnOutput, geomContainsPoint, isEngine, mountOf, partDemand, partMaterial, partSupply, perTick, perTickUp, toEu,
+} from '../../../common/src/ships/index';
 
 // ---- Roles (EnergyLayout.role)
 export const ROLE_INERT = 0;
@@ -466,4 +470,15 @@ export function layoutSig(L: EnergyLayout): number {
   all(L.diodeOut); all(L.srcPart); all(L.feedStart); all(L.feedCons); all(L.pushRelay); all(L.pairA); all(L.pairB); all(L.pairDir); all(L.dynRelay);
   const s = ((h >>> 16) ^ (h & 0xffff)) & 0xffff;
   return s === 0 ? 1 : s;
+}
+
+/** A blueprint's layout input, built from its rebuild (it was common/src/ships/power/blueprint.ts) */
+export function blueprintEnergyInput(catalog: Catalog, tuning: ShipTuning, bp: Blueprint): EnergyLayoutInput {
+  const d = createShipState(catalog, tuning, 1, bp, 0).derived;
+  const geoms = blueprintGeometry(catalog, bp);
+  return {
+    fns: bp.parts.map((p) => catalog.functions.get(p.fn)!), area: geoms.map((g) => g.area), mats: bp.parts.map((p) => partMaterial(catalog, p)),
+    alive: d.alive, joins: d.joins, core: d.root >= 0 && bp.parts[d.root].fn === 'core' ? d.root : -1, tuning,
+    weapons: d.weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })), geoms,
+  };
 }

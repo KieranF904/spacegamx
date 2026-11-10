@@ -39,7 +39,7 @@ export class HangarAids {
   }
 
   private snap(): Snap {
-    return JSON.stringify({ parts: this.host.bp.parts, wires: this.host.bp.wires });
+    return JSON.stringify({ parts: this.host.bp.parts });
   }
 
   /** Run one edit as an undo step (inside a held drag it is part of the drag's step) */
@@ -65,9 +65,8 @@ export class HangarAids {
   private go(s: Snap | null, said: string): void {
     const h = this.host;
     if (s === null) { h.status(said === 'Undone' ? 'Nothing to undo' : 'Nothing to redo'); return; }
-    const d = JSON.parse(s) as { parts: PlacedPart[]; wires?: typeof h.bp.wires };
+    const d = JSON.parse(s) as { parts: PlacedPart[] };
     h.bp.parts = d.parts;
-    if (d.wires) h.bp.wires = d.wires; else delete h.bp.wires;
     h.status(said);
     this.sync();
     h.refresh();

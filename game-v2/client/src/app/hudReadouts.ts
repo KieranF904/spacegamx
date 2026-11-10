@@ -1,13 +1,12 @@
 /**
  * @contract client.app.hud-readouts
- * owns:       the top-HUD readouts each frame: boost bar, bank bars, XP bar and level (with their gain glow), credits, system name
- * needs:      HudHost (state, pilot, ship client, system names), BankBars, domWrite setText and setStyle
+ * owns:       the top-HUD readouts each frame: boost bar, XP bar and level (with their gain glow), credits, system name
+ * needs:      HudHost (state, pilot, ship client, system names), domWrite setText and setStyle
  * invariants: each element is written only when its value changes (domWrite) — none pinned
  * extend:     a new readout is a cached element below and one more write in update()
  */
 
 import { setText, setStyle } from '../ui/domWrite';
-import { BankBars } from '../ui/BankBars';
 import type { PilotState } from '../econ/clientEcon';
 import type { ShipClient } from '../ships/ShipClient';
 import type { GameState } from '../state/GameState';
@@ -26,8 +25,6 @@ export class HudReadouts {
   /** The XP bar as last shown (to glow when it grows) */
   private xpSeen: { level: number; into: number } | null = null;
   private boostFillEl = document.getElementById('boostFill');
-  /** Each bank's charge beside the ENERGY gauge (circuits.ts banks) */
-  private bankBars = new BankBars();
   private levelEl = document.getElementById('level');
   private xpEl = document.getElementById('xp');
   private xpToNextEl = document.getElementById('xpToNext');
@@ -45,8 +42,6 @@ export class HudReadouts {
       const boostPercent = (this.h.state.boostFuel / this.h.state.maxBoostFuel) * 100;
       setStyle(this.boostFillEl, 'height', `${boostPercent.toFixed(1)}%`);
     }
-    // (and each bank's, flashing while what it feeds browns out: ui/BankBars.ts)
-    this.bankBars?.update(this.h.shipClient?.myShip()?.derived, this.h.state.charge);
     
     // XP bar: progress through the current level (from the pilot's profile)
     const prof = this.h.pilot.profile;

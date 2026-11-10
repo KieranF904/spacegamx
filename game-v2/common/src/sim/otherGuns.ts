@@ -34,7 +34,7 @@ import type { FlightBody } from '../ships/flight.js';
 import { jumpPhase, jumpTuning } from '../ships/flight.js';
 import type { ShipState } from '../ships/state.js';
 import type { ShipTuning } from '../ships/tuning.js';
-import { powerTick, gunLoadTick, ensurePortsCharge, remapCharge, type Charge } from '../ships/energy.js';
+import { powerTick, ensurePortsCharge, remapCharge, type Charge } from '../ships/energy.js';
 import { firesStraight } from '../ships/launch.js';
 import { gunShell } from '../ships/hitRules.js';
 import { TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '../ships/guns.js';
@@ -184,7 +184,7 @@ function laneView(ship: ShipState, g: GunState): ShipState {
   return v;
 }
 
-const PILOTLESS_USE = { thrusting: false, boosting: false, load: undefined as ArrayLike<number> | undefined };
+const PILOTLESS_USE = { thrusting: false, boosting: false };
 
 /**
  * One tick of an AI pilot's lane, as the server's stepPilotless runs its battery and guns: spare power charges it
@@ -196,9 +196,7 @@ export function lanePilotless(id: number, prev: Readonly<OwnExtras>, after: Read
   const view = laneView(ship, x.guns);
   view.derived = d;
   ensurePortsCharge(d, x.charge);
-  PILOTLESS_USE.load = gunLoadTick(view, tick);
-  const energy = { charge: powerTick(d, x.charge, PILOTLESS_USE, tuning).charge };
-  PILOTLESS_USE.load = undefined;
+  const energy = { charge: powerTick(d, x.charge, PILOTLESS_USE).charge };
   const burning = jumpPhase(after.jump ?? 0, jumpTuning(tuning)).phase === 'burn';
   const firing = fire && (bits & BIT_EMP) === 0 && !burning;
   gunsTick(view, id, after, { firing, aimWorld: aim, aimDist, energy }, tick, tuning, events);
@@ -235,7 +233,7 @@ export function pdParts(ship: ShipState, tuning: ShipTuning): number[] {
 }
 
 const HASH_STATE: SimShipState = {
-  id: 0, mode: 0 as SimShipState['mode'], body: { x: 0, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0 }, ctl: { bits: 0, q: 0 }, charge: { g: 0, b: [] },
+  id: 0, mode: 0 as SimShipState['mode'], body: { x: 0, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0 }, ctl: { bits: 0, q: 0 }, charge: {},
   accounted: true, jumpPrime: 0, hazard: NO_HAZARD as SimShipState['hazard'], guns: undefined as unknown as GunState,
   structure: { derived: undefined as unknown as SimStructure['derived'], version: 0 },
 };
@@ -271,7 +269,7 @@ export function laneOf(guns: GunState, charge: Charge): OwnExtras {
  * `gunSync` (a plain message, server to a client, just before a snapshot): ship `id`'s gun lane as tick `t` ended,
  * exact, and its gun controls then (which that ship's gun rows step from). Its lane starts here; its fire records
  * through t are told. `z` is the whole state as one list of numbers (packGunSync: each array sparse, packArr):
- *   [pool, ...banks, ...eng, ...gun, ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
+ *   [100, ...[], -1, -1 (the retired pool's and banks' slots, constant), ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
  *    ...sat), ...cooldown, ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, minePaid, mineUntil,
  *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord), then any later
  *    gun scalars (sim/state.ts GUN_SCALARS past GUN_SCALARS_HASHED, trailing absent ones left off)]
@@ -297,6 +295,7 @@ export interface ServerGunSyncMessage {
 /** The gun state's and a ports ship's stores' arrays (by part, by port): sent sparse (packArr) */
 const GUN_ARRAYS = ['cooldown', 'rounds', 'reload', 'charge', 'spin', 'aim'] as const;
 const PORT_ARRAYS = ['held', 'flags', 'amt', 'mat', 'closed', 'aug', 'sat'] as const;
+const NO_BANKS: number[] = [];
 
 /** An array as [length, its commonest value, then index, value for each other entry] */
 export function packArr(a: ArrayLike<number>): number[] {
@@ -321,8 +320,9 @@ const putArr = (z: (number | null)[], a: ArrayLike<number> | undefined) => { if 
 const opt = (v: number | undefined) => (v === undefined ? null : v);
 
 export function packGunSync(id: number, t: number, x: Readonly<OwnExtras>, k: Readonly<GunCtl>): ServerGunSyncMessage {
-  const c = x.charge, g = x.guns, z: (number | null)[] = [c.g];
-  putArr(z, c.b); putArr(z, c.eng); putArr(z, c.gun);
+  const c = x.charge, g = x.guns, z: (number | null)[] = [100];
+  // (The retired pool's and banks' slots, kept so the message reads as before: 100, no banks, no shares)
+  putArr(z, NO_BANKS); putArr(z, undefined); putArr(z, undefined);
   // (mach: which field machines draw, so another ship's guns get the power its own do; their energy counters aren't needed here)
   if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge, c.e.mach ?? 0); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
   for (const a of GUN_ARRAYS) putArr(z, g[a]);
@@ -340,10 +340,9 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
   const num = () => z[i++] as number;
   const val = () => { const v = z[i++]; return v === null ? undefined : v; };
   const arr = () => { const n = num(); if (n < 0) return undefined; const p = z.slice(i, i + n) as number[]; i += n; return unpackArr(p); };
-  const charge: Charge = { g: num(), b: arr() ?? [] };
-  const eng = arr(), gun = arr();
-  if (eng) charge.eng = eng;
-  if (gun) charge.gun = gun;
+  // (The retired pool's and banks' slots: read past)
+  num(); arr(); arr(); arr();
+  const charge: Charge = {};
   if (num() === 1) {
     const sig = num(), shieldSat = num(), gauge = num(), mach = num();
     const [held, flags, amt, mat, closed, aug, sat] = PORT_ARRAYS.map(() => arr() ?? []);

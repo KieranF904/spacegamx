@@ -65,7 +65,7 @@ export function seedOwnExtras(ship: Pick<ShipState, 'derived'> & Partial<Pick<Sh
     cooldown: [...ship.cooldown], rounds: [...(ship.rounds ?? [])], reload: [...(ship.reload ?? [])], charge: [...(ship.charge ?? [])], spin: [...(ship.spin ?? [])], aim: [...(ship.aim ?? [])],
     triggerHeld: false, clickAt: -1,
   } : newGunState(n);
-  const c = cloneCharge(charge ?? { g: 100, b: [] });
+  const c = cloneCharge(charge ?? {});
   ensurePortsCharge(ship.derived, c);
   return { charge: c, guns, hazard: { ...NO_HAZARD }, jumpPrime: 0 };
 }
@@ -173,7 +173,7 @@ export function unpackOwnSync(m: ServerOwnSyncMessage): OwnExtras {
   } as GunState;
   copyGunScalars(g as GunState, guns);
   guns.triggerHeld = !!g.triggerHeld; guns.clickAt = g.clickAt ?? -1;
-  const charge: Charge = { ...m.c, b: [...(m.c.b ?? [])] };
+  const charge: Charge = {};
   if (m.c.e) charge.e = portsIn(m.c.e);
   return {
     charge: cloneCharge(charge), guns, jumpPrime: m.p ?? 0, hazard: ownSyncHazards(m),
