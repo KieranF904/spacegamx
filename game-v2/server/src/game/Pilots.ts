@@ -4,7 +4,7 @@
  * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs
  * events:     PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings
  * invariants: guests are never saved with the accounts: a guest with a key is kept a while by it (pilots/guests.ts) — server/src/game/pilots/guests.test.ts
- *             a death costs what DeathRules says, the bank pays the rebuild — none pinned
+ *             a death puts the same design back, the bank paying for the rebuild — server/src/game/repairBank.test.ts
  * extend:     a new item or death rule goes in pilots/; a new progress counter is a method here emitting a PilotEvent
  *
  * Pilots: each connected player's progress while they play.

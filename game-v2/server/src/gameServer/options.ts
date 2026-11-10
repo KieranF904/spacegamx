@@ -2,7 +2,7 @@
  * @contract server.gameserver.options
  * owns:       the GameServer constructor options
  * needs:      types only; npm: @space-game/common
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: the dev-only options (guestAdmin, freeBuild, devStart) are dropped under NODE_ENV=production — server/src/gameServer/serverParts.test.ts
  * extend:      a new option is a field here
  */
 

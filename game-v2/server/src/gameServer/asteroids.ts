@@ -2,7 +2,7 @@
  * @contract server.gameserver.asteroids
  * owns:       creating, breaking, respawning and announcing asteroids and their ids
  * needs:      GameServer (type), common asteroid helpers; npm: bitecs
- * invariants: asteroid ids stay stable across respawns — none pinned
+ * invariants: a rock that breaks and grows back keeps its belt index (its entity id is new), and a rock is the same from the same (system, index, tick) — server/src/gameServer/asteroids.test.ts
  * extend:      a new asteroid stage rule goes into shedAsteroid or createAsteroid
  */
 

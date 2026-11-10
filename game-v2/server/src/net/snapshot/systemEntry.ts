@@ -4,7 +4,7 @@
  *             sent), its HUD numbers (playerState) and the system's visuals (systemInfo)
  * needs:      EntryHost (world, gameData, scene, events, surfaces, crowd, focus, away, asteroid maps, send, ticks); npm: bitecs
  * invariants: a new system starts the client from scratch (known, synced, names, map) — server/src/net/cells/focusCells.test.ts
- *             playerState only when it changed (or every 600 ticks) — none pinned
+ *             playerState only when it changed (or every 600 ticks) — server/src/net/snapshot/snapshotParts.test.ts
  * extend:     a new per-system thing a client is told on entry is one send in enterSystem
  */
 import { hasComponent, entityExists, type IWorld } from 'bitecs';

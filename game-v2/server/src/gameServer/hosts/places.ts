@@ -2,7 +2,7 @@
  * @contract server.gameserver.hosts.places
  * owns:       host adapters for surfaces, sieges, pods and system memory, plus lod observers and body names
  * needs:      GameServer (type); npm: @space-game/common, bitecs
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: whereIs answers only for a live pilot, with their system's id and place — server/src/gameServer/hosts/hosts.test.ts
  * extend:      a new host member is added to the matching create*Host
  */
 

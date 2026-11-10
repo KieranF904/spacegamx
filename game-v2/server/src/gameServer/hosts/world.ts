@@ -2,7 +2,7 @@
  * @contract server.gameserver.hosts.world
  * owns:       host adapters for operations, events, mobs and enemies
  * needs:      GameServer (type); npm: @space-game/common, bitecs
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: hostiles see only living, visible, undocked pilots in their system — server/src/gameServer/hosts/hosts.test.ts
  * extend:      a new host member is added to the matching create*Host
  */
 

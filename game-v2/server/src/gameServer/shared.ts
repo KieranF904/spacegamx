@@ -2,7 +2,7 @@
  * @contract server.gameserver.shared
  * owns:       module constants and queries shared by the gameServer modules
  * needs:      bitecs, common
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: a removal remembers the system the entity was in when it was added — server/src/gameServer/serverParts.test.ts
  * extend:      a new shared constant goes here
  */
 

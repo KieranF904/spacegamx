@@ -2,7 +2,7 @@
  * @contract server.pilots.cargo
  * owns:       the hold and storage: capacity, give/take, move, store, jettison, use, scrap
  * needs:      Pilots (sessions, econ, host, ships), common/econ bags; npm: bitecs
- * invariants: cargo never exceeds capacity except through give() — none pinned
+ * invariants: cargo never exceeds capacity: give() takes only what fits, a move to the hold clips, only toStorage skips it — server/src/game/pilots/cargo.test.ts
  * extend:     a new item action is a handleX here and a message handler calling it
  */
 

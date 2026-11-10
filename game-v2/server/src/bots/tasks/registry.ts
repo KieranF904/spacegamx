@@ -2,7 +2,7 @@
  * @contract server.bots.task-registry
  * owns:       the bot tasks by name
  * needs:      TaskDef (tasks/types.ts), the task modules
- * invariants: listed tasks run: mine and deposit, random flight — none pinned
+ * invariants: mine and deposit and random flight are listed and found by their names, a registered task too — server/src/bots/tasks/registry.test.ts
  * extend:     a new task is tasks/<name>.ts exporting a TaskDef and one entry in the defs list
  */
 

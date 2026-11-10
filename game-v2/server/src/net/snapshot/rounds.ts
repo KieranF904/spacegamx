@@ -3,7 +3,7 @@
  * owns:       when snapshot rounds are due: every CROWD_BASE_WINDOW ticks, a widened system's (crowd fallbacks) when its
  *             wider window comes round, and a system on a clock of its own in its own pass
  * needs:      CrowdControl (widened, windowOf), sim/SystemClocks SimPass, the server's tick; npm: @space-game/common
- * invariants: a round goes every CROWD_BASE_WINDOW ticks for unwidened systems — none pinned
+ * invariants: a round goes every CROWD_BASE_WINDOW ticks for unwidened systems — server/src/net/snapshot/snapshotParts.test.ts
  *             widened systems skip until their window comes round — server/src/net/crowd/crowd.test.ts
  * extend:     a new reason to skip a system's round is one `skip.add` in due()
  */

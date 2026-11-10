@@ -2,7 +2,7 @@
  * @contract server.pilots.death
  * owns:       what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return
  * needs:      Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common
- * invariants: a wreck is only for its pilot for wreckMinutes — none pinned
+ * invariants: a wreck is only for its pilot for wreckMinutes — server/src/game/pilots/death.test.ts
  * extend:     a new loss or notice is a step in onDestroyed / showNotices
  */
 

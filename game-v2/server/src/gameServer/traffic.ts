@@ -2,7 +2,7 @@
  * @contract server.gameserver.traffic
  * owns:       freighter traffic between stations
  * needs:      GameServer (type), ships/SimLod; npm: @space-game/common
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: a distant freighter holds out its dwell at a station, then heads for the next; a ship that is not a freighter has no leg — server/src/gameServer/serverParts.test.ts
  * extend:      traffic rules live in trafficSystem and trafficIntent
  */
 

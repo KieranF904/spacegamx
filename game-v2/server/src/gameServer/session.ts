@@ -4,7 +4,7 @@
  * needs:      GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs
  * invariants: a connection gets its player entity when it joins (enter), never before; one that never joins is hung up
  *             on (JOIN_DEADLINE_MS, MAX_UNJOINED) — server/src/net/joinDeadline.test.ts
- *             saveAll saves every live pilot once — none pinned
+ *             saveAll saves every live pilot once, and a failing store does not stop the others — server/src/gameServer/saveAll.test.ts
  * extend:      a new join/leave step is a function here called from connect or loginPilot
  */
 

@@ -2,7 +2,7 @@
  * @contract server.gameserver.threats
  * owns:       threat ratings of systems and regions for maps and HUD
  * needs:      GameServer (type), game/Enemies, @space-game/common
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: ratings are cached until cleared, the training yard is not rated, a band is at least as bad as the one inside it — server/src/gameServer/serverParts.test.ts
  * extend:      n/a
  */
 
