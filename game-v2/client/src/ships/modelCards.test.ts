@@ -48,7 +48,7 @@ describe('model cards', () => {
     expect(keyStats(catalog, tuning, fn('cannon_hammer'))).toMatch(/dmg\/s · reach/);
     expect(keyStats(catalog, tuning, fn('engine_torch'))).toMatch(/thrust .* top [\d,]+ m\/s/);
     expect(keyStats(catalog, tuning, fn('power_cell_reactor'))).toMatch(/^\+\d+ power/);
-    expect(keyStats(catalog, tuning, fn('power_capacitor'))).toMatch(/holds [\d,]+ \(guns\)/);
+    expect(keyStats(catalog, tuning, fn('power_capacitor'))).toMatch(/^holds [\d,]+$/);
   });
 
   it('a locked model gives its level and nothing earlier, legendaries and non-weapons included', () => {

@@ -287,10 +287,10 @@ const OTHER = [
   ['power_isotope_pile', 'Isotope Pile', 'reactor', ['round'], 9, 'steel', { produce: 18, hpScale: 1.6 }, 'A weak generator, but tough, and it never explodes.', 'power'],
   ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'A heavy plant with plenty of power, and a big blast.', 'power'],
   ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size: fragile, and the biggest blast.', 'power'],
-  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, intake: 50, hpScale: 0.6 }, 'Adds to the ship\'s pool on a powered network: holds 200 and gives it quickly.', 'power'],
-  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, intake: 40, hpScale: 0.6 }, 'Touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screen it touches before the ship does; it does not feed engines.', 'power'],
-  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, intake: 80, hpScale: 0.6 }, 'Touching Drive Cells form a bank that feeds the engines and Burst Strafers it touches before the ship does; it does not feed guns.', 'power'],
-  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 450, discharge: 150, intake: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
+  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, intake: 50, hpScale: 0.6 }, 'A store for power: holds 200 and gives it out quickly.', 'power'],
+  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, discharge: 2000, intake: 40, hpScale: 0.6 }, 'A small store that gives its power out in a rush: holds 160, for guns and beams that want a burst.', 'power'],
+  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, discharge: 1400, intake: 80, hpScale: 0.6 }, 'A bigger store for the engines and Burst Strafers: holds 320 and gives it out steadily.', 'power'],
+  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 450, discharge: 150, intake: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy store: holds a lot, but gives it out slowly.', 'power'],
   ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 30, priority: 2, facing: true, mining: true, minePulse: 0.9, hpScale: 0.7 }, 'A pulsed cutter that takes ore from rock, and a poor weapon.', 'utility'],
   ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 20, priority: 2, facing: true, mining: true, minePulse: 1.2, hpScale: 0.8 }, 'A heavy cutter that breaks harder rock than a mining laser.', 'utility'],
   ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges (30 a crate, one every 2 seconds) that stick to rock, blink for a second, then blow it open. Harmless to ships.', 'utility'],
@@ -326,14 +326,14 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   });
 }
 // ---- The Pulse Dynamo, the Flash Screen and the Rail Driver (docs/design/rework-2026-11.md §2.6) ----------
-// The Pulse Dynamo charges the banks it touches (circuits.ts `dynamo`: a second, into each), with no wires; the Flash Screen's
-// return is its own feature (features/flash) and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
+// The Pulse Dynamo is a stub on the ports core: no ports, so it makes and moves no power (its `dynamo` figure is read only by
+// the shipgen tool's layout); the Flash Screen's return is its own feature (features/flash) and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
 // last, so no other model's order moves.
 {
   const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
   const LATE_OTHER = [
-    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'Puts 10 a second into each Capacitor or Drive Cell bank it touches. It needs no wires and powers nothing itself.', 'power', DYNAMO_LOOK],
-    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill that returns whole 4 seconds after it breaks, or at once for 4 E a point from a Capacitor bank touching it.', 'shields', legacyLook('shield')],
+    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'An old charger the ports core no longer uses: it has no ports and makes and moves no power.', 'power', DYNAMO_LOOK],
+    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill that returns whole 4 seconds after it breaks.', 'shields', legacyLook('shield')],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
     models.push({
@@ -344,10 +344,10 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
   MOUNT.railgun_rail_driver = 'fixed';
   MOUNTING.railgun_rail_driver = { attach: 'back', clear: ahead(3) };
-  // (The semi-automatic rifle, its own numbers: a clip of 4 at 12 ticks, 60 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E,
-  // the bank first. Its demand is that reload's draw spread over the clip's cycle as it was (6 at 10 ticks: heavier-shots-2026-11 keeps
-  // the legacy pool draw); the fire block below gives the rest.)
-  const desc = 'The semi-automatic rifle: a clip of four heavy shots, one a click (as fast as you can click, up to five a second; a second Rail Driver takes alternate shots, skipping one that is reloading), then it reloads itself in a second and a half for 48 E, from its bank first. It needs no ammo.';
+  // (The semi-automatic rifle, its own numbers: a clip of 4 at 12 ticks, 60 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E.
+  // Its demand is that reload's draw spread over the clip's cycle as it was (6 at 10 ticks: heavier-shots-2026-11 keeps
+  // the legacy draw); the fire block below gives the rest.)
+  const desc = 'The semi-automatic rifle: a clip of four heavy shots, one a click (as fast as you can click, up to five a second; a second Rail Driver takes alternate shots, skipping one that is reloading), then it reloads itself in a second and a half for 48 E. It needs no ammo.';
   models.push({
     ...base('railgun_rail_driver', 'Rail Driver', 'railgun', ['block2'], 29, 'titanium', { grade: 4 }),
     weapon: 'railgun', ...mounted('railgun_rail_driver', desc), hpScale: 0.96, demand: r2((48 * 60) / (90 + 6 * 10) / PIECE_AREA.block2), priority: 2, fireInterval: 10,
@@ -394,7 +394,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // (`strafe.ticks`) of `strafe.kick` push per cell out of its facing's opposite side, the next `strafe.cooldown` ticks after
 // one starts (no charges: energy is the limit); while a burst runs it draws `demand` per cell a second (140 a burst for its
 // one cell: several times an engine's energy per push, so dodging as often as it allows browns the ship out unless Drive Cells,
-// batteries and generation back it), from the Drive Cell bank it touches first. (Kieran 2026-10-31, after playtesting:
+// batteries and generation back it). (Kieran 2026-10-31, after playtesting:
 // any direction, stronger, short cooldown, energy-limited; was a quarter-second sideways burst with three slow charges.) The Tow Beam (the Salvage Tug's): latches onto
 // a wreck, debris or a pod and pulls it on a tether (tuning.json `tow`), drawing `demand` per cell a second while it tows.
 // Appended last, so no other model's order moves.
@@ -406,7 +406,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   const TUG = [
     ['engine_burst_strafer', 'Burst Strafer', 'strafer', ['sq'], 10, 'steel',
       { strafe: { kick: 14, ticks: 12, cooldown: 24 }, demand: 700, intake: 40, buffer: 140, priority: 1, facing: true, hpScale: 0.6 },
-      'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. It draws from a Drive Cell bank touching it first. No push at all for cruising.', 'engines'],
+      'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. No push at all for cruising.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
       'Latches onto a wreck, debris or a loot pod and drags it on a tether to a station to salvage, and never takes hold of a working ship.', 'utility'],
@@ -422,10 +422,9 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // ---- (end Burst Strafer and Tow Beam)
 // ---- Energy routing's relays: the Conduit and the Diode (docs/design/energy-routing-impl.md §1.1, §3.4, P4; §0 D1: no
 // wires, power moves only between parts sharing a full cell edge). Plain store data, read by the power core
-// (common/src/ships/power/layout.ts): a relay holds `store`, gives `discharge` and takes `intake` E a second per cell.
-// `relayOnly`: a pass-through (a Pulse Dynamo never tops it up). `oneWay`: a Diode, giving only out of its facing edge
+// (common/src/ships/power/portsBuild.ts): a relay holds `store`, gives `discharge` and takes `intake` E a second per cell.
+// `relayOnly`: a pass-through. `oneWay`: a Diode, giving only out of its facing edge
 // (that edge must touch a part: blueprint.ts partFacingRule 'joined'), taking from every other. Until the switch-over
-// (P2) the live energy system (circuits.ts) leaves both out of the pool and the banks: they carry nothing yet.
 // Appended last, so no other model's order moves.
 {
   const RELAY_LOOK = {
@@ -449,8 +448,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // ---- (end Conduit and Diode)
 // ---- The Gyro and the Heavy Gyro (common/src/ships/features/gyro): reaction wheels. `gyro` is turning torque per cell,
 // added to the ship's turning both ways wherever the part sits, with no push of its own. A gyro draws `demand` per cell a
-// second only while the ship turns flat out (less turning gently, none holding a heading), as an engine does (the Drive
-// Cell bank it touches first). `intake`/`buffer` are its numbers for the routing core (a thruster that is active while
+// second only while the ship turns flat out (less turning gently, none holding a heading), as an engine does `intake`/`buffer` are its numbers for the routing core (a thruster that is active while
 // turning). Heavy (`massScale`): the price is a little thrust. Sized so 2-4 Heavy Gyros swing a capital ship onto a new
 // heading 30-50% sooner, and a Gyro on a small ship helps a little. Appended last, so no other model's order moves.
 {
@@ -562,8 +560,8 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   // `intake` E a second. Its `shot` (E) is derived so that at full supply the beat and damage are today's: a cycle, ammo or
   // auto gun's intake over its interval; a spin gun's over its fastest beat; a clip refills whole in today's `reload` (the
   // Hive in its eight regrows); a charge gun's over charge + cooldown. `buffer` is in shots (a clip's: its clip). A beam
-  // burns `burn` E a second from a buffer of `bufferE`, refilled at `intake`, and relights at tuning energy.relight of it.
-  // Read by the power core from P1; `demand` stays what the pool reads until the switch-over.
+  // burns `burn` E a second from a buffer of `bufferE`, refilled at `intake`, and relights at half of it (a weapon fire.relight overrides).
+  // Read by the power core; `demand` is the draw the hangar and the ratings quote.
   const ENERGY = {
     cannon_pip: { intake: 20 }, autocannon_rattler: { intake: 28 }, flak_burst: { intake: 10 }, cannon_hammer: { intake: 30 },
     mortar_lobber: { intake: 6 }, laser_glint: { intake: 35 }, pulse_strobe: { intake: 50 }, legendary_prism: { intake: 60 },
@@ -634,8 +632,6 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // ---- (end firing models)
 for (const id of Object.keys(MOUNT)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`mount for ${id}, which isn't a weapon model`);
 for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mounting rules for ${id}, which isn't a weapon model`);
-// (Everything below the legacy functions' own keys: a model is a FunctionDef)
-for (const m of models) m.carriesFlow = true;
 
 // ---------------------------------------------------------------------------
 // Components (docs §2) and recipes
@@ -643,7 +639,7 @@ for (const m of models) m.carriesFlow = true;
 
 // ---- The ports energy core (common/src/ships/power/ports.ts; docs/design/energy-ports-2026-11.md): every part's ports, the
 // weapons' power profiles, the feed layer's parts, and which guns and engines take which material (tuning.json feeds).
-// Read only by a design that says `power: 'ports'`; the live pool-and-banks system ignores all of it. A port is in the
+// Read by every ship. A port is in the
 // part's own frame (a gun's or engine's: N its facing, S its back), `rate` E a second. Generators give out of their
 // front, one port a cell; stores take at the back and give at the front; guns, engines, shields and tools take at the
 // back, their rate a little over what they draw (a beam's its burn). Appended last, so no other model's order moves.

@@ -1,7 +1,6 @@
 {
  "name": "Redtooth Cutter",
  "catalogVersion": 1,
- "power": "ports",
  "parts": [
   {
    "uid": 0,

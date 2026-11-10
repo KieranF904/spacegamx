@@ -25,7 +25,7 @@ const part = (uid: number, piece: string, fn: string, x: number, y: number, extr
 
 /** A 2x1 core with two Pips on top and a hull under it */
 const design = (): Blueprint => ({
-  name: 'Groups test', catalogVersion: catalog.version, power: 'ports',
+  name: 'Groups test', catalogVersion: catalog.version,
   parts: [part(0, 'rect2', 'core', 0, 0), part(1, 'sq', 'cannon_pip', 0, -1, { facing: 'N' }), part(2, 'sq', 'cannon_pip', 1, -1, { facing: 'N' }), part(3, 'sq', 'hull', 0, 1)],
 });
 

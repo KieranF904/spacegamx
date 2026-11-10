@@ -21,7 +21,6 @@ const name = (bp: Blueprint) => (i: number) => catalog.functions.get(bp.parts[i]
 describe('portsReport', () => {
   it('the starter (a ports design) has every gun and engine fed', () => {
     const bp = cfg.library!['sparrow-t'];
-    expect(bp.power).toBe('ports');
     const r = report(bp);
     expect(r.unfed).toEqual([]);
     expect(r.partly).toEqual([]);

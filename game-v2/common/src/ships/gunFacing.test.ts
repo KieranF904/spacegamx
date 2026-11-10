@@ -17,7 +17,7 @@ const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const p = (uid: number, piece: string, fn: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart =>
   ({ uid, piece, fn, material: catalog.functions.get(fn)?.material ?? 'alloy', x, y, rot: 0 as Rot, flip: false, ...extra });
-const bp = (parts: PlacedPart[]): Blueprint => ({ name: 'test', catalogVersion: catalog.version, parts, power: 'ports' });
+const bp = (parts: PlacedPart[]): Blueprint => ({ name: 'test', catalogVersion: catalog.version, parts });
 const SIDES: Side[] = ['N', 'E', 'S', 'W'];
 const ROTS: Rot[] = [0, 1, 2, 3];
 const gunModels = [...catalog.functions.values()].filter((f) => f.model && f.weapon);

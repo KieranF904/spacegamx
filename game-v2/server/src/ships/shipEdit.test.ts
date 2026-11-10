@@ -97,15 +97,14 @@ describe('hangar refits in the live game', () => {
     }
   });
 
-  it('the server decides the power system: a design sent without the ports flag (or with another) is built as a ports ship', () => {
+  it('an old design that still says it runs on the pool is built as a ports ship, the field ignored', () => {
     const { server, t, got, pid } = liveServer();
     (server as any).shipEditAnywhere = true;
     grantParts(server, pid, arrow);
-    const { power: _drop, ...sent } = arrow;
-    t.send({ type: 'shipEdit', blueprint: { ...sent, power: 'pool' } as any });
+    t.send({ type: 'shipEdit', blueprint: { ...arrow, power: 'pool' } as any });
     expect(lastEdit(got).ok).toBe(true);
     const ship = server.getShips().get(pid)!;
-    expect(ship.blueprint.power).toBe('ports');
+    expect('power' in ship.blueprint).toBe(false);
     expect(ship.derived.ports).toBeDefined();
   });
 
@@ -113,7 +112,6 @@ describe('hangar refits in the live game', () => {
     const { server, pid } = liveServer();
     const ship = server.getShips().get(pid)!;
     expect(ship.blueprint.name).toBe('Sparrow T');
-    expect(ship.blueprint.power).toBe('ports');
     expect(ship.derived.ports).toBeDefined();
   });
 

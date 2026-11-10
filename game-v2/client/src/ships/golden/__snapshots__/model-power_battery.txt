@@ -21,7 +21,7 @@ Small
 Small · Square
 
 == tradeOff ==
-the ship's pool: holds and gives quickly
+a store: holds and gives quickly
 
 == keyStats ==
 holds 200

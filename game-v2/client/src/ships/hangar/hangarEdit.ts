@@ -168,7 +168,7 @@ export function remove(ui: HangarUI, g: Vec2, mirrored = false): void {
 
 export function newBlueprint(ui: HangarUI): void {
   ui.aids.edit(() => {
-    ui.bp = { name: 'New ship', catalogVersion: ui.deps.catalog.version, power: 'ports', parts: [
+    ui.bp = { name: 'New ship', catalogVersion: ui.deps.catalog.version, parts: [
       { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
     ] };
   });

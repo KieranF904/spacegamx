@@ -1,7 +1,6 @@
 {
   "name": "Wasp",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#2f4f6f",
   "parts": [
     {"uid":0,"piece":"nose2","fn":"hull","material":"alloy","x":-1,"y":-7,"rot":0,"flip":false},

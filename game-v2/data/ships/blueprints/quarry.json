@@ -1,7 +1,6 @@
 {
   "name": "Quarry",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#b08a2e",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"utility_bore","material":"steel","x":-1,"y":0,"rot":0,"flip":false,"facing":"N"},

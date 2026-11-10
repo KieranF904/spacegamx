@@ -68,7 +68,7 @@ function rig(m, main, aug) {
   const gun = partOf(m.id, 0, 0, m.pieces[0] === 'round' ? 1 : 0, { facing: 'N' });
   const parts = [gun], taken = new Set(cellsOf(gun).map((c) => key(c[0], c[1])));
   // (Its input ports from the game's own layout of the gun alone)
-  const lay = C.createShipState(catalog, tuning, 1, { name: 'probe', catalogVersion: 1, power: 'ports', parts: [{ uid: 0, ...partOf('core', -1, 0) }, { uid: 1, ...gun }] }, 0).derived.ports;
+  const lay = C.createShipState(catalog, tuning, 1, { name: 'probe', catalogVersion: 1, parts: [{ uid: 0, ...partOf('core', -1, 0) }, { uid: 1, ...gun }] }, 0).derived.ports;
   const ins = lay ? lay.ports.filter((p) => p.part === 1 && p.dir === 0) : [];
   let cells = C.placeGeometry(catalog, gun).area, failed = false, points = C.partBuildPoints(catalog, gun);
   // A gun's own feed: the first material it takes, in a tank at its feed input (required feed only)
@@ -100,7 +100,7 @@ function rig(m, main, aug) {
   for (const k of taken) { const [x, y] = k.split(',').map(Number); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!taken.has(key(x + dx, y + dy))) around.push([x + dx, y + dy]); }
   for (const [x, y] of around) {
     const all = [...parts, partOf('core', x, y)].map((q, uid) => ({ uid, ...q }));
-    const bp = { name: `${m.id}:${main}:${aug ?? '-'}`, catalogVersion: 1, power: 'ports', parts: all };
+    const bp = { name: `${m.id}:${main}:${aug ?? '-'}`, catalogVersion: 1, parts: all };
     const v = C.validateBlueprint(catalog, bp, tuning, null, {});
     // (Not in its way: nothing on its firing edge or in its barrel's clearance)
     if (v.errors.some((e) => e.code === 'unreachable' || e.code === 'overlap' || e.code === 'facingBlocked' || (e.code === 'badMounting' && /clear/.test(e.message)))) continue;

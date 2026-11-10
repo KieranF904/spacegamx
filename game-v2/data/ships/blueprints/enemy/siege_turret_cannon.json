@@ -1,7 +1,6 @@
 {
  "name": "Cannon Turret",
  "catalogVersion": 1,
- "power": "ports",
  "parts": [
   {
    "uid": 0,

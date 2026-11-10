@@ -1,7 +1,6 @@
 {
  "name": "Brood Mother",
  "catalogVersion": 1,
- "power": "ports",
  "paint": "#3d4763",
  "rigid": true,
  "parts": [

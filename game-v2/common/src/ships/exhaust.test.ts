@@ -23,7 +23,7 @@ const p = (uid: number, piece: string, fn: string, x: number, y: number, extra: 
 const S = { facing: 'S' as Side };
 /** A 2×1 core at (0,0)-(1,0), two Cell Reactors under it giving S, and the parts given (on the ports core) */
 const ship = (...parts: PlacedPart[]): Blueprint => ({
-  name: 'test', catalogVersion: 1, power: 'ports',
+  name: 'test', catalogVersion: 1,
   parts: [p(0, 'rect2', 'core', 0, 0), p(1, 'sq', 'power_cell_reactor', 0, 1, { rot: 2 }), p(2, 'sq', 'power_cell_reactor', 1, 1, { rot: 2 }), ...parts],
 });
 const geoms = (b: Blueprint) => b.parts.map((q) => placeGeometry(catalog, q));
@@ -127,7 +127,7 @@ describe('a Torch stood on end on the ports core: its two in ports are one, rate
   it('a Joiner Bank (90) gives it its whole burn (68); a Cell Reactor (35) about half', () => {
     // Two reactors into a Joiner Bank, its out (x 3) into the top of the Torch
     const joined: Blueprint = {
-      name: 'test', catalogVersion: 1, power: 'ports',
+      name: 'test', catalogVersion: 1,
       parts: [p(0, 'rect2', 'core', 0, 0), p(1, 'sq', 'power_cell_reactor', 2, -1, { rot: 2 }), p(2, 'sq', 'power_cell_reactor', 3, -1, { rot: 2 }),
         p(3, 'rect2', 'power_joiner_bank', 3, 0, { rot: 2, material: 'steel' }), p(4, 'rect2', 'engine_torch', 3, 1, { rot: 1, ...S })],
     };

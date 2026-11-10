@@ -1,7 +1,6 @@
 {
   "name": "Sparrow T",
   "catalogVersion": 1,
-  "power": "ports",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"alloy","x":0,"y":3,"rot":0,"flip":false},
     {"uid":1,"piece":"cap","fn":"hull","material":"alloy","x":0,"y":-1,"rot":0,"flip":false},

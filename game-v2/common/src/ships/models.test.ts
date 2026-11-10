@@ -371,7 +371,6 @@ describe('legacy parts stand for models', () => {
     const prod = loadCatalog(readCatalogFiles());
     for (const name of names) {
       const b = blueprint(name);
-      expect(b.power, name).toBe('ports');
       expect(b.parts.filter((q) => FN(q.fn).legacy).map((q) => q.fn), name).toEqual([]);
       expect(validateBlueprint(prod, b, tuning, null).errors, name).toEqual([]);
       const d = createShipState(prod, tuning, 1, b, 0).derived;

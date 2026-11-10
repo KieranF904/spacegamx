@@ -28,7 +28,7 @@ const box = (piece: string) => {
   return { w, h, full: Math.abs((v?.area ?? 0) - w * h) < 1e-6 };
 };
 for (const fn of ctx.catalog.functions.values()) {
-  const f = fn as typeof fn & { model?: unknown; material?: string; family?: string; pool?: string; loss?: number };
+  const f = fn as typeof fn & { model?: unknown; material?: string; family?: string; pool?: string; loss?: number; carriesFlow?: boolean };
   const model = !!f.model && MODEL_CATEGORIES.has(fn.category ?? '');
   if (!model && !STRUCTURE.has(fn.id)) { skipped.push(`${fn.id} (${f.model ? fn.category : 'legacy or not a player part'})`); continue; }
   const pieces = model ? (fn.pieces as string[]) : fn.pieces === '*' ? Object.keys(PIECES) : (fn.pieces as string[]).filter((p) => p in PIECES);
@@ -49,7 +49,7 @@ for (const fn of ctx.catalog.functions.values()) {
         // (What it does when destroyed: a model's own blast, else its function's (tuning partBlast), as bridge/damage.ts)
         blast: (model ? (fn as { blast?: unknown }).blast : (ctx.tuning as { partBlast?: Record<string, unknown> }).partBlast?.[fn.id]) ?? null,
         hp: Math.round(st.hp * 10) / 10, armour: st.armour, resist: st.resist ?? {}, mass: Math.round(st.mass * 100) / 100, cost,
-        carriesFlow: !!fn.carriesFlow, pool: f.pool ?? null, loss: f.loss ?? null,
+        carriesFlow: !!f.carriesFlow, pool: f.pool ?? null, loss: f.loss ?? null,
         power: pw ? { role: pw.role, makes: pw.makes ?? 0, holds: pw.holds ?? 0, gives: pw.gives ?? 0, takes: pw.takes ?? 0, uses: pw.uses ?? 0, boostUses: pw.boostUses ?? 0, gun: pw.gun ?? null } : null,
         dps: st.dps ?? 0, range: st.range ?? 0, damageType: st.damageType ?? null, pen: st.pen ?? null,
         supply: st.supply ?? 0, draw: st.draw ?? 0, thrust: st.thrust ?? 0, cargo: st.cargo ?? 0, shield: st.shield ?? 0,

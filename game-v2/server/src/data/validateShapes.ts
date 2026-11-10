@@ -462,10 +462,10 @@ export const SHIP_SHAPES: Record<string, Spec> = {
   // (functions.json is growing presentation fields, review §3.4: entries aren't strict)
   'ships/functions.json': strict({
     functions: arr(obj({
-      id: 'string', pieces: { or: ['string[]', oneOf('*')] }, hpScale: 'number', 'carriesFlow?': 'boolean',
-      'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'loss?': 'number', 'thrust?': 'number', 'boost?': 'number',
+      id: 'string', pieces: { or: ['string[]', oneOf('*')] }, hpScale: 'number',
+      'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'thrust?': 'number', 'boost?': 'number',
       'boostDrain?': 'number', 'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number',
-      'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number', 'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'legacy?': 'boolean',
+      'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number', 'store?': 'number', 'discharge?': 'number', 'legacy?': 'boolean',
       // (Energy routing, types.ts FunctionDef: a store's Takes, an engine's refill and buffer)
       'intake?': 'number', 'buffer?': 'number',
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
@@ -554,8 +554,8 @@ export const SHIP_SHAPES: Record<string, Spec> = {
       });
     }),
     'shield?': obj({ regenDelayTicks: 'number', regenPerSecond: 'number', maxPerArea: 'number' }),
-    // (The core and the pool, circuits.ts/energy.ts; coreIntake and relight: energy routing, docs/design/energy-routing-impl.md §5.2)
-    'energy?': obj({ 'coreCapacity?': 'number', 'boostDraw?': 'number', 'coreDischarge?': 'number', 'discharge?': rec('number'), 'coreIntake?': 'number', 'relight?': 'number' }),
+    // (The core's store: power/portsBuild.ts)
+    'energy?': obj({ 'coreCapacity?': 'number' }),
     // (The feed layer's materials, common/src/ships/power/ports.ts FeedDef: what each multiplies on a part that takes it)
     'feeds?': rec(strict({ name: 'string', 'short?': 'string', on: oneOf('weapon', 'engine'), mod: rec('number'), 'color?': 'string', 'say?': 'string' })),
     'miner?': obj({ range: 'number', dps: 'number', shipDps: 'number', gimbalDeg: 'number' }),
@@ -565,7 +565,7 @@ export const SHIP_SHAPES: Record<string, Spec> = {
     'repair?': obj({ range: 'number', healPerSecond: 'number', restoreTicks: 'number', restoreHp: 'number', intervalTicks: 'number', combatPauseTicks: 'number' }),
     collision: obj({ restitution: 'number', minDamageSpeed: 'number', damagePerSpeed: 'number' }),
     'damage?': obj({ penetration: rec('number') }),
-    debug: 'any', fixtures: 'any',
+    debug: 'any',
   }),
 };
 

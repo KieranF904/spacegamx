@@ -61,7 +61,7 @@ describe('game data validation', () => {
   });
 
   it('catches a function with no display name', () => {
-    const e = broken((_f, s) => { s.catalog.functions.functions.push({ id: 'tractor', pieces: '*', hpScale: 1, carriesFlow: true }); });
+    const e = broken((_f, s) => { s.catalog.functions.functions.push({ id: 'tractor', pieces: '*', hpScale: 1 }); });
     expect(e.some((p) => p.message.includes('"tractor" has no display name in FN_NAMES'))).toBe(true);
   });
 

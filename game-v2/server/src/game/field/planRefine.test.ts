@@ -21,7 +21,7 @@ const validate = (bp: Blueprint) => validateBlueprint(catalog, bp, tuning, null,
 const part = (uid: number, piece: string, fn: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart =>
   ({ uid, piece, fn, material: catalog.functions.get(fn)?.material ?? 'alloy', x, y, rot: 0 as Rot, flip: false, ...extra });
 const ship = (...more: PlacedPart[]): Blueprint => ({
-  name: 'Plan', catalogVersion: catalog.version, power: 'ports',
+  name: 'Plan', catalogVersion: catalog.version,
   parts: [part(0, 'rect2', 'core', 0, 0), part(1, 'sq', 'cannon_pip', 0, -1, { facing: 'N' }), part(2, 'sq', 'cannon_pip', 1, -1, { facing: 'N' }), ...more],
 });
 const live = (bp: Blueprint, ghosts: number[] = [], dead: number[] = []) => ({ blueprint: bp, ghosts: new Set(ghosts), alive: (u: number) => !ghosts.includes(u) && !dead.includes(u) });

@@ -1,7 +1,6 @@
 {
   "name": "Wisp",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#3f8fb8",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"cannon_twinlink","material":"steel","x":-1,"y":2,"rot":0,"flip":false,"facing":"N"},

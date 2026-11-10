@@ -114,10 +114,6 @@ export interface ShipTuning {
   };
 
   debug: { damageFraction: number; replayTicks: number; replayRuns: number };
-
-  fixtures: {
-    flowExample: { supply: number; demands: number[]; priorities: number[]; expected: number[] };
-  };
 }
 
 export interface WeaponTuning {

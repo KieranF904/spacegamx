@@ -1,7 +1,6 @@
 {
   "name": "Sunspear",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#c9a227",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"lance_lance","material":"cobalt","x":-1,"y":2,"rot":0,"flip":false,"facing":"N"},

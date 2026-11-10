@@ -172,7 +172,7 @@ describe('ports tick', () => {
 function volley(parts: { fn: string; piece?: string; x: number; y: number; rot?: number; facing?: Side }[], secs = 30) {
   const fnOf = (id: string) => catalog.functions.get(id);
   const pieceOf = (id: string) => { const ps = fnOf(id)?.pieces; return ps && ps !== '*' ? ps[0] : 'sq'; };
-  const bp = { name: 't', catalogVersion: 1, power: 'ports' as const, parts: parts.map((q, uid) => ({ uid, fn: q.fn, piece: q.piece ?? pieceOf(q.fn), material: fnOf(q.fn)?.material ?? 'alloy', x: q.x, y: q.y, rot: (q.rot ?? 0) as 0, flip: false, ...(q.facing ? { facing: q.facing } : {}) })) };
+  const bp = { name: 't', catalogVersion: 1, parts: parts.map((q, uid) => ({ uid, fn: q.fn, piece: q.piece ?? pieceOf(q.fn), material: fnOf(q.fn)?.material ?? 'alloy', x: q.x, y: q.y, rot: (q.rot ?? 0) as 0, flip: false, ...(q.facing ? { facing: q.facing } : {}) })) };
   const ship = createShipState(catalog, tuning, 1, bp, 0), d = ship.derived;
   let c: Charge = { g: 100, b: [], e: createPortsState(d.ports!) }, shots = 0, aug = 0;
   for (let t = 0; t < (secs + 10) * 60; t++) {

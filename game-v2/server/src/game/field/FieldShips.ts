@@ -726,7 +726,6 @@ export class FieldShips implements FeatureInstance {
       if (!r || typeof r !== 'object' || !Array.isArray(r.parts) || r.parts.length > 256) throw new Error('not a blueprint');
       target = fixModelMaterials(this.host.ships.catalog, parseBlueprint(JSON.stringify(raw)));
       target.name = (target.name || fs.ship.blueprint.name).slice(0, 64);
-      target.power = 'ports';
       for (const p of target.parts) if (p.facing !== undefined && (typeof p.facing !== 'string' || p.facing.length > 16)) delete p.facing;
     } catch {
       this.host.tell(eid, "That plan isn't a ship design", 'warn');

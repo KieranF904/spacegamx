@@ -11,7 +11,7 @@ const config = loadShipConfigCached(join(__dirname, '../../../../data'));
 const { catalog, tuning } = createShipBridge(config);
 const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as RecipesFile, catalog, {});
 const ctx = { catalog, tuning, econ };
-const base: Blueprint = { ...(config.library as Record<string, Blueprint>).arrow, power: 'ports' };
+const base: Blueprint = (config.library as Record<string, Blueprint>).arrow;
 
 const hull = (uid: number, x: number, y: number): PlacedPart => ({ uid, piece: 'sq', fn: 'hull', material: 'alloy', x, y, rot: 0, flip: false });
 

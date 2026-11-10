@@ -337,7 +337,7 @@ export class HangarUI implements HangarHost {
       this.bp = clone(this.deps.getBlueprint());
       this.plan = undefined;
     } else {
-      this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, power: 'ports', parts: [
+      this.bp = { name: 'New ship', catalogVersion: this.deps.catalog.version, parts: [
         { uid: 0, piece: 'sq', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
       ] };
       this.plan = undefined;
@@ -565,8 +565,6 @@ export class HangarUI implements HangarHost {
   /** The design's derived state (as built whole) */
   private rederive(): void {
     const { catalog, tuning } = this.deps;
-    // (Every design runs on the ports core; the marker is kept on what the hangar saves, as the server does)
-    this.bp.power = 'ports';
     try {
       this.derived = createShipState(catalog, tuning, 0, this.bp, 0).derived;
     } catch {

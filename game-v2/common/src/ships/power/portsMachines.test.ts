@@ -22,7 +22,7 @@ const p = (uid: number, piece: string, fn: string, x: number, y: number, rot = 0
 /** A 2x1 core; a Field Fabricator under it fed by two Cell Reactors under that; a Field Refiner beside the core fed by one */
 function design(): Blueprint {
   return {
-    name: 'machines', catalogVersion: 1, power: 'ports',
+    name: 'machines', catalogVersion: 1,
     parts: [
       p(0, 'rect2', 'core', 0, 0),
       p(1, 'rect2', 'fabricator_field', 0, 1), p(2, 'sq', 'power_cell_reactor', 0, 2), p(3, 'sq', 'power_cell_reactor', 1, 2),

@@ -1,7 +1,6 @@
 {
  "name": "Heart of the Maw",
  "catalogVersion": 1,
- "power": "ports",
  "parts": [
   {
    "uid": 0,
