@@ -22,7 +22,7 @@ import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 
 const dataDir = fileURLToPath(new URL('../../../data', import.meta.url));
 const files = readGameDataFiles(dataDir);

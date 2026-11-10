@@ -8,7 +8,7 @@ import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 import { withDevData } from '../data/devData.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 

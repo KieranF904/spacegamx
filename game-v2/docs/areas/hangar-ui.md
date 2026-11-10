@@ -40,7 +40,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 ## Invariants
 - No game rules in the UI: mounting/validity/power math come from `common` and are shown, never re-derived. Add a rule in common (with the server using it via `ships.validate`), then surface it.
 - The server is authoritative: `handleShipEdit`/`handleSlotSave` (net/handlers/shipEdit.ts) always re-run `ships.validate` and `Hangar.save`; a client check is feedback only. Both require being docked (or `shipEditAnywhere`).
-- Free build (no parts or licence needed) is dev only: proto mode (everyone admin + `shipEditAnywhere`) or an admin with `freeBuild` toggled where the server was started with `freeBuild` (index.ts: `DEV_MODE`) and `NODE_ENV !== 'production'`. `grantAll` must never be reachable in production.
+- Free build (no parts or licence needed) is dev only: an admin with `freeBuild` toggled where the server was started with `freeBuild` (index.ts: `DEV_MODE`) and `NODE_ENV !== 'production'`. `grantAll` must never be reachable in production.
 - Gun gems/mods are the server's to give: `Hangar.save` strips client-supplied `mods/gems`.
 - Generated art here (part sprites, item icons) uses the asset cache with `PART_SPRITES_VERSION`; bump on change.
 - Editor look matches flight: built parts are drawn by `HangarLitView`; ghosts (not built yet) are faint flat shapes in `draw()`.

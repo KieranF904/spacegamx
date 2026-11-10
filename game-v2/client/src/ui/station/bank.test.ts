@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { join } from 'path';
 import { Economy, setUnlockTable, depositable, packDefs, type ItemsFile, type RecipesFile, type ServerRepairBankMessage, type Stack, type UnlockTable } from '@space-game/common';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import items from '../../../../data/items.json';
 import recipes from '../../../../data/recipes.json';
 import unlockData from '../../../../data/unlocks.json';

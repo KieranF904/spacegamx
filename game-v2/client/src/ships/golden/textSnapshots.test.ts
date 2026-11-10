@@ -11,7 +11,7 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { join } from 'path';
 import { Economy, type Blueprint, partStats, type ItemsFile, type RecipesFile } from '@space-game/common';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import items from '../../../../data/items.json';
 import recipes from '../../../../data/recipes.json';
 import modelsFile from '../../../../data/ships/models.json';

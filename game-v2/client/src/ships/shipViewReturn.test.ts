@@ -10,7 +10,7 @@ import { join } from 'path';
 import { Container } from 'pixi.js';
 import { createShipState, EntityType, isWeaponFn, type Blueprint } from '@space-game/common';
 import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../server/src/ships/createShipBridge';
 
 // The hull batch: which ship ids hold a slot, and which were placed (drawn) this frame
 const batch = vi.hoisted(() => ({ slots: new Set<number>(), placed: new Set<number>() }));

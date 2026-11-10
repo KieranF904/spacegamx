@@ -17,7 +17,6 @@
     "dev:browser": "cd server-browser && npm run dev",
     "dev": "npm run dev:browser & npm run dev:server & npm run dev:client",
     "start": "cd server && npm start",
-    "proto": "cd client && npx vite --open \"/?proto\"",
     "test": "vitest run",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install",

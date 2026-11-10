@@ -17,7 +17,7 @@ import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { LocalTransport } from '../net/LocalTransport.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 
 const dataDir = join(__dirname, '../../../data');
 const srcRoot = join(__dirname, '../../..');

@@ -22,7 +22,7 @@ import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { serverTruth, damageOff, removedBoth, type ServerTruth } from '../hits/serverTruth.testkit.js';
 import { COALESCE_TICKS } from './constants.js';

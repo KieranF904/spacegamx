@@ -16,7 +16,7 @@ import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 import { DEFEND_QUIET_TICKS, DEFEND_GRUDGE_HALF_TICKS } from './defenders.js';
 
 const dataDir = join(__dirname, '../../../../data');

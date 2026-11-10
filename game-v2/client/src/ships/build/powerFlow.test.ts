@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { createShipState, portsLoadTestCached, PS_LINKED, type Blueprint } from '@space-game/common';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import { powerFlow, pulsesOn, portTriangle, type FlowSegment } from './powerFlow';
 import { ALL_LAYERS, drawFlow, flowLegend, type FlowSink } from './powerFlowView';
 import { loadPowerFlow, savePowerFlow } from './powerFlowPref';

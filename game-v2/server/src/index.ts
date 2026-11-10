@@ -13,7 +13,7 @@ import { withDevData, devGuestShips } from './data/devData.js';
 import { checkGameData } from './data/validateGameData.js';
 import { SocketTransport } from './net/SocketTransport.js';
 import { loadShipConfigFromDisk } from './ships/loadShipConfig.js';
-import { createShipBridge } from './proto/createProtoServer.js';
+import { createShipBridge } from './ships/createShipBridge.js';
 import { createProfileStore } from './profile/index.js';
 import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';

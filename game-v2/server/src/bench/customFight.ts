@@ -30,7 +30,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 import { FakeHitsClient } from '../net/hits/fakeHitsClient.testkit.js';
 
 // (The payout dice's secret fixed too, as Math.random is: the same run every time. game/payoutDice.ts)

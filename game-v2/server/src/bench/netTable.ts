@@ -24,7 +24,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 
 const K = common as unknown as Record<string, any>;
 const { Position, Velocity, Input, InSystem, Asteroid, encodeMessage, decodeMessage } = K;

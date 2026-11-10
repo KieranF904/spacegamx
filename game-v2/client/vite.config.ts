@@ -6,7 +6,7 @@ import { shipsDevApi } from './shipsDevApi';
 const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib|crypto)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
 
 /**
- * Fails the build if server code (proto mode's and the replays', which only load
+ * Fails the build if server code (the replays', which only load
  * lazily) ends up in what index.html loads at start: the main chunk and its static imports
  */
 const serverOutOfMain = (): Plugin => ({
@@ -41,7 +41,7 @@ export default defineConfig(({ command }) => ({
   server: {
     port: 5273,
     strictPort: true,
-    // Proto mode imports ../server/src and ../data
+    // The replay worker imports ../server/src and ../data
     fs: { allow: ['..'] },
     // (WS_TARGET: where this /ws proxy forwards, the dev server on 3000 by default. The game's own join doesn't use it: it
     // connects straight to the server picked in the server browser, so a server on another port is joined from there)

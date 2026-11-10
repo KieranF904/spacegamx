@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import { tradeOff } from '../modelCards';
 import { cardKind, cardNumbers, partSummary, placeCard, SUMMARY_WORDS } from './partCard';
 

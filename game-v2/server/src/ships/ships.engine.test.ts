@@ -8,7 +8,7 @@ import {
   BULLET_SPEED, BLASTER_LIFE_TICKS, BANK,
   parseBlueprint, ShipTuning, CatalogFiles, Blueprint,
 } from '@space-game/common';
-import { createProtoServer } from '../proto/createProtoServer.js';
+import { createLocalServer } from '../createLocalServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { recordInputs, runReplay, RecordedInput } from './replay.js';
@@ -28,7 +28,7 @@ const idle: RecordedInput = { forward: false, backward: false, left: false, righ
 
 function setup() {
   resetGlobals();
-  const server = createProtoServer({ files, ships, autoStart: false });
+  const server = createLocalServer({ files, ships, autoStart: false });
   const transport = new LocalTransport(server);
   const received: ServerMessage[] = [];
   transport.onMessage = (m) => received.push(m);

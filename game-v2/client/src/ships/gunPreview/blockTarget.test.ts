@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import { BLOCK_ID, BlockTarget, blockSpec, type HitDamage } from './blockTarget';
 import { WALL_COLS, WALL_ROWS } from './framing';
 

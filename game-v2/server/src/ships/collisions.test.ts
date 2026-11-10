@@ -13,7 +13,7 @@ import {
   Position, Rotation, Velocity, InSystem, parseBlueprint, pointInConvex, standing, stageOf, currentStage, deciding,
   shipPointToWorld, localToWorldDir, partWeaponDef, seededRng, type Blueprint, type Vec2, type ShipState,
 } from '@space-game/common';
-import { createProtoServer } from '../proto/createProtoServer.js';
+import { createLocalServer } from '../createLocalServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from './loadShipConfig.js';
@@ -27,7 +27,7 @@ const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blue
 
 function setup(design: string, angle = 0.4) {
   resetGlobals();
-  const server = createProtoServer({ files, ships: shipsCfg, autoStart: false });
+  const server = createLocalServer({ files, ships: shipsCfg, autoStart: false });
   const t = new LocalTransport(server);
   t.onMessage = () => {};
   t.connect();

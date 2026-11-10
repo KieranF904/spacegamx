@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { Economy, placeGeometry, overlapsAny, validateBlueprint, nextFreeUid, type Blueprint, type PlacedPart, type ItemsFile, type RecipesFile } from '@space-game/common';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import items from '../../../../data/items.json';
 import recipes from '../../../../data/recipes.json';
 import { DeltaCache, changeFor, diffMeasures, measure, type Change, type Measure } from './statDelta';

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, Rotation, Input, InSystem, ServerMessage, parseBlueprint, Blueprint, shipPointToWorld, partWeaponDef, pulseProfile, effectiveRange } from '@space-game/common';
-import { createProtoServer } from '../proto/createProtoServer.js';
+import { createLocalServer } from '../createLocalServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
@@ -17,7 +17,7 @@ const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blue
 function setup(bubbles = false) {
   resetGlobals();
   // (bubbles: the ship-wide shields work on player ships, as the bubble rules need: catalog.ts PLAYER_BUBBLE_MODELS)
-  const server = createProtoServer({ files, ships: bubbles ? { ...ships, playerBubbles: true } : ships, autoStart: false });
+  const server = createLocalServer({ files, ships: bubbles ? { ...ships, playerBubbles: true } : ships, autoStart: false });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

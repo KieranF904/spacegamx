@@ -10,7 +10,7 @@ import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 
 export const dataDir = join(dirname(fileURLToPath(import.meta.url)), '../../../../data');
 

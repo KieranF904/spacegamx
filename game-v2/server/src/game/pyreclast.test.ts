@@ -10,7 +10,7 @@ import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 import type { BossesFile } from './Bosses.js';
 import { PYRECLAST_EXPOSURE, PYRECLAST_LOOP, type PyreclastBrain } from './brains/pyreclast.js';
 

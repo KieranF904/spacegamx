@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { Position, ServerMessage } from '@space-game/common';
-import { createProtoServer } from './createProtoServer.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
+import { createLocalServer } from './createLocalServer.js';
+import { LocalTransport } from './net/LocalTransport.js';
+import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
+import { loadShipConfigCached } from './ships/loadShipConfig.js';
 
-const files = readGameDataFiles(join(__dirname, '../../../data'));
-const ships = loadShipConfigCached(join(__dirname, '../../../data'));
+const files = readGameDataFiles(join(__dirname, '../../data'));
+const ships = loadShipConfigCached(join(__dirname, '../../data'));
 
-describe('proto mode (M0)', () => {
+describe('local server', () => {
   it('runs 300 ticks in-process with a LocalTransport client', () => {
-    const server = createProtoServer({ files, ships, autoStart: false });
+    const server = createLocalServer({ files, ships, autoStart: false });
     const transport = new LocalTransport(server);
     const received: ServerMessage[] = [];
     transport.onMessage = (msg) => received.push(msg);
