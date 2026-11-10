@@ -10,7 +10,6 @@ import { createUserStore } from './auth/index.js';
 import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
 import { GameData } from './data/GameData.js';
 import { withDevData, devGuestShips } from './data/devData.js';
-import { checkGameData } from './data/validateGameData.js';
 import { SocketTransport } from './net/SocketTransport.js';
 import { loadShipConfigFromDisk } from './ships/loadShipConfig.js';
 import { createShipBridge } from './ships/createShipBridge.js';
@@ -52,9 +51,11 @@ if (!LOBBY_ADMIN_SECRET) console.log("LOBBY_ADMIN_SECRET isn't set: the admin to
 // Pilots' progress: same backend switch (data/profiles/ by default)
 const profileStore = await createProfileStore(dataPath);
 
-// Every data file checked against the others, ship designs included (GameData checks the rest alone)
+// The data files, read once (in development, with the dev-only rock system: data/dev/rockery.json), and checked once:
+// every file against the others, ship designs included (so the GameData built on them doesn't check them again)
 const shipConfig = loadShipConfigFromDisk(dataPath);
-checkGameData(readGameDataFiles(dataPath), { ships: shipConfig });
+const gameDataFiles = withDevData(readGameDataFiles(dataPath), dataPath);
+GameData.checkFiles(gameDataFiles, { ships: shipConfig });
 
 /** Appends telemetry lines to a file, making its folder the first time */
 function telemetryFile(file: string): (lines: string) => Promise<void> {
@@ -67,8 +68,7 @@ function telemetryFile(file: string): (lines: string) => Promise<void> {
 }
 
 const gameServer = new GameServer({
-  // (in development, with the dev-only rock system: data/dev/rockery.json)
-  gameData: new GameData(withDevData(readGameDataFiles(dataPath), dataPath)),
+  gameData: new GameData(gameDataFiles),
   userDB: userStore,
   ships: createShipBridge(shipConfig),
   profileStore,
