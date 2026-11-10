@@ -19,6 +19,7 @@ import { LoginBody, loginBodyForVisit } from './loginBody';
 import { SkyRenderer, skyPrograms } from '../rendering/sky/SkyRenderer';
 import { skyBiome, type BiomeHints } from '../rendering/sky/skyBiome';
 import { attachVolumeUploads } from '../rendering/planet-proto/planetTextures';
+import { esc } from './escape';
 
 export class LoginUI {
   private container: HTMLElement;
@@ -555,7 +556,7 @@ export class LoginUI {
             <div class="login-tab ${!isLogin ? 'active' : ''}" data-mode="register">Create Account</div>
           </div>
           
-          ${this.errorMessage ? `<div class="login-error">${this.errorMessage}</div>` : ''}
+          ${this.errorMessage ? `<div class="login-error">${esc(this.errorMessage)}</div>` : ''}
           
           <form class="login-form">
             <div class="form-group">

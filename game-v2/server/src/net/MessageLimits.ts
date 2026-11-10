@@ -24,6 +24,8 @@ interface Limit { per: number; burst: number }
 export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // Broadcast to everyone
   chat: { per: 40, burst: 8 },
+  // The clock sync (the client pings every 2 s, 30 a minute)
+  ping: { per: 120, burst: 20 },
   // Every market priced (the client asks every 20 s)
   marketScan: { per: 12, burst: 4 },
   // Every account sorted

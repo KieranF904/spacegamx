@@ -74,8 +74,15 @@ export class Market {
     return { demand, sat, wanted: Object.keys(shift.wanted), glut: Object.keys(shift.glut), cycleEndsIn: MARKET_CYCLE_MS - (now % MARKET_CYCLE_MS) };
   }
 
+  private lastScan = new WeakMap<PilotConn, number>();
+
   /** Where else pays best for these items, and what every market wants this cycle */
   scan(conn: PilotConn, ids: string[]): void {
+    // The client asks every 20 s; a faster ask costs a full sort per id, so drop it
+    const now = Date.now();
+    if (now - (this.lastScan.get(conn) ?? 0) < 5000) return;
+    this.lastScan.set(conn, now);
+    ids = [...new Set(ids)];
     const here = this.host.stationAt(conn)?.id;
     const markets = this.host.stations().filter((s) => s.services.includes('market' as never) && s.id !== here);
     const best: Record<string, { station: string; name: string; system: string; price: number }[]> = {};

@@ -14,7 +14,7 @@
     "@space-game/common": "file:../common",
     "bitecs": "^0.3.40",
     "pg": "^8.23.1",
-    "ws": "^8.16.0"
+    "ws": "^8.22.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

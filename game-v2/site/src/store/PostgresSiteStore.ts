@@ -77,7 +77,10 @@ export class PostgresSiteStore implements SiteStore {
   static async create(connectionString: string): Promise<PostgresSiteStore> {
     const moduleName = 'pg';
     const pg: any = await import(moduleName);
-    const store = new PostgresSiteStore(new pg.Pool({ connectionString }) as PgPool);
+    const pool = new pg.Pool({ connectionString });
+    // Idle-client errors (Postgres restart) must not crash the site; the pool reconnects on the next query
+    pool.on('error', (err: Error) => console.error('[site] postgres pool error:', err.message));
+    const store = new PostgresSiteStore(pool as PgPool);
     await store.upgrade();
     return store;
   }

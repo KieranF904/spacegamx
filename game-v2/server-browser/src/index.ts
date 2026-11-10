@@ -84,6 +84,7 @@ async function sendPushoverNotification(title: string, message: string, priority
     await fetch('https://api.pushover.net/1/messages.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10_000),
       body: JSON.stringify({
         token: PUSHOVER_APP_TOKEN,
         user: PUSHOVER_USER_KEY,
@@ -115,7 +116,18 @@ function cleanup(): void {
 // ROUTE HANDLERS
 // ============================================
 
+/** Game servers prove themselves with the shared LOBBY_ADMIN_SECRET (when one is set; the lobby only listens on localhost either way) */
+const REGISTER_SECRET = process.env.LOBBY_ADMIN_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-lobby-admin-secret');
+
 async function handleRegister(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  if (REGISTER_SECRET) {
+    const given = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    const a = Buffer.from(given), b = Buffer.from(REGISTER_SECRET);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return;
+    }
+  }
   try {
     const body = await parseJson(req);
     const beat = parseHeartbeat(body, getClientIp(req));

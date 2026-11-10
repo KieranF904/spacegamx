@@ -26,6 +26,8 @@ RestartSec=3
 CPUWeight=200
 MemoryHigh=1536M
 MemoryMax=2G
+# V8 heap ceiling just under MemoryHigh, so the garbage collector works harder before the kernel would kill the process
+Environment=NODE_OPTIONS=--max-old-space-size=1400
 # Files it makes: not readable by other users (data/status gets an ACL for the monitor: remote-install.sh)
 UMask=0027
 # Keep it to its own folder
