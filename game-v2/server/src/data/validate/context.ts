@@ -62,9 +62,9 @@ export function checkShapes(c: Ctx, f: Record<string, any>, ships: ShipDataFiles
   const FILE_KEYS: Record<string, string> = {
     items: 'items.json', recipes: 'recipes.json', mining: 'mining.json', factions: 'factions.json', bosses: 'bosses.json',
     systems: 'systems.json', stations: 'stations.json', quests: 'quests.json',
-    people: 'people.json', codex: 'codex.json', achievements: 'achievements.json', unlocks: 'unlocks.json', hazards: 'hazards.json', gems: 'gems.json', station: 'station.json',
+    people: 'people.json', codex: 'codex.json', achievements: 'achievements.json', unlocks: 'unlocks.json', strings: 'strings.json', mobs: 'mobs.json', hazards: 'hazards.json', gems: 'gems.json', station: 'station.json',
   };
-  const OPTIONAL = new Set(['bosses', 'people', 'codex', 'achievements', 'unlocks', 'hazards', 'gems', 'station']);
+  const OPTIONAL = new Set(['bosses', 'people', 'codex', 'achievements', 'unlocks', 'strings', 'mobs', 'hazards', 'gems', 'station']);
   for (const [key, file] of Object.entries(FILE_KEYS)) {
     c.file = file;
     if (f[key] === undefined) { if (!OPTIONAL.has(key)) c.err('', 'file missing'); continue; }
