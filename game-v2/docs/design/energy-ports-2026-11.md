@@ -1,6 +1,6 @@
 # Energy ports: directed power routing (2026-11-02)
 
-Status: **design for testing in the lab** (`prototypes/energy-lab/ports.html`), from the owner's direction on 2026-11-02.
+Status (2026-11-10): BUILT; this is the design record, the current code is docs/areas/energy.md, and the pool model it replaces is gone. Original status: **design for testing in the lab** (`prototypes/energy-lab/ports.html`), from the owner's direction on 2026-11-02.
 Nothing in the game changes until the lab has settled the numbers. It replaces the touch-and-even-out routing of
 `energy-routing-impl.md` (D1, D5), the bank and pool rules (`circuits.ts`), the Diode and the Pulse Dynamo. It keeps the
 weapon buffer model (`energy-economy-2026-11.md` §2: Shot, Intake, Buffer) and the thruster buffer.

@@ -1,5 +1,5 @@
 /**
- * Debris, worked out alike on the server and every client (docs/areas/networking.md "Debris").
+ * Debris, worked out alike on the server and every client (docs/areas/networking/crowd-structs-cargo-debris.md "Debris").
  *
  * Debris is transient and harmless (ships pass through it), so it is kept cheap on the wire: when a part's loss splits
  * a ship, each client works out the pieces itself from what it already has (the ship's blueprint, its pose at the

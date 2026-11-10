@@ -1,6 +1,6 @@
 # Focus re-entry deltas: before and after on the crowd bench (2026-11-05)
 
-What changed (protocol 49, `CAPS.FOCUS`; docs/areas/networking.md "The focus grid"): the dropped-cell cache (a 10 s
+What changed (protocol 49, `CAPS.FOCUS`; docs/areas/networking/focus-blocks.md "The focus grid"): the dropped-cell cache (a 10 s
 hold, a hash round trip, a control log the client fast-forwarded, a 600-tick replay cap) and the forget path for a
 ship leaving the focus are gone. There is now one path for both. A ship leaving a pilot's view is remembered at both
 ends for 5 minutes, at most 256 a client (common network/cells.ts `AwayShips`, the same rule at both ends). The client

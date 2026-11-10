@@ -1,6 +1,6 @@
 # Focus grid: before and after on the crowd bench (2026-11-04)
 
-What changed: `CAPS.FOCUS` (1024, protocol 38; docs/design/awareness-model.md section 0, docs/areas/networking.md "The
+What changed: `CAPS.FOCUS` (1024, protocol 38; docs/design/awareness-model.md section 0, docs/areas/networking/focus-blocks.md "The
 focus grid"). A capable client holds the ships homed in the 8,192-unit cells within 19 km of its ship (flat), not
 everything within 40 km; the ring out to 35 km comes as map-dot ghosts; a dropped cell is kept 10 s and, back in focus,
 fast-forwarded from a log when its hash agrees and the log is smaller than an entry.

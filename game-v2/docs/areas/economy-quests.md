@@ -91,7 +91,7 @@ Mining has two separate sides (Kieran, 2026-11-05):
 | work | 1.3 | 1.2 | 1 | 0.85 | 0.7 | can't mine ("fit a better one") |
 | keep | 1 | 1 | 1 | 0.8 | 0.6 | |
 
-Every laser mines independently. The crowd mechanic (`crowd`, `kByGap`, `crowdFactor`, "works best with N lasers") is gone: four lasers mine four times as fast. **Power is the limit on laser spam.** A Mining Laser draws 30 a second (it was 12) and a Bore 40 (was 18). On the pool core, `payMining` records the share of their draw the lasers got (`ShipState.mineShare`), and `stepMiners` cuts by it, so lasers beyond what the generators can run brown out. Before this change the pool's share was ignored: a laser cut at full strength whatever it got, unless it got nothing at all. The ports core already cut by fulfilment, and its port rates were not changed.
+Every laser mines independently. The crowd mechanic (`crowd`, `kByGap`, `crowdFactor`, "works best with N lasers") is gone: four lasers mine four times as fast. **Power is the limit on laser spam.** A Mining Laser draws 30 a second (it was 12) and a Bore 40 (was 18). (History: the pool core is gone; the ports core shares power by its own rules, energy.md.) On the pool core, `payMining` recorded the share of their draw the lasers got (`ShipState.mineShare`), and `stepMiners` cuts by it, so lasers beyond what the generators can run brown out. Before this change the pool's share was ignored: a laser cut at full strength whatever it got, unless it got nothing at all. The ports core already cut by fulfilment, and its port rates were not changed.
 
 **Guns** are any tool that is neither a mining laser nor a `mining: true` tool (charges, the siphon). They use `guns`:
 - They mine hardness-1 rock only. On anything harder they say "fit a mining laser". Their tool hardness only decides which harder ores and gem seams inside soft rock they can take.
@@ -119,7 +119,7 @@ Why the numbers: guns keep about 30% of a Mk I Chondrite, so a Mk I laser gets a
 
 main_01 (10 ore with the starter's guns) takes about 18 s of steady fire. The training yard's "mine a rock" step finishes on the first chunk, after about 3 s.
 
-**Lasers on power** (pool core, Mk I Cell Reactor 35/s, core + reactor + N Mk I lasers, mining held from full; ore/min on Mk I rock = N × 41.9 × share, at the old 96 damage a unit: multiply by 2.6 at today's 37):
+**Lasers on power** (HISTORY, measured on the old pool core; Mk I Cell Reactor 35/s, core + reactor + N Mk I lasers, mining held from full; ore/min on Mk I rock = N × 41.9 × share, at the old 96 damage a unit: multiply by 2.6 at today's 37):
 
 | Mk I lasers on 1 Cell Reactor | Before: share (brownout at) | After: share, 1st min / steady (brownout at) | After: ore/min, steady |
 |---|---|---|---|

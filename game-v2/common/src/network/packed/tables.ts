@@ -96,7 +96,7 @@ export const PACKED_FIELDS: Record<string, { code: number; fields: readonly Pack
  * `data` values by index at 0 decimals in these chunks (types not listed: the default).
  */
 export const PK_ENTITY: Record<number, { xy: number; angle: number; v: number; data: readonly number[] }> = {
-  // Player (status rows; your own row's data: cursor/weapon state, charge, ... see docs/areas/networking.md)
+  // Player (status rows; your own row's data: cursor/weapon state, charge, ... see docs/areas/networking/interface-core.md)
   1: { xy: 2, angle: 5, v: 4, data: [11, 4, 6, 1, 1, 1, 11, 1, 8, 2, 1, 8, 1, 8, 1, 1, 1, 1, 1, 1, 5, 3, 6, 1, 5, 3, 6] },
   // Enemy (mobs)
   2: { xy: 1, angle: 3, v: 1, data: [2] },

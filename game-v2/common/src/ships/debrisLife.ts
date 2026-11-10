@@ -1,6 +1,6 @@
 /**
  * A piece of debris's life after its spawn, worked out alike on the server and on a client running the piece itself
- * (CAPS.DEBRIS, docs/areas/networking.md "Debris"): when each part crumbles away, and what a crumble leaves. Nothing
+ * (CAPS.DEBRIS, docs/areas/networking/crowd-structs-cargo-debris.md "Debris"): when each part crumbles away, and what a crumble leaves. Nothing
  * else changes a piece's structure without the server saying so (a shot, a blast, a tow: the piece is told from then).
  *
  *   decay     each part's crumble tick, fixed at its spawn: seeded by the piece and its spawn tick (debrisDecay), or

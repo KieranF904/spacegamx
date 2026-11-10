@@ -18,7 +18,7 @@ to the working tree on `refactor/split` at 764619d.
 - **Ring = every cell within 35 km**, ghosts only, not simulated, flat threshold. About 75 cells in all, so about 48
   beyond the focus.
 - **Dropped-cell cache.** (Superseded 2026-11-05, protocol 49: no log or replay. A ship leaving view is remembered at
-  both ends for minutes and comes back with its keyframe and only what changed since: docs/areas/networking.md "The
+  both ends for minutes and comes back with its keyframe and only what changed since: docs/areas/networking/focus-blocks.md "The
   focus grid", docs/audits/focus-reentry-deltas-2026-11-05.md. The original text follows.)
   When a cell leaves the focus the client keeps its state, stamped with the drop tick, for 10 s.
   On re-entry it sends (cell, tick T, hash H). If the server's recorded hash for that cell at T matches and the cell's log
@@ -1243,7 +1243,7 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
 - *Status (2026-11-04):* the cause half is built behind `CAPS.CAUSES` (2048, protocol 39), on the dev server: contacts
   (every pair, a cell border or not), rebuilds and pilots' pulls go as cause records on the ships they moved, worked out
   on every client's tick layer with the shared function; contacts and rebuilds no longer keyframe other ships for such a
-  client, and its own check covers every ship it holds (docs/areas/networking.md, "Other ships' causes"; measured in
+  client, and its own check covers every ship it holds (docs/areas/networking/causes-waypoints-pilots.md, "Other ships' causes"; measured in
   docs/audits/effects-2026-11-04.md). Not built: shell spawn quantisation and arrivals (out-of-view shells still come as
   rounded rows, their hits told), itineraries and inflow blocks, debris knocked by debris a client doesn't hold
   (keyframed as before).
@@ -1258,7 +1258,7 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
 
 **Phase 6: resolved streams, waypoint laws and the cell hash.**
 - *Status (2026-11-04, `CAPS.WAYPOINTS` 4096, protocol 40):* the waypoint law is built for homing shells and mobs
-  (common guidance/; docs/areas/networking.md "Scheduled waypoints"): the server flies on it, a client derives the
+  (common guidance/; docs/areas/networking/causes-waypoints-pilots.md "Scheduled waypoints"): the server flies on it, a client derives the
   waypoints when it held the target through a window and takes the server's records otherwise (MODE per window),
   exact through the switch; checked on its own check. Measured in docs/audits/waypoints-2026-11-04.md (a missile
   barrage in focus: 2,168 -> 657 B/s). Not built: the AI pilot (needs the commander/pilot split), guided shells,
