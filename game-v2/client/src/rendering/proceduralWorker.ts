@@ -14,7 +14,7 @@ import { buildStationAtlas, STATION_ATLAS_VERSION } from './stations/stationText
 import { bakeStation, bakeTransfers, STATION_BAKE_VERSION, type BakeOutput } from './stations/stationBake';
 import { noise3Data, PLASMA_NOISE_VERSION } from './sun/plasmaNoise';
 import { buildPlanetNoise, type PlanetNoise, type ProceduralRequest } from './procedural';
-import { PLANET_NOISE_VERSION } from './planet-proto/planetNoise';
+import { PLANET_NOISE_VERSION } from './planetView/planetNoise';
 
 // (Nothing kept in memory here: each is handed over, its buffers moved)
 const rockAtlas = assetKind<Uint8Array>('rockAtlas', ROCK_ATLAS_VERSION, { memory: false });

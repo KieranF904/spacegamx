@@ -6,7 +6,6 @@ import { join, dirname } from 'path';
 import { appendFile, mkdir, writeFile, rename } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { GameServer } from './GameServer.js';
-import { AdminServer, adminPassword } from './AdminServer.js';
 import { createUserStore } from './auth/index.js';
 import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
 import { GameData } from './data/GameData.js';
@@ -31,7 +30,6 @@ const dataPath = join(__dirname, '../../data');
 const PORT = parseInt(process.env.PORT || '3000', 10);
 /** The address it listens on: every interface unless HOST says (the VPS unit: 127.0.0.1, behind nginx) */
 const HOST = process.env.HOST || undefined;
-const ADMIN_PORT = parseInt(process.env.ADMIN_PORT || '3005', 10);
 const DEV_MODE = process.env.NODE_ENV !== 'production';
 // The training yard for new pilots (game/tutorial): on in production; on the dev server only with TUTORIAL=1 (it then replaces the dev Rockery start); TUTORIAL=0 turns it off anywhere
 const TUTORIAL_ON = process.env.TUTORIAL ? process.env.TUTORIAL === '1' : !DEV_MODE;
@@ -45,17 +43,6 @@ const PUBLIC_HOST = process.env.PUBLIC_HOST || 'localhost';
 console.log('Starting Space Game Server v2...');
 console.log(`Data path: ${dataPath}`);
 console.log(`Mode: ${DEV_MODE ? 'DEVELOPMENT' : 'PRODUCTION'}`);
-
-// Start admin server (both dev and production for live editing), with a password from the environment
-// (adminPassword: development falls back to 'admin'; production has none, so without one it stays off)
-let adminServer: AdminServer | null = null;
-const ADMIN_PASSWORD = adminPassword();
-if (ADMIN_PASSWORD) {
-  adminServer = new AdminServer(ADMIN_PORT, ADMIN_PASSWORD);
-  console.log(`Admin server running on port ${ADMIN_PORT}`);
-} else {
-  console.log("Admin server not started: no ADMIN_SERVER_PASSWORD, ADMIN_PASSWORD or LOBBY_ADMIN_SECRET is set (production has no default password)");
-}
 
 // Accounts: the lobby keeps them (one account for every server); we ask it
 const userStore = createUserStore(BROWSER_URL, LOBBY_ADMIN_SECRET);
@@ -81,7 +68,6 @@ const gameServer = new GameServer({
   // (in development, with the dev-only rock system: data/dev/rockery.json)
   gameData: new GameData(withDevData(readGameDataFiles(dataPath), dataPath)),
   userDB: userStore,
-  adminServer,
   ships: createShipBridge(shipConfig),
   profileStore,
   // Friends and status live per account in the lobby, so they follow the account to every server (game/social).
@@ -212,7 +198,6 @@ async function registerWithBrowser() {
         players: gameServer.getPlayerCount(),
         secure: !DEV_MODE,
         version: '2.0.0',
-        adminPort: ADMIN_PORT,
         // (Who this is and what it runs: the lobby matches it to its definition, and offers it only to clients on this protocol)
         ...heartbeatIdentity()
       })

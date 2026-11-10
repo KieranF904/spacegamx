@@ -17250,7 +17250,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 759,
+      "lines": 751,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -17277,8 +17277,8 @@
         {
           "name": "GameServer",
           "kind": "class",
-          "start": 120,
-          "end": 759
+          "start": 119,
+          "end": 751
         }
       ]
     },
@@ -20289,9 +20289,9 @@
       "id": "server.gameserver.admin",
       "path": "server/src/gameServer/admin.ts",
       "group": "server/gameServer",
-      "lines": 274,
-      "owns": "the admin host and the admin server hooks, admin stats and perf metrics",
-      "needs": "GameServer (type), game/AdminTools, AdminServer; npm: @space-game/common, bitecs",
+      "lines": 196,
+      "owns": "the admin host, admin stats and perf metrics",
+      "needs": "GameServer (type), game/AdminTools; npm: @space-game/common, bitecs",
       "events": "",
       "invariants": [
         {
@@ -20301,11 +20301,8 @@
       ],
       "extend": "a new admin command is an AdminHost member here",
       "exports": [
-        "adminKillAllEnemies",
-        "adminTeleportPlayer",
         "createAdminHost",
         "reportAdminStats",
-        "setupAdminHandlers",
         "updatePerfMetrics"
       ],
       "sections": [
@@ -20316,34 +20313,16 @@
           "end": 119
         },
         {
-          "name": "setupAdminHandlers",
-          "kind": "function",
-          "start": 121,
-          "end": 148
-        },
-        {
-          "name": "adminKillAllEnemies",
-          "kind": "function",
-          "start": 150,
-          "end": 159
-        },
-        {
-          "name": "adminTeleportPlayer",
-          "kind": "function",
-          "start": 161,
-          "end": 187
-        },
-        {
           "name": "reportAdminStats",
           "kind": "function",
-          "start": 189,
-          "end": 250
+          "start": 121,
+          "end": 172
         },
         {
           "name": "updatePerfMetrics",
           "kind": "function",
-          "start": 252,
-          "end": 274
+          "start": 174,
+          "end": 196
         }
       ]
     },
@@ -20838,7 +20817,7 @@
       "id": "server.gameserver.options",
       "path": "server/src/gameServer/options.ts",
       "group": "server/gameServer",
-      "lines": 70,
+      "lines": 68,
       "owns": "the GameServer constructor options",
       "needs": "types only; npm: @space-game/common",
       "events": "",
@@ -20856,8 +20835,8 @@
         {
           "name": "GameServerOptions",
           "kind": "interface",
-          "start": 21,
-          "end": 70
+          "start": 20,
+          "end": 68
         }
       ]
     },

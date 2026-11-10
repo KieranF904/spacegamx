@@ -5,7 +5,7 @@
   `CONTEXT.md` points at its guide. Do not read other areas "just in case".
 - Big files (open by line range, not whole): `client/src/Game.ts` (~1,300 lines), `server/src/game/Quests.ts`,
   `client/src/state/GameState.ts` (~900 each). `GameServer.ts`, `Renderer.ts`, `HangarUI.ts` are now ~750 lines each
-  and `common/src/network/protocol.ts` is a small index; `client/tools/sandbox.ts` (~4,900 lines) is a stale dev tool.
+  and `common/src/network/protocol.ts` is a small index.
   Grep the name, or read the line range the guide gives.
 - Line numbers in docs drift; grep the banner text or symbol.
 

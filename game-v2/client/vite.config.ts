@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import { shipsDevApi } from './shipsDevApi';
 
-/** In the browser, Node's built-ins (imported by the server code the sandbox and replays bundle) are stubs */
+/** In the browser, Node's built-ins (imported by the server code proto mode and the replays bundle) are stubs */
 const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib|crypto)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
 
 /**
@@ -27,14 +27,14 @@ const serverOutOfMain = (): Plugin => ({
   },
 });
 
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig(({ command }) => ({
   plugins: [shipsDevApi(), serverOutOfMain()],
   // (module workers, split like the rest: the hull worker brings in the hull builder and what it needs)
   worker: { format: 'es' },
   resolve: {
     alias: [
       { find: '@space-game/common', replacement: resolve(__dirname, '../common/src') },
-      // (in dev too: the sandbox and replays bundle server code that imports Node's built-ins by name)
+      // (in dev too: proto mode and replays bundle server code that imports Node's built-ins by name)
       ...nodeStubs(true),
     ],
   },
@@ -64,8 +64,6 @@ export default defineConfig(({ command, mode }) => ({
       },
       input: {
         main: resolve(__dirname, 'index.html'),
-        // The sandbox (a developer tool) only in non-production builds, or with SANDBOX_BUILD=1
-        ...(mode !== 'production' || process.env.SANDBOX_BUILD === '1' ? { sandbox: resolve(__dirname, 'sandbox.html') } : {}),
       },
     },
   },

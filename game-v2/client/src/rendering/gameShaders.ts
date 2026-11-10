@@ -10,7 +10,7 @@ import { batchProgram, pipePrograms, programsUnder } from './shaderWarmup';
 import { litProgram } from './lighting/litShader';
 import { sunProgram } from './sun/SunRenderer';
 import { skyPrograms, skyRingProgram } from './sky/SkyRenderer';
-import { planetPrograms } from './planet-proto/planetQuad';
+import { planetPrograms } from './planetView/planetQuad';
 import { shipHullProgram } from './lighting/ShipBatch';
 import { asteroidPrograms } from './lighting/AsteroidBatch';
 import { stationProgram } from './stations/StationMaterials';

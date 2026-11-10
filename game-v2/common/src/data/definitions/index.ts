@@ -19,4 +19,3 @@ export type {
 } from './AsteroidDefinition.js';
 
 // === Sun Shader System ===
-export * from './SunShaderDefs.js';

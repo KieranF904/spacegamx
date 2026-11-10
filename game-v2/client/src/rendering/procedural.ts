@@ -13,7 +13,7 @@ import { buildStillstoneMap } from './stillstoneMap';
 import { buildStationAtlas } from './stations/stationTextures';
 import { bakeStation, type BakeInput, type BakeOutput } from './stations/stationBake';
 import { noise3Data } from './sun/plasmaNoise';
-import { planetCrackCells, planetNoiseData as bakePlanetNoise } from './planet-proto/planetNoise';
+import { planetCrackCells, planetNoiseData as bakePlanetNoise } from './planetView/planetNoise';
 
 export type ProceduralRequest = { id: number; kind: 'rockAtlas' } | { id: number; kind: 'stillstone'; data: LodestoneData }
   | { id: number; kind: 'stationAtlas' } | { id: number; kind: 'stationBake'; data: BakeInput } | { id: number; kind: 'plasmaNoise' }
@@ -108,7 +108,7 @@ export function plasmaNoiseData(): Promise<Uint8Array> {
   return (plasmaNoise ??= run<Uint8Array>({ kind: 'plasmaNoise' }));
 }
 
-/** The planets' noise volume and crack candidates (planet-proto/planetNoise.ts) */
+/** The planets' noise volume and crack candidates (planetView/planetNoise.ts) */
 export interface PlanetNoise { noise: Uint8Array; cells: Uint8Array }
 export function buildPlanetNoise(): PlanetNoise {
   return { noise: bakePlanetNoise(), cells: planetCrackCells() };

@@ -21,7 +21,7 @@ import { vignette } from './fxTextures';
 import { stepOverlays, screenTint } from './overlayFrame';
 import { screenToWorld, viewHalfExtents, worldToScreen } from './cameraView';
 import { PlanetRenderer } from './PlanetRenderer';
-import { setPlanetDetail } from './planet-proto/planetQuad';
+import { setPlanetDetail } from './planetView/planetQuad';
 import { installVolumeUpload } from './texture3d';
 import { SceneryRenderer } from './Scenery';
 import { NestRenderer } from './NestViews';
@@ -200,7 +200,7 @@ export class Renderer {
   constructor(app: Application, state: GameState) {
     this.app = app;
     this.state = state;
-    // (the planets' noise is a 3D texture: planet-proto/planetTextures.ts)
+    // (the planets' noise is a 3D texture: planetView/planetTextures.ts)
     installVolumeUpload(app.renderer);
     this.panCtl = new PanControl(app.canvas as HTMLCanvasElement, { zoom: () => this.cameraZoom, locked: () => !!this.cameraTarget });
 

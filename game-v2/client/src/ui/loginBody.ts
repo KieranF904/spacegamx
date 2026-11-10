@@ -22,8 +22,8 @@
 import { Container, type GlProgram } from 'pixi.js';
 import type { PlanetData, StarSystemData } from '@space-game/common';
 import { planetBody, moonBody, hashId } from '../rendering/PlanetRenderer';
-import { planetQuad, planetProgram } from '../rendering/planet-proto/planetQuad';
-import { planetTexturesReady } from '../rendering/planet-proto/planetTextures';
+import { planetQuad, planetProgram } from '../rendering/planetView/planetQuad';
+import { planetTexturesReady } from '../rendering/planetView/planetTextures';
 import type { ShaderQuad } from '../rendering/shaderQuad';
 import { shaderReady } from '../rendering/shaderWarmup';
 import { LOGIN_ORBITS, offScreen, pathAngle, pathPoint, pathThrough, pathWindow, pickFloater, startSpots, type OrbitView } from './loginOrbits';

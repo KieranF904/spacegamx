@@ -3,7 +3,7 @@
 The project runs fully locally: no Supabase, no Fly.io, no external services. Production is the user's shared VPS
 (`deploy/vps/deploy.sh`, see the ops-tools guide). Read this page, then only your area's guide in the table below.
 Never open the god-files whole (`GameServer.ts`, `Game.ts`, `Renderer.ts`, `HangarUI.ts`,
-`protocol.ts`, `client/tools/sandbox.ts`): the guides give section maps to grep. The Stage 2-5 splits are where to start: `server/src/ships/bridge/*.ts`, `server/src/net/auth.ts`, `server/src/net/handlers/*.ts`, `server/src/net/SnapshotBuilder.ts`, `server/src/net/snapshot/*.ts`, `server/src/game/Docking.ts`, `server/src/game/Derelicts.ts`, `client/src/app/*.ts`, `common/src/network/inputFields.ts`, `common/src/ships/flightInputs.ts`.
+`protocol.ts`): the guides give section maps to grep. The Stage 2-5 splits are where to start: `server/src/ships/bridge/*.ts`, `server/src/net/auth.ts`, `server/src/net/handlers/*.ts`, `server/src/net/SnapshotBuilder.ts`, `server/src/net/snapshot/*.ts`, `server/src/game/Docking.ts`, `server/src/game/Derelicts.ts`, `client/src/app/*.ts`, `common/src/network/inputFields.ts`, `common/src/ships/flightInputs.ts`.
 
 ## Quick start
 
@@ -20,9 +20,8 @@ Then open http://localhost:5273. No servers needed for `npm run proto` (the game
 
 | Service | Port | Purpose |
 |---|---|---|
-| Client (Vite) | 5273 | Game client, sandbox, `viewer.html`, `sunlab.html`, `planetlab.html` (dev only) |
+| Client (Vite) | 5273 | Game client, `viewer.html` (dev only) |
 | Game server | 3000 | WebSocket game server + HTTP auth |
-| Admin server | 3005 | Live admin dashboard (password `admin` in dev; see `ADMIN_SERVER_PASSWORD`) |
 | Server browser (lobby) | 8787 | Lobby/server registry and accounts |
 | Website | 5310 | `site/`: updates, community, accounts, Play |
 | Native renderer | 5311 | Stills service (127.0.0.1 only), `npm run render` |
@@ -41,8 +40,6 @@ Never leave dev servers or headless browsers running after a check.
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | 3000 | Game server port |
-| `ADMIN_PORT` | 3005 | Admin dashboard port |
-| `ADMIN_SERVER_PASSWORD` | dev `admin`; production none | Admin dashboard password (then `ADMIN_PASSWORD`, then `LOBBY_ADMIN_SECRET`). With none in production the dashboard does not start. The VPS deploy makes one in `/etc/spacegame/secrets.env` |
 | `BROWSER_URL` | `http://localhost:8787` | Server browser URL |
 | `LOBBY_ADMIN_SECRET` | dev fixed; production none | Shared by the lobby and game servers for admin account commands (admin rank, bans); same value on both; with none in production those commands are refused |
 | `OWNER_USERNAMES` | none | Lobby: comma-separated usernames made the owner (the rank above admin) at every start; removing a name doesn't revoke (the lobby's `/admin/set-owner` does). See web-accounts, Ranks |

@@ -6,8 +6,8 @@
 import { Container } from 'pixi.js';
 import type { PlanetLookData } from '@space-game/common';
 import { createShaderQuad, ShaderQuad } from './shaderQuad';
-import { planetQuad } from './planet-proto/planetQuad';
-import { planetTexturesReady } from './planet-proto/planetTextures';
+import { planetQuad } from './planetView/planetQuad';
+import { planetTexturesReady } from './planetView/planetTextures';
 
 /** Top-down black hole: event horizon, photon ring, Keplerian accretion disk, faint haze. */
 const BLACK_HOLE = `
