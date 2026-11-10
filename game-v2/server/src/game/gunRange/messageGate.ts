@@ -40,7 +40,7 @@ export const RANGE_GATE = {
   tradeOffer: 'refuse', tradeAccept: 'refuse', tradeCancel: 'refuse', outpostCharter: 'refuse', outpostUpgrade: 'refuse', skillUp: 'refuse',
   // Jobs, people, the codex, sieges and the training yard
   job: 'refuse', questAccept: 'refuse', questAbandon: 'refuse', questBoard: 'refuse', questSeen: 'refuse', talk: 'refuse', codexRead: 'refuse',
-  siege: 'refuse', trainingDrone: 'refuse', tutorialLeave: 'refuse', tutorialReport: 'refuse', contrib: 'refuse',
+  siege: 'refuse', tutorialLeave: 'refuse', tutorialReport: 'refuse', contrib: 'refuse',
   // Admin and dev tools (they move ships and hand out things: leave the range first)
   admin: 'refuse', devTeleport: 'refuse', devSpawn: 'refuse', devShip: 'refuse', devBoss: 'refuse', devStation: 'refuse', devBank: 'refuse',
   bossDevTool: 'refuse',

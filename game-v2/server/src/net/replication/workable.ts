@@ -26,10 +26,12 @@ export function workable(rep: ReplicationCore, s: Shadow, synced: ((id: number) 
     if (!c) continue;
     // (Its own ship: it has the structure it flew each tick with)
     if (c.other === self) { if (!mine?.own) return false; continue; }
+    // (Not rebuilt since, in view: it has it, or will by this frame's sync. The cheap test first; none of them moves anything)
+    const now = rep.ships.get(c.other)?.rebuilds;
+    if (now === c.rebuilds && (!view || view.has(c.other))) continue;
     // (Keeping every structure by its tick, CAPS.STRUCTS: the one the other had then)
     if (kept?.(c.other)?.includes(c.rebuilds)) continue;
-    const now = rep.ships.get(c.other)?.rebuilds, has = synced ? synced(c.other) : now;
-    if (has === c.rebuilds || (now === c.rebuilds && (!view || view.has(c.other)))) continue;
+    if ((synced ? synced(c.other) : now) === c.rebuilds) continue;
     return false;
   }
   return true;

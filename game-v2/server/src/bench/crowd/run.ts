@@ -30,6 +30,11 @@ export interface CaseOpts {
   hash?: boolean;
   /** Write the first counting socket's messages, decoded, one per line, to this file (to diff two runs' frames) */
   dump?: string;
+  /**
+   * Time these server methods too (inclusive ms per measured tick, timing.parts): paths from the server object, the
+   * method last, e.g. "snapshots.motionFor,gunNet.pilot" (a method called inside another counts in both)
+   */
+  parts?: string;
 }
 
 const WS_HEADER = 66; // TCP/IP + WebSocket framing per message, as the earlier probes counted it
@@ -89,6 +94,15 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const cpuMs = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
   { const orig = srv.snapshots.sendSnapshots; srv.snapshots.sendSnapshots = (...a: any[]) => { const c0 = cpuMs(); try { return orig(...a); } finally { cSnap += cpuMs() - c0; } }; }
   timed(srv.replication, 'forClient', (ms) => { aRepl += ms; });
+  // (--parts: more methods' time, summed while measuring)
+  const parts: Record<string, number> = {};
+  for (const path of (o.parts ?? '').split(',').filter(Boolean)) {
+    const keys = path.split('.'), name = keys.pop()!;
+    const obj = keys.reduce((x: any, k) => x?.[k], srv);
+    if (typeof obj?.[name] !== 'function') { console.error(`--parts: no method ${path}`); continue; }
+    parts[path] = 0;
+    timed(obj, name, (ms) => { if (measuring) parts[path] += ms; });
+  }
   timed(srv.net, 'flushOutbox', (ms) => { aFlush += ms; });
   timed(ships, 'rebuildNow', (ms) => { aReb += ms; nReb++; });
   // (Debris: the shared drift-and-knock step's cost, and how many pieces there are)
@@ -233,6 +247,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
     rebuildMsPerTick: r2(mean(rebuildMs)), rebuildsPerSec: r2(sum(rebuildCount) / secs), rebuildRepeats: sum(rebuildRepeat),
     debrisStepMsPerTick: r2(mean(debrisMs)), debrisMean: r2(mean(debrisN)), debrisMax: Math.max(0, ...debrisN),
     tickCpuMs: r2(mean(tickCpu)), snapshotsCpuMsPerTick: r2(mean(snapCpu)),
+    parts: Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, r2(v / Math.max(1, tickMs.length))])),
   };
   const bulk: Counter[] = [...counters.values()];
   const bulkRaw = bulk.map((c) => c.raw / secs), bulkMsgs = bulk.map((c) => c.msgs / secs);

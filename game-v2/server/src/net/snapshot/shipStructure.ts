@@ -9,7 +9,7 @@
  * extend:     a new field of a ship's structure on the wire is one member of the shipSync in sendShipUpdates
  */
 import { InSystem, hpWire, type ShipState, type ClientSocket, type ServerMessage } from '@space-game/common';
-import type { ClientConnection } from '../ClientConnection.js';
+import { syncedShip, type ClientConnection } from '../ClientConnection.js';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 import { nextSync, type StructEntry } from '../../ships/bridge/structLog.js';
 import type { HitLedger } from '../hits/HitLedger.js';
@@ -24,6 +24,13 @@ export function designHash(bp: unknown): string {
     b = Math.imul(b ^ c, 0x5bd1e995) ^ (b >>> 15);
   }
   return (a >>> 0).toString(36) + (b >>> 0).toString(36);
+}
+
+/** Two HP copies alike to the bit (Object.is: NaN, a resync's, is itself and -0 isn't 0) */
+function sameHp(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
 }
 
 /** What ship structure needs of the server */
@@ -155,7 +162,12 @@ export class ShipStructure {
         // (Its crumbling it works out: what it has is the server's, so nothing goes. Told: a sync (it takes that as the
         // word it's told from now on), at least of the structure it has now, and its HP since)
         if (!this.ships.debrisNet.told.has(id) && synced?.ship === ship) {
-          if (syncs) { synced.rebuilds = ship.rebuilds; conn.shipHpSent.set(id, this.syncWireOf(id, ship).hp.slice()); }
+          if (syncs) {
+            synced.rebuilds = ship.rebuilds;
+            // (a copy of the sync's HP; the one it has kept when it's that already: nothing else holds it, hits change it in place)
+            const hp = this.syncWireOf(id, ship).hp, had = conn.shipHpSent.get(id);
+            if (!had || !sameHp(had, hp)) conn.shipHpSent.set(id, hp.slice());
+          }
           continue;
         }
         live.delete(id);
@@ -175,7 +187,7 @@ export class ShipStructure {
         const dmg = this.ships.damageMulOf(id), hadDmg = fresh ? 1 : (synced?.dmg ?? 1);
         // (Pinned as it spawned, told on a new ship's sync: the client's contact pass takes it so, contactsFor.ts)
         const pinned = fresh ? this.ships.isPinned(id) : !!synced?.pinned;
-        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg, pinned };
+        synced = syncedShip(ship, ship.rebuilds, this.currentTick, kept, dmg, pinned);
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;

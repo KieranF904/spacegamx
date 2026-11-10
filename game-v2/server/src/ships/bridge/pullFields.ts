@@ -98,6 +98,13 @@ export class ServerPulls {
     return false;
   }
 
+  /** The pullers needsPuller is true of (every field's `from` whose pull reads where it is) */
+  pullers(): Set<number> {
+    const out = new Set<number>();
+    for (const f of this.declarer.book.all()) if (fieldNeedsPuller(f.kind)) out.add(f.from);
+    return out;
+  }
+
   /**
    * One client's records: every field of its system it hasn't been told as it now stands (`told`: id -> version, its
    * connection's; cleared when it changes system). Null: none

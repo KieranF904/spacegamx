@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { GUN_ARRAYS, GUN_SCALARS, cloneGunState, cloneSimShip, gunScalarsOntoRecord, gunStateOf, newSimShip, type GunState } from './state.js';
-import { packGunSync, unpackGunSync, laneHash, laneOf } from './otherGuns.js';
+import { packGunSync, unpackGunSync, laneHash, laneOf, GUN_SYNC_UNSENT } from './otherGuns.js';
 import { cloneOwnExtras, packOwnSync, unpackOwnSync, type OwnExtras } from './ownStep.js';
 import { shipHash } from './ring.js';
 import type { ShipDerived } from '../ships/rebuild.js';
@@ -49,7 +49,10 @@ describe('GUN_FIELDS', () => {
     const g = full();
     expect(unpackOwnSync(JSON.parse(JSON.stringify(packOwnSync(5, extras(g))))).guns).toEqual(g);
     const back = unpackGunSync(JSON.parse(JSON.stringify(packGunSync(1, 5, extras(g), { bits: 3, dist: 400 })))).x.guns;
-    expect(back).toEqual(g);
+    // (but the mining scalars, which a lane doesn't run: GUN_SYNC_UNSENT)
+    const lane = { ...g } as Record<string, unknown>;
+    for (const k of GUN_SYNC_UNSENT) lane[k] = undefined;
+    expect(back).toEqual(lane);
   });
 
   it('every scalar moves the hash (the Tow Beam\'s tow aside in a lane\'s)', () => {

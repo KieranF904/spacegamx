@@ -9,7 +9,7 @@
  */
 import { hasComponent, type IWorld } from 'bitecs';
 import { Player, Health, packIds, packRuns, packSheds, TICK_RATE, type ClientSocket, type ServerMessage } from '@space-game/common';
-import type { ClientConnection } from '../ClientConnection.js';
+import { syncedShip, type ClientConnection } from '../ClientConnection.js';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 import type { Replication } from '../Replication.js';
 import { DEBRIS_ACK_TICKS } from './constants.js';
@@ -138,7 +138,7 @@ export class DebrisHold {
         continue;
       }
       this.debrisAcks.ok++;
-      conn.shipSynced.set(id, { ship, rebuilds: sp.rebuilds });
+      conn.shipSynced.set(id, syncedShip(ship, sp.rebuilds));
       conn.shipHpSent.set(id, held.hp);
       conn.repKnown.set(id, 1);
       conn.debrisRowOk.add(id);

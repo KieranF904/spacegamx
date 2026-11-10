@@ -108,8 +108,8 @@ export class Replication implements ReplicationCore {
    * One client's share: keyframes for ships it's new to or behind on, control changes and causes for the rest
    * (replication/forClient.ts). `known` is the client's ship → keyframe version; `since` its last snapshot's tick
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, live?: ReadonlySet<number>, since?: number, pins?: (id: number) => boolean | undefined): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
-    return forClient(this, systemId, self, known, snapshotTick, view, held, synced, bodies, kept, readers, live, since, pins);
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, live?: ReadonlySet<number>, since?: number, pins?: (id: number) => boolean | undefined, pinsAmong?: () => Iterable<number>): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; found?: ContactWindow } {
+    return forClient(this, systemId, self, known, snapshotTick, view, held, synced, bodies, kept, readers, live, since, pins, pinsAmong);
   }
 
   /** Its bodied shadow's keyframe version (CAPS.BODIES clients' known version of it), or undefined: not flown by its body */
@@ -135,14 +135,22 @@ export class Replication implements ReplicationCore {
    */
   heldByte(known: ReadonlyMap<number, number>, self: number, bodies?: (id: number) => boolean): number {
     let sum = 0;
+    // (Each body's hash once a round, for every client holding it: nothing steps a shadow within a round)
+    const hashes = this.roundHashes;
     for (const [id, v] of known) {
       const s = this.shadows.get(id);
       if (id === self || !s || s.mode === ReplicaMode.Drift || s.mode === ReplicaMode.Docked || this.ships.get(id)?.kind !== 'ship') continue;
       const b = s.bodied && bodies?.(id) && v === s.bodied.cver ? s.bodied.body : v === s.cver ? s.body : null;
-      if (b) sum = (sum + replicaHash(id, b)) >>> 0;
+      if (!b) continue;
+      let h = hashes?.get(b);
+      if (h === undefined) { h = replicaHash(id, b); hashes?.set(b, h); }
+      sum = (sum + h) >>> 0;
     }
     return replicasByte(sum);
   }
+
+  /** This round's bodies' replica hashes (heldByte; null between rounds) */
+  private roundHashes: Map<FlightBody, number> | null = null;
 
   /** A keyframe of this ship added to a client's snapshot after its forClient (BodyNet.readersOf) */
   keyNow(eid: number, known: Map<number, number>, ships: KeyframeRow[]): void {
@@ -203,6 +211,7 @@ export class Replication implements ReplicationCore {
   /** Before building snapshots: ships that left their predicted path get a new keyframe */
   beginSnapshot(due?: (eid: number) => boolean): void {
     this.roundShips = new Map();
+    this.roundHashes = new Map();
     for (const [eid, s] of this.shadows) {
       // Gone since the tick ended (taken out of the world between): nothing to send
       if (!this.ships.has(eid)) { this.shadows.delete(eid); continue; }
@@ -234,6 +243,7 @@ export class Replication implements ReplicationCore {
   /** After the snapshots: the control changes have been delivered */
   endSnapshot(due?: (eid: number) => boolean): void {
     this.roundShips = null;
+    this.roundHashes = null;
     if (due) { let n = 0; for (const k of this.knocks) if (!due(k[0]) && !due(k[1])) this.knocks[n++] = k; this.knocks.length = n; }
     else this.knocks.length = 0;
     this.ships.debrisNet.clearTouched(due);

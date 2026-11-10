@@ -38,6 +38,8 @@ export interface ContactWindowHost {
    * now), and a pinned ship is left out. Absent: no client knows, every pinned ship is left out
    */
   toldPinned?(id: number): boolean | undefined;
+  /** Every ship it may have been told pinned (a superset of those toldPinned is true of; absent: any it holds) */
+  toldPinnedAmong?(): Iterable<number>;
 }
 
 export interface ContactWindow {
@@ -79,22 +81,28 @@ export function contactWindow(h: ContactWindowHost): ContactWindow {
       for (let k = 0; k < e.rebuilds.length; k++) if (!h.structOk(id, e.rebuilds[k], e.ticks[k])) { out.add(id); break; }
     }
   }
-  // (A tick whose pass had none pinned: a side differs only where it was told pinned, so with none of those its pairs
-  // can't differ. toldPinned reads nothing that moves within the window: asked once a ship)
-  let toldAny: boolean | undefined;
+  // (A pair's side the client takes otherwise pinned or not than the pass had it: pinned in the pass, or told pinned
+  // (toldPinned true), but not both. Not told, or told not pinned, it takes the pass's. So the ships that differ on a
+  // tick are the pass's pinned it wasn't told so and those told so the pass hadn't pinned; a tick with none, or no
+  // pairs, can't differ. toldPinned reads nothing that moves within the window: asked once a ship)
+  let toldSet: Set<number> | undefined;
   for (let t = from + 1; t <= h.to; t++) {
     const L = log.at(t, systemId);
-    if (!L) continue;
-    // (A pair's side the client takes otherwise pinned or not than the pass had it)
-    if (L.pinned.length || (h.toldPinned && (toldAny ??= [...held].some((id) => h.toldPinned!(id) === true)))) {
-      const told = h.toldPinned;
-      const differs = (id: number) => { const p = L.pinned.includes(id), k = told?.(id); return k === undefined ? p : k !== p; };
-      for (let k = 0; k < L.pairs.length; k += 2) {
-        const a = L.pairs[k], b = L.pairs[k + 1];
-        if (!held.has(a) || !held.has(b)) continue;
-        if (differs(a)) out.add(a);
-        if (differs(b)) out.add(b);
-      }
+    if (!L || !L.pairs.length) continue;
+    if (!toldSet) {
+      toldSet = new Set();
+      if (h.toldPinned) for (const id of h.toldPinnedAmong?.() ?? held) if (held.has(id) && h.toldPinned(id) === true) toldSet.add(id);
+    }
+    if (!L.pinned.length && !toldSet.size) continue;
+    let differs: Set<number> | null = null;
+    for (const id of L.pinned) if (held.has(id) && !toldSet.has(id)) (differs ??= new Set()).add(id);
+    for (const id of toldSet) if (!L.pinned.includes(id)) (differs ??= new Set()).add(id);
+    if (!differs) continue;
+    for (let k = 0; k < L.pairs.length; k += 2) {
+      const a = L.pairs[k], b = L.pairs[k + 1];
+      if (!held.has(a) || !held.has(b)) continue;
+      if (differs.has(a)) out.add(a);
+      if (differs.has(b)) out.add(b);
     }
   }
   // Its pass on a tick: the ships it takes there, as the server's pass had them

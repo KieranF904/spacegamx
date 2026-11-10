@@ -12,7 +12,7 @@ import { addEntity, addComponent, hasComponent } from 'bitecs';
 import { Position, Velocity, Rotation, Radius, Health, Player, Input, Boost, Inventory, Station, NetworkSync, InSystem, Dead, TICK_RATE, BOOST_DRAIN, BOOST_REGEN, BOOST_REGEN_DELAY, BOOST_FUEL_DEFAULT, PLAYER_MAX_HP, PLAYER_RADIUS, stationInteractRadius, dcos, dsin } from '@space-game/common';
 import { ClientMessage, PROTOCOL_VERSION } from '@space-game/common';
 import type { ClientSocket, ClientLink } from '@space-game/common';
-import type { ClientConnection } from '../net/ClientConnection.js';
+import { SyncedShips, type ClientConnection } from '../net/ClientConnection.js';
 import { activity } from '../activity/index.js';
 import { stationQuery } from '../game/Docking.js';
 import { startLinger, reinhabit, tellCombatLocks } from './combatLock.js';
@@ -70,7 +70,7 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
     lastSnapshotSentTick: 0,
     blueprint: null,
     docked: null,
-    shipSynced: new Map(),
+    shipSynced: new SyncedShips(),
     shipHpSent: new Map(),
     sentNames: new Map(),
     repKnown: new Map(),

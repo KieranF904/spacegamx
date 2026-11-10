@@ -86,7 +86,8 @@ describe('structure pins', () => {
     resetGlobals();
     const server = makeServer({ clock: () => 1_000_000 });
     const types = server.handledMessageTypes().sort();
-    expect(types.length).toBe(103);
+    // (102: trainingDrone went with protocol 68, nothing sent it)
+    expect(types.length).toBe(102);
     pin('clientMessages.json', types);
   }, 120_000);
 

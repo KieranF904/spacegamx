@@ -269,12 +269,17 @@ export function laneOf(guns: GunState, charge: Charge): OwnExtras {
  * `gunSync` (a plain message, server to a client, just before a snapshot): ship `id`'s gun lane as tick `t` ended,
  * exact, and its gun controls then (which that ship's gun rows step from). Its lane starts here; its fire records
  * through t are told. `z` is the whole state as one list of numbers (packGunSync: each array sparse, packArr):
- *   [100, ...[], -1, -1 (the retired pool's and banks' slots, constant), ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug,
- *    ...sat), ...cooldown, ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, minePaid, mineUntil,
- *    mineShare, tow, control bits, cursor distance / 4, held aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord), then any later
- *    gun scalars (sim/state.ts GUN_SCALARS past GUN_SCALARS_HASHED, trailing absent ones left off)]
- * (each `...x` an array as its packArr's length, then the packArr; absent: -1; an absent scalar: null)
+ *   [ports?, (sig, shieldSat, gauge, mach, ...held, ...flags, ...amt, ...mat, ...closed, ...aug, ...sat), ...cooldown,
+ *    ...rounds, ...reload, ...charge, ...spin, ...aim, triggerHeld, clickAt, tow, control bits, cursor distance / 4, held
+ *    aim distance (ships/guns.ts distDue), trigger word (weaponGroups.ts trigWord), then any later gun scalars
+ *    (sim/state.ts GUN_SCALARS past GUN_SCALARS_HASHED, trailing absent ones left off)]
+ * (each `...x` an array as its packArr's length, then the packArr; absent: -1; an absent scalar: null). The mining
+ * scalars (minePaid, mineUntil, mineShare) don't go: a lane runs no mining (its guns' step only zeroes mineUntil when
+ * stopped), and nothing a client does with a lane reads them; its lane has them undefined
  */
+/** The gun scalars a gunSync leaves out (a lane runs no mining): its lane has them undefined */
+export const GUN_SYNC_UNSENT = ['minePaid', 'mineUntil', 'mineShare'] as const;
+
 export interface ServerGunSyncMessage {
   type: 'gunSync';
   id: number;
@@ -295,7 +300,6 @@ export interface ServerGunSyncMessage {
 /** The gun state's and a ports ship's stores' arrays (by part, by port): sent sparse (packArr) */
 const GUN_ARRAYS = ['cooldown', 'rounds', 'reload', 'charge', 'spin', 'aim'] as const;
 const PORT_ARRAYS = ['held', 'flags', 'amt', 'mat', 'closed', 'aug', 'sat'] as const;
-const NO_BANKS: number[] = [];
 
 /** An array as [length, its commonest value, then index, value for each other entry] */
 export function packArr(a: ArrayLike<number>): number[] {
@@ -320,13 +324,11 @@ const putArr = (z: (number | null)[], a: ArrayLike<number> | undefined) => { if 
 const opt = (v: number | undefined) => (v === undefined ? null : v);
 
 export function packGunSync(id: number, t: number, x: Readonly<OwnExtras>, k: Readonly<GunCtl>): ServerGunSyncMessage {
-  const c = x.charge, g = x.guns, z: (number | null)[] = [100];
-  // (The retired pool's and banks' slots, kept so the message reads as before: 100, no banks, no shares)
-  putArr(z, NO_BANKS); putArr(z, undefined); putArr(z, undefined);
+  const c = x.charge, g = x.guns, z: (number | null)[] = [];
   // (mach: which field machines draw, so another ship's guns get the power its own do; their energy counters aren't needed here)
   if (c.e) { z.push(1, c.e.sig, c.e.shieldSat, c.e.gauge, c.e.mach ?? 0); for (const a of PORT_ARRAYS) putArr(z, c.e[a]); } else z.push(0);
   for (const a of GUN_ARRAYS) putArr(z, g[a]);
-  z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.minePaid), opt(g.mineUntil), opt(g.mineShare), opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist), g.trig ?? 0);
+  z.push(g.triggerHeld ? 1 : 0, g.clickAt, opt(g.tow), k.bits, Math.round(k.dist / 4), opt(g.heldDist), g.trig ?? 0);
   // (Scalars past the hand-ruled ones (state.ts GUN_SCALARS_HASHED), in order, absent as null, the trailing absent ones left off)
   const end = z.length;
   for (let n = GUN_SCALARS_HASHED; n < GUN_SCALARS.length; n++) z.push(opt(g[GUN_SCALARS[n]] as number | undefined));
@@ -340,8 +342,6 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
   const num = () => z[i++] as number;
   const val = () => { const v = z[i++]; return v === null ? undefined : v; };
   const arr = () => { const n = num(); if (n < 0) return undefined; const p = z.slice(i, i + n) as number[]; i += n; return unpackArr(p); };
-  // (The retired pool's and banks' slots: read past)
-  num(); arr(); arr(); arr();
   const charge: Charge = {};
   if (num() === 1) {
     const sig = num(), shieldSat = num(), gauge = num(), mach = num();
@@ -349,7 +349,7 @@ export function unpackGunSync(m: ServerGunSyncMessage): { x: OwnExtras; k: GunCt
     charge.e = { sig, shieldSat, gauge, held: Int32Array.from(held), flags: Uint8Array.from(flags), amt: Int32Array.from(amt), mat: Uint8Array.from(mat), closed: Int16Array.from(closed), aug: Int32Array.from(aug), sat: Uint8Array.from(sat), mach, machEu: new Float64Array(3) };
   }
   const [cooldown, rounds, reload, gcharge, spin, aim] = GUN_ARRAYS.map(() => arr() ?? []);
-  const guns: GunState = { cooldown, rounds, reload, charge: gcharge, spin, aim, triggerHeld: num() === 1, clickAt: num(), minePaid: val(), mineUntil: val(), mineShare: val(), tow: val() };
+  const guns: GunState = { cooldown, rounds, reload, charge: gcharge, spin, aim, triggerHeld: num() === 1, clickAt: num(), minePaid: undefined, mineUntil: undefined, mineShare: undefined, tow: val() };
   const bits = num(), dist = num() * 4;
   if (i < z.length) guns.heldDist = val();
   if (i < z.length) guns.trig = num();

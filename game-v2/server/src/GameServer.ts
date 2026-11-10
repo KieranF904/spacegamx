@@ -650,9 +650,6 @@ this.devTeleport = opts.devTeleport ?? false;
 
   regionThreats(): Record<string, Record<string, number>> { return regionThreats(this); }
 
-  /** Pilots with a training drone out (the tutorial's combat lesson): pilot entity -> drone */
-  readonly trainers = new Map<number, number>();
-
   deathCause(player: number): Record<string, unknown> { return deathCause(this, player); }
 
   namedBody(eid: number): { name: string; kind: number } | undefined { return namedBody(this, eid); }

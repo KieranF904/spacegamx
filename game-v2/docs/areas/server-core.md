@@ -13,7 +13,7 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 | server/src/net/auth.ts | 199 | `registerAuthHandlers`: join; guest-name rules; `rejectAuth` |
 | server/src/net/handlers/modules.ts | 170 | `registerModuleHandlers`: the message types that only forward to one game module (party, trade, market, items, quests, hangar orders, sieges, admin ...) |
 | server/src/net/handlers/shipEdit.ts | 145 | `registerShipEditHandlers`: dock, undock, shipEdit, slotSave/Fly/Clear, designSave, shareDesign, pilotInfo; `clientBlueprint`, `handleShipEdit` |
-| server/src/net/handlers/flight.ts | 256 | `registerFlightHandlers`: input (queued for the tick), ping, stateHash, mapView, interact, respawn, trainingDrone, target, tow; `handleInput`, `applyInputToEntity`, `releaseControls`, `recordSelfHashes` (GameServer keeps one-line delegates, called by `drainInputQueue` and the tick list); `portalQuery` |
+| server/src/net/handlers/flight.ts | 256 | `registerFlightHandlers`: input (queued for the tick), ping, stateHash, mapView, interact, respawn, target, tow; `handleInput`, `applyInputToEntity`, `releaseControls`, `recordSelfHashes` (GameServer keeps one-line delegates, called by `drainInputQueue` and the tick list); `portalQuery` |
 | server/src/net/dispatch.ts | 55 | `dispatch(table, ctx, conn, msg)` and `HandlerRegistry` (`t.on(type, fn)`); the pre-join gate (`PRE_JOIN`), the per-type rate limit and the handler call. `MAX_INPUTS_PER_TICK` lives here too |
 | server/src/net/ServerCtx.ts | 110 | `ServerCtx`: the narrow view of the server a client message handler may use (GameServer implements it) |
 | server/src/net/ClientConnection.ts | 81 | `ClientConnection`: the per-socket state (was the CLIENT CONNECTION block of GameServer) |
