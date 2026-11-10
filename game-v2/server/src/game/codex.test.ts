@@ -2,24 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, ServerMessage, Station as StationComp, migrateProfile } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData, type GameDataFiles } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { validateGameData } from '../data/validateGameData.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
 
 function world(data: GameDataFiles = files, store = new MemoryProfileStore()) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    profileStore: store, gameData: new GameData(data), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({
+    profileStore: store, gameData: new GameData(data), });
   const join = () => {
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];

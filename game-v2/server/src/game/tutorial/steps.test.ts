@@ -13,6 +13,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { GRADUATE_AFTER_TICKS } from './TutorialSteps.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -21,9 +22,8 @@ const shipConfig = loadShipConfigCached(dataDir);
 function yard(names = ['ann']) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, tutorial: true, ships: createShipBridge(shipConfig), clock: () => clock.t,
+  const server = makeServer({
+    gameData: new GameData(files), tutorial: true, ships: createShipBridge(shipConfig), clock: () => clock.t,
   });
   const pilots = names.map((n) => {
     const t = new LocalTransport(server);

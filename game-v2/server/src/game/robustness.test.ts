@@ -17,6 +17,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { MessageLimiter } from '../net/MessageLimits.js';
+import { makeServer as kitServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -25,10 +26,10 @@ const shipConfig = loadShipConfigCached(dataDir);
 
 function makeServer(userDB: Record<string, unknown> = {}) {
   resetGlobals();
-  return new GameServer({
+  return kitServer({
     profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {}, ...userDB } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(shipConfig),
+    ships: createShipBridge(shipConfig),
   });
 }
 
@@ -118,8 +119,8 @@ describe('crash isolation', () => {
     const store = new MemoryProfileStore();
     await store.save(7, { version: 1, credits: 'not a profile', ship: 5, hangar: 'x' });
     resetGlobals();
-    const server = new GameServer({
-      profileStore: store, gameData: new GameData(files), autoStart: false, scene: 'sectors', ships: createShipBridge(shipConfig),
+    const server = kitServer({
+      profileStore: store, gameData: new GameData(files), ships: createShipBridge(shipConfig),
       userDB: { validateSession: async () => ({ id: 7, username: 'seven', is_admin: false }), cleanupExpiredSessions: async () => {} } as any,
     });
     const c = rawClient(server);

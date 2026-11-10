@@ -2,13 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, ServerMessage, planetPosition, moonOffset } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import { waveRoster, haulBonus, SIEGE_TURRETS } from './Sieges.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -16,10 +14,8 @@ const files = readGameDataFiles(dataDir);
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
   const gameData = new GameData(files);
-  const server = new GameServer({
-    gameData, userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({
+    gameData, });
   const join = (name: string) => {
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];

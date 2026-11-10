@@ -10,7 +10,6 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { readFileSync } from 'fs';
 import { Position, Velocity, Rotation, InSystem, type ReplicaEnv, type ReplicaState } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
@@ -18,6 +17,7 @@ import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { PtStLayer } from '../../../../client/src/predict/ptst.js';
 import { ReplicaPtWorld, type PtHost } from '../../../../client/src/predict/world.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 /** The shared config is frozen: this test changes the collision tuning, so it gets its own copy of that part */
 const withTuning = (cfg: ReturnType<typeof loadShipConfigCached>) => ({ ...cfg, tuning: { ...cfg.tuning } });
@@ -29,10 +29,8 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 function pack() {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
+  const server = makeServer({
     gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
     ships: createShipBridge(withTuning(loadShipConfigCached(dataDir))),
     clock: () => clock.t,
   });

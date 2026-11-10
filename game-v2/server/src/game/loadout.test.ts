@@ -6,8 +6,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -17,10 +16,8 @@ const files = readGameDataFiles(dataDir);
 function liveServer() {
   resetGlobals();
   const userDB: any = { validateSession: async () => null, cleanupExpiredSessions: async () => {} };
-  const server = new GameServer({
-    gameData: new GameData(files), userDB, scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({
+    gameData: new GameData(files), userDB, });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

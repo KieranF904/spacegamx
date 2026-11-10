@@ -12,7 +12,6 @@ import {
   Position, Velocity, Rotation, MACHINE_FAB, attachWork, fabWork, jobEu, jobTicks, portsMachineEu, portsMachinePart, recycleReturn,
   tierRule, partItemId, loadCatalog, packShare, fieldPay, packDefs, type Bag, type Blueprint, type PlacedPart, type Rot, type ServerMessage,
 } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
@@ -20,6 +19,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import type { FieldShips } from './FieldShips.js';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -51,11 +51,8 @@ function design(opts: { reactors?: number; fabricator?: boolean; fabRot?: Rot } 
 /** `bank`: keep the repair bank's free part (full; its spare pays repairs and rebuilds of the ship's own parts). Off: emptied, so the hold alone pays */
 function world(bp: Blueprint, opts: { bank?: boolean } = {}) {
   resetGlobals();
-  const server = new GameServer({
+  const server = makeServer({
     gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
     ships: createShipBridge(config),
     clock: () => 1_000_000,
   });
