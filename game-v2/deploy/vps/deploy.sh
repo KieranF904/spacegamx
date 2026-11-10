@@ -47,9 +47,9 @@ cat "$WORK/REVISION"
 # production server doesn't read them). blueprints/remakes does ship: the design update swaps players' saves for them.
 # The client is built here, not on the box: its production build needs more memory than the shared VPS can spare (vite
 # ran out of heap there, 2026-11-07). It ships as client/dist; remote-install.sh builds only if none came
-(cd client && VITE_BROWSER_URL=https://space.brotherk3d.com/lobby npx vite build --outDir "$WORK/client-build" --emptyOutDir --logLevel warn)
+(cd client && VITE_NO_SOURCEMAP=1 VITE_BROWSER_URL=https://space.brotherk3d.com/lobby npx vite build --outDir "$WORK/client-build" --emptyOutDir --logLevel warn)
 # (data/dev and data/ships/blueprints/dev ship: dev parts are admin-only in the game, not stripped from the data)
-tar -czf "$TGZ" --exclude=node_modules --exclude=dist --transform 's,^client-build,client/dist,' \
+tar -czf "$TGZ" --exclude=node_modules --exclude=dist --exclude='*.map' --transform 's,^client-build,client/dist,' \
   --exclude='data/users.json' --exclude='data/users.json.tmp' --exclude='data/users.db*' --exclude='data/lobby' \
   --exclude='data/ships/players' --exclude='data/profiles' --exclude='data/telemetry' --exclude='data/contributor' \
   --exclude='data/status' --exclude='data/site' --exclude='data/world' --exclude='data/backups' \
