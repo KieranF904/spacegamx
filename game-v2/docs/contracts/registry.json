@@ -12428,9 +12428,9 @@
       "id": "network.replication",
       "path": "common/src/network/replication.ts",
       "group": "common/network",
-      "lines": 1004,
-      "owns": "ship motion on the wire: keyframe and control-row packing and the client's ShipReplicaSet that rebuilds other ships from them",
-      "needs": "common/ships (replicaStep, ReplicaMode, debris), common/sim (StateRing, sources, pull fields, clamp links), network/clampProtocol types, cursorState, math/detTrig",
+      "lines": 25,
+      "owns": "the entry point for ship motion on the wire: re-exports the row codecs, the replica set's hosts and the client's ShipReplicaSet from network/replication/, so import paths stay",
+      "needs": "network/replication/{wire,hooks,ShipReplicaSet}",
       "events": "",
       "invariants": [
         {
@@ -12438,254 +12438,16 @@
           "test": "server/src/net/replication.test.ts"
         },
         {
-          "text": "a far ship costs nothing; coming into focus it is sent on its own and leaving is told once",
-          "test": "server/src/net/replication.test.ts"
-        },
-        {
           "text": "bit-packed and base frames decode to the same snapshot",
           "test": "common/src/network/packed/packedCodec.test.ts"
         }
       ],
-      "extend": "a new keyframe field is appended to packKeyframe / unpackKeyframe and needs npm run wire:bump; a new thing a replica is moved by is a source or cause passed to ShipReplicaSet, not a branch in its step",
+      "extend": "a new keyframe field goes in replication/wire.ts (packKeyframe / unpackKeyframe, npm run wire:bump); a new thing a replica is moved by is a source or cause in replication/hooks.ts passed to ShipReplicaSet",
       "exports": [
-        "BodyDriver",
-        "ControlRow",
-        "DebrisShape",
-        "DebrisWorld",
-        "Keyframe",
-        "KeyframeRow",
-        "OwnTimeline",
-        "ReplicaCauses",
-        "ReplicaRewinds",
-        "ReplicaSideSteps",
-        "ShipReplicaSet",
-        "Step",
-        "controlRowId",
-        "packControlRow",
-        "packKeyframe",
-        "quantizeReplicaAngle",
-        "replicaAngle",
-        "unpackControlRow",
-        "unpackKeyframe"
+        "*",
+        "ShipReplicaSet"
       ],
-      "sections": [
-        {
-          "name": "DebrisShape",
-          "kind": "interface",
-          "start": 55,
-          "end": 56
-        },
-        {
-          "name": "DebrisWorld",
-          "kind": "interface",
-          "start": 58,
-          "end": 76
-        },
-        {
-          "name": "KeyframeRow",
-          "kind": "type",
-          "start": 78,
-          "end": 78
-        },
-        {
-          "name": "ControlRow",
-          "kind": "type",
-          "start": 79,
-          "end": 79
-        },
-        {
-          "name": "replicaAngle",
-          "kind": "function",
-          "start": 81,
-          "end": 85
-        },
-        {
-          "name": "quantizeReplicaAngle",
-          "kind": "function",
-          "start": 87,
-          "end": 89
-        },
-        {
-          "name": "Keyframe",
-          "kind": "interface",
-          "start": 91,
-          "end": 99
-        },
-        {
-          "name": "packKeyframe",
-          "kind": "function",
-          "start": 101,
-          "end": 114
-        },
-        {
-          "name": "unpackKeyframe",
-          "kind": "function",
-          "start": 116,
-          "end": 125
-        },
-        {
-          "name": "AIM_Q",
-          "kind": "const",
-          "start": 127,
-          "end": 127
-        },
-        {
-          "name": "stepQ",
-          "kind": "const",
-          "start": 128,
-          "end": 128
-        },
-        {
-          "name": "addQ",
-          "kind": "const",
-          "start": 129,
-          "end": 129
-        },
-        {
-          "name": "packControlRow",
-          "kind": "function",
-          "start": 131,
-          "end": 143
-        },
-        {
-          "name": "controlRowId",
-          "kind": "function",
-          "start": 145,
-          "end": 148
-        },
-        {
-          "name": "unpackControlRow",
-          "kind": "function",
-          "start": 150,
-          "end": 176
-        },
-        {
-          "name": "Step",
-          "kind": "interface",
-          "start": 178,
-          "end": 179
-        },
-        {
-          "name": "Rep",
-          "kind": "interface",
-          "start": 181,
-          "end": 205
-        },
-        {
-          "name": "HISTORY",
-          "kind": "const",
-          "start": 207,
-          "end": 207
-        },
-        {
-          "name": "NO_PULLS",
-          "kind": "const",
-          "start": 208,
-          "end": 208
-        },
-        {
-          "name": "BEND_TICKS",
-          "kind": "const",
-          "start": 209,
-          "end": 210
-        },
-        {
-          "name": "SMOOTH_TICKS",
-          "kind": "const",
-          "start": 211,
-          "end": 212
-        },
-        {
-          "name": "SMOOTH_MAX",
-          "kind": "const",
-          "start": 213,
-          "end": 214
-        },
-        {
-          "name": "GAP_MAX",
-          "kind": "const",
-          "start": 215,
-          "end": 216
-        },
-        {
-          "name": "BACK_TICKS",
-          "kind": "const",
-          "start": 217,
-          "end": 218
-        },
-        {
-          "name": "PREV",
-          "kind": "const",
-          "start": 220,
-          "end": 221
-        },
-        {
-          "name": "smoothstep",
-          "kind": "const",
-          "start": 222,
-          "end": 222
-        },
-        {
-          "name": "wrapAngle",
-          "kind": "function",
-          "start": 224,
-          "end": 230
-        },
-        {
-          "name": "rewrote",
-          "kind": "function",
-          "start": 232,
-          "end": 235
-        },
-        {
-          "name": "fixWeight",
-          "kind": "function",
-          "start": 237,
-          "end": 243
-        },
-        {
-          "name": "cloneBody",
-          "kind": "const",
-          "start": 245,
-          "end": 245
-        },
-        {
-          "name": "OwnTimeline",
-          "kind": "interface",
-          "start": 247,
-          "end": 272
-        },
-        {
-          "name": "BodyDriver",
-          "kind": "interface",
-          "start": 274,
-          "end": 287
-        },
-        {
-          "name": "ReplicaCauses",
-          "kind": "interface",
-          "start": 289,
-          "end": 305
-        },
-        {
-          "name": "ReplicaRewinds",
-          "kind": "interface",
-          "start": 307,
-          "end": 318
-        },
-        {
-          "name": "ReplicaSideSteps",
-          "kind": "interface",
-          "start": 320,
-          "end": 329
-        },
-        {
-          "name": "ShipReplicaSet",
-          "kind": "class",
-          "start": 331,
-          "end": 1004
-        }
-      ]
+      "sections": []
     },
     {
       "id": "protocol.social",
@@ -14713,6 +14475,396 @@
           "kind": "interface",
           "start": 243,
           "end": 251
+        }
+      ]
+    },
+    {
+      "id": "network.replication.set",
+      "path": "common/src/network/replication/ShipReplicaSet.ts",
+      "group": "common/network/replication",
+      "lines": 601,
+      "owns": "the client's ShipReplicaSet: every other ship's timeline rebuilt from keyframes, control changes, pulls, clamp links and causes, stepped on demand with the shared replicaStep and rewound when news comes late",
+      "needs": "common/ships (replicaStep, ReplicaMode), common/sim (StateRing, ReplicaState, sources, pull fields, clamp links), network/clampProtocol types, network/replication/{wire,hooks,rep,pose,debris}",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a client rebuilds every other ship exactly from keyframes, control changes and causes against the server's state",
+          "test": "server/src/net/replication.test.ts"
+        },
+        {
+          "text": "a far ship costs nothing; coming into focus it is sent on its own and leaving is told once",
+          "test": "server/src/net/replication.test.ts"
+        },
+        {
+          "text": "clamped pairs step as the server steps them",
+          "test": "common/src/network/clampReplicas.test.ts"
+        }
+      ],
+      "extend": "a new thing a replica is moved by is a source or cause passed in (hooks.ts), not a branch in its step",
+      "exports": [
+        "ShipReplicaSet"
+      ],
+      "sections": [
+        {
+          "name": "NO_PULLS",
+          "kind": "const",
+          "start": 30,
+          "end": 30
+        },
+        {
+          "name": "PREV",
+          "kind": "const",
+          "start": 32,
+          "end": 33
+        },
+        {
+          "name": "ShipReplicaSet",
+          "kind": "class",
+          "start": 35,
+          "end": 601
+        }
+      ]
+    },
+    {
+      "id": "network.replication.debris",
+      "path": "common/src/network/replication/debris.ts",
+      "group": "common/network/replication",
+      "lines": 88,
+      "owns": "the client's debris world inside the replica set: every piece stepped all together a tick at a time (drift, then knocks), as the server steps it, and stepped again from the earliest tick a keyframe or new piece changed",
+      "needs": "common/ships/debris (stepDebrisWorld), ships/physics (SHIP_FLIGHT_CONSTANTS), sim/ring, sim/c-replicaState, network/replication/rep and hooks (DebrisWorld)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a control row or a rewind for a piece already stepped past leaves it moving, not frozen",
+          "test": "common/src/network/replicaSmoothing.test.ts"
+        }
+      ],
+      "extend": "what a piece asks of the client (its shape, life, rebuild point) is a DebrisWorld member (hooks.ts)",
+      "exports": [
+        "DebrisSteps"
+      ],
+      "sections": [
+        {
+          "name": "DebrisSteps",
+          "kind": "class",
+          "start": 20,
+          "end": 88
+        }
+      ]
+    },
+    {
+      "id": "network.replication.hooks",
+      "path": "common/src/network/replication/hooks.ts",
+      "group": "common/network/replication",
+      "lines": 122,
+      "owns": "what the client's ShipReplicaSet asks of its hosts: the own timeline, body drivers, other ships' causes, the contact pass's rewinds, side steps (other ships' guns) and the debris world; the Step it hands out",
+      "needs": "common/ships (ReplicaMode, ReplicaEnv, FlightBody, ShipDerived, Vec2), sim/input (SimInput)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a client rebuilds every other ship exactly from keyframes, control changes and causes against the server's state",
+          "test": "server/src/net/replication.test.ts"
+        }
+      ],
+      "extend": "a new thing a replica is moved by is a source or cause here, passed to ShipReplicaSet, not a branch in its step",
+      "exports": [
+        "BodyDriver",
+        "DebrisShape",
+        "DebrisWorld",
+        "OwnTimeline",
+        "ReplicaCauses",
+        "ReplicaRewinds",
+        "ReplicaSideSteps",
+        "Step"
+      ],
+      "sections": [
+        {
+          "name": "DebrisShape",
+          "kind": "interface",
+          "start": 16,
+          "end": 17
+        },
+        {
+          "name": "DebrisWorld",
+          "kind": "interface",
+          "start": 19,
+          "end": 35
+        },
+        {
+          "name": "Step",
+          "kind": "interface",
+          "start": 37,
+          "end": 38
+        },
+        {
+          "name": "OwnTimeline",
+          "kind": "interface",
+          "start": 40,
+          "end": 65
+        },
+        {
+          "name": "BodyDriver",
+          "kind": "interface",
+          "start": 67,
+          "end": 80
+        },
+        {
+          "name": "ReplicaCauses",
+          "kind": "interface",
+          "start": 82,
+          "end": 98
+        },
+        {
+          "name": "ReplicaRewinds",
+          "kind": "interface",
+          "start": 100,
+          "end": 111
+        },
+        {
+          "name": "ReplicaSideSteps",
+          "kind": "interface",
+          "start": 113,
+          "end": 122
+        }
+      ]
+    },
+    {
+      "id": "network.replication.pose",
+      "path": "common/src/network/replication/pose.ts",
+      "group": "common/network/replication",
+      "lines": 133,
+      "owns": "where a replicated ship is drawn between ticks: the lerp between stepped states, the way in before its first state, and the keyframe corrections and re-stepped paths bent in or eased out (drawing only)",
+      "needs": "network/replication/rep (Rep, Fix), wire (Keyframe, replicaAngle), hooks (Step), sim/ring, math/detTrig",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a keyframe off the drawn path bends it on with no jump ahead and no step; a teleport snaps; a re-stepped path eases out",
+          "test": "common/src/network/replicaSmoothing.test.ts"
+        },
+        {
+          "text": "drawing never changes a stepped state (`at` stays exact)",
+          "test": "common/src/network/replicaSmoothing.test.ts"
+        }
+      ],
+      "extend": "a new kind of correction is a Fix pushed on the Rep; its weight over time is fixWeight",
+      "exports": [
+        "BACK_TICKS",
+        "BEND_TICKS",
+        "DrawnPose",
+        "GAP_MAX",
+        "RawPose",
+        "SMOOTH_MAX",
+        "SMOOTH_TICKS",
+        "bendPose",
+        "dropFixesFrom",
+        "fixWeight",
+        "noteKeyframeFix",
+        "poseBetween",
+        "poseComingIn",
+        "wrapAngle"
+      ],
+      "sections": [
+        {
+          "name": "BEND_TICKS",
+          "kind": "const",
+          "start": 20,
+          "end": 21
+        },
+        {
+          "name": "SMOOTH_TICKS",
+          "kind": "const",
+          "start": 22,
+          "end": 23
+        },
+        {
+          "name": "SMOOTH_MAX",
+          "kind": "const",
+          "start": 24,
+          "end": 25
+        },
+        {
+          "name": "GAP_MAX",
+          "kind": "const",
+          "start": 26,
+          "end": 27
+        },
+        {
+          "name": "BACK_TICKS",
+          "kind": "const",
+          "start": 28,
+          "end": 29
+        },
+        {
+          "name": "smoothstep",
+          "kind": "const",
+          "start": 31,
+          "end": 31
+        },
+        {
+          "name": "wrapAngle",
+          "kind": "function",
+          "start": 33,
+          "end": 38
+        },
+        {
+          "name": "fixWeight",
+          "kind": "function",
+          "start": 40,
+          "end": 47
+        },
+        {
+          "name": "RawPose",
+          "kind": "interface",
+          "start": 49,
+          "end": 50
+        },
+        {
+          "name": "DrawnPose",
+          "kind": "interface",
+          "start": 52,
+          "end": 53
+        },
+        {
+          "name": "poseComingIn",
+          "kind": "function",
+          "start": 55,
+          "end": 71
+        },
+        {
+          "name": "poseBetween",
+          "kind": "function",
+          "start": 73,
+          "end": 78
+        },
+        {
+          "name": "bendPose",
+          "kind": "function",
+          "start": 80,
+          "end": 116
+        },
+        {
+          "name": "dropFixesFrom",
+          "kind": "function",
+          "start": 118,
+          "end": 121
+        },
+        {
+          "name": "noteKeyframeFix",
+          "kind": "function",
+          "start": 123,
+          "end": 133
+        }
+      ]
+    },
+    {
+      "id": "network.replication.wire",
+      "path": "common/src/network/replication/wire.ts",
+      "group": "common/network/replication",
+      "lines": 134,
+      "owns": "ship motion's rows on the wire: keyframe and control-row packing, and the aim's quantization for a step",
+      "needs": "common/ships (ReplicaMode, ReplicaControls, FlightBody), sim/input (simAim, simAimQ), network/cursorState",
+      "events": "",
+      "invariants": [
+        {
+          "text": "bit-packed and base frames decode to the same snapshot",
+          "test": "common/src/network/packed/packedCodec.test.ts"
+        },
+        {
+          "text": "a keyframe's tail round-trips (cargo, dock, dodge, jump lock)",
+          "test": "common/src/sim/jumpLock.test.ts"
+        }
+      ],
+      "extend": "a new keyframe field is appended to packKeyframe / unpackKeyframe and needs npm run wire:bump",
+      "exports": [
+        "ControlRow",
+        "Keyframe",
+        "KeyframeRow",
+        "controlRowId",
+        "packControlRow",
+        "packKeyframe",
+        "quantizeReplicaAngle",
+        "replicaAngle",
+        "unpackControlRow",
+        "unpackKeyframe"
+      ],
+      "sections": [
+        {
+          "name": "KeyframeRow",
+          "kind": "type",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "ControlRow",
+          "kind": "type",
+          "start": 41,
+          "end": 41
+        },
+        {
+          "name": "replicaAngle",
+          "kind": "function",
+          "start": 43,
+          "end": 47
+        },
+        {
+          "name": "quantizeReplicaAngle",
+          "kind": "function",
+          "start": 49,
+          "end": 51
+        },
+        {
+          "name": "Keyframe",
+          "kind": "interface",
+          "start": 53,
+          "end": 61
+        },
+        {
+          "name": "packKeyframe",
+          "kind": "function",
+          "start": 63,
+          "end": 76
+        },
+        {
+          "name": "unpackKeyframe",
+          "kind": "function",
+          "start": 78,
+          "end": 87
+        },
+        {
+          "name": "AIM_Q",
+          "kind": "const",
+          "start": 89,
+          "end": 89
+        },
+        {
+          "name": "stepQ",
+          "kind": "const",
+          "start": 90,
+          "end": 90
+        },
+        {
+          "name": "addQ",
+          "kind": "const",
+          "start": 91,
+          "end": 91
+        },
+        {
+          "name": "packControlRow",
+          "kind": "function",
+          "start": 93,
+          "end": 105
+        },
+        {
+          "name": "controlRowId",
+          "kind": "function",
+          "start": 107,
+          "end": 110
+        },
+        {
+          "name": "unpackControlRow",
+          "kind": "function",
+          "start": 112,
+          "end": 134
         }
       ]
     },

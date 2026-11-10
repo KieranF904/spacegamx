@@ -10,7 +10,7 @@
 
 // Plain maths helpers for NON-SIM code (UI, rendering, input, econ, scripts).
 // The deterministic sim keeps its own copies on purpose (ships/flight.ts wrapAngle is its canonical angle wrap,
-// network/replication.ts, asteroid/orbit.ts, minebay, predict/*): do not swap those for these.
+// network/replication/pose.ts, asteroid/orbit.ts, minebay, predict/*): do not swap those for these.
 
 /** `v` held within [min, max] (min <= max). */
 export function clamp(v: number, min: number, max: number): number {
