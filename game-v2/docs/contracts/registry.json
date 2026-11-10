@@ -20479,7 +20479,7 @@
       "id": "server.gameserver.hooks",
       "path": "server/src/gameServer/hooks.ts",
       "group": "server/gameServer",
-      "lines": 65,
+      "lines": 71,
       "owns": "the small hooks GameServer's constructor installs: feature messages joining the table, pilots' login events, the station a connection is at, the error log tail",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -20532,7 +20532,7 @@
           "name": "trackErrors",
           "kind": "function",
           "start": 56,
-          "end": 65
+          "end": 71
         }
       ]
     },
@@ -22049,7 +22049,7 @@
       "id": "server.net.limits",
       "path": "server/src/net/MessageLimits.ts",
       "group": "server/net",
-      "lines": 112,
+      "lines": 114,
       "owns": "per-connection token-bucket rate limits for expensive or player-reaching client messages",
       "needs": "nothing imported; a WeakMap keyed by connection",
       "events": "",
@@ -22075,19 +22075,19 @@
           "name": "MESSAGE_LIMITS",
           "kind": "const",
           "start": 24,
-          "end": 77
+          "end": 79
         },
         {
           "name": "Bucket",
           "kind": "class",
-          "start": 79,
-          "end": 90
+          "start": 81,
+          "end": 92
         },
         {
           "name": "MessageLimiter",
           "kind": "class",
-          "start": 92,
-          "end": 112
+          "start": 94,
+          "end": 114
         }
       ]
     },
