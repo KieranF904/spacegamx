@@ -2,8 +2,8 @@
  * @contract client.state.screen-shake
  * owns:       camera shake: trauma that hits add to and time drains, read as a smooth-noise offset and roll
  * needs:      nothing (pure functions over a ScreenShake)
- * invariants: shake is trauma squared, so small knocks stay small — none pinned
- *             the offset follows time-based noise, the same at any frame rate — none pinned
+ * invariants: shake is trauma squared, so small knocks stay small — client/src/state/screenShake.test.ts
+ *             the offset follows time-based noise, the same at any frame rate; trauma drains by at most 0.1 s a frame — client/src/state/screenShake.test.ts
  * extend:     none (tune SHAKE_* below)
  */
 

@@ -3,7 +3,7 @@
  * owns:       what the damage effect modules share: the particle field, the world (ships, entities), the sound hook, the
  *             effects clock and its delayed actions
  * needs:      DamageParticles, ShipSource, GameState
- * invariants: a delayed action runs on the first update at or after its time — none pinned
+ * invariants: a delayed action runs once, on the first update at or after its time — client/src/ships/damage/context.test.ts
  * extend:     a shared capability for every effect is one member here
  */
 

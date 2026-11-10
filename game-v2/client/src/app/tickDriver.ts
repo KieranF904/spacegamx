@@ -2,7 +2,7 @@
  * @contract client.app.tick-driver
  * owns:       the per-frame tick stepping (proto: fixed-rate input ticks; online: one prediction step per tick number) and the 1 Hz state hash check
  * needs:      TickHost (state, input send context, send), app/inputSend tickInput, common TICK_MS and computeStateHash
- * invariants: every tick number is stepped exactly once, up to the server's estimated tick — none pinned
+ * invariants: every tick number is stepped exactly once, up to the server's estimated tick (at most 4 a frame) — client/src/app/tickDriver.test.ts
  * extend:     none (the tick order is fixed)
  */
 
