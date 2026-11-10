@@ -268,7 +268,7 @@ export const SHAPES: Record<string, Spec> = {
   'items.json': strict({
     items: arr(strict({
       id: 'string', name: 'string', category: oneOf(...ITEM_CATEGORIES), rarity: oneOf(...RARITIES), value: 'number', color: 'string', description: 'string',
-      'volume?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'quest?': 'string',
+      'volume?': 'number', 'mass?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'quest?': 'string',
       'repair?': obj({ budget: 'number', hpPerSec: 'number', restoreSec: 'number' }),
       // (Material packs: what one is made of, docs/design/field-fabrication.md)
       'pack?': 'bag',
@@ -306,6 +306,14 @@ export const SHAPES: Record<string, Spec> = {
       for (const h of Object.keys(isObj(r) ? r : {})) if (!h.startsWith('_') && !(HAZARDS as readonly string[]).includes(h)) c.err(join(k, h), `not a hazard (${HAZARDS.join(', ')})`);
     }
   },
+  // (Player-facing text: flat dotted keys to text, server/src/data/rules.ts texts())
+  'strings.json': rec('string'),
+  'mobs.json': strict({
+    mobs: rec(strict({
+      name: 'string', behaviour: oneOf('kamikaze', 'mine'), hp: 'number', radius: 'number', speed: 'number', accel: 'number', turn: 'number', life: 'number', arm: 'number',
+      blast: obj({ fuse: 'number', radius: 'number', damage: 'number' }), shape: arr('number[]'), color: 'string', glow: 'string',
+    })),
+  }),
   'station.json': obj({
     charter: obj({ level: 'number', credits: 'number', items: 'bag' }),
     sites: arr(obj({ id: 'string', name: 'string', station: 'string' })),
@@ -371,6 +379,8 @@ export const SHAPES: Record<string, Spec> = {
         respawnSeconds: 'number', idleDespawnSeconds: 'number', assistXpShare: 'number', 'gradeCredits?': 'number[]', 'nestWake?': 'number',
         stationDefence: rec(obj({ range: 'number', damage: 'number', interval: 'number', 'splash?': 'number' })),
       }),
+      // (Custom enemy designs: docs/enemies/custom-roster.md, checked by game/custom)
+      'custom?': 'any',
     });
   })(),
   'achievements.json': strict({

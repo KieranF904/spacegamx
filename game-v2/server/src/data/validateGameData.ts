@@ -44,6 +44,7 @@ import { validatePeople } from './validate/people.js';
 import { validateCodex } from './validate/codex.js';
 import { validateAchievements } from './validate/achievements.js';
 import { validateTutorial } from './validate/tutorial.js';
+import { validateExtras } from './validate/extras.js';
 import { validateShipData } from './validate/shipData.js';
 
 export type { DataProblem, ShipDataFiles, ValidateOptions };
@@ -66,6 +67,7 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
   validateCodex(v);
   validateAchievements(v);
   validateTutorial(v);
+  validateExtras(v);
   validateShipData(v);
   return c.problems;
 }

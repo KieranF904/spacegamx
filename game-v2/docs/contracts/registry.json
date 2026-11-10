@@ -18151,7 +18151,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 100,
+      "lines": 102,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "validate/* (one validator per data file, shared context), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -18178,20 +18178,20 @@
         {
           "name": "validateGameData",
           "kind": "function",
-          "start": 51,
-          "end": 71
+          "start": 52,
+          "end": 73
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 73,
-          "end": 79
+          "start": 75,
+          "end": 81
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 81,
-          "end": 100
+          "start": 83,
+          "end": 102
         }
       ]
     },
@@ -18199,7 +18199,7 @@
       "id": "server.data.validate-shapes",
       "path": "server/src/data/validateShapes.ts",
       "group": "server/data",
-      "lines": 572,
+      "lines": 582,
       "owns": "the shape pass of load-time data validation: a tiny schema language (Spec) and one spec per data file",
       "needs": "@space-game/common (tables, dictionary), game/brains ids; browser-safe: no Node imports",
       "events": "",
@@ -18414,19 +18414,19 @@
           "name": "SHAPES",
           "kind": "const",
           "start": 253,
-          "end": 459
+          "end": 469
         },
         {
           "name": "SHIP_SHAPES",
           "kind": "const",
-          "start": 461,
-          "end": 570
+          "start": 471,
+          "end": 580
         },
         {
           "name": "blueprintSpec",
           "kind": "const",
-          "start": 572,
-          "end": 572
+          "start": 582,
+          "end": 582
         }
       ]
     },
@@ -18601,6 +18601,37 @@
           "kind": "type",
           "start": 221,
           "end": 221
+        }
+      ]
+    },
+    {
+      "id": "validate.extras",
+      "path": "server/src/data/validate/extras.ts",
+      "group": "server/data/validate",
+      "lines": 31,
+      "owns": "the small data files nothing else validates: strings.json (placeholders), mobs.json (blast, the mobs that part functions launch) and terrain/<id>.json (named for a real system)",
+      "needs": "validate/context (the ids and reference helpers); browser-safe: no Node imports",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors",
+          "test": "server/src/data/validateGameData.test.ts"
+        },
+        {
+          "text": "a launched mob that does not exist, an unbalanced string placeholder and a terrain file for no system are caught",
+          "test": "server/src/data/validate/extras.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for one of these files goes in the function below",
+      "exports": [
+        "validateExtras"
+      ],
+      "sections": [
+        {
+          "name": "validateExtras",
+          "kind": "function",
+          "start": 14,
+          "end": 31
         }
       ]
     },
