@@ -440,7 +440,8 @@ this.devTeleport = opts.devTeleport ?? false;
 
     // Start game loop
     if (opts.autoStart ?? true) {
-      this.asteroidOrbits.flush(); // a live server files its orbits now, not at the first shot
+      // (Every belt filed before the first tick: a server started by hand, a test's, files each system's on first use)
+      this.asteroidOrbits.fileAll();
       this.lastTickTime = performance.now();
       this.gameLoop();
     }

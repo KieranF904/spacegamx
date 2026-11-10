@@ -114,6 +114,8 @@ const SIM_FIELDS: FieldEnv = { central: null };
 const SIM_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: SIM_FIELDS, terrain: null };
 const EVENTS: SimEvent[] = [];
 const LANE_RECS: LaneRec[] = [];
+/** The real ship's lane as laneHash reads it, without a copy: its record's gun fields and its live stores (read only) */
+const REAL_LANE: OwnExtras = { charge: undefined as never, guns: undefined as never, hazard: undefined as never, jumpPrime: 0 };
 
 const bodyOf = (eid: number, ship: ShipState): FlightBody => ({
   x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: ship.angVel,
@@ -319,7 +321,11 @@ export class GunNet {
       // (A respawn: the lane starts again; a rebuild this tick: its stores onto the new structure now, as its clients' are)
       if (ship !== l.ship) { this.restart(eid, l, ship); continue; }
       this.track(l, ship);
-      if (laneHash(eid, l.x, l.pd) !== laneHash(eid, laneOf(gunStateOf(ship), b.chargeOf(eid)), l.pd) && now - l.fixAt >= GUN_FIX_GAP) {
+      // (The real ship hashed where it stands: laneHash only reads, and copies nothing a gunStateOf copy wouldn't have)
+      REAL_LANE.charge = b.chargeOf(eid); REAL_LANE.guns = ship as unknown as OwnExtras['guns'];
+      const off = laneHash(eid, l.x, l.pd) !== laneHash(eid, REAL_LANE, l.pd);
+      REAL_LANE.charge = REAL_LANE.guns = undefined as never;
+      if (off && now - l.fixAt >= GUN_FIX_GAP) {
         l.x = laneOf(gunStateOf(ship), b.chargeOf(eid));
         l.ver = ++this.verSeq;
         l.fixAt = now;

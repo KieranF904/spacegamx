@@ -16,8 +16,14 @@
  *
  * A rock that keeps still (a stationary field's: `fixed`) is filed only in the
  * cells round its spot, there for its whole clock.
+ *
+ * A system's orbits are filed when it's first asked about (or by fileAll: the
+ * real server's start), not as each is added: a test world that never looks in
+ * most systems never walks their belts. Filed late or not, every cell ends up
+ * with the same entries in the same order (adds and removes before then keep
+ * their order: a re-added rock goes to the back, as filing it would have).
  */
-import { ORBIT_MU, dcos, dsin } from '@space-game/common';
+import { ORBIT_MU, dcos, dsin, dsincos } from '@space-game/common';
 
 /** Cell size of the timetable (world units) */
 const ORBIT_CELL = 1000;
@@ -31,6 +37,11 @@ const TWO_PI = Math.PI * 2;
 const PHASE_SLACK = 1e-5;
 /** Slack on each footprint (world units: orbit-solver and rounding error, well under one) */
 const SPACE_SLACK = 2;
+
+/** walk's scratch: two lists of a step's cells (keys, and when each one's stretch started), and a sin and cos */
+const WALK_KEY: [number[], number[]] = [[], []];
+const WALK_LO: [number[], number[]] = [[], []];
+const WALK_SC: [number, number] = [0, 0];
 
 /** A new cell's room (entries); doubled as it fills */
 const CELL_START = 4;
@@ -66,8 +77,13 @@ export class AsteroidOrbits {
   private pHi = new Float32Array(1 << 16);
   private poolEnd = 0;
   private wasted = 0;
-  /** What each filed asteroid's orbit is (to work out its clock, and to unfile it) */
+  /** What each asteroid's orbit is, filed yet or not (to work out its clock, and to file and unfile it) */
   private orbits = new Map<number, { system: number; shape: OrbitShape }>();
+  /** The systems whose orbits are filed (each one's added from then on is filed at once) */
+  private filed = new Set<number>();
+  /** The rest's asteroids, by system, in the order they're to be filed */
+  private waiting = new Map<number, Set<number>>();
+  private settled = false;
   /** Query dedupe: an asteroid's last query number, by id */
   private stamp = new Int32Array(1 << 14);
   private queryNo = 0;
@@ -79,19 +95,14 @@ export class AsteroidOrbits {
   private phase = new Float64Array(1 << 14);
   private phaseTick = new Float64Array(1 << 14).fill(-1);
 
-  /** Orbits added but not yet walked and filed, in filing order (see flush) */
-  private pending = new Map<number, { system: number; shape: OrbitShape }>();
-  private settleAfterFlush = false;
-  private filed = 0;
-
   /** How many entries are filed (for stats) */
-  get entries(): number { this.flush(); return this.filed; }
+  entries = 0;
 
   private static key(system: number, cx: number, cy: number): number {
     return ((system * STRIDE) + cx + OFFSET) * STRIDE + (cy + OFFSET);
   }
 
-  /** File an asteroid's whole orbit */
+  /** Add an asteroid's whole orbit (filed now if its system's are, else with them) */
   add(id: number, system: number, shape: OrbitShape): void {
     if (this.orbits.has(id)) this.remove(id);
     const a = shape.semiMajorAxis;
@@ -101,23 +112,31 @@ export class AsteroidOrbits {
     this.rate[id] = shape.fixed ? 0 : Math.sqrt(ORBIT_MU / (a * a * a));
     this.epoch[id] = shape.epochTick;
     this.phaseTick[id] = -1;
-    // The walk (the costly part) waits until a query needs the cells: a world nobody shoots in never pays it
-    this.pending.set(id, { system, shape });
+    if (this.filed.has(system)) { this.file(id, system, shape); return; }
+    let w = this.waiting.get(system);
+    if (!w) this.waiting.set(system, (w = new Set()));
+    w.add(id);
   }
 
-  /**
-   * File every orbit added so far, in the order they were added (so each cell's order is the
-   * same as filing them one by one on add). A running server calls this at start; queries call it first.
-   */
-  flush(): void {
-    if (this.pending.size) {
-      const todo = [...this.pending];
-      this.pending.clear();
-      for (const [id, o] of todo) this.file(id, o.system, o.shape);
-    }
-    if (this.settleAfterFlush) { this.settleAfterFlush = false; this.compact(true); }
+  /** File every system's orbits now (the real server's start: no system's first shot waits on its belt) */
+  fileAll(): void {
+    if (!this.waiting.size) return;
+    for (const system of [...this.waiting.keys()]) this.fileSystem(system, false);
+    if (this.settled) this.compact(true);
   }
 
+  /** File a system's waiting orbits, in the order they were added */
+  private fileSystem(system: number, trim = true): void {
+    this.filed.add(system);
+    const w = this.waiting.get(system);
+    if (!w) return;
+    this.waiting.delete(system);
+    for (const id of w) this.file(id, system, this.orbits.get(id)!.shape);
+    // (Trimmed as settle trims the boot's, once the boot is done)
+    if (trim && this.settled) this.compact(true);
+  }
+
+  /** Walk an orbit into the cells it passes through */
   private file(id: number, system: number, shape: OrbitShape): void {
     this.walk(system, shape, (key, lo, hi) => {
       let c = this.cellOf.get(key);
@@ -129,7 +148,7 @@ export class AsteroidOrbits {
       this.pLo[at] = lo - PHASE_SLACK;
       this.pHi[at] = hi + PHASE_SLACK;
       this.cN[c]++;
-      this.filed++;
+      this.entries++;
     });
     if (this.wasted > this.poolEnd / 2 && this.poolEnd > 1 << 16) this.compact();
   }
@@ -175,8 +194,8 @@ export class AsteroidOrbits {
    * little room), so the pools are the size of what's in them rather than of how they grew
    */
   settle(): void {
-    if (this.pending.size) this.settleAfterFlush = true;
-    else this.compact(true);
+    this.settled = true;
+    this.compact(true);
   }
 
   /** Close up the regions left behind: every live cell's region copied, in order, to fresh pools (`tight`: each trimmed to its entries and a little room) */
@@ -207,7 +226,8 @@ export class AsteroidOrbits {
     const o = this.orbits.get(id);
     if (!o) return;
     this.orbits.delete(id);
-    if (this.pending.delete(id)) { this.phaseTick[id] = -1; return; }
+    this.phaseTick[id] = -1;
+    if (!this.filed.has(o.system)) { this.waiting.get(o.system)?.delete(id); return; }
     const seen = new Set<number>();
     this.walk(o.system, o.shape, (key) => {
       if (seen.has(key)) return;
@@ -218,7 +238,7 @@ export class AsteroidOrbits {
       const s0 = this.cStart[c], n = this.cN[c];
       let w = 0;
       for (let r = 0; r < n; r++) {
-        if (this.pIds[s0 + r] === id) { this.filed--; continue; }
+        if (this.pIds[s0 + r] === id) { this.entries--; continue; }
         this.pIds[s0 + w] = this.pIds[s0 + r]; this.pLo[s0 + w] = this.pLo[s0 + r]; this.pHi[s0 + w] = this.pHi[s0 + r]; w++;
       }
       this.cN[c] = w;
@@ -229,7 +249,6 @@ export class AsteroidOrbits {
         this.freeCells.push(c);
       }
     });
-    this.phaseTick[id] = -1;
   }
 
   /**
@@ -254,27 +273,41 @@ export class AsteroidOrbits {
     const steps = Math.max(16, Math.ceil(TWO_PI * a / ORBIT_STEP));
     const dE = TWO_PI / steps;
     const reach = s.size + (a * dE) / 2 + SPACE_SLACK;
-    /** Open stretches: cell -> [lo, hi, last step] */
-    const open = new Map<number, [number, number, number]>();
+    // Open stretches: the cells the last step's footprint touched, each with the clock its stretch started at. A step
+    // whose footprint misses one closes it (emitted then: a later visit starts a new stretch), so each cell's stretches
+    // come out in clock order. A footprint is a few cells, so these are short lists rather than a map
+    let prevKey = WALK_KEY[0], prevLo = WALK_LO[0], prevN = 0;
+    let curKey = WALK_KEY[1], curLo = WALK_LO[1];
+    // (The clock's sin at a step's start is the last step's end's: the same angle, worked out once)
+    let sin0 = dsin(0), lastM1 = 0;
     for (let k = 0; k < steps; k++) {
       const e0 = k * dE, e1 = k === steps - 1 ? TWO_PI : (k + 1) * dE, em = (e0 + e1) / 2;
       // Clock at both ends of the step, and where it is halfway (every point of the step is within reach of it)
-      const m0 = e0 - e * dsin(e0), m1 = e1 - e * dsin(e1);
-      const px = a * (dcos(em) - e), py = b * dsin(em);
+      const sin1 = dsin(e1);
+      const m0 = e0 - e * sin0, m1 = e1 - e * sin1;
+      sin0 = sin1;
+      dsincos(em, WALK_SC);
+      const px = a * (WALK_SC[1] - e), py = b * WALK_SC[0];
       const x = px * cw - py * sw, y = px * sw + py * cw;
       const cx0 = Math.floor((x - reach) / ORBIT_CELL), cx1 = Math.floor((x + reach) / ORBIT_CELL);
       const cy0 = Math.floor((y - reach) / ORBIT_CELL), cy1 = Math.floor((y + reach) / ORBIT_CELL);
+      let curN = 0;
       for (let cx = cx0; cx <= cx1; cx++) {
         for (let cy = cy0; cy <= cy1; cy++) {
           const key = AsteroidOrbits.key(system, cx, cy);
-          const run = open.get(key);
-          if (run && run[2] === k - 1) { run[1] = m1; run[2] = k; continue; }
-          if (run) emit(key, run[0], run[1]);
-          open.set(key, [m0, m1, k]);
+          let lo = m0;
+          for (let j = 0; j < prevN; j++) if (prevKey[j] === key) { lo = prevLo[j]; prevKey[j] = -1; break; }
+          curKey[curN] = key; curLo[curN] = lo; curN++;
         }
       }
+      // (The last step's cells this one missed: their stretches end where the last step did)
+      for (let j = 0; j < prevN; j++) if (prevKey[j] >= 0) emit(prevKey[j], prevLo[j], lastM1);
+      lastM1 = m1;
+      const tk = prevKey, tl = prevLo;
+      prevKey = curKey; prevLo = curLo; prevN = curN;
+      curKey = tk; curLo = tl;
     }
-    for (const [key, run] of open) emit(key, run[0], run[1]);
+    for (let j = 0; j < prevN; j++) emit(prevKey[j], prevLo[j], lastM1);
   }
 
   /**
@@ -282,8 +315,7 @@ export class AsteroidOrbits {
    * each once, in filing order within each cell
    */
   query(system: number, x1: number, y1: number, x2: number, y2: number, padding: number, tick: number): number[] {
-    this.flush();
-   
+    if (!this.filed.has(system)) this.fileSystem(system);
     const cx0 = Math.floor((Math.min(x1, x2) - padding) / ORBIT_CELL), cx1 = Math.floor((Math.max(x1, x2) + padding) / ORBIT_CELL);
     const cy0 = Math.floor((Math.min(y1, y2) - padding) / ORBIT_CELL), cy1 = Math.floor((Math.max(y1, y2) + padding) / ORBIT_CELL);
     if (++this.queryNo === 0x7fffffff) { this.stamp.fill(0); this.queryNo = 1; }

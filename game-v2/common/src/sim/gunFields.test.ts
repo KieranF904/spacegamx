@@ -3,8 +3,8 @@
  * table and the types fails here if one of them drops it.
  */
 import { describe, expect, it } from 'vitest';
-import { GUN_ARRAYS, GUN_SCALARS, cloneGunState, cloneSimShip, gunScalarsOntoRecord, newSimShip, type GunState } from './state.js';
-import { packGunSync, unpackGunSync, laneHash } from './otherGuns.js';
+import { GUN_ARRAYS, GUN_SCALARS, cloneGunState, cloneSimShip, gunScalarsOntoRecord, gunStateOf, newSimShip, type GunState } from './state.js';
+import { packGunSync, unpackGunSync, laneHash, laneOf } from './otherGuns.js';
 import { cloneOwnExtras, packOwnSync, unpackOwnSync, type OwnExtras } from './ownStep.js';
 import { shipHash } from './ring.js';
 import type { ShipDerived } from '../ships/rebuild.js';
@@ -63,6 +63,17 @@ describe('GUN_FIELDS', () => {
       expect(shipHash({ ...s, guns: g }), k).not.toBe(base);
       if (k !== 'tow') expect(laneHash(3, extras(g)), k).not.toBe(lane);
       else expect(laneHash(3, extras(g))).toBe(lane);
+    }
+  });
+
+  it("a ship record's lane hashes as its copy does (GunNet hashes the real ship without one)", () => {
+    for (const held of [true, false]) {
+      const rec = { ...full(), triggerHeld: held, hp: [5, 5], blueprint: {}, jump: 0 } as unknown as ShipState;
+      const charge = { g: 50, b: [10], eng: [1, 2] };
+      const copy = laneOf(gunStateOf(rec), charge);
+      for (const pd of [[], [1]]) {
+        expect(laneHash(3, { charge, guns: rec as unknown as GunState, hazard: undefined as never, jumpPrime: 0 }, pd)).toBe(laneHash(3, copy, pd));
+      }
     }
   });
 });
