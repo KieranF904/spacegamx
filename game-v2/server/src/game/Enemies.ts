@@ -4,7 +4,7 @@
  * needs:      EnemyHost, ShipBridge, enemies/{model, populations, placement, steering, memory, loot, stationDefence}; npm: @space-game/common
  * events:     BossHooks (Bosses plugs in), EnemyHost.reward/dropLoot/questKill on a kill
  * invariants: tick order: forget the dead, packs, populations, spawners, arrivals, station turrets — server/src/golden/tickOrder.json
- *             a ghost pack place is worked out from the seed and the tick — none pinned
+ *             a ghost pack place is worked out from the seed and the tick, and its ships load where it is — server/src/game/nests.test.ts
  * extend:     a new area of enemy behaviour is a module in enemies/ taking the Enemies instance, with a door here if public
  *
  * Enemies: hostile ships built from blueprints (data/ships/blueprints/enemy),

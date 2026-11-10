@@ -2,7 +2,7 @@
  * @contract server.gameserver.hosts.boss
  * owns:       host adapter for bosses and the hostile shot helpers
  * needs:      GameServer (type); npm: @space-game/common, bitecs
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: a boss sees only living, visible, undocked pilots in its system — server/src/gameServer/hosts/hosts.test.ts
  * extend:      a new host member is added to createBossHost
  */
 

@@ -18030,8 +18030,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "listed tasks run: mine and deposit, random flight",
-          "test": "none pinned"
+          "text": "mine and deposit and random flight are listed and found by their names, a registered task too",
+          "test": "server/src/bots/tasks/registry.test.ts"
         }
       ],
       "extend": "a new task is tasks/<name>.ts exporting a TaskDef and one entry in the defs list",
@@ -18882,8 +18882,8 @@
           "test": "server/src/golden/tickOrder.json"
         },
         {
-          "text": "a ghost pack place is worked out from the seed and the tick",
-          "test": "none pinned"
+          "text": "a ghost pack place is worked out from the seed and the tick, and its ships load where it is",
+          "test": "server/src/game/nests.test.ts"
         }
       ],
       "extend": "a new area of enemy behaviour is a module in enemies/ taking the Enemies instance, with a door here if public",
@@ -18929,8 +18929,8 @@
           "test": "server/src/game/pilots/guests.test.ts"
         },
         {
-          "text": "a death costs what DeathRules says, the bank pays the rebuild",
-          "test": "none pinned"
+          "text": "a death puts the same design back, the bank paying for the rebuild",
+          "test": "server/src/game/repairBank.test.ts"
         }
       ],
       "extend": "a new item or death rule goes in pilots/; a new progress counter is a method here emitting a PilotEvent",
@@ -19087,8 +19087,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the kiln den works through its kind",
-          "test": "none pinned"
+          "text": "the vents and cache dens work through their kinds",
+          "test": "server/src/game/dens/kiln.test.ts"
         }
       ],
       "extend": "a new den kind is a module and one entry in DEN_KINDS (tsc fails if a kind of DenFeatureData has no entry)",
@@ -19114,8 +19114,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour unchanged from Enemies.ts, which it was split from",
-          "test": "none pinned"
+          "text": "a kill pays the killer XP and credits and drops a loot pod",
+          "test": "server/src/game/enemies.test.ts"
         }
       ],
       "extend": "a new payout rule is a step in onDestroyed",
@@ -19210,8 +19210,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour unchanged from Enemies.ts, which it was split from",
-          "test": "none pinned"
+          "text": "a nest's ships are tended one at a time, and nomads travel between places and never into safe space",
+          "test": "server/src/game/nests.test.ts"
         }
       ],
       "extend": "a new way a pack gets about is a Roaming style handled in steerNomad/wander",
@@ -19517,8 +19517,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour unchanged from Enemies.ts, which it was split from",
-          "test": "none pinned"
+          "text": "an armed station fires on hostiles in reach a turret at a time, an unarmed one does not",
+          "test": "server/src/game/enemies.test.ts"
         }
       ],
       "extend": "a new turret behaviour is a change in stationDefence/stationShot",
@@ -19551,8 +19551,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour unchanged from Enemies.ts, which it was split from",
-          "test": "none pinned"
+          "text": "a pack engages a nearby pilot, and a passive one leaves them alone until one of them is shot",
+          "test": "server/src/game/enemies.test.ts"
         }
       ],
       "extend": "a new behaviour is a state in fly()",
@@ -21812,8 +21812,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "a boss sees only living, visible, undocked pilots in its system",
+          "test": "server/src/gameServer/hosts/hosts.test.ts"
         }
       ],
       "extend": "a new host member is added to createBossHost",
@@ -21894,8 +21894,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "the comet passes for `hours` of every `days` of the clock, and a belt rock is not gas",
+          "test": "server/src/gameServer/hosts/hosts.test.ts"
         }
       ],
       "extend": "a new host member is added to createMiningHost",
@@ -21977,8 +21977,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "a wreck the pilot host spawns is kept for its key for the seconds given",
+          "test": "server/src/gameServer/hosts/hosts.test.ts"
         }
       ],
       "extend": "a new host member is added to the matching create*Host",
@@ -22032,8 +22032,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "whereIs answers only for a live pilot, with their system's id and place",
+          "test": "server/src/gameServer/hosts/hosts.test.ts"
         }
       ],
       "extend": "a new host member is added to the matching create*Host",
@@ -22190,8 +22190,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "hostiles see only living, visible, undocked pilots in their system",
+          "test": "server/src/gameServer/hosts/hosts.test.ts"
         }
       ],
       "extend": "a new host member is added to the matching create*Host",
@@ -23064,7 +23064,7 @@
       "invariants": [
         {
           "text": "a spark a client finds itself is never sent to it",
-          "test": "none pinned"
+          "test": "server/src/net/snapshot/snapshotParts.test.ts"
         }
       ],
       "extend": "a new kind of contact effect rides ServerContactMessage, not a new list here",
@@ -23578,7 +23578,7 @@
         },
         {
           "text": "a hazard running out on its own is no ownSync",
-          "test": "none pinned"
+          "test": "server/src/net/snapshot/snapshotParts.test.ts"
         }
       ],
       "extend": "a new value its flight depends on is one more slot in selfNow (and ClientConnection.selfState)",
@@ -23638,7 +23638,7 @@
       "invariants": [
         {
           "text": "a round goes every CROWD_BASE_WINDOW ticks for unwidened systems",
-          "test": "none pinned"
+          "test": "server/src/net/snapshot/snapshotParts.test.ts"
         },
         {
           "text": "widened systems skip until their window comes round",
@@ -23788,8 +23788,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "an unchanged key is the very string it was last snapshot",
-          "test": "none pinned"
+          "text": "an unchanged key is kept across a round and unchanged values are not joined again",
+          "test": "server/src/net/snapshot/snapshotParts.test.ts"
         },
         {
           "text": "row bytes per client unchanged",
@@ -23845,7 +23845,7 @@
         },
         {
           "text": "status row's data order matches features.wire.json status",
-          "test": "none pinned"
+          "test": "server/src/net/snapshot/snapshotParts.test.ts"
         }
       ],
       "extend": "a new value on another pilot's status row is one entry at the end of `status.data` below",
@@ -23950,7 +23950,7 @@
         },
         {
           "text": "playerState only when it changed (or every 600 ticks)",
-          "test": "none pinned"
+          "test": "server/src/net/snapshot/snapshotParts.test.ts"
         }
       ],
       "extend": "a new per-system thing a client is told on entry is one send in enterSystem",

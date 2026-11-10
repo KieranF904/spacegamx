@@ -4,7 +4,7 @@
  *             status-only row every other pilot gets
  * needs:      RowHost (world, clients, lingering, ships, features, gunNet), RowKeys, common energy/guns packers; npm: bitecs
  * invariants: the own row's layout is PILOT_ROW / packCharge / gunStateAt — server/src/golden/parity.test.ts
- *             status row's data order matches features.wire.json status — none pinned
+ *             status row's data order matches features.wire.json status — server/src/net/snapshot/snapshotParts.test.ts
  * extend:     a new value on another pilot's status row is one entry at the end of `status.data` below
  */
 import { defineQuery } from 'bitecs';

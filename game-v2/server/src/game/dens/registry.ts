@@ -2,7 +2,7 @@
  * @contract server.dens.registry
  * owns:       den features by kind (systems.json den[].kind)
  * needs:      DenFeatureData (common), DenFactory (dens/types), the den feature modules
- * invariants: the kiln den works through its kind — none pinned
+ * invariants: the vents and cache dens work through their kinds — server/src/game/dens/kiln.test.ts
  * extend:     a new den kind is a module and one entry in DEN_KINDS (tsc fails if a kind of DenFeatureData has no
  *             entry)
  */

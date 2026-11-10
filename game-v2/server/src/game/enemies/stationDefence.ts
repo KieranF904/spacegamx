@@ -2,7 +2,7 @@
  * @contract server.enemies.station-defence
  * owns:       armed stations' turrets firing on hostiles in reach
  * needs:      Enemies (enemies, batteries, ships, host, data); npm: @space-game/common
- * invariants: behaviour unchanged from Enemies.ts, which it was split from — none pinned
+ * invariants: an armed station fires on hostiles in reach a turret at a time, an unarmed one does not — server/src/game/enemies.test.ts
  * extend:     a new turret behaviour is a change in stationDefence/stationShot
  */
 

@@ -2,7 +2,7 @@
  * @contract server.gameserver.hosts.mining
  * owns:       host adapter for mining and beams, comets and site exits
  * needs:      GameServer (type); npm: @space-game/common, bitecs
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: the comet passes for `hours` of every `days` of the clock, and a belt rock is not gas — server/src/gameServer/hosts/hosts.test.ts
  * extend:      a new host member is added to createMiningHost
  */
 

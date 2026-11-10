@@ -2,7 +2,7 @@
  * @contract server.gameserver.hosts.pilots
  * owns:       host adapters for pilots, quests, party, people and arenas
  * needs:      GameServer (type); npm: @space-game/common, bitecs
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: a wreck the pilot host spawns is kept for its key for the seconds given — server/src/gameServer/hosts/hosts.test.ts
  * extend:      a new host member is added to the matching create*Host
  */
 
