@@ -18,6 +18,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const srcRoot = join(__dirname, '../../..');
@@ -57,14 +58,7 @@ function caseLabels(src: string, startRe: RegExp, caseIndent: number): string[] 
 describe('structure pins', () => {
   it('server tick order (guard names)', () => {
     resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors',
-      autoStart: false,
-      ships: createShipBridge(loadShipConfigCached(dataDir)),
-      clock: () => 1_000_000,
-    });
+    const server = makeServer({ clock: () => 1_000_000 });
     // One pilot, so the per-client periodic steps run too
     const t = new LocalTransport(server);
     t.connect();
@@ -90,14 +84,7 @@ describe('structure pins', () => {
     // Stage 1 Cut 1 turned handleMessage's switch into a handler table (net/dispatch.ts), so the types come from the
     // table. (The Stage 0 pin, read from case labels at one indent, missed 'join' and 'respawn'; Stage 2 added them.)
     resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors',
-      autoStart: false,
-      ships: createShipBridge(loadShipConfigCached(dataDir)),
-      clock: () => 1_000_000,
-    });
+    const server = makeServer({ clock: () => 1_000_000 });
     const types = server.handledMessageTypes().sort();
     expect(types.length).toBe(103);
     pin('clientMessages.json', types);

@@ -16,6 +16,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { FakeHitsClient } from '../net/hits/fakeHitsClient.testkit.js';
+import { makeServer } from './world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -51,13 +52,7 @@ export interface Opts {
 export function fight(o: Opts = {}) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-  });
+  const server = makeServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   /** Every mob's state at each tick's end, and A's mobs (CAPS.WAYPOINTS) against it on every tick it steps them */

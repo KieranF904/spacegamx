@@ -14,6 +14,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -36,15 +37,7 @@ function custom(name: string, n: number, from: string): ShipRecord {
 async function login(username: string) {
   resetGlobals();
   const store = new MemoryProfileStore();
-  const server = new GameServer({
-    profileStore: store,
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => 1_000_000,
-  });
+  const server = makeServer({ profileStore: store, clock: () => 1_000_000 });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

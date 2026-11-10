@@ -21,6 +21,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { targetFreighter } from '../../testkits/targetFreighter.testkit.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -29,11 +30,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 function world(opts: { acks: boolean }) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(readGameDataFiles(dataDir)),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t,
-  });
+  const server = makeServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const A = new FakeHitsClient(server, { name: 'watcher', env });

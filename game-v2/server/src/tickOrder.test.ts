@@ -12,6 +12,7 @@ import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from './ships/loadShipConfig.js';
 import { createShipBridge } from './proto/createProtoServer.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
+import { makeServer } from './testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -67,14 +68,7 @@ const FROZEN: [name: string, phase: string, gate?: string][] = [
 describe('tick order table', () => {
   it('is frozen: names, phases and gates in order', () => {
     resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors',
-      autoStart: false,
-      ships: createShipBridge(loadShipConfigCached(dataDir)),
-      clock: () => 1_000_000,
-    });
+    const server = makeServer({ clock: () => 1_000_000 });
     const got = server.tickSystemList().map((s) => {
       const gate = [s.scene, s.every ? `every${s.every}` : '', s.perClient ? 'perClient' : ''].filter(Boolean).join(' ');
       return gate ? [s.name, s.phase, gate] : [s.name, s.phase];

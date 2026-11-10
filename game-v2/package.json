@@ -20,6 +20,7 @@
     "proto": "cd client && npx vite --open \"/?proto\"",
     "test": "vitest run",
     "test:perf": "vitest run --config vitest.perf.config.ts",
+    "test:node": "node --test scripts/refactor/moveCheck.test.mjs prototypes/energy-lab/ports-model.test.mjs",
     "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install",
     "gen:sfx": "node --env-file=.env scripts/gen-sfx.mjs",
     "panels:index": "node scripts/panels-index.mjs",

@@ -12,6 +12,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -20,13 +21,7 @@ const files = readGameDataFiles(dataDir);
 describe('Demolition Launcher charge', () => {
   it('sticks to rock, waits 60 ticks, then blows', () => {
     resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(files),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors',
-      autoStart: false,
-      ships: createShipBridge(loadShipConfigCached(dataDir)),
-    });
+    const server = makeServer();
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'blaster' } as any);

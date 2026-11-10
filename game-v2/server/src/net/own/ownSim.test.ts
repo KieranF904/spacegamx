@@ -20,6 +20,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { stationQuery } from '../../game/Docking.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -50,13 +51,7 @@ interface World { server: GameServer; A: FakeHitsClient; target: number; x0: num
 function fly(o: Opts = {}) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-  });
+  const server = makeServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const A = new FakeHitsClient(server, { name: 'own_sim', env });

@@ -10,6 +10,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
 import { stationQuery } from '../Docking.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = joinPath(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -18,11 +19,7 @@ export const S = (server: GameServer) => server as any;
 export function boot(): { server: GameServer; store: MemoryProfileStore; def: GunRangeDef; num: number } {
   resetGlobals();
   const store = new MemoryProfileStore();
-  const server = new GameServer({
-    gameData: new GameData(readGameDataFiles(dataDir)),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), profileStore: store, clock: () => 1_000_000,
-  });
+  const server = makeServer({ profileStore: store, clock: () => 1_000_000 });
   const real = S(server).send.bind(server);
   S(server).send = (ws: any, msg: any) => { (ws.said ??= []).push(msg); real(ws, msg); };
   const sys = server.gameData.getSystem('gun_range')!;

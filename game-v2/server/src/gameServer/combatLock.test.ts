@@ -15,6 +15,7 @@ import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { COMBAT_RULES, combatLeft } from './combatLock.js';
 import { lingerSystem } from './session.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -23,11 +24,7 @@ const S = (server: GameServer) => server as any;
 function boot() {
   resetGlobals();
   const store = new MemoryProfileStore();
-  const server = new GameServer({
-    gameData: new GameData(readGameDataFiles(dataDir)),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), profileStore: store,
-  });
+  const server = makeServer({ profileStore: store });
   // (What the game says to each socket, as objects: the transport would pack them into frames)
   const real = S(server).send.bind(server);
   S(server).send = (ws: any, msg: any) => { (ws.said ??= []).push(msg); real(ws, msg); };

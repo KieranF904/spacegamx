@@ -18,9 +18,7 @@ describe('your station', () => {
   it('is chartered at a site, and its tracks build over real time and then work', () => {
     resetGlobals();
     const clock = { t: 5_000_000 };
-    const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t });
+    const server = makeServer({ profileStore: new MemoryProfileStore(), clock: () => clock.t });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'pilot' } as any);
@@ -95,4 +93,5 @@ describe('your station, in its own space', () => {
 });
 
 import { InSystem as InSystemComp } from '@space-game/common';
+import { makeServer } from '../testkits/world.testkit.js';
 function InSystemRef() { return InSystemComp; }

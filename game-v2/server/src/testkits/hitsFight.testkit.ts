@@ -18,6 +18,7 @@ import { FakeHitsClient } from '../net/hits/fakeHitsClient.testkit.js';
 import { targetFreighter } from './targetFreighter.testkit.js';
 import { serverTruth, damageOff, removedBoth } from '../net/hits/serverTruth.testkit.js';
 import type { OwnHit } from '../../../client/src/ships/hits/ConfirmedHits.js';
+import { makeServer } from './world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -58,13 +59,7 @@ export interface FightScenario {
 export function runFight(sc: FightScenario) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-  });
+  const server = makeServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const A = new FakeHitsClient(server, { name: 'shooter', env, drop: sc.drop });

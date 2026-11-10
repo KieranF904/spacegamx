@@ -13,6 +13,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { dispatch, HandlerRegistry, PRE_JOIN, MAX_INPUTS_PER_TICK } from './dispatch.js';
 import { MessageLimiter } from './MessageLimits.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -20,14 +21,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 describe('message dispatch', () => {
   it('the handler table is the old switch: exactly the pinned types (golden/clientMessages.json)', () => {
     resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors',
-      autoStart: false,
-      ships: createShipBridge(loadShipConfigCached(dataDir)),
-      clock: () => 1_000_000,
-    });
+    const server = makeServer({ clock: () => 1_000_000 });
     const pinned: string[] = JSON.parse(readFileSync(join(__dirname, '../golden/clientMessages.json'), 'utf8'));
     expect(server.handledMessageTypes().sort()).toEqual(pinned);
     expect(server.handledMessageTypes().length).toBe(103);

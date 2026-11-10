@@ -8,6 +8,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
@@ -16,10 +17,7 @@ const files = readGameDataFiles(dataDir);
 /** A guest docked at Sol Central on a server started with (or without) free build; `admin` makes them one */
 function world(opts: { freeBuild?: boolean; admin?: boolean }) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, freeBuild: opts.freeBuild, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({ freeBuild: opts.freeBuild });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

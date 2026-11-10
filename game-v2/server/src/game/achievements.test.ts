@@ -10,6 +10,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import type { RankBatch, RankingsBackend } from './rankings/RankingsBackend.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -17,16 +18,7 @@ const files = readGameDataFiles(dataDir);
 
 function world(clock = { t: Date.UTC(2026, 9, 21, 12) }, store = new MemoryProfileStore(), rankings?: RankingsBackend) {
   resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-    profileStore: store,
-    rankings,
-  });
+  const server = makeServer({ clock: () => clock.t, profileStore: store, rankings });
   const pilot = (name: string) => {
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];

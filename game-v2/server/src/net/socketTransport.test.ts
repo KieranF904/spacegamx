@@ -14,17 +14,14 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { SocketTransport, clientAddress, MAX_CLIENT_MESSAGE_BYTES, MAX_SOCKETS_PER_IP } from './SocketTransport.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
 resetGlobals();
 const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-const server = new GameServer({
-  profileStore: new MemoryProfileStore(), gameData: new GameData(readGameDataFiles(dataDir)), autoStart: false, scene: 'sectors',
-  userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-  ships: createShipBridge(loadShipConfigCached(dataDir)),
-});
+const server = makeServer({ profileStore: new MemoryProfileStore() });
 const transport = new SocketTransport(server, 0);
 const sockets: WebSocket[] = [];
 

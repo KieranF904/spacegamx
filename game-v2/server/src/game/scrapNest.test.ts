@@ -10,6 +10,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { BossesFile } from './Bosses.js';
 import { liveTracks, ghostTracks, summarise } from '../bench/nestRoam.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -19,13 +20,7 @@ const NEST = 'sol_scrap_nest';
 
 function world() {
   resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer();
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

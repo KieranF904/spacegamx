@@ -10,6 +10,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { devGuestShips } from '../data/devData.js';
 import { readFileSync } from 'fs';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
@@ -17,10 +18,7 @@ const env = process.env.NODE_ENV;
 /** A guest's authResult on a server started with or without guestAdmin */
 function guestJoin(guestAdmin: boolean): boolean | undefined {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, guestAdmin, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({ guestAdmin });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);
@@ -47,10 +45,7 @@ describe('guest admins (dev server only)', () => {
 /** The hangar a guest is given on a server started with these guest designs */
 function guestHangar(guestShips: unknown[]): (string | null)[] {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, guestShips: guestShips as any, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({ guestShips: guestShips as any });
   const t = new LocalTransport(server);
   t.onMessage = () => {};
   t.connect();
