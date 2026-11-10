@@ -3,7 +3,7 @@
  * owns:       the particle record shapes, caps, colour helpers and texture handles that WeaponFx's sub-systems share
  * needs:      fxTextures, impactAnchor (ImpactAnchor type)
  * invariants: impactScale grows as the square root of shell size, never below 0.2 — client/src/rendering/weapons/weaponStyles.test.ts
- *             a layered impact's particle lists are capped (HIT_CAP, FRAG_CAP, SMOKE_CAP), oldest dropped first — none pinned
+ *             a layered impact's particle lists are capped (HIT_CAP, FRAG_CAP, SMOKE_CAP), oldest dropped first — client/src/rendering/weapons/fx/fxInvariants.test.ts
  * extend:     a new kind of particle is one interface here, one list on FxField and its draw in FxField / hitDraw
  */
 

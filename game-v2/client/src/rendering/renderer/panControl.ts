@@ -2,7 +2,7 @@
  * @contract client.render.pan-control
  * owns:       the middle-mouse view drag (the pan offset) and the RECENTER VIEW button
  * needs:      the game canvas, PanHost (zoom, whether the camera is locked to a target)
- * invariants: middle mouse never autoscrolls the page — none pinned
+ * invariants: middle mouse never autoscrolls the page — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     other pan inputs (touch, keys) go in the constructor's listeners
  */
 

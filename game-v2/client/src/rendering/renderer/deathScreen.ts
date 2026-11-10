@@ -2,7 +2,7 @@
  * @contract client.render.death-screen
  * owns:       the DESTROYED overlay: building it, easing it in, rebuilding it on a resize
  * needs:      pixi Container, settings/keybindings (respawn key name); npm: pixi.js
- * invariants: a resize while dead keeps the fade where it was — none pinned
+ * invariants: a resize while dead keeps the fade where it was — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     new lines on the overlay go in build()
  */
 

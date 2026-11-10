@@ -2,7 +2,7 @@
  * @contract client.render.background
  * owns:       Renderer's backdrop pass: the sky, surface and city, terrain, the star and central bodies, ship shadows
  * needs:      Renderer (its fields, as the first argument), SkyRenderer, SurfaceRenderer, SunRenderer, Lighting; npm: pixi.js, @space-game/common
- * invariants: behaviour is the one it had inside Renderer — none pinned
+ * invariants: a system's star is its systems.json entry, else one made once per visuals object; with no systemInfo yet it draws DEFAULT_SYSTEM_VISUALS — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new backdrop layer is a step in renderBackground
  */
 

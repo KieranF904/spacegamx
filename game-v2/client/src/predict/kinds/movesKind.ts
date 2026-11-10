@@ -2,7 +2,7 @@
  * @contract client.predict.kind.moves
  * owns:       bodies' moves (boss attacks) on the PT timeline: a MoveRunner fork per body, looks queued to the body's draw tick, shells drawn ahead
  * needs:      @space-game/common, MoveRunner (TimedMoveMsg), ptKinds (hash helpers)
- * invariants: a miss against ST re-forks from c - FORK_BACK and steps to the head once; looks already shown are not shown twice — none pinned
+ * invariants: a miss against ST re-forks from c - FORK_BACK and steps to the head once; looks already shown are not shown twice — client/src/predict/kindInvariants.test.ts
  * extend:     a new move look or shell type is handled where the MoveRunner outputs it; the kind is registered in worldKinds.ts
  */
 /**

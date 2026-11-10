@@ -2,7 +2,7 @@
  * @contract client.render.system-visuals
  * owns:       a system's look as the renderer holds it (SystemVisuals), built from the server's systemInfo, and the light it casts (ambient and sun)
  * needs:      common ServerSystemInfoMessage and StarSystemData, Lighting, SurfaceRenderer, SkyBiome
- * invariants: until systemInfo arrives a system draws with DEFAULT_SYSTEM_VISUALS — none pinned
+ * invariants: until systemInfo arrives a system draws with DEFAULT_SYSTEM_VISUALS, which a systemInfo naming no hue or radius also builds — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new systemInfo visual field is one more line in visualsFromInfo() and one on SystemVisuals
  */
 

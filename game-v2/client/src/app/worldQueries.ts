@@ -2,7 +2,7 @@
  * @contract client.app.world-queries
  * owns:       questions about where the pilot is: the current system's data, a pocket's way in, a planet or cave mouth below
  * needs:      GameState (system, entities, tick, threats), data/systems.json, common planetPosition, moonOffset and pocketAt
- * invariants: the current system is looked up once per system, not per frame — none pinned
+ * invariants: the current system is looked up once per system, not per frame — client/src/app/appInvariants.test.ts
  * extend:     a new "what is near me" question is one more method here
  */
 

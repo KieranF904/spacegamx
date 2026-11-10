@@ -2,7 +2,7 @@
  * @contract client.predict.kind.guides
  * owns:       homing shells and mobs on the PT timeline: forks GuideRunner runs from ST and steps the copy to the PT head
  * needs:      @space-game/common (guideHash, GuideBody), GuideRunner (GuideFork), ptKinds, a GuidesKindHost
- * invariants: a hash miss at the confirmed tick re-forks from ST once and eases the drawn place — none pinned
+ * invariants: a hash miss at the confirmed tick re-forks from ST once and eases the drawn place — client/src/predict/kindInvariants.test.ts
  * extend:     a change to the waypoint law belongs in common/guidance, not here; the kind is registered in worldKinds.ts
  */
 /**

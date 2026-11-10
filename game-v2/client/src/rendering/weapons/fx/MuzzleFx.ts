@@ -3,7 +3,7 @@
  * owns:       the muzzle flash, casings, coil rings and gun smoke a shell makes as it leaves its barrel, and a prism's split pop
  * needs:      FxField (flash, spark, ring and smoke lists), MuzzleHost (onMuzzle, barrelTip, spinAt), weaponStyles (muzzleScale)
  * invariants: the flash and the shell are drawn from the barrel's tip, the shell easing onto its true path — client/src/rendering/weapons/visualStop.test.ts
- *             a minigun throws more brass the faster it spins — none pinned
+ *             a minigun throws more brass the faster it spins — client/src/rendering/weapons/fx/fxInvariants.test.ts
  * extend:     a new muzzle part is one block in flash, driven by a field of WeaponStyle.muzzle
  */
 

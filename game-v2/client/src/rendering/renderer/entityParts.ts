@@ -2,7 +2,7 @@
  * @contract client.render.entity-parts
  * owns:       the small pieces drawn over an entity: name tag and health bar (Tag), a jump gate's rings (Gate), and placing them upright on a turned view
  * needs:      pixi Container, Graphics and Text; npm: pixi.js
- * invariants: the health bar redraws only when what it shows changes — none pinned
+ * invariants: the health bar redraws only when what it shows changes — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new overlay part is one more build function here and one field on Renderer's per-entity maps
  */
 

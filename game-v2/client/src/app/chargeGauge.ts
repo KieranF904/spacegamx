@@ -2,7 +2,7 @@
  * @contract client.app.charge-gauge
  * owns:       the thin bar over the jump gauge while pulse lasers charge to their next pulse
  * needs:      domWrite setText and setStyle, ShipClient.laserCharge (passed in)
- * invariants: the bar's element is made on first use and only changed when a value changes — none pinned
+ * invariants: the bar's element is made on first use and only changed when a value changes — client/src/app/appInvariants.test.ts
  * extend:     another charge readout is one more branch in update()
  */
 

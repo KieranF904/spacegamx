@@ -2,7 +2,7 @@
  * @contract client.render.camera-step
  * owns:       Renderer's per-frame camera: pan limits, roll onto the helm heading, follow smoothing, screen shake
  * needs:      Renderer (its fields, as the first argument), cameraView, PanControl
- * invariants: behaviour is the one it had inside Renderer — none pinned
+ * invariants: a panned view keeps the ship 10% inside every edge, a snap lands on the ship, and with no helm heading the roll returns to north-up — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     camera maths lives in cameraView.ts; this is the per-frame application of it
  */
 

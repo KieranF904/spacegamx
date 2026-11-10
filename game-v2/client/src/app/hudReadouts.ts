@@ -2,7 +2,7 @@
  * @contract client.app.hud-readouts
  * owns:       the top-HUD readouts each frame: boost bar, XP bar and level (with their gain glow), credits, system name
  * needs:      HudHost (state, pilot, ship client, system names), domWrite setText and setStyle
- * invariants: each element is written only when its value changes (domWrite) — none pinned
+ * invariants: each element is written only when its value changes (domWrite) — client/src/app/appInvariants.test.ts
  * extend:     a new readout is a cached element below and one more write in update()
  */
 

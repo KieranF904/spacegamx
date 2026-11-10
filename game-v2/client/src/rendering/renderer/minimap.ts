@@ -2,8 +2,8 @@
  * @contract client.render.minimap
  * owns:       the corner radar: its disc, the throttled redraw and one dot style per entity kind
  * needs:      GameState (entities, populations, player), MinimapHost (view roll, system data, way-ins), ships/ShipRenderer FACTION_COLORS, NestViews nestColor; npm: @space-game/common, pixi.js
- * invariants: it is turned against the view's roll so it reads like the screen — none pinned
- *             it redraws at most every 1000/minimapHz milliseconds (quality tier) — none pinned
+ * invariants: it is turned against the view's roll so it reads like the screen — client/src/rendering/renderer/rendererModules.test.ts
+ *             it redraws at most every 1000/minimapHz milliseconds (quality tier) — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new entity kind on the radar is one more case in the entity switch of draw()
  */
 

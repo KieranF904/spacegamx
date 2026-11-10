@@ -2,7 +2,7 @@
  * @contract client.render.entity-views
  * owns:       Renderer's per-frame entity pass: make, place, fade and dispose each entity's graphics, and the asteroid hit flash
  * needs:      Renderer (its fields, as the first argument), GameState, entityParts, the entity views (rocks, stations, rifts, pods, mobs); npm: pixi.js, @space-game/common
- * invariants: behaviour is the one it had inside Renderer — none pinned
+ * invariants: a view is made once per entity and kept while it lives, shots get none, one out of view is hidden and a gone one disposed — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new entity kind's graphics is a case in createEntityGraphics
  */
 

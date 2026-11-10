@@ -2,7 +2,7 @@
  * @contract client.predict.kind.bodies
  * owns:       PT bookkeeping for bodies the replica layer flies from their decisions (bosses): hash by tick, confirm against ST, ease the drawn pose
  * needs:      @space-game/common, ptKinds (PtKind, PtEase), a BodiesKindHost (ids, at)
- * invariants: a body whose recorded hash misses ST is re-read to the PT head once, never stepped on the PT layer itself — none pinned
+ * invariants: a body whose recorded hash misses ST is re-read to the PT head once, never stepped on the PT layer itself — client/src/predict/kindInvariants.test.ts
  * extend:     a new kind of body is a host ids() source; the kind itself is registered in worldKinds.ts at order 10
  */
 /**
