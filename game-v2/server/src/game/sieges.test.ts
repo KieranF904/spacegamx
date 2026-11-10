@@ -1,42 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, ServerMessage, planetPosition, moonOffset } from '@space-game/common';
-import { GameData } from '../data/GameData.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
+import { Position, Velocity, InSystem } from '@space-game/common';
 import { waveRoster, haulBonus, SIEGE_TURRETS } from './Sieges.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeServer, gameFiles } from '../testkits/world.testkit.js';
+import { siegeWorld } from '../testkits/boss.testkit.js';
 
-const dataDir = join(__dirname, '../../../data');
-const files = readGameDataFiles(dataDir);
 
-function world() {
-  (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const gameData = new GameData(files);
-  const server = makeServer({
-    gameData, });
-  const join = (name: string) => {
-    const t = new LocalTransport(server);
-    const got: ServerMessage[] = [];
-    t.onMessage = (m) => got.push(m);
-    t.connect();
-    t.send({ type: 'join', username: name } as any);
-    const pid = t.getPlayerId();
-    return { t, got, pid: () => server.pilots.connOf(pid) ? pid : pid, conn: server.pilots.connOf(pid)! };
-  };
-  const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };
-  // Over Selene, in orbit
-  const overSelene = (pid: number) => {
-    const sol = gameData.getSystem('sol')!;
-    const planet = sol.planets!.find((p) => p.id === 'terra_nova')!;
-    const tick = (server as any).currentTick;
-    const p = planetPosition(planet, tick), o = moonOffset(planet, 0, tick);
-    InSystem.systemId[pid] = gameData.getSystemNum('sol');
-    Position.x[pid] = p.x + o.x + 500; Position.y[pid] = p.y + o.y; Velocity.x[pid] = 0; Velocity.y[pid] = 0;
-  };
-  return { server, gameData, join, step, overSelene };
-}
+const world = siegeWorld;
 
 describe('moon sieges (Selene)', () => {
   it('nights get bigger and tougher', () => {

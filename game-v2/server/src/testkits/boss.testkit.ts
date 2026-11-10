@@ -2,8 +2,9 @@
  * Test-only: what the staged-boss walk-throughs (game/pyreclast, game/scrapMother) share: standing a pilot somewhere,
  * keeping it whole, moving a boss's fight on to the start of a stage, and catching the looks of its moves.
  */
-import { Position, Velocity, InSystem, currentStage, type ServerMessage } from '@space-game/common';
+import { Position, Velocity, InSystem, currentStage, planetPosition, moonOffset, type ServerMessage } from '@space-game/common';
 import type { GameServer } from '../GameServer.js';
+import { makeServer, resetGlobals, joinPilot } from './world.testkit.js';
 
 /** Put a pilot in a system at a spot, with a velocity */
 export const place = (pid: number, num: number, x: number, y: number, vx = 0, vy = 0): void => {
@@ -32,4 +33,21 @@ export const advance = (server: GameServer, eid: number, stage: number, step: (n
  */
 export function watchMoveFx(server: GameServer, into: (sys: number) => ServerMessage[][]): void {
   (server as unknown as { moveFx: unknown }).moveFx = (sys: number, _eid: number, _origin: unknown, msg: ServerMessage) => { for (const l of into(sys)) l.push(msg); };
+}
+
+/** A fresh sectors world for the moon-siege tests: the server, its game data, `join` (a pilot with its conn), `step`, and `overSelene` (a pilot put in orbit over Selene) */
+export function siegeWorld() {
+  resetGlobals();
+  const server = makeServer();
+  const gameData = server['gameData'];
+  const join = (name: string) => joinPilot(server, name);
+  const step = (n = 1): void => { for (let i = 0; i < n; i++) server.step(); };
+  const overSelene = (pid: number) => {
+    const planet = gameData.getSystem('sol')!.planets!.find((p) => p.id === 'terra_nova')!;
+    const tick = (server as any).currentTick;
+    const p = planetPosition(planet, tick), o = moonOffset(planet, 0, tick);
+    InSystem.systemId[pid] = gameData.getSystemNum('sol');
+    Position.x[pid] = p.x + o.x + 500; Position.y[pid] = p.y + o.y; Velocity.x[pid] = 0; Velocity.y[pid] = 0;
+  };
+  return { server, gameData, join, step, overSelene };
 }

@@ -1,34 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, ServerMessage, Station as StationComp, Projectile, DroppedItem, countOf, validateBlueprint, createShipState, parseBlueprint, MAX_DRIVE } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
-import { GameData } from '../data/GameData.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
+import type { BossesFile } from './Bosses.js';
+import * as bitecs from 'bitecs';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
-import type { BossesFile } from './Bosses.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeServer, gameFiles, dataDir, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
 
-const dataDir = join(__dirname, '../../../data');
-const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const files = readGameDataFiles(dataDir);
+const files = gameFiles();
 const bossFile = files.bosses as BossesFile;
 
 function world() {
   resetGlobals();
-  const server = makeServer({
-    gameData: new GameData(files),
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
-  });
-  const t = new LocalTransport(server);
-  const got: ServerMessage[] = [];
-  t.onMessage = (m) => got.push(m);
-  t.connect();
-  t.send({ type: 'join', username: 'slayer' } as any);
-  const pid = t.getPlayerId();
-  const conn = server.pilots.connOf(pid)!;
+  // (its own ship config: the test adds enemy designs to it, which the cached one does not allow)
+  const server = makeServer({ ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+  const { t, got, pid, conn } = joinPilot(server, 'slayer');
   const profile = () => server.pilots.get(conn)!;
   profile().licences.push('the_maw');
   const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };

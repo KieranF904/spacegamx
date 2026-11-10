@@ -45,7 +45,8 @@ export function joinPilot(server: GameServer, username: string) {
   t.onMessage = (m) => got.push(m);
   t.connect();
   t.send({ type: 'join', username } as never);
-  return { t, got, pid: t.getPlayerId() };
+  const pid = t.getPlayerId();
+  return { t, got, pid, conn: server.pilots.connOf(pid)! };
 }
 
 /** Step the server n ticks */
