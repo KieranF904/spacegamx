@@ -4,32 +4,16 @@
  * personal attacks and the boss tools.
  */
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, LIFE, GATE, WINDOW, DECISION, rayTerrain, insideArena, type ServerMessage } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
-import { GameData } from '../../data/GameData.js';
-import { LocalTransport } from '../../net/LocalTransport.js';
-import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../ships/createShipBridge.js';
 import { devHooks } from '../brains/kit.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeServer, resetGlobals, joinPilot } from '../../testkits/world.testkit.js';
 
-const dataDir = join(__dirname, '../../../../data');
-const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const files = readGameDataFiles(dataDir);
 const NEST = 'sol_scrap_nest', MOTHER = 'boss_scrap_mother';
 
 function world() {
   resetGlobals();
   const server = makeServer({ devTeleport: true });
-  const t = new LocalTransport(server);
-  const got: ServerMessage[] = [];
-  t.onMessage = (m) => got.push(m);
-  t.connect();
-  t.send({ type: 'join', username: 'arena' } as any);
-  const pid = t.getPlayerId();
+  const { t, got, pid } = joinPilot(server, 'arena');
   const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };
   const num = server['gameData'].getSystemNum(NEST);
   const arena = server['gameData'].getSystem(NEST)!.arena!;

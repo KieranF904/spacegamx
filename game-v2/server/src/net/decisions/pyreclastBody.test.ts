@@ -7,24 +7,15 @@
  * The same harness as bodies.test.ts (the Scrap Mother's), for this boss.
  */
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, DECISION, encodeMessage, decodeMessage, controlRowId, datan2,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
-import { GameData } from '../../data/GameData.js';
-import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import type { StagedBrain } from '../../game/brains/staged.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeServer, resetGlobals } from '../../testkits/world.testkit.js';
 
-const dataDir = join(__dirname, '../../../../data');
-const files = readGameDataFiles(dataDir);
-const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
 interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number }
 const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0 });

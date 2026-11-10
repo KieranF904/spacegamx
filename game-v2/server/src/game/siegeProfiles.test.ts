@@ -1,40 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, ServerMessage, planetPosition, moonOffset } from '@space-game/common';
-import { GameData } from '../data/GameData.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
+import { Position, Velocity, InSystem } from '@space-game/common';
 import { wavePlan, waveRoster, siegeBoss, siegeProfile, DEFAULT_SIEGE_RULES } from './Sieges.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeServer, gameFiles } from '../testkits/world.testkit.js';
+import { siegeWorld } from '../testkits/boss.testkit.js';
 
-const dataDir = join(__dirname, '../../../data');
-const files = readGameDataFiles(dataDir);
 
-function world() {
-  (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const gameData = new GameData(files);
-  const server = makeServer({
-    gameData, });
-  const join = (name: string) => {
-    const t = new LocalTransport(server);
-    const got: ServerMessage[] = [];
-    t.onMessage = (m) => got.push(m);
-    t.connect();
-    t.send({ type: 'join', username: name } as any);
-    return { t, got, conn: server.pilots.connOf(t.getPlayerId())! };
-  };
-  const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };
-  const overSelene = (pid: number) => {
-    const sol = gameData.getSystem('sol')!;
-    const planet = sol.planets!.find((p) => p.id === 'terra_nova')!;
-    const tick = (server as any).currentTick;
-    const p = planetPosition(planet, tick), o = moonOffset(planet, 0, tick);
-    InSystem.systemId[pid] = gameData.getSystemNum('sol');
-    Position.x[pid] = p.x + o.x + 500; Position.y[pid] = p.y + o.y; Velocity.x[pid] = 0; Velocity.y[pid] = 0;
-  };
-  return { server, gameData, join, step, overSelene };
-}
+const world = siegeWorld;
 
 /** Down on Selene, alone, by day */
 function onSelene() {
@@ -65,7 +36,7 @@ describe('siege profiles', () => {
     const factions = (gameData.factionsFile as any).factions;
     const rules = server.sieges.rules;
     const used = new Set<string>();
-    for (const sys of gameData.getAllSystems?.() ?? (files.systems as any).systems) {
+    for (const sys of gameData.getAllSystems?.() ?? (gameFiles().systems as any).systems) {
       const b = sys.surface?.bastion;
       if (!b) continue;
       expect(rules.profiles[b.profile], `${sys.id}'s profile`).toBeDefined();
