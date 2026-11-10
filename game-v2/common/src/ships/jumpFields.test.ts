@@ -37,6 +37,25 @@ describe('stillstones', () => {
     expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeLessThan(t.lodestoneField / 2);
   });
 
+  it("are worked out once a tick and come out the same (the memo is keyed by tick and orbit; positions handed out are the caller's)", () => {
+    const fresh = (l: LodestoneData, tick: number) => { const a = planetAngle({ orbit: l.orbit! }, tick), r = l.orbit!.radius; return { x: Math.round(dcos(a) * r), y: Math.round(dsin(a) * r) }; };
+    for (const tick of [5, 5, 6, 5, 1e7, 6]) {
+      const p = fresh(moving, tick);
+      expect(lodestonePosition(moving, tick)).toEqual(p);
+      const F = lodestoneFieldRadius(moving, t);
+      expect(lodestoneAt(p.x + F - 1, p.y, [moving], tick, t)?.id).toBe('moving');
+      expect(lodestoneAt(p.x + F + 1, p.y, [moving], tick, t)).toBeNull();
+    }
+    const q = lodestonePosition(moving, 42);
+    q.x += 1e6;
+    expect(lodestonePosition(moving, 42)).toEqual(fresh(moving, 42));
+    // (A stone given a new orbit is placed on it, the same tick)
+    const swap: LodestoneData = { id: 'swap', orbit: { radius: 50000, phase: 0, period: 1000 } };
+    lodestonePosition(swap, 7);
+    swap.orbit = { radius: 70000, phase: 2, period: 3000 };
+    expect(lodestonePosition(swap, 7)).toEqual(fresh(swap, 7));
+  });
+
   it('have a field reaching the tuned distance past the stone, wherever they have got to', () => {
     const F = lodestoneFieldRadius(fixed, t);
     expect(F).toBe(t.lodestoneSize + t.lodestoneField);

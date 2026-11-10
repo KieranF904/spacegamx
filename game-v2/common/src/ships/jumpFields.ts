@@ -42,10 +42,25 @@ export const NO_FIELDS: FieldEnv = Object.freeze({ central: null });
 /** Where a lodestone is at a tick (whole units; its orbit by the deterministic sin and cos: replicas fly by its field) */
 export function lodestonePosition(l: LodestoneData, tick: number): { x: number; y: number } {
   if (l.orbit) {
-    const a = planetAngle({ orbit: l.orbit }, tick), r = l.orbit.radius;
-    return { x: Math.round(dcos(a) * r), y: Math.round(dsin(a) * r) };
+    const m = orbitAt(l, tick);
+    return { x: m.x, y: m.y };
   }
   return { x: l.position?.x ?? 0, y: l.position?.y ?? 0 };
+}
+
+/**
+ * An orbiting lodestone's spot, worked out once per tick (every ship's step asks for every stone's): the last tick's
+ * kept by stone (and by orbit, should a stone's be replaced). Read only
+ */
+const ORBIT_AT = new WeakMap<LodestoneData, { tick: number; orbit: unknown; x: number; y: number }>();
+function orbitAt(l: LodestoneData, tick: number): { readonly x: number; readonly y: number } {
+  const o = l.orbit!;
+  let m = ORBIT_AT.get(l);
+  if (m && m.tick === tick && m.orbit === o) return m;
+  const a = planetAngle({ orbit: o }, tick), r = o.radius;
+  if (!m) ORBIT_AT.set(l, (m = { tick, orbit: o, x: 0, y: 0 }));
+  m.tick = tick; m.orbit = o; m.x = Math.round(dcos(a) * r); m.y = Math.round(dsin(a) * r);
+  return m;
 }
 
 /** What a lodestone is called */
@@ -97,7 +112,7 @@ export function lodestoneAt(x: number, y: number, list: readonly LodestoneData[]
   for (const l of list) {
     const r = lodestoneFieldRadius(l, t);
     if (!r) continue;
-    const p = lodestonePosition(l, tick);
+    const p = l.orbit ? orbitAt(l, tick) : lodestonePosition(l, tick);
     const dx = x - p.x, dy = y - p.y;
     if (dx * dx + dy * dy < r * r) return l;
   }
