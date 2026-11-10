@@ -2,7 +2,7 @@
  * @contract ships.function-registry
  * owns:       what each part function is (weapon, needs a facing edge, joined facing), filled by loadCatalog
  * needs:      FunctionDef (ships/types) only; a leaf module so catalog.ts can register into it
- * invariants: the catalog registers every function flag it loads — none pinned
+ * invariants: the catalog registers every function flag it loads — common/src/ships/invariants.test.ts
  * extend:     a new function trait is a set filled in registerFunctionDefs, not a hand-kept list
  */
 

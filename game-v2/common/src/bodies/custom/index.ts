@@ -2,7 +2,7 @@
  * @contract bodies.custom
  * owns:       custom enemies' bodies in roster.json order
  * needs:      roster.json, the per-enemy body modules
- * invariants: bodies are listed in roster order (an order's design) — none pinned
+ * invariants: bodies are listed in roster order (an order's design) — common/src/bodies/invariants.test.ts
  * extend:     a new custom enemy is its module and a line here, in the roster's order
  */
 

@@ -4,7 +4,7 @@
  *             wrapPi, cloneJson
  * needs:      nothing
  * invariants: wrapPi matches the sim wraps bit for bit — common/src/math/basic.test.ts
- *             the deterministic sim keeps its own copies on purpose and does not import this — none pinned
+ *             the deterministic sim keeps its own copies on purpose and does not import this — common/src/math/simCopies.test.ts
  * extend:     add a helper only if non-sim code needs it; sim code uses detTrig / simMaths instead
  */
 

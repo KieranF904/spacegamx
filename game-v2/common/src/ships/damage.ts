@@ -2,7 +2,7 @@
  * @contract ships.damage
  * owns:       the damage rules for a block a hit lands on: penetration against armour, material resist by damage type
  * needs:      ShipTuning (tuning.json damage), material and function defs from the catalog
- * invariants: a gun does full damage to equal-grade blocks and falls off by whole grade steps — none pinned
+ * invariants: a gun does full damage to equal-grade blocks and falls off by whole grade steps — common/src/ships/invariants.test.ts
  * extend:     a new damage type is a resist entry in materials.json and a name in DAMAGE_TYPES, not a branch here
  */
 
