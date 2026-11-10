@@ -13,6 +13,7 @@ import { ReplicaMode } from '../../ships/index.js';
 import type { StateRing } from '../../sim/ring.js';
 import type { ReplicaState } from '../../sim/c-replicaState.js';
 import { dhypot } from '../../math/detTrig.js';
+import { wrapPi } from '../../math/basic.js';
 import type { Rep } from './rep.js';
 import type { Step } from './hooks.js';
 import { replicaAngle, type Keyframe } from './wire.js';
@@ -30,12 +31,8 @@ export const BACK_TICKS = 20;
 
 const smoothstep = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
-/** An angle difference into (-pi, pi] */
-export function wrapAngle(d: number): number {
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  return d;
-}
+/** An angle difference into (-pi, pi]: the one shared wrap, math/basic.ts wrapPi (the same loop for every angle the sim feeds it, never hangs) */
+export const wrapAngle = wrapPi;
 
 /** How much of a correction is added to the drawn pose at tick t (drawn = stepped path + d × this) */
 export function fixWeight(f: { t: number; s: number }, t: number): number {

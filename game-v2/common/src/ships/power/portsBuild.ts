@@ -3,7 +3,7 @@
  * owns:       building a PortsLayout from a ship's parts (buildPortsLayout), its signature and which parts power reaches
  * needs:      portsTypes, common/ships catalog, grades, power/units
  * invariants: the reference ships feed every consumer — common/src/ships/power/ports.test.ts
- * extend:     a new port consumer's layout case is in buildPortsLayout
+ * extend:     a new port consumer's layout case is in partRoles (buildPortsLayout's first phase)
  */
 
 import type { FunctionDef, PlacedPart, Rot, Side, Vec2, WeaponMods } from '../types.js';
@@ -41,7 +41,44 @@ export function placeEdge(part: PlacedPart, F: PartFrame, side: Side, cell: numb
   return { x, y, side: ws, nx: x + nrm[0], ny: y + nrm[1] };
 }
 
+/**
+ * A ports layout, in phases (each its own function below, in the order one function ran them, so the layout is the same
+ * to the bit): every part's role and numbers (partRoles), its ports placed and the touch-routed parts' neighbours
+ * (placePorts), the links and what each consumer's lines can bring (linkUp), the feed networks (feedNetworks), then the
+ * layout and its signature
+ */
 export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
+  const R = partRoles(input);
+  const { n, feeds, feedDefs, thrustKind, role, cap, rate, burn, bBurn, boostMul, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, tierDmg, miner, minePulse, machine, tow, flash, shield, carrier, matCap, matUse, takes, tankFeed, feedPort, mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw, machineDraw } = R;
+  const placed = placePorts(input, R);
+  const { ports } = placed;
+  const { linkFrom, linkTo, linkCap, linkAug, openIn, openOut, outStart, outLink, inStart, inLink, intake, touchOut, touchClus, touchNext } = linkUp(input, R, placed);
+  const { fps, netOf, nets, selIn, selOut, selectors, drawers } = feedNetworks(input, R, placed);
+
+  const list = (r: number) => { const o: number[] = []; for (let i = 0; i < n; i++) if (role[i] === r) o.push(i); return Int32Array.from(o); };
+  const relays = list(P_RELAY), consumers: number[] = [];
+  for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
+  let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
+  const L: PortsLayout = {
+    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, machine, tow, flash, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
+    links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
+    outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
+    ports: ports.map((p) => ({ part: p.part, dir: p.dir, x: p.x, y: p.y, side: p.side, rate: p.rate, link: p.link >= 0 ? 1 : 0, l: p.link, aug: p.aug })),
+    feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
+    netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
+    gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
+    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw, machineDraw,
+  };
+  L.sig = portsSig(L);
+  return L;
+}
+
+/** A grid cell as a map key */
+const key = (x: number, y: number) => (x + 1024) * 4096 + (y + 1024);
+
+/** Each part's role (generator, relay, tank, weapon, thruster, tool...) and its numbers, and what they add up to */
+function partRoles(input: PortsLayoutInput) {
   const { parts, fns, area, mats, alive, tuning } = input;
   const n = parts.length;
   const feedTable = (tuning as { feeds?: Record<string, FeedDef> }).feeds ?? {};
@@ -182,15 +219,28 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     if (fn.combiner) takes[i] = -1;
   }
 
+  return {
+    n, feeds, feedDefs, health, thrustKind, role, cap, rate, burn, bBurn, boostMul, gun, shot, rounds, relight, passive, discharge, rest, burst, steady,
+    pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, tierDmg, miner, minePulse, machine, tow, flash,
+    shield, carrier, matCap, matUse, takes, tankFeed, feedPort, mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain,
+    supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw, machineDraw,
+  };
+}
+type Roles = ReturnType<typeof partRoles>;
+
+type Port = { part: number; dir: 0 | 1; x: number; y: number; side: Side; nx: number; ny: number; rate: number; link: number; aug: 0 | 1 };
+
+/** Ports, placed (and the frames and cells they're placed by); the touch-routed parts' neighbours and what each takes on a link */
+function placePorts(input: PortsLayoutInput, R: Roles) {
+  const { parts, fns, alive } = input;
+  const { n, health, role, rate, bBurn, augCap } = R;
   // ---- Ports, placed; links where an out port faces an in port across a shared edge
   const occ = new Map<number, number>();
-  const key = (x: number, y: number) => (x + 1024) * 4096 + (y + 1024);
   const frames: PartFrame[] = [];
   for (let i = 0; i < n; i++) {
     frames.push(frameOf(parts[i], input.cells[i]));
     if (alive[i]) for (const c of input.cells[i]) occ.set(key(c[0], c[1]), i);
   }
-  type Port = { part: number; dir: 0 | 1; x: number; y: number; side: Side; nx: number; ny: number; rate: number; link: number; aug: 0 | 1 };
   const ports: Port[] = [];
   const byPart: Port[][] = Array.from({ length: n }, () => []);
   // Touch-routed parts (FunctionDef.touch: the legacy functions enemy designs are built of) have no ports of their own:
@@ -241,6 +291,19 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     byPart[C] = keep;
     tin[C] = TOUCH_LINE_RATE;
   }
+  return { occ, frames, ports, byPart, nb, tin, C, coreTouch };
+}
+type Placed = ReturnType<typeof placePorts>;
+
+/**
+ * Links: where an out port faces an in port across a shared edge, the touch links, the old touch designs' auto-wiring
+ * and touch generator blocks; which parts are left open, the links by part, and what each consumer's lines can bring
+ * (rate, after intake keeps its own)
+ */
+function linkUp(input: PortsLayoutInput, R: Roles, placed: Placed) {
+  const { fns, area, mats, alive } = input;
+  const { n, health, role, rate, bBurn } = R;
+  const { occ, ports, byPart, nb, tin, C, coreTouch } = placed;
   const touchGen = (i: number) => alive[i] && role[i] === P_GEN && fns[i].touch === 'gen';
   // (Touch relays pass power only away from the generators: each one's depth is its hops from a generator or the hub
   // through touching touch relays, and a touch relay feeds a touching one only if that is deeper, or as deep and later in
@@ -335,8 +398,14 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) if (!linkAug[inLink[x]]) r += linkCap[inLink[x]];
     rate[i] = role[i] === P_THRUSTER ? (fns[i].touch ? Math.min(r, Math.max(rate[i], bBurn[i])) : r) || rate[i] : Math.min(rate[i] || r, r) || rate[i];
   }
+  return { linkFrom, linkTo, linkCap, linkAug, openIn, openOut, outStart, outLink, inStart, inLink, intake, touchOut, touchClus, touchNext };
+}
 
-  // ---- Feed points and networks (union-find; a Selector's points join nothing, they look across)
+/** ---- Feed points and networks (union-find; a Selector's points join nothing, they look across) */
+function feedNetworks(input: PortsLayoutInput, R: Roles, placed: Placed) {
+  const { parts, fns, alive } = input;
+  const { n, role, tankFeed, feedPort } = R;
+  const { occ, frames } = placed;
   type FP = { part: number; x: number; y: number; side: Side; nx: number; ny: number; joined: number; i: number };
   const fps: FP[] = [], fpBy: FP[][] = Array.from({ length: n }, () => []);
   for (let i = 0; i < n; i++) {
@@ -375,24 +444,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   }
   const drawers: number[] = [];
   for (let i = 0; i < n; i++) if (alive[i] && netOf[i] >= 0 && (fns[i].combiner || feedPort[i])) drawers.push(i);
-
-  const list = (r: number) => { const o: number[] = []; for (let i = 0; i < n; i++) if (role[i] === r) o.push(i); return Int32Array.from(o); };
-  const relays = list(P_RELAY), consumers: number[] = [];
-  for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
-  let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
-  const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, machine, tow, flash, carrier, matCap, matUse, takes, tankFeed, feedPort,
-    mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
-    links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
-    outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
-    ports: ports.map((p) => ({ part: p.part, dir: p.dir, x: p.x, y: p.y, side: p.side, rate: p.rate, link: p.link >= 0 ? 1 : 0, l: p.link, aug: p.aug })),
-    feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
-    netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
-    gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
-    consumers: Int32Array.from(consumers), selectors: Int32Array.from(selectors), gaugeMax, touchOut, touchClus, touchNext, supply, engineDraw, weaponDraw, strafeDraw, gyroDraw, shieldDraw, machineDraw,
-  };
-  L.sig = portsSig(L);
-  return L;
+  return { fps, netOf, nets, selIn, selOut, selectors, drawers };
 }
 
 /**

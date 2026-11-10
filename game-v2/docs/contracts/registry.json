@@ -388,7 +388,7 @@
       "id": "client.predict.pt-kinds",
       "path": "client/src/predict/ptKinds.ts",
       "group": "client/predict",
-      "lines": 199,
+      "lines": 200,
       "owns": "the PT timeline's kind registry: every kind of thing stepped ahead of the confirmed tick, in order (confirm all, then advance all)",
       "needs": "@space-game/common, PtHost types; kinds read only kinds of lower order",
       "events": "",
@@ -412,75 +412,68 @@
         "PtKinds",
         "hashNums",
         "hashStr",
-        "noPtStats",
-        "wrapAngle"
+        "noPtStats"
       ],
       "sections": [
         {
           "name": "PoseXY",
           "kind": "interface",
-          "start": 35,
-          "end": 35
+          "start": 37,
+          "end": 37
         },
         {
           "name": "PtKindStats",
           "kind": "interface",
-          "start": 37,
-          "end": 62
+          "start": 39,
+          "end": 64
         },
         {
           "name": "noPtStats",
           "kind": "function",
-          "start": 64,
-          "end": 66
+          "start": 66,
+          "end": 68
         },
         {
           "name": "PtKind",
           "kind": "interface",
-          "start": 68,
-          "end": 86
+          "start": 70,
+          "end": 88
         },
         {
           "name": "PtKinds",
           "kind": "class",
-          "start": 88,
-          "end": 140
+          "start": 90,
+          "end": 142
         },
         {
           "name": "smoothstep",
           "kind": "const",
-          "start": 142,
-          "end": 142
-        },
-        {
-          "name": "wrapAngle",
-          "kind": "const",
-          "start": 143,
-          "end": 143
+          "start": 144,
+          "end": 144
         },
         {
           "name": "PtEase",
           "kind": "class",
-          "start": 145,
-          "end": 179
+          "start": 146,
+          "end": 180
         },
         {
           "name": "hashNums",
           "kind": "function",
-          "start": 181,
-          "end": 191
+          "start": 182,
+          "end": 192
         },
         {
           "name": "hashStr",
           "kind": "function",
-          "start": 193,
-          "end": 197
+          "start": 194,
+          "end": 198
         },
         {
           "name": "FNV0",
           "kind": "const",
-          "start": 199,
-          "end": 199
+          "start": 200,
+          "end": 200
         }
       ]
     },
@@ -11054,21 +11047,21 @@
       "id": "math.basic",
       "path": "common/src/math/basic.ts",
       "group": "common/math",
-      "lines": 41,
-      "owns": "plain maths helpers for non-sim code (UI, rendering, input, econ, scripts): clamp, lerp, smoothstep, wrapPi, cloneJson",
+      "lines": 48,
+      "owns": "plain maths helpers: clamp, lerp, smoothstep, cloneJson (non-sim code), and wrapPi, the one angle wrap shared by the sim and everything else",
       "needs": "nothing",
       "events": "",
       "invariants": [
         {
-          "text": "wrapPi matches the sim wraps bit for bit",
+          "text": "wrapPi is bit-identical to the old sim loop for |a| <= 64 and to orbit.ts's old modulo form",
           "test": "common/src/math/basic.test.ts"
         },
         {
-          "text": "the deterministic sim keeps its own copies on purpose and does not import this",
-          "test": "none pinned"
+          "text": "wrapPi always returns (Infinity and NaN give NaN, no hang)",
+          "test": "common/src/math/basic.test.ts"
         }
       ],
-      "extend": "add a helper only if non-sim code needs it; sim code uses detTrig / simMaths instead",
+      "extend": "add a helper only if non-sim code needs it; sim code uses detTrig / simMaths instead (wrapPi is the exception)",
       "exports": [
         "clamp",
         "cloneJson",
@@ -11080,32 +11073,38 @@
         {
           "name": "clamp",
           "kind": "function",
-          "start": 15,
-          "end": 18
+          "start": 14,
+          "end": 17
         },
         {
           "name": "lerp",
           "kind": "function",
-          "start": 20,
-          "end": 23
+          "start": 19,
+          "end": 22
         },
         {
           "name": "smoothstep",
           "kind": "function",
-          "start": 25,
-          "end": 29
+          "start": 24,
+          "end": 28
+        },
+        {
+          "name": "TAU",
+          "kind": "const",
+          "start": 30,
+          "end": 30
         },
         {
           "name": "wrapPi",
           "kind": "function",
-          "start": 31,
-          "end": 36
+          "start": 32,
+          "end": 43
         },
         {
           "name": "cloneJson",
           "kind": "function",
-          "start": 38,
-          "end": 41
+          "start": 45,
+          "end": 48
         }
       ]
     },
@@ -14632,7 +14631,7 @@
       "id": "network.replication.pose",
       "path": "common/src/network/replication/pose.ts",
       "group": "common/network/replication",
-      "lines": 133,
+      "lines": 130,
       "owns": "where a replicated ship is drawn between ticks: the lerp between stepped states, the way in before its first state, and the keyframe corrections and re-stepped paths bent in or eased out (drawing only)",
       "needs": "network/replication/rep (Rep, Fix), wire (Keyframe, replicaAngle), hooks (Step), sim/ring, math/detTrig",
       "events": "",
@@ -14667,92 +14666,92 @@
         {
           "name": "BEND_TICKS",
           "kind": "const",
-          "start": 20,
-          "end": 21
+          "start": 21,
+          "end": 22
         },
         {
           "name": "SMOOTH_TICKS",
           "kind": "const",
-          "start": 22,
-          "end": 23
+          "start": 23,
+          "end": 24
         },
         {
           "name": "SMOOTH_MAX",
           "kind": "const",
-          "start": 24,
-          "end": 25
+          "start": 25,
+          "end": 26
         },
         {
           "name": "GAP_MAX",
           "kind": "const",
-          "start": 26,
-          "end": 27
+          "start": 27,
+          "end": 28
         },
         {
           "name": "BACK_TICKS",
           "kind": "const",
-          "start": 28,
-          "end": 29
+          "start": 29,
+          "end": 30
         },
         {
           "name": "smoothstep",
           "kind": "const",
-          "start": 31,
-          "end": 31
+          "start": 32,
+          "end": 32
         },
         {
           "name": "wrapAngle",
-          "kind": "function",
-          "start": 33,
-          "end": 38
+          "kind": "const",
+          "start": 34,
+          "end": 35
         },
         {
           "name": "fixWeight",
           "kind": "function",
-          "start": 40,
-          "end": 47
+          "start": 37,
+          "end": 44
         },
         {
           "name": "RawPose",
+          "kind": "interface",
+          "start": 46,
+          "end": 47
+        },
+        {
+          "name": "DrawnPose",
           "kind": "interface",
           "start": 49,
           "end": 50
         },
         {
-          "name": "DrawnPose",
-          "kind": "interface",
-          "start": 52,
-          "end": 53
-        },
-        {
           "name": "poseComingIn",
           "kind": "function",
-          "start": 55,
-          "end": 71
+          "start": 52,
+          "end": 68
         },
         {
           "name": "poseBetween",
           "kind": "function",
-          "start": 73,
-          "end": 78
+          "start": 70,
+          "end": 75
         },
         {
           "name": "bendPose",
           "kind": "function",
-          "start": 80,
-          "end": 116
+          "start": 77,
+          "end": 113
         },
         {
           "name": "dropFixesFrom",
           "kind": "function",
-          "start": 118,
-          "end": 121
+          "start": 115,
+          "end": 118
         },
         {
           "name": "noteKeyframeFix",
           "kind": "function",
-          "start": 123,
-          "end": 133
+          "start": 120,
+          "end": 130
         }
       ]
     },
@@ -16425,7 +16424,7 @@
       "id": "power.ports-build",
       "path": "common/src/ships/power/portsBuild.ts",
       "group": "common/ships/power",
-      "lines": 425,
+      "lines": 477,
       "owns": "building a PortsLayout from a ship's parts (buildPortsLayout), its signature and which parts power reaches",
       "needs": "portsTypes, common/ships catalog, grades, power/units",
       "events": "",
@@ -16435,7 +16434,7 @@
           "test": "common/src/ships/power/ports.test.ts"
         }
       ],
-      "extend": "a new port consumer's layout case is in buildPortsLayout",
+      "extend": "a new port consumer's layout case is in partRoles (buildPortsLayout's first phase)",
       "exports": [
         "PartFrame",
         "buildPortsLayout",
@@ -16479,19 +16478,67 @@
           "name": "buildPortsLayout",
           "kind": "function",
           "start": 44,
-          "end": 396
+          "end": 75
+        },
+        {
+          "name": "key",
+          "kind": "const",
+          "start": 77,
+          "end": 78
+        },
+        {
+          "name": "partRoles",
+          "kind": "function",
+          "start": 80,
+          "end": 228
+        },
+        {
+          "name": "Roles",
+          "kind": "type",
+          "start": 229,
+          "end": 229
+        },
+        {
+          "name": "Port",
+          "kind": "type",
+          "start": 231,
+          "end": 231
+        },
+        {
+          "name": "placePorts",
+          "kind": "function",
+          "start": 233,
+          "end": 295
+        },
+        {
+          "name": "Placed",
+          "kind": "type",
+          "start": 296,
+          "end": 296
+        },
+        {
+          "name": "linkUp",
+          "kind": "function",
+          "start": 298,
+          "end": 402
+        },
+        {
+          "name": "feedNetworks",
+          "kind": "function",
+          "start": 404,
+          "end": 448
         },
         {
           "name": "portsFed",
           "kind": "function",
-          "start": 398,
-          "end": 414
+          "start": 450,
+          "end": 466
         },
         {
           "name": "portsSig",
           "kind": "function",
-          "start": 416,
-          "end": 425
+          "start": 468,
+          "end": 477
         }
       ]
     },
