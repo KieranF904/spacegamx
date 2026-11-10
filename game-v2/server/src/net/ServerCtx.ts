@@ -83,6 +83,8 @@ export interface ServerCtx {
   isDocked(eid: number): boolean;
   /** The connection flying this entity, if any */
   liveConn(eid: number): ClientConnection | undefined;
+  /** Joined: its player entity, pilot and welcome (gameServer/session.ts enter; once) */
+  enter(conn: ClientConnection): void;
   loginPilot(conn: ClientConnection, userId: number): Promise<void>;
   /** A guest joined with a guest key: their kept pilot back, any other connection on it ended (gameServer/session.ts) */
   resumeGuest(conn: ClientConnection): Promise<void>;

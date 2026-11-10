@@ -26,6 +26,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   chat: { per: 40, burst: 8 },
   // The clock sync (the client pings every 2 s, 30 a minute)
   ping: { per: 120, burst: 20 },
+  // A socket joins once (net/auth.ts), so these are retries
+  join: { per: 10, burst: 5 },
   // Every market priced (the client asks every 20 s)
   marketScan: { per: 12, burst: 4 },
   // Every account sorted

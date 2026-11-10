@@ -103,7 +103,7 @@ import { joinFeatureMessages, stationAtConn, installHangarLogin, installSocialLo
 import { asteroidSpawnData, placeAsteroid } from './gameServer/asteroids.js';
 import { shotWall, hurtAsteroid } from './gameServer/combat.js';
 import { getTrafficShips, stationEntity } from './gameServer/traffic.js';
-import { connect, createPlayer, placePlayer, loginPilot, resumeGuest, forgetAccounts, saveAll } from './gameServer/session.js';
+import { connect, enter, createPlayer, placePlayer, loginPilot, resumeGuest, forgetAccounts, saveAll } from './gameServer/session.js';
 import { buildMessageHandlers, handleMessage, handleInput, applyInputToEntity } from './gameServer/messages.js';
 import { canHeal, canDamage, sideOf, inPvpZone, hunted } from './gameServer/rules.js';
 import { fault, faultCounts } from './gameServer/faults.js';
@@ -517,6 +517,8 @@ this.devTeleport = opts.devTeleport ?? false;
   canHeal(healer: number, target: number): boolean { return canHeal(this, healer, target); }
 
   placePlayer(conn: ClientConnection, systemNum: number, x: number, y: number): void { placePlayer(this, conn, systemNum, x, y); }
+
+  enter(conn: ClientConnection): void { enter(this, conn); }
 
   async loginPilot(conn: ClientConnection, userId: number): Promise<void> { return loginPilot(this, conn, userId); }
 

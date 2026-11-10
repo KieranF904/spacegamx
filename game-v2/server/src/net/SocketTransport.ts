@@ -121,7 +121,8 @@ export class SocketTransport {
         if (opts?.raw) ws.send(data, { compress: false });
         else ws.send(data);
       },
-      close: () => ws.close(4001, 'Sign-in failed'),
+      // (A refused sign-in unless told otherwise: the protocol mismatch and the join deadline say their own code)
+      close: (code, reason) => ws.close(code ?? 4001, reason ?? 'Sign-in failed'),
     };
 
     let link: ReturnType<GameServer['connect']>;

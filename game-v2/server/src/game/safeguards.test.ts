@@ -118,26 +118,29 @@ describe('boss pay', () => {
 describe('connections', () => {
   it('nothing but join, ping and sign-in is handled before joining', () => {
     const w = world(false);
-    const conn = [...(w.server as any).clients.values()][0];
+    // (Before its join a connection is only a socket: no entity, not one of the server's clients)
+    expect(w.pid).toBe(0);
     w.t.send({ type: 'chat', text: 'hello' } as any);
     w.t.send({ type: 'input', seq: 1, tick: 0, forward: true, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0 } as any);
     w.server.step();
-    expect(conn.joined).toBe(false);
-    expect(Input.forward[w.pid]).toBe(0);
+    expect((w.server as any).clients.size).toBe(0);
+    expect(w.got.some((m) => m.type === 'chat')).toBe(false);
+    w.t.send({ type: 'join', username: 'pilot' } as any);
+    expect(Input.forward[w.t.getPlayerId()]).toBe(0);
   });
 
   it('a client built for another protocol, or without the full caps set, is turned away', () => {
     const w = world(false);
-    const conn = [...(w.server as any).clients.values()][0];
+    const joined = () => [...(w.server as any).clients.values()].some((c: any) => c.joined);
     w.t.send({ type: 'join', username: 'old', protocol: PROTOCOL_VERSION + 1 } as any);
-    expect(conn.joined).toBe(false);
+    expect(joined()).toBe(false);
     // (the right protocol but not every cap: there's no base protocol to fall back on)
     w.t.send({ type: 'join', username: 'part', protocol: PROTOCOL_VERSION } as any);
-    expect(conn.joined).toBe(false);
+    expect(joined()).toBe(false);
     w.t.send({ type: 'join', username: 'part', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS & ~CAPS.PACKED } as any);
-    expect(conn.joined).toBe(false);
+    expect(joined()).toBe(false);
     w.t.send({ type: 'join', username: 'new', protocol: PROTOCOL_VERSION, caps: DEFAULT_CAPS } as any);
-    expect(conn.joined).toBe(true);
+    expect(joined()).toBe(true);
     expect((w.got.find((m) => m.type === 'welcome') as any).protocol).toBe(PROTOCOL_VERSION);
   });
 

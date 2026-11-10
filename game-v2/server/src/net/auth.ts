@@ -2,7 +2,7 @@
  * Join and sign-in: the join message and the guest-name rules.
  * Moved verbatim from GameServer (the receiver `this` became `ctx`, the helpers take ctx first). Security-critical: a
  * guest can't pose as a registered or admin name, a banned or expired token never becomes a guest, and a protocol
- * mismatch closes the socket (4002). `conn.joined = true` still comes before the first await.
+ * mismatch closes the socket (4002). `conn.joined = true` still comes before the first await, and a socket joins once.
  */
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON, fullCaps } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
@@ -21,6 +21,9 @@ export function registerAuthHandlers(t: HandlerRegistry): void {
 }
 
 export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
+  // One join per socket: a second would swap who it is past the one-session sweep and the profile lease (a guest coming
+  // back with their key, or a reconnect, is a new socket)
+  if (conn.joined) return;
   // A client built for another wire format can't talk to us: it shows "new version, reload"
   // (one that doesn't say predates the handshake, and the format it knows hasn't changed since)
   // Nor can one without the full netcode (common network/hits.ts DEFAULT_CAPS): there's no base protocol to fall back
@@ -33,6 +36,8 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
   }
   if (gated(ctx, conn)) return;
   conn.joined = true;
+  // (Its ship from now: a socket that never joins has none)
+  ctx.enter(conn);
   if (msg.token) {
     // Authenticated join - validate token
     const { user, error } = ctx.userDB.checkSession
