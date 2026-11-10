@@ -238,7 +238,7 @@
       "events": "",
       "invariants": [
         {
-          "text": "a panel is made once, never for a signed-out admin or in a proto build; Game starts the admin one for admins and the notes one for contributors only",
+          "text": "a panel is made once, never for a signed-out admin; Game starts the admin one for admins and the notes one for contributors only",
           "test": "client/src/app/appInvariants.test.ts"
         }
       ],

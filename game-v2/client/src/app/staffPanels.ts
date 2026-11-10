@@ -2,7 +2,7 @@
  * @contract client.app.staff-panels
  * owns:       the admin panel (F2) and contributor notes panel (F6): loaded on demand, made once, torn down on sign-out
  * needs:      StaffHost (send, state, pilot, renderer, input, windows, flyTo, chat), dynamic imports of ui/AdminPanel and ui/ContributorPanel; npm: @space-game/common
- * invariants: a panel is made once, never for a signed-out admin or in a proto build; Game starts the admin one for admins and the notes one for contributors only — client/src/app/appInvariants.test.ts
+ * invariants: a panel is made once, never for a signed-out admin; Game starts the admin one for admins and the notes one for contributors only — client/src/app/appInvariants.test.ts
  * extend:     a new staff-only panel is one more start/stop pair here
  */
 

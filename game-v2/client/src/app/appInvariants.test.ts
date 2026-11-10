@@ -184,8 +184,8 @@ describe('client.app.staff-panels', () => {
   });
   afterEach(() => { vi.doUnmock('../ui/AdminPanel'); vi.doUnmock('../ui/ContributorPanel'); });
   const flush = () => new Promise((r) => setTimeout(r, 0));
-  const host = (admin: boolean, proto = false) => ({
-    state: {}, pilot: { econ: {} }, renderer: {}, input: {}, w: { systemMapUI: {} }, proto, isAdmin: () => admin,
+  const host = (admin: boolean) => ({
+    state: {}, pilot: { econ: {} }, renderer: {}, input: {}, w: { systemMapUI: {} }, isAdmin: () => admin,
     send: vi.fn(), flyTo: vi.fn(), chat: vi.fn(),
   });
 
@@ -211,14 +211,11 @@ describe('client.app.staff-panels', () => {
     expect(made.destroyed).toBe(1);
   });
 
-  it('makes the notes panel once, never in a proto build, and not after a stop while it loaded', async () => {
+  it('makes the notes panel once, and not after a stop while it loaded', async () => {
     const { StaffPanels } = await import('./staffPanels');
     const c = new StaffPanels(host(false) as never);
     c.startContrib(); c.startContrib(); await flush();
     expect(made.contrib).toBe(1);
-    const p = new StaffPanels(host(false, true) as never);
-    p.startContrib(); await flush();
-    expect(p.contribPanel).toBeNull();
     const s = new StaffPanels(host(false) as never);
     s.startContrib(); s.stopContrib(); await flush();
     expect(s.contribPanel).toBeNull();
