@@ -19783,8 +19783,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "cargo never exceeds capacity except through give()",
-          "test": "none pinned"
+          "text": "cargo never exceeds capacity: give() takes only what fits, a move to the hold clips, only toStorage skips it",
+          "test": "server/src/game/pilots/cargo.test.ts"
         }
       ],
       "extend": "a new item action is a handleX here and a message handler calling it",
@@ -19909,7 +19909,7 @@
       "invariants": [
         {
           "text": "a wreck is only for its pilot for wreckMinutes",
-          "test": "none pinned"
+          "test": "server/src/game/pilots/death.test.ts"
         }
       ],
       "extend": "a new loss or notice is a step in onDestroyed / showNotices",
@@ -20526,8 +20526,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "tick times kept for the admin stats are the last 120, sent to open admin sockets once a second",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "a new admin command is an AdminHost member here",
@@ -20567,8 +20567,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "asteroid ids stay stable across respawns",
-          "test": "none pinned"
+          "text": "a rock that breaks and grows back keeps its belt index (its entity id is new), and a rock is the same from the same (system, index, tick)",
+          "test": "server/src/gameServer/asteroids.test.ts"
         }
       ],
       "extend": "a new asteroid stage rule goes into shedAsteroid or createAsteroid",
@@ -20803,8 +20803,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "an error is counted every time but logged once per place per 10 s",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "n/a",
@@ -21054,8 +21054,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "the dev-only options (guestAdmin, freeBuild, devStart) are dropped under NODE_ENV=production",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "a new option is a field here",
@@ -21081,8 +21081,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "min, max, window max and a smoothed average follow every tick, per-tick counters reset (updatePerfMetrics)",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "n/a",
@@ -21174,8 +21174,8 @@
           "test": "server/src/net/joinDeadline.test.ts"
         },
         {
-          "text": "saveAll saves every live pilot once",
-          "test": "none pinned"
+          "text": "saveAll saves every live pilot once, and a failing store does not stop the others",
+          "test": "server/src/gameServer/saveAll.test.ts"
         }
       ],
       "extend": "a new join/leave step is a function here called from connect or loginPilot",
@@ -21323,8 +21323,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "a removal remembers the system the entity was in when it was added",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "a new shared constant goes here",
@@ -21593,8 +21593,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "ratings are cached until cleared, the training yard is not rated, a band is at least as bad as the one inside it",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "n/a",
@@ -21627,8 +21627,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "a distant freighter holds out its dwell at a station, then heads for the next; a ship that is not a freighter has no leg",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "traffic rules live in trafficSystem and trafficIntent",
@@ -21675,8 +21675,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is unchanged from the class it was split from",
-          "test": "none pinned"
+          "text": "a clock change moves a pilot's tick notes by the delta and drops inputs said in the old ticks",
+          "test": "server/src/gameServer/serverParts.test.ts"
         }
       ],
       "extend": "a new way between systems is a branch of travelTo",

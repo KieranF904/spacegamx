@@ -2,7 +2,7 @@
  * @contract server.gameserver.faults
  * owns:       crash isolation: logging and counting errors by place
  * needs:      GameServer (type), activity
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: an error is counted every time but logged once per place per 10 s — server/src/gameServer/serverParts.test.ts
  * extend:      n/a
  */
 

@@ -2,7 +2,7 @@
  * @contract server.gameserver.admin
  * owns:       the admin host, admin stats and perf metrics
  * needs:      GameServer (type), game/AdminTools; npm: @space-game/common, bitecs
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: tick times kept for the admin stats are the last 120, sent to open admin sockets once a second — server/src/gameServer/serverParts.test.ts
  * extend:      a new admin command is an AdminHost member here
  */
 

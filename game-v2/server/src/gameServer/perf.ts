@@ -2,7 +2,7 @@
  * @contract server.gameserver.perf
  * owns:       tick time metrics
  * needs:      none
- * invariants: behaviour is unchanged from the class it was split from — none pinned
+ * invariants: min, max, window max and a smoothed average follow every tick, per-tick counters reset (updatePerfMetrics) — server/src/gameServer/serverParts.test.ts
  * extend:      n/a
  */
 
