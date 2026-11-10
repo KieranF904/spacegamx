@@ -18070,7 +18070,7 @@
       "id": "server.data.game-data",
       "path": "server/src/data/GameData.ts",
       "group": "server/data",
-      "lines": 266,
+      "lines": 270,
       "owns": "loading and indexing the game data JSON files into GameData",
       "needs": "@space-game/common data shapes and terrain builders",
       "events": "",
@@ -18093,10 +18093,16 @@
           "end": 73
         },
         {
+          "name": "checkedFiles",
+          "kind": "const",
+          "start": 75,
+          "end": 76
+        },
+        {
           "name": "GameData",
           "kind": "class",
-          "start": 75,
-          "end": 266
+          "start": 78,
+          "end": 270
         }
       ]
     },
@@ -18865,7 +18871,7 @@
       "id": "server.enemies",
       "path": "server/src/game/Enemies.ts",
       "group": "server/game",
-      "lines": 527,
+      "lines": 538,
       "owns": "the hostile ships of every system: spawning, the tick, and the public doors to the rules in enemies/*.ts",
       "needs": "EnemyHost, ShipBridge, enemies/{model, populations, placement, steering, memory, loot, stationDefence}; npm: @space-game/common",
       "events": "BossHooks (Bosses plugs in), EnemyHost.reward/dropLoot/questKill on a kill",
@@ -18904,7 +18910,7 @@
           "name": "Enemies",
           "kind": "class",
           "start": 62,
-          "end": 526
+          "end": 537
         }
       ]
     },
@@ -20885,7 +20891,7 @@
       "id": "server.gameserver.loop",
       "path": "server/src/gameServer/loop.ts",
       "group": "server/gameServer",
-      "lines": 298,
+      "lines": 316,
       "owns": "the real-time loop, one step, the guarded tick table and its per-tick passes",
       "needs": "GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks; npm: @space-game/common, bitecs",
       "events": "",
@@ -20903,6 +20909,7 @@
       "exports": [
         "buildTickSystems",
         "drainInputQueue",
+        "fileBeltsLater",
         "gameLoop",
         "ownPasses",
         "releaseControls",
@@ -20936,28 +20943,46 @@
           "end": 151
         },
         {
+          "name": "BELT_SLICE_MS",
+          "kind": "const",
+          "start": 153,
+          "end": 154
+        },
+        {
+          "name": "BELT_GAP_MS",
+          "kind": "const",
+          "start": 155,
+          "end": 155
+        },
+        {
+          "name": "fileBeltsLater",
+          "kind": "function",
+          "start": 157,
+          "end": 169
+        },
+        {
           "name": "drainInputQueue",
           "kind": "function",
-          "start": 153,
-          "end": 190
+          "start": 171,
+          "end": 208
         },
         {
           "name": "releaseControls",
           "kind": "function",
-          "start": 192,
-          "end": 195
+          "start": 210,
+          "end": 213
         },
         {
           "name": "buildTickSystems",
           "kind": "function",
-          "start": 197,
-          "end": 272
+          "start": 215,
+          "end": 290
         },
         {
           "name": "tick",
           "kind": "function",
-          "start": 274,
-          "end": 298
+          "start": 292,
+          "end": 316
         }
       ]
     },

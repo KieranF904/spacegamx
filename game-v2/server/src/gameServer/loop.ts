@@ -150,6 +150,24 @@ export function gameLoop(gs: GameServer): void {
   }
 }
 
+/** How long each slice of the start's belt filing runs, and the gap after it (ms): the loop's ticks go on between */
+const BELT_SLICE_MS = 4;
+const BELT_GAP_MS = 1;
+
+/**
+ * The real server's start: every system's belts filed (game/AsteroidOrbits.ts) a slice at a time between its first
+ * ticks rather than all before the first (most of a second): the timetable comes out the same either way, and a system
+ * asked about before its turn files its own at once
+ */
+export function fileBeltsLater(gs: GameServer): void {
+  const slice = (): void => {
+    if (!gs.asteroidOrbits.fileSome(BELT_SLICE_MS)) return;
+    const t = setTimeout(slice, BELT_GAP_MS) as { unref?: () => void };
+    t.unref?.();
+  };
+  slice();
+}
+
 /**
  * Apply all queued player inputs.  Called once per tick, right before
  * simulation, so every input lands on the earliest tick boundary.

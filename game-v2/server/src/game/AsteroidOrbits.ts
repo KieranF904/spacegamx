@@ -17,11 +17,12 @@
  * A rock that keeps still (a stationary field's: `fixed`) is filed only in the
  * cells round its spot, there for its whole clock.
  *
- * A system's orbits are filed when it's first asked about (or by fileAll: the
- * real server's start), not as each is added: a test world that never looks in
- * most systems never walks their belts. Filed late or not, every cell ends up
- * with the same entries in the same order (adds and removes before then keep
- * their order: a re-added rock goes to the back, as filing it would have).
+ * A system's orbits are filed when it's first asked about (or by fileSome, a
+ * slice at a time: the real server's start, in the gaps between its first ticks),
+ * not as each is added: a test world that never looks in most systems never
+ * walks their belts. Filed late, in slices or not, every cell ends up with the
+ * same entries in the same order (adds and removes before then keep their
+ * order: a re-added rock goes to the back, as filing it would have).
  */
 import { ORBIT_MU, dcos, dsin, dsincos } from '@space-game/common';
 
@@ -81,7 +82,7 @@ export class AsteroidOrbits {
   private orbits = new Map<number, { system: number; shape: OrbitShape }>();
   /** The systems whose orbits are filed (each one's added from then on is filed at once) */
   private filed = new Set<number>();
-  /** The rest's asteroids, by system, in the order they're to be filed */
+  /** The rest's asteroids, by system, in the order they're to be filed (a system part filed by fileSome: what's left of it) */
   private waiting = new Map<number, Set<number>>();
   private settled = false;
   /** Query dedupe: an asteroid's last query number, by id */
@@ -123,6 +124,26 @@ export class AsteroidOrbits {
     if (!this.waiting.size) return;
     for (const system of [...this.waiting.keys()]) this.fileSystem(system, false);
     if (this.settled) this.compact(true);
+  }
+
+  /**
+   * File waiting orbits, in the order fileAll would, for about `budgetMs`; true while some are still waiting. The real
+   * server's start: its belts filed a slice at a time while it runs (a system asked about before then files the rest of
+   * its own at once)
+   */
+  fileSome(budgetMs: number, now: () => number = () => performance.now()): boolean {
+    const end = now() + budgetMs;
+    for (const [system, w] of this.waiting) {
+      for (const id of w) {
+        w.delete(id);
+        this.file(id, system, this.orbits.get(id)!.shape);
+        if (now() >= end) return true;
+      }
+      this.waiting.delete(system);
+      this.filed.add(system);
+    }
+    if (this.settled) this.compact(true);
+    return false;
   }
 
   /** File a system's waiting orbits, in the order they were added */
@@ -227,7 +248,8 @@ export class AsteroidOrbits {
     if (!o) return;
     this.orbits.delete(id);
     this.phaseTick[id] = -1;
-    if (!this.filed.has(o.system)) { this.waiting.get(o.system)?.delete(id); return; }
+    // (Not filed yet: off the waiting list. One fileSome filed in a system it hasn't finished is unfiled as in a filed one)
+    if (!this.filed.has(o.system) && this.waiting.get(o.system)?.delete(id)) return;
     const seen = new Set<number>();
     this.walk(o.system, o.shape, (key) => {
       if (seen.has(key)) return;
