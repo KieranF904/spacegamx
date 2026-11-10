@@ -65,6 +65,7 @@ import type { UserRecord, UserStore, UserSummary } from './types.js';
 import { BAN_FOREVER, banMessage, isAdminRank, rankOf, safeEqual, validatePassword } from './utils.js';
 import { RateLimiter } from './RateLimiter.js';
 import { notifier } from './pushover.js';
+import { devAuthOn } from './devAuth.js';
 
 type Json = (res: http.ServerResponse, status: number, body: unknown) => void;
 type Body = (req: http.IncomingMessage) => Promise<any>;
@@ -88,7 +89,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 /** Accounts live beside the game's data (kept across deploys): ../../data/lobby from dist/accounts or src/accounts */
 export const DATA_DIR = process.env.ACCOUNTS_DIR || path.resolve(here, '../../../data/lobby');
 /** Shared with the game servers for /admin/* (dev servers share a fixed one, so it works out of the box) */
-const ADMIN_SECRET = process.env.LOBBY_ADMIN_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-lobby-admin-secret');
+const ADMIN_SECRET = process.env.LOBBY_ADMIN_SECRET || (devAuthOn() ? 'dev-lobby-admin-secret' : '');
 /** Account management actions (handleAccount) */
 const ACCOUNT_ACTIONS = ['account', 'change-password', 'change-email', 'logout-all', 'delete-account'];
 /** Most users in one page of /admin/users */

@@ -2573,33 +2573,6 @@
    "seconds": 120
   },
   {
-   "id": "power_pulse_dynamo",
-   "tab": "power",
-   "kind": "model",
-   "name": "Pulse Dynamo",
-   "level": 18,
-   "order": 108,
-   "fn": "power_pulse_dynamo",
-   "material": "titanium",
-   "piece": "sq",
-   "art": {
-    "src": "/static/img/parts/power_pulse_dynamo.webp",
-    "w": 56,
-    "h": 61
-   },
-   "licence": false,
-   "tradeOff": "an old charger the ports core no longer uses: makes and moves no power",
-   "family": "Old chargers",
-   "size": "Small · Square",
-   "keyNumbers": "67 hp · armour 2",
-   "cost": {
-    "titanium_plate": 1,
-    "coil_winding": 2,
-    "capacitor_cell": 1
-   },
-   "seconds": 0
-  },
-  {
    "id": "shield_half_dome",
    "tab": "shields",
    "kind": "model",

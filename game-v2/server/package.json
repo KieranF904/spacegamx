@@ -5,7 +5,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=../dev.env src/index.ts",
     "start": "node dist/index.js",
     "bench:crowd": "tsx src/bench/crowdBench.ts",
     "bench:table": "tsx --tsconfig ../scripts/net/tsconfig.json src/bench/netTable.ts"

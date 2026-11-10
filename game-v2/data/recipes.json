@@ -1457,14 +1457,6 @@
       "time": 0,
       "perCell": true
     },
-    "power_pulse_dynamo": {
-      "inputs": {
-        "titanium_plate": 1,
-        "coil_winding": 2,
-        "capacitor_cell": 1
-      },
-      "time": 0
-    },
     "shield_flash_screen": {
       "inputs": {
         "steel_plate": 1,

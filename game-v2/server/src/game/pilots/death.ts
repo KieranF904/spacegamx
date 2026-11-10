@@ -3,6 +3,7 @@
  * owns:       what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return
  * needs:      Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common
  * invariants: a wreck is only for its pilot for wreckMinutes — server/src/game/pilots/death.test.ts
+ *             a destroyed loaner costs its pilot's cargo as any death does, but not the loaner or the saved ship — server/src/game/pilots/loaner.test.ts
  * extend:     a new loss or notice is a step in onDestroyed / showNotices
  */
 
@@ -35,13 +36,10 @@ export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x:
     s.dirty = true;
     return;
   }
-  // A loaner lost (flown while the saved ship fails the rules: persist.ts flyLoaner): nothing dropped or salvaged, the
-  // saved ship back as its record, so the respawn checks it again (and flies another loaner if it still fails)
-  if (self.loaners.has(p.ship) && p.hangar[p.activeSlot]) {
-    p.ship = p.hangar[p.activeSlot]!;
-    self.toast(conn, 'The loaner was destroyed: you respawn in another', 'info');
-    return;
-  }
+  // A loaner lost (flown while the saved ship fails the rules: persist.ts flyLoaner): the cargo goes as in any death, but
+  // the loaner itself costs nothing (no salvage, no bank) and the saved ship is untouched, back as its record, so the
+  // respawn checks it again (and flies another loaner if it still fails)
+  const loaner = self.loaners.has(p.ship) && !!p.hangar[p.activeSlot];
   const D = self.death;
   const safe = !!self.host.safeAt?.(systemNum, x, y);
   self.track(conn, 'death', { system: self.host.systemId(systemNum), x: Math.round(x), y: Math.round(y), safe, ship: p.ship.blueprint.name, parts: p.ship.blueprint.parts.length, cargo: p.cargo.reduce((n, st) => n + st.n, 0), deaths: (p.stats.deaths ?? 0) + 1, ...cause });
@@ -57,6 +55,7 @@ export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x:
     }
     p.cargo = kept;
   }
+  if (loaner) { loanerLost(self, s, systemNum, x, y, vx, vy, cargo); return; }
   const rec = p.ship;
   const standing = new Set(rec.ghosts ?? []);
   const built = rec.blueprint.parts.filter((q) => !standing.has(q.uid));
@@ -75,17 +74,7 @@ export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x:
     : back.paid > 0
       ? `Your repair bank rebuilt ${back.paid} part${back.paid > 1 ? 's' : ''}; ${back.owed} more come back ${deposits ? 'from your deposits and ' : ''}as the bank refills`
       : `You are back as a bare core: ${back.owed} part${back.owed > 1 ? 's' : ''} come back ${deposits ? 'from your deposits and ' : ''}as your repair bank refills`);
-  // The wreck: kept for its pilot a while, marked on their map
-  const sysId = self.host.systemId(systemNum);
-  const key = self.keyOf(conn);
-  if (Object.keys(cargo).length) {
-    const kept = !!(self.host.spawnWreck && key && sysId);
-    const eid = kept ? self.host.spawnWreck!(systemNum, x, y, vx * 0.3, vy * 0.3, cargo, key!, D.wreckMinutes * 60) : self.host.spawnPod(systemNum, x, y, vx * 0.5, vy * 0.5, cargo);
-    if (kept && eid >= 0) {
-      p.wreck = { system: sysId!, x: Math.round(x), y: Math.round(y), until: self.now() + D.wreckMinutes * 60_000 };
-      note += `. Your wreck holds your cargo and the rest of its materials: it's marked on your map and kept for you for ${D.wreckMinutes} minutes`;
-    }
-  }
+  note += leaveWreck(self, s, systemNum, x, y, vx, vy, cargo, 'Your wreck holds your cargo and the rest of its materials');
   if (!safe && p.cargo.length) note += `. Your secure hold kept ${p.cargo.length} stack${p.cargo.length > 1 ? 's' : ''}`;
   self.toast(conn, note, 'warn');
   p.stats.deaths = (p.stats.deaths ?? 0) + 1;
@@ -94,6 +83,33 @@ export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x:
   sendWreck(self, s);
   self.sendBank(s, true);
   void persist.save(self, s);
+}
+
+/** The wreck: kept for its pilot a while, marked on their map. Returns the note to add to their message ('' if nothing was dropped) */
+function leaveWreck(self: Pilots, s: Session, systemNum: number, x: number, y: number, vx: number, vy: number, cargo: Bag, holds: string): string {
+  if (!Object.keys(cargo).length) return '';
+  const { conn, profile: p } = s;
+  const minutes = self.death.wreckMinutes;
+  const sysId = self.host.systemId(systemNum);
+  const key = self.keyOf(conn);
+  const kept = !!(self.host.spawnWreck && key && sysId);
+  const eid = kept ? self.host.spawnWreck!(systemNum, x, y, vx * 0.3, vy * 0.3, cargo, key!, minutes * 60) : self.host.spawnPod(systemNum, x, y, vx * 0.5, vy * 0.5, cargo);
+  if (!kept || eid < 0) return '';
+  p.wreck = { system: sysId!, x: Math.round(x), y: Math.round(y), until: self.now() + minutes * 60_000 };
+  return `. ${holds}: it's marked on your map and kept for you for ${minutes} minutes`;
+}
+
+/** The loaner lost: its pilot's cargo is wrecked as in any death, nothing else is (the loaner is free, the saved ship as it was) */
+function loanerLost(self: Pilots, s: Session, systemNum: number, x: number, y: number, vx: number, vy: number, cargo: Bag): void {
+  const { conn, profile: p } = s;
+  p.ship = p.hangar[p.activeSlot]!;
+  const wreck = leaveWreck(self, s, systemNum, x, y, vx, vy, cargo, 'Your wreck holds your cargo');
+  const secure = p.cargo.length ? `. Your secure hold kept ${p.cargo.length} stack${p.cargo.length > 1 ? 's' : ''}` : '';
+  self.toast(conn, `The loaner was destroyed: it costs you nothing, and you respawn in another${wreck}${secure}`, 'info');
+  p.stats.deaths = (p.stats.deaths ?? 0) + 1;
+  s.dirty = true;
+  self.sendItems(conn);
+  sendWreck(self, s);
 }
 
 /** A pilot recovered their wreck (its pod was emptied) */

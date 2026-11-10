@@ -13,6 +13,7 @@ import { cloneJson } from '../math/basic.js';
 import { migrateGunFacings } from '../ships/gunFacing.js';
 import { Stack, Bag, cleanStacks } from './stacks.js';
 import { retireWireSpools } from './retiredWire.js';
+import { retirePulseDynamos } from './retiredDynamo.js';
 import { levelAt } from './levels.js';
 import { unlocks } from './unlocks.js';
 import type { TraceLedger } from './traces.js';
@@ -382,6 +383,8 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
   setActiveShip(out, out.ship, active);
   // The wire spool is retired: any held is paid back as credits (econ/retiredWire.ts)
   retireWireSpools(out);
+  // The Pulse Dynamo is retired too: any held or placed is paid back as credits (econ/retiredDynamo.ts)
+  retirePulseDynamos(out);
   // The field update (v6): kits and bonds become bank deposits, loaners go (econ/fieldUpdate.ts)
   if (was < 6) {
     if (!opts.econ) { out.version = 5; return out; }

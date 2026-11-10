@@ -13,6 +13,8 @@ import {
   RefusedError, canonical, loadJsonSource, loadNormaliser, planMigration, schemaStatements, verify, writePlan,
 } from './migrateJsonToPostgres.js';
 
+// (The lobby seeds its dev admin only with DEV_AUTH=1: the test makes one to show the tool never does)
+process.env.DEV_AUTH = '1';
 const SCHEMA = readFileSync(join(__dirname, '../../server-browser/schema.sql'), 'utf-8');
 
 /** A data folder like the VPS's: alice (id 2) with a save, bob (id 3) deleted after playing, an admin (id 1) */

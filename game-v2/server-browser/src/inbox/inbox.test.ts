@@ -9,6 +9,9 @@ import { InboxRoutes, BODY_MAX, SUBJECT_MAX, IP_LIMIT, SEND_LIMIT, BROADCAST_LIM
 import { JsonMessageStore } from './JsonMessageStore.js';
 import { MESSAGES_SCHEMA, PostgresMessageStore } from './PostgresMessageStore.js';
 
+// (These count the dev admin the store seeds: only with DEV_AUTH=1, server-browser/src/accounts/devAuth.ts)
+process.env.DEV_AUTH = '1';
+
 const dirs: string[] = [];
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 

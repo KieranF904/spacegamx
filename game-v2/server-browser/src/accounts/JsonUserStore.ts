@@ -17,6 +17,7 @@
  */
 
 import fs from 'fs';
+import { devAuthOn } from './devAuth.js';
 import path from 'path';
 import {
   AuthResult,
@@ -169,10 +170,10 @@ export class JsonUserStore implements UserStore {
 
     // An admin already (made one by hand): nothing to seed
     if (this.users.some((u) => u.is_admin)) return;
-    // In production an admin is only made with a password you chose (ADMIN_PASSWORD), never the default
-    const password = process.env.ADMIN_PASSWORD || (production ? '' : 'admin');
+    // An admin is only made with a password you chose (ADMIN_PASSWORD); the default one only with DEV_AUTH=1 (never in production)
+    const password = process.env.ADMIN_PASSWORD || (devAuthOn() ? 'admin' : '');
     if (!password) {
-      console.log('[UserStore] No admin account (set ADMIN_PASSWORD to create one)');
+      console.log('[UserStore] No admin account (set ADMIN_PASSWORD to create one; DEV_AUTH=1 seeds the dev default)');
       return;
     }
     const salt = generateSalt();

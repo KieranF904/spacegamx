@@ -7,7 +7,7 @@
  */
 
 import type { ProfileStore } from './ProfileStore.js';
-import { LEASE_MS, type LeaseResult, type ProfileLeases } from './lease.js';
+import { LEASE_MS, LeaseRefusedError, type LeaseResult, type ProfileLeases } from './lease.js';
 
 export interface PgPool {
   query(sql: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
@@ -105,7 +105,7 @@ export class PostgresProfileStore implements ProfileStore, ProfileLeases {
        RETURNING user_id`,
       [userId, version, JSON.stringify(profile), holder ?? null],
     );
-    if (!r.rows.length) throw new Error(`profile ${userId} not saved: another server holds its lease`);
+    if (!r.rows.length) throw new LeaseRefusedError(userId);
   }
 
   async delete(userId: number): Promise<void> {

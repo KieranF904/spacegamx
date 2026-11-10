@@ -15,7 +15,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   laser: 'Lasers', pulse: 'Pulse guns', lance: 'Lances', arc: 'Arc projectors',
   missile: 'Missiles', torpedo: 'Torpedoes', emp: 'EMP',
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
-  reactor: 'Generators', dynamo: 'Old chargers', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
+  reactor: 'Generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   // (Energy routing's Conduit and Diode: models.mjs)
   relay: 'Relays',
   shield: 'Shields', shieldwall: 'Shield walls', shieldarc: 'Shield arcs', plating: 'Plating',
@@ -102,7 +102,6 @@ const TRADE_OFF: Record<string, string> = {
   power_capacitor: 'a small store that gives its power in a rush, for guns and beams',
   power_drive_cell: 'a bigger store for the engines and strafers',
   power_heavy_bank: 'deep but slow: endurance, not alpha strikes',
-  power_pulse_dynamo: 'an old charger the ports core no longer uses: makes and moves no power',
   utility_mining_laser: 'cuts ore, a poor weapon',
   utility_bore: 'cuts harder rock',
   utility_demolition_launcher: 'cracks rock wide open',

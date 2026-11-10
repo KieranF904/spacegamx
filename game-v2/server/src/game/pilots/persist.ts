@@ -4,6 +4,7 @@
  * needs:      Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs
  * invariants: a guest profile is never saved with the accounts (one with a key is kept by it: pilots/guests.ts) — server/src/game/pilots/guests.test.ts
  *             a saved ship that fails the rules is kept as saved; a loaner flies meanwhile and is never written — server/src/game/pilots/loaner.test.ts
+ *             a save the lease refuses tells the pilot, retries with backoff and never kicks — server/src/game/pilots/lease.test.ts
  * extend:     a new profile field that mirrors onto the ship goes in applyProfile/capture
  */
 
@@ -12,6 +13,7 @@ import { Player, Position, InSystem, Dead, PlayerProfile, type ShipRecord, coreO
 import { cloneJson } from '@space-game/common';
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
 import * as lease from './lease.js';
+import { isLeaseRefused } from '../../profile/lease.js';
 
 /** Does this profile hold a gun range cheat ship anywhere (never to be saved: Blueprint.range) */
 export function holdsRangeShip(p: PlayerProfile): boolean {
@@ -34,11 +36,34 @@ export async function save(self: Pilots, s: Session): Promise<void> {
   try {
     // (Fenced by the lease: a server that lost the account can't write over the one that took it)
     await self.store.save(s.conn.userId, persistable(self, s.conn, s.profile), lease.serverId(self));
+    s.leaseRefused = undefined;
   } catch (e) {
     s.dirty = true;
+    if (isLeaseRefused(e)) { leaseRefused(self, s); return; }
     console.error(`[Pilots] save failed for ${s.conn.userId}:`, e);
   }
 }
+
+/** Longest wait between tries while another session holds the account */
+const LEASE_RETRY_MAX_MS = 60_000;
+/** The pilot hears of it again no sooner than this */
+const LEASE_TOAST_MS = 30_000;
+
+/**
+ * A save the lease refused (another server or session holds the account): never a kick. The pilot is told, once and
+ * then again now and then, and the save is retried with a growing wait (the profile stays dirty, so autosave takes it up)
+ */
+function leaseRefused(self: Pilots, s: Session): void {
+  const now = self.now();
+  const count = (s.leaseRefused?.count ?? 0) + 1;
+  const wait = Math.min(LEASE_RETRY_MAX_MS, Math.max(1000, self.opts.autosaveMs) * (1 << Math.min(count - 1, 10)));
+  const told = s.leaseRefused?.toldAt ?? -Infinity;
+  const tell = now - told >= LEASE_TOAST_MS;
+  s.leaseRefused = { count, retryAt: now + wait, toldAt: tell ? now : told };
+  console.error(`[Pilots] save refused for ${s.conn.userId}: the account's lease is held elsewhere (try ${count}, next in ${Math.round(wait / 1000)}s)`);
+  if (tell) self.toast(s.conn, LEASE_REFUSED_TEXT, 'bad');
+}
+export const LEASE_REFUSED_TEXT = "Your progress couldn't be saved: your account is active in another session. Retrying…";
 
 /** Copy live state (ship HP, position) into the profile */
 export function capture(self: Pilots, s: Session): void {
@@ -117,7 +142,7 @@ export function applyShip(self: Pilots, s: Session): void {
  * The saved ship fails the ship rules (a data edit since it was built): it stays in its hangar slot exactly as saved, and
  * a loaner (the starter) flies in its place. The loaner is the profile's ship only in memory: persistable writes the saved
  * record back, so nothing of the pilot's is replaced, and a later fix to the data gives them their ship back as it was.
- * A refit of that slot or flying another ship ends the loan (Hangar.ts); losing the loaner costs nothing (death.ts).
+ * A refit of that slot or flying another ship ends the loan (Hangar.ts); losing the loaner costs only the pilot's cargo, as in any death (death.ts).
  */
 function flyLoaner(self: Pilots, s: Session, errors: string[]): void {
   const p = s.profile, saved = p.ship;

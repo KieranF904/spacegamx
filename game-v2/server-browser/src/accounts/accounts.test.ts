@@ -8,6 +8,9 @@ import { AccountRoutes } from './routes.js';
 import { DeletedAccounts } from './DeletedAccounts.js';
 import { BAN_FOREVER } from './utils.js';
 
+// (These count the dev admin the store seeds: only with DEV_AUTH=1, server-browser/src/accounts/devAuth.ts)
+process.env.DEV_AUTH = '1';
+
 const dirs: string[] = [];
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 

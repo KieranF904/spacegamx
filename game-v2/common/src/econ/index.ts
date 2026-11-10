@@ -10,6 +10,7 @@ export * from './recipes.js';
 export * from './profile.js';
 export * from './fieldUpdate.js';
 export * from './retiredWire.js';
+export * from './retiredDynamo.js';
 export * from './economy.js';
 export * from './mining.js';
 export * from './market.js';
