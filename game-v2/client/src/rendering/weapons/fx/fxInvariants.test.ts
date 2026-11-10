@@ -188,6 +188,19 @@ describe('client.weapon-fx.field', () => {
     expect(smoke).toBeLessThan(lastDisc);
   });
 
+  it('a vent makes no particles when the quality share drops it', () => {
+    const { f } = makeField();
+    f.particleKeep = 0.5;
+    const rnd = vi.spyOn(Math, 'random').mockReturnValue(0.9);   // above the share: dropped
+    f.vent(0, 0, 0, 'smoke', 1); f.vent(0, 0, 0, 'spark', 1);
+    expect(f.smoke).toHaveLength(0);
+    expect(f.sparks).toHaveLength(0);
+    rnd.mockReturnValue(0.1);                                    // below it: made
+    f.vent(0, 0, 0, 'smoke', 1); f.vent(0, 0, 0, 'spark', 1);
+    expect(f.smoke).toHaveLength(1);
+    expect(f.sparks).toHaveLength(2);
+  });
+
   it('draws the liquid, then the layered hits', () => {
     const { f, log } = makeField();
     f.hitGlows.push({ x: 0, y: 0, life: 0, max: 10, size: 10, color: 1, core: false });

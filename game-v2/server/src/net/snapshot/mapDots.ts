@@ -4,7 +4,7 @@
  *             tier, looks, names, the gone) and the hostile populations (pops) to the clients in their systems
  * needs:      MapHost (world, clients, ships, enemies, lod, namedBody, flying, gameData, focus.ghost, send, ticks),
  *             common map packers (packMapLeg, packMapRoute, mapDotFlags), FEED_TIERS; npm: bitecs
- * invariants: a dot is sent again only when its route changes or it strays MAP_DOT_SLACK — none pinned
+ * invariants: a dot is sent again only when its route changes or it strays MAP_DOT_SLACK — server/src/net/snapshot/mapDots.test.ts
  *             map bytes unchanged — server/src/golden/frameHash.test.ts
  * extend:     a new kind of dot is one `add(...)` source in rowsFor (sendMapDots)
  */

@@ -1654,7 +1654,7 @@
         },
         {
           "text": "a vent makes no particles when the quality share drops it",
-          "test": "none pinned"
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new particle list is one field here and a loop in drawParticles (or hitDraw for layered impacts)",
@@ -23522,7 +23522,7 @@
       "invariants": [
         {
           "text": "a dot is sent again only when its route changes or it strays MAP_DOT_SLACK",
-          "test": "none pinned"
+          "test": "server/src/net/snapshot/mapDots.test.ts"
         },
         {
           "text": "map bytes unchanged",
@@ -26147,7 +26147,7 @@
       },
       {
         "path": "scripts/contracts/gen.mjs",
-        "line": 273,
+        "line": 274,
         "text": "L.push('', '### `satisfies Record<...>` tables (tsc fails when a key is missing)', '');"
       },
       {

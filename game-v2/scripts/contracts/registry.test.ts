@@ -28,6 +28,7 @@ describe('contract registry', () => {
       ' * invariants: one holds — a/b.test.ts',
       ' *             two holds on a wrapped',
       ' *             line — none pinned',
+      ' *             three holds — untestable: needs a real GPU',
       ' * extend:     add a case',
       ' */',
       'export const X = 1;',
@@ -38,6 +39,7 @@ describe('contract registry', () => {
     expect(h.invariants).toEqual([
       { text: 'one holds', test: 'a/b.test.ts' },
       { text: 'two holds on a wrapped line', test: 'none pinned' },
+      { text: 'three holds', test: 'untestable: needs a real GPU' },
     ]);
     expect(h.errors).toEqual([]);
   });
