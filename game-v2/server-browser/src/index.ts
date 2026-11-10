@@ -9,6 +9,7 @@
 import http from 'http';
 import crypto from 'crypto';
 import { AccountRoutes, DATA_DIR } from './accounts/routes.js';
+import { devAuthOn } from './accounts/devAuth.js';
 import { InboxRoutes } from './inbox/routes.js';
 import { ActivityRoutes } from './activity/routes.js';
 import { FriendRoutes } from './friends/routes.js';
@@ -118,7 +119,7 @@ function cleanup(): void {
 // ============================================
 
 /** Game servers prove themselves with the shared LOBBY_ADMIN_SECRET (when one is set; the lobby only listens on localhost either way) */
-const REGISTER_SECRET = process.env.LOBBY_ADMIN_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-lobby-admin-secret');
+const REGISTER_SECRET = process.env.LOBBY_ADMIN_SECRET || (devAuthOn() ? 'dev-lobby-admin-secret' : '');
 
 async function handleRegister(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   if (REGISTER_SECRET) {

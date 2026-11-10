@@ -42,7 +42,9 @@ Never leave dev servers or headless browsers running after a check.
 |---|---|---|
 | `PORT` | 3000 | Game server port |
 | `BROWSER_URL` | `http://localhost:8787` | Server browser URL |
-| `LOBBY_ADMIN_SECRET` | dev fixed; production none | Shared by the lobby and game servers for admin account commands (admin rank, bans); same value on both; with none in production those commands are refused |
+| `DEV_AUTH` | none (the dev npm scripts set `1`, from `dev.env`) | Turns on the dev-only known passwords: the seeded `admin` account (password `admin`) and the default `LOBBY_ADMIN_SECRET`. Off unless set to `1` explicitly, and never on under `NODE_ENV=production`. A server started by hand (`npm start`, `tsx src/index.ts`) without it has neither: set `ADMIN_PASSWORD` and `LOBBY_ADMIN_SECRET`, or pass `DEV_AUTH=1` |
+| `ADMIN_PASSWORD` | none | Lobby: seeds the `admin` account with this password when there is no admin yet (any mode) |
+| `LOBBY_ADMIN_SECRET` | `dev-lobby-admin-secret` with `DEV_AUTH=1`, else none | Shared by the lobby and game servers for admin account commands (admin rank, bans); same value on both; with none those commands are refused |
 | `OWNER_USERNAMES` | none | Lobby: comma-separated usernames made the owner (the rank above admin) at every start; removing a name doesn't revoke (the lobby's `/admin/set-owner` does). See web-accounts, Ranks |
 | `PUBLIC_HOST` | `localhost` | Host reported to the browser |
 | `USER_STORE_BACKEND` | `json` | `json` or `postgres` (production is `postgres`, set by systemd drop-ins) |

@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { appendFile, mkdir, writeFile, rename } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { GameServer } from './GameServer.js';
+import { devAuthOn } from './auth/devAuth.js';
 import { createUserStore } from './auth/index.js';
 import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
 import { GameData } from './data/GameData.js';
@@ -38,7 +39,7 @@ const SERVER_NAME = process.env.SERVER_NAME || 'Local dev';
 const SERVER_REGION = process.env.SERVER_REGION || 'local';
 const BROWSER_URL = process.env.BROWSER_URL || 'http://localhost:8787';
 /** Shared with the lobby: lets the admin tools manage accounts (ranks, bans). Dev lobbies share a fixed one */
-const LOBBY_ADMIN_SECRET = process.env.LOBBY_ADMIN_SECRET || (DEV_MODE ? 'dev-lobby-admin-secret' : '');
+const LOBBY_ADMIN_SECRET = process.env.LOBBY_ADMIN_SECRET || (devAuthOn() ? 'dev-lobby-admin-secret' : '');
 const PUBLIC_HOST = process.env.PUBLIC_HOST || 'localhost';
 
 console.log('Starting Space Game Server v2...');
