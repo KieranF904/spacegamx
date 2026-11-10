@@ -7,7 +7,7 @@
 
 import { controlBits, flightControls } from '../ships/replicaControls.js';
 import type { FlightBody, FlightControls } from '../ships/flight.js';
-import type { BodyDriver } from '../network/replication.js';
+import type { BodyDriver } from '../network/replication/hooks.js';
 import { quantizeCursorDist } from '../network/cursorDist.js';
 import { NO_INPUT, simAimQ, type InputKnowledge, type InputPrev, type InputSource, type SimInput } from './input.js';
 
