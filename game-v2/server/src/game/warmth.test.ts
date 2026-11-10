@@ -22,7 +22,7 @@ function world(faster = 20) {
   w.coldPerPoint *= faster;
   w.ambient *= faster;
   for (const src of Object.values(w.sources) as any[]) { src.rate *= faster; if (src.docked) src.docked *= faster; }
-  const server = makeServer({ profileStore: new MemoryProfileStore() });
+  const server = makeServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files) });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

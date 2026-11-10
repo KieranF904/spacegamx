@@ -42,8 +42,6 @@ describe('enemy recovery (the clock)', () => {
 });
 
 describe('enemy recovery (on the server)', () => {
-  const dataDir = join(__dirname, '../../../../data');
-  const files = readGameDataFiles(dataDir);
   function world() {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
     const server = makeServer();
