@@ -2,7 +2,7 @@
  * Join and sign-in: the join / authLogin / authRegister messages, the guest-name rules and the HTTP auth endpoints.
  * Moved verbatim from GameServer (the receiver `this` became `ctx`, the helpers take ctx first). Security-critical: a
  * guest can't pose as a registered or admin name, a banned or expired token never becomes a guest, and a protocol
- * mismatch closes the socket (4002). `conn.joined = true` still comes before the first await.
+ * mismatch closes the socket (4002). `conn.joined = true` still comes before the first await, and a socket joins once.
  */
 import type { IncomingMessage, ServerResponse } from 'http';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON, fullCaps } from '@space-game/common';
@@ -28,6 +28,9 @@ export function registerAuthHandlers(t: HandlerRegistry): void {
 }
 
 export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
+  // One join per socket: a second would swap who it is past the one-session sweep and the profile lease (a guest coming
+  // back with their key, or a reconnect, is a new socket)
+  if (conn.joined) return;
   // A client built for another wire format can't talk to us: it shows "new version, reload"
   // (one that doesn't say predates the handshake, and the format it knows hasn't changed since)
   // Nor can one without the full netcode (common network/hits.ts DEFAULT_CAPS): there's no base protocol to fall back
@@ -95,6 +98,11 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
   if (conn.userId === null && conn.guestId) ctx.resumeGuest(conn).catch((e) => ctx.fault('resumeGuest', e));
 }
 
+/** Joined or signed in already: a sign-in on top would swap who the socket is, as a second join would */
+function signedIn(conn: ClientConnection): boolean {
+  return conn.joined || conn.userId !== null;
+}
+
 /** A server update is about to restart us (server/src/update): no new sign-ins. True if it refused this one */
 function gated(ctx: ServerCtx, conn: ClientConnection): boolean {
   const why = ctx.joinGate?.();
@@ -104,7 +112,7 @@ function gated(ctx: ServerCtx, conn: ClientConnection): boolean {
 }
 
 export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
-  if (gated(ctx, conn)) return;
+  if (signedIn(conn) || gated(ctx, conn)) return;
   const result = await ctx.userDB.login(msg.username, msg.password, conn.address);
   if (result.success) {
     conn.username = result.user.username;
@@ -166,7 +174,7 @@ export function rejectAuth(ctx: ServerCtx, conn: ClientConnection, error: string
 }
 
 export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
-  if (gated(ctx, conn)) return;
+  if (signedIn(conn) || gated(ctx, conn)) return;
   const result = await ctx.userDB.register(msg.username, msg.email, msg.password, conn.address);
   if (result.success) {
     conn.username = result.user.username;

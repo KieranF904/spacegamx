@@ -24,7 +24,8 @@ interface Limit { per: number; burst: number }
 export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // Broadcast to everyone
   chat: { per: 40, burst: 8 },
-  // Each goes to the lobby (and a wrong password hangs up anyway)
+  // Each goes to the lobby (and a wrong password hangs up anyway); a socket joins once (net/auth.ts), so these are retries
+  join: { per: 10, burst: 3 },
   authLogin: { per: 10, burst: 5 },
   authRegister: { per: 10, burst: 5 },
   // Every market priced (the client asks every 20 s)
