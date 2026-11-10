@@ -154,23 +154,6 @@ export const Bullet = defineComponent({
   speed: Types.f32,
 });
 
-/** Laser beam data */
-export const Laser = defineComponent({
-  range: Types.f32,
-  maxDamage: Types.f32,
-  endX: Types.f64,
-  endY: Types.f64,
-  hitEntityId: Types.eid,
-});
-
-/** Pulse projectile data */
-export const Pulse = defineComponent({
-  chargeLevel: Types.f32,     // 0-1 charge multiplier
-  splashRadius: Types.f32,
-  growing: Types.ui8,         // Still growing
-  growTimer: Types.f32,
-});
-
 /** Mining shot data - sticks to asteroids and deals DoT */
 export const MiningShot = defineComponent({
   attachedToId: Types.eid,    // Asteroid this shot is stuck to
@@ -178,34 +161,6 @@ export const MiningShot = defineComponent({
   dotInterval: Types.ui16,    // Ticks between damage ticks
   dotTimer: Types.ui16,       // Current timer until next tick
   dotDamage: Types.f32,       // Damage per tick
-});
-
-// ============================================
-// AI / ENEMY COMPONENTS
-// ============================================
-
-/** AI state machine */
-export const AI = defineComponent({
-  behaviorType: Types.ui8,    // AI behavior enum
-  state: Types.ui8,           // Current state enum
-  targetId: Types.eid,        // Current target entity
-  stateTimer: Types.ui32,     // Ticks in current state
-  attackCooldown: Types.ui16,
-  homeX: Types.f64,           // Spawn/home position
-  homeY: Types.f64,
-  aggroRange: Types.f32,
-  deaggroRange: Types.f32,
-});
-
-/** Enemy marker with type info */
-export const Enemy = defineComponent({
-  typeId: Types.ui16,         // Enemy type definition ID
-  xpValue: Types.ui16,
-});
-
-/** NPC marker (friendly) */
-export const NPC = defineComponent({
-  npcId: Types.ui16,          // NPC definition ID
 });
 
 // ============================================
@@ -263,34 +218,6 @@ export const DroppedItem = defineComponent({
 });
 
 // ============================================
-// VISUAL/RENDERING COMPONENTS
-// ============================================
-
-/** Sprite reference for rendering */
-export const Sprite = defineComponent({
-  textureId: Types.ui16,
-  scaleX: Types.f32,
-  scaleY: Types.f32,
-  tint: Types.ui32,           // RGB color
-  alpha: Types.f32,
-});
-
-/** Trail effect (engine exhaust, projectile trails) */
-export const Trail = defineComponent({
-  color: Types.ui32,
-  width: Types.f32,
-  length: Types.ui16,         // Max points
-  fadeRate: Types.f32,
-});
-
-/** Glow effect */
-export const Glow = defineComponent({
-  color: Types.ui32,
-  intensity: Types.f32,
-  radius: Types.f32,
-});
-
-// ============================================
 // NETWORKING COMPONENTS
 // ============================================
 
@@ -299,10 +226,6 @@ export const NetworkSync = defineComponent({
   priority: Types.ui8,        // Sync priority
   lastSyncTick: Types.ui32,
 });
-
-// ============================================
-// QUEST/PROGRESSION COMPONENTS
-// ============================================
 
 // ============================================
 // UTILITY TAGS
@@ -365,34 +288,3 @@ export const WEAPON_KIND_TYPE: Record<string, number> = {
   heart_spark: 24, heart_seeker: 25, rivet: 26, scrap_chunk: 27, seam_seeker: 28,
 };
 
-export enum AIBehavior {
-  Idle = 0,
-  Aggressive = 1,
-  Flanker = 2,
-  Sniper = 3,
-  Swarm = 4,
-  Territorial = 5,
-}
-
-export enum AIState {
-  Idle = 0,
-  Patrol = 1,
-  Chase = 2,
-  Attack = 3,
-  Flee = 4,
-  Return = 5,
-}
-
-enum ParticleType {
-  Engine = 0,
-  Explosion = 1,
-  Debris = 2,
-  Spark = 3,
-  Ice = 4,
-}
-
-enum ResourceType {
-  Iron = 0,
-  Crystal = 1,
-  Plasma = 2,
-}
