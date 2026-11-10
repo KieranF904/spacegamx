@@ -282,6 +282,7 @@ export class AsteroidOrbits {
    * each once, in filing order within each cell
    */
   query(system: number, x1: number, y1: number, x2: number, y2: number, padding: number, tick: number): number[] {
+    this.flush();
    
     const cx0 = Math.floor((Math.min(x1, x2) - padding) / ORBIT_CELL), cx1 = Math.floor((Math.max(x1, x2) + padding) / ORBIT_CELL);
     const cy0 = Math.floor((Math.min(y1, y2) - padding) / ORBIT_CELL), cy1 = Math.floor((Math.max(y1, y2) + padding) / ORBIT_CELL);
