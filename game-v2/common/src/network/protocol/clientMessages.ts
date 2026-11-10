@@ -137,11 +137,6 @@ export interface ClientRespawnMessage {
   rally?: string;
 }
 
-/** The tutorial's combat lesson: a training drone in front of you (inner Sol only, one at a time) */
-export interface ClientTrainingDroneMessage {
-  type: 'trainingDrone';
-}
-
 export interface ClientJoinMessage {
   type: 'join';
   token?: string;      // Auth session token (for registered users)
@@ -179,7 +174,6 @@ export interface ClientStateHashMessage {
 
 export type ClientMessage =
   | ClientInputMessage
-  | ClientTrainingDroneMessage
   | ClientShipNeedMessage
   | ClientPingMessage
   | ClientMapViewMessage

@@ -137,7 +137,7 @@ describe('crash isolation', () => {
 });
 
 // Every client message type the server handles (GameServer.handleMessage)
-const TYPES = ['input', 'ping', 'mapView', 'chat', 'interact', 'respawn', 'trainingDrone', 'target', 'pilotInfo', 'partyInvite',
+const TYPES = ['input', 'ping', 'mapView', 'chat', 'interact', 'respawn', 'target', 'pilotInfo', 'partyInvite',
   'ribbons', 'rankings', 'shareDesign', 'mapPing', 'partyRespond', 'partyLeave', 'partyKick', 'partyPromote', 'tradeRequest',
   'tradeRespond', 'tradeOffer', 'tradeAccept', 'tradeCancel', 'vendorOpen', 'vendorBuy', 'marketScan', 'itemMove', 'itemJettison',
   'itemUse', 'stationOpen', 'refine', 'craft', 'outpostCharter', 'outpostUpgrade', 'ammoPrefer', 'slotLoadout',

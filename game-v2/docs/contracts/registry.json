@@ -13073,7 +13073,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 314,
+      "lines": 308,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -13115,7 +13115,6 @@
         "ClientSiegeMessage",
         "ClientStateHashMessage",
         "ClientTowMessage",
-        "ClientTrainingDroneMessage",
         "ClientUndockMessage",
         "ClientWarpMessage",
         "quantizeCursorDist"
@@ -13206,106 +13205,100 @@
           "end": 138
         },
         {
-          "name": "ClientTrainingDroneMessage",
-          "kind": "interface",
-          "start": 140,
-          "end": 143
-        },
-        {
           "name": "ClientJoinMessage",
           "kind": "interface",
-          "start": 145,
-          "end": 158
+          "start": 140,
+          "end": 153
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 160,
-          "end": 167
+          "start": 155,
+          "end": 162
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 169,
-          "end": 172
+          "start": 164,
+          "end": 167
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 174,
-          "end": 178
+          "start": 169,
+          "end": 173
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 180,
-          "end": 220
+          "start": 175,
+          "end": 214
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 222,
-          "end": 231
+          "start": 216,
+          "end": 225
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 233,
-          "end": 240
+          "start": 227,
+          "end": 234
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 242,
-          "end": 249
+          "start": 236,
+          "end": 243
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 251,
-          "end": 261
+          "start": 245,
+          "end": 255
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 263,
-          "end": 277
+          "start": 257,
+          "end": 271
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 279,
-          "end": 284
+          "start": 273,
+          "end": 278
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 286,
-          "end": 289
+          "start": 280,
+          "end": 283
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 291,
-          "end": 293
+          "start": 285,
+          "end": 287
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 295,
-          "end": 302
+          "start": 289,
+          "end": 296
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 304,
-          "end": 307
+          "start": 298,
+          "end": 301
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 309,
-          "end": 313
+          "start": 303,
+          "end": 307
         }
       ]
     },
@@ -17481,7 +17474,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 751,
+      "lines": 748,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -17509,7 +17502,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 119,
-          "end": 751
+          "end": 748
         }
       ]
     },
@@ -22727,7 +22720,7 @@
       "id": "server.net.handlers.flight",
       "path": "server/src/net/handlers/flight.ts",
       "group": "server/net/handlers",
-      "lines": 337,
+      "lines": 321,
       "owns": "the prediction-sensitive client messages: input, ping, stateHash, mapView, interact, respawn, training drone, target",
       "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx; @space-game/common, bitecs",
       "events": "",
@@ -22750,105 +22743,98 @@
         "portalQuery",
         "recordSelfHashes",
         "registerFlightHandlers",
-        "releaseControls",
-        "trainingDrone"
+        "releaseControls"
       ],
       "sections": [
         {
           "name": "MAX_INPUT_LEAD",
           "kind": "const",
-          "start": 34,
-          "end": 35
+          "start": 33,
+          "end": 34
         },
         {
           "name": "MAX_SCHEDULED_INPUTS",
           "kind": "const",
-          "start": 36,
-          "end": 36
+          "start": 35,
+          "end": 35
         },
         {
           "name": "portalQuery",
           "kind": "const",
-          "start": 38,
-          "end": 39
+          "start": 37,
+          "end": 38
         },
         {
           "name": "registerFlightHandlers",
           "kind": "function",
-          "start": 41,
-          "end": 86
+          "start": 40,
+          "end": 82
         },
         {
           "name": "handleStateHash",
           "kind": "function",
-          "start": 88,
-          "end": 101
+          "start": 84,
+          "end": 97
         },
         {
           "name": "recordSelfHashes",
           "kind": "function",
-          "start": 103,
-          "end": 119
+          "start": 99,
+          "end": 115
         },
         {
           "name": "handleInput",
           "kind": "function",
-          "start": 121,
-          "end": 161
+          "start": 117,
+          "end": 157
         },
         {
           "name": "keepGroups",
           "kind": "function",
-          "start": 163,
-          "end": 169
+          "start": 159,
+          "end": 165
         },
         {
           "name": "applyInputToEntity",
           "kind": "function",
-          "start": 171,
-          "end": 194
+          "start": 167,
+          "end": 190
         },
         {
           "name": "ownControlsOf",
           "kind": "function",
-          "start": 196,
-          "end": 202
+          "start": 192,
+          "end": 198
         },
         {
           "name": "handlePing",
           "kind": "function",
-          "start": 204,
-          "end": 217
+          "start": 200,
+          "end": 213
         },
         {
           "name": "handleInteract",
           "kind": "function",
-          "start": 219,
-          "end": 268
+          "start": 215,
+          "end": 264
         },
         {
           "name": "handleRespawn",
           "kind": "function",
-          "start": 270,
-          "end": 310
+          "start": 266,
+          "end": 306
         },
         {
           "name": "releaseControls",
           "kind": "function",
-          "start": 312,
-          "end": 318
+          "start": 308,
+          "end": 314
         },
         {
           "name": "neutralInput",
           "kind": "function",
-          "start": 320,
-          "end": 325
-        },
-        {
-          "name": "trainingDrone",
-          "kind": "function",
-          "start": 327,
-          "end": 337
+          "start": 316,
+          "end": 321
         }
       ]
     },
@@ -23890,7 +23876,7 @@
       "id": "server.snapshot.structure",
       "path": "server/src/net/snapshot/shipStructure.ts",
       "group": "server/net/snapshot",
-      "lines": 228,
+      "lines": 240,
       "owns": "ship structure for each client: a full sync (blueprint or design hash) on first sight, a light one after each rebuild (the structures between first, CAPS.STRUCTS), part HP deltas otherwise; the HP copies hits derive from",
       "needs": "StructureHost (ships, send, hits, ticks), ships/bridge/structLog (nextSync), common hpWire",
       "events": "",
@@ -23922,16 +23908,22 @@
           "end": 27
         },
         {
+          "name": "sameHp",
+          "kind": "function",
+          "start": 29,
+          "end": 34
+        },
+        {
           "name": "StructureHost",
           "kind": "interface",
-          "start": 29,
-          "end": 35
+          "start": 36,
+          "end": 42
         },
         {
           "name": "ShipStructure",
           "kind": "class",
-          "start": 37,
-          "end": 228
+          "start": 44,
+          "end": 240
         }
       ]
     },

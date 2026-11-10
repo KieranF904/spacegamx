@@ -57,3 +57,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 65 (2026-11-08): shaped shields: seven new models (Spark Wall, Guard Wall, Rampart, Visor, Buckler, Shell, Half-dome) in the dictionary; the zoneshield feature's pilot-row extra and status-row slot 8 (a nibble of HP level a shield)
 - 66 (2026-11-08): six new power banks (elbow, end, cross joiners; elbow, tee, end splitters) appended to the wire dictionary
 - 67 (2026-11-09): shipSync carries pinned (a new ship's sync): clients take pinned ships in their own contact pass
+- 68 (2026-11-10): gunSync drops the retired pool and banks slots and the mining scalars (minePaid, mineUntil, mineShare); the trainingDrone client message is gone; the wire hash covers the gunSync layout

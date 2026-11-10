@@ -12,7 +12,7 @@
 
 /**
  * Flight messages, the prediction-sensitive ones: input (queued for the tick boundary), ping, stateHash, mapView,
- * interact, respawn, trainingDrone, and target (the Tow Beam's `tow` is a part feature's: ships/features/tow). Moved verbatim from GameServer (the receiver `this` became `ctx`;
+ * interact, respawn, and target (the Tow Beam's `tow` is a part feature's: ships/features/tow). Moved verbatim from GameServer (the receiver `this` became `ctx`;
  * the helpers take ctx first).
  *
  * Order matters here and was kept to the statement: GameServer.drainInputQueue (still in GameServer, run right before
@@ -22,10 +22,9 @@
 import { hasComponent, entityExists, removeEntity, defineQuery } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Player, Input, Boost, Portal, InSystem, Dead,
-  TICK_RATE, inSafeSpace, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
+  TICK_RATE, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
   replicaAngle, quantizeReplicaAngle, pilotAimQ, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit, CURSOR_DIST_MAX, cleanGroupSel,
 } from '@space-game/common';
-import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
 import { MAX_INPUTS_PER_TICK, type HandlerRegistry } from '../dispatch.js';
 import type { ServerCtx } from '../ServerCtx.js';
@@ -73,9 +72,6 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
   });
   t.on('respawn', (ctx, conn, msg) => {
     handleRespawn(ctx, conn, typeof msg.rally === 'string' ? msg.rally : undefined);
-  });
-  t.on('trainingDrone', (ctx, conn, msg) => {
-    trainingDrone(ctx, conn);
   });
   t.on('target', (ctx, conn, msg) => {
     ctx.ships.setTarget(conn.playerId, Number(msg.id) || 0);
@@ -322,16 +318,4 @@ export function neutralInput(eid: number): void {
   for (let i = 0; i < INPUT_BOOLS.length; i++) Input[INPUT_BOOLS[i]][eid] = 0;
   Input.targetAngle[eid] = 0;
   Input.cursorDist[eid] = 0;
-}
-
-/** A Helios drone 1400 ahead of a pilot in safe space, to practise on: it only fights back once shot */
-export function trainingDrone(ctx: ServerCtx, conn: ClientConnection): void {
-  const eid = conn.playerId;
-  const num = InSystem.systemId[eid];
-  const prev = ctx.trainers.get(eid);
-  if (prev !== undefined && ctx.enemies.isAlive(prev)) return;
-  if (!inSafeSpace(ctx.gameData.getSystemByNum(num), Position.x[eid], Position.y[eid]) || !(ctx.gameData.factionsFile as FactionsFile).factions?.helios) return;
-  const a = Rotation.angle[eid];
-  const [d] = ctx.enemies.spawnPack(num, { faction: 'helios', ships: ['helios_drone'], passive: true }, Position.x[eid] + dcos(a) * 1400, Position.y[eid] + dsin(a) * 1400);
-  if (d !== undefined) ctx.trainers.set(eid, d);
 }

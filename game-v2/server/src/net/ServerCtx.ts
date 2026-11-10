@@ -119,8 +119,6 @@ export interface ServerCtx {
   // ---- flight messages (net/handlers/flight.ts) ----
   /** Inputs received since the last tick boundary (GameServer.drainInputQueue applies them right before the tick) */
   readonly inputQueue: Array<{ conn: ClientConnection; msg: any }>;
-  /** Pilots with a training drone out: pilot entity -> drone */
-  readonly trainers: Map<number, number>;
   readonly enemies: Enemies;
   readonly surfaces: Surfaces;
   readonly homes: HomeStations;
