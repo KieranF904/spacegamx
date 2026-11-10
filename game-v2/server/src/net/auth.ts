@@ -43,6 +43,8 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
   }
   if (gated(ctx, conn)) return;
   conn.joined = true;
+  // (Its ship from now: a socket that never joins has none)
+  ctx.enter(conn);
   if (msg.token) {
     // Authenticated join - validate token
     const { user, error } = ctx.userDB.checkSession
@@ -115,6 +117,7 @@ export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, ms
   if (signedIn(conn) || gated(ctx, conn)) return;
   const result = await ctx.userDB.login(msg.username, msg.password, conn.address);
   if (result.success) {
+    ctx.enter(conn);
     conn.username = result.user.username;
     conn.userId = result.user.id;
     ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
@@ -177,6 +180,7 @@ export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection,
   if (signedIn(conn) || gated(ctx, conn)) return;
   const result = await ctx.userDB.register(msg.username, msg.email, msg.password, conn.address);
   if (result.success) {
+    ctx.enter(conn);
     conn.username = result.user.username;
     conn.userId = result.user.id;
     ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));

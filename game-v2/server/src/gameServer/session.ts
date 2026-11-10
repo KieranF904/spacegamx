@@ -2,7 +2,8 @@
  * @contract server.gameserver.session
  * owns:       connecting, creating and placing a player, logging a pilot in, a guest back by their key, lingering, saving and forgetting accounts
  * needs:      GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs
- * invariants: a new connection gets its player entity before any message is handled — none pinned
+ * invariants: a connection gets its player entity when it joins (enter), never before; one that never joins is hung up
+ *             on (JOIN_DEADLINE_MS, MAX_UNJOINED) — server/src/net/joinDeadline.test.ts
  *             saveAll saves every live pilot once — none pinned
  * extend:      a new join/leave step is a function here called from connect or loginPilot
  */
@@ -17,22 +18,38 @@ import { stationQuery } from '../game/Docking.js';
 import { startLinger, reinhabit, tellCombatLocks } from './combatLock.js';
 import type { GameServer } from '../GameServer.js';
 
+/** A socket that hasn't sent a valid `join` this long after connecting is hung up on (a real client joins at once) */
+export const JOIN_DEADLINE_MS = 10_000;
+/** At most this many sockets open and not yet joined; past it the oldest is hung up on, so a flood can't lock real pilots out */
+export const MAX_UNJOINED = 64;
+/** The close code for both (not 4001: the client tries again) */
+export const JOIN_TIMEOUT_CLOSE = 4003;
+/** A connection's player entity before it joins: none (enter makes it) */
+export const NO_PLAYER = -1;
+
+/** Connections open and not yet entered, with their client ids: no entity, not in gs.clients, so nothing in a tick sees them */
+const waiting = new WeakMap<GameServer, Map<ClientConnection, number>>();
+function waitingOf(gs: GameServer): Map<ClientConnection, number> {
+  let w = waiting.get(gs);
+  if (!w) { w = new Map(); waiting.set(gs, w); }
+  return w;
+}
+
 /**
  * Register a new client. The transport owns the socket; it decodes incoming
- * data and feeds messages through the returned link.
+ * data and feeds messages through the returned link. Until it joins it is only
+ * a socket (pings and sign-in answered): its ship comes with the join (enter).
  */
 export function connect(gs: GameServer, ws: ClientSocket, address?: string): ClientLink {
   console.log('Client connected');
   gs.totalConnectionsEver++;
-
-  // Create player entity
-  const playerId = gs.createPlayer();
+  capUnjoined(gs);
   const clientId = gs.clientIdCounter++;
 
   const conn: ClientConnection = {
     ws,
     address,
-    playerId,
+    playerId: NO_PLAYER,
     lastInputSeq: 0,
     lastPingTime: Date.now(),
     ping: 0,
@@ -69,23 +86,13 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
     selfHashes: new Map(),
   };
   
-  gs.clients.set(ws, conn);
-  Player.clientId[playerId] = clientId;
-  gs.pilots.attach(conn);
+  waitingOf(gs).set(conn, clientId);
 
-  // Send welcome message
-  gs.send(ws, {
-    type: 'welcome',
-    playerId,
-    protocol: PROTOCOL_VERSION,
-    tickRate: TICK_RATE,
-    serverTime: Date.now(),
-    threats: gs.threats(),
-    regionThreats: gs.regionThreats(),
-  });
-
-  // Send initial state
-  gs.sendPlayerState(conn);
+  // (Never joined in time: hung up on. Unref'd, so a pending one never keeps a process alive)
+  const deadline = setTimeout(() => {
+    if (!conn.joined) ws.close?.(JOIN_TIMEOUT_CLOSE, 'Join timed out');
+  }, JOIN_DEADLINE_MS);
+  deadline.unref?.();
 
   return {
     receive: (msg: ClientMessage) => {
@@ -103,6 +110,9 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
     },
     close: () => {
       console.log('Client disconnected');
+      clearTimeout(deadline);
+      // (Never entered: nothing in the world, nobody told, nothing to save)
+      if (waitingOf(gs).delete(conn)) return;
       gs.guard('close', () => activity.leave(conn));
       // Off a siege moon first (paid what they're owed, back in orbit), so that's where they're saved
       // (Each step on its own: one that throws mustn't stop the rest, or the save, from happening)
@@ -129,6 +139,42 @@ export function connect(gs: GameServer, ws: ClientSocket, address?: string): Cli
       if (hasComponent(gs.world, Player, eid)) addComponent(gs.world, Dead, eid);
     },
   };
+}
+
+/**
+ * A connection joining (net/auth.ts handleJoin, or a sign-in message): its player entity and pilot, the welcome and its
+ * state, and it is one of gs.clients from now on. Once only; a second call does nothing
+ */
+export function enter(gs: GameServer, conn: ClientConnection): void {
+  const w = waitingOf(gs);
+  const clientId = w.get(conn);
+  if (clientId === undefined) return;
+  w.delete(conn);
+  const playerId = gs.createPlayer();
+  conn.playerId = playerId;
+  gs.clients.set(conn.ws, conn);
+  Player.clientId[playerId] = clientId;
+  gs.pilots.attach(conn);
+
+  // Send welcome message
+  gs.send(conn.ws, {
+    type: 'welcome',
+    playerId,
+    protocol: PROTOCOL_VERSION,
+    tickRate: TICK_RATE,
+    serverTime: Date.now(),
+    threats: gs.threats(),
+    regionThreats: gs.regionThreats(),
+  });
+
+  // Send initial state
+  gs.sendPlayerState(conn);
+}
+
+/** Room for one more unjoined socket: past MAX_UNJOINED the oldest open one is hung up on (Map order: oldest first) */
+function capUnjoined(gs: GameServer): void {
+  const open = [...waitingOf(gs).keys()].filter((c) => c.ws.isOpen());
+  for (let i = 0; i <= open.length - MAX_UNJOINED; i++) open[i].ws.close?.(JOIN_TIMEOUT_CLOSE, 'Too many connections waiting to join');
 }
 
 export function createPlayer(gs: GameServer): number {

@@ -17134,7 +17134,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 761,
+      "lines": 763,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -17162,7 +17162,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 121,
-          "end": 761
+          "end": 763
         }
       ]
     },
@@ -20812,14 +20812,14 @@
       "id": "server.gameserver.session",
       "path": "server/src/gameServer/session.ts",
       "group": "server/gameServer",
-      "lines": 341,
+      "lines": 387,
       "owns": "connecting, creating and placing a player, logging a pilot in, a guest back by their key, lingering, saving and forgetting accounts",
       "needs": "GameServer (type), game/Pilots, net/ClientConnection, common/network; npm: bitecs",
       "events": "",
       "invariants": [
         {
-          "text": "a new connection gets its player entity before any message is handled",
-          "test": "none pinned"
+          "text": "a connection gets its player entity when it joins (enter), never before; one that never joins is hung up on (JOIN_DEADLINE_MS, MAX_UNJOINED)",
+          "test": "server/src/net/joinDeadline.test.ts"
         },
         {
           "text": "saveAll saves every live pilot once",
@@ -20828,9 +20828,14 @@
       ],
       "extend": "a new join/leave step is a function here called from connect or loginPilot",
       "exports": [
+        "JOIN_DEADLINE_MS",
+        "JOIN_TIMEOUT_CLOSE",
+        "MAX_UNJOINED",
+        "NO_PLAYER",
         "connect",
         "createPlayer",
         "devStartSpot",
+        "enter",
         "forgetAccounts",
         "lingerSystem",
         "loginPilot",
@@ -20841,70 +20846,118 @@
       ],
       "sections": [
         {
+          "name": "JOIN_DEADLINE_MS",
+          "kind": "const",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "MAX_UNJOINED",
+          "kind": "const",
+          "start": 23,
+          "end": 24
+        },
+        {
+          "name": "JOIN_TIMEOUT_CLOSE",
+          "kind": "const",
+          "start": 25,
+          "end": 26
+        },
+        {
+          "name": "NO_PLAYER",
+          "kind": "const",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "waiting",
+          "kind": "const",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "waitingOf",
+          "kind": "function",
+          "start": 32,
+          "end": 36
+        },
+        {
           "name": "connect",
           "kind": "function",
-          "start": 20,
-          "end": 132
+          "start": 38,
+          "end": 142
+        },
+        {
+          "name": "enter",
+          "kind": "function",
+          "start": 144,
+          "end": 172
+        },
+        {
+          "name": "capUnjoined",
+          "kind": "function",
+          "start": 174,
+          "end": 178
         },
         {
           "name": "createPlayer",
           "kind": "function",
-          "start": 134,
-          "end": 188
+          "start": 180,
+          "end": 234
         },
         {
           "name": "placePlayer",
           "kind": "function",
-          "start": 190,
-          "end": 207
+          "start": 236,
+          "end": 253
         },
         {
           "name": "loginPilot",
           "kind": "function",
-          "start": 209,
-          "end": 235
+          "start": 255,
+          "end": 281
         },
         {
           "name": "resumeGuest",
           "kind": "function",
-          "start": 237,
-          "end": 256
+          "start": 283,
+          "end": 302
         },
         {
           "name": "claimProfile",
           "kind": "function",
-          "start": 258,
-          "end": 268
+          "start": 304,
+          "end": 314
         },
         {
           "name": "lingerSystem",
           "kind": "function",
-          "start": 270,
-          "end": 280
+          "start": 316,
+          "end": 326
         },
         {
           "name": "forgetAccounts",
           "kind": "function",
-          "start": 282,
-          "end": 296
+          "start": 328,
+          "end": 342
         },
         {
           "name": "saveAll",
           "kind": "function",
-          "start": 298,
-          "end": 311
+          "start": 344,
+          "end": 357
         },
         {
           "name": "starterSpot",
           "kind": "function",
-          "start": 313,
-          "end": 328
+          "start": 359,
+          "end": 374
         },
         {
           "name": "devStartSpot",
           "kind": "function",
-          "start": 330,
-          "end": 341
+          "start": 376,
+          "end": 387
         }
       ]
     },
@@ -22049,7 +22102,7 @@
       "id": "server.net.limits",
       "path": "server/src/net/MessageLimits.ts",
       "group": "server/net",
-      "lines": 112,
+      "lines": 113,
       "owns": "per-connection token-bucket rate limits for expensive or player-reaching client messages",
       "needs": "nothing imported; a WeakMap keyed by connection",
       "events": "",
@@ -22075,19 +22128,19 @@
           "name": "MESSAGE_LIMITS",
           "kind": "const",
           "start": 24,
-          "end": 77
+          "end": 78
         },
         {
           "name": "Bucket",
           "kind": "class",
-          "start": 79,
-          "end": 90
+          "start": 80,
+          "end": 91
         },
         {
           "name": "MessageLimiter",
           "kind": "class",
-          "start": 92,
-          "end": 112
+          "start": 93,
+          "end": 113
         }
       ]
     },
@@ -22132,7 +22185,7 @@
       "id": "server.snapshot",
       "path": "server/src/net/SnapshotBuilder.ts",
       "group": "server/net",
-      "lines": 582,
+      "lines": 583,
       "owns": "the snapshot round: every SNAPSHOT_RATE, one snapshot per client, assembled in a fixed order from the snapshot/ modules (rows, own row, debris hold, replication, fire, structure, removals), then map dots and pops",
       "needs": "SnapshotHost (GameServer builds one, once), snapshot/{rows, ownRow, shipStructure, debrisHold, frameParts, mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet; npm: bitecs",
       "events": "",
@@ -22177,7 +22230,7 @@
           "name": "SnapshotBuilder",
           "kind": "class",
           "start": 124,
-          "end": 582
+          "end": 583
         }
       ]
     },

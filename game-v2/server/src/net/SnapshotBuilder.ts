@@ -303,14 +303,15 @@ export class SnapshotBuilder {
     this.gunNet?.beginRound(due);
     // (The focus grid's home cells, for the systems with a client in them)
     const focusSystems = new Set<number>();
-    for (const conn of this.clients.values()) if (hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
+    for (const conn of this.clients.values()) if (conn.joined && hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
     if (focusSystems.size) this.focus.beginRound(focusSystems);
     const crowd = this.crowd;
     let t0 = crowd ? performance.now() : 0;
 
     for (const conn of this.clients.values()) {
       // No snapshot this round: it misses the control changes, so it starts over with keyframes
-      if (!conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) { conn.repKnown.clear(); if (conn.focus) this.focus.reset(conn); continue; }
+      // (Nor before it has joined: a socket that never joins costs no snapshots, session.ts's join deadline)
+      if (!conn.joined || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) { conn.repKnown.clear(); if (conn.focus) this.focus.reset(conn); continue; }
 
       const playerSystemId = InSystem.systemId[conn.playerId];
       // (Its system's window hasn't come round: crowd fallbacks)
