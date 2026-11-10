@@ -3,28 +3,12 @@
  * admin cannot teleport, spawn, swap ships, build a station, touch the boss or the bank; an admin can, and so can anyone on a dev server.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
-import { GameServer } from '../GameServer.js';
-import { GameData } from '../data/GameData.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
-
-const dataDir = join(__dirname, '../../../data');
-const files = readGameDataFiles(dataDir);
-const shipConfig = loadShipConfigCached(dataDir);
+import { makeServer, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
 
 function rig(devTeleport: boolean) {
-  (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const gs = new GameServer({
-    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, devTeleport, ships: createShipBridge(shipConfig),
-  });
-  const t = new LocalTransport(gs);
-  t.connect();
-  t.send({ type: 'join', username: 'someone' } as never);
+  resetGlobals();
+  const gs = makeServer({ devTeleport });
+  const { t } = joinPilot(gs, 'someone');
   const conn = gs.pilots.connOf(t.getPlayerId())!;
   gs.step(3);
   const spies = {
