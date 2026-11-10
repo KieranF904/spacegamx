@@ -64,7 +64,7 @@ export class Ammo {
       if (this.dry.delete(conn)) this.pilots.sendProfile(conn);
       return { scale: 1, dry: false, mods: this.crate(item, kind).mods, item };
     }
-    const ammo = p.ammo ?? { open: {}, load: {} };
+    const ammo = p.ammo ?? { open: {} };
     // The loadout's crates open before any others; its first pick before those
     const pick = chooseCrate(crateOrder(crates, this.loadoutOf(p.ship)), this.firstOf(p)[kind], ammo.open, (c) => countOf(p.cargo, c) > 0);
     if (pick) {
@@ -142,9 +142,9 @@ export class Ammo {
     return load;
   }
 
-  /** Each gun kind's first crate on a ship: its own pick, else the one an old save named */
+  /** Each gun kind's first crate on a ship: its own pick */
   firstOf(p: PlayerProfile): Record<string, string> {
-    return { ...p.ammo?.prefer, ...p.ship.ammo?.first };
+    return { ...p.ship.ammo?.first };
   }
 
   /**
@@ -219,7 +219,7 @@ export class Ammo {
     if (!p || p.ammo || !ship) return;
     const kinds = [...new Set(ship.derived.weapons.filter((w) => this.needs(w.kind) && this.crates.has(w.kind)).map((w) => this.crates.get(w.kind)![0]))];
     if (!kinds.length) return;
-    p.ammo = { open: {}, load: {} };
+    p.ammo = { open: {} };
     const bag: Record<string, number> = {};
     for (const item of kinds) bag[item] = DEFAULT_CRATES;
     this.pilots.give(conn, bag, { toStorage: true, quiet: true });

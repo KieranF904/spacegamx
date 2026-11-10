@@ -48,10 +48,8 @@ function cleanOutpost(v: unknown): { outpost?: Outpost } {
 function cleanAmmo(v: unknown): { ammo?: PlayerProfile['ammo'] } {
   const r = rec<unknown>(v);
   const counts = (x: unknown) => Object.fromEntries(Object.entries(rec<unknown>(x)).filter(([, n]) => typeof n === 'number' && n > 0).map(([k, n]) => [k, Math.floor(n as number)]));
-  const open = counts(r.open), load = counts(r.load);
-  const prefer = Object.fromEntries(Object.entries(rec<unknown>(r.prefer)).filter(([, v]) => typeof v === 'string')) as Record<string, string>;
-  return Object.keys(open).length || Object.keys(load).length || Object.keys(prefer).length
-    ? { ammo: { open, load, ...(Object.keys(prefer).length ? { prefer } : {}) } } : {};
+  const open = counts(r.open);
+  return Object.keys(open).length ? { ammo: { open } } : {};
 }
 
 /** A ship's loadout as saved: whole crate counts (0 kept: it means none) and first picks */
@@ -206,11 +204,9 @@ export interface PlayerProfile {
   outpost?: Outpost;
   /**
    * Ammunition (server/src/game/Ammo.ts): rounds left in each opened crate.
-   * (`load` and `prefer` are from before loadouts were the ship's: what was
-   * carried when last leaving a station, and which crate opens first. Every
-   * live save had them moved to its ship's loadout, so they stay empty.)
+   * (Old saves' `load` and `prefer`, from before loadouts were the ship's, are ignored on load.)
    */
-  ammo?: { open: Record<string, number>; load: Record<string, number>; prefer?: Record<string, string> };
+  ammo?: { open: Record<string, number> };
   /** Records found (data/codex.json ids, in the order found), and those not opened yet */
   codex: { found: string[]; fresh: string[] };
   /** One-time messages for the next login (Pilots.login shows them, then clears them); absent when none */

@@ -23,7 +23,7 @@ describe('gun range: nothing leaks into the real game', () => {
     pilots.give(a.conn, { copper_ore: 4 }, { toStorage: true });
     pilots.addCredits(a.conn, 1234);
     pilots.addXp(a.conn, 50);
-    pilots.get(a.conn).ammo = { open: { railgun_slugs: 7 }, load: {} };
+    pilots.get(a.conn).ammo = { open: { railgun_slugs: 7 } };
     dock(server, a);
     run(server, 3);
     pilots.saveNow(a.conn);

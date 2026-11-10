@@ -726,7 +726,7 @@ export class Hangar {
           wrecked: [...states].filter(([, s]) => s === 'wrecked').map(([u]) => u),
           lost: rec.lost, auto: rec.auto, paused: rec.paused, rank: rec.rank,
           loadout: shipLoadout(this.catalog, this.ships.tuning, rec.blueprint, rec.ammo),
-          first: slot === p.activeSlot ? { ...p.ammo?.prefer, ...rec.ammo?.first } : rec.ammo?.first,
+          first: slot === p.activeSlot ? { ...rec.ammo?.first } : rec.ammo?.first,
         };
       }),
       designs: Array.from({ length: unlocks(p).blueprintSlots }, (_, i) => p.designs?.[i] ?? null),

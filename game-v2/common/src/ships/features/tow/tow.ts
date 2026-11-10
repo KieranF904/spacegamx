@@ -57,9 +57,6 @@ export const DEFAULT_TOW: TowTuning = {
   salvage: 0.5,
 };
 
-/** The beam needs at least this much of its power to take hold */
-export const MIN_TOW_POWER = 0.5;
-
 const cache = new WeakMap<object, TowTuning>();
 
 /** A tuning's tow settings (tuning.json `tow` over the defaults) */
