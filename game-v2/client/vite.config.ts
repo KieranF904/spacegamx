@@ -55,8 +55,13 @@ export default defineConfig(({ command, mode }) => ({
   build: {
     target: 'esnext',
     // (maps are written for local debugging, but no bundle links to them: nothing tells a browser they exist)
-    sourcemap: 'hidden',
+    // (VITE_NO_SOURCEMAP=1, set by deploy/vps/deploy.sh, skips them: they were 73% of the deploy tarball and nginx 404s them)
+    sourcemap: process.env.VITE_NO_SOURCEMAP === '1' ? false : 'hidden',
     rollupOptions: {
+      output: {
+        // Libraries in their own chunk: it changes rarely, so a browser keeps it cached across deploys of the game code
+        manualChunks: (id) => (/[\/]node_modules[\/](pixi\.js|@pixi|bitecs)[\/]/.test(id) ? 'vendor' : undefined),
+      },
       input: {
         main: resolve(__dirname, 'index.html'),
         // The sandbox (a developer tool) only in non-production builds, or with SANDBOX_BUILD=1
