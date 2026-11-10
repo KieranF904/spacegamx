@@ -16265,7 +16265,7 @@
       "id": "power.ports-build",
       "path": "common/src/ships/power/portsBuild.ts",
       "group": "common/ships/power",
-      "lines": 421,
+      "lines": 473,
       "owns": "building a PortsLayout from a ship's parts (buildPortsLayout), its signature and which parts power reaches",
       "needs": "portsTypes, common/ships catalog, grades, power/units",
       "events": "",
@@ -16275,7 +16275,7 @@
           "test": "common/src/ships/power/ports.test.ts"
         }
       ],
-      "extend": "a new port consumer's layout case is in buildPortsLayout",
+      "extend": "a new port consumer's layout case is in partRoles (buildPortsLayout's first phase)",
       "exports": [
         "PartFrame",
         "buildPortsLayout",
@@ -16319,19 +16319,67 @@
           "name": "buildPortsLayout",
           "kind": "function",
           "start": 44,
-          "end": 392
+          "end": 75
+        },
+        {
+          "name": "key",
+          "kind": "const",
+          "start": 77,
+          "end": 78
+        },
+        {
+          "name": "partRoles",
+          "kind": "function",
+          "start": 80,
+          "end": 224
+        },
+        {
+          "name": "Roles",
+          "kind": "type",
+          "start": 225,
+          "end": 225
+        },
+        {
+          "name": "Port",
+          "kind": "type",
+          "start": 227,
+          "end": 227
+        },
+        {
+          "name": "placePorts",
+          "kind": "function",
+          "start": 229,
+          "end": 291
+        },
+        {
+          "name": "Placed",
+          "kind": "type",
+          "start": 292,
+          "end": 292
+        },
+        {
+          "name": "linkUp",
+          "kind": "function",
+          "start": 294,
+          "end": 398
+        },
+        {
+          "name": "feedNetworks",
+          "kind": "function",
+          "start": 400,
+          "end": 444
         },
         {
           "name": "portsFed",
           "kind": "function",
-          "start": 394,
-          "end": 410
+          "start": 446,
+          "end": 462
         },
         {
           "name": "portsSig",
           "kind": "function",
-          "start": 412,
-          "end": 421
+          "start": 464,
+          "end": 473
         }
       ]
     },
