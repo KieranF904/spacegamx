@@ -55,7 +55,10 @@ export default defineConfig(({ command }) => ({
     rollupOptions: {
       output: {
         // Libraries in their own chunk: it changes rarely, so a browser keeps it cached across deploys of the game code
-        manualChunks: (id) => (/[\/]node_modules[\/](pixi\.js|@pixi|bitecs)[\/]/.test(id) ? 'vendor' : undefined),
+        // (Designs' bespoke hulls likewise: every system's enemies may use them, so they load at start, but they're large and
+        // change apart from the code. Surfaces' rock is lazy instead, a chunk per system: rendering/terrainData.ts)
+        manualChunks: (id) => (/[\/]node_modules[\/](pixi\.js|@pixi|bitecs)[\/]/.test(id) ? 'vendor'
+          : /[\/]data[\/]ships[\/]bespoke[\/]/.test(id) ? 'bespoke' : undefined),
       },
       input: {
         main: resolve(__dirname, 'index.html'),

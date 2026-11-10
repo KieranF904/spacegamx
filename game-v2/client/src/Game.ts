@@ -18,6 +18,8 @@ import { installDevTools } from './app/devTools';
 import { Prediction } from './predict/Prediction';
 import { handleKey, type KeyHost } from './app/keys';
 import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
+import { FrameGate } from './app/frameGate';
+import { terrainHold } from './rendering/terrainData';
 import { tickInput, sendNeutralInput, newInputSendState, forgetSession, type InputSendCtx } from './app/inputSend';
 import { guestKey, guestName } from './network/guestId';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
@@ -405,11 +407,13 @@ this.boostHudEl = document.getElementById('boostHud');
     window.addEventListener('resize', () => this.onResize());
     
     // Set up network handlers
-    this.network.onMessage = (msg) => this.handleServerMessage(msg);
+    // (Through a gate: a join or system change waits for that system's rock to load, app/frameGate.ts)
     // (Client-detected hits: a frame's hits go out once the whole frame is in, ships/hits/SelfHits.ts)
-    this.network.onFrameEnd = () => this.shipClient.frameEnd((m) => this.handleServerMessage(m));
+    const gate = new FrameGate((msg) => this.handleServerMessage(msg), () => this.shipClient.frameEnd((m) => this.handleServerMessage(m)), terrainHold);
+    this.network.onMessage = (msg) => gate.message(msg);
+    this.network.onFrameEnd = () => gate.end();
     this.network.onConnect = () => this.onConnected();
-    this.network.onDisconnect = (info) => this.onDisconnected(info);
+    this.network.onDisconnect = (info) => { gate.drop(); this.onDisconnected(info); };
 
     // Set up input handlers
     this.input.init(this.app.canvas as HTMLCanvasElement);

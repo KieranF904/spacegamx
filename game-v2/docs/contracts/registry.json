@@ -28,6 +28,37 @@
       ]
     },
     {
+      "id": "client.app.frame-gate",
+      "path": "client/src/app/frameGate.ts",
+      "group": "client/app",
+      "lines": 73,
+      "owns": "holding the server's messages, in order, while something a message needs is still loading (a system's rock)",
+      "needs": "@space-game/common ServerMessage, a deliver/frameEnd pair (Game's handlers), a hold test per message (rendering/terrainData.ts terrainHold)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "messages and frame ends come out in the order they went in, held or not",
+          "test": "client/src/rendering/terrainLoad.test.ts"
+        },
+        {
+          "text": "a message is handled only once what it waits for is in",
+          "test": "client/src/rendering/terrainLoad.test.ts"
+        }
+      ],
+      "extend": "something else a message must wait for is one more check in the hold test",
+      "exports": [
+        "FrameGate"
+      ],
+      "sections": [
+        {
+          "name": "FrameGate",
+          "kind": "class",
+          "start": 12,
+          "end": 73
+        }
+      ]
+    },
+    {
       "id": "client.app.hud-readouts",
       "path": "client/src/app/hudReadouts.ts",
       "group": "client/app",
@@ -910,6 +941,132 @@
           "kind": "function",
           "start": 17,
           "end": 36
+        }
+      ]
+    },
+    {
+      "id": "client.rendering.terrain-data",
+      "path": "client/src/rendering/terrainData.ts",
+      "group": "client/rendering",
+      "lines": 96,
+      "owns": "surfaces' rock on the client: each system's terrain file as a chunk of its own, loaded before the system's messages are handled, then the built terrain (arena gates and gun range walls in it) by system id",
+      "needs": "@space-game/common buildTerrain/withArenaGates/withGunRange, data/terrain/*.json, data/systems.json",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a system's rock is in before its playerState/systemInfo is handled (terrainHold), so the first predicted tick there has it",
+          "test": "client/src/rendering/terrainLoad.test.ts"
+        },
+        {
+          "text": "the client's rock is the server's, piece for piece",
+          "test": "client/src/rendering/terrainData.test.ts"
+        }
+      ],
+      "extend": "a new surface is one data/terrain/<system id>.json: its chunk and its hold come with it",
+      "exports": [
+        "arenaFor",
+        "gunRangeFor",
+        "loadTerrain",
+        "preloadTerrain",
+        "terrainFor",
+        "terrainHold"
+      ],
+      "sections": [
+        {
+          "name": "LOADERS",
+          "kind": "const",
+          "start": 25,
+          "end": 29
+        },
+        {
+          "name": "FILES",
+          "kind": "const",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "loading",
+          "kind": "const",
+          "start": 32,
+          "end": 32
+        },
+        {
+          "name": "failed",
+          "kind": "const",
+          "start": 33,
+          "end": 33
+        },
+        {
+          "name": "built",
+          "kind": "const",
+          "start": 34,
+          "end": 34
+        },
+        {
+          "name": "SystemRow",
+          "kind": "type",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "SYSTEMS",
+          "kind": "const",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "ARENAS",
+          "kind": "const",
+          "start": 37,
+          "end": 38
+        },
+        {
+          "name": "RANGES",
+          "kind": "const",
+          "start": 39,
+          "end": 40
+        },
+        {
+          "name": "arenaFor",
+          "kind": "function",
+          "start": 42,
+          "end": 45
+        },
+        {
+          "name": "gunRangeFor",
+          "kind": "function",
+          "start": 47,
+          "end": 50
+        },
+        {
+          "name": "terrainFor",
+          "kind": "function",
+          "start": 52,
+          "end": 63
+        },
+        {
+          "name": "loadTerrain",
+          "kind": "function",
+          "start": 65,
+          "end": 78
+        },
+        {
+          "name": "preloaded",
+          "kind": "let",
+          "start": 80,
+          "end": 80
+        },
+        {
+          "name": "preloadTerrain",
+          "kind": "function",
+          "start": 81,
+          "end": 86
+        },
+        {
+          "name": "terrainHold",
+          "kind": "function",
+          "start": 88,
+          "end": 96
         }
       ]
     },
