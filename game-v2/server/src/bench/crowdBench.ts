@@ -13,6 +13,9 @@
  *   --pt 0                                 probes without the game's prediction of other ships (client predict/, C3; on by
  *                                          default: its CPU is reported apart, "probe PT"); --pt-reach 1e9 lifts its
  *                                          level of detail (every held ship on PT)
+ *   --hash                                 hash every frame the counting sockets are sent (frameHash in the JSON): runs
+ *                                          are seeded, so a change that keeps the bytes keeps the hash; --dump <file>
+ *                                          writes the first counting socket's messages decoded, one a line (to diff runs)
  *   --crowd                                crowd fallbacks on and automatic (CAPS.CROWD, probes with every cap): each
  *                                          second's level and base-tick time, where it settled (try --secs 40)
  */
@@ -24,6 +27,8 @@ import { LAYOUTS, type Layout } from './crowd/world.js';
 import { DEFAULT_CAPS } from '@space-game/common';
 
 const argv = process.argv.slice(2);
+// (The payout dice's secret fixed: the same loot and chunks every run, so the frames are too. game/payoutDice.ts)
+process.env.PAYOUT_SECRET ??= 'bench';
 const arg = (name: string, d?: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : d; };
 const flag = (name: string) => argv.includes(`--${name}`);
 
@@ -31,7 +36,7 @@ const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
   layout, n, secs: Number(arg('secs', full ? '15' : '10')),   crowd: flag('crowd'),
   probes: Number(arg('probes', '4')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
-  pt: arg('pt', '1') !== '0', ptReach: arg('pt-reach') ? Number(arg('pt-reach')) : undefined,
+  pt: arg('pt', '1') !== '0', ptReach: arg('pt-reach') ? Number(arg('pt-reach')) : undefined, hash: flag('hash'), dump: arg('dump'),
 });
 
 const one = arg('case');
