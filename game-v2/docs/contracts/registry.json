@@ -11,7 +11,7 @@
       "invariants": [
         {
           "text": "the bar's element is made on first use and only changed when a value changes",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "another charge readout is one more branch in update()",
@@ -38,7 +38,7 @@
       "invariants": [
         {
           "text": "each element is written only when its value changes (domWrite)",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "a new readout is a cached element below and one more write in update()",
@@ -72,7 +72,7 @@
       "invariants": [
         {
           "text": "both sides generate the same rocks from the same table",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "a new dev-only rock field is one more entry merged into the table below",
@@ -90,11 +90,11 @@
       "invariants": [
         {
           "text": "shots and impacts are not heard here, they are heard as WeaponFx draws them (CombatSounds)",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         },
         {
           "text": "a beam lighting is heard once",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "a new screen-driven sound is one more line in update()",
@@ -238,8 +238,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "only admins fetch the admin chunk, only contributors the notes chunk",
-          "test": "none pinned"
+          "text": "a panel is made once, never for a signed-out admin or in a proto build; Game starts the admin one for admins and the notes one for contributors only",
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "a new staff-only panel is one more start/stop pair here",
@@ -307,7 +307,7 @@
       "invariants": [
         {
           "text": "shown at most once per page",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "none (a fixed notice)",
@@ -334,7 +334,7 @@
       "invariants": [
         {
           "text": "the current system is looked up once per system, not per frame",
-          "test": "none pinned"
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "a new \"what is near me\" question is one more method here",
@@ -360,8 +360,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "safety follows the same rules as the server's canDamage",
-          "test": "none pinned"
+          "text": "safety follows the server's inPvpZone rule (the zone half of canDamage): safe in a pvp system only inside a station's ring",
+          "test": "client/src/app/appInvariants.test.ts"
         }
       ],
       "extend": "a new zone fact on the HUD is one more argument to setZone below",
@@ -488,7 +488,7 @@
       "invariants": [
         {
           "text": "ships are stepped on PT from their kind's rule and the first claiming kind has the ship",
-          "test": "none pinned"
+          "test": "client/src/predict/kindInvariants.test.ts"
         }
       ],
       "extend": "a new ship kind registers with registerPtKind; nothing in the layer or the draw path names a kind",
@@ -614,7 +614,7 @@
       "invariants": [
         {
           "text": "a body whose recorded hash misses ST is re-read to the PT head once, never stepped on the PT layer itself",
-          "test": "none pinned"
+          "test": "client/src/predict/kindInvariants.test.ts"
         }
       ],
       "extend": "a new kind of body is a host ids() source; the kind itself is registered in worldKinds.ts at order 10",
@@ -654,7 +654,7 @@
       "invariants": [
         {
           "text": "a hash miss at the confirmed tick re-forks from ST once and eases the drawn place",
-          "test": "none pinned"
+          "test": "client/src/predict/kindInvariants.test.ts"
         }
       ],
       "extend": "a change to the waypoint law belongs in common/guidance, not here; the kind is registered in worldKinds.ts",
@@ -700,7 +700,7 @@
       "invariants": [
         {
           "text": "a miss against ST re-forks from c - FORK_BACK and steps to the head once; looks already shown are not shown twice",
-          "test": "none pinned"
+          "test": "client/src/predict/kindInvariants.test.ts"
         }
       ],
       "extend": "a new move look or shell type is handled where the MoveRunner outputs it; the kind is registered in worldKinds.ts",
@@ -783,7 +783,7 @@
       "invariants": [
         {
           "text": "a tick whose lane records changed has its drawn shells taken back and the new ones drawn",
-          "test": "none pinned"
+          "test": "client/src/predict/shellsKind.test.ts"
         }
       ],
       "extend": "gun behaviour lives in common sim/otherGuns.ts; the kind is registered in worldKinds.ts",
@@ -852,12 +852,12 @@
       "events": "",
       "invariants": [
         {
-          "text": "one update(delta) per frame draws everything from GameState",
-          "test": "none pinned"
+          "text": "one update(delta) per frame steps camera, backdrop, entities, effects, hit numbers and minimap in that order",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         },
         {
           "text": "effects, hit numbers, minimap and death screen are modules under renderer/, not code here",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new effect or overlay is a module under renderer/ created in the constructor and stepped in update()",
@@ -992,8 +992,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is the one it had inside Renderer",
-          "test": "none pinned"
+          "text": "a system's star is its systems.json entry, else one made once per visuals object; with no systemInfo yet it draws DEFAULT_SYSTEM_VISUALS",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new backdrop layer is a step in renderBackground",
@@ -1040,8 +1040,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is the one it had inside Renderer",
-          "test": "none pinned"
+          "text": "a panned view keeps the ship 10% inside every edge, a snap lands on the ship, and with no helm heading the roll returns to north-up",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "camera maths lives in cameraView.ts; this is the per-frame application of it",
@@ -1074,7 +1074,7 @@
       "invariants": [
         {
           "text": "texts are pooled, never created per hit once warm",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new number style (colour or size) is one more branch in show()",
@@ -1114,7 +1114,7 @@
       "invariants": [
         {
           "text": "a resize while dead keeps the fade where it was",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "new lines on the overlay go in build()",
@@ -1141,7 +1141,7 @@
       "invariants": [
         {
           "text": "the health bar redraws only when what it shows changes",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new overlay part is one more build function here and one field on Renderer's per-entity maps",
@@ -1202,8 +1202,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is the one it had inside Renderer",
-          "test": "none pinned"
+          "text": "a view is made once per entity and kept while it lives, shots get none, one out of view is hidden and a gone one disposed",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new entity kind's graphics is a case in createEntityGraphics",
@@ -1263,8 +1263,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "behaviour is the one it had inside Renderer",
-          "test": "none pinned"
+          "text": "gates breathe within a fixed band, seams and pods of gone entities are dropped, a dropped item's light is its rarity's colour and ship shadows fall only in space",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new animated scene object is a loop in updateEffects; a new light is a case in collectLights",
@@ -1298,11 +1298,11 @@
       "invariants": [
         {
           "text": "it is turned against the view's roll so it reads like the screen",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         },
         {
           "text": "it redraws at most every 1000/minimapHz milliseconds (quality tier)",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new entity kind on the radar is one more case in the entity switch of draw()",
@@ -1336,7 +1336,7 @@
       "invariants": [
         {
           "text": "middle mouse never autoscrolls the page",
-          "test": "none pinned"
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "other pan inputs (touch, keys) go in the constructor's listeners",
@@ -1369,8 +1369,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "random draws happen in the same order as before the split (effects look the same)",
-          "test": "none pinned"
+          "text": "an effect's random draws go in a fixed order, so the same sequence makes the same effect",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new one-shot effect is one case in showEffect() plus a create* method",
@@ -1414,8 +1414,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "until systemInfo arrives a system draws with DEFAULT_SYSTEM_VISUALS",
-          "test": "none pinned"
+          "text": "until systemInfo arrives a system draws with DEFAULT_SYSTEM_VISUALS, which a systemInfo naming no hue or radius also builds",
+          "test": "client/src/rendering/renderer/rendererModules.test.ts"
         }
       ],
       "extend": "a new systemInfo visual field is one more line in visualsFromInfo() and one on SystemVisuals",
@@ -1575,8 +1575,8 @@
           "test": "client/src/rendering/weapons/fx/FlakAimFx.test.ts"
         },
         {
-          "text": "nothing is allocated per frame",
-          "test": "none pinned"
+          "text": "its mark list is made once and reused every frame (at most MAX_AIM_MARKS drawn), nothing is allocated per frame",
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new look for the marker is one change to draw below",
@@ -1650,7 +1650,7 @@
       "invariants": [
         {
           "text": "lists are drawn in a fixed order — flashes, sparks, smoke, rings, liquid, then layered hits",
-          "test": "none pinned"
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         },
         {
           "text": "a vent makes no particles when the quality share drops it",
@@ -1689,7 +1689,7 @@
         },
         {
           "text": "layered particle lists stop growing at their caps",
-          "test": "none pinned"
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new layered impact part is one block in layeredHit (and its list in FxField / draw in hitDraw)",
@@ -1734,7 +1734,7 @@
         },
         {
           "text": "a minigun throws more brass the faster it spins",
-          "test": "none pinned"
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new muzzle part is one block in flash, driven by a field of WeaponStyle.muzzle",
@@ -1761,7 +1761,7 @@
       "id": "client.weapon-fx.tracer",
       "path": "client/src/rendering/weapons/fx/TracerFx.ts",
       "group": "client/rendering/weapons",
-      "lines": 318,
+      "lines": 326,
       "owns": "drawing every flying shell: its tracer or body, contrail, afterimages, pulse rings, nose light, crackle and pull field, the lobbed shells' landing marks and the guided shell's guide line",
       "needs": "FxField (pools, smoke list, line/circle), ShellBodies, WeaponStyle fields, TracerHost (guideTo, state); npm: @space-game/common, pixi.js",
       "events": "",
@@ -1771,14 +1771,15 @@
           "test": "client/src/rendering/weapons/visualStop.test.ts"
         },
         {
-          "text": "a dying tracer shrinks towards its head over FADE_FRAMES",
-          "test": "none pinned"
+          "text": "a dying tracer fades and shrinks towards its head linearly over FADE_FRAMES (fadeState) and draws nothing after it",
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new tracer look is one block in drawExtras (or drawBody for the shape itself), driven by a WeaponStyle field",
       "exports": [
         "TracerFx",
-        "TracerHost"
+        "TracerHost",
+        "fadeState"
       ],
       "sections": [
         {
@@ -1794,34 +1795,40 @@
           "end": 23
         },
         {
+          "name": "fadeState",
+          "kind": "function",
+          "start": 25,
+          "end": 30
+        },
+        {
           "name": "SHIP_TYPES",
           "kind": "const",
-          "start": 25,
-          "end": 25
+          "start": 32,
+          "end": 32
         },
         {
           "name": "ORB_LIGHTNING",
           "kind": "const",
-          "start": 27,
-          "end": 28
+          "start": 34,
+          "end": 35
         },
         {
           "name": "TracerHost",
           "kind": "interface",
-          "start": 30,
-          "end": 35
+          "start": 37,
+          "end": 42
         },
         {
           "name": "TracerFrame",
           "kind": "interface",
-          "start": 37,
-          "end": 41
+          "start": 44,
+          "end": 48
         },
         {
           "name": "TracerFx",
           "kind": "class",
-          "start": 43,
-          "end": 318
+          "start": 50,
+          "end": 326
         }
       ]
     },
@@ -1836,7 +1843,7 @@
       "invariants": [
         {
           "text": "each list is aged and drawn newest first, spliced out at max life",
-          "test": "none pinned"
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new layered-impact part is one list on FxField and one loop here",
@@ -1867,7 +1874,7 @@
         },
         {
           "text": "a layered impact's particle lists are capped (HIT_CAP, FRAG_CAP, SMOKE_CAP), oldest dropped first",
-          "test": "none pinned"
+          "test": "client/src/rendering/weapons/fx/fxInvariants.test.ts"
         }
       ],
       "extend": "a new kind of particle is one interface here, one list on FxField and its draw in FxField / hitDraw",

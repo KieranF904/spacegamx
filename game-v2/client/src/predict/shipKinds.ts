@@ -3,7 +3,7 @@
  * owns:       the kinds of ship on the PT layer: who claims a ship, how one is stepped a tick, and how far behind
  *             your shells it is drawn
  * needs:      @space-game/common (replica state, CtlChangeInputs), PtHost (predict/world)
- * invariants: ships are stepped on PT from their kind's rule and the first claiming kind has the ship — none pinned
+ * invariants: ships are stepped on PT from their kind's rule and the first claiming kind has the ship — client/src/predict/kindInvariants.test.ts
  * extend:     a new ship kind registers with registerPtKind; nothing in the layer or the draw path names a kind
  */
 

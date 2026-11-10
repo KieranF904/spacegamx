@@ -4,7 +4,7 @@
  *             field, the lobbed shells' landing marks and the guided shell's guide line
  * needs:      FxField (pools, smoke list, line/circle), ShellBodies, WeaponStyle fields, TracerHost (guideTo, state); npm: @space-game/common, pixi.js
  * invariants: a shell that ended at a surface draws nothing past it — client/src/rendering/weapons/visualStop.test.ts
- *             a dying tracer shrinks towards its head over FADE_FRAMES — none pinned
+ *             a dying tracer fades and shrinks towards its head linearly over FADE_FRAMES (fadeState) and draws nothing after it — client/src/rendering/weapons/fx/fxInvariants.test.ts
  * extend:     a new tracer look is one block in drawExtras (or drawBody for the shape itself), driven by a WeaponStyle field
  */
 
@@ -21,6 +21,13 @@ import type { Shot } from './shotTypes';
 /** A piece of contrail left in the world: it stays where it was laid and fades over `max` frames, long after the shot has gone */
 interface TrailSeg { x0: number; y0: number; x1: number; y1: number; age: number; max: number; width: number; color: number; alpha: number }
 const TRAIL_CAP = 2048;
+
+/** A dying tracer's fade (1 to 0) and shrink towards its head (0 to 1), linear over FADE_FRAMES; null once it has gone (or when not dying: fading null is full) */
+export function fadeState(fading: number | null): { fade: number; k: number } | null {
+  if (fading === null) return { fade: 1, k: 0 };
+  if (fading >= FADE_FRAMES) return null;
+  return { fade: 1 - fading / FADE_FRAMES, k: fading / FADE_FRAMES };
+}
 
 const SHIP_TYPES = [EntityType.Player, EntityType.Enemy, EntityType.NPC, EntityType.ShipBody];
 
@@ -73,11 +80,12 @@ export class TracerFx {
 
   /** One shell this frame: its pose (through the dying shrink and sway), then body and extras */
   private drawShot(shot: Shot, clock: number, frames: number): void {
-    if (!shot.head || !shot.tail || (shot.fading !== null && shot.fading >= FADE_FRAMES)) return;
-    const fade = shot.fading === null ? 1 : 1 - shot.fading / FADE_FRAMES;
+    const fs = fadeState(shot.fading);
+    if (!shot.head || !shot.tail || !fs) return;
+    const fade = fs.fade;
     const st = shot.style;
     // A dying tracer shrinks towards its head
-    const k = shot.fading === null ? 0 : shot.fading / FADE_FRAMES;
+    const k = fs.k;
     const tx = shot.tail.x + (shot.head.x - shot.tail.x) * k;
     const ty = shot.tail.y + (shot.head.y - shot.tail.y) * k;
 

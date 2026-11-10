@@ -3,7 +3,7 @@
  * owns:       the particle pools and live particle lists every WeaponFx sub-system draws into, and the simple lists' draw
  *             (muzzle flashes, sparks, smoke, rings, liquid)
  * needs:      ParticlePool, particleTypes, impactAnchor (AnchorList), liquidSplash, fxTextures; npm: pixi.js
- * invariants: lists are drawn in a fixed order — flashes, sparks, smoke, rings, liquid, then layered hits — none pinned
+ * invariants: lists are drawn in a fixed order — flashes, sparks, smoke, rings, liquid, then layered hits — client/src/rendering/weapons/fx/fxInvariants.test.ts
  *             a vent makes no particles when the quality share drops it — none pinned
  * extend:     a new particle list is one field here and a loop in drawParticles (or hitDraw for layered impacts)
  */

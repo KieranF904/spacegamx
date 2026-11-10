@@ -5,7 +5,7 @@
  * needs:      FxField (particle lists), ImpactHost (surfaceAt, sounds, state), weaponStyles, impactAim, impactAnchor, liquidSplash; npm: @space-game/common
  * invariants: a hit's throw follows the style's hitThrow, off the struck surface where one is known — client/src/rendering/weapons/impactAim.test.ts
  *             an impact's parts ride what it hit as one group — client/src/rendering/weapons/impactAnchor.test.ts
- *             layered particle lists stop growing at their caps — none pinned
+ *             layered particle lists stop growing at their caps — client/src/rendering/weapons/fx/fxInvariants.test.ts
  * extend:     a new layered impact part is one block in layeredHit (and its list in FxField / draw in hitDraw)
  */
 

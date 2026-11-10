@@ -4,7 +4,7 @@
  *             burst along its turret's aim, with a small ring at its middle
  * needs:      FxField (line, ringAt), an aimMarks hook set by the Renderer (ships/render/flakAim.ts fills the marks)
  * invariants: a mark's dashes are evenly spaced round its circle and turn with the clock — client/src/rendering/weapons/fx/FlakAimFx.test.ts
- *             nothing is allocated per frame — none pinned
+ *             its mark list is made once and reused every frame (at most MAX_AIM_MARKS drawn), nothing is allocated per frame — client/src/rendering/weapons/fx/fxInvariants.test.ts
  * extend:     a new look for the marker is one change to draw below
  */
 

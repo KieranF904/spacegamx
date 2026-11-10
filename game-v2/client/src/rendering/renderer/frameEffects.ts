@@ -2,7 +2,7 @@
  * @contract client.render.frame-effects
  * owns:       Renderer's per-frame animation of effects, gates, rifts, pods and stations, and the lights the renderer itself adds
  * needs:      Renderer (its fields, as the first argument), WeaponFx, Lighting; npm: pixi.js, @space-game/common
- * invariants: behaviour is the one it had inside Renderer — none pinned
+ * invariants: gates breathe within a fixed band, seams and pods of gone entities are dropped, a dropped item's light is its rarity's colour and ship shadows fall only in space — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new animated scene object is a loop in updateEffects; a new light is a case in collectLights
  */
 

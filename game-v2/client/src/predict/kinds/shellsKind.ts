@@ -2,7 +2,7 @@
  * @contract client.predict.kind.shells
  * owns:       other ships' shells on the PT timeline: their guns stepped from inputs, records drawn as predicted shells and taken back when wrong
  * needs:      @space-game/common (sim/otherGuns lanes), PtStLayer, ptKinds
- * invariants: a tick whose lane records changed has its drawn shells taken back and the new ones drawn — none pinned
+ * invariants: a tick whose lane records changed has its drawn shells taken back and the new ones drawn — client/src/predict/shellsKind.test.ts
  * extend:     gun behaviour lives in common sim/otherGuns.ts; the kind is registered in worldKinds.ts
  */
 /**

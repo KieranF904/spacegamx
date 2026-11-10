@@ -2,8 +2,8 @@
  * @contract client.render.renderer
  * owns:       the PixiJS scene: layers, camera, entity views, background and lighting, per frame
  * needs:      GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common
- * invariants: one update(delta) per frame draws everything from GameState — none pinned
- *             effects, hit numbers, minimap and death screen are modules under renderer/, not code here — none pinned
+ * invariants: one update(delta) per frame steps camera, backdrop, entities, effects, hit numbers and minimap in that order — client/src/rendering/renderer/rendererModules.test.ts
+ *             effects, hit numbers, minimap and death screen are modules under renderer/, not code here — client/src/rendering/renderer/rendererModules.test.ts
  * extend:     a new effect or overlay is a module under renderer/ created in the constructor and stepped in update()
  */
 
