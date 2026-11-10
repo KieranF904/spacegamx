@@ -480,7 +480,7 @@ export const SHIP_SHAPES: Record<string, Spec> = {
       'intake?': 'number', 'buffer?': 'number',
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
       'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
-      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number' }),
+      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number', 'pieces?': 'number', 'spike?': 'number', 'spikeWidth?': 'number' }),
       'tank?': strict({ feed: 'string', holds: 'number' }), 'feedPoints?': arr(strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number' })),
       'selector?': 'boolean', 'pipe?': 'boolean', 'combiner?': 'boolean', 'pipeThrough?': 'boolean',
       'infra?': strict({ tier: oneOf('simple', 'dual', 'heavy', 'super'), damage: 'number', 'draw?': 'number' }),
@@ -505,7 +505,7 @@ export const SHIP_SHAPES: Record<string, Spec> = {
       'clamp?': strict({ size: 'number' }),
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
       'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
-      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number' }),
+      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number', 'pieces?': 'number', 'spike?': 'number', 'spikeWidth?': 'number' }),
       'tank?': strict({ feed: 'string', holds: 'number' }), 'feedPoints?': arr(strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number' })),
       'selector?': 'boolean', 'pipe?': 'boolean', 'combiner?': 'boolean', 'pipeThrough?': 'boolean',
       'infra?': strict({ tier: oneOf('simple', 'dual', 'heavy', 'super'), damage: 'number', 'draw?': 'number' }),

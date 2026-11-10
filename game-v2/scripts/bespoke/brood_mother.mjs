@@ -21,6 +21,7 @@
  */
 
 import { writeFileSync, mkdirSync } from 'fs';
+import { compactJson } from '../lib/compactJson.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -424,7 +425,7 @@ const pieceFile = { _comment: 'The Brood Mother\'s own hull (bosses.json boss_br
 const order = [...parts.filter((q) => q.piece.includes('_s3_')), ...parts.filter((q) => !q.piece.includes('_s3_'))].map((q, k) => ({ ...q, uid: k }));
 const design = { name: 'Brood Mother', catalogVersion: 1, paint: '#3d4763', rigid: true, parts: order };
 mkdirSync(join(root, 'data/ships/bespoke'), { recursive: true });
-writeFileSync(join(root, 'data/ships/bespoke/brood_mother.json'), JSON.stringify(pieceFile, null, 1) + '\n');
+writeFileSync(join(root, 'data/ships/bespoke/brood_mother.json'), compactJson(pieceFile));
 writeFileSync(join(root, 'data/ships/blueprints/enemy/brood_mother.json'), JSON.stringify(design, null, 1) + '\n');
 const by = (st) => pieces.filter((p) => p.stage === st).length;
 console.log(`${pieces.length} pieces: stage 1 ${by(1)}, stage 2 ${by(2)}, stage 3 ${by(3)}`);

@@ -18151,7 +18151,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 102,
+      "lines": 104,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "validate/* (one validator per data file, shared context), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -18178,20 +18178,20 @@
         {
           "name": "validateGameData",
           "kind": "function",
-          "start": 52,
-          "end": 73
+          "start": 53,
+          "end": 75
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 75,
-          "end": 81
+          "start": 77,
+          "end": 83
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 83,
-          "end": 102
+          "start": 85,
+          "end": 104
         }
       ]
     },
@@ -18608,8 +18608,8 @@
       "id": "validate.extras",
       "path": "server/src/data/validate/extras.ts",
       "group": "server/data/validate",
-      "lines": 34,
-      "owns": "the small data files nothing else validates: strings.json (placeholders), mobs.json (blast, the mobs that part functions launch) and terrain/<id>.json (named for a real system)",
+      "lines": 62,
+      "owns": "the small data files nothing else validates: strings.json (placeholders), mobs.json (blast, the mobs that part functions launch) and terrain/<id>.json (named for a real system, outlines well-formed)",
       "needs": "validate/context (the ids and reference helpers), common MOB_IDS; browser-safe: no Node imports",
       "events": "",
       "invariants": [
@@ -18630,8 +18630,38 @@
         {
           "name": "validateExtras",
           "kind": "function",
-          "start": 15,
-          "end": 34
+          "start": 16,
+          "end": 36
+        },
+        {
+          "name": "isPoint",
+          "kind": "const",
+          "start": 38,
+          "end": 38
+        },
+        {
+          "name": "POLYGONS",
+          "kind": "const",
+          "start": 39,
+          "end": 39
+        },
+        {
+          "name": "LINES",
+          "kind": "const",
+          "start": 40,
+          "end": 40
+        },
+        {
+          "name": "LINE_SETS",
+          "kind": "const",
+          "start": 41,
+          "end": 41
+        },
+        {
+          "name": "validateTerrain",
+          "kind": "function",
+          "start": 43,
+          "end": 62
         }
       ]
     },
@@ -18794,6 +18824,49 @@
           "kind": "function",
           "start": 12,
           "end": 34
+        }
+      ]
+    },
+    {
+      "id": "validate.rules",
+      "path": "server/src/data/validate/rules.ts",
+      "group": "server/data/validate",
+      "lines": 66,
+      "owns": "rules.json: its sections are known, the siege profiles and turrets resolve against the real ids (bastion profiles in systems.json, enemy designs, factions), and the number fields the modules read are numbers",
+      "needs": "validate/context (the ids and reference helpers); browser-safe: no Node imports",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors",
+          "test": "server/src/data/validateGameData.test.ts"
+        },
+        {
+          "text": "a siege roster naming a missing enemy design or a bastion naming no profile is caught",
+          "test": "server/src/data/validate/extras.test.ts"
+        }
+      ],
+      "extend": "a new cross-reference check for rules.json goes in the function below",
+      "exports": [
+        "validateRules"
+      ],
+      "sections": [
+        {
+          "name": "F",
+          "kind": "const",
+          "start": 14,
+          "end": 14
+        },
+        {
+          "name": "SECTIONS",
+          "kind": "const",
+          "start": 15,
+          "end": 15
+        },
+        {
+          "name": "validateRules",
+          "kind": "function",
+          "start": 17,
+          "end": 66
         }
       ]
     },

@@ -14,6 +14,7 @@
  * shadow, not ink), and a part may take `surface: 'solar'` (the stations' solar cells, whatever its material).
  */
 import { writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { compactJson } from '../../lib/compactJson.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -169,7 +170,7 @@ export function design(id, card) {
         for (const q of parts) if (!order.includes(q._group)) throw new Error(`${id}: group ${q._group} isn't in roster.json`);
         const numbered = ordered.map((q, k) => { const { _group, ...rest } = q; return { ...rest, uid: k, group: order.indexOf(_group) }; });
         mkdirSync(join(GAME, 'bespoke'), { recursive: true });
-        writeFileSync(join(GAME, 'bespoke', `${id}.json`), JSON.stringify({ _comment: `${card.name}'s own hull (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs: edit that, not this.`, pieces }, null, 1) + '\n');
+        writeFileSync(join(GAME, 'bespoke', `${id}.json`), compactJson({ _comment: `${card.name}'s own hull (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs: edit that, not this.`, pieces }));
         writeFileSync(join(GAME, 'blueprints', 'enemy', `${id}.json`), JSON.stringify({ name: card.name, catalogVersion: 1, paint, rigid: true, parts: numbered, ...(drive !== undefined ? { drive } : {}) }, null, 1) + '\n');
       }
       writeFileSync(join(OUT, `${id}.pieces.json`), JSON.stringify({ _comment: `DESIGN ONLY, not loaded by the game: ${card.name} (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs.`, pieces }, null, 1) + '\n');

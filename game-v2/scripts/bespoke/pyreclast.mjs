@@ -16,6 +16,7 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { compactJson } from '../lib/compactJson.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -648,7 +649,7 @@ const all = [...heart, ...parts].map((q, k) => ({ ...q, uid: k }));
 // (rigid: it flies as built throughout, its hull drawn once: Blueprint `rigid`)
 const design = { name: 'Pyreclast', catalogVersion: 1, paint: '#2a201c', rigid: true, parts: all };
 mkdirSync(join(root, 'data/ships/bespoke'), { recursive: true });
-writeFileSync(join(root, 'data/ships/bespoke/pyreclast.json'), JSON.stringify(pieceFile, null, 1) + '\n');
+writeFileSync(join(root, 'data/ships/bespoke/pyreclast.json'), compactJson(pieceFile));
 writeFileSync(join(root, 'data/ships/blueprints/enemy/pyreclast.json'), JSON.stringify(design, null, 1) + '\n');
 console.log(`${pieces.length} pieces, ${all.length} parts (${heart.length} of its heart)`);
 

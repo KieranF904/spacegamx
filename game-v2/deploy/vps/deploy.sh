@@ -23,6 +23,9 @@ case "${1:-}" in
   *) echo "usage: deploy.sh [releases | rollback [release]]" >&2; exit 2 ;;
 esac
 
+# The data must validate (shapes, then every cross-referenced id) before anything is built or shipped; set -e aborts on errors
+npm run --silent data:validate
+
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 TGZ=$WORK/spacegame.tgz
