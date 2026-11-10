@@ -24,6 +24,7 @@ import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { PtStLayer } from '../../../../client/src/predict/ptst.js';
 import { ReplicaPtWorld } from '../../../../client/src/predict/world.js';
 import { ShellsKind } from '../../../../client/src/predict/kinds/shellsKind.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -35,13 +36,7 @@ interface Drawn { owner: number; t: number; x: number; y: number; vx: number; vy
 function ptFight(who: 'pilot' | 'ai') {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-  });
+  const server = makeServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const down: { at: number; data: Uint8Array }[] = [];

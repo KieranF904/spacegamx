@@ -13,6 +13,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import type { BossesFile } from './Bosses.js';
 import { PYRECLAST_EXPOSURE, PYRECLAST_LOOP, type PyreclastBrain } from './brains/pyreclast.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -21,13 +22,7 @@ const def = (files.bosses as BossesFile).bosses.boss_pyreclast;
 
 function world() {
   resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer();
   const pilots: { pid: number; got: ServerMessage[] }[] = [];
   // (A move's looks (its tells, beams, strikes' looks) are worked out by every client running the boss's body (CAPS.MOVES,
   // every client), so none go on the wire: the server's own word for them, GameServer.moveFx, is what's watched here,

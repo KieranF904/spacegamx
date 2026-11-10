@@ -18,6 +18,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { DEFEND_QUIET_TICKS, DEFEND_GRUDGE_HALF_TICKS } from './defenders.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -25,10 +26,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 
 function live() {
   resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer();
   const join = (name: string) => {
     const t = new LocalTransport(server);
     t.onMessage = () => {};

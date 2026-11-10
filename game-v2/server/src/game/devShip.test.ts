@@ -7,16 +7,14 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
 describe('dev ship swap', () => {
   it('flies a library ship at once, and what is saved is always the real ship', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, devTeleport: true, ships: createShipBridge(loadShipConfigCached(dataDir)),
-    });
+    const server = makeServer({ devTeleport: true });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'swapper' } as any);
@@ -60,10 +58,7 @@ describe('dev ship swap', () => {
 
   it('losing a borrowed ship gives your own back: nothing salvaged, nothing on order, no wreck', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, devTeleport: true, ships: createShipBridge(loadShipConfigCached(dataDir)),
-    });
+    const server = makeServer({ devTeleport: true });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'crasher' } as any);
@@ -87,10 +82,7 @@ describe('dev ship swap', () => {
 
   it('is refused on a server that is not a dev server', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-    });
+    const server = makeServer();
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'cheat' } as any);

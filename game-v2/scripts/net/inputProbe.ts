@@ -26,7 +26,7 @@ import { GameServer } from '../../server/src/GameServer.js';
 import { GameData } from '../../server/src/data/GameData.js';
 import { readGameDataFiles } from '../../server/src/data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../../server/src/ships/loadShipConfig.js';
-import { createShipBridge } from '../../server/src/proto/createProtoServer.js';
+import { createShipBridge } from '../../server/src/ships/createShipBridge.js';
 import { stationQuery } from '../../server/src/game/Docking.js';
 
 const C = common as unknown as Record<string, any>;

@@ -14,6 +14,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { EnemyRecovery } from './recovery.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 describe('enemy recovery (the clock)', () => {
   it('waits LIFE.idle quiet ticks, heals in steps to full over LIFE.heal, then regrows once; combat restarts it', () => {
@@ -41,15 +42,9 @@ describe('enemy recovery (the clock)', () => {
 });
 
 describe('enemy recovery (on the server)', () => {
-  const dataDir = join(__dirname, '../../../../data');
-  const files = readGameDataFiles(dataDir);
   function world() {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({
-      gameData: new GameData(files),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-    });
+    const server = makeServer();
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'mender' } as any);

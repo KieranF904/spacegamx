@@ -26,6 +26,7 @@ import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { serverTruth, damageOff, removedBoth, type ServerTruth } from '../hits/serverTruth.testkit.js';
 import { COALESCE_TICKS } from './constants.js';
+import { makeServer as makeTestServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -76,13 +77,7 @@ if (process.env.PACKED_DEBUG) {
 function makeServer() {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-  });
+  const server = makeTestServer({ clock: () => clock.t });
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   return { server, clock, env };
 }

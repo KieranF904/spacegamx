@@ -12,17 +12,14 @@ import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
 function setup() {
   resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(readGameDataFiles(dataDir)),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer();
   let open = true;
   const socket: ClientSocket = { isOpen: () => open, send: () => {}, close: () => { open = false; } };
   const link = server.connect(socket);

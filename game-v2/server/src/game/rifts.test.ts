@@ -13,6 +13,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -20,7 +21,7 @@ const files = readGameDataFiles(dataDir);
 describe('rifts', () => {
   it("don't bounce you straight back, however long you sit in the rift you came out by", () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = new GameServer({ gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
+    const server = makeServer();
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'drifter' } as any);

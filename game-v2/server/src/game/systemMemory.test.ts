@@ -12,6 +12,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { worldFileStore, MEMORY_VERSION, type WorldStore, type MemoryFile } from './SystemMemory.js';
 import type { BossesFile } from './Bosses.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -27,10 +28,7 @@ function memStore() {
 /** A server with a pilot in Sol (god mode), on a clock that's ours to move; `store`: what it keeps the world in */
 function world(store?: WorldStore, clock = { t: 1_000_000 }) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), worldStore: store, clock: () => clock.t,
-  });
+  const server = makeServer({ worldStore: store, clock: () => clock.t });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

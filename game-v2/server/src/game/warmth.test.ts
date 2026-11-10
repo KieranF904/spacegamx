@@ -9,6 +9,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const base = readGameDataFiles(dataDir);
@@ -21,10 +22,7 @@ function world(faster = 20) {
   w.coldPerPoint *= faster;
   w.ambient *= faster;
   for (const src of Object.values(w.sources) as any[]) { src.rate *= faster; if (src.docked) src.docked *= faster; }
-  const server = new GameServer({
-    profileStore: new MemoryProfileStore(), gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files) });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

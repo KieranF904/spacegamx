@@ -20,6 +20,7 @@ import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { CrowdControl, CROWD_HIGH_MS, CROWD_LOW_MS } from './CrowdControl.js';
 import type { ClientConnection } from '../ClientConnection.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -30,14 +31,7 @@ interface Seen { snaps: number[]; checked: number; offIds: string[]; ownKf: numb
 function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = new GameServer({
-    gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)),
-    clock: () => clock.t,
-    crowd: true,
-  });
+  const server = makeServer({ clock: () => clock.t, crowd: true });
   server.crowd!.auto = false;
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const A = new FakeHitsClient(server, { name: 'watcher', env });
