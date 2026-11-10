@@ -124,6 +124,7 @@ export interface Session {
   bankSent?: { at: number; key: string };
   /** The bank changed since it was last sent (a station repair paid from it): sent on the next tick, at most once a second */
   bankDirty?: boolean;
+  leaseRefused?: { count: number; retryAt: number; toldAt: number }; // saves the lease refused in a row: how many, retry time, last told (wall ms)
   /** Their saved profile is still loading: the one in hand isn't theirs, so it's never saved */
   loading?: boolean;
   /** Where they last paid a docking fee, and when (a berth is paid once per visit) */
@@ -479,7 +480,7 @@ export class Pilots {
         if (at) this.setHome(s);
         this.sendItems(s.conn);
       }
-      if (s.dirty && !s.loading && (s.conn.userId !== null || !!s.conn.guestId) && now - s.lastSave > this.opts.autosaveMs) {
+      if (s.dirty && !s.loading && (s.conn.userId !== null || !!s.conn.guestId) && now - s.lastSave > this.opts.autosaveMs && now >= (s.leaseRefused?.retryAt ?? 0)) {
         persist.capture(this, s);
         void persist.save(this, s);
       }

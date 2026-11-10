@@ -18956,7 +18956,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 799,
+      "lines": 800,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -19026,25 +19026,25 @@
           "name": "Session",
           "kind": "interface",
           "start": 113,
-          "end": 131
+          "end": 132
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 133,
-          "end": 134
+          "start": 134,
+          "end": 135
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 136,
-          "end": 146
+          "start": 137,
+          "end": 147
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 148,
-          "end": 799
+          "start": 149,
+          "end": 800
         }
       ]
     },
@@ -20168,7 +20168,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 190,
+      "lines": 215,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -20180,10 +20180,15 @@
         {
           "text": "a saved ship that fails the rules is kept as saved; a loaner flies meanwhile and is never written",
           "test": "server/src/game/pilots/loaner.test.ts"
+        },
+        {
+          "text": "a save the lease refuses tells the pilot, retries with backoff and never kicks",
+          "test": "server/src/game/pilots/lease.test.ts"
         }
       ],
       "extend": "a new profile field that mirrors onto the ship goes in applyProfile/capture",
       "exports": [
+        "LEASE_REFUSED_TEXT",
         "applyProfile",
         "applyShip",
         "capture",
@@ -20198,74 +20203,98 @@
         {
           "name": "holdsRangeShip",
           "kind": "function",
-          "start": 16,
-          "end": 19
+          "start": 18,
+          "end": 21
         },
         {
           "name": "save",
           "kind": "function",
-          "start": 21,
-          "end": 41
+          "start": 23,
+          "end": 45
+        },
+        {
+          "name": "LEASE_RETRY_MAX_MS",
+          "kind": "const",
+          "start": 47,
+          "end": 48
+        },
+        {
+          "name": "LEASE_TOAST_MS",
+          "kind": "const",
+          "start": 49,
+          "end": 50
+        },
+        {
+          "name": "leaseRefused",
+          "kind": "function",
+          "start": 52,
+          "end": 65
+        },
+        {
+          "name": "LEASE_REFUSED_TEXT",
+          "kind": "const",
+          "start": 66,
+          "end": 66
         },
         {
           "name": "capture",
           "kind": "function",
-          "start": 43,
-          "end": 71
+          "start": 68,
+          "end": 96
         },
         {
           "name": "applyProfile",
           "kind": "function",
-          "start": 73,
-          "end": 94
+          "start": 98,
+          "end": 119
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 96,
-          "end": 114
+          "start": 121,
+          "end": 139
         },
         {
           "name": "flyLoaner",
           "kind": "function",
-          "start": 116,
-          "end": 130
+          "start": 141,
+          "end": 155
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 132,
-          "end": 140
+          "start": 157,
+          "end": 165
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 142,
-          "end": 146
+          "start": 167,
+          "end": 171
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 148,
-          "end": 155
+          "start": 173,
+          "end": 180
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 157,
-          "end": 163
+          "start": 182,
+          "end": 188
         },
         {
           "name": "chosen",
           "kind": "function",
-          "start": 165,
-          "end": 178
+          "start": 190,
+          "end": 203
         },
         {
           "name": "keepSavedShip",
           "kind": "function",
-          "start": 180,
-          "end": 190
+          "start": 205,
+          "end": 215
         }
       ]
     },
@@ -24046,7 +24075,7 @@
       "id": "server.profile.lease",
       "path": "server/src/profile/lease.ts",
       "group": "server/profile",
-      "lines": 60,
+      "lines": 67,
       "owns": "the profile lease: which game server holds an account right now (types, the in-process table, the server id)",
       "needs": "ProfileStore implementers (JsonProfileStore, MemoryProfileStore, PostgresProfileStore); npm: os",
       "events": "",
@@ -24064,9 +24093,11 @@
       "exports": [
         "LEASE_MS",
         "LEASE_RENEW_MS",
+        "LeaseRefusedError",
         "LeaseResult",
         "LocalLeases",
         "ProfileLeases",
+        "isLeaseRefused",
         "serverIdFromEnv"
       ],
       "sections": [
@@ -24083,28 +24114,40 @@
           "end": 15
         },
         {
+          "name": "LeaseRefusedError",
+          "kind": "class",
+          "start": 17,
+          "end": 21
+        },
+        {
+          "name": "isLeaseRefused",
+          "kind": "const",
+          "start": 22,
+          "end": 22
+        },
+        {
           "name": "LeaseResult",
           "kind": "type",
-          "start": 17,
-          "end": 17
+          "start": 24,
+          "end": 24
         },
         {
           "name": "ProfileLeases",
           "kind": "interface",
-          "start": 19,
-          "end": 27
+          "start": 26,
+          "end": 34
         },
         {
           "name": "serverIdFromEnv",
           "kind": "function",
-          "start": 29,
-          "end": 32
+          "start": 36,
+          "end": 39
         },
         {
           "name": "LocalLeases",
           "kind": "class",
-          "start": 34,
-          "end": 60
+          "start": 41,
+          "end": 67
         }
       ]
     },

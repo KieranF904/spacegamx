@@ -14,6 +14,13 @@ export const LEASE_MS = 90_000;
 /** A server renews the leases of its pilots this often */
 export const LEASE_RENEW_MS = 30_000;
 
+/** A save refused by the fence: another server holds the account's lease (stores throw it; the pilot is told, and the save retried: game/pilots/persist.ts) */
+export class LeaseRefusedError extends Error {
+  readonly leaseRefused = true;
+  constructor(userId: number) { super(`profile ${userId} not saved: another server holds its lease`); this.name = 'LeaseRefusedError'; }
+}
+export const isLeaseRefused = (e: unknown): boolean => !!e && typeof e === 'object' && (e as { leaseRefused?: unknown }).leaseRefused === true;
+
 export type LeaseResult = { ok: true } | { ok: false; holder: string };
 
 /** What a store offers for one-server-per-account; optional, so a store without it means one server and no contention */

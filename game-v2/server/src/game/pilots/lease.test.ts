@@ -118,6 +118,44 @@ describe('profile lease on the game server', () => {
     expect(JSON.parse(db.profiles.get(10) as string).mark).toBe('again');
   });
 
+  it('tells the pilot a refused save is retrying, backs off, never kicks, and saves once the account is theirs again', async () => {
+    const { db, server, sydney, join, flush } = await setup();
+    const p = await join(12);
+    let wall = 5_000_000;
+    server.pilots.now = () => wall;
+    server.pilots.opts.autosaveMs = 1000;
+    db.clock += LEASE_MS + 1;
+    expect((await sydney.claimLease(12, 'sydney')).ok).toBe(true);
+    const conn = server.pilots.connOf(p.t.getPlayerId())!;
+    const told = () => p.got.filter((m) => m.type === 'toast' && /couldn't be saved: your account is active in another session\. Retrying/.test((m as any).text)).length;
+    server.pilots.saveNow(conn);
+    await flush();
+    expect(told()).toBe(1);
+    const sess = server.pilots.sessions.get(conn)!;
+    expect(sess.dirty).toBe(true);
+    expect(sess.leaseRefused?.count).toBe(1);
+    expect(p.got.some((m) => m.type === 'authResult' && !(m as any).success)).toBe(false); // never kicked
+    // Backoff: no new try before the wait is up
+    const writes = () => db.log.filter((l) => l.startsWith('INSERT INTO profiles')).length;
+    const before = writes();
+    wall += 500;
+    server.pilots.tick(); await flush();
+    expect(writes()).toBe(before);
+    // Then a try (refused again): the wait doubles, and the pilot is not nagged again at once
+    wall += 600;
+    server.pilots.tick(); await flush();
+    expect(writes()).toBe(before + 1);
+    expect(sess.leaseRefused?.count).toBe(2);
+    expect(told()).toBe(1);
+    // The other session lets go: the next try saves, and the retrying stops
+    await sydney.releaseLease(12, 'sydney');
+    wall += 5000;
+    server.pilots.tick(); await flush();
+    expect(sess.dirty).toBe(false);
+    expect(sess.leaseRefused).toBeUndefined();
+    expect(db.profiles.has(12)).toBe(true);
+  });
+
   it('refuses the login (fails closed) while the database cannot be reached', async () => {
     const { db, join } = await setup();
     db.down = true;
