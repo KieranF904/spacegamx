@@ -4,7 +4,6 @@ Mk I · Square · 1 cell
 Hull · mass38 hp · 1.0
 Armour · build1 · 1 pts
 Holds10 energy
-Givesup to 200/s on to the parts it touches
 One waypower only flows out of its front, into the part there; the other parts touching it can only feed it, and its front must touch a part
 
 == partStats (stats rows) ==
@@ -27,7 +26,7 @@ Small · Square
 A one-way power line
 
 == keyStats ==
-holds 10 · gives 200/s · one way
+holds 10 · one way
 
 == mountBadge ==
 

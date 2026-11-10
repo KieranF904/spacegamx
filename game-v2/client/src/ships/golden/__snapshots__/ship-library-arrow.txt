@@ -18,12 +18,7 @@
   },
   "energy": {
     "max": 280,
-    "driveMax": 0,
-    "weaponMax": 0,
-    "spare": 152.27433388230816,
-    "engineDraw": 40,
-    "weaponDraw": 16,
-    "boostDraw": 110.4
+    "spare": 152.27433388230816
   },
   "guns": 2,
   "turrets": 0,

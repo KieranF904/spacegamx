@@ -4,7 +4,6 @@ Mk I · Square · 1 cell
 Hull · mass38 hp · 1.0
 Armour · build1 · 1 pts
 Holds10 energy
-Givesup to 200/s on to the parts it touches
 Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
 
 == partStats (stats rows) ==
@@ -27,7 +26,7 @@ Small · Square
 A power line with a pipe through it, side to side
 
 == keyStats ==
-holds 10 · gives 200/s · power line
+holds 10 · power line
 
 == mountBadge ==
 

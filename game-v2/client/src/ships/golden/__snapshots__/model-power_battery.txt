@@ -4,7 +4,6 @@ Mk I · Square · 1 cell
 Hull · mass45 hp · 1.0
 Armour · build1 · 1 pts
 Holds200 energy
-Givesup to 600/s into the ship's pool, on a powered network
 
 == partStats (stats rows) ==
 GradeMk I
@@ -25,7 +24,7 @@ Small · Square
 the ship's pool: holds and gives quickly
 
 == keyStats ==
-holds 200 · gives 600/s
+holds 200
 
 == mountBadge ==
 
