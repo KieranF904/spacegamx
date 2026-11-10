@@ -26,6 +26,13 @@ export function designHash(bp: unknown): string {
   return (a >>> 0).toString(36) + (b >>> 0).toString(36);
 }
 
+/** Two HP copies alike to the bit (Object.is: NaN, a resync's, is itself and -0 isn't 0) */
+function sameHp(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+
 /** What ship structure needs of the server */
 export interface StructureHost {
   readonly ships: ShipBridge;
@@ -155,7 +162,12 @@ export class ShipStructure {
         // (Its crumbling it works out: what it has is the server's, so nothing goes. Told: a sync (it takes that as the
         // word it's told from now on), at least of the structure it has now, and its HP since)
         if (!this.ships.debrisNet.told.has(id) && synced?.ship === ship) {
-          if (syncs) { synced.rebuilds = ship.rebuilds; conn.shipHpSent.set(id, this.syncWireOf(id, ship).hp.slice()); }
+          if (syncs) {
+            synced.rebuilds = ship.rebuilds;
+            // (a copy of the sync's HP; the one it has kept when it's that already: nothing else holds it, hits change it in place)
+            const hp = this.syncWireOf(id, ship).hp, had = conn.shipHpSent.get(id);
+            if (!had || !sameHp(had, hp)) conn.shipHpSent.set(id, hp.slice());
+          }
           continue;
         }
         live.delete(id);
