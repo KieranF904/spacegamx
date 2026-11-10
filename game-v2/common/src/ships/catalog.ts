@@ -343,11 +343,35 @@ function switchedOff(f: FunctionDef): FunctionDef {
   return { ...rest, bubbleOff: true, description: 'Switched off: ship-wide bubble shields do not work on player ships. Use a shaped shield instead.' };
 }
 
-export function loadCatalog(files: CatalogFiles, opts: { overlapShrink?: number; playerBubbles?: boolean } = {}): Catalog {
-  const shrink = opts.overlapShrink ?? 0.01;
+/**
+ * The pieces and their 8 variants, built once per process for each pieces + bespoke content and shrink: the same
+ * shapes always build the same variants, and every server a test boots (and a client's catalogs) shares them. Read-only:
+ * nothing changes a piece or a variant once it's built (not frozen: that costs more than building them; checked by
+ * freezing them through the ship, hangar and viewer tests, 2026-11-11).
+ */
+const builtPieces = new Map<string, { pieces: Map<string, PieceDef>; variants: Map<string, PieceVariant[]> }>();
+const BUILT_PIECES_KEEP = 8;
+/** Frozen pieces files' keys (frozen: what they hold can't have changed since) */
+const pieceKeys = new WeakMap<object, { bespoke: unknown; shrink: number; key: string }>();
+
+function piecesAndVariants(files: CatalogFiles, shrink: number): { pieces: Map<string, PieceDef>; variants: Map<string, PieceVariant[]> } {
+  // (The same files again, as a test's shared config hands every server: its key without writing it out again)
+  const seen = pieceKeys.get(files.pieces);
+  const key = seen && seen.bespoke === files.bespoke && seen.shrink === shrink ? seen.key : JSON.stringify([shrink, files.pieces.pieces, files.bespoke ?? []]);
+  if (!seen && Object.isFrozen(files.pieces.pieces) && (!files.bespoke || Object.isFrozen(files.bespoke))) pieceKeys.set(files.pieces, { bespoke: files.bespoke, shrink, key });
+  let built = builtPieces.get(key);
+  if (!built) {
+    built = buildPieces(files, shrink);
+    if (builtPieces.size >= BUILT_PIECES_KEEP) builtPieces.delete(builtPieces.keys().next().value!);
+    builtPieces.set(key, built);
+  }
+  // (Each catalog its own maps over the shared pieces)
+  return { pieces: new Map(built.pieces), variants: new Map(built.variants) };
+}
+
+function buildPieces(files: CatalogFiles, shrink: number): { pieces: Map<string, PieceDef>; variants: Map<string, PieceVariant[]> } {
   const pieces = new Map<string, PieceDef>();
   const variants = new Map<string, PieceVariant[]>();
-
   const all = [...files.pieces.pieces, ...(files.bespoke ?? []).flatMap((f) => f.pieces.map(bespokePiece))];
   for (const p of all) {
     if (pieces.has(p.id)) throw new CatalogError(`piece "${p.id}": duplicate id`);
@@ -371,6 +395,11 @@ export function loadCatalog(files: CatalogFiles, opts: { overlapShrink?: number;
     pieces.set(p.id, p);
     variants.set(p.id, list);
   }
+  return { pieces, variants };
+}
+
+export function loadCatalog(files: CatalogFiles, opts: { overlapShrink?: number; playerBubbles?: boolean } = {}): Catalog {
+  const { pieces, variants } = piecesAndVariants(files, opts.overlapShrink ?? 0.01);
 
   const functions = new Map<string, FunctionDef>();
   for (const f of [...files.functions.functions, ...(files.models?.models ?? [])]) {

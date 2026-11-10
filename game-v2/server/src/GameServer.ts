@@ -108,7 +108,7 @@ import { canHeal, canDamage, sideOf, inPvpZone, hunted } from './gameServer/rule
 import { fault, faultCounts } from './gameServer/faults.js';
 import { threats, regionThreats } from './gameServer/threats.js';
 import { travelTo } from './gameServer/travel.js';
-import { step, snapshotRound, ownPasses, gameLoop, drainInputQueue, releaseControls, buildTickSystems, tick } from './gameServer/loop.js';
+import { step, snapshotRound, ownPasses, gameLoop, drainInputQueue, releaseControls, buildTickSystems, tick, fileBeltsLater } from './gameServer/loop.js';
 import { featuresDeps, replicationDeps, lodDeps, crowdDeps, clocksDeps, snapshotDeps, ownChecksDeps, bodiesDeps } from './gameServer/wiring/net.js';
 import { dockingDeps, pilotsOpts, weaponsDeps, marketDeps, servicesDeps, hazardsDeps, warmthDeps, homesDeps, arenaGatesDeps, recoveryDeps, bossDevDeps, densDeps, contribDeps, codexDeps, achievementsDeps, socialDeps, derelictsDeps, tradeDeps } from './gameServer/wiring/game.js';
 
@@ -432,8 +432,8 @@ this.devTeleport = opts.devTeleport ?? false;
 
     // Start game loop
     if (opts.autoStart ?? true) {
-      // (Every belt filed before the first tick: a server started by hand, a test's, files each system's on first use)
-      this.asteroidOrbits.fileAll();
+      // (Every belt filed a slice at a time from here, between the first ticks: a server started by hand, a test's, files each system's on first use)
+      fileBeltsLater(this);
       this.lastTickTime = performance.now();
       this.gameLoop();
     }

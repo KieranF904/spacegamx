@@ -111,6 +111,40 @@ describe('asteroid orbit timetable', () => {
     expect(late.entries).toBe(now.entries);
   });
 
+  it('filing in slices (the real start) gives what filing at once does, order and all, whatever happens between slices', () => {
+    const { ids, orbits } = world();
+    const sys = [...new Set(ids.map((e) => InSystem.systemId[e]))].sort((a, b) => a - b).slice(0, 3);
+    const mine = ids.filter((e) => sys.includes(InSystem.systemId[e]));
+    const shape = (e: number) => orbits.orbits.get(e) as { system: number; shape: OrbitShape };
+    const now = new AsteroidOrbits(), sliced = new AsteroidOrbits();
+    for (const e of mine) { now.add(e, shape(e).system, shape(e).shape); sliced.add(e, shape(e).system, shape(e).shape); }
+    now.settle(); sliced.settle();
+    now.fileAll();
+    // (A clock that moves on a step each time it's read: a slice files a few orbits)
+    let t = 0;
+    const clock = () => t++;
+    const rnd = mulberry32(5);
+    // Between slices: rocks broken and made again (some filed already, some waiting, in a system part filed) and the second system asked about early
+    let slices = 0;
+    while (sliced.fileSome(9, clock)) {
+      slices++;
+      if (slices % 5 === 0) {
+        const some = mine.filter(() => rnd() < 0.05);
+        for (const e of some) { now.remove(e); sliced.remove(e); }
+        for (const e of some.filter((_, i) => i % 2 === 0)) { now.add(e, shape(e).system, shape(e).shape); sliced.add(e, shape(e).system, shape(e).shape); }
+      }
+      if (slices === 12) sliced.query(sys[1], 0, 0, 0, 0, 0, 0);
+    }
+    expect(slices).toBeGreaterThan(20);
+    for (let q = 0; q < 400; q++) {
+      const tick = Math.floor(rnd() * 2e8), e = mine[Math.floor(rnd() * mine.length)];
+      const [x, y] = where(e, tick);
+      const s = InSystem.systemId[e];
+      expect(sliced.query(s, x - 900, y - 300, x + 700, y + 900, 120, tick)).toEqual(now.query(s, x - 900, y - 300, x + 700, y + 900, 120, tick));
+    }
+    expect(sliced.entries).toBe(now.entries);
+  });
+
   it('a broken asteroid leaves the timetable', () => {
     const { server, ids, orbits } = world();
     const e = ids[0];

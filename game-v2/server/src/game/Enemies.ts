@@ -179,6 +179,17 @@ export class Enemies {
     return out;
   }
 
+  /** Each design's rating as built, by its toughness scale (the threat maps rate every design many times over) */
+  private ratings = new WeakMap<Blueprint, Map<number, ReturnType<typeof rateShip>>>();
+  /** A design's rating as built (a fresh ship of it), `hpScale` its faction's toughness: kept, as a design rates the same every time */
+  designRating(bp: Blueprint, hpScale = 1): Readonly<ReturnType<typeof rateShip>> {
+    let byScale = this.ratings.get(bp);
+    if (!byScale) this.ratings.set(bp, (byScale = new Map()));
+    let r = byScale.get(hpScale);
+    if (!r) byScale.set(hpScale, (r = rateShip(this.ships.catalog, this.ships.tuning, createShipState(this.ships.catalog, this.ships.tuning, 0, bp, 0), hpScale)));
+    return r;
+  }
+
   /** The typical rating of what a system sends: its packs' ratings (each pack's ships together), weighted as they're picked */
   systemRating(systemId: string, band?: { inner: number; outer: number }): number {
     const sp = this.data.spawns[systemId];
@@ -201,7 +212,7 @@ export class Enemies {
         if (cs) { fp += this.custom.firepower(type, grade); tough += Object.values(cs.hp).reduce((a, h) => a + h, 0) * 4; continue; }
         const bp = this.design(type, grade, g.plating ?? 0);
         if (!bp) continue;
-        const r = rateShip(this.ships.catalog, this.ships.tuning, createShipState(this.ships.catalog, this.ships.tuning, 0, bp, 0), f?.hpScale ?? 1);
+        const r = this.designRating(bp, f?.hpScale ?? 1);
         fp += r.firepower * (f?.damageScale ?? 1); tough += r.toughness;
       }
       sum += ratingOf(fp, tough) * (g.weight ?? 1);

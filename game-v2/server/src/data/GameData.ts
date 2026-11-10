@@ -72,6 +72,9 @@ export interface GameDataFiles {
   station?: StationFile;
 }
 
+/** The files objects that have passed checkGameData (each checked once, not once per GameData built on it) */
+const checkedFiles = new WeakSet<GameDataFiles>();
+
 export class GameData {
   // Indexed by ID for O(1) lookup
   private items: Map<string, ItemDef> = new Map();
@@ -111,8 +114,9 @@ export class GameData {
   private numToStationId: Map<number, string> = new Map();
 
   constructor(files: GameDataFiles) {
-    // Shape and cross-reference checks (throws in dev/test, logs in production)
-    checkGameData(files);
+    // Shape and cross-reference checks (throws in dev/test, logs in production): once per files object (a test file's
+    // servers share one; a changed copy is a new object and is checked)
+    if (!checkedFiles.has(files)) { checkGameData(files); checkedFiles.add(files); }
     this.itemsFile = files.items;
     this.recipesFile = files.recipes;
     this.miningTable = files.mining;

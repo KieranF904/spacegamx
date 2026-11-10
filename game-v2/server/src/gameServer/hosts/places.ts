@@ -9,7 +9,7 @@
 import { addComponent, hasComponent, entityExists } from 'bitecs';
 import { Position, Velocity, Rotation, Radius, Player, Portal, InSystem, Dead, regionAt, datan2, dcos, dhypot, dsin } from '@space-game/common';
 import { EffectType } from '@space-game/common';
-import { jumpTuning, jumpPhase, rateShip, ratingOf, createShipState, gradeReward } from '@space-game/common';
+import { jumpTuning, jumpPhase, rateShip, ratingOf, gradeReward } from '@space-game/common';
 import { PodHost } from '../../game/LootPods.js';
 import { FactionsFile } from '../../game/Enemies.js';
 import { type SurfaceHost } from '../../game/Surfaces.js';
@@ -127,7 +127,7 @@ export function createSiegeHost(gs: GameServer): SiegeHost {
         const bp = gs.enemies.design(s, grade);
         if (!bp) continue;
         const faction = Object.values(factions().factions).find((f) => s in f.ships);
-        const r = rateShip(gs.ships.catalog, gs.ships.tuning, createShipState(gs.ships.catalog, gs.ships.tuning, 0, bp, 0), faction?.hpScale ?? 1);
+        const r = gs.enemies.designRating(bp, faction?.hpScale ?? 1);
         fp += r.firepower; tough += r.toughness;
       }
       return ratingOf(fp, tough);
