@@ -32,6 +32,7 @@ import { drawFieldGroups, fieldGroupEdit } from '../weaponGroups/fieldEditor';
 import { groupOfKey } from '../weaponGroups/editor';
 import { drawPartArt } from '../build/partArt';
 import { drawFacingMark, drawShieldCover } from '../build/buildMarks';
+import { drawPortMarks } from '../build/portMarks';
 import type { FieldDeps } from './bridge';
 import { FieldFlow } from './fieldFlow';
 import { FLOW_KEY } from '../build/powerFlowView';
@@ -654,8 +655,11 @@ export class FieldOverlay {
       if (w.liveIndex[i] < 0) fillPoly(g, X, geom, 0xfbbf24, 0, 0xfbbf24, 0.8, 1.2);
     });
     // Which way each part faces, and what each shield covers
+    const mouseAt = this.mouse ? this.gridAt(this.mouse.x, this.mouse.y) : null;
+    const hotPart = mouseAt ? partAtPoint(this.deps.catalog, w, mouseAt) : -1;
     w.bp.parts.forEach((p, i) => {
       drawFacingMark(g, p, geoms[i], toScreen, ctx.cs); // (the hangar's colours: guns warm, the rest cool)
+      drawPortMarks(g, p, geoms[i], toScreen, ctx.cs, i === hotPart ? 0.95 : 0.35); // (power ports: faint, bright under the mouse)
       drawShieldCover(g, p, geoms[i], toScreen, ctx.cs, 0.35);
     });
     this.flow.draw(g, at, ctx.cs, w, geoms);
@@ -669,6 +673,7 @@ export class FieldOverlay {
         drawPartArt(g, this.deps.catalog, pg, at, ctx.cs, { alpha: 0.85, tint, tintK: 0.45, paint });
         fillPoly(g, X, pg, tint, 0, ok ? 0x86efac : 0xfca5a5, 0.95);
         drawFacingMark(g, pv.part, pg, toScreen, ctx.cs, ok ? 0xbbf7d0 : 0xfecaca);
+        drawPortMarks(g, pv.part, pg, toScreen, ctx.cs, 1);
         drawShieldCover(g, pv.part, pg, toScreen, ctx.cs, 0.8);
       }
     }

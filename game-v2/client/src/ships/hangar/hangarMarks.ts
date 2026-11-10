@@ -1,8 +1,8 @@
 /**
  * @contract client.hangar.marks
- * owns:       the hangar's build marks on its 2d canvas: facing arrows (the part in hand always, placed parts faint and bright
- *             under the mouse) and shaped-shield cover (in hand, hovered in the parts list, fitted ones faint)
- * needs:      HangarHost (geoms, ctx, mouse, view, paletteHover, handTurn), ships/build/buildMarks geometry; npm: @space-game/common
+ * owns:       the hangar's build marks on its 2d canvas: facing arrows and power-port marks (the part in hand always, placed parts
+ *             faint and bright under the mouse) and shaped-shield cover (in hand, hovered in the parts list, fitted ones faint)
+ * needs:      HangarHost (geoms, ctx, mouse, view, paletteHover, handTurn), ships/build/buildMarks and portMarks geometry; npm: @space-game/common
  * invariants: the cover drawn is the one shaped.ts derives — client/src/ships/build/buildMarks.test.ts
  *             marks only draw, never change the design — none pinned
  * extend:     a new kind of mark is one function here, called from hangarDraw.ts draw()
@@ -10,6 +10,7 @@
 
 import { placeGeometry, facingEdges, isWeaponFn, type PlacedPart, type PlacedGeom, type Side, type Vec2 } from '@space-game/common';
 import { facingMark, shieldCover, coverPolyline, COVER_COLOR, COVER_DEEP_COLOR, FACING_COLOR, GUN_FACING_COLOR } from '../build/buildMarks';
+import { portMarks, PORT_COLOR } from '../build/portMarks';
 import type { HangarHost } from './host';
 
 type Px = (x: number) => number;
@@ -29,6 +30,26 @@ function arrow(host: HangarHost, p: PlacedPart, g: PlacedGeom, sx: Px, sy: Px, a
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.restore();
+}
+
+/** A part's power ports: OUT arrows pointing out, IN notches pointing in, feed diamonds */
+function ports(host: HangarHost, p: PlacedPart, g: PlacedGeom, sx: Px, sy: Px, alpha: number): void {
+  const marks = portMarks(p, g);
+  if (!marks.length) return;
+  const ctx = host.ctx;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = 'rgba(7, 11, 20, 0.7)';
+  ctx.lineWidth = 1;
+  for (const m of marks) {
+    ctx.fillStyle = css(PORT_COLOR[m.kind]);
+    ctx.beginPath();
+    m.poly.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -52,6 +73,7 @@ export function drawPlacedMarks(host: HangarHost, sx: Px, sy: Px): void {
   host.geoms.forEach((g, i) => {
     const hot = i === under;
     arrow(host, g.part, g, sx, sy, hot ? 1 : 0.4);
+    ports(host, g.part, g, sx, sy, hot ? 0.95 : 0.35);
     cover(host, g.part, g, sx, sy, hot ? 0.7 : 0.2);
   });
 }
@@ -59,6 +81,7 @@ export function drawPlacedMarks(host: HangarHost, sx: Px, sy: Px): void {
 /** The part in hand, placed where the mouse is (R turns it): its arrow and, for a shield, the cover it would put up */
 export function drawHandMarks(host: HangarHost, cand: PlacedPart, g: PlacedGeom, sx: Px, sy: Px, blocked: boolean): void {
   arrow(host, cand, g, sx, sy, 1);
+  ports(host, cand, g, sx, sy, 1);
   cover(host, cand, g, sx, sy, blocked ? 0.35 : 0.8);
 }
 
@@ -81,5 +104,6 @@ export function drawHoverCover(host: HangarHost, sx: Px, sy: Px): void {
   host.ctx.fill();
   host.ctx.restore();
   arrow(host, p, g, sx, sy, 1);
+  ports(host, p, g, sx, sy, 1);
   cover(host, p, g, sx, sy, 0.8);
 }
