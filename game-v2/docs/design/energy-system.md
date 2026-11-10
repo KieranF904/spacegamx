@@ -1,6 +1,6 @@
 # Energy system: a discussion draft
 
-*Status: HISTORY. Phases 1 (local circuits) and 2 (Steady and Surge) were built on 2026-10-31 and are **superseded by docs/design/rework-2026-11.md section 2** (wires restored, one ship pool with an Output limit, Capacitor and Drive Cell banks; Surge, circuits and the core trickle are cut). Read the "Implemented" sections below as a record of what was tried, not of what runs; the energy guide is docs/areas/energy.md. The rest is the original draft for discussion with Kieran. Part names, power-type names and numbers are
+*Status: HISTORY (pool and wire model, removed 2026-11-10). Phases 1 (local circuits) and 2 (Steady and Surge) were built on 2026-10-31 and are **superseded by docs/design/rework-2026-11.md section 2** (wires restored, one ship pool with an Output limit, Capacitor and Drive Cell banks; Surge, circuits and the core trickle are cut). Read the "Implemented" sections below as a record of what was tried, not of what runs; the energy guide is docs/areas/energy.md. The rest is the original draft for discussion with Kieran. Part names, power-type names and numbers are
 placeholders. Sibling doc: docs/design/build-archetypes.md (this one builds on its §3.1 "Energy with shape").*
 
 Kieran's brief, in short: batteries and generators are "just placed somewhere and they'll probably connect". He wants

@@ -68,7 +68,7 @@ Add a part model:
 - Mount rules are not retroactive: saved ships that break them still fly, flagged in the hangar (`mounting: false` on load).
 
 ## Related areas
-- [energy](energy.md): `demand`/`produce`/`store`/`bank`/`pool`/`dynamo` fields feed the pool and banks; a weapon row's `fire` block picks its firing model (cycle, clip, charge, ammo, beam). [flight](flight.md): `thrust`, `strafe`, `tow` effects. [weapons](weapons.md): `weapon`, `weaponMods`, `gunDef`. [hangar-ui](hangar-ui.md), [render-ships](render-ships.md) (`decor`), [economy-quests](economy-quests.md) (recipes, items, unlocks), [networking](networking.md) (wire dictionary).
+- [energy](energy.md): `demand`/`produce`/`store` and the ports feed the ports core (the `bank`/`pool`/`dynamo` fields are kept for old data and no longer read; history in energy.md); a weapon row's `fire` block picks its firing model (cycle, clip, charge, ammo, beam). [flight](flight.md): `thrust`, `strafe`, `tow` effects. [weapons](weapons.md): `weapon`, `weaponMods`, `gunDef`. [hangar-ui](hangar-ui.md), [render-ships](render-ships.md) (`decor`), [economy-quests](economy-quests.md) (recipes, items, unlocks), [networking](networking.md) (wire dictionary).
 
 ## Notes (moved from DEVELOPMENT.md and the old engine-map)
 - **Grades** (`data/ships/materials.json`, `grades.ts`): Mk I alloy (or lighter, frailer composite), II steel, III titanium, IV cobalt, V neutronium (refined from neutronium ore, danger 4+ belts). Each has `toughness` (HP per cell), `density`, `output`; output multiplies weapon damage (`WeaponInfo.strength`), generator power (`partSupply`) and shield capacity, and weapons/shields draw `output` times the power (`partDemand`).

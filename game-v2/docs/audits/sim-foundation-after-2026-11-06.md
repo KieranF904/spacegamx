@@ -475,7 +475,7 @@ rows plus new gun rows: triggers and cursor distance; an AI pilot's body, whose 
 shared body). Each armed ship a client steps has a gun lane (stores and gun state) stepped beside its replica; the
 server runs the same lane, tells only ticks where it differs from the real ship (fire records as before, TELL_NONE),
 puts a drifted lane back (gunSync, at most once per 60 ticks), and tells point-defence shots (TELL_PD). Design and
-rules: docs/areas/networking.md "Other ships' guns, stepped from their inputs".
+rules: docs/areas/networking/notes.md "Other ships' guns, stepped from their inputs".
 
 Proof (server/src/net/guns): another pilot through every firing model (cycle cannon and pulsed laser, spinning
 minigun and flak, clip turret and rail clip, charge gun and regrowing nest, coilgun cone and pulse bolts): 206 shells

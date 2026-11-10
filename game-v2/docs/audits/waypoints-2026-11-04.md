@@ -3,7 +3,7 @@
 Stage "Waypoints" of the awareness-model work (docs/design/awareness-model.md 6.3, phase 6). Homing shells and mobs fly
 by one shared law (common guidance/) on the server and on a `CAPS.WAYPOINTS` (4096, protocol 40) client's tick layer:
 derived there when it holds the target, from the server's waypoint records when it doesn't. How it works:
-docs/areas/networking.md, "Scheduled waypoints".
+docs/areas/networking/causes-waypoints-pilots.md, "Scheduled waypoints".
 
 ## Scenes (server/src/bench/guides/guideScene.testkit.ts)
 

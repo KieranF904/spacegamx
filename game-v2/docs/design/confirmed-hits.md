@@ -998,7 +998,7 @@ it right. `common/src/network/ownTick.test.ts`: the input's check and the snapsh
 pull grid, the 12-bit tick and the hashes; a contact's push and a rebuild's recentring from the cause equal the
 server's pass to the bit.
 
-### G7. Other ships: still keyframed "just in case"? (built 2026-11-04 as CAPS.CAUSES: docs/areas/networking.md, "Other ships' causes"; docs/audits/effects-2026-11-04.md)
+### G7. Other ships: still keyframed "just in case"? (built 2026-11-04 as CAPS.CAUSES: docs/areas/networking/causes-waypoints-pilots.md, "Other ships' causes"; docs/audits/effects-2026-11-04.md)
 
 Yes. Every other ship's replica gets a keyframe whenever its shadow leaves its path, to every client that has it. The
 probe's keyframes of other ships: Pips 122 B/s, Hammerhead 172, Gale 355, pirates 46, boss 385, debris 577 (shadows'

@@ -36,7 +36,7 @@ export interface PtShipKind {
 }
 
 /**
- * Level of detail (the crowd rule, docs/areas/networking.md "Other ships: the PT/ST layer"): ships further than `reach`
+ * Level of detail (the crowd rule, docs/areas/networking/notes.md "Other ships: the PT/ST layer"): ships further than `reach`
  * from your own ship (at the confirmed tick) stay on the plain confirmed view (interpolated at the render tick); one
  * on PT leaves it past `reach * leaveShare`. At most `maxShips` on PT, nearest first (one on PT counted that much
  * nearer: no churn at the edge). A ship going onto PT or off it is eased between the two poses (modes.ts ptstHook)

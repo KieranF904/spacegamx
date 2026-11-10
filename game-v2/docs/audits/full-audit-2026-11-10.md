@@ -213,3 +213,13 @@ Each package touches its own set of files, so it can run as a parallel worktree.
 - Should real prod admins keep the dev tools? (SEC-17)
 - Do you want any of SEC-11, SEC-12, SEC-18, SEC-20 and SD-13 done?
 - Should the lobby's on-demand regions code go too? (DS-01)
+
+
+## BD-3 follow-up (2026-11-10, docs round 3): not done, and why
+
+The terrain half and the boss-hull half both load through `import.meta.glob(..., { eager: true })` (`client/src/rendering/terrainData.ts`; `client/src/Game.ts:251` and `client/src/ships/hullWorker.ts:18` for `data/ships/bespoke/*.json`). Making either lazy is not behaviour-identical:
+- `terrainFor(systemId)` is synchronous and is called on the join path (`JumpControl.ts:213` sets the prediction's terrain from the join message), in `background.ts` every frame and in `BossFx.ts` per beam. With a dynamic import the first ticks after a join would predict flight without rock, then correct: a visible prediction change, not just a smaller chunk. The fix is to hold the join (or the first predicted tick) until the system's rock has loaded, which changes the join and prediction start-up order; it is not a data-loading edit.
+- The bespoke (boss) hulls feed `Game.ts` ship catalog building synchronously and the hull worker at module load; the same reasoning applies, and the worker would need its own async start-up.
+- `data/terrain` is 252 KB on disk (the audit's 512 KB is the bundled form). The win is roughly 120 KB gzip at startup (row 24), real but small against the risk in the prediction path.
+
+Suggested shape for later (O-crowd, with the netcode owner): load a system's terrain as a per-system dynamic import, awaited in the join handler before `JumpControl` starts predicting, and keep `terrainFor` synchronous after that. It needs a client start-up test for "the first predicted tick has the rock". No size was measured because nothing was changed.

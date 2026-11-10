@@ -1,6 +1,6 @@
 # Encode once: before and after (2026-11-04)
 
-What `CAPS.BLOCKS` (512, protocol 37; docs/areas/networking.md "Encode-once blocks", docs/design/awareness-model.md 7.6)
+What `CAPS.BLOCKS` (512, protocol 37; docs/areas/networking/focus-blocks.md "Encode-once blocks", docs/design/awareness-model.md 7.6)
 changes on the crowd bench (docs/audits/crowd-baseline.md). Raw numbers: encode-once-packed-2026-11-04.json (before:
 bulk sockets on PACKED|COALESCE, probes on caps 511) and encode-once-blocks-2026-11-04.json (after: bulk sockets on
 PACKED|COALESCE|BLOCKS, probes on 1023). Same seeded worlds, so the same sims: the agreement figures are identical
