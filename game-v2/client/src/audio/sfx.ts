@@ -7,20 +7,18 @@
  * sharp transient, a saturated noise body, a sub-bass thump, inharmonic
  * metal resonances and debris grains, with no pitch-swept "pew" tones.
  * Frequent sounds render several variants (seeded), picked at random on play,
- * and each recipe says how much of the shared reverb it sends to.
+ * and sfxMeta.ts says how many variants each has and how much of the shared
+ * reverb it sends to.
  */
 
 import { hashString, mulberry32 } from '@space-game/common';
+import { SFX_TABLE, variantKey } from './sfxMeta';
 
 const SR = 44100;
 
 type Rand = () => number;
 type Recipe = {
   duration: number;
-  /** Distinct renders, picked at random on play (default 1) */
-  variants?: number;
-  /** Send to the shared reverb, 0..1 */
-  reverb?: number;
   build(ctx: OfflineAudioContext, out: AudioNode, rnd: Rand): void;
 };
 
@@ -153,7 +151,7 @@ function swish(ctx: OfflineAudioContext, out: AudioNode, rnd: Rand, f0: number, 
 const RECIPES: Record<string, Recipe> = {
   // Ship cannon (a heavy kinetic autocannon heard through the hull): a hard
   // crack, a saturated boom, a sub thump, the barrel ringing and the breech cycling
-  shot: { duration: 0.55, variants: 4, reverb: 0.3, build(ctx, out, r) {
+  shot: { duration: 0.55, build(ctx, out, r) {
     const k = 0.92 + r() * 0.16;
     burst(ctx, out, r, 0, 0.85, 0.0005, 0.03, [filter(ctx, 'highpass', 1800), drive(ctx, 3)]);
     burst(ctx, out, r, 0, 0.9, 0.001, 0.2, [filter(ctx, 'lowpass', 1500 * k, 0.9, 220, 0.18), drive(ctx, 2.6)]);
@@ -167,7 +165,7 @@ const RECIPES: Record<string, Recipe> = {
   } },
   // A round striking a hull: a sharp impact, crunch, a clang of plate at
   // irregular pitches, and fragments skittering off
-  hit: { duration: 0.6, variants: 4, reverb: 0.3, build(ctx, out, r) {
+  hit: { duration: 0.6, build(ctx, out, r) {
     const k = 0.9 + r() * 0.2;
     burst(ctx, out, r, 0, 0.7, 0.0005, 0.015, [filter(ctx, 'highpass', 2500), drive(ctx, 3)]);
     burst(ctx, out, r, 0, 0.6, 0.001, 0.12, [filter(ctx, 'bandpass', 1200 * k, 0.8), drive(ctx, 2)]);
@@ -178,7 +176,7 @@ const RECIPES: Record<string, Recipe> = {
   } },
   // A working hit of yours on rock (ShipClient.mineTick, throttled): light and dry, rock not metal: a soft chip of
   // stone (a short low-mid knock), a trickle of grit falling off the face, nothing ringing
-  mine_tick: { duration: 0.28, variants: 4, reverb: 0.08, build(ctx, out, r) {
+  mine_tick: { duration: 0.28, build(ctx, out, r) {
     const k = 0.85 + r() * 0.3;
     burst(ctx, out, r, 0, 0.32, 0.0008, 0.035, [filter(ctx, 'bandpass', 900 * k, 1.1), drive(ctx, 1.6)]);
     thump(ctx, out, 0, 210 * k, 120 * k, 0.18, 0.05);
@@ -188,7 +186,7 @@ const RECIPES: Record<string, Recipe> = {
   // ~0.36 s; the next starts as it ends, ~0.9 s): the pulse laser's low
   // end, softer and deeper, nothing at the top: a sub gathering, a round thoom
   // at the peak, a short low rumble trailing off
-  mining_pulse: { duration: 1.3, variants: 3, reverb: 0.25, build(ctx, out, r) {
+  mining_pulse: { duration: 1.3, build(ctx, out, r) {
     const k = 0.96 + r() * 0.08, peak = 0.36;
     const swell = (amp: number) => {
       const g = ctx.createGain();
@@ -216,7 +214,7 @@ const RECIPES: Record<string, Recipe> = {
   // A boss's beam gathering (its lance's charge, BossFx: played sped up when the charge is shorter): a sub-bass
   // swell rising out of nothing, a growl under it climbing and roughening, a brown rumble thickening, and at the
   // end, where the beam lets go, a deep thoom
-  boss_charge: { duration: 3.2, variants: 2, reverb: 0.35, build(ctx, out, r) {
+  boss_charge: { duration: 3.2, build(ctx, out, r) {
     const k = 0.97 + r() * 0.06, fire = 2.7;
     const rise = (amp: number) => {
       const g = ctx.createGain();
@@ -240,7 +238,7 @@ const RECIPES: Record<string, Recipe> = {
   } },
   // A ball of magma swelling on a boss's turret (~0.85 s to the throw): a low gurgle bubbling up and
   // opening out, a sub rising under it, popping blisters getting thicker
-  magma_charge: { duration: 1.1, variants: 3, reverb: 0.3, build(ctx, out, r) {
+  magma_charge: { duration: 1.1, build(ctx, out, r) {
     const k = 0.95 + r() * 0.1, end = 0.85;
     const rise = (amp: number) => {
       const g = ctx.createGain();
@@ -265,7 +263,7 @@ const RECIPES: Record<string, Recipe> = {
     }
   } },
   // A ball of magma hurled from a boss's turret: a deep heavy thoom, a wet tearing glorp, a hiss trailing off
-  magma_shot: { duration: 1.5, variants: 3, reverb: 0.3, build(ctx, out, r) {
+  magma_shot: { duration: 1.5, build(ctx, out, r) {
     const k = 0.95 + r() * 0.1;
     thump(ctx, out, 0, 78 * k, 30 * k, 1.0, 0.6, 2.6);
     burst(ctx, out, r, 0, 0.7, 0.004, 0.5, [filter(ctx, 'lowpass', 700, 0.8, 140, 0.45), drive(ctx, 2.4)], 'brown');
@@ -276,7 +274,7 @@ const RECIPES: Record<string, Recipe> = {
     grains(ctx, out, r, 0.02, 0.8, 26, 900, 5000, 0.18);
   } },
   // A ball of magma bursting: a splatting crunch, a deep thud, molten gobbets spattering, a long sizzle
-  magma_burst: { duration: 2.0, variants: 3, reverb: 0.35, build(ctx, out, r) {
+  magma_burst: { duration: 2.0, build(ctx, out, r) {
     const k = 0.95 + r() * 0.1;
     thump(ctx, out, 0, 64 * k, 26 * k, 0.9, 0.7, 2.4);
     burst(ctx, out, r, 0, 0.85, 0.002, 0.45, [filter(ctx, 'lowpass', 1600, 0.8, 200, 0.4), drive(ctx, 2.8)]);
@@ -286,7 +284,7 @@ const RECIPES: Record<string, Recipe> = {
   } },
   // A boss's lance burning (played for its sweep, stopped at its end): a crack as it lights, then a driven
   // roar held under a fluttering burn, a thin sizzle over it, dying away when it's cut
-  boss_beam: { duration: 3.2, variants: 2, reverb: 0.3, build(ctx, out, r) {
+  boss_beam: { duration: 3.2, build(ctx, out, r) {
     const k = 0.97 + r() * 0.06, hold = 2.6;
     const held = (amp: number) => {
       const g = ctx.createGain();
@@ -322,7 +320,7 @@ const RECIPES: Record<string, Recipe> = {
   // swell and a growl gathering out of nothing (slow, narrow drifts, never a
   // sweep), a heavy thoom at the peak with a distorted low growl over it and
   // only a breath of sizzle, then a low rumble dying away
-  laser_pulse: { duration: 2.1, variants: 3, reverb: 0.3, build(ctx, out, r) {
+  laser_pulse: { duration: 2.1, build(ctx, out, r) {
     const k = 0.97 + r() * 0.06, peak = 0.59;
     /** A gain swelling out of nothing to `amp` at the peak, gone just after */
     const swell = (amp: number, cut = 0.05) => {
@@ -359,7 +357,7 @@ const RECIPES: Record<string, Recipe> = {
     tail.start(peak); tail.stop(peak + 1.3);
   } },
   // Your own hull taking a hit: a thud you feel, crunch, and the frame groaning
-  hurt: { duration: 1.2, variants: 2, reverb: 0.2, build(ctx, out, r) {
+  hurt: { duration: 1.2, build(ctx, out, r) {
     thump(ctx, out, 0, 72, 32, 1.0, 0.5, 2);
     burst(ctx, out, r, 0, 0.8, 0.001, 0.35, [filter(ctx, 'lowpass', 1800, 0.8, 250, 0.4), drive(ctx, 2.5)]);
     const g = noise(ctx, 1.1, r);
@@ -369,7 +367,7 @@ const RECIPES: Record<string, Recipe> = {
     grains(ctx, out, r, 0.01, 0.5, 14, 800, 5000, 0.3);
   } },
   // Parts shot off / a small craft breaking up
-  explosion_small: { duration: 2.2, variants: 3, reverb: 0.55, build(ctx, out, r) {
+  explosion_small: { duration: 2.2, build(ctx, out, r) {
     burst(ctx, out, r, 0, 0.9, 0.0005, 0.06, [filter(ctx, 'highpass', 1200), drive(ctx, 4)]);
     burst(ctx, out, r, 0, 1.0, 0.003, 1.7, [filter(ctx, 'lowpass', 3200, 0.7, 160, 1.6), drive(ctx, 2)], 'brown');
     thump(ctx, out, 0, 62, 26, 1.0, 1.1, 2);
@@ -379,7 +377,7 @@ const RECIPES: Record<string, Recipe> = {
   } },
   // A ship's core going: blast, a second deeper blast, long rumble, a rain of
   // debris and the structure groaning as it fails
-  explosion_large: { duration: 5, variants: 2, reverb: 0.7, build(ctx, out, r) {
+  explosion_large: { duration: 5, build(ctx, out, r) {
     burst(ctx, out, r, 0, 1.0, 0.0005, 0.09, [filter(ctx, 'highpass', 900), drive(ctx, 4)]);
     burst(ctx, out, r, 0, 1.0, 0.002, 0.8, [filter(ctx, 'lowpass', 4000, 0.7, 300, 0.6), drive(ctx, 2.5)], 'brown');
     burst(ctx, out, r, 0.15, 1.0, 0.01, 3.2, [filter(ctx, 'lowpass', 2000, 0.7, 120, 2.5), drive(ctx, 2.5)], 'brown');
@@ -399,7 +397,7 @@ const RECIPES: Record<string, Recipe> = {
   } },
   // Jump drive spooling (about the charge time): capacitors whining up,
   // a building drone, electrical crackle getting denser
-  jump_charge: { duration: 1.6, reverb: 0.2, build(ctx, out, r) {
+  jump_charge: { duration: 1.6, build(ctx, out, r) {
     const swell = (peak: number) => {
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, 0);
@@ -423,7 +421,7 @@ const RECIPES: Record<string, Recipe> = {
     grains(ctx, out, r, 0, 1.5, 70, 2000, 9000, 0.28, true);
   } },
   // A charge gun gathering (about the Longbarrel's second): a thin whine rising and brightening, a swelling hum under it
-  gun_charge: { duration: 1.4, reverb: 0.15, build(ctx, out, r) {
+  gun_charge: { duration: 1.4, build(ctx, out, r) {
     const swell = (peak: number) => {
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, 0);
@@ -442,18 +440,18 @@ const RECIPES: Record<string, Recipe> = {
     grains(ctx, out, r, 0.2, 1.1, 40, 3000, 9000, 0.14, true);
   } },
   // A clip gun's reload seating: a short metal clack
-  gun_clack: { duration: 0.35, variants: 2, reverb: 0.1, build(ctx, out, r) {
+  gun_clack: { duration: 0.35, build(ctx, out, r) {
     modal(ctx, out, 0, [[640, 0.2, 0.12], [1130, 0.14, 0.08], [2210, 0.07, 0.05]]);
     burst(ctx, out, r, 0, 0.7, 0.0008, 0.03, [filter(ctx, 'highpass', 1800), drive(ctx, 2)]);
     thump(ctx, out, 0.015, 130, 70, 0.4, 0.1);
   } },
   // The last round gone: the reload vent, a hiss of vented heat
-  gun_vent: { duration: 0.7, reverb: 0.25, build(ctx, out, r) {
+  gun_vent: { duration: 0.7, build(ctx, out, r) {
     burst(ctx, out, r, 0, 0.45, 0.01, 0.5, [filter(ctx, 'bandpass', 5200, 0.9, 2400, 0.5)]);
     modal(ctx, out, 0.02, [[420, 0.12, 0.14], [880, 0.08, 0.1]]);
   } },
   // The Chainsaw's barrels spinning up: a motor winding from a growl to a whir
-  gun_spin: { duration: 1.2, reverb: 0.12, build(ctx, out, r) {
+  gun_spin: { duration: 1.2, build(ctx, out, r) {
     const swell = (peak: number) => {
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, 0);
@@ -470,14 +468,14 @@ const RECIPES: Record<string, Recipe> = {
     grains(ctx, out, r, 0, 1.1, 60, 1500, 6000, 0.2, true);
   } },
   // The jump itself: a deep boom and the air of the hull tearing away
-  jump_launch: { duration: 2.6, reverb: 0.6, build(ctx, out, r) {
+  jump_launch: { duration: 2.6, build(ctx, out, r) {
     burst(ctx, out, r, 0, 0.9, 0.0005, 0.07, [filter(ctx, 'highpass', 1000), drive(ctx, 4)]);
     thump(ctx, out, 0, 72, 20, 1.0, 1.6, 2.2);
     burst(ctx, out, r, 0, 0.8, 0.003, 1.2, [filter(ctx, 'lowpass', 1500, 0.7, 100, 1.1), drive(ctx, 2)], 'brown');
     burst(ctx, out, r, 0, 0.9, 0.01, 2.2, [filter(ctx, 'bandpass', 4000, 0.8, 150, 2.0)]);
   } },
   // Dropping out of a jump: a rushing swell into a thump
-  jump_arrive: { duration: 1.6, reverb: 0.5, build(ctx, out, r) {
+  jump_arrive: { duration: 1.6, build(ctx, out, r) {
     const n = noise(ctx, 0.45, r);
     chain(n, filter(ctx, 'bandpass', 200, 1.2, 3000, 0.35), env(ctx, 0, 0.6, 0.32, 0.08), out);
     n.start();
@@ -485,7 +483,7 @@ const RECIPES: Record<string, Recipe> = {
     burst(ctx, out, r, 0.35, 0.7, 0.002, 0.9, [filter(ctx, 'lowpass', 1200, 0.7, 150, 0.8), drive(ctx, 2)], 'brown');
   } },
   // Jump gates and rifts: a sub hit, a beating low drone and a rising-falling rush
-  warp: { duration: 2.8, reverb: 0.6, build(ctx, out, r) {
+  warp: { duration: 2.8, build(ctx, out, r) {
     thump(ctx, out, 0, 56, 30, 0.8, 1.4);
     for (const f of [62, 65.5, 124.5]) {
       const o = osc(ctx, 'sawtooth', f);
@@ -501,7 +499,7 @@ const RECIPES: Record<string, Recipe> = {
     grains(ctx, out, r, 0.2, 2.0, 40, 5000, 12000, 0.12);
   } },
   // Docking clamps engaging, pressure equalising, a quiet confirm tone
-  dock: { duration: 2.0, reverb: 0.4, build(ctx, out, r) {
+  dock: { duration: 2.0, build(ctx, out, r) {
     clunk(ctx, out, r, 0, 1);
     clunk(ctx, out, r, 0.32, 0.92);
     burst(ctx, out, r, 0.45, 0.22, 0.05, 0.9, [filter(ctx, 'highpass', 2500)]);
@@ -512,7 +510,7 @@ const RECIPES: Record<string, Recipe> = {
     }
   } },
   // Clamps releasing: a hiss of venting pressure, the clamp letting go, servos
-  undock: { duration: 1.6, reverb: 0.4, build(ctx, out, r) {
+  undock: { duration: 1.6, build(ctx, out, r) {
     burst(ctx, out, r, 0, 0.3, 0.01, 0.6, [filter(ctx, 'highpass', 3500, 0.7, 1500, 0.6)]);
     clunk(ctx, out, r, 0.18, 1.1, 0.7);
     const o = osc(ctx, 'sawtooth', 180, 260, 0.6, 0.3);
@@ -520,7 +518,7 @@ const RECIPES: Record<string, Recipe> = {
     o.start(0.3);
   } },
   // Credits in: two soft, short data tones
-  credits: { duration: 0.7, reverb: 0.2, build(ctx, out) {
+  credits: { duration: 0.7, build(ctx, out) {
     [1568, 2093].forEach((f, i) => {
       for (const [m, a] of [[1, 0.18], [2, 0.03]] as const) {
         const o = osc(ctx, 'sine', f * m);
@@ -530,7 +528,7 @@ const RECIPES: Record<string, Recipe> = {
     });
   } },
   // Level up: a warm chord swelling in, with a little air on top
-  level_up: { duration: 3.0, reverb: 0.5, build(ctx, out, r) {
+  level_up: { duration: 3.0, build(ctx, out, r) {
     [220, 329.6, 440, 554.4, 659.3].forEach((f, i) => {
       for (const det of [-4, 4]) {
         const o = osc(ctx, 'sine', f * Math.pow(2, det / 1200));
@@ -570,17 +568,17 @@ const RECIPES: Record<string, Recipe> = {
   ui_hover: { duration: 0.03, build(ctx, out, r) {
     burst(ctx, out, r, 0, 0.4, 0.0003, 0.008, [filter(ctx, 'bandpass', 5000, 2)]);
   } },
-  ui_open: { duration: 0.4, reverb: 0.15, build(ctx, out, r) {
+  ui_open: { duration: 0.4, build(ctx, out, r) {
     swish(ctx, out, r, 600, 2400, 0.25, 0.18);
     thump(ctx, out, 0, 160, 90, 0.25, 0.06, 1);
     burst(ctx, out, r, 0.24, 0.25, 0.0003, 0.012, [filter(ctx, 'bandpass', 3200, 1.2)]);
   } },
-  ui_close: { duration: 0.35, reverb: 0.15, build(ctx, out, r) {
+  ui_close: { duration: 0.35, build(ctx, out, r) {
     swish(ctx, out, r, 2400, 500, 0.22, 0.16);
     thump(ctx, out, 0.21, 140, 80, 0.25, 0.06, 1);
   } },
   // The jump drive's charged again: two soft rising tones over a hum settling
-  jump_ready: { duration: 0.9, reverb: 0.35, build(ctx, out, r) {
+  jump_ready: { duration: 0.9, build(ctx, out, r) {
     thump(ctx, out, 0, 110, 70, 0.2, 0.25, 1);
     for (const [t, f] of [[0.02, 660], [0.14, 990]] as const) {
       const o = osc(ctx, 'sine', f);
@@ -647,24 +645,12 @@ function loopBuffer(ctx: BaseAudioContext, kind: 'engine' | 'boost'): AudioBuffe
   return buf;
 }
 
-/** A looping sound: the engine, boost and mining hums, and each held beam's (its part's sfxLoop) */
-export type LoopId = 'engine' | 'boost' | 'mining' | (string & {});
-
-/** How many variants each effect has (rendered as id, id#1, id#2, ...) */
-export const SFX_VARIANTS: Record<string, number> = Object.fromEntries(Object.entries(RECIPES).map(([id, r]) => [id, r.variants ?? 1]));
-/** Each effect's send to the shared reverb */
-export const SFX_REVERB: Record<string, number> = Object.fromEntries(Object.entries(RECIPES).map(([id, r]) => [id, r.reverb ?? 0]));
-
-export function variantKey(id: string, v: number): string {
-  return v === 0 ? id : `${id}#${v}`;
-}
-
 /** Render every effect variant (in parallel) plus the loops. */
 export async function renderSfx(ctx: BaseAudioContext): Promise<Map<string, AudioBuffer>> {
   const out = new Map<string, AudioBuffer>();
   const jobs: Promise<void>[] = [];
   for (const [id, recipe] of Object.entries(RECIPES)) {
-    for (let v = 0; v < (recipe.variants ?? 1); v++) {
+    for (let v = 0; v < (SFX_TABLE[id]?.[0] ?? 1); v++) {
       jobs.push((async () => {
         const off = new OfflineAudioContext(1, Math.ceil(recipe.duration * SR), SR);
         const master = off.createGain();

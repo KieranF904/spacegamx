@@ -2,7 +2,7 @@
  * @contract client.ui.tutorial.ui
  * owns:       wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the
  *             training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour
- * needs:      tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook
+ * needs:      npm: @space-game/common; tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook
  * invariants: step text, targets and rules come from the server's state and data/tutorial.json, never hardcoded here — client/src/ui/tutorial/tutorialModel.test.ts
  * extend:     a new panel to report is an entry in `panelsOpen` (Game wiring) and in common TUTORIAL_PANELS
  */

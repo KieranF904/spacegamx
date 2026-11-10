@@ -2,7 +2,7 @@
  * @contract client.ships.build-power-flow-view
  * owns:       drawing the power flow overlay (powerFlow.ts) onto a canvas (the hangar's animated layer) or a pixi Graphics (the
  *             world build view), through one small sink, plus the legend words both editors show
- * needs:      powerFlow.ts (the data), PlacedGeom outlines; npm: pixi.js (type only)
+ * needs:      npm: @space-game/common; powerFlow.ts (the data), PlacedGeom outlines; npm: pixi.js (type only)
  * invariants: the layers are independent (the hangar's own overlay already draws the lines and port glyphs, so it asks for
  *             pulses and verdicts only) — client/src/ships/build/powerFlow.test.ts
  *             the animated canvas layer runs its frame loop only while it has something to show — client/src/ships/build/buildViews.test.ts

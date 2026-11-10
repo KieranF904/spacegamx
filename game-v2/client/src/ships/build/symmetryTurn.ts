@@ -1,7 +1,7 @@
 /**
  * @contract client.ships.build-symmetry-turn
  * owns:       the other half of a turn, mirror or re-face in symmetry mode: which part across the axis follows, and the copy it becomes
- * needs:      build/symmetry (the mirror), build/editPlaced (partUnder, turnProblem: the rules a turned part must keep)
+ * needs:      npm: @space-game/common; build/symmetry (the mirror), build/editPlaced (partUnder, turnProblem: the rules a turned part must keep)
  * invariants: the follower is the part under the mirrored cursor, made the exact mirror of the turned part, keeping its own uid — client/src/ships/build/symmetryTurn.test.ts
  *             a different part there, or a turn the rules refuse, leaves it alone with a reason — client/src/ships/build/symmetryTurn.test.ts
  *             a part on the axis has no follower — client/src/ships/build/symmetryTurn.test.ts
