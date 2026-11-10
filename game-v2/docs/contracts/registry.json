@@ -23959,7 +23959,7 @@
       "id": "server.ships.bridge.core",
       "path": "server/src/ships/bridge/core.ts",
       "group": "server/ships/bridge",
-      "lines": 294,
+      "lines": 292,
       "owns": "the types, constants and engine interface (ShipHost) the bridge modules share, and BridgeCtx, the bridge's internal state",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
@@ -24026,55 +24026,55 @@
           "name": "ShipBridgeConfig",
           "kind": "interface",
           "start": 196,
-          "end": 213
+          "end": 211
         },
         {
           "name": "ShipBridgeStats",
           "kind": "interface",
-          "start": 215,
-          "end": 221
+          "start": 213,
+          "end": 219
         },
         {
           "name": "K",
           "kind": "const",
-          "start": 223,
-          "end": 226
+          "start": 221,
+          "end": 224
         },
         {
           "name": "EMP_IMMUNE_TICKS",
           "kind": "const",
-          "start": 228,
-          "end": 235
+          "start": 226,
+          "end": 233
         },
         {
           "name": "BEAM_PAD",
           "kind": "const",
-          "start": 237,
-          "end": 238
+          "start": 235,
+          "end": 236
         },
         {
           "name": "BIG_BODY",
           "kind": "const",
-          "start": 240,
-          "end": 241
+          "start": 238,
+          "end": 239
         },
         {
           "name": "BridgeInternals",
           "kind": "interface",
-          "start": 243,
-          "end": 284
+          "start": 241,
+          "end": 282
         },
         {
           "name": "BridgeCtx",
           "kind": "type",
-          "start": 286,
-          "end": 287
+          "start": 284,
+          "end": 285
         },
         {
           "name": "WeaponBridge",
           "kind": "type",
-          "start": 289,
-          "end": 294
+          "start": 287,
+          "end": 292
         }
       ]
     },

@@ -5,5 +5,5 @@ refit is needed; none are run by npm scripts, tests or deploys. Paths inside wer
 not been run since the move.
 
 - `merge-thrusters.ts`: a refit pass over the player ship plans (bigger engines). (`add-batteries.ts`, the pool core's battery refit, went with the pool core.)
-- `econ/migrate-blueprints.mjs`: moved the legacy parts of the library blueprints to models (docs/parts-redesign.md).
+- (`econ/migrate-blueprints.mjs`, which moved the library blueprints' legacy parts to models, went with the ship migration it called, 2026-11-10.)
 - `econ/retireKits.mjs`: replaced repair kits and insurance bonds with material packs (docs/design/field-fabrication.md).

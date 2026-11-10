@@ -25,7 +25,7 @@ import {
   Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
   GravityWell, FlightConstants, type HitInfo, type SegmentHit, type WarmthStage, type JumpField, standing,
-  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot, newAimHoldStats, type DesignUpdate,
+  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, type OwnExtras, dhypot, newAimHoldStats,
 } from '@space-game/common';
 import {
   STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type PendingSalvoShell,
@@ -61,8 +61,9 @@ export class ShipBridge {
   readonly library: Map<string, Blueprint>;
   readonly enemyDesigns: Record<string, Blueprint>;
   readonly devDesigns: Record<string, Blueprint>;
-  /** The design update mapping (Pilots, for saves below v5) */
-  readonly designUpdate: DesignUpdate | undefined;
+  /** Gone (the v5 design update was removed with the old save migrations, 2026-11-10): always undefined, kept only
+   *  because shipBridgeApi.json pins the name (drop it with a deliberate golden update) */
+  readonly designUpdate: undefined = undefined;
   readonly stats: ShipBridgeStats = { lastRebuildMs: 0, rebuildCount: 0, debrisCount: 0, aimHold: newAimHoldStats() };
   /**
    * What each body flew with this tick (replication: the server's shadow of each
@@ -207,7 +208,6 @@ export class ShipBridge {
     this.library = new Map(Object.entries(cfg.library ?? {}));
     this.enemyDesigns = cfg.enemies ?? {};
     this.devDesigns = cfg.dev ?? {};
-    this.designUpdate = cfg.designUpdate;
     this.now = cfg.now ?? (() => 0);
   }
 

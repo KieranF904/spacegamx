@@ -74,9 +74,9 @@ describe('hangar slots', () => {
     expect(h.slots[0]!.blueprint.name).toBe('Sparrow T');
   });
 
-  it('old saves come back with their ship in slot 1', () => {
+  it('a save with no hangar comes back with its ship in slot 1', () => {
     const { server } = world();
-    const old = { version: 1, credits: 5, ship: { blueprint: server.getShips().library.get('arrow'), hp: { 3: 0 } }, roster: [] };
+    const old = { version: 5, credits: 5, ship: { blueprint: server.getShips().library.get('arrow'), hp: { 3: 0 } }, roster: [] };
     const p = migrateProfile(old, (server as any).starterKit());
     expect(p.hangar.length).toBe(5);
     expect(p.hangar[0]).toBe(p.ship);

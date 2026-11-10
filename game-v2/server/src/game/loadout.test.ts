@@ -162,13 +162,12 @@ describe('quick storage controls', () => {
   });
 });
 
-describe('loadout profile migration', () => {
-  it('the crates last carried out and the first picks become the active ship\'s loadout', () => {
+describe('loadouts in the save', () => {
+  it('a ship\'s loadout and the open crates come back as saved', () => {
     const { server } = liveServer();
     const kit = (server as any).starterKit() as StarterKit;
-    const ship = { blueprint: kit.blueprint, hp: {}, ghosts: [] };
-    const raw = { version: 2, xp: 0, ship, hangar: [ship, null], activeSlot: 0,
-      ammo: { open: { cannon_hv: 40 }, load: { cannon_hv: 3, railgun_slugs: 0 }, prefer: { cannon: 'cannon_hv' } } };
+    const ship = { blueprint: kit.blueprint, hp: {}, ghosts: [], ammo: { load: { cannon_hv: 3 }, first: { cannon: 'cannon_hv' } } };
+    const raw = { version: 6, xp: 0, ship, hangar: [ship, null], activeSlot: 0, ammo: { open: { cannon_hv: 40 }, load: {} } };
     const p = migrateProfile(JSON.parse(JSON.stringify(raw)), kit);
     expect(p.ship.ammo).toEqual({ load: { cannon_hv: 3 }, first: { cannon: 'cannon_hv' } });
     expect(p.hangar[0]).toBe(p.ship);
@@ -180,11 +179,11 @@ describe('loadout profile migration', () => {
     expect(again.ammo).toEqual({ open: { cannon_hv: 40 }, load: {} });
   });
 
-  it('an old save without ammunition gets none, and other slots keep the default', () => {
+  it('a save without ammunition gets none, and other slots keep the default', () => {
     const { server } = liveServer();
     const kit = (server as any).starterKit() as StarterKit;
     const ship = { blueprint: kit.blueprint, hp: {} };
-    const p = migrateProfile({ version: 2, ship, hangar: [ship, { blueprint: kit.blueprint, hp: {} }] }, kit);
+    const p = migrateProfile({ version: 6, ship, hangar: [ship, { blueprint: kit.blueprint, hp: {} }] }, kit);
     expect(p.ship.ammo).toBeUndefined();
     expect(p.hangar[1]?.ammo).toBeUndefined();
   });

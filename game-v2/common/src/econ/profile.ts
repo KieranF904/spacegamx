@@ -3,18 +3,16 @@
  *
  * Stored as one JSON document per account (JsonProfileStore writes a file,
  * PostgresProfileStore a jsonb row). `version` lets old saves be upgraded by
- * migrateProfile() whenever the shape changes.
+ * migrateProfile() whenever the shape changes. Only the steps a live save still
+ * needs are kept (OLDEST_PROFILE_VERSION): an older save fails to load, loudly.
  */
 
-import type { Blueprint, FunctionDef } from '../ships/types.js';
+import type { Blueprint } from '../ships/types.js';
 import type { Catalog } from '../ships/catalog.js';
-import { migrateBlueprint, migrateItemBag, migratePartItem } from '../ships/migrate.js';
 import { cloneJson } from '../math/basic.js';
 import { migrateGunFacings } from '../ships/gunFacing.js';
-import { modelLicensed } from './market.js';
-import { Stack, Bag, cleanStacks, addTo } from './stacks.js';
+import { Stack, Bag, cleanStacks } from './stacks.js';
 import { levelAt } from './levels.js';
-import { retireSchematics } from './retired.js';
 import { unlocks } from './unlocks.js';
 import type { TraceLedger } from './traces.js';
 import type { Outpost } from './outpost.js';
@@ -24,8 +22,6 @@ import { fieldUpdate, setActiveShip } from './fieldUpdate.js';
 
 // (setActiveShip lives in fieldUpdate.ts so that file need not import this one)
 export { setActiveShip };
-import { designUpdateShips, fingerprint, type DesignUpdate, type DesignUpdateReport } from './designUpdate.js';
-import type { ShipTuning } from '../ships/tuning.js';
 import { cleanBank, type RepairBank } from './field/bank.js';
 import { cleanFieldRecord, type FieldRecord } from './field/record.js';
 import { newTutorial, cleanTutorial } from '../tutorial/state.js';
@@ -97,6 +93,13 @@ function cleanCodex(v: unknown): PlayerProfile['codex'] {
 export const QUICKBAR_SLOTS = 5;
 
 export const PROFILE_VERSION = 6;
+
+/**
+ * The oldest save migrateProfile can still upgrade (every live save was at v5 or later when the older steps went,
+ * 2026-11-10: v4 legacy parts to models, the v5 design update, the v3 loadout move and the schematics' retirement).
+ * An older one throws rather than loading as a fresh pilot (Pilots logs it and keeps the save, never saving over it)
+ */
+export const OLDEST_PROFILE_VERSION = 5;
 
 /** A ship as saved: its design and each part's HP fraction by uid (absent = full, 0 = destroyed) */
 export interface ShipRecord {
@@ -203,8 +206,8 @@ export interface PlayerProfile {
   /**
    * Ammunition (server/src/game/Ammo.ts): rounds left in each opened crate.
    * (`load` and `prefer` are from before loadouts were the ship's: what was
-   * carried when last leaving a station, and which crate opens first. They
-   * move to the active ship's loadout on load, so they stay empty.)
+   * carried when last leaving a station, and which crate opens first. Every
+   * live save had them moved to its ship's loadout, so they stay empty.)
    */
   ammo?: { open: Record<string, number>; load: Record<string, number>; prefer?: Record<string, string> };
   /** Records found (data/codex.json ids, in the order found), and those not opened yet */
@@ -311,65 +314,10 @@ const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
 const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const rec = <T>(v: unknown): Record<string, T> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, T>) : {});
 
-/** A ship record with its legacy parts as models (ships/migrate.ts): new parts take their old part's HP and ghost place; models with no room go to `refund` */
-export function migrateShipRecord(catalog: Catalog, rec: ShipRecord, refund: Bag): ShipRecord {
-  const m = migrateBlueprint(catalog, rec.blueprint);
-  if (!m.changed) return rec;
-  const hp = { ...rec.hp };
-  let ghosts = [...(rec.ghosts ?? [])];
-  for (const { uid, from } of m.added) {
-    if (rec.hp[from] !== undefined) hp[uid] = rec.hp[from];
-    const at = ghosts.indexOf(from);
-    if (at >= 0) ghosts = [...ghosts.slice(0, at + 1), uid, ...ghosts.slice(at + 1)];
-  }
-  // (An unbuilt part's model was never had: nothing back for it)
-  const ghost = new Set(rec.ghosts ?? []);
-  for (const { uid, item } of m.refund) if (!ghost.has(uid)) refund[item] = (refund[item] ?? 0) + 1;
-  return { ...rec, blueprint: m.blueprint, hp, ghosts };
-}
-
-const mapStacks = (catalog: Catalog, list: Stack[], usable: (m: FunctionDef) => boolean): Stack[] => {
-  const out: Stack[] = [];
-  for (const s of list) for (const [id, n] of Object.entries(migrateItemBag(catalog, { [s.id]: s.n }, usable))) addTo(out, id, n);
-  return out;
-};
-
-/**
- * (v4) Modules are models now (docs/parts-redesign.md §7): every ship,
- * design, part item and fabricator job's output with its legacy parts as
- * their models; models that found no room on a ship go to storage. A built
- * part keeps its model; loose items (hold, storage, jobs' outputs) become
- * only models the pilot can fit, smaller copies if need be (ships/migrate.ts
- * migrateItemStack). Licences are kept (a legacy fn: licence still teaches
- * its family). Ships stay unwired: they're auto-wired whenever they're built
- * (ships/wires.ts).
- */
-export function migrateProfileParts(p: PlayerProfile, catalog: Catalog): void {
-  const refund: Bag = {};
-  p.hangar = p.hangar.map((rec) => (rec ? migrateShipRecord(catalog, rec, refund) : null));
-  setActiveShip(p, p.hangar[p.activeSlot] ?? migrateShipRecord(catalog, p.ship, refund), p.activeSlot);
-  if (p.designs) p.designs = p.designs.map((b) => (b ? migrateBlueprint(catalog, b).blueprint : null));
-  const usable = (m: FunctionDef) => modelLicensed(m, p.recipes, p.level);
-  p.cargo = mapStacks(catalog, p.cargo, usable);
-  p.storage = mapStacks(catalog, p.storage, usable);
-  p.jobs = p.jobs.map((j) => ({ ...j, recipe: migratePartItem(catalog, j.recipe), out: migrateItemBag(catalog, j.out, usable) }));
-  if (p.fabOrders) p.fabOrders = p.fabOrders.map((o) => ({ ...o, item: migratePartItem(catalog, o.item) }));
-  p.quickbar = p.quickbar.map((id) => (id ? migratePartItem(catalog, id) : id));
-  for (const [id, n] of Object.entries(refund)) addTo(p.storage, id, n);
-}
-
 /** What migrateProfile can be given beyond the kit */
 export interface MigrateOptions {
-  /** The economy (item and recipe books): the v5 design update needs it to break ships down. Without it a save older than v5 keeps its ships (and its version, to be upgraded later) */
+  /** The economy (item and recipe books): the v6 field update needs it to turn kits into deposits. Without it a v5 save keeps its kits (and its version, to be upgraded later) */
   econ?: Economy;
-  /** The design update mapping (data/ships/designUpdate.json, resolved): without it every ship of a save below v5 is broken down (the ship wipe) */
-  designUpdate?: DesignUpdate;
-  /** The account name the mapping is keyed by (none: not in the mapping, so wiped) */
-  username?: string;
-  /** Ship tuning (which crates each gun takes): keeps a swapped ship's ammo loadout where its new guns take it */
-  tuning?: ShipTuning;
-  /** Told what the design update did, when it runs */
-  onDesignUpdate?: (r: DesignUpdateReport) => void;
   /** The wall clock (ms) the v6 field update starts the repair bank at (default: now) */
   now?: number;
 }
@@ -377,19 +325,16 @@ export interface MigrateOptions {
 /**
  * Bring any saved profile up to the current version, filling anything missing
  * from a fresh profile. Unknown or broken fields fall back to defaults rather
- * than failing the login. Without the ship catalogue (`catalog`) a save older
- * than v4 keeps its parts as they are (and its version, to be upgraded later);
- * without the economy (`opts.econ`) a save older than v5 keeps its ships.
- * Below v5 the design update runs: given the mapping (`opts.designUpdate`)
- * and the account's `opts.username`, mapped ships are swapped for their
- * remakes; the rest (every ship of an account not mapped) are broken down.
+ * than failing the login. A save older than OLDEST_PROFILE_VERSION (or with no
+ * version) throws: the steps that upgraded it are gone. Without the economy
+ * (`opts.econ`) a v5 save keeps its kits (and its version, to be upgraded later).
  */
 export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog, opts: MigrateOptions = {}): PlayerProfile {
   const base = newProfile(kit);
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Record<string, unknown>;
-  const was = num(r.version, 1);
-  // (v1 is the first version: future migrations go here, e.g. if (r.version === 1) { ...; r.version = 2 })
+  const was = num(r.version, 0);
+  if (was < OLDEST_PROFILE_VERSION) throw new Error(`profile ${was ? `v${was}` : 'with no version'} is older than v${OLDEST_PROFILE_VERSION}, the oldest save this build can upgrade (the older steps were removed 2026-11-10)`);
   const ship = validRecord(r.ship) ? cleanRecord(r.ship) : undefined;
   const pos = rec<number | string>(r.position);
   const quests = rec<unknown>(r.quests);
@@ -432,33 +377,12 @@ export function migrateProfile(raw: unknown, kit: StarterKit, catalog?: Catalog,
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : base.createdAt,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : base.updatedAt,
   };
-  // Hangar slots (v2): v1 saves had only the one ship; the extra slots start empty (as many as the pilot's level gives)
+  // Hangar slots: as many as the pilot's level gives (the extra ones start empty)
   const slots = Array.isArray(r.hangar) ? (r.hangar as unknown[]).map((s) => (validRecord(s) ? cleanRecord(s) : null)) : [];
   while (slots.length < unlocks(out).hangarSlots) slots.push(null);
   const active = Math.max(0, Math.min(slots.length - 1, Math.floor(num(r.activeSlot, 0))));
   out.hangar = slots;
   setActiveShip(out, out.ship, active);
-  // (The ships as saved, before anything below changes them: the design update checks them against its `was`)
-  const saved = was < 5 ? { slots: out.hangar.map((s) => fingerprint(s?.blueprint)), designs: (out.designs ?? []).map((b) => fingerprint(b)) } : null;
-  // Loadouts (v3): the crates last carried out, and the first picks, become the ship's own loadout
-  if (out.ammo && (Object.keys(out.ammo.load).length || out.ammo.prefer)) {
-    if (!out.ship.ammo) out.ship.ammo = { load: { ...out.ammo.load }, ...(out.ammo.prefer ? { first: { ...out.ammo.prefer } } : {}) };
-    out.ammo = { open: out.ammo.open, load: {} };
-  }
-  // The schematics are retired: held ones go (a legendary one as its artefact), and the licences they taught (econ/retired.ts)
-  retireSchematics(out);
-  // Models (v4)
-  if (was < 4) {
-    if (!catalog) { out.version = Math.min(was, 3); return out; }
-    migrateProfileParts(out, catalog);
-  }
-  // The design update (v5): ships swapped for their remakes on the ports core, or broken down (econ/designUpdate.ts)
-  if (was < 5) {
-    if (!opts.econ) { out.version = 4; return out; }
-    const account = opts.username !== undefined ? opts.designUpdate?.accounts[opts.username] : undefined;
-    const r = designUpdateShips(out, { econ: opts.econ, kit, account, blueprints: opts.designUpdate?.blueprints, was: saved!, tuning: opts.tuning });
-    opts.onDesignUpdate?.(r);
-  }
   // The field update (v6): kits and bonds become bank deposits, loaners go (econ/fieldUpdate.ts)
   if (was < 6) {
     if (!opts.econ) { out.version = 5; return out; }

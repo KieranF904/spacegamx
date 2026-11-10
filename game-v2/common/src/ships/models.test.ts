@@ -1,7 +1,7 @@
 /**
  * Models (docs/parts-redesign.md): fixed named modules with their own numbers,
- * engines that fade near their rated speed, licences by level, and what legacy
- * parts, ships and saves become.
+ * engines that fade near their rated speed, licences by level, and the model a
+ * legacy part (an enemy's) stands for.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -15,13 +15,13 @@ import { accelAlong, ratedFade, stepFlight } from './flight.js';
 import { gunDef, partWeaponDef } from './launch.js';
 import { partBuildPoints, partGrade, partSupply, partThrust, weaponSizeFactor, weaponStrength } from './grades.js';
 import { partArmour } from './damage.js';
-import { legacyCandidates, legacyModel, migrateBlueprint, migrateItemStack, migratePartItem } from './migrate.js';
+import { legacyModel, migratePartItem } from './migrate.js';
 import { describePart } from './describe.js';
 import type { ShipTuning } from './tuning.js';
 import { readShipJson, readCatalogFiles, testCatalog, SHIP_DATA_DIR } from './testData.js';
 import { loadCatalog } from './catalog.js';
 import { canCraft, MATERIAL_LEVEL, modelLicensed, partLicensed } from '../econ/market.js';
-import { migrateProfile, newProfile, PROFILE_VERSION, type StarterKit } from '../econ/profile.js';
+import { migrateProfile, OLDEST_PROFILE_VERSION, type StarterKit } from '../econ/profile.js';
 import { FRICTION, BOOST_FACTOR, WORLD_SIZE } from '../constants.js';
 
 const catalog = testCatalog();
@@ -341,7 +341,7 @@ describe('licences: everything by level, nothing early', () => {
   });
 });
 
-describe('migration: legacy parts become models', () => {
+describe('legacy parts stand for models', () => {
   it('a legacy part becomes its family\'s model of its size (its own piece first, then the nearest size)', () => {
     expect(legacyModel(catalog, { fn: 'weapon', piece: 'sq' })!.id).toBe('cannon_pip');
     expect(legacyModel(catalog, { fn: 'weapon', piece: 'rect2' })!.id).toBe('cannon_hammer');
@@ -364,91 +364,6 @@ describe('migration: legacy parts become models', () => {
     expect(migratePartItem(catalog, 'iron_ore')).toBe('iron_ore');
   });
 
-  it("a loose part item never becomes a model its pilot can't fit: smaller copies, else the soonest one", () => {
-    const at = (level: number, learned: string[] = []) => (m: Parameters<typeof modelLicensed>[0]) => modelLicensed(m, learned, level);
-    const cell = 'part:alloy:power_cell_reactor:sq', ion = 'part:alloy:engine_ion_drive:sq';
-    // A 2-cell generator: two Cell Reactors until the Overclock Reactor's level (smaller copies before a bigger model)
-    expect(migrateItemStack(catalog, 'part:alloy:generator:rect2', 3, at(1))).toEqual({ [cell]: 6 });
-    expect(migrateItemStack(catalog, 'part:alloy:generator:rect2', 1, at(20))).toEqual({ [cell]: 2 });
-    expect(migrateItemStack(catalog, 'part:alloy:generator:rect2', 1, at(24))).toEqual({ 'part:titanium:power_overclock_reactor:rect2': 1 });
-    // A 2×2 one: four Cell Reactors, or a Fusion Plant from its level
-    expect(migrateItemStack(catalog, 'part:steel:generator:block2', 1, at(5))).toEqual({ [cell]: 4 });
-    expect(migrateItemStack(catalog, 'part:steel:generator:block2', 1, at(18))).toEqual({ 'part:steel:power_fusion_plant:block2': 1 });
-    // A 2-cell thruster: two Ion Drives until a 2-cell engine is theirs
-    expect(migrateItemStack(catalog, 'part:alloy:thruster:rect2', 2, at(1))).toEqual({ [ion]: 4 });
-    expect(migrateItemStack(catalog, 'part:alloy:thruster:rect2', 1, at(8))).toEqual({ 'part:alloy:engine_torch:rect2': 1 });
-    expect(migrateItemStack(catalog, 'part:alloy:thruster:rect2', 1, at(16))).toEqual({ 'part:steel:engine_plasma_drive:rect2': 1 });
-    // A licence doesn't count (nothing opens early): a 2×2 battery is four Batteries, even with the (legacy) battery licence
-    expect(migrateItemStack(catalog, 'part:alloy:battery:block2', 1, at(1))).toEqual({ 'part:alloy:power_battery:sq': 4 });
-    expect(migrateItemStack(catalog, 'part:alloy:battery:block2', 1, at(1, ['fn:battery']))).toEqual({ 'part:alloy:power_battery:sq': 4 });
-    // No model of its family theirs yet: the earliest, theirs soonest (a railgun: the Needle)
-    const needle = `part:${FN('railgun_needle').material}:railgun_needle:rect2`;
-    expect(migrateItemStack(catalog, 'part:titanium:railgun:rect2', 1, at(1))).toEqual({ [needle]: 1 });
-    // (a weapon schematic no longer opens one early: Needles, two to its four cells)
-    expect(migrateItemStack(catalog, 'part:titanium:railgun:block2', 1, at(1, ['fn:railgun']))).toEqual({ [needle]: 2 });
-    // Anything else as it was; conduits hull
-    expect(migrateItemStack(catalog, 'iron_ore', 5, at(1))).toEqual({ iron_ore: 5 });
-    expect(migrateItemStack(catalog, 'part:steel:conduit:sq', 2, at(1))).toEqual({ 'part:steel:hull:sq': 2 });
-    expect(migrateItemStack(catalog, 'part:cobalt:armor:sq', 2, at(1))).toEqual({ 'part:cobalt:armor:sq': 2 });
-    // Never a model above what its pilot could fit, whatever it was (unless nothing of its kind is theirs yet)
-    for (const fn of Object.keys(MODELS.legacy)) {
-      for (const piece of ['sq', 'tri', 'round', 'rect2', 'block2', 'block3']) {
-        for (const level of [1, 5, 12, 22]) {
-          const theirs = legacyCandidates(catalog, { fn, piece }).some(at(level));
-          for (const id of Object.keys(migrateItemStack(catalog, `part:alloy:${fn}:${piece}`, 1, at(level)))) {
-            const m = FN(/^part:[^:]+:([^:]+):/.exec(id)![1]);
-            expect(m.model && (!theirs || modelLicensed(m, [], level)), `${fn} ${piece} L${level} -> ${m.id}`).toBe(true);
-          }
-        }
-      }
-    }
-  });
-
-  it('a ship keeps its shape: as many models as fit a part\'s place, business edge out, the rest hull; nothing loose', () => {
-    // A 2×1 shield: two Deflectors in its place; a 2×2 flak gun facing south: one Cloudmaker, lying along the south edge
-    // with its barrel (a model's is on its piece's long edge, gunFacing.ts) out of it, and hull in the cells above it
-    const b = bp([
-      p(0, 'rect2', 'core', 0, 0),
-      p(1, 'rect2', 'shield', 0, 1, { material: 'steel' }),
-      p(2, 'block2', 'flak', 0, 2, { facing: 'S', material: 'steel', mount: 'turret' }),
-      p(3, 'sq', 'conduit', 2, 0, { material: 'steel' }),
-    ]);
-    const m = migrateBlueprint(catalog, b);
-    expect(m.changed).toBe(true);
-    const fns = m.blueprint.parts.map((q) => q.fn).sort();
-    expect(fns).toEqual(['core', 'shield_deflector', 'shield_deflector', 'flak_cloudmaker', 'hull', 'hull', 'hull'].sort());
-    const shields = m.blueprint.parts.filter((q) => q.fn === 'shield_deflector');
-    expect(shields.every((q) => q.y === 1 && q.material === FN('shield_deflector').material)).toBe(true);
-    expect(shields.some((q) => q.uid === 1)).toBe(true);
-    const flak = m.blueprint.parts.filter((q) => q.fn === 'flak_cloudmaker');
-    // (A model's mount is its own: the part's turret isn't kept)
-    expect(flak.every((q) => q.facing === 'S' && q.mount === undefined && partMount(catalog, q) === 'turret')).toBe(true);
-    expect(flak.some((q) => q.uid === 2)).toBe(true);
-    // The rest are new uids, each from the part it replaced; the conduit is steel hull
-    expect(m.added.filter((a) => a.from === 1)).toHaveLength(1);
-    expect(m.added.filter((a) => a.from === 2)).toHaveLength(2);
-    expect(m.blueprint.parts.find((q) => q.uid === 3)).toMatchObject({ fn: 'hull', material: 'steel' });
-    // A 2×2 battery whose family has a 2×2 model: one Heavy Bank, as it lay; in a part too small for any, hull round one
-    const bank = migrateBlueprint(catalog, bp([p(0, 'rect2', 'core', 0, 0), p(1, 'block2', 'battery', 0, 1)]));
-    expect(bank.blueprint.parts.find((q) => q.uid === 1)).toMatchObject({ fn: 'power_heavy_bank', piece: 'block2', x: 0, y: 1 });
-    const gens = migrateBlueprint(catalog, bp([p(0, 'rect2', 'core', 0, 0), p(1, 'block3', 'generator', 0, 1)]));
-    expect(gens.blueprint.parts.map((q) => q.fn).sort()).toEqual(['core', 'power_fusion_plant', 'hull', 'hull', 'hull', 'hull', 'hull'].sort());
-    expect(validateBlueprint(catalog, gens.blueprint, tuning, null).errors).toEqual([]);
-    // (Cloudmakers are side mounts, and a migrated ship's are where its flak gun was: it loads and flies as it is,
-    // validated as a saved ship is, and its hangar flags them until refitted)
-    expect(validateBlueprint(catalog, m.blueprint, tuning, null, { mounting: false }).errors).toEqual([]);
-    const strict = validateBlueprint(catalog, m.blueprint, tuning, null).errors;
-    expect(strict.length).toBeGreaterThan(0);
-    expect(strict.every((e) => e.code === 'badMounting' && e.uids.every((u) => m.blueprint.parts.find((q) => q.uid === u)!.fn === 'flak_cloudmaker'))).toBe(true);
-    expect(createShipState(catalog, tuning, 1, m.blueprint, 0).derived.weapons.filter((w) => w.kind === 'flak')).toHaveLength(1);
-    // A wedge gun: no model fits, so it's hull and its model is owed
-    const w = migrateBlueprint(catalog, bp([p(0, 'rect2', 'core', 0, 0), p(1, 'tri', 'weapon', 2, 0, { facing: 'E', rot: 3 as Rot })]));
-    expect(w.blueprint.parts.find((q) => q.uid === 1)!.fn).toBe('hull');
-    expect(w.refund).toEqual([{ uid: 1, item: 'part:alloy:cannon_pip:sq' }]);
-    // Nothing legacy is touched twice
-    expect(migrateBlueprint(catalog, m.blueprint).changed).toBe(false);
-  });
-
   it('the library ships run on the ports core: valid, nothing legacy, every gun, engine and tool fed through its ports', () => {
     const names = readdirSync(join(SHIP_DATA_DIR, 'blueprints')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
     expect(names.sort()).toEqual(['ark-tender', 'arrow', 'bulwark', 'drum', 'halberd', 'hauler', 'prospector', 'quarry', 'sparrow-t', 'sunspear', 'wisp']);
@@ -468,98 +383,9 @@ describe('migration: legacy parts become models', () => {
   });
 
 
-  // A pilot's save from before models (version 3): a refitted Sparrow (a steel gun, a wedge gun, a 2×2 flak gun
-  // half-built), a design, parts in the hold and storage, a fabricator job, and the railgun licence
-  const legacySparrow = (): Blueprint => ({ name: 'Sparrow T', catalogVersion: 1, parts: [
-    p(0, 'rect2', 'core', 0, 0),
-    p(1, 'cap', 'hull', 0, -1),
-    p(2, 'sq', 'weapon', -1, 0, { facing: 'N', material: 'steel', gems: ['ruby_1'] }),
-    p(3, 'tri', 'weapon', 2, 0, { facing: 'N', rot: 1 as Rot }),
-    p(4, 'rect2', 'generator', 0, 1),
-    p(5, 'block2', 'flak', 0, 2, { facing: 'S' }),
-    p(7, 'sq', 'thruster', -1, 2, { facing: 'S' }),
-    p(8, 'sq', 'thruster', 2, 2, { facing: 'S' }),
-    p(6, 'sq', 'conduit', -1, 1),
-  ] });
-  const v3 = () => ({
-    version: 3, credits: 1300, xp: 1300, level: 2, skillPoints: 0, skills: {},
-    cargo: [{ id: 'part:steel:weapon:sq', n: 2 }, { id: 'iron_ore', n: 7 }, { id: 'part:steel:thruster:sq', n: 1 }],
-    storage: [{ id: 'part:alloy:weapon:sq', n: 1 }, { id: 'part:alloy:generator:rect2', n: 3 }, { id: 'part:alloy:conduit:sq', n: 4 }, { id: 'copper_wire', n: 6 }],
-    ship: { blueprint: legacySparrow(), hp: { 5: 0.5, 2: 0 }, ghosts: [5] },
-    hangar: [{ blueprint: legacySparrow(), hp: { 5: 0.5, 2: 0 }, ghosts: [5] }, null, null, null, null],
-    designs: [legacySparrow(), null],
-    activeSlot: 0, roster: [], quickbar: ['repair_kit', null, null, null, null], plans: ['sparrow-t'],
-    recipes: ['fn:railgun', 'material:steel'],
-    jobs: [{ id: 1, recipe: 'part:alloy:thruster:sq', station: 'sol_station_central', out: { 'part:alloy:thruster:sq': 1 }, count: 3, done: 1, unitMs: 1000, startedAt: 0, readyAt: 3000 }],
-    fabOrders: [{ id: 1, item: 'part:alloy:laser:sq', n: 2, made: 0 }],
-    quests: { active: {}, done: [], known: [], flags: [] }, reputation: {}, licences: [], position: { system: 'sol', x: 0, y: 0 },
-    home: 'sol_station_central', stats: {}, codex: { found: [], fresh: [] }, createdAt: '2026-01-01', updatedAt: '2026-01-01',
-  });
-  const kit: StarterKit = { blueprint: blueprint('sparrow-t'), planFile: 'sparrow-t', credits: 300, storage: {}, home: 'sol_station_central', position: { system: 'sol', x: 0, y: 0 } };
-
-  it('a version 3 save comes up to version 4 with its ships, designs, items and jobs as models; nothing lost, dead licences dropped', () => {
-    const out = migrateProfile(v3(), kit, catalog);
-    expect(PROFILE_VERSION).toBe(6);
-    expect(out.version).toBe(4);
-    expect(out.ship).toBe(out.hangar[0]);
-    for (const b of [out.ship.blueprint, out.designs![0]!]) {
-      expect(b.parts.filter((q) => FN(q.fn).legacy).map((q) => q.fn)).toEqual([]);
-      // (Its Cloudmaker is a side mount that lies where the flak gun's edge was: flagged, as a saved ship is)
-      expect(validateBlueprint(catalog, b, tuning, null, { mounting: false }).errors).toEqual([]);
-      // (No wires of its own: power runs through the parts' ports)
-      expect((b as { wires?: unknown }).wires).toBeUndefined();
-    }
-    const parts = out.ship.blueprint.parts;
-    const byUid = (u: number) => parts.find((q) => q.uid === u)!;
-    // The steel gun is a Pip (its gems with it, destroyed as it was); the wedge gun hull, its Pip to storage
-    expect(byUid(2)).toMatchObject({ fn: 'cannon_pip', material: 'alloy', gems: ['ruby_1'] });
-    expect(out.ship.hp[2]).toBe(0);
-    expect(byUid(3).fn).toBe('hull');
-    // The rect2 generator is an Overclock Reactor (the model of its size); the conduit hull
-    expect(byUid(4).fn).toBe('power_overclock_reactor');
-    expect(byUid(6)).toMatchObject({ fn: 'hull', material: 'alloy' });
-    // The half-built 2×2 flak gun: one Cloudmaker (its barrel on its long edge, out of the south edge) and two hull cells above
-    // it, all still to build, at its HP; the thrusters Ion Drives
-    const fromFlak = parts.filter((q) => q.uid === 5 || out.ship.ghosts!.includes(q.uid));
-    expect(fromFlak.map((q) => q.fn).sort()).toEqual(['flak_cloudmaker', 'hull', 'hull']);
-    expect(out.ship.ghosts!.length).toBe(3);
-    expect(out.ship.ghosts![0]).toBe(5);
-    for (const q of fromFlak) expect(out.ship.hp[q.uid]).toBe(0.5);
-    expect(byUid(7).fn).toBe('engine_ion_drive');
-    // Items: counts kept, mapped; the owed Pip from the wedge gun (built, so owned) in storage
-    const count = (list: { id: string; n: number }[], id: string) => list.find((s) => s.id === id)?.n ?? 0;
-    expect(count(out.cargo, 'part:alloy:cannon_pip:sq')).toBe(2);
-    expect(count(out.cargo, 'part:alloy:engine_ion_drive:sq')).toBe(1);
-    expect(count(out.cargo, 'iron_ore')).toBe(7);
-    // (The active ship and its hangar slot are one ship: its wedge gun's Pip is owed once)
-    expect(count(out.storage, 'part:alloy:cannon_pip:sq')).toBe(1 + 1);
-    // (Loose ones only what a level 3 pilot can fit: three 2-cell generators are six Cell Reactors; the built one keeps its model)
-    expect(out.level).toBe(3);
-    expect(count(out.storage, 'part:titanium:power_overclock_reactor:rect2')).toBe(0);
-    expect(count(out.storage, 'part:alloy:power_cell_reactor:sq')).toBe(6);
-    expect(count(out.storage, 'part:alloy:hull:sq')).toBe(4);
-    expect(out.storage.some((s) => /:(weapon|generator|conduit|thruster):/.test(s.id))).toBe(false);
-    // Jobs and orders make models
-    expect(out.jobs[0].out).toEqual({ 'part:alloy:engine_ion_drive:sq': 1 });
-    expect(out.jobs[0].recipe).toBe('part:alloy:engine_ion_drive:sq');
-    expect(out.fabOrders![0].item).toBe('part:alloy:laser_glint:sq');
-    // The licences schematics taught mean nothing now (everything opens by level): they go
-    expect(out.recipes).toEqual([]);
-    expect(partLicensed({ fn: 'railgun_needle', material: FN('railgun_needle').material! }, out.recipes, out.level)).toBe(out.level >= FN('railgun_needle').unlock!.level);
-    // Flies: it builds, its engines push and its generators make power
-    const d = createShipState(catalog, tuning, 1, out.ship.blueprint, 0).derived;
-    expect(d.maxThrust.forward).toBeGreaterThan(0);
-    expect(d.energy.supply).toBeGreaterThan(0);
-  });
-
-  it('a version 4 save is left as it is; without the catalogue a version 3 one waits', () => {
-    const once = migrateProfile(v3(), kit, catalog);
-    const twice = migrateProfile(JSON.parse(JSON.stringify(once)), kit, catalog);
-    expect(twice.ship.blueprint).toEqual(once.ship.blueprint);
-    expect(twice.storage).toEqual(once.storage);
-    const waiting = migrateProfile(v3(), kit);
-    expect(waiting.version).toBe(3);
-    expect(waiting.ship.blueprint.parts.find((q) => q.uid === 4)!.fn).toBe('generator');
-    expect(newProfile(kit).version).toBe(6);
+  it('a save from before models (version 3) no longer loads: it throws, never a fresh pilot', () => {
+    const kit: StarterKit = { blueprint: blueprint('sparrow-t'), planFile: 'sparrow-t', credits: 300, storage: {}, home: 'sol_station_central', position: { system: 'sol', x: 0, y: 0 } };
+    expect(OLDEST_PROFILE_VERSION).toBe(5);
+    expect(() => migrateProfile({ version: 3, credits: 1300, xp: 1300 }, kit, catalog)).toThrow(/v3 is older than v5/);
   });
 });

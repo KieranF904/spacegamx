@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
-import { Blueprint, parseBlueprint, resolveDesignUpdate, type DesignUpdateFile } from '@space-game/common';
+import { Blueprint, parseBlueprint } from '@space-game/common';
 import type { ShipConfig } from '../proto/createProtoServer.js';
 
 export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
@@ -25,18 +25,12 @@ export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
   if (existsSync(devDir)) for (const f of readdirSync(devDir)) {
     if (f.endsWith('.json')) dev[f.slice(0, -5)] = parseBlueprint(readFileSync(join(devDir, f), 'utf-8'));
   }
-  // The players' remakes (blueprints/remakes): the design update swaps them in (designUpdate.json); never sold, learned
-  // or spawned. The deploy ships them (unlike dev/); like the dev test ships they're on the F9 ship swap too
-  const remakes: Record<string, Blueprint> = {};
+  // The players' remakes (blueprints/remakes: made for the v5 design update, long run): never sold, learned or spawned.
+  // The deploy ships them (unlike dev/); like the dev test ships they're on the F9 ship swap
   const remakeDir = join(dir, 'blueprints', 'remakes');
   if (existsSync(remakeDir)) for (const f of readdirSync(remakeDir)) {
-    if (f.endsWith('.json')) remakes[f.slice(0, -5)] = dev[f.slice(0, -5)] = parseBlueprint(readFileSync(join(remakeDir, f), 'utf-8'));
+    if (f.endsWith('.json')) dev[f.slice(0, -5)] = parseBlueprint(readFileSync(join(remakeDir, f), 'utf-8'));
   }
-  // The design update's mapping, its blueprints found: "remakes/<file>", or a library ship's id
-  const designUpdate = existsSync(join(dir, 'designUpdate.json'))
-    ? resolveDesignUpdate(read('designUpdate.json') as DesignUpdateFile, (id) => (id.startsWith('remakes/') ? remakes[id.slice('remakes/'.length)] : library[id]))
-    : undefined;
-  if (designUpdate?.missing.length) console.warn(`[ships] designUpdate.json names blueprints that aren't there (those saves are wiped instead): ${designUpdate.missing.join(', ')}`);
   // Designs' own pieces (bosses' bespoke hulls)
   const bespokeDir = join(dir, 'bespoke');
   const bespoke = existsSync(bespokeDir) ? readdirSync(bespokeDir).filter((f) => f.endsWith('.json')).sort().map((f) => JSON.parse(readFileSync(join(bespokeDir, f), 'utf-8'))) : [];
@@ -48,7 +42,6 @@ export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
     library,
     enemies,
     dev,
-    ...(designUpdate ? { designUpdate: { accounts: designUpdate.accounts, blueprints: designUpdate.blueprints } } : {}),
   };
 }
 
