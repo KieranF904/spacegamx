@@ -35,8 +35,6 @@ export interface TutorialUIDeps {
   sound(id: string, v?: number): void;
   /** Which of the reportable panels are open right now */
   panelsOpen(): Partial<Record<TutorialPanel, boolean>>;
-  /** End the old flight-school tour (it must not run beside this one) */
-  stopOldTour(): void;
 }
 
 /** A training body is matched to its entity by place: the yard is stationary */
@@ -87,8 +85,6 @@ export class TutorialUI {
   private onState(s: ServerTutorialStateMessage): void {
     const prev = this.cur;
     this.cur = s;
-    // (A server that runs the yard teaches there: the old flight-school tour never runs beside it, nor after it)
-    this.d.stopOldTour();
     for (const t of newlyDone(prev, s, tutorialData)) this.panel.toast(t);
     if (targetGained(prev, s, tutorialData)) this.d.sound('scan_ping', 0.6);
     // A new step: whatever panel is already open counts again

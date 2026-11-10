@@ -13,7 +13,6 @@ import { ACTIONS, ActionDef, RESERVED_KEYS, keyName } from '../input/keybindings
 import { settings, SettingsData, defaultSettings } from '../settings/Settings';
 import { FPS_CAPS, type QualitySetting } from '../settings/quality';
 import { esc } from './escape';
-import { getTutorialState } from './tutorial/tutorialStore';
 
 export interface MenuShipInfo {
   name: string;
@@ -73,8 +72,6 @@ export interface MenuDeps {
   onOpenChange(open: boolean): void;
   /** UI sounds */
   sound(id: string, volume?: number): void;
-  /** Run the new-pilot tutorial again */
-  replayTutorial?(): void;
   /** Threat ratings by system and siege moon, and your ship's rating (the field guide's tiers) */
   threats?(): Record<string, number>;
   myRating?(): number;
@@ -373,12 +370,9 @@ export class GameMenuUI {
     const { GUIDE_TABS, guideHtml, wireGuideCharts } = fg;
     const k = (id: string) => `<kbd>${keyName(settings.data.bindings[id] ?? ACTIONS.find((a) => a.id === id)!.key)}</kbd>`;
     panel.classList.add('fg');
-    // (The old flight-school tour is offered only where it is the lesson: a server that runs the training yard teaches there)
-    const replay = !!this.deps.replayTutorial && !getTutorialState();
-    panel.innerHTML = `<div class="fg-head"><h2>Field guide</h2><p class="muted">What a pilot needs to know${replay ? ' · <button class="btn" data-a="tutorial" style="padding:3px 10px">Replay flight school</button>' : ''}</p></div>
+    panel.innerHTML = `<div class="fg-head"><h2>Field guide</h2><p class="muted">What a pilot needs to know</p></div>
       <div class="fg-tabs">${GUIDE_TABS.map((t) => `<button class="fg-tab${t.id === this.guideTab ? ' on' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}</div>
       <div class="fg-body">${guideHtml(this.guideTab, { k, threats: () => this.deps.threats?.() ?? {}, myRating: () => this.deps.myRating?.() ?? 0, level: () => this.deps.level?.() ?? 1, xp: () => this.deps.xp?.() ?? 0, icon: (id) => this.deps.icon?.(id) ?? '', shipIcon: this.deps.shipIcon })}</div>`;
-    panel.querySelector<HTMLButtonElement>('[data-a="tutorial"]')?.addEventListener('click', () => { this.close(); this.deps.replayTutorial?.(); });
     for (const b of panel.querySelectorAll<HTMLElement>('[data-tab]')) b.onclick = () => { this.guideTab = b.dataset.tab as GuideTab; this.renderMain(); };
     wireGuideCharts(panel);
   }

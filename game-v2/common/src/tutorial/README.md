@@ -17,7 +17,7 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard in its own
 - server -> client `tutorialState {step, done[], left, broken[]}`: to that pilot alone, on join and on every change. `step` is '' once left. Ghost an object when `done.includes(o.step) || broken.includes(o.id)`. Client store: `client/src/ui/tutorial/tutorialStore.ts` (`onTutorial`, `ghosted`, `currentStep`, `tutorialData`).
 
 ## Server: `server/src/game/tutorial/`
-- `Tutorial` (reached as `gs.tutorial`, undefined unless the server runs a tutorial: `GameServerOptions.tutorial`, `index.ts` TUTORIAL env: on in production, on the dev server with `TUTORIAL=1` which also replaces the Rockery start, `TUTORIAL=0` off):
+- `Tutorial` (reached as `gs.tutorial`, undefined unless the server runs a tutorial: `GameServerOptions.tutorial`, `index.ts` TUTORIAL env: on everywhere, dev server included; `TUTORIAL=0` turns it off; `DEV_START=rockery` (dev only) starts every pilot in the dev Rockery instead and so turns it off):
   - `hit(bodyEid, shooterEid, damage): boolean` (the three asteroid damage sites call it: `hurtAsteroid`, `mineBeam`, `beamAsteroid`; true = a training body, caller does nothing else).
   - `onEvent(pid, ev: TutorialEvent)`; `subscribe(fn(conn, ev))`; events emitted by the foundation: `objectBroken`, `ringPassed`, `zoneStopped`, `docked`, `jumped {x,y,exit?}`, plus `ack`/`panelOpened` from `tutorialReport`. Other modules report the rest through it: `collected` (pods taken into the hold), `refined` (StationServices), `partPlaced`/`powered` (Hangar saves).
   - `completeStep(conn, stepId)` (the engine's one way to advance; zeroes the next step's counters), `resetObjects(conn, step)`, `leave(conn)` (pack, home reset, exit, quests opened, state sent), `sendState(conn)`, `active(conn)`, `spawnFor(conn, resume)`, `objectOf/isBody/entityOf/def`.
@@ -30,5 +30,4 @@ Design (agreed with Kieran): new pilots start in ONE shared safe yard in its own
 
 ## Notes
 - A drone is an asteroid body, so the client draws a drone model where the asteroid for index `TUTORIAL_INDEX_BASE + i` is (hide the rock look); a system with no belt sends its bodies as `asteroidSpawn` on entry; shells stop on it like on a rock. Hits count for guns and mining beams.
-- The old client tour (`client/src/ui/Tutorial.ts`) never starts on a server that runs the yard (any `tutorialState` stops it); it still runs on servers without one (the dev Rockery start), and only there does the field guide offer "Replay flight school".
 - The yard's bodies live in `vesta_yard`, so pilots in Sol (and anyone who has left) are never told of them.
