@@ -7,7 +7,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import type { ServerMessage } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
@@ -20,6 +19,7 @@ import { MemoryFriends } from './MemoryFriends.js';
 import { migrateFriends } from './friendsMigration.js';
 import { LobbyFriends } from './LobbyFriends.js';
 import { FriendsUnavailable } from './FriendsBackend.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -38,10 +38,10 @@ function world(store = new MemoryProfileStore(), clock = { t: 1_000_000 }, frien
     const i = ACCOUNTS.findIndex((n) => n.toLowerCase() === t.split(':')[1]?.toLowerCase());
     return i < 0 ? null : { id: i + 1, username: ACCOUNTS[i], email: '', is_admin: false, created_at: '' };
   };
-  const server = new GameServer({
+  const server = makeServer({
     gameData: new GameData(files),
     userDB: { checkSession: async (t: string) => ({ user: user(t) }), validateSession: async (t: string) => user(t), cleanupExpiredSessions: async () => {}, admin: null } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(shipConfig), profileStore: store, clock: () => clock.t, friends,
+    ships: createShipBridge(shipConfig), profileStore: store, clock: () => clock.t, friends,
   });
   const flush = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0)); };
   const join = async (name: string, guest = false) => {

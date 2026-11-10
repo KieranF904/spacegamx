@@ -8,19 +8,17 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Input, InSystem, isWeaponFn, replicaAngle, quantizeReplicaAngle, ReplicaMode, Position, Velocity, Rotation, shapedOf, shieldHp, shieldUp, packShaped, shapedLevel, shipPointToWorld, parseBlueprint, type Blueprint, type Catalog } from '@space-game/common';
 import { readFileSync } from 'fs';
-import { GameServer } from '../../../GameServer.js';
 import { GameData } from '../../../data/GameData.js';
 import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../../loadShipConfig.js';
-import { createShipBridge } from '../../../ships/createShipBridge.js';
 import { LocalTransport } from '../../../net/LocalTransport.js';
 import { feedParts } from '../../../../../common/src/ships/testData.js';
+import { makeServer } from '../../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
+  const server = makeServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, });
   return { server, ships: server.getShips() };
 }
 

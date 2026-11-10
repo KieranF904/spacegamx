@@ -3,7 +3,6 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, InSystem, Dead } from '@space-game/common';
 import { addComponent } from 'bitecs';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
@@ -11,6 +10,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { withDevData } from '../data/devData.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
@@ -26,8 +26,8 @@ const userDB = {
 /** A server (started with or without devStart) and a way to join it as a guest or as "pilot" */
 function serverWith(devStart: string | undefined, profileStore = new MemoryProfileStore()) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false, devStart, profileStore,
+  const server = makeServer({
+    gameData: new GameData(files), userDB: userDB as any, devStart, profileStore,
     ships: createShipBridge(shipConfig),
   });
   const join = async (signedIn: boolean) => {

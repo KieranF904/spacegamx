@@ -2,15 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import type { ServerMessage } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../ships/createShipBridge.js';
 import { PostgresProfileStore } from '../../profile/PostgresProfileStore.js';
 import { FakePgPool } from '../../profile/fakePg.js';
 import { LEASE_MS } from '../../profile/lease.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -30,9 +28,8 @@ async function setup() {
   const db = new FakePgPool();
   const store = await PostgresProfileStore.setup(db);
   const sydney = await PostgresProfileStore.setup(db);
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)), profileStore: store,
+  const server = makeServer({
+    gameData: new GameData(files), userDB: userDB as any, profileStore: store,
   });
   server.pilots.opts.serverId = 'paris';
   const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); };

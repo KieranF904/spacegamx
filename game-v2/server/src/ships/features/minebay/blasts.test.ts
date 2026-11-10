@@ -12,7 +12,6 @@ import {
   Position, Velocity, Rotation, InSystem, MINES, loadCatalog, mineId, mineRest,
   type Blueprint, type PlacedPart, type Rot, type ServerMessage, type SearchShips,
 } from '@space-game/common';
-import { GameServer } from '../../../GameServer.js';
 import { GameData } from '../../../data/GameData.js';
 import { LocalTransport } from '../../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
@@ -20,6 +19,7 @@ import { loadShipConfigCached } from '../../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../../ships/createShipBridge.js';
 import { MineStore } from '../../../../../client/src/ships/features/minebay/mines';
 import type { Minefield } from './Minefield.js';
+import { makeServer } from '../../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -40,11 +40,8 @@ const of = <T extends Msg['type']>(got: Msg[], type: T) => got.filter((m) => m.t
 
 function world() {
   resetGlobals();
-  const server = new GameServer({
+  const server = makeServer({
     gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
     ships: createShipBridge(config),
     clock: () => 1_000_000,
   });

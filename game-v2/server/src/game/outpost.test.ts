@@ -2,12 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { countOf } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
 const dataDir = join(__dirname, '../../../data');
@@ -61,9 +58,8 @@ describe('your station, in its own space', () => {
   it("the site's jump point takes you to your station's own copy, with its tracks built as structures; the gate brings you back", () => {
     resetGlobals();
     const gameData = new GameData(files);
-    const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData,
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)) });
+    const server = makeServer({ profileStore: new MemoryProfileStore(), gameData,
+      });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'pilot' } as any);

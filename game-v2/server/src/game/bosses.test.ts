@@ -9,6 +9,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import type { BossesFile } from './Bosses.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -17,11 +18,8 @@ const bossFile = files.bosses as BossesFile;
 
 function world() {
   resetGlobals();
-  const server = new GameServer({
+  const server = makeServer({
     gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors',
-    autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
   });
   const t = new LocalTransport(server);

@@ -2,16 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import type { ServerMessage } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import type { AccountAdmin, AccountInfo } from '../auth/types.js';
 import { JsonProfileStore } from '../profile/JsonProfileStore.js';
 import { mkdtempSync, existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -52,9 +50,8 @@ function world(lobby: boolean, profileStore?: JsonProfileStore, names = ['boss',
   resetGlobals();
   const fake = fakeLobby(names);
   const userDB = lobby ? fake.userDB : { ...fake.userDB, admin: null };
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigCached(dataDir)), profileStore,
+  const server = makeServer({
+    gameData: new GameData(files), userDB: userDB as any, profileStore,
   });
   const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
   const join = async (name: string, guest = false) => {

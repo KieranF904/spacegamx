@@ -2,14 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { TICK_RATE, Position, type ServerMessage } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import { BotManager } from './index.js';
 import { installRockeryTools } from './rockeryTools.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
@@ -17,9 +15,8 @@ describe('Rockery spawn tools (/rockery)', () => {
   it('spawns drones, a still dummy and random-flight bot players beside the asker, and clears them', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
     const clock = { t: 1_000_000 };
-    const server = new GameServer({
-      gameData: new GameData(readGameDataFiles(dataDir)), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-      scene: 'sectors', autoStart: false, devTeleport: true, guestAdmin: true, ships: createShipBridge(loadShipConfigCached(dataDir)), clock: () => clock.t,
+    const server = makeServer({
+      gameData: new GameData(readGameDataFiles(dataDir)), devTeleport: true, guestAdmin: true, clock: () => clock.t,
     } as never);
     const step = (secs: number) => { for (let i = 0; i < secs * TICK_RATE; i++) { clock.t += 1000 / TICK_RATE; server.step(); } };
     const mgr = new BotManager(server, { log: () => {} });

@@ -9,8 +9,6 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { makeServer } from '../testkits/world.testkit.js';
 
@@ -794,11 +792,9 @@ describe('reveals', () => {
     const hidden = { ...base, id: 'test_hidden_cache', name: 'A Hidden Cache', level: 1, requires: [], reveal: { all: [{ level: 3 }, { has: { iron_ore: 5 } }] } };
     const quests = { ...files.quests, quests: [...files.quests.quests, hidden] };
     resetGlobals();
-    const server = new GameServer({
+    const server = makeServer({
       profileStore: new MemoryProfileStore(), gameData: new GameData({ ...files, quests } as any),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-    });
+      });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'pilot' } as any);

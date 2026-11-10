@@ -6,12 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, Asteroid, InSystem, Projectile, Dead, ServerMessage, TutorialEvent, objectPos, planetPosition } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -19,9 +19,8 @@ const shipConfig = loadShipConfigCached(dataDir);
 
 function yard(names = ['ann', 'bo'], tutorial = true) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({
-    gameData: new GameData(files), userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, tutorial, ships: createShipBridge(shipConfig),
+  const server = makeServer({
+    gameData: new GameData(files), tutorial, ships: createShipBridge(shipConfig),
   });
   const pilots = names.map((n) => {
     const t = new LocalTransport(server);

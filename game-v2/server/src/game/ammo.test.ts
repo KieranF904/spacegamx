@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Input, Position, Projectile, InSystem, countOf } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -19,9 +19,8 @@ function world() {
   resetGlobals();
   const config = loadShipConfigFromDisk(dataDir);
   for (const [k, d] of Object.entries(config.tuning.weapons!)) if (d.type === 'projectile') config.tuning.weapons![k] = { ...d, ammo: { item: 'scrap_electronics', rounds: 3 } };
-  const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(config) });
+  const server = makeServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
+    ships: createShipBridge(config) });
   const t = new LocalTransport(server);
   t.connect();
   t.send({ type: 'join', username: 'pilot' } as any);
@@ -79,9 +78,8 @@ describe('ammunition made for one enemy', () => {
   /** A world as the game has it (crates as data says), a Cult ship and a pirate side by side, and Quench Slugs' mods */
   function sides() {
     resetGlobals();
-    const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
-      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-      scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
+    const server = makeServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
+      ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'pilot' } as any);

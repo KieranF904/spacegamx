@@ -2,18 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { FLASH_RESTORE_TICKS, type Blueprint } from '@space-game/common';
-import { GameServer } from '../../../GameServer.js';
 import { GameData } from '../../../data/GameData.js';
 import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../loadShipConfig.js';
 import { createShipBridge } from '../../../ships/createShipBridge.js';
 import { feedParts } from '../../../../../common/src/ships/testData.js';
+import { makeServer } from '../../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = new GameServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge({ ...loadShipConfigCached(dataDir), playerBubbles: true }) });
+  const server = makeServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, ships: createShipBridge({ ...loadShipConfigCached(dataDir), playerBubbles: true }) });
   return { server, ships: server.getShips() };
 }
 

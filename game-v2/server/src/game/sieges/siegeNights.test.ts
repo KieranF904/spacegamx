@@ -2,17 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, ServerMessage, planetPosition, moonOffset } from '@space-game/common';
-import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../ships/createShipBridge.js';
 import { DEFAULT_SIEGE_RULES, SIEGE_STRINGS } from './rules.js';
 import { frontCount, siegeProfile, unitSpawns } from './plan.js';
 import { ROLES } from './roles/index.js';
 import { OBJECTIVES } from './objectives/index.js';
 import { TURRET_ORDERS, pickTarget } from './turrets.js';
+import { makeServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -20,10 +18,8 @@ const files = readGameDataFiles(dataDir);
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
   const gameData = new GameData(files);
-  const server = new GameServer({
-    gameData, userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({
+    gameData, });
   const join = (name: string) => {
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];
@@ -93,9 +89,8 @@ function raider(s: ReturnType<typeof onSelene>, ship: string, x: number, y: numb
 
 describe('siege upgrades: building, orders, the night', () => {
   it('every role, objective and order the data names exists, with its text', () => {
-    const rules = new GameServer({
-      gameData: new GameData(files), userDB: {} as any, scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-    }).sieges.rules;
+    const rules = makeServer({
+      gameData: new GameData(files), userDB: {} as any, }).sieges.rules;
     for (const R of [rules, DEFAULT_SIEGE_RULES]) {
       for (const [id, P] of Object.entries(R.profiles)) {
         for (const u of P.roster) if (u.role) expect(ROLES[u.role], `${id}: ${u.ship} role ${u.role}`).toBeDefined();

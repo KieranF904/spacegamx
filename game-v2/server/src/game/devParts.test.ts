@@ -8,13 +8,13 @@ import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
 import { Position, InSystem, Station as StationComp, parseBlueprint, isDevOnly, usesDevParts, validateBlueprint, type ServerMessage } from '@space-game/common';
-import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { withDevData } from '../data/devData.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -28,10 +28,9 @@ const { catalog, tuning } = createShipBridge(config);
 
 function live() {
   resetGlobals();
-  const server = new GameServer({
+  const server = makeServer({
     gameData: new GameData(withDevData(readGameDataFiles(dataDir), dataDir)),
-    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as never,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(config),
+    ships: createShipBridge(config),
   });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];

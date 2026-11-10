@@ -6,8 +6,7 @@ import { GameServer } from './GameServer.js';
 import { GameData } from './data/GameData.js';
 import { LocalTransport } from './net/LocalTransport.js';
 import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from './ships/loadShipConfig.js';
-import { createShipBridge } from './ships/createShipBridge.js';
+import { makeServer } from './testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../data');
 const files = readGameDataFiles(dataDir);
@@ -16,9 +15,8 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 function live(devTeleport = false) {
   resetGlobals();
   const gameData = new GameData(files);
-  const server = new GameServer({
-    gameData, userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)), devTeleport,
+  const server = makeServer({
+    gameData, devTeleport,
   });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];

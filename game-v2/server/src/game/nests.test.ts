@@ -3,12 +3,10 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, EffectType, NEST_RADIUS, ServerMessage, ghostShip, LURE_RAMP, type ServerPopsMessage } from '@space-game/common';
 import { Populations } from '../../../client/src/state/Populations.js';
-import { GameServer } from '../GameServer.js';
 import { GameData, type GameDataFiles } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
+import { makeServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -19,10 +17,8 @@ function world(edit?: (f: any) => void) {
   const f = structuredClone(files) as any;
   edit?.(f);
   const gameData = new GameData(f as GameDataFiles);
-  const server = new GameServer({
-    gameData, userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
-    scene: 'sectors', autoStart: false, ships: createShipBridge(loadShipConfigCached(dataDir)),
-  });
+  const server = makeServer({
+    gameData, });
   const step = (n = 1, each?: () => void) => { for (let i = 0; i < n; i++) { each?.(); server.step(); } };
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
