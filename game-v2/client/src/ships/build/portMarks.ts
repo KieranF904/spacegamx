@@ -4,7 +4,7 @@
  *             points sit (cell edge, outward direction) and the small OUT / IN / feed glyphs for them, as pure grid-space geometry
  * needs:      common frameOf / placeEdge (the ports core's own port placement), registeredFunction
  * invariants: every mark sits where buildPortsLayout puts the port (same rot / flip / facing frame) — client/src/ships/build/portMarks.test.ts
- *             marks only draw, never change a design — none pinned
+ *             marks only draw, never change a design — client/src/ships/hangar/marksPure.test.ts
  * extend:     a new kind of port is one more case in portMarks(); a canvas or pixi drawer reuses PortMark.poly and PORT_COLOR
  */
 

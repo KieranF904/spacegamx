@@ -4,7 +4,7 @@
  *             edit, the drawing in the world, and the toggle button and legend in the build panel
  * needs:      build/powerFlow (data), build/powerFlowView (drawing), build/powerFlowPref (the remembered choice), common createShipState
  *             / portsLoadTestCached (the whole design as built); WorkingDesign from plan.ts; npm: pixi.js (type only)
- * invariants: it shows the working design as it would run once every planned part is built (labelled "as designed") — none pinned
+ * invariants: it shows the working design as it would run once every planned part is built (labelled "as designed") — client/src/ships/field/fieldViews.test.ts
  * extend:     FieldOverlay calls mount() once, toggle() on the key, draw() each frame; nothing else
  */
 import type { Graphics } from 'pixi.js';

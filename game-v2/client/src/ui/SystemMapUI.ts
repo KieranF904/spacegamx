@@ -2,7 +2,7 @@
  * @contract client.system-map
  * owns:       the map overlay shell: views, camera, input, hits and hover, the frame loop
  * needs:      systemMap/* modules (layers, galaxyView, marks, tooltip) through the MapHost interface, GameState; npm: @space-game/common
- * invariants: each frame rebuilds hits from the layers, in draw order — none pinned
+ * invariants: the hover is the nearest of the hits the layers push each frame in draw order (nearestHit) — client/src/ui/systemMap/systemMapViews.test.ts
  * extend:     a new system-view layer is one function in systemMap/layers*.ts, called from drawSystem; a new tooltip case goes in systemMap/tooltip.ts
  */
 /**
@@ -46,7 +46,7 @@ import { drawGhosts, drawHostiles, drawFreighters, drawDerelicts, drawYourWreck,
 import { drawBossLairs, drawRoute, drawPings, drawGuideMarks } from './systemMap/layersGuides';
 import { JUMP, SECTOR_COLORS, BODY_NAMES } from './systemMap/mapConsts';
 import type { View, Camera, Fit, Hit } from './systemMap/types';
-import { actionable } from './systemMap/types';
+import { actionable, nearestHit } from './systemMap/types';
 import type { MapHost, MapScene } from './systemMap/host';
 
 export class SystemMapUI implements MapHost {
@@ -615,12 +615,7 @@ export class SystemMapUI implements MapHost {
     else this.drawSystem(ctx, sx, sy, cam, time, w, h);
 
     // Hover: nearest hit within reach of the cursor
-    let best: Hit | null = null, bestD = 22;
-    for (const hit of this.hits) {
-      // (Band edges and zones give way to anything on them)
-      const d = Math.hypot(hit.sx - this.mouse.x, hit.sy - this.mouse.y) + (hit.kind === 'region' || hit.kind === 'zone' ? 12 : 0);
-      if (d < bestD) { best = hit; bestD = d; }
-    }
+    const best = nearestHit(this.hits, this.mouse.x, this.mouse.y);
     const panning = !!this.drag?.moved && this.drag.pan;
     this.hover = panning ? null : best;
     this.canvas.style.cursor = panning ? 'grabbing' : actionable(this.hover) ? 'pointer' : this.view === 'system' ? 'crosshair' : 'grab';

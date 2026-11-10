@@ -4,7 +4,7 @@
  *             and cracking as its HP falls, fading in when the wall is rebuilt
  * needs:      BlockTarget, build/partArt drawPartArt (it takes the colours from hullPreview2d), render/gunLooks crackTexture and crackShow;
  *             common placeGeometry; npm: pixi.js
- * invariants: only a block whose HP changed is redrawn — none pinned
+ * invariants: only a block whose HP changed is redrawn — client/src/ships/gunPreview/blockArt.test.ts
  * extend:     a new damage look is one change in drawBlock
  */
 

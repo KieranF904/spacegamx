@@ -4,7 +4,7 @@
  *             real cover (wall line or arc) of a shaped shield, as pure grid-space geometry plus a pixi Graphics drawer
  * needs:      common mountOf / shapedAt / registeredFunction / partNeedsFacing (the game's own rules); npm: pixi.js (types only)
  * invariants: a shield's cover is the one shaped.ts builds, so the preview matches what blocks shots — client/src/ships/build/buildMarks.test.ts
- *             marks only draw, never change a design — none pinned
+ *             marks only draw, never change a design — client/src/ships/hangar/marksPure.test.ts
  * extend:     a part kind with a direction but no `facing` is one more case in facingMark(); a canvas drawer reuses facingMark / coverPolyline
  */
 

@@ -2,7 +2,7 @@
  * @contract client.system-map.marks
  * owns:       labels (queued, placed so they make way for each other), your ship's marker and the jump drive's reach
  * needs:      MapHost (labelQueue, state, jump, jumpAim)
- * invariants: label priority decides who keeps a spot — none pinned
+ * invariants: label priority decides who keeps a spot — client/src/ui/systemMap/systemMapViews.test.ts
  * extend:     a new kind of mark is one function here
  */
 

@@ -2,7 +2,7 @@
  * @contract client.hangar.overlays
  * owns:       the hangar grid's canvas marks: turret windows, mounting rules, facing arrows
  * needs:      HangarHost (geoms, derived, view, ctx, deps); npm: @space-game/common
- * invariants: marks only draw, never change the design — none pinned
+ * invariants: marks only draw, never change the design — client/src/ships/hangar/marksPure.test.ts
  * extend:     a new grid mark is one function here, called from hangarDraw.ts draw()
  */
 

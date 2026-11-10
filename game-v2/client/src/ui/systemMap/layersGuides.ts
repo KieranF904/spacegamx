@@ -2,7 +2,7 @@
  * @contract client.system-map.layers-guides
  * owns:       the system view's guide layers: boss lairs, the autopilot's route, pings, the lesson's spots (Jump here)
  * needs:      MapHost (autoRoute, autoTarget, pings, label), MapScene; npm: @space-game/common
- * invariants: drawn over the scenery and traffic, under your own ship — none pinned
+ * invariants: drawn over the scenery and traffic, under your own ship — client/src/ui/systemMap/systemMapViews.test.ts
  * extend:     a new guide layer is one function here, called from SystemMapUI.drawSystem
  */
 

@@ -36,3 +36,16 @@ export type Hit =
 
 /** Hits a left click acts on (elsewhere, left fires) */
 export const actionable = (h: Hit | null): h is Hit => !!h && h.kind !== 'region' && h.kind !== 'zone' && h.kind !== 'hostile';
+
+/**
+ * The hit the cursor means: the nearest within `reach` px (band edges and zones give way to anything on them). Hits come
+ * in draw order, and an earlier one keeps an exact tie.
+ */
+export function nearestHit(hits: readonly Hit[], mx: number, my: number, reach = 22): Hit | null {
+  let best: Hit | null = null, bestD = reach;
+  for (const hit of hits) {
+    const d = Math.hypot(hit.sx - mx, hit.sy - my) + (hit.kind === 'region' || hit.kind === 'zone' ? 12 : 0);
+    if (d < bestD) { best = hit; bestD = d; }
+  }
+  return best;
+}

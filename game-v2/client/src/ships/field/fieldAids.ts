@@ -5,7 +5,7 @@
  * needs:      plan.ts (BuildEdits, addPart, replacePart, freeUid), build/history, build/symmetry, build/symmetryTurn
  * invariants: one place, remove or turn (with its mirror), and one whole held drag, is one undo step — client/src/ships/field/fieldAids.test.ts
  *             an undone edit comes back whole on redo — client/src/ships/field/fieldAids.test.ts
- *             a step the live ship has since made moot falls away (the history is dropped when edits settle) — none pinned
+ *             a step the live ship has since made moot falls away (the history is dropped when edits settle) — client/src/ships/field/fieldViews.test.ts
  * extend:     a new kind of edit in the view runs inside aids.edit() so it is undoable
  */
 

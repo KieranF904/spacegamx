@@ -2,7 +2,7 @@
  * @contract client.ships.build-detail-toggle
  * owns:       the small "Simple · Advanced" switch in an editor's header
  * needs:      build/detailMode; DOM
- * invariants: the switch shows the stored mode and follows changes made elsewhere — none pinned
+ * invariants: the switch shows the stored mode and follows changes made elsewhere — client/src/ships/build/buildViews.test.ts
  * extend:     none
  */
 

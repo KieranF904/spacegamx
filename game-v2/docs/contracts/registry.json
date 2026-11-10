@@ -2130,7 +2130,7 @@
       "invariants": [
         {
           "text": "a frame runs delayed actions, ambient effects, anchors, then draws particles, shields, ripples, charges",
-          "test": "none pinned"
+          "test": "client/src/ships/DamageFx.test.ts"
         }
       ],
       "extend": "a new announced effect is a function in damage/events.ts (or a kind in damage/detonations.ts) and one forwarding method here",
@@ -2163,8 +2163,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the hangar edits a copy of the blueprint until Save",
-          "test": "none pinned"
+          "text": "the hangar loads a cloneJson copy of the stored design and edits only that until Save",
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new panel or overlay is a module under hangar/ taking HangarHost; add the members it needs to hangar/host.ts",
@@ -2336,7 +2336,7 @@
         },
         {
           "text": "marks only draw, never change a design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a part kind with a direction but no `facing` is one more case in facingMark(); a canvas drawer reuses facingMark / coverPolyline",
@@ -2550,7 +2550,7 @@
       "invariants": [
         {
           "text": "the switch shows the stored mode and follows changes made elsewhere",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "none",
@@ -2587,7 +2587,7 @@
         },
         {
           "text": "it only walks cells; whether a part can go or be taken there stays with each editor's own rules",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "an editor starts a DragPaint on mouse down (after acting on the clicked cell) and calls visit() on each mouse move",
@@ -2929,11 +2929,11 @@
       "invariants": [
         {
           "text": "one card and one preview per list, made on the first hover; the preview stops when the card hides",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         },
         {
           "text": "\"More…\" starts open in Advanced and closed in Simple; Shift or a click flips it",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "a new part kind's numbers are in build/partCard.ts; a new card section is one function here, appended in render()",
@@ -3171,7 +3171,7 @@
         },
         {
           "text": "marks only draw, never change a design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a new kind of port is one more case in portMarks(); a canvas or pixi drawer reuses PortMark.poly and PORT_COLOR",
@@ -3398,7 +3398,7 @@
         },
         {
           "text": "the animated canvas layer runs its frame loop only while it has something to show",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "a new thing drawn is a FlowSink call in drawFlow(); a new target (another renderer) is one more FlowSink",
@@ -3746,11 +3746,11 @@
       "invariants": [
         {
           "text": "a stats panel opts in by putting <span data-sd=\"KEY\"> beside a stat; chips fill and clear without rebuilding the panel",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         },
         {
           "text": "the card is hidden whenever there is no change under the cursor",
-          "test": "none pinned"
+          "test": "client/src/ships/build/buildViews.test.ts"
         }
       ],
       "extend": "a stat gets a chip by emitting a data-sd span with its STATS key in the panel's html",
@@ -4978,7 +4978,7 @@
         },
         {
           "text": "a step the live ship has since made moot falls away (the history is dropped when edits settle)",
-          "test": "none pinned"
+          "test": "client/src/ships/field/fieldViews.test.ts"
         }
       ],
       "extend": "a new kind of edit in the view runs inside aids.edit() so it is undoable",
@@ -5074,7 +5074,7 @@
       "invariants": [
         {
           "text": "it shows the working design as it would run once every planned part is built (labelled \"as designed\")",
-          "test": "none pinned"
+          "test": "client/src/ships/field/fieldViews.test.ts"
         }
       ],
       "extend": "FieldOverlay calls mount() once, toggle() on the key, draw() each frame; nothing else",
@@ -5101,11 +5101,11 @@
       "invariants": [
         {
           "text": "what glows is added as a bloom source",
-          "test": "none pinned"
+          "test": "client/src/ships/fx/ShipFx.test.ts"
         },
         {
           "text": "the local jump charge sound is cut on abort",
-          "test": "none pinned"
+          "test": "client/src/ships/fx/ShipFx.test.ts"
         }
       ],
       "extend": "a new effect layer is one more field and one more line in init",
@@ -5145,7 +5145,7 @@
       "invariants": [
         {
           "text": "only a block whose HP changed is redrawn",
-          "test": "none pinned"
+          "test": "client/src/ships/gunPreview/blockArt.test.ts"
         }
       ],
       "extend": "a new damage look is one change in drawBlock",
@@ -5609,7 +5609,7 @@
       "invariants": [
         {
           "text": "a save or delete that would lose a design asks first",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new load source is one case in loadSelected() and one option group in refreshLoadList()",
@@ -5684,8 +5684,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "layer order is grid, turret arcs, parts, mounting, groups, overlays, ghost",
-          "test": "none pinned"
+          "text": "layer order is grid, turret arcs, parts, placed marks, mounting, groups, overlays, ghost",
+          "test": "client/src/ships/hangar/hangarDraw.test.ts"
         }
       ],
       "extend": "a new overlay is one block in draw() and one toggle in HangarHost.overlays",
@@ -5717,8 +5717,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the hangar edits a copy of the blueprint until Save",
-          "test": "none pinned"
+          "text": "editing changes only ui.bp (the editor's copy), never the design it was cloned from",
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new placement rule is a case in placementProblem",
@@ -5839,7 +5839,7 @@
         },
         {
           "text": "marks only draw, never change the design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a new kind of mark is one function here, called from hangarDraw.ts draw()",
@@ -5910,7 +5910,7 @@
       "invariants": [
         {
           "text": "marks only draw, never change the design",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/marksPure.test.ts"
         }
       ],
       "extend": "a new grid mark is one function here, called from hangarDraw.ts draw()",
@@ -5951,7 +5951,7 @@
       "invariants": [
         {
           "text": "renderStats rebuilds the panel and rebinds its buttons",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new section is one html function here, appended in renderStats()",
@@ -6026,7 +6026,7 @@
       "invariants": [
         {
           "text": "every row carries its data-sd span, so the stat-delta chips fill in as in Advanced",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a stat kept in Simple is one row here and one key in build/simpleStats.ts",
@@ -6053,7 +6053,7 @@
       "invariants": [
         {
           "text": "tooltip contents rebuild only when the key changes",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a new tooltip source is one function here, calling showTip with its key",
@@ -6108,7 +6108,7 @@
       "invariants": [
         {
           "text": "modules reach the editor only through this interface",
-          "test": "none pinned"
+          "test": "client/src/ships/hangar/hangarViews.test.ts"
         }
       ],
       "extend": "a member a new module needs is added to HangarHost, and made public in HangarUI",
@@ -7172,7 +7172,7 @@
       "invariants": [
         {
           "text": "a rock's first position is its orbit position at the current tick, not (0, 0)",
-          "test": "none pinned"
+          "test": "client/src/state/asteroidGuideState.test.ts"
         }
       ],
       "extend": "a new way asteroids arrive is one more exported function here and one delegating method on GameState",
@@ -7260,7 +7260,7 @@
       "invariants": [
         {
           "text": "empty unless a lesson step is pointing at a spot",
-          "test": "none pinned"
+          "test": "client/src/state/asteroidGuideState.test.ts"
         }
       ],
       "extend": "a new kind of spot is a field on GuideMark and a case in the map layer (ui/systemMap/layersGuides.ts)",
@@ -7568,14 +7568,14 @@
       "id": "client.system-map",
       "path": "client/src/ui/SystemMapUI.ts",
       "group": "client/ui",
-      "lines": 776,
+      "lines": 771,
       "owns": "the map overlay shell: views, camera, input, hits and hover, the frame loop",
       "needs": "systemMap/* modules (layers, galaxyView, marks, tooltip) through the MapHost interface, GameState; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
-          "text": "each frame rebuilds hits from the layers, in draw order",
-          "test": "none pinned"
+          "text": "the hover is the nearest of the hits the layers push each frame in draw order (nearestHit)",
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new system-view layer is one function in systemMap/layers*.ts, called from drawSystem; a new tooltip case goes in systemMap/tooltip.ts",
@@ -7587,7 +7587,7 @@
           "name": "SystemMapUI",
           "kind": "class",
           "start": 52,
-          "end": 776
+          "end": 771
         }
       ]
     },
@@ -9573,7 +9573,7 @@
       "invariants": [
         {
           "text": "one hit per system, pushed as it is drawn",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new galaxy mark is one block in drawGalaxy",
@@ -9620,7 +9620,7 @@
       "invariants": [
         {
           "text": "modules reach the map only through this interface",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a member a new layer needs is added to MapHost, and made public in SystemMapUI",
@@ -9654,7 +9654,7 @@
       "invariants": [
         {
           "text": "drawn over the scenery and traffic, under your own ship",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new guide layer is one function here, called from SystemMapUI.drawSystem",
@@ -9701,8 +9701,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "layers push hits in draw order, so later ones win ties",
-          "test": "none pinned"
+          "text": "layers push hits in draw order; the hover takes the nearest, an earlier hit keeping an exact tie (nearestHit)",
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new traffic layer is one function here, called from SystemMapUI.drawSystem",
@@ -9777,8 +9777,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "layers push hits in draw order, so later ones win ties",
-          "test": "none pinned"
+          "text": "layers push hits in draw order; the hover takes the nearest, an earlier hit keeping an exact tie (nearestHit)",
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new scenery layer is one function here, called from SystemMapUI.drawSystem",
@@ -9889,7 +9889,7 @@
       "invariants": [
         {
           "text": "label priority decides who keeps a spot",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new kind of mark is one function here",
@@ -9951,7 +9951,7 @@
       "invariants": [
         {
           "text": "the tooltip shows the nearest hit's details",
-          "test": "none pinned"
+          "test": "client/src/ui/systemMap/systemMapViews.test.ts"
         }
       ],
       "extend": "a new hit kind is one case in updateTooltip",

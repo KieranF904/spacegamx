@@ -2,7 +2,7 @@
  * @contract client.hangar.stats-simple
  * owns:       the hangar's right-hand ship section in Simple mode: top speed, turn, firepower, hull (and shield), power balance
  * needs:      HangarHost (deps, derived, bp, unsaved, overlays, deltaNow), shipSummary, build/simpleStats, build/statDelta (flowOf)
- * invariants: every row carries its data-sd span, so the stat-delta chips fill in as in Advanced — none pinned
+ * invariants: every row carries its data-sd span, so the stat-delta chips fill in as in Advanced — client/src/ships/hangar/hangarViews.test.ts
  * extend:     a stat kept in Simple is one row here and one key in build/simpleStats.ts
  */
 

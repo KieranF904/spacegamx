@@ -2,7 +2,7 @@
  * @contract client.system-map.layers-world
  * owns:       the system view's fixed scenery layers: rings, danger bands, belts, gravity, central body, zones, planets, structures, lodestones, pockets, nests, comets
  * needs:      MapHost (state, hits, label), MapScene; npm: @space-game/common
- * invariants: layers push hits in draw order, so later ones win ties — none pinned
+ * invariants: layers push hits in draw order; the hover takes the nearest, an earlier hit keeping an exact tie (nearestHit) — client/src/ui/systemMap/systemMapViews.test.ts
  * extend:     a new scenery layer is one function here, called from SystemMapUI.drawSystem
  */
 

@@ -2,7 +2,7 @@
  * @contract client.hangar.edit
  * owns:       the hangar's grid editing: the part in hand as a candidate, placement rules, place, pick up, paint-drag, remove, new design
  * needs:      HangarUI (its fields, as the first argument), hangar/hangarAids, common ship geometry and mounting; npm: @space-game/common
- * invariants: the hangar edits a copy of the blueprint until Save — none pinned
+ * invariants: editing changes only ui.bp (the editor's copy), never the design it was cloned from — client/src/ships/hangar/hangarViews.test.ts
  * extend:     a new placement rule is a case in placementProblem
  */
 
