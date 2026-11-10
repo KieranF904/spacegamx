@@ -7,6 +7,7 @@ import { GameData } from '../../../data/GameData.js';
 import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../loadShipConfig.js';
 import { createShipBridge } from '../../../proto/createProtoServer.js';
+import { feedParts } from '../../../../../common/src/ships/testData.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 
@@ -24,15 +25,31 @@ function withParts(base: Blueprint, extra: { fn: string; x: number; y: number }[
 }
 
 describe('Flash Screen (server half)', () => {
-  const spawn = (extra: { fn: string; x: number; y: number }[]) => {
+  /** The starter with parts added beside its first gun, the Flash Screen fed by a Cell Reactor across its in port (fed) */
+  const spawn = (extra: { fn: string; x: number; y: number }[], fed = true) => {
     const w = world();
-    const e = w.ships.spawnDummy(withParts(w.ships.playerBlueprint, extra), 0, 300000, 0, 0);
+    const bp = withParts(w.ships.playerBlueprint, extra);
+    if (fed) feedParts(w.ships.catalog, bp, extra.map((_, k) => 900 + k));
+    const e = w.ships.spawnDummy(bp, 0, 300000, 0, 0);
     return { ...w, e, ship: w.ships.get(e)! };
   };
+  const flashPart = (ship: { derived: { fx?: { flash?: { parts: number[] } } } }) => ship.derived.fx!.flash!.parts[0];
 
-  it('comes back whole after 240 ticks', () => {
-    const { server, ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }]);
+  it('with its own store full, comes back at once and the store is spent', () => {
+    const { ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }]);
+    const p = flashPart(ship), L = ship.derived.ports;
     expect(ship.derived.shieldMax).toBe(36);
+    expect(ship.shield).toBe(36);
+    expect(L.cap[p]).toBeGreaterThan(0);
+    ships.hurt(e, ship, 0, 36);
+    expect(ship.shield).toBe(36);
+    expect(ships.chargeOf(e).e!.held[p]).toBe(0);
+  });
+
+  it('with its store spent, comes back whole after 240 ticks, and the store refills from its line', () => {
+    const { server, ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }]);
+    const p = flashPart(ship), L = ship.derived.ports;
+    ships.hurt(e, ship, 0, 36);
     expect(ship.shield).toBe(36);
     ships.hurt(e, ship, 0, 36);
     expect(ship.shield).toBe(0);
@@ -40,11 +57,22 @@ describe('Flash Screen (server half)', () => {
     expect(ship.shield).toBe(0);
     for (let i = 0; i < 10; i++) server.step();
     expect(ship.shield).toBe(36);
+    const held = ships.chargeOf(e).e!.held[p];
+    expect(held).toBeGreaterThan(0);
+    for (let i = 0; i < 900; i++) server.step();
+    expect(ships.chargeOf(e).e!.held[p]).toBe(L.cap[p]);
   });
 
-  // (A Capacitor bank paying to bring it back at once was the pool core's, removed with it: on the ports core the Flash
-  // Screen draws nothing yet, a known gap the owner deferred with the ports switch)
-  it.todo('on the ports core: a store touching it pays to bring it back at once (deferred: Flash draws nothing on ports)');
+  it('cut off from power, its store never refills: after the first, it always waits', () => {
+    const { server, ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }], false);
+    ships.hurt(e, ship, 0, 36);
+    expect(ship.shield).toBe(36);
+    for (let i = 0; i < 900; i++) server.step();
+    ships.hurt(e, ship, 0, 36);
+    expect(ship.shield).toBe(0);
+    for (let i = 0; i < FLASH_RESTORE_TICKS + 5; i++) server.step();
+    expect(ship.shield).toBe(36);
+  });
 
 });
 

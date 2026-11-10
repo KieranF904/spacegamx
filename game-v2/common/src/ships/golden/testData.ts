@@ -54,10 +54,15 @@ const blueprint = (file: string): Blueprint => parseBlueprint(readFileSync(join(
 const sparrow = () => blueprint('sparrow-t.json');
 const withParts = (bp: Blueprint, parts: object[]): Blueprint => ({ ...bp, parts: [...bp.parts, ...(parts as PlacedPart[])] });
 
-/** A strafer on the right flank (dodges the ship left), one on the left (dodges it right), a Tow Beam ahead of the left reactor, beam out to the left */
+/**
+ * A strafer on the right flank (dodges the ship left), one on the left (dodges it right), a Tow Beam ahead of the left
+ * reactor, beam out to the left, fed by a Cell Reactor of its own behind it (TOW_FEED: on the ports core a Tow Beam power
+ * can't reach can't take hold; until 2026-11-10 it sat a cell further in, unfed, when its power wasn't accounted)
+ */
 export const RIGHT_FLANK = { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' };
 export const LEFT_FLANK = { uid: 61, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: -2, y: 0, rot: 0, flip: false, facing: 'W' };
-export const TOW_BEAM = { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -2, y: -1, rot: 0, flip: false, facing: 'W' };
+export const TOW_BEAM = { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -3, y: -1, rot: 0, flip: false, facing: 'W' };
+export const TOW_FEED = { uid: 63, piece: 'sq', fn: 'power_cell_reactor', material: 'alloy', x: -1, y: -1, rot: 3, flip: false };
 
 /**
  * The boost test ship: a reactor, two Afterburners and a Drive Cell (once the pool core's bank test ship: one engine
@@ -187,7 +192,7 @@ export const SCENARIOS: Scenario[] = [
   { name: 'strafer-replay', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), replayAt: [14, 47, 100], replicaDiverges: false },
   { name: 'strafer-heavy', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), cargo: 4, cargoOre: 40, replayAt: [47], replicaDiverges: false },
   { name: 'strafer-energy-short', ship: () => withParts(sparrow(), [RIGHT_FLANK]), script: dodgeTillDry(), replayAt: [501, 700], replicaDiverges: false },
-  { name: 'tow', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK, TOW_BEAM]), script: towScript(), tow: { from: 2, wreckDist: 300 }, replayAt: [125, 200], replicaDiverges: true },
+  { name: 'tow', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK, TOW_BEAM, TOW_FEED]), script: towScript(), tow: { from: 2, wreckDist: 300 }, replayAt: [125, 200], replicaDiverges: true },
   { name: 'drive-bank-boost', ship: driveBankShip, script: driveBankScript(), replayAt: [41, 150], replicaDiverges: false },
   { name: 'jump-burn', ship: sparrow, script: jumpScript(), replayAt: [95, 150], replicaDiverges: true },
 ];

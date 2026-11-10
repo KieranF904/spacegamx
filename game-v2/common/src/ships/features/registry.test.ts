@@ -29,7 +29,7 @@ const feature = (o: Partial<PartFeature> & { id: string }): PartFeature => ({ ap
 const strip = <T extends object>(d: T) => { const { fxMask, fxList, fx, ...rest } = d as T & { fxMask?: unknown; fxList?: unknown; fx?: unknown }; return rest; };
 
 declare module './types.js' {
-  interface FeatureDerived { towProbe?: { power: number; parts: number[] } }
+  interface FeatureDerived { towProbe?: { parts: number[] } }
 }
 
 /** A stand-in that re-derives the Tow Beam's `derived.fx.tow` through the seam (the real Tow feature is tow/) */
@@ -40,7 +40,7 @@ const towProbe = feature({
   burst: true,
   derive(c) {
     for (const i of c.parts) {
-      const t = c.out.towProbe ??= { power: 1, parts: [] };
+      const t = c.out.towProbe ??= { parts: [] };
       t.parts.push(i);
     }
   },

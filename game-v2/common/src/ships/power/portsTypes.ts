@@ -20,6 +20,12 @@ export const TK_ENGINE = 0, TK_STRAFER = 1, TK_GYRO = 2;
  */
 export const MACHINE_FAB = 1, MACHINE_REF = 2;
 export const machineBit = (kind: number): number => 1 << (kind - 1);
+/**
+ * PortsState.mach's bit for the Tow Beams (after the machines' two): they draw their full rate only while it is set (the
+ * server sets it while the ship tows: features/tow, a decision carried as the machines' bits are) and nothing otherwise;
+ * a beam's fulfilment (PortsState.sat) is the share of its pull
+ */
+export const TOW_BIT = 4;
 export const P_INERT = 0, P_GEN = 1, P_RELAY = 2, P_THRUSTER = 3, P_TOOL = 4, P_WEAPON = 5, P_TANK = 6, P_SELECTOR = 7, P_PIPE = 8;
 // ---- Flags (PortsState.flags; three bits on the wire)
 /** A clip reloading, or a burst beam resting */
@@ -129,6 +135,11 @@ export interface PortsLayout {
   miner: Uint8Array;
   /** Tools: a field machine's kind (MACHINE_FAB, MACHINE_REF; 0 none): it draws only while PortsState.mach has its bit */
   machine: Uint8Array;
+  /** Tools: 1 for a Tow Beam (it draws only while PortsState.mach has TOW_BIT) */
+  tow: Uint8Array;
+  /** Tools: 1 for a Flash Screen, a store and no draw: its buffer (`cap`, FunctionDef.flashCost a shield point) fills over its
+   * in ports and is spent whole on the server's word when the shield breaks (features/flash flashPay), buying its return at once */
+  flash: Uint8Array;
   minePulse: Int32Array;
   /** Lines (conduit-like stores: they carry material too) */
   carrier: Uint8Array;
@@ -229,7 +240,8 @@ export interface PortsState {
   sat: Uint8Array;
   shieldSat: number;
   gauge: number;
-  /** Field machines: which may draw this tick (bits machineBit(kind)); 0: none. A control the server sets, kept by remaps */
+  /** Tool switches: which field machines may draw this tick (bits machineBit(kind)) and whether the Tow Beams do (TOW_BIT); 0:
+   * none. A control the server sets, kept by remaps */
   mach: number;
   /** Field machines: eu each kind has taken in all (index = kind): its jobs' progress (econ/field/jobs.ts). Kept by remaps */
   machEu: Float64Array;

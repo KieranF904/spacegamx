@@ -3,7 +3,7 @@
  *
  * A full 'sectors' GameServer runs in-process with four scripted pilots for 900 ticks:
  *   strafer  - the Sparrow with Burst Strafers every way (common golden testData strafersEveryWay): thrust, turns, dodges every way, fires
- *   tug      - the Sparrow with a Tow Beam (golden testData TOW_BEAM) and ore in its hold, towing a Bulwark wreck
+ *   tug      - the Sparrow with a Tow Beam (golden testData TOW_BEAM, fed by TOW_FEED) and ore in its hold, towing a Bulwark wreck
  *   striker  - the dev Breacher (dev/ports-breacher: four Hammers), firing
  *   sparrow  - a stock Sparrow (sparrow-t) flying and firing alongside
  * (Until 2026-11-10 the first three were the pool-era F9 dev ships test-strafer, test-tow-hauler and test-surge-striker,
@@ -47,7 +47,7 @@ import {
   encodeMessage, decodeMessage, ServerFrameReader, parseBlueprint,
   type ClientMessage, type ClientSocket, type Blueprint, type PlacedPart,
 } from '@space-game/common';
-import { TOW_BEAM, strafersEveryWay } from '../../../common/src/ships/golden/testData.js';
+import { TOW_BEAM, TOW_FEED, strafersEveryWay } from '../../../common/src/ships/golden/testData.js';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
@@ -112,7 +112,7 @@ function fixtures(): { specs: PilotSpec[]; corsair: Blueprint; shipCfg: ReturnTy
     corsair: bp('bulwark.json'),
     specs: [
       { name: 'strafer', bp: strafersEveryWay(), dx: 0, dy: 0 },
-      { name: 'tug', bp: { ...sparrow, parts: [...sparrow.parts, TOW_BEAM as PlacedPart] }, dx: 500, dy: 0 },
+      { name: 'tug', bp: { ...sparrow, parts: [...sparrow.parts, TOW_BEAM as PlacedPart, TOW_FEED as PlacedPart] }, dx: 500, dy: 0 },
       { name: 'striker', bp: dev['ports-breacher'], dx: 0, dy: 500 },
       { name: 'sparrow', bp: sparrow, dx: 500, dy: 500 },
     ],

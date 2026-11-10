@@ -26,7 +26,7 @@ import {
   Position, Velocity, Rotation, InSystem, createShipState, flightSignature, controlBits, replicaStep, ReplicaMode, CTL,
   quantizeCursorAngle, dequantizeCursorAngle, quantizeCursorDist, CURSOR_DIST_STEP, jumpTuning, packKeyframe, unpackKeyframe,
   packGunState, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE, simAimQ, buildFlightInputs, stepOwnShip, ownStructure, seedOwnExtras,
-  ownStateHash, packOwnSync, unpackOwnSync, cloneOwnExtras,
+  ownStateHash, packOwnSync, unpackOwnSync, cloneOwnExtras, setPortsTow, ensurePortsCharge,
   type FlightBody, type Charge, type ShipState, type ShipTuning, type ReplicaEnv, type ClientInputMessage, type OwnExtras, type SimEnv,
 } from '@space-game/common';
 import { PILOT_EXTRAS } from '../../../common/src/ships/features/plan.js';
@@ -197,11 +197,13 @@ function clientPredictor(sc: Scenario, env: ReplicaEnv) {
      * either on the grid (simAimQ), so both fly what the server flies
      */
     step(player: { body: FlightBody; x: OwnExtras; bits: number }, s: ScriptTick, i: number, charge: Charge, tick: number, server: Tick, aim: 'wire' | 'game' = 'wire'): Charge {
-      // (What the server tells it: the load it flies with, the tow its beam draws for, the slowed ticks)
+      // (What the server tells it: the load it flies with, the tow its beam draws for (its switch in the ports state, which
+      // an ownSync carries: features/tow), the slowed ticks)
       player.body.cargo = server.body.cargo ?? 0;
       player.x.guns.tow = server.tow;
       player.x.hazard.slowUntil = server.slowUntil;
       player.x.charge = charge;
+      if (sc.tow) { ensurePortsCharge(ship.derived, charge); setPortsTow(charge.e!, server.tow !== undefined); }
       const input = inputOf(s, i, aim);
       const dist = Number(input.cursorDist) || 0;
       const st = stepOwnShip(1, player.x, player.body, controlBits(buildFlightInputs(input, false)), simAimQ(input.targetAngle), { fire: !!input.fireLeft, fireAlt: !!input.fireRight, jumpDist: dist, aimDist: dist }, ownStructure(ship.derived, ship), simEnv(tick), []);

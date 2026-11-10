@@ -8,13 +8,15 @@
  *   the towed thing (towPull), weaker short of power; it lets go when the beam's lost or out of power, the
  *   thing's gone, the pilot jumps, docks or changes system, or the tether stretches past `snap`.
  * - The pilot carries its load (towLoad): as the feature's cargoMass, ShipBridge adds `load(pilot)` to the hold's mass, so the pilot's
- *   prediction and replicas fly it. The beam draws while it tows (ShipState.tow: the feature's load()).
+ *   prediction and replicas fly it. The beam draws only while it tows: the server switches it on in the ship's ports
+ *   state (setPortsTow, TOW_BIT; the pilot hears it as it hears a field machine's, sim/ownStep.ts ownSync), and the pull is
+ *   as strong as the share of its draw it gets (towShare).
  * - Towed into a station's reach, it's delivered: the host salvages it (GameServer: a wreck or debris into
  *   station storage, a derelict's credits too; a pod's contents into storage) and the beam lets go.
  */
 
 import { hasComponent } from 'bitecs';
-import { Position, Velocity, InSystem, Dead, Input, canTow, towLoad, towPull, towTuning, type ShipTuning, type TowKind, dcos, dhypot, dsin } from '@space-game/common';
+import { Position, Velocity, InSystem, Dead, Input, canTow, fullPortsCharge, setPortsTow, TOW_BIT, towLoad, towPull, towShare, towTuning, type ShipTuning, type TowKind, dcos, dhypot, dsin } from '@space-game/common';
 import type { LootPods } from '../../../game/LootPods.js';
 import type { FeatureInstance, FeatureMessageHandler, ShipsOf, StationCap, TellCap, WorldCap } from '../types.js';
 import { SimPass } from '../../../sim/SystemClocks.js';
@@ -23,7 +25,7 @@ interface Tow { target: number; kind: TowKind }
 
 /** What Tow Beams ask of the game: the towables and the towing ship's stores, toasts, the stations and the pods */
 export type TowHost = WorldCap & ShipsOf<TowShipCalls> & Pick<TellCap, 'tell'> & StationCap;
-type TowShipCalls = 'get' | 'isJumping' | 'towable' | 'towablesNear' | 'chargeOf' | 'holdTowed';
+type TowShipCalls = 'get' | 'isJumping' | 'towable' | 'towablesNear' | 'chargeOf' | 'setCharge' | 'holdTowed';
 
 export class Towing implements FeatureInstance {
   private tows = new Map<number, Tow>();
@@ -115,6 +117,7 @@ export class Towing implements FeatureInstance {
     if (best < 0) { this.host.tell(pilot, `Nothing to tow within ${Math.round(t.range)} of your hull: wrecks, debris and pods only`, '#f2d24b'); return; }
     this.tows.set(pilot, { target: best, kind: bestKind });
     ship.tow = best;
+    this.power(pilot, true);
     const what = bestKind === 'pod' ? 'a pod' : bestKind === 'wreck' ? 'a wreck' : 'debris';
     this.host.tell(pilot, `Tow Beam: towing ${what}. Bring it into a station's reach to salvage it`, '#facc15');
   }
@@ -124,6 +127,7 @@ export class Towing implements FeatureInstance {
     if (!this.tows.delete(pilot)) return;
     const ship = this.ships.get(pilot);
     if (ship) ship.tow = undefined;
+    this.power(pilot, false);
     if (text) this.host.tell(pilot, text, color);
   }
 
@@ -147,14 +151,16 @@ export class Towing implements FeatureInstance {
       if (this.ships.isJumping(ship)) { this.release(pilot, 'Tow Beam: let go for the jump'); continue; }
       // (A refit gives the pilot a new ship state: it still tows, and draws for it)
       ship.tow = tow.target;
+      this.power(pilot, true);
       // Into a station's reach: delivered (salvaged), then the beam's free
       if (this.host.isDocked(pilot) || this.host.stationInRange(pilot) >= 0) {
         this.host.deliver(pilot, tow.target, tow.kind);
         this.release(pilot);
         continue;
       }
-      // Its power this tick: whole (the ports core doesn't account the Tow Beam yet, docs/areas/energy.md)
-      const share = 1;
+      // Its power this tick: what the beams got of their draw (this tick's flight ran the ports core with them on)
+      const share = towShare(ship.derived, this.ships.chargeOf(pilot));
+      if (share < t.minShare) { this.release(pilot, 'Tow Beam out of power: the tether let go'); continue; }
       const pull = towPull(
         { x: Position.x[pilot], y: Position.y[pilot], vx: Velocity.x[pilot], vy: Velocity.y[pilot], r: ship.derived.radius },
         { x: Position.x[tow.target], y: Position.y[tow.target], vx: Velocity.x[tow.target], vy: Velocity.y[tow.target], r: e.r },
@@ -164,6 +170,19 @@ export class Towing implements FeatureInstance {
       Velocity.y[tow.target] += pull.dvy;
       if (tow.kind === 'debris') this.ships.holdTowed(tow.target);
     }
+  }
+
+  /** Switch the pilot's Tow Beams' draw on or off in its ports state (made, full, if it has none yet) */
+  private power(pilot: number, on: boolean): void {
+    const ship = this.ships.get(pilot);
+    if (!ship) return;
+    let c = this.ships.chargeOf(pilot);
+    if (!c.e || c.e.held.length !== ship.derived.ports.n) {
+      if (!on) return;
+      c = fullPortsCharge(ship.derived);
+      this.ships.setCharge(pilot, c);
+    }
+    if (((c.e!.mach & TOW_BIT) !== 0) !== on) setPortsTow(c.e!, on);
   }
 
   /** For the snapshot: what each pilot tows (entity id + 1; 0 none) */

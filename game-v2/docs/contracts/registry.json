@@ -15304,9 +15304,9 @@
       "id": "feature.flash.common",
       "path": "common/src/ships/features/flash/index.ts",
       "group": "common/ships/features",
-      "lines": 48,
+      "lines": 56,
       "owns": "the Flash Screen part feature, shared half: the shield points a rebuild derives for the Flash Screens",
-      "needs": "PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks)",
+      "needs": "PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks, the store's payment)",
       "events": "",
       "invariants": [
         {
@@ -15326,8 +15326,8 @@
         {
           "name": "feature",
           "kind": "const",
-          "start": 26,
-          "end": 48
+          "start": 27,
+          "end": 56
         }
       ]
     },
@@ -15964,7 +15964,7 @@
       "id": "power.ports-core",
       "path": "common/src/ships/power/ports.ts",
       "group": "common/ships/power",
-      "lines": 410,
+      "lines": 415,
       "owns": "the ports energy core's tick: per-tick offer / accept / apply across shared edges, feed layer (tanks, pipes, selectors, combiners), guns' gates, beams, mining; re-exports portsTypes / portsBuild / portsState / portsWire",
       "needs": "portsTypes, portsState, common/ships types",
       "events": "",
@@ -15976,6 +15976,10 @@
         {
           "text": "feature parts (strafer, gyro, machines) draw through the ports core",
           "test": "common/src/ships/power/portsFeatures.test.ts"
+        },
+        {
+          "text": "a Tow Beam draws only while switched on and a Flash Screen is a store that draws nothing",
+          "test": "common/src/ships/power/portsTools.test.ts"
         }
       ],
       "extend": "a new port consumer is a part kind constant (P_*) with a case in buildPortsLayout and portsTick; mechanics first, no ship-level routing",
@@ -16009,6 +16013,7 @@
         "TK_ENGINE",
         "TK_GYRO",
         "TK_STRAFER",
+        "TOW_BIT",
         "createPortsState",
         "effCap",
         "effShot",
@@ -16017,6 +16022,7 @@
         "machineBit",
         "matOf",
         "portsBeamStep",
+        "portsCapStores",
         "portsDamageMul",
         "portsGauge",
         "portsGaugePct",
@@ -16041,224 +16047,225 @@
         "portsTick",
         "remapPorts",
         "remapPortsByIndex",
-        "setPortsMachine"
+        "setPortsMachine",
+        "setPortsTow"
       ],
       "sections": [
         {
           "name": "PortsControls",
           "kind": "interface",
-          "start": 45,
-          "end": 57
+          "start": 47,
+          "end": 59
         },
         {
           "name": "sOffer",
           "kind": "let",
-          "start": 58,
-          "end": 58
+          "start": 60,
+          "end": 60
         },
         {
           "name": "sList",
           "kind": "let",
-          "start": 59,
-          "end": 59
+          "start": 61,
+          "end": 61
         },
         {
           "name": "grow",
           "kind": "function",
-          "start": 60,
-          "end": 66
+          "start": 62,
+          "end": 68
         },
         {
           "name": "portsThrustFrac",
           "kind": "function",
-          "start": 67,
-          "end": 68
+          "start": 69,
+          "end": 70
         },
         {
           "name": "portsThrustMul",
           "kind": "function",
-          "start": 69,
-          "end": 69
-        },
-        {
-          "name": "portsInflow",
-          "kind": "function",
-          "start": 70,
+          "start": 71,
           "end": 71
         },
         {
-          "name": "portsLinkSend",
+          "name": "portsInflow",
           "kind": "function",
           "start": 72,
           "end": 73
         },
         {
+          "name": "portsLinkSend",
+          "kind": "function",
+          "start": 74,
+          "end": 75
+        },
+        {
           "name": "waterfill",
           "kind": "function",
-          "start": 75,
-          "end": 81
+          "start": 77,
+          "end": 83
         },
         {
           "name": "portsSpace",
           "kind": "function",
-          "start": 82,
-          "end": 83
+          "start": 84,
+          "end": 85
         },
         {
           "name": "spaceOf",
           "kind": "function",
-          "start": 84,
-          "end": 91
+          "start": 86,
+          "end": 93
         },
         {
           "name": "supplyNet",
           "kind": "let",
-          "start": 92,
-          "end": 93
+          "start": 94,
+          "end": 95
         },
         {
           "name": "supplyOf",
           "kind": "function",
-          "start": 94,
-          "end": 102
+          "start": 96,
+          "end": 104
         },
         {
           "name": "drawMat",
           "kind": "function",
-          "start": 103,
-          "end": 112
+          "start": 105,
+          "end": 114
         },
         {
           "name": "accepts",
           "kind": "const",
-          "start": 113,
-          "end": 113
+          "start": 115,
+          "end": 115
         },
         {
           "name": "takeOver",
           "kind": "function",
-          "start": 115,
-          "end": 124
+          "start": 117,
+          "end": 126
         },
         {
           "name": "portsTick",
           "kind": "function",
-          "start": 126,
-          "end": 247
+          "start": 128,
+          "end": 252
         },
         {
           "name": "portsThrustersFree",
           "kind": "function",
-          "start": 249,
-          "end": 260
+          "start": 254,
+          "end": 265
         },
         {
           "name": "portsGunReady",
           "kind": "function",
-          "start": 262,
-          "end": 268
+          "start": 267,
+          "end": 273
         },
         {
           "name": "lastAug",
           "kind": "let",
-          "start": 269,
-          "end": 269
+          "start": 274,
+          "end": 274
         },
         {
           "name": "portsShotAugmented",
           "kind": "function",
-          "start": 270,
-          "end": 271
+          "start": 275,
+          "end": 276
         },
         {
           "name": "portsSpendShot",
           "kind": "function",
-          "start": 272,
-          "end": 283
+          "start": 277,
+          "end": 288
         },
         {
           "name": "portsDamageMul",
           "kind": "function",
-          "start": 284,
-          "end": 288
+          "start": 289,
+          "end": 293
         },
         {
           "name": "portsBeamStep",
           "kind": "function",
-          "start": 289,
-          "end": 313
+          "start": 294,
+          "end": 318
         },
         {
           "name": "portsPiecesHeld",
           "kind": "function",
-          "start": 314,
-          "end": 326
+          "start": 319,
+          "end": 331
         },
         {
           "name": "portsPiecePhase",
           "kind": "function",
-          "start": 327,
-          "end": 330
+          "start": 332,
+          "end": 335
         },
         {
           "name": "portsPieceLit",
           "kind": "function",
-          "start": 331,
-          "end": 334
+          "start": 336,
+          "end": 339
         },
         {
           "name": "portsPieceSpike",
           "kind": "function",
-          "start": 335,
-          "end": 339
+          "start": 340,
+          "end": 344
         },
         {
           "name": "piecesStep",
           "kind": "function",
-          "start": 340,
-          "end": 353
+          "start": 345,
+          "end": 358
         },
         {
           "name": "pieceSpend",
           "kind": "function",
-          "start": 354,
-          "end": 363
+          "start": 359,
+          "end": 368
         },
         {
           "name": "pieceBurn",
           "kind": "function",
-          "start": 364,
-          "end": 370
+          "start": 369,
+          "end": 375
         },
         {
           "name": "portsMineStep",
           "kind": "function",
-          "start": 371,
-          "end": 394
+          "start": 376,
+          "end": 399
         },
         {
           "name": "portsMinePhase",
           "kind": "function",
-          "start": 395,
-          "end": 398
+          "start": 400,
+          "end": 403
         },
         {
           "name": "portsMineStop",
           "kind": "function",
-          "start": 399,
-          "end": 402
+          "start": 404,
+          "end": 407
         },
         {
           "name": "portsSwitchFeeds",
           "kind": "function",
-          "start": 403,
-          "end": 406
+          "start": 408,
+          "end": 411
         },
         {
           "name": "portsPurge",
           "kind": "function",
-          "start": 407,
-          "end": 410
+          "start": 412,
+          "end": 415
         }
       ]
     },
@@ -16266,7 +16273,7 @@
       "id": "power.ports-build",
       "path": "common/src/ships/power/portsBuild.ts",
       "group": "common/ships/power",
-      "lines": 421,
+      "lines": 425,
       "owns": "building a PortsLayout from a ship's parts (buildPortsLayout), its signature and which parts power reaches",
       "needs": "portsTypes, common/ships catalog, grades, power/units",
       "events": "",
@@ -16320,19 +16327,19 @@
           "name": "buildPortsLayout",
           "kind": "function",
           "start": 44,
-          "end": 392
+          "end": 396
         },
         {
           "name": "portsFed",
           "kind": "function",
-          "start": 394,
-          "end": 410
+          "start": 398,
+          "end": 414
         },
         {
           "name": "portsSig",
           "kind": "function",
-          "start": 412,
-          "end": 421
+          "start": 416,
+          "end": 425
         }
       ]
     },
@@ -16340,14 +16347,18 @@
       "id": "power.ports-state",
       "path": "common/src/ships/power/portsState.ts",
       "group": "common/ships/power",
-      "lines": 101,
-      "owns": "PortsState creation and remaps, gauges, field machine switches and a part's effective stats under its material",
+      "lines": 123,
+      "owns": "PortsState creation and remaps, gauges, tool switches (field machines, Tow Beams), a hazard's cap on the stores and a part's effective stats under its material",
       "needs": "portsTypes",
       "events": "",
       "invariants": [
         {
           "text": "remaps keep what a kept part held",
           "test": "common/src/ships/power/ports.test.ts"
+        },
+        {
+          "text": "Tow Beams draw only while switched on; a capped store holds no more than its share",
+          "test": "common/src/ships/power/portsTools.test.ts"
         }
       ],
       "extend": "a new material-shaped stat is an eff* beside effShot",
@@ -16364,128 +16375,142 @@
         "effThrust",
         "fullPorts",
         "matOf",
+        "portsCapStores",
         "portsGauge",
         "portsGaugePct",
         "portsMachineEu",
         "portsMachinePart",
         "remapPorts",
         "remapPortsByIndex",
-        "setPortsMachine"
+        "setPortsMachine",
+        "setPortsTow"
       ],
       "sections": [
         {
           "name": "createPortsState",
           "kind": "function",
-          "start": 11,
-          "end": 14
+          "start": 14,
+          "end": 17
         },
         {
           "name": "fullPorts",
           "kind": "function",
-          "start": 15,
-          "end": 22
+          "start": 18,
+          "end": 25
         },
         {
           "name": "remapPorts",
           "kind": "function",
-          "start": 23,
-          "end": 41
+          "start": 26,
+          "end": 44
         },
         {
           "name": "remapPortsByIndex",
           "kind": "function",
-          "start": 42,
-          "end": 68
+          "start": 45,
+          "end": 71
         },
         {
           "name": "portsGauge",
           "kind": "function",
-          "start": 69,
-          "end": 69
+          "start": 72,
+          "end": 72
         },
         {
           "name": "portsGaugePct",
           "kind": "function",
-          "start": 70,
-          "end": 70
+          "start": 73,
+          "end": 73
         },
         {
           "name": "portsMachinePart",
           "kind": "function",
-          "start": 71,
-          "end": 75
+          "start": 74,
+          "end": 78
         },
         {
           "name": "setPortsMachine",
           "kind": "function",
-          "start": 76,
-          "end": 80
+          "start": 79,
+          "end": 83
         },
         {
           "name": "portsMachineEu",
           "kind": "function",
-          "start": 81,
-          "end": 82
+          "start": 84,
+          "end": 85
+        },
+        {
+          "name": "setPortsTow",
+          "kind": "function",
+          "start": 86,
+          "end": 89
+        },
+        {
+          "name": "portsCapStores",
+          "kind": "function",
+          "start": 90,
+          "end": 104
         },
         {
           "name": "matOf",
           "kind": "function",
-          "start": 84,
-          "end": 90
+          "start": 106,
+          "end": 112
         },
         {
           "name": "W",
           "kind": "const",
-          "start": 91,
-          "end": 91
+          "start": 113,
+          "end": 113
         },
         {
           "name": "effShot",
           "kind": "const",
-          "start": 92,
-          "end": 92
+          "start": 114,
+          "end": 114
         },
         {
           "name": "effDamage",
           "kind": "const",
-          "start": 93,
-          "end": 93
+          "start": 115,
+          "end": 115
         },
         {
           "name": "effCycle",
           "kind": "const",
-          "start": 94,
-          "end": 94
+          "start": 116,
+          "end": 116
         },
         {
           "name": "effDischarge",
           "kind": "const",
-          "start": 95,
-          "end": 95
+          "start": 117,
+          "end": 117
         },
         {
           "name": "effRest",
           "kind": "const",
-          "start": 96,
-          "end": 96
+          "start": 118,
+          "end": 118
         },
         {
           "name": "effSteady",
           "kind": "const",
-          "start": 97,
-          "end": 97
+          "start": 119,
+          "end": 119
         },
         {
           "name": "effCap",
           "kind": "const",
-          "start": 98,
-          "end": 99
+          "start": 120,
+          "end": 121
         },
         {
           "name": "effThrust",
           "kind": "function",
-          "start": 100,
-          "end": 101
+          "start": 122,
+          "end": 123
         }
       ]
     },
@@ -16493,7 +16518,7 @@
       "id": "power.ports-types",
       "path": "common/src/ships/power/portsTypes.ts",
       "group": "common/ships/power",
-      "lines": 236,
+      "lines": 248,
       "owns": "the ports core's constants (roles, flags, rates) and the PortsLayout / PortsState shapes",
       "needs": "common/ships types, tuning",
       "events": "",
@@ -16525,6 +16550,7 @@
         "TK_ENGINE",
         "TOUCH_LINE_HOLDS",
         "TOUCH_LINE_RATE",
+        "TOW_BIT",
         "TPS",
         "machineBit"
       ],
@@ -16548,118 +16574,124 @@
           "end": 22
         },
         {
-          "name": "P_INERT",
+          "name": "TOW_BIT",
           "kind": "const",
           "start": 23,
-          "end": 23
+          "end": 28
+        },
+        {
+          "name": "P_INERT",
+          "kind": "const",
+          "start": 29,
+          "end": 29
         },
         {
           "name": "PF_LATCH",
           "kind": "const",
-          "start": 24,
-          "end": 26
+          "start": 30,
+          "end": 32
         },
         {
           "name": "PF_LIT",
           "kind": "const",
-          "start": 27,
-          "end": 28
+          "start": 33,
+          "end": 34
         },
         {
           "name": "PF_SEL",
-          "kind": "const",
-          "start": 29,
-          "end": 30
-        },
-        {
-          "name": "PF_AUG",
-          "kind": "const",
-          "start": 31,
-          "end": 32
-        },
-        {
-          "name": "PF_MASK",
-          "kind": "const",
-          "start": 33,
-          "end": 33
-        },
-        {
-          "name": "MAT_UNIT",
           "kind": "const",
           "start": 35,
           "end": 36
         },
         {
-          "name": "MAT_RATE",
+          "name": "PF_AUG",
           "kind": "const",
           "start": 37,
           "end": 38
         },
         {
-          "name": "BOOST_DRAW",
+          "name": "PF_MASK",
           "kind": "const",
           "start": 39,
           "end": 39
         },
         {
-          "name": "TOUCH_LINE_RATE",
+          "name": "MAT_UNIT",
           "kind": "const",
-          "start": 40,
-          "end": 41
-        },
-        {
-          "name": "TOUCH_LINE_HOLDS",
-          "kind": "const",
-          "start": 42,
+          "start": 41,
           "end": 42
         },
         {
-          "name": "TPS",
+          "name": "MAT_RATE",
           "kind": "const",
           "start": 43,
           "end": 44
         },
         {
+          "name": "BOOST_DRAW",
+          "kind": "const",
+          "start": 45,
+          "end": 45
+        },
+        {
+          "name": "TOUCH_LINE_RATE",
+          "kind": "const",
+          "start": 46,
+          "end": 47
+        },
+        {
+          "name": "TOUCH_LINE_HOLDS",
+          "kind": "const",
+          "start": 48,
+          "end": 48
+        },
+        {
+          "name": "TPS",
+          "kind": "const",
+          "start": 49,
+          "end": 50
+        },
+        {
           "name": "PortSpec",
           "kind": "interface",
-          "start": 46,
-          "end": 46
+          "start": 52,
+          "end": 52
         },
         {
           "name": "EdgeSpec",
           "kind": "interface",
-          "start": 47,
-          "end": 47
+          "start": 53,
+          "end": 53
         },
         {
           "name": "FeedDef",
           "kind": "interface",
-          "start": 48,
-          "end": 58
+          "start": 54,
+          "end": 64
         },
         {
           "name": "PortsWeaponInput",
           "kind": "interface",
-          "start": 60,
-          "end": 60
+          "start": 66,
+          "end": 66
         },
         {
           "name": "PortsLayoutInput",
           "kind": "interface",
-          "start": 61,
-          "end": 73
+          "start": 67,
+          "end": 79
         },
         {
           "name": "PortsLayout",
           "kind": "interface",
-          "start": 75,
-          "end": 214
+          "start": 81,
+          "end": 225
         },
         {
           "name": "PortsState",
           "kind": "interface",
-          "start": 216,
-          "end": 236
+          "start": 227,
+          "end": 248
         }
       ]
     },
@@ -25441,7 +25473,7 @@
       "path": "server/src/ships/features/flash/index.ts",
       "group": "server/ships/features",
       "lines": 19,
-      "owns": "the Flash Screen world half entry: the wait after a break and the bloom",
+      "owns": "the Flash Screen world half entry: the store's instant return, the wait after a break and the bloom",
       "needs": "ServerFeature, Flash.ts",
       "events": "",
       "invariants": [

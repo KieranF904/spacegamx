@@ -7,14 +7,18 @@
  *   `snap` the tether breaks. The server moves the towed thing (server/src/ships/features/tow/Towing.ts); it's never predicted.
  * - The ship feels the load: what it tows counts as cargo (load.ts), `loadShare` of its mass, so it pushes, turns
  *   and stops slower. That rides the flight body's cargo mass, so the pilot's prediction and every replica fly it.
- * - It draws its `demand` while towing, on the ship like a gun (energy.ts gunLoad); short of power the pull
- *   weakens, and under `minShare` the beam lets go.
+ * - It draws its `demand` only while towing (power/ports.ts TOW_BIT: the server switches it, as a field machine's), from
+ *   its one-second buffer filled over its in ports; the pull is as strong as the share of that it gets (towShare), and
+ *   under `minShare` the beam lets go. One power can't reach at all (power/portsBuild.ts portsFed) can't take hold.
  * - It never takes hold of a working ship: no enemies, no bosses, no pilots (only wrecks, debris and pods).
  * - Towed into a station's reach, a wreck or debris is salvaged into the pilot's station storage (econ/salvage.ts
  *   salvageParts × `salvage`), and a pod's contents go to storage too.
  */
 
 import type { ShipTuning } from '../../tuning.js';
+import type { Charge } from '../../energy.js';
+import type { PortsLayout } from '../../power/portsTypes.js';
+import { portsFed } from '../../power/portsBuild.js';
 import { dhypot } from '../../../math/detTrig.js';
 
 export interface TowTuning {
@@ -67,8 +71,8 @@ export function towTuning(t: ShipTuning): TowTuning {
   return a;
 }
 
-/** What a rebuild derives for a ship's Tow Beams (`derived.fx.tow`): the best one's satisfaction (it takes hold from MIN_TOW_POWER), and every powered one (they draw while towing) */
-export interface TowInfo { power: number; parts: number[] }
+/** What a rebuild derives for a ship's Tow Beams (`derived.fx.tow`): every live one (they all draw while towing) */
+export interface TowInfo { parts: number[] }
 
 // (Declared here, not in index.ts, so everything that imports tow.ts (the barrel) sees `derived.fx.tow`)
 declare module '../types.js' {
@@ -78,9 +82,29 @@ declare module '../types.js' {
 /** What a Tow Beam can take hold of */
 export type TowKind = 'wreck' | 'debris' | 'pod';
 
-/** Can this ship tow (a powered Tow Beam) */
-export function canTow(d: { fx?: { tow?: { power: number } } }): boolean {
-  return (d.fx?.tow?.power ?? 0) >= MIN_TOW_POWER;
+const fedCache = new WeakMap<PortsLayout, Uint8Array>();
+/** Can this ship tow: a Tow Beam power can reach through its links (portsFed, by the layout as built) */
+export function canTow(d: { fx?: { tow?: TowInfo }; ports?: PortsLayout }): boolean {
+  const t = d.fx?.tow, L = d.ports;
+  if (!t || !L) return false;
+  let fed = fedCache.get(L);
+  if (!fed) fedCache.set(L, (fed = portsFed(L)));
+  for (const p of t.parts) if (fed[p]) return true;
+  return false;
+}
+
+/**
+ * The share of its pull a towing ship's beams give this tick (0..1): the best-fed beam's fulfilment (PortsState.sat, out
+ * of its draw this tick: power/ports.ts TOW_BIT). 1 for a ship whose power isn't accounted
+ */
+export function towShare(d: { fx?: { tow?: TowInfo }; ports: PortsLayout }, c: Charge | undefined): number {
+  const t = d.fx?.tow;
+  if (!t) return 0;
+  const e = c?.e;
+  if (!e || e.held.length !== d.ports.n) return 1;
+  let best = 0;
+  for (const p of t.parts) if (e.sat[p] > best) best = e.sat[p];
+  return best / 255;
 }
 
 /** The load a ship carries towing this mass (load.ts cargo), for its own mass */

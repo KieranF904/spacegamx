@@ -695,7 +695,8 @@ export function stepFlight(
     const dir = thrusting ? worldToLocalDir([ix / mag, iy / mag], body.angle) : undefined;
     // (The engines burn only pushing the way asked; features' thrusters by part: energy.ts PowerUse.extra)
     const extra = c.loads ? c.load : undefined;
-    const pt = powerTick(d, boost.charge, { thrusting, boosting: !!input.boost, dir, extra });
+    // (A hazard that saps the stores, radiation: they hold only so much, energy.ts PowerUse.storeCap)
+    const pt = powerTick(d, boost.charge, { thrusting, boosting: !!input.boost, dir, extra, storeCap: k.hazard?.cap });
     charge = pt.charge;
     // (Part features' shares on the replicated grid's steps, as the engines' power below: replicas are told it, ctlOfShare)
     const sh = pt.extra;

@@ -211,7 +211,7 @@ export interface FunctionDef {
    * the next. It draws its `demand` per cell a second while a burst runs, through its ports like any consumer
    */
   strafe?: { kick: number; ticks: number; cooldown: number };
-  /** Tow Beam (ships/features/tow/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
+  /** Tow Beam (ships/features/tow/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` only while towing (power/ports.ts TOW_BIT), pulling by the share it gets */
   tow?: boolean;
   /** Gyro (ships/features/gyro/gyro.ts): turning torque per unit of area, both ways, wherever it sits; draws its `demand` per cell a second turning flat out, less turning gently */
   gyro?: number;
@@ -254,8 +254,10 @@ export interface FunctionDef {
    */
   shieldRegen?: number;
   shieldDelay?: number;
-  /** Flash Screen (ships/features/flash): no slow regen; when the shield breaks it comes back whole after a wait, or at once for power a point (the feature says how) */
+  /** Flash Screen (ships/features/flash): no slow regen; when the shield breaks it comes back whole after a wait, or at once when its own store is full (it pays `flashCost`) */
   flash?: boolean;
+  /** Flash Screen: E a shield point its own store holds (filled over its in port; power/ports.ts): a full store pays for its return at once */
+  flashCost?: number;
   /**
    * Shaped shields (ships/features/zoneshield): a line (`wall`: `len` cells long, `off` cells out from the part's open edge)
    * or an arc (`rad` cells round the edge's middle, `span` degrees about its outward normal) with its own HP (`cap`, ×
