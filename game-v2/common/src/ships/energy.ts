@@ -8,7 +8,7 @@ import type { ShipDerived, WeaponInfo } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
 import {
-  type PortsControls, type PortsLayout, type PortsState, P_THRUSTER, TK_ENGINE, createPortsState, portsMineStep, portsMineStop, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
+  type PortsControls, type PortsLayout, type PortsState, P_THRUSTER, TK_ENGINE, createPortsState, portsCapStores, portsMineStep, portsMineStop, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
 } from './power/ports.js';
 import { dhypot } from '../math/detTrig.js';
 
@@ -97,6 +97,8 @@ export interface PowerUse {
    * TK_STRAFER, TK_GYRO). Undefined entries ask nothing
    */
   extra?: readonly (ArrayLike<number> | undefined)[];
+  /** A hazard that saps the stores (radiation: hazards.ts HazardFlight.cap): each store holds at most this share. Absent, 1: all */
+  storeCap?: number;
 }
 
 export interface PowerResult {
@@ -186,6 +188,7 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, _tuning?: Sh
   PORTS_CTL.active = sActive; PORTS_CTL.scale = sScale; PORTS_CTL.boosting = use.boosting && use.thrusting;
   portsTick(L, c.e!, PORTS_CTL);
   PORTS_CTL.active = null; PORTS_CTL.scale = null;
+  if (use.storeCap !== undefined && use.storeCap < 1) portsCapStores(L, c.e!, use.storeCap);
   // (The engines' share all together; whether a boost is possible is each engine's own, folded into thrustShare)
   const frac = portsThrustFrac();
   let want = 0, got = 0;

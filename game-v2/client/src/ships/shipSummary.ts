@@ -5,7 +5,7 @@
  * against the one you saved).
  */
 
-import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, baseWeaponDps, partWeaponDef, bestDodge, describeFn } from '@space-game/common';
+import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, baseWeaponDps, partWeaponDef, bestDodge, canTow, describeFn } from '@space-game/common';
 import { summaryFields, type SummaryField } from './describe';
 
 export interface ShipSummary {
@@ -35,7 +35,7 @@ export interface ShipSummary {
   miners: number;
   /** Burst Strafer: the speed a burst gives (m/s, the way it pushes hardest; 0: none; ships/strafer.ts) */
   dodge: number;
-  /** Tow Beam: its best one's power (0: none; ships/tow.ts) */
+  /** Tow Beam: 1 one power reaches (features/tow canTow), 0.1 fitted but cut off, 0 none */
   tow: number;
   /** Credits it costs to lose it: the minerals salvage doesn't bring back, at station prices */
   rebuild: number;
@@ -101,7 +101,7 @@ export function shipSummaryWithDerived(catalog: Catalog, tuning: ShipTuning, eco
     turrets: d.weapons.filter((w) => w.mount === 'turret').length,
     miners: d.miners.length,
     dodge: d.fx?.strafe ? Math.round((bestDodge(d.fx.strafe).force * d.fx.strafe.ticks / Math.max(1, d.fullMass ?? d.mass)) * 60) : 0,
-    tow: d.fx?.tow?.power ?? 0,
+    tow: d.fx?.tow ? (canTow(d) ? 1 : 0.1) : 0,
     rebuild,
   };
   return { summary, derived: d };

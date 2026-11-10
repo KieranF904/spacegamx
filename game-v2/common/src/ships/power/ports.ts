@@ -7,6 +7,8 @@
  *             common/src/ships/power/ports.test.ts
  *             feature parts (strafer, gyro, machines) draw through the ports core —
  *             common/src/ships/power/portsFeatures.test.ts
+ *             a Tow Beam draws only while switched on and a Flash Screen is a store that draws nothing —
+ *             common/src/ships/power/portsTools.test.ts
  * extend:     a new port consumer is a part kind constant (P_*) with a case in buildPortsLayout and portsTick;
  *             mechanics first, no ship-level routing
  */
@@ -25,12 +27,12 @@
  */
 
 import type { FunctionDef } from '../types.js';
-import { PF_LATCH, PF_LIT, PF_SEL, PF_AUG, MAT_UNIT, MAT_RATE, TPS, P_RELAY, P_WEAPON, P_TANK, type PortsLayout, type PortsState } from './portsTypes.js';
+import { PF_LATCH, PF_LIT, PF_SEL, PF_AUG, MAT_UNIT, MAT_RATE, TPS, TOW_BIT, P_RELAY, P_WEAPON, P_TANK, type PortsLayout, type PortsState } from './portsTypes.js';
 import { portsGauge, matOf, effShot, effDischarge, effRest, effSteady, effCap, effThrust } from './portsState.js';
 
 // (The core's pieces, re-exported so importers of this file are unchanged)
 export {
-  TK_ENGINE, TK_STRAFER, TK_GYRO, MACHINE_FAB, MACHINE_REF, machineBit,
+  TK_ENGINE, TK_STRAFER, TK_GYRO, MACHINE_FAB, MACHINE_REF, machineBit, TOW_BIT,
   P_INERT, P_GEN, P_RELAY, P_THRUSTER, P_TOOL, P_WEAPON, P_TANK, P_SELECTOR, P_PIPE,
   PF_LATCH, PF_LIT, PF_SEL, PF_AUG, PF_MASK, MAT_UNIT,
 } from './portsTypes.js';
@@ -38,7 +40,7 @@ export type { PortSpec, EdgeSpec, FeedDef, PortsWeaponInput, PortsLayoutInput, P
 export * from './portsBuild.js';
 export {
   createPortsState, fullPorts, remapPorts, remapPortsByIndex, portsGauge, portsGaugePct,
-  portsMachinePart, setPortsMachine, portsMachineEu, matOf, effShot, effCap, effThrust,
+  portsMachinePart, setPortsMachine, portsMachineEu, setPortsTow, portsCapStores, matOf, effShot, effCap, effThrust,
 } from './portsState.js';
 export * from './portsWire.js';
 
@@ -217,8 +219,11 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
     // (A mining laser draws by its pulse: portsMineStep)
     if (L.miner[p]) continue;
     // (A field machine draws its rate only while its bit is on: PortsState.mach)
+    // (A Tow Beam only while TOW_BIT is on; a Flash Screen never: its buffer is a store the server spends, features/flash)
     const mk = L.machine[p];
-    const w = mk ? ((e.mach & (1 << (mk - 1))) !== 0 ? L.rate[p] : 0) : tw ? tw[p] : L.rate[p], want = w > 0 ? w : 0, got = held[p] < want ? held[p] : want;
+    const w = L.flash[p] ? 0 : L.tow[p] ? ((e.mach & TOW_BIT) !== 0 ? L.rate[p] : 0)
+      : mk ? ((e.mach & (1 << (mk - 1))) !== 0 ? L.rate[p] : 0) : tw ? tw[p] : L.rate[p];
+    const want = w > 0 ? w : 0, got = held[p] < want ? held[p] : want;
     held[p] -= got;
     e.sat[p] = want > 0 ? Math.round((255 * got) / want) : 255;
     if (mk) e.machEu[mk] += got;

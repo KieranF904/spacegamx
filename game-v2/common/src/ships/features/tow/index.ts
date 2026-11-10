@@ -29,7 +29,7 @@ export const feature: PartFeature = {
   burst: true,
   derive(c) {
     for (const i of c.parts) {
-      const t = c.out.tow ??= { power: 1, parts: [] };
+      const t = c.out.tow ??= { parts: [] };
       t.parts.push(i);
     }
   },

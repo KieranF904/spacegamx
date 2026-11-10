@@ -9,21 +9,22 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, ServerMessage, parseBlueprint, worldToLocalDir, strafeForce, dodgePhase, DODGE_LEFT, DODGE_RIGHT, pilotExtras, type Blueprint } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, ServerMessage, parseBlueprint, worldToLocalDir, strafeForce, dodgePhase, DODGE_LEFT, DODGE_RIGHT, pilotExtras, TOW_BIT, type Blueprint } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
+import { feedParts, testCatalog } from '../../../common/src/ships/testData.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
 const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
 const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/bulwark.json'), 'utf-8'));
-/** The Sparrow with a Burst Strafer on each flank and a Tow Beam under its left wing, in place of the wing's armour tip (a Tug-ish Dancer) */
-const fitted: Blueprint = {
+/** The Sparrow with a Burst Strafer on each flank and a Tow Beam under its left wing, in place of the wing's armour tip (a Tug-ish Dancer); the beam fed by a Cell Reactor across each in port (testData feedParts) */
+const unfed: Blueprint = {
   ...sparrow,
   parts: [
     ...sparrow.parts.filter((p) => p.uid !== 10),
@@ -32,6 +33,7 @@ const fitted: Blueprint = {
     { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -2, y: 2, rot: 0, flip: false, facing: 'S' },
   ] as Blueprint['parts'],
 };
+const fitted = feedParts(testCatalog(), JSON.parse(JSON.stringify(unfed)), [62]);
 
 function world() {
   resetGlobals();
@@ -119,6 +121,8 @@ describe('Tow Beam in the server', () => {
     run(1);
     expect((server as any).features.get('tow').targetOf(pid)).toBe(wreck);
     expect(ships.get(pid)!.tow).toBe(wreck);
+    // (Its beam draws while it tows: switched on in the ports state, as a field machine is)
+    expect(ships.chargeOf(pid).e!.mach & TOW_BIT).toBe(TOW_BIT);
     // Fly away to the right: the wreck comes after
     const x0 = Position.x[wreck];
     input({ right: true, targetAngle: -Math.PI / 2 });
@@ -132,6 +136,17 @@ describe('Tow Beam in the server', () => {
     expect((server as any).features.get('tow').targetOf(pid)).toBeUndefined();
     expect(ships.get(pid)!.tow).toBeUndefined();
     expect(ships.get(pid)!.cargo ?? 0).toBe(0);
+    expect(ships.chargeOf(pid).e!.mach & TOW_BIT).toBe(0);
+  });
+
+  it('a Tow Beam power cannot reach takes hold of nothing', () => {
+    const { t, pid, got, run, ships, server } = withWreck();
+    ships.respawnInPlace(pid, unfed);
+    run(1);
+    t.send({ type: 'tow', on: true } as any);
+    run(1);
+    expect((server as any).features.get('tow').targetOf(pid)).toBeUndefined();
+    expect(got.some((m) => m.type === 'systemMessage' && /no power/.test((m as any).text))).toBe(true);
   });
 
   it('a towing pilot flies heavier than a free one', () => {

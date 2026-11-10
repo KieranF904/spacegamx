@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseBlueprint } from '../../blueprint.js';
 import { createShipState } from '../../state.js';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
+import { feedParts, readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
 import type { ShipTuning } from '../../tuning.js';
 import { DEFAULT_TOW, canTow, towAnswer, towLoad, towPull, towTuning } from './tow.js';
 
@@ -11,9 +11,11 @@ const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 /** The Sparrow with a Tow Beam on its left flank, emitter out to the left */
 const TOW_PART = { uid: 70, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -3, y: 0, rot: 0, flip: false, facing: 'W' };
-const sparrow = (extra: object[] = []) => {
+/** The Sparrow with parts added, each fed by a Cell Reactor across its in ports (testData feedParts), or not */
+const sparrow = (extra: object[] = [], fed = true) => {
   const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
+  if (fed) feedParts(catalog, bp, (extra as { uid: number }[]).map((q) => q.uid));
   return createShipState(catalog, tuning, 1, bp, 0);
 };
 const T = DEFAULT_TOW;
@@ -30,10 +32,12 @@ describe('Tow Beam: the part', () => {
     const d = sparrow([TOW_PART]).derived;
     expect(d.fx!.tow!.parts.length).toBe(1);
     expect(canTow(d)).toBe(true);
+    // (One power can't reach can't take hold)
+    expect(canTow(sparrow([TOW_PART], false).derived)).toBe(false);
     expect(towTuning(tuning).range).toBeGreaterThan(0);
   });
 
-  it('is no steady load: it draws only while it tows', () => {
+  it('is no steady load: it draws only while it tows (power/portsTools.test.ts)', () => {
     expect(sparrow([TOW_PART]).derived.energy.demand).toBe(sparrow().derived.energy.demand);
   });
 });

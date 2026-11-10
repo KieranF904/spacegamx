@@ -59,7 +59,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const pieces = new Uint8Array(n), pieceE = Z(), pieceT = Z(), spikeLo = Z(), spikeHi = Z(), spikeIn = new Float64Array(n).fill(1), spikeOut = new Float64Array(n).fill(1);
   const augCap = Z(), augCost = Z(), augRate = Z(), augSteady = Z(), augDps = new Float64Array(n).fill(1), augMods: (WeaponMods | undefined)[] = new Array(n).fill(undefined), augName: (string | undefined)[] = new Array(n).fill(undefined);
   const tierDmg = new Float64Array(n).fill(1);
-  const miner = new Uint8Array(n), minePulse = Z(), machine = new Uint8Array(n);
+  const miner = new Uint8Array(n), minePulse = Z(), machine = new Uint8Array(n), tow = new Uint8Array(n), flash = new Uint8Array(n);
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
   const mul = () => new Float64Array(n * W).fill(1);
   const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
@@ -157,6 +157,10 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       if (((fn.shield ?? 0) > 0 || fn.shaped) && !fn.flash) { shield[i] = 1; shieldDraw += partDemand(fn, a, m); }
       if (fn.mining) { miner[i] = 1; minePulse[i] = Math.max(1, Math.round((fn.minePulse ?? 0.9) * TPS)); }
       if (fn.machine) { machine[i] = fn.machine.kind === 'fabricator' ? MACHINE_FAB : MACHINE_REF; machineDraw += partDemand(fn, a, m); }
+      if (fn.tow) tow[i] = 1;
+      // (A Flash Screen is a store with no draw of its own: it holds flashCost E a shield point, filled over its in port, and a
+      // full one pays for the screen's return at once when the shield breaks: features/flash)
+      if (fn.flash) { flash[i] = 1; cap[i] = toEu((fn.flashCost ?? 0) * (fn.shield ?? 0) * a * out); }
     }
     // Feed: what it takes, its buffer, and its stats under each material
     if (fn.takes?.length && (role[i] === P_WEAPON || role[i] === P_THRUSTER)) {
@@ -377,7 +381,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, machine, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, intake, thrustKind, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, machine, tow, flash, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,

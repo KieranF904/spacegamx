@@ -1,12 +1,15 @@
 /**
  * @contract power.ports-state
- * owns:       PortsState creation and remaps, gauges, field machine switches and a part's effective stats under its material
+ * owns:       PortsState creation and remaps, gauges, tool switches (field machines, Tow Beams), a hazard's cap on the
+ *             stores and a part's effective stats under its material
  * needs:      portsTypes
  * invariants: remaps keep what a kept part held — common/src/ships/power/ports.test.ts
+ *             Tow Beams draw only while switched on; a capped store holds no more than its share —
+ *             common/src/ships/power/portsTools.test.ts
  * extend:     a new material-shaped stat is an eff* beside effShot
  */
 
-import { MACHINE_FAB, machineBit, MACHINE_REF, P_SELECTOR, type PortsLayout, type PortsState } from './portsTypes.js';
+import { MACHINE_FAB, machineBit, MACHINE_REF, P_SELECTOR, TOW_BIT, type PortsLayout, type PortsState } from './portsTypes.js';
 
 // ================================================================ state
 export function createPortsState(L: PortsLayout): PortsState {
@@ -80,6 +83,25 @@ export function setPortsMachine(e: PortsState, kind: number, on: boolean): void 
 }
 /** eu a field machine kind has taken in all (its jobs progress by the difference between two reads) */
 export function portsMachineEu(e: PortsState, kind: number): number { return e.machEu[kind] ?? 0; }
+/** Let the Tow Beams draw (on: the ship tows) or not: the server's decision, as a machine's (TOW_BIT) */
+export function setPortsTow(e: PortsState, on: boolean): void {
+  e.mach = on ? e.mach | TOW_BIT : e.mach & ~TOW_BIT;
+}
+/**
+ * A hazard that saps the stores (radiation: hazards.ts HazardFlight.cap): each store (the core and the banks; not the
+ * lines) holds at most `share` of its capacity, what's over is lost. Integer eu, the same on every side
+ */
+export function portsCapStores(L: PortsLayout, e: PortsState, share: number): void {
+  if (!(share < 1) || e.held.length !== L.n) return;
+  const f = share > 0 ? Math.round(share * 1000) / 1000 : 0;
+  let any = false;
+  for (const r of L.relays) {
+    if (L.carrier[r]) continue;
+    const m = Math.floor(L.cap[r] * f);
+    if (e.held[r] > m) { e.held[r] = m; any = true; }
+  }
+  if (any) e.gauge = portsGauge(L, e);
+}
 
 // ================================================================ effective stats (a part's material)
 /** The feed index a part's stats are shaped by now: its material, if it holds enough for its next use and takes it */

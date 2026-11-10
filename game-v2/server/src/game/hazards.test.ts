@@ -41,5 +41,12 @@ describe('hazards', () => {
     expect(hazards.deficit(pid).radiation).toBeGreaterThan(4);
     expect(ships.get(pid)!.hp.reduce((a, b) => a + b, 0)).toBeLessThan(hp0);
     expect(got.some((m) => m.type === 'toast' && /Radiation 5 against your 0\.0/.test((m as any).text))).toBe(true);
+    // Its stores hold only their share (hazards.json radiation batteryCap a point, floored at a fifth: energy.ts storeCap)
+    const L = ships.get(pid)!.derived.ports, e = ships.chargeOf(pid).e!;
+    const share = Math.max(0.2, 1 + hazards.deficit(pid).radiation * -0.08);
+    const stores = [...L.relays].filter((r) => !L.carrier[r] && L.cap[r] > 0);
+    expect(stores.length).toBeGreaterThan(0);
+    expect(stores.some((r) => e.held[r] > 0)).toBe(true);
+    for (const r of stores) expect(e.held[r]).toBeLessThanOrEqual(Math.floor(L.cap[r] * (Math.round(share * 1000) / 1000)));
   });
 });

@@ -68,7 +68,7 @@ export function hazardTolerance(rules: HazardRules, d: { mass: number; makeup: {
  * What a ship's hazards do to how it flies, where it is (worked out alike on
  * server and client, from the same ratings, rules and build): steering and
  * thrust × control, a pull towards the well (world units / tick²), jump range
- * × jump, battery capacity × cap. Undefined: nothing.
+ * × jump, what each store may hold × cap (energy.ts PowerUse.storeCap). Undefined: nothing.
  */
 export interface HazardFlight { control: number; driftAccel: number; jump: number; cap: number }
 

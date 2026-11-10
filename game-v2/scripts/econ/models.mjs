@@ -333,7 +333,8 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
   const LATE_OTHER = [
     ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'Puts 10 a second into each Capacitor or Drive Cell bank it touches. It needs no wires and powers nothing itself.', 'power', DYNAMO_LOOK],
-    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill that returns whole 4 seconds after it breaks, or at once for 4 E a point from a Capacitor bank touching it.', 'shields', legacyLook('shield')],
+    // (The Flash Screen's own store holds flashCost E a point: full, it buys the return at once; it refills over its in port. features/flash)
+    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, flashCost: 4, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill. When it breaks, a full store of its own brings it straight back; otherwise it returns whole 4 seconds later. The store refills from its power line.', 'shields', legacyLook('shield')],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
     models.push({
@@ -409,7 +410,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
       'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. It draws from a Drive Cell bank touching it first. No push at all for cruising.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
-      'Latches onto a wreck, debris or a loot pod and drags it on a tether to a station to salvage, and never takes hold of a working ship.', 'utility'],
+      'Latches onto a wreck, debris or a loot pod and drags it on a tether to a station to salvage, and never takes hold of a working ship. It draws power only while towing, and pulls weaker short of it.', 'utility'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category] of TUG) {
     models.push({

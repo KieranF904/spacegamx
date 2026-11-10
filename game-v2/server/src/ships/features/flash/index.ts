@@ -1,6 +1,6 @@
 /**
  * @contract feature.flash.server
- * owns:       the Flash Screen world half entry: the wait after a break and the bloom
+ * owns:       the Flash Screen world half entry: the store's instant return, the wait after a break and the bloom
  * needs:      ServerFeature, Flash.ts
  * invariants: its hooks run in feature id order and its message names never clash with another feature or the game —
  *             server/src/ships/features/host.test.ts
