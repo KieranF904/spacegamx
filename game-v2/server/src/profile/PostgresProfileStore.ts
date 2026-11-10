@@ -20,7 +20,10 @@ export class PostgresProfileStore implements ProfileStore, ProfileLeases {
   static async create(connectionString: string): Promise<PostgresProfileStore> {
     const moduleName = 'pg';
     const pg: any = await import(moduleName);
-    return PostgresProfileStore.setup(new pg.Pool({ connectionString }) as PgPool);
+    const pool = new pg.Pool({ connectionString });
+    // An idle client dropping (Postgres restart) emits 'error'; unhandled it would crash the process. The pool reconnects on the next query.
+    pool.on('error', (err: Error) => console.error('[profiles] postgres pool error:', err.message));
+    return PostgresProfileStore.setup(pool as PgPool);
   }
 
   /** Make the tables (if missing) on a pool */

@@ -93,7 +93,10 @@ export class PostgresUserStore implements UserStore {
     // Non-literal specifier so TypeScript doesn't require 'pg' at compile time
     const moduleName = 'pg';
     const pg: any = await import(moduleName);
-    const store = new PostgresUserStore(new pg.Pool({ connectionString }) as unknown as PgPool);
+    const pool = new pg.Pool({ connectionString });
+    // Idle-client errors (Postgres restart) must not crash the lobby; the pool reconnects on the next query
+    pool.on('error', (err: Error) => console.error('[lobby] postgres pool error:', err.message));
+    const store = new PostgresUserStore(pool as unknown as PgPool);
     await store.upgrade();
     return store;
   }
