@@ -3,7 +3,7 @@
  * owns:       the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call
  * needs:      ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js
  * events:     server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd
- * invariants: hits are searched once per snapshot window, before anything that reads HP — none pinned
+ * invariants: hits are searched once per snapshot window, before anything that reads HP (HitFlow.findHits, called from here before the HP check) — client/src/ships/hits/HitFlow.test.ts
  *             your own ship is stepped on its tick layer only (own/OwnTick), never here — server/src/golden/parity.test.ts
  *             replicated ships are placed as the pose says, a keyframe correction is not eased twice — server/src/golden/parity.test.ts
  * extend:     a new area is a new class under ships/<area>/ built in the constructor and delegated to below

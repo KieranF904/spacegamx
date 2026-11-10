@@ -2,8 +2,8 @@
  * @contract client.ship.readouts
  * owns:       the numbers the HUD and menus read off your ship: weapon ring groups, gun and laser charge, status-panel input, rating, acceleration, menu ship info
  * needs:      ReadoutsHost (state, store, catalog, tuning, pilot, features, thrustCommand, helm, localJump, jump, jumpReach), RingModel, common rateShip
- * invariants: the status record and ring records are reused between calls — none pinned
- *             ring groups come off the predicted gun state — none pinned
+ * invariants: the status record and ring records are reused between calls — client/src/ships/hud/ShipReadouts.test.ts
+ *             ring groups come off the predicted gun state — client/src/ships/hud/ShipReadouts.test.ts
  * extend:     a new HUD readout is one more method here, fed from the ship record
  */
 

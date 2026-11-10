@@ -5,7 +5,7 @@
  * needs:      ShipSource (bodies, geometry, tuning), GameState (drawn ship poses), common standing/localToWorldDir
  * invariants: every fragment ends at the damage radius from the burst, whatever its count — client/src/ships/damage/flakBurst.test.ts
  *             a fragment's end is on a ship only when it is inside a standing part's outline — client/src/ships/damage/flakBurst.test.ts
- *             nothing here changes a hit or a blast; it only draws what the server's detonation already says — none pinned
+ *             nothing here changes a hit or a blast: the fragment plan is pure and the ship search only reads the drawn world — client/src/ships/damage/flakBurstShips.test.ts
  * extend:     a new quality tier is one more row of FRAGMENT_TIERS
  */
 

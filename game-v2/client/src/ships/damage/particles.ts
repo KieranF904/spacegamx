@@ -3,8 +3,8 @@
  * owns:       the damage effects' particle list and pools (sparks, glows, rings, smoke, chunks, beams, arcs) and their
  *             per-frame move, fade and draw, and the quality cap on them
  * needs:      ParticlePool, fxTextures, gfx (clearIfDrawn), impactAnchor (AnchorList); npm: pixi.js
- * invariants: the live list is capped by setQuality and the lower tiers drop a share of the small particles — none pinned
- *             a chunk's hot edge is stroked once and parked for the next chunk when it cools — none pinned
+ * invariants: the live list is capped by setQuality and the lower tiers drop a share of the small particles — client/src/ships/damage/particles.test.ts
+ *             a chunk's hot edge is stroked once and parked for the next chunk when it cools — client/src/ships/damage/particles.test.ts
  * extend:     a new particle kind is one member of P.kind, one helper below and one case in draw
  */
 

@@ -2,8 +2,8 @@
  * @contract client.ship.own-present
  * owns:       what your own ship's tick layer fired, drawn as the prediction reaches each tick, and confirmed to OwnShells when a snapshot lands
  * needs:      OwnPresentHost (store, state, tuning, own, replicas, ownShells, gunFeel, scene, beamFx, docked, jump, ownAmmo), common fireVolley/gunControls
- * invariants: each tick's events are drawn once — none pinned
- *             no volley is drawn while berthed — none pinned
+ * invariants: each event OwnTick hands out is drawn once (OwnTick.takeEvents presents each tick once) — client/src/ships/own/OwnPresent.test.ts
+ *             no volley is drawn while berthed — client/src/ships/own/OwnPresent.test.ts
  * extend:     a new own-ship gun event kind is one more branch in presentOwn
  */
 

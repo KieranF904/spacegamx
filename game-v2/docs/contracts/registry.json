@@ -2197,8 +2197,8 @@
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
       "invariants": [
         {
-          "text": "hits are searched once per snapshot window, before anything that reads HP",
-          "test": "none pinned"
+          "text": "hits are searched once per snapshot window, before anything that reads HP (HitFlow.findHits, called from here before the HP check)",
+          "test": "client/src/ships/hits/HitFlow.test.ts"
         },
         {
           "text": "your own ship is stepped on its tick layer only (own/OwnTick), never here",
@@ -4255,8 +4255,8 @@
           "test": "client/src/ships/damage/flakBurst.test.ts"
         },
         {
-          "text": "nothing here changes a hit or a blast; it only draws what the server's detonation already says",
-          "test": "none pinned"
+          "text": "nothing here changes a hit or a blast: the fragment plan is pure and the ship search only reads the drawn world",
+          "test": "client/src/ships/damage/flakBurstShips.test.ts"
         }
       ],
       "extend": "a new quality tier is one more row of FRAGMENT_TIERS",
@@ -4415,11 +4415,11 @@
       "invariants": [
         {
           "text": "the live list is capped by setQuality and the lower tiers drop a share of the small particles",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/particles.test.ts"
         },
         {
           "text": "a chunk's hot edge is stroked once and parked for the next chunk when it cools",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/particles.test.ts"
         }
       ],
       "extend": "a new particle kind is one member of P.kind, one helper below and one case in draw",
@@ -4511,7 +4511,7 @@
         },
         {
           "text": "undock puts the ship back where it came in",
-          "test": "none pinned"
+          "test": "client/src/ships/dock/DockControl.test.ts"
         }
       ],
       "extend": "a new hint line is one more branch in updateHints",
@@ -6207,11 +6207,11 @@
       "invariants": [
         {
           "text": "the snapshot window is searched once, before anything that reads HP",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/HitFlow.test.ts"
         },
         {
           "text": "hits found here are worked out before the told ones, as the server orders them",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/HitFlow.test.ts"
         }
       ],
       "extend": "a new hit-related server message is one more call to findHits() before it reads HP",
@@ -6252,11 +6252,11 @@
       "invariants": [
         {
           "text": "a hit that cannot mine shows plain sparks",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/StrikeFx.test.ts"
         },
         {
           "text": "only your own working hits tick and add progress",
-          "test": "none pinned"
+          "test": "client/src/ships/hits/StrikeFx.test.ts"
         }
       ],
       "extend": "a new hit look is one more branch in struck()",
@@ -6302,11 +6302,11 @@
       "invariants": [
         {
           "text": "the status record and ring records are reused between calls",
-          "test": "none pinned"
+          "test": "client/src/ships/hud/ShipReadouts.test.ts"
         },
         {
           "text": "ring groups come off the predicted gun state",
-          "test": "none pinned"
+          "test": "client/src/ships/hud/ShipReadouts.test.ts"
         }
       ],
       "extend": "a new HUD readout is one more method here, fed from the ship record",
@@ -6344,7 +6344,7 @@
         },
         {
           "text": "a charge under way keeps the aim it was locked with",
-          "test": "none pinned"
+          "test": "client/src/ships/jump/JumpControl.test.ts"
         }
       ],
       "extend": "a new system-wide flight field is one more field set in onSystemInfo and read by replicaEnv",
@@ -6417,12 +6417,12 @@
       "events": "",
       "invariants": [
         {
-          "text": "each tick's events are drawn once",
-          "test": "none pinned"
+          "text": "each event OwnTick hands out is drawn once (OwnTick.takeEvents presents each tick once)",
+          "test": "client/src/ships/own/OwnPresent.test.ts"
         },
         {
           "text": "no volley is drawn while berthed",
-          "test": "none pinned"
+          "test": "client/src/ships/own/OwnPresent.test.ts"
         }
       ],
       "extend": "a new own-ship gun event kind is one more branch in presentOwn",
@@ -6514,7 +6514,7 @@
       "invariants": [
         {
           "text": "a gun too small on screen is neither drawn nor turned",
-          "test": "none pinned"
+          "test": "client/src/ships/render/GunDrawer.test.ts"
         }
       ],
       "extend": "a new per-gun visual state is one more branch in animate()",
@@ -6552,7 +6552,7 @@
         },
         {
           "text": "a design changed in place drops a stale worker answer",
-          "test": "none pinned"
+          "test": "client/src/ships/render/HullDrawer.test.ts"
         }
       ],
       "extend": "a new kind of per-view mesh is built in drawHull and freed in disposeFrame",
@@ -6585,8 +6585,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "values only; changing one changes the look of every ship",
-          "test": "none pinned"
+          "text": "values and text styles only, no functions or state",
+          "test": "client/src/ships/render/renderValues.test.ts"
         }
       ],
       "extend": "a new draw constant is added here and imported where used",
@@ -6773,7 +6773,7 @@
       "invariants": [
         {
           "text": "a look is destroyed only when no ship uses it and the idle cache is full",
-          "test": "none pinned"
+          "test": "client/src/ships/render/gunLooks.test.ts"
         }
       ],
       "extend": "a new shared gun-look helper is added here",
@@ -7058,8 +7058,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "a view holds drawn state only; nothing here is decided by gameplay",
-          "test": "none pinned"
+          "text": "types only (no runtime code); a view holds drawn state, nothing gameplay decides",
+          "test": "client/src/ships/render/renderValues.test.ts"
         }
       ],
       "extend": "a new per-ship drawn thing is one more field on BodyView",
@@ -7104,7 +7104,7 @@
         },
         {
           "text": "a ship docked to yours is placed at your draw tick",
-          "test": "none pinned"
+          "test": "client/src/ships/replicas/ReplicaPlacement.test.ts"
         }
       ],
       "extend": "a new per-pilot data column is one more entry in placeReplica's data row",

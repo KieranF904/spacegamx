@@ -2,7 +2,7 @@
  * @contract client.ship.render.gun-looks
  * owns:       gun looks drawn once and shared by every gun like it (reference counted), plus cracks, colour darkening and light shading
  * needs:      pixi Graphics/GraphicsContext/Texture, gunDecor GunShape, shipColors mix; npm: pixi.js
- * invariants: a look is destroyed only when no ship uses it and the idle cache is full — none pinned
+ * invariants: a look is destroyed only when no ship uses it and the idle cache is full — client/src/ships/render/gunLooks.test.ts
  * extend:     a new shared gun-look helper is added here
  */
 

@@ -3,7 +3,7 @@
  * owns:       the local jump drive as the client sees it: phase, reach, landing, aim, charging fields, plus the system's flight world (gravity, star, lodestones, hazards, terrain)
  * needs:      JumpControlHost (state, store, isKeyDown, hangarOpen, helm, showMessage), common jump/jumpFields/hazardFlight, terrainFor
  * invariants: reach and landing use the burn's own rules (jumpReachAt, jumpLanding) — server/src/golden/parity.test.ts
- *             a charge under way keeps the aim it was locked with — none pinned
+ *             a charge under way keeps the aim it was locked with — client/src/ships/jump/JumpControl.test.ts
  * extend:     a new system-wide flight field is one more field set in onSystemInfo and read by replicaEnv
  */
 
