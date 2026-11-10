@@ -1,5 +1,5 @@
-// node --test prototypes/energy-lab/ports-model.test.mjs
-import { test } from 'node:test';
+// Runs under vitest (npm test)
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);

@@ -2,7 +2,7 @@
  * Test-only: the one server boot every GameServer test shares. makeServer() is a real GameServer on the 'sectors' scene,
  * not auto-started (the test steps it), with the shared game data, the stub user database and the cached ship config;
  * any option a test passes replaces the default. The data files are read once per test file, not once per world.
- * (Boot cost, mostly asteroid orbit filing, is one place to fix here.)
+ * makeEmptyServer() is the same on the 'empty' scene (no sector world, no asteroid orbit filing) for tests that need none of it.
  */
 import { join } from 'path';
 import * as bitecs from 'bitecs';
@@ -34,6 +34,9 @@ export function makeServer(opts: Partial<GameServerOptions> = {}): GameServer {
     ...opts,
   } as GameServerOptions);
 }
+
+/** A test GameServer on the 'empty' scene: no stations, NPCs, portals or asteroids, so it boots in milliseconds. For tests that do not need the sector world. */
+export const makeEmptyServer = (opts: Partial<GameServerOptions> = {}): GameServer => makeServer({ scene: 'empty', ...opts });
 
 /** A pilot joined over a LocalTransport, with every server message it was sent */
 export function joinPilot(server: GameServer, username: string) {

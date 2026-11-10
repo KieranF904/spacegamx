@@ -1,40 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
 import {
   Position, Velocity, InSystem, Rotation, ServerMessage, insideTerrain, rayTerrain, isRuined, currentStage, deciding, stageOf, partArmour,
   hitMultiplier, WINDOW,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
-import { GameData } from '../data/GameData.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import type { BossesFile } from './Bosses.js';
 import { PYRECLAST_EXPOSURE, PYRECLAST_LOOP, type PyreclastBrain } from './brains/pyreclast.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeServer, gameFiles, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
+import { place, mend, advance, watchMoveFx } from '../testkits/boss.testkit.js';
 
-const dataDir = join(__dirname, '../../../data');
-const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const files = readGameDataFiles(dataDir);
+const files = gameFiles();
 const def = (files.bosses as BossesFile).bosses.boss_pyreclast;
 
 function world() {
   resetGlobals();
   const server = makeServer();
   const pilots: { pid: number; got: ServerMessage[] }[] = [];
-  // (A move's looks (its tells, beams, strikes' looks) are worked out by every client running the boss's body (CAPS.MOVES,
-  // every client), so none go on the wire: the server's own word for them, GameServer.moveFx, is what's watched here,
-  // as every pilot in the system would have been sent it)
-  (server as any).moveFx = (sys: number, _eid: number, _origin: unknown, msg: ServerMessage) => { for (const p of pilots) if (InSystem.systemId[p.pid] === sys) p.got.push(msg); };
+  watchMoveFx(server, (sys) => pilots.filter((p) => InSystem.systemId[p.pid] === sys).map((p) => p.got));
   const join_ = (name: string) => {
-    const t = new LocalTransport(server);
-    const got: ServerMessage[] = [];
-    t.onMessage = (m) => got.push(m);
-    t.connect();
-    t.send({ type: 'join', username: name } as any);
-    const p = { pid: t.getPlayerId(), got };
+    const { pid, got } = joinPilot(server, name);
+    const p = { pid, got };
     pilots.push(p);
     return p;
   };
@@ -46,23 +31,7 @@ function world() {
   return { server, got, pid, step, num, bridge: server.getShips(), god, join: join_ };
 }
 
-const place = (pid: number, num: number, x: number, y: number, vx = 0, vy = 0) => {
-  InSystem.systemId[pid] = num; Position.x[pid] = x; Position.y[pid] = y; Velocity.x[pid] = vx; Velocity.y[pid] = vy;
-};
-/** Keep the pilot whole (it's the boss's moves under test, not how long a pilot lasts) */
-const mend = (server: GameServer, pid: number) => server.getShips().scaleHp(pid, 1);
 const brainOf = (server: GameServer, eid: number) => server.bosses.brainOf(eid) as unknown as PyreclastBrain;
-/** (dev) Its fight moved on to the start of a stage: what's before it beaten, blown away, and done blowing */
-const advance = (server: GameServer, eid: number, stage: number, step: (n?: number) => void) => {
-  const brain = server.bosses.brainOf(eid)!, bridge = server.getShips();
-  for (let n = 1; n < 400; n++) {
-    const s = bridge.get(eid);
-    if (!s || currentStage(bridge.catalog, s) >= stage) break;
-    brain.forceShed!(n);
-  }
-  step(2);
-  for (let i = 0; i < 60 * 15 && brain.invulnerable!(); i++) step();
-};
 /** Its personal attacks off (a signature move under test alone) */
 const noPersonal = (server: GameServer, eid: number) => { (brainOf(server, eid).fight.tables as { personal?: unknown }).personal = undefined; };
 

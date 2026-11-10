@@ -15,7 +15,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
 import { GuestKeep, guestIdOf, GUEST_DOC, GUEST_KEEP_MAX, GUEST_KEEP_MS } from './guests.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -26,7 +26,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 function server(store: MemoryProfileStore) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  return makeServer({
+  return makeEmptyServer({
     gameData: new GameData(files), tutorial: true, ships: createShipBridge(shipConfig), profileStore: store,
   });
 }

@@ -9,7 +9,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -19,7 +19,7 @@ describe('fabrication orders', () => {
   it('short of plate, an order refines it from ore (waiting for ore if need be), then makes the thing', () => {
     resetGlobals();
     const clock = { t: 1_000_000 };
-    const server = makeServer({ profileStore: new MemoryProfileStore(), clock: () => clock.t });
+    const server = makeEmptyServer({ profileStore: new MemoryProfileStore(), clock: () => clock.t });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'pilot' } as any);
@@ -44,7 +44,7 @@ describe('fabrication orders', () => {
   it('a component a part needs (a power coupling) is fabricated from its own inputs, not left short', () => {
     resetGlobals();
     const clock = { t: 1_000_000 };
-    const server = makeServer({ profileStore: new MemoryProfileStore(), clock: () => clock.t });
+    const server = makeEmptyServer({ profileStore: new MemoryProfileStore(), clock: () => clock.t });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'pilot' } as any);

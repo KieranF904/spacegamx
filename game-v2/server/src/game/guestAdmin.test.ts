@@ -10,7 +10,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { devGuestShips } from '../data/devData.js';
 import { readFileSync } from 'fs';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
@@ -18,7 +18,7 @@ const env = process.env.NODE_ENV;
 /** A guest's authResult on a server started with or without guestAdmin */
 function guestJoin(guestAdmin: boolean): boolean | undefined {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = makeServer({ guestAdmin });
+  const server = makeEmptyServer({ guestAdmin });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);
@@ -45,7 +45,7 @@ describe('guest admins (dev server only)', () => {
 /** The hangar a guest is given on a server started with these guest designs */
 function guestHangar(guestShips: unknown[]): (string | null)[] {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = makeServer({ guestShips: guestShips as any });
+  const server = makeEmptyServer({ guestShips: guestShips as any });
   const t = new LocalTransport(server);
   t.onMessage = () => {};
   t.connect();

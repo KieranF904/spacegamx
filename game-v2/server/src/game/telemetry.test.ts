@@ -10,7 +10,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
@@ -18,7 +18,7 @@ describe('telemetry', () => {
   it('writes a line for each death and each first-time milestone', async () => {
     const file = join(tmpdir(), `sg-telemetry-${process.pid}-${Date.now()}.jsonl`);
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = makeServer({ telemetry: async (lines) => appendFileSync(file, lines) });
+    const server = makeEmptyServer({ telemetry: async (lines) => appendFileSync(file, lines) });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'rookie' } as any);

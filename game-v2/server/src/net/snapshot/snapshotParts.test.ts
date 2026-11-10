@@ -13,7 +13,7 @@ import { RowKeys } from './rows/keys.js';
 import { ContactFx } from '../replication/contactFx.js';
 import type { ContactWindow } from '../causes/contactsFor.js';
 import type { CrowdControl } from '../crowd/CrowdControl.js';
-import { joinPilot, makeServer, resetGlobals, stepServer } from '../../testkits/world.testkit.js';
+import { joinPilot, makeEmptyServer, resetGlobals, stepServer } from '../../testkits/world.testkit.js';
 
 describe('snapshot rounds', () => {
   it('go every CROWD_BASE_WINDOW ticks for unwidened systems, none in between', () => {
@@ -114,7 +114,7 @@ describe('own hazards key', () => {
 describe('playerState', () => {
   it('is sent when it changes (or every 600 ticks), not every tick', () => {
     resetGlobals();
-    const server = makeServer();
+    const server = makeEmptyServer();
     const p = joinPilot(server, 'Hud');
     const count = () => p.got.filter((m) => m.type === 'playerState').length;
     const conn = [...server.clients.values()].find((c) => c.playerId === p.pid)!;
