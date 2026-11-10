@@ -28,7 +28,6 @@ import { InfoPanel } from '../ui/InfoPanel';
 import { TradeWindow } from '../ui/TradeWindow';
 import { TargetUI } from '../ui/TargetUI';
 import { OpsUI } from '../ui/OpsUI';
-import { TutorialUI } from '../ui/tutorial/TutorialUI';
 import { PingUI } from '../ui/PingUI';
 import { RibbonPopup } from '../ui/RibbonPopup';
 import { QuestClient } from '../ui/QuestUI';
@@ -52,6 +51,8 @@ import type { GameMenuUI, MenuPilotInfo } from '../ui/GameMenuUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ComponentGuideUI } from '../ui/ComponentGuideUI';
 import type { StationWindow } from '../ui/StationWindow';
+import type { TutorialUI } from '../ui/tutorial/TutorialUI';
+import type { GunRangeHud } from '../ui/gunRange/GunRangeHud';
 import type { Lazy } from '../lazy';
 import type { AudioManager } from '../audio/AudioManager';
 import type { InputManager } from '../input/InputManager';
@@ -61,9 +62,8 @@ import type { ShipClient } from '../ships/ShipClient';
 import type { GameState } from '../state/GameState';
 import type { PilotState } from '../econ/clientEcon';
 import type { ClientTransport } from '@space-game/common';
-import { makeComponentGuide, makeStationWindow } from './lazyScreens';
-import { GunRangeHud } from '../ui/gunRange/GunRangeHud';
-import { chamberOf, inGunRange } from '../ui/gunRange/rangeState';
+import { makeComponentGuide, makeStationWindow, makeTutorialUI, makeGunRangeHud } from './lazyScreens';
+import { inGunRange } from '../ui/gunRange/rangeState';
 
 /** What the windows read from the game (Game supplies it as getters, so later-built state resolves at use) */
 export interface WindowHost {
@@ -129,7 +129,7 @@ export interface WindowSet {
   ribbonPopup: RibbonPopup;
   pingUI: PingUI;
   /** The training-yard lesson (card, markers, ghosts) */
-  tutorialUI: TutorialUI;
+  tutorialUI: Lazy<TutorialUI>;
   killFeedUI: KillFeedUI;
   playerStatsUI: PlayerStatsUI;
   systemMapUI: SystemMapUI;
@@ -142,7 +142,7 @@ export interface WindowSet {
   /** Structures you've built or are building (drawn for you alone) */
   buildSites: BuildSites | null;
   /** The gun range's banner, target bar, door prompt and weapon picker (ui/gunRange) */
-  gunRangeHud: GunRangeHud;
+  gunRangeHud: Lazy<GunRangeHud>;
 }
 
 export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSet {
@@ -312,24 +312,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.ribbonPopup = new RibbonPopup((id) => host.audio.playUI(id, 0.6));
     w.pingUI = new PingUI(host.state, (m) => host.network.send(m), (x, y) => host.renderer.worldToScreen(x, y), cursorWorld,
       () => host.renderer.getZoom(), (id) => host.audio.playUI(id, 0.5));
-    w.tutorialUI = new TutorialUI({
-      state: host.state,
-      send: (m) => host.network.send(m),
-      worldToScreen: (x, y) => host.renderer.worldToScreen(x, y),
-      setTrainingLook: (id, look) => host.renderer.setTrainingLook(id, look),
-      keyOf: (a) => boundKeyName(a, settings.data.bindings),
-      helm: () => host.shipClient.helmMode(),
-      itemName: (id) => host.pilot.econ.items.get(id)?.name ?? id,
-      itemIcon: (id) => itemIcon(host.pilot.econ, id),
-      sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
-      panelsOpen: () => {
-        const tab = host.stationOpen ? w.stationWindow.value?.currentTab : '';
-        return {
-          hold: w.inventoryWindow.isOpen, hangar: host.shipClient.hangarOpen, map: w.systemMapUI.isOpen, guide: !!w.componentGuide.value?.isOpen,
-          bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator',
-        };
-      },
-    });
+    w.tutorialUI = makeTutorialUI(host, w);
     w.killFeedUI = new KillFeedUI(uiOverlay);
     w.playerStatsUI = new PlayerStatsUI(uiOverlay);
     w.systemMapUI = new SystemMapUI(uiOverlay, host.state);
@@ -379,27 +362,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       return { name: r.name, hint: r.hint };
     };
     w.systemMapUI.pings = () => w.pingUI.markers();
-    w.gunRangeHud = new GunRangeHud({
-      send: (m) => host.network.send(m),
-      sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
-      catalog: host.pilot.econ.ships,
-      econ: host.pilot.econ,
-      tuning: shipTuning as ShipTuning,
-      chamber: () => chamberOf(host.state.systemId),
-      me: () => { const e = host.state.entities.get(host.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
-      hull: (id) => {
-        const ship = host.shipClient.store.get(id);
-        if (!ship) return null;
-        let hp = 0, max = 0;
-        for (let i = 0; i < ship.hp.length; i++) { max += ship.maxHp[i]; if (ship.derived.alive[i]) hp += ship.hp[i]; }
-        return { hp, max, name: host.state.entities.get(id)?.name || ship.blueprint.name || 'Target' };
-      },
-      keyName: (a) => boundKeyName(a, settings.data.bindings),
-      column: () => {
-        const c = w.cargoPanel.column();
-        return { left: c.left, width: c.width, top: Math.max(w.pilotHud.bottom(), w.social.hudBottom()) + 8, lift: w.pilotHud.top(), floor: c.floor };
-      },
-    });
+    w.gunRangeHud = makeGunRangeHud(host, w);
     w.systemMapUI.onPing = (x, y) => w.pingUI.pingAt(x, y);
 
   return w;

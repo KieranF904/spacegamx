@@ -101,7 +101,7 @@ export interface MessageHost {
   readonly quickBar: QuickBar;
   readonly dialogue: DialogueUI;
   readonly objectives: ObjectiveBanner;
-  readonly siegePanel: SiegePanel;
+  readonly siegePanel: Lazy<SiegePanel>;
   readonly bossUI: BossUI;
   readonly stationWindow: Lazy<StationWindow>;
   readonly worldEvents: Map<number, { name: string; x: number; y: number; system: string }>;
@@ -393,7 +393,7 @@ const TABLE: Handlers = {
     h.renderer.setNight(0);
   },
   siegeState: (h, msg) => {
-    h.siegePanel.update(msg);
+    h.siegePanel.use((p) => p.update(msg));
     if (!msg.active) h.renderer.setNight(0);
   },
   bossIntro: (h, msg) => { h.bossUI.intro(msg.name, msg.title, msg.text); },

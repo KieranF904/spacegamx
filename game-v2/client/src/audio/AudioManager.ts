@@ -12,8 +12,12 @@
  */
 
 import { renderSfx, reverbImpulse, variantKey, LoopId, SFX_REVERB, SFX_VARIANTS } from './sfx';
-import { MusicEngine, MUSIC } from './MusicEngine';
-import { MusicDirector, type MusicPlace } from './musicProfiles';
+import audioData from '../../../data/audio.json';
+import type { MusicEngine } from './MusicEngine';
+import { MusicDirector, type MusicPlace, type MusicRegistry } from './musicProfiles';
+
+/** The music registry (data/audio.json `music`); the engine that plays it is its own chunk, fetched when the audio starts */
+const MUSIC = (audioData as unknown as { music: MusicRegistry }).music;
 import { ALL_BEAM_LOOPS, shotSoundFor } from './weaponSounds';
 
 /** A held beam lit now, for its loop: where it is, and whether it's yours (heard full and centred) */
@@ -152,6 +156,7 @@ export class AudioManager {
 
       this.buffers = await renderSfx(ctx);
       await this.loadFiles(ctx);
+      const { MusicEngine } = await import('./MusicEngine');
       this.music = new MusicEngine(ctx, this.musicGain);
       this.music.setPlace(this.director.place ?? this.pendingPlace);
       this.music.start();
