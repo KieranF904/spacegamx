@@ -150,9 +150,8 @@ export function gameLoop(gs: GameServer): void {
   }
 }
 
-/** How long each slice of the start's belt filing runs, and the gap after it (ms): the loop's ticks go on between */
+/** How long each slice of the start's belt filing runs (ms): the loop's ticks go on between slices */
 const BELT_SLICE_MS = 4;
-const BELT_GAP_MS = 1;
 
 /**
  * The real server's start: every system's belts filed (game/AsteroidOrbits.ts) a slice at a time between its first
@@ -161,9 +160,7 @@ const BELT_GAP_MS = 1;
  */
 export function fileBeltsLater(gs: GameServer): void {
   const slice = (): void => {
-    if (!gs.asteroidOrbits.fileSome(BELT_SLICE_MS)) return;
-    const t = setTimeout(slice, BELT_GAP_MS) as { unref?: () => void };
-    t.unref?.();
+    if (gs.asteroidOrbits.fileSome(BELT_SLICE_MS)) scheduleImmediate(slice);
   };
   slice();
 }

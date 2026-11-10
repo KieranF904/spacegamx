@@ -346,7 +346,8 @@ function switchedOff(f: FunctionDef): FunctionDef {
 /**
  * The pieces and their 8 variants, built once per process for each pieces + bespoke content and shrink: the same
  * shapes always build the same variants, and every server a test boots (and a client's catalogs) shares them. Read-only:
- * nothing changes a piece or a variant once it's built.
+ * nothing changes a piece or a variant once it's built (not frozen: that costs more than building them; checked by
+ * freezing them through the ship, hangar and viewer tests, 2026-11-11).
  */
 const builtPieces = new Map<string, { pieces: Map<string, PieceDef>; variants: Map<string, PieceVariant[]> }>();
 const BUILT_PIECES_KEEP = 8;
@@ -361,19 +362,11 @@ function piecesAndVariants(files: CatalogFiles, shrink: number): { pieces: Map<s
   let built = builtPieces.get(key);
   if (!built) {
     built = buildPieces(files, shrink);
-    // (Shared from here on, so frozen: a change to one would be every catalog's)
-    for (const list of built.variants.values()) deepFreeze(list);
     if (builtPieces.size >= BUILT_PIECES_KEEP) builtPieces.delete(builtPieces.keys().next().value!);
     builtPieces.set(key, built);
   }
   // (Each catalog its own maps over the shared pieces)
   return { pieces: new Map(built.pieces), variants: new Map(built.variants) };
-}
-
-function deepFreeze(v: unknown): void {
-  if (!v || typeof v !== 'object' || Object.isFrozen(v)) return;
-  Object.freeze(v);
-  for (const k of Object.keys(v)) deepFreeze((v as Record<string, unknown>)[k]);
 }
 
 function buildPieces(files: CatalogFiles, shrink: number): { pieces: Map<string, PieceDef>; variants: Map<string, PieceVariant[]> } {

@@ -20891,7 +20891,7 @@
       "id": "server.gameserver.loop",
       "path": "server/src/gameServer/loop.ts",
       "group": "server/gameServer",
-      "lines": 316,
+      "lines": 313,
       "owns": "the real-time loop, one step, the guarded tick table and its per-tick passes",
       "needs": "GameServer (type), tickOrder, gameServer/* systems, sim/SystemClocks; npm: @space-game/common, bitecs",
       "events": "",
@@ -20949,40 +20949,34 @@
           "end": 154
         },
         {
-          "name": "BELT_GAP_MS",
-          "kind": "const",
-          "start": 155,
-          "end": 155
-        },
-        {
           "name": "fileBeltsLater",
           "kind": "function",
-          "start": 157,
-          "end": 169
+          "start": 156,
+          "end": 166
         },
         {
           "name": "drainInputQueue",
           "kind": "function",
-          "start": 171,
-          "end": 208
+          "start": 168,
+          "end": 205
         },
         {
           "name": "releaseControls",
           "kind": "function",
-          "start": 210,
-          "end": 213
+          "start": 207,
+          "end": 210
         },
         {
           "name": "buildTickSystems",
           "kind": "function",
-          "start": 215,
-          "end": 290
+          "start": 212,
+          "end": 287
         },
         {
           "name": "tick",
           "kind": "function",
-          "start": 292,
-          "end": 316
+          "start": 289,
+          "end": 313
         }
       ]
     },
