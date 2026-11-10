@@ -564,7 +564,20 @@ this.boostHudEl = document.getElementById('boostHud');
     // Start game loop (but don't connect yet - wait for login)
     this.running = true;
     this.lastFrameTime = performance.now();
-    this.app.ticker.add(() => this.update());
+    // One throw in a frame must not end the loop: log it (a line every 5 s at most) and carry on with the next frame
+    let lastLog = 0, since = 0;
+    const report = (what: string, e: unknown) => {
+      const t = performance.now();
+      if (t - lastLog < 5000) { since++; return; }
+      console.error(`[Game] ${what}${since ? ` (and ${since} more since)` : ''}:`, e);
+      lastLog = t; since = 0;
+    };
+    this.app.ticker.add(() => {
+      try { this.update(); } catch (e) { report('frame error', e); }
+    });
+    // Errors outside the frame (a callback, a rejected promise) are logged too, never left to stop anything
+    window.addEventListener('error', (ev) => report('uncaught error', ev.error ?? ev.message));
+    window.addEventListener('unhandledrejection', (ev) => report('unhandled rejection', ev.reason));
   }
 
   private createMenu(): void {
