@@ -22,6 +22,7 @@ import {
   shapedOf, shieldHp, shieldUp, type Charge, type ShipState, type ShipTuning,
 } from '@space-game/common';
 import type { RingGroup } from '../../ships/gunHud';
+import { shipFunction } from '../../ships/shipFunctionData';
 
 /** A part feature's line on the panel (ClientFeature.status) */
 export interface FeatureStatusLine {
@@ -316,8 +317,6 @@ function readWeapons(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
   }
 }
 
-const PART_STORE_FN = new Set(['core', 'battery', 'drive_battery', 'weapon_battery']);
-
 /** The per-part readout: tanks and stores show what each one holds (the ports state); legacy store functions full */
 const e0 = (cap: number, held: number) => (cap > 0 ? Math.max(0, Math.min(1, held / cap)) : 0);
 function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
@@ -330,7 +329,7 @@ function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
     // (Tanks show what's left, stores what they hold)
     const P = d.ports;
     if (c.e && (P.role[i] === P_TANK || (P.cap[i] > 0 && P.relays.includes(i)))) { r.kind = 'store'; r.fill = e0(P.cap[i], c.e.held[i]); continue; }
-    if (PART_STORE_FN.has(fn)) { r.kind = 'store'; r.fill = 1; }
+    if (shipFunction(fn)?.statusFull) { r.kind = 'store'; r.fill = 1; }
     else if (fn === 'generator') { r.kind = 'gen'; r.glow = 1; }
     else if (fn === 'shield') {
       r.kind = 'shield'; r.fill = out.shield.pct / 100; r.dim = out.shield.state === 'down';

@@ -13,6 +13,7 @@ import { shieldLookOf } from '../shieldLooks';
 import { settings } from '../../settings/Settings';
 import { EntityType } from '@space-game/common';
 import type { DamageCtx } from './context';
+import { shipFunction } from '../shipFunctionData';
 
 /** A shield's drop this soon after a shell's strike rippled it (ms) was that strike's, heard as it was drawn */
 const RIPPLE_HEARD_MS = 700;
@@ -145,15 +146,14 @@ export class ShieldFx {
       let hit = -1, bd = 0.9;
       for (let i = 0; i < parts.length; i++) {
         if (!ship.derived.alive[i]) continue;
-        const f = parts[i].fn;
-        if (f !== 'plating_reactive_armour' && f !== 'plating_spaced_plating') continue;
+        if (!shipFunction(parts[i].fn)?.platingHit) continue;
         const c = geoms[i]?.centroid;
         if (!c) continue;
         const d = Math.hypot(c[0] - gx, c[1] - gy);
         if (d < bd) { bd = d; hit = i; }
       }
       if (hit < 0) continue;
-      const reactive = parts[hit].fn === 'plating_reactive_armour';
+      const reactive = shipFunction(parts[hit].fn)?.platingHit === 'sparks';
       // (thrown off the plate in the ship's frame: they ride it, impactAnchor, so they don't smear behind it as it flies)
       const anc = this.c.p.anchors.open(this.c.state.entities, id, x, y), n0 = this.c.p.ps.length, bv = anc ? 0 : 1;
       if (reactive) {

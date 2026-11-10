@@ -1161,6 +1161,15 @@ for (const id of Object.keys(MODEL_SOUND)) if (!models.some((m) => m.id === id))
 const ids = new Set();
 for (const m of models) { if (ids.has(m.id) || FNS.has(m.id)) throw new Error(`duplicate id ${m.id}`); ids.add(m.id); }
 
+// Which edge a family's models are drawn pointing by default (FunctionDef.pointing: the viewer's defaultFacing), and the
+// plating that reacts to a shot (FunctionDef.platingHit: the client's hit effects)
+const POINTING = { ion: 'S', afterburner: 'S', plasma: 'S', mining: 'N', demolition: 'N', siphon: 'N' };
+const PLATING_HIT = { plating_reactive_armour: 'sparks', plating_spaced_plating: 'chips' };
+for (const m of models) {
+  if (POINTING[m.family]) m.pointing = POINTING[m.family];
+  if (PLATING_HIT[m.id]) m.platingHit = PLATING_HIT[m.id];
+}
+
 // (One model a line)
 const NOTE = 'Written by scripts/econ/models.mjs (edit that, not this). Player models: fixed named modules (docs/parts-redesign.md). `legacy`: the family each legacy function migrates to.';
 writeFileSync(join(DATA, 'ships/models.json'),

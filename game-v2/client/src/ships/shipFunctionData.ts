@@ -12,3 +12,8 @@ export const SHIP_FUNCTIONS: FunctionDef[] = [
   ...(shipFunctions as unknown as { functions: FunctionDef[] }).functions,
   ...(shipModels as unknown as { models: FunctionDef[] }).models,
 ];
+
+const BY_ID = new Map(SHIP_FUNCTIONS.map((f) => [f.id, f]));
+
+/** One function's data by id (undefined for an id no data file has) */
+export const shipFunction = (id: string): FunctionDef | undefined => BY_ID.get(id);

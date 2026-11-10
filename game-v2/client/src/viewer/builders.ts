@@ -8,9 +8,6 @@ import type { AssetRef } from './assets';
 
 const STEP: Record<Side, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 const OPPOSITE: Record<Side, Side> = { N: 'S', E: 'W', S: 'N', W: 'E' };
-/** Families (and legacy functions) that point somewhere: they get a facing */
-const POINTED = new Set(['ion', 'afterburner', 'plasma', 'mining', 'demolition', 'siphon', 'thruster', 'plasma_drive', 'miner']);
-const ENGINES = new Set(['ion', 'afterburner', 'plasma', 'thruster', 'plasma_drive']);
 
 const part = (uid: number, piece: string, fn: string, material: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart =>
   ({ uid, piece, fn, material, x, y, rot: 0, flip: false, ...extra });
@@ -20,9 +17,7 @@ export function defaultFacing(catalog: Catalog, fnId: string): Side | null {
   const f = catalog.functions.get(fnId);
   if (!f) return null;
   if (f.weapon) return 'N';
-  const fam = f.family ?? f.id;
-  if (POINTED.has(fam) || POINTED.has(f.id)) return ENGINES.has(fam) || ENGINES.has(f.id) ? 'S' : 'N';
-  return null;
+  return f.pointing ?? null;
 }
 
 /**

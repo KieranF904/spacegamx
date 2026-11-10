@@ -4492,13 +4492,13 @@
         {
           "name": "RIPPLE_HEARD_MS",
           "kind": "const",
-          "start": 17,
-          "end": 18
+          "start": 18,
+          "end": 19
         },
         {
           "name": "ShieldFx",
           "kind": "class",
-          "start": 20,
+          "start": 21,
           "end": 214
         }
       ]
