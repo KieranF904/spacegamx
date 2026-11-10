@@ -32,7 +32,6 @@ function compactCtx() {
     loggedIn: true, compactInputs: true,
     get stationOpen() { return sc.station; },
     get localDead() { return sc.dead; },
-    proto: null,
     menu: { isOpen: false },
     adminPanel: null,
     shipClient: {

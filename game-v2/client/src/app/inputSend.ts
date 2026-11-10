@@ -37,7 +37,6 @@ import type { Renderer } from '../rendering/Renderer';
 import type { ShipClient } from '../ships/ShipClient';
 import type { Autopilot } from '../ships/Autopilot';
 import type { GameState } from '../state/GameState';
-import type { ProtoHooks } from '../Game';
 import { groupSelection } from '../ships/weaponGroups/selection';
 
 /** What the input path reads from the game (Game supplies it as getters, so late-built windows resolve at use) */
@@ -53,7 +52,6 @@ export interface InputSendHost {
    * keys push along the ship, said by both strafe bits (common flight.ts noseFrame)
    */
   readonly noseThrust?: boolean;
-  readonly proto: ProtoHooks | null;
   readonly menu: GameMenuUI;
   readonly adminPanel: AdminPanel | null;
   readonly shipClient: ShipClient;
@@ -134,7 +132,7 @@ export function tickInput(s: InputSendCtx): void {
   let aimDist = Math.hypot(mouseWorld.x - playerPos.x, mouseWorld.y - playerPos.y);
   // Lining up a jump: lock on to a station, gate or marker near the cursor, and stop just short of it (a stillstone: inside its field)
   // A menu jump: its mark, wherever the cursor is
-  const inputEnabled = (s.proto?.inputEnabled?.() ?? true) && !s.shipClient.hangarOpen && !s.menu.isOpen && !s.adminPanel?.capturesFlight;
+  const inputEnabled = !s.shipClient.hangarOpen && !s.menu.isOpen && !s.adminPanel?.capturesFlight;
   const order = inputEnabled ? s.context.flight() : null;
   // (A charge under way: where it goes was locked as it started (common flight.ts FlightBody.jumpAim/jumpTo), so the
   // map and the overlay show that, and the cursor is the cursor again: nothing it does moves the jump)
@@ -245,7 +243,7 @@ export function tickInput(s: InputSendCtx): void {
   const berthed = !!s.shipClient.berthed?.(), dead = !!s.localDead;
   if (dead) forgetSent(s);
   else if (berthed) for (let i = 0; i < INPUT_HELD.length; i++) s.lastSent[INPUT_HELD[i]] = false;
-  const compact = !!s.compactInputs && !s.proto;
+  const compact = !!s.compactInputs;
   let changed: boolean;
   if (berthed || dead) {
     for (let i = 0; i < INPUT_HELD.length; i++) msg[INPUT_HELD[i]] = false;
@@ -255,7 +253,7 @@ export function tickInput(s: InputSendCtx): void {
     quantized = s.lastSentAngle;
     cursorDistQ = quantizeCursorDist(msg.cursorDist);
     changed = false;
-  } else if (!s.proto && s.state.inputLate?.(targetTick)) {
+  } else if (s.state.inputLate?.(targetTick)) {
     // Catching up after a hitch: a tick the server has run (or will before this gets there) flew what it last had, so
     // it goes as that, held (the server takes it as nothing new: no correction); what changed goes from the next on time
     for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; (msg as unknown as Record<string, boolean>)[k] = !!s.lastSent[k]; }
@@ -277,7 +275,7 @@ export function tickInput(s: InputSendCtx): void {
   // The weapon groups selection is state, not a held key: it goes on the input it changes on, and on the first one after a
   // welcome or a respawn (not while berthed or dead: the server holds it, and it goes on the first input after). No delay:
   // an input that was going to be sent goes as it did, and a change sends one now
-  if (groupSelection.due() && !berthed && !dead && !(!s.proto && s.state.inputLate?.(targetTick))) {
+  if (groupSelection.due() && !berthed && !dead && !s.state.inputLate?.(targetTick)) {
     msg.weaponGroups = groupSelection.packed;
     changed = true;
   }
@@ -296,17 +294,6 @@ export function tickInput(s: InputSendCtx): void {
   const bodyCheck = s.shipClient?.takeBodyCheck?.(changed || !!acks || !!hitReport || !!ownCheck);
   if (bodyCheck) msg.bodyCheck = bodyCheck;
   const send = changed || !!acks || !!hitReport || !!ownCheck;
-
-  // Proto: no targetTick (applied on the next tick) and no prediction queue.
-  if (s.proto) {
-    if (send) {
-      msg.seq = s.state.nextInputSeq();
-      msg.targetTick = undefined;
-      s.network.send(msg);
-      markSent(s, msg, quantized, cursorDistQ);
-    }
-    return;
-  }
 
   // Only send over network if something changed (or debris is to be confirmed)
   if (send) {
@@ -376,7 +363,7 @@ export function sendNeutralInput(s: InputSendCtx): void {
     type: 'input',
     seq: s.state.nextInputSeq(),
     tick: s.state.serverTick,
-    targetTick: s.proto ? undefined : s.state.getInputTargetTick(),
+    targetTick: s.state.getInputTargetTick(),
     forward: false,
     backward: false,
     left: false,
@@ -388,13 +375,13 @@ export function sendNeutralInput(s: InputSendCtx): void {
     strafeLeft: false,
     strafeRight: false,
     helm: s.lastSent.helm,
-    cursorDist: s.compactInputs && !s.proto ? s.sentDist : s.lastSentCursorDist * CURSOR_DIST_STEP,
+    cursorDist: s.compactInputs ? s.sentDist : s.lastSentCursorDist * CURSOR_DIST_STEP,
     jump: false,
     dodge: false,
   };
   s.network.send(msg);
   s.shipClient?.noteInput?.(msg);
-  // The prediction steps the same input (proto has none)
-  if (!s.proto) s.state.applyInput(msg);
+  // The prediction steps the same input
+  s.state.applyInput(msg);
   for (let i = 0; i < INPUT_HELD.length; i++) s.lastSent[INPUT_HELD[i]] = false;
 }

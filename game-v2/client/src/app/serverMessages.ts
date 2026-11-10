@@ -70,11 +70,9 @@ import type { BossUI } from '../ui/BossUI';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { ContributorPanel } from '../ui/ContributorPanel';
 import type { ChatBubbles } from '../ui/bubbles/ChatBubbles';
-import type { ProtoHooks } from '../Game';
 
 /** What the message handlers read and write on the game (Game supplies it as getters/setters) */
 export interface MessageHost {
-  readonly proto: ProtoHooks | null;
   readonly network: { disconnect(): void };
   readonly state: GameState;
   readonly pilot: PilotState;

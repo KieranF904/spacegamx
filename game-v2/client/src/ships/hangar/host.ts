@@ -49,7 +49,6 @@ export interface HangarDeps {
   getBlueprint(): Blueprint;
   /** The ship you're flying (its parts' HP now) */
   liveShip?(): ShipState | undefined;
-  onOpen(): void;
   /** `launch` is the saved blueprint to respawn with, or null when closed without saving */
   onClose(launch: Blueprint | null): void;
 }

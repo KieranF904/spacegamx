@@ -61,7 +61,6 @@ import type { ShipClient } from '../ships/ShipClient';
 import type { GameState } from '../state/GameState';
 import type { PilotState } from '../econ/clientEcon';
 import type { ClientTransport } from '@space-game/common';
-import type { ProtoHooks } from '../Game';
 import { makeComponentGuide, makeStationWindow } from './lazyScreens';
 import { GunRangeHud } from '../ui/gunRange/GunRangeHud';
 import { chamberOf, inGunRange } from '../ui/gunRange/rangeState';
@@ -73,11 +72,10 @@ export interface WindowHost {
   readonly network: ClientTransport;
   readonly audio: AudioManager;
   readonly shipClient: ShipClient;
-  /** Other ships' prediction (predict/Prediction.ts); null in proto */
+  /** Other ships' prediction (predict/Prediction.ts) */
   readonly prediction: Prediction | null;
   readonly renderer: Renderer;
   readonly input: InputManager;
-  readonly proto: ProtoHooks | null;
   readonly regionUI: RegionUI;
   readonly objectives: ObjectiveBanner;
   readonly worldEvents: Map<number, { name: string; x: number; y: number; system: string }>;
@@ -352,9 +350,8 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       host.input.zoom = host.input.targetZoom = Math.max(host.input.minZoom, scale);
       host.audio.playUI('ui_close', 0.4);
     };
-    // Proto's empty scene has nothing to navigate to
-    if (!host.proto) w.peopleUI = new PeopleUI(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => w.quests.people);
-    if (!host.proto) w.navMarkers = new NavMarkersUI(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => host.objective(),
+    w.peopleUI = new PeopleUI(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => w.quests.people);
+    w.navMarkers = new NavMarkersUI(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => host.objective(),
       () => [...host.worldEvents.values()].filter((e) => e.system === host.state.systemId).concat(host.objectives.markers(host.state.systemId), host.wreckMarker(), host.siegeMarkers()),
       () => w.social.others().filter((m) => m.alive && m.system === host.state.systemId).map((m) => {
         const e = host.state.entities.get(m.eid);

@@ -42,7 +42,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 ### Game.ts map (1591 lines; grep the method name, then read a short slice)
 | symbol(s) | section |
 |---|---|
-| imports, `ProtoHooks`, `GameOptions`, fields | field declarations; every window is a field of `private w: WindowSet` (use `this.w.<name>`), filled by `buildWindows` in app/windows.ts. `keyHost`, `msgHost`, `inputCtx` and the window host are built by `makeKeyHost`, `makeMessageHost`, `makeInputCtx`, `makeWindowHost` |
+| imports, `GameOptions`, fields | field declarations; every window is a field of `private w: WindowSet` (use `this.w.<name>`), filled by `buildWindows` in app/windows.ts. `keyHost`, `msgHost`, `inputCtx` and the window host are built by `makeKeyHost`, `makeMessageHost`, `makeInputCtx`, `makeWindowHost` |
 | `constructor`, `init()` | `init()` starts the renderer and input, calls `buildWindows(makeWindowHost(), ...)` and `installDevTools` (app/devTools.ts), and sets the callbacks (`network.onMessage` calls `handleServerMessage`; `input.onKeyPressed` calls `handleKeyPress`) |
 | `handleLogin`, `handleRegister`, `resumeSession`, `handleGuestPlay`, `handleServerSelect`, `handleLogout`, `signedIn` | sign-in and session flow; `prefetchScreens` (one line: the `screensFetched` guard, then `prefetchScreens(host, w)` in app/lazyScreens.ts, which holds the list) |
 | `start`, `createMenu`, `updateSounds`, `pocketWayIn`, `currentSystem`, `planetBelow`, `updateZone`, `applySettings`, `updateHeatGauge`, `applyVolume` | menu, audio, zone and heat gauge, settings |
@@ -94,11 +94,9 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 
 ## Gotchas
 - Key hints that wrote default letters went stale on rebind (fixed across Tutorial, death screen, QuestUI, SocialUI; see the polish pass). Don't reintroduce.
-- Vite node stubs: `fs|path|os|url|zlib` resolve to `client/src/nodeStubs.ts` in the browser, so server code pulled into the sandbox/replays can't do real I/O.
 - The `MODAL_CHAIN` order matters (app/keys.ts): a window early in the chain returns and swallows keys meant for later ones (C is ignored on the map; Esc priority).
 - `SystemMapUI` and `StationWindow` are big; grep for the tab/section name, don't open whole.
 - Guests: `handleGuestPlay` (Game.ts) makes `Guest_<0-9999>` client-side; the server decides rights (guests are admins on dev servers).
-- Proto mode (`?proto`, `ProtoHooks`) skips some windows (`if (!host.proto)` in app/windows.ts); keep both paths working.
 
 ## Related areas
 `hangar-ui` (HangarUI, component guide shared), `economy-quests` (Station/Trade/Quest content), `networking` (messages), `energy` (the ports core), `render-world` (Renderer, quality), `web-accounts` (LoginUI/ServerBrowserUI talk to the lobby), `flight` (input bundle), `ops-tools` (screenshot tools). Links: `docs/areas/<slug>.md`.

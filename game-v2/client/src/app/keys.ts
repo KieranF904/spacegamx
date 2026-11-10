@@ -3,7 +3,7 @@
  * global key-action tables. Split out of Game.handleKeyPress; keys.ts never imports Game, it reads a KeyHost.
  *
  * ORDER MATTERS. The chain runs first, top to bottom, and each open window swallows the keys it owns.
- * After it come the proto hook, the autopilot/menu-order cancel, the PRE table (Escape cancels an order, G),
+ * After it come the autopilot/menu-order cancel, the PRE table (Escape cancels an order, G),
  * the ship's own keys (ShipClient.onKey), and last the POST table (the rest of the global keys).
  * A table entry returns true when it consumed the key.
  * Per keypress, not per tick: no performance constraints here.
@@ -31,7 +31,6 @@ import type { Renderer } from '../rendering/Renderer';
 import type { ShipClient } from '../ships/ShipClient';
 import type { Autopilot } from '../ships/Autopilot';
 import type { ContextActions } from '../input/ContextActions';
-import type { ProtoHooks } from '../Game';
 import { settings } from '../settings/Settings';
 import { viewMode } from '../input/viewMode';
 import { groupKey } from '../ships/weaponGroups/keys';
@@ -42,7 +41,6 @@ import { rangeKey } from '../ui/gunRange/rangeKeys';
 export interface KeyHost {
   readonly loggedIn: boolean;
   readonly stationOpen: boolean;
-  readonly proto: ProtoHooks | null;
   readonly menu: GameMenuUI;
   readonly dialogue: DialogueUI;
   /** The side panel on the HUD (Social, Party, Pilot, Components) */
@@ -228,10 +226,9 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
   },
 };
 
-/** One key press: the modal chain, the proto hook, the autopilot cancels, then the key tables */
+/** One key press: the modal chain, the autopilot cancels, then the key tables */
 export function handleKey(h: KeyHost, code: string): void {
   for (let i = 0; i < MODAL_CHAIN.length; i++) if (MODAL_CHAIN[i](h, code)) return;
-  if (h.proto?.onKeyPressed?.(code)) return;
   // Any flight key hands control back from the autopilot
   if (h.autopilot.active && FLIGHT_KEYS.has(code) && !h.shipClient.hangarOpen) h.autopilot.cancel('Autopilot off');
   // ...and calls off a menu jump

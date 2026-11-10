@@ -23,7 +23,6 @@ export interface StaffHost {
   readonly renderer: Renderer;
   readonly input: InputManager;
   readonly w: Pick<WindowSet, 'systemMapUI'>;
-  readonly proto: boolean;
   isAdmin(): boolean;
   send(msg: ClientMessage): void;
   flyTo(dest: AutoDest): void;
@@ -79,7 +78,7 @@ export class StaffPanels {
 
   startContrib(): void {
     const h = this.h;
-    if (this.contribPanel || h.proto) return;
+    if (this.contribPanel) return;
     this.contribWanted = true;
     void import('../ui/ContributorPanel').then(({ ContributorPanel }) => {
       if (this.contribPanel || !this.contribWanted) return;

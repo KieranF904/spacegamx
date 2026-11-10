@@ -24,7 +24,7 @@ function fakeCtx() {
   };
   const map = { aimWorld: () => null, jumpAim: null as { angle: number; dist: number; label: string | null } | null, jumpLock: () => sc.hover, firing: () => false };
   const ctx = {
-    loggedIn: true, stationOpen: false, proto: null, menu: { isOpen: false }, adminPanel: null,
+    loggedIn: true, stationOpen: false, menu: { isOpen: false }, adminPanel: null,
     shipClient: {
       hangarOpen: false,
       setJumpAim: (d: number, label: string | null) => { sc.aimed.push([d, label]); },

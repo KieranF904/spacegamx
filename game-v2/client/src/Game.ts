@@ -82,30 +82,14 @@ import { LoadingFlow } from './app/loadingFlow';
 import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, DEFAULT_CAPS } from '@space-game/common';
 import { inGunRange, resetRangeState } from './ui/gunRange/rangeState';
 
-/** Proto mode (npm run proto): in-process server, no login, no prediction. */
-export interface ProtoHooks {
-  /** Called once after init with the pieces proto tools draw into and read from. */
-  onInit?(ctx: { app: Application; renderer: Renderer; state: GameState; input: InputManager }): void;
-  /** Runs after entity interpolation each frame. Proto mode writes simulation state straight into GameState here. */
-  afterInterpolate(state: GameState): void;
-  /** Return true to consume the key. */
-  onKeyPressed?(code: string): boolean;
-  /** Return false to stop movement/fire input reaching the simulation. */
-  inputEnabled?(): boolean;
-}
-
 export interface GameOptions {
   transport?: ClientTransport;
-  proto?: ProtoHooks;
-  /** Modular ship options (proto: hangar anywhere, pause while editing) */
-  ships?: { editAnywhere?: boolean; onHangarOpen?(): void; onHangarClose?(): void };
 }
 
 export class Game {
   private container: HTMLElement;
   private app!: Application;
   private network: ClientTransport;
-  private proto: ProtoHooks | null;
   private readonly keyHost: KeyHost = this.makeKeyHost();
   private readonly msgHost: MessageHost = this.makeMessageHost();
   private readonly inputCtx: InputSendCtx = this.makeInputCtx();
@@ -121,7 +105,7 @@ export class Game {
   private sceneSounds!: SceneSounds;
   private zoneHost!: ZoneHost;
   private chargeGauge = new ChargeGauge();
-  /** Other ships predicted on the PT layer (predict/Prediction.ts: C3); null in proto */
+  /** Other ships predicted on the PT layer (predict/Prediction.ts: C3) */
   private prediction: Prediction | null = null;
   /** The time-scale badge: the system slowed in a crowd (CAPS.CROWD) */
   private timeBadge: TimeScaleBadge | null = typeof document !== 'undefined' ? new TimeScaleBadge() : null;
@@ -196,7 +180,7 @@ export class Game {
   
   // UI elements - new HUD
   private loadingEl: HTMLElement | null;
-  /** The loading screen from choosing a server (and on arriving elsewhere, or respawning) until the world is in sync (none in proto) */
+  /** The loading screen from choosing a server (and on arriving elsewhere, or respawning) until the world is in sync */
   private loading: LoadingFlow | null = null;
   private topHudEl: HTMLElement | null;
 private xpHudEl: HTMLElement | null;
@@ -236,14 +220,12 @@ private perfMonitor: PerfMonitor | null = null;
   constructor(container: HTMLElement, options: GameOptions = {}) {
     this.container = container;
     this.network = options.transport ?? new NetworkManager();
-    this.proto = options.proto ?? null;
     this.input = new InputManager();
     this.state = new GameState();
     this.world = new WorldQueries(this.state);
     // Asteroid compositions, exactly as the server derives them
     const systemDanger = new Map((systemsDataForMenu as { systems: { id: string; danger?: number }[] }).systems.map((s) => [s.id, s.danger ?? 1]));
     this.state.composeAsteroid = (type, key, size, systemId, stage) => asteroidComposition(miningTable as unknown as MiningTable, type, key, size, systemDanger.get(systemId) ?? 1, stage);
-    this.state.predictionEnabled = !this.proto;
 
     // Modular ships: the client carries the same piece catalog (and economy) as the server
     const shipTuningData = shipTuning as ShipTuning;
@@ -254,7 +236,6 @@ private perfMonitor: PerfMonitor | null = null;
     this.shipClient = new ShipClient({
       catalog: shipCatalog,
       pilot: this.pilot,
-      grantAllParts: !!options.proto,
       isAdmin: () => this.isAdmin,
       onDocked: () => this.w.stationWindow.use((w) => w.open()),
       stationOpen: () => this.stationOpen,
@@ -270,31 +251,26 @@ private perfMonitor: PerfMonitor | null = null;
       inputEnabled: () => !this.menu?.isOpen,
       noseThrust: () => !!this.inputCtx?.noseThrust,
       sound: (id, at, volume, pitch) => (at ? this.audio.play(id, at.x, at.y, { volume, pitch }) : this.audio.playUI(id, volume, pitch)),
-      editAnywhere: options.ships?.editAnywhere,
-      onHangarOpen: options.ships?.onHangarOpen,
-      onHangarClose: options.ships?.onHangarClose,
       zoom: { get: () => this.input.targetZoom, set: (z) => { this.input.targetZoom = z; } },
     });
     this.state.chargeTotal = (charge) => this.shipClient.chargeTotal(charge);
-    // Every other ship moves by replication (proto writes its state straight in instead)
-    if (!this.proto) {
-      this.state.preSnapshot = (m) => this.shipClient.preSnapshot(m);
-      this.state.onReplication = (m) => this.shipClient.onReplication(m);
-      // (Your own ship: on its tick layer, stepped once a tick to the prediction's and drawn from there)
-      this.state.ownStep = (t) => this.shipClient.ownStepTo(t);
-      this.state.ownPose = (t) => this.shipClient.ownPose(t);
-      this.state.replicaPose = (e, t) => this.shipClient.placeReplica(e, t);
-      // (Every other ship on the PT layer at your tick, drawn by the prediction's hook: C3)
-      this.prediction = new Prediction(this.state, this.shipClient, () => this.renderer ?? null);
-    }
+    // Every other ship moves by replication
+    this.state.preSnapshot = (m) => this.shipClient.preSnapshot(m);
+    this.state.onReplication = (m) => this.shipClient.onReplication(m);
+    // (Your own ship: on its tick layer, stepped once a tick to the prediction's and drawn from there)
+    this.state.ownStep = (t) => this.shipClient.ownStepTo(t);
+    this.state.ownPose = (t) => this.shipClient.ownPose(t);
+    this.state.replicaPose = (e, t) => this.shipClient.placeReplica(e, t);
+    // (Every other ship on the PT layer at your tick, drawn by the prediction's hook: C3)
+    this.prediction = new Prediction(this.state, this.shipClient, () => this.renderer ?? null);
     this.audio = new AudioManager();
     const g = this;
     this.staff = new StaffPanels({
-      state: this.state, pilot: this.pilot, proto: !!this.proto,
+      state: this.state, pilot: this.pilot,
       get renderer() { return g.renderer; }, input: this.input, get w() { return g.w; },
       isAdmin: () => g.isAdmin, send: (m) => g.network.send(m), flyTo: (d) => g.flyTo(d), chat: (n, t, s, c) => g.addChatMessage(n, t, s, c),
     });
-    this.ticks = new TickDriver({ state: this.state, ctx: this.inputCtx, proto: !!this.proto, send: (m) => this.network.send(m) });
+    this.ticks = new TickDriver({ state: this.state, ctx: this.inputCtx, send: (m) => this.network.send(m) });
     this.hud = new HudReadouts({ state: this.state, pilot: this.pilot, shipClient: this.shipClient, systemNames: this.systemNames });
     this.zoneHost = { state: this.state, world: this.world, shipClient: this.shipClient, regionUI: this.regionUI, get w() { return g.w; } };
     this.sceneSounds = new SceneSounds({
@@ -400,7 +376,7 @@ this.boostHudEl = document.getElementById('boostHud');
     window.addEventListener('blur', () => { this.windowFocused = false; this.applyVolume(settings.data); });
     window.addEventListener('focus', () => { this.windowFocused = true; this.applyVolume(settings.data); });
     this.damageIndicatorUI = new DamageIndicatorUI(uiOverlay);
-    if (!this.proto) {
+    {
       const g = this;
       // (On the body: over the HUD, which sits outside the overlay's stacking)
       this.loading = new LoadingFlow(document.body, {
@@ -450,15 +426,6 @@ this.boostHudEl = document.getElementById('boostHud');
     // Hide loading, show login
     if (this.loadingEl) this.loadingEl.style.display = 'none';
 
-    if (this.proto) {
-      this.proto.onInit?.({ app: this.app, renderer: this.renderer, state: this.state, input: this.input });
-      // No login or server browser: join the in-process server as a guest.
-      this.loginUI.hide();
-      this.state.playerName = 'Proto';
-      this.pendingAuth = { type: 'guest', username: 'Proto' };
-      this.network.connect('local');
-    }
-
     console.log('Game initialized');
   }
 
@@ -506,7 +473,7 @@ this.boostHudEl = document.getElementById('boostHud');
   private async resumeSession(): Promise<void> {
     let token: string | null = null;
     try { token = localStorage.getItem('authToken'); } catch { /* storage unavailable */ }
-    if (!token || this.proto) return;
+    if (!token) return;
     const r = await lobbyAuth('validate', { token });
     if (!r.success) {
       try { localStorage.removeItem('authToken'); } catch { /* storage unavailable */ }
@@ -581,7 +548,6 @@ this.boostHudEl = document.getElementById('boostHud');
 
   private createMenu(): void {
     this.menu= new GameMenuUI({
-      proto: !!this.proto,
       openMap: () => this.w.systemMapUI.toggle(),
       pilot: () => this.pilotInfo(),
       ship: () => this.shipClient.menuShipInfo(),
@@ -589,8 +555,8 @@ this.boostHudEl = document.getElementById('boostHud');
         let pilots = 0;
         for (const e of this.state.entities.values()) if (e.type === EntityType.Player) pilots++;
         return {
-          name: this.proto ? 'Prototype (in this tab)' : this.serverName,
-          address: this.proto ? 'local' : this.serverAddress || location.host,
+          name: this.serverName,
+          address: this.serverAddress || location.host,
           ping: this.state.ping, jitter: this.state.jitter, tick: this.state.serverTick,
           pilotsHere: pilots, entities: this.state.entities.size,
         };
@@ -692,7 +658,6 @@ this.boostHudEl = document.getElementById('boostHud');
       get prediction() { return g.prediction; },
       get renderer() { return g.renderer; },
       get input() { return g.input; },
-      get proto() { return g.proto; },
       get regionUI() { return g.regionUI; },
       get objectives() { return g.objectives; },
       get worldEvents() { return g.worldEvents; },
@@ -723,7 +688,6 @@ this.boostHudEl = document.getElementById('boostHud');
     return {
       get loggedIn() { return g.loggedIn; },
       get stationOpen() { return g.stationOpen; },
-      get proto() { return g.proto; },
       get menu() { return g.menu; },
       get dialogue() { return g.w.dialogue; },
       get hub() { return g.w.hub; },
@@ -800,7 +764,7 @@ this.boostHudEl = document.getElementById('boostHud');
 
   /** Engage the autopilot (map clicks, the job tracker, party members, right-clicks) */
   flyTo(dest: AutoDest, note?: string): void {
-    if (!this.loggedIn || this.proto) return;
+    if (!this.loggedIn) return;
     if (this.stationOpen) this.w.stationWindow.value!.close();
     // (Somewhere new: a menu jump lining up is off)
     if (this.w.context.jumpMark()) this.w.context.cancel();
@@ -870,7 +834,7 @@ this.boostHudEl = document.getElementById('boostHud');
     this.timeBadge?.update(this.state.crowd);
     
     if (this.loggedIn && this.state.playerId && this.network.isConnected()) {
-      this.ticks.run(delta);
+      this.ticks.run();
     }
 
     // Interpolate entities (rocks out of sight placed less often: see GameState.orbitFocus)
@@ -881,7 +845,6 @@ this.boostHudEl = document.getElementById('boostHud');
       else this.state.orbitFocus = null;
     }
     this.state.interpolate(delta);
-    this.proto?.afterInterpolate(this.state);
     this.shipClient.update(now);
     this.hazards.setHorizonDanger(this.shipClient.horizonDanger());
     this.frost.update(this.loggedIn ? this.state.entities.get(this.state.playerId)?.warmth ?? null : null, delta);
@@ -982,8 +945,8 @@ this.boostHudEl = document.getElementById('boostHud');
       }
     }
     
-    // Periodic state hash for snapshot-on-mismatch (1 Hz). Proto has no prediction to check.
-    if (!this.proto && this.loggedIn && this.state.playerId && this.network.isConnected()) {
+    // Periodic state hash for snapshot-on-mismatch (1 Hz).
+    if (this.loggedIn && this.state.playerId && this.network.isConnected()) {
       this.ticks.sendHash(now);
     }
     
@@ -1006,7 +969,6 @@ this.boostHudEl = document.getElementById('boostHud');
       get localDead() { return g.localDead; },
       get compactInputs() { return g.network instanceof NetworkManager; },
       get noseThrust() { return viewMode.pinnedAim(g.shipClient.helmMode()); },
-      get proto() { return g.proto; },
       get menu() { return g.menu; },
       get adminPanel() { return g.staff.adminPanel; },
       get shipClient() { return g.shipClient; },
@@ -1040,7 +1002,6 @@ this.boostHudEl = document.getElementById('boostHud');
     const g = this;
     return {
       get chat() { return g.chat; },
-      get proto() { return g.proto; },
       get network() { return g.network; },
       get state() { return g.state; },
       get pilot() { return g.pilot; },
@@ -1114,7 +1075,6 @@ this.boostHudEl = document.getElementById('boostHud');
 
   private onConnected(): void {
     console.log('Connected to server');
-    // (proto mode skips the server list)
     this.prefetchScreens();
     this.clearLoadingClick();
     if (this.loadingEl) this.loadingEl.style.display = 'none';
@@ -1223,7 +1183,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
   private mailToasted = false;
   private mailToast(): void {
     const token = this.authToken;
-    if (this.mailToasted || !token || this.proto) return;
+    if (this.mailToasted || !token) return;
     this.mailToasted = true;
     void lobbyInbox.list(token).then((r) => {
       if (!r.success || !r.unread) return;
