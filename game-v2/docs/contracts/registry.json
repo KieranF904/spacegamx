@@ -2931,6 +2931,77 @@
       ]
     },
     {
+      "id": "client.ships.port-marks",
+      "path": "client/src/ships/build/portMarks.ts",
+      "group": "client/ships/build",
+      "lines": 66,
+      "owns": "build-view port marks shared by the hangar and the world build view: where a placed part's power ports and feed points sit (cell edge, outward direction) and the small OUT / IN / feed glyphs for them, as pure grid-space geometry",
+      "needs": "common frameOf / placeEdge (the ports core's own port placement), registeredFunction",
+      "events": "",
+      "invariants": [
+        {
+          "text": "every mark sits where buildPortsLayout puts the port (same rot / flip / facing frame)",
+          "test": "client/src/ships/build/portMarks.test.ts"
+        },
+        {
+          "text": "marks only draw, never change a design",
+          "test": "none pinned"
+        }
+      ],
+      "extend": "a new kind of port is one more case in portMarks(); a canvas or pixi drawer reuses PortMark.poly and PORT_COLOR",
+      "exports": [
+        "PORT_COLOR",
+        "PortKind",
+        "PortMark",
+        "drawPortMarks",
+        "portMarks"
+      ],
+      "sections": [
+        {
+          "name": "PortKind",
+          "kind": "type",
+          "start": 13,
+          "end": 13
+        },
+        {
+          "name": "PortMark",
+          "kind": "interface",
+          "start": 14,
+          "end": 15
+        },
+        {
+          "name": "PORT_COLOR",
+          "kind": "const",
+          "start": 17,
+          "end": 18
+        },
+        {
+          "name": "LEN",
+          "kind": "const",
+          "start": 20,
+          "end": 20
+        },
+        {
+          "name": "glyph",
+          "kind": "function",
+          "start": 22,
+          "end": 31
+        },
+        {
+          "name": "portMarks",
+          "kind": "function",
+          "start": 33,
+          "end": 57
+        },
+        {
+          "name": "drawPortMarks",
+          "kind": "function",
+          "start": 59,
+          "end": 66
+        }
+      ]
+    },
+    {
       "id": "client.ships.build-power-flow",
       "path": "client/src/ships/build/powerFlow.ts",
       "group": "client/ships/build",
@@ -5538,9 +5609,9 @@
       "id": "client.hangar.marks",
       "path": "client/src/ships/hangar/hangarMarks.ts",
       "group": "client/ships/hangar",
-      "lines": 85,
-      "owns": "the hangar's build marks on its 2d canvas: facing arrows (the part in hand always, placed parts faint and bright under the mouse) and shaped-shield cover (in hand, hovered in the parts list, fitted ones faint)",
-      "needs": "HangarHost (geoms, ctx, mouse, view, paletteHover, handTurn), ships/build/buildMarks geometry; npm: @space-game/common",
+      "lines": 109,
+      "owns": "the hangar's build marks on its 2d canvas: facing arrows and power-port marks (the part in hand always, placed parts faint and bright under the mouse) and shaped-shield cover (in hand, hovered in the parts list, fitted ones faint)",
+      "needs": "HangarHost (geoms, ctx, mouse, view, paletteHover, handTurn), ships/build/buildMarks and portMarks geometry; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -5562,44 +5633,50 @@
         {
           "name": "Px",
           "kind": "type",
-          "start": 15,
-          "end": 15
-        },
-        {
-          "name": "css",
-          "kind": "const",
           "start": 16,
           "end": 16
         },
         {
+          "name": "css",
+          "kind": "const",
+          "start": 17,
+          "end": 17
+        },
+        {
           "name": "arrow",
           "kind": "function",
-          "start": 18,
-          "end": 33
+          "start": 19,
+          "end": 34
+        },
+        {
+          "name": "ports",
+          "kind": "function",
+          "start": 36,
+          "end": 54
         },
         {
           "name": "cover",
           "kind": "function",
-          "start": 35,
-          "end": 47
+          "start": 56,
+          "end": 68
         },
         {
           "name": "drawPlacedMarks",
           "kind": "function",
-          "start": 49,
-          "end": 57
+          "start": 70,
+          "end": 79
         },
         {
           "name": "drawHandMarks",
           "kind": "function",
-          "start": 59,
-          "end": 63
+          "start": 81,
+          "end": 86
         },
         {
           "name": "drawHoverCover",
           "kind": "function",
-          "start": 65,
-          "end": 85
+          "start": 88,
+          "end": 109
         }
       ]
     },
