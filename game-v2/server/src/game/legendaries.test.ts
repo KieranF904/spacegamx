@@ -15,7 +15,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -28,7 +28,7 @@ const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
  * buffer, filling at its feed: guns.ts) */
 function pilotWith(model: string, fed = false) {
   resetGlobals();
-  const server = makeServer({ profileStore: new MemoryProfileStore() });
+  const server = makeEmptyServer({ profileStore: new MemoryProfileStore() });
   const t = new LocalTransport(server);
   t.connect();
   t.send({ type: 'join', username: 'pilot' } as any);

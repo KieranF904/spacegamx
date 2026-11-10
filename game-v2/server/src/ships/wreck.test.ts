@@ -4,7 +4,7 @@ import * as bitecs from 'bitecs';
 import { createShipState, seededRng, splitRebuild } from '@space-game/common';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
@@ -16,7 +16,7 @@ const dataDir = join(__dirname, '../../../data');
 describe('wrecks', () => {
   it('a wreck is the ship a fresh build with its damage would be, however many of its design came first', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = makeServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any });
+    const server = makeEmptyServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any });
     const ships = server.getShips();
     const designs = ['hauler', 'halberd', 'wisp'].filter((id) => ships.library.has(id));
     expect(designs.length).toBeGreaterThan(0);

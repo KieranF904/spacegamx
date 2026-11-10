@@ -17,7 +17,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { targetFreighter } from '../../testkits/targetFreighter.testkit.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -28,7 +28,7 @@ interface Seen { kfAt: [number, number][]; kfRun: number; syncRun: number; crumb
 function world() {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = makeServer({ clock: () => clock.t });
+  const server = makeEmptyServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   // (Three clients side by side, as the test always had; each runs its debris and is checked on its own)

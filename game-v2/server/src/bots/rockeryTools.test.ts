@@ -7,7 +7,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { BotManager } from './index.js';
 import { installRockeryTools } from './rockeryTools.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
@@ -15,7 +15,7 @@ describe('Rockery spawn tools (/rockery)', () => {
   it('spawns drones, a still dummy and random-flight bot players beside the asker, and clears them', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
     const clock = { t: 1_000_000 };
-    const server = makeServer({
+    const server = makeEmptyServer({
       gameData: new GameData(readGameDataFiles(dataDir)), devTeleport: true, guestAdmin: true, clock: () => clock.t,
     } as never);
     const step = (secs: number) => { for (let i = 0; i < secs * TICK_RATE; i++) { clock.t += 1000 / TICK_RATE; server.step(); } };

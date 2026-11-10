@@ -19,7 +19,7 @@ import { MemoryFriends } from './MemoryFriends.js';
 import { migrateFriends } from './friendsMigration.js';
 import { LobbyFriends } from './LobbyFriends.js';
 import { FriendsUnavailable } from './FriendsBackend.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -38,7 +38,7 @@ function world(store = new MemoryProfileStore(), clock = { t: 1_000_000 }, frien
     const i = ACCOUNTS.findIndex((n) => n.toLowerCase() === t.split(':')[1]?.toLowerCase());
     return i < 0 ? null : { id: i + 1, username: ACCOUNTS[i], email: '', is_admin: false, created_at: '' };
   };
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files),
     userDB: { checkSession: async (t: string) => ({ user: user(t) }), validateSession: async (t: string) => user(t), cleanupExpiredSessions: async () => {}, admin: null } as any,
     ships: createShipBridge(shipConfig), profileStore: store, clock: () => clock.t, friends,

@@ -11,11 +11,11 @@ import { createBossHost } from './boss.js';
 import { createPilotHost } from './pilots.js';
 import { whereIs } from './places.js';
 import { cometNow, isGas } from './mining.js';
-import { joinPilot, makeServer, resetGlobals } from '../../testkits/world.testkit.js';
+import { joinPilot, makeEmptyServer, resetGlobals } from '../../testkits/world.testkit.js';
 
 function rig(clock?: () => number) {
   resetGlobals();
-  const server = makeServer(clock ? { clock } : {});
+  const server = makeEmptyServer(clock ? { clock } : {});
   const pilots = ['A', 'B', 'C', 'D'].map((n) => {
     const p = joinPilot(server, n);
     return { ...p, conn: [...server.clients.values()].find((c) => c.playerId === p.pid)! };

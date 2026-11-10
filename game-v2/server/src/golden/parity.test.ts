@@ -49,7 +49,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -111,7 +111,7 @@ const keysOf = (t: ScriptTick) => ({ forward: false, backward: false, left: fals
 
 function runServer(sc: Scenario) {
   resetGlobals();
-  const server = makeServer({ clock: () => 1_000_000 });
+  const server = makeEmptyServer({ clock: () => 1_000_000 });
   const t = new LocalTransport(server);
   t.connect();
   t.send({ type: 'join', username: 'parity' } as any);

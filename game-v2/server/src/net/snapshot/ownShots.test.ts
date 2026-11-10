@@ -22,7 +22,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { serverTruth, damageOff } from '../hits/serverTruth.testkit.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -42,7 +42,7 @@ function fight(o: FightOpts = {}) {
   const forceAt = o.forceAt ?? [], knockAt = o.knockAt ?? [];
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = makeServer({ clock: () => clock.t });
+  const server = makeEmptyServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const A = new FakeHitsClient(server, { name: 'own_shooter', env, predictionError: o.predictionError });

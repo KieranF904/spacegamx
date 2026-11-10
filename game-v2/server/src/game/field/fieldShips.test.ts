@@ -19,7 +19,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import type { FieldShips } from './FieldShips.js';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -51,7 +51,7 @@ function design(opts: { reactors?: number; fabricator?: boolean; fabRot?: Rot } 
 /** `bank`: keep the repair bank's free part (full; its spare pays repairs and rebuilds of the ship's own parts). Off: emptied, so the hold alone pays */
 function world(bp: Blueprint, opts: { bank?: boolean } = {}) {
   resetGlobals();
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files),
     ships: createShipBridge(config),
     clock: () => 1_000_000,

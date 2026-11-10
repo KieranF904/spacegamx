@@ -3,11 +3,11 @@
  * admin cannot teleport, spawn, swap ships, build a station, touch the boss or the bank; an admin can, and so can anyone on a dev server.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeServer, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
+import { makeEmptyServer, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
 
 function rig(devTeleport: boolean) {
   resetGlobals();
-  const gs = makeServer({ devTeleport });
+  const gs = makeEmptyServer({ devTeleport });
   const { t } = joinPilot(gs, 'someone');
   const conn = gs.pilots.connOf(t.getPlayerId())!;
   gs.step(3);

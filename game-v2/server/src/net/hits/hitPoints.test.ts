@@ -26,7 +26,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from './fakeHitsClient.testkit.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -41,7 +41,7 @@ describe('confirmed hits: the impact is drawn where the server\'s shell struck',
     Math.random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     try {
       const clock = { t: 1_000_000 };
-      const server = makeServer({ clock: () => clock.t });
+      const server = makeEmptyServer({ clock: () => clock.t });
       const ships = server.getShips();
       const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
       const A = new FakeHitsClient(server, { name: 'hit_points', env });

@@ -10,7 +10,7 @@ import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { withDevData } from '../data/devData.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
@@ -26,7 +26,7 @@ const userDB = {
 /** A server (started with or without devStart) and a way to join it as a guest or as "pilot" */
 function serverWith(devStart: string | undefined, profileStore = new MemoryProfileStore()) {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files), userDB: userDB as any, devStart, profileStore,
     ships: createShipBridge(shipConfig),
   });

@@ -7,13 +7,13 @@ import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../loadShipConfig.js';
 import { createShipBridge } from '../../../ships/createShipBridge.js';
 import { feedParts } from '../../../../../common/src/ships/testData.js';
-import { makeServer } from '../../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = makeServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, ships: createShipBridge({ ...loadShipConfigCached(dataDir), playerBubbles: true }) });
+  const server = makeEmptyServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, ships: createShipBridge({ ...loadShipConfigCached(dataDir), playerBubbles: true }) });
   return { server, ships: server.getShips() };
 }
 

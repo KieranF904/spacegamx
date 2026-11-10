@@ -9,7 +9,7 @@ import type { AccountAdmin, AccountInfo } from '../auth/types.js';
 import { JsonProfileStore } from '../profile/JsonProfileStore.js';
 import { mkdtempSync, existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -50,7 +50,7 @@ function world(lobby: boolean, profileStore?: JsonProfileStore, names = ['boss',
   resetGlobals();
   const fake = fakeLobby(names);
   const userDB = lobby ? fake.userDB : { ...fake.userDB, admin: null };
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files), userDB: userDB as any, profileStore,
   });
   const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };

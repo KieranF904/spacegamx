@@ -25,7 +25,7 @@ import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { tickInput, newInputSendState, type InputSendCtx } from '../../../../client/src/app/inputSend.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -42,7 +42,7 @@ type MapLock = { name: string; x: number; y: number; stop?: number } | null;
 function jumpWithMouse(dist: (t: number) => number, v0 = 0, opts: { bearing?: (t: number) => number; lock?: (t: number, at: { x: number; y: number }) => MapLock } = {}) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = makeServer({ clock: () => clock.t });
+  const server = makeEmptyServer({ clock: () => clock.t });
   const ships = server.getShips();
   const jt = jumpTuning((ships as unknown as { tuning: never }).tuning);
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);

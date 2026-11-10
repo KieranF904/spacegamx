@@ -5,14 +5,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Position, Velocity, InSystem } from '@space-game/common';
 import { DEFAULT_DEATH_RULES } from '../Pilots.js';
-import { joinPilot, makeServer, resetGlobals, stepServer } from '../../testkits/world.testkit.js';
+import { joinPilot, makeEmptyServer, resetGlobals, stepServer } from '../../testkits/world.testkit.js';
 
 const TICKS_PER_MIN = 60 * 60;
 
 function rig() {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = makeServer({ clock: () => clock.t });
+  const server = makeEmptyServer({ clock: () => clock.t });
   const a = joinPilot(server, 'Victim');
   const b = joinPilot(server, 'Thief');
   const ca = server.pilots.connOf(a.pid)!;

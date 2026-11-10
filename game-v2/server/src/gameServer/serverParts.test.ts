@@ -12,7 +12,7 @@ import { RemovalSet, TRAFFIC_ARRIVE_RADIUS, TRAFFIC_DWELL_TICKS } from './shared
 import { threats, regionThreats } from './threats.js';
 import { trafficIntent, getTrafficShips } from './traffic.js';
 import { changeClock } from './travel.js';
-import { joinPilot, makeServer, resetGlobals } from '../testkits/world.testkit.js';
+import { joinPilot, makeEmptyServer, resetGlobals } from '../testkits/world.testkit.js';
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
@@ -51,7 +51,7 @@ describe('tick metrics', () => {
 
   it('keep the last 120 tick times for the admin stats, and send those only to open admin sockets once a second', () => {
     resetGlobals();
-    const server = makeServer();
+    const server = makeEmptyServer();
     const sent: unknown[] = [];
     const sock = { isOpen: () => true };
     server.clients.set({} as never, { isAdmin: true, ws: sock, playerId: -1 } as never);
@@ -82,7 +82,7 @@ describe('RemovalSet', () => {
 describe('threat ratings', () => {
   it('are cached until cleared, leave out the training yard and dev-only systems, and a band is at least as bad as the one inside it', () => {
     resetGlobals();
-    const server = makeServer();
+    const server = makeEmptyServer();
     const t = threats(server);
     expect(threats(server)).toBe(t);
     for (const sys of server.gameData.getAllSystems()) if (sys.tutorial) expect(t[sys.id]).toBeUndefined();
@@ -141,7 +141,7 @@ describe('freighter legs', () => {
 describe('a clock change (travel.ts)', () => {
   it('moves the notes of the pilot\'s client by the delta and drops inputs said in the old ticks; a zero delta changes nothing', () => {
     resetGlobals();
-    const server = makeServer();
+    const server = makeEmptyServer();
     const p = joinPilot(server, 'Clock');
     const conn = [...server.clients.values()].find((c) => c.playerId === p.pid)!;
     conn.scheduledInputs = [{ tick: 3 } as never];
@@ -165,11 +165,11 @@ describe('GameServer options (options.ts)', () => {
     try {
       process.env.NODE_ENV = 'production';
       resetGlobals();
-      const prod = makeServer({ guestAdmin: true, freeBuild: true, devStart: 'dev_rockery' });
+      const prod = makeEmptyServer({ guestAdmin: true, freeBuild: true, devStart: 'dev_rockery' });
       expect([prod.guestAdmin, prod.freeBuildAllowed, prod.devStartNum]).toEqual([false, false, -1]);
       process.env.NODE_ENV = 'development';
       resetGlobals();
-      const dev = makeServer({ guestAdmin: true, freeBuild: true, devStart: 'dev_rockery' });
+      const dev = makeEmptyServer({ guestAdmin: true, freeBuild: true, devStart: 'dev_rockery' });
       expect([dev.guestAdmin, dev.freeBuildAllowed]).toEqual([true, true]);
       expect(dev.devStartNum).toBeDefined();
     } finally { process.env.NODE_ENV = was; }

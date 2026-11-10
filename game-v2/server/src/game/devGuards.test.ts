@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { resetGlobals, makeServer, joinPilot, stepServer } from '../testkits/world.testkit.js';
+import { resetGlobals, makeEmptyServer, joinPilot, stepServer } from '../testkits/world.testkit.js';
 
 /** A pilot on a server with or without dev tools (devTeleport); `admin` makes the pilot an admin */
 function world(dev: boolean, admin = false) {
   resetGlobals();
-  const server = makeServer({ devTeleport: dev });
+  const server = makeEmptyServer({ devTeleport: dev });
   const me = joinPilot(server, 'pilot');
   const conn = server.pilots.connOf(me.pid)!;
   if (admin) conn.isAdmin = true;

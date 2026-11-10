@@ -11,7 +11,7 @@ import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -30,7 +30,7 @@ const flush = async () => { for (let i = 0; i < 8; i++) await new Promise((r) =>
 function setup() {
   resetGlobals();
   const store = new MemoryProfileStore();
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files), userDB: userDB as any, profileStore: store,
   });
   const join = async (id: number) => {
