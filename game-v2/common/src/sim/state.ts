@@ -6,7 +6,8 @@
  * invariants: every gun field rides every copy, both wire forms and the hash; a field added to the table but dropped
  *             by one fails — common/src/sim/gunFields.test.ts
  * extend:     a new per-gun field is one name in GUN_ARRAYS or GUN_SCALARS plus its declaration in GunState and the
- *             ShipState type (tsc fails until they agree)
+ *             ShipState type (tsc fails until they agree); a scalar also gets its line in copyGunScalars (unrolled for
+ *             speed; gunFields.test.ts fails until it has)
  */
 
 /**
@@ -89,10 +90,15 @@ void GUN_FIELDS_COVER; void GUN_FIELDS_ON_RECORD;
 
 type GunScalars = Pick<GunState, GunScalarField>;
 
-/** Every gun scalar from `from` onto `to` (absent ones too: a copy is the same shape whatever is set) */
+/**
+ * Every gun scalar from `from` onto `to` (absent ones too: a copy is the same shape whatever is set), in GUN_SCALARS
+ * order. Named one by one: a loop over the names makes every load and store a keyed one, a hot cost in every copy of
+ * a gun state (a scalar added to GUN_SCALARS but not here fails gunFields.test.ts)
+ */
 export function copyGunScalars(from: Readonly<GunScalars>, to: GunScalars): void {
-  const f = from as unknown as Record<string, unknown>, t = to as unknown as Record<string, unknown>;
-  for (let i = 0; i < GUN_SCALARS.length; i++) { const k = GUN_SCALARS[i]; t[k] = f[k]; }
+  to.triggerHeld = from.triggerHeld; to.clickAt = from.clickAt; to.trig = from.trig; to.minePaid = from.minePaid;
+  to.mineUntil = from.mineUntil; to.mineShare = from.mineShare; to.tow = from.tow; to.heldDist = from.heldDist;
+  to.clickMasks = from.clickMasks;
 }
 
 /**

@@ -16626,7 +16626,7 @@
       "id": "sim.state",
       "path": "common/src/sim/state.ts",
       "group": "common/sim",
-      "lines": 201,
+      "lines": 207,
       "owns": "the sim's state shapes and GUN_FIELDS: the one table of per-gun fields every copy, wire form and hash iterates",
       "needs": "common/ships ShipState and derived types",
       "events": "",
@@ -16636,7 +16636,7 @@
           "test": "common/src/sim/gunFields.test.ts"
         }
       ],
-      "extend": "a new per-gun field is one name in GUN_ARRAYS or GUN_SCALARS plus its declaration in GunState and the ShipState type (tsc fails until they agree)",
+      "extend": "a new per-gun field is one name in GUN_ARRAYS or GUN_SCALARS plus its declaration in GunState and the ShipState type (tsc fails until they agree); a scalar also gets its line in copyGunScalars (unrolled for speed; gunFields.test.ts fails until it has)",
       "exports": [
         "GUN_ARRAYS",
         "GUN_SCALARS",
@@ -16662,152 +16662,152 @@
         {
           "name": "SimStructure",
           "kind": "interface",
-          "start": 33,
-          "end": 40
+          "start": 34,
+          "end": 41
         },
         {
           "name": "GunState",
           "kind": "interface",
-          "start": 42,
-          "end": 64
+          "start": 43,
+          "end": 65
         },
         {
           "name": "GUN_ARRAYS",
           "kind": "const",
-          "start": 66,
-          "end": 76
+          "start": 67,
+          "end": 77
         },
         {
           "name": "GUN_SCALARS",
           "kind": "const",
-          "start": 77,
-          "end": 77
+          "start": 78,
+          "end": 78
         },
         {
           "name": "GUN_SCALARS_HASHED",
           "kind": "const",
-          "start": 78,
-          "end": 79
-        },
-        {
-          "name": "GunArrayField",
-          "kind": "type",
-          "start": 80,
+          "start": 79,
           "end": 80
         },
         {
-          "name": "GunScalarField",
+          "name": "GunArrayField",
           "kind": "type",
           "start": 81,
           "end": 81
         },
         {
+          "name": "GunScalarField",
+          "kind": "type",
+          "start": 82,
+          "end": 82
+        },
+        {
           "name": "Same",
           "kind": "type",
-          "start": 83,
-          "end": 84
+          "start": 84,
+          "end": 85
         },
         {
           "name": "GUN_FIELDS_COVER",
           "kind": "const",
-          "start": 85,
-          "end": 85
-        },
-        {
-          "name": "OnRecord",
-          "kind": "type",
           "start": 86,
           "end": 86
         },
         {
+          "name": "OnRecord",
+          "kind": "type",
+          "start": 87,
+          "end": 87
+        },
+        {
           "name": "GUN_FIELDS_ON_RECORD",
           "kind": "const",
-          "start": 87,
-          "end": 88
+          "start": 88,
+          "end": 89
         },
         {
           "name": "GunScalars",
           "kind": "type",
-          "start": 90,
-          "end": 90
+          "start": 91,
+          "end": 91
         },
         {
           "name": "copyGunScalars",
           "kind": "function",
-          "start": 92,
-          "end": 96
+          "start": 93,
+          "end": 102
         },
         {
           "name": "gunScalarsOntoRecord",
           "kind": "function",
-          "start": 98,
-          "end": 105
+          "start": 104,
+          "end": 111
         },
         {
           "name": "cloneGunState",
           "kind": "function",
-          "start": 107,
-          "end": 114
+          "start": 113,
+          "end": 120
         },
         {
           "name": "HazardState",
           "kind": "interface",
-          "start": 116,
-          "end": 127
+          "start": 122,
+          "end": 133
         },
         {
           "name": "SimCtl",
           "kind": "interface",
-          "start": 129,
-          "end": 133
+          "start": 135,
+          "end": 139
         },
         {
           "name": "SimShipState",
           "kind": "interface",
-          "start": 135,
-          "end": 153
+          "start": 141,
+          "end": 159
         },
         {
           "name": "NO_HAZARD",
           "kind": "const",
-          "start": 155,
-          "end": 155
+          "start": 161,
+          "end": 161
         },
         {
           "name": "newGunState",
           "kind": "function",
-          "start": 157,
-          "end": 161
+          "start": 163,
+          "end": 167
         },
         {
           "name": "gunStateOf",
           "kind": "function",
-          "start": 163,
-          "end": 166
+          "start": 169,
+          "end": 172
         },
         {
           "name": "clonePorts",
           "kind": "function",
-          "start": 168,
-          "end": 170
+          "start": 174,
+          "end": 176
         },
         {
           "name": "cloneCharge",
           "kind": "function",
-          "start": 172,
-          "end": 179
+          "start": 178,
+          "end": 185
         },
         {
           "name": "cloneSimShip",
           "kind": "function",
-          "start": 181,
-          "end": 191
+          "start": 187,
+          "end": 197
         },
         {
           "name": "newSimShip",
           "kind": "function",
-          "start": 193,
-          "end": 201
+          "start": 199,
+          "end": 207
         }
       ]
     },
@@ -17134,7 +17134,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 761,
+      "lines": 763,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -17162,7 +17162,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 121,
-          "end": 761
+          "end": 763
         }
       ]
     },
