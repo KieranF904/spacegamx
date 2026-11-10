@@ -10741,7 +10741,7 @@
       "invariants": [
         {
           "text": "bodies are listed in roster order (an order's design)",
-          "test": "none pinned"
+          "test": "common/src/bodies/invariants.test.ts"
         }
       ],
       "extend": "a new custom enemy is its module and a line here, in the roster's order",
@@ -10806,8 +10806,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "move output is the same on both sides",
-          "test": "none pinned"
+          "text": "move output is the same on both sides (no outside inputs, same calls from the same inputs)",
+          "test": "common/src/bodies/invariants.test.ts"
         }
       ],
       "extend": "a new boss move set is a module and a line here",
@@ -14878,7 +14878,7 @@
       "invariants": [
         {
           "text": "a gun does full damage to equal-grade blocks and falls off by whole grade steps",
-          "test": "none pinned"
+          "test": "common/src/ships/invariants.test.ts"
         }
       ],
       "extend": "a new damage type is a resist entry in materials.json and a name in DAMAGE_TYPES, not a branch here",
@@ -15038,7 +15038,7 @@
       "invariants": [
         {
           "text": "the catalog registers every function flag it loads",
-          "test": "none pinned"
+          "test": "common/src/ships/invariants.test.ts"
         }
       ],
       "extend": "a new function trait is a set filled in registerFunctionDefs, not a hand-kept list",
