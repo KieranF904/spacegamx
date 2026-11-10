@@ -326,6 +326,29 @@ export function structureOf(blueprint: Blueprint, hp: readonly number[], detache
   return { intact, joins, root, alive, orphanGroups };
 }
 
+/** What every phase of a rebuild reads: the design (design.ts) and the ship as it stands */
+interface Phase {
+  catalog: Catalog;
+  tuning: ShipTuning;
+  blueprint: Blueprint;
+  parts: Blueprint['parts'];
+  n: number;
+  D: DesignInfo;
+  geoms: DesignInfo['geoms'];
+  mounts: DesignInfo['mounts'];
+  fns: FunctionDef[];
+  mats: MaterialDef[];
+  area: number[];
+  hp: number[];
+  maxHp: number[];
+  alive: boolean[];
+}
+
+/**
+ * The phases, in order (each its own function below; the order of every sum is kept, so results are bit for bit as
+ * one function gave them): 1-2 structure (structureOf), the memo, 3 steady power, 5 physics, engines, 6 weapons,
+ * 7 cargo, miners and the rest, part features, the ports layout and what it feeds, then the result
+ */
 function rebuildAsIs(input: RebuildInput): ShipDerived {
   const { catalog, tuning, blueprint, hp, maxHp } = input;
   const parts = blueprint.parts;
@@ -333,8 +356,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // What the design fixes, worked out once per blueprint (design.ts)
   const D = input.fresh ? newDesign(catalog, blueprint) : designOf(catalog, blueprint);
   const { geoms, mounts, fns, mats } = D;
-  const allJoins = D.joins;
-  const { joins, root, alive, orphanGroups } = structureOf(blueprint, hp, input.detached, input.rootMode, allJoins, D.core >= 0 ? wholeBuilt(D) : undefined);
+  const { joins, root, alive, orphanGroups } = structureOf(blueprint, hp, input.detached, input.rootMode, D.joins, D.core >= 0 ? wholeBuilt(D) : undefined);
+  const S: Phase = { catalog, tuning, blueprint, parts, n, D, geoms, mounts, fns, mats, area: D.area, hp, maxHp, alive };
   // (Parts only went since the last rebuild: its turrets' rays and engines' exhaust carry on from it, RebuildMemo)
   const last = input.fresh ? undefined : input.memo?.last;
   let shrunk = !!last && last.design === D && last.tuning === tuning;
@@ -348,24 +371,90 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     return rays.win;
   };
 
-  // 3. Power: what the generators make and the steady loads (not engines, guns, mining lasers or a `burst` feature's parts)
-  // ask, for the hangar and ratings (the ports core decides what each part gets, every tick)
-  const area = D.area;
   // (Part features: which ones each part's function gives (features/plan.ts))
   const P = getPlan();
   const fxOf = P.features.length ? fns.map((fn) => featureBits(P, fn)) : undefined;
+  const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
+  const power = steadyPower(S, P, fxOf);
+  const body = bodyOf(S, input);
+  const eng = enginesOf(S, input, body.com, was, exhaustOf);
+  const hasCore = root >= 0 && parts[root].fn === 'core';
+  const gyro = hasCore ? tuning.flight.gyroTorque : 0;
+  const gain = tuning.flight.thrusterTorqueGain;
+  const { weapons, weaponDraw } = weaponsOf(S, turretWindow);
+  const sys = systemsOf(S, hasCore);
+  const fx = featuresOf(S, P, fxOf);
+  const fxOut = fx.fxOut;
+
+  // ---- The ports layout (power/ports.ts): power crosses only through the parts' ports; energy.ts runs it every tick
+  const health = hp.map((h, i) => partHealth(h, maxHp[i], tuning));
+  const ports = buildPortsLayout({ parts, fns, area: D.area, mats, alive, cells: geoms.map((g) => g.cells), core: coreAlive ? root : -1, tuning, health, weapons: weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })) });
+  const coilCool = portsFedSystems(S, ports, sys, fxOut);
+  const jump = jumpDriveStats(sys.jumpCap, sys.hullCells, sys.jumpCap > 0 ? sys.jumpGradeSum / sys.jumpCap : 1, sys.jt);
+  if (input.memo) input.memo.last = { design: D, tuning, alive: Uint8Array.from(alive, Number), turrets: turretRays, exhaust: exhaustOf };
+
+  const { mass, com, fullMass, inertiaGrid, fullInertiaGrid, radius } = body;
+  const cs = tuning.cellSize;
+  const { shieldMax, shieldRegen, shieldDelayW } = sys, fxMask = fx.fxMask;
+  return {
+    root,
+    alive,
+    orphanGroups,
+    joins,
+    energy: { max: Math.round(ports.gaugeMax / 256), supply: power.totalSupply, demand: power.steadyDemand, engineDraw: sys.engineDraw, minerDraw: sys.minerDraw, weaponDraw },
+    ports,
+    mass,
+    com,
+    inertia: inertiaGrid * cs * cs,
+    fullMass: Math.max(mass, fullMass),
+    fullInertia: Math.max(inertiaGrid, fullInertiaGrid) * cs * cs,
+    drive: driveFactor(mass, fullMass) * Math.max(0.1, Math.min(MAX_DRIVE, blueprint.drive ?? 1)),
+    ...(blueprint.turn ? { turn: Math.max(0.1, Math.min(MAX_TURN, blueprint.turn)) } : {}),
+    boostFactor: 1,
+    boostDrain: eng.demandSum > 0 ? eng.drainSum / eng.demandSum : 1,
+    thrusters: eng.thrusters,
+    maxThrust: eng.maxThrust,
+    maneuverForce: hasCore ? tuning.flight.coreManeuverForce : 0,
+    maxTorque: { cw: gyro + fx.fxTurn.torque + gain * eng.torqueCw, ccw: gyro + fx.fxTurn.torque + gain * eng.torqueCcw },
+    weapons,
+    cargoCapacity: Math.round(sys.cargoCapacity),
+    miners: sys.miners,
+    launchers: sys.launchers,
+    dash: sys.dash,
+    scanRange: Math.round(sys.scanRange),
+    shieldMax: Math.round(shieldMax),
+    shieldRegen: Math.round(shieldRegen * 100) / 100,
+    shieldDelay: shieldRegen > 0 ? Math.round(shieldDelayW / shieldRegen) : 0,
+    ...(fxMask ? { fxMask, fxList: fx.fxList, fx: fxOut } : {}),
+    // (A gun range cheat ship has no jump drive: it never leaves the chamber, types.ts Blueprint.range)
+    jumpRange: blueprint.range ? 0 : jump.range,
+    jumpCooldown: coilCool < 1 ? Math.round(jump.cooldown * coilCool) : jump.cooldown,
+    jumpRatio: jump.ratio,
+    radius: radius * cs,
+    makeup: makeupOf(alive, D.area, mats, fns),
+  };
+}
+
+/**
+ * 3. Power: what the generators make and the steady loads (not engines, guns, mining lasers or a `burst` feature's parts)
+ * ask, for the hangar and ratings (the ports core decides what each part gets, every tick)
+ */
+function steadyPower(S: Phase, P: ReturnType<typeof getPlan>, fxOf: number[] | undefined): { totalSupply: number; steadyDemand: number } {
+  const { tuning, n, fns, mats, area, hp, maxHp, alive } = S;
   const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i])
     || (fxOf !== undefined && (fxOf[i] & P.burstMask) !== 0);
-  const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
   let totalSupply = 0, steadyDemand = 0;
   for (let i = 0; i < n; i++) {
     if (!alive[i]) continue;
     if ((fns[i].produce ?? 0) > 0) totalSupply += partSupply(fns[i], area[i], mats[i]) * partHealth(hp[i], maxHp[i], tuning);
     if ((fns[i].demand ?? 0) > 0 && !burst(i)) steadyDemand += partDemand(fns[i], area[i], mats[i]);
   }
+  return { totalSupply, steadyDemand };
+}
 
-  // 5. Derived physics
-  const cs = tuning.cellSize;
+/** 5. Derived physics: mass, centre of mass, inertia and radius as it stands, and mass and inertia as built */
+function bodyOf(S: Phase, input: RebuildInput): { mass: number; com: Vec2; fullMass: number; inertiaGrid: number; fullInertiaGrid: number; radius: number } {
+  const { parts, n, D, geoms, fns, mats, area, alive } = S;
   let mass = 0, mx = 0, my = 0;
   for (let i = 0; i < n; i++) {
     if (!alive[i]) continue;
@@ -378,7 +467,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // The same for the ship as built: every part but ghosts, held on through built parts
   const core = D.core;
   const asBuilt = core >= 0 && input.rootMode === 'core'
-    ? !input.ghost?.some(Boolean) ? wholeBuilt(D) : floodFill(n, allJoins.filter(([a, b]) => !input.ghost?.[a] && !input.ghost?.[b]), core, (i) => !input.ghost?.[i])
+    ? !input.ghost?.some(Boolean) ? wholeBuilt(D) : floodFill(n, D.joins.filter(([a, b]) => !input.ghost?.[a] && !input.ghost?.[b]), core, (i) => !input.ghost?.[i])
     : parts.map((_, i) => !input.ghost?.[i]);
   const built = (i: number) => asBuilt[i];
   let fullMass = 0, fx = 0, fy = 0;
@@ -405,7 +494,13 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     inertiaGrid += d * (geoms[i].variant.polarMoment + area[i] * (dx * dx + dy * dy));
     for (const p of geoms[i].polygon) radius = Math.max(radius, dhypot(p[0] - com[0], p[1] - com[1]));
   }
+  return { mass, com, fullMass, inertiaGrid, fullInertiaGrid, radius };
+}
 
+/** The engines: each one's force and torque about `com`, what they add up to each way, and their boost drain weights */
+function enginesOf(S: Phase, input: RebuildInput, com: Vec2, was: RebuildMemo['last'], exhaustOf: Map<number, number>) {
+  const { catalog, tuning, parts, n, D, geoms, mounts, fns, mats, area, alive } = S;
+  const cs = tuning.cellSize;
   const thrusters: ThrusterInfo[] = [];
   const maxThrust = { forward: 0, back: 0, left: 0, right: 0 };
   let torqueCw = 0, torqueCcw = 0;
@@ -433,11 +528,12 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     maxThrust.right += Math.max(0, force[0]);
     if (torque > 0) torqueCw += torque; else torqueCcw -= torque;
   }
-  const hasCore = root >= 0 && parts[root].fn === 'core';
-  const gyro = hasCore ? tuning.flight.gyroTorque : 0;
-  const gain = tuning.flight.thrusterTorqueGain;
+  return { thrusters, maxThrust, torqueCw, torqueCcw, drainSum, demandSum };
+}
 
-  // 6. Weapons
+/** 6. Weapons: each gun's rhythm, energy, mount and (a turret's) window, and what they all draw firing flat out */
+function weaponsOf(S: Phase, turretWindow: (i: number) => TurretWindow): { weapons: WeaponInfo[]; weaponDraw: number } {
+  const { catalog, tuning, parts, n, mounts, fns, mats, area, alive } = S;
   const weapons: WeaponInfo[] = [];
   let weaponDraw = 0;
   for (let i = 0; i < n; i++) {
@@ -477,14 +573,18 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     // (What it draws firing flat out, by its firing model: an ammunition gun nothing, a clip gun its reloads, a spinning one spun up: energy.ts)
     weaponDraw += gunDrawFlatOut(weapons[weapons.length - 1], draw);
   }
+  return { weapons, weaponDraw };
+}
 
-  // 7. Cargo, mining lasers, scanners
+/** 7. Cargo, mining lasers, scanners, shields, jump coils, launch bays and dash coils (the ports-fed ones wait: portsFedSystems) */
+function systemsOf(S: Phase, hasCore: boolean) {
+  const { catalog, tuning, parts, n, geoms, mounts, fns, mats, area, alive } = S;
   let cargoCapacity = hasCore ? CORE_CARGO : 0;
   let scanRange = 0;
-  let shieldMax = 0, shieldRegen = 0, shieldDelayW = 0, coilCool = 1;
+  let shieldMax = 0, shieldRegen = 0, shieldDelayW = 0;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
-  // (Coils other than the core's count once the ports layout says power reaches them: portsCoils, below)
+  // (Coils other than the core's count once the ports layout says power reaches them: portsCoils, portsFedSystems)
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
   const portsCoils: number[] = [], portsShields: number[] = [];
   const miners: MinerInfo[] = [];
@@ -537,8 +637,12 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       dash.cooldown = dash.cooldown ? Math.min(dash.cooldown, ds.cooldown) : ds.cooldown;
     }
   }
+  return { cargoCapacity, scanRange, shieldMax, shieldRegen, shieldDelayW, jt, jumpCap, jumpGradeSum, hullCells, portsCoils, portsShields, miners, launchers, dash, engineDraw, minerDraw };
+}
 
-  // ---- Part features (features/): each one this ship has derives its own `fx.<key>`, in plan order
+/** ---- Part features (features/): each one this ship has derives its own `fx.<key>`, in plan order */
+function featuresOf(S: Phase, P: ReturnType<typeof getPlan>, fxOf: number[] | undefined): { fxMask: number; fxList?: Int8Array; fxOut?: FeatureDerived; fxTurn: { torque: number } } {
+  const { catalog, tuning, blueprint, n, geoms, mounts, fns, mats, area, alive } = S;
   let fxMask = 0, fxList: Int8Array | undefined, fxOut: FeatureDerived | undefined;
   // (Turning torque features add, both ways and wherever their parts sit: a Gyro's. DeriveCtx.turn)
   const fxTurn = { torque: 0 };
@@ -557,33 +661,39 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       }
     }
   }
+  return { fxMask, fxList, fxOut, fxTurn };
+}
 
-  // ---- The ports layout (power/ports.ts): power crosses only through the parts' ports; energy.ts runs it every tick
-  const health = hp.map((h, i) => partHealth(h, maxHp[i], tuning));
-  const ports = buildPortsLayout({ parts, fns, area, mats, alive, cells: geoms.map((g) => g.cells), core: coreAlive ? root : -1, tuning, health, weapons: weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })) });
-
+/**
+ * What only counts once the ports layout says power reaches it: jump coils (other than the core's), shields and shaped
+ * shields. Adds to `sys`'s sums (after its own, as one pass did) and trims `fxOut.shaped`; returns the best coil's cooldown share
+ */
+function portsFedSystems(S: Phase, ports: PortsLayout, sys: ReturnType<typeof systemsOf>, fxOut: FeatureDerived | undefined): number {
+  const { catalog, tuning, parts, fns, mats, area } = S;
+  const jt = sys.jt;
+  let coilCool = 1;
   // (A ports design's coils: those power reaches, through their in ports, count; one cut off is dead weight)
-  if (portsCoils.length) {
+  if (sys.portsCoils.length) {
     const fed = portsFed(ports);
-    for (const i of portsCoils) {
+    for (const i of sys.portsCoils) {
       if (!fed[i]) continue;
       const coil = (fns[i].jumpCapacity ?? 0) * area[i], grade = partGrade(catalog, parts[i]);
-      jumpCap += coilCapacity(coil, grade, jt);
-      jumpGradeSum += coil * grade;
+      sys.jumpCap += coilCapacity(coil, grade, jt);
+      sys.jumpGradeSum += coil * grade;
       if ((fns[i].jumpCooldown ?? 1) < coilCool) coilCool = fns[i].jumpCooldown!;
     }
   }
   // (And its shields, by the same rule: one power can't reach adds nothing; one reached refills as it is fed, energy.ts shieldShare)
-  if (portsShields.length) {
+  if (sys.portsShields.length) {
     const fed = portsFed(ports);
-    for (const i of portsShields) {
+    for (const i of sys.portsShields) {
       if (!fed[i]) continue;
       const cap = fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]);
-      shieldMax += cap;
+      sys.shieldMax += cap;
       const sr = fns[i].shieldRegen, sd = fns[i].shieldDelay ?? tuning.shield?.regenDelayTicks ?? 0;
       const rate = sr !== undefined ? sr * area[i] * fnOutput(fns[i], mats[i]) : cap * (tuning.shield?.regenPerSecond ?? 0);
-      shieldRegen += rate;
-      shieldDelayW += rate * sd;
+      sys.shieldRegen += rate;
+      sys.shieldDelayW += rate * sd;
     }
   }
   // (Shaped shields by the same rule: one power cannot reach is not up; features/zoneshield)
@@ -591,46 +701,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     const fed = portsFed(ports), up = fxOut.shaped.shields.filter((s) => fed[s.part]);
     if (up.length) fxOut.shaped.shields = up; else delete fxOut.shaped;
   }
-  const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
-  if (input.memo) input.memo.last = { design: D, tuning, alive: Uint8Array.from(alive, Number), turrets: turretRays, exhaust: exhaustOf };
-
-  return {
-    root,
-    alive,
-    orphanGroups,
-    joins,
-    energy: { max: Math.round(ports.gaugeMax / 256), supply: totalSupply, demand: steadyDemand, engineDraw, minerDraw, weaponDraw },
-    ports,
-    mass,
-    com,
-    inertia: inertiaGrid * cs * cs,
-    fullMass: Math.max(mass, fullMass),
-    fullInertia: Math.max(inertiaGrid, fullInertiaGrid) * cs * cs,
-    drive: driveFactor(mass, fullMass) * Math.max(0.1, Math.min(MAX_DRIVE, blueprint.drive ?? 1)),
-    ...(blueprint.turn ? { turn: Math.max(0.1, Math.min(MAX_TURN, blueprint.turn)) } : {}),
-    boostFactor: 1,
-    boostDrain: demandSum > 0 ? drainSum / demandSum : 1,
-    thrusters,
-    maxThrust,
-    maneuverForce: hasCore ? tuning.flight.coreManeuverForce : 0,
-    maxTorque: { cw: gyro + fxTurn.torque + gain * torqueCw, ccw: gyro + fxTurn.torque + gain * torqueCcw },
-    weapons,
-    cargoCapacity: Math.round(cargoCapacity),
-    miners,
-    launchers,
-    dash,
-    scanRange: Math.round(scanRange),
-    shieldMax: Math.round(shieldMax),
-    shieldRegen: Math.round(shieldRegen * 100) / 100,
-    shieldDelay: shieldRegen > 0 ? Math.round(shieldDelayW / shieldRegen) : 0,
-    ...(fxMask ? { fxMask, fxList, fx: fxOut } : {}),
-    // (A gun range cheat ship has no jump drive: it never leaves the chamber, types.ts Blueprint.range)
-    jumpRange: blueprint.range ? 0 : jump.range,
-    jumpCooldown: coilCool < 1 ? Math.round(jump.cooldown * coilCool) : jump.cooldown,
-    jumpRatio: jump.ratio,
-    radius: radius * cs,
-    makeup: makeupOf(alive, area, mats, fns),
-  };
+  return coilCool;
 }
 
 function makeupOf(alive: boolean[], area: number[], mats: MaterialDef[], fns: FunctionDef[]): ShipDerived['makeup'] {
