@@ -18077,7 +18077,7 @@
       "id": "server.data.game-data",
       "path": "server/src/data/GameData.ts",
       "group": "server/data",
-      "lines": 270,
+      "lines": 279,
       "owns": "loading and indexing the game data JSON files into GameData",
       "needs": "@space-game/common data shapes and terrain builders",
       "events": "",
@@ -18109,7 +18109,7 @@
           "name": "GameData",
           "kind": "class",
           "start": 78,
-          "end": 270
+          "end": 279
         }
       ]
     },
@@ -25103,7 +25103,7 @@
       "id": "server.ships.bridge.rebuild",
       "path": "server/src/ships/bridge/rebuild.ts",
       "group": "server/ships/bridge",
-      "lines": 443,
+      "lines": 480,
       "owns": "a ship's body coming and going: geometry cache, spawning, removal, rebuild after parts are lost, shedding and station repair",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
@@ -25111,6 +25111,10 @@
         {
           "text": "bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to bridge/*.ts to core.ts or common)",
           "test": "server/src/ships/bridge/imports.test.ts"
+        },
+        {
+          "text": "a wreck copied from its design's as-built state is the ship a fresh build with its damage makes, sharing nothing changeable",
+          "test": "server/src/ships/wreck.test.ts"
         }
       ],
       "extend": "a new way to spawn or remove a body is a function here with a delegator on ShipBridge",
@@ -25144,146 +25148,170 @@
         {
           "name": "geometry",
           "kind": "function",
-          "start": 37,
-          "end": 45
+          "start": 39,
+          "end": 47
         },
         {
           "name": "spawnOn",
           "kind": "function",
-          "start": 47,
-          "end": 59
+          "start": 49,
+          "end": 52
+        },
+        {
+          "name": "placeNew",
+          "kind": "function",
+          "start": 54,
+          "end": 65
         },
         {
           "name": "onPlayerCreated",
           "kind": "function",
-          "start": 61,
-          "end": 64
+          "start": 67,
+          "end": 70
         },
         {
           "name": "spawnDummy",
           "kind": "function",
-          "start": 66,
+          "start": 72,
           "end": 77
+        },
+        {
+          "name": "stillBody",
+          "kind": "function",
+          "start": 79,
+          "end": 89
+        },
+        {
+          "name": "asBuilt",
+          "kind": "const",
+          "start": 91,
+          "end": 92
+        },
+        {
+          "name": "asBuiltState",
+          "kind": "function",
+          "start": 94,
+          "end": 112
         },
         {
           "name": "spawnWreck",
           "kind": "function",
-          "start": 79,
-          "end": 99
+          "start": 114,
+          "end": 136
         },
         {
           "name": "setSkills",
           "kind": "function",
-          "start": 101,
-          "end": 103
+          "start": 138,
+          "end": 140
         },
         {
           "name": "removeShip",
           "kind": "function",
-          "start": 105,
-          "end": 108
+          "start": 142,
+          "end": 145
         },
         {
           "name": "forget",
           "kind": "function",
-          "start": 110,
-          "end": 157
+          "start": 147,
+          "end": 194
         },
         {
           "name": "nextMissing",
           "kind": "function",
-          "start": 159,
-          "end": 178
+          "start": 196,
+          "end": 215
         },
         {
           "name": "validate",
           "kind": "function",
-          "start": 180,
-          "end": 186
+          "start": 217,
+          "end": 223
         },
         {
           "name": "respawnInPlace",
           "kind": "function",
-          "start": 188,
-          "end": 195
+          "start": 225,
+          "end": 232
         },
         {
           "name": "repair",
           "kind": "function",
-          "start": 197,
-          "end": 206
+          "start": 234,
+          "end": 243
         },
         {
           "name": "joinsOf",
           "kind": "function",
-          "start": 208,
-          "end": 213
+          "start": 245,
+          "end": 250
         },
         {
           "name": "partWorld",
           "kind": "function",
-          "start": 215,
-          "end": 217
+          "start": 252,
+          "end": 254
         },
         {
           "name": "decay",
           "kind": "function",
-          "start": 219,
-          "end": 232
+          "start": 256,
+          "end": 269
         },
         {
           "name": "repairStep",
           "kind": "function",
-          "start": 234,
-          "end": 292
+          "start": 271,
+          "end": 329
         },
         {
           "name": "noteRebuild",
           "kind": "function",
-          "start": 294,
-          "end": 297
+          "start": 331,
+          "end": 334
         },
         {
           "name": "markRebuild",
           "kind": "function",
-          "start": 299,
-          "end": 306
+          "start": 336,
+          "end": 343
         },
         {
           "name": "settle",
           "kind": "function",
-          "start": 308,
-          "end": 312
+          "start": 345,
+          "end": 349
         },
         {
           "name": "rebuildMarked",
           "kind": "function",
-          "start": 314,
-          "end": 317
+          "start": 351,
+          "end": 354
         },
         {
           "name": "rebuildNow",
           "kind": "function",
-          "start": 319,
-          "end": 393
+          "start": 356,
+          "end": 430
         },
         {
           "name": "shed",
           "kind": "function",
-          "start": 395,
-          "end": 414
+          "start": 432,
+          "end": 451
         },
         {
           "name": "spawnDebris",
           "kind": "function",
-          "start": 416,
-          "end": 436
+          "start": 453,
+          "end": 473
         },
         {
           "name": "removeBody",
           "kind": "function",
-          "start": 438,
-          "end": 443
+          "start": 475,
+          "end": 480
         }
       ]
     },

@@ -6,6 +6,8 @@
  *             @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)
  * invariants: bridge modules import ShipBridge as a type only; runtime imports run one way (ShipBridge.ts to
  *             bridge/*.ts to core.ts or common) — server/src/ships/bridge/imports.test.ts
+ *             a wreck copied from its design's as-built state is the ship a fresh build with its damage makes, sharing
+ *             nothing changeable — server/src/ships/wreck.test.ts
  * extend:     a new way to spawn or remove a body is a function here with a delegator on ShipBridge
  */
 
@@ -46,7 +48,11 @@ export function geometry(b: BridgeCtx, ship: ShipState): PlacedGeom[] {
 
 export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' | 'debris', hp?: number[], angVel = 0): ShipState {
   const t0 = b.now();
-  const ship = createShipState(b.catalog, b.tuning, eid, bp, b.host.getTick(), { kind, hp, angVel });
+  return placeNew(b, eid, createShipState(b.catalog, b.tuning, eid, bp, b.host.getTick(), { kind, hp, angVel }), t0);
+}
+
+/** A ship state just made (rebuilt once) put on its body: its charge, its first structure noted, its radius */
+function placeNew(b: BridgeCtx, eid: number, ship: ShipState, t0: number): ShipState {
   b.noteRebuild(t0);
   // (A new ship's state: every part full; an old one's on the body is no use to it)
   b.charge.set(eid, fullPortsCharge(ship.derived));
@@ -65,6 +71,13 @@ export function onPlayerCreated(b: BridgeCtx, eid: number): void {
 
 /** A pilotless ship (debug key B). Returns its entity id. */
 export function spawnDummy(b: BridgeCtx, bp: Blueprint, x: number, y: number, angle: number, systemId = 0): number {
+  const eid = stillBody(b, x, y, angle, systemId);
+  b.spawnOn(eid, bp, 'ship');
+  return eid;
+}
+
+/** A new body at rest, here */
+function stillBody(b: BridgeCtx, x: number, y: number, angle: number, systemId: number): number {
   const eid = b.host.createBody();
   InSystem.systemId[eid] = systemId;
   Position.x[eid] = x;
@@ -72,8 +85,30 @@ export function spawnDummy(b: BridgeCtx, bp: Blueprint, x: number, y: number, an
   Velocity.x[eid] = 0;
   Velocity.y[eid] = 0;
   Rotation.angle[eid] = angle;
-  b.spawnOn(eid, bp, 'ship');
   return eid;
+}
+
+/** Each design's ship as built (createShipState at full HP), kept per catalog and tuning: a wreck starts as a copy */
+const asBuilt = new WeakMap<object, WeakMap<Blueprint, { tuning: object; ship: ShipState }>>();
+
+/**
+ * A full-HP ship state for a design, the same as spawnOn's createShipState makes, copied from the design's as-built one
+ * instead of worked out again: its id and spawn tick its own, every array its own copy; its derived structure shared,
+ * read only (nothing changes a derived structure in place: a rebuild replaces it), until the wreck's damage rebuilds
+ * it (spawnWreck)
+ */
+function asBuiltState(b: BridgeCtx, eid: number, bp: Blueprint): ShipState {
+  let byBp = asBuilt.get(b.catalog);
+  if (!byBp) asBuilt.set(b.catalog, (byBp = new WeakMap()));
+  let base = byBp.get(bp);
+  if (!base || base.tuning !== b.tuning) byBp.set(bp, (base = { tuning: b.tuning, ship: createShipState(b.catalog, b.tuning, -1, bp, 0, { kind: 'ship' }) }));
+  const ship: ShipState = { ...base.ship, id: eid, spawnTick: b.host.getTick() };
+  const rec = ship as unknown as Record<string, unknown>;
+  for (const k of Object.keys(rec)) if (Array.isArray(rec[k])) rec[k] = (rec[k] as unknown[]).slice();
+  // (Its rebuild memo a memo of its own holding the as-built one's last rebuild, as a ship built so would have: a rebuild
+  // only reads a memo's last and replaces it, never changes it)
+  Object.defineProperty(ship, 'memo', { value: { last: base.ship.memo?.last }, enumerable: false, writable: false, configurable: true });
+  return ship;
 }
 
 /**
@@ -81,8 +116,10 @@ export function spawnDummy(b: BridgeCtx, bp: Blueprint, x: number, y: number, an
  * shot away, many scorched) that drifts in place. Returns its entity id.
  */
 export function spawnWreck(b: BridgeCtx, bp: Blueprint, x: number, y: number, angle: number, systemId: number, seed: number): number {
-  const eid = b.spawnDummy(bp, x, y, angle, systemId);
-  const ship = b.bodies.get(eid)!;
+  // (As spawnDummy makes one, its full-HP state copied from the design's as built: asBuiltState)
+  const eid = stillBody(b, x, y, angle, systemId);
+  const t0 = b.now();
+  const ship = placeNew(b, eid, asBuiltState(b, eid, bp), t0);
   const rng = seededRng(seed);
   ship.blueprint.parts.forEach((p, i) => {
     if (p.fn === 'core') return;

@@ -33,7 +33,7 @@ import {
   setStationTable,
   type TutorialData,
 } from '@space-game/common';
-import { checkGameData } from './validateGameData.js';
+import { checkGameData, type ValidateOptions } from './validateGameData.js';
 import type { RulesFile, StringsFile } from './rules.js';
 
 /** Parsed contents of the data JSON files. Node loads them from disk; proto mode bundles them. */
@@ -112,6 +112,15 @@ export class GameData {
   private stationIdToNum: Map<string, number> = new Map();
   private instances: Map<string, number[]> = new Map();
   private numToStationId: Map<number, string> = new Map();
+
+  /**
+   * Check a files object now, with the ship data too (the real start, index.ts: every file against the others, ship
+   * designs included), so a GameData built on it doesn't check it again
+   */
+  static checkFiles(files: GameDataFiles, opts: ValidateOptions = {}): void {
+    checkGameData(files, opts);
+    checkedFiles.add(files);
+  }
 
   constructor(files: GameDataFiles) {
     // Shape and cross-reference checks (throws in dev/test, logs in production): once per files object (a test file's
