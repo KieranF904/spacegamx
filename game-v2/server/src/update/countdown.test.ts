@@ -118,6 +118,7 @@ describe('join gate in auth', () => {
       everyoneAdmin: false,
       guestAdmin: false,
       contrib: { allowed: () => false },
+      enter: () => {},
     };
     await handleJoin(ctx, conn, { username: 'Zed' });
     expect(sent[0]).toMatchObject({ type: 'authResult', success: false, error: JOIN_REFUSED });
