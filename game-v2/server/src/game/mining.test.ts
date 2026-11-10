@@ -106,7 +106,7 @@ describe('mining: work and keep', () => {
   });
 
   it('drops come three times as often as before 2026-11-06, guns and lasers alike, with twice the ore a second', () => {
-    // Before (damagePerUnit 74, chunkUnits 4 to 9, a drop due with nothing kept skipped: bench/miningCadence.ts): a
+    // Before (damagePerUnit 74, chunkUnits 4 to 9, a drop due with nothing kept skipped; a since-removed bench): a
     // starter's Pips a drop every 8.15 s and 0.275 ore a second; a Mk I laser every 7.13 s and 0.907 ore a second
     const S = 1800, gun = rate('asteroid_metal', 1, pips(), S), mk1 = rate('asteroid_metal', 1, [{ tool: laser(), dps: LASER_DPS }], S);
     expect(60 / gun.chunks).toBeLessThan((8.15 / 3) * 1.08);

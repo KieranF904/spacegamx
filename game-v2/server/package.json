@@ -4,10 +4,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.bench.json",
     "dev": "tsx watch --env-file=../dev.env src/index.ts",
     "start": "node dist/index.js",
-    "bench:crowd": "tsx src/bench/crowdBench.ts",
+    "bench:crowd": "tsx --tsconfig tsconfig.bench.json src/bench/crowdBench.ts",
     "bench:table": "tsx --tsconfig ../scripts/net/tsconfig.json src/bench/netTable.ts"
   },
   "dependencies": {

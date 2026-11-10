@@ -53,7 +53,7 @@ The map and everything that keeps it alive cheaply: system/station/planet/astero
 - `npx vitest run server/src/ships/simLod.test.ts server/src/game/systemMemory.test.ts server/src/game/hazards.test.ts server/src/game/warmth.test.ts common/src/ships/hazards.test.ts common/src/ships/warmth.test.ts`
 - Travel and world: `npx vitest run server/src/travel.test.ts server/src/game/surfaces.test.ts server/src/game/solRegions.test.ts server/src/game/asteroidOrbits.test.ts server/src/game/mining.test.ts server/src/game/nests.test.ts server/src/game/sieges.test.ts`
 - Client dots: `npx vitest run client/src/state/farShips.test.ts`
-- Bench: `server/src/bench/profileBench.ts`, `tickBench.ts`.
+- Bench: `server/src/bench/tickBench.ts`, `crowdBench.ts`.
 
 ## Gotchas
 - hazards.json `_comment` says ratings live in `systems.json hazardRatings`; the real field is each system's `hazards` array. Trust the schema.
