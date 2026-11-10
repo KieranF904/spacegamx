@@ -121,7 +121,6 @@
   "power_splitter_end"
  ],
  "skip": [
-  "power_pulse_dynamo",
   "shield_flash_screen",
   "railgun_rail_driver",
   "utility_repair_beam",

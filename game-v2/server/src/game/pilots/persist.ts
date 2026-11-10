@@ -56,7 +56,7 @@ const LEASE_TOAST_MS = 30_000;
 function leaseRefused(self: Pilots, s: Session): void {
   const now = self.now();
   const count = (s.leaseRefused?.count ?? 0) + 1;
-  const wait = Math.min(LEASE_RETRY_MAX_MS, Math.max(1000, self.opts.autosaveMs) * 2 ** (count - 1));
+  const wait = Math.min(LEASE_RETRY_MAX_MS, Math.max(1000, self.opts.autosaveMs) * (1 << Math.min(count - 1, 10)));
   const told = s.leaseRefused?.toldAt ?? -Infinity;
   const tell = now - told >= LEASE_TOAST_MS;
   s.leaseRefused = { count, retryAt: now + wait, toldAt: tell ? now : told };
