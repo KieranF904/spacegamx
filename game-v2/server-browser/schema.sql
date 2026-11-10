@@ -32,7 +32,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_by    TEXT;     -- the admin's
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner     BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS sessions (
-    token      TEXT PRIMARY KEY,          -- 48 random bytes, hex
+    token      TEXT PRIMARY KEY,          -- 'h1:' + SHA-256 of the 48 random bytes (hex) the client holds
     user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     expires_at BIGINT NOT NULL            -- epoch milliseconds
 );

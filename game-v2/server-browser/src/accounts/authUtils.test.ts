@@ -43,7 +43,7 @@ describe('banMessage', () => {
 
 describe('input checks', () => {
   it('usernames are 2-20 characters of letters, digits, _ and -', () => {
-    const ok = (u: string) => validateRegistration(u, 'a@b.co', 'pw');
+    const ok = (u: string) => validateRegistration(u, 'a@b.co', 'pw-12345');
     expect(ok('ab')).toBeNull();
     expect(ok('a'.repeat(20))).toBeNull();
     expect(ok('a_b-9')).toBeNull();
@@ -66,7 +66,9 @@ describe('input checks', () => {
   });
   it('a password is 1 to 200 characters', () => {
     expect(validatePassword('')).not.toBeNull();
-    expect(validatePassword('x')).toBeNull();
+    expect(validatePassword('x')).toMatch(/at least 8/);
+    expect(validatePassword('x'.repeat(7))).not.toBeNull();
+    expect(validatePassword('x'.repeat(8))).toBeNull();
     expect(validatePassword('x'.repeat(200))).toBeNull();
     expect(validatePassword('x'.repeat(201))).not.toBeNull();
   });
@@ -84,8 +86,8 @@ describe('passwords and tokens', () => {
   });
   it('a malformed stored hash fails the check rather than throwing', async () => {
     const salt = generateSalt();
-    expect(verifyPasswordSync('pw', salt, 'short')).toBe(false);
-    expect(await verifyPassword('pw', salt, '')).toBe(false);
+    expect(verifyPasswordSync('pw-12345', salt, 'short')).toBe(false);
+    expect(await verifyPassword('pw-12345', salt, '')).toBe(false);
   });
   it('salts and tokens are random and long enough', () => {
     expect(generateSalt()).toHaveLength(64);

@@ -47,7 +47,7 @@ function request(chunks: (string | Buffer)[], headers: Record<string, string> = 
 describe('sign-in limits', () => {
   it('after 10 wrong passwords for a name from one address, that address is locked out of it (the right password too); the pilot elsewhere is not', async () => {
     const s = new JsonUserStore(join(tmp(), 'users.json'));
-    await s.register('victim', 'victim@example.com', 'right');
+    await s.register('victim', 'victim@example.com', 'right-pass1');
     // (Before the routes: their limits keep the clock they were made with)
     vi.useFakeTimers({ toFake: ['Date'] });
     const call = await routes(s);
@@ -55,11 +55,11 @@ describe('sign-in limits', () => {
       for (let i = 0; i < 10; i++) expect((await call('/auth/login', { username: 'victim', password: `guess${i}` }, '10.1.0.1')).status).toBe(401);
       // (A minute on, so it's the wrong passwords that hold it, not the address's 10 attempts a minute)
       vi.setSystemTime(Date.now() + 61_000);
-      const locked = await call('/auth/login', { username: 'VICTIM', password: 'right' }, '10.1.0.1');
+      const locked = await call('/auth/login', { username: 'VICTIM', password: 'right-pass1' }, '10.1.0.1');
       expect(locked.status).toBe(429);
       expect(locked.body).toEqual({ success: false, error: expect.stringMatching(/Too many wrong passwords for this account\. Try again in 14 minutes/) });
       // The pilot, from their own address, gets in
-      expect((await call('/auth/login', { username: 'victim', password: 'right' }, '10.2.0.1')).status).toBe(200);
+      expect((await call('/auth/login', { username: 'victim', password: 'right-pass1' }, '10.2.0.1')).status).toBe(200);
     } finally {
       vi.useRealTimers();
     }
@@ -67,25 +67,25 @@ describe('sign-in limits', () => {
 
   it('locks a name from every address after 100 wrong passwords from anywhere (guessing shared out); other names are fine', async () => {
     const s = new JsonUserStore(join(tmp(), 'users.json'));
-    await s.register('victim', 'victim@example.com', 'right');
-    await s.register('bystander', 'by@example.com', 'pw');
+    await s.register('victim', 'victim@example.com', 'right-pass1');
+    await s.register('bystander', 'by@example.com', 'pw-12345');
     const call = await routes(s);
     for (let i = 0; i < 100; i++) expect((await call('/auth/login', { username: 'victim', password: `guess${i}` }, `10.1.${i >> 3}.${i & 7}`)).status).toBe(401);
-    const locked = await call('/auth/login', { username: 'VICTIM', password: 'right' }, '10.9.0.1');
+    const locked = await call('/auth/login', { username: 'VICTIM', password: 'right-pass1' }, '10.9.0.1');
     expect(locked.status).toBe(429);
     expect(locked.body).toEqual({ success: false, error: expect.stringMatching(/Too many wrong passwords for this account\. Try again in 15 minutes/) });
-    expect((await call('/auth/login', { username: 'bystander', password: 'pw' }, '10.9.0.2')).status).toBe(200);
+    expect((await call('/auth/login', { username: 'bystander', password: 'pw-12345' }, '10.9.0.2')).status).toBe(200);
   });
 
   it('a right password clears that address\'s wrong ones', async () => {
     const s = new JsonUserStore(join(tmp(), 'users.json'));
-    await s.register('forgetful', 'f@example.com', 'right');
+    await s.register('forgetful', 'f@example.com', 'right-pass1');
     // (Before the routes: their limits keep the clock they were made with)
     vi.useFakeTimers({ toFake: ['Date'] });
     const call = await routes(s);
     try {
       for (let i = 0; i < 9; i++) await call('/auth/login', { username: 'forgetful', password: 'x' }, '10.5.0.1');
-      expect((await call('/auth/login', { username: 'forgetful', password: 'right' }, '10.5.0.1')).status).toBe(200);
+      expect((await call('/auth/login', { username: 'forgetful', password: 'right-pass1' }, '10.5.0.1')).status).toBe(200);
       vi.setSystemTime(Date.now() + 61_000);
       for (let i = 0; i < 9; i++) expect((await call('/auth/login', { username: 'forgetful', password: 'x' }, '10.5.0.1')).status).toBe(401);
     } finally {
@@ -103,11 +103,11 @@ describe('sign-in limits', () => {
 
   it('limits wrong passwords on account changes per account, from any address', async () => {
     const s = new JsonUserStore(join(tmp(), 'users.json'));
-    const reg = await s.register('owner', 'owner@example.com', 'right');
+    const reg = await s.register('owner', 'owner@example.com', 'right-pass1');
     if (!reg.success) throw new Error(reg.error);
     const call = await routes(s);
     for (let i = 0; i < 10; i++) expect((await call('/auth/delete-account', { token: reg.token, password: 'x' }, `10.7.0.${i}`)).status).toBe(401);
-    expect((await call('/auth/delete-account', { token: reg.token, password: 'right' }, '10.8.0.1')).status).toBe(429);
+    expect((await call('/auth/delete-account', { token: reg.token, password: 'right-pass1' }, '10.8.0.1')).status).toBe(429);
     expect(await s.getUserById(reg.user.id)).not.toBeNull();
   });
 });
@@ -196,7 +196,7 @@ describe('accounts file safety', () => {
     const dir = tmp();
     const file = join(dir, 'users.json');
     const s = new JsonUserStore(file);
-    await s.register('keeper', 'keeper@example.com', 'pw');
+    await s.register('keeper', 'keeper@example.com', 'pw-12345');
     await s.close();
     new JsonUserStore(file); // (a good start: backs it up)
     expect(JSON.parse(readFileSync(`${file}.bak`, 'utf-8')).users.map((u: any) => u.username)).toContain('keeper');
@@ -208,14 +208,14 @@ describe('accounts file safety', () => {
     expect(readFileSync(file, 'utf-8')).toBe('');
     // Restoring the backup brings everyone back
     writeFileSync(file, readFileSync(`${file}.bak`));
-    expect((await new JsonUserStore(file).login('keeper', 'pw')).success).toBe(true);
+    expect((await new JsonUserStore(file).login('keeper', 'pw-12345')).success).toBe(true);
   });
 
   it('many changes at once all reach the file, which is always whole, with no temp file left', async () => {
     const dir = tmp();
     const file = join(dir, 'users.json');
     const s = new JsonUserStore(file);
-    await Promise.all(Array.from({ length: 20 }, (_, i) => s.register(`pilot${i}`, `p${i}@example.com`, 'pw')));
+    await Promise.all(Array.from({ length: 20 }, (_, i) => s.register(`pilot${i}`, `p${i}@example.com`, 'pw-12345')));
     await s.close();
     const raw = JSON.parse(readFileSync(file, 'utf-8'));
     expect(raw.users.filter((u: any) => u.username.startsWith('pilot'))).toHaveLength(20);
@@ -226,7 +226,7 @@ describe('accounts file safety', () => {
   it('a deleted account is on disk by the time deleteUser returns', async () => {
     const file = join(tmp(), 'users.json');
     const s = new JsonUserStore(file);
-    const reg = await s.register('gone', 'gone@example.com', 'pw');
+    const reg = await s.register('gone', 'gone@example.com', 'pw-12345');
     if (!reg.success) throw new Error(reg.error);
     await s.deleteUser(reg.user.id);
     expect(readFileSync(file, 'utf-8')).not.toMatch(/gone@example/);

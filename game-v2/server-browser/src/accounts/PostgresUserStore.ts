@@ -6,7 +6,7 @@
  *
  *   users:    (id, username, email, password_hash, salt, is_admin, is_owner, created_at,
  *              banned_until, ban_reason, banned_by)
- *   sessions: (token, user_id, expires_at)
+ *   sessions: (token, user_id, expires_at)   (token: a hash of the one the client holds)
  *
  * Uses node-postgres (pg) via a small connection pool. Enable by setting
  * DATABASE_URL and USER_STORE_BACKEND=postgres in createUserStore().
@@ -27,6 +27,8 @@ import {
   banMessage,
   generateSalt,
   generateToken,
+  hashToken,
+  TOKEN_HASH_PREFIX,
   hashPassword,
   validateEmail,
   validateRegistration,
@@ -40,6 +42,7 @@ import {
  */
 interface PgQueryResult {
   rows: any[];
+  rowCount?: number | null;
 }
 interface PgClient {
   query(sql: string, params?: any[]): Promise<PgQueryResult>;
@@ -107,6 +110,7 @@ export class PostgresUserStore implements UserStore {
    * rights; the ALTER needs the table's owner). No users table at all: schema.sql hasn't been applied, left alone.
    */
   async upgrade(): Promise<void> {
+    await this.hashSessionTokens();
     const r = await this.pool.query(
       `SELECT to_regclass('users') IS NOT NULL AS users,
               EXISTS (SELECT 1 FROM information_schema.columns
@@ -118,6 +122,19 @@ export class PostgresUserStore implements UserStore {
     } catch (e) {
       throw new Error(`users has no "is_owner" column and this database user can't add it: run server-browser/schema.sql as the table's owner (${e})`);
     }
+  }
+
+  /**
+   * Sessions kept before tokens were hashed (SEC-12): hashed in place (the same value hashToken gives, so they keep
+   * working), those not yet marked with the prefix. Safe to run at every start; no sessions table: left alone.
+   */
+  private async hashSessionTokens(): Promise<void> {
+    const has = await this.pool.query(`SELECT to_regclass('sessions') IS NOT NULL AS sessions`);
+    if (!has.rows[0]?.sessions) return;
+    const r = await this.pool.query(
+      `UPDATE sessions SET token = $1 || encode(sha256(convert_to(token, 'UTF8')), 'hex') WHERE token NOT LIKE $2`,
+      [TOKEN_HASH_PREFIX, `${TOKEN_HASH_PREFIX}%`]);
+    if (r.rowCount) console.log(`[UserStore] Hashed ${r.rowCount} stored session tokens`);
   }
 
   // ============================================
@@ -187,11 +204,11 @@ export class PostgresUserStore implements UserStore {
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = $1 AND s.expires_at > $2`,
-      [token, Date.now()]
+      [hashToken(token), Date.now()]
     );
     if (result.rows.length === 0) {
       // Opportunistic cleanup of the expired session, if any
-      await this.pool.query('DELETE FROM sessions WHERE token = $1', [token]);
+      await this.pool.query('DELETE FROM sessions WHERE token = $1', [hashToken(token)]);
       return null;
     }
     return this.toPublicRecord(result.rows[0]);
@@ -201,13 +218,13 @@ export class PostgresUserStore implements UserStore {
     const token = generateToken();
     await this.pool.query(
       'INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)',
-      [token, userId, Date.now() + SESSION_DURATION_MS]
+      [hashToken(token), userId, Date.now() + SESSION_DURATION_MS]
     );
     return token;
   }
 
   async logout(token: string): Promise<void> {
-    await this.pool.query('DELETE FROM sessions WHERE token = $1', [token]);
+    await this.pool.query('DELETE FROM sessions WHERE token = $1', [hashToken(token)]);
   }
 
   async getUserById(id: number): Promise<UserRecord | null> {
@@ -285,7 +302,7 @@ export class PostgresUserStore implements UserStore {
   async endSessions(userId: number, keep?: string): Promise<number> {
     const result = keep === undefined
       ? await this.pool.query('DELETE FROM sessions WHERE user_id = $1 RETURNING token', [userId])
-      : await this.pool.query('DELETE FROM sessions WHERE user_id = $1 AND token <> $2 RETURNING token', [userId, keep]);
+      : await this.pool.query('DELETE FROM sessions WHERE user_id = $1 AND token <> $2 RETURNING token', [userId, hashToken(keep)]);
     return result.rows.length;
   }
 

@@ -16,12 +16,12 @@ function contract(name: string, make: () => Promise<{ store: UserStore; done: ()
   describe(`${name} account store`, () => {
     it('registers, signs in, validates and signs out', async () => {
       const { store, done } = await make();
-      const reg = await store.register('contract-ace', 'contract-ace@example.com', 'pw-1234');
+      const reg = await store.register('contract-ace', 'contract-ace@example.com', 'pw-12345');
       if (!reg.success) throw new Error(reg.error);
-      expect((await store.register('CONTRACT-ACE', 'other@example.com', 'pw')).success).toBe(false);
-      expect((await store.register('contract-two', 'Contract-Ace@example.com', 'pw')).success).toBe(false);
+      expect((await store.register('CONTRACT-ACE', 'other@example.com', 'pw-12345')).success).toBe(false);
+      expect((await store.register('contract-two', 'Contract-Ace@example.com', 'pw-12345')).success).toBe(false);
       expect((await store.login('contract-ace', 'wrong')).success).toBe(false);
-      const login = await store.login('Contract-Ace', 'pw-1234');
+      const login = await store.login('Contract-Ace', 'pw-12345');
       if (!login.success) throw new Error(login.error);
       expect((await store.validateSession(login.token))?.id).toBe(reg.user.id);
       await store.logout(login.token);
@@ -33,15 +33,15 @@ function contract(name: string, make: () => Promise<{ store: UserStore; done: ()
 
     it('changes the password and email, and ends the other sessions', async () => {
       const { store, done } = await make();
-      const reg = await store.register('contract-bob', 'contract-bob@example.com', 'old-pw');
+      const reg = await store.register('contract-bob', 'contract-bob@example.com', 'old-pw-123');
       if (!reg.success) throw new Error(reg.error);
       const id = reg.user.id;
-      const other = await store.login('contract-bob', 'old-pw');
+      const other = await store.login('contract-bob', 'old-pw-123');
       if (!other.success) throw new Error(other.error);
-      expect(await store.checkPassword(id, 'old-pw')).toBe(true);
-      await store.setPassword(id, 'new-pw');
-      expect(await store.checkPassword(id, 'old-pw')).toBe(false);
-      expect(await store.checkPassword(id, 'new-pw')).toBe(true);
+      expect(await store.checkPassword(id, 'old-pw-123')).toBe(true);
+      await store.setPassword(id, 'new-pw-123');
+      expect(await store.checkPassword(id, 'old-pw-123')).toBe(false);
+      expect(await store.checkPassword(id, 'new-pw-123')).toBe(true);
       expect(await store.endSessions(id, reg.token)).toBe(1);
       expect(await store.validateSession(other.token)).toBeNull();
       expect(await store.validateSession(reg.token)).not.toBeNull();
@@ -54,7 +54,7 @@ function contract(name: string, make: () => Promise<{ store: UserStore; done: ()
 
     it('bans, lists and ranks accounts', async () => {
       const { store, done } = await make();
-      const reg = await store.register('contract-cy', 'contract-cy@example.com', 'pw');
+      const reg = await store.register('contract-cy', 'contract-cy@example.com', 'pw-12345');
       if (!reg.success) throw new Error(reg.error);
       const id = reg.user.id;
       await store.setBan(id, BAN_FOREVER, 'spam', 'boss');
@@ -78,14 +78,14 @@ function contract(name: string, make: () => Promise<{ store: UserStore; done: ()
 
     it('deletes an account for good, sessions with it, and never gives its id out again', async () => {
       const { store, done } = await make();
-      const reg = await store.register('contract-dee', 'contract-dee@example.com', 'pw');
+      const reg = await store.register('contract-dee', 'contract-dee@example.com', 'pw-12345');
       if (!reg.success) throw new Error(reg.error);
       await store.deleteUser(reg.user.id);
       await store.deleteUser(reg.user.id); // nothing left is fine
       expect(await store.getUserById(reg.user.id)).toBeNull();
       expect(await store.validateSession(reg.token)).toBeNull();
-      expect((await store.login('contract-dee', 'pw')).success).toBe(false);
-      const next = await store.register('contract-eve', 'contract-eve@example.com', 'pw');
+      expect((await store.login('contract-dee', 'pw-12345')).success).toBe(false);
+      const next = await store.register('contract-eve', 'contract-eve@example.com', 'pw-12345');
       if (!next.success) throw new Error(next.error);
       expect(next.user.id).toBeGreaterThan(reg.user.id);
       await store.deleteUser(next.user.id);

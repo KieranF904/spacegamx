@@ -440,7 +440,7 @@ export function signInPage(ctx: PageCtx, d: { mode: 'signin' | 'register'; next:
       <input id="e" name="email" type="email" required autocomplete="email" maxlength="254" value="${d.email ?? ''}">
       <p class="hint">Not shown to anyone.</p>` : ''}
       <label for="p">Password</label>
-      <input id="p" name="password" type="password" required autocomplete="${reg ? 'new-password' : 'current-password'}" maxlength="200">
+      <input id="p" name="password" type="password" required autocomplete="${reg ? 'new-password' : 'current-password'}" maxlength="200"${reg ? raw(' minlength="8"') : ''}>
       ${d.error ? html`<p class="form-error" role="alert">${d.error}</p>` : ''}
       <button class="btn btn-primary btn-wide" type="submit">${reg ? 'Create account' : 'Sign in'}</button>
     </form>
@@ -488,7 +488,7 @@ export function accountPage(ctx: PageCtx, d: { account: LobbyAccount; card: Pilo
       <form method="post" action="/account/password" class="stack">
         ${csrfField(ctx)}
         <label for="pw-c">Current password</label><input id="pw-c" name="password" type="password" required autocomplete="current-password">
-        <label for="pw-n">New password</label><input id="pw-n" name="newPassword" type="password" required minlength="1" maxlength="200" autocomplete="new-password">
+        <label for="pw-n">New password</label><input id="pw-n" name="newPassword" type="password" required minlength="8" maxlength="200" autocomplete="new-password">
         <label for="pw-r">New password again</label><input id="pw-r" name="repeat" type="password" required maxlength="200" autocomplete="new-password">
         ${err('password')}
         <button class="btn" type="submit">Change password</button>

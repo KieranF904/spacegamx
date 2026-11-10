@@ -36,13 +36,13 @@ async function routes(s: JsonUserStore, secret = 'sssh') {
 describe('lobby bans', () => {
   it('a banned account can\'t sign in or validate until the ban ends; unbanning lets it back', async () => {
     const { store: s } = store();
-    const reg = await s.register('rowdy', 'rowdy@example.com', 'pw');
+    const reg = await s.register('rowdy', 'rowdy@example.com', 'pw-12345');
     if (!reg.success) throw new Error(reg.error);
     const id = reg.user.id;
     expect(reg.user.banned_until).toBeNull();
 
     await s.setBan(id, Date.now() + 60_000, 'griefing', 'boss');
-    const login = await s.login('rowdy', 'pw');
+    const login = await s.login('rowdy', 'pw-12345');
     expect(login.success).toBe(false);
     expect(!login.success && login.error).toMatch(/banned until .* UTC: griefing/);
     // A wrong password doesn't say the name is banned
@@ -56,11 +56,11 @@ describe('lobby bans', () => {
 
     // For good
     await s.setBan(id, BAN_FOREVER, 'cheating', 'boss');
-    const perm = await s.login('rowdy', 'pw');
+    const perm = await s.login('rowdy', 'pw-12345');
     expect(!perm.success && perm.error).toBe('This account is banned permanently: cheating');
 
     await s.setBan(id, null, '', '');
-    expect((await s.login('rowdy', 'pw')).success).toBe(true);
+    expect((await s.login('rowdy', 'pw-12345')).success).toBe(true);
     expect((await call('/auth/validate', { token: reg.token })).body.success).toBe(true);
     const back = await s.getUserById(id);
     expect([back?.banned_until, back?.ban_reason, back?.banned_by]).toEqual([null, null, null]);
@@ -68,10 +68,10 @@ describe('lobby bans', () => {
 
   it('an ended ban is no ban', async () => {
     const { store: s } = store();
-    const reg = await s.register('brief', 'brief@example.com', 'pw');
+    const reg = await s.register('brief', 'brief@example.com', 'pw-12345');
     if (!reg.success) throw new Error(reg.error);
     await s.setBan(reg.user.id, Date.now() - 1, 'spam', 'boss');
-    expect((await s.login('brief', 'pw')).success).toBe(true);
+    expect((await s.login('brief', 'pw-12345')).success).toBe(true);
     const call = await routes(s);
     expect((await call('/auth/validate', { token: reg.token })).body.success).toBe(true);
     const list = await call('/admin/users', { search: 'brief' }, 'sssh');
@@ -80,7 +80,7 @@ describe('lobby bans', () => {
 
   it('reads records from before bans, and keeps bans across a restart', async () => {
     const { file, store: s } = store();
-    await s.register('old', 'old@example.com', 'pw');
+    await s.register('old', 'old@example.com', 'pw-12345');
     await s.close();
     // Strip the ban fields, as an old file would be
     const raw = JSON.parse(readFileSync(file, 'utf-8'));
@@ -89,10 +89,10 @@ describe('lobby bans', () => {
     const again = new JsonUserStore(file);
     const old = await again.getUserByUsername('OLD');
     expect(old?.banned_until).toBeNull();
-    expect((await again.login('old', 'pw')).success).toBe(true);
+    expect((await again.login('old', 'pw-12345')).success).toBe(true);
     await again.setBan(old!.id, BAN_FOREVER, 'x', 'boss');
     await again.close();
-    expect((await new JsonUserStore(file).login('old', 'pw')).success).toBe(false);
+    expect((await new JsonUserStore(file).login('old', 'pw-12345')).success).toBe(false);
   });
 });
 
@@ -110,7 +110,7 @@ describe('lobby admin endpoints', () => {
 
   it('list and search by prefix, a page at a time, with no emails or credentials', async () => {
     const { store: s } = store();
-    for (const n of ['alpha', 'alpine', 'beta']) await s.register(n, `${n}@example.com`, 'pw');
+    for (const n of ['alpha', 'alpine', 'beta']) await s.register(n, `${n}@example.com`, 'pw-12345');
     const call = await routes(s);
     const al = await call('/admin/users', { search: 'AL' }, 'sssh');
     expect(al.body.users.map((u: any) => u.username)).toEqual(['alpha', 'alpine']);
@@ -124,7 +124,7 @@ describe('lobby admin endpoints', () => {
 
   it('set admin, ban (timed or for good) and unban by username', async () => {
     const { store: s } = store();
-    await s.register('pilot', 'pilot@example.com', 'pw');
+    await s.register('pilot', 'pilot@example.com', 'pw-12345');
     const call = await routes(s);
     expect((await call('/admin/set-admin', { username: 'Pilot', isAdmin: true }, 'sssh')).body.user.isAdmin).toBe(true);
     expect((await s.getUserByUsername('pilot'))?.is_admin).toBe(true);
@@ -143,7 +143,7 @@ describe('lobby admin endpoints', () => {
 describe('lobby account management', () => {
   async function pilot() {
     const { file, store: s } = store();
-    const reg = await s.register('ace', 'ace@example.com', 'old-pw');
+    const reg = await s.register('ace', 'ace@example.com', 'old-pw-123');
     if (!reg.success) throw new Error(reg.error);
     return { file, s, token: reg.token, id: reg.user.id, call: await routes(s) };
   }
@@ -160,33 +160,33 @@ describe('lobby account management', () => {
 
   it('changes the password with the old one, ending the other sessions but not this one', async () => {
     const { s, token, call } = await pilot();
-    const other = await s.login('ace', 'old-pw');
+    const other = await s.login('ace', 'old-pw-123');
     if (!other.success) throw new Error(other.error);
-    expect((await call('/auth/change-password', { token, password: 'wrong', newPassword: 'x' })).status).toBe(401);
-    expect((await call('/auth/change-password', { token, password: 'old-pw', newPassword: '' })).status).toBe(400);
-    const ok = await call('/auth/change-password', { token, password: 'old-pw', newPassword: 'new-pw' });
+    expect((await call('/auth/change-password', { token, password: 'wrong', newPassword: 'short' })).status).toBe(401);
+    expect((await call('/auth/change-password', { token, password: 'old-pw-123', newPassword: '' })).status).toBe(400);
+    const ok = await call('/auth/change-password', { token, password: 'old-pw-123', newPassword: 'new-pw-123' });
     expect(ok.body.success).toBe(true);
-    expect((await s.login('ace', 'old-pw')).success).toBe(false);
-    expect((await s.login('ace', 'new-pw')).success).toBe(true);
+    expect((await s.login('ace', 'old-pw-123')).success).toBe(false);
+    expect((await s.login('ace', 'new-pw-123')).success).toBe(true);
     expect(await s.validateSession(token)).not.toBeNull();
     expect(await s.validateSession(other.token)).toBeNull();
   });
 
   it('changes the email (valid, not someone else\'s) with the password', async () => {
     const { s, token, call } = await pilot();
-    await s.register('bob', 'bob@example.com', 'pw');
-    expect((await call('/auth/change-email', { token, password: 'old-pw', email: 'BOB@example.com' })).body.error).toBe('Email already registered');
-    expect((await call('/auth/change-email', { token, password: 'old-pw', email: 'nope' })).status).toBe(400);
+    await s.register('bob', 'bob@example.com', 'pw-12345');
+    expect((await call('/auth/change-email', { token, password: 'old-pw-123', email: 'BOB@example.com' })).body.error).toBe('Email already registered');
+    expect((await call('/auth/change-email', { token, password: 'old-pw-123', email: 'nope' })).status).toBe(400);
     expect((await call('/auth/change-email', { token, password: 'bad', email: 'a@b.cd' })).status).toBe(401);
-    const ok = await call('/auth/change-email', { token, password: 'old-pw', email: ' New@Example.com ' });
+    const ok = await call('/auth/change-email', { token, password: 'old-pw-123', email: ' New@Example.com ' });
     expect(ok.body).toEqual({ success: true, email: 'new@example.com' });
     // Signs in by the new email
-    expect((await s.login('new@example.com', 'old-pw')).success).toBe(true);
+    expect((await s.login('new@example.com', 'old-pw-123')).success).toBe(true);
   });
 
   it('signs out everywhere', async () => {
     const { s, token, call } = await pilot();
-    const other = await s.login('ace', 'old-pw');
+    const other = await s.login('ace', 'old-pw-123');
     if (!other.success) throw new Error(other.error);
     const r = await call('/auth/logout-all', { token });
     expect(r.body).toEqual({ success: true, ended: 2 });
@@ -198,21 +198,21 @@ describe('lobby account management', () => {
     const { file, s, token, id, call } = await pilot();
     expect((await call('/auth/delete-account', { token, password: 'nah' })).status).toBe(401);
     expect(await s.getUserById(id)).not.toBeNull();
-    const r = await call('/auth/delete-account', { token, password: 'old-pw' });
+    const r = await call('/auth/delete-account', { token, password: 'old-pw-123' });
     expect(r.body).toEqual({ success: true, id });
     expect(await s.getUserById(id)).toBeNull();
     expect(await s.validateSession(token)).toBeNull();
     await s.close();
-    expect((await new JsonUserStore(file).login('ace', 'old-pw')).success).toBe(false);
+    expect((await new JsonUserStore(file).login('ace', 'old-pw-123')).success).toBe(false);
     // The name is free again
-    expect((await new JsonUserStore(file).register('ace', 'ace@example.com', 'pw')).success).toBe(true);
+    expect((await new JsonUserStore(file).register('ace', 'ace@example.com', 'pw-12345')).success).toBe(true);
   });
 
   it('lists a deleted account for the game servers to delete its profile, and never gives its id to anyone else', async () => {
     const { file, s, token, id } = await pilot();
     const deletedFile = join(file, '../deleted-accounts.json');
     let out: { status: number; body: any } = { status: 0, body: null };
-    const r = await AccountRoutes.create((_, status, b) => { out = { status, body: b }; }, async () => ({ token, password: 'old-pw' }), () => '127.0.0.1',
+    const r = await AccountRoutes.create((_, status, b) => { out = { status, body: b }; }, async () => ({ token, password: 'old-pw-123' }), () => '127.0.0.1',
       { store: s, adminSecret: 'sssh', deleted: new DeletedAccounts(deletedFile) });
     expect(r.deletedAccounts()).toEqual([]);
     await r.handle({ method: 'POST', headers: {} } as unknown as http.IncomingMessage, {} as http.ServerResponse, '/auth/delete-account');
@@ -222,7 +222,7 @@ describe('lobby account management', () => {
     expect(new DeletedAccounts(deletedFile).recent()).toEqual([id]);
     // That was the newest account, yet its id isn't handed out again (not even after a restart)
     await s.close();
-    const reg = await new JsonUserStore(file).register('newcomer', 'new@example.com', 'pw');
+    const reg = await new JsonUserStore(file).register('newcomer', 'new@example.com', 'pw-12345');
     if (!reg.success) throw new Error(reg.error);
     expect(reg.user.id).toBeGreaterThan(id);
   });
@@ -241,7 +241,7 @@ describe('lobby account management', () => {
     const { s, token, id, call } = await pilot();
     await s.setBan(id, BAN_FOREVER, 'spam', 'boss');
     expect((await call('/auth/account', { token })).status).toBe(403);
-    expect((await call('/auth/delete-account', { token, password: 'old-pw' })).status).toBe(403);
+    expect((await call('/auth/delete-account', { token, password: 'old-pw-123' })).status).toBe(403);
     expect(await s.getUserById(id)).not.toBeNull();
   });
 });
@@ -249,10 +249,10 @@ describe('lobby account management', () => {
 describe('lobby registration', () => {
   it('a name is taken whatever its case', async () => {
     const { store: s } = store();
-    expect((await s.register('Dusty', 'd1@example.com', 'pw')).success).toBe(true);
-    const again = await s.register('Dusty', 'd2@example.com', 'pw');
+    expect((await s.register('Dusty', 'd1@example.com', 'pw-12345')).success).toBe(true);
+    const again = await s.register('Dusty', 'd2@example.com', 'pw-12345');
     expect(!again.success && again.error).toBe('Username already taken');
-    expect((await s.register('dUSTY', 'd3@example.com', 'pw')).success).toBe(false);
-    expect((await s.register('Other', 'D1@Example.com', 'pw')).success).toBe(false); // email too
+    expect((await s.register('dUSTY', 'd3@example.com', 'pw-12345')).success).toBe(false);
+    expect((await s.register('Other', 'D1@Example.com', 'pw-12345')).success).toBe(false); // email too
   });
 });

@@ -573,7 +573,7 @@ export class LoginUI {
             
             <div class="form-group">
               <label>Password</label>
-              <input type="password" name="password" placeholder="Enter your password" required autocomplete="${isLogin ? 'current-password' : 'new-password'}">
+              <input type="password" name="password" placeholder="Enter your password" required ${isLogin ? "" : "minlength=\"8\""} autocomplete="${isLogin ? 'current-password' : 'new-password'}">
             </div>
             
             ${!isLogin ? `

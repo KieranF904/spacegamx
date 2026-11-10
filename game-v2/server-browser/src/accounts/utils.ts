@@ -60,6 +60,14 @@ export function generateToken(): string {
   return crypto.randomBytes(48).toString('hex');
 }
 
+/** Marks a stored session token as a hash (a raw token is hex, so never starts with this) */
+export const TOKEN_HASH_PREFIX = 'h1:';
+
+/** What a session's row keeps in place of its token (SEC-12): the client holds the token, a copy of the table can't sign in */
+export function hashToken(token: string): string {
+  return TOKEN_HASH_PREFIX + crypto.createHash('sha256').update(token).digest('hex');
+}
+
 /** Constant-time password verification (safe against malformed stored hashes) */
 export async function verifyPassword(password: string, salt: string, expectedHash: string): Promise<boolean> {
   try {
@@ -103,10 +111,13 @@ export function validateEmail(email: string): string | null {
   return null;
 }
 
+/** Shortest password a new or changed one may be (accounts made before this keep theirs; sign-in doesn't check it) */
+export const MIN_PASSWORD_LENGTH = 8;
+
 /** A password an account can have (an error, or null) */
 export function validatePassword(password: string): string | null {
-  if (password.length < 1) {
-    return 'Password cannot be empty';
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
   if (password.length > 200) {
     return 'Password is too long (200 characters at most)';

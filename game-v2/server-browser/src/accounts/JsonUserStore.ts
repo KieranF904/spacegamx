@@ -5,7 +5,7 @@
  *
  *   users:    (id, username, email, password_hash, salt, is_admin, is_owner, created_at,
  *              banned_until, ban_reason, banned_by)
- *   sessions: (token, user_id, expires_at)
+ *   sessions: (token, user_id, expires_at)   (token: a hash of the one the client holds)
  *
  * Data lives in a single JSON file on disk. Writes are atomic and durable
  * (temp file, fsync, rename) so a crash mid-write can't corrupt the store.
@@ -31,6 +31,8 @@ import {
   banMessage,
   generateSalt,
   generateToken,
+  hashToken,
+  TOKEN_HASH_PREFIX,
   hashPassword,
   hashPasswordSync,
   validateEmail,
@@ -114,6 +116,9 @@ export class JsonUserStore implements UserStore {
         ? [raw.users]
         : [];
     this.sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
+    // Sessions kept before tokens were hashed (SEC-12): hash them in place, so they keep working and the file no longer holds a usable token
+    const plain = this.sessions.filter(s => !s.token.startsWith(TOKEN_HASH_PREFIX));
+    for (const s of plain) s.token = hashToken(s.token);
     this.nextUserId = Math.max(
       Number(raw.nextUserId) || 1,
       this.users.length > 0 ? Math.max(...this.users.map(u => u.id)) + 1 : 1,
@@ -124,6 +129,8 @@ export class JsonUserStore implements UserStore {
     } catch (err) {
       console.error('[UserStore] Could not back up the accounts:', err);
     }
+    // (After the copy: the .bak is the file as it was found, until the next start's copy replaces it)
+    if (plain.length > 0) { this.save(); console.log(`[UserStore] Hashed ${plain.length} stored session tokens`); }
   }
 
   /**
@@ -256,7 +263,7 @@ export class JsonUserStore implements UserStore {
   }
 
   async validateSession(token: string): Promise<UserRecord | null> {
-    const idx = this.sessions.findIndex(s => s.token === token);
+    const idx = this.sessions.findIndex(s => s.token === hashToken(token));
     if (idx === -1) return null;
 
     const session = this.sessions[idx];
@@ -273,7 +280,7 @@ export class JsonUserStore implements UserStore {
   private async createSession(userId: number): Promise<string> {
     const token = generateToken();
     this.sessions.push({
-      token,
+      token: hashToken(token),
       user_id: userId,
       expires_at: Date.now() + SESSION_DURATION_MS,
     });
@@ -282,7 +289,7 @@ export class JsonUserStore implements UserStore {
   }
 
   async logout(token: string): Promise<void> {
-    const idx = this.sessions.findIndex(s => s.token === token);
+    const idx = this.sessions.findIndex(s => s.token === hashToken(token));
     if (idx !== -1) {
       this.sessions.splice(idx, 1);
       this.save();
@@ -368,7 +375,7 @@ export class JsonUserStore implements UserStore {
 
   async endSessions(userId: number, keep?: string): Promise<number> {
     const before = this.sessions.length;
-    this.sessions = this.sessions.filter(s => s.user_id !== userId || (keep !== undefined && s.token === keep));
+    this.sessions = this.sessions.filter(s => s.user_id !== userId || (keep !== undefined && s.token === hashToken(keep)));
     const ended = before - this.sessions.length;
     if (ended) this.save();
     return ended;

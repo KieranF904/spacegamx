@@ -38,7 +38,7 @@ async function cast(opts: { deleted?: DeletedAccounts } = {}) {
   const ids: Record<string, number> = {};
   const tokens: Record<string, string> = {};
   for (const n of ['boss', 'mod', 'mod2', 'ace']) {
-    const r = await s.register(n, `${n}@example.com`, 'pw');
+    const r = await s.register(n, `${n}@example.com`, 'pw-12345');
     if (!r.success) throw new Error(r.error);
     ids[n] = r.user.id;
     tokens[n] = r.token;
@@ -52,7 +52,7 @@ async function cast(opts: { deleted?: DeletedAccounts } = {}) {
 describe('owner rank: the stores', () => {
   it('JSON: is_owner defaults to false, is set and kept across a restart', async () => {
     const { store: s, file } = newStore();
-    const r = await s.register('kier', 'kier@example.com', 'pw');
+    const r = await s.register('kier', 'kier@example.com', 'pw-12345');
     if (!r.success) throw new Error(r.error);
     expect(r.user.is_owner).toBe(false);
     await s.setOwner(r.user.id, true);
@@ -65,7 +65,7 @@ describe('owner rank: the stores', () => {
 
   it('JSON: records from before the rank read as not owners', async () => {
     const { store: s, file } = newStore();
-    await s.register('old', 'old@example.com', 'pw');
+    await s.register('old', 'old@example.com', 'pw-12345');
     await s.close();
     const raw = JSON.parse(readFileSync(file, 'utf-8'));
     for (const u of raw.users) delete u.is_owner;
@@ -201,7 +201,7 @@ describe('owner rank: the lobby', () => {
 
   it('OWNER_USERNAMES makes the named accounts owners at start (case and spaces aside; unknown names skipped)', async () => {
     const { store: s } = newStore();
-    for (const n of ['kier', 'other', 'third']) await s.register(n, `${n}@example.com`, 'pw');
+    for (const n of ['kier', 'other', 'third']) await s.register(n, `${n}@example.com`, 'pw-12345');
     const call = await routes(s, { ownerUsernames: ' KIER , ghost,third ' });
     expect((await s.getUserByUsername('kier'))?.is_owner).toBe(true);
     expect((await s.getUserByUsername('third'))?.is_owner).toBe(true);
@@ -213,7 +213,7 @@ describe('owner rank: the lobby', () => {
 
   it('OWNER_USERNAMES is read from the environment at lobby start', async () => {
     const { store: s } = newStore();
-    await s.register('envboss', 'envboss@example.com', 'pw');
+    await s.register('envboss', 'envboss@example.com', 'pw-12345');
     const before = process.env.OWNER_USERNAMES;
     process.env.OWNER_USERNAMES = 'envboss';
     try {
