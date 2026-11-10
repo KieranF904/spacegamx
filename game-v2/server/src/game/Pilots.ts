@@ -46,6 +46,7 @@ export interface PilotConn {
   docked: { station: number } | null;
   /** A guest's id by their browser's key (pilots/guests.ts guestIdOf): kept under it a while. None: a guest kept nowhere */
   guestId?: string | null;
+  address?: string;  // where they joined from (the guest keep's per-address cap)
 }
 
 export interface PilotHost {

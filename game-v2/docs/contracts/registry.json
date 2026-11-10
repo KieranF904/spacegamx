@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 491,
+      "lines": 493,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -146,85 +146,85 @@
           "name": "MessageHost",
           "kind": "interface",
           "start": 74,
-          "end": 126
+          "end": 128
         },
         {
           "name": "Msg",
           "kind": "type",
-          "start": 128,
-          "end": 128
+          "start": 130,
+          "end": 130
         },
         {
           "name": "Handler",
           "kind": "type",
-          "start": 129,
-          "end": 129
+          "start": 131,
+          "end": 131
         },
         {
           "name": "Handlers",
           "kind": "type",
-          "start": 130,
-          "end": 132
+          "start": 132,
+          "end": 134
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 134,
-          "end": 152
+          "start": 136,
+          "end": 154
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 154,
-          "end": 158
+          "start": 156,
+          "end": 160
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 160,
-          "end": 205
+          "start": 162,
+          "end": 207
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 207,
-          "end": 218
+          "start": 209,
+          "end": 220
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 220,
-          "end": 238
+          "start": 222,
+          "end": 240
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 240,
-          "end": 274
+          "start": 242,
+          "end": 276
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 276,
-          "end": 293
+          "start": 278,
+          "end": 295
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 295,
-          "end": 481
+          "start": 297,
+          "end": 483
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 483,
-          "end": 484
+          "start": 485,
+          "end": 486
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 486,
-          "end": 491
+          "start": 488,
+          "end": 493
         }
       ]
     },
@@ -232,7 +232,7 @@
       "id": "client.app.staff-panels",
       "path": "client/src/app/staffPanels.ts",
       "group": "client/app",
-      "lines": 112,
+      "lines": 117,
       "owns": "the admin panel (F2) and contributor notes panel (F6): loaded on demand, made once, torn down on sign-out",
       "needs": "StaffHost (send, state, pilot, renderer, input, windows, flyTo, chat), dynamic imports of ui/AdminPanel and ui/ContributorPanel; npm: @space-game/common",
       "events": "",
@@ -252,13 +252,13 @@
           "name": "StaffHost",
           "kind": "interface",
           "start": 19,
-          "end": 30
+          "end": 32
         },
         {
           "name": "StaffPanels",
           "kind": "class",
-          "start": 32,
-          "end": 112
+          "start": 34,
+          "end": 117
         }
       ]
     },
@@ -18956,7 +18956,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 800,
+      "lines": 801,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -18990,61 +18990,61 @@
           "name": "PilotConn",
           "kind": "interface",
           "start": 41,
-          "end": 49
+          "end": 50
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 51,
-          "end": 76
+          "start": 52,
+          "end": 77
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 78,
-          "end": 89
+          "start": 79,
+          "end": 90
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 91,
-          "end": 91
+          "start": 92,
+          "end": 92
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 93,
-          "end": 108
+          "start": 94,
+          "end": 109
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 110,
-          "end": 111
+          "start": 111,
+          "end": 112
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 113,
-          "end": 132
+          "start": 114,
+          "end": 133
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 134,
-          "end": 135
+          "start": 135,
+          "end": 136
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 137,
-          "end": 147
+          "start": 138,
+          "end": 148
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 149,
-          "end": 800
+          "start": 150,
+          "end": 801
         }
       ]
     },
@@ -20050,7 +20050,7 @@
       "id": "server.pilots.guests",
       "path": "server/src/game/pilots/guests.ts",
       "group": "server/game/pilots",
-      "lines": 119,
+      "lines": 139,
       "owns": "guest pilots kept for a while by their browser's guest key (the join's guestKey): a guest who joins again (a dropped socket, a restarted server, a reload) flies on as they were, tutorial step and all",
       "needs": "ProfileStore (loadDoc / saveDoc only: never the accounts' saves); npm: node crypto, @space-game/common",
       "events": "",
@@ -20062,6 +20062,10 @@
         {
           "text": "kept GUEST_KEEP_MS at most, GUEST_KEEP_MAX at most (the oldest go first)",
           "test": "server/src/game/pilots/guests.test.ts"
+        },
+        {
+          "text": "one address keeps GUEST_KEEP_PER_IP guests at most (its own oldest go first): a flood of new guests from one place can't push out everyone else's",
+          "test": "server/src/game/pilots/guests.test.ts"
         }
       ],
       "extend": "none: what a guest keeps is their profile; Pilots decides when one is put or taken",
@@ -20069,6 +20073,7 @@
         "GUEST_DOC",
         "GUEST_KEEP_MAX",
         "GUEST_KEEP_MS",
+        "GUEST_KEEP_PER_IP",
         "GUEST_WRITE_MS",
         "GuestKeep",
         "guestIdOf"
@@ -20077,50 +20082,62 @@
         {
           "name": "GUEST_KEEP_MS",
           "kind": "const",
-          "start": 16,
-          "end": 17
-        },
-        {
-          "name": "GUEST_KEEP_MAX",
-          "kind": "const",
           "start": 18,
           "end": 19
         },
         {
-          "name": "GUEST_DOC",
+          "name": "GUEST_KEEP_MAX",
           "kind": "const",
           "start": 20,
           "end": 21
         },
         {
-          "name": "GUEST_WRITE_MS",
+          "name": "GUEST_KEEP_PER_IP",
           "kind": "const",
           "start": 22,
-          "end": 23
+          "end": 26
+        },
+        {
+          "name": "GUEST_DOC",
+          "kind": "const",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "GUEST_WRITE_MS",
+          "kind": "const",
+          "start": 29,
+          "end": 30
         },
         {
           "name": "KEY",
           "kind": "const",
-          "start": 25,
-          "end": 26
+          "start": 32,
+          "end": 33
         },
         {
           "name": "guestIdOf",
           "kind": "function",
-          "start": 28,
-          "end": 32
+          "start": 35,
+          "end": 39
+        },
+        {
+          "name": "addressKey",
+          "kind": "function",
+          "start": 41,
+          "end": 45
         },
         {
           "name": "Kept",
           "kind": "interface",
-          "start": 34,
-          "end": 34
+          "start": 47,
+          "end": 47
         },
         {
           "name": "GuestKeep",
           "kind": "class",
-          "start": 36,
-          "end": 119
+          "start": 49,
+          "end": 139
         }
       ]
     },
@@ -21067,7 +21084,7 @@
       "id": "server.gameserver.messages",
       "path": "server/src/gameServer/messages.ts",
       "group": "server/gameServer",
-      "lines": 228,
+      "lines": 233,
       "owns": "the client message table and the dev message handlers (teleport, spawn), chat and input forwarding",
       "needs": "GameServer (type), net/dispatch, net/handlers/*; npm: @space-game/common, bitecs",
       "events": "",
@@ -21081,6 +21098,7 @@
       "exports": [
         "applyInputToEntity",
         "buildMessageHandlers",
+        "devToolsOpen",
         "handleChat",
         "handleDevSpawn",
         "handleDevTeleport",
@@ -21096,46 +21114,52 @@
           "end": 124
         },
         {
-          "name": "handleMessage",
+          "name": "devToolsOpen",
           "kind": "function",
           "start": 126,
-          "end": 135
+          "end": 129
+        },
+        {
+          "name": "handleMessage",
+          "kind": "function",
+          "start": 131,
+          "end": 140
         },
         {
           "name": "handleDevTeleport",
           "kind": "function",
-          "start": 137,
-          "end": 167
+          "start": 142,
+          "end": 172
         },
         {
           "name": "handleDevSpawn",
           "kind": "function",
-          "start": 169,
-          "end": 178
+          "start": 174,
+          "end": 183
         },
         {
           "name": "handleChat",
           "kind": "function",
-          "start": 180,
-          "end": 213
-        },
-        {
-          "name": "handleInput",
-          "kind": "function",
-          "start": 215,
+          "start": 185,
           "end": 218
         },
         {
-          "name": "applyInputToEntity",
+          "name": "handleInput",
           "kind": "function",
           "start": 220,
           "end": 223
         },
         {
-          "name": "recordSelfHashes",
+          "name": "applyInputToEntity",
           "kind": "function",
           "start": 225,
           "end": 228
+        },
+        {
+          "name": "recordSelfHashes",
+          "kind": "function",
+          "start": 230,
+          "end": 233
         }
       ]
     },

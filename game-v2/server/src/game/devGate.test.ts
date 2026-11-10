@@ -1,6 +1,7 @@
 /**
  * The dev message gate (gameServer/messages.ts, net/handlers/bank.ts): on a server without the dev flag, a pilot who is not an
- * admin cannot teleport, spawn, swap ships, build a station, touch the boss or the bank; an admin can, and so can anyone on a dev server.
+ * owner cannot teleport, spawn, swap ships, build a station, touch the boss or the bank (an ordinary admin cannot either: SEC-17);
+ * the owner can, and so can anyone on a dev server.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { makeEmptyServer, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
@@ -46,9 +47,18 @@ describe('dev message gate', () => {
     expect(gs.pilots.get(conn)!.ship.blueprint.name).toBe(own);
   });
 
-  it('an admin on a non-dev server gets through the gate', () => {
+  it('an admin who is not the owner on a non-dev server is refused; the owner gets through', () => {
+    const adm = rig(false);
+    adm.conn.isAdmin = true;
+    adm.sendAll();
+    expect(adm.spies.travelTo).not.toHaveBeenCalled();
+    expect(adm.spies.spawnPack).not.toHaveBeenCalled();
+    expect(adm.spies.devSwapShip).not.toHaveBeenCalled();
+    expect(adm.spies.bossDev).not.toHaveBeenCalled();
+    expect(adm.gs.pilots.get(adm.conn)!.outpost ?? null).toBeNull();
     const { conn, spies, sendAll } = rig(false);
     conn.isAdmin = true;
+    conn.isOwner = true;
     sendAll();
     expect(spies.spawnPack).toHaveBeenCalled();
     expect(spies.devSwapShip).toHaveBeenCalled();
@@ -72,9 +82,9 @@ describe('dev message gate', () => {
     expect(gs.pilots.get(conn)!.outpost ?? null).toBeNull();
   });
 
-  it('an admin: devStation clamps the tier to 0-5; devBoss in a system with no boss only says so', () => {
+  it('the owner: devStation clamps the tier to 0-5; devBoss in a system with no boss only says so', () => {
     const { gs, t, conn } = rig(false);
-    conn.isAdmin = true;
+    conn.isAdmin = true; conn.isOwner = true;
     const toast = vi.spyOn(gs.pilots, 'toast');
     for (const [tier, want] of [[99, 5], [-4, 0]] as const) {
       t.send({ type: 'devStation', tier } as never);
@@ -89,9 +99,9 @@ describe('dev message gate', () => {
     expect(toast).toHaveBeenCalledWith(conn, 'No boss in this system', 'warn');
   });
 
-  it('devSpawn refuses a spot that is not a finite point, even for an admin', () => {
+  it('devSpawn refuses a spot that is not a finite point, even for the owner', () => {
     const { gs, t, conn, spies } = rig(false);
-    conn.isAdmin = true;
+    conn.isAdmin = true; conn.isOwner = true;
     t.send({ type: 'devSpawn', x: Number.NaN, y: 5 } as never);
     t.send({ type: 'devSpawn', x: 5, y: Infinity } as never);
     gs.step(2);
