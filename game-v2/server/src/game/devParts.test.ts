@@ -86,7 +86,7 @@ describe('dev-only parts', () => {
     expect(bridge.validate(dev, { mounting: false }).errors.some((e) => e.code === 'exclusive')).toBe(true);
   });
 
-  it('the Rockery ships in the data but a non-admin can not warp there, an admin can', () => {
+  it('the Rockery ships in the data but a non-owner can not warp there, the owner can', () => {
     const { server, t, pid, conn } = live();
     const rock = server.gameData.getSystemNum('dev_rockery');
     expect(server.gameData.getSystem('dev_rockery')).toBeTruthy();
@@ -94,7 +94,7 @@ describe('dev-only parts', () => {
     t.send({ type: 'devTeleport', systemId: 'dev_rockery' } as never);
     server.step(3);
     expect(InSystem.systemId[pid]).not.toBe(rock);
-    conn.isAdmin = true;
+    conn.isAdmin = true; conn.isOwner = true;
     t.send({ type: 'devTeleport', systemId: 'dev_rockery' } as never);
     server.step(3);
     expect(InSystem.systemId[pid]).toBe(rock);
