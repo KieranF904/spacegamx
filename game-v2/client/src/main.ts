@@ -2,6 +2,9 @@
  * Main Entry Point
  */
 
+// Pixi builds its uniform and shader-sync code with new Function() by default; this swaps in versions that don't, so the
+// page's Content-Security-Policy (deploy/vps/nginx-spacegame-game.conf) needs no 'unsafe-eval'. Loads before Pixi starts.
+import 'pixi.js/unsafe-eval';
 import { Game } from './Game';
 
 // Wait for DOM
