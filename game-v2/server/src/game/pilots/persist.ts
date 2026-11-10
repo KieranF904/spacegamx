@@ -27,7 +27,7 @@ export async function save(self: Pilots, s: Session): Promise<void> {
     // loading isn't theirs)
     if (s.conn.guestId && !s.loading) {
       s.dirty = false;
-      self.guests.put(s.conn.guestId, s.conn.username, persistable(self, s.conn, s.profile));
+      self.guests.put(s.conn.guestId, s.conn.username, persistable(self, s.conn, s.profile), s.conn.address);
     }
     return;
   }

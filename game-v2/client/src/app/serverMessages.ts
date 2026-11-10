@@ -121,6 +121,8 @@ export interface MessageHost {
   addChatMessage(playerName: string, text: string, isSystem?: boolean, color?: string): void;
   showSystemMessage(text: string, color?: string): void;
   handleAuthResult(msg: Msg<'authResult'>): void;
+  /** The server says whether it is a dev server (adminInfo: free build is only ever on there) */
+  noteDevServer(on: boolean): void;
   startContrib(): void;
   stopContrib(): void;
 }
@@ -460,7 +462,7 @@ const TABLE: Handlers = {
   },
   authResult: (h, msg) => { h.handleAuthResult(msg); },
   adminStats: (h, msg) => { h.adminPanel?.onStats(msg); },
-  adminInfo: (h, msg) => { h.adminPanel?.onInfo(msg); },
+  adminInfo: (h, msg) => { h.adminPanel?.onInfo(msg); h.noteDevServer(!!msg.freeBuild); },
   adminAccounts: (h, msg) => { h.adminPanel?.onAccounts(msg); },
   contribRank: (h, msg) => {
     if (msg.on) h.startContrib(); else h.stopContrib();

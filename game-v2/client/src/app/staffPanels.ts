@@ -24,6 +24,8 @@ export interface StaffHost {
   readonly input: InputManager;
   readonly w: Pick<WindowSet, 'systemMapUI'>;
   isAdmin(): boolean;
+  /** The dev tools (warp) are on offer: the owner, or any admin on a dev server */
+  devTools(): boolean;
   send(msg: ClientMessage): void;
   flyTo(dest: AutoDest): void;
   chat(playerName: string, text: string, isSystem?: boolean, color?: string): void;
@@ -62,6 +64,8 @@ export class StaffPanels {
             <b>Input delay</b><span>${s.inputDelayTicks} ticks (${(s.inputDelayTicks * 16.67).toFixed(0)} ms)</span>`;
         },
       });
+      // (The lists come back as adminInfo, which also says whether this is a dev server: the dev tools' on-screen offers follow it)
+      h.send({ type: 'admin', cmd: 'info', args: {} });
       h.chat('', 'Admin: F2 opens the admin panel, F3 teleports to the cursor, F4 frees the camera. /help lists the chat commands.', true, '#ff8a6a');
     }, (e) => { this.adminLoading = false; console.error('Admin panel failed to load:', e); });
   }
@@ -87,6 +91,7 @@ export class StaffPanels {
         state: h.state,
         me: () => h.state.playerName,
         isAdmin: () => h.isAdmin(),
+        canWarp: () => h.devTools(),
         screenToWorld: (x, y) => h.renderer.screenToWorld(x, y),
         worldToScreen: (x, y) => h.renderer.worldToScreen(x, y),
         zoom: () => h.renderer.getZoom(),

@@ -14,7 +14,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
-import { GuestKeep, guestIdOf, GUEST_DOC, GUEST_KEEP_MAX, GUEST_KEEP_MS } from './guests.js';
+import { GuestKeep, guestIdOf, GUEST_DOC, GUEST_KEEP_MAX, GUEST_KEEP_MS, GUEST_KEEP_PER_IP } from './guests.js';
 import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
@@ -133,5 +133,24 @@ describe('guests kept by their key', () => {
     // (read back by the next process)
     const again = new GuestKeep(store, () => now);
     expect((await again.take('g10'))?.profile).toEqual({ n: 10 });
+  });
+
+  it('a flood of new guests from one address only churns that address: others stay kept (SEC-20)', async () => {
+    const store = new MemoryProfileStore();
+    const keep = new GuestKeep(store, () => 0);
+    keep.put('real1', 'Real', { n: 1 }, '203.0.113.7');
+    keep.put('real2', 'Real', { n: 2 });
+    for (let i = 0; i < GUEST_KEEP_MAX * 2; i++) keep.put(`bot${i}`, 'Bot', { n: i }, '198.51.100.9');
+    expect(keep.size).toBe(GUEST_KEEP_PER_IP + 2);
+    expect((await keep.take('real1'))?.profile).toEqual({ n: 1 });
+    expect((await keep.take('real2'))?.profile).toEqual({ n: 2 });
+    // (the flood's own newest are the ones left; a kept guest updating again takes no extra place)
+    expect(await keep.take('bot0')).toBeNull();
+    expect(await keep.take(`bot${GUEST_KEEP_MAX * 2 - 1}`)).not.toBeNull();
+    keep.put(`bot${GUEST_KEEP_MAX * 2 - 1}`, 'Bot', { n: 0 });
+    expect(keep.size).toBe(GUEST_KEEP_PER_IP + 2);
+    // (the saved doc holds no address)
+    await keep.flush();
+    expect(JSON.stringify(await store.loadDoc(GUEST_DOC))).not.toContain('198.51.100.9');
   });
 });

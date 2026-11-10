@@ -52,6 +52,8 @@ export interface ContributorDeps {
   flyTo(dest: AutoDest): void;
   /** The camera follows this instead of your ship (null: your ship again) */
   setCamera(target: (() => { x: number; y: number } | null) | null): void;
+  /** Whether the dev warp is on offer (the owner, or a dev server); absent: admins */
+  canWarp?(): boolean;
   /** Admins: warp there */
   warp(system: string, x: number, y: number): void;
 }
@@ -823,7 +825,8 @@ export class ContributorPanel {
     }
     if (!this.overlay) { box.innerHTML = '<div class="ctb-hint">Turn the overlay on to see the notes.</div>'; return; }
     if (!list.length) { box.innerHTML = `<div class="ctb-hint">${here.length ? 'None match the filter.' : 'No notes in this system yet.'}</div>`; return; }
-    const admin = this.deps.isAdmin();
+    // (The warp is a dev tool: the server gives it to the owner, or anyone on a dev server)
+    const canWarp = this.deps.canWarp ? this.deps.canWarp() : this.deps.isAdmin();
     box.innerHTML = list.map((n) => {
       const mine = this.mayEdit(n);
       return `<div class="ctb-note${n.status !== 'open' ? ' dim' : ''}${this.focus === n.id ? ' focus' : ''}" data-id="${esc(n.id)}">
@@ -832,7 +835,7 @@ export class ContributorPanel {
         <div class="acts">
           <button class="ctb-btn sm" data-n="fly" title="Autopilot there">Fly</button>
           <button class="ctb-btn sm${this.looking === n.id ? ' on' : ''}" data-n="look" title="Camera to it (Esc: back)">Look</button>
-          ${admin ? '<button class="ctb-btn sm" data-n="warp" title="Warp there (admin)">Warp</button>' : ''}
+          ${canWarp ? '<button class="ctb-btn sm" data-n="warp" title="Warp there (dev tool)">Warp</button>' : ''}
           ${mine ? `<button class="ctb-btn sm" data-n="edit">Edit</button>
             <select class="ctb-in" data-n="status" style="font-size:11px;padding:0 2px">${(['open', 'done', 'wontdo'] as const).map((s) => `<option value="${s}"${s === n.status ? ' selected' : ''}>${STATUS_WORD[s]}</option>`).join('')}</select>
             <button class="ctb-btn sm bad" data-n="delete">${this.armed === n.id ? 'Sure?' : 'Delete'}</button>` : ''}

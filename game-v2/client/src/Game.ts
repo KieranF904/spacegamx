@@ -212,6 +212,8 @@ private perfMonitor: PerfMonitor | null = null;
   private isAdmin = false;
   /** The owner rank (above admin: isAdmin is true too) */
   private isOwner = false;
+  /** The server is a dev server (its adminInfo says free build is on): its dev tools are open to every admin */
+  private devServer = false;
   /** A guest's name, to join with once connected (signed-in pilots join with authToken) */
   private pendingAuth: { type: 'guest'; username: string } | null = null;
   /** This build speaks another protocol than the server: nothing more until the player reloads */
@@ -270,7 +272,7 @@ private perfMonitor: PerfMonitor | null = null;
     this.staff = new StaffPanels({
       state: this.state, pilot: this.pilot,
       get renderer() { return g.renderer; }, input: this.input, get w() { return g.w; },
-      isAdmin: () => g.isAdmin, send: (m) => g.network.send(m), flyTo: (d) => g.flyTo(d), chat: (n, t, s, c) => g.addChatMessage(n, t, s, c),
+      isAdmin: () => g.isAdmin, devTools: () => g.devTools(), send: (m) => g.network.send(m), flyTo: (d) => g.flyTo(d), chat: (n, t, s, c) => g.addChatMessage(n, t, s, c),
     });
     this.ticks = new TickDriver({ state: this.state, ctx: this.inputCtx, send: (m) => this.network.send(m) });
     this.hud = new HudReadouts({ state: this.state, pilot: this.pilot, shipClient: this.shipClient, systemNames: this.systemNames });
@@ -1060,6 +1062,7 @@ this.boostHudEl = document.getElementById('boostHud');
       addChatMessage: (playerName, text, isSystem, color) => g.addChatMessage(playerName, text, isSystem, color),
       showSystemMessage: (text, color) => g.showSystemMessage(text, color),
       handleAuthResult: (msg) => g.handleAuthResult(msg),
+      noteDevServer: (on) => g.noteDevServer(on),
       startContrib: () => g.staff.startContrib(),
       stopContrib: () => g.staff.stopContrib(),
     };
@@ -1206,8 +1209,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
       }
       this.isOwner = !!msg.isOwner;
       this.isAdmin = !!msg.isAdmin || this.isOwner;
-      // Map warp (Ctrl-click) is an admin tool: the server refuses it for anyone else, so only admins see it offered
-      this.w.systemMapUI.onWarp = this.isAdmin ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
+      this.offerDevWarp();
       
       if (this.isAdmin) this.staff.startAdmin();
       else this.stopAdmin();
@@ -1248,6 +1250,23 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.staff.stopAdmin();
     this.isAdmin = false;
     this.isOwner = false;
+    this.devServer = false;
+    this.offerDevWarp();
+  }
+
+  /** The dev tools are the owner's (on a dev server, every admin's): the server refuses them for anyone else, so only they see them offered */
+  private devTools(): boolean {
+    return this.isOwner || (this.isAdmin && this.devServer);
+  }
+
+  /** Map warp (Ctrl-click) is a dev tool */
+  private offerDevWarp(): void {
+    this.w.systemMapUI.onWarp = this.devTools() ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
+  }
+
+  private noteDevServer(on: boolean): void {
+    this.devServer = on;
+    this.offerDevWarp();
   }
 
   /** The server's notices (party, travel, announcements) go in the chat */

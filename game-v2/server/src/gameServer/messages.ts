@@ -48,8 +48,8 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
     handleChat(gs, conn, msg);
   });
   t.on('devStation', (_ctx, conn, msg) => {
-    // Dev (or an admin): a station at Sol's site with every track at a tier, and in you go
-    if (!gs.devTeleport && !conn.isAdmin) return;
+    // Dev (or the owner): a station at Sol's site with every track at a tier, and in you go
+    if (!devToolsOpen(gs, conn)) return;
     const p = gs.pilots.get(conn), file = stationTable();
     if (!p || !file) return;
     const tier = Math.max(0, Math.min(5, Math.floor(Number((msg as { tier?: number }).tier ?? 3))));
@@ -66,7 +66,7 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
     handleDevSpawn(gs, conn, msg);
   });
   t.on('devShip', (_ctx, conn, msg) => {
-    if (!gs.devTeleport && !conn.isAdmin) return;
+    if (!devToolsOpen(gs, conn)) return;
     const name = typeof msg.ship === 'string' ? msg.ship : '';
     const bp = name ? gs.ships.library.get(name) ?? gs.ships.enemyDesigns[name] ?? gs.ships.devDesigns[name] ?? null : null;
     if (name && !bp) { gs.pilots.toast(conn, `No library ship called ${name}`, 'warn'); return; }
@@ -84,7 +84,7 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
     gs.pilots.toast(conn, 'Feeds switched: the old material runs out first', 'info');
   });
   t.on('devBoss', (_ctx, conn, msg) => {
-    if (!gs.devTeleport && !conn.isAdmin) return;
+    if (!devToolsOpen(gs, conn)) return;
     const pid = conn.playerId, num = InSystem.systemId[pid];
     let boss = -1, bd = Infinity;
     for (const b of gs.bosses.inSystem(num)) {
@@ -107,9 +107,9 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
     }
     gs.pilots.toast(conn, `Boss worn to ${Math.round(gs.ships.integrity(boss) * 100)}%`, 'info');
   });
-  // The boss tools (game/dev/bossDev.ts): dev servers and admins, never in production
+  // The boss tools (game/dev/bossDev.ts): dev servers and the owner, never in production
   t.on('bossDevTool', (_ctx, conn, msg) => {
-    if (process.env.NODE_ENV === 'production' || (!gs.devTeleport && !conn.isAdmin)) return;
+    if (process.env.NODE_ENV === 'production' || !devToolsOpen(gs, conn)) return;
     gs.bossDev.handle(conn, msg);
   });
   t.on('shipNeed', (_ctx, conn, msg) => {
@@ -121,6 +121,11 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
     if (bp) conn.designs.delete(designHash(bp));
   });
   return t.freeze();
+}
+
+/** The dev tools (teleport, spawn, ship swap, station, boss): anyone on a dev server, only the owner rank elsewhere (an ordinary admin keeps the moderation tools, not these) */
+export function devToolsOpen(gs: GameServer, conn: ClientConnection): boolean {
+  return gs.devTeleport || !!conn.isOwner;
 }
 
 export function handleMessage(gs: GameServer, conn: ClientConnection, msg: ClientMessage): void {
@@ -139,7 +144,7 @@ export function handleMessage(gs: GameServer, conn: ClientConnection, msg: Clien
  * beside the system's first station, else clear of the central body.
  */
 export function handleDevTeleport(gs: GameServer, conn: ClientConnection, msg: { systemId: string; x?: number; y?: number }): void {
-  if (!gs.devTeleport && !conn.isAdmin) {
+  if (!devToolsOpen(gs, conn)) {
     gs.send(conn.ws, { type: 'systemMessage', text: 'Map warp is a dev tool (not enabled on this server)', color: '#f2d24b' });
     return;
   }
@@ -168,7 +173,7 @@ export function handleDevTeleport(gs: GameServer, conn: ClientConnection, msg: {
 
 /** Dev tool: a hostile pack here (the system's own kind unless given) */
 export function handleDevSpawn(gs: GameServer, conn: ClientConnection, msg: { x: number; y: number; faction?: string; ships?: string[] }): void {
-  if ((!gs.devTeleport && !conn.isAdmin) || !Number.isFinite(msg.x) || !Number.isFinite(msg.y)) return;
+  if (!devToolsOpen(gs, conn) || !Number.isFinite(msg.x) || !Number.isFinite(msg.y)) return;
   const num = InSystem.systemId[conn.playerId];
   const sys = gs.gameData.getSystemByNum(num);
   const groups = ((gs.gameData.factionsFile as FactionsFile).spawns?.[sys?.id ?? '']?.groups ?? []).filter((g) => !g.passive);
