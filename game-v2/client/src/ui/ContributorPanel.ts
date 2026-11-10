@@ -32,7 +32,7 @@ import {
   type NoteStatus, type PlanetData, type StarSystemData, type StationData,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
-import type { SystemMapUI } from './SystemMapUI';
+import type { SystemMap } from './systemMapLazy';
 import type { AutoDest } from '../ships/Autopilot';
 import { drawDraft, drawNotes, noteAt } from '../rendering/contributorDraw';
 import systemsData from '../../../data/systems.json';
@@ -48,7 +48,7 @@ export interface ContributorDeps {
   screenToWorld(x: number, y: number): { x: number; y: number };
   worldToScreen(x: number, y: number): { x: number; y: number };
   zoom(): number;
-  map: SystemMapUI;
+  map: SystemMap;
   flyTo(dest: AutoDest): void;
   /** The camera follows this instead of your ship (null: your ship again) */
   setCamera(target: (() => { x: number; y: number } | null) | null): void;

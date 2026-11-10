@@ -26,9 +26,9 @@ import {
   CURSOR_DIST_STEP,
 } from '@space-game/common';
 import { compactSend } from './inputCompactSend';
-import type { GameMenuUI } from '../ui/GameMenuUI';
+import type { MenuFacade } from '../ui/menuLazy';
 import type { PlayerStatsUI } from '../ui/PlayerStatsUI';
-import type { SystemMapUI } from '../ui/SystemMapUI';
+import type { SystemMap } from '../ui/systemMapLazy';
 import type { AdminPanel } from '../ui/AdminPanel';
 import type { AudioManager } from '../audio/AudioManager';
 import type { InputManager } from '../input/InputManager';
@@ -52,13 +52,13 @@ export interface InputSendHost {
    * keys push along the ship, said by both strafe bits (common flight.ts noseFrame)
    */
   readonly noseThrust?: boolean;
-  readonly menu: GameMenuUI;
+  readonly menu: MenuFacade;
   readonly adminPanel: AdminPanel | null;
   readonly shipClient: ShipClient;
   readonly autopilot: Autopilot;
   readonly context: ContextActions;
   readonly playerStatsUI: PlayerStatsUI;
-  readonly systemMapUI: SystemMapUI;
+  readonly systemMapUI: SystemMap;
   readonly audio: AudioManager;
   readonly network: ClientTransport;
   readonly input: InputManager;

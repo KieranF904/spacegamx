@@ -50,7 +50,8 @@ import { CombatSounds } from './audio/CombatSounds';
 import { PerfMonitor } from './ui/PerfMonitor';
 
 
-import { GameMenuUI, type MenuPilotInfo } from './ui/GameMenuUI';
+import type { MenuPilotInfo } from './ui/GameMenuUI';
+import { MenuFacade } from './ui/menuLazy';
 import { settings, SettingsData } from './settings/Settings';
 import { AutoQuality, PROFILES, type QualityTier } from './settings/quality';
 import { ACTIONS, boundKeyName } from './input/keybindings';
@@ -151,7 +152,7 @@ export class Game {
   private lastTraffic = { t: 0, bytesIn: 0, bytesOut: 0, framesIn: 0 };
   private trafficText = '';
   private localDead = false;
-  private menu!: GameMenuUI;
+  private menu!: MenuFacade;
   /** The server we joined (for the menu's Server page) */
   private serverName = 'Local';
   private serverAddress = '';
@@ -548,7 +549,7 @@ this.boostHudEl = document.getElementById('boostHud');
   }
 
   private createMenu(): void {
-    this.menu= new GameMenuUI({
+    this.menu = new MenuFacade(new Lazy(() => import('./ui/GameMenuUI').then(({ GameMenuUI }) => new GameMenuUI({
       openMap: () => this.w.systemMapUI.toggle(),
       pilot: () => this.pilotInfo(),
       ship: () => this.shipClient.menuShipInfo(),
@@ -580,7 +581,7 @@ this.boostHudEl = document.getElementById('boostHud');
       icon: (id) => itemIcon(this.pilot.econ, id),
       shipIcon: (parts, size) => shipIcon(this.pilot.econ, parts, size),
       openComponents: () => this.w.hub.open('components'),
-    });
+    }))));
   }
 
   /** You as the readouts show you (the Esc menu's front page, the side panel's Pilot tab) */

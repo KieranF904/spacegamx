@@ -47,7 +47,7 @@ import type { StationWindow } from '../ui/StationWindow';
 import type { ShipClient } from '../ships/ShipClient';
 import type { Autopilot } from '../ships/Autopilot';
 import type { HazardOverlay } from '../ui/HazardOverlay';
-import type { SystemMapUI } from '../ui/SystemMapUI';
+import type { SystemMap } from '../ui/systemMapLazy';
 import type { PlayerStatsUI } from '../ui/PlayerStatsUI';
 import type { FloatingRewardsUI } from '../ui/FloatingRewardsUI';
 import type { DamageIndicatorUI } from '../ui/DamageIndicatorUI';
@@ -82,7 +82,7 @@ export interface MessageHost {
   readonly autopilot: Autopilot;
   readonly hazards: HazardOverlay;
   readonly systemNames: Map<string, string>;
-  readonly systemMapUI: SystemMapUI;
+  readonly systemMapUI: SystemMap;
   readonly playerStatsUI: PlayerStatsUI;
   readonly floatingRewardsUI: FloatingRewardsUI;
   readonly damageIndicatorUI: DamageIndicatorUI;
