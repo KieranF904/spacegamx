@@ -13,6 +13,7 @@ import type { FlightCtx } from './features/types.js';
 import type { FlightEntry } from './features/plan.js';
 import { getPlan } from './features/plan.js';
 import { dhypot, dlog2, dpow, dsincos } from '../math/detTrig.js';
+import { wrapPi } from '../math/basic.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from '../network/cursorState.js';
 
 // (dsincos's result, reused: the flight step allocates nothing for its trig)
@@ -439,12 +440,8 @@ export function jumpScaleFor(dist: number, t: JumpTuning, friction: number): num
   return Math.round(Math.max(0, extra / ((t.speed - t.exitSpeed) * shape)) * 1000) / 1000;
 }
 
-/** The sim's angle wrap, into (-PI, PI]: canonical for deterministic code (the loop is part of the parity goldens). Non-sim code uses math/basic.ts. */
-export function wrapAngle(a: number): number {
-  while (a > Math.PI) a -= 2 * Math.PI;
-  while (a < -Math.PI) a += 2 * Math.PI;
-  return a;
-}
+/** The sim's angle wrap, into [-PI, PI]: math/basic.ts wrapPi (closed form, bit-identical to the old loop on sim angles). */
+export const wrapAngle = wrapPi;
 
 /** Ship-local grid frame → world: forward (-y) maps to the ship's heading. */
 export function localToWorldDir(v: Vec2, angle: number): Vec2 {

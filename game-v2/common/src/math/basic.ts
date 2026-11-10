@@ -1,16 +1,15 @@
 /**
  * @contract math.basic
- * owns:       plain maths helpers for non-sim code (UI, rendering, input, econ, scripts): clamp, lerp, smoothstep,
- *             wrapPi, cloneJson
+ * owns:       plain maths helpers: clamp, lerp, smoothstep, cloneJson (non-sim code), and wrapPi, the one angle wrap
+ *             shared by the sim and everything else
  * needs:      nothing
- * invariants: wrapPi matches the sim wraps bit for bit — common/src/math/basic.test.ts
- *             the deterministic sim keeps its own copies on purpose and does not import this — none pinned
- * extend:     add a helper only if non-sim code needs it; sim code uses detTrig / simMaths instead
+ * invariants: wrapPi is bit-identical to the old sim loop for |a| <= 64 and to orbit.ts's old modulo form — common/src/math/basic.test.ts
+ *             wrapPi always returns (Infinity and NaN give NaN, no hang) — common/src/math/basic.test.ts
+ * extend:     add a helper only if non-sim code needs it; sim code uses detTrig / simMaths instead (wrapPi is the exception)
  */
 
-// Plain maths helpers for NON-SIM code (UI, rendering, input, econ, scripts).
-// The deterministic sim keeps its own copies on purpose (ships/flight.ts wrapAngle is its canonical angle wrap,
-// network/replication.ts, asteroid/orbit.ts, minebay, predict/*): do not swap those for these.
+// Plain maths helpers for NON-SIM code (UI, rendering, input, econ, scripts), plus wrapPi, which the sim uses too
+// (ships/flight.ts re-exports it as wrapAngle; turret, minebay and asteroid orbits import it).
 
 /** `v` held within [min, max] (min <= max). */
 export function clamp(v: number, min: number, max: number): number {
@@ -28,11 +27,19 @@ export function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** An angle wrapped into (-PI, PI]. Same loop as the sim's wrapAngle / turret wrapPi (bit-identical results). */
+const TAU = 2 * Math.PI;
+
+/**
+ * An angle wrapped into [-PI, PI] (PI and -PI stay as they are; whole turns give +0). Closed form: `%` is exact and the
+ * one fix-up is exact (Sterbenz), so it never loops and Infinity/NaN come back NaN. Bit-identical to the old
+ * `while (a > PI) a -= 2 * PI` loop for |a| <= 64 (every angle the sim feeds it) and to orbit.ts's old modulo form.
+ */
 export function wrapPi(a: number): number {
-  while (a > Math.PI) a -= 2 * Math.PI;
-  while (a < -Math.PI) a += 2 * Math.PI;
-  return a;
+  if (a >= -Math.PI && a <= Math.PI) return a;
+  let r = a % TAU;
+  if (r > Math.PI) r -= TAU;
+  else if (r < -Math.PI) r += TAU;
+  return r === 0 ? 0 : r;
 }
 
 /** Deep copy of plain JSON data (no Maps, Dates, undefined or functions survive). */

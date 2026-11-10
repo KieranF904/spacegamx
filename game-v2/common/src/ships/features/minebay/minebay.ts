@@ -9,6 +9,7 @@
  */
 
 import { datan2, dsincos } from '../../../math/detTrig.js';
+import { wrapPi } from '../../../math/basic.js';
 import { hashInts } from '../../../math/rng.js';
 import type { FunctionDef } from '../../types.js';
 
@@ -147,11 +148,6 @@ function localAngle(dx: number, dy: number): number {
   return datan2(dx, -dy);
 }
 
-function wrapPi(a: number): number {
-  while (a > Math.PI) a -= 2 * Math.PI;
-  while (a < -Math.PI) a += 2 * Math.PI;
-  return a;
-}
 
 /**
  * The drop record for a batch of `n` from `bay` (one of fx.minebay.bays) of a ship at `pose`, on `tick`. `com`: the

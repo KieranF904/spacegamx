@@ -16,9 +16,9 @@
  *             and the drawn place eases from the old PT head to the new
  *   draw      at its PT draw tick (non-pilot: where your shells meet it), between the two stepped ticks either side
  */
-import { guideHash, type GuideBody } from '@space-game/common';
+import { guideHash, wrapPi, type GuideBody } from '@space-game/common';
 import type { GuideFork } from '../../ships/guides/GuideRunner';
-import { PtEase, noPtStats, wrapAngle, type PoseXY, type PtKind } from '../ptKinds';
+import { PtEase, noPtStats, type PoseXY, type PtKind } from '../ptKinds';
 
 export interface GuidesKindHost {
   /** The shells and mobs the snapshots run (GuideRunner.ids) */
@@ -112,7 +112,7 @@ export class GuidesKind implements PtKind {
     if (!a) return null;
     const b = tr.states.get(f + 1) ?? a, k = Math.max(0, Math.min(1, t - f));
     const pa = poseOf(a), pb = poseOf(b);
-    return this.ease.apply(id, { x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, angle: pa.angle + wrapAngle(pb.angle - pa.angle) * k });
+    return this.ease.apply(id, { x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, angle: pa.angle + wrapPi(pb.angle - pa.angle) * k });
   }
 
   /** Its PT afresh from a copy of its ST run, stepped to `to` */

@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { helmFollow, HELM_FOLLOW_RATE, HELM_TIGHT_RATE, MAX_VIEW_SPIN, HELM_TIGHT_SPIN, noseUpAngle, screenToWorld, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir, wrapAngle } from './cameraView';
+import { helmFollow, HELM_FOLLOW_RATE, HELM_TIGHT_RATE, MAX_VIEW_SPIN, HELM_TIGHT_SPIN, noseUpAngle, screenToWorld, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
+import { wrapPi } from '@space-game/common';
 
 const PI = Math.PI;
 
-describe('wrapAngle', () => {
-  it('keeps angles in [-π, π)', () => {
-    expect(wrapAngle(0)).toBeCloseTo(0);
-    expect(wrapAngle(3 * PI)).toBeCloseTo(-PI);
-    expect(wrapAngle(-3 * PI / 2)).toBeCloseTo(PI / 2);
-    expect(wrapAngle(7.5 * PI)).toBeCloseTo(-PI / 2);
-    expect(wrapAngle(-0.1)).toBeCloseTo(-0.1);
+describe('wrapPi (the one angle wrap, common/math/basic.ts)', () => {
+  it('keeps angles in [-π, π]', () => {
+    expect(wrapPi(0)).toBeCloseTo(0);
+    expect(Math.abs(wrapPi(3 * PI))).toBeCloseTo(PI);
+    expect(wrapPi(-3 * PI / 2)).toBeCloseTo(PI / 2);
+    expect(wrapPi(7.5 * PI)).toBeCloseTo(-PI / 2);
+    expect(wrapPi(-0.1)).toBeCloseTo(-0.1);
   });
 });
 
@@ -17,8 +18,8 @@ describe('smoothAngle', () => {
   it('goes the short way across ±π', () => {
     const a = smoothAngle(PI - 0.1, -PI + 0.1, 3, 1 / 60);
     // Stepped up past π (wrapping), not back down through 0
-    expect(Math.abs(wrapAngle(a - (PI - 0.1)))).toBeLessThan(0.2);
-    expect(wrapAngle(a - (PI - 0.1))).toBeGreaterThan(0);
+    expect(Math.abs(wrapPi(a - (PI - 0.1)))).toBeLessThan(0.2);
+    expect(wrapPi(a - (PI - 0.1))).toBeGreaterThan(0);
   });
 
   it('is the same at any frame rate', () => {
@@ -95,7 +96,7 @@ describe('helmFollow', () => {
     let cam = 0, ship = 0;
     const { rate, maxSpin } = helmFollow(5);
     for (let i = 0; i < 240; i++) { ship += 2 / 60; cam = smoothAngle(cam, ship, rate, 1 / 60, maxSpin); }
-    const lag = Math.abs(wrapAngle(ship - cam));
+    const lag = Math.abs(wrapPi(ship - cam));
     expect(lag).toBeGreaterThan(0.05);
     expect(lag).toBeLessThan(0.25);
   });

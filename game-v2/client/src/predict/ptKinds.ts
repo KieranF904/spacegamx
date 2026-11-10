@@ -32,6 +32,8 @@
  * prediction modes are (state/drawMode.ts). A kind's stats are the overlay's rows (dev/simOverlay/predictSource.ts).
  */
 
+import { wrapPi } from '@space-game/common';
+
 export interface PoseXY { x: number; y: number; angle: number }
 
 export interface PtKindStats {
@@ -140,7 +142,6 @@ export class PtKinds {
 }
 
 const smoothstep = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
-export const wrapAngle = (d: number) => { while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 
 /**
  * The eased draw: after a re-step moved a thing's PT from `was` to `now`, it is drawn at the new PT plus an offset that
@@ -153,7 +154,7 @@ export class PtEase {
 
   /** A re-step moved it: returns how far (0: it didn't move) */
   moved(id: number, was: PoseXY, to: PoseXY): number {
-    const dx = was.x - to.x, dy = was.y - to.y, da = wrapAngle(was.angle - to.angle);
+    const dx = was.x - to.x, dy = was.y - to.y, da = wrapPi(was.angle - to.angle);
     if (!dx && !dy && !da) return 0;
     const now = this.now(), o = this.offsets.get(id), w = o ? this.weight(o.at, now) : 0;
     this.offsets.set(id, { dx: dx + (o ? o.dx * w : 0), dy: dy + (o ? o.dy * w : 0), da: da + (o ? o.da * w : 0), at: now });

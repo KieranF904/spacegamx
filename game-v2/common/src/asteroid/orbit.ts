@@ -1,5 +1,6 @@
 import { ORBIT_MU } from '../constants.js';
 import { dasinh, datan, datan2, dcos, dcosh, dsin, dsincos, dsinh, dtanh } from '../math/detTrig.js';
+import { wrapPi } from '../math/basic.js';
 
 // (Orbits are worked out alike on the server and every client: deterministic maths only, docs/design/deterministic-maths.md)
 const SC: [number, number] = [0, 0];
@@ -77,7 +78,7 @@ export function calcOrbitStateRaw(
   if (orbitType === OrbitType.Elliptic) {
     const a = semiMajorAxis;
     const n = Math.sqrt(ORBIT_MU / (a * a * a));
-    const M = wrapAngle(meanAnomaly0 + n * dt);
+    const M = wrapPi(meanAnomaly0 + n * dt);
     const E = solveKeplerElliptic(M, e);
     s.r = a * (1 - e * dcos(E));
     dsincos(E / 2, SC);
@@ -131,14 +132,6 @@ export function calcOrbitState(
 ): OrbitState2D {
   const s = calcOrbitStateInto(params, tick);
   return { x: s.x, y: s.y, r: s.r, trueAnomaly: s.trueAnomaly };
-}
-
-function wrapAngle(angle: number): number {
-  const twoPi = Math.PI * 2;
-  let a = angle % twoPi;
-  if (a > Math.PI) a -= twoPi;
-  if (a < -Math.PI) a += twoPi;
-  return a;
 }
 
 function solveKeplerElliptic(M: number, e: number): number {

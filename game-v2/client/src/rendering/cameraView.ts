@@ -5,6 +5,8 @@
  * damage numbers, labels) turns by +angle in world space.
  */
 
+import { wrapPi } from '@space-game/common';
+
 /** Live roll of the camera (radians); written by the Renderer once a frame */
 export const cameraView = { angle: 0 };
 
@@ -28,27 +30,21 @@ export function helmFollow(t: number): { rate: number; maxSpin: number } {
   return { rate: HELM_FOLLOW_RATE + (HELM_TIGHT_RATE - HELM_FOLLOW_RATE) * e, maxSpin: MAX_VIEW_SPIN + (HELM_TIGHT_SPIN - MAX_VIEW_SPIN) * e };
 }
 
-const TAU = Math.PI * 2;
-
-/** An angle in [-π, π) */
-export function wrapAngle(a: number): number {
-  return ((((a + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
-}
 
 /** Exponential approach to `target` the short way round, the same at any frame rate; its step capped at `maxSpeed`·dt */
 export function smoothAngle(current: number, target: number, rate: number, dt: number, maxSpeed = Infinity): number {
   if (dt <= 0) return current;
-  const gap = wrapAngle(target - current);
+  const gap = wrapPi(target - current);
   let step = gap * (1 - Math.exp(-rate * dt));
   const cap = maxSpeed * dt;
   if (Math.abs(step) > cap) step = Math.sign(step) * cap;
   // (Kept within one turn, so it never winds up)
-  return wrapAngle(current + step);
+  return wrapPi(current + step);
 }
 
 /** The roll that puts a ship's nose up the screen (an entity's angle points its nose along +x; up is -y) */
 export function noseUpAngle(shipAngle: number): number {
-  return wrapAngle(shipAngle + Math.PI / 2);
+  return wrapPi(shipAngle + Math.PI / 2);
 }
 
 export interface CameraPose { x: number; y: number; zoom: number; angle: number }

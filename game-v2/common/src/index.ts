@@ -58,7 +58,7 @@ export * from './ships/index.js';
 export * from './math/detTrig.js';
 // Deterministic randomness (hashInts, seededRng and mulberry32 come through ships/ and asteroid/): math/rng.ts
 export { tickRng, hashUnit } from './math/rng.js';
-// Plain maths for non-sim code (wrapPi already comes through ships/turret.js with the same loop): math/basic.ts
+// Plain maths (wrapPi, the one angle wrap, comes through ships/turret.js): math/basic.ts
 export { clamp, lerp, smoothstep, cloneJson } from './math/basic.js';
 
 // Economy: items, stacks, recipes, player profiles

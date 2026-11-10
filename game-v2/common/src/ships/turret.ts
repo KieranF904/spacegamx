@@ -17,6 +17,7 @@ import type { PlacedGeom } from './grid.js';
 import { pointInConvex, segmentConvexEntry } from './geometry.js';
 import type { ShipTuning } from './tuning.js';
 import { datan2, dcos, dhypot, dsin } from '../math/detTrig.js';
+import { wrapPi } from '../math/basic.js';
 
 const DEG = Math.PI / 180;
 
@@ -193,11 +194,8 @@ export function computeTurretWindow(
   return castTurret(turretFrame(geoms, self, facing, tuning, arcDeg), geoms, alive).win;
 }
 
-export function wrapPi(a: number): number {
-  while (a > Math.PI) a -= 2 * Math.PI;
-  while (a < -Math.PI) a += 2 * Math.PI;
-  return a;
-}
+// The one angle wrap (math/basic.ts), re-exported: the package index takes wrapPi from here
+export { wrapPi };
 
 export function isOpen(w: TurretWindow, offset: number): boolean {
   return w.open.some(([lo, hi]) => offset >= lo - 1e-9 && offset <= hi + 1e-9);
