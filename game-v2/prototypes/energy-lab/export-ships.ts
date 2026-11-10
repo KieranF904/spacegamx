@@ -13,7 +13,7 @@ const catalog = loadCatalog(raw.catalog, { overlapShrink: raw.tuning.overlapShri
 const MAP: Record<string, string> = {
   core: 'core', armor: 'armor', hull: 'hull', cargo: 'cargo', conduit: 'conduit', power_conduit: 'conduit', power_diode: 'diode',
   power_cell_reactor: 'cell_reactor', power_isotope_pile: 'isotope', power_fusion_plant: 'fusion', power_overclock_reactor: 'overclock',
-  power_battery: 'battery', power_heavy_bank: 'heavy_bank', power_capacitor: 'capacitor', power_drive_cell: 'drive_cell', power_pulse_dynamo: 'dynamo',
+  power_battery: 'battery', power_heavy_bank: 'heavy_bank', power_capacitor: 'capacitor', power_drive_cell: 'drive_cell',
   engine_ion_drive: 'ion', engine_vernier: 'vernier', engine_afterburner: 'afterburner', engine_torch: 'torch', engine_plasma_drive: 'plasma',
   engine_drift_sail: 'drift_sail', engine_fusion_torch: 'fusion_torch', engine_burst_strafer: 'strafer',
   utility_mining_laser: 'mining', utility_bore: 'bore', utility_siphon: 'siphon', utility_scanner: 'scanner', utility_long_range_array: 'scanner',

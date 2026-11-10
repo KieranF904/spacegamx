@@ -325,14 +325,11 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
   });
 }
-// ---- The Pulse Dynamo, the Flash Screen and the Rail Driver (docs/design/rework-2026-11.md §2.6) ----------
-// The Pulse Dynamo is a stub on the ports core: no ports, so it makes and moves no power (its `dynamo` figure is read only by
-// the shipgen tool's layout); the Flash Screen's return is its own feature (features/flash) and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
+// ---- The Flash Screen and the Rail Driver (docs/design/rework-2026-11.md §2.6) ----------
+// The Flash Screen's return is its own feature (features/flash) and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
 // last, so no other model's order moves.
 {
-  const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
   const LATE_OTHER = [
-    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'An old charger the ports core no longer uses: it has no ports and makes and moves no power.', 'power', DYNAMO_LOOK],
     // (The Flash Screen's own store holds flashCost E a point: full, it buys the return at once; it refills over its in port. features/flash)
     ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, flashCost: 4, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill. When it breaks, a full store of its own brings it straight back; otherwise it returns whole 4 seconds later. The store refills from its power line.', 'shields', legacyLook('shield')],
   ];
@@ -1024,7 +1021,6 @@ const RECIPES = {
 };
 // (The Pulse Dynamo, Flash Screen and Rail Driver)
 Object.assign(RECIPES, {
-  power_pulse_dynamo: { titanium_plate: 1, coil_winding: 2, capacitor_cell: 1 },
   shield_flash_screen: { steel_plate: 1, copper_wire: 2, shield_emitter: 1, capacitor_cell: 2 },
   railgun_rail_driver: { titanium_plate: 4, hardened_steel: 2, coil_winding: 3, capacitor_cell: 2, power_coupling: 2 },
 });

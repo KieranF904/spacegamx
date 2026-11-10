@@ -8,7 +8,6 @@
  *   Overclock Reactor fast, jittery red-white pulse
  *   Battery           a green charge bar
  *   Heavy Bank        four dim bars that fill one after another
- *   Pulse Dynamo      a violet ring spinning
  *   Rustjaw's Hive    a honeycomb of seven cells, one lit per clip round held; the next to regrow breathes
  *
  * Charge is only known for your own ship (the pilot row: state.charge); other ships show their parts nearly full.
@@ -18,16 +17,16 @@ import { Graphics, type Container } from 'pixi.js';
 import type { Charge, PlacedGeom, ShipState } from '@space-game/common';
 import './utilityLooks';
 
-type Kind = 'coil' | 'heavycoil' | 'cell' | 'pile' | 'fusion' | 'overclock' | 'battery' | 'bank' | 'dynamo' | 'hive';
+type Kind = 'coil' | 'heavycoil' | 'cell' | 'pile' | 'fusion' | 'overclock' | 'battery' | 'bank' | 'hive';
 const KINDS: Record<string, Kind> = {
   utility_jump_coil: 'coil', utility_heavy_coil: 'heavycoil', power_cell_reactor: 'cell', power_isotope_pile: 'pile', power_fusion_plant: 'fusion', power_overclock_reactor: 'overclock',
-  power_battery: 'battery', power_heavy_bank: 'bank', power_pulse_dynamo: 'dynamo', legendary_hive: 'hive',
+  power_battery: 'battery', power_heavy_bank: 'bank', legendary_hive: 'hive',
 };
 
 interface Item { i: number; kind: Kind; x: number; y: number; r: number; seed: number; w: number; h: number }
 interface View { g: Graphics; ship: ShipState | null; rebuilds: number; items: Item[]; visible: boolean }
 
-const VIOLET = 0xb57cff, RED = 0xff3b30;
+const RED = 0xff3b30;
 
 /** Is a flicker "on" this moment (fast, irregular) */
 const flick = (t: number, seed: number): boolean => Math.sin(t * 0.083 + seed) * Math.sin(t * 0.047 + seed * 1.7) > -0.25;
@@ -122,12 +121,6 @@ export class PartFx {
           const p = 0.5 + 0.5 * Math.sin(t * 1.6 + seed), heavy = it.kind === 'heavycoil';
           g.circle(x, y, r * 1.1).stroke({ color: 0x9fd4ff, width: Math.max(1.2, cs * (heavy ? 0.1 : 0.06)), alpha: 0.2 + 0.2 * p });
           if (heavy) g.circle(x, y, r * 0.65).stroke({ color: 0xc8e6ff, width: Math.max(1.4, cs * 0.12), alpha: 0.28 + 0.25 * (1 - p) });
-          break;
-        }
-        case 'dynamo': {
-          const a = t * 2.4 + seed;
-          for (let k = 0; k < 2; k++) arcAt(g, x, y, r * 1.2, a + k * Math.PI, a + k * Math.PI + 1.7).stroke({ color: VIOLET, width: Math.max(1.4, cs * 0.08), alpha: 0.85 });
-          g.circle(x, y, r * 0.5).fill({ color: VIOLET, alpha: 0.3 });
           break;
         }
         case 'hive': {
