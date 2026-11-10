@@ -15,7 +15,7 @@ import {
   Position, Rotation, Velocity, InSystem, seededRng, weaponHit, weaponDef, shipPointToWorld, type ServerMessage,
 } from '@space-game/common';
 import { goldenFile, hashRows } from '../../../common/src/ships/golden/testData.js';
-import { createProtoServer } from '../proto/createProtoServer.js';
+import { createLocalServer } from '../createLocalServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
@@ -32,7 +32,7 @@ const KINDS = ['cannon', 'railgun', 'flak', 'missile', 'laser', 'autocannon', 'p
 
 function setup() {
   resetGlobals();
-  const server = createProtoServer({ files, ships: shipsCfg, autoStart: false });
+  const server = createLocalServer({ files, ships: shipsCfg, autoStart: false });
   const t = new LocalTransport(server);
   t.onMessage = () => {};
   t.connect();

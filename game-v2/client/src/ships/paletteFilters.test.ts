@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../server/src/ships/createShipBridge';
 import { COMP_TABS, guideRows } from '../ui/componentGuide';
 import { PLATES } from '../ui/componentData';
 import { paletteRows } from './paletteModel';

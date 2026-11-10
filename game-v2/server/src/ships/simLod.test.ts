@@ -7,7 +7,7 @@ import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from './loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 import { PROMOTE_RADIUS, DEMOTE_RADIUS, DEMOTE_AFTER, DEMOTE_CHECK, RECENT, cruiseOf } from './SimLod.js';
 
 const dataDir = join(__dirname, '../../../data');

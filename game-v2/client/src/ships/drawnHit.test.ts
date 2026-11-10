@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { createShipState, EntityType, SIDE } from '@space-game/common';
 import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../server/src/ships/createShipBridge';
 import { ShipStore } from './ShipStore';
 import { DrawnWorld, bubbleRadius } from './drawnHit';
 import type { GameState } from '../state/GameState';

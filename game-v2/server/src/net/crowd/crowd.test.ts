@@ -16,7 +16,7 @@ import { GameServer } from '../../GameServer.js';
 import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { CrowdControl, CROWD_HIGH_MS, CROWD_LOW_MS } from './CrowdControl.js';
 import type { ClientConnection } from '../ClientConnection.js';

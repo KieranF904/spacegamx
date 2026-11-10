@@ -15,8 +15,7 @@ npm run dev:server       # game server, port 3000 (admin dashboard on 3005)
 npm run dev:client       # Vite client, port 5273
 ```
 
-Then open http://localhost:5273. No servers needed for `npm run proto` (the game server runs in the browser tab; open
-`/?proto`). The website is separate: `cd site; npm run dev` (port 5310, needs the lobby on 8787).
+Then open http://localhost:5273. The website is separate: `cd site; npm run dev` (port 5310, needs the lobby on 8787).
 
 | Service | Port | Purpose |
 |---|---|---|

@@ -11,7 +11,7 @@ import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../proto/createProtoServer.js';
+import { createShipBridge } from '../ships/createShipBridge.js';
 import { JOIN_DEADLINE_MS, MAX_UNJOINED, JOIN_TIMEOUT_CLOSE } from '../gameServer/session.js';
 
 const dataDir = join(__dirname, '../../../data');

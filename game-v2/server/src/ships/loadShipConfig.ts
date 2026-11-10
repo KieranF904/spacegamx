@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { Blueprint, parseBlueprint, resolveDesignUpdate, type DesignUpdateFile } from '@space-game/common';
-import type { ShipConfig } from '../proto/createProtoServer.js';
+import type { ShipConfig } from './createShipBridge.js';
 
 export function loadShipConfigFromDisk(dataPath: string): ShipConfig {
   const dir = join(dataPath, 'ships');

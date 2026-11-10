@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { createShipState } from '@space-game/common';
 import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../server/src/ships/createShipBridge';
 import { buildHull, skeletonCovered } from './hullBuild';
 import { buildSkeleton } from './skeletonBuild';
 import { LitGeometry } from '../rendering/lighting/LitGeometry';

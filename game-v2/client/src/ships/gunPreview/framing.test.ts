@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { loadShipConfigCached } from '../../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../../server/src/ships/createShipBridge';
 import { gunPlan, type GunPlan } from './gunPlan';
 import { DIST_MAX, DIST_MIN, MIN_ZOOM, PREVIEW_H, PREVIEW_W, WALL_COLS, frame, reachOf } from './framing';
 

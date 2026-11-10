@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'path';
 import { createShipState, parseBlueprint, portsLoadTest, portsView, PORTS_SCENARIOS, PS_LINKED, PS_WASTE, type Blueprint } from '@space-game/common';
 import { loadShipConfigCached } from '../../../server/src/ships/loadShipConfig';
-import { createShipBridge } from '../../../server/src/proto/createProtoServer';
+import { createShipBridge } from '../../../server/src/ships/createShipBridge';
 import { loadRow, portTipHtml, portsReport, portsWarnings } from './portsReport';
 import { ghostHint, glyphCentre, portNear } from './portsOverlay';
 

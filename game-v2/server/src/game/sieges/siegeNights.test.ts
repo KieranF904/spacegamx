@@ -7,7 +7,7 @@ import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 import { DEFAULT_SIEGE_RULES, SIEGE_STRINGS } from './rules.js';
 import { frontCount, siegeProfile, unitSpawns } from './plan.js';
 import { ROLES } from './roles/index.js';

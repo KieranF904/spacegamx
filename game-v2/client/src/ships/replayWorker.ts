@@ -5,11 +5,11 @@
  */
 
 import { runReplay, recordInputs } from '../../../server/src/ships/replay';
-import type { ProtoServerOptions } from '../../../server/src/proto/createProtoServer';
+import type { LocalServerOptions } from '../../../server/src/createLocalServer';
 
 interface Request {
-  files: ProtoServerOptions['files'];
-  ships: ProtoServerOptions['ships'];
+  files: LocalServerOptions['files'];
+  ships: LocalServerOptions['ships'];
   seed: number;
   ticks: number;
   runs: number;

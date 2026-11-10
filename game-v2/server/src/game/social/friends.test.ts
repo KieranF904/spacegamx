@@ -12,7 +12,7 @@ import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
 import { SOCIAL_DOC, emptyDoc, touch, request, respond, unfriend, forget, parseDoc, findByName, MAX_PENDING } from './friendsDoc.js';
 import { WHISPER_BURST, WHISPER_WINDOW, REQUEST_BURST, UNAVAILABLE, LIST_UNAVAILABLE, STATUS_UNSAVED } from './Social.js';

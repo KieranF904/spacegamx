@@ -12,13 +12,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
-  // Proto mode (npm run proto): in-process server, loaded lazily so normal builds don't bundle it
-  if (new URLSearchParams(window.location.search).has('proto')) {
-    const { startProto } = await import('./proto/protoMain');
-    await startProto(container);
-    return;
-  }
-  
   const game = new Game(container);
   await game.init();
   game.start();

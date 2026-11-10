@@ -9,7 +9,7 @@
 
 import * as bitecs from 'bitecs';
 import { Position, Velocity, Rotation, Health, ClientInputMessage, Blueprint, seededRng, hashInts, dsin } from '@space-game/common';
-import { createProtoServer, ProtoServerOptions } from '../proto/createProtoServer.js';
+import { createLocalServer, LocalServerOptions } from '../createLocalServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import type { ShipBridge } from './ShipBridge.js';
 
@@ -58,8 +58,8 @@ export function hashShips(bridge: ShipBridge): number {
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
 export interface ReplayOptions {
-  files: ProtoServerOptions['files'];
-  ships: ProtoServerOptions['ships'];
+  files: LocalServerOptions['files'];
+  ships: LocalServerOptions['ships'];
   inputs: RecordedInput[];
   /** Blueprint for a target dummy placed ahead of the player, so shots land and parts break */
   dummy?: Blueprint;
@@ -67,7 +67,7 @@ export interface ReplayOptions {
 
 export function runReplay(opts: ReplayOptions): { hash: number; ticks: number; bodies: number } {
   resetGlobals();
-  const server = createProtoServer({ files: opts.files, ships: opts.ships, autoStart: false });
+  const server = createLocalServer({ files: opts.files, ships: opts.ships, autoStart: false });
   const bridge = server.getShips()!;
   const transport = new LocalTransport(server);
   transport.connect();

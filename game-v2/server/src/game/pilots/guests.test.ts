@@ -12,7 +12,7 @@ import { GameData } from '../../data/GameData.js';
 import { LocalTransport } from '../../net/LocalTransport.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
-import { createShipBridge } from '../../proto/createProtoServer.js';
+import { createShipBridge } from '../../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../../profile/ProfileStore.js';
 import { GuestKeep, guestIdOf, GUEST_DOC, GUEST_KEEP_MAX, GUEST_KEEP_MS } from './guests.js';
 
