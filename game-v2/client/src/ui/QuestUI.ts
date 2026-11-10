@@ -26,7 +26,7 @@ import { setText, setStyle } from './domWrite';
 import { boundKeyName } from '../input/keybindings';
 import { esc } from './escape';
 import { fetchRankings } from '../network/rankings';
-import { RewardScreen } from './rewards/RewardScreen';
+import type { RewardScreen } from './rewards/RewardScreen';
 import { questRewardLines, shortOutro } from './rewards/rewardModel';
 import { itemIcon } from './itemIcons';
 import { inCombat } from './CombatLockUI';
@@ -312,14 +312,16 @@ export class QuestClient {
   /** A job finished: its rewards on the reward screen's compact card (folds to a "View" pill in combat) */
   jobDone(j: NonNullable<ServerQuestStepMessage['done']>): void {
     const econ = this.d.pilot.econ;
-    this.rewards ??= new RewardScreen({ sound: this.d.sound, inCombat: () => inCombat() });
-    this.rewards.show({
+    // (the reward screen is its own chunk: it arrives with the first finished job)
+    this.rewards ??= import('./rewards/RewardScreen').then((m) => new m.RewardScreen({ sound: this.d.sound, inCombat: () => inCombat() }));
+    const lines = questRewardLines(j.rewards, { item: (id) => econ.items.name(id), icon: (id) => itemIcon(econ, id) });
+    void this.rewards.then((r) => r.show({
       mode: 'card', kicker: 'JOB COMPLETE', title: j.name, intro: shortOutro(j.outro),
-      lines: questRewardLines(j.rewards, { item: (id) => econ.items.name(id), icon: (id) => itemIcon(econ, id) }),
+      lines,
       button: 'Done',
-    });
+    }));
   }
-  private rewards?: RewardScreen;
+  private rewards?: Promise<RewardScreen>;
 
   stepDone(text: string): void {
     this.d.sound('scan_ping', 0.35);

@@ -13,7 +13,7 @@ import { ChargeGauge } from './app/chargeGauge';
 import { updateZone, type ZoneHost } from './app/zoneHud';
 import { showVersionOverlay } from './app/versionOverlay';
 import { buildWindows, type WindowHost, type WindowSet } from './app/windows';
-import { prefetchScreens } from './app/lazyScreens';
+import { prefetchScreens, resetTutorialUI } from './app/lazyScreens';
 import { installDevTools } from './app/devTools';
 import { Prediction } from './predict/Prediction';
 import { handleKey, type KeyHost } from './app/keys';
@@ -64,7 +64,8 @@ import type { ContributorPanel } from './ui/ContributorPanel';
 
 import { WeaponRing } from './ui/WeaponRing';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
-import { SiegePanel } from './ui/SiegePanel';
+import type { SiegePanel } from './ui/SiegePanel';
+import { Lazy } from './lazy';
 import { moonOffset, planetPosition, pocketAt, inSafeSpace, type StarSystemData } from '@space-game/common';
 import { AutoDest } from './ships/Autopilot';
 import { HazardOverlay } from './ui/HazardOverlay';
@@ -139,14 +140,14 @@ export class Game {
   private wreck: { system: string; x: number; y: number; until: number } | null = null;
   /** Objective banners (a city under siege) */
   private objectives = new ObjectiveBanner();
-  /** A moon siege's panel (and its night HUD and cards) */
-  private siegePanel = new SiegePanel((m) => this.network.send(m), {
+  /** A moon siege's panel (and its night HUD and cards): its own chunk, fetched when the first siege message arrives */
+  private siegePanel = new Lazy(() => import('./ui/SiegePanel').then(({ SiegePanel }) => new SiegePanel((m) => this.network.send(m), {
     tick: () => this.state.getRawServerTick(),
     target: () => this.w?.targetUI.target ?? 0,
     me: () => { const e = this.state.entities.get(this.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
     bastion: () => this.world.currentSystem()?.surface?.bastion ?? null,
     focusKey: () => boundKeyName('siegeFocus', settings.data.bindings),
-  });
+  })));
   private lastTraffic = { t: 0, bytesIn: 0, bytesOut: 0, framesIn: 0 };
   private trafficText = '';
   private localDead = false;
@@ -675,7 +676,7 @@ this.boostHudEl = document.getElementById('boostHud');
       currentSystem: () => g.world.currentSystem(),
       planetBelow: () => g.world.planetBelow(),
       wreckMarker: () => g.wreckMarker(),
-      siegeMarkers: () => g.siegePanel.markers().map((m) => ({ ...m, system: g.state.systemId })),
+      siegeMarkers: () => (g.siegePanel.value?.markers() ?? []).map((m) => ({ ...m, system: g.state.systemId })),
       toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
       chatTo: (name) => g.chat.messageTo(name),
       friendsOnline: (n) => g.chat.setFriendsOnline(n),
@@ -706,8 +707,8 @@ this.boostHudEl = document.getElementById('boostHud');
       get playerStatsUI() { return g.w.playerStatsUI; },
       get systemMapUI() { return g.w.systemMapUI; },
       get navMarkers() { return g.w.navMarkers; },
-      get siegePanel() { return g.siegePanel; },
-      get gunRangeHud() { return g.w.gunRangeHud; },
+      get siegePanel() { return { focus: () => g.siegePanel.value?.focus() ?? false }; },
+      get gunRangeHud() { return g.w.gunRangeHud.value ?? undefined; },
       get regionUI() { return g.regionUI; },
       get audio() { return g.audio; },
       get network() { return g.network; },
@@ -873,7 +874,9 @@ this.boostHudEl = document.getElementById('boostHud');
     const windowOpen = this.stationOpen || this.w.inventoryWindow.isOpen || this.w.tradeWindow.isOpen || this.w.quests.log.isOpen;
     this.w.targetUI.setHidden(blocked);
     this.w.targetUI.update();
-    this.w.gunRangeHud.update(blocked || this.localDead);
+    // (the range's HUD is its own chunk: fetched the first time a range is entered)
+    if (inGunRange() && !this.w.gunRangeHud.value) this.w.gunRangeHud.load().catch(() => {});
+    this.w.gunRangeHud.value?.update(blocked || this.localDead);
     this.w.infoPanel.update(!blocked && !windowOpen && !this.localDead);
     this.w.opsUI.setHidden(blocked);
     this.w.opsUI.update(this.w.bossUI.visible);
@@ -881,7 +884,7 @@ this.boostHudEl = document.getElementById('boostHud');
     const building = this.w.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
     this.w.buildSites?.update(1 / 60, building ? building.markers[0] : null);
     // (the training card stays up over the hangar and the map, by them: the part, generator and map steps are done there)
-    this.w.tutorialUI.update(blocked || this.localDead, !this.loggedIn || this.menu.isOpen || this.localDead);
+    this.w.tutorialUI.value?.update(blocked || this.localDead, !this.loggedIn || this.menu.isOpen || this.localDead);
     this.w.pingUI.setHidden(blocked);
     this.w.pingUI.update();
     // The hold above the chat: not while docked (the station's storage has it) or behind a full-screen view
@@ -1133,7 +1136,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
   private onDisconnected(info?: DisconnectInfo): void {
     console.log('Disconnected from server', info ?? '');
     this.loggedIn = false;
-    this.w.tutorialUI?.reset();
+    if (this.w.tutorialUI) resetTutorialUI(this.w.tutorialUI);
     resetRangeState();
     this.loading?.cancel();
     
