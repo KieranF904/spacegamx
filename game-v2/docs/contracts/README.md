@@ -13,7 +13,7 @@ A JSDoc block at the very top of the file (after any shebang). First line `@cont
  * needs:      ChatHost (send, tell, pilotsIn), common/network/chatProtocol
  * events:     (optional) hooks it fires or handles
  * invariants: slash commands never reach other pilots — server/src/game/chat.test.ts
- *             message order per channel is kept — none pinned
+ *             message order per channel is kept — untestable: depends on the network clock
  * extend:     a new slash command is one entry in COMMANDS below
  */
 ```
@@ -21,7 +21,7 @@ A JSDoc block at the very top of the file (after any shebang). First line `@cont
 - `owns`: what the file is responsible for. One or two lines, no history.
 - `needs`: the modules, capabilities and host members it may use. Name every npm package it imports (the check warns when one is missing).
 - `events`: optional. Hooks it fires or handles.
-- `invariants`: one per line, each ending with ` — <test file relative to game-v2>`, or a golden in `server/src/golden` (`tickOrder.json`), or `none pinned`. Name a test only if it really pins the line.
+- `invariants`: one per line, each ending with ` — <test file relative to game-v2>`, or a golden in `server/src/golden` (`tickOrder.json`), or ` — untestable: <reason>` for a line that genuinely cannot be tested (the reason is required). Name a test only if it really pins the line. `none pinned` is no longer accepted: the check fails on it, so the count stays at zero.
 - `extend`: the one place to add a new case.
 
 ## Which files get one
@@ -37,7 +37,7 @@ npm run contracts:check    fail if the registry is stale or a header is broken
 
 The registry adds what the code already knows: line count, exports, section ranges (top-level declarations with their lines) and a list of executable contracts (feature `contract.test.ts` suites, `server/src/golden` pins, `satisfies Record<...>` tables). Never edit it by hand. A vitest (`scripts/contracts/registry.test.ts`) runs the check in the normal suite.
 
-The check fails on: a stale registry, a header without `owns`, `needs`, `invariants` or `extend`, a duplicated id, an invariant naming a test that does not exist. It warns (does not fail) on a contracted file over 800 lines ("split candidate") and on an npm package the file imports that its `needs` line does not mention.
+The check fails on: a stale registry, a header without `owns`, `needs`, `invariants` or `extend`, a duplicated id, an invariant naming a test that does not exist, an invariant marked `none pinned`, an `untestable:` with no reason. It warns (does not fail) on a contracted file over 800 lines ("split candidate") and on an npm package the file imports that its `needs` line does not mention.
 
 ## The rule
 

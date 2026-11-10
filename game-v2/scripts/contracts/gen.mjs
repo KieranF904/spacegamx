@@ -90,7 +90,7 @@ export function parseHeader(block) {
       let pend = '';
       for (const l of lines) {
         pend = pend ? `${pend} ${l}` : l;
-        if (/ — (none pinned|\S+)$/i.test(pend)) { items.push(pend); pend = ''; }
+        if (/ — (none pinned|untestable: .+|\S+)$/i.test(pend)) { items.push(pend); pend = ''; }
       }
       if (pend) errors.push(`invariant does not end with " — <test>": "${pend.slice(0, 60)}"`);
       out.invariants = items.map((t) => {
@@ -196,7 +196,8 @@ export function collect() {
       const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
       if (lines > MAX_LINES) warnings.push(`${path}: ${lines} lines (over ${MAX_LINES}, split candidate)`);
       for (const inv of header.invariants ?? []) {
-        if (/^none pinned$/i.test(inv.test)) continue;
+        if (/^none pinned$/i.test(inv.test)) { problems.push(`${path}: invariant "${inv.text.slice(0, 50)}" has no test: pin it, or mark it " — untestable: <reason>"`); continue; }
+        if (/^untestable:/i.test(inv.test)) { if (!/^untestable:\s*\S/i.test(inv.test)) problems.push(`${path}: "untestable:" needs a reason`); continue; }
         if (existsSync(join(ROOT, inv.test)) && statSync(join(ROOT, inv.test)).isFile()) continue;
         if (goldenExists(inv.test)) continue;
         problems.push(`${path}: invariant names "${inv.test}", which is not a file under game-v2 or a golden in server/src/golden`);
@@ -256,8 +257,8 @@ export function renderMd({ contracts, exec }) {
     if (c.events) L.push(`- events: ${c.events}`);
     L.push('- invariants:');
     for (const inv of c.invariants) {
-      const none = /^none pinned$/i.test(inv.test);
-      L.push(`  - ${inv.text} — ${none ? 'none pinned' : `[${inv.test}](../../${inv.test})`}`);
+      const plain = /^(none pinned|untestable:)/i.test(inv.test);
+      L.push(`  - ${inv.text} — ${plain ? inv.test : `[${inv.test}](../../${inv.test})`}`);
     }
     L.push(`- extend: ${c.extend}`);
     if (c.exports.length) L.push(`- exports: ${c.exports.slice(0, 40).join(', ')}${c.exports.length > 40 ? `, +${c.exports.length - 40} more` : ''}`);
