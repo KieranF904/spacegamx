@@ -148,8 +148,9 @@ export class Probe {
       return oHandle(m);
     };
     // (The client's debris world: drift and knocks stepped, and stepped again from a keyframe or new piece)
-    const reps = f.reps, oDeb = reps.stepDebrisTo.bind(reps);
-    reps.stepDebrisTo = (to: number) => { const t0 = performance.now(); try { return oDeb(to); } finally { if (this.measuring) this.debrisMs += performance.now() - t0; } };
+    // (The debris world steps live in the replica set's DebrisSteps, network/replication/debris.ts)
+    const reps = f.reps, ds = reps.debrisSteps, oDeb = ds.stepTo.bind(ds);
+    ds.stepTo = (to: number) => { const t0 = performance.now(); try { return oDeb(to); } finally { if (this.measuring) this.debrisMs += performance.now() - t0; } };
     const oAt = reps.at.bind(reps);
     reps.at = (id: number, t: number) => {
       if (!this.fresh.delete(id)) return oAt(id, t);

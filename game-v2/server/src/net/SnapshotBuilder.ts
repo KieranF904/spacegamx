@@ -32,7 +32,7 @@ import {
   headWord, HEAD_HASH_ROW, packOwnSync, packOwnHazards, jumpPhase, jumpTuning, SEARCH_WINDOW_MAX,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
-import type { ClientConnection } from './ClientConnection.js';
+import { SyncedShips, type ClientConnection } from './ClientConnection.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { toldShips } from './hits/toldShips.js';
 import type { SimLod } from '../ships/SimLod.js';
@@ -526,7 +526,9 @@ export class SnapshotBuilder {
       // (Contact pairs it finds itself: since its last snapshot, the window it works them out over)
       conn.lastSnapshotSentTick,
       // (Which ships it was told were pinned, on their first sync: its contact pass takes them so, contactsFor.ts)
-      (id) => { const s = conn.shipSynced.get(id); return s && s.ship === this.ships.bodies.get(id) ? !!s.pinned : undefined; });
+      (id) => { const s = conn.shipSynced.get(id); return s && s.ship === this.ships.bodies.get(id) ? !!s.pinned : undefined; },
+      // (...of those it was told were: the rest it takes unpinned)
+      () => { const syn = conn.shipSynced; if (syn instanceof SyncedShips) return syn.pinned; const ids: number[] = []; for (const [id, s] of syn) if (s.pinned) ids.push(id); return ids; });
     // (...and their sparks it draws itself: the rest go now, Replication.contactFxFor)
     for (const msg of this.replication.contactFxFor(conn, playerSystemId, rep.found ?? null, this.currentTick)) {
       if (!fartherThan(msg.x - px, msg.y - py, FX_NEAR)) this.send(conn.ws, msg);
@@ -564,6 +566,8 @@ export class SnapshotBuilder {
     covered: ReadonlySet<number>, entities: EntityState[]): void {
     const px = Position.x[conn.playerId], py = Position.y[conn.playerId];
     const bodies = this.bodies, guidesOn = this.guides;
+    // (its shells and other ships' it works out itself, as collectFire named them: nothing adds to them past it)
+    const ownShots = this.ownShotLog.of(conn), otherShots = this.otherShotLog.of(conn);
     for (const r of rows) {
       if ((r.kind === 'player' || r.kind === 'ship') && !conn.shipView.has(r.id)) continue;
       // (Debris it's working out itself: nothing till it confirms; once it has, the status row it made itself counts as sent)
@@ -571,7 +575,7 @@ export class SnapshotBuilder {
       if (conn.debrisRowOk.size && conn.debrisRowOk.delete(r.id) && r.key === DEBRIS_ROW_KEY) { newStates.set(r.id, r.key); continue; }
       if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
       // (its own shell it works out itself, CAPS.SHOT_IDS: no row, ever; nor another ship's whose guns it steps)
-      if (r.kind === 'projectile' && (this.ownShotLog.has(conn, r.id) || this.otherShotLog.has(conn, r.id))) continue;
+      if (r.kind === 'projectile' && (!!ownShots?.has(r.id) || !!otherShots?.has(r.id))) continue;
       // (a body's move's straight shell it makes itself, CAPS.MOVES: no row, nor a removal)
       if (r.kind === 'projectile' && bodies?.shellDerived(conn, conn.playerId, r.id, prevStates.has(r.id))) continue;
       // (a homing shell it runs, its row once sent: it flies it itself)

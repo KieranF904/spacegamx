@@ -22500,7 +22500,7 @@
       "id": "server.replication",
       "path": "server/src/net/Replication.ts",
       "group": "server/net",
-      "lines": 265,
+      "lines": 275,
       "owns": "ship replication's state and its public face: every ship's shadow, keyframe versions, the snapshot window (beginSnapshot / endSnapshot), and the questions the snapshot path asks (keysFor, heldByte, versions)",
       "needs": "ReplicationHost, ShipBridge, replication/{step, forClient, ownShip, workable, env, contactFx, types}",
       "events": "",
@@ -22529,7 +22529,7 @@
           "name": "Replication",
           "kind": "class",
           "start": 49,
-          "end": 265
+          "end": 275
         }
       ]
     },
@@ -22537,7 +22537,7 @@
       "id": "server.snapshot",
       "path": "server/src/net/SnapshotBuilder.ts",
       "group": "server/net",
-      "lines": 655,
+      "lines": 659,
       "owns": "the snapshot round: every SNAPSHOT_RATE, one snapshot per client, assembled in a fixed order from the snapshot/ modules (rows, own row, debris hold, replication, fire, structure, removals), then map dots and pops",
       "needs": "SnapshotHost (GameServer builds one, once), snapshot/{rows, ownRow, shipStructure, debrisHold, frameParts, mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet; npm: bitecs",
       "events": "",
@@ -22588,7 +22588,7 @@
           "name": "SnapshotBuilder",
           "kind": "class",
           "start": 128,
-          "end": 655
+          "end": 659
         }
       ]
     },
@@ -23084,7 +23084,7 @@
       "id": "server.replication.for-client",
       "path": "server/src/net/replication/forClient.ts",
       "group": "server/net/replication",
-      "lines": 251,
+      "lines": 260,
       "owns": "one client's share of a snapshot's ship motion: keyframes for ships it's new to or behind on, control rows, cause records (contacts it finds itself left out, pulls it works out left out, zero PULL records)",
       "needs": "ReplicationCore (shadows, knocks, pullOff, pullsJudged, ships, stats, real, keyNow, shipsIn), ownShip (ownFor, ownPulls), workable (workable, otherBefore), causes/contactsFor, causes/shadowCauses",
       "events": "",
@@ -23109,19 +23109,19 @@
           "name": "forClient",
           "kind": "function",
           "start": 20,
-          "end": 192
+          "end": 198
         },
         {
           "name": "contactsFound",
           "kind": "function",
-          "start": 194,
-          "end": 229
+          "start": 200,
+          "end": 236
         },
         {
           "name": "zeroPulls",
           "kind": "function",
-          "start": 231,
-          "end": 251
+          "start": 238,
+          "end": 260
         }
       ]
     },
@@ -23174,7 +23174,7 @@
       "id": "server.replication.step",
       "path": "server/src/net/replication/step.ts",
       "group": "server/net/replication",
-      "lines": 226,
+      "lines": 231,
       "owns": "the once-a-tick shadow step (endTick): every ship's shadow stepped with the controls it flew and its causes, then compared with the real ship; pullers off as a tick began, bodied shadows, clamped followers",
       "needs": "ReplicationCore (shadows, host, ships, stats, why, real), ownShip.stepOwn, env (envOf, clampId), causes/shadowCauses, common ships/replica",
       "events": "",
@@ -23205,31 +23205,31 @@
           "name": "endTick",
           "kind": "function",
           "start": 23,
-          "end": 136
+          "end": 141
         },
         {
           "name": "notePullers",
           "kind": "function",
-          "start": 138,
-          "end": 159
+          "start": 143,
+          "end": 164
         },
         {
           "name": "work",
           "kind": "function",
-          "start": 161,
-          "end": 180
+          "start": 166,
+          "end": 185
         },
         {
           "name": "clampFollower",
           "kind": "function",
-          "start": 182,
-          "end": 197
+          "start": 187,
+          "end": 202
         },
         {
           "name": "stepBodied",
           "kind": "function",
-          "start": 199,
-          "end": 226
+          "start": 204,
+          "end": 231
         }
       ]
     },
@@ -23366,7 +23366,7 @@
       "id": "server.replication.workable",
       "path": "server/src/net/replication/workable.ts",
       "group": "server/net/replication",
-      "lines": 57,
+      "lines": 59,
       "owns": "whether a client can work a ship's window of causes out from the structures it has (contacts' others, rebuilds either side of this frame's sync, OTHER_BEFORE)",
       "needs": "ReplicationCore (ships: get, structLog, debrisNet.comAt), causes/shadowCauses CauseEvent",
       "events": "",
@@ -23393,13 +23393,13 @@
           "name": "workable",
           "kind": "function",
           "start": 18,
-          "end": 36
+          "end": 38
         },
         {
           "name": "rebuildOk",
           "kind": "function",
-          "start": 38,
-          "end": 57
+          "start": 40,
+          "end": 59
         }
       ]
     },

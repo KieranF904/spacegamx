@@ -16,6 +16,7 @@
  *   --hash                                 hash every frame the counting sockets are sent (frameHash in the JSON): runs
  *                                          are seeded, so a change that keeps the bytes keeps the hash; --dump <file>
  *                                          writes the first counting socket's messages decoded, one a line (to diff runs)
+ *   --parts snapshots.motionFor,gunNet.pilot   more of the server's methods timed (ms per tick, the JSON's timing.parts)
  *   --crowd                                crowd fallbacks on and automatic (CAPS.CROWD, probes with every cap): each
  *                                          second's level and base-tick time, where it settled (try --secs 40)
  */
@@ -36,7 +37,7 @@ const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
   layout, n, secs: Number(arg('secs', full ? '15' : '10')),   crowd: flag('crowd'),
   probes: Number(arg('probes', '4')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
-  pt: arg('pt', '1') !== '0', ptReach: arg('pt-reach') ? Number(arg('pt-reach')) : undefined, hash: flag('hash'), dump: arg('dump'),
+  pt: arg('pt', '1') !== '0', ptReach: arg('pt-reach') ? Number(arg('pt-reach')) : undefined, hash: flag('hash'), dump: arg('dump'), parts: arg('parts'),
 });
 
 const one = arg('case');

@@ -9,7 +9,7 @@
  * extend:     a new field of a ship's structure on the wire is one member of the shipSync in sendShipUpdates
  */
 import { InSystem, hpWire, type ShipState, type ClientSocket, type ServerMessage } from '@space-game/common';
-import type { ClientConnection } from '../ClientConnection.js';
+import { syncedShip, type ClientConnection } from '../ClientConnection.js';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 import { nextSync, type StructEntry } from '../../ships/bridge/structLog.js';
 import type { HitLedger } from '../hits/HitLedger.js';
@@ -175,7 +175,7 @@ export class ShipStructure {
         const dmg = this.ships.damageMulOf(id), hadDmg = fresh ? 1 : (synced?.dmg ?? 1);
         // (Pinned as it spawned, told on a new ship's sync: the client's contact pass takes it so, contactsFor.ts)
         const pinned = fresh ? this.ships.isPinned(id) : !!synced?.pinned;
-        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept, dmg, pinned };
+        synced = syncedShip(ship, ship.rebuilds, this.currentTick, kept, dmg, pinned);
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;

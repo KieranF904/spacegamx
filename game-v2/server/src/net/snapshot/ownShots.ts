@@ -55,6 +55,11 @@ export class OwnShotLog {
     return this.byConn.get(conn)?.get(id);
   }
 
+  /** A client's shells as derive named them (id -> wire name; undefined: none yet), to look many up at once */
+  of(conn: object): ReadonlyMap<number, number> | undefined {
+    return this.byConn.get(conn);
+  }
+
   has(conn: object, id: number): boolean {
     return !!this.byConn.get(conn)?.has(id);
   }

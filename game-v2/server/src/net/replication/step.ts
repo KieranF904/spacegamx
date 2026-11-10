@@ -57,7 +57,12 @@ export function endTick(rep: ReplicationCore): void {
     const q = dock ? 0 : rec?.q ?? 0;
     let s = rep.shadows.get(eid);
     if (!s) {
-      rep.shadows.set(eid, { mode, body: rep.real(eid), bits, q, version: 1, cver: 1, gen: 1, dver: 1, diverged: false, caused: false, causes: [], rebuilds: ship.rebuilds, sig: flightSignature(ship.derived), dock, events: [], qSent: q });
+      // (Every field there from the start, the optional ones undefined: one shape for every shadow, read per client per ship)
+      rep.shadows.set(eid, {
+        mode, body: rep.real(eid), bits, q, version: 1, cver: 1, gen: 1, dver: 1, lived: undefined, diverged: false, caused: false, causes: [],
+        pre: undefined, preTick: undefined, worked: undefined, workedTick: undefined, rebuilds: ship.rebuilds, sig: flightSignature(ship.derived), dock,
+        events: [], qSent: q, keyRow: undefined, ctlRow: undefined, stepped: undefined, own: undefined, bodied: undefined,
+      });
       continue;
     }
     if (mode !== s.mode || !sameDock(dock, s.dock)) { if (!s.diverged) rep.why('mode'); s.diverged = true; s.mode = mode; s.dock = dock; if (s.bodied) s.bodied.diverged = true; }

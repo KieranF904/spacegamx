@@ -53,7 +53,7 @@ export interface ClientConnection {
    * last went (`at`: a client finding its own hits leaves a ship synced in that snapshot to the records, HitLedger);
    * `kept`: the rebuild counts whose structures it keeps by tick, oldest first (CAPS.STRUCTS: every one since went)
    */
-  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number; kept?: number[]; dmg?: number; pinned?: boolean }>;
+  shipSynced: Map<number, SyncedShip>;
   /** Last part HP sent to this client, per ship body */
   shipHpSent: Map<number, number[]>;
   /**
@@ -142,4 +142,39 @@ export interface ClientConnection {
   focus?: FocusState;
   /** Ships out of its view that it keeps, and what it was last sent of each (CAPS.FOCUS: net/cells/AwayNet.ts) */
   away?: AwayShips<AwayShip>;
+}
+
+/** A ship body a client has been synced to (ClientConnection.shipSynced) */
+export interface SyncedShip { ship: ShipState; rebuilds: number; hpAt?: number; at?: number; kept?: number[]; dmg?: number; pinned?: boolean }
+
+/**
+ * A SyncedShip with every field there from the start, in one order: the snapshot path reads them per client per ship,
+ * so they all share one shape (a field added later, as hpAt is, would give them several)
+ */
+export function syncedShip(ship: ShipState, rebuilds: number, at?: number, kept?: number[], dmg?: number, pinned?: boolean): SyncedShip {
+  return { ship, rebuilds, hpAt: undefined, at, kept, dmg, pinned };
+}
+
+/**
+ * shipSynced as session.ts makes it: a Map that also keeps which ships the client was told pinned (an entry's `pinned`
+ * is set only with the entry), so its contact window asks only those (net/causes/contactsFor.ts toldPinnedAmong)
+ */
+export class SyncedShips extends Map<number, SyncedShip> {
+  readonly pinned = new Set<number>();
+
+  override set(id: number, s: SyncedShip): this {
+    // (Made with no entries: Map's constructor would set them before `pinned` is)
+    if (s.pinned) this.pinned.add(id); else this.pinned.delete(id);
+    return super.set(id, s);
+  }
+
+  override delete(id: number): boolean {
+    this.pinned.delete(id);
+    return super.delete(id);
+  }
+
+  override clear(): void {
+    this.pinned.clear();
+    super.clear();
+  }
 }
