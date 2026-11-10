@@ -67,17 +67,26 @@ export function contactWindow(h: ContactWindowHost): ContactWindow {
       if (L && e.seq >= L.seq) { out.add(id); break; }
     }
   }
+  // (Out of a pass there was, docked aside, or a pass's structure it lacks. By ship over the window's passes (one sum
+  // for every client in the system: ContactLog.window); docked and structOk read nothing that moves within the window)
+  const passes = log.window(systemId, from, h.to);
+  if (passes.any) {
+    for (const id of held) {
+      if (out.has(id)) continue;
+      const e = passes.ships.get(id);
+      if ((!e || e.missing) && !h.docked(id)) { out.add(id); continue; }
+      if (!e) continue;
+      for (let k = 0; k < e.rebuilds.length; k++) if (!h.structOk(id, e.rebuilds[k], e.ticks[k])) { out.add(id); break; }
+    }
+  }
+  // (A tick whose pass had none pinned: a side differs only where it was told pinned, so with none of those its pairs
+  // can't differ. toldPinned reads nothing that moves within the window: asked once a ship)
+  let toldAny: boolean | undefined;
   for (let t = from + 1; t <= h.to; t++) {
     const L = log.at(t, systemId);
     if (!L) continue;
-    for (const id of held) {
-      if (out.has(id)) continue;
-      const i = passIndex(L, id);
-      if (i < 0) { if (!h.docked(id)) out.add(id); continue; }
-      if (!h.structOk(id, L.rebuilds[i], t)) out.add(id);
-    }
     // (A pair's side the client takes otherwise pinned or not than the pass had it)
-    if (L.pinned.length || h.toldPinned) {
+    if (L.pinned.length || (h.toldPinned && (toldAny ??= [...held].some((id) => h.toldPinned!(id) === true)))) {
       const told = h.toldPinned;
       const differs = (id: number) => { const p = L.pinned.includes(id), k = told?.(id); return k === undefined ? p : k !== p; };
       for (let k = 0; k < L.pairs.length; k += 2) {

@@ -23,13 +23,32 @@ export interface ContactPassLog {
 
 const KEEP_TICKS = 128;
 
+/** One ship across a window's passes (ContactLog.window): missing from one, and the rebuild counts it had in them */
+export interface WindowShip {
+  /** Not in every pass of the window (out of one there was) */
+  missing: boolean;
+  /** Its rebuild counts in the passes it was in, each once, and the first tick it had each */
+  rebuilds: number[];
+  ticks: number[];
+}
+
+/** A system's passes over a window, summed up by ship (ContactLog.window): what every client's window there reads */
+export interface WindowPasses {
+  /** Any pass at all in the window */
+  any: boolean;
+  ships: Map<number, WindowShip>;
+}
+
 export class ContactLog {
   /** Kept only once some client finds its own contacts */
   wanted = false;
   private readonly ticks = new Map<number, Map<number, ContactPassLog>>();
+  /** Windows summed up since the last pass was noted (the passes don't change after: one sum for every client) */
+  private readonly windows = new Map<string, WindowPasses>();
 
   note(tick: number, systemId: number, log: ContactPassLog): void {
     if (!this.wanted) return;
+    this.windows.clear();
     let t = this.ticks.get(tick);
     if (!t) {
       this.ticks.set(tick, (t = new Map()));
@@ -41,6 +60,30 @@ export class ContactLog {
   /** A system's pass on a tick (undefined: no pass there with two bodies, or not kept) */
   at(tick: number, systemId: number): ContactPassLog | undefined {
     return this.ticks.get(tick)?.get(systemId);
+  }
+
+  /** A system's passes on the ticks after `from` up to `to`, by ship (worked out once, until a pass is noted) */
+  window(systemId: number, from: number, to: number): WindowPasses {
+    const k = `${systemId}:${from}:${to}`;
+    let w = this.windows.get(k);
+    if (w) return w;
+    const ships = new Map<number, WindowShip>(), seen = new Map<number, number>();
+    let passes = 0;
+    for (let t = from + 1; t <= to; t++) {
+      const L = this.at(t, systemId);
+      if (!L) continue;
+      passes++;
+      for (let i = 0; i < L.ids.length; i++) {
+        const id = L.ids[i], rb = L.rebuilds[i];
+        let e = ships.get(id);
+        if (!e) ships.set(id, (e = { missing: false, rebuilds: [], ticks: [] }));
+        seen.set(id, (seen.get(id) ?? 0) + 1);
+        if (!e.rebuilds.includes(rb)) { e.rebuilds.push(rb); e.ticks.push(t); }
+      }
+    }
+    for (const [id, e] of ships) e.missing = seen.get(id)! < passes;
+    this.windows.set(k, (w = { any: passes > 0, ships }));
+    return w;
   }
 }
 

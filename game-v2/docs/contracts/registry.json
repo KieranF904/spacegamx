@@ -22290,7 +22290,7 @@
       "id": "server.replication",
       "path": "server/src/net/Replication.ts",
       "group": "server/net",
-      "lines": 248,
+      "lines": 265,
       "owns": "ship replication's state and its public face: every ship's shadow, keyframe versions, the snapshot window (beginSnapshot / endSnapshot), and the questions the snapshot path asks (keysFor, heldByte, versions)",
       "needs": "ReplicationHost, ShipBridge, replication/{step, forClient, ownShip, workable, env, contactFx, types}",
       "events": "",
@@ -22319,7 +22319,7 @@
           "name": "Replication",
           "kind": "class",
           "start": 49,
-          "end": 248
+          "end": 265
         }
       ]
     },
@@ -22327,7 +22327,7 @@
       "id": "server.snapshot",
       "path": "server/src/net/SnapshotBuilder.ts",
       "group": "server/net",
-      "lines": 583,
+      "lines": 655,
       "owns": "the snapshot round: every SNAPSHOT_RATE, one snapshot per client, assembled in a fixed order from the snapshot/ modules (rows, own row, debris hold, replication, fire, structure, removals), then map dots and pops",
       "needs": "SnapshotHost (GameServer builds one, once), snapshot/{rows, ownRow, shipStructure, debrisHold, frameParts, mapDots, systemEntry, rounds}, Replication, FocusCells, AwayNet; npm: bitecs",
       "events": "",
@@ -22345,7 +22345,7 @@
           "test": "tickOrder.json"
         }
       ],
-      "extend": "a new row kind is one entry in snapshot/rows/index.ts ROW_KINDS; a new per-client message goes in sendSnapshots",
+      "extend": "a new row kind is one entry in snapshot/rows/index.ts ROW_KINDS; a new per-client message goes in clientSnapshot",
       "exports": [
         "RoundSkip",
         "SnapshotBuilder",
@@ -22359,20 +22359,26 @@
         {
           "name": "DEBRIS_ROW_KEY",
           "kind": "const",
-          "start": 70,
-          "end": 71
+          "start": 71,
+          "end": 72
+        },
+        {
+          "name": "OwnRowState",
+          "kind": "type",
+          "start": 74,
+          "end": 75
         },
         {
           "name": "SnapshotHost",
           "kind": "interface",
-          "start": 73,
-          "end": 122
+          "start": 77,
+          "end": 126
         },
         {
           "name": "SnapshotBuilder",
           "kind": "class",
-          "start": 124,
-          "end": 583
+          "start": 128,
+          "end": 655
         }
       ]
     },
@@ -22868,9 +22874,9 @@
       "id": "server.replication.for-client",
       "path": "server/src/net/replication/forClient.ts",
       "group": "server/net/replication",
-      "lines": 244,
+      "lines": 251,
       "owns": "one client's share of a snapshot's ship motion: keyframes for ships it's new to or behind on, control rows, cause records (contacts it finds itself left out, pulls it works out left out, zero PULL records)",
-      "needs": "ReplicationCore (shadows, knocks, pullOff, pullsJudged, ships, stats, real, keyNow), ownShip (ownFor, ownPulls), workable (workable, otherBefore), causes/contactsFor, causes/shadowCauses",
+      "needs": "ReplicationCore (shadows, knocks, pullOff, pullsJudged, ships, stats, real, keyNow, shipsIn), ownShip (ownFor, ownPulls), workable (workable, otherBefore), causes/contactsFor, causes/shadowCauses",
       "events": "",
       "invariants": [
         {
@@ -22899,13 +22905,13 @@
           "name": "contactsFound",
           "kind": "function",
           "start": 194,
-          "end": 222
+          "end": 229
         },
         {
           "name": "zeroPulls",
           "kind": "function",
-          "start": 224,
-          "end": 244
+          "start": 231,
+          "end": 251
         }
       ]
     },
@@ -23021,7 +23027,7 @@
       "id": "server.replication.types",
       "path": "server/src/net/replication/types.ts",
       "group": "server/net/replication",
-      "lines": 175,
+      "lines": 180,
       "owns": "the shadow records (Shadow, OwnShadow), the host Replication reads, and the core state its modules share",
       "needs": "common ships/replica (FlightBody, ReplicaMode, ReplicaEnv, rows), causes/shadowCauses types",
       "events": "",
@@ -23142,7 +23148,7 @@
           "name": "ReplicationCore",
           "kind": "interface",
           "start": 145,
-          "end": 175
+          "end": 180
         }
       ]
     },
@@ -23229,9 +23235,9 @@
       "id": "server.snapshot.frame-parts",
       "path": "server/src/net/snapshot/frameParts.ts",
       "group": "server/net/snapshot",
-      "lines": 147,
+      "lines": 157,
       "owns": "three parts of one client's snapshot, each called once per client: its fire events (shots it builds itself, or works out from gun lanes and its own shot log), the stations and portals it hasn't had, and the removals it cares about (renamed to shot-id names where it works the shell out)",
-      "needs": "FireHost (ships.fired, gunNet, ownShotLog, otherShotLog, fireRows, ticks), RemovalHost (pending removals, shot logs, hits), world + GameData for stations, Docking/flight queries; npm: bitecs",
+      "needs": "FireHost (ships.fired, gunNet, ownShotLog, otherShotLog, fireRows, ticks), RemovalHost (pending removals, shot logs, hits), world + GameData for stations (staticOf: a system's list, once a round), Docking/flight queries; npm: bitecs",
       "events": "",
       "invariants": [
         {
@@ -23251,40 +23257,54 @@
       "exports": [
         "FireHost",
         "RemovalHost",
+        "StaticList",
         "collectFire",
         "removalsFor",
+        "staticOf",
         "staticRows"
       ],
       "sections": [
         {
           "name": "FireHost",
           "kind": "interface",
-          "start": 27,
-          "end": 36
+          "start": 28,
+          "end": 37
         },
         {
           "name": "collectFire",
           "kind": "function",
-          "start": 38,
-          "end": 75
+          "start": 39,
+          "end": 76
+        },
+        {
+          "name": "StaticList",
+          "kind": "interface",
+          "start": 78,
+          "end": 79
+        },
+        {
+          "name": "staticOf",
+          "kind": "function",
+          "start": 81,
+          "end": 87
         },
         {
           "name": "staticRows",
           "kind": "function",
-          "start": 77,
-          "end": 105
+          "start": 89,
+          "end": 115
         },
         {
           "name": "RemovalHost",
           "kind": "interface",
-          "start": 107,
-          "end": 114
+          "start": 117,
+          "end": 124
         },
         {
           "name": "removalsFor",
           "kind": "function",
-          "start": 116,
-          "end": 147
+          "start": 126,
+          "end": 157
         }
       ]
     },

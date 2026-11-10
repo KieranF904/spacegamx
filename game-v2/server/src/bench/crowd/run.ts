@@ -75,7 +75,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
   let measuring = false;
-  const tickMs: number[] = [], snapMs: number[] = [], replMs: number[] = [], flushMs: number[] = [], rebuildMs: number[] = [], rebuildCount: number[] = [], rebuildRepeat: number[] = [];
+  const tickMs: number[] = [], tickCpu: number[] = [], snapCpu: number[] = [], snapMs: number[] = [], replMs: number[] = [], flushMs: number[] = [], rebuildMs: number[] = [], rebuildCount: number[] = [], rebuildRepeat: number[] = [];
   let aSnap = 0, aRepl = 0, aFlush = 0, aReb = 0, nReb = 0, nRepeat = 0;
   // (Rebuilds of a ship already rebuilt this tick: the batching's target is none)
   const rebuiltThisTick = new Set<number>();
@@ -84,6 +84,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
     obj[name] = (...a: any[]) => { const t0 = performance.now(); try { return orig(...a); } finally { add(performance.now() - t0); } };
   };
   timed(srv.snapshots, 'sendSnapshots', (ms) => { aSnap += ms; });
+  // (CPU time too, the process's: on a busy machine the wall time takes in time the bench wasn't running)
+  let cSnap = 0;
+  const cpuMs = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
+  { const orig = srv.snapshots.sendSnapshots; srv.snapshots.sendSnapshots = (...a: any[]) => { const c0 = cpuMs(); try { return orig(...a); } finally { cSnap += cpuMs() - c0; } }; }
   timed(srv.replication, 'forClient', (ms) => { aRepl += ms; });
   timed(srv.net, 'flushOutbox', (ms) => { aFlush += ms; });
   timed(ships, 'rebuildNow', (ms) => { aReb += ms; nReb++; });
@@ -98,10 +102,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
   {
     const orig = server.step.bind(server);
     server.step = () => {
-      aSnap = aRepl = aFlush = aReb = aDeb = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
-      const t0 = performance.now();
+      aSnap = aRepl = aFlush = aReb = aDeb = 0; cSnap = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
+      const t0 = performance.now(), c0 = cpuMs();
       orig();
-      if (measuring) { tickMs.push(performance.now() - t0); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); debrisMs.push(aDeb); debrisN.push(ships.stats.debrisCount ?? 0); }
+      if (measuring) { tickMs.push(performance.now() - t0); tickCpu.push(cpuMs() - c0); snapCpu.push(cSnap); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); debrisMs.push(aDeb); debrisN.push(ships.stats.debrisCount ?? 0); }
     };
   }
 
@@ -228,6 +232,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
     snapshotsMsPerTick: r2(mean(snapMs)), replicationMsPerTick: r2(mean(replMs)), encodeSendMsPerTick: r2(mean(flushMs)),
     rebuildMsPerTick: r2(mean(rebuildMs)), rebuildsPerSec: r2(sum(rebuildCount) / secs), rebuildRepeats: sum(rebuildRepeat),
     debrisStepMsPerTick: r2(mean(debrisMs)), debrisMean: r2(mean(debrisN)), debrisMax: Math.max(0, ...debrisN),
+    tickCpuMs: r2(mean(tickCpu)), snapshotsCpuMsPerTick: r2(mean(snapCpu)),
   };
   const bulk: Counter[] = [...counters.values()];
   const bulkRaw = bulk.map((c) => c.raw / secs), bulkMsgs = bulk.map((c) => c.msgs / secs);

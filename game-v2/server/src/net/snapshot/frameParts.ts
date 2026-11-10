@@ -4,7 +4,8 @@
  *             itself, or works out from gun lanes and its own shot log), the stations and portals it hasn't had, and
  *             the removals it cares about (renamed to shot-id names where it works the shell out)
  * needs:      FireHost (ships.fired, gunNet, ownShotLog, otherShotLog, fireRows, ticks), RemovalHost (pending removals,
- *             shot logs, hits), world + GameData for stations, Docking/flight queries; npm: bitecs
+ *             shot logs, hits), world + GameData for stations (staticOf: a system's list, once a round), Docking/flight
+ *             queries; npm: bitecs
  * invariants: a fire event's row is made once a snapshot for every client (encode-once) — server/src/net/snapshot/shotIds.test.ts
  *             a client is told only of removals it was sent or made — server/src/net/snapshot/shotIds.test.ts
  *             fire and removal bytes unchanged — server/src/golden/frameHash.test.ts
@@ -74,11 +75,21 @@ export function collectFire(h: FireHost, conn: ClientConnection, playerSystemId:
   if (guns) { for (const r of guns.none) fire.push(r); }
 }
 
-/** Stations and portals of its system it hasn't had: sent once per system (they never move) */
-export function staticRows(world: IWorld, gameData: GameData, conn: ClientConnection, playerSystemId: number, markIfChanged: (state: EntityState) => void): void {
+/** A system's stations and portals, in the world's order (staticOf: walked once a round, not once a client) */
+export interface StaticList { readonly stations: number[]; readonly portals: number[] }
+
+/** A system's stations and portals as staticRows takes them (the world's queries, filtered to the system) */
+export function staticOf(world: IWorld, playerSystemId: number): StaticList {
+  const stations: number[] = [], portals: number[] = [];
+  for (const eid of stationQuery(world)) if (InSystem.systemId[eid] === playerSystemId) stations.push(eid);
+  for (const eid of portalQuery(world)) if (InSystem.systemId[eid] === playerSystemId) portals.push(eid);
+  return { stations, portals };
+}
+
+/** Stations and portals of its system it hasn't had: sent once per system (they never move). `list`: staticOf its system */
+export function staticRows(gameData: GameData, conn: ClientConnection, list: StaticList, markIfChanged: (state: EntityState) => void): void {
   // Stations — sent once per system (they never move)
-  for (const eid of stationQuery(world)) {
-    if (InSystem.systemId[eid] !== playerSystemId) continue;
+  for (const eid of list.stations) {
     if (conn.knownEntities.has(eid)) continue;
     conn.knownEntities.add(eid);
     // data: [stationId, orbitType (255 = fixed), a, e, argP, M0, epoch, orbitTimeScale, radius, design, turrets, weapon]
@@ -96,8 +107,7 @@ export function staticRows(world: IWorld, gameData: GameData, conn: ClientConnec
   }
 
   // Portals — sent once per system (they never move)
-  for (const eid of portalQuery(world)) {
-    if (InSystem.systemId[eid] !== playerSystemId) continue;
+  for (const eid of list.portals) {
     if (conn.knownEntities.has(eid)) continue;
     conn.knownEntities.add(eid);
     markIfChanged({ id: eid, type: EntityType.Portal, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]), data: [Portal.targetSystem[eid], Portal.kind[eid], Portal.hue[eid]] });

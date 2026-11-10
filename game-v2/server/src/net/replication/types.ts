@@ -170,6 +170,11 @@ export interface ReplicationCore {
   /** The real ship's flight state now */
   real(eid: number): FlightBody;
   keyNow(eid: number, known: Map<number, number>, ships: KeyframeRow[]): void;
+  /**
+   * In a snapshot round (beginSnapshot to endSnapshot): a system's ships (kind 'ship') with a shadow, worked out once a
+   * round for every client there (nothing it reads moves within the round). Null outside a round
+   */
+  shipsIn(systemId: number): ReadonlySet<number> | null;
   /** Work a shadow's causes out for one tick (replication/step.ts work); a method so tests can watch it */
   work(eid: number, s: Shadow, causes: OwnCause[], tick: number): WorkedCauses | null;
 }
