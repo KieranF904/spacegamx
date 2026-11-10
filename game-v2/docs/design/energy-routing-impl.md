@@ -1,6 +1,6 @@
 # Energy routing: implementation spec (2026-11-01)
 
-Status: **implementation plan** for the target agreed with Kieran on 2026-11-01. Sources: the prototype
+Status: **implementation plan, now HISTORICAL** (built; file names below such as `tick.ts`, `wire.ts`, `view.ts`, `facts.ts`, `energyPanel.ts`, `scripts/ships/routeCheck.mjs` were renamed or removed, see docs/areas/energy.md for the current files) for the target agreed with Kieran on 2026-11-01. Sources: the prototype
 `prototypes/energy-lab/index.html` (`rebuild()`, `tick()`, the T/W/EN tables), the proposal
 `docs/design/energy-economy-2026-11.md` (§1b, 2, 2b, 3, 4), and five code maps. Line numbers are as of commit ae0c3da.
 

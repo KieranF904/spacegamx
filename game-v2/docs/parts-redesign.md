@@ -285,5 +285,5 @@ and dev's aren't a pilot's to build with.
 - Ships in `ship`, `hangar[]`, `designs[]` are converted and auto-wired; part items in cargo and storage become the
   mapped model's item (counts kept); fabricator jobs' outputs too. Licences are kept.
 - The starter and library blueprints (data/ships/blueprints/*.json, not enemy/) are converted in place by
-  `scripts/econ/migrate-blueprints.mjs`.
+  `scripts/archive/econ/migrate-blueprints.mjs`.
 - Salvage from enemies (legacy parts) yields the mapped model's item.
