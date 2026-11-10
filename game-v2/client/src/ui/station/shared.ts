@@ -3,7 +3,7 @@
  * owns:       what every station window tab shares: tab ids, StationWindowDeps, StationCtx, the station data files
  *             and text helpers
  * needs:      @space-game/common types, econ/clientEcon, data JSON files, ui/escape
- * invariants: the repair bank tab behaves as its store says — none pinned
+ * invariants: the repair bank tab (the 'bank' Tab id) is drawn from its store's last report — client/src/ui/station/bank.test.ts
  * extend:     a new tab id goes in Tab, a new shared need on StationCtx (built once in StationWindow.ts), and a new
  *             tab is a module under ui/station/ plus a line in StationWindow's tab list and render()
  */

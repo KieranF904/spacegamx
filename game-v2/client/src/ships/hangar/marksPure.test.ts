@@ -12,6 +12,7 @@ import { drawFacingMark, drawShieldCover, facingMark, shieldCover, coverPolyline
 import { portMarks, drawPortMarks } from '../build/portMarks';
 import { drawPlacedMarks, drawHandMarks } from './hangarMarks';
 import { drawMounting, drawFacing, drawWindow } from './hangarOverlays';
+import { sink } from '../../fakeDom.testkit';
 import type { HangarHost } from './host';
 
 const bridge = createShipBridge(loadShipConfigCached(join(__dirname, '../../../../data')));
@@ -24,8 +25,6 @@ function deepFreeze<T>(o: T): T {
   return o;
 }
 
-/** Calls on it do nothing and give back itself, properties set on it are kept (a canvas context or a pixi Graphics) */
-const sink = (): never => new Proxy(function () {}, { get: (t, k) => (k in t ? (t as never)[k] : sink()), set: () => true, apply: () => sink() }) as never;
 
 describe('marks only draw, never change a design', () => {
   for (const name of ['drum', 'sunspear', 'hauler']) {

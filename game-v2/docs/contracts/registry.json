@@ -2244,7 +2244,7 @@
         },
         {
           "text": "damage and the hit flash are data the hull shader reads: taking hits builds nothing",
-          "test": "none pinned"
+          "test": "client/src/ships/ShipRenderer.test.ts"
         }
       ],
       "extend": "a new per-ship visual is a field on BodyView (render/viewTypes.ts) drawn in update(), or a new module under ships/render/",
@@ -7633,7 +7633,7 @@
         },
         {
           "text": "the picker sends only weapons on offer, and never the one already flown",
-          "test": "none pinned"
+          "test": "client/src/ui/gunRange/gunRangeHud.test.ts"
         }
       ],
       "extend": "a new HUD piece is an element built in the constructor and drawn in update()",
@@ -7946,8 +7946,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the panel sizes, folds and places itself around its tabs",
-          "test": "none pinned"
+          "text": "tabs keep their registration order and unique ids, and the panel names no tab (its sizing and placing is hubLayout's)",
+          "test": "client/src/ui/hub/hub.test.ts"
         }
       ],
       "extend": "a new tab is a module in ui/hub/tabs/ giving a HubTab and one register line in app/windows.ts; the panel names no tab",
@@ -9454,8 +9454,8 @@
       "events": "",
       "invariants": [
         {
-          "text": "the repair bank tab behaves as its store says",
-          "test": "none pinned"
+          "text": "the repair bank tab (the 'bank' Tab id) is drawn from its store's last report",
+          "test": "client/src/ui/station/bank.test.ts"
         }
       ],
       "extend": "a new tab id goes in Tab, a new shared need on StationCtx (built once in StationWindow.ts), and a new tab is a module under ui/station/ plus a line in StationWindow's tab list and render()",

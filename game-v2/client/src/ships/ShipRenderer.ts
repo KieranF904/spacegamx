@@ -3,7 +3,7 @@
  * owns:       drawing modular ships and debris each frame: views per ship, hull slots, fades, labels, health bars, lights
  * needs:      ShipSource (ShipStore), GameState entities, Renderer, ships/render/{GunDrawer,HullDrawer,muzzle,flakAim,gunLooks,hullCaches}; npm: @space-game/common, pixi.js
  * invariants: a hull is built once per design, parts attached, colouring and kind, and shared by every ship like it — client/src/ships/rigidHull.test.ts
- *             damage and the hit flash are data the hull shader reads: taking hits builds nothing — none pinned
+ *             damage and the hit flash are data the hull shader reads: taking hits builds nothing — client/src/ships/ShipRenderer.test.ts
  * extend:     a new per-ship visual is a field on BodyView (render/viewTypes.ts) drawn in update(), or a new module under ships/render/
  */
 

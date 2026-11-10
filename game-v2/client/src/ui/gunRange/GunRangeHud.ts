@@ -8,7 +8,7 @@
  * needs:      ./rangeState, ./pickerModel, common (atRangeDoor, Catalog, ShipTuning), ui/itemIcons, ships/modelCards
  *             (mountBadge), ships/hangar/filterIcons, ui/domWrite, ui/escape
  * invariants: nothing shows outside the range; the door prompt shows by the server's own door rule — client/src/ui/gunRange/rangeState.test.ts
- *             the picker sends only weapons on offer, and never the one already flown — none pinned
+ *             the picker sends only weapons on offer, and never the one already flown — client/src/ui/gunRange/gunRangeHud.test.ts
  * extend:     a new HUD piece is an element built in the constructor and drawn in update()
  *
  * Plain DOM, drawn only when something changed (domWrite; the picker's list only on a new state or filter). The picker

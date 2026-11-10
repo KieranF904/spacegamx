@@ -49,7 +49,8 @@ export class FakeEl {
 
 /** Anything called on it does nothing and gives back itself; properties set on it are kept */
 export function sink(): never {
-  return new Proxy(function () {}, { get: (t, k) => (k in t ? (t as never)[k] : sink()), set: () => true, apply: () => sink() }) as never;
+  const target = function () {} as unknown as Record<string | symbol, unknown>;
+  return new Proxy(target, { get: (t, k) => (k in t ? t[k] : sink()), set: () => true, apply: () => sink() } as ProxyHandler<typeof target>) as never;
 }
 
 /** document, window and animation frames as stand-ins; undo with vi.unstubAllGlobals() */
