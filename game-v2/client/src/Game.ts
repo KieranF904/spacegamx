@@ -606,7 +606,6 @@ this.boostHudEl = document.getElementById('boostHud');
         location.reload();
       },
       onOpenChange: () => {},
-      replayTutorial: () => this.w.tutorial.restart(),
       threats: () => this.state.threats,
       myRating: () => this.shipClient.myRating(),
       level: () => this.pilot.profile?.level ?? this.state.level,
@@ -918,7 +917,6 @@ this.boostHudEl = document.getElementById('boostHud');
     // A construct job's site, while a piece is going on: the constructor beam
     const building = this.w.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
     this.w.buildSites?.update(1 / 60, building ? building.markers[0] : null);
-    this.w.tutorial.update(blocked || this.localDead || this.w.playerStatsUI.isVisible() || inGunRange());
     // (the training card stays up over the hangar and the map, by them: the part, generator and map steps are done there)
     this.w.tutorialUI.update(blocked || this.localDead, !this.loggedIn || this.menu.isOpen || this.localDead);
     this.w.pingUI.setHidden(blocked);
@@ -1058,7 +1056,6 @@ this.boostHudEl = document.getElementById('boostHud');
       get damageIndicatorUI() { return g.damageIndicatorUI; },
       get killFeedUI() { return g.w.killFeedUI; },
       get toasts() { return g.w.toasts; },
-      get tutorial() { return g.w.tutorial; },
       get quests() { return g.w.quests; },
       get buildSites() { return g.w.buildSites; },
       get social() { return g.w.social; },

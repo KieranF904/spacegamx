@@ -117,7 +117,7 @@ Why the numbers: guns keep about 30% of a Mk I Chondrite, so a Mk I laser gets a
 
 (2026-11-06, damagePerUnit 37 and chunkUnits 3-5 with the carry. Before, at 74 and 4-9 with skipping: Pips on Mk I rock 16.5 ore/min, a Mk I laser 54.4.)
 
-main_01 (10 ore with the starter's guns) takes about 18 s of steady fire. Flight School's "mine a rock" step finishes on the first chunk, after about 3 s.
+main_01 (10 ore with the starter's guns) takes about 18 s of steady fire. The training yard's "mine a rock" step finishes on the first chunk, after about 3 s.
 
 **Lasers on power** (pool core, Mk I Cell Reactor 35/s, core + reactor + N Mk I lasers, mining held from full; ore/min on Mk I rock = N × 41.9 × share, at the old 96 damage a unit: multiply by 2.6 at today's 37):
 

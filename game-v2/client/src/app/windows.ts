@@ -28,7 +28,6 @@ import { InfoPanel } from '../ui/InfoPanel';
 import { TradeWindow } from '../ui/TradeWindow';
 import { TargetUI } from '../ui/TargetUI';
 import { OpsUI } from '../ui/OpsUI';
-import { Tutorial } from '../ui/Tutorial';
 import { TutorialUI } from '../ui/tutorial/TutorialUI';
 import { PingUI } from '../ui/PingUI';
 import { RibbonPopup } from '../ui/RibbonPopup';
@@ -131,7 +130,6 @@ export interface WindowSet {
   opsUI: OpsUI;
   ribbonPopup: RibbonPopup;
   pingUI: PingUI;
-  tutorial: Tutorial;
   /** The training-yard lesson (card, markers, ghosts) */
   tutorialUI: TutorialUI;
   killFeedUI: KillFeedUI;
@@ -316,21 +314,6 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.ribbonPopup = new RibbonPopup((id) => host.audio.playUI(id, 0.6));
     w.pingUI = new PingUI(host.state, (m) => host.network.send(m), (x, y) => host.renderer.worldToScreen(x, y), cursorWorld,
       () => host.renderer.getZoom(), (id) => host.audio.playUI(id, 0.5));
-    w.tutorial = new Tutorial({
-      state: host.state,
-      isKeyDown: (c) => host.input.isKeyDown(c),
-      worldToScreen: (x, y) => host.renderer.worldToScreen(x, y),
-      oreInHold: () => host.pilot.cargo.filter((s) => ['mineral', 'gem', 'volatile'].includes(host.pilot.econ.items.get(s.id)?.category ?? '')).reduce((t, s) => t + s.n, 0),
-      inventoryOpen: () => w.inventoryWindow.isOpen,
-      stationOpen: () => host.stationOpen,
-      stationTab: () => (host.stationOpen ? w.stationWindow.value!.currentTab : ''),
-      inDockRing: () => host.shipClient.isDocked(),
-      autopilotOn: () => w.autopilot.active,
-      sound: (id, v) => host.audio.playUI(id, v ?? 0.5),
-      trainingDrone: () => host.network.send({ type: 'trainingDrone' }),
-      kills: () => host.sessionKills,
-      jumpPhase: () => host.shipClient.localJump().phase,
-    });
     w.tutorialUI = new TutorialUI({
       state: host.state,
       send: (m) => host.network.send(m),
@@ -348,7 +331,6 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
           bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator',
         };
       },
-      stopOldTour: () => w.tutorial.stop(),
     });
     w.killFeedUI = new KillFeedUI(uiOverlay);
     w.playerStatsUI = new PlayerStatsUI(uiOverlay);

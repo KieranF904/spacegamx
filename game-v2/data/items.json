@@ -912,15 +912,6 @@
       "description": "The heart of a generator past the cell reactor."
     },
     {
-      "id": "wire_spool",
-      "name": "Wire Spool",
-      "category": "component",
-      "rarity": "common",
-      "value": 14,
-      "color": "#c2773a",
-      "description": "Insulated power wire: one spool lays four segments of wiring."
-    },
-    {
       "id": "rustjaw_cog",
       "name": "Rustjaw's Cog",
       "category": "artefact",

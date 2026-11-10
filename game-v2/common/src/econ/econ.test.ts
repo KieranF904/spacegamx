@@ -70,7 +70,7 @@ describe('recipes and costs', () => {
     expect(econ.recipes.recipeFor('part:steel:cannon_pip:sq')).toBeNull();
     expect(econ.recipes.recipeFor('part:alloy:thruster:sq')).toBeNull();
     // The new components are made from what the spec says
-    expect(econ.recipes.recipeFor('wire_spool')!.inputs).toEqual({ copper_wire: 4, insulated_polymer: 1 });
+    expect(econ.recipes.recipeFor('capacitor_cell')!.inputs).toEqual({ copper_wire: 3, insulated_polymer: 1, scrap_electronics: 1 });
     expect(econ.items.get('barrel_assembly')?.category).toBe('component');
   });
 

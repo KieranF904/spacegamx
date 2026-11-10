@@ -955,7 +955,6 @@ const COMPONENTS = [
   ['thrust_nozzle', 'Thrust Nozzle', 'rare', 85, { titanium_plate: 2, ceramic_plate: 1 }, 60, '#f97316', 'A ceramic-lined titanium bell: torches, plasma and fusion drives.'],
   ['fuel_injector', 'Fuel Injector', 'uncommon', 55, { steel_plate: 1, propellant: 2, servo_motor: 1 }, 45, '#fb923c', 'Meters propellant into a burn: afterburners and torches.'],
   ['reactor_core', 'Reactor Core', 'rare', 130, { hardened_steel: 2, crystal: 1, coolant: 2 }, 90, '#facc15', 'The heart of a generator past the cell reactor.'],
-  ['wire_spool', 'Wire Spool', 'common', 14, { copper_wire: 4, insulated_polymer: 1 }, 0, '#c2773a', 'Insulated power wire: one spool lays four segments of wiring.'],
 ];
 
 /** Each model's recipe: its own (handwritten where it's special), else plate per cell and its kind's parts */
@@ -1166,8 +1165,12 @@ const NOTE = 'Written by scripts/econ/models.mjs (edit that, not this). Player m
 writeFileSync(join(DATA, 'ships/models.json'),
   `{\n  "_comment": ${JSON.stringify(NOTE)},\n  "legacy": ${JSON.stringify(LEGACY)},\n  "models": [\n${models.map((m) => '    ' + JSON.stringify(m)).join(',\n')}\n  ]\n}\n`);
 
+/** Components that were retired: dropped from the books when this runs (wire_spool: ships no longer take wire) */
+const RETIRED = new Set(['wire_spool']);
+
 const rec = read('recipes.json');
 rec.models = recipes;
+rec.craft = rec.craft.filter((c) => !RETIRED.has(c.id));
 for (const [id, , , , inputs, time] of COMPONENTS) {
   const r = { id, out: { [id]: 1 }, inputs, time, starter: true };
   const i = rec.craft.findIndex((c) => c.id === id);
@@ -1176,6 +1179,7 @@ for (const [id, , , , inputs, time] of COMPONENTS) {
 writeFileSync(join(DATA, 'recipes.json'), JSON.stringify(rec, null, 2) + '\n');
 
 const items = read('items.json');
+items.items = items.items.filter((x) => !RETIRED.has(x.id));
 for (const [id, name, rarity, value, , , color, description] of COMPONENTS) {
   const d = { id, name, category: 'component', rarity, value, color, description };
   const i = items.items.findIndex((x) => x.id === id);

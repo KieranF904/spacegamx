@@ -53,7 +53,6 @@ import type { FloatingRewardsUI } from '../ui/FloatingRewardsUI';
 import type { DamageIndicatorUI } from '../ui/DamageIndicatorUI';
 import type { KillFeedUI } from '../ui/KillFeedUI';
 import type { ToastUI } from '../ui/PilotHud';
-import type { Tutorial } from '../ui/Tutorial';
 import type { QuestClient } from '../ui/QuestUI';
 import type { BuildSites } from '../rendering/BuildSites';
 import type { SocialUI } from '../ui/SocialUI';
@@ -91,7 +90,6 @@ export interface MessageHost {
   readonly damageIndicatorUI: DamageIndicatorUI;
   readonly killFeedUI: KillFeedUI;
   readonly toasts: ToastUI;
-  readonly tutorial: Tutorial;
   readonly quests: QuestClient;
   readonly buildSites: BuildSites | null;
   readonly social: SocialUI;
@@ -328,8 +326,6 @@ const TABLE: Handlers = {
   vendors: (h, msg) => { h.stationWindow.use((w) => w.setVendors(msg)); },
   marketScan: (h, msg) => { h.stationWindow.use((w) => w.setScan(msg)); },
   quests: (h, msg) => {
-    // Brand-new pilots get the flight school
-    if (!h.proto) h.tutorial.maybeStart(msg.done === 0 && (h.pilot.profile?.level ?? 1) <= 1 && (h.pilot.profile?.xp ?? 0) < 20);
     h.quests.setQuests(msg);
     h.buildSites?.set(msg.builds);
   },

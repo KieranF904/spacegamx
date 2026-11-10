@@ -17,7 +17,6 @@
     "power_coupling": "Scrapping a ship or module gives its couplings back in full, so lost gear is never wasted.",
     "targeting_chip": "Scrapping a ship or module gives its chips back in full.",
     "servo_motor": "Scrapping a ship or module gives its servos back in full.",
-    "wire_spool": "Fabricated from copper wire and insulated polymer.",
     "pack_hull": "The first pack to learn: a crate of plate that makes field repairs and builds quicker.",
     "boost_cell": "Cheap and quick to fabricate from ice and wire. Keep a few in the hold.",
     "scanner_charge": "Cheap to fabricate from silicate and wire. Keep a few in the hold.",

@@ -139,7 +139,6 @@ describe('hangar slots', () => {
     const wires = [[0, 0, 1, 0], [1, 0, 1, 1], [1, 1, 2, 1]];
     t.send({ type: 'slotSave', slot: 1, blueprint: { ...bp, wires }, plan: 'prospector' } as any);
     expect(last('shipEditResult')!.ok).toBe(true);
-    expect(countOf(profile().storage, 'wire_spool')).toBe(0);
     expect((profile().hangar[1]!.blueprint as { wires?: unknown }).wires).toBeUndefined();
   });
 
