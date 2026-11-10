@@ -6,7 +6,6 @@ import { parseBlueprint } from '../blueprint.js';
 import { createShipState } from '../state.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../testData.js';
 import type { ShipTuning } from '../tuning.js';
-import { gunLoad } from '../energy.js';
 import { flightSignature, CTL } from '../replica.js';
 import { pilotExtras } from './strafer/strafer.js';
 import { CHARGE_GROUPS_AT } from '../energy.js';
@@ -22,7 +21,7 @@ const tuning: ShipTuning = readShipJson('tuning.json');
 const TOW_PART = { uid: 70, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -3, y: 0, rot: 0, flip: false, facing: 'W' };
 const SCANNER_PART = { ...TOW_PART, uid: 71, fn: 'scanner' };
 const sparrow = (extra: object[] = []) => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0);
 };
@@ -33,7 +32,7 @@ declare module './types.js' {
   interface FeatureDerived { towProbe?: { power: number; parts: number[] } }
 }
 
-/** A stand-in that re-derives the Tow Beam's `derived.fx.tow` and load through the seam (the real Tow feature is tow/) */
+/** A stand-in that re-derives the Tow Beam's `derived.fx.tow` through the seam (the real Tow feature is tow/) */
 const towProbe = feature({
   id: 'towProbe',
   order: 10,
@@ -41,16 +40,9 @@ const towProbe = feature({
   burst: true,
   derive(c) {
     for (const i of c.parts) {
-      if (c.satisfaction[i] <= 0) continue;
-      const t = c.out.towProbe ??= { power: 0, parts: [] };
-      t.power = Math.max(t.power, c.satisfaction[i]);
+      const t = c.out.towProbe ??= { power: 1, parts: [] };
       t.parts.push(i);
     }
-    if (c.out.towProbe) c.out.towProbe.power = Math.round(c.out.towProbe.power * 1000) / 1000;
-  },
-  load(ship, L, out) {
-    if (!(ship as { probe?: number }).probe) return;
-    for (const i of ship.derived.fx!.towProbe!.parts) { const f = L.feedOf[i]; if (f >= 0) out[f] += L.draw[i]; }
   },
   describe: (c) => [{ feature: 'towProbe', key: 'range', label: 'Range', value: c.fn.id, tier: 'stat' }],
 });
@@ -127,7 +119,7 @@ describe('part features: compiling a plan', () => {
   });
 });
 
-describe('part features: the seam (rebuild, energy, describe, flight signature)', () => {
+describe('part features: the seam (rebuild, describe, flight signature)', () => {
   it('with no features, a rebuild carries no feature fields at all', () => {
     setPlanForTests(compilePlan([]));
     const d = sparrow([TOW_PART]).derived;
@@ -151,25 +143,15 @@ describe('part features: the seam (rebuild, energy, describe, flight signature)'
     expect(before.fxMask).toBe(1);
   });
 
-  it('load(): a feature draws by the tick through gunLoad, only when it says so', () => {
-    setPlanForTests(compilePlan([towProbe]));
-    const ship = sparrow([TOW_PART]);
-    const part = ship.derived.fx!.towProbe!.parts[0], f = ship.derived.power!.feedOf[part];
-    const idle = gunLoad(ship, 0)!;
-    expect(idle[f]).toBe(0);
-    const drawing = gunLoad({ ...ship, probe: 1 } as typeof ship, 0)!;
-    expect(drawing[f]).toBeCloseTo(ship.derived.power!.draw[part], 9);
-    expect(drawing.filter((_, k) => k !== f)).toEqual(idle.filter((_, k) => k !== f));
-  });
-
-  it('burst: a feature makes its parts draw by the tick (a feed group), not as a steady load', () => {
+  it('burst: a feature makes its parts draw by the tick, not as a steady load (energy.demand)', () => {
     setPlanForTests(compilePlan([]));
+    const plain = sparrow().derived.energy.demand;
     const steady = sparrow([SCANNER_PART]);
-    const i = steady.derived.power!.feedOf.length - 1;
-    expect(steady.derived.power!.feedOf[i]).toBe(-1);
+    expect(catalog.functions.get('scanner')!.demand).toBeGreaterThan(0);
+    expect(steady.derived.energy.demand).toBeGreaterThan(plain);
     setPlanForTests(compilePlan([feature({ id: 'scanBurst', burst: true, applies: (fn) => fn.id === 'scanner' })]));
     const burst = sparrow([SCANNER_PART]);
-    expect(burst.derived.power!.feedOf[i]).toBeGreaterThanOrEqual(0);
+    expect(burst.derived.energy.demand).toBe(plain);
     expect(burst.derived.fxMask).toBe(1);
     expect(burst.derived.fx).toEqual({});
   });

@@ -117,7 +117,7 @@ function rig(m, main, aug) {
 // ---------------------------------------------------------------- firing through the ports core
 function fire(bp, semi) {
   const ship = C.createShipState(catalog, tuning, 1, C.parseBlueprint(JSON.stringify(bp)), 0), d = ship.derived, L = d.ports;
-  let c = { g: 100, b: [], e: C.createPortsState(L) }, shots = 0, aug = 0, lit = 0, litAug = 0;
+  let c = { e: C.createPortsState(L) }, shots = 0, aug = 0, lit = 0, litAug = 0;
   const p = d.weapons[0]?.part;
   if (p === undefined) return null;
   for (let t = 0; t < 70 * 60; t++) {

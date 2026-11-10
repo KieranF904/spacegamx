@@ -6,7 +6,7 @@
  *             a new edit drops the redo steps — client/src/ships/build/history.test.ts
  *             a drag (begin .. end) is one step, and an edit that changed nothing is none — client/src/ships/build/history.test.ts
  *             the oldest steps fall off past the cap — client/src/ships/build/history.test.ts
- * extend:     an editor snapshots its state (parts and wires, or its pending edits), records each edit with record(), wraps a drag in begin()/end()
+ * extend:     an editor snapshots its state (its parts, or its pending edits), records each edit with record(), wraps a drag in begin()/end()
  */
 
 /** Steps kept per session (a design is small, so a snapshot each is cheap) */

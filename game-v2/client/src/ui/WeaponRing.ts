@@ -5,7 +5,6 @@
  *   charge arc       fills as a charge gun charges, flashes white at full and after the shot; cooldown drains dim
  *   ammo count       the rounds left in the open crate (red when out), by the segment
  *   spin arc         a thin inner arc for a spinning gun
- *   bank bar         a thin arc outside the segment when a Capacitor bank feeds the group
  *   beam pieces      a beam in pieces (power/ports.ts): one short arc a piece, lit when whole, the one burning white and
  *                    shrinking, a part-filled one as a dim amber sliver (it can't fire), and the cooldown a thin grey arc inside
  *   mining pulse     a ports ship's mining lasers: the pulse sweeping along the segment, cyan when fully fed and dimming to red
@@ -90,9 +89,9 @@ export class WeaponRing {
     let sweeping = false;
     this.put(groups.length); this.put(chip);
     for (const g of groups) {
-      if (g.reloading && !g.starved) sweeping = true;
-      this.put(g.model); this.put(g.clip); this.put(g.rounds); this.put(g.reloading); this.put(g.starved); this.put(g.charge);
-      this.put(g.cooling); this.put(g.flash); this.put(g.ready); this.put(g.spin); this.put(g.bank); this.put(g.ammo); this.put(g.crates);
+      if (g.reloading) sweeping = true;
+      this.put(g.model); this.put(g.clip); this.put(g.rounds); this.put(g.reloading); this.put(g.charge);
+      this.put(g.cooling); this.put(g.flash); this.put(g.ready); this.put(g.spin); this.put(g.ammo); this.put(g.crates);
       this.put(g.minePhase < 0 ? -1 : Math.round(g.minePhase * 30)); this.put(Math.round(g.mineFill * 20)); this.put(Math.round(g.mineBuffer * 20));
       this.put(g.dim); this.put(g.showState && g.inLeft ? g.state : -1);
       this.put(g.pieces); this.put(g.piecesFull); this.put(Math.round(g.piecePart * 40)); this.put(Math.round(g.pieceBurn * 40)); this.put(Math.round(g.pieceCool * 40));
@@ -143,11 +142,6 @@ export class WeaponRing {
     }
     // The spin arc: thin, inside
     if (g.spin > 0.005) arc(R - 6, a0, a0 + len * g.spin, '#fde68a', 1.6, 0.9);
-    // The bank bar: thin, outside
-    if (g.bank >= 0) {
-      arc(R + 6, a0, a1, '#fbbf24', 1.5, 0.18);
-      arc(R + 6, a0, a0 + len * g.bank, g.bank < 0.12 ? '#ef4444' : '#fbbf24', 1.5, 0.85);
-    }
     // The group's state, when a group is selected and this one is in the left button's: a dot inside the segment's middle
     if (g.showState && g.inLeft && !g.mine) {
       ctx.globalAlpha = 1;
@@ -192,12 +186,12 @@ export class WeaponRing {
       const a = shown === 1 ? (a0 + a1) / 2 : a0 + ((a1 - a0) * k) / (shown - 1);
       const lit = k < full;
       ctx.globalAlpha = this.mul;
-      ctx.fillStyle = lit ? ACCENT.clip : g.starved ? '#6b7280' : '#334155';
-      if (g.reloading && !lit && !g.starved) {
+      ctx.fillStyle = lit ? ACCENT.clip : '#334155';
+      if (g.reloading && !lit) {
         // A reload running: the empty pips breathe in sequence
         ctx.globalAlpha = (0.35 + 0.35 * Math.max(0, Math.cos(this.sweep - k * 0.5))) * this.mul;
         ctx.fillStyle = '#fde68a';
-      } else if (!lit) ctx.globalAlpha = (g.starved ? 0.9 : 0.6) * this.mul;
+      } else if (!lit) ctx.globalAlpha = 0.6 * this.mul;
       ctx.beginPath();
       ctx.arc(C + Math.cos(a) * R, C + Math.sin(a) * R, r, 0, TAU);
       ctx.fill();

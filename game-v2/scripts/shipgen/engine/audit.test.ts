@@ -14,7 +14,7 @@ import { Runs } from './runs';
 import { listWatchRuns, watchRun } from './watch';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const GOOD = blueprintToGrid(ctx, wren).text;
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 

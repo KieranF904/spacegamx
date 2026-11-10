@@ -13,7 +13,7 @@ import { defaultPaths } from './paths';
 import { buildUp } from './timelapse';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const GOOD = blueprintToGrid(ctx, wren).text;
 // (The Wren less its wing tips: a batch keeps only a ship that isn't a copy of the role's worked example)
 const TRIM = blueprintToGrid(ctx, pruneFrame(ctx, wren).bp).text;
@@ -85,11 +85,11 @@ describe('shipgen engine', () => {
     expect((byCode.get('PI') as any).cat).toBe('weapon');
     expect((byCode.get('ID') as any).cat).toBe('thruster');
     expect((byCode.get('BT') as any).cat).toBe('store');
-    expect(info.library.find((s: any) => s.id === 'dev/review-wren')).toMatchObject({ group: 'Dev ships' });
+    expect(info.library.find((s: any) => s.id === 'samples/review-wren')).toMatchObject({ group: 'Samples' });
     expect(info.library.some((s: any) => s.group === 'Enemy ships')).toBe(true);
     expect(info.contracts.map((c: any) => c.id)).toEqual(['grid-text', 'grid-json', 'parts']);
 
-    const one = await call('library', { id: 'dev/review-wren', role: 'starter' });
+    const one = await call('library', { id: 'samples/review-wren', role: 'starter' });
     expect(one.check.valid).toBe(true);
     expect(one.grid).toMatch(/^name: Review: Wren/);
     expect(Object.keys(one.cells).length).toBe(wren.parts.length);
@@ -161,7 +161,7 @@ describe('shipgen engine', () => {
   });
 
   it('starts from a library ship, with the tier and size overrides in the brief', async () => {
-    const r = await call('start', { form: { mode: 'design', model: 'fake', role: 'starter', rounds: 1, startId: 'dev/review-wren', note: 'make it faster', maxLevel: 3, cells: [20, 30] } });
+    const r = await call('start', { form: { mode: 'design', model: 'fake', role: 'starter', rounds: 1, startId: 'samples/review-wren', note: 'make it faster', maxLevel: 3, cells: [20, 30] } });
     await stream(r.id);
     const req = (llm as any).requests.at(-1);
     expect(req.messages[1].content).toMatch(/Here is a design \(its left half and centre line\):[\s\S]*Change it: make it faster/);
@@ -246,7 +246,7 @@ describe('shipgen engine', () => {
   });
 
   it('opens a saved design in the Energy Lab (a page on disk)', async () => {
-    const r = await call('lab', { bp: wren, saved: 'dev/review-wren' });
+    const r = await call('lab', { bp: wren, saved: 'samples/review-wren' });
     expect(r.url).toMatch(/^file:\/\/\/.+\/index\.html#ship=Review%3A%20Wren$/);
     expect(labCalls.length).toBe(1);
     expect((await call('lab', { bp: wren, role: 'gunship' })).saved.id).toBe('dev/gen-gunship-1');
@@ -260,7 +260,7 @@ describe('shipgen engine', () => {
     const order = ['core', 'frame', 'power', 'weapons', 'engines', 'tools', 'armour'];
     const idx = frames.map((f) => order.indexOf(f.stage));
     expect(idx).toEqual([...idx].sort((x, y) => x - y));
-    expect(buildUp(ctx, ship('dev/review-monarch'), 40).length).toBeLessThanOrEqual(46);
+    expect(buildUp(ctx, ship('samples/review-monarch'), 40).length).toBeLessThanOrEqual(46);
 
     const before = renderer.calls;
     const r = await call('timelapse', { bp: wren });

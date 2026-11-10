@@ -8,7 +8,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseBlueprint, blueprintGeometry } from '../../blueprint.js';
 import { createShipState, type ShipState } from '../../state.js';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
+import { feedParts, readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
 import type { ShipTuning } from '../../tuning.js';
 import type { Blueprint, PlacedPart, Rot } from '../../types.js';
 import { partHit, shipSegmentHit, shapedStopAt, newPartHit, type HitCtx } from '../../hitRules.js';
@@ -21,11 +21,12 @@ const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const ctx: HitCtx = { catalog, tuning, geometry: (s) => blueprintGeometry(catalog, s.blueprint) };
 
-/** The pool starter with shield parts added on its left (free cells at x -2): [fn, piece, x, y, facing] */
+/** The starter with shield parts added on its left (free cells at x -2), each fed by a Cell Reactor across its in port (testData feedParts): [fn, piece, x, y, facing] */
 type Add = [fn: string, piece: string, x: number, y: number, facing?: 'N' | 'E' | 'S' | 'W'];
 const sparrow = (adds: Add[], cat = catalog): ShipState => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   adds.forEach(([fn, piece, x, y, facing], k) => bp.parts.push({ uid: 70 + k, piece, fn, material: cat.functions.get(fn)!.material, x, y, rot: 0 as Rot, flip: false, ...(facing ? { facing } : {}) } as PlacedPart));
+  feedParts(cat, bp, adds.map((_, k) => 70 + k));
   return createShipState(cat, tuning, 1, bp, 0);
 };
 const X: ShapedCross = { t: 0, i: -1 };

@@ -1,6 +1,6 @@
 // Local copy of the retired relay-style energy tick (was common/src/ships/power/tick.ts, removed from the shared core:
-// the game runs the ports core and the pool path). Only shipgen's check/partPower still read this model; retargeting
-// them at the ports core is a separate job.
+// the game runs the ports core). Only shipgen's check/partPower still read this model (its layout: energyLayout.ts);
+// retargeting them at the ports core is a separate job.
 
 /**
  * The energy tick (docs/design/energy-routing-impl.md §1.3), 60 a second, the same on the server, in the pilot's
@@ -14,9 +14,7 @@
  * want first. So a thruster comes first only against the sources it shares: local priority, nothing reserved.
  */
 
-import {
-  type EnergyLayout, GUN_BEAM, GUN_CLIP, PHASE_THRUST, PHASE_TOOL, PHASE_WEAPON, ROLE_GEN,
-} from '../../../common/src/ships/index';
+import { type EnergyLayout, GUN_BEAM, GUN_CLIP, PHASE_THRUST, PHASE_TOOL, PHASE_WEAPON, ROLE_GEN } from './energyLayout';
 import { type EnergyState, FLAG_LATCH, FLAG_LIT, energyGauge } from './energyState';
 
 /** What the ship does this tick, as far as energy cares */

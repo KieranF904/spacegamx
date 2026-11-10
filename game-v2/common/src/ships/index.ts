@@ -40,14 +40,13 @@ export * from './partStats.js';
 export * from './describe.js';
 export * from './guns.js';
 export * from './energy.js';
-export * from './circuits.js';
-// The energy core (energy routing, P1: nothing in the game runs it yet)
+// The ports energy core (every ship runs it)
 export * from './power/index.js';
 export * from './features/support/support.js';
 export * from './pulse.js';
 export * from './hazards.js';
 export * from './warmth.js';
-export * from './wires.js';
+export * from './cells.js';
 export * from './migrate.js';
 export * from './mounting.js';
 export * from './devOnly.js';

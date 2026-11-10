@@ -14,7 +14,7 @@ import { NO_MIRROR_SYMMETRY_WEIGHT } from './design';
 import type { Renderer } from './render';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const STARTER = { ...findRole(ctx, 'starter')!, example: undefined };
 const fb = (ev: ShipgenEvent[]) => ev.filter((e) => e.type === 'feedback').map((e) => (e.type === 'feedback' ? e.text : ''));
 

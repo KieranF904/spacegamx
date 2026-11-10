@@ -27,7 +27,6 @@ const CTL = { active: null, boosting: false, toolWant: null, reload: false };
 describe('ports layout on the dev ships', () => {
   it('the Gunship: every consumer is fed, the core by two reactors, the rattlers through corner conduits', () => {
     const ship = shipOf('ports-gunship.json'), L = ship.derived.ports!, bp = ship.blueprint;
-    expect(ship.derived.power).toBeUndefined();
     expect(L.role[partAt(bp, 'core')]).toBe(P_RELAY);
     expect(L.gens.length).toBe(6);
     for (const w of L.weapons) expect(linksInto(L, w).length).toBeGreaterThan(0);
@@ -35,8 +34,6 @@ describe('ports layout on the dev ships', () => {
     expect(linksInto(L, partAt(bp, 'core')).sort()).toEqual([partAt(bp, 'power_cell_reactor', -1), partAt(bp, 'power_cell_reactor', 1)].sort());
     expect(linksInto(L, partAt(bp, 'autocannon_rattler', -1))).toEqual([partAt(bp, 'power_corner', -1)]);
     expect(linksInto(L, partAt(bp, 'power_corner', -1))).toEqual([partAt(bp, 'power_cell_reactor', -2)]);
-    // (nothing is starved by the old networks)
-    expect(ship.derived.satisfaction.every((s) => s === 1)).toBe(true);
   });
 
   it('the Lancer: the Lance takes at both back ports, its Combiner line carries the Selector\'s material', () => {

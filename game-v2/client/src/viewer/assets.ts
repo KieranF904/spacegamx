@@ -1,6 +1,6 @@
 /**
  * What the asset viewer can show, as ids:
- *   ship:<path>       a blueprint under data/ships/blueprints (ship:sparrow-t, ship:enemy/pirate_gunship, ship:dev/annihilator)
+ *   ship:<path>       a blueprint under data/ships/blueprints (ship:sparrow-t, ship:enemy/pirate_gunship, ship:dev/ports-heron)
  *   boss:<name>       the same as ship:enemy/<name> (bespoke boss and giant designs)
  *   model:<id>[@F]    a part model (models.json) on a hull stub, or alone (stub=0); @N/E/S/W picks its facing
  *   material:<id>     a test block in that material

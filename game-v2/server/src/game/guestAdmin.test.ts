@@ -9,6 +9,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { devGuestShips } from '../data/devData.js';
+import { readFileSync } from 'fs';
 
 const dataDir = join(__dirname, '../../../data');
 const env = process.env.NODE_ENV;
@@ -61,10 +62,13 @@ function guestHangar(guestShips: unknown[]): (string | null)[] {
 describe('guest ships (dev server only)', () => {
   afterEach(() => { process.env.NODE_ENV = env; });
 
-  it("guests on a dev server find the dev guest designs in their hangar's free bays", () => {
+  it("guests on a dev server find the dev guest designs in their hangar's free bays (none bundled now: they get the ports starter)", () => {
     process.env.NODE_ENV = 'development';
-    const ships = devGuestShips(dataDir);
-    expect(ships.map((b) => (b as { name: string }).name)).toContain('Sparrow T (brotherk3d)');
+    // (The pool-era guest Sparrow is gone: no data/ships/blueprints/dev/guest-*.json, so a guest has the starter alone)
+    expect(devGuestShips(dataDir)).toEqual([]);
+    expect(guestHangar([]).filter(Boolean)).toHaveLength(1);
+    // (A guest design dropped into dev/ still lands in the free bays)
+    const ships = [{ ...JSON.parse(readFileSync(join(dataDir, 'ships/blueprints/dev/ports-wren.json'), 'utf-8')), name: 'Guest Wren' }];
     const hangar = guestHangar(ships);
     expect(hangar.slice(1, 1 + ships.length)).toEqual(ships.map((b) => (b as { name: string }).name));
     expect(hangar[0]).not.toBeNull();
@@ -72,6 +76,6 @@ describe('guest ships (dev server only)', () => {
 
   it('never under production', () => {
     process.env.NODE_ENV = 'production';
-    expect(guestHangar(devGuestShips(dataDir)).filter(Boolean)).toHaveLength(1);
+    expect(guestHangar([JSON.parse(readFileSync(join(dataDir, 'ships/blueprints/dev/ports-wren.json'), 'utf-8'))]).filter(Boolean)).toHaveLength(1);
   });
 });

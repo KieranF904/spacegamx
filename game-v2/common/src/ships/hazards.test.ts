@@ -26,16 +26,16 @@ describe('hazards', () => {
   });
 
   it('tolerance comes from the build: mass holds a ship in a gravity well, a composite hull shrugs off some corrosion', () => {
-    const sparrow = ship('fixtures/sparrow-t'), hammerhead = ship('fixtures/hammerhead');
+    const sparrow = ship('sparrow-t'), hammerhead = ship('hauler');
     expect(hazardTolerance(rules, sparrow).gravitational).toBeLessThan(1);
     expect(hazardTolerance(rules, hammerhead).gravitational).toBe(5);
     expect(hazardDeficit({ gravitational: 5 }, hazardTolerance(rules, hammerhead))).toEqual({});
     expect(hazardDeficit({ gravitational: 5 }, hazardTolerance(rules, sparrow)).gravitational).toBeGreaterThan(4);
-    // A composite hull (its modules are their own material, its core alloy): tolerance by the share of its cells that are composite
-    const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+    // A composite hull (its modules are their own material, its core alloy): tolerance by the share of its cells that are composite (its hull and armour)
+    const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
     const area = (fn?: string) => bp.parts.filter((p) => !fn || p.fn === fn).reduce((a, p) => a + catalog.variants.get(p.piece)![0].area, 0);
-    expect(area('hull') / area()).toBeGreaterThan(0.3);
-    expect(hazardTolerance(rules, ship('fixtures/sparrow-t', 'composite')).corrosive).toBeCloseTo(area('hull') / area(), 6);
+    expect(area('hull') / area()).toBeGreaterThan(0.2);
+    expect(hazardTolerance(rules, ship('sparrow-t', 'composite')).corrosive).toBeCloseTo((area('hull') + area('armor')) / area(), 6);
   });
 });
 
@@ -44,15 +44,15 @@ describe('hazard flight', () => {
     const { stepShipPhysics } = await import('./physics.js');
     const { hazardFlight } = await import('./hazards.js');
     const maw = { hazardRatings: { gravitational: 5 }, starRadius: 1400, centralBody: { type: 'black_hole' } };
-    const sparrow = ship('fixtures/sparrow-t');
+    const sparrow = ship('sparrow-t');
     const hz = hazardFlight(rules, maw, sparrow, 20000, 0)!;
     expect(hz.driftAccel).toBeGreaterThan(0);
     expect(hz.control).toBeLessThan(1);
-    expect(hazardFlight(rules, maw, ship('fixtures/hammerhead'), 20000, 0)).toBeUndefined();
+    expect(hazardFlight(rules, maw, ship('hauler'), 20000, 0)).toBeUndefined();
     const fly = (h?: typeof hz) => {
       const body = { x: 20000, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0, jump: 0 };
       const input = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0 };
-      for (let i = 0; i < 300; i++) stepShipPhysics(body, input, sparrow, tuning, { charge: { g: 100, d: 100, w: 100 }, drainRate: 0 }, null, 1, h);
+      for (let i = 0; i < 300; i++) stepShipPhysics(body, input, sparrow, tuning, { charge: {}, drainRate: 0 }, null, 1, h);
       return body.x;
     };
     expect(fly(hz)).toBeLessThan(fly() - 50);

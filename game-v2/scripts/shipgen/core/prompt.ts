@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { isEngine, parseBlueprint } from '../../../common/src/ships/index';
-import type { ShipgenContext } from './context';
+import { type ShipgenContext, shipFile } from './context';
 import { type LegendEntry, type TierBand, buildLegend, legendFor, legendText, partInBand } from './legend';
 import { allShapes, pieceShapes } from './shapes';
 import { CodeBook, type GridError, blueprintToGrid } from './grid';
@@ -150,7 +150,7 @@ export function designText(ctx: ShipgenContext, bp: Blueprint, opts: { form?: De
 /** The role's worked example as the model reads it, or null when it has none, or draws with a key, or a pilot of the band couldn't fit it */
 function exampleText(ctx: ShipgenContext, path: string | undefined, band: TierBand, opts: { form?: DesignForm; mirror?: boolean } = {}): { text: string; parts: Blueprint['parts'] } | null {
   if (!path) return null;
-  const f = join(ctx.dataDir, 'ships/blueprints', `${path}.json`);
+  const f = shipFile(ctx.dataDir, path);
   if (!existsSync(f)) return null;
   const bp = parseBlueprint(readFileSync(f, 'utf8'));
   // (An example with a part above the band would hand the model a code it may not use)

@@ -20,12 +20,11 @@ const files = readGameDataFiles(dataDir);
 const X = 25000, Y = 20000;
 const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
 
-/** The pool-era starter (a fixture): its guns fed in full, so a beam's damage is its ramp alone (on the ports Sparrow one
- * Cell Reactor can't keep a Cutter lit, and the damage falls with its fulfilment) */
-const poolSparrow = () => parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
 
 /** A pilot whose every gun is this weapon model, held at (X, Y), and what its client is sent */
-function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2, pool = false) {
+/** `fed`: its guns never want for power (the gun range's flag, types.ts Blueprint.range), so a beam's damage is its ramp
+ * alone (on the starter one Cell Reactor can't keep a Cutter lit, and the damage falls with its fulfilment) */
+function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2, fed = false) {
   resetGlobals();
   const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
@@ -39,9 +38,9 @@ function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2, p
   const p = server.pilots.get(conn)!;
   // (The starter's guns are Pips, swapped in place as the parity harness does: its mounting rules aren't the point here)
   const ships = server.getShips()!;
-  const bp = pool ? poolSparrow() : ships.get(pid)!.blueprint;
+  const bp = ships.get(pid)!.blueprint;
   let n = 0;
-  ships.respawnInPlace(pid, { ...bp, parts: bp.parts.map((q) => ((q.fn === 'cannon_pip' || isWeaponFn(q.fn)) && n++ < guns ? { ...q, fn: model } : q)) });
+  ships.respawnInPlace(pid, { ...bp, ...(fed ? { range: true as const } : {}), parts: bp.parts.map((q) => ((q.fn === 'cannon_pip' || isWeaponFn(q.fn)) && n++ < guns ? { ...q, fn: model } : q)) });
   if (cargo) p.cargo.push(cargo);
   const hold = () => { Position.x[pid] = X; Position.y[pid] = Y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
   const detonations = (kind: string) => got.filter((g) => g.m.type === 'detonation' && (g.m as any).kind === kind).map((g) => ({ tick: g.tick, ...(g.m as any) }));
@@ -57,7 +56,8 @@ function beamRig(model: string, gap = 400) {
   const ships = w.ships as any, hurt = ships.hurt.bind(ships);
   ships.hurt = (eid: number, ship: unknown, part: number, amount: number, src: number, hit?: unknown) => {
     const d = hurt(eid, ship, part, amount, src, hit);
-    if (eid === skiff && src === w.pid && amount < 5) dealt.push({ part, amount });
+    // (Under 10: the Cutter's ticks, not the starter's other gun's Pip shells)
+    if (eid === skiff && src === w.pid && amount < 10) dealt.push({ part, amount });
     return d;
   };
   const sk = w.ships.get(skiff)!;

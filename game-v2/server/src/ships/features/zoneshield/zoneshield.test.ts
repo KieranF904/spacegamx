@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Input, InSystem, isWeaponFn, replicaAngle, quantizeReplicaAngle, ReplicaMode, Position, Velocity, Rotation, shapedOf, shieldHp, shieldUp, packShaped, shapedLevel, shipPointToWorld, parseBlueprint, type Blueprint } from '@space-game/common';
+import { Input, InSystem, isWeaponFn, replicaAngle, quantizeReplicaAngle, ReplicaMode, Position, Velocity, Rotation, shapedOf, shieldHp, shieldUp, packShaped, shapedLevel, shipPointToWorld, parseBlueprint, type Blueprint, type Catalog } from '@space-game/common';
 import { readFileSync } from 'fs';
 import { GameServer } from '../../../GameServer.js';
 import { GameData } from '../../../data/GameData.js';
@@ -14,6 +14,7 @@ import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../loadShipConfig.js';
 import { createShipBridge } from '../../../proto/createProtoServer.js';
 import { LocalTransport } from '../../../net/LocalTransport.js';
+import { feedParts } from '../../../../../common/src/ships/testData.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 
@@ -23,17 +24,16 @@ function world() {
   return { server, ships: server.getShips() };
 }
 
-/** The pool-era starter (a fixture) with shaped shields added at its left: [fn, piece, x, y, facing] */
-function design(extra: [string, string, number, number, 'W' | 'N' | 'S'][]): Blueprint {
-  const bp = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+/** The starter with shaped shields added at its left, each fed by a Cell Reactor across its in port (testData feedParts): [fn, piece, x, y, facing] */
+function design(extra: [string, string, number, number, 'W' | 'N' | 'S'][], catalog: Catalog): Blueprint {
+  const bp = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
   extra.forEach(([fn, piece, x, y, facing], k) => bp.parts.push({ uid: 900 + k, piece, fn, material: fn === 'shield_rampart' ? 'steel' : 'alloy', x, y, rot: 0, flip: false, facing } as never));
-  delete (bp as { wires?: unknown }).wires;
-  return bp;
+  return feedParts(catalog, bp, extra.map((_, k) => 900 + k));
 }
 
 const spawn = (extra: Parameters<typeof design>[0]) => {
   const w = world();
-  const e = w.ships.spawnDummy(design(extra), 0, 300000, 0, 0);
+  const e = w.ships.spawnDummy(design(extra, w.ships.catalog), 0, 300000, 0, 0);
   Rotation.angle[e] = 0;
   const ship = w.ships.get(e)!;
   const cs = w.ships.tuning.cellSize;
@@ -136,11 +136,11 @@ describe('shaped shields (server half)', () => {
     const pid = t.getPlayerId();
     const ships = w.ships, X = 25000, Y = 20000, gap = 400;
     // (the pool-era starter, its guns fed in full, one of them a Cutter)
-    const mine = design([]);
+    const mine = design([], ships.catalog);
     let n = 0;
     // (the first gun a Cutter, the other a plain hull cell so only the beam burns)
     ships.respawnInPlace(pid, { ...mine, parts: mine.parts.map((q) => (!isWeaponFn(q.fn) ? q : n++ < 1 ? { ...q, fn: 'laser_cutter' } : { ...q, fn: 'hull', facing: undefined })) });
-    const e = ships.spawnDummy(design(WALL), X + gap, Y, 0, InSystem.systemId[pid]);
+    const e = ships.spawnDummy(design(WALL, ships.catalog), X + gap, Y, 0, InSystem.systemId[pid]);
     const target = ships.get(e)!;
     // (angle -90 degrees: its grid's west is the world's west, the wall faces the pilot; its middle is put on the beam's line)
     Rotation.angle[e] = -Math.PI / 2;

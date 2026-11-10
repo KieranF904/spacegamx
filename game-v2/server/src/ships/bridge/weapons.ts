@@ -163,7 +163,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
     const focus = mp.share[ma] * mp.ticks;
     // (Cut by the share of its draw it got: a ports ship's laser its fulfilment, the rest the ship's share for its mining lasers)
     const fill = ph >= 0 ? pe!.sat[m.part] / 255 : ship.mineShare ?? 1;
-    if (m.satisfaction * fill <= 0.01) continue;
+    if (fill <= 0.01) continue;
     const [x, y] = shipPointToWorld(ship, pose, m.muzzle, cs);
     const facing = pose.angle + Math.PI / 2 + datan2(m.dir[1], m.dir[0]);
     let off = datan2(aimY - y, aimX - x) - facing;
@@ -182,7 +182,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
       const h = b.castShip(other, os, x, y, x1, y1);
       if (h && (!shipHit || h.t < shipHit.t)) shipHit = { eid: other, ship: os, ...h };
     }
-    const sat = m.satisfaction * fill;
+    const sat = fill;
     const rockT = b.host.mineBeam?.(eid, x, y, angle, shipHit ? shipHit.t * range : range, (mt.dps / 60) * sat * focus, m.material, m.gas, mt.range) ?? 1;
     const rockFrac = rockT * (shipHit ? shipHit.t : 1);
     if (shipHit && rockT >= 0.999) {
@@ -409,7 +409,7 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   const zapK = zapping ? (b.host.getTick() % def.zap! === 0 ? def.zap! : 0) : 1;
   // (A ports ship's gun: its infrastructure tier's damage and its material's, power/ports.ts)
   const pz = ship.derived.ports, pc = pz ? b.chargeOf(eid).e : undefined;
-  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc * (pz && pc ? portsDamageMul(pz, pc, w.part) : 1);
+  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * w.strength * b.damageMul(eid) * npc * (pz && pc ? portsDamageMul(pz, pc, w.part) : 1);
   let shipHit: { eid: number; ship: ShipState; part: number; t: number; shield?: number; spill?: boolean } | null = null;
   // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;

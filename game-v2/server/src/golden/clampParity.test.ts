@@ -35,7 +35,7 @@ import { stationQuery } from '../game/Docking.js';
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
-const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
+const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
 const UP = -1.5708;
 
 /** A Sparrow T with a Docking Clamp on its right (E) or left (W) */

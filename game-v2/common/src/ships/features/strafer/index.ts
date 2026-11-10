@@ -78,15 +78,15 @@ export const feature: PartFeature = {
   applies: (fn) => !!fn.strafe,
   // (After the Tow Beam: feature numbers follow (order, id), and the Tow Beam keeps number 0)
   order: 30,
-  // It draws by the tick, only while a burst runs, and Drive Cell banks touching it feed it as they do engines
-  burst: 'engine',
+  // It draws by the tick, only while a burst runs
+  burst: true,
   // Each powered strafer pushes away from its facing edge, whichever way that is
   derive(c) {
     for (const i of c.parts) {
       const sf = c.fns[i].strafe!, mount = c.mounts[i];
-      if (!mount || c.satisfaction[i] <= 0) continue;
+      if (!mount) continue;
       const s = c.out.strafe ??= { parts: [], ticks: sf.ticks, cooldown: sf.cooldown };
-      const force = sf.kick * c.area[i] * fnOutput(c.fns[i], c.mats[i]) * c.satisfaction[i];
+      const force = sf.kick * c.area[i] * fnOutput(c.fns[i], c.mats[i]);
       const r = (v: number) => Math.round(v * 1000) / 1000 || 0;
       s.parts.push({ part: i, push: [r(-mount.dir[0] * force), r(-mount.dir[1] * force)] });
       s.ticks = Math.max(s.ticks, sf.ticks);

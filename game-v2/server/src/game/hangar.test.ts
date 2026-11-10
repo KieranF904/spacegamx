@@ -3,7 +3,7 @@ import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
   Position, Velocity, ServerMessage, Station as StationComp, Blueprint, countOf, partItemId, migrateProfile, ghostBill, planOrders,
-  addTo, autoWire, cleanWires, orderRanking, buildableGhosts,
+  addTo, orderRanking, buildableGhosts,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -131,17 +131,16 @@ describe('hangar slots', () => {
     expect(profile().hangar[1]!.ghosts ?? []).toEqual([]);
   });
 
-  it('wires are retired: a design with saved wires costs no spools, and its wires are kept as sent', () => {
-    const { server, t, pid, profile, last, ships } = world();
+  it('wires are gone: a design sent with old saved wires costs no spools, and is kept without them', () => {
+    const { server, t, pid, profile, last } = world();
     dock(server, pid);
     const bp = prospector(server);
     emptyStorage(server, pid, bill(server, bp));
-    const wires = autoWire(bp, ships.catalog).slice(0, 6);
-    expect(wires).toHaveLength(6);
+    const wires = [[0, 0, 1, 0], [1, 0, 1, 1], [1, 1, 2, 1]];
     t.send({ type: 'slotSave', slot: 1, blueprint: { ...bp, wires }, plan: 'prospector' } as any);
     expect(last('shipEditResult')!.ok).toBe(true);
     expect(countOf(profile().storage, 'wire_spool')).toBe(0);
-    expect(profile().hangar[1]!.blueprint.wires).toEqual(cleanWires(wires));
+    expect((profile().hangar[1]!.blueprint as { wires?: unknown }).wires).toBeUndefined();
   });
 
   it('parts reaching storage fit themselves, from the core outwards, never leaving any loose', () => {

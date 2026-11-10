@@ -6,9 +6,8 @@
  * extend:     a new section is one html function here, appended in renderStats()
  */
 
-import { Bag, ShipTuning, ShipDerived, ghostBill, SALVAGE, buildPoints, loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, coreOf } from '@space-game/common';
+import { Bag, ShipDerived, ghostBill, SALVAGE, buildPoints, loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, coreOf } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
-import { gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../../settings/Settings';
 import { boundKeyName } from '../../input/keybindings';
 import { costHtml } from '../../ui/windowKit';
@@ -172,64 +171,10 @@ export function bindBuildButtons(host: HangarHost): void {
   });
 }
 
-/**
- * Power: each network (in its overlay colour) with its generators and
- * batteries and what it makes against what's drawn on it, and what's left
- * without power; then the ship's pool and Output, its banks, and the load
- * test. (The networks are the old energy system's: P5 replaces host with the
- * energy overlay's report.)
- */
+/** The POWER section: the ports design's report (portsHtml), when there is a ship */
 export function powerHtml(host: HangarHost): string {
-  const rep = host.power, d = host.derived;
-  if (d?.ports) return host.portsHtml(d.ports);
-  if (!rep || !d) return '';
-  let html = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>`;
-  const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.generators.length || n.batteries.length || n.demand > 0);
-  if (!nets.length) html += '<div style="color:#6b7a93; font-size:11px; margin-bottom:4px">No generator on host ship.</div>';
-  for (const { n, k } of nets) {
-    const gens = n.generators.length, bats = n.batteries.length;
-    const what = [gens ? `${gens} generator${gens > 1 ? 's' : ''}` : 'no generator', bats ? `${bats} batter${bats > 1 ? 'ies' : 'y'}` : ''].filter(Boolean).join(' · ');
-    const ok = n.supply >= n.demand - 1e-6;
-    html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="${n.parts.length} parts on it">`
-      + `<span style="width:10px; height:10px; border-radius:2px; flex-shrink:0; background:${n.color}"></span><span style="color:#cfd8e6; white-space:nowrap">Network ${k + 1}</span><span style="color:#8ea0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${what}</span>`
-      + `<span style="margin-left:auto; white-space:nowrap" title="Made / drawn steadily (engines and guns draw on the batteries)"><b style="color:${!n.powered ? '#8ea0bd' : ok ? '#4ade80' : '#fbbf24'}">+${Math.round(n.supply)}</b><span style="color:#6b7a93"> / ${Math.round(n.demand)}</span></span></div>`;
-  }
-  // The ship's numbers in four lines, its banks, and the one load-test warning (rework 2026-11 section 2.4)
-  const L = d.power, n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
-  if (L) {
-    const line = (t: string, tip = '') => `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" ${tip ? `title="${tip}"` : ''}>${t}</div>`;
-    const gen = rep.nets.reduce((s, n) => s + (n.powered ? n.supply : 0), 0), steady = Math.max(0, gen - L.spare);
-    html += line(`Generation ${n0(gen)}/s · steady loads ${n0(steady)}/s · spare ${n0(L.spare)}/s`, 'What the generators make, what shields, scanners and coils take first, and what is left for the stores and the guns');
-    const nb = L.pool.parts.length;
-    html += line(`Store ${n0(L.pool.cap)} (core ${n0(L.pool.coreCap)}${nb ? ` + ${nb} ${nb === 1 ? 'battery' : 'batteries'}` : ''}) · Output ${n0(L.spare + L.pool.rate)}/s`, 'Your ship can give out at most its Output each second. Short of it, engines, guns and banks refilling share it by what each asks: thrust drops and guns reload slower. A bank asks for its intake, so it raises the share of what it feeds');
-    const boost = energyTuning(host.deps.tuning).boostDraw;
-    let eng = 0, engBoost = 0, guns = 0;
-    for (const t of new Set(d.thrusters.filter((x) => x.force[0] || x.force[1]).map((x) => x.part))) { eng += L.draw[t]; engBoost += L.draw[t] * (1 + boost * L.boostDrain[t]); }
-    for (const w of d.weapons) if (L.feedOf[w.part] >= 0) guns += gunDrawFlatOut(w, L.draw[w.part]);
-    html += line(`Flat out: engines ${n0(eng)}/s (boosting ${n0(engBoost)}/s) · guns ${n0(guns)}/s`);
-    const partName = (i: number) => { const p = host.bp.parts[i], fn = host.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
-    const r = host.bothTest();
-    if (r && (guns > 0 || eng > 0)) {
-      const unbanked = d.weapons.filter((w) => L.feedOf[w.part] >= 0 && !L.feeds[L.feedOf[w.part]].banks.length && gunDrawFlatOut(w, L.draw[w.part]) > 0);
-      const share = unbanked.length ? Math.min(...unbanked.map((w) => r.part[w.part])) : 1;
-      const act = guns > 0 ? 'Boosting while firing' : 'Boosting';
-      // (Short of Output, the engines and the unbanked guns get the same share of what each asks: energy.ts powerTick)
-      const both = Math.min(share, r.engines);
-      if (r.brownAt >= 0 && share < BROWNOUT) html += `<div style="font-size:11px; padding:1px 0 3px; color:${both < 0.5 ? '#f87171' : '#fbbf24'}" title="Short of Output, everything drawing on it gets the same share of what it asks. A Capacitor bank touching the guns pays them first">⚠ Boosting while firing: engines and unbanked guns share the Output, down to ${Math.round(both * 100)}% each</div>`;
-      else if (r.brownAt >= 0) html += `<div style="font-size:11px; padding:1px 0 3px; color:#fbbf24">⚠ ${act}: engines get ${Math.round(r.engines * 100)}%</div>`;
-      else html += `<div style="font-size:11px; padding:1px 0 3px; color:#4ade80">Holds up: full power while ${guns > 0 ? 'boosting and firing' : 'boosting'}</div>`;
-    }
-    L.banks.forEach((B, k) => {
-      const fed = [...new Set([...B.feeds, ...B.shields].map(partName))].join(', ');
-      const never = !B.refills && B.dynamo <= 0;
-      html += `<div style="font-size:11px; padding:1px 0; color:${never ? '#94a3b8' : B.kind === 'drive' ? '#7dd3fc' : '#fbbf24'}">Bank ${k + 1} (${B.parts.length} ${B.kind === 'drive' ? 'Drive Cell' : 'Capacitor'}${B.parts.length > 1 ? 's' : ''}) ${n0(B.cap)} · ${n0(B.rate)}/s → ${fed ? esc(fed) : 'feeds nothing'}${never ? ' · never refills' : ''}</div>`;
-    });
-  }
-  if (rep.warnings.length) {
-    html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
-      + `${rep.warnings.length > 6 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 6} more</div>` : ''}</div>`;
-  } else if (nets.length) html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Everything that uses power has it.</div>';
-  return html + '<div style="margin-bottom:12px"></div>';
+  const d = host.derived;
+  return d ? host.portsHtml(d.ports) : '';
 }
 
 /** Power on a ports design: what the generators make and the stores hold, what the routing leaves out (portsReport.ts), then the load test (portsGrid.ts) */
@@ -311,7 +256,7 @@ export function summaryHtml(host: HangarHost): string {
     html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${ways.length === 4 ? 'any way' : ways.join(', ') || 'no way'} · ${n0(cost)} energy` : '<span style="color:#f87171">none</span>', 'dodge',
       `Burst Strafers: press ${boundKeyName('dodge', settings.data.bindings)} for one hard burst (${((s?.ticks ?? 12) / 60).toFixed(2)} s) the way you're steering, diagonals too, with whichever strafers push that way; `
       + `with nothing held, back the other way from your last dodge. Ready again ${((s ? Math.max(s.ticks, s.cooldown) : 24) / 60).toFixed(2)} s after the last one started. `
-      + 'There are no charges: every burst draws a lot of energy, from a Drive Cell bank the strafer touches first, then the ship, so dodging often browns the ship out unless Drive Cells, batteries and generation back it. '
+      + 'There are no charges: every burst draws a lot of energy, from the strafers\' own buffers (filled over their in ports), so dodging often runs them dry unless their lines back it. '
       + 'A strafer pushes away from its nozzle: fit them facing different ways to dodge any way. The heavier the ship, the less a burst moves it');
   }
   if (now.tow > 0) html += row('Tow Beam', now.tow >= 0.5 ? 'ready' : '<span style="color:#f87171">no power</span>', 'tow',
@@ -320,7 +265,7 @@ export function summaryHtml(host: HangarHost): string {
   for (const f of designFields(catalog, tuning, host.bp)) html += row(f.label, f.text);
   html += row('Mass', `${n0(now.mass)}`, 'mass', '', 'mass');
   html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices`);
-  html += energyHtml(now.energy, host.derived, host.deps.tuning);
+  html += energyHtml(now.energy);
   return html + '<div style="margin-bottom:12px"></div>';
 }
 
@@ -349,20 +294,14 @@ export function renderStats(host: HangarHost): void {
     html += `<div style="margin-top:6px; color:#8ea0bd">turn accel (rad/tick²)</div>`;
     html += `<div>  ⟳ ${fmt(d.maxTorque.cw / d.inertia, 4)}  ⟲ ${fmt(d.maxTorque.ccw / d.inertia, 4)}</div>`;
     html += `<div style="margin-top:6px; color:#8ea0bd">power</div>`;
-    d.networks.forEach((n, k) => {
-      if (n.demand === 0 && n.supply === 0) return;
-      const ok = n.supply >= n.demand;
-      html += `<div>  net ${k + 1}: <span style="color:${ok ? '#4ade80' : '#f2d24b'}">${fmt(n.supply, 1)}</span> / ${fmt(n.demand, 1)}</div>`;
-    });
+    if (d.energy.demand > 0 || d.energy.supply > 0) {
+      const ok = d.energy.supply >= d.energy.demand;
+      html += `<div>  made / steady: <span style="color:${ok ? '#4ade80' : '#f2d24b'}">${fmt(d.energy.supply, 1)}</span> / ${fmt(d.energy.demand, 1)}</div>`;
+    }
     html += `<div style="margin-top:6px; color:#8ea0bd">weapons (fire interval)</div>`;
     for (const w of d.weapons) {
       const arc = w.window ? ` turret ${Math.round(w.window.open.reduce((s, [lo, hi]) => s + hi - lo, 0) * 180 / Math.PI)}°` : '';
-      html += `<div>  #${w.uid}: ${fmt(w.interval, 1)} ticks (${Math.round(w.satisfaction * 100)}%)${arc}</div>`;
-    }
-    const consumers = host.bp.parts.map((p, i) => ({ p, i })).filter(({ p }) => p.fn === 'thruster');
-    if (consumers.length) {
-      html += `<div style="margin-top:6px; color:#8ea0bd">thrusters</div>`;
-      for (const { p, i } of consumers) html += `<div>  #${p.uid}: ${Math.round(d.satisfaction[i] * 100)}% power</div>`;
+      html += `<div>  #${w.uid}: ${fmt(w.interval, 1)} ticks${arc}</div>`;
     }
   } else {
     html += `<div style="color:#8ea0bd">(no core: nothing attached)</div>`;
@@ -381,60 +320,10 @@ export function renderStats(host: HangarHost): void {
   host.bindBuildButtons();
 }
 
-/**
- * The hangar's energy readout, from the same power layout as the Power section
- * (circuits.ts, energy.ts; the store and the Output are in that section): how
- * long the engines and guns get full power, how low they drop after, and how
- * long the stores take to fill from empty. A consumer draws on the banks it
- * touches first (their cap, at their Gives rate), then on the Output; a bank
- * that feeds nothing counts for nothing, and one that never refills is a single
- * draught.
- */
-/** The load tests behind the hangar's Energy rows, per derived ship */
-const energyRuns = new WeakMap<ShipDerived, { cruise: LoadTestResult; boost: LoadTestResult; fire: LoadTestResult; refill: number }>();
-const ENERGY_ROW_SECONDS = 20;
-
-function energyHtml(e: ShipSummary['energy'], d: ShipDerived | null, tuning: ShipTuning): string {
-  const L = d?.power;
+/** The hangar's energy readout: what the stores hold and the generation the steady loads leave (the load test is in the POWER section) */
+function energyHtml(e: ShipSummary['energy']): string {
   const row = (label: string, value: string, tip: string) =>
     `<div style="display:flex; justify-content:space-between; padding:2px 0" title="${tip}"><span style="color:#8ea0bd">${label}</span>${value}</div>`;
   const head = `<div style="color:#ffb547; font-weight:bold; margin:10px 0 4px; letter-spacing:1px">ENERGY</div>`;
-  if (!L || !d) return head + row('Store', `<b style="color:#e5ecf7">${Math.round(e.max)}</b>`, 'The core store plus batteries') + row('Spare power', `<b style="color:#e5ecf7">${e.spare.toFixed(0)}/s</b>`, 'Generation left after the steady loads');
-  const output = L.spare + L.pool.rate;
-  let hasEng = false, hasGun = false, engDraw = 0;
-  for (const t of d.thrusters) if (t.force[0] || t.force[1]) { hasEng = true; engDraw += L.draw[t.part]; }
-  for (const w of d.weapons) if (L.feedOf[w.part] >= 0) hasGun = true;
-  // Each row is the ship's own power code run tick by tick (loadTest): a bank pays only for the parts it touches
-  let runs = energyRuns.get(d);
-  if (!runs) energyRuns.set(d, runs = {
-    cruise: loadTest(d, tuning, { fire: false, thrust: true, boost: false, seconds: ENERGY_ROW_SECONDS }),
-    boost: loadTest(d, tuning, { fire: false, thrust: true, boost: true, seconds: ENERGY_ROW_SECONDS }),
-    fire: loadTest(d, tuning, { fire: true, thrust: true, boost: false, seconds: ENERGY_ROW_SECONDS }),
-    // (From every store empty, idle: how long until they're full)
-    refill: loadTest(d, tuning, { fire: false, thrust: false, boost: false, seconds: 0, from: { g: 0, b: L.banks.map(() => 0) } }).refill,
-  });
-  const dash = '<span style="color:#8ea0bd">—</span>';
-  const show = (r: LoadTestResult, share: number, any: boolean): { html: string; ok: boolean } => {
-    if (!any) return { html: dash, ok: true };
-    if (r.brownAt < 0) return r.end >= 99
-      ? { html: '<span style="color:#4ade80">sustained</span>', ok: true }
-      : { html: `<span style="color:#fbbf24">holds ${ENERGY_ROW_SECONDS} s+ · store ${Math.round(r.end)}%</span>`, ok: true };
-    const t = r.brownAt;
-    return { html: `<span style="color:#f87171">full power ${t.toFixed(t < 10 ? 1 : 0)} s, then ${Math.round(share * 100)}%</span>`, ok: false };
-  };
-  const cruise = show(runs.cruise, runs.cruise.engines, hasEng && engDraw > 0);
-  const boosting = show(runs.boost, runs.boost.engines, hasEng && engDraw > 0);
-  const firing = show(runs.fire, Math.min(runs.fire.engines, runs.fire.guns), hasGun);
-  const dry = hasGun && !firing.ok;
-
-  const rf = runs.refill;
-  // (loadTest gives up after two minutes)
-  const refill = !Number.isFinite(rf) ? `<span style="color:#f87171">${L.spare > 0 || L.banks.some((B) => B.dynamo > 0) ? 'over 2 min' : 'never: no spare power'}</span>`
-    : rf <= 0 ? dash : `<span style="color:${rf > 30 ? '#fbbf24' : '#e5ecf7'}">${rf.toFixed(rf < 10 ? 1 : 0)} s from empty</span>`;
-  return head
-    + row('Cruising', cruise.html, `Engines thrusting for ${ENERGY_ROW_SECONDS} s, run through the ship's real power code: each bank pays only for the parts it touches. Sustained: the generators keep up`)
-    + row('Boosting', boosting.html, `Engines boosting, same test: how long they get full power before the stores run dry, then the lowest share they get. Store ${Math.round(L.pool.cap)}, Output ${Math.round(output)}/s`)
-    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust, same test. Short of power, engines and guns share it by what each asks: thrust drops, guns reload slower, beams flicker')
-    + row('Refills', refill, 'Idle, from every store empty: how long the spare generation takes to fill the pool and every bank that refills (a bank takes in at most its intake a second)')
-    + (dry ? `<div style="color:#fbbf24; font-size:11px; margin-top:4px">The ship runs short in a fight: engines and guns share what there is, so both slow. Add generation, a battery, or a Capacitor bank touching the guns (it pays them first, and its intake raises their share).</div>` : '');
+  return head + row('Store', `<b style="color:#e5ecf7">${Math.round(e.max)}</b>`, 'The core store plus batteries') + row('Spare power', `<b style="color:#e5ecf7">${e.spare.toFixed(0)}/s</b>`, 'Generation left after the steady loads');
 }

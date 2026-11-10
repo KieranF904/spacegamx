@@ -8,7 +8,6 @@ import { type Catalog, SIDE_NORMAL } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import { PlacedGeom, computeJoins, facingEdges, findOverlaps, geomContainsPoint, isEdgeFree, placeGeometry } from './grid.js';
 import { partMaterial } from './grades.js';
-import { cleanWires } from './wires.js';
 import { isDevOnly } from './devOnly.js';
 import { checkMounting } from './mounting.js';
 import { MAX_GROUPS } from './groups.js';
@@ -229,12 +228,8 @@ export function cleanMods(m: unknown): WeaponMods | undefined {
 
 export function serializeBlueprint(bp: Blueprint): string {
   const parts = [...bp.parts].sort((a, b) => a.uid - b.uid).map((p) => '    ' + JSON.stringify(canonicalPart(p)));
-  // (Wires a dozen segments a line)
-  const wires = bp.wires ? cleanWires(bp.wires) : undefined, rows: string[] = [];
-  for (let i = 0; wires && i < wires.length; i += 12) rows.push('    ' + wires.slice(i, i + 12).map((w) => JSON.stringify(w)).join(', '));
-  const wired = !wires ? '' : rows.length ? `,\n  "wires": [\n${rows.join(',\n')}\n  ]` : ',\n  "wires": []';
   const power = bp.power === 'ports' ? ',\n  "power": "ports"' : '';
-  return `{\n  "name": ${JSON.stringify(bp.name)},\n  "catalogVersion": ${bp.catalogVersion},\n  "parts": [\n${parts.join(',\n')}\n  ]${wired}${power}\n}\n`;
+  return `{\n  "name": ${JSON.stringify(bp.name)},\n  "catalogVersion": ${bp.catalogVersion},\n  "parts": [\n${parts.join(',\n')}\n  ]${power}\n}\n`;
 }
 
 export function parseBlueprint(json: string): Blueprint {
@@ -246,7 +241,6 @@ export function parseBlueprint(json: string): Blueprint {
     ...(typeof raw.paint === 'string' && /^#[0-9a-f]{6}$/i.test(raw.paint) ? { paint: raw.paint.toLowerCase() } : {}),
     ...(typeof raw.drive === 'number' && raw.drive > 0 && raw.drive < 1 ? { drive: Math.max(0.1, raw.drive) } : {}),
     ...(raw.rigid === true ? { rigid: true } : {}),
-    ...(Array.isArray(raw.wires) ? { wires: cleanWires(raw.wires) } : {}),
     ...(raw.power === 'ports' ? { power: 'ports' as const } : {}),
     parts: raw.parts.map((p: any) => canonicalPart({
       uid: p.uid, piece: p.piece, fn: p.fn, material: p.material,

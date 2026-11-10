@@ -18,7 +18,7 @@
         "Mirror it left to right.",
         "A wedge or two of hull (shaped pieces) at the wing tips looks good but is optional."
       ],
-      "example": "dev/review-wren",
+      "example": "samples/review-wren",
       "targets": { "weaponShare": 0.08, "thrustToMass": 0.2 },
       "shapes": [
         "a dart: narrow (5 columns) and long (7 rows), with a pointed nose",
@@ -48,7 +48,7 @@
         "Armour across the nose and down the sides; the core, generators and stores deep inside.",
         "Each group of guns gets its own store beside a generator."
       ],
-      "example": "dev/review-kestrel",
+      "example": "samples/review-kestrel",
       "shapes": [
         "a hammerhead: a wide armoured nose (12 columns) over a narrower body, 10 rows long",
         "a long brawler: narrow (8 columns) and long (12 rows), the guns down the front half",
@@ -76,7 +76,7 @@
         "A long, narrow hull with the beams forward and the engines in a row at the back.",
         "Use Diodes to keep an engine or shield reserve that the beams can't drain."
       ],
-      "example": "dev/review-heron",
+      "example": "samples/review-heron",
       "targets": { "weaponShare": 0.08, "generationPerCell": 2.5 }
     },
     {
@@ -96,7 +96,6 @@
         "Keep it light and quick: good thrust for its mass.",
         "Launchers along the flanks, mirrored."
       ],
-      "example": "dev/review-mako",
       "weights": { "enginesAft": 0.2 },
       "targets": { "weaponShare": 0.12, "thrustToMass": 0.12 }
     },
@@ -145,7 +144,6 @@
         "Armour all round the outside; nothing vital on the edge.",
         "Big guns forward facing ^, turrets out at the flanks, a wall of engines at the back facing v."
       ],
-      "example": "dev/review-monarch",
       "targets": { "weaponShare": 0.08, "armourShare": 0.2, "thrustToMass": 0.06 }
     }
   ]

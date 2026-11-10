@@ -18,11 +18,8 @@
  * many of each crate its guns carry, and which they open first. Docking,
  * launching and flying it top the hold up to that from storage.
  *
- * Wiring is retired (docs/design/energy-routing-impl.md D1): there is no
- * wire tool and no wire is drawn. A saved design's wires stay in it (pruned
- * as parts go) for the old energy system, which still auto-wires inside until
- * the switch-over. The power overlay marks generators and batteries and what's
- * left without power; P5 replaces it with the energy overlay.
+ * Every design runs on the ports core: the energy overlay (portsGrid.ts) shows
+ * its ports, links and what the load test leaves short. There are no wires.
  *
  * The palette (HangarPalette.ts) is the component guide's model laid out for
  * building: the part in hand with its shapes, category tabs, and each tab's
@@ -45,9 +42,7 @@ import { DragPaint } from './build/dragPaint';
 import { bindBuildKeys } from './build/buildKeys';
 import { HangarAids } from './hangar/hangarAids';
 import { Blueprint, Bag, partItemId, PlacedPart, PlacedGeom, Rot, Side, ShipDerived, Vec2, SIDES, placeGeometry, validateBlueprint, hasFixedBarrel, createShipState, BlueprintError, TurretWindow, partMountingProblems, type MountingProblem, cellMap, exhaustProblem } from '@space-game/common';
-import { loadTest, type LoadTestResult } from '@space-game/common';
 import { cloneJson as clone } from '@space-game/common';
-import { powerReport, type PowerReport } from './wireEdit';
 import { PortsGrid } from './portsGrid';
 import { HangarPalette, type PaletteSel } from './HangarPalette';
 import { groupOfKey, groupsSaid, hangarGroupKey } from './weaponGroups/editor';
@@ -61,7 +56,7 @@ import { detailToggle } from './build/detailToggleView';
 import { FlowCanvasLayer, FLOW_KEY } from './build/powerFlowView';
 import type { HangarDeps, HangarHost, Overlay } from './hangar/host';
 import { foldHeading, button, chip, checkbox } from './hangar/hangarWidgets';
-import { feedPreview, drawFeedPreview, drawWindow, drawPower, drawBanks, boltGlyph, drawMounting, drawFacing } from './hangar/hangarOverlays';
+import { drawWindow, drawMounting, drawFacing } from './hangar/hangarOverlays';
 import { draw } from './hangar/hangarDraw';
 import { buildHtml, ammoHtml, bindBuildButtons, powerHtml, portsHtml, summaryHtml, renderStats } from './hangar/hangarStats';
 import { refreshLoadList, loadSelected, designKey, toggleDesigns, renderDesigns, saveDesign, deleteDesign, loadDesign } from './hangar/hangarDesigns';
@@ -72,12 +67,9 @@ import type { StatDelta } from './build/statDelta';
 import { candidate, placementProblem, candidateMounting, place, partAt, turnPlaced, pickUp, startDrag, stopDrag, dragTo, remove, newBlueprint } from './hangar/hangarEdit';
 export type { HangarDeps };
 
-/** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
-const LOAD_TEST_SECONDS = 4;
 
-
-/** What a save would change: the parts, the paint, the wiring (absent: auto-wired) */
-const designSig = (bp: Blueprint) => JSON.stringify(bp.parts) + (bp.paint ?? '') + (bp.wires ? JSON.stringify(bp.wires) : '~');
+/** What a save would change: the parts and the paint */
+const designSig = (bp: Blueprint) => JSON.stringify(bp.parts) + (bp.paint ?? '');
 
 export class HangarUI implements HangarHost {
   isOpen = false;
@@ -109,22 +101,11 @@ export class HangarUI implements HangarHost {
   deltaHover = makeDeltaHover(this);
   /** The part the mouse is over in the parts list (for the shield cover preview, hangarMarks.ts) */
   paletteHover: { fn: string; piece: string; material: string } | null = null;
-  overlays: Record<Overlay, boolean> = { energy: loadPowerFlow(), connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
+  overlays: Record<Overlay, boolean> = { energy: loadPowerFlow(), connectors: false, joins: false, com: true, thrust: true, arcs: true };
   /** The energy overlay of a ports design (portsOverlay.ts): its layer, the load test it shows, and the port under the mouse */
   ports = new PortsGrid();
   /** The power flow overlay's animated layer over the grid (pulses, ticks, crosses) */
   flow!: FlowCanvasLayer;
-  /** The power overlay's networks and warnings (from the design's derived state) */
-  power: PowerReport | null = null;
-  /** The last load test (local circuits): which, on which design (it's dropped once the design changes), and what it found */
-  /** The boost-and-fire load test of the derived design (the POWER panel's warning, the overlay's browned-out parts) */
-  private loadRun: { for: ShipDerived; result: LoadTestResult } | null = null;
-  bothTest(): LoadTestResult | null {
-    const d = this.derived;
-    if (!d) return null;
-    if (this.loadRun?.for !== d) this.loadRun = { for: d, result: loadTest(d, this.deps.tuning, { fire: true, thrust: true, boost: true, seconds: LOAD_TEST_SECONDS }) };
-    return this.loadRun.result;
-  }
   grantAll = false;
   private owned: Bag = {};
   /** The slot being edited, the plan it was loaded from, and what was last saved (to spot unsaved edits) */
@@ -581,21 +562,16 @@ export class HangarUI implements HangarHost {
     this.draw();
   }
 
-  /** The design's derived state (as built whole), and its power report */
+  /** The design's derived state (as built whole) */
   private rederive(): void {
-    const { catalog, tuning, econ } = this.deps;
-    // (Every design runs on the ports core: an older pool design opened here is shown and saved as one; the server decides too)
+    const { catalog, tuning } = this.deps;
+    // (Every design runs on the ports core; the marker is kept on what the hangar saves, as the server does)
     this.bp.power = 'ports';
     try {
       this.derived = createShipState(catalog, tuning, 0, this.bp, 0).derived;
     } catch {
       this.derived = null;
     }
-    const name = (i: number) => {
-      const p = this.bp.parts[i], fn = catalog.functions.get(p.fn);
-      return fn?.model && fn.name ? fn.name : econ.items.name(partItemId(p)).split(' · ')[0];
-    };
-    this.power = this.derived ? powerReport(catalog, this.bp, this.derived, this.geoms, name) : null;
   }
 
   /** The lit layer shows the built parts (not ghosts), wrecked ones damaged */
@@ -737,21 +713,7 @@ export class HangarUI implements HangarHost {
 
   draw(): void { syncDelta(this); return draw(this); }
 
-  feedPreviewKey = '';
-  feedPreviewFor: ShipDerived | null = null;
-  feedPreviewVal: { feeds: number[]; hint: string } | null = null;
-
-  feedPreview(cand: PlacedPart): { feeds: number[]; hint: string } | null { return feedPreview(this, cand); }
-
-  drawFeedPreview(cand: PlacedPart, g: PlacedGeom, sx: (x: number) => number, sy: (y: number) => number): void { return drawFeedPreview(this, cand, g, sx, sy); }
-
   drawWindow(w: TurretWindow, sx: (x: number) => number, sy: (y: number) => number, alpha: number, ctx = this.ctx): void { return drawWindow(this, w, sx, sy, alpha, ctx); }
-
-  drawPower(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number): void { return drawPower(this, d, sx, sy); }
-
-  drawBanks(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number, ring: number): void { return drawBanks(this, d, sx, sy, ring); }
-
-  boltGlyph(cx: number, cy: number, r: number, color: string): void { return boltGlyph(this, cx, cy, r, color); }
 
   drawMounting(g: PlacedGeom, broken: MountingProblem[], sx: (x: number) => number, sy: (y: number) => number, all: boolean): void { return drawMounting(this, g, broken, sx, sy, all); }
 

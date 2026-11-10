@@ -48,7 +48,7 @@ export function playerRows(h: RowHost, keys: RowKeys, num: number, rows: SnapRow
     if (InSystem.systemId[eid] !== num) continue;
     const beam = h.ships.beamState(eid);
     const ship = h.ships.get(eid);
-    // (The charge, packed: the whole gauge, the pool's, and the charge groups (the pool's, then each bank's), energy.ts packCharge)
+    // (The charge, packed: the whole gauge, the layout's sig, and the parts' triples, energy.ts packCharge)
     const charge = packCharge(ship?.derived, h.ships.chargeOf(eid));
     const field = h.ships.jumpFieldState(eid);
     const row = pushRow(rows, keys, {
@@ -64,8 +64,8 @@ export function playerRows(h: RowHost, keys: RowKeys, num: number, rows: SnapRow
       av: quantizeShipValue('angVel', ship?.angVel ?? 0),
       hp: Math.round(Health.current[eid]),
       maxHp: Math.round(Health.max[eid]),
-      // data[0]: cursor/weapon state (see CURSOR_STATE.md); data[1]: the whole charge (the gauge); [8] the pool's, [9] how many
-      // charge groups, [13...] each group's charge: the pool's, then each bank's (reconciliation: energy.ts PILOT_ROW, packCharge / unpackCharge)
+      // data[0]: cursor/weapon state (see CURSOR_STATE.md); data[1]: the whole charge (the gauge); [8] the ports layout's sig, [9]
+      // -(the parts' triples' count), [13...] the triples (reconciliation: energy.ts PILOT_ROW, packCharge / unpackCharge)
       data: [
         packCursorWeaponState(Input.targetAngle[eid], beam.hit, h.ships.weaponBeamState(eid).on, beam.on),
         charge.total,
@@ -75,12 +75,12 @@ export function playerRows(h: RowHost, keys: RowKeys, num: number, rows: SnapRow
         h.ships.empTicksLeft(eid),          // knocked out by an EMP: ticks left (prediction drifts that long)
         Math.round((ship?.jumpScale ?? 1) * 1000), // this jump's speed scale (prediction)
         field.flags,                           // in a charging field: 1 a star's ring, 2 a lodestone's (bits)
-        charge.g,                              // [8] the ship pool's charge %
-        charge.count,                          // [9] charge groups that follow from [13] (1 + banks; a ports ship: -(its parts' triples))
+        charge.g,                              // [8] the ports layout's sig (100 for a ship with no state yet)
+        charge.count,                          // [9] -(its parts' triples) that follow from [13] (1 for a ship with no state yet)
         field.prime,                           // a lodestone's priming left, ticks (prediction)
         warmthPercent(h.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
         ship?.cargo ?? 0,                      // [12] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
-        ...charge.groups,                      // [13...] the pool's charge %, then each bank's (CHARGE_GROUPS_AT)
+        ...charge.groups,                      // [13...] the parts' triples (CHARGE_GROUPS_AT)
         // After the groups, the part features' values in features.wire.json pilotExtra order (features/strafer/strafer.ts
         // pilotExtras reads them): the Burst Strafer's dodge counter and way (ships/features/strafer), what the Tow Beam tows (+1: ships/features/tow)
         ...fxWire(h, eid),

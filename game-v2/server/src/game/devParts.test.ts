@@ -18,7 +18,11 @@ import { createShipBridge } from '../proto/createProtoServer.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const dev = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/dev/annihilator.json'), 'utf-8'));
+/** A design with dev parts: the starter with its hull and armour in the dev material (its models keep their own) */
+const dev = (() => {
+  const bp = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
+  return { ...bp, name: 'Dev Sparrow', parts: bp.parts.map((p) => (p.fn === 'hull' || p.fn === 'armor' ? { ...p, material: 'dev_singularity' } : p)) };
+})();
 const config = loadShipConfigCached(dataDir);
 const { catalog, tuning } = createShipBridge(config);
 

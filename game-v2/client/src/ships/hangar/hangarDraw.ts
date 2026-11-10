@@ -158,10 +158,8 @@ export function draw(host: HangarHost): void {
       ctx.beginPath(); ctx.arc(sx((A[0] + B[0]) / 2), sy((A[1] + B[1]) / 2), 2.5, 0, Math.PI * 2); ctx.fill();
     }
   }
-  // Power: generators, batteries and what lacks power, each network its own colour
-  if (d && !d.ports && host.overlays.power) host.drawPower(d, sx, sy);
-  // Energy (a ports design): ports, links with their flow, stores' fill, what the load test left short (portsGrid.ts)
-  if (d?.ports && host.overlays.energy) {
+  // Energy: ports, links with their flow, stores' fill, what the load test left short (portsGrid.ts)
+  if (d && host.overlays.energy) {
     host.ports.draw(ctx, d, host.geoms, { px, cx, cy, w, h, dpr });
     // (the moving pulses, ticks and crosses are their own animated layer: build/powerFlowView.ts)
     const ff = host.ports.flowFrame(d, host.geoms, { px, cx, cy, w, h, dpr });
@@ -210,12 +208,12 @@ if (d && host.overlays.com && d.mass > 0) {
         host.drawWindow(computeTurretWindow(all, all.map(() => true), all.length - 1, cand.facing, host.deps.tuning, arc), sx, sy, problem ? 0.4 : 0.8);
       }
       // Its ports, turned and flipped as it would go, and the parts they would link to (portsGrid.ts)
-      if (!d || d.ports) host.ports.drawGhost(ctx, d, host.geoms, cand, g, host.deps.catalog, { px, cx, cy, w, h, dpr }, !problem, (i) => host.partName(i));
+      host.ports.drawGhost(ctx, d, host.geoms, cand, g, host.deps.catalog, { px, cx, cy, w, h, dpr }, !problem, (i) => host.partName(i));
       if (problem) {
         ctx.fillStyle = '#fca5a5';
         ctx.font = '12px sans-serif';
         ctx.fillText(problem, sx(g.bbox.maxX) + 6, sy(g.bbox.minY) + 12);
-      } else host.drawFeedPreview(cand, g, sx, sy);
+      }
     }
   }
 }

@@ -5,7 +5,7 @@ import { loadContext } from './context';
 import { partKey } from './grid';
 import { buildLegend } from './legend';
 import { blueprintToParts, partsToBlueprint } from './partlist';
-import { REVIEW_SHIPS, bundledShips, ship } from './testShips';
+import { SAMPLE_SHIPS, bundledShips, ship } from './testShips';
 
 const ctx = loadContext();
 const keys = (bp: Blueprint) => bp.parts.map((p) => partKey(ctx, p)).sort();
@@ -30,7 +30,7 @@ describe('shipgen part list', () => {
   }
 
   it('reads the key section wherever it stands', () => {
-    const wren = ship('dev/review-wren');
+    const wren = ship('samples/review-wren');
     const gun = wren.parts.find((p) => p.fn === 'cannon_pip')!;
     const bp: Blueprint = { ...wren, parts: wren.parts.map((p) => (p === gun ? { ...p, material: 'composite' } : p)) };
     const text = blueprintToParts(ctx, bp).text;
@@ -41,7 +41,7 @@ describe('shipgen part list', () => {
   });
 
   it('carries paint, drive, rigid, mods and gems', () => {
-    const wren = ship('dev/review-wren');
+    const wren = ship('samples/review-wren');
     const bp: Blueprint = { ...wren, paint: '#336699', drive: 0.8, rigid: true, parts: wren.parts.map((p, i) => (i === 1 ? { ...p, mods: { x: 1 } as never } : p)) };
     const enc = blueprintToParts(ctx, bp);
     expect(enc.raw.map((r) => r.reason)).toContain('has mods or gems');
@@ -62,6 +62,6 @@ describe('shipgen part list', () => {
   });
 
   it('reads a ship the review set draws', () => {
-    for (const path of REVIEW_SHIPS) expect(partsToBlueprint(ctx, blueprintToParts(ctx, ship(path)).text).errors, path).toEqual([]);
+    for (const path of SAMPLE_SHIPS) expect(partsToBlueprint(ctx, blueprintToParts(ctx, ship(path)).text).errors, path).toEqual([]);
   });
 });

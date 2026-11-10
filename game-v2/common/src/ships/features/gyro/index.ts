@@ -62,15 +62,14 @@ export const feature: PartFeature = {
   applies: (fn) => (fn.gyro ?? 0) > 0,
   // (After the others: feature numbers follow (order, id), so theirs do not move)
   order: 60,
-  // It draws by the tick, only while the ship turns, and Drive Cell banks touching it feed it as they do engines
-  burst: 'engine',
+  // It draws by the tick, only while the ship turns
+  burst: true,
   derive(c) {
     let torque = 0;
     const parts: number[] = [];
     for (const i of c.parts) {
-      if (c.satisfaction[i] <= 0) continue;
       parts.push(i);
-      torque += gyroTorque(c.fns[i], c.area[i], c.mats[i]) * c.satisfaction[i];
+      torque += gyroTorque(c.fns[i], c.area[i], c.mats[i]);
     }
     if (!parts.length) return;
     torque = Math.round(torque * 1000) / 1000;

@@ -5,14 +5,14 @@ import { loadContext } from './context';
 import { blueprintToGrid, coreAxis2, gridToBlueprint, partKey } from './grid';
 import { asymmetricCells, halfOf, mirrorHalf } from './mirror';
 import { blueprintToParts, mergeParts, partsToBlueprint } from './partlist';
-import { REVIEW_SHIPS, ship } from './testShips';
+import { SAMPLE_SHIPS, ship } from './testShips';
 
 const ctx = loadContext();
 const keys = (bp: Blueprint) => bp.parts.map((p) => partKey(ctx, p)).sort();
 
 describe('shipgen mirror mode', () => {
   it('a review ship is the mirror of its own left half', () => {
-    for (const path of REVIEW_SHIPS) {
+    for (const path of SAMPLE_SHIPS) {
       const bp = ship(path);
       const half = halfOf(ctx, bp);
       expect(half.parts.length, path).toBeLessThan(bp.parts.length);
@@ -59,7 +59,7 @@ describe('shipgen mirror mode', () => {
   });
 
   it('names the cells that have no mirror twin', () => {
-    const wren = ship('dev/review-wren');
+    const wren = ship('samples/review-wren');
     const tip = wren.parts.reduce((a, p) => (p.x > a.x ? p : a));
     const lop: Blueprint = { ...wren, parts: wren.parts.filter((p) => p !== tip) };
     const asym = asymmetricCells(ctx, lop);
@@ -71,7 +71,7 @@ describe('shipgen mirror mode', () => {
 
 describe('shipgen part list', () => {
   it('round-trips every review ship', () => {
-    for (const path of REVIEW_SHIPS) {
+    for (const path of SAMPLE_SHIPS) {
       const bp = ship(path);
       const t = blueprintToParts(ctx, bp).text;
       const d = partsToBlueprint(ctx, t);

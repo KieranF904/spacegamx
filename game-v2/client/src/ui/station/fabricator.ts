@@ -7,7 +7,7 @@
  */
 
 import {
-  Bag, CraftRecipe, canCraft, partItemId, PIECE_NAMES, RARITY_COLOR, FN_NAMES, partStats, gradeOf, markName, unlocks, CATEGORY_LABEL, WIRE_ITEM, stationLearned, type ItemDef, type FunctionDef,
+  Bag, CraftRecipe, canCraft, partItemId, PIECE_NAMES, RARITY_COLOR, FN_NAMES, partStats, gradeOf, markName, unlocks, CATEGORY_LABEL, stationLearned, type ItemDef, type FunctionDef,
 } from '@space-game/common';
 import { FAMILY_LABEL, familyLabel, familyRank, keyStats, modelLock, sizeText, tradeOff } from '../../ships/modelCards';
 import { costHtml, itemTipHtml, showTip, hideTip } from '../windowKit';
@@ -331,7 +331,7 @@ export class FabricatorTab {
       rows.push(['Your ship', onShip ? `<span style="color:#86efac">${onShip} gun${onShip > 1 ? 's' : ''} that fire${onShip > 1 ? '' : 's'} it</span>` : '<span style="color:#8394ad">nothing that fires it</span>']);
     }
     // A component: the models it goes into (a wire spool: wiring)
-    if (outId === WIRE_ITEM) rows.push(['For', 'nothing now: ships no longer take wire (power flows between parts that touch)']);
+    if (outId === 'wire_spool') rows.push(['For', 'nothing now: ships no longer take wire (power flows between parts that touch)']);
     else if (d?.category === 'component') {
       const into = [...econ.ships.functions.values()].filter((f) => f.model && !f.exclusive && (f.pieces === '*' ? ['sq'] : f.pieces).some((pc) => (econ.recipes.recipeFor(partItemId({ material: f.material!, fn: f.id, piece: pc }))?.inputs[outId] ?? 0) > 0));
       if (into.length) rows.push(['Goes into', esc(into.map((f) => f.name ?? f.id).join(', '))]);

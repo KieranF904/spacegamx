@@ -22,7 +22,7 @@ import { newSimShip, simAim, simAimQ, NO_INPUT, stepShip, appliedAimQ, type SimE
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const fixture = (n: string) => readFileSync(join(SHIP_DATA_DIR, `blueprints/fixtures/${n}.json`), 'utf-8');
+const fixture = (n: string) => readFileSync(join(SHIP_DATA_DIR, `blueprints/${n}.json`), 'utf-8');
 const envAt = (t: number): SimEnv => ({ tick: t, tuning, gravity: null, fields: NO_FIELDS, terrain: null });
 const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 
@@ -116,7 +116,7 @@ describe('the held aim angle (sim/aimHold.ts)', () => {
       // (nobody flying: the heading held whatever the aim)
       ['hold', (t) => ({ ...NO_INPUT, q: sweep(0.05)(t), bits: CTL.hold }), 0.999],
     ];
-    for (const make of [plain('sparrow-t'), plain('corsair'), plain('galleon')]) for (const [name, script, share] of scripts) {
+    for (const make of [plain('sparrow-t'), plain('bulwark'), plain('ark-tender')]) for (const [name, script, share] of scripts) {
       const r = trio(make, script);
       expect(r.moved, name).toBeGreaterThan(100);
       expect(r.held / r.moved, name).toBeGreaterThanOrEqual(share);
@@ -136,7 +136,7 @@ describe('the held aim angle (sim/aimHold.ts)', () => {
 
   it('guns: turrets slewing and pointed, fixed guns\' gimbals, every firing model, clicks: every shot and the gun state the same', () => {
     const fire = (t: number) => (t % 110 < 70) && !(t % 37 === 0);
-    const rigs: [string, () => ShipState][] = [['corsair', plain('corsair')], ['sparrow', plain('sparrow-t')], ['galleon', plain('galleon')], ...Object.entries(kinds).map(([k, m]) => [k, armed(m)] as [string, () => ShipState])];
+    const rigs: [string, () => ShipState][] = [['bulwark', plain('bulwark')], ['sparrow', plain('sparrow-t')], ['ark-tender', plain('ark-tender')], ...Object.entries(kinds).map(([k, m]) => [k, armed(m)] as [string, () => ShipState])];
     for (const [name, make] of rigs) {
       for (const q of [sweep(0.02), sweep(0.2), marks]) {
         const r = trio(make, (t) => ({ ...NO_INPUT, q: q(t), bits: t % 90 < 45 ? CTL.forward : CTL.helm | CTL.right, fire: name === 'semi' ? t % 23 < 2 : fire(t), aimDist: 300 + 5 * (t % 60) }));

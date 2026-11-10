@@ -36,7 +36,6 @@ export const feature: PartFeature = {
   order: 100,
   derive(c) {
     for (const i of c.parts) {
-      if (c.satisfaction[i] <= 0) continue;
       const list = (c.out.shaped ??= { shields: [] }).shields;
       if (list.length >= MAX_SHAPED) break;
       const s = shapedAt(c.fns[i], c.mats[i], i, c.mounts[i]);

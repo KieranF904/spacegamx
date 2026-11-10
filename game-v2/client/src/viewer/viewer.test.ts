@@ -94,7 +94,7 @@ const sources: AssetSources = {
   blueprints: [
     { path: 'sparrow-t', name: 'Sparrow T' }, { path: 'enemy/pirate_raider', name: 'Pirate Raider' },
     { path: 'enemy/scrap_mother', name: 'Scrap Mother', bespoke: true, rigid: true }, { path: 'enemy/giant_mammoth', name: 'Redtooth Mammoth' },
-    { path: 'dev/annihilator', name: 'Dev Annihilator' },
+    { path: 'dev/ports-heron', name: 'Heron' },
   ],
   models: [{ id: 'laser_glint', name: 'Glint', family: 'laser', mount: 'turret' }, { id: 'cannon_pip', name: 'Pip', family: 'cannon', mount: 'fixed' }],
   materials: [{ id: 'alloy', name: 'Alloy', grade: 1 }, { id: 'scrap_rust', name: 'Scrapborn Rust', grade: 3 }],
@@ -118,7 +118,7 @@ describe('viewer assets', () => {
     expect(ids[0]).toBe('sheet:models');
     expect(ids).toContain('ship:enemy/scrap_mother');
     expect(ids.indexOf('model:cannon_pip')).toBeLessThan(ids.indexOf('model:laser_glint'));
-    expect(ids).toEqual(expect.arrayContaining(['material:scrap_rust', 'piece:round2', 'ship:dev/annihilator']));
+    expect(ids).toEqual(expect.arrayContaining(['material:scrap_rust', 'piece:round2', 'ship:dev/ports-heron']));
   });
 
   it('searches by every word', () => {

@@ -1,4 +1,4 @@
-// The ship library (data/ships/blueprints: player ships, enemy/, dev/) for "start from", and Save: a valid design written
+// The ship library (data/ships/blueprints: player ships, enemy/, dev/; and shipgen's samples) for "start from", and Save: a valid design written
 // as dev/gen-<role>-<n>.json, a normal blueprint the in-game F9 panel can fly.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -8,12 +8,14 @@ import { EngineError } from './errors';
 
 export interface LibraryShip { id: string; name: string; group: string }
 
-const GROUPS: [string, string][] = [['', 'Player ships'], ['dev', 'Dev ships'], ['enemy', 'Enemy ships']];
+const GROUPS: [string, string][] = [['', 'Player ships'], ['dev', 'Dev ships'], ['enemy', 'Enemy ships'], ['samples', 'Samples']];
+/** A group's folder: under data/ships/blueprints, or shipgen's own samples (data/shipgen/samples) */
+const dirOf = (blueprints: string, sub: string) => (sub === 'samples' ? join(blueprints, '..', '..', 'shipgen', 'samples') : sub ? join(blueprints, sub) : blueprints);
 
 export function listLibrary(blueprints: string): LibraryShip[] {
   const out: LibraryShip[] = [];
   for (const [sub, group] of GROUPS) {
-    const d = sub ? join(blueprints, sub) : blueprints;
+    const d = dirOf(blueprints, sub);
     if (!existsSync(d)) continue;
     for (const f of readdirSync(d).filter((x) => x.endsWith('.json')).sort()) {
       const id = `${sub ? `${sub}/` : ''}${f.slice(0, -5)}`;
@@ -25,12 +27,12 @@ export function listLibrary(blueprints: string): LibraryShip[] {
   return out;
 }
 
-const ID = /^(?:(dev|enemy)\/)?([\w.-]+)$/;
+const ID = /^(?:(dev|enemy|samples)\/)?([\w.-]+)$/;
 
 export function loadLibrary(blueprints: string, id: string): Blueprint {
   const m = ID.exec(id);
   if (!m || m[2].startsWith('.')) throw new EngineError(400, `bad ship id: ${id}`);
-  const p = join(blueprints, ...(m[1] ? [m[1]] : []), `${m[2]}.json`);
+  const p = join(dirOf(blueprints, m[1] ?? ''), `${m[2]}.json`);
   if (!existsSync(p)) throw new EngineError(404, `no ship ${id}`);
   return parseBlueprint(readFileSync(p, 'utf8'));
 }

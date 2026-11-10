@@ -1,7 +1,7 @@
 /**
  * @contract feature.flash.common
  * owns:       the Flash Screen part feature, shared half: the shield points a rebuild derives for the Flash Screens
- * needs:      PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks, bank cost)
+ * needs:      PartFeature, grades.ts fnOutput, flash/flash.ts (restore ticks)
  * invariants: the feature is in the registry, its folder matches its id and its wire slots and input bits are the
  *             pinned ones (none dropped) — common/src/ships/features/flash/contract.test.ts
  *             a ship without the part carries nothing of the feature, and facts are finite, labelled and repeat
@@ -21,7 +21,7 @@
 
 import type { PartFeature } from '../types.js';
 import { fnOutput } from '../../grades.js';
-import { FLASH_RESTORE_TICKS, FLASH_BANK_COST } from './flash.js';
+import { FLASH_RESTORE_TICKS } from './flash.js';
 
 export const feature: PartFeature = {
   id: 'flash',
@@ -30,9 +30,8 @@ export const feature: PartFeature = {
   order: 50,
   derive(c) {
     for (const i of c.parts) {
-      if (c.satisfaction[i] <= 0) continue;
       const f = c.out.flash ??= { max: 0, parts: [] };
-      f.max += (c.fns[i].shield ?? 0) * c.area[i] * fnOutput(c.fns[i], c.mats[i]) * c.satisfaction[i];
+      f.max += (c.fns[i].shield ?? 0) * c.area[i] * fnOutput(c.fns[i], c.mats[i]);
       f.parts.push(i);
     }
     if (c.out.flash) c.out.flash.max = Math.round(c.out.flash.max * 100) / 100;
@@ -41,7 +40,7 @@ export const feature: PartFeature = {
     const s = FLASH_RESTORE_TICKS / 60;
     return [{
       feature: 'flash', key: 'restore', label: 'Returns whole', value: s, unit: 's', tier: 'stat',
-      sentence: `no slow refill: it returns whole ${s} s after it breaks, or at once for ${FLASH_BANK_COST} E a point from a Capacitor bank touching it`,
+      sentence: `no slow refill: it returns whole ${s} s after it breaks`,
       short: `returns whole ${s} s after it breaks`,
       chip: `back in ${s} s`,
     }];

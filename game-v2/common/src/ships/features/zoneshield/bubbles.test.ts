@@ -12,7 +12,7 @@ import { join } from 'path';
 import { parseBlueprint } from '../../blueprint.js';
 import { loadCatalog, PLAYER_BUBBLE_MODELS } from '../../catalog.js';
 import { createShipState, type ShipState } from '../../state.js';
-import { readCatalogFiles, readShipJson, SHIP_DATA_DIR } from '../../testData.js';
+import { feedParts, readCatalogFiles, readShipJson, SHIP_DATA_DIR } from '../../testData.js';
 import type { ShipTuning } from '../../tuning.js';
 import type { Blueprint, PlacedPart, Rot } from '../../types.js';
 import { newPartHit, partHit, type HitCtx } from '../../hitRules.js';
@@ -22,9 +22,15 @@ const tuning: ShipTuning = readShipJson('tuning.json');
 const BUBBLES = ['shield_deflector', 'shield_flicker_screen', 'shield_flash_screen', 'shield_bulwark_projector'];
 const pieceOf = (fn: string) => (fn === 'shield_bulwark_projector' ? 'block2' : fn === 'shield_flicker_screen' ? 'round' : 'sq');
 
-const sparrow = (cat: ReturnType<typeof loadCatalog>, fn?: string, y = 0): ShipState => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
-  if (fn) bp.parts.push({ uid: 70, piece: pieceOf(fn), fn, material: cat.functions.get(fn)!.material, x: -2, y, rot: 0 as Rot, flip: false } as PlacedPart);
+/** The starter with a bubble shield on its left (the Bulwark Projector, 2x2, ahead of its left reactor), fed by a Cell Reactor across its in ports */
+const sparrow = (cat: ReturnType<typeof loadCatalog>, fn?: string): ShipState => {
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
+  if (fn) {
+    const big = pieceOf(fn) === 'block2';
+    bp.parts.push({ uid: 70, piece: pieceOf(fn), fn, material: cat.functions.get(fn)!.material, x: -2, y: big ? -2 : 0, rot: 0 as Rot, flip: false } as PlacedPart);
+    // (Production catalogs give a bubble no ports to feed: it's off)
+    if (cat.functions.get(fn)!.ports?.length) feedParts(cat, bp, [70]);
+  }
   return createShipState(cat, tuning, 1, bp, 0);
 };
 
@@ -65,7 +71,7 @@ describe('the ship-wide bubbles', () => {
     const production = loadCatalog(readCatalogFiles());
     const bp: Blueprint = { name: 'enemy', catalogVersion: 1, parts: [
       { uid: 0, piece: 'rect2', fn: 'core', material: 'alloy', x: 0, y: 0, rot: 0, flip: false },
-      { uid: 1, piece: 'sq', fn: 'power_cell_reactor', material: 'alloy', x: 0, y: 1, rot: 0, flip: false },
+      { uid: 1, piece: 'sq', fn: 'generator', material: 'alloy', x: 0, y: 1, rot: 0, flip: false },
       { uid: 2, piece: 'sq', fn: 'shield', material: 'steel', x: 1, y: 1, rot: 0, flip: false },
     ] } as never;
     const e = createShipState(production, tuning, 2, bp, 0);

@@ -17,7 +17,7 @@ import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
 import { inertBody } from '../state/trainingBodies';
 import {
-  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL, mineFalloff,
+  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, pulseProfile, MINING_PULSE, MINE_TAIL, mineFalloff,
   type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition, type PortsLayout, type PortsState,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
@@ -38,7 +38,7 @@ import { JumpFx } from './JumpFx';
 import { canHurt, canHeal } from './sides';
 import { beamLook, type BeamLook } from '../rendering/weapons/weaponStyles';
 import './energyLooks';
-import { drawCone, drawStrands, sputterGain } from './beamLookFx';
+import { drawCone, drawStrands } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
 import { LanceFx } from './LanceFx';
 import { PieceStarts, ownPiecePhase, pieceLook } from './beamPieces';
@@ -139,7 +139,6 @@ export class MiningBeamFx {
       const gimbal = mt.gimbalDeg * Math.PI / 180;
       for (let mi = 0; mi < ship.derived.miners.length; mi++) {
         const m = ship.derived.miners[mi];
-        if (m.satisfaction <= 0.01) continue;
         const [x, y] = shipPointToWorld(ship, pose, m.muzzle, this.tuning.cellSize);
         const facing = pose.angle + Math.PI / 2 + Math.atan2(m.dir[1], m.dir[0]);
         let off = Math.atan2(aimY - y, aimX - x) - facing;
@@ -172,7 +171,7 @@ export class MiningBeamFx {
         if (!runs.length) continue;
         miningSeen.add(key);
         if (id === this.state.playerId && t < 0.999 && this.rockId >= 0 && !m.gas && (!pz || pz.phase[mi] >= 0)) {
-          this.onOwnCut?.(this.rockId, hx, hy, mt.dps * m.satisfaction * (pz ? pz.fill[mi] : 1) * mineFalloff(t * reach, mt.range), this.dt, m.material);
+          this.onOwnCut?.(this.rockId, hx, hy, mt.dps * (pz ? pz.fill[mi] : 1) * mineFalloff(t * reach, mt.range), this.dt, m.material);
         }
         // (Its newest pulse sets the beam's brightness; older ones are trailing off under it)
         const rock = t < 0.999 ? rockMaterial(this.rockHit) : null;
@@ -270,9 +269,7 @@ export class MiningBeamFx {
         // (A model's own look, if it has one: BEAM_LOOKS)
         if (look) { outer = look.outer ?? outer; mid = look.mid ?? mid; core = look.core ?? core; }
         const wid = (w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1) * pw;
-        // (Short of power a model with a sputter breaks up: your own ship's feed is known; others' beams burn steady)
-        const starved = !!look?.sputter && id === this.state.playerId && feedShare(ship.derived, this.state.charge, w.part, 'gun') < BROWNOUT;
-        const gain = (starved ? sputterGain(look!.sputter, this.t, id + w.part) : 1) * pg;
+        const gain = pg;
         const bl = Math.hypot(hx - x, hy - y) || 1, bux = (hx - x) / bl, buy = (hy - y) / bl;
         const hold = this.held(id * 256 + w.part, hx, hy, t < 0.999, this.dt);
         // How far up its ramp a beam that gets hotter the longer it burns one spot has come (the Cutter's: 0 to 1)
@@ -340,14 +337,13 @@ export class MiningBeamFx {
     if (L && pe && pe.held.length === L.n && L.cap[p] > 0) {
       charge = pe.closed[p] > 0 || (pe.flags[p] & PF_LIT) ? 0 : Math.min(1, pe.held[p] / L.cap[p]);
     } else if (L && L.cap[p] > 0 && L.rate[p] > 0) charge = this.lanceGuess(id * 256 + p, lit, L.rest[p], L.cap[p] / L.rate[p]);
-    const starved = !!look?.sputter && own && feedShare(ship.derived, this.state.charge, p, 'gun') < BROWNOUT;
     const len = Math.hypot(hx - x, hy - y) || 1;
     const base = this.tuning.weapons?.lance?.width ?? 1;
     this.lanceFx.draw(g, id * 256 + p, {
       // (a burn rides a ship it lands on; wreckage and rock only flare)
       lit, charge, x, y, ux: (hx - x) / len, uy: (hy - y) / len, len, hit: t < 0.999, target: this.source.bodies.get(target)?.kind === 'ship' ? target : -1,
       wid: 11 * ((def.width ?? base) / base) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1) * pw,
-      colors, gain: (starved ? sputterGain(look!.sputter, this.t, id + p) : 1) * pg,
+      colors, gain: pg,
     }, this.dt, Math.min(4, this.dt * 60), this.poseOf);
   }
 

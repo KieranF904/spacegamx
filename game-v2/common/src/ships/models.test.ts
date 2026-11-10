@@ -16,7 +16,6 @@ import { gunDef, partWeaponDef } from './launch.js';
 import { partBuildPoints, partGrade, partSupply, partThrust, weaponSizeFactor, weaponStrength } from './grades.js';
 import { partArmour } from './damage.js';
 import { legacyCandidates, legacyModel, migrateBlueprint, migrateItemStack, migratePartItem } from './migrate.js';
-import { isPowerPart } from './wires.js';
 import { describePart } from './describe.js';
 import type { ShipTuning } from './tuning.js';
 import { readShipJson, readCatalogFiles, testCatalog, SHIP_DATA_DIR } from './testData.js';
@@ -91,7 +90,6 @@ describe('models', () => {
     expect(validateBlueprint(catalog, b, tuning, null).errors).toEqual([]);
     const s = createShipState(catalog, tuning, 1, b, 0);
     const w = s.derived.weapons[0];
-    expect(w.satisfaction).toBe(1);
     expect(w.size).toBe(1);
     expect(w.grade).toBe(FN('cannon_hammer').grade);
     expect(w.model).toBe(FN('cannon_hammer').weaponMods);
@@ -129,7 +127,6 @@ describe('models', () => {
     // Its push: two ion drives, as two thrusters pushed
     expect(d.maxThrust.forward).toBeCloseTo(2 * FN('thruster').thrust!, 6);
     expect(d.weapons).toHaveLength(2);
-    expect(d.weapons.every((w) => w.satisfaction === 1)).toBe(true);
   });
 
   it('the Conduit and the Diode: plain relay data (holds 10, gives and takes 200), cheap, from level 0 and 4, and say what they do', () => {
@@ -509,8 +506,8 @@ describe('migration: legacy parts become models', () => {
       expect(b.parts.filter((q) => FN(q.fn).legacy).map((q) => q.fn)).toEqual([]);
       // (Its Cloudmaker is a side mount that lies where the flak gun's edge was: flagged, as a saved ship is)
       expect(validateBlueprint(catalog, b, tuning, null, { mounting: false }).errors).toEqual([]);
-      // (Auto-wired when built: no wires of its own)
-      expect(b.wires).toBeUndefined();
+      // (No wires of its own: power runs through the parts' ports)
+      expect((b as { wires?: unknown }).wires).toBeUndefined();
     }
     const parts = out.ship.blueprint.parts;
     const byUid = (u: number) => parts.find((q) => q.uid === u)!;
@@ -549,9 +546,10 @@ describe('migration: legacy parts become models', () => {
     // The licences schematics taught mean nothing now (everything opens by level): they go
     expect(out.recipes).toEqual([]);
     expect(partLicensed({ fn: 'railgun_needle', material: FN('railgun_needle').material! }, out.recipes, out.level)).toBe(out.level >= FN('railgun_needle').unlock!.level);
-    // Flies: every power part on a powered network
+    // Flies: it builds, its engines push and its generators make power
     const d = createShipState(catalog, tuning, 1, out.ship.blueprint, 0).derived;
-    out.ship.blueprint.parts.forEach((q, i) => { if (isPowerPart(FN(q.fn)) && d.alive[i]) expect(d.networks[d.network[i]]?.powered, q.fn).toBe(true); });
+    expect(d.maxThrust.forward).toBeGreaterThan(0);
+    expect(d.energy.supply).toBeGreaterThan(0);
   });
 
   it('a version 4 save is left as it is; without the catalogue a version 3 one waits', () => {

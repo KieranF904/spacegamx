@@ -6,14 +6,13 @@ import { createShipState } from '../../state.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
 import type { ShipTuning } from '../../tuning.js';
 import { DEFAULT_TOW, canTow, towAnswer, towLoad, towPull, towTuning } from './tow.js';
-import { gunLoad } from '../../energy.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 /** The Sparrow with a Tow Beam on its left flank, emitter out to the left */
 const TOW_PART = { uid: 70, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -3, y: 0, rot: 0, flip: false, facing: 'W' };
 const sparrow = (extra: object[] = []) => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0);
 };
@@ -34,15 +33,8 @@ describe('Tow Beam: the part', () => {
     expect(towTuning(tuning).range).toBeGreaterThan(0);
   });
 
-  it('draws only while it tows (on its circuit, as a gun does)', () => {
-    const ship = sparrow([TOW_PART]);
-    const part = ship.derived.fx!.tow!.parts[0];
-    const f = ship.derived.power!.feedOf[part];
-    expect(f).toBeGreaterThanOrEqual(0);
-    const idle = gunLoad(ship, 0) ?? [];
-    expect(idle[f] ?? 0).toBe(0);
-    const towing = gunLoad({ ...ship, tow: 99 }, 0)!;
-    expect(towing[f]).toBeCloseTo(ship.derived.power!.draw[part], 6);
+  it('is no steady load: it draws only while it tows', () => {
+    expect(sparrow([TOW_PART]).derived.energy.demand).toBe(sparrow().derived.energy.demand);
   });
 });
 

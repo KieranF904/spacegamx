@@ -21,7 +21,7 @@ const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
 const sparrow: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
-const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/corsair.json'), 'utf-8'));
+const corsair: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/bulwark.json'), 'utf-8'));
 /** The Sparrow with a Burst Strafer on each flank and a Tow Beam under its left wing, in place of the wing's armour tip (a Tug-ish Dancer) */
 const fitted: Blueprint = {
   ...sparrow,

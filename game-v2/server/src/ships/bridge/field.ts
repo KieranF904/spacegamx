@@ -47,7 +47,7 @@ export function refitInFlight(b: BridgeCtx, eid: number, bp: Blueprint, ghosts: 
   ship.shield = Math.min(was.shield, ship.derived.shieldMax);
   // (What each kept part held stays; a new part starts empty)
   if (held) {
-    if (ship.derived.ports && held.e) b.setCharge(eid, { g: 100, b: [], e: remapPortsByIndex(held.e, ship.derived.ports, keep) });
+    if (held.e) b.setCharge(eid, { e: remapPortsByIndex(held.e, ship.derived.ports, keep) });
     else b.setCharge(eid, remapCharge(before, ship.derived, held));
   }
   // (Keep the standing parts where they were: a part taken away moves the centre of mass)

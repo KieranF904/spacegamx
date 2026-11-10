@@ -7,8 +7,7 @@
  */
 
 import { DragPaint } from '../build/dragPaint';
-import { SIDES, partItemId, PlacedPart, Side, Vec2, placeGeometry, overlapsAny, facingProblem, geomContainsPoint, nextFreeUid, partNeedsFacing, gunFacing, hasFixedBarrel, wireCells, cellKey, mountingOf, partMountingProblems, type MountingProblem } from '@space-game/common';
-import { pruneWires } from '../wireEdit';
+import { SIDES, partItemId, PlacedPart, Side, Vec2, placeGeometry, overlapsAny, facingProblem, geomContainsPoint, nextFreeUid, partNeedsFacing, gunFacing, hasFixedBarrel, mountingOf, partMountingProblems, type MountingProblem } from '@space-game/common';
 import { modelLock } from '../modelCards';
 import { TURN_KEYS, partUnder, tryTurn } from '../build/editPlaced';
 import { ruleText } from './hangarTips';
@@ -113,7 +112,6 @@ export function turnPlaced(ui: HangarUI, code: string): boolean {
   ui.aids.edit(() => {
     ui.bp.parts[i] = r.part;
     const note = ui.aids.followTurn(i, ui.mouse!);
-    if (ui.bp.wires) ui.bp.wires = pruneWires(ui.bp.wires, onHull(ui));
     ui.status(r.said + note);
     ui.refresh();
   });
@@ -161,19 +159,11 @@ export function remove(ui: HangarUI, g: Vec2, mirrored = false): void {
   ui.aids.edit(() => {
     // (What it held on to stays, planned and not connected, until something joins it again)
     ui.bp.parts = ui.bp.parts.filter((_, k) => k !== i);
-    // (wire laid over what's gone goes with it)
-    if (ui.bp.wires) ui.bp.wires = pruneWires(ui.bp.wires, onHull(ui));
     ui.refresh();
     // (symmetry: the part across the centre line goes too)
     const m = mirrored ? null : ui.aids.mirrorOf(g);
     if (m) remove(ui, m, true);
   });
-}
-
-/** Is a cell under one of the design's parts (where saved wire stays) */
-export function onHull(ui: HangarUI): (x: number, y: number) => boolean {
-  const cells = wireCells(ui.deps.catalog, ui.bp, ui.bp.parts.map((p) => placeGeometry(ui.deps.catalog, p)));
-  return (x, y) => cells.has(cellKey(x, y));
 }
 
 export function newBlueprint(ui: HangarUI): void {

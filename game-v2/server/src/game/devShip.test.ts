@@ -50,12 +50,12 @@ describe('dev ship swap', () => {
     server.step(2);
     expect(bridge.get(pid)!.blueprint.name).toBe(own);
 
-    // A dev test ship (blueprints/dev: never in the plan library), its guns hitting as hard as its material says
-    expect(bridge.library.has('annihilator')).toBe(false);
-    t.send({ type: 'devShip', ship: 'annihilator' } as any);
+    // A dev test ship (blueprints/dev: never in the plan library)
+    expect(bridge.library.has('ports-wren')).toBe(false);
+    t.send({ type: 'devShip', ship: 'ports-wren' } as any);
     server.step(2);
-    expect(bridge.get(pid)!.blueprint.name).toBe('Dev Annihilator');
-    expect(bridge.get(pid)!.derived.weapons.length).toBe(8);
+    expect(bridge.get(pid)!.blueprint.name).toBe('Wren');
+    expect(bridge.get(pid)!.derived.weapons.length).toBe(2);
   });
 
   it('losing a borrowed ship gives your own back: nothing salvaged, nothing on order, no wreck', () => {

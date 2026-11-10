@@ -31,7 +31,7 @@ function ship(id: number): SimShipState {
   const s = createShipState(catalog, tuning, id, corsair(), 0);
   // (A ring round the centre, each flying in: they meet and push each other about)
   const a = (id / N) * Math.PI * 2;
-  const r = 600 + (id % 3) * 90;
+  const r = 480 + (id % 3) * 70;
   return newSimShip({ id, derived: s.derived, ship: s, body: { x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0, angle: a + Math.PI, angVel: 0, jump: 0, cargo: 0 }, charge: FULL_CHARGE });
 }
 

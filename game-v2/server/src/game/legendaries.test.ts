@@ -22,9 +22,10 @@ const files = readGameDataFiles(dataDir);
 const X = 25000, Y = 20000;
 const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
 
-/** A pilot whose first gun is this weapon model, held at (X, Y). `pool`: on the pool-era starter (a fixture), whose clip
- * regrows a round at a time (on the ports core a clip is the gun's buffer, filling at its feed: guns.ts) */
-function pilotWith(model: string, pool = false) {
+/** A pilot whose first gun is this weapon model, held at (X, Y). `fed`: its guns never want for power (the gun range's
+ * flag, types.ts Blueprint.range), so its clip regrows a round at a time by its model (powered, a clip is the gun's
+ * buffer, filling at its feed: guns.ts) */
+function pilotWith(model: string, fed = false) {
   resetGlobals();
   const server = new GameServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
@@ -34,7 +35,7 @@ function pilotWith(model: string, pool = false) {
   t.send({ type: 'join', username: 'pilot' } as any);
   const pid = t.getPlayerId();
   const ships = server.getShips()!;
-  const bp = pool ? parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8')) : ships.get(pid)!.blueprint;
+  const bp = fed ? { ...ships.get(pid)!.blueprint, range: true as const } : ships.get(pid)!.blueprint;
   let n = 0;
   ships.respawnInPlace(pid, { ...bp, parts: bp.parts.map((q) => ((q.fn === 'cannon_pip' || isWeaponFn(q.fn)) && n++ < 1 ? { ...q, fn: model } : q)) });
   const hold = () => { Position.x[pid] = X; Position.y[pid] = Y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };

@@ -11,7 +11,7 @@ import { STEPS } from './staged';
 import { critique } from './critic';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const STARTER = { ...findRole(ctx, 'starter')!, example: undefined };
 
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });

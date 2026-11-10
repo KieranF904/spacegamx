@@ -7,7 +7,7 @@ import { check } from './check';
 import { gridToBlueprint } from './grid';
 import { feedbackMessage, rulesShort, rulesText, shownLegend, systemPrompt } from './prompt';
 import { briefCheck, loadRoles, type Selector } from './roles';
-import { BLUEPRINTS } from './testShips';
+import { DATA_DIR, shipFile } from './context';
 
 const ctx = loadContext();
 const roles = loadRoles(ctx).roles;
@@ -26,7 +26,7 @@ describe('shipgen roles and prompt', () => {
         for (const f of list(s.family)) expect(families.has(f), `${r.id}: family ${f}`).toBe(true);
         for (const p of list(s.role)) expect(powerRoles.has(p), `${r.id}: role ${p}`).toBe(true);
       }
-      if (r.example) expect(existsSync(join(BLUEPRINTS, `${r.example}.json`)), r.example).toBe(true);
+      if (r.example) expect(existsSync(shipFile(DATA_DIR, r.example)), r.example).toBe(true);
     }
   });
 

@@ -2,7 +2,7 @@
 //   npx tsx scripts/shipgen/cli.ts --list
 //   npx tsx scripts/shipgen/cli.ts --model gemma4:12b --role starter --rounds 3
 //   npx tsx scripts/shipgen/cli.ts --mode evolve --model qwen3:4b --role gunship --generations 3 --population 4 --keep 2
-//   npx tsx scripts/shipgen/cli.ts --mode evolve --model qwen3:4b --seed data/ships/blueprints/dev/review-wren.json
+//   npx tsx scripts/shipgen/cli.ts --mode evolve --model qwen3:4b --seed data/shipgen/samples/review-wren.json
 //   npx tsx scripts/shipgen/cli.ts --mode compare --models qwen3:4b,gemma4:12b --role starter --trials 3 --rounds 4
 //   npx tsx scripts/shipgen/cli.ts --model gemma4:12b --role gunship --build staged --rounds 3   (skeleton, then power, guns, engines, armour)
 //   ... --contract auto|grid-text|grid-json|parts (auto: the model's measured best, loop/modelPrefs.ts)  --no-mirror (draw the whole ship)

@@ -14,14 +14,15 @@ import {
   dodgePhase, stepDodge, strafeForce, dodgeLoad, burstEnergy, pilotExtras, chooseDodgeDir, dodgeDirOf, dodgeVec, oppositeDir, bestDodge,
   dodgeAffordable, DODGE_DIRS, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK, type StrafeInfo,
 } from './strafer.js';
-import { FULL_CHARGE, chargeTotal, CHARGE_GROUPS_AT, PILOT_ROW, type Charge } from '../../energy.js';
+import { FULL_CHARGE, fullPortsCharge, CHARGE_GROUPS_AT, PILOT_ROW, type Charge } from '../../energy.js';
+import { createPortsState } from '../../power/ports.js';
 import { packKeyframe, unpackKeyframe } from '../../../network/replication.js';
 import { encodeInputBinary, decodeInputBinary } from '../../../network/protocol.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 
-const sparrowBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+const sparrowBp = () => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
 const ship = (extra: object[] = []) => {
   const bp = sparrowBp();
   bp.parts.push(...(extra as never[]));
@@ -31,10 +32,20 @@ const ship = (extra: object[] = []) => {
 const RIGHT_FLANK = { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' };
 /** And one on the left flank, nozzle out to the left: it dodges the ship right */
 const LEFT_FLANK = { uid: 61, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: -2, y: 0, rot: 0, flip: false, facing: 'W' };
-/** A Drive Cell touching the right-flank strafer */
-const CELL = { uid: 62, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: 3, y: -1, rot: 0, flip: false };
-
-const testStrafer = () => createShipState(catalog, tuning, 1, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/dev/test-strafer.json'), 'utf-8')), 0).derived;
+/**
+ * The starter with strafers every way (what the old dev Test Strafer had): two at the nose (facing N: push back), two at
+ * the tail in place of its side hull and armour (facing S: push forward), one each flank. Their power is no matter here
+ * (flown unaccounted); the energy tests below fly the flank one on the ports core
+ */
+const testStrafer = () => {
+  const bp = sparrowBp();
+  bp.parts = bp.parts.filter((q) => !(q.x === -1 && q.y >= 1) && !(q.x === 2 && q.y >= 1));
+  const S = (uid: number, x: number, y: number, facing: string) => ({ uid, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x, y, rot: 0, flip: false, facing });
+  bp.parts.push(...[S(60, -1, -1, 'N'), S(61, 2, -1, 'N'), S(62, -1, 1, 'S'), S(63, 2, 1, 'S'), RIGHT_FLANK, LEFT_FLANK] as never[]);
+  return createShipState(catalog, tuning, 1, bp, 0).derived;
+};
+/** A strafer's buffer (power/ports.ts TK_STRAFER), held and full */
+const buffer = (d: ShipDerived, c: Charge, part: number) => ({ held: c.e!.held[part], cap: d.ports.cap[part] });
 
 const NONE: FlightControls = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: -Math.PI / 2 };
 const body = (o: Partial<FlightBody> = {}): FlightBody => ({ x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0, jump: 0, ...o });
@@ -79,8 +90,8 @@ describe('Burst Strafer: the part', () => {
     expect(d.thrusters.some((t) => t.part === d.fx!.strafe!.parts[0].part)).toBe(false);
     const both = ship([RIGHT_FLANK, LEFT_FLANK]).derived;
     expect(both.fx!.strafe!.parts.length).toBe(2);
-    // (It's an engine on its circuit: a burst consumer with a feed group)
-    expect(both.power!.feedOf[both.fx!.strafe!.parts[0].part]).toBeGreaterThanOrEqual(0);
+    // (A ports thruster with its own buffer, which a burst burns)
+    expect(both.ports.cap[both.fx!.strafe!.parts[0].part]).toBeGreaterThan(0);
     expect(flightSignature(both)).not.toBe(flightSignature(ship().derived));
   });
 
@@ -92,9 +103,6 @@ describe('Burst Strafer: the part', () => {
     expect(strafeForce(s, DODGE_BACK)).toBeCloseTo(strafeForce(s, DODGE_LEFT) * 2, 3);
     expect(strafeForce(s, DODGE_FORWARD)).toBeCloseTo(strafeForce(s, DODGE_LEFT) * 2, 3);
     expect(strafeForce(s, DODGE_RIGHT)).toBeGreaterThan(0);
-    // (Every flank strafer touches a Drive Cell bank)
-    const L = d.power!;
-    expect(s.parts.filter((p) => L.feeds[L.feedOf[p.part]].banks.length > 0).length).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -248,31 +256,24 @@ describe('Burst Strafer: flight', () => {
     expect(Math.hypot(fitted.vx, fitted.vy)).toBeLessThanOrEqual(Math.hypot(plain.vx, plain.vy));
   });
 
-  it('a burst costs a lot of energy, and a Drive Cell bank it touches pays first', () => {
-    const plain = ship([RIGHT_FLANK]).derived, banked = ship([RIGHT_FLANK, CELL]).derived;
+  it('a burst costs a lot of energy, out of the strafer\'s own buffer', () => {
+    const plain = ship([RIGHT_FLANK]).derived;
     expect(burstEnergy(plain, DODGE_LEFT)).toBeGreaterThan(100);
     expect(burstEnergy(plain, DODGE_RIGHT)).toBe(0);
     // (At an angle, a share of it)
     expect(burstEnergy(plain, dodgeDirOf([-1, -1]))).toBeCloseTo(burstEnergy(plain, DODGE_LEFT) * Math.SQRT1_2, 3);
     expect(dodgeLoad(plain, DODGE_LEFT)!.some((v) => v > 0)).toBe(true);
-    const cost = (d: ShipDerived) => {
-      const ch = { c: FULL_CHARGE as Charge };
-      fly(body(), d, { dodge: true }, d.fx!.strafe!.ticks, ch);
-      return ch.c;
-    };
-    const a = cost(plain), b = cost(banked);
-    // Without a bank the pool pays; with one, the bank does and the pool's touched less
-    expect(a.g).toBeLessThan(85);
-    expect(b.g).toBeGreaterThan(a.g + 5);
-    expect(banked.power!.banks[0].kind).toBe('drive');
-    expect(b.b[0]).toBeLessThan(100);
-    expect(chargeTotal(plain, a)).toBeLessThan(100);
-    expect(dodgeAffordable(plain, FULL_CHARGE, DODGE_LEFT)).toBe(1);
+    const ch = { c: fullPortsCharge(plain) };
+    fly(body(), plain, { dodge: true }, plain.fx!.strafe!.ticks, ch);
+    const p = plain.fx!.strafe!.parts[0].part, buf = buffer(plain, ch.c, p);
+    expect(buf.held).toBeLessThan(buf.cap * 0.85);
+    expect(dodgeAffordable(plain, fullPortsCharge(plain), DODGE_LEFT)).toBe(1);
   });
 
-  it('energy is the limit: dodging as fast as it allows browns out a small ship, then bursts get weaker and are refused', () => {
+  it('energy is the limit: dodging as fast as it allows runs its buffer dry, then bursts get weaker and are refused', () => {
+    // (Nothing feeds the flank strafer: its buffer is all it has)
     const d = ship([RIGHT_FLANK]).derived;
-    const ch = { c: FULL_CHARGE as Charge };
+    const ch = { c: fullPortsCharge(d) };
     const b = body();
     const kicks: number[] = [];
     for (let n = 0; n < 40; n++) {
@@ -286,15 +287,17 @@ describe('Burst Strafer: flight', () => {
     }
     // The first bursts get their full push; by the end the ship can't keep up
     expect(kicks[kicks.length - 1]).toBeLessThan(kicks[0] * 0.75);
-    expect(chargeTotal(d, ch.c)).toBeLessThan(30);
+    const buf = buffer(d, ch.c, d.fx!.strafe!.parts[0].part);
+    expect(buf.held).toBeLessThan(buf.cap * 0.3);
     expect(dodgeAffordable(d, ch.c, DODGE_LEFT)).toBeLessThan(1);
   });
 
   it('a burst that gets almost no energy on its first tick is refused: no push, ready again once let go', () => {
     const d = ship([RIGHT_FLANK]).derived;
-    const empty: Charge = { g: 0, b: d.power!.banks.map(() => 0) };
-    // (All it has is what the generators make this tick: under a quarter of a burst's draw)
-    expect(d.energy!.spare / 60).toBeLessThan(0.25 * (burstEnergy(d, DODGE_LEFT) / d.fx!.strafe!.ticks));
+    // (Its buffer empty, and nothing feeding it)
+    const e = createPortsState(d.ports);
+    e.held.fill(0);
+    const empty: Charge = { e };
     const b = body();
     const r = stepShipPhysics(b, { ...NONE, dodge: true }, d, tuning, { charge: empty, drainRate: 1 });
     expect(lateral(b)).toBe(0);

@@ -440,12 +440,7 @@ export interface Blueprint {
    * throughout, its brain changing how it flies by stage): so its hull, drawn once, never moves about its centre
    */
   rigid?: boolean;
-  /**
-   * Power wires (wires.ts): segments between neighbouring grid cells (8-neighbour), each end a cell's integer
-   * coordinates. Absent: auto-wired (wires.ts autoWire), as enemies' ships and old designs are
-   */
-  wires?: WireSeg[];
-  /** 'ports': runs on the ports energy core (power/ports.ts): power crosses between parts only through their ports, no wires. Absent: the pool and banks (energy.ts) */
+  /** A marker kept from when there were two energy models: every design runs on the ports core (power/ports.ts), with it or without it */
   power?: 'ports';
   /**
    * A gun range cheat ship (common/gunRange/cheatShip.ts, built by the server only: parseBlueprint drops it, so no client
@@ -454,9 +449,6 @@ export interface Blueprint {
    */
   range?: true;
 }
-
-/** A wire segment: from cell (x0, y0) to the neighbouring cell (x1, y1) */
-export type WireSeg = [number, number, number, number];
 
 export interface PlacedPart {
   /** 0..255, unique within the blueprint */

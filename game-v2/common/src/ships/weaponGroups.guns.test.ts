@@ -16,7 +16,7 @@ import { gunControls } from '../sim/guns.js';
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
-const corsairText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/corsair.json'), 'utf-8');
+const corsairText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/bulwark.json'), 'utf-8');
 const UP = -Math.PI / 2;
 const pose = { x: 0, y: 0, angle: UP };
 

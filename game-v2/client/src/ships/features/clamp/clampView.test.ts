@@ -13,7 +13,7 @@ import { findPrompt, ClampView, breakText } from './clampView';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
+const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
 const CS = tuning.cellSize;
 
 function clamped(id: number, side: 'E' | 'W'): ShipState {

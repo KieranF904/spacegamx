@@ -5,7 +5,7 @@ import { extractDesign, partialGrid, stripChatter } from './reply';
 import { parseVerdict } from './critic';
 
 const ctx = loadContext();
-const wren = ship('dev/review-wren');
+const wren = ship('samples/review-wren');
 const grid = blueprintToGrid(ctx, wren).text;
 const rows = grid.split('\n').filter((l) => !/^(name|grid|end)\b/.test(l.trim()));
 const keys = (t: string) => gridToBlueprint(ctx, t).bp!.parts.map((p) => partKey(ctx, p)).sort();

@@ -20,6 +20,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
+import { targetFreighter } from '../../testkits/targetFreighter.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -74,7 +75,7 @@ function world(opts: { acks: boolean }) {
   const sys = InSystem.systemId[A.pid];
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
-  const h = ships.spawnDummy(ships.devDesigns['target-freighter'], x0 + 700, y0, 0.3, sys);
+  const h = ships.spawnDummy(targetFreighter(ships), x0 + 700, y0, 0.3, sys);
   for (let i = 0; i < 90; i++) step();
   expect(A.store.get(h)).toBeTruthy();
   /** Its core shot out: the core's blast lands on this tick, then the ship splits into pieces and is gone */

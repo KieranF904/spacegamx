@@ -2,15 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { loadContext } from './context';
 import { check } from './check';
 import { gridToBlueprint } from './grid';
-import { REVIEW_SHIPS, ship } from './testShips';
+import { SAMPLE_SHIPS, ship } from './testShips';
 
 const ctx = loadContext();
 /** What the review ships' write-ups (docs/panels/entries/2026-11-01-review-ships-*.md) recorded below full over 60 s
  *  (the Lance 77% and the Glints 30% then; 81% and 41% since the Heavy Bank holds 450 a cell, 2026-11-04 energy audit) */
-const HELD: Record<string, Record<string, number>> = { 'dev/review-heron': { Lance: 81, Glint: 41 } };
+const HELD: Record<string, Record<string, number>> = { 'samples/review-heron': { Lance: 81, Glint: 41 } };
 
 describe('shipgen check', () => {
-  for (const path of REVIEW_SHIPS) {
+  for (const path of SAMPLE_SHIPS) {
     it(`finds ${path} valid, every consumer powered, guns and engines at full, and scores it well`, () => {
       const r = check(ctx, ship(path));
       expect(r.errors).toEqual([]);
@@ -43,7 +43,7 @@ describe('shipgen check', () => {
   }
 
   it('scores a ship that is mostly power plant down (lean), measures the role\'s targets (fit), and reads compactness by row fill', () => {
-    const kestrel = ship('dev/review-kestrel');
+    const kestrel = ship('samples/review-kestrel');
     // Kestrel with a capacitor bank bolted on under it: the same guns and engines, three times the stores
     const cap = kestrel.parts.find((p) => p.fn === 'power_capacitor')!;
     const ys = kestrel.parts.map((p) => p.y), y0 = Math.max(...ys) + 1;

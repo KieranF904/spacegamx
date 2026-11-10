@@ -1,30 +1,24 @@
 /**
  * The ship status data source (ui/shipStatus/Schematic.ts draws it on the HUD's ship schematic): everything the HUD shows
  * about energy, shield, weapons and thrust, worked out from what the client already has, in one record rewritten in
- * place (no allocation at the HUD's 10 Hz beyond gunLoad's small vector). `parts` is the per-part readout the schematic
- * paints (fills, glows, flashes, brownouts).
+ * place (no allocation at the HUD's 10 Hz). `parts` is the per-part readout the schematic paints (fills, glows, flashes).
  *
- * THE ONE PLACE THE PANEL READS ENERGY. The live game still runs the old energy system (common/src/ships/energy.ts,
- * circuits.ts: a pool, Capacitor and Drive Cell banks, feed-group shares in Charge.eng/gun). The touch-only power core
- * (common/src/ships/power/, docs/design/energy-routing-impl.md) replaces it at the P2 switch-over; then only
- * `readEnergy` (and the `charge` field of StatusInput) changes to read the new EnergyState: generation, draw, stored,
- * per-store fills and the shortfall. The panel and the rest of this record stay as they are.
+ * THE ONE PLACE THE PANEL READS ENERGY: the ports core (common/src/ships/power/ports.ts): its gauge, each tank's and
+ * store's fill, and the ports lines (tanks, Selectors, augments, heavy guns).
  *
  * Inputs (ShipClient.statusInput builds them):
- *   ship         the pilot's ShipState (derived: energy, power, satisfaction, shield, weapons; the predicted gun state)
- *   charge       the predicted charge (GameState.charge: the pool's and each bank's %, this tick's feed shares)
+ *   ship         the pilot's ShipState (derived: energy, ports, shield, weapons; the predicted gun state)
+ *   charge       the predicted charge (GameState.charge: the ports state)
  *   shieldPct    the pilot row's shield % (data[4])
  *   thrust       what the keys ask the engines for now (thrusting, boosting)
  *   groups       the weapon ring's groups (ships/gunHud.ts RingModel): clip, charge, spin, ammo per gun model
  *   features     part features' status lines (ClientFeature.status: the Burst Strafer's dodge)
  *
- * Numbers are per second (E/s). "Draw" is the closest the client can know: the steady loads (shields, scanners: what
- * generation they take at the rebuild), the engines while the keys thrust (boosting at the boost rate), and what the
- * guns draw this tick by their predicted state (gunLoad). "Net" is the stores' measured rate of change.
+ * Numbers are per second (E/s). "Draw" is the steady loads (shields, scanners, coils).
  */
 
 import {
-  BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, portsInflow, bankHeld, chargeTotal, energyTuning, feedShare, gunLoad, poolHeld,
+  P_TANK, PF_SEL, MAT_UNIT, portsInflow, chargeTotal,
   shapedOf, shieldHp, shieldUp, type Charge, type ShipState, type ShipTuning,
 } from '@space-game/common';
 import type { RingGroup } from '../../ships/gunHud';
@@ -55,15 +49,6 @@ export interface StatusInput {
   now: number;
 }
 
-export interface StoreBar {
-  kind: 'pool' | 'cap' | 'drive';
-  /** 0..100 */
-  pct: number;
-  cap: number;
-  /** A feed group this store feeds got less than it asked this tick */
-  brown: boolean;
-}
-
 export interface WeaponLine {
   name: string;
   count: number;
@@ -85,7 +70,7 @@ export interface ShipStatus {
   hull: { parts: number; intact: number; lost: number; integrity: number; coreHp: number; coreMax: number };
   shield: { max: number; cur: number; pct: number; regen: number; state: 'none' | 'full' | 'regen' | 'wait' | 'down'; wait: number };
   energy: {
-    /** Generation (spare after nothing: all generators, plus bank dynamos), steady loads, estimated draw, measured net, all E/s */
+    /** Generation (all generators), steady loads, estimated draw, net, all E/s */
     gen: number;
     steady: number;
     draw: number;
@@ -106,10 +91,8 @@ export interface ShipStatus {
     empty: number;
     /** Seconds until they are full again at this net rate (Infinity: not filling) */
     full: number;
-    stores: StoreBar[];
   };
   weapons: WeaponLine[];
-  thrust: { engines: number; boost: 'ready' | 'boosting' | 'empty' | 'none'; share: number };
   features: readonly FeatureStatusLine[];
   parts: PartStatus[];
 }
@@ -127,29 +110,20 @@ export interface PartStatus {
   flash: number;
   /** Clip guns: the clip size (ticks drawn for a small clip); 0: none */
   clip: number;
-  /** Short of power this tick */
-  brown: boolean;
   /** Out of ammo, or a shield that is down: drawn dim */
   dim: boolean;
 }
 
-/** What the source remembers between reads (the net rate, the shield's last hit) */
+/** What the source remembers between reads (the shield's last hit) */
 export interface StatusMemory {
   ship: ShipState | null;
   rebuilds: number;
-  held: number;
-  at: number;
-  net: number;
   shield: number;
   hitAt: number;
-  /** When the engines and the guns were last short of power (ms), and the lowest share then: a brownout is held a moment (an empty-store boost re-arms every other tick, so the share flickers) */
-  engAt: number;
-  gunAt: number;
-  share: number;
 }
 
 export function newMemory(): StatusMemory {
-  return { ship: null, rebuilds: -1, held: NaN, at: 0, net: 0, shield: NaN, hitAt: -Infinity, engAt: -Infinity, gunAt: -Infinity, share: 1 };
+  return { ship: null, rebuilds: -1, shield: NaN, hitAt: -Infinity };
 }
 
 export function emptyStatus(): ShipStatus {
@@ -157,34 +131,26 @@ export function emptyStatus(): ShipStatus {
     has: false,
     hull: { parts: 0, intact: 0, lost: 0, integrity: 0, coreHp: 0, coreMax: 1 },
     shield: { max: 0, cur: 0, pct: 0, regen: 0, state: 'none', wait: 0 },
-    energy: { gen: 0, steady: 0, draw: 0, net: 0, held: 0, cap: 0, pct: 100, brownout: false, short: '', share: 1, draining: false, empty: Infinity, full: Infinity, stores: [] },
+    energy: { gen: 0, steady: 0, draw: 0, net: 0, held: 0, cap: 0, pct: 100, brownout: false, short: '', share: 1, draining: false, empty: Infinity, full: Infinity },
     weapons: [],
-    thrust: { engines: 0, boost: 'none', share: 1 },
     features: [],
     parts: [],
   };
 }
-
-/** How long a brownout stays on the readout after the last short tick (ms) */
-const BROWN_HOLD = 500;
-
-/** How long the net rate is smoothed over (s) */
-const NET_SMOOTH = 0.6;
 
 /** Fill `out` (or a new record) from `inp`; `mem` carries the measured rates between calls */
 export function readStatus(inp: StatusInput, mem: StatusMemory, out: ShipStatus = emptyStatus()): ShipStatus {
   const ship = inp.ship;
   if (!ship || ship.kind !== 'ship') { out.has = false; mem.ship = null; return out; }
   const fresh = ship !== mem.ship || ship.rebuilds !== mem.rebuilds;
-  if (fresh) { mem.ship = ship; mem.rebuilds = ship.rebuilds; mem.held = NaN; mem.net = 0; mem.shield = NaN; mem.hitAt = -Infinity; mem.engAt = -Infinity; mem.gunAt = -Infinity; mem.share = 1; }
+  if (fresh) { mem.ship = ship; mem.rebuilds = ship.rebuilds; mem.shield = NaN; mem.hitAt = -Infinity; }
   out.has = true;
   readHull(ship, out.hull);
   readShield(ship, inp, mem, out.shield);
-  readEnergy(ship, inp, mem, out.energy);
+  readEnergy(ship, inp, out.energy);
   readWeapons(ship, inp, out);
-  readThrust(ship, inp, out);
   readParts(ship, inp, out);
-  out.features = ship.derived.ports && inp.charge.e ? [...portsLines(ship, inp.charge, inp.nameOf), ...inp.features] : inp.features;
+  out.features = inp.charge.e ? [...portsLines(ship, inp.charge, inp.nameOf), ...inp.features] : inp.features;
   return out;
 }
 
@@ -286,96 +252,25 @@ function readShield(ship: ShipState, inp: StatusInput, mem: StatusMemory, s: Shi
 }
 
 /**
- * The energy readout. P2 switch-over: this function (and StatusInput.charge) is what changes, to read the new
- * EnergyState instead of the old pool-and-banks Charge.
+ * The energy readout: generation, the steady loads and the ports gauge (chargeTotal). The ports core keeps no ship-wide
+ * store, net rate or share yet, so those read as steady (held 0, net 0, nothing short).
  */
-function readEnergy(ship: ShipState, inp: StatusInput, mem: StatusMemory, e: ShipStatus['energy']): void {
-  const d = ship.derived, L = d.power, c = inp.charge;
-  const supply = d.energy?.supply ?? 0;
-  const spare = L?.spare ?? d.energy?.spare ?? 0;
-  let dynamo = 0;
-  e.steady = Math.max(0, supply - spare);
-  // Stores: the pool, then each bank (the bars past MAX_STORES are left off; the total counts them)
-  let held = 0, cap = 0;
-  const stores = e.stores;
-  let n = 0;
-  if (L) {
-    held = poolHeld(d, c);
-    cap = L.pool.cap;
-    if (L.pool.cap > 0) setStore(stores, n++, 'pool', pctOf(c.g), L.pool.cap, false);
-    for (let b = 0; b < L.banks.length; b++) {
-      const B = L.banks[b];
-      held += bankHeld(d, c, b);
-      cap += B.cap;
-      dynamo += B.dynamo;
-      if (n < MAX_STORES) setStore(stores, n++, B.kind, pctOf(c.b[b]), B.cap, bankBrown(L.feeds, b, c));
-    }
-  }
-  stores.length = n;
-  e.gen = supply + dynamo;
-  e.held = held;
-  e.cap = cap;
-  // (A ports ship has no pool or banks: its gauge is what its parts hold, power/ports.ts)
-  e.pct = cap > 0 ? (held / cap) * 100 : !L && d.ports ? chargeTotal(d, c) : 100;
-  // Draw: steady loads, engines while thrusting, guns by their state this tick
-  let draw = e.steady;
-  if (L && inp.thrust.on) {
-    const boostDraw = inp.thrust.boost ? energyTuning(inp.tuning).boostDraw : 0;
-    for (const t of d.thrusters) {
-      if (!t.force[0] && !t.force[1]) continue;
-      draw += (L.draw[t.part] ?? 0) * (1 + boostDraw * (L.boostDrain[t.part] ?? 0));
-    }
-  }
-  const load = L ? gunLoad(ship as Parameters<typeof gunLoad>[0], inp.tick) : undefined;
-  if (load) for (let f = 0; f < load.length; f++) draw += load[f];
-  e.draw = draw;
-  // Brownout: any feed group's share this tick below the line
-  let engShort = false, gunShort = false, share = 1;
-  if (L) for (let f = 0; f < L.feeds.length; f++) {
-    const se = c.eng?.[f] ?? 1, sg = c.gun?.[f] ?? 1;
-    if (se < BROWNOUT) { engShort = true; share = Math.min(share, se); }
-    if (sg < BROWNOUT) { gunShort = true; share = Math.min(share, sg); }
-  }
-  // (Each held BROWN_HOLD after its last short tick, with the share it last had)
-  if (engShort) mem.engAt = inp.now;
-  if (gunShort) mem.gunAt = inp.now;
-  if (engShort || gunShort) mem.share = share;
-  const eng = inp.now - mem.engAt < BROWN_HOLD, gun = inp.now - mem.gunAt < BROWN_HOLD;
-  e.brownout = eng || gun;
-  e.short = eng && gun ? 'engines+guns' : eng ? 'engines' : gun ? 'guns' : '';
-  e.share = e.brownout ? mem.share : 1;
-  // Net: the stores' measured rate (smoothed)
-  if (Number.isFinite(mem.held) && inp.now > mem.at) {
-    const dt = (inp.now - mem.at) / 1000;
-    const raw = (held - mem.held) / dt;
-    mem.net += (raw - mem.net) * Math.min(1, dt / NET_SMOOTH);
-  }
-  mem.held = held;
-  mem.at = inp.now;
-  e.net = Math.abs(mem.net) < 0.05 ? 0 : mem.net;
-  e.draining = draw > e.gen + 1e-6;
-  e.empty = e.net < -0.05 && held > 0 ? held / -e.net : Infinity;
-  e.full = e.net > 0.05 && held < cap ? (cap - held) / e.net : Infinity;
+function readEnergy(ship: ShipState, inp: StatusInput, e: ShipStatus['energy']): void {
+  const d = ship.derived, en = d.energy;
+  e.gen = en.supply;
+  e.steady = Math.min(en.supply, en.demand);
+  e.draw = e.steady;
+  e.held = 0;
+  e.cap = 0;
+  e.pct = chargeTotal(d, inp.charge);
+  e.brownout = false;
+  e.short = '';
+  e.share = 1;
+  e.net = 0;
+  e.draining = false;
+  e.empty = Infinity;
+  e.full = Infinity;
 }
-
-/** The most store bars shown (the pool and three banks) */
-export const MAX_STORES = 5;
-
-/** Rewrite store record `i` (made the first time it's needed) */
-function setStore(stores: StoreBar[], i: number, kind: StoreBar['kind'], pct: number, cap: number, brown: boolean): void {
-  const r = stores[i] ?? (stores[i] = { kind, pct, cap, brown });
-  r.kind = kind; r.pct = pct; r.cap = cap; r.brown = brown;
-}
-
-function bankBrown(feeds: { banks: number[] }[], b: number, c: Charge): boolean {
-  for (let f = 0; f < feeds.length; f++) {
-    if (!feeds[f].banks.includes(b)) continue;
-    if (Math.min(c.eng?.[f] ?? 1, c.gun?.[f] ?? 1) < BROWNOUT) return true;
-  }
-  return false;
-}
-
-const pctOf = (v: number | undefined) => (v === undefined || !Number.isFinite(v) ? 100 : Math.max(0, Math.min(100, v)));
 
 function readWeapons(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
   const lines = out.weapons;
@@ -383,7 +278,6 @@ function readWeapons(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
   // (The records are rebuilt only when the group count changes; otherwise rewritten)
   while (lines.length > gs.length) lines.pop();
   while (lines.length < gs.length) lines.push({ name: '', count: 0, model: '', state: '', tone: 'ok', progress: -1, rounds: 0, clip: 0, ammo: -1, crates: 0 });
-  const d = ship.derived;
   for (let i = 0; i < gs.length; i++) {
     const g = gs[i], w = lines[i];
     w.name = inp.nameOf(g.fn);
@@ -394,14 +288,10 @@ function readWeapons(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
     w.ammo = g.ammo;
     w.crates = g.crates;
     w.progress = -1;
-    // Short of power: any gun of the group got less than it asked
-    let starved = g.starved;
-    if (!starved) for (const p of g.parts) if (feedShare(d, inp.charge, p, 'gun') < BROWNOUT) { starved = true; break; }
     switch (g.model) {
       case 'clip':
         w.progress = g.clip > 0 ? Math.min(1, g.rounds / g.clip) : -1;
-        if (g.reloading && g.starved) { w.state = 'NO POWER'; w.tone = 'bad'; }
-        else if (g.reloading && g.rounds < 1) { w.state = 'RELOAD'; w.tone = 'busy'; }
+        if (g.reloading && g.rounds < 1) { w.state = 'RELOAD'; w.tone = 'busy'; }
         else { w.state = 'READY'; w.tone = 'ok'; }
         break;
       case 'charge':
@@ -423,44 +313,24 @@ function readWeapons(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
         else if (g.ready < 1) { w.state = 'CYCLING'; w.tone = 'busy'; w.progress = g.ready; }
         else { w.state = 'READY'; w.tone = 'ok'; }
     }
-    if (starved && w.tone !== 'bad' && w.state !== 'READY' && w.state !== 'RESTING') { w.state = 'LOW POWER'; w.tone = 'warn'; }
   }
-}
-
-function readThrust(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
-  const d = ship.derived, L = d.power, t = out.thrust;
-  let engines = 0;
-  for (const th of d.thrusters) if (th.force[0] || th.force[1]) engines++;
-  t.engines = engines;
-  // Boosting needs charge stored for the engines: the pool's, or a Drive Cell bank's (energy.ts powerTick)
-  let stored = L ? poolHeld(d, inp.charge) : 0;
-  if (L) for (let b = 0; b < L.banks.length; b++) if (L.banks[b].kind === 'drive') stored += bankHeld(d, inp.charge, b);
-  t.boost = engines === 0 ? 'none' : stored <= 0 ? 'empty' : inp.thrust.on && inp.thrust.boost ? 'boosting' : 'ready';
-  let share = 1;
-  if (L) for (let f = 0; f < L.feeds.length; f++) share = Math.min(share, inp.charge.eng?.[f] ?? 1);
-  t.share = share;
 }
 
 const PART_STORE_FN = new Set(['core', 'battery', 'drive_battery', 'weapon_battery']);
 
-/**
- * The per-part readout. Stores show the charge of the pool or bank they belong to (the old energy system keeps no
- * per-part charge); at the P2 switch-over this reads each part's own EnergyState level instead.
- */
+/** The per-part readout: tanks and stores show what each one holds (the ports state); legacy store functions full */
 const e0 = (cap: number, held: number) => (cap > 0 ? Math.max(0, Math.min(1, held / cap)) : 0);
 function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
-  const parts = ship.blueprint.parts, d = ship.derived, L = d.power, c = inp.charge, ps = out.parts;
+  const parts = ship.blueprint.parts, d = ship.derived, c = inp.charge, ps = out.parts;
   while (ps.length > parts.length) ps.pop();
-  while (ps.length < parts.length) ps.push({ kind: 'none', fill: -1, glow: 0, flash: 0, clip: 0, brown: false, dim: false });
+  while (ps.length < parts.length) ps.push({ kind: 'none', fill: -1, glow: 0, flash: 0, clip: 0, dim: false });
   for (let i = 0; i < parts.length; i++) {
     const r = ps[i], fn = parts[i].fn;
-    r.kind = 'none'; r.fill = -1; r.glow = 0; r.flash = 0; r.clip = 0; r.brown = false; r.dim = false;
-    const bank = L ? L.bankOf[i] : -1;
-    // (A ports ship: tanks show what's left, stores what they hold)
+    r.kind = 'none'; r.fill = -1; r.glow = 0; r.flash = 0; r.clip = 0; r.dim = false;
+    // (Tanks show what's left, stores what they hold)
     const P = d.ports;
-    if (P && c.e && (P.role[i] === P_TANK || (P.cap[i] > 0 && P.relays.includes(i)))) { r.kind = 'store'; r.fill = e0(P.cap[i], c.e.held[i]); continue; }
-    if (bank >= 0) { r.kind = 'store'; r.fill = pctOf(c.b[bank]) / 100; r.brown = bankBrown(L!.feeds, bank, c); }
-    else if (PART_STORE_FN.has(fn) || L?.pooled[i]) { r.kind = 'store'; r.fill = pctOf(c.g) / 100; }
+    if (c.e && (P.role[i] === P_TANK || (P.cap[i] > 0 && P.relays.includes(i)))) { r.kind = 'store'; r.fill = e0(P.cap[i], c.e.held[i]); continue; }
+    if (PART_STORE_FN.has(fn)) { r.kind = 'store'; r.fill = 1; }
     else if (fn === 'generator') { r.kind = 'gen'; r.glow = 1; }
     else if (fn === 'shield') {
       r.kind = 'shield'; r.fill = out.shield.pct / 100; r.dim = out.shield.state === 'down';
@@ -475,7 +345,6 @@ function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
     if (!r || (!t.force[0] && !t.force[1])) continue;
     r.kind = 'engine';
     r.glow = inp.thrust.on ? (inp.thrust.boost ? 1 : 0.55) : 0;
-    r.brown = inp.thrust.on && feedShare(d, c, t.part, 'eng') < BROWNOUT;
   }
   for (const g of inp.groups) {
     const dry = g.ammo === 0 && g.crates <= 0;
@@ -484,7 +353,6 @@ function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
       if (!r) continue;
       r.kind = 'weapon';
       r.flash = g.flash;
-      r.brown = g.starved || feedShare(d, c, p, 'gun') < BROWNOUT;
       r.dim = dry && g.model !== 'clip';
       switch (g.model) {
         case 'clip': r.fill = g.clip > 0 ? Math.min(1, g.rounds / g.clip) : 1; r.clip = g.clip; break;

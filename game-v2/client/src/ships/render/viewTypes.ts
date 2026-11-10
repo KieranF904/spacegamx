@@ -48,8 +48,6 @@ export interface BodyView {
   calmLabel?: boolean;
   /** Hostiles: a health bar under the label */
   bar?: Graphics;
-  /** The pilot's own bank members glowing by their bank's charge (drawBankGlow), and what it last showed */
-  bankGlow?: { g: Graphics; sig: number; ship: ShipState | null; rebuilds: number };
   /** How brightly the hull flashes white from a hit (the hull shader adds it), fading fast */
   flashLevel: number;
   /** Fading in on arrival, out on leaving (0..1) */

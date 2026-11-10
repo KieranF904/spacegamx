@@ -14,7 +14,7 @@
  */
 
 import { hasComponent } from 'bitecs';
-import { Position, Velocity, InSystem, Dead, Input, canTow, feedShare, towLoad, towPull, towTuning, type ShipTuning, type TowKind, dcos, dhypot, dsin } from '@space-game/common';
+import { Position, Velocity, InSystem, Dead, Input, canTow, towLoad, towPull, towTuning, type ShipTuning, type TowKind, dcos, dhypot, dsin } from '@space-game/common';
 import type { LootPods } from '../../../game/LootPods.js';
 import type { FeatureInstance, FeatureMessageHandler, ShipsOf, StationCap, TellCap, WorldCap } from '../types.js';
 import { SimPass } from '../../../sim/SystemClocks.js';
@@ -153,11 +153,8 @@ export class Towing implements FeatureInstance {
         this.release(pilot);
         continue;
       }
-      // Its power this tick (it draws on the ship like a gun: energy.ts gunLoad)
-      let share = 1;
-      const c = this.ships.chargeOf(pilot);
-      for (const i of ship.derived.fx?.tow?.parts ?? []) share = Math.min(share, feedShare(ship.derived, c, i, 'gun'));
-      if (share < t.minShare) { this.release(pilot, 'Tow Beam out of power: the tether let go'); continue; }
+      // Its power this tick: whole (the ports core doesn't account the Tow Beam yet, docs/areas/energy.md)
+      const share = 1;
       const pull = towPull(
         { x: Position.x[pilot], y: Position.y[pilot], vx: Velocity.x[pilot], vy: Velocity.y[pilot], r: ship.derived.radius },
         { x: Position.x[tow.target], y: Position.y[tow.target], vx: Velocity.x[tow.target], vy: Velocity.y[tow.target], r: e.r },

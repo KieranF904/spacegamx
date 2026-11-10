@@ -8,7 +8,7 @@
 
 import {
   Catalog, Economy, FunctionDef, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
-  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, loadTest, gunDrawFlatOut, circuitTuning, partDischarge, partIntake, bankKind, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
+  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
 import { costHtml, resistText } from '../ui/windowKit';
 
 // (resistText lives in windowKit so that file need not import this one)
@@ -18,35 +18,6 @@ import { functionColor, numToCss } from './shipColors';
 import { tipRows } from './describe';
 import { FIRE_SENTENCE, REGROW_SENTENCE, MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
 import { esc } from '../ui/escape';
-
-/** A ship's boost-and-fire load test, kept per derived state: a tooltip reads it for every gun (4 s of power ticks) */
-const boostFire = new WeakMap<ShipDerived, ReturnType<typeof loadTest>>();
-
-/**
- * What a gun's power means in shots (rework 2026-11 §2.4): how many reloads, charges or shots its banks cover, and a
- * charge gun's real charge time while the ship boosts with no bank behind it
- */
-function powerShots(d: ShipDerived, tuning: ShipTuning, i: number, f: NonNullable<FunctionDef['fire']>): [string, string][] {
-  const L = d.power, w = d.weapons.find((x) => x.part === i);
-  if (!L || !w) return [];
-  const out: [string, string][] = [];
-  const fd = L.feedOf[i], banks = fd >= 0 ? L.feeds[fd].banks : [];
-  if (banks.length && f.model !== 'ammo') {
-    const held = banks.reduce((s, b) => s + L.banks[b].cap, 0);
-    const per = f.model === 'clip' ? (f.reloadE ?? 0) : f.model === 'charge' ? (f.chargeE ?? 0) : f.model === 'beam' ? L.draw[i] : (L.draw[i] * w.interval) / 60;
-    if (per > 0) {
-      const n = held / per;
-      const text = f.model === 'beam' ? `${n < 10 ? n.toFixed(1) : n0(n)} s of beam` : `${n < 10 ? n.toFixed(1).replace(/\.0$/, '') : n0(n)} ${f.model === 'clip' ? 'reload' : f.model === 'charge' ? 'charge' : 'shot'}${Math.abs(n - 1) < 0.05 ? '' : 's'}`;
-      out.push(['Bank covers', `${text} <span style="color:#8ea0bd; font-weight:400">(Bank ${banks.map((b) => b + 1).join(', ')} pays first, then the ship)</span>`]);
-    }
-  } else if (f.model === 'charge' && (f.chargeE ?? 0) > 0 && gunDrawFlatOut(w, L.draw[i]) > 0) {
-    let r = boostFire.get(d);
-    if (!r) boostFire.set(d, r = loadTest(d, tuning, { fire: true, thrust: true, boost: true, seconds: 3 }));
-    const share = r.part[i];
-    if (share < 0.995 && share > 0.02) out.push(['Boosting', `charge ${((f.charge ?? 0) / 60).toFixed(1)} s becomes <span style="color:#fbbf24">${((f.charge ?? 0) / 60 / share).toFixed(1)} s</span> while you boost and fire with no bank behind it`]);
-  }
-  return out;
-}
 
 export interface PartTipCtx {
   catalog: Catalog;
@@ -149,8 +120,6 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     else if (f?.model === 'charge') html += row('Charge', `hold ${((f.charge ?? 0) / 60).toFixed(1)}s: it fires itself, then ${((f.cooldown ?? 0) / 60).toFixed(1)}s to cool · let go early and nothing fires · ${n0(f.chargeE ?? 0)} energy a charge`);
     else html += row('Fire rate', `${f?.spin ? `${(60 / f.spin.from).toFixed(1)}/s spinning up to ${60 / f.spin.to >= 10 ? n0(60 / f.spin.to) : (60 / f.spin.to).toFixed(1)}/s` : rate >= 10 ? n0(rate) : rate.toFixed(1)}${f?.spin ? '' : '/s'} · ${esc(KIND[def?.type ?? ''] ?? def?.type ?? fn.weapon)}${def?.ammo && (!f || f.model === 'ammo') ? ` · ${esc(econ.items.name(def.ammo.item))}${(f?.rounds ?? 1) > 1 ? ` (${f!.rounds} a shot, no energy)` : f ? ' (no energy)' : ''}` : ''}`);
     if (f && FIRE_SENTENCE[f.model]) html += row('Model', `${esc(f.model)}: ${esc(f.model === 'clip' && f.regrow ? REGROW_SENTENCE : FIRE_SENTENCE[f.model])}`);
-    if (w && w.satisfaction < 0.995) html += row('Under-powered', `<span style="color:#fbbf24">${Math.round(w.satisfaction * 100)}%: fires slower</span>`);
-    if (d && i >= 0 && f) for (const [a, b] of powerShots(d, tuning, i, f)) html += row(a, b);
     // (Its model's mount: not a choice)
     const facing = p.facing ? FACING[p.facing] : '';
     const arc = w?.window ? ` · ${Math.round((w.window.open.reduce((s, [lo, hi]) => s + hi - lo, 0) * 180) / Math.PI)}° clear` : '';
@@ -162,32 +131,9 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   } else if (p.facing) html += row('Facing', FACING[p.facing]);
   if (st.thrust) html += row('Thrust', `${st.thrust.toFixed(1)}${(st.boost ?? 1) > 1 ? ` · boost ×${st.boost}, drain ×${st.boostDrain ?? 1}` : ' · no boost'}`);
   if (st.supply) html += row('Power out', `<span style="color:#86efac">+${n0(st.supply)}/s</span>`);
-  if (st.draw) {
-    const sat = d && i >= 0 ? d.satisfaction[i] : 1;
-    html += row('Power draw', `${n0(st.draw)}/s${sat < 0.995 ? ` <span style="color:#fbbf24">(${Math.round(sat * 100)}% met)</span>` : ''}`);
-  }
-  if ((fn.store ?? 0) > 0) {
-    const kind = bankKind(fn);
-    html += row(kind === 'drive' ? 'Holds (engines it touches)' : kind === 'cap' ? 'Holds (guns it touches)' : 'Holds', `${n0(fn.store! * st.area * fnOutput(fn, mat))} energy`);
-    // The most it gives a second (circuits.ts): a pool battery into the ship's Output, a bank member only into what its bank touches
-    const rate = partDischarge(fn, st.area, mat, circuitTuning(tuning));
-    html += row('Gives', `up to ${n0(rate)}/s${kind ? ` <span style="color:#8ea0bd; font-weight:400">first to the ${kind === 'drive' ? 'engines and strafers' : 'guns, beams, mining lasers and Flash Screens'} its bank touches; touching ${kind === 'drive' ? 'Drive Cells' : 'Capacitors'} are one bank</span>` : fn.oneWay || fn.relayOnly ? ' <span style="color:#8ea0bd; font-weight:400">on to the parts it touches</span>' : ' <span style="color:#8ea0bd; font-weight:400">into the ship\'s pool, on a powered network</span>'}`);
-    // (A bank asks the ship's Output for its intake while not full, sharing it by what each asks: energy.ts powerTick)
-    if (kind) html += row('Takes', `up to ${n0(partIntake(fn, st.area, mat, circuitTuning(tuning)))}/s <span style="color:#8ea0bd; font-weight:400">while not full, from the ship's Output; short of power, it shares by what it asks, so more raises its parts' share</span>`);
-  }
-  if ((fn.dynamo ?? 0) > 0) html += row('Charges', `${n0(fn.dynamo!)}/s into each Capacitor or Drive Cell bank it touches <span style="color:#8ea0bd; font-weight:400">(no wires; it powers nothing itself)</span>`);
+  if (st.draw) html += row('Power draw', `${n0(st.draw)}/s`);
+  if ((fn.store ?? 0) > 0) html += row('Holds', `${n0(fn.store! * st.area * fnOutput(fn, mat))} energy`);
   if (fn.rated) html += row('Rated speed', `${n0(fn.rated * 60)} m/s <span style="color:#8ea0bd; font-weight:400">(its push fades out near it)</span>`);
-  // On the design: a bank member's bank (circuits.ts), and the bank(s) feeding a consumer
-  if (d && i >= 0 && d.power) {
-    const L = d.power, amber = (t: string) => `<span style="color:#fbbf24">${t}</span>`;
-    const b = L.bankOf[i];
-    if (b >= 0) {
-      const B = L.banks[b];
-      html += row('Bank', `<b>${b + 1}</b> · ${B.parts.length} part${B.parts.length > 1 ? 's' : ''} · holds ${n0(B.cap)} · gives ${n0(B.rate)}/s${B.feeds.length + B.shields.length ? ` · feeds ${B.feeds.length + B.shields.length} it touches` : ` · ${amber('feeds nothing')}`}${!B.refills && B.dynamo <= 0 ? ` · ${amber('never refills')}` : ''}`);
-    }
-    const f = L.feedOf[i];
-    if (f >= 0 && L.feeds[f].banks.length) html += row('Fed by', `Bank ${L.feeds[f].banks.map((x) => x + 1).join(', ')} first, then the ship`);
-  }
   if (st.shield) html += row('Shield', n0(st.shield));
   if (st.shield && fn.shieldRegen) html += row('Refills', `${n0(fn.shieldRegen * st.area)}/s after ${(fn.shieldDelay ?? 0) / 60} s unhit`);
   if (fn.splashTaken !== undefined && fn.splashTaken < 1) html += row('Blasts', `${Math.round((1 - fn.splashTaken) * 100)}% less damage`);
@@ -197,7 +143,7 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   if (st.dodge) {
     const o = st.dodge;
     html += row('Dodge', `<span style="color:#f9a8d4">${o.force.toFixed(1)} push for ${o.secs.toFixed(2)} s</span> away from its nozzle · again after ${o.cooldown.toFixed(2)} s · <span style="color:#8ea0bd; font-weight:400">no push for cruising</span>`);
-    html += row('A burst costs', `${n0(o.energy)} energy straight out (less at an angle) <span style="color:#8ea0bd; font-weight:400">(from a Drive Cell bank it touches first, then the ship: dodging often needs Drive Cells, batteries and generation behind it)</span>`);
+    html += row('A burst costs', `${n0(o.energy)} energy straight out (less at an angle) <span style="color:#8ea0bd; font-weight:400">(from its own buffer, filled over its in ports: dodging often needs strong lines behind it)</span>`);
     if (d && i >= 0) {
       const p = d.fx?.strafe?.parts.find((x) => x.part === i);
       // (Ship-local: x right, y back)
@@ -222,7 +168,6 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   }
   if (p.fn === 'core') {
     const jt = jumpTuning(tuning);
-    html += row('Battery', `${n0(energyTuning(tuning).coreCapacity)} in the ship's pool · gives up to ${n0(circuitTuning(tuning).coreDischarge)}/s`);
     html += row('Steering', `gyro ${n0(tuning.flight.gyroTorque)} · strafe ${tuning.flight.coreManeuverForce.toFixed(1)}`);
     html += row('Jump drive', d ? `${(d.jumpRange / 1000).toFixed(1)} km · ${Math.round(d.jumpCooldown / 60)} s` : `${(jt.baseRange / 1000).toFixed(0)} km · ${Math.round(jt.cooldownTicks / 60)} s when its coils suit the hull`);
     html += row('Cargo', n0(CORE_CARGO));

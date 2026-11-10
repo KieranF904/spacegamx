@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import type { Blueprint } from '../../../common/src/ships/index';
 import { parseBlueprint } from '../../../common/src/ships/index';
-import { DATA_DIR } from './context';
+import { DATA_DIR, shipFile } from './context';
 
 export const BLUEPRINTS = join(DATA_DIR, 'ships/blueprints');
 
@@ -20,8 +20,9 @@ export function bundledShips(): { path: string; bp: Blueprint }[] {
   return out;
 }
 
-export const REVIEW_SHIPS = ['dev/review-wren', 'dev/review-kestrel', 'dev/review-heron', 'dev/review-mako', 'dev/review-monarch'];
+/** Shipgen's own sample designs (data/shipgen/samples: the review ships, kept for the tools when they left the game) */
+export const SAMPLE_SHIPS = ['samples/review-wren', 'samples/review-kestrel', 'samples/review-heron', 'samples/review-mako', 'samples/review-monarch'];
 
 export function ship(path: string): Blueprint {
-  return parseBlueprint(readFileSync(join(BLUEPRINTS, `${path}.json`), 'utf8'));
+  return parseBlueprint(readFileSync(shipFile(DATA_DIR, path), 'utf8'));
 }

@@ -107,7 +107,6 @@ describe('hangar refits in the live game', () => {
     const ship = server.getShips().get(pid)!;
     expect(ship.blueprint.power).toBe('ports');
     expect(ship.derived.ports).toBeDefined();
-    expect(ship.derived.power).toBeUndefined();
   });
 
   it('a new pilot starts in the ports Sparrow T', () => {

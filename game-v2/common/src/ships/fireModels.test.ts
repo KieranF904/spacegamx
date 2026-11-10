@@ -10,13 +10,13 @@ import { parseBlueprint } from './blueprint.js';
 import { createShipState, type ShipState } from './state.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
 import { stepGuns, gunInterval, windupScale, CHARGE_DRAIN, CLIP_IDLE, packGunState, gunStateAt, applyGunState, gunStateValue, GUN_STATE_RELOADING } from './guns.js';
-import { gunDraw, gunLoad, PILOT_ROW, CHARGE_GROUPS_AT, type Charge } from './energy.js';
+import { gunDraw, PILOT_ROW, CHARGE_GROUPS_AT, type Charge } from './energy.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 import type { ShipTuning } from './tuning.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
+const sparrowText = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
 const UP = -Math.PI / 2;
 const pose = { x: 0, y: 0, angle: UP };
 
@@ -80,19 +80,6 @@ describe('firing models', () => {
     expect(startedAt).toBe(13 + CLIP_IDLE);
     expect(s.rounds[w.part]).toBe(4);
     expect(drawn).toBeCloseTo(w.fire.reloadE! * 2 / 4, 6);
-  });
-
-  it('clip: short of power it reloads at its share; the energy is what a whole reload draws', () => {
-    const s = armed('railgun_rail_driver');
-    const w = s.derived.weapons[0];
-    // (The fourth shot at 37 empties it; its reload starts on the next tick)
-    run(s, 37, (t) => t % 2 === 1);
-    expect(s.rounds[w.part]).toBe(0);
-    const L = s.derived.power!;
-    const half: Charge = { g: 100, b: [], gun: L.feeds.map(() => 0.5), eng: L.feeds.map(() => 1) };
-    let n = 0;
-    while (s.reload[w.part] > 0 || s.rounds[w.part] === 0) { stepGuns(s, pose, { firing: false, aimWorld: UP, aimDist: 0, energy: { charge: half } }, 38 + n, tuning); n++; if (n > 1000) break; }
-    expect(n).toBe(1 + 2 * w.fire.reload!);
   });
 
   it('regrow: a round back at a time, each drawing reloadE / clip', () => {
@@ -177,7 +164,7 @@ describe('firing models', () => {
     expect(cm.ammo).toBeFalsy();
   });
 
-  it('beam: no heat (lit as long as it is held), a windup ramps its damage in, and short of power it sputters evenly', () => {
+  it('beam: no heat (lit as long as it is held), and a windup ramps its damage in', () => {
     const s = armed('lance_lance');
     const w = s.derived.weapons[0];
     expect(w.fire).toMatchObject({ model: 'beam', windup: 18 });
@@ -193,13 +180,6 @@ describe('firing models', () => {
     // Let go, it winds up again from nothing
     run(s, 1, () => false, 901);
     expect(windupScale(s, w)).toBe(0);
-    // Half the power it asks for: it burns half the ticks, evenly spread
-    const L = s.derived.power!;
-    const half: Charge = { g: 0, b: [], gun: L.feeds.map(() => 0.5), eng: L.feeds.map(() => 1) };
-    const { beams } = run(s, 120, () => true, 1000, { charge: half });
-    expect(beams.length).toBe(60);
-    const gaps = new Set(beams.slice(1).map((t, i) => t - beams[i]));
-    expect([...gaps]).toEqual([2]);
   });
 
   it('ammo: a beat with no energy drawn', () => {
@@ -208,7 +188,6 @@ describe('firing models', () => {
     const { shots } = run(s, 100, () => true);
     expect(shots).toEqual([1, 1 + w.interval, 1 + 2 * w.interval]);
     expect(gunDraw(s, w, 100)).toBe(0);
-    expect((gunLoad(s, 50) ?? []).reduce((a, b) => a + b, 0)).toBe(0);
   });
 
   it('the gun-state slot carries clip and charge guns after the part features, and round-trips', () => {

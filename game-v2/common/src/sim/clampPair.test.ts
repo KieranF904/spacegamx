@@ -24,7 +24,7 @@ import type { ReplicaEnv } from '../ships/replica.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
-const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8');
+const sparrow = readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8');
 const CS = tuning.cellSize;
 const UP = -Math.PI / 2;
 

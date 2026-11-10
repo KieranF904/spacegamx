@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { Blueprint, PlacedGeom } from '../../../common/src/ships/index';
 import { parseBlueprint, placeGeometry } from '../../../common/src/ships/index';
-import type { ShipgenContext } from './context';
+import { type ShipgenContext, shipFile } from './context';
 import { type TierBand, partInBand } from './legend';
 import { type PowerRole, partPower } from './partPower';
 import { isEngine } from '../../../common/src/ships/index';
@@ -30,7 +30,7 @@ export interface Role {
   require?: Selector[];
   encourage?: Selector[];
   style?: string[];
-  /** A bundled blueprint (path under data/ships/blueprints, no .json) shown as a worked example */
+  /** A design shown as a worked example (context.ts shipFile: a path under data/ships/blueprints, or samples/<name>) */
   example?: string;
   /** Silhouettes to ask for, one per trial: a target that isn't the example */
   shapes?: string[];
@@ -126,10 +126,10 @@ export function outOfBand(ctx: ShipgenContext, bp: Blueprint, band: TierBand): s
 
 const examples = new Map<string, Blueprint | null>();
 
-/** A role's worked example (data/ships/blueprints/<path>.json), or null */
+/** A role's worked example (context.ts shipFile), or null */
 export function exampleShip(ctx: ShipgenContext, path: string | undefined): Blueprint | null {
   if (!path) return null;
-  const f = join(ctx.dataDir, 'ships/blueprints', `${path}.json`);
+  const f = shipFile(ctx.dataDir, path);
   if (!examples.has(f)) examples.set(f, existsSync(f) ? parseBlueprint(readFileSync(f, 'utf8')) : null);
   return examples.get(f)!;
 }

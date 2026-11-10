@@ -62,13 +62,11 @@ describe('grades, sizes and ship ratings', () => {
     // The starter's boost is its Ion Drives' (on the ports core, each engine's own: energy.ts boostOf)
     const starter = createShipState(ships.catalog, ships.tuning, 0, ships.playerBlueprint, 0).derived;
     expect(boostOf(starter)).toBeCloseTo(cat.functions.get('engine_ion_drive')!.boost!, 6);
-    // An afterburner ship's kicks harder and drains faster: the pool core's ship-wide boost and drain, on the pool-era
-    // starter (a fixture)
-    const pool: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
-    expect(createShipState(ships.catalog, ships.tuning, 0, pool, 0).derived.boostFactor).toBeCloseTo(cat.functions.get('engine_ion_drive')!.boost!, 6);
-    const swapped = { ...pool, parts: pool.parts.map((p) => (p.fn === 'engine_ion_drive' ? { ...p, fn: 'engine_afterburner' } : p)) };
+    // An afterburner ship's kicks harder and drains faster: the starter with Afterburners for its Ion Drives
+    const plain = ships.playerBlueprint;
+    const swapped = { ...plain, parts: plain.parts.map((p) => (p.fn === 'engine_ion_drive' ? { ...p, fn: 'engine_afterburner' } : p)) };
     const d = createShipState(ships.catalog, ships.tuning, 0, swapped, 0).derived;
-    expect(d.boostFactor).toBeGreaterThan(3);
+    expect(boostOf(d)).toBeGreaterThan(boostOf(starter));
     expect(d.boostDrain).toBeGreaterThan(2);
     expect(burner.boost).toBeGreaterThan(ion.boost!);
   });
