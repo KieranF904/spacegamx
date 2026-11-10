@@ -101,7 +101,7 @@ export class GameState {
   // PLAYER STATE
   // ============================================
   public playerId: number = 0;
-  /** Off in proto mode: the client reads the in-process simulation directly. */
+  /** Own ship predicted (always on in the game; the gun preview and tests turn it off) */
   public predictionEnabled = true;
   /**
    * The own ship on its tick layer (set by Game: ShipClient.ownStepTo): stepped to a tick (once per tick: its whole step,

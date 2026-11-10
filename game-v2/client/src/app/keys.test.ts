@@ -6,7 +6,7 @@ function fakeHost(over: Record<string, unknown> = {}): { h: KeyHost; calls: stri
   const calls: string[] = [];
   const rec = (name: string) => () => { calls.push(name); };
   const h = {
-    loggedIn: true, stationOpen: false, proto: null,
+    loggedIn: true, stationOpen: false,
     menu: { isOpen: false, back: rec('menu.back'), open: rec('menu.open') },
     dialogue: { onKey: () => false },
     hub: { dismiss: () => false, toggle: (id: string) => { calls.push('hub:' + id); } },

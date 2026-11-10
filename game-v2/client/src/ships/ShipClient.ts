@@ -85,8 +85,6 @@ export interface ShipClientOptions {
   tuning: ShipTuning;
   /** The pilot's items (the hangar builds from owned parts) */
   pilot: PilotState;
-  /** Proto mode: every part is free in the hangar */
-  grantAllParts?: boolean;
   /** An admin: dev-only parts (`exclusive: "dev"`) are in the hangar and free to place for them, and nobody else */
   isAdmin?(): boolean;
   /** Docked at a station: open the station screen (without this, docking opens the hangar) */
@@ -112,10 +110,6 @@ export interface ShipClientOptions {
   sound?(id: string, at?: { x: number; y: number }, volume?: number, pitch?: number): (() => void) | null;
   /** A short notice at the top of the screen */
   toast?(text: string, kind: 'info' | 'good' | 'warn' | 'bad'): void;
-  /** Proto: no stations, so the hangar opens anywhere */
-  editAnywhere?: boolean;
-  onHangarOpen?(): void;
-  onHangarClose?(): void;
   /** The flight zoom (the build overlay zooms in on the ship and puts it back) */
   zoom?: { get(): number; set(z: number): void };
 }
@@ -183,7 +177,7 @@ export class ShipClient {
     // (The field machines' HUD and build overlay, ships/field: they read the game through this)
     mountFieldFor(opts, wiring);
     this.dock = new DockControl({
-      state: opts.state, tuning: opts.tuning, store: this.store, editAnywhere: opts.editAnywhere,
+      state: opts.state, tuning: opts.tuning, store: this.store,
       stationOpen: () => opts.stationOpen?.() ?? false, onDocked: opts.onDocked ? (station) => opts.onDocked!(station) : undefined,
       send: (msg) => opts.send(msg), showMessage: (text, color) => opts.showMessage(text, color), sound,
       hangarOpen: () => this.hangarOpen, openHangar: () => this.hangar.use((h) => h.open()), refreshShip: (id) => this.renderer?.refresh(id),

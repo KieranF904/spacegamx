@@ -57,7 +57,6 @@ export interface MenuServerInfo {
 
 export interface MenuDeps {
   /** In-process prototype: no server to leave */
-  proto: boolean;
   openMap(): void;
   pilot(): MenuPilotInfo;
   ship(): MenuShipInfo | null;
@@ -285,7 +284,6 @@ export class GameMenuUI {
     const pilot = this.deps.pilot();
     this.side.innerHTML = `<div class="gm-title">MENU</div><div class="gm-sub">${esc(pilot.name)} · ${esc(pilot.system)}</div>`;
     for (const it of ITEMS) {
-      if (it.page === 'leave' && this.deps.proto) continue;
       if (it.page === 'server' || it.page === 'leave') {
         if (!this.side.querySelector('.gm-sep')) this.side.insertAdjacentHTML('beforeend', '<div class="gm-sep"></div>');
       }
@@ -559,10 +557,9 @@ export class GameMenuUI {
         <div class="stat"><span>Server tick</span><b>${s.tick.toLocaleString()}</b></div>
       </div>
       <div class="actions">
-        ${this.deps.proto ? '<span class="muted">Prototype mode runs the server in this tab.</span>' : `
         <button class="btn" data-a="copy">Copy server address</button>
         <button class="btn danger" data-a="leave">Leave server</button>
-        <button class="btn danger" data-a="logout">Log out</button>`}
+        <button class="btn danger" data-a="logout">Log out</button>
       </div>
       ${this.confirmLeave ? `<div class="confirm"><p style="margin-top:0">Leave <b>${esc(s.name)}</b>? Your refitted ship is kept if you're logged in.</p>
         <div class="actions" style="margin-top:8px"><button class="btn danger" data-a="confirm">Leave</button><button class="btn" data-a="cancel">Stay</button></div></div>` : ''}

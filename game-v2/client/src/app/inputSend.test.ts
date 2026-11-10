@@ -19,7 +19,7 @@ interface Script {
 }
 
 /** A context whose game parts are fakes, recording every send / applyInput / predictTick in order */
-function fakeCtx(proto = false) {
+function fakeCtx() {
   const log: string[] = [];
   const sent: ClientInputMessage[] = [];
   const predicted: ClientInputMessage[] = [];
@@ -39,7 +39,6 @@ function fakeCtx(proto = false) {
   const ctx = {
     loggedIn: true,
     get stationOpen() { return sc.station; },
-    proto: proto ? { inputEnabled: () => true } : null,
     get menu() { return { isOpen: sc.menuOpen }; },
     adminPanel: null,
     shipClient: {
@@ -164,16 +163,6 @@ describe('inputSend: an input-script replay', () => {
     expect([m.forward, m.right, m.boost, m.helm, m.strafeLeft]).toEqual([true, true, true, false, false]);
     expect(m.targetAngle).toBe(dequantizeCursorAngle(quantizeCursorAngle(Math.PI)));
     expect(m.cursorDist).toBe(100);      // not jumping: the cursor's own distance
-  });
-
-  it('proto: sent with no targetTick, no prediction, nothing when unchanged', () => {
-    const { ctx, sc, log, sent, tick } = fakeCtx(true);
-    tick(); tick();
-    sc.keys.add('KeyD'); tick();
-    sendNeutralInput(ctx);
-    expect(log).toEqual(['send:1', 'send:2', 'send:3']);
-    expect(sent.map((m) => m.targetTick)).toEqual([undefined, undefined, undefined]);
-    expect(sent[1].right).toBe(true);
   });
 
   it('berthed: nothing is sent (the server let go of the controls), the prediction steps them neutral; a station click is no shot', () => {

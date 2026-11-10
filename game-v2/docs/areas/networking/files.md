@@ -15,7 +15,7 @@
 | common/src/network/stateHash.ts | 38 | `computeStateHash` (client/server desync check) |
 | common/src/network/Transport.ts | 47 | `ClientTransport`, `ClientSocket`, `ClientLink`, `DisconnectInfo` |
 | server/src/net/SocketTransport.ts | 191 | HTTP (/health) + `ws` server; per-IP cap 16 sockets, 512 KB max message, 8 MB buffered cap, permessage-deflate, bad-frame log throttle |
-| server/src/net/LocalTransport.ts | 62 | in-process transport for proto mode and tests (real encode/decode, synchronous) |
+| server/src/net/LocalTransport.ts | 62 | in-process transport for tests (real encode/decode, synchronous) |
 | server/src/net/Replication.ts | 183 | a server shadow per ship, stepped with the controls clients know; mismatch => keyframe version bump |
 | server/src/net/MessageLimits.ts | 76 | `MESSAGE_LIMITS` token buckets per message type, `MessageLimiter` |
 | client/src/network/NetworkManager.ts | 158 | browser WebSocket: reconnect back-off, `decodeServerFrame`, per-message error isolation, traffic counters |

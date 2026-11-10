@@ -323,7 +323,6 @@ export class HangarUI implements HangarHost {
     this.recenter();
     this.refresh();
     this.refreshLoadList();
-    this.deps.onOpen();
   }
 
   /** Edit what's saved in the current slot (an empty slot starts with a core) */
@@ -505,7 +504,7 @@ export class HangarUI implements HangarHost {
     return !this.grantAll && !!this.deps.hangarState()?.freeBuild;
   }
 
-  /** Every part is free: proto mode, or free build */
+  /** Every part is free: free build */
   get free(): boolean {
     return this.grantAll || this.freeBuild;
   }

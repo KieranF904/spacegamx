@@ -121,7 +121,7 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 493,
+      "lines": 491,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
       "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
       "events": "",
@@ -145,86 +145,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 75,
-          "end": 128
+          "start": 74,
+          "end": 126
         },
         {
           "name": "Msg",
           "kind": "type",
-          "start": 130,
-          "end": 130
+          "start": 128,
+          "end": 128
         },
         {
           "name": "Handler",
           "kind": "type",
-          "start": 131,
-          "end": 131
+          "start": 129,
+          "end": 129
         },
         {
           "name": "Handlers",
           "kind": "type",
-          "start": 132,
-          "end": 134
+          "start": 130,
+          "end": 132
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 136,
-          "end": 154
+          "start": 134,
+          "end": 152
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 156,
-          "end": 160
+          "start": 154,
+          "end": 158
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 162,
-          "end": 207
+          "start": 160,
+          "end": 205
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 209,
-          "end": 220
+          "start": 207,
+          "end": 218
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 222,
-          "end": 240
+          "start": 220,
+          "end": 238
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 242,
-          "end": 276
+          "start": 240,
+          "end": 274
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 278,
-          "end": 295
+          "start": 276,
+          "end": 293
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 297,
-          "end": 483
+          "start": 295,
+          "end": 481
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 485,
-          "end": 486
+          "start": 483,
+          "end": 484
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 488,
-          "end": 493
+          "start": 486,
+          "end": 491
         }
       ]
     },
@@ -232,7 +232,7 @@
       "id": "client.app.staff-panels",
       "path": "client/src/app/staffPanels.ts",
       "group": "client/app",
-      "lines": 113,
+      "lines": 112,
       "owns": "the admin panel (F2) and contributor notes panel (F6): loaded on demand, made once, torn down on sign-out",
       "needs": "StaffHost (send, state, pilot, renderer, input, windows, flyTo, chat), dynamic imports of ui/AdminPanel and ui/ContributorPanel; npm: @space-game/common",
       "events": "",
@@ -252,13 +252,13 @@
           "name": "StaffHost",
           "kind": "interface",
           "start": 19,
-          "end": 31
+          "end": 30
         },
         {
           "name": "StaffPanels",
           "kind": "class",
-          "start": 33,
-          "end": 113
+          "start": 32,
+          "end": 112
         }
       ]
     },
@@ -266,9 +266,9 @@
       "id": "client.app.tick-driver",
       "path": "client/src/app/tickDriver.ts",
       "group": "client/app",
-      "lines": 79,
-      "owns": "the per-frame tick stepping (proto: fixed-rate input ticks; online: one prediction step per tick number) and the 1 Hz state hash check",
-      "needs": "TickHost (state, input send context, send), app/inputSend tickInput, common TICK_MS and computeStateHash",
+      "lines": 63,
+      "owns": "the per-frame tick stepping (one prediction step per tick number) and the 1 Hz state hash check",
+      "needs": "TickHost (state, input send context, send), app/inputSend tickInput, common computeStateHash",
       "events": "",
       "invariants": [
         {
@@ -286,13 +286,13 @@
           "name": "TickHost",
           "kind": "interface",
           "start": 13,
-          "end": 19
+          "end": 18
         },
         {
           "name": "TickDriver",
           "kind": "class",
-          "start": 21,
-          "end": 79
+          "start": 20,
+          "end": 63
         }
       ]
     },
@@ -2157,7 +2157,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 720,
+      "lines": 719,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -2183,7 +2183,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 74,
-          "end": 720
+          "end": 719
         }
       ]
     },
@@ -2191,7 +2191,7 @@
       "id": "client.ship.client",
       "path": "client/src/ships/ShipClient.ts",
       "group": "client/ships",
-      "lines": 783,
+      "lines": 777,
       "owns": "the client's ship hub: builds the per-area pieces and exposes the one surface Game, the predictor and the UI call",
       "needs": "ShipClientOptions (state, send, sound, ...), ShipStore, the pieces under ships/{own,guns,hits,jump,dock,replicas,fx,hud,wiring,messages}; npm: @space-game/common, pixi.js",
       "events": "server messages via handleMessage; snapshots via preSnapshot / afterSnapshot / onReplication / frameEnd",
@@ -2219,13 +2219,13 @@
           "name": "ShipClientOptions",
           "kind": "interface",
           "start": 83,
-          "end": 121
+          "end": 115
         },
         {
           "name": "ShipClient",
           "kind": "class",
-          "start": 123,
-          "end": 783
+          "start": 117,
+          "end": 777
         }
       ]
     },
@@ -4500,7 +4500,7 @@
       "id": "client.ship.dock",
       "path": "client/src/ships/dock/DockControl.ts",
       "group": "client/ships/dock",
-      "lines": 184,
+      "lines": 180,
       "owns": "docking at a station: the dock request/answer, the berth, undocking, the dock and planet and repair hints",
       "needs": "DockHost (state, tuning, store, send, showMessage, sound, hangarOpen, openHangar, refreshShip, stationOpen, onDocked); npm: @space-game/common",
       "events": "",
@@ -4524,13 +4524,13 @@
           "name": "DockHost",
           "kind": "interface",
           "start": 17,
-          "end": 34
+          "end": 32
         },
         {
           "name": "DockControl",
           "kind": "class",
-          "start": 36,
-          "end": 184
+          "start": 34,
+          "end": 180
         }
       ]
     },
@@ -6101,7 +6101,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 143,
+      "lines": 142,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -6122,19 +6122,19 @@
           "name": "HangarDeps",
           "kind": "interface",
           "start": 17,
-          "end": 55
+          "end": 54
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 57,
-          "end": 57
+          "start": 56,
+          "end": 56
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 59,
-          "end": 143
+          "start": 58,
+          "end": 142
         }
       ]
     },

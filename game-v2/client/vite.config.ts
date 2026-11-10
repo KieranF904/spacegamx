@@ -2,12 +2,9 @@ import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import { shipsDevApi } from './shipsDevApi';
 
-/** In the browser, Node's built-ins (imported by the server code proto mode and the replays bundle) are stubs */
-const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib|crypto)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
-
 /**
- * Fails the build if server code (the replays', which only load
- * lazily) ends up in what index.html loads at start: the main chunk and its static imports
+ * Fails the build if server code (the browser game has none: it talks to a server over the wire)
+ * ends up in what index.html loads at start: the main chunk and its static imports
  */
 const serverOutOfMain = (): Plugin => ({
   name: 'server-out-of-main',
@@ -34,8 +31,6 @@ export default defineConfig(({ command }) => ({
   resolve: {
     alias: [
       { find: '@space-game/common', replacement: resolve(__dirname, '../common/src') },
-      // (in dev too: proto mode and replays bundle server code that imports Node's built-ins by name)
-      ...nodeStubs(true),
     ],
   },
   server: {

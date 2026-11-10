@@ -18,8 +18,6 @@ export interface DockHost {
   readonly state: GameState;
   readonly tuning: ShipTuning;
   readonly store: ShipStore;
-  /** Proto mode: no stations, so the hangar opens anywhere */
-  readonly editAnywhere?: boolean;
   /** Is the station screen open */
   stationOpen?(): boolean;
   /** Docked at a station: open the station screen (without this, docking opens the hangar) */
@@ -109,7 +107,6 @@ export class DockControl {
 
   /** Name of the station whose docking ring we're in (for the menu) */
   dockableStationName(): string | null {
-    if (this.h.editAnywhere) return 'Hangar';
     return this.stationInRange()?.name ?? null;
   }
 
@@ -144,7 +141,7 @@ export class DockControl {
   onDockResult(msg: Extract<ServerMessage, { type: 'dockResult' }>): void {
     this.dockPending = false;
     if (msg.ok) {
-      this.docked = !this.h.editAnywhere;
+      this.docked = true;
       // Inside the station: held at its centre (the server puts you back where you came in when you leave)
       const st = this.stationInRange(), me = this.h.state.entities.get(this.h.state.playerId);
       this.berth = this.docked && st && me ? { station: st.id, ox: me.x - st.x, oy: me.y - st.y } : null;
@@ -159,8 +156,7 @@ export class DockControl {
 
   /** H pressed: dock if in range (the server checks again), else say how */
   pressDock(): void {
-    if (this.h.editAnywhere) this.h.openHangar();
-    else if (this.dockPending) return;
+    if (this.dockPending) return;
     else if (this.isDocked()) { this.dockPending = true; this.h.send({ type: 'dock' }); }
     else this.h.showMessage(`Fly into a station's docking ring and press ${boundKeyName('dock', settings.data.bindings)} to dock`, '#f2d24b');
   }
@@ -175,7 +171,7 @@ export class DockControl {
     const { state } = this.h;
     // "Press H to dock" while inside a station's docking ring (not while docked: the station's screen is up);
     // in orbit close over a planet you can land on, "X to descend"
-    const station = !this.h.editAnywhere && !this.h.hangarOpen() && !this.dockPending && !this.h.stationOpen?.() ? this.stationInRange() : null;
+    const station = !this.h.hangarOpen() && !this.dockPending && !this.h.stationOpen?.() ? this.stationInRange() : null;
     const planet = !station && !this.h.hangarOpen() ? this.planetHint : null;
     setStyle(this.dockHint, 'display', station || planet ? 'block' : 'none');
     if (station) setHtml(this.dockHint, `<kbd>${boundKeyName('dock', settings.data.bindings)}</kbd> Dock at <b>${station.name ?? 'station'}</b>`);
