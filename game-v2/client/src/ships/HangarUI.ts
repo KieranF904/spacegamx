@@ -55,7 +55,7 @@ import { onDetailMode } from './build/detailMode';
 import { detailToggle } from './build/detailToggleView';
 import { FlowCanvasLayer, FLOW_KEY } from './build/powerFlowView';
 import type { HangarDeps, HangarHost, Overlay } from './hangar/host';
-import { foldHeading, button, chip, checkbox } from './hangar/hangarWidgets';
+import { foldHeading, button, chip } from './hangar/hangarWidgets';
 import { drawWindow, drawMounting, drawFacing } from './hangar/hangarOverlays';
 import { draw } from './hangar/hangarDraw';
 import { buildHtml, ammoHtml, bindBuildButtons, powerHtml, portsHtml, summaryHtml, renderStats } from './hangar/hangarStats';
@@ -106,7 +106,6 @@ export class HangarUI implements HangarHost {
   ports = new PortsGrid();
   /** The power flow overlay's animated layer over the grid (pulses, ticks, crosses) */
   flow!: FlowCanvasLayer;
-  grantAll = false;
   private owned: Bag = {};
   /** The slot being edited, the plan it was loaded from, and what was last saved (to spot unsaved edits) */
   slot = 0;
@@ -227,7 +226,6 @@ export class HangarUI implements HangarHost {
       owned: () => this.owned,
       free: () => this.free,
       freeBuild: () => this.freeBuild,
-      grantAll: () => this.grantAll,
       hideTip: () => { if (this.tipKey.startsWith('p:')) this.hideTip(); },
     });
     this.palette.append(this.pal.root);
@@ -316,7 +314,6 @@ export class HangarUI implements HangarHost {
     this.loadSlot();
     this.aids.reset();
     this.status('');
-    this.grantAll = this.deps.grantAll;
     this.isOpen = true;
     this.root.style.display = 'grid';
     this.lit.setOpen(true);
@@ -476,7 +473,7 @@ export class HangarUI implements HangarHost {
       return;
     }
     // Hangar slots: the server builds in what you have and ghosts the rest
-    if (this.deps.hangarState() && !this.grantAll) {
+    if (this.deps.hangarState()) {
       this.deps.send({ type: 'slotSave', slot: this.slot, blueprint: clone(this.bp), plan: this.plan });
       this.status('saved');
       return;
@@ -495,18 +492,17 @@ export class HangarUI implements HangarHost {
 
   /** How many more of a part (item id) the pilot could still place from what they have */
   remaining(id: string): number {
-    if (this.grantAll) return Infinity;
     return (this.owned[id] ?? 0) - this.bp.parts.filter((q) => partItemId(q) === id).length;
   }
 
   /** Free build is on (a dev server's admin, from the admin panel): any part places, and the server takes nothing */
   private get freeBuild(): boolean {
-    return !this.grantAll && !!this.deps.hangarState()?.freeBuild;
+    return !!this.deps.hangarState()?.freeBuild;
   }
 
   /** Every part is free: free build */
   get free(): boolean {
-    return this.grantAll || this.freeBuild;
+    return this.freeBuild;
   }
 
   /** Parts of the saved design not built yet (uids), and parts added since the last save */
@@ -573,7 +569,7 @@ export class HangarUI implements HangarHost {
 
   /** The lit layer shows the built parts (not ghosts), wrecked ones damaged */
   private showLit(): void {
-    const { ghosts, fresh } = this.grantAll ? { ghosts: new Set<number>(), fresh: new Set<number>() } : this.ghostInfo();
+    const { ghosts, fresh } = this.ghostInfo();
     const wrecked = new Set(this.deps.hangarState()?.slots[this.slot]?.wrecked ?? []);
     const keep = this.bp.parts.map((p, i) => [p, i] as const).filter(([p]) => !(ghosts.has(p.uid) && !fresh.has(p.uid)) && !this.unreachable.has(p.uid));
     if (!keep.length) { this.lit.show(null, []); return; }
@@ -619,17 +615,12 @@ export class HangarUI implements HangarHost {
     info.style.cssText = 'color:#6b7a93; margin:3px 0 2px; font-size:10.5px; line-height:1.45;';
     info.innerHTML = `Click places · right-click removes · hold and drag to paint or sweep · <b style="color:#9fb0cc">middle-click picks up</b><br>R turn · F mirror · T facing · E/U power flow · Tab list · wheel zoom<br>M symmetry · Ctrl+Z undo · Ctrl+Y redo`;
     el.append(info);
-    // Overlays (folded) and proto's debug switch, on one line
+    // Overlays (folded)
     const row = document.createElement('div');
     row.style.cssText = 'display:flex; align-items:baseline; gap:10px;';
     const fold = foldHeading('Overlays', this.folded.overlays, () => { this.folded.overlays = !this.folded.overlays; this.renderFooter(); });
     fold.style.margin = '2px 0';
     row.append(fold);
-    if (this.deps.grantAll) {
-      const c = checkbox('grant everything', this.grantAll, (v) => { this.grantAll = v; this.refresh(); this.refreshLoadList(); });
-      c.style.cssText += 'margin:0 0 0 auto; font-size:11px; color:#8ea0bd;';
-      row.append(c);
-    }
     el.append(row);
     if (!this.folded.overlays) {
       const ov = document.createElement('div');
@@ -645,7 +636,7 @@ export class HangarUI implements HangarHost {
   private renderSlots(): void {
     const hs = this.deps.hangarState();
     this.slotBar.innerHTML = '';
-    if (!hs || this.grantAll) return;
+    if (!hs) return;
     hs.slots.forEach((rec, i) => {
       const built = rec ? rec.blueprint.parts.length - rec.ghosts.length : 0;
       const b = document.createElement('button');

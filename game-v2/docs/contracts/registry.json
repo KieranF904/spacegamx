@@ -2164,7 +2164,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 719,
+      "lines": 710,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -2190,7 +2190,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 74,
-          "end": 719
+          "end": 710
         }
       ]
     },
@@ -6108,7 +6108,7 @@
       "id": "client.hangar.host",
       "path": "client/src/ships/hangar/host.ts",
       "group": "client/ships/hangar",
-      "lines": 142,
+      "lines": 139,
       "owns": "HangarDeps (what the hangar needs from the game) and HangarHost (what its split-out modules may use of the editor)",
       "needs": "common ship types, PortsGrid, HangarLitView",
       "events": "",
@@ -6129,19 +6129,19 @@
           "name": "HangarDeps",
           "kind": "interface",
           "start": 17,
-          "end": 54
+          "end": 52
         },
         {
           "name": "Overlay",
           "kind": "type",
-          "start": 56,
-          "end": 56
+          "start": 54,
+          "end": 54
         },
         {
           "name": "HangarHost",
           "kind": "interface",
-          "start": 58,
-          "end": 142
+          "start": 56,
+          "end": 139
         }
       ]
     },

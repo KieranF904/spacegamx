@@ -68,7 +68,6 @@ export interface PaletteHost {
   /** Every part places (free build or proto), and which */
   free(): boolean;
   freeBuild(): boolean;
-  grantAll(): boolean;
   /** Field build overlay: `free()` only says a plan can hold any part; each part still costs materials to build, so show its cost, not "free" */
   fieldBuild?: boolean;
   hideTip(): void;
@@ -312,7 +311,7 @@ export class HangarPalette {
     const bag = isStructural(part.fn) || part.fn === 'core' || !rec ? econ.recipes.partInputs(part) : rec.inputs;
     return {
       // (proto's grant-everything has no locks; free build keeps them, undimmed: they place too)
-      part, id, gates, avail, locked: !can && !this.h.grantAll(), spare,
+      part, id, gates, avail, locked: !can, spare,
       cost: costLines(bag, (k) => this.h.have(k)),
       time: rec && !isStructural(part.fn) ? rec.time : null,
       lock: lockText(gates) || (can ? '' : 'Not licensed to fit yet'),
@@ -327,7 +326,7 @@ export class HangarPalette {
 
   /** Rows of a tab: the tab's components, then spares no row covers */
   private rowsOf(tab: CompTab): PaletteRow[] {
-    const owned = this.h.grantAll() ? [] : Object.keys(this.h.owned()).filter((id) => this.h.remaining(id) > 0);
+    const owned = Object.keys(this.h.owned()).filter((id) => this.h.remaining(id) > 0);
     const spares = spareRows(this.h.catalog, owned, this.rows, (id) => this.h.econ.items.get(id)?.part ?? null, (id) => this.h.econ.items.name(id));
     return [...this.rows, ...spares].filter((r) => r.tab === tab);
   }
@@ -529,7 +528,6 @@ export class HangarPalette {
     const gates = this.gatesOf(row, material);
     const why = lockText(gates);
     const say = this.h.freeBuild() ? '<span class="fb">Free build: it places, and saving takes nothing</span>'
-      : this.h.grantAll() ? '<span class="q">Free here</span>'
       : !can ? `<span class="bad">${esc(why || (structure ? `You can't build in ${catalog.materials.get(material)?.name ?? material} yet` : "You can't make this yet"))}</span>`
       : structure ? '<span class="mk">Built from materials as it goes in</span>'
       : left > 0 ? `<span class="ok">${left} on hand</span>`
