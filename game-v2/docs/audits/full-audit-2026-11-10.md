@@ -223,3 +223,16 @@ The terrain half and the boss-hull half both load through `import.meta.glob(...,
 - `data/terrain` is 252 KB on disk (the audit's 512 KB is the bundled form). The win is roughly 120 KB gzip at startup (row 24), real but small against the risk in the prediction path.
 
 Suggested shape for later (O-crowd, with the netcode owner): load a system's terrain as a per-system dynamic import, awaited in the join handler before `JumpControl` starts predicting, and keep `terrainFor` synchronous after that. It needs a client start-up test for "the first predicted tick has the rock". No size was measured because nothing was changed.
+
+## SD-10 / DDC-11 follow-up (2026-11-11): measured, not converted, and why
+
+What is left: all 33 legacy functions (`legacy: true` in `data/ships/functions.json`) are still live. 71 enemy designs in `data/ships/blueprints/enemy/` use 19 of them (about 1,780 parts: 772 generators, 509 conduits, 135 thrusters, 89 cannons, 78 shields, and the rest). The 14 unused ones (afterburner, battery, drive_battery, weapon_battery, hive, frostbite, cinder_bloom, prism, phase, singularity, jumpcoil, pulse, charge_launcher, siphon) can't go on their own either: `lookFn` (ships/functionRegistry.ts) takes each model family's look and break effects from its legacy function, licences (econ/market.ts) teach through them, and `data/quests.json` refit steps name `miner`, `weapon` and `constructor`.
+
+Why no design was converted: each conversion changes balance, so none was guessed at. A naive swap (each legacy part to `legacyModel()`, conduits to hull; `rateShip` before and after) gives:
+- Material grading goes. Legacy parts scale by material (steel 1.3x, titanium 1.65x, cobalt 2.1x), but models have one fixed material. Steel and titanium designs lose 35-75% of their firepower. Examples: siege_turret_cannon 130 to 54, giant_mammoth 6,619 to 1,431, maw_heart_titan 5,291 to 1,176, boss_void_leviathan 666 to 321 (its toughness also falls 16,960 to 7,804). Composite designs gain 20-200% toughness (giant_dredge 30,513 to 91,939).
+- Behaviour changes. Legacy weapons turret-mount anywhere, but most model guns are fixed (cannon_pip), so enemies would have to aim with the hull. Fire models differ too (legacy cannon interval 10, Pip 20).
+- Power has to be rewired. Legacy parts are touch-routed (generators pool by touching, conduits relay). Models need out-to-in port faces, so every design would need its layout redone, not just its ids swapped.
+- Shapes are missing. 290 legacy parts (mostly the bespoke bosses: maw_heart_titan 169, scrap_mother 30, pyreclast 27) sit on pieces their model doesn't come in.
+- Closest to equivalent: pirate_skiff, pirate_raider, scav_drone, grid_helios_drone (firepower within 5%). Even these lose turrets and need port wiring, and converting them alone deletes nothing.
+
+What this needs is a decision, not an agent pass: either (a) keep legacy functions as the enemy-only system (they are now in effect "enemy parts"), or (b) add graded or turret enemy models and a ports re-layout of every enemy design, with a fresh balance pass.
