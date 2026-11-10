@@ -85,21 +85,27 @@ export class PostgresProfileStore implements ProfileStore, ProfileLeases {
   /** Saves of one account go one at a time, newest last (the pool would otherwise run them side by side, in any order) */
   private writing = new Map<number, Promise<unknown>>();
 
-  save(userId: number, profile: unknown): Promise<void> {
+  save(userId: number, profile: unknown, holder?: string): Promise<void> {
     const prev = this.writing.get(userId) ?? Promise.resolve();
-    const run = prev.catch(() => {}).then(() => this.write(userId, profile));
+    const run = prev.catch(() => {}).then(() => this.write(userId, profile, holder));
     this.writing.set(userId, run);
     void run.catch(() => {}).then(() => { if (this.writing.get(userId) === run) this.writing.delete(userId); });
     return run;
   }
 
-  private async write(userId: number, profile: unknown): Promise<void> {
+  private async write(userId: number, profile: unknown, holder?: string): Promise<void> {
     const version = (profile as { version?: number }).version ?? 0;
-    await this.pool.query(
-      `INSERT INTO profiles (user_id, version, data, updated_at) VALUES ($1, $2, $3, now())
-       ON CONFLICT (user_id) DO UPDATE SET version = EXCLUDED.version, data = EXCLUDED.data, updated_at = now()`,
-      [userId, version, JSON.stringify(profile)],
+    // (Fenced by the lease, in the same statement: nothing is written while another server holds the account unexpired)
+    const r = await this.pool.query(
+      `INSERT INTO profiles (user_id, version, data, updated_at)
+       SELECT $1::bigint, $2::integer, $3::jsonb, now()
+       WHERE $4::text IS NULL OR NOT EXISTS (
+         SELECT 1 FROM profile_leases l WHERE l.user_id = $1::bigint AND l.holder <> $4::text AND l.expires_at >= now())
+       ON CONFLICT (user_id) DO UPDATE SET version = EXCLUDED.version, data = EXCLUDED.data, updated_at = now()
+       RETURNING user_id`,
+      [userId, version, JSON.stringify(profile), holder ?? null],
     );
+    if (!r.rows.length) throw new Error(`profile ${userId} not saved: another server holds its lease`);
   }
 
   async delete(userId: number): Promise<void> {

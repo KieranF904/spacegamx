@@ -103,6 +103,24 @@ describe('profile lease on the game server', () => {
     expect((await sydney.claimLease(8, 'sydney')).ok).toBe(false);
   });
 
+  it("a server that lost the lease can't save over the region that took it (SD-03)", async () => {
+    const { db, server, sydney, join, flush } = await setup();
+    const p = await join(10);
+    // Paris stalls past the lease; Sydney takes the account and saves it
+    db.clock += LEASE_MS + 1;
+    expect((await sydney.claimLease(10, 'sydney')).ok).toBe(true);
+    await sydney.save(10, { version: 6, mark: 'sydney' }, 'sydney');
+    const conn = server.pilots.connOf(p.t.getPlayerId())!;
+    server.pilots.saveNow(conn);
+    p.t.disconnect();
+    await flush();
+    expect(JSON.parse(db.profiles.get(10) as string).mark).toBe('sydney'); // untouched by paris
+    expect(db.leases.get(10)?.holder).toBe('sydney');
+    // (The holder itself saves as before)
+    await sydney.save(10, { version: 6, mark: 'again' }, 'sydney');
+    expect(JSON.parse(db.profiles.get(10) as string).mark).toBe('again');
+  });
+
   it('refuses the login (fails closed) while the database cannot be reached', async () => {
     const { db, join } = await setup();
     db.down = true;

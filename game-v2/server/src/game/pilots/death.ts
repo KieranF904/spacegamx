@@ -35,6 +35,13 @@ export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x:
     s.dirty = true;
     return;
   }
+  // A loaner lost (flown while the saved ship fails the rules: persist.ts flyLoaner): nothing dropped or salvaged, the
+  // saved ship back as its record, so the respawn checks it again (and flies another loaner if it still fails)
+  if (self.loaners.has(p.ship) && p.hangar[p.activeSlot]) {
+    p.ship = p.hangar[p.activeSlot]!;
+    self.toast(conn, 'The loaner was destroyed: you respawn in another', 'info');
+    return;
+  }
   const D = self.death;
   const safe = !!self.host.safeAt?.(systemNum, x, y);
   self.track(conn, 'death', { system: self.host.systemId(systemNum), x: Math.round(x), y: Math.round(y), safe, ship: p.ship.blueprint.name, parts: p.ship.blueprint.parts.length, cargo: p.cargo.reduce((n, st) => n + st.n, 0), deaths: (p.stats.deaths ?? 0) + 1, ...cause });

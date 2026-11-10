@@ -391,6 +391,7 @@ export class Pilots {
 
   /** Dev tool: pilots flying a library ship (devShip): the ship record (and slot) they really have, to be put back */
   devStash = new Map<PilotConn, { rec: ShipRecord; slot: number }>();
+  /** @internal Loaners flown in place of a saved ship that fails the rules (pilots/persist.ts flyLoaner): never saved */ loaners = new WeakSet<ShipRecord>();
 
   /**
    * Pilots in the gun range (game/gunRange): their real profile, frozen as it was when they went in, while a throwaway

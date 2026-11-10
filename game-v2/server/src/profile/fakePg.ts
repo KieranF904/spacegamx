@@ -25,7 +25,13 @@ export class FakePgPool implements PgPool {
       const d = this.profiles.get(params[0] as number);
       return { rows: d === undefined ? [] : [{ data: JSON.parse(d as string) }] };
     }
-    if (q.startsWith('INSERT INTO profiles')) { this.profiles.set(params[0] as number, params[2]); return { rows: [] }; }
+    if (q.startsWith('INSERT INTO profiles')) {
+      const [id, , data, holder] = params as [number, number, string, string | null];
+      const cur = this.leases.get(id);
+      if (holder != null && cur && cur.holder !== holder && cur.until >= this.clock) return { rows: [] }; // the lease fence
+      this.profiles.set(id, data);
+      return { rows: [{ user_id: id }] };
+    }
     if (q.startsWith('DELETE FROM profiles')) { this.profiles.delete(params[0] as number); return { rows: [] }; }
     if (q.startsWith('SELECT data FROM game_docs')) {
       const d = this.docs.get(params[0] as string);

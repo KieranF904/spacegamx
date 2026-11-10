@@ -16,7 +16,12 @@ import { LocalLeases, type ProfileLeases } from './lease.js';
 export interface ProfileStore extends Partial<ProfileLeases> {
   /** The saved document, or null for an account that has never played */
   load(userId: number): Promise<unknown | null>;
-  save(userId: number, profile: unknown): Promise<void>;
+  /**
+   * `holder`: the saving server's lease id. A store with leases shared between servers (Postgres) refuses the save, as an
+   * error, while another server holds an unexpired lease on the account: a server that lost it can't write over the one
+   * that took it. (One-server stores ignore it)
+   */
+  save(userId: number, profile: unknown, holder?: string): Promise<void>;
   /** Forget an account's save for good (its account was deleted); nothing if there is none */
   delete(userId: number): Promise<void>;
   /** Game-wide documents (the rankings), by name */
