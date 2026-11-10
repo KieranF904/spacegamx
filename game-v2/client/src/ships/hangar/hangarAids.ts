@@ -2,7 +2,7 @@
  * @contract client.hangar.aids
  * owns:       the hangar's undo / redo history and symmetry mode: what a step is (the parts and the saved wiring), the toolbar buttons,
  *             the mirrored half of a place / remove / turn, and the axis line
- * needs:      HangarHost (bp, deps, refresh, status), build/history, build/symmetry, build/symmetryTurn, build/buildKeys, hangar/hangarWidgets
+ * needs:      npm: @space-game/common; HangarHost (bp, deps, refresh, status), build/history, build/symmetry, build/symmetryTurn, build/buildKeys, hangar/hangarWidgets
  * invariants: one place, remove or turn (with its mirror), and one whole held drag, is one undo step — client/src/ships/build/history.test.ts
  *             the mirrored half follows the shared mirror rules — client/src/ships/build/symmetry.test.ts
  * extend:     a new kind of hangar edit runs inside aids.edit() so it is undoable (and mirrored if it asks for the mirror)

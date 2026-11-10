@@ -115,3 +115,13 @@ export function podDrift(a: { x: number; y: number; vx: number; vy: number }, n:
   const f = (POD_DRAG * (1 - dn)) / (1 - POD_DRAG);
   return { x: a.x + a.vx * f, y: a.y + a.vy * f, vx: a.vx * dn, vy: a.vy * dn };
 }
+
+// ============================================
+// MOB IDS NAMED IN CODE
+// ============================================
+
+/** Mob ids (data/mobs.json) that move code launches by name; validate/extras.ts checks each exists */
+export const MOB_IDS = {
+  rivetMine: 'rivet_mine',
+  emberDrone: 'ember_drone',
+} as const;

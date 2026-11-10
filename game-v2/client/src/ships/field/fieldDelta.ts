@@ -2,7 +2,7 @@
  * @contract client.field.delta
  * owns:       the world build view's stat-delta card: which change the cursor means on the working design (the hand's part here, or the
  *             part under the cursor taken out), measured on the design the fabricator would build (planTarget)
- * needs:      plan.ts (planTarget, partAtPoint, WorkingDesign), build/statDelta, build/statDeltaView, FieldDeps' catalog / tuning / econ
+ * needs:      npm: @space-game/common; plan.ts (planTarget, partAtPoint, WorkingDesign), build/statDelta, build/statDeltaView, FieldDeps' catalog / tuning / econ
  * invariants: derives only when the cell, the hand or the working design changes — client/src/ships/build/statDelta.test.ts
  * extend:     none: the stats it lists are build/statDelta.ts STATS
  */

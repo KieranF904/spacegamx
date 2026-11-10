@@ -11,7 +11,7 @@ import tuningData from '../../../data/ships/tuning.json';
 import { DECOR_SHAPES } from './partDecor';
 import { RARITIES, WEAPON_KIND_TYPE, type FunctionDef } from '@space-game/common';
 import sfxIndex from '../../public/sfx/index.json';
-import { SFX_VARIANTS } from '../audio/sfx';
+import { SFX_VARIANTS } from '../audio/sfxMeta';
 import { BEAM_LOOP, KIND_SFX, baseModel, beamLightSound, beamLoopFor, shotSoundFor, shotSoundForKind, shotSoundForType } from '../audio/weaponSounds';
 import { AUG } from '../rendering/weapons/weaponStyles';
 import { WARN_GAP_MS, tellSound, warnSound } from './bossTells';

@@ -11,7 +11,7 @@
  *     └ music
  */
 
-import { renderSfx, reverbImpulse, variantKey, LoopId, SFX_REVERB, SFX_VARIANTS } from './sfx';
+import { variantKey, LoopId, SFX_REVERB, SFX_VARIANTS } from './sfxMeta';
 import audioData from '../../../data/audio.json';
 import type { MusicEngine } from './MusicEngine';
 import { MusicDirector, type MusicPlace, type MusicRegistry } from './musicProfiles';
@@ -148,6 +148,7 @@ export class AudioManager {
       this.musicGain.connect(this.masterGain);
       // Shared reverb: effects send to it, and it returns into the effects bus
       const verb = ctx.createConvolver();
+      const { renderSfx, reverbImpulse } = await import('./sfx');
       verb.buffer = reverbImpulse(ctx);
       const ret = ctx.createGain();
       ret.gain.value = 0.55;

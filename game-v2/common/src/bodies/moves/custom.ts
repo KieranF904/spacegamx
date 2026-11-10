@@ -7,6 +7,7 @@
  * custom's (both sides hold the file). Adding a design is its entry here.
  */
 import { datan2, dcos, dhypot, dsin } from '../../math/detTrig.js';
+import { MOB_IDS } from '../../constants.js';
 import { hashUnit } from '../../math/rng.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from '../../network/cursorState.js';
 import { EffectType, type ServerMessage } from '../../network/protocol.js';
@@ -382,7 +383,7 @@ export function customMoves(next: (a: CustomAct) => number): Record<string, Desi
         // Along the line across your path, or (blind: no sensors) in a ring round itself; one LAUNCH row to its clients
         const ring = !a.has('sensors');
         const p = launchPattern(drum.x, drum.y, m.arg, Math.round(num(a, 'lay', 'mines', 6)), ring, ring ? num(a, 'lay', 'ring', 260) : num(a, 'lay', 'gap', 170));
-        a.work?.launch('rivet_mine', p, a.dmg);
+        a.work?.launch(MOB_IDS.rivetMine, p, a.dmg);
         a.fx({ type: 'effect', effectType: EffectType.WarpOut, x: Math.round(drum.x), y: Math.round(drum.y), data: [0] });
       },
       lost(a, newly) {

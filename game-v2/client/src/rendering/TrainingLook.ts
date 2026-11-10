@@ -2,7 +2,7 @@
  * @contract client.rendering.training-look
  * owns:       how a training-yard body is drawn in place of its batch rock: a practice drone (a small hexagonal craft),
  *             a ghost (a faded grey outline of a drone whose lesson this pilot has done), or nothing (a later step's)
- * needs:      pixi Graphics, common getAsteroidPolygon
+ * needs:      npm: pixi.js; pixi Graphics, common getAsteroidPolygon
  * invariants: which look a body gets is decided by lookFor — client/src/ui/tutorial/tutorialModel.test.ts
  * extend:     a new look is a member of TrainingLook (tutorialModel.ts) and a case here; Renderer.setTrainingLook applies it
  */

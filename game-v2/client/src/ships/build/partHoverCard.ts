@@ -2,7 +2,7 @@
  * @contract client.ships.build-part-hover-card
  * owns:       the one card beside a parts list (hangar palette, world build view) for the part under the pointer or focus: live preview or art,
  *             name, size and mount, one sentence, three numbers, cost and lock, and a "More…" section holding the long tooltip rows
- * needs:      build/partCard (numbers, sentence, placement), build/detailMode, gunPreview (GunPlan, GunPreview, gunArt), partTip, modelCards, ui/componentKit;
+ * needs:      npm: @space-game/common; build/partCard (numbers, sentence, placement), build/detailMode, gunPreview (GunPlan, GunPreview, gunArt), partTip, modelCards, ui/componentKit;
  *             DOM; the palette's styles for .hp-mat chips
  * invariants: one card and one preview per list, made on the first hover; the preview stops when the card hides — client/src/ships/build/buildViews.test.ts
  *             "More…" starts open in Advanced and closed in Simple; Shift or a click flips it — client/src/ships/build/buildViews.test.ts

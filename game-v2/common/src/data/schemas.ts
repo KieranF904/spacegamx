@@ -362,13 +362,13 @@ export interface CentralBodyData {
   /** Gravity well at the origin (black holes): a = strength / max(r, minRadius)²; inside `horizon` ships are destroyed */
   gravity?: { strength: number; minRadius: number; horizon?: number };
   /**
-   * Detail-star mode: full fBM/warp/plasma control (sandbox detail_sun look).
-   * When true, detailParams/detailColors drive the sun shader.
+   * Detail-star mode (the sandbox detail_sun): the star takes its radius from detailParams.radius.
+   * Its look is the plasma shader, set by `plasma` below (STAR_PLASMA_FIELDS), not by detailParams/detailColors.
    */
   detailStar?: boolean;
-  /** Detail-star parameters (octaves, lacunarity, gain, warp, plasma, edge...) */
+  /** Detail-star parameters: only `radius` is read now (the old fBM octave/warp knobs no longer drive the shader) */
   detailParams?: Record<string, number>;
-  /** Detail-star colors (darkColor, midColor, brightColor, edgeColor, plasmaColor, centerColor) */
+  /** Detail-star colors: carried through to the renderer but unused by the plasma shader (see `plasma`) */
   detailColors?: Record<string, string>;
   /** A brown dwarf's look over its defaults (drawn as a planet: PlanetLookData) */
   look?: PlanetLookData;

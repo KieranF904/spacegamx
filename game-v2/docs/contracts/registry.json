@@ -848,7 +848,7 @@
       "group": "client/rendering",
       "lines": 742,
       "owns": "the PixiJS scene: layers, camera, entity views, background and lighting, per frame",
-      "needs": "GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
+      "needs": "npm: pixi.js; GameState, renderer/{particleFx,damageNumbers,deathScreen,minimap,panControl,entityParts,systemVisuals}, WeaponFx, SunRenderer, SkyRenderer, SurfaceRenderer, Lighting; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
@@ -879,7 +879,7 @@
       "group": "client/rendering",
       "lines": 36,
       "owns": "how a training-yard body is drawn in place of its batch rock: a practice drone (a small hexagonal craft), a ghost (a faded grey outline of a drone whose lesson this pilot has done), or nothing (a later step's)",
-      "needs": "pixi Graphics, common getAsteroidPolygon",
+      "needs": "npm: pixi.js; pixi Graphics, common getAsteroidPolygon",
       "events": "",
       "invariants": [
         {
@@ -2931,7 +2931,7 @@
       "group": "client/ships/build",
       "lines": 255,
       "owns": "the one card beside a parts list (hangar palette, world build view) for the part under the pointer or focus: live preview or art, name, size and mount, one sentence, three numbers, cost and lock, and a \"More…\" section holding the long tooltip rows",
-      "needs": "build/partCard (numbers, sentence, placement), build/detailMode, gunPreview (GunPlan, GunPreview, gunArt), partTip, modelCards, ui/componentKit; DOM; the palette's styles for .hp-mat chips",
+      "needs": "npm: @space-game/common; build/partCard (numbers, sentence, placement), build/detailMode, gunPreview (GunPlan, GunPreview, gunArt), partTip, modelCards, ui/componentKit; DOM; the palette's styles for .hp-mat chips",
       "events": "",
       "invariants": [
         {
@@ -3396,7 +3396,7 @@
       "group": "client/ships/build",
       "lines": 233,
       "owns": "drawing the power flow overlay (powerFlow.ts) onto a canvas (the hangar's animated layer) or a pixi Graphics (the world build view), through one small sink, plus the legend words both editors show",
-      "needs": "powerFlow.ts (the data), PlacedGeom outlines; npm: pixi.js (type only)",
+      "needs": "npm: @space-game/common; powerFlow.ts (the data), PlacedGeom outlines; npm: pixi.js (type only)",
       "events": "",
       "invariants": [
         {
@@ -3748,7 +3748,7 @@
       "group": "client/ships/build",
       "lines": 138,
       "owns": "showing a StatDelta: the small card that follows the cursor, the +/- chips beside each stat in a stats panel, and the controller that keeps both current as the hovered cell, the hand or the design changes (debounced when a derive is slow)",
-      "needs": "statDelta (the numbers), build/detailMode and simpleStats (Simple shows five stats), ui/escape; DOM",
+      "needs": "npm: @space-game/common; statDelta (the numbers), build/detailMode and simpleStats (Simple shows five stats), ui/escape; DOM",
       "events": "",
       "invariants": [
         {
@@ -3922,7 +3922,7 @@
       "group": "client/ships/build",
       "lines": 33,
       "owns": "the other half of a turn, mirror or re-face in symmetry mode: which part across the axis follows, and the copy it becomes",
-      "needs": "build/symmetry (the mirror), build/editPlaced (partUnder, turnProblem: the rules a turned part must keep)",
+      "needs": "npm: @space-game/common; build/symmetry (the mirror), build/editPlaced (partUnder, turnProblem: the rules a turned part must keep)",
       "events": "",
       "invariants": [
         {
@@ -4972,7 +4972,7 @@
       "group": "client/ships/field",
       "lines": 140,
       "owns": "the world build view's undo / redo history and symmetry mode: a step is the pilot's pending edits (plan.ts BuildEdits), the mirrored half of a place / remove / turn, and the axis",
-      "needs": "plan.ts (BuildEdits, addPart, replacePart, freeUid), build/history, build/symmetry, build/symmetryTurn",
+      "needs": "npm: @space-game/common; plan.ts (BuildEdits, addPart, replacePart, freeUid), build/history, build/symmetry, build/symmetryTurn",
       "events": "",
       "invariants": [
         {
@@ -5035,7 +5035,7 @@
       "group": "client/ships/field",
       "lines": 41,
       "owns": "the world build view's stat-delta card: which change the cursor means on the working design (the hand's part here, or the part under the cursor taken out), measured on the design the fabricator would build (planTarget)",
-      "needs": "plan.ts (planTarget, partAtPoint, WorkingDesign), build/statDelta, build/statDeltaView, FieldDeps' catalog / tuning / econ",
+      "needs": "npm: @space-game/common; plan.ts (planTarget, partAtPoint, WorkingDesign), build/statDelta, build/statDeltaView, FieldDeps' catalog / tuning / econ",
       "events": "",
       "invariants": [
         {
@@ -5540,7 +5540,7 @@
       "group": "client/ships/hangar",
       "lines": 135,
       "owns": "the hangar's undo / redo history and symmetry mode: what a step is (the parts and the saved wiring), the toolbar buttons, the mirrored half of a place / remove / turn, and the axis line",
-      "needs": "HangarHost (bp, deps, refresh, status), build/history, build/symmetry, build/symmetryTurn, build/buildKeys, hangar/hangarWidgets",
+      "needs": "npm: @space-game/common; HangarHost (bp, deps, refresh, status), build/history, build/symmetry, build/symmetryTurn, build/buildKeys, hangar/hangarWidgets",
       "events": "",
       "invariants": [
         {
@@ -10104,7 +10104,7 @@
       "group": "client/ui/tutorial",
       "lines": 198,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
-      "needs": "tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
+      "needs": "npm: @space-game/common; tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
       "invariants": [
         {
@@ -18608,9 +18608,9 @@
       "id": "validate.extras",
       "path": "server/src/data/validate/extras.ts",
       "group": "server/data/validate",
-      "lines": 31,
+      "lines": 34,
       "owns": "the small data files nothing else validates: strings.json (placeholders), mobs.json (blast, the mobs that part functions launch) and terrain/<id>.json (named for a real system)",
-      "needs": "validate/context (the ids and reference helpers); browser-safe: no Node imports",
+      "needs": "validate/context (the ids and reference helpers), common MOB_IDS; browser-safe: no Node imports",
       "events": "",
       "invariants": [
         {
@@ -18618,7 +18618,7 @@
           "test": "server/src/data/validateGameData.test.ts"
         },
         {
-          "text": "a launched mob that does not exist, an unbalanced string placeholder and a terrain file for no system are caught",
+          "text": "a launched mob that does not exist (also those named in move code), an unbalanced string placeholder and a terrain file for no system are caught",
           "test": "server/src/data/validate/extras.test.ts"
         }
       ],
@@ -18630,8 +18630,8 @@
         {
           "name": "validateExtras",
           "kind": "function",
-          "start": 14,
-          "end": 31
+          "start": 15,
+          "end": 34
         }
       ]
     },

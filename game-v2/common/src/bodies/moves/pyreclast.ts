@@ -3,6 +3,7 @@
  * server/src/game/brains/pyreclast.ts, where its fight is described). The same on both sides: the server runs them for
  * real, a client running its body draws their tells and straight shots from its MOVE, HARASS and PERSONAL decisions.
  */
+import { MOB_IDS } from '../../constants.js';
 import { datan2, dcos, dhypot, dsin } from '../../math/detTrig.js';
 import { wantAim, wantDrive, wantFace, wantFly, wantHold } from '../decisions.js';
 import type { StagedFlightTables } from '../stagedFlight.js';
@@ -501,7 +502,7 @@ export class PyreclastMoves extends StagedMoves {
     const w = this.h.work;
     if (!w) return;
     const mb = this.mount(bay), tp = this.at(target), a = datan2(tp.y - mb.y, tp.x - mb.x);
-    w.mob('ember_drone', mb.x + dcos(a) * 40, mb.y + dsin(a) * 40, a, 13, w.damageScale * BITE.ember);
+    w.mob(MOB_IDS.emberDrone, mb.x + dcos(a) * 40, mb.y + dsin(a) * 40, a, 13, w.damageScale * BITE.ember);
   }
 
   /** Its wing flak swings to you with a click: five bursts round where you are (move off the spot) */
