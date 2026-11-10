@@ -2,7 +2,7 @@
  * @contract client.damage.part-effects
  * owns:       what a destroyed part looks, sounds and shakes like, by the part's kind and how it died
  * needs:      DamageCtx (particles, sound, shake, delayed actions), common lookFn
- * invariants: a crumbling part throttles its sound — none pinned
+ * invariants: a crumbling part throttles its sound — client/src/ships/damage/shieldsAmbient.test.ts
  * extend:     a new kind of part is one case in partDestroyed and a function below
  */
 

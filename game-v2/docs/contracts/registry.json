@@ -3962,7 +3962,7 @@
       "invariants": [
         {
           "text": "a burn ends when its time is up or its part is gone",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         }
       ],
       "extend": "a new lingering effect is one member below, called from DamageFx.update",
@@ -4029,11 +4029,11 @@
       "invariants": [
         {
           "text": "a kind with no entry below is drawn as a missile's fireball",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/detonations.test.ts"
         },
         {
           "text": "a hive's blast is a missile's at 0.7 of its radius",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/detonations.test.ts"
         }
       ],
       "extend": "a new kind of detonation is one function below and one line in KINDS",
@@ -4187,7 +4187,7 @@
       "invariants": [
         {
           "text": "a boss's death is nine blasts across its hull then one huge one",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/detonations.test.ts"
         }
       ],
       "extend": "a new announced effect is one function below and one forwarding method on DamageFx",
@@ -4332,7 +4332,7 @@
       "invariants": [
         {
           "text": "a crumbling part throttles its sound",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         }
       ],
       "extend": "a new kind of part is one case in partDestroyed and a function below",
@@ -4470,11 +4470,11 @@
       "invariants": [
         {
           "text": "a shield's drop that a shell's ripple already sounded is not sounded again within RIPPLE_HEARD_MS",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         },
         {
           "text": "a ripple lives 18 frames and rides the ship's frame",
-          "test": "none pinned"
+          "test": "client/src/ships/damage/shieldsAmbient.test.ts"
         }
       ],
       "extend": "a new shield look is a ShieldLook field (shieldLooks.ts) drawn in drawShields",
@@ -5411,11 +5411,11 @@
       "invariants": [
         {
           "text": "a fire event's shells are rebuilt exactly as the server spawned them",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/FireShells.test.ts"
         },
         {
           "text": "tell codes (TELL_*) never build shells",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/FireShells.test.ts"
         }
       ],
       "extend": "a new fire-event tell is one more `if (ammo === TELL_X)` branch in fromFire",
@@ -5456,11 +5456,11 @@
       "invariants": [
         {
           "text": "point defence turns to its last intercept and rests after 900 ms",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/TurretVisuals.test.ts"
         },
         {
           "text": "your own ship with prediction on is skipped (its guns are stepped on the tick layer)",
-          "test": "none pinned"
+          "test": "client/src/ships/guns/TurretVisuals.test.ts"
         }
       ],
       "extend": "a new gimbal rule is one more branch in stepTurrets",
@@ -6480,7 +6480,7 @@
       "invariants": [
         {
           "text": "the drive has the engines while charging or burning (idle command)",
-          "test": "none pinned"
+          "test": "client/src/ships/own/thrustCommand.test.ts"
         }
       ],
       "extend": "a new control scheme is one more branch on helm / noseThrust",
@@ -7014,11 +7014,11 @@
       "invariants": [
         {
           "text": "the nearest muzzle to the shot takes the kick",
-          "test": "none pinned"
+          "test": "client/src/ships/render/muzzle.test.ts"
         },
         {
           "text": "twin barrels take turns (view.salvo)",
-          "test": "none pinned"
+          "test": "client/src/ships/render/muzzle.test.ts"
         }
       ],
       "extend": "a new muzzle query is one more exported function here",

@@ -3,8 +3,8 @@
  * owns:       shield bubbles (rim, fill, hex, recharge and re-form glow), the ripples where shells strike them, EMP crackle over
  *             knocked-out ships, and the plating hits (reactive, spaced) a shot makes on an unshielded hull
  * needs:      DamageCtx (particles, ships, sound), shieldLooks, Settings (own shield strength), impactAnchor; npm: @space-game/common
- * invariants: a shield's drop that a shell's ripple already sounded is not sounded again within RIPPLE_HEARD_MS — none pinned
- *             a ripple lives 18 frames and rides the ship's frame — none pinned
+ * invariants: a shield's drop that a shell's ripple already sounded is not sounded again within RIPPLE_HEARD_MS — client/src/ships/damage/shieldsAmbient.test.ts
+ *             a ripple lives 18 frames and rides the ship's frame — client/src/ships/damage/shieldsAmbient.test.ts
  * extend:     a new shield look is a ShieldLook field (shieldLooks.ts) drawn in drawShields
  */
 

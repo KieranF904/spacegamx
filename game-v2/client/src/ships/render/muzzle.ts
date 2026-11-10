@@ -2,8 +2,8 @@
  * @contract client.ship.render.muzzle
  * owns:       where a shot left a gun as drawn: which turret or barrel recoils and warms, its spin, and the barrel tip a shot comes out of
  * needs:      the views map (BodyView, Turret, Barrel)
- * invariants: the nearest muzzle to the shot takes the kick — none pinned
- *             twin barrels take turns (view.salvo) — none pinned
+ * invariants: the nearest muzzle to the shot takes the kick — client/src/ships/render/muzzle.test.ts
+ *             twin barrels take turns (view.salvo) — client/src/ships/render/muzzle.test.ts
  * extend:     a new muzzle query is one more exported function here
  */
 
