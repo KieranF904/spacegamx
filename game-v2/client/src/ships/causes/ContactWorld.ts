@@ -72,7 +72,10 @@ const MEMO_TICKS = KEEP_TICKS;
 export class ContactWorld implements ReplicaRewinds {
   /** The snapshots' windows: their ticks and the ships each leaves out */
   private windows: { from: number; to: number; out: Set<number> }[] = [];
+  /** The open ticks' memos (past `final`: what stale and restepPartners walk) */
   private readonly memo = new Map<number, Memo>();
+  /** The final ticks' memos (never found again: kept apart, so those walks stay a window long, not MEMO_TICKS) */
+  private readonly finalMemo = new Map<number, Memo>();
   /** Ticks found before and dropped since (a ship stepped again): what their ships were stepped with, until found again */
   private readonly was = new Map<number, Memo>();
   /** Each tick's pairs, found once (common sim/c-contactCache.ts) */
@@ -104,6 +107,7 @@ export class ContactWorld implements ReplicaRewinds {
 
   clear(): void {
     this.memo.clear();
+    this.finalMemo.clear();
     this.was.clear();
     this.queued.clear();
     this.bodies.clear();
@@ -122,7 +126,7 @@ export class ContactWorld implements ReplicaRewinds {
     const prev = this.snapTick;
     this.snapTick = m.tick;
     // (Its first snapshot: nothing held before it, so nothing to find up to it; the server sends that window's pairs)
-    if (prev === -Infinity) { this.since = this.final = m.tick; return; }
+    if (prev === -Infinity) { this.since = this.final = m.tick; this.closeMemos(); return; }
     const out = new Set<number>();
     for (const k of m.ships ?? []) out.add(k[0]);
     for (const id of m.removed ?? []) out.add(id);
@@ -131,6 +135,7 @@ export class ContactWorld implements ReplicaRewinds {
     this.windows.push({ from: prev + 1, to: m.tick, out });
     while (this.windows.length && this.windows[0].to < m.tick - KEEP_TICKS) this.windows.shift();
     this.final = Math.max(this.final, prev);
+    this.closeMemos();
     // (Ships stepped past the last snapshot (AI stepped ahead for the PT layer, a pose drawn a tick ahead) were stepped
     // with no pairs there: the window's pairs are found now, so they're stepped again from it)
     const reps = this.host.reps, self = this.host.self();
@@ -167,10 +172,23 @@ export class ContactWorld implements ReplicaRewinds {
       }
     }
     this.final = Math.max(this.final, tick);
+    this.closeMemos();
     this.settle();
     if (this.fxLast.size > 256) for (const [k, t] of this.fxLast) if (t < tick - KEEP_TICKS) this.fxLast.delete(k);
-    if (this.memo.size > MEMO_TICKS) for (const t of this.memo.keys()) if (t < tick - MEMO_TICKS) this.memo.delete(t);
+    if (this.memo.size + this.finalMemo.size > MEMO_TICKS) {
+      for (const t of this.finalMemo.keys()) if (t < tick - MEMO_TICKS) this.finalMemo.delete(t);
+      for (const t of this.memo.keys()) if (t < tick - MEMO_TICKS) this.memo.delete(t);
+    }
     return { touched, fx, own };
+  }
+
+  /** Ticks gone final: their memos move apart (stale never drops one again: it starts past `final`) */
+  private closeMemos(): void {
+    for (const [k, m] of this.memo) if (k <= this.final) { this.finalMemo.set(k, m); this.memo.delete(k); }
+  }
+
+  private memoAt(t: number): Memo | undefined {
+    return this.memo.get(t) ?? this.finalMemo.get(t);
   }
 
   /** Did ship `id` take part in tick t's pairs found here (it has causes then)? */
@@ -180,7 +198,7 @@ export class ContactWorld implements ReplicaRewinds {
 
   /** Tick t's pass as found here, if it has been (tests, the dev overlay): its ships and pairs */
   passAt(t: number): { ids: readonly number[]; pairs: readonly ContactPair[] } | undefined {
-    return this.memo.get(t);
+    return this.memoAt(t);
   }
 
   /** Ship `id`'s rows for tick t's pairs found here, each with its place in the pass (undefined: none) */
@@ -349,7 +367,7 @@ export class ContactWorld implements ReplicaRewinds {
 
   /** Tick t's pairs among the ships it holds in step, worked out once */
   private pairsAt(t: number): Memo {
-    const have = this.memo.get(t);
+    const have = this.memoAt(t);
     if (have) return have;
     if (t <= this.since) return EMPTY;
     // (Past the newest snapshot: no pairs. Its ships aren't final there, and finding them meant stepping every ship it
@@ -384,7 +402,7 @@ export class ContactWorld implements ReplicaRewinds {
         const ea = byId.get(a), eb = byId.get(b);
         if (!ea || !eb || contactLive(ea, eb)) { link(a, b); link(b, a); }
       }
-      this.memo.set(t, m);
+      (t <= this.final ? this.finalMemo : this.memo).set(t, m);
       this.stats.ticks++;
       this.stats.pairs += pairs.length;
       // Held against what its ships were stepped with: one whose live pairs changed is stepped again after this tick's step
