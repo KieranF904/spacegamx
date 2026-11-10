@@ -7,6 +7,7 @@
  */
 
 import http from 'http';
+import crypto from 'crypto';
 import { AccountRoutes, DATA_DIR } from './accounts/routes.js';
 import { InboxRoutes } from './inbox/routes.js';
 import { ActivityRoutes } from './activity/routes.js';
