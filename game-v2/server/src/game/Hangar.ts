@@ -91,7 +91,8 @@ export class Hangar {
     const rec = p.hangar[slot];
     if (!rec) return out;
     const ghosts = new Set(rec.ghosts ?? []);
-    const live = slot === p.activeSlot ? this.ships.get(conn.playerId) : undefined;
+    // (Not while a loaner flies in place of this record: persist.ts flyLoaner)
+    const live = slot === p.activeSlot && p.ship === rec ? this.ships.get(conn.playerId) : undefined;
     rec.blueprint.parts.forEach((part, i) => {
       if (ghosts.has(part.uid)) out.set(part.uid, 'ghost');
       else if (live) out.set(part.uid, live.derived.alive[i] ? 'intact' : 'wrecked');
@@ -214,7 +215,7 @@ export class Hangar {
       if (st === 'ghost') ghosts.push(q.uid);
       else if (st === 'wrecked') hp[q.uid] = 0;
       else if (keep(q.uid, partItemId(q)) === 'intact' && old) {
-        const f = slot === p.activeSlot ? this.liveHp(conn, q.uid) : old.hp[q.uid];
+        const f = slot === p.activeSlot && p.ship === old ? this.liveHp(conn, q.uid) : old.hp[q.uid];
         if (f !== undefined && f < 0.999) hp[q.uid] = f;
       }
     }
@@ -311,7 +312,8 @@ export class Hangar {
     const next = { ...rec, blueprint: bp };
     if (slot === p.activeSlot) {
       this.pilots.captureNow(conn);
-      setActiveShip(p, { ...p.ship, blueprint: bp }, slot);
+      // (The slot's record, captured into: the ship flown, unless a loaner flies in its place, persist.ts flyLoaner)
+      setActiveShip(p, { ...rec, blueprint: bp }, slot);
       this.pilots.reapplyShip(conn);
     } else p.hangar[slot] = next;
     this.pilots.markDirty(conn);
@@ -358,7 +360,7 @@ export class Hangar {
     setPartGems(this.gems, bp.parts.find((q) => q.uid === uid)!, []);
     // The record only: the live ship's part is gone anyway, and changes when it's next put on
     p.ship.blueprint = bp;
-    p.hangar[p.activeSlot] = p.ship;
+    if (!this.pilots.loaners.has(p.ship)) p.hangar[p.activeSlot] = p.ship;
     this.pilots.markDirty(conn);
     this.pilots.toast(conn, `Lost with the part: ${names.join(', ')}`, 'bad');
   }

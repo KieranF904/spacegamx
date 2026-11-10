@@ -18572,7 +18572,7 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 798,
+      "lines": 799,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
       "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
@@ -18660,7 +18660,7 @@
           "name": "Pilots",
           "kind": "class",
           "start": 148,
-          "end": 798
+          "end": 799
         }
       ]
     },
@@ -19555,7 +19555,7 @@
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
-      "lines": 126,
+      "lines": 133,
       "owns": "what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return",
       "needs": "Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common",
       "events": "",
@@ -19577,25 +19577,25 @@
           "name": "onDestroyed",
           "kind": "function",
           "start": 13,
-          "end": 90
+          "end": 97
         },
         {
           "name": "wreckRecovered",
           "kind": "function",
-          "start": 92,
-          "end": 101
+          "start": 99,
+          "end": 108
         },
         {
           "name": "sendWreck",
           "kind": "function",
-          "start": 103,
-          "end": 112
+          "start": 110,
+          "end": 119
         },
         {
           "name": "showNotices",
           "kind": "function",
-          "start": 114,
-          "end": 126
+          "start": 121,
+          "end": 133
         }
       ]
     },
@@ -19780,7 +19780,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 154,
+      "lines": 188,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -19788,6 +19788,10 @@
         {
           "text": "a guest profile is never saved with the accounts (one with a key is kept by it: pilots/guests.ts)",
           "test": "server/src/game/pilots/guests.test.ts"
+        },
+        {
+          "text": "a saved ship that fails the rules is kept as saved; a loaner flies meanwhile and is never written",
+          "test": "server/src/game/pilots/loaner.test.ts"
         }
       ],
       "extend": "a new profile field that mirrors onto the ship goes in applyProfile/capture",
@@ -19806,56 +19810,74 @@
         {
           "name": "holdsRangeShip",
           "kind": "function",
-          "start": 14,
-          "end": 17
+          "start": 15,
+          "end": 18
         },
         {
           "name": "save",
           "kind": "function",
-          "start": 19,
-          "end": 38
+          "start": 20,
+          "end": 39
         },
         {
           "name": "capture",
           "kind": "function",
-          "start": 40,
-          "end": 68
+          "start": 41,
+          "end": 69
         },
         {
           "name": "applyProfile",
           "kind": "function",
-          "start": 70,
-          "end": 91
+          "start": 71,
+          "end": 92
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 93,
-          "end": 110
+          "start": 94,
+          "end": 112
+        },
+        {
+          "name": "flyLoaner",
+          "kind": "function",
+          "start": 114,
+          "end": 128
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 112,
-          "end": 120
+          "start": 130,
+          "end": 138
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 122,
-          "end": 126
+          "start": 140,
+          "end": 144
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 128,
-          "end": 135
+          "start": 146,
+          "end": 153
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 137,
-          "end": 154
+          "start": 155,
+          "end": 161
+        },
+        {
+          "name": "chosen",
+          "kind": "function",
+          "start": 163,
+          "end": 176
+        },
+        {
+          "name": "keepSavedShip",
+          "kind": "function",
+          "start": 178,
+          "end": 188
         }
       ]
     },
