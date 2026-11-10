@@ -132,8 +132,8 @@ describe('records (codex)', () => {
     expect(all.fresh).toEqual(['halden_caches']);
     // Migration: missing → none; junk and fresh-but-not-found dropped
     const kit = (w.server as any).pilots.opts.starter;
-    expect(migrateProfile({ credits: 5 }, kit).codex).toEqual({ found: [], fresh: [] });
-    expect(migrateProfile({ codex: { found: ['a', 'a', 3, 'b'], fresh: ['b', 'c'] } }, kit).codex).toEqual({ found: ['a', 'b'], fresh: ['b'] });
+    expect(migrateProfile({ version: 6, credits: 5 }, kit).codex).toEqual({ found: [], fresh: [] });
+    expect(migrateProfile({ version: 6, codex: { found: ['a', 'a', 3, 'b'], fresh: ['b', 'c'] } }, kit).codex).toEqual({ found: ['a', 'b'], fresh: ['b'] });
   });
 
   it('admins can hand records out and take them back (/codex)', () => {

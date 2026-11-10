@@ -452,7 +452,7 @@ export class Quests {
   }
 
   /**
-   * A job at a build or fly step whose ship is gone from the hangar (scrapped, or the v5 ship wipe) goes back to
+   * A job at a build or fly step whose ship is gone from the hangar (scrapped, say) goes back to
    * its step that starts that ship, so what it asks for next is something the pilot can do
    */
   private rewindShipSteps(conn: PilotConn, p: PlayerProfile): void {

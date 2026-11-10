@@ -285,9 +285,9 @@ export class Pilots {
     // A save we can't make sense of is kept as it is (never saved over), like one we couldn't read
     let profile: PlayerProfile;
     try {
-      // (A save below v5 takes the design update: its ships swapped for their remakes, by the account's name, or broken down)
+      // (A save older than OLDEST_PROFILE_VERSION throws: logged below, and kept as it is)
       profile = raw
-        ? migrateProfile(raw, this.opts.starter, this.econ.ships, { econ: this.econ, designUpdate: this.ships?.designUpdate, username: conn.username, tuning: this.ships?.tuning })
+        ? migrateProfile(raw, this.opts.starter, this.econ.ships, { econ: this.econ })
         : newProfile(this.opts.starter);
     } catch (e) {
       s.loading = true;
@@ -325,7 +325,7 @@ export class Pilots {
     if (!kept || !s || s.loading || conn.userId !== null || conn.guestId !== id) return false;
     let profile: PlayerProfile;
     try {
-      profile = migrateProfile(kept.profile, this.opts.starter, this.econ.ships, { econ: this.econ, designUpdate: this.ships?.designUpdate, username: conn.username, tuning: this.ships?.tuning });
+      profile = migrateProfile(kept.profile, this.opts.starter, this.econ.ships, { econ: this.econ });
     } catch (e) {
       console.error(`[Pilots] could not migrate a kept guest profile (${conn.username}):`, e);
       return false;

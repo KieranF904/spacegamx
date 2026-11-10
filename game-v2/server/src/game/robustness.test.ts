@@ -129,9 +129,10 @@ describe('crash isolation', () => {
       for (let i = 0; i < 5; i++) server.step();
       await server.saveAll();
     });
-    // Whether migrateProfile coped with it or not, what's stored is never a fresh start over a real save
+    // (A v1 save is older than the oldest migration kept: migrateProfile throws, Pilots logs it) What's stored is never a
+    // fresh start over a real save: it stays as it was
     const saved = await store.load(7) as { credits: unknown };
-    expect(saved).not.toBeNull();
+    expect(saved).toEqual({ version: 1, credits: 'not a profile', ship: 5, hangar: 'x' });
   });
 });
 

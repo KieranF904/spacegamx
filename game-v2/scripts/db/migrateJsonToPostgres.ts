@@ -326,8 +326,8 @@ export function loadNormaliser(gameDataDir: string): Normaliser {
   return { kit, catalog };
 }
 
-/** migrateProfile with the clock and randomness pinned, so two runs over equal input can be compared */
-function normalise(n: Normaliser, raw: unknown): string {
+/** migrateProfile with the clock and randomness pinned, so two runs over equal input can be compared (null: a save older than the oldest migration kept, which migrateProfile refuses) */
+function normalise(n: Normaliser, raw: unknown): string | null {
   const RealDate = Date;
   const realRandom = Math.random;
   const t = RealDate.UTC(2026, 0, 1);
@@ -343,6 +343,8 @@ function normalise(n: Normaliser, raw: unknown): string {
   Math.random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   try {
     return canonical(migrateProfile(structuredClone(raw), n.kit, n.catalog));
+  } catch {
+    return null;
   } finally {
     globalThis.Date = RealDate;
     Math.random = realRandom;
@@ -431,7 +433,8 @@ export async function verify(databaseUrl: string, plan: Plan, src: JsonSource, n
         const a = normalise(normaliser, exp);
         const control = normalise(normaliser, exp);
         const b = normalise(normaliser, got);
-        if (a !== control) detail += '; migrateProfile is not deterministic here (compared raw only)';
+        if (a === null || b === null) detail += '; older than the oldest migration kept (compared raw only)';
+        else if (a !== control) detail += '; migrateProfile is not deterministic here (compared raw only)';
         else { ok &&= a === b; detail += `; after migrateProfile ${a === b ? 'deep-equal' : 'DIFFERS'}`; }
       }
       add(`profile ${id}`, ok, detail);
