@@ -79,8 +79,13 @@ export class AsteroidOrbits {
   private phase = new Float64Array(1 << 14);
   private phaseTick = new Float64Array(1 << 14).fill(-1);
 
+  /** Orbits added but not yet walked and filed, in filing order (see flush) */
+  private pending = new Map<number, { system: number; shape: OrbitShape }>();
+  private settleAfterFlush = false;
+  private filed = 0;
+
   /** How many entries are filed (for stats) */
-  entries = 0;
+  get entries(): number { this.flush(); return this.filed; }
 
   private static key(system: number, cx: number, cy: number): number {
     return ((system * STRIDE) + cx + OFFSET) * STRIDE + (cy + OFFSET);
@@ -96,6 +101,24 @@ export class AsteroidOrbits {
     this.rate[id] = shape.fixed ? 0 : Math.sqrt(ORBIT_MU / (a * a * a));
     this.epoch[id] = shape.epochTick;
     this.phaseTick[id] = -1;
+    // The walk (the costly part) waits until a query needs the cells: a world nobody shoots in never pays it
+    this.pending.set(id, { system, shape });
+  }
+
+  /**
+   * File every orbit added so far, in the order they were added (so each cell's order is the
+   * same as filing them one by one on add). A running server calls this at start; queries call it first.
+   */
+  flush(): void {
+    if (this.pending.size) {
+      const todo = [...this.pending];
+      this.pending.clear();
+      for (const [id, o] of todo) this.file(id, o.system, o.shape);
+    }
+    if (this.settleAfterFlush) { this.settleAfterFlush = false; this.compact(true); }
+  }
+
+  private file(id: number, system: number, shape: OrbitShape): void {
     this.walk(system, shape, (key, lo, hi) => {
       let c = this.cellOf.get(key);
       if (c === undefined) { c = this.newCell(); this.cellOf.set(key, c); }
@@ -106,7 +129,7 @@ export class AsteroidOrbits {
       this.pLo[at] = lo - PHASE_SLACK;
       this.pHi[at] = hi + PHASE_SLACK;
       this.cN[c]++;
-      this.entries++;
+      this.filed++;
     });
     if (this.wasted > this.poolEnd / 2 && this.poolEnd > 1 << 16) this.compact();
   }
@@ -152,7 +175,8 @@ export class AsteroidOrbits {
    * little room), so the pools are the size of what's in them rather than of how they grew
    */
   settle(): void {
-    this.compact(true);
+    if (this.pending.size) this.settleAfterFlush = true;
+    else this.compact(true);
   }
 
   /** Close up the regions left behind: every live cell's region copied, in order, to fresh pools (`tight`: each trimmed to its entries and a little room) */
@@ -183,6 +207,7 @@ export class AsteroidOrbits {
     const o = this.orbits.get(id);
     if (!o) return;
     this.orbits.delete(id);
+    if (this.pending.delete(id)) { this.phaseTick[id] = -1; return; }
     const seen = new Set<number>();
     this.walk(o.system, o.shape, (key) => {
       if (seen.has(key)) return;
@@ -193,7 +218,7 @@ export class AsteroidOrbits {
       const s0 = this.cStart[c], n = this.cN[c];
       let w = 0;
       for (let r = 0; r < n; r++) {
-        if (this.pIds[s0 + r] === id) { this.entries--; continue; }
+        if (this.pIds[s0 + r] === id) { this.filed--; continue; }
         this.pIds[s0 + w] = this.pIds[s0 + r]; this.pLo[s0 + w] = this.pLo[s0 + r]; this.pHi[s0 + w] = this.pHi[s0 + r]; w++;
       }
       this.cN[c] = w;
@@ -257,6 +282,8 @@ export class AsteroidOrbits {
    * each once, in filing order within each cell
    */
   query(system: number, x1: number, y1: number, x2: number, y2: number, padding: number, tick: number): number[] {
+    this.flush();
+   
     const cx0 = Math.floor((Math.min(x1, x2) - padding) / ORBIT_CELL), cx1 = Math.floor((Math.max(x1, x2) + padding) / ORBIT_CELL);
     const cy0 = Math.floor((Math.min(y1, y2) - padding) / ORBIT_CELL), cy1 = Math.floor((Math.max(y1, y2) + padding) / ORBIT_CELL);
     if (++this.queryNo === 0x7fffffff) { this.stamp.fill(0); this.queryNo = 1; }

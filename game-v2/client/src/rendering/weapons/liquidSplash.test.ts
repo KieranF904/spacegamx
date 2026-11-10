@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LiquidFx, LIQUID_CAP, type LiquidSink } from './liquidSplash';
 import { ImpactAnchor } from './impactAnchor';
 import type { LiquidLayer } from './weaponStyles';
@@ -14,6 +14,13 @@ function sink(): LiquidSink & { lines: number[][] } {
 }
 
 describe('liquid splash', () => {
+  // The splash rolls Math.random for its blobs' spread and speed; a fixed sequence keeps the checks below from flaking
+  beforeEach(() => {
+    let s = 12345;
+    vi.spyOn(Math, 'random').mockImplementation(() => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
   it('throws blobs off the surface that fall back and stick as smears, under a film along the surface', () => {
     const fx = new LiquidFx(), s = sink();
     // A surface facing up (-y), the beam coming down and sliding right

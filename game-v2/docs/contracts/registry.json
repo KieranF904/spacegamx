@@ -17359,7 +17359,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 755,
+      "lines": 756,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -17387,7 +17387,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 120,
-          "end": 755
+          "end": 756
         }
       ]
     },
