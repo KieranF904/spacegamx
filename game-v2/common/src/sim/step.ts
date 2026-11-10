@@ -172,14 +172,5 @@ export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: 
   }
 }
 
-/** (What gunLoadTick reads: the guns' state and the structure) */
-const LOAD = { derived: undefined as unknown as SimShipState['structure']['derived'], cooldown: [] as number[], rounds: [] as number[], reload: [] as number[], charge: [] as number[], spin: [] as number[], mineUntil: undefined as number | undefined, tow: undefined as number | undefined };
-function gunLoadOf(s: SimShipState): typeof LOAD {
-  const g = s.guns;
-  LOAD.derived = s.structure.derived; LOAD.cooldown = g.cooldown; LOAD.rounds = g.rounds; LOAD.reload = g.reload;
-  LOAD.charge = g.charge; LOAD.spin = g.spin; LOAD.mineUntil = g.mineUntil; LOAD.tow = g.tow;
-  return LOAD;
-}
-
 /** (A replica's numb drive: it knows only CTL.numb, warmthStage(1). warmth.ts is outside the replica.ts cycle) */
 const NUMB_REPLICA = warmthStage(1).control;

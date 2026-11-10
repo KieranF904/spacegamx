@@ -171,12 +171,12 @@ describe('loadouts in the save', () => {
     const p = migrateProfile(JSON.parse(JSON.stringify(raw)), kit);
     expect(p.ship.ammo).toEqual({ load: { cannon_hv: 3 }, first: { cannon: 'cannon_hv' } });
     expect(p.hangar[0]).toBe(p.ship);
-    expect(p.ammo).toEqual({ open: { cannon_hv: 40 }, load: {} });
+    expect(p.ammo).toEqual({ open: { cannon_hv: 40 } });
     // Saved and loaded again: unchanged (a zero is kept: it means none)
     p.ship.ammo!.load.cannon_hv = 0;
     const again = migrateProfile(JSON.parse(JSON.stringify(p)), kit);
     expect(again.ship.ammo).toEqual({ load: { cannon_hv: 0 }, first: { cannon: 'cannon_hv' } });
-    expect(again.ammo).toEqual({ open: { cannon_hv: 40 }, load: {} });
+    expect(again.ammo).toEqual({ open: { cannon_hv: 40 } });
   });
 
   it('a save without ammunition gets none, and other slots keep the default', () => {
