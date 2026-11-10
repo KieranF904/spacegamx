@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
+const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'data');
 export const MAP = {
   repair_kit: 'pack_hull',
   field_repair_kit: 'pack_wiring',
