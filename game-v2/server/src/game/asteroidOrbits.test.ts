@@ -8,6 +8,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
+import { AsteroidOrbits, type OrbitShape } from './AsteroidOrbits.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -80,6 +81,34 @@ describe('asteroid orbit timetable', () => {
         expect(got.has(a), `asteroid ${a} at tick ${tick}`).toBe(true);
       }
     }
+  });
+
+  it('filing a system late (on its first query) gives what filing at once does, order and all', () => {
+    const { ids, orbits } = world();
+    const sys = [...new Set(ids.map((e) => InSystem.systemId[e]))].sort((a, b) => a - b).slice(0, 2);
+    const mine = ids.filter((e) => sys.includes(InSystem.systemId[e]));
+    const shape = (e: number) => orbits.orbits.get(e) as { system: number; shape: OrbitShape };
+    const now = new AsteroidOrbits(), late = new AsteroidOrbits();
+    for (const e of mine) now.add(e, shape(e).system, shape(e).shape);
+    now.fileAll();
+    for (const e of mine) late.add(e, shape(e).system, shape(e).shape);
+    // (The same churn on both: on `late`, before anything of the first system is filed, then after)
+    const rnd = mulberry32(3);
+    const churn = () => {
+      const some = mine.filter(() => rnd() < 0.3);
+      for (const e of some) { now.remove(e); late.remove(e); }
+      for (const e of some.filter((_, i) => i % 2 === 0)) { now.add(e, shape(e).system, shape(e).shape); late.add(e, shape(e).system, shape(e).shape); }
+    };
+    churn();
+    late.query(sys[0], 0, 0, 0, 0, 0, 0);
+    churn();
+    for (let q = 0; q < 400; q++) {
+      const tick = Math.floor(rnd() * 2e8), e = mine[Math.floor(rnd() * mine.length)];
+      const [x, y] = where(e, tick);
+      const s = InSystem.systemId[e];
+      expect(late.query(s, x - 900, y - 300, x + 700, y + 900, 120, tick)).toEqual(now.query(s, x - 900, y - 300, x + 700, y + 900, 120, tick));
+    }
+    expect(late.entries).toBe(now.entries);
   });
 
   it('a broken asteroid leaves the timetable', () => {
