@@ -4,6 +4,7 @@
  */
 import { createDeflateRaw, constants as zc } from 'zlib';
 import { Position, InSystem, DEFAULT_CAPS, splitServerFrame, type ClientSocket, type ClientMessage } from '@space-game/common';
+import { ServerFrameReader } from '../../../../common/src/network/packed/packedCodec.js';
 import { makeServer, clock, rng, Scene, controlsFor, applyDirect, type Layout } from './world.js';
 import { Probe, PoseRing, classifier } from './probe.js';
 import { PT_TUNING } from '../../../../client/src/predict/shipKinds.js';
@@ -25,6 +26,10 @@ export interface CaseOpts {
   pt?: boolean;
   /** Its level of detail's reach (client predict/shipKinds.ts PT_TUNING.reach; default the game's) */
   ptReach?: number;
+  /** Hash every byte sent to the counting sockets, from the first (a check that a change left the frames as they were) */
+  hash?: boolean;
+  /** Write the first counting socket's messages, decoded, one per line, to this file (to diff two runs' frames) */
+  dump?: string;
 }
 
 const WS_HEADER = 66; // TCP/IP + WebSocket framing per message, as the earlier probes counted it
@@ -60,6 +65,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const seed = rng(0x2545f491);
   Math.random = seed;
   clock.t = 1_000_000;
+  // (--hash: the wall clock the server still reads (a welcome's serverTime and the like) the bench's too, so frames repeat)
+  if (o.hash) Date.now = () => Math.floor(clock.t);
   const wallStart = performance.now();
   if (o.ptReach !== undefined) PT_TUNING.reach = o.ptReach;
   // (Every client runs the full caps set; crowd fallbacks only with --crowd)
@@ -68,7 +75,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
   let measuring = false;
-  const tickMs: number[] = [], snapMs: number[] = [], replMs: number[] = [], flushMs: number[] = [], rebuildMs: number[] = [], rebuildCount: number[] = [], rebuildRepeat: number[] = [];
+  const tickMs: number[] = [], tickCpu: number[] = [], snapCpu: number[] = [], snapMs: number[] = [], replMs: number[] = [], flushMs: number[] = [], rebuildMs: number[] = [], rebuildCount: number[] = [], rebuildRepeat: number[] = [];
   let aSnap = 0, aRepl = 0, aFlush = 0, aReb = 0, nReb = 0, nRepeat = 0;
   // (Rebuilds of a ship already rebuilt this tick: the batching's target is none)
   const rebuiltThisTick = new Set<number>();
@@ -77,6 +84,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
     obj[name] = (...a: any[]) => { const t0 = performance.now(); try { return orig(...a); } finally { add(performance.now() - t0); } };
   };
   timed(srv.snapshots, 'sendSnapshots', (ms) => { aSnap += ms; });
+  // (CPU time too, the process's: on a busy machine the wall time takes in time the bench wasn't running)
+  let cSnap = 0;
+  const cpuMs = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
+  { const orig = srv.snapshots.sendSnapshots; srv.snapshots.sendSnapshots = (...a: any[]) => { const c0 = cpuMs(); try { return orig(...a); } finally { cSnap += cpuMs() - c0; } }; }
   timed(srv.replication, 'forClient', (ms) => { aRepl += ms; });
   timed(srv.net, 'flushOutbox', (ms) => { aFlush += ms; });
   timed(ships, 'rebuildNow', (ms) => { aReb += ms; nReb++; });
@@ -91,10 +102,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
   {
     const orig = server.step.bind(server);
     server.step = () => {
-      aSnap = aRepl = aFlush = aReb = aDeb = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
-      const t0 = performance.now();
+      aSnap = aRepl = aFlush = aReb = aDeb = 0; cSnap = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
+      const t0 = performance.now(), c0 = cpuMs();
       orig();
-      if (measuring) { tickMs.push(performance.now() - t0); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); debrisMs.push(aDeb); debrisN.push(ships.stats.debrisCount ?? 0); }
+      if (measuring) { tickMs.push(performance.now() - t0); tickCpu.push(cpuMs() - c0); snapCpu.push(cSnap); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); debrisMs.push(aDeb); debrisN.push(ships.stats.debrisCount ?? 0); }
     };
   }
 
@@ -112,6 +123,15 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const sampledBulk = new Set<number>();
   const probes = new Map<number, Probe>();
   const pids: number[] = [];
+  // (--hash: FNV-1a over every frame every counting socket was sent, in order, its index first; --dump: the first one's, decoded)
+  let frameHash = 0x811c9dc5, frameBytes = 0;
+  const dumpLines: string[] = [];
+  const dumpReader = new ServerFrameReader();
+  const hashFrame = (idx: number, u: Uint8Array) => {
+    let h = Math.imul(frameHash ^ idx, 0x01000193);
+    for (let j = 0; j < u.length; j++) h = Math.imul(h ^ u[j], 0x01000193);
+    frameHash = h; frameBytes += u.length;
+  };
   for (let i = 0; i < o.n; i++) {
     if (probeIdx.has(i)) {
       const p = new Probe(server, `probe${i}`, o.lat, ring, klass, 0, sysTick, o.pt !== false);
@@ -123,6 +143,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
       const socket: ClientSocket = {
         isOpen: () => true,
         send: (data) => {
+          if (o.hash) hashFrame(idx, data as Uint8Array);
+          if (o.dump && idx === 1) { const u = data as Uint8Array; let line: string; try { line = dumpReader.read(u).flat().map((m) => JSON.stringify(m)).join('\n'); } catch (e) { line = 'RAW ' + u.length + ' ' + String(e); } dumpLines.push(line); }
           if (!measuring) return;
           const u = data as Uint8Array;
           c.raw += u.length; c.msgs++;
@@ -210,6 +232,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
     snapshotsMsPerTick: r2(mean(snapMs)), replicationMsPerTick: r2(mean(replMs)), encodeSendMsPerTick: r2(mean(flushMs)),
     rebuildMsPerTick: r2(mean(rebuildMs)), rebuildsPerSec: r2(sum(rebuildCount) / secs), rebuildRepeats: sum(rebuildRepeat),
     debrisStepMsPerTick: r2(mean(debrisMs)), debrisMean: r2(mean(debrisN)), debrisMax: Math.max(0, ...debrisN),
+    tickCpuMs: r2(mean(tickCpu)), snapshotsCpuMsPerTick: r2(mean(snapCpu)),
   };
   const bulk: Counter[] = [...counters.values()];
   const bulkRaw = bulk.map((c) => c.raw / secs), bulkMsgs = bulk.map((c) => c.msgs / secs);
@@ -329,9 +352,11 @@ export async function runCase(o: CaseOpts): Promise<any> {
       settledTickMs: r2(mean(crowdSecs.slice(-Math.max(1, Math.floor(crowdSecs.length / 3))).map((c) => c.tickMs))),
       settledLevel: crowdSecs.at(-1)?.lv ?? 0,
     } : undefined,
+    frameHash: o.hash ? { hash: (frameHash >>> 0).toString(16), bytes: frameBytes } : undefined,
     wallSeconds: r2((performance.now() - wallStart) / 1000),
     ticks: server.getTick() - m0,
   };
+  if (o.dump) (await import('fs')).writeFileSync(o.dump, dumpLines.join('\n'));
   void Position; void InSystem;
   return out;
 }

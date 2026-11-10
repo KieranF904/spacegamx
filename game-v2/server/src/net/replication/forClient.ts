@@ -2,7 +2,7 @@
  * @contract server.replication.for-client
  * owns:       one client's share of a snapshot's ship motion: keyframes for ships it's new to or behind on, control rows,
  *             cause records (contacts it finds itself left out, pulls it works out left out, zero PULL records)
- * needs:      ReplicationCore (shadows, knocks, pullOff, pullsJudged, ships, stats, real, keyNow), ownShip (ownFor,
+ * needs:      ReplicationCore (shadows, knocks, pullOff, pullsJudged, ships, stats, real, keyNow, shipsIn), ownShip (ownFor,
  *             ownPulls), workable (workable, otherBefore), causes/contactsFor, causes/shadowCauses
  * invariants: each keyframe and control row is packed once a snapshot for every client — server/src/net/replication.test.ts
  *             bytes per client unchanged — server/src/golden/frameHash.test.ts
@@ -27,9 +27,9 @@ export function forClient(rep: ReplicationCore, systemId: number, self: number, 
   const ships: KeyframeRow[] = [];
   const ctl: ControlRow[] = [];
   const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[]; found?: ContactWindow } = {};
-  // (The ships it held before this snapshot: the ones it may take in its own contact pass, and the pullers whose
-  // fields' pulls it works out itself)
-  const before = since !== undefined || rep.ships.pulls.any ? new Set(known.keys()) : null;
+  // (The ships it held before this snapshot: the pullers whose fields' pulls it works out itself. Those it may take in
+  // its own contact pass are the ones it still holds unkeyframed after it: contactsFound)
+  const before = rep.ships.pulls.any ? new Set(known.keys()) : null;
   if (since !== undefined) rep.ships.contactLog.wanted = true;
   // (Which version of a ship this client goes by: moved only when causes don't explain it; a piece of debris, only
   // when it left what it works out)
@@ -100,7 +100,7 @@ export function forClient(rep: ReplicationCore, systemId: number, self: number, 
   }
   // (CAPS.CONTACTS: the window's contacts it finds itself, between ships it held before and holds in step: neither
   // as own rows nor as records, net/causes/contactsFor.ts)
-  const found = before && since !== undefined ? contactsFound(rep, systemId, self, before, known, ships, snapshotTick, since, mine, view, held, synced, kept, pins) : null;
+  const found = since !== undefined ? contactsFound(rep, systemId, self, known, ships, snapshotTick, since, mine, view, held, synced, kept, pins) : null;
   // (Pull fields' pulls it works out itself: a puller it held before this snapshot, in view, not keyframed now, its
   // clients' replica of it the real ship as the tick began. A tick whose pulls aren't all so is told whole)
   const pulls = rep.ships.pulls;
@@ -194,24 +194,31 @@ export function forClient(rep: ReplicationCore, systemId: number, self: number, 
 /**
  * The window's contacts a CONTACTS client finds itself (net/causes/contactsFor.ts): the ships it takes are the ones it
  * held before this snapshot and holds in step through it (no keyframe now, still in view, in this system, ships; its
- * own when it steps it, CAPS.OWN_SIM)
+ * own when it steps it, CAPS.OWN_SIM).
+ *
+ * `known` as forClient left it: a ship it holds now without a keyframe in `ships` is one it held before (forClient adds
+ * a ship to `known` only with its keyframe), in the order it had them (a Map keeps a kept key's place), so it walks
+ * that rather than a copy of them made before
  */
-export function contactsFound(rep: ReplicationCore, systemId: number, self: number, before: ReadonlySet<number>, known: ReadonlyMap<number, number>, ships: KeyframeRow[], snapshotTick: number, since: number, mine: Shadow | undefined, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, kept?: Kept, pins?: (id: number) => boolean | undefined): ContactWindow {
+export function contactsFound(rep: ReplicationCore, systemId: number, self: number, known: ReadonlyMap<number, number>, ships: KeyframeRow[], snapshotTick: number, since: number, mine: Shadow | undefined, view?: Set<number>, held?: ReadonlyMap<number, unknown>, synced?: (id: number) => number | undefined, kept?: Kept, pins?: (id: number) => boolean | undefined): ContactWindow {
   const keyed = new Set(ships.map((k) => k[0]));
   const take = new Set<number>();
-  for (const id of before) {
-    if (!known.has(id) || keyed.has(id) || held?.has(id) || InSystem.systemId[id] !== systemId || rep.ships.get(id)?.kind !== 'ship') continue;
-    if (id === self ? !mine?.own : !rep.shadows.has(id) || (view && !view.has(id))) continue;
+  // (In a round, the system's ships with a shadow, once for every client: its own has one whenever it steps it)
+  const inSystem = rep.shipsIn?.(systemId) ?? null;
+  for (const id of known.keys()) {
+    if (inSystem ? !inSystem.has(id) : InSystem.systemId[id] !== systemId || rep.ships.get(id)?.kind !== 'ship') continue;
+    if (keyed.has(id) || held?.has(id)) continue;
+    if (id === self ? !mine?.own : (!inSystem && !rep.shadows.has(id)) || (view && !view.has(id))) continue;
     take.add(id);
   }
   const w = contactWindow({
     log: rep.ships.contactLog, systemId, from: since, to: snapshotTick, held: take,
     docked: (id) => rep.shadows.get(id)?.mode === ReplicaMode.Docked,
     events: (id) => rep.shadows.get(id)?.causes,
+    // (the cheap test first: `kept`, the structures it keeps (ShipStructure.keptAfter), only when that fails)
     structOk: (id, rb) => {
-      if (kept?.(id)?.includes(rb)) return true;
       const now = rep.ships.get(id)?.rebuilds;
-      return now === rb && (synced?.(id) === now || id === self || !!view?.has(id));
+      return (now === rb && (synced?.(id) === now || id === self || !!view?.has(id))) || !!kept?.(id)?.includes(rb);
     },
     toldPinned: pins,
   });

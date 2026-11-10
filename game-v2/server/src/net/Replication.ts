@@ -29,7 +29,7 @@
  */
 
 import {
-  Position, Velocity, Rotation, ReplicaMode, packKeyframe, replicaHash, replicasByte,
+  Position, Velocity, Rotation, InSystem, ReplicaMode, packKeyframe, replicaHash, replicasByte,
   type FlightBody, type KeyframeRow, type ControlRow, type ReplicaEnv, type ServerContactMessage,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
@@ -185,8 +185,24 @@ export class Replication implements ReplicationCore {
     return this.shadows.get(eid)?.own?.version;
   }
 
+  /** This round's ships by system (shipsIn; null: no round open) */
+  private roundShips: Map<number, Set<number>> | null = null;
+
+  shipsIn(systemId: number): ReadonlySet<number> | null {
+    const r = this.roundShips;
+    if (!r) return null;
+    let s = r.get(systemId);
+    if (!s) {
+      s = new Set();
+      for (const eid of this.shadows.keys()) if (InSystem.systemId[eid] === systemId && this.ships.get(eid)?.kind === 'ship') s.add(eid);
+      r.set(systemId, s);
+    }
+    return s;
+  }
+
   /** Before building snapshots: ships that left their predicted path get a new keyframe */
   beginSnapshot(due?: (eid: number) => boolean): void {
+    this.roundShips = new Map();
     for (const [eid, s] of this.shadows) {
       // Gone since the tick ended (taken out of the world between): nothing to send
       if (!this.ships.has(eid)) { this.shadows.delete(eid); continue; }
@@ -217,6 +233,7 @@ export class Replication implements ReplicationCore {
 
   /** After the snapshots: the control changes have been delivered */
   endSnapshot(due?: (eid: number) => boolean): void {
+    this.roundShips = null;
     if (due) { let n = 0; for (const k of this.knocks) if (!due(k[0]) && !due(k[1])) this.knocks[n++] = k; this.knocks.length = n; }
     else this.knocks.length = 0;
     this.ships.debrisNet.clearTouched(due);
