@@ -4,19 +4,19 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| server/src/index.ts | 192 | entry: env (`PORT`, `BROWSER_URL`, `LOBBY_ADMIN_SECRET`, `NODE_ENV`), `createUserStore`, `createProfileStore`, `checkGameData`, builds `GameServer`, `SocketTransport`, writes `data/status/live.json` every 2 s, graceful `shutdown` (20 s save budget), process-level handlers, registers with the lobby every 10 s (also receives `deletedAccounts`) |
-| server/src/GameServer.ts | 4168 | see section map below |
-| server/src/net/SnapshotBuilder.ts | 828 | `SnapshotBuilder` with its `SnapshotHost` (built once at the end of the constructor, pieces copied into plain fields): `sendSnapshots`, `systemRows`, `sendShipUpdates`, row keys, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo`. GameServer reaches it as `this.snapshots` |
+| server/src/index.ts | 230 | entry: env (`PORT`, `BROWSER_URL`, `LOBBY_ADMIN_SECRET`, `NODE_ENV`), `createUserStore`, `createProfileStore`, `checkGameData`, builds `GameServer`, `SocketTransport`, writes `data/status/live.json` every 2 s, graceful `shutdown` (20 s save budget), process-level handlers, registers with the lobby every 10 s (also receives `deletedAccounts`) |
+| server/src/GameServer.ts | 748 | see section map below |
+| server/src/net/SnapshotBuilder.ts | 659 | `SnapshotBuilder` with its `SnapshotHost` (built once at the end of the constructor, pieces copied into plain fields): `sendSnapshots`, `systemRows`, `sendShipUpdates`, row keys, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo`. GameServer reaches it as `this.snapshots` |
 | server/src/net/snapshot/Outbox.ts, constants.ts | 140 / 25 | `Outbox`: outboxes, lazy effects, broadcasts, byte counters (`this.net`; GameServer bumps `this.net.batching` around a tick or request); the snapshot tuning constants |
 | server/src/game/Docking.ts | 142 | `Docking`: berthing at a station, `dockedShips` (the Set GameServer aliases), `stationInRange`, `dockingSystem`, `handleDock`/`undock` |
 | server/src/game/Derelicts.ts | 202 | `Derelicts`: derelict hulks (spawn, break-up, salvage, respawn, tow delivery), `personCraft`, `onPilotlessShipDestroyed` |
-| server/src/net/auth.ts | 199 | `registerAuthHandlers`: join; guest-name rules; `rejectAuth` |
+| server/src/net/auth.ts | 139 | `registerAuthHandlers`: join; guest-name rules; `rejectAuth` |
 | server/src/net/handlers/modules.ts | 170 | `registerModuleHandlers`: the message types that only forward to one game module (party, trade, market, items, quests, hangar orders, sieges, admin ...) |
 | server/src/net/handlers/shipEdit.ts | 145 | `registerShipEditHandlers`: dock, undock, shipEdit, slotSave/Fly/Clear, designSave, shareDesign, pilotInfo; `clientBlueprint`, `handleShipEdit` |
-| server/src/net/handlers/flight.ts | 256 | `registerFlightHandlers`: input (queued for the tick), ping, stateHash, mapView, interact, respawn, target, tow; `handleInput`, `applyInputToEntity`, `releaseControls`, `recordSelfHashes` (GameServer keeps one-line delegates, called by `drainInputQueue` and the tick list); `portalQuery` |
+| server/src/net/handlers/flight.ts | 321 | `registerFlightHandlers`: input (queued for the tick), ping, stateHash, mapView, interact, respawn, target, tow; `handleInput`, `applyInputToEntity`, `releaseControls`, `recordSelfHashes` (GameServer keeps one-line delegates, called by `drainInputQueue` and the tick list); `portalQuery` |
 | server/src/net/dispatch.ts | 55 | `dispatch(table, ctx, conn, msg)` and `HandlerRegistry` (`t.on(type, fn)`); the pre-join gate (`PRE_JOIN`), the per-type rate limit and the handler call. `MAX_INPUTS_PER_TICK` lives here too |
-| server/src/net/ServerCtx.ts | 110 | `ServerCtx`: the narrow view of the server a client message handler may use (GameServer implements it) |
-| server/src/net/ClientConnection.ts | 81 | `ClientConnection`: the per-socket state (was the CLIENT CONNECTION block of GameServer) |
+| server/src/net/ServerCtx.ts | 135 | `ServerCtx`: the narrow view of the server a client message handler may use (GameServer implements it) |
+| server/src/net/ClientConnection.ts | 180 | `ClientConnection`: the per-socket state (was the CLIENT CONNECTION block of GameServer) |
 | server/src/tickOrder.ts | 48 | `TickSystem`, `TICK_PHASES` (pilots-move, combat, world, persist), `checkTickOrder` |
 | server/src/ships/bridge/core.ts, sync.ts, damage.ts, rebuild.ts, weapons.ts, flight.ts, pilotless.ts | 243 / 144 / 461 / 431 / 522 / 503 / 95 | ShipBridge split (see flight.md and weapons.md); ShipBridge.ts (540) is the facade: shared types and constants; body, health and tow glue; hits and EMP and fire; geometry, spawning, rebuild and repair; firing, beams and projectile hits; the movement step, tick, contacts and sleep/wake; AI pilots and the autopilot |
 | server/src/net/* | | transports, limits, shadows: see networking.md |

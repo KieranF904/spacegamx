@@ -3,10 +3,10 @@
 ## Orient
 - Read `DEVELOPMENT.md` (the router), then only your area's guide in `docs/areas/<slug>.md`. Each folder with a
   `CONTEXT.md` points at its guide. Do not read other areas "just in case".
-- Big files (open by line range, not whole): `client/src/Game.ts` (~1,300 lines), `server/src/game/Quests.ts`,
-  `client/src/state/GameState.ts` (~900 each). `GameServer.ts`, `Renderer.ts`, `HangarUI.ts` are now ~750 lines each
-  and `common/src/network/protocol.ts` is a small index.
-  Grep the name, or read the line range the guide gives.
+- Big files (open by line range, not whole; `wc -l` on 2026-11-11): `client/src/Game.ts` (1,311 lines),
+  `server/src/game/Quests.ts` (942), `client/src/state/GameState.ts` (911), `server/src/GameServer.ts` (748),
+  `client/src/rendering/Renderer.ts` (742), `client/src/ships/HangarUI.ts` (710). `common/src/network/protocol.ts`
+  (82) is a small index. Grep the name, or read the line range the guide gives.
 - Line numbers in docs drift; grep the banner text or symbol.
 
 ## Rules of the code

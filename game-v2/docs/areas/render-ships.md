@@ -4,7 +4,7 @@ How a ship looks on screen: the whole-hull geometry build (in a worker), the lit
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| client/src/ships/ShipRenderer.ts | 1155 | `ShipRenderer`: per-ship scene (hull via ShipBatch, turrets, barrels, strafer/tow bits; no wires: retired, energy-routing-impl.md D1). `update()` 487-863 is the per-frame body; Strafer/Tow section 1009-1088 |
+| client/src/ships/ShipRenderer.ts | 501 | `ShipRenderer`: per-ship scene (hull via ShipBatch, turrets, barrels, strafer/tow bits; no wires: retired, energy-routing-impl.md D1). `update()` 487-863 is the per-frame body; Strafer/Tow section 1009-1088 |
 | client/src/rendering/lighting/ShipBatch.ts | 752 | `ShipGeometry` (a LitGeometry with per-part marks), hull shader (`shipHullProgram`), `ShipBatch` (chunked draw of many hulls), `mergeInto`, `SHIP_MAX_PARTS`=256 |
 | client/src/rendering/lighting/{LitGeometry,litShader,Lighting}.ts | 327/128/312 | shared lit-geometry base, lit shader, `Lighting` (sun/ambient, point lights) |
 | client/src/ships/hullBuild.ts | 348 | `buildHull(catalog, geoms, ship, cs, tint, whole)` -> `HullBuild {hull:{full,far}, barrels}` |

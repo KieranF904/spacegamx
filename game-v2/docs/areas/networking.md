@@ -1,5 +1,5 @@
 # Networking and protocol
-How client and server talk: message types (objects over a WebSocket), the compact/binary wire encoding, the snapshot and ship-replication format, the version/hash handshake, and the transports (WebSocket, in-process). Gameplay never touches sockets; it builds `ServerMessage`s and the codec turns them into frames. Read this instead of protocol.ts (1,585 lines) when adding a message or a snapshot field.
+How client and server talk: message types (objects over a WebSocket), the compact/binary wire encoding, the snapshot and ship-replication format, the version/hash handshake, and the transports (WebSocket, in-process). Gameplay never touches sockets; it builds `ServerMessage`s and the codec turns them into frames. Read this instead of protocol.ts (a small index now; the tables live under common/src/network/protocol/) when adding a message or a snapshot field.
 
 This page is an index; the content is split by topic under docs/areas/networking/ (no section was dropped; each part keeps its original headings). Start with rules.md for the invariants, how to extend and the tests.
 

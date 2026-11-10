@@ -4,22 +4,22 @@ How a ship moves: `stepFlight` turns inputs plus `ShipDerived` (thrust, mass, in
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| common/src/ships/flight.ts | 522 | `FlightBody`, `FlightControls`, `FlightConstants`, `stepFlight` (jump, rotation, thrust, the strafer's dodge just before the energy tick, integrator: find them by their `// ---` banners), `stepDrift`, gravity, jump drive state machine (`stepJump`, `jumpPhase`, `jumpRange`, `jumpReachAt`, `jumpAimed`, `JumpTuning`), `accelAlong`, `turnAccel`, `ratedFade` |
+| common/src/ships/flight.ts | 815 | `FlightBody`, `FlightControls`, `FlightConstants`, `stepFlight` (jump, rotation, thrust, the strafer's dodge just before the energy tick, integrator: find them by their `// ---` banners), `stepDrift`, gravity, jump drive state machine (`stepJump`, `jumpPhase`, `jumpRange`, `jumpReachAt`, `jumpAimed`, `JumpTuning`), `accelAlong`, `turnAccel`, `ratedFade` |
 | common/src/ships/jumpAim.ts | 47 | `jumpLanding` (where a jump stops the ship: the overlay), `jumpGo` |
 | common/src/ships/physics.ts | 61 | `stepShipPhysics` (stepFlight + `collideTerrain` + `quantizeShipBody`), `SHIP_PRECISION`, `SHIP_FLIGHT_CONSTANTS` |
-| common/src/ships/state.ts | 171 | `ShipState` (blueprint, per-part hp, derived, cooldowns; no position), `createShipState`, `damagePart`, `healPart`, `rebuildShip` |
+| common/src/ships/state.ts | 297 | `ShipState` (blueprint, per-part hp, derived, cooldowns; no position), `createShipState`, `damagePart`, `healPart`, `rebuildShip` |
 | common/src/ships/load.ts | 49 | cargo mass: `cargoThrust`, `cargoTurn`, `cargoEffect`, `quantizeCargo`, `CARGO_TURN_SHARE` |
 | common/src/ships/features/strafer/strafer.ts, features/tow/tow.ts (each feature's index.ts: its hooks) | 225/103 | dodge counter `stepDodge`, ways (`DODGE_DIRS`, `chooseDodgeDir`, `dodgeVec`), `strafeForce`, `dodgeLoad`, `dodgeAffordable`; tow tether physics `towPull`, `towLoad` |
-| common/src/ships/replica.ts | 136 | `replicaStep`, `controlBits`/`flightControls`, `CTL` bit flags, `ReplicaMode`: replay a ship from keyframe + control bits |
+| common/src/ships/replica.ts | 90 | `replicaStep`, `controlBits`/`flightControls`, `CTL` bit flags, `ReplicaMode`: replay a ship from keyframe + control bits |
 | common/src/ships/jumpFields.ts, hazards.ts, warmth.ts | 170/107/110 | jump charging fields; hazard and cold effects on control (`hazardFlight`, `withEmp`, `withNumb`); warmth is the cold hazard only, no gun or part reads it |
 | common/src/ships/collide.ts | 158 | hit tests in grid space: `castParts`, `partDistance`, `nearestParts`; `stages.ts` which part is hittable on staged bosses. Hit tests are used by [weapons](weapons.md), not flight |
 | common/src/terrain.ts | - | `collideTerrain`, `terrainRadius` (planet-surface rock) |
 | common/src/ships/flightInputs.ts | 52 | `buildFlightInputs(src, emp, out)` and `newFlightControls()`: the one place a `FlightControls` is built from an input source. The server's `ShipBridge.stepMovement` and the client's `ShipClient.predict` both use it |
-| server/src/ships/ShipBridge.ts | 540 | the facade: public and private fields, constructor, `attach`, and one-line delegators grouped by bridge module (below), every public name unchanged (pinned by server/src/golden/shipBridgeApi.json) |
+| server/src/ships/ShipBridge.ts | 647 | the facade: public and private fields, constructor, `attach`, and one-line delegators grouped by bridge module (below), every public name unchanged (pinned by server/src/golden/shipBridgeApi.json) |
 | server/src/ships/bridge/flight.ts | 503 | server flight step `stepMovement`, `tick()` (per-tick ship loop: shields, contacts, event horizons, part deaths, station repair, rebuilds, rounding), `resolveContacts`/`worldPieces`, `addToSpatialGrid`, `sleep`/`wake`/`moveDistant` (SimLod), `teleport`, `pin` |
-| server/src/ships/bridge/pilotless.ts | 95 | ships nobody pilots: `setController` (AI pilots' `PilotOrders`), `setAutopilot`/`autopilotControls`, and `stepPilotless` (tick's pilotless step) |
+| server/src/ships/bridge/pilotless.ts | 130 | ships nobody pilots: `setController` (AI pilots' `PilotOrders`), `setAutopilot`/`autopilotControls`, and `stepPilotless` (tick's pilotless step) |
 | server/src/ships/bridge/core.ts, sync.ts, damage.ts, rebuild.ts, weapons.ts | 243 / 144 / 461 / 431 / 522 | shared bridge types (`ShipHost`, `ShipBridgeConfig`, `BridgeCtx`) and constants (core.ts); body, health, jump-field and tow readers and writers (`readBody`, `writeBody`, `syncHealth`, `jumpFieldState`, `towable`) (sync.ts); hits, EMP, fire and part deaths (damage.ts); geometry, spawning, removal, rebuild, station repair from the repair bank (rebuild.ts); firing, beams and `hitProjectile` (weapons.ts) |
-| client/src/ships/ShipClient.ts | 1126 | `ownStepTo()` / `ownPose()`: the own ship from its tick layer (own/OwnTick.ts `step`, common sim/ownStep.ts `stepOwnShip`), `presentOwn` (what its guns did, drawn once a tick) |
+| client/src/ships/ShipClient.ts | 777 | `ownStepTo()` / `ownPose()`: the own ship from its tick layer (own/OwnTick.ts `step`, common sim/ownStep.ts `stepOwnShip`), `presentOwn` (what its guns did, drawn once a tick) |
 | server/src/net/Replication.ts | - | the `replicaStep` shadow in `Replication` that decides when a keyframe is needed |
 | data/ships/tuning.json `flight`, `jump`, `tow` | - | gains and constants; read via `jumpTuning`, `towTuning` (the strafer's numbers are per model: `strafe` in models.mjs) |
 

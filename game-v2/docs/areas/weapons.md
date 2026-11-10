@@ -4,9 +4,9 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| common/src/ships/tuning.ts | 205 | `ShipTuning`, `WeaponTuning` (every per-kind field: damage, speed, splash, fuse, homing, pierce, chain, frost, heal, ammo...) loaded from data/ships/tuning.json `weapons.<kind>` |
-| common/src/ships/guns.ts | 330 | `stepGuns`: the firing models (cycle, clip, charge, ammo, beam, auto: `FireSpec` in types.ts, each model's `fire` block in models.mjs, `WeaponInfo.fire`), cooldowns, clips, charges, spin, beam windup, turret slew (only while firing: `pointTurretAim` idle), fixed-gun gimbal, who fires; returns `{shots, beams, pulses, tells}`; the gun-state slot (`packGunState`, `applyGunState`) |
-| common/src/ships/launch.ts | 255 | `weaponDef`, `gunDef`/`partWeaponDef` (kind + grade + size + gem/ammo mods), ammo crate registry, `launchShot`, `volleyAngles`, `rebuildVolley`, `volleyShells`, `shellSeed`, `shotAimQ` |
+| common/src/ships/tuning.ts | 272 | `ShipTuning`, `WeaponTuning` (every per-kind field: damage, speed, splash, fuse, homing, pierce, chain, frost, heal, ammo...) loaded from data/ships/tuning.json `weapons.<kind>` |
+| common/src/ships/guns.ts | 562 | `stepGuns`: the firing models (cycle, clip, charge, ammo, beam, auto: `FireSpec` in types.ts, each model's `fire` block in models.mjs, `WeaponInfo.fire`), cooldowns, clips, charges, spin, beam windup, turret slew (only while firing: `pointTurretAim` idle), fixed-gun gimbal, who fires; returns `{shots, beams, pulses, tells}`; the gun-state slot (`packGunState`, `applyGunState`) |
+| common/src/ships/launch.ts | 313 | `weaponDef`, `gunDef`/`partWeaponDef` (kind + grade + size + gem/ammo mods), ammo crate registry, `launchShot`, `volleyAngles`, `rebuildVolley`, `volleyShells`, `shellSeed`, `shotAimQ` |
 | common/src/ships/shot.ts, pulse.ts | 69 | `buildShot` (base shot, `ProjectileSpec`); pulse-laser run maths |
 | common/src/ships/damage.ts | 89 | damage types, `weaponHit`, `penetrationMul`, `hitMultiplier` (type x armour x material resist), `TYPE_BY_KIND` |
 | common/src/ships/hitRules.ts | ~280 | what a shell's hit does, shared by server and client: `partHit` (the body of `hurt`: cover, stage cover, splash share, bane, taken, shield, armour, ruin floor), `coverPart`, `shellAmount`, `shellVs`, `igniteRule`, `hitEndFx`, `bursts`, `hpWire`, `GLANCING`, `STAGE_COVER`, `deriveShellHit` (the client's view), `gunShell` (a gun's shell from the firing ship: what confirmed hits work out from). Pinned by server/src/game/hitRules.golden.test.ts. Confirmed hits (docs/areas/networking.md) run it on both sides: a ship hit's ignite, pierce flash and end detonation go through `WeaponsHost.hitFx` (Weapons `atHit`), and bridge `notifyProjectileHit` carries the hit's part, damage, glancing, shield share and rebuild count |
@@ -15,11 +15,11 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | common/src/ships/features/support/support.ts | 93 | Repair Beam + Point Defence: `isRepairBeam`, `isPointDefence`, `pointDefenceOf`, `interceptHits`, `repairAt`, `stepPointDefenceAim` |
 | common/src/ships/hazards.ts | 107 | `EMP_CONTROL`, `withEmp` (EMP is a hazard-flight modifier); the rest is world-sim |
 | common/src/ecs/components.ts | ~L359 | `WEAPON_KIND_TYPE` kind -> snapshot `WeaponType` number (client style lookup) |
-| server/src/game/Weapons.ts | 300 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
+| server/src/game/Weapons.ts | 421 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
 | server/src/game/Ammo.ts | 240 | `Ammo`: crates, rounds, dry-fire at `dry` share; the gun range's `setFree` (the standard crate, unlimited) |
 | common/src/gunRange/*, server/src/game/gunRange/*, server/src/game/pilots/freeze.ts | | **The gun range** (below): the chamber, the cheat ship, the weapon options, the isolation |
 | server/src/ships/features/support/Support.ts | 59 | support credit window (`SUPPORT_WINDOW_TICKS`); the Tow Beam is a part feature now (`ships/features/tow`, see flight) |
-| server/src/ships/ShipBridge.ts | 540 | the bridge facade: fields and one-line delegators (the per-tick loop and contacts are in bridge/flight.ts) |
+| server/src/ships/ShipBridge.ts | 647 | the bridge facade: fields and one-line delegators (the per-tick loop and contacts are in bridge/flight.ts) |
 | server/src/ships/bridge/damage.ts, weapons.ts | 461 / 522 | the combat slices below (ShipBridge delegates to them) |
 | client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade, modelId)` (`MODEL_STYLES[modelId]` overrides the kind; grade only scales size and brightness), `BEAM_LOOKS[modelId]` for PulseFx/MiningFx/held beams, `shotScale(damage)`; predicted own shells (`PredictedShell`) |
 | client/src/ships/{DamageFx,MiningBeamFx,PulseFx,gunDecor}.ts | 886, 372, 310, 623 | part damage/fire/break visuals; mining + lance beams (`castShips` uses collide.ts); pulse beams (`pulseLook`); per-gun barrel art |

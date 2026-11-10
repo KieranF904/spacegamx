@@ -4,7 +4,7 @@ Everything the client draws that is not a ship hull: the camera and entity layer
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| client/src/rendering/Renderer.ts | 1982 | the world: see "Renderer.ts sections" below |
+| client/src/rendering/Renderer.ts | 742 | the world: see "Renderer.ts sections" below |
 | rendering/sun/{SunRenderer,plasmaSun,plasmaNoise}.ts | 213/402/79 | the star: plasma R5 shader + per-star look (`centralBody.plasma` in data/systems.json), drawn into a target at 1/2 device pixels (1/3 on Low) and stretched back |
 | rendering/sky/{SkyRenderer,skySprites,skyShaders,skyBiome,noiseTexture}.ts | 351/535/297/213/92 | sky: six star layers in one instanced draw, deep sky + motes in another; biomes; black-hole ring (`skyRingProgram`) |
 | rendering/PlanetRenderer.ts + planetView/{planetQuad,planetTextures,planetNoise,planetLook}.ts | 119/60/60/174/159/728 | planets and moons: one fragment body for every planet, moon and the brown dwarf on `shaderQuad`, three detail levels (lite/standard/fine = `PlanetDetail`); `planetLook.ts` is that shader |
@@ -63,7 +63,6 @@ Everything the client draws that is not a ship hull: the camera and entity layer
 - Re-sending many uniforms each repeat measures ANGLE validation, not the shader.
 - Cold shader compile can be 0.1-2 s per big program; that is what shaderWarmup hides (parallel compile where KHR_parallel_shader_compile exists).
 - A bloom source container is replayed by `Bloom` as a render group; adding one changes draw order.
-- Legacy renderers still compile in the sandbox bundle; editing them does not change the game.
 
 ## Related areas
 [render-ships](render-ships.md), [ui-hud-input](ui-hud-input.md) (settings UI for quality), [world-sim](world-sim.md) (systems data, planets), [weapons](weapons.md) (shot types), [networking](networking.md) (effect messages), [ops-tools](ops-tools.md). Docs: docs/rendering/*.md, DEVELOPMENT.md "The star and the sky".

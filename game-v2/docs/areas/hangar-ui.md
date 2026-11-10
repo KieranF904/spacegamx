@@ -4,15 +4,15 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| client/src/ships/HangarUI.ts | 1912 | `HangarUI` class + `HangarDeps`; sections below |
-| client/src/ships/HangarPalette.ts | 682 | the part palette (left column; `HangarPalette`, `PaletteHost`, `pieceIcon`): IN HAND card (status, cost against what you have, mount line, SHAPE strip, MATERIAL chips, FACING), the six category tabs with open counts, the list (open first, then a foldable LOCKED with "Reach level N"), each row's chevron opening its build facts; its keyboard (below); `foot` is HangarUI's (keys line, overlays, proto debug) |
+| client/src/ships/HangarUI.ts | 710 | `HangarUI` class + `HangarDeps`; sections below |
+| client/src/ships/HangarPalette.ts | 808 | the part palette (left column; `HangarPalette`, `PaletteHost`, `pieceIcon`): IN HAND card (status, cost against what you have, mount line, SHAPE strip, MATERIAL chips, FACING), the six category tabs with open counts, the list (open first, then a foldable LOCKED with "Reach level N"), each row's chevron opening its build facts; its keyboard (below); `foot` is HangarUI's (keys line, overlays, proto debug) |
 | client/src/ships/paletteModel.ts | 87 | pure: `paletteRows` (the guide's models and core, structure one row per function), `spareRows` (owned parts no row covers), `rowPart`/`rowPartId` (the part a row puts in hand: shape in hand, remembered, or default), `rowInHand`, `tabOfFn` |
 | client/src/ships/paletteFilters.ts, paletteCard.ts, paletteCardView.ts | 150/135/45 | the palette's subcategories and compact rows. `paletteFilters` (pure): `subsOf(tab)`, `subOfFn`, `weaponRole` (direct, burst, beam, guided, area, support, read from the data), `usesAmmo`, `applyFilters` (group, plus ammo and mount for weapons), `subCounts`, and the remembered choice (`loadFilters`/`saveFilters`, localStorage `hangar.palette.filters.v1`, guarded). `paletteCard` (pure): `cardStats` -> bars (damage per hit, shots a second, reach, scaled against the strongest weapon), headline numbers, the ammo item and rounds a shot, the power need and the side it is fed from. `paletteCardView`: those as markup (ammo as its item icon) |
 | client/src/ships/gunPreview/ | 215/290/150 | the live gun preview: `gunPlan.ts` (pure: `gunPlan`, the round and volley from tuning `gunDef`, `FireClock` the trigger beat, `flightTicks`, `segmentCircle`), `GunPreview.ts` (one small Pixi app, made on first hover and reused: WeaponFx fed fake projectile rows, beams from BEAM_LOOKS, a target dummy; quality tier sets particles and frame cap; stops when hidden; no server connection), the hover card that shows it is `build/partHoverCard.ts` (`PartHoverCard`: one card per list for every part; numbers and sentence in `build/partCard.ts`; Simple / Advanced in `build/detailMode.ts`) |
 | client/src/ships/buildFacts.ts | 89 | pure: `buildFacts(catalog, tuning, fn, piece, material)` -> `BuildFact[]` by group (Shape, Build, Does, Power, Fitting, Limits) from partStats, describeFn, ports, mountingWords, partFacingRule; `portsText` |
 | client/src/ships/portsGrid.ts, portsOverlay.ts, portsReport.ts | 105/235/150 | ports designs: `PortsGrid` (overlay, hover, ghost ports, scenario) and `portsPanelHtml` (load test rows); `PortsOverlay` (cached layer, glyphs, `portNear`, `ghostHint`); `portsReport`/`portsWarnings` (unfed, open, wasted, clashing), `loadRow`, `portTipHtml` |
-| client/src/ships/modelCards.ts | 210 | model card text: `familyLabel`, `mountBadge`, `mountingText`, `keyStats`, `sizeText`, `tradeOff`, `modelLock` (what a locked model waits on) |
-| client/src/ships/partTip.ts | 228 | `partTipHtml(part, PartTipCtx)`, `PART_TIP_CSS`, `resistText`, `modsText` |
+| client/src/ships/modelCards.ts | 254 | model card text: `familyLabel`, `mountBadge`, `mountingText`, `keyStats`, `sizeText`, `tradeOff`, `modelLock` (what a locked model waits on) |
+| client/src/ships/partTip.ts | 193 | `partTipHtml(part, PartTipCtx)`, `PART_TIP_CSS`, `resistText`, `modsText` |
 | client/src/ships/shipSummary.ts | 114 | `shipSummary(catalog, tuning, econ, bp)` -> `ShipSummary` (stats shown/compared), `BIGGER_IS_BETTER`, `jumpRatioNote` |
 | client/src/ships/ShipStore.ts, blueprintApi.ts | 122/31 | live ship source; blueprint file list/load/save (`listBlueprints, loadBlueprint, saveBlueprint`) |
 | client/src/ships/HangarLitView.ts, hullPreview2d.ts | 102/26 | lit WebGL layer under the grid (render-ships); 2D part colours |
@@ -23,8 +23,8 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 | client/src/ui/componentSprites.ts | 130 | part sprites for the guide: `partSprite`, `peekSprite`, `PART_SPRITES_VERSION` (asset cache) |
 | common/src/ships/{mounting,blueprint,energy}.ts | | the rules: `checkMounting`, `partMountingProblems`, `mountingWords`, blueprint validation (`badMounting` etc.), `loadTest`/`BROWNOUT` |
 | server/src/net/handlers/shipEdit.ts | 145 | `registerShipEditHandlers`: dock, undock, shipEdit, slotSave/Fly/Clear, designSave, shareDesign, pilotInfo; `clientBlueprint` (the untrusted blueprint parse), `handleShipEdit`, `handleSlotSave`. Registered from GameServer's `buildMessageHandlers()` |
-| server/src/GameServer.ts | 4168 | `freeBuild(conn)` (dev free-build check), reached from shipEdit.ts through `ServerCtx` |
-| server/src/ships/ShipBridge.ts | 540 | `validate(bp, {mounting?})` (one-line delegator to bridge/rebuild.ts `validate`): shared by both handlers |
+| server/src/GameServer.ts | 748 | `freeBuild(conn)` (dev free-build check), reached from shipEdit.ts through `ServerCtx` |
+| server/src/ships/ShipBridge.ts | 647 | `validate(bp, {mounting?})` (one-line delegator to bridge/rebuild.ts `validate`): shared by both handlers |
 | server/src/game/Hangar.ts | | `save(conn, slot, bp, {plan, grantAll})`: costs, ghosts vs built parts, gem handling, returns `string[]` errors |
 | server/src/game/AdminTools.ts | | admin free-build toggle (`freeBuild`, and its admin command) |
 

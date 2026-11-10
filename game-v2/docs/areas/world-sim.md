@@ -19,7 +19,7 @@ The map and everything that keeps it alive cheaply: system/station/planet/astero
 | server/src/game/{Hazards,Warmth}.ts | 106, 115 | once-a-second hazard effects per pilot; warmth stepping (cold builds, heat sources bring it back) |
 | server/src/game/{Surfaces,Arenas,Events,Roaming,AsteroidOrbits,Mining,HomeStations,LootPods}.ts | 439, 119, 418, 133, 301, 248, 141, 231 | planet surfaces, job arenas, raids/dynamic events, nest wandering, asteroid timetable, ore from damage, homesteads, loot containers |
 | server/src/game/sieges/ | ~1400 | moon sieges: `Sieges.ts` (run loop, phases, messages), `rules.ts` (`SiegeRules`, defaults, `SIEGE_STRINGS`), `plan.ts` (`wavePlan`, `planNight` at dusk, `frontCount`, `unitSpawns`), `shop.ts` (buy on a pad, night builds, orders, `stepMending`), `turrets.ts` (`TURRET_ORDERS`, `pickTarget`, focus fire), `score.ts` (tally, streak, dawn summary), `roles/` (sapper, runner, artillery, escort) and `objectives/` (cache, nest): registries, one file per kind; `game/Sieges.ts` re-exports |
-| server/src/GameServer.ts | god-file | `travelTo`, `createPortal`, rift constants `RIFT_*`, `MEMORY_GATE_MOUTH`, `trafficSystem`/`trafficIntent`, system creation in `initializeWorld`; read slices only |
+| server/src/GameServer.ts | 748 | `travelTo`, `createPortal`, rift constants `RIFT_*`, `MEMORY_GATE_MOUTH`, `trafficSystem`/`trafficIntent`, system creation in `initializeWorld`; read slices only |
 | server/src/game/Derelicts.ts | 202 | derelict wrecks and people's craft: `derelictRespawnSystem`, salvage, `towDelivered`, `onPilotlessShipDestroyed` |
 | client/src/state/FarShips.ts, ui/SystemMapUI.ts | | map dots for ships past the snapshot's view, carried on by the same legs as the server |
 
@@ -61,7 +61,7 @@ The map and everything that keeps it alive cheaply: system/station/planet/astero
 - Sleep is also blocked by anything "watched" (a pilot's selected target).
 - Eviction happens ~20 s (`evictAfterSeconds`) after the last pilot leaves; tests that hop a gate and back must account for it.
 - `data/world/memory.json` is runtime state: do not commit or ship; the VPS keeps its own.
-- GameServer.ts is a god-file: grep, read slices. Sieges: a new enemy role, objective or turret order is one file (or entry) in its registry under sieges/, named from data (rules.json `sieges.profiles`); no kind branches in Sieges.ts.
+- GameServer.ts is ~750 lines: grep, read slices. Sieges: a new enemy role, objective or turret order is one file (or entry) in its registry under sieges/, named from data (rules.json `sieges.profiles`); no kind branches in Sieges.ts.
 
 ## Related areas
 `bosses-ai` (boss/pack `capture`/`restore`, `busy`/`idle`, nests), `weapons` (EMP/frost via `hazardFlight`, `ShipBridge.warm`), `energy` (thermal coupling plan; hands off warmth), `flight` (`stepFlight`, rifts keep momentum), `economy-quests` (stations, markets, quests referencing systems), `server-core` (tick order, `trafficSystem`), `networking` (mapDots, snapshots), `render-world` (planets, sky, map drawing).

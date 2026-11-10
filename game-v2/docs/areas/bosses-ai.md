@@ -8,13 +8,13 @@ Everything hostile and pilotless: faction packs and nests (Enemies.ts), single-b
 | data/mobs.json | 35 | single-body enemies (ember_drone, scrap_mite...): radius, hp, speed, blast |
 | data/factions.json | | factions, behaviour (aggro/range/flee/leash), ship tables, `spawns.<system>.nests/groups`, loot |
 | data/ships/blueprints/enemy/*.json, data/ships/bespoke/*.json | | enemy and boss hulls; bespoke are generated from scripts/bespoke/*.mjs (pyreclast, pyreclast_heart, scrap_mother, brood_mother); enemy ones by scripts/gen-enemy-ships.mjs |
-| server/src/game/Bosses.ts | 550 | `Bosses`: spawn at lair, phases (`stepPhases`, `enterPhase`), novas, credit/loot (`onDestroyed`, `rollLoot`), memory (`capture`/`restore`), `busy`, `stageCover`; `BossDef`, `BossPhase`, `BossesFile` |
+| server/src/game/Bosses.ts | 729 | `Bosses`: spawn at lair, phases (`stepPhases`, `enterPhase`), novas, credit/loot (`onDestroyed`, `rollLoot`), memory (`capture`/`restore`), `busy`, `stageCover`; `BossDef`, `BossPhase`, `BossesFile` |
 | server/src/game/brains/ids.ts | 2 | `BRAIN_IDS` (pyreclast, scrap_mother, brood_mother); the validator reads it |
-| server/src/game/brains/kit.ts | 118 | `BossBrain`, `BrainHost`, `BossView`; helpers `partsWith`, `partMount`, `bodyFrame`, `lead`, `strike`, `wrap` |
-| server/src/game/brains/staged.ts | 468 | `StagedBrain` base (generator `Move`s, `StagedTables`, per-stage `loop`, stage blow-away, drones) |
+| server/src/game/brains/kit.ts | 159 | `BossBrain`, `BrainHost`, `BossView`; helpers `partsWith`, `partMount`, `bodyFrame`, `lead`, `strike`, `wrap` |
+| server/src/game/brains/staged.ts | 707 | `StagedBrain` base (generator `Move`s, `StagedTables`, per-stage `loop`, stage blow-away, drones) |
 | server/src/game/brains/{scrapMother,pyreclast,broodMother}.ts | 461, 988, 24 | concrete brains. broodMother.ts is an empty stub (loop `[[],[],[]]`); its design is docs/bosses/brood-mother.md |
-| server/src/game/Enemies.ts | 1371 | god-file: `Enemies` (packs, AI `pilot()`, tick, kills). Banners: "Nests" (~L663), "Memory" (~L831), "The pilot" (~L1048), "Kills and station defence" (~L1247); types at top (`FactionDef`, `SpawnNest`, `PackMemory`, `EnemyHost`) |
-| server/src/game/Mobs.ts | 251 | `Mobs`: circle-hit drones (kamikaze) |
+| server/src/game/Enemies.ts (+ enemies/*.ts) | 538 | `Enemies` (tick, AI `pilot()`); split out under enemies/: `model.ts` (types `FactionDef`, `SpawnNest`, `PackMemory`, `EnemyHost`), `populations.ts`, `placement.ts`, `memory.ts`, `steering.ts`, `defenders.ts`, `recovery.ts`, `stationDefence.ts`, `loot.ts` |
+| server/src/game/Mobs.ts | 312 | `Mobs`: circle-hit drones (kamikaze) |
 | server/src/game/Roaming.ts, Arenas.ts | 133, 119 | how nest packs wander (`style`); job arenas (boss `arena: true` via `spawnAt`) |
 | common/src/bosses/ (windows, personal, lifecycle) | ~250 | the rework's shared rules (docs/bosses/rework-2026-11.md 13): weak-point windows and the crack, personal-attack rolls and the loose cap, a lair boss's life states and timings, every enemy's recovery timings |
 | common/src/world/gates.ts | ~120 | boss arenas (systems.json `arena`): the barrier as terrain gate pieces, inside/near tests, where a passing ship is put |
