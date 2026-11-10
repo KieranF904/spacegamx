@@ -4,7 +4,7 @@ Three cooperating services. The **lobby** (`server-browser/`) owns accounts and 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| `server-browser/src/index.ts` | 659 | Lobby HTTP server (port `BROWSER_PORT`, dev 8787, prod 8790): `POST /register` (game-server heartbeat, returns deleted-account ids), `GET /list`, `/stats`, `/stats/all`, `/log`, `/logs`, `/stream`, `/health`, `/` browser page; delegates `/auth/*` and `/admin/*` |
+| `server-browser/src/index.ts` | 258 | Lobby HTTP server (port `BROWSER_PORT`, dev 8787, prod 8790): `POST /register` (game-server heartbeat, returns deleted-account ids), `GET /list`, `/health`; delegates `/auth/*` and `/admin/*` |
 | `server-browser/src/servers.ts` | 59 | Registry of game servers |
 | `server-browser/src/accounts/routes.ts` | 266 | `AccountRoutes`: `/auth/{login,register,validate,logout,account,logout-all,change-password,change-email,delete-account}`, and `/admin/*` (needs `LOBBY_ADMIN_SECRET`: `users`, `user`, `set-admin`, `ban`, `unban`, `delete`, `set-owner`); the ranks' rules (`rankRefusal`) for calls with an `actor`; `OWNER_USERNAMES` (`applyOwners`); rate limits |
 | `accounts/types.ts` | 99 | `UserRecord`, `AuthResult`, the `UserStore` interface (register, login, validateSession, setAdmin, setBan, listUsers, setPassword, setEmail, endSessions, deleteUser, ...) |
