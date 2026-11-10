@@ -8,7 +8,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -19,7 +19,7 @@ function world() {
   resetGlobals();
   const config = loadShipConfigFromDisk(dataDir);
   for (const [k, d] of Object.entries(config.tuning.weapons!)) if (d.type === 'projectile') config.tuning.weapons![k] = { ...d, ammo: { item: 'scrap_electronics', rounds: 3 } };
-  const server = makeServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
+  const server = makeEmptyServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
     ships: createShipBridge(config) });
   const t = new LocalTransport(server);
   t.connect();
@@ -78,7 +78,7 @@ describe('ammunition made for one enemy', () => {
   /** A world as the game has it (crates as data says), a Cult ship and a pirate side by side, and Quench Slugs' mods */
   function sides() {
     resetGlobals();
-    const server = makeServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
+    const server = makeEmptyServer({ profileStore: new MemoryProfileStore(), gameData: new GameData(files),
       ships: createShipBridge(loadShipConfigFromDisk(dataDir)) });
     const t = new LocalTransport(server);
     t.connect();

@@ -17,7 +17,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -28,7 +28,7 @@ const aimEast = () => replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(0));
 /** A pilot whose every gun is this weapon model, held at (X, Y), and what its client is sent */
 function pilotWith(model: string, cargo?: { id: string; n: number }, guns = 2) {
   resetGlobals();
-  const server = makeServer({ profileStore: new MemoryProfileStore() });
+  const server = makeEmptyServer({ profileStore: new MemoryProfileStore() });
   const t = new LocalTransport(server);
   const got: { tick: number; m: ServerMessage }[] = [];
   t.onMessage = (m) => got.push({ tick: server.getTick(), m });

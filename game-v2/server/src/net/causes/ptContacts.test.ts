@@ -17,7 +17,7 @@ import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 import { PtStLayer } from '../../../../client/src/predict/ptst.js';
 import { ReplicaPtWorld, type PtHost } from '../../../../client/src/predict/world.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 /** The shared config is frozen: this test changes the collision tuning, so it gets its own copy of that part */
 const withTuning = (cfg: ReturnType<typeof loadShipConfigCached>) => ({ ...cfg, tuning: { ...cfg.tuning } });
@@ -29,7 +29,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 function pack() {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files),
     ships: createShipBridge(withTuning(loadShipConfigCached(dataDir))),
     clock: () => clock.t,

@@ -17,7 +17,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { feedParts, testCatalog } from '../../../common/src/ships/testData.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -38,7 +38,7 @@ const fitted = feedParts(testCatalog(), JSON.parse(JSON.stringify(unfed)), [62])
 
 function world() {
   resetGlobals();
-  const server = makeServer({ clock: () => 1_000_000 });
+  const server = makeEmptyServer({ clock: () => 1_000_000 });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);

@@ -17,7 +17,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../ships/createShipBridge.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
-import { makeServer } from '../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -28,7 +28,7 @@ interface Seen { held: number; keyframes: number; entries: number; records: numb
 function fight(dropAt = -1, hurtEvery = 45, pin = false) {
   resetGlobals();
   const clock = { t: 1_000_000 };
-  const server = makeServer({ clock: () => clock.t });
+  const server = makeEmptyServer({ clock: () => clock.t });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const A = new FakeHitsClient(server, { name: 'causes', env });

@@ -7,14 +7,14 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
 describe('dev ship swap', () => {
   it('flies a library ship at once, and what is saved is always the real ship', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = makeServer({ devTeleport: true });
+    const server = makeEmptyServer({ devTeleport: true });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'swapper' } as any);
@@ -58,7 +58,7 @@ describe('dev ship swap', () => {
 
   it('losing a borrowed ship gives your own back: nothing salvaged, nothing on order, no wreck', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = makeServer({ devTeleport: true });
+    const server = makeEmptyServer({ devTeleport: true });
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'crasher' } as any);
@@ -82,7 +82,7 @@ describe('dev ship swap', () => {
 
   it('is refused on a server that is not a dev server', () => {
     (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-    const server = makeServer();
+    const server = makeEmptyServer();
     const t = new LocalTransport(server);
     t.connect();
     t.send({ type: 'join', username: 'cheat' } as any);

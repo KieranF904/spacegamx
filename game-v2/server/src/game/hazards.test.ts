@@ -6,7 +6,7 @@ import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -19,7 +19,7 @@ describe('hazards', () => {
   it("a ship short of a system's radiation wears down, and its pilot is told what and why", () => {
     resetGlobals();
     const gameData = new GameData(files);
-    const server = makeServer({ profileStore: new MemoryProfileStore(), gameData,
+    const server = makeEmptyServer({ profileStore: new MemoryProfileStore(), gameData,
       });
     const t = new LocalTransport(server);
     const got: ServerMessage[] = [];

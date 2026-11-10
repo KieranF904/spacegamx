@@ -4,13 +4,13 @@ import * as bitecs from 'bitecs';
 import { Velocity } from '@space-game/common';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 
 function world() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  const server = makeServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, });
+  const server = makeEmptyServer({ gameData: new GameData(readGameDataFiles(dataDir)), userDB: {} as any, });
   return { server, ships: server.getShips() };
 }
 

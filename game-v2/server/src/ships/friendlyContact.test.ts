@@ -12,7 +12,7 @@ import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from './loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -21,7 +21,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 /** Two ships (each the first of a pack of its faction) set 180 apart and driven at each other, for `ticks` */
 function ram(a: { faction: string; ship: string }, b: { faction: string; ship: string }, ticks = 20) {
   resetGlobals();
-  const server = makeServer({ clock: () => 0 });
+  const server = makeEmptyServer({ clock: () => 0 });
   const ships = server.getShips(), num = server.gameData.getSystemNum('sol');
   const x0 = 140000, y0 = 140000;
   const [ea] = server.enemies.spawnPack(num, { faction: a.faction, ships: [a.ship] } as never, x0, y0);

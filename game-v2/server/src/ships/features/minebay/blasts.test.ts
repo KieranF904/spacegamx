@@ -19,7 +19,7 @@ import { loadShipConfigCached } from '../../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../../ships/createShipBridge.js';
 import { MineStore } from '../../../../../client/src/ships/features/minebay/mines';
 import type { Minefield } from './Minefield.js';
-import { makeServer } from '../../../testkits/world.testkit.js';
+import { makeEmptyServer } from '../../../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -40,7 +40,7 @@ const of = <T extends Msg['type']>(got: Msg[], type: T) => got.filter((m) => m.t
 
 function world() {
   resetGlobals();
-  const server = makeServer({
+  const server = makeEmptyServer({
     gameData: new GameData(files),
     ships: createShipBridge(config),
     clock: () => 1_000_000,
