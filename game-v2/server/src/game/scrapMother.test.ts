@@ -1,57 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'path';
-import * as bitecs from 'bitecs';
 import { Position, Velocity, InSystem, ServerMessage, isRuined, currentStage, createShipState, stepFlight, deciding, stageOf, type FlightBody } from '@space-game/common';
 import { devHooks } from './brains/kit.js';
 import { MOTHER_SIGNATURE, MOTHER_EXPOSURE, MOTHER_LOOP } from './brains/scrapMother.js';
 import { GameServer } from '../GameServer.js';
-import { GameData } from '../data/GameData.js';
-import { LocalTransport } from '../net/LocalTransport.js';
-import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
-import { loadShipConfigCached } from '../ships/loadShipConfig.js';
-import { createShipBridge } from '../ships/createShipBridge.js';
 import type { BossesFile } from './Bosses.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeServer, gameFiles, resetGlobals, joinPilot } from '../testkits/world.testkit.js';
+import { place, mend, advance, watchMoveFx } from '../testkits/boss.testkit.js';
 
-const dataDir = join(__dirname, '../../../data');
-const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const files = readGameDataFiles(dataDir);
+const files = gameFiles();
 const def = (files.bosses as BossesFile).bosses.boss_scrap_mother;
 
 function world() {
   resetGlobals();
   const server = makeServer();
-  const t = new LocalTransport(server);
-  const got: ServerMessage[] = [];
-  t.onMessage = (m) => got.push(m);
-  t.connect();
-  t.send({ type: 'join', username: 'salvager' } as any);
-  const pid = t.getPlayerId();
-  // (A move's looks (its tells, beams, strikes' looks) are worked out by every client running the boss's body (CAPS.MOVES,
-  // every client), so none go on the wire: the server's own word for them, GameServer.moveFx, is what's watched here,
-  // as every pilot in the system would have been sent it)
-  (server as any).moveFx = (sys: number, _eid: number, _origin: unknown, msg: ServerMessage) => { if (InSystem.systemId[pid] === sys) got.push(msg); };
+  const { pid, got } = joinPilot(server, 'salvager');
+  watchMoveFx(server, (sys) => (InSystem.systemId[pid] === sys ? [got] : []));
   const step = (n = 1) => { for (let i = 0; i < n; i++) server.step(); };
   const num = server['gameData'].getSystemNum(def.system);
   const god = () => server['admin'].god.add(server.pilots.connOf(pid) as any);
   return { server, got, pid, step, num, bridge: server.getShips(), god };
 }
 
-const place = (pid: number, num: number, x: number, y: number, vx = 0, vy = 0) => {
-  InSystem.systemId[pid] = num; Position.x[pid] = x; Position.y[pid] = y; Velocity.x[pid] = vx; Velocity.y[pid] = vy;
-};
-const mend = (server: GameServer, pid: number) => server.getShips().scaleHp(pid, 1);
-/** (dev) Her fight moved on to the start of a stage: what's before it beaten, blown away, and done blowing */
-const advance = (server: GameServer, eid: number, stage: number, step: (n?: number) => void) => {
-  const brain = server.bosses.brainOf(eid)!, bridge = server.getShips();
-  for (let n = 1; n < 400; n++) {
-    const s = bridge.get(eid);
-    if (!s || currentStage(bridge.catalog, s) >= stage) break;
-    brain.forceShed!(n);
-  }
-  step(2);
-  for (let i = 0; i < 60 * 15 && brain.invulnerable!(); i++) step();
-};
 /**
  * Her fight watched from a pilot held `d` from her (mended, never dying), until `w` windows have opened: the signature
  * moves in the order she starts them, the windows told (their caps), the order of both (`order`: a move's name, or

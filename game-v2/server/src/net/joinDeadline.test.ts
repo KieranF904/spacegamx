@@ -13,7 +13,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { JOIN_DEADLINE_MS, MAX_UNJOINED, JOIN_TIMEOUT_CLOSE } from '../gameServer/session.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const files = readGameDataFiles(dataDir);
@@ -21,7 +21,7 @@ const shipConfig = loadShipConfigCached(dataDir);
 
 function server() {
   (bitecs as unknown as { resetGlobals: () => void }).resetGlobals();
-  return makeServer({
+  return makeEmptyServer({
     gameData: new GameData(files), ships: createShipBridge(shipConfig),
   });
 }

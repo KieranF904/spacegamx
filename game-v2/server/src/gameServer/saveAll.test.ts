@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
 import { LocalTransport } from '../net/LocalTransport.js';
-import { makeServer, resetGlobals } from '../testkits/world.testkit.js';
+import { makeEmptyServer, resetGlobals } from '../testkits/world.testkit.js';
 
 const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
 
@@ -24,7 +24,7 @@ function lobby(store: MemoryProfileStore) {
     validateSession: async (t: string) => (t.startsWith('tok:') ? { id: Number(t.slice(4)), username: `acct${t.slice(4)}`, email: '', is_admin: false, is_owner: false, created_at: '' } : null),
     cleanupExpiredSessions: async () => {},
   } as never;
-  const server = makeServer({ userDB, profileStore: store });
+  const server = makeEmptyServer({ userDB, profileStore: store });
   const join = async (username: string, token?: string) => {
     const t = new LocalTransport(server);
     t.onMessage = () => {};

@@ -60,4 +60,55 @@ describe('dev message gate', () => {
     expect(spies.spawnPack).toHaveBeenCalled();
     expect(spies.devSwapShip).toHaveBeenCalled();
   });
+
+  it("a plain pilot's devBoss never even looks for a boss, and devStation builds nothing", () => {
+    const { gs, t, conn } = rig(false);
+    const look = vi.spyOn(gs.bosses, 'inSystem'), toast = vi.spyOn(gs.pilots, 'toast');
+    t.send({ type: 'devBoss', wear: 0.3 } as never);
+    t.send({ type: 'devStation', tier: 5 } as never);
+    gs.step(2);
+    expect(look).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+    expect(gs.pilots.get(conn)!.outpost ?? null).toBeNull();
+  });
+
+  it('an admin: devStation clamps the tier to 0-5; devBoss in a system with no boss only says so', () => {
+    const { gs, t, conn } = rig(false);
+    conn.isAdmin = true;
+    const toast = vi.spyOn(gs.pilots, 'toast');
+    for (const [tier, want] of [[99, 5], [-4, 0]] as const) {
+      t.send({ type: 'devStation', tier } as never);
+      gs.step(1);
+      const tracks = Object.values(gs.pilots.get(conn)!.outpost!.tracks);
+      expect(tracks.length).toBeGreaterThan(0);
+      expect(new Set(tracks)).toEqual(new Set([want]));
+    }
+    vi.spyOn(gs.bosses, 'inSystem').mockReturnValue([]);
+    t.send({ type: 'devBoss', reset: true } as never);
+    gs.step(1);
+    expect(toast).toHaveBeenCalledWith(conn, 'No boss in this system', 'warn');
+  });
+
+  it('devSpawn refuses a spot that is not a finite point, even for an admin', () => {
+    const { gs, t, conn, spies } = rig(false);
+    conn.isAdmin = true;
+    t.send({ type: 'devSpawn', x: Number.NaN, y: 5 } as never);
+    t.send({ type: 'devSpawn', x: 5, y: Infinity } as never);
+    gs.step(2);
+    expect(spies.spawnPack).not.toHaveBeenCalled();
+  });
+
+  it('feedSwitch says so when the ship has no Selector, and does nothing at all without ports power', () => {
+    const { gs, t, conn } = rig(false);
+    const toast = vi.spyOn(gs.pilots, 'toast');
+    toast.mockClear();
+    t.send({ type: 'feedSwitch' } as never);
+    gs.step(1);
+    expect(toast).toHaveBeenCalledWith(conn, 'No Selector fitted: nothing to switch', 'warn');
+    toast.mockClear();
+    (gs.ships.get(conn.playerId)!.derived as { ports?: unknown }).ports = undefined;
+    t.send({ type: 'feedSwitch' } as never);
+    gs.step(1);
+    expect(toast).not.toHaveBeenCalled();
+  });
 });

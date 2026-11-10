@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * moveCheck: prove that code moved between files was moved verbatim.
  *

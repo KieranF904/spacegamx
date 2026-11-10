@@ -1,5 +1,5 @@
-// Run: node --test scripts/refactor/moveCheck.test.mjs
-import { test } from 'node:test';
+// Runs under vitest (npm test)
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { checkMoves, extractFunctions, normalise } from './moveCheck.mjs';
 

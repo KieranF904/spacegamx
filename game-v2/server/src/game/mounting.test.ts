@@ -14,7 +14,7 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigCached } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../ships/createShipBridge.js';
 import { MemoryProfileStore } from '../profile/ProfileStore.js';
-import { makeServer } from '../testkits/world.testkit.js';
+import { makeEmptyServer } from '../testkits/world.testkit.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -22,7 +22,7 @@ const files = readGameDataFiles(dataDir);
 
 function world() {
   resetGlobals();
-  const server = makeServer({ profileStore: new MemoryProfileStore(), shipEditAnywhere: true });
+  const server = makeEmptyServer({ profileStore: new MemoryProfileStore(), shipEditAnywhere: true });
   const t = new LocalTransport(server);
   const got: ServerMessage[] = [];
   t.onMessage = (m) => got.push(m);
