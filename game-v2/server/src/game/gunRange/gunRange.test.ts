@@ -351,7 +351,7 @@ describe('gun range: a target keeps its spot', () => {
 describe('gun range: the message gate', () => {
   it('lets flying, talking and leaving through, and nothing that builds, trades, moves items or teleports', () => {
     for (const t of ['input', 'interact', 'chat', 'respawn', 'gunRangeWeapon']) expect(passesInRange(t)).toBe(true);
-    for (const t of ['shipEdit', 'slotFly', 'fieldPlan', 'itemJettison', 'tradeOffer', 'marketSell', 'devTeleport', 'admin', 'authLogin', 'undock', 'dock', 'craft', 'questAccept', 'skillUp']) expect(passesInRange(t)).toBe(false);
+    for (const t of ['shipEdit', 'slotFly', 'fieldPlan', 'itemJettison', 'tradeOffer', 'marketSell', 'devTeleport', 'admin', 'undock', 'dock', 'craft', 'questAccept', 'skillUp']) expect(passesInRange(t)).toBe(false);
     expect(passesInRange('somethingNew')).toBe(false);
     // (Every type the server dispatches is in the table: the compiler holds the union, this the dispatched set)
     const { server } = boot();

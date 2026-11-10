@@ -60,7 +60,7 @@ One account plays on one server at a time: a profile lease (Postgres `profile_le
   `SERVER_ID` (lobby definition id, heartbeat id, profile-lease holder) and `BUILD_ID` are set per app by the script.
 - Wake-up: after a suspend/resume the loop skips a gap over 2 s (`server/src/gameServer/wakeGap.ts`): no catch-up ticks; the tick
   counter jumps, so boss/nest timers and world memory advance by wall clock like an empty system. Logged as `[Loop] woke after ...`.
-- Old `fly.toml`, `fly.server.toml`, `fly.client.toml`, `server/fly.toml` are legacy (the old always-on apps); left untouched, unused.
+- The old always-on app configs (root `fly*.toml`, `server/fly.toml`) and the per-package Dockerfiles were removed (2026-11-10 audit); only `deploy/fly/` remains.
 - The script reads the lobby's own server file (`data/lobby/servers.json`, example `deploy/fly/servers.example.json`): a Fly server is an `on-demand` entry with `app` and `flyRegion` (Fly region code), which the lobby ignores.
 
 ## Add a region

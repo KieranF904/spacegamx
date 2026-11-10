@@ -8,7 +8,6 @@
  * extend:      a new area of server logic is a module under gameServer/ taking `gs: GameServer` (or a narrower Pick), wired in the constructor
  */
 
-import type { IncomingMessage, ServerResponse } from 'http';
 import { createWorld, addEntity, hasComponent, getAllEntities, IWorld } from 'bitecs';
 import { Player, InSystem, Dead } from '@space-game/common';
 import { ClientMessage, ServerMessage, ReplicaEnv, mulberry32, TrafficData } from '@space-game/common';
@@ -70,7 +69,7 @@ import { MessageLimiter } from './net/MessageLimits.js';
 import { type TickSystem } from './tickOrder.js';
 import type { ClientConnection } from './net/ClientConnection.js';
 import type { ServerCtx } from './net/ServerCtx.js';
-import { rejectAuth, handleHttpAuth } from './net/auth.js';
+import { rejectAuth } from './net/auth.js';
 import { Docking } from './game/Docking.js';
 import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
 import { type HandlerTable } from './net/dispatch.js';
@@ -569,11 +568,6 @@ this.devTeleport = opts.devTeleport ?? false;
   /** A wrong password, a refused registration, a replaced or deleted session: say why, then hang up (net/auth.ts) */
   rejectAuth(conn: ClientConnection, error: string | undefined): void {
     rejectAuth(this, conn, error);
-  }
-
-  /** HTTP auth requests (register, login, validate), called by SocketTransport (net/auth.ts) */
-  handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
-    return handleHttpAuth(this, req, res, action, address);
   }
 
   /**

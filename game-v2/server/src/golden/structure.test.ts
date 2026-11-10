@@ -99,7 +99,7 @@ describe('structure pins', () => {
       clock: () => 1_000_000,
     });
     const types = server.handledMessageTypes().sort();
-    expect(types.length).toBe(105);
+    expect(types.length).toBe(103);
     pin('clientMessages.json', types);
   }, 120_000);
 

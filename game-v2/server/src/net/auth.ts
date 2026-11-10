@@ -1,10 +1,9 @@
 /**
- * Join and sign-in: the join / authLogin / authRegister messages, the guest-name rules and the HTTP auth endpoints.
+ * Join and sign-in: the join message and the guest-name rules.
  * Moved verbatim from GameServer (the receiver `this` became `ctx`, the helpers take ctx first). Security-critical: a
  * guest can't pose as a registered or admin name, a banned or expired token never becomes a guest, and a protocol
  * mismatch closes the socket (4002). `conn.joined = true` still comes before the first await.
  */
-import type { IncomingMessage, ServerResponse } from 'http';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON, fullCaps } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
 import type { HandlerRegistry } from './dispatch.js';
@@ -18,12 +17,6 @@ export function registerAuthHandlers(t: HandlerRegistry): void {
   t.on('join', (ctx, conn, msg) => {
     // (Async: a throw inside is a rejected promise the receive() try/catch can't see)
     handleJoin(ctx, conn, msg).catch((e) => ctx.fault('join', e));
-  });
-  t.on('authLogin', (ctx, conn, msg) => {
-    handleAuthLogin(ctx, conn, msg).catch((e) => ctx.fault('authLogin', e));
-  });
-  t.on('authRegister', (ctx, conn, msg) => {
-    handleAuthRegister(ctx, conn, msg).catch((e) => ctx.fault('authRegister', e));
   });
 }
 
@@ -103,31 +96,6 @@ function gated(ctx: ServerCtx, conn: ClientConnection): boolean {
   return true;
 }
 
-export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
-  if (gated(ctx, conn)) return;
-  const result = await ctx.userDB.login(msg.username, msg.password, conn.address);
-  if (result.success) {
-    conn.username = result.user.username;
-    conn.userId = result.user.id;
-    ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
-    setRanks(ctx, conn, result.user);
-    conn.isContributor = ctx.contrib.hasRank(result.user.id, result.user.username);
-    conn.authToken = result.token;
-    
-    ctx.send(conn.ws, {
-      type: 'authResult',
-      success: true,
-      username: result.user.username,
-      token: result.token,
-      isAdmin: conn.isAdmin,
-      ...(conn.isOwner ? { isOwner: true } : {}),
-      isContributor: ctx.contrib.allowed(conn),
-    });
-  } else {
-    rejectAuth(ctx, conn, result.error);
-  }
-}
-
 /** An account's ranks on its connection: owner > admin > pilot (an owner passes every admin check) */
 function setRanks(ctx: ServerCtx, conn: ClientConnection, user: { is_admin: boolean; is_owner?: boolean }): void {
   conn.isOwner = !!user.is_owner;
@@ -163,81 +131,4 @@ export function rejectAuth(ctx: ServerCtx, conn: ClientConnection, error: string
   ctx.send(conn.ws, { type: 'authResult', success: false, error });
   // A moment for the answer to get out before the socket closes
   setTimeout(() => conn.ws.close?.(), 250);
-}
-
-export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection, msg: any): Promise<void> {
-  if (gated(ctx, conn)) return;
-  const result = await ctx.userDB.register(msg.username, msg.email, msg.password, conn.address);
-  if (result.success) {
-    conn.username = result.user.username;
-    conn.userId = result.user.id;
-    ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
-    setRanks(ctx, conn, result.user);
-    conn.isContributor = ctx.contrib.hasRank(result.user.id, result.user.username);
-    conn.authToken = result.token;
-    
-    ctx.send(conn.ws, {
-      type: 'authResult',
-      success: true,
-      username: result.user.username,
-      token: result.token,
-      isAdmin: conn.isAdmin,
-      ...(conn.isOwner ? { isOwner: true } : {}),
-      isContributor: ctx.contrib.allowed(conn),
-    });
-  } else {
-    rejectAuth(ctx, conn, result.error);
-  }
-}
-
-export async function handleHttpAuth(ctx: ServerCtx, req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
-  // (A sign-in is a few hundred bytes: anything past 16 KB is refused, not held in memory)
-  let body = '', tooBig = false;
-  req.on('data', (chunk: { toString(): string }) => {
-    if (tooBig) return;
-    body += chunk.toString();
-    if (body.length > 16 * 1024) { tooBig = true; body = ''; }
-  });
-  req.on('error', () => {});
-  req.on('end', async () => {
-    try {
-      if (tooBig) throw new Error('request too large');
-      const data = JSON.parse(body);
-      if (!data || typeof data !== 'object') throw new Error('not an object');
-      res.setHeader('Content-Type', 'application/json');
-
-      if (action === 'register') {
-        const result = await ctx.userDB.register(data.username, data.email, data.password, address);
-        if (result.success) {
-          res.writeHead(200);
-          res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
-        } else {
-          res.writeHead(400);
-          res.end(JSON.stringify({ success: false, error: result.error }));
-        }
-      } else if (action === 'login') {
-        const result = await ctx.userDB.login(data.username, data.password, address);
-        if (result.success) {
-          res.writeHead(200);
-          res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
-        } else {
-          res.writeHead(400);
-          res.end(JSON.stringify({ success: false, error: result.error }));
-        }
-      } else if (action === 'validate') {
-        const user = await ctx.userDB.validateSession(data.token);
-        if (user) {
-          res.writeHead(200);
-          res.end(JSON.stringify({ success: true, username: user.username, isAdmin: user.is_admin }));
-        } else {
-          res.writeHead(401);
-          res.end(JSON.stringify({ success: false, error: 'Invalid or expired session' }));
-        }
-      }
-    } catch (e) {
-      if (res.headersSent) { res.end(); return; }
-      res.writeHead(400);
-      res.end(JSON.stringify({ success: false, error: 'Invalid request' }));
-    }
-  });
 }

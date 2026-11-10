@@ -27,7 +27,7 @@ import type { ServerCtx } from './ServerCtx.js';
 import { passesInRange } from '../game/gunRange/messageGate.js';
 
 /** Messages a connection may send before it has joined */
-export const PRE_JOIN = new Set(['join', 'ping', 'authLogin', 'authRegister']);
+export const PRE_JOIN = new Set(['join', 'ping']);
 /** Input flood guard: inputs queued per connection per tick (the rest are dropped) */
 export const MAX_INPUTS_PER_TICK = 16;
 

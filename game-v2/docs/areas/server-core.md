@@ -10,7 +10,7 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 | server/src/net/snapshot/Outbox.ts, constants.ts | 140 / 25 | `Outbox`: outboxes, lazy effects, broadcasts, byte counters (`this.net`; GameServer bumps `this.net.batching` around a tick or request); the snapshot tuning constants |
 | server/src/game/Docking.ts | 142 | `Docking`: berthing at a station, `dockedShips` (the Set GameServer aliases), `stationInRange`, `dockingSystem`, `handleDock`/`undock` |
 | server/src/game/Derelicts.ts | 202 | `Derelicts`: derelict hulks (spawn, break-up, salvage, respawn, tow delivery), `personCraft`, `onPilotlessShipDestroyed` |
-| server/src/net/auth.ts | 199 | `registerAuthHandlers`: join, authLogin, authRegister; guest-name rules; `handleHttpAuth`, `rejectAuth` |
+| server/src/net/auth.ts | 199 | `registerAuthHandlers`: join; guest-name rules; `rejectAuth` |
 | server/src/net/handlers/modules.ts | 170 | `registerModuleHandlers`: the message types that only forward to one game module (party, trade, market, items, quests, hangar orders, sieges, admin ...) |
 | server/src/net/handlers/shipEdit.ts | 145 | `registerShipEditHandlers`: dock, undock, shipEdit, slotSave/Fly/Clear, designSave, shareDesign, pilotInfo; `clientBlueprint`, `handleShipEdit` |
 | server/src/net/handlers/flight.ts | 256 | `registerFlightHandlers`: input (queued for the tick), ping, stateHash, mapView, interact, respawn, trainingDrone, target, tow; `handleInput`, `applyInputToEntity`, `releaseControls`, `recordSelfHashes` (GameServer keeps one-line delegates, called by `drainInputQueue` and the tick list); `portalQuery` |
@@ -50,7 +50,7 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 | docking | the `dockingSystem` tick entry and `handleDock` live in game/Docking.ts; GameServer keeps the `dockedShips` alias and `stationInRange`/`isDocked` one-liners |
 | NETWORKING | one-line delegates only: `send`, `flushOutbox`, `flushLazy`, `broadcastToSystem`, `broadcastProjectileHit`, `broadcastNear` (net/snapshot/Outbox.ts), `sendSnapshots`, `sendPlayerState` (net/SnapshotBuilder.ts); `terrainOf`, `replicaEnv` (the replication environments) |
 | QUEST HANDLERS, BANK HANDLERS | the quest and bank message handlers, still registered in `buildMessageHandlers()` |
-| ADMIN SERVER INTEGRATION | `setupAdminHandlers`, `adminKillAllEnemies`, `adminTeleportPlayer`, `handleHttpAuth` (delegates to net/auth.ts), `reportAdminStats`, `liveStatus` |
+| ADMIN SERVER INTEGRATION | `setupAdminHandlers`, `adminKillAllEnemies`, `adminTeleportPlayer`, `reportAdminStats`, `liveStatus` |
 
 ### Tick order (`buildTickSystems()` builds the table; `tick()` walks it)
 Each entry is `{ name, phase, run }` plus optional `every`, `scene` or `when`. The walker guards every entry with `guard(name, run)`; a `perClient` entry runs its own loop and guards each client. `server/src/golden/tickOrder.json` pins the order, and `tickOrder.test.ts` checks the table. The summary below is for orientation; the table is authoritative.
