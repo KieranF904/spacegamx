@@ -172,7 +172,7 @@ describe('rebuild caches: the same ship as worked out afresh', () => {
     const P = (uid: number, piece: string, fn: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart =>
       ({ uid, piece, fn, material: catalog.functions.get(fn)?.material ?? 'alloy', x, y, rot: 0 as Rot, flip: false, ...extra });
     const bp: Blueprint = {
-      name: 'blocked', catalogVersion: 1, power: 'ports',
+      name: 'blocked', catalogVersion: 1,
       parts: [
         P(0, 'rect2', 'core', 0, 0), P(1, 'sq', 'power_cell_reactor', 0, 1, { rot: 2 }), P(2, 'sq', 'power_cell_reactor', 1, 1, { rot: 2 }),
         P(3, 'rect2', 'engine_torch', 0, 2, { facing: 'S' }), ...[1, 2, 3, 4, 5].map((y) => P(10 + y, 'sq', 'hull', 2, y)),

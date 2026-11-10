@@ -228,8 +228,7 @@ export function cleanMods(m: unknown): WeaponMods | undefined {
 
 export function serializeBlueprint(bp: Blueprint): string {
   const parts = [...bp.parts].sort((a, b) => a.uid - b.uid).map((p) => '    ' + JSON.stringify(canonicalPart(p)));
-  const power = bp.power === 'ports' ? ',\n  "power": "ports"' : '';
-  return `{\n  "name": ${JSON.stringify(bp.name)},\n  "catalogVersion": ${bp.catalogVersion},\n  "parts": [\n${parts.join(',\n')}\n  ]${power}\n}\n`;
+  return `{\n  "name": ${JSON.stringify(bp.name)},\n  "catalogVersion": ${bp.catalogVersion},\n  "parts": [\n${parts.join(',\n')}\n  ]\n}\n`;
 }
 
 export function parseBlueprint(json: string): Blueprint {
@@ -241,7 +240,6 @@ export function parseBlueprint(json: string): Blueprint {
     ...(typeof raw.paint === 'string' && /^#[0-9a-f]{6}$/i.test(raw.paint) ? { paint: raw.paint.toLowerCase() } : {}),
     ...(typeof raw.drive === 'number' && raw.drive > 0 && raw.drive < 1 ? { drive: Math.max(0.1, raw.drive) } : {}),
     ...(raw.rigid === true ? { rigid: true } : {}),
-    ...(raw.power === 'ports' ? { power: 'ports' as const } : {}),
     parts: raw.parts.map((p: any) => canonicalPart({
       uid: p.uid, piece: p.piece, fn: p.fn, material: p.material,
       x: p.x, y: p.y, rot: p.rot as Rot, flip: !!p.flip, facing: p.facing, mount: p.mount, mods: p.mods, gems: p.gems, group: p.group, wg: p.wg,

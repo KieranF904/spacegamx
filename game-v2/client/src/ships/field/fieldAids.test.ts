@@ -6,7 +6,7 @@ import { addPart, noEdits, placementProblem, working, type BuildEdits } from './
 
 const catalog = testCatalog();
 const part = (over: Partial<PlacedPart> & { uid: number }): PlacedPart => ({ piece: 'sq', fn: 'hull', material: 'alloy', x: 0, y: 0, rot: 0, flip: false, ...over });
-const bp: Blueprint = { name: 't', catalogVersion: catalog.version, power: 'ports', parts: [part({ uid: 0, fn: 'core' })] } as Blueprint;
+const bp: Blueprint = { name: 't', catalogVersion: catalog.version, parts: [part({ uid: 0, fn: 'core' })] } as Blueprint;
 
 function rig() {
   let edits: BuildEdits = noEdits();

@@ -1,7 +1,6 @@
 {
  "name": "Redtooth Mammoth",
  "catalogVersion": 1,
- "power": "ports",
  "parts": [
   {
    "uid": 0,

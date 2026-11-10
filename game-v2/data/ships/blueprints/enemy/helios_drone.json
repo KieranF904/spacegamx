@@ -1,7 +1,6 @@
 {
  "name": "Helios Drone",
  "catalogVersion": 1,
- "power": "ports",
  "paint": "#c9ccd2",
  "rigid": true,
  "parts": [

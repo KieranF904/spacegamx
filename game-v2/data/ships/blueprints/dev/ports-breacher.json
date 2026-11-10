@@ -1,7 +1,6 @@
 {
   "name": "Breacher",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#6b4a2a",
   "parts": [
     {"uid":0,"piece":"nose2","fn":"hull","material":"alloy","x":-1,"y":-8,"rot":0,"flip":false},

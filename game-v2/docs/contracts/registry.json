@@ -2164,7 +2164,7 @@
       "id": "client.hangar",
       "path": "client/src/ships/HangarUI.ts",
       "group": "client/ships",
-      "lines": 722,
+      "lines": 720,
       "owns": "the hangar editor shell: slot and design state, grid editing (place, pick up, remove), input and open/close flow",
       "needs": "hangar/* modules (draw, overlays, stats, designs, tips) through the HangarHost interface, HangarPalette, HangarLitView; npm: @space-game/common",
       "events": "",
@@ -2190,7 +2190,7 @@
           "name": "HangarUI",
           "kind": "class",
           "start": 74,
-          "end": 722
+          "end": 720
         }
       ]
     },
@@ -22700,7 +22700,7 @@
       "id": "server.net.handlers.ship-edit",
       "path": "server/src/net/handlers/shipEdit.ts",
       "group": "server/net/handlers",
-      "lines": 157,
+      "lines": 155,
       "owns": "ship editing and the hangar docking messages: dock, undock, shipEdit, slot saves, designSave, shareDesign, pilotInfo",
       "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx; @space-game/common, bitecs",
       "events": "",
@@ -22742,25 +22742,25 @@
           "name": "clientBlueprint",
           "kind": "function",
           "start": 85,
-          "end": 97
+          "end": 95
         },
         {
           "name": "handleShareDesign",
           "kind": "function",
-          "start": 99,
-          "end": 115
+          "start": 97,
+          "end": 113
         },
         {
           "name": "handleShipEdit",
           "kind": "function",
-          "start": 117,
-          "end": 138
+          "start": 115,
+          "end": 136
         },
         {
           "name": "handleSlotSave",
           "kind": "function",
-          "start": 140,
-          "end": 157
+          "start": 138,
+          "end": 155
         }
       ]
     },

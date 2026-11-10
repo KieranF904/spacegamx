@@ -31,7 +31,7 @@ const BAY = 7;
 const part = (uid: number, piece: string, fn: string, x: number, y: number, extra: Partial<PlacedPart> = {}): PlacedPart =>
   ({ uid, piece, fn, material: catalog.functions.get(fn)?.material ?? 'alloy', x, y, rot: 0 as Rot, flip: false, ...extra });
 const design = (): Blueprint => ({
-  name: 'Mine test', catalogVersion: catalog.version, power: 'ports',
+  name: 'Mine test', catalogVersion: catalog.version,
   parts: [part(0, 'rect2', 'core', 0, 0), part(1, 'sq', 'cannon_pip', 0, -1, { facing: 'N' }), part(BAY, 'rect2', 'mine_bay', 0, 1, { facing: 'S' })],
 });
 

@@ -53,7 +53,6 @@ describe('jump coils against the hull', () => {
 
   it('on the ports core a coil counts once power reaches it: fed, it extends the range; cut off, it does nothing', () => {
     const b = load('remakes/player-xire-sparrow');
-    expect(b.power).toBe('ports');
     const coils = b.parts.map((p, i) => (/coil/.test(p.fn) ? i : -1)).filter((i) => i >= 0);
     expect(coils.length).toBeGreaterThan(0);
     const fed = derive(b);

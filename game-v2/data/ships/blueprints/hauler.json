@@ -1,7 +1,6 @@
 {
   "name": "Ceres Hauler",
   "catalogVersion": 1,
-  "power": "ports",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"alloy","x":-1,"y":3,"rot":0,"flip":false},
     {"uid":1,"piece":"tri","fn":"armor","material":"alloy","x":-2,"y":0,"rot":3,"flip":false},

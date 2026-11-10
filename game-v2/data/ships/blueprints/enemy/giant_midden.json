@@ -1,7 +1,6 @@
 {
  "name": "The Midden",
  "catalogVersion": 1,
- "power": "ports",
  "parts": [
   {
    "uid": 0,

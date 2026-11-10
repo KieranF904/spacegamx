@@ -1,7 +1,6 @@
 {
  "name": "Scrap Mother",
  "catalogVersion": 1,
- "power": "ports",
  "paint": "#3a3c40",
  "rigid": true,
  "parts": [

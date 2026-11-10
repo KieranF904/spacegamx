@@ -1,7 +1,6 @@
 {
  "name": "Hookboat",
  "catalogVersion": 1,
- "power": "ports",
  "paint": "#34363c",
  "rigid": true,
  "parts": [

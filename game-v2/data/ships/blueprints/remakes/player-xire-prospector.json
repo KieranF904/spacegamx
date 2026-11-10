@@ -1,7 +1,6 @@
 {
   "name": "Prospector",
   "catalogVersion": 1,
-  "power": "ports",
   "parts": [
     {"uid":0,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":-1,"y":2,"rot":1,"flip":false},
     {"uid":1,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":1,"y":2,"rot":3,"flip":false},

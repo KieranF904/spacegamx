@@ -240,7 +240,6 @@ describe('v5 design update: the swap', () => {
     const real = resolveDesignUpdate(file, (id) => (id.startsWith('remakes/') ? remakes[id.slice(8)] : plans[id]));
     expect(real.missing).toEqual([]);
     expect(Object.keys(real.blueprints).length).toBeGreaterThanOrEqual(6);
-    for (const [id, bp] of Object.entries(real.blueprints)) expect(bp.power, id).toBe('ports');
     // Never a dev-only blueprint (the deploy leaves dev/ out), and remakes aren't library ships
     expect(Object.keys(real.blueprints).some((id) => id.startsWith('dev/'))).toBe(false);
     for (const id of Object.keys(remakes)) expect(plans[id]).toBeUndefined();

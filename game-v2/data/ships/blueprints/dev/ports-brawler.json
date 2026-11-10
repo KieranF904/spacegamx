@@ -1,7 +1,6 @@
 {
   "name": "Brawler",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#5a2f2f",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"cannon_hammer","material":"alloy","x":-1,"y":-6,"rot":0,"flip":false,"facing":"N"},

@@ -13,7 +13,7 @@
 
 /**
  * The ports energy core (docs/design/energy-ports-2026-11.md; the Energy Lab's prototypes/energy-lab/ports-model.js is
- * the reference): a ship whose blueprint says `power: 'ports'` runs on this instead of energy.ts. Power moves only out of
+ * the reference): every ship runs on it. Power moves only out of
  * an out port into an in port across a shared cell edge, in a synchronous tick (offer, accept, apply, then the consumers
  * act), so the server, the pilot's prediction and the hangar agree to the eu. On top, the feed layer: tanks of
  * materials joined by pipes, Selectors, Combiners that put a material onto a power line, and feed buffers on the guns and

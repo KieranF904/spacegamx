@@ -1,7 +1,6 @@
 {
   "name": "Heron",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#3e5566",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"laser_cutter","material":"steel","x":-1,"y":-9,"rot":0,"flip":false,"facing":"N"},

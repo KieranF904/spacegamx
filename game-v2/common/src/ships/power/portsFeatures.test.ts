@@ -34,7 +34,7 @@ const E = { facing: 'E' as Side };
 function design(fed = true): Blueprint {
   const src = (uid: number, x: number, y: number, rot: number) => (fed ? p(uid, 'sq', 'power_cell_reactor', x, y, { rot: rot as Rot }) : p(uid, 'sq', 'hull', x, y));
   return {
-    name: 'test', catalogVersion: 1, power: 'ports',
+    name: 'test', catalogVersion: 1,
     parts: [
       p(0, 'rect2', 'core', 0, 0),
       src(1, 2, 0, 1), p(2, 'sq', 'engine_burst_strafer', 3, 0, E),

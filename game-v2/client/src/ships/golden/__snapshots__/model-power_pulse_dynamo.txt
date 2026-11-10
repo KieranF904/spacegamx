@@ -13,7 +13,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Rating scoretoughness 67
 
 == familyLabel ==
-Bank chargers
+Old chargers
 
 == sizeWord ==
 Small
@@ -22,10 +22,10 @@ Small
 Small · Square
 
 == tradeOff ==
-puts 10 a second into each bank it touches, no wires
+an old charger the ports core no longer uses: makes and moves no power
 
 == keyStats ==
-+10/s into each bank it touches
+67 hp · armour 2
 
 == mountBadge ==
 

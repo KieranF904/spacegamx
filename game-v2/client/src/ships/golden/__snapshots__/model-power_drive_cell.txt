@@ -23,10 +23,10 @@ Small
 Small · Square
 
 == tradeOff ==
-touching Drive Cells form a bank that feeds the engines and strafers it touches first
+a bigger store for the engines and strafers
 
 == keyStats ==
-holds 320 (engines)
+holds 320
 
 == mountBadge ==
 

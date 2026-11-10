@@ -87,8 +87,6 @@ export function clientBlueprint(ctx: ServerCtx, raw: unknown): Blueprint {
   if (!r || typeof r !== 'object' || !Array.isArray(r.parts) || r.parts.length > 256) throw new Error('not a blueprint');
   const bp = fixModelMaterials(ctx.ships.catalog, parseBlueprint(JSON.stringify(raw)));
   bp.name = bp.name.slice(0, 64);
-  // (The server decides the power system, not the client: every design runs on the ports core)
-  bp.power = 'ports';
   for (const p of bp.parts) {
     if (p.facing !== undefined && (typeof p.facing !== 'string' || p.facing.length > 16)) delete p.facing;
     if (p.gems) p.gems = p.gems.map((g) => g.slice(0, 40));

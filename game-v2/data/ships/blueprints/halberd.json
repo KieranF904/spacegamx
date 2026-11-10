@@ -1,7 +1,6 @@
 {
   "name": "Halberd",
   "catalogVersion": 1,
-  "power": "ports",
   "paint": "#8a4a32",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"cannon_hammer","material":"alloy","x":-1,"y":1,"rot":0,"flip":false,"facing":"N"},

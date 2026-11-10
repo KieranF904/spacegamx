@@ -80,7 +80,6 @@ export function buildFacts(catalog: Catalog, tuning: ShipTuning | undefined, fn:
     add('Power', 'Buffer', `${n0(buf)} · ${fn.strafe ? `${bursts} burst${bursts === 1 ? '' : 's'}` : `${secs.toFixed(1)} s turning`} held`);
   }
   if ((fn.store ?? 0) > 0) add('Power', 'Holds', n0(fn.store! * st.area));
-  if ((fn.dynamo ?? 0) > 0) add('Power', 'Charges banks', `${n0(fn.dynamo!)}/s each`);
   const ports = portsText(fn);
   if (ports.length) add('Power', 'Ports', ports.join(' · '));
 

@@ -15,7 +15,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   laser: 'Lasers', pulse: 'Pulse guns', lance: 'Lances', arc: 'Arc projectors',
   missile: 'Missiles', torpedo: 'Torpedoes', emp: 'EMP',
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
-  reactor: 'Generators', dynamo: 'Bank chargers', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
+  reactor: 'Generators', dynamo: 'Old chargers', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   // (Energy routing's Conduit and Diode: models.mjs)
   relay: 'Relays',
   shield: 'Shields', shieldwall: 'Shield walls', shieldarc: 'Shield arcs', plating: 'Plating',
@@ -98,11 +98,11 @@ const TRADE_OFF: Record<string, string> = {
   power_isotope_pile: 'weak but tough, never explodes',
   power_fusion_plant: 'plenty of power, heavy, big blast',
   power_overclock_reactor: 'most power, fragile, biggest blast',
-  power_battery: 'the ship\'s pool: holds and gives quickly',
-  power_capacitor: 'touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines',
-  power_drive_cell: 'touching Drive Cells form a bank that feeds the engines and strafers it touches first',
+  power_battery: 'a store: holds and gives quickly',
+  power_capacitor: 'a small store that gives its power in a rush, for guns and beams',
+  power_drive_cell: 'a bigger store for the engines and strafers',
   power_heavy_bank: 'deep but slow: endurance, not alpha strikes',
-  power_pulse_dynamo: 'puts 10 a second into each bank it touches, no wires',
+  power_pulse_dynamo: 'an old charger the ports core no longer uses: makes and moves no power',
   utility_mining_laser: 'cuts ore, a poor weapon',
   utility_bore: 'cuts harder rock',
   utility_demolition_launcher: 'cracks rock wide open',
@@ -218,9 +218,8 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if (st.thrust) out.push(`thrust ${st.thrust.toFixed(1)}`);
   if (fn.rated) out.push(`top ${n0(fn.rated * 60)} m/s`);
   if (st.supply) out.push(`+${n0(st.supply)} power`);
-  if ((fn.dynamo ?? 0) > 0) out.push(`+${n0(fn.dynamo!)}/s into each bank it touches`);
   if ((fn.store ?? 0) > 0) {
-    out.push(`holds ${n0(fn.store! * st.area)}${fn.bank ? (fn.pool === 'drive' ? ' (engines)' : ' (guns)') : ''}`);
+    out.push(`holds ${n0(fn.store! * st.area)}`);
   }
   if (st.shield) out.push(`shield ${n0(st.shield)}`);
   if (st.shield && fn.shieldRegen) out.push(`refills ${n0(fn.shieldRegen * st.area)}/s after ${(fn.shieldDelay ?? 0) / 60} s`);

@@ -178,14 +178,10 @@ export interface FunctionDef {
   armour?: number;
   /** Mass × this (armour plate is heavy) */
   massScale?: number;
-  /** (Unused since power runs along wires, wires.ts: kept in the data for old tools) */
-  carriesFlow?: boolean;
   /** per unit of area (generators) */
   produce?: number;
   demand?: number;
   priority?: 1 | 2 | 3;
-  /** (Unused: conduits are plain structure now that power runs along wires) */
-  loss?: number;
   /** per unit of area, pushes opposite to `facing` */
   thrust?: number;
   /** Engines: how much harder they push while boosting (× thrust), and how fast that drains the boost battery (× the usual) */
@@ -212,7 +208,7 @@ export interface FunctionDef {
   /**
    * Burst Strafer (ships/features/strafer/strafer.ts): a dodge, pushing away from its nozzle. `kick` its push per cell while a burst
    * runs (force, as an engine's thrust), `ticks` how long a burst lasts, `cooldown` ticks from one burst's start to
-   * the next. It draws its `demand` per cell a second while a burst runs, from the bank it touches first
+   * the next. It draws its `demand` per cell a second while a burst runs, through its ports like any consumer
    */
   strafe?: { kick: number; ticks: number; cooldown: number };
   /** Tow Beam (ships/features/tow/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
@@ -258,7 +254,7 @@ export interface FunctionDef {
    */
   shieldRegen?: number;
   shieldDelay?: number;
-  /** Flash Screen (ships/features/flash): no slow regen; when the shield breaks it comes back whole after a wait, or at once for 4 E a point from a Capacitor bank touching it */
+  /** Flash Screen (ships/features/flash): no slow regen; when the shield breaks it comes back whole after a wait, or at once for power a point (the feature says how) */
   flash?: boolean;
   /**
    * Shaped shields (ships/features/zoneshield): a line (`wall`: `len` cells long, `off` cells out from the part's open edge)
@@ -275,13 +271,9 @@ export interface FunctionDef {
   jumpCooldown?: number;
   /** battery capacity per unit of area (batteries; × the material's output): energy.ts */
   store?: number;
-  /** A bank member's kind: 'drive' a Drive Cell (feeds engines and strafers it touches); else a Capacitor. A store that isn't a bank member is a pool battery, whatever this says (legacy drive and weapon batteries) */
-  pool?: 'drive' | 'weapon';
-  /** The most a store gives a second, per unit of area (× its output): past it the ship browns out (circuits.ts; absent: tuning energy.discharge by kind) */
+  /** The most a store gives a second, per unit of area (× its output): read only by the shipgen tool's own layout (scripts/shipgen/core/energyLayout.ts): the ports core uses a part's `ports` rates */
   discharge?: number;
-  /** A bank member (with `pool: 'drive'` a Drive Cell, else a Capacitor): touching ones of a kind make one bank, which feeds the consumers of its kind it touches first (circuits.ts) */
-  bank?: boolean;
-  /** A bank charger (the Pulse Dynamo): energy a second it puts into each bank it touches (× its health), never along wires (circuits.ts) */
+  /** The Pulse Dynamo's figure, read only by the shipgen tool's layout: the ports core gives the part no ports, so in the game it does nothing */
   dynamo?: number;
   /** Must point a facing edge out (engines and weapons do anyway: this is for the rest, e.g. mining lasers) */
   facing?: boolean;
@@ -296,7 +288,7 @@ export interface FunctionDef {
    */
   relayOnly?: boolean;
 
-  // The ports energy core (power/ports.ts; docs/design/energy-ports-2026-11.md), for ships whose blueprint says `power: 'ports'`
+  // The ports energy core (power/ports.ts; docs/design/energy-ports-2026-11.md)
   /** Its power ports, in its own frame (N the nose, `cell` the index along that side, `rate` E a second): power crosses only out → in over a shared edge */
   ports?: { dir: 'in' | 'out'; side: Side; cell?: number; rate: number }[];
   /**
@@ -440,8 +432,6 @@ export interface Blueprint {
    * throughout, its brain changing how it flies by stage): so its hull, drawn once, never moves about its centre
    */
   rigid?: boolean;
-  /** A marker kept from when there were two energy models: every design runs on the ports core (power/ports.ts), with it or without it */
-  power?: 'ports';
   /**
    * A gun range cheat ship (common/gunRange/cheatShip.ts, built by the server only: parseBlueprint drops it, so no client
    * can claim it): its guns never want for power (guns.ts stepGuns) and it has no jump drive (rebuild.ts), on the server

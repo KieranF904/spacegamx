@@ -55,7 +55,7 @@ export class FieldFlow {
     this.forW = w;
     this.val = null;
     try {
-      const d = createShipState(this.deps.catalog, this.deps.tuning, 0, { ...w.bp, power: 'ports' }, 0).derived;
+      const d = createShipState(this.deps.catalog, this.deps.tuning, 0, w.bp, 0).derived;
       this.val = powerFlow(d, portsLoadTestCached(d, 'both'));
     } catch { /* a design the core can't build whole shows no flow */ }
     return this.val;

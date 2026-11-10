@@ -23,10 +23,10 @@ Small
 Small · Square
 
 == tradeOff ==
-touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines
+a small store that gives its power in a rush, for guns and beams
 
 == keyStats ==
-holds 160 (guns)
+holds 160
 
 == mountBadge ==
 

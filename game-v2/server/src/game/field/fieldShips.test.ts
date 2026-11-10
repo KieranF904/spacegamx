@@ -45,7 +45,7 @@ function design(opts: { reactors?: number; fabricator?: boolean; fabRot?: Rot } 
     if (r >= 1) parts.push(part(4, 'sq', 'power_cell_reactor', 0, 2));
     if (r >= 2) parts.push(part(5, 'sq', 'power_cell_reactor', 1, 2));
   }
-  return { name: 'Field test', catalogVersion: catalog.version, power: 'ports', parts };
+  return { name: 'Field test', catalogVersion: catalog.version, parts };
 }
 
 /** `bank`: keep the repair bank's free part (full; its spare pays repairs and rebuilds of the ship's own parts). Off: emptied, so the hold alone pays */

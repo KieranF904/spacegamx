@@ -1,7 +1,6 @@
 {
   "name": "Sparrow T",
   "catalogVersion": 1,
-  "power": "ports",
   "parts": [
     {"uid":0,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":-1,"y":0,"rot":1,"flip":false},
     {"uid":1,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":0,"y":2,"rot":0,"flip":false,"facing":"S"},
