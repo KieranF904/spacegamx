@@ -17725,7 +17725,7 @@
       "id": "common.tutorial.data",
       "path": "common/src/tutorial/data.ts",
       "group": "common/tutorial",
-      "lines": 118,
+      "lines": 120,
       "owns": "validateTutorialData: every problem in a parsed data/tutorial.json, as readable lines",
       "needs": "types",
       "events": "",
@@ -17781,7 +17781,7 @@
           "name": "validateTutorialData",
           "kind": "function",
           "start": 27,
-          "end": 118
+          "end": 120
         }
       ]
     },
@@ -17905,7 +17905,7 @@
       "id": "common.tutorial.types",
       "path": "common/src/tutorial/types.ts",
       "group": "common/tutorial",
-      "lines": 152,
+      "lines": 159,
       "owns": "the shapes of data/tutorial.json (steps, training objects, the yard, the starter pack), the events the server's step engine listens to, and the per-pilot saved state",
       "needs": "nothing (leaf module)",
       "events": "",
@@ -17958,85 +17958,85 @@
           "name": "TutorialTriggerKind",
           "kind": "type",
           "start": 32,
-          "end": 44
+          "end": 46
         },
         {
           "name": "TutorialTrigger",
           "kind": "interface",
-          "start": 46,
-          "end": 56
+          "start": 48,
+          "end": 58
         },
         {
           "name": "TutorialLine",
           "kind": "type",
-          "start": 58,
-          "end": 62
+          "start": 60,
+          "end": 64
         },
         {
           "name": "TutorialStepDef",
           "kind": "interface",
-          "start": 64,
-          "end": 83
+          "start": 66,
+          "end": 87
         },
         {
           "name": "TutorialYardDef",
           "kind": "interface",
-          "start": 85,
-          "end": 99
+          "start": 89,
+          "end": 103
         },
         {
           "name": "TutorialPackDef",
           "kind": "interface",
-          "start": 101,
-          "end": 104
+          "start": 105,
+          "end": 108
         },
         {
           "name": "TutorialData",
           "kind": "interface",
-          "start": 106,
-          "end": 112
+          "start": 110,
+          "end": 116
         },
         {
           "name": "TUTORIAL_INDEX_BASE",
-          "kind": "const",
-          "start": 114,
-          "end": 115
-        },
-        {
-          "name": "TUTORIAL_ROCK_TYPE",
-          "kind": "const",
-          "start": 116,
-          "end": 117
-        },
-        {
-          "name": "TUTORIAL_FIRST_STEP",
           "kind": "const",
           "start": 118,
           "end": 119
         },
         {
+          "name": "TUTORIAL_ROCK_TYPE",
+          "kind": "const",
+          "start": 120,
+          "end": 121
+        },
+        {
+          "name": "TUTORIAL_FIRST_STEP",
+          "kind": "const",
+          "start": 122,
+          "end": 123
+        },
+        {
           "name": "TutorialProfile",
           "kind": "interface",
-          "start": 121,
-          "end": 129
+          "start": 125,
+          "end": 133
         },
         {
           "name": "TutorialEvent",
           "kind": "type",
-          "start": 131,
-          "end": 148
+          "start": 135,
+          "end": 155
         },
         {
           "name": "TUTORIAL_PANELS",
           "kind": "const",
-          "start": 150,
-          "end": 151
+          "start": 157,
+          "end": 158
         },
         {
           "name": "TutorialPanel",
           "kind": "type",
-          "start": 152,
-          "end": 152
+          "start": 159,
+          "end": 159
         }
       ]
     },
@@ -18044,7 +18044,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 748,
+      "lines": 749,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -18072,7 +18072,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 119,
-          "end": 748
+          "end": 749
         }
       ]
     },
@@ -21375,7 +21375,7 @@
       "id": "server.game.tutorial",
       "path": "server/src/game/tutorial/Tutorial.ts",
       "group": "server/game/tutorial",
-      "lines": 411,
+      "lines": 427,
       "owns": "the training yard: its stationary drones, each pilot's own damage counters on them, marker events (rings, stop zones, jumps, docking), the boundary (trainees held in, everyone else kept out), leaving (skip or graduate: the starter pack and the one-way exit) and the pilot's tutorialState",
       "needs": "TutorialHost, Pilots (profiles, give, toast), common/tutorial, TutorialSteps",
       "events": "",
@@ -21413,7 +21413,7 @@
           "name": "Tutorial",
           "kind": "class",
           "start": 42,
-          "end": 410
+          "end": 426
         }
       ]
     },
@@ -21421,7 +21421,7 @@
       "id": "server.game.tutorial.steps",
       "path": "server/src/game/tutorial/TutorialSteps.ts",
       "group": "server/game/tutorial",
-      "lines": 159,
+      "lines": 164,
       "owns": "the step engine: which event advances which step, what a step grants when it starts, and the graduation",
       "needs": "Tutorial (completeStep, leave, data, grant); npm: @space-game/common",
       "events": "",
@@ -21453,7 +21453,7 @@
           "name": "TutorialSteps",
           "kind": "class",
           "start": 24,
-          "end": 159
+          "end": 164
         }
       ]
     },

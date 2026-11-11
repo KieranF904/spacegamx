@@ -14,6 +14,7 @@ import { chamberOf } from '../ui/gunRange/rangeState';
 import { onTutorial, resetTutorial } from '../ui/tutorial/tutorialStore';
 import { clearTrainingBodies } from '../state/trainingBodies';
 import { loadField } from '../ships/field/mount';
+import { fieldBridge } from '../ships/field/bridge';
 import type { TutorialUI } from '../ui/tutorial/TutorialUI';
 import type { GunRangeHud } from '../ui/gunRange/GunRangeHud';
 import type { ComponentGuideUI } from '../ui/ComponentGuideUI';
@@ -59,7 +60,7 @@ export function makeTutorialUI(host: WindowHost, w: WindowSet): Lazy<TutorialUI>
         const tab = host.stationOpen ? w.stationWindow.value?.currentTab : '';
         return {
           hold: w.inventoryWindow.isOpen, hangar: host.shipClient.hangarOpen, map: w.systemMapUI.isOpen, guide: !!w.componentGuide.value?.isOpen,
-          bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator',
+          bank: tab === 'bank', refinery: tab === 'refinery', fabricator: tab === 'fabricator', build: !!fieldBridge.overlay?.isOpen,
         };
       },
     })));

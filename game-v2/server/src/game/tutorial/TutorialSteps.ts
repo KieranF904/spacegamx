@@ -115,6 +115,10 @@ export class TutorialSteps {
         return ev.kind === 'partPlaced';
       case 'powered':
         return ev.kind === 'powered';
+      case 'fieldPlanned':
+        return ev.kind === 'fieldPlanned';
+      case 'fieldBuilt':
+        return ev.kind === 'fieldBuilt';
       case 'jumped':
         return ev.kind === 'jumped' && !!ev.exit && objects.includes(ev.exit);
       default:
@@ -136,6 +140,7 @@ export class TutorialSteps {
     if (!step) return;
     this.tutorial.resetObjects(conn, stepId);
     if (fresh && step.grant) this.tutorial.grant(conn, step.grant);
+    if (fresh && step.holdGrant) this.tutorial.grantHold(conn, step.holdGrant);
     if (step.trigger.kind === 'graduate') this.graduateAt.set(pid, this.tutorial.nowTick() + GRADUATE_AFTER_TICKS);
   }
 

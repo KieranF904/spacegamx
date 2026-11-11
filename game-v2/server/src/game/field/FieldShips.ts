@@ -138,6 +138,9 @@ export class FieldShips implements FeatureInstance {
 
   // ===================================================================== feature hooks
 
+  /** Told when a saved plan adds parts to a pilot's design (`added`), and when the fabricator puts a part on the ship (the tutorial listens) */
+  hooks: { planned?: (eid: number, added: number) => void; built?: (eid: number, fn: string) => void } = {};
+
   readonly messages: Readonly<Record<string, FeatureMessageHandler>> = {
     fieldPlan: (eid, msg) => this.onPlan(eid, msg?.blueprint),
     fieldPlanClear: (eid) => this.onPlanClear(eid),
@@ -539,7 +542,7 @@ export class FieldShips implements FeatureInstance {
     if (j.kind === 'build') {
       const own = j.uid !== undefined ? this.indexOf(fs, j.uid) : -1;
       const at = placeFinished(j.item!, own, this.spots(fs));
-      if (at.to === 'spot') { const uid = this.install(fs, at.part); done(j.item!, 'ship', uid); return; }
+      if (at.to === 'spot') { const uid = this.install(fs, at.part); this.hooks.built?.(fs.eid, fs.ship.blueprint.parts[at.part].fn); done(j.item!, 'ship', uid); return; }
       done(j.item!, this.toHold(fs, m, { [j.item!]: 1 }));
       return;
     }
@@ -759,9 +762,12 @@ export class FieldShips implements FeatureInstance {
       alive: (u) => { const i = this.indexOf(fs, u); return i >= 0 && !!ship.derived.alive[i]; },
     }, target);
     if ('error' in r) { this.host.tell(fs.eid, r.error, 'warn'); return; }
+    const had = new Set(ship.blueprint.parts.map((q) => q.uid));
+    const added = r.blueprint.parts.filter((q) => !had.has(q.uid)).length;
     const kept = [...ghosts].filter((u) => r.blueprint.parts.some((p) => p.uid === u));
     if (!this.refit(fs, r.blueprint, kept)) { this.host.tell(fs.eid, "That plan can't be saved", 'warn'); return; }
     this.setRecycle(fs, clear ? [] : r.recycle);
+    if (!clear) this.hooks.planned?.(fs.eid, added);
     // Jobs on parts no longer in it, or no longer to recycle, are called off (a build carries on: its part goes where it can)
     const rc = new Set(fs.rec.field?.recycle ?? []);
     const j = fs.fab.job;

@@ -1,5 +1,5 @@
 /**
- * The step engine on a real GameServer over LocalTransport: a fake client walks all fourteen steps, a pilot can leave at
+ * The step engine on a real GameServer over LocalTransport: a fake client walks all seventeen steps, a pilot can leave at
  * every one of them, and the client's reports can only complete the steps that are about opening something
  */
 import { describe, it, expect } from 'vitest';
@@ -77,10 +77,10 @@ function mineChunk(w: World, p: Pilot, bag: Record<string, number>): void {
 }
 
 describe('the step engine', () => {
-  it('has fourteen steps, each with a real binding name and one or two short lines', () => {
+  it('has seventeen steps, each with a real binding name and one or two short lines', () => {
     const w = yard();
-    expect(w.data.steps.map((s) => s.id)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'jump', 'graduate']);
-    const actions = new Set(['forward', 'backward', 'left', 'right', 'wasd', 'powerFlow', 'fire', 'inventory', 'dock', 'components', 'map', 'jump']);
+    expect(w.data.steps.map((s) => s.id)).toEqual(['welcome', 'rings', 'brake', 'drones', 'mine', 'hold', 'dock', 'refine', 'hangar', 'power', 'bank', 'guide', 'fieldview', 'fieldplan', 'fieldbuild', 'jump', 'graduate']);
+    const actions = new Set(['forward', 'backward', 'left', 'right', 'wasd', 'powerFlow', 'fire', 'inventory', 'dock', 'components', 'map', 'jump', 'fieldBuild', 'fabricator']);
     for (const s of w.data.steps) {
       expect(s.lines.length).toBeGreaterThanOrEqual(1);
       expect(s.lines.length).toBeLessThanOrEqual(2);
@@ -198,16 +198,39 @@ describe('the step engine', () => {
     expect(stepOf(a)).toBe('guide');
     a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'guide' } as never);
     w.step(1);
-    expectStep('jump');
+    expectStep('fieldview');
 
-    // 13 jump: finishing a jump inside the exit marker (the jump drive itself is the flight code's; here its finish is told)
+    // 13 the world build view: out of the station, opening it is the client's report
     a.t.send({ type: 'undock' } as never);
     w.step(2);
+    a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'build' } as never);
+    w.step(1);
+    expectStep('fieldplan');
+    // (the step put plate in the hold, where the fabricator looks)
+    const plate = (id: string) => countOf(a.profile().cargo, id);
+    expect(plate('alloy_plate')).toBeGreaterThanOrEqual(3);
+
+    // 14 plan a part: a saved plan that adds one (the server sees the blueprint, not the client's word)
+    w.tut.fieldPlanned(a.pid, 0);
+    expect(stepOf(a)).toBe('fieldplan');
+    a.t.send({ type: 'fieldPlan', blueprint: withPart(w, a, 'hull', 'sq', 'alloy', 202) } as never);
+    w.step(1);
+    expectStep('fieldbuild');
+
+    // 15 the fabricator (off until the pilot switches it on) builds it from the hold
+    w.step(TICK_RATE * 5);
+    expect(stepOf(a)).toBe('fieldbuild');
+    a.t.send({ type: 'machine', kind: 'fabricator', on: true } as never);
+    w.step(TICK_RATE * 60);
+    expectStep('jump');
+    expect(w.server.ships.get(a.pid)!.blueprint.parts.some((q) => q.uid === 202)).toBe(true);
+
+    // 16 jump: finishing a jump inside the exit marker (the jump drive itself is the flight code's; here its finish is told)
     const ex = w.at('exit_marker');
     w.tut.onEvent(a.pid, { kind: 'jumped', x: ex.x, y: ex.y, exit: 'exit_marker' });
     expectStep('graduate');
 
-    // 14 graduate: the client acknowledges and the pilot leaves for Sol with the pack
+    // 17 graduate: the client acknowledges and the pilot leaves for Sol with the pack
     const storage0 = Object.fromEntries(p.storage.map((s) => [s.id, s.n]));
     const credits0 = p.credits;
     a.t.send({ type: 'tutorialReport', kind: 'ack', step: 'graduate' } as never);
@@ -236,8 +259,8 @@ describe('the step engine', () => {
     expect(a.profile().tutorial.left).toBe(true);
   });
 
-  it('a pilot can leave at every one of the fourteen steps and gets the pack once', () => {
-    const w = yard(Array.from({ length: 14 }, (_, i) => `p${i}`));
+  it('a pilot can leave at every one of the seventeen steps and gets the pack once', () => {
+    const w = yard(Array.from({ length: 17 }, (_, i) => `p${i}`));
     const ids = w.data.steps.map((s) => s.id);
     w.pilots.forEach((p, i) => { p.profile().tutorial.step = ids[i]; p.profile().tutorial.done = ids.slice(0, i); });
     w.step(2);
@@ -383,7 +406,7 @@ describe('the step engine', () => {
     expect(stepOf(a)).toBe('guide');
     a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'map' } as never);
     w.step(1);
-    expect(stepOf(a)).toBe('jump');
+    expect(stepOf(a)).toBe('fieldview');
     w.tut.leave(a.conn);
     a.t.send({ type: 'tutorialReport', kind: 'panel', panel: 'map' } as never);
     w.step(1);

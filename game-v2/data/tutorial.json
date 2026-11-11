@@ -98,6 +98,28 @@
       "highlight": [".tp kbd, .hub-tab[data-tab=\"components\"]"]
     },
     {
+      "id": "fieldview",
+      "title": "Build in the field",
+      "lines": ["Edit your ship out here too: press {fieldBuild} for the build view.", "You need to be out of the station."],
+      "trigger": { "kind": "panel", "panel": "build" },
+      "highlight": [".tp kbd"]
+    },
+    {
+      "id": "fieldplan",
+      "title": "Plan a part",
+      "lines": ["Pick Hull on the left, click next to your ship, then Save.", "Saving is free: a new part is only planned."],
+      "trigger": { "kind": "fieldPlanned" },
+      "highlight": [".fo .hp-row:has(> .hp-pick[data-part*=\":hull:\"])",".fo [data-a=\"save\"]"],
+      "holdGrant": { "alloy_plate": 3 }
+    },
+    {
+      "id": "fieldbuild",
+      "title": "Watch it build",
+      "lines": ["Press {fabricator} to switch your fabricator on.", "It builds the planned hull from your hold. Close the view with {fieldBuild}."],
+      "trigger": { "kind": "fieldBuilt" },
+      "highlight": [".tp kbd"]
+    },
+    {
       "id": "jump",
       "title": "Jump to the marker",
       "lines": ["Zoom out with the wheel, or press {map}, to see the Jump here ring.", "Put the cursor inside the ring and press {jump} to jump there."],
