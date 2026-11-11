@@ -88,7 +88,7 @@ function paint(): void {
   root?.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((i) => { typed[i.dataset.field!] = i.value; });
   root?.remove();
 
-  const box = el('div', `background:#101a2c;color:#e5ecf6;border:1px solid ${m.urgent ? '#fbbf24' : '#3b4a63'};border-radius:8px;padding:10px 12px;width:min(300px,92vw);box-shadow:0 4px 18px rgba(0,0,0,.45);${FONT}`);
+  const box = el('div', `background:#101a2c;color:#e5ecf6;border:1px solid ${m.urgent ? '#fbbf24' : '#3b4a63'};border-radius:8px;padding:10px 12px;width:min(260px,92vw);box-sizing:border-box;box-shadow:0 4px 18px rgba(0,0,0,.45);${FONT}`);
   box.setAttribute('role', 'status');
   box.append(el('div', 'font-weight:700;margin-bottom:3px', m.title), el('div', 'color:#a9b7cc;margin-bottom:8px', m.detail));
 
@@ -107,7 +107,7 @@ function paint(): void {
     box.style.width = 'min(340px,92vw)';
     root.append(box);
   } else {
-    root = el('div', 'position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;z-index:8900');
+    root = el('div', 'position:fixed;top:calc(205px + env(safe-area-inset-top,0px));right:15px;z-index:8900');
     root.append(box);
   }
   document.body.appendChild(root);
