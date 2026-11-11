@@ -11,6 +11,7 @@ import { createApp } from './app.js';
 import { CatalogBook } from './catalog/book.js';
 import type { CatalogFile } from './catalog/types.js';
 import { changelogItems } from './changelog.js';
+import { launcherNewsItems, plainBody } from './launcherNews.js';
 import { loadConfig } from './config.js';
 import type { Lobby } from './lobby.js';
 import type { PilotSource } from './pilots.js';
@@ -229,6 +230,45 @@ describe('changelog feed', () => {
     expect(j.items.map((i: { slug: string }) => i.slug)).toEqual(['feed-a']);
     expect(j.items[0].url).toBe(`${base}/updates/feed-a`);
     expect(JSON.parse((await get('/api/v1/changelog?tag=nope')).text).items).toEqual([]);
+  });
+});
+
+describe('launcher news', () => {
+  const post = (slug: string, publishedAt: string | null, launcher: boolean, body = 'Text'): Post => ({
+    id: 1, slug, title: `T ${slug}`, summary: '', body, tags: [], cover: null, launcher, status: publishedAt ? 'published' : 'draft', authorId: 1, authorName: 'a',
+    createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', publishedAt,
+  });
+
+  it('flagged and published only, newest first, capped', () => {
+    const many = Array.from({ length: 14 }, (_, i) => post(`p${i}`, `2026-11-${String(i + 1).padStart(2, '0')}T00:00:00Z`, true));
+    const posts = [...many, post('plain', '2026-11-30T00:00:00Z', false), post('draft', null, true)];
+    const items = launcherNewsItems(posts, { origin: 'https://x.test' });
+    expect(items).toHaveLength(10);
+    expect(items[0]).toMatchObject({ slug: 'p13', title: 'T p13', date: '2026-11-14T00:00:00Z', url: 'https://x.test/updates/p13' });
+    expect(items.map((i) => i.slug)).not.toContain('plain');
+    expect(items.map((i) => i.slug)).not.toContain('draft');
+    expect(launcherNewsItems(many, { origin: 'o', limit: 999 })).toHaveLength(14);
+  });
+
+  it('the body is plain text: paragraphs and bullet lists, no markup or images', () => {
+    const md = '## Heading\n\nSome **bold** and a [link](https://a.test) with `code` & <b>tags</b>.\n\n![pic](/x.png)\n\n- one\n- *two*\n\n> quoted';
+    expect(plainBody(md)).toBe('Heading\n\nSome bold and a link with code & <b>tags</b>.\n\n- one\n- two\n\nquoted');
+  });
+
+  it('the endpoint is public, open to any origin, and carries only flagged posts', async () => {
+    await store.createPost({ slug: 'ln-a', title: 'Launcher A', summary: '', body: 'Hi **there**', tags: [], cover: null, launcher: true, status: 'published', authorId: 1, authorName: 'x' });
+    await store.createPost({ slug: 'ln-b', title: 'Site only', summary: '', body: 'b', tags: [], cover: null, status: 'published', authorId: 1, authorName: 'x' });
+    const r = await get('/api/v1/launcher-news');
+    expect(r.status).toBe(200);
+    const j = JSON.parse(r.text);
+    expect(j.items.map((i: { slug: string }) => i.slug)).toEqual(['ln-a']);
+    expect(j.items[0]).toMatchObject({ title: 'Launcher A', body: 'Hi there', url: `${base}/updates/ln-a` });
+  });
+
+  it('the store keeps the flag, and an update can clear it', async () => {
+    const p = await store.createPost({ slug: 'ln-c', title: 'C', summary: '', body: 'b', tags: [], cover: null, launcher: true, status: 'draft', authorId: 1, authorName: 'x' });
+    expect(p?.launcher).toBe(true);
+    expect((await store.updatePost(p!.id, { launcher: false }))?.launcher).toBe(false);
   });
 });
 

@@ -1,6 +1,6 @@
 /**
  * Join screen - shown after sign-in. There is one main server, so it's a Join button for it, a short
- * description of the game with a few photos, and the development news feed (join/news.json).
+ * description of the game with a few photos, and the development news feed (from the website: join/newsFeed.ts).
  * The server is the one this page belongs to: the dev server on the dev client, the live server on the VPS.
  * Signed-in pilots also get their inbox (join/InboxPanel.ts): a banner above everything for an unread admin
  * message, a badge on the Join button, and the inbox below it.
@@ -9,7 +9,7 @@
 import { LOBBY_URL } from '../network/lobby';
 import { lobbyInbox, type InboxApi } from '../network/inbox';
 import { InboxPanel, type InboxAccount } from './join/InboxPanel';
-import NEWS from './join/news.json';
+import { fetchNews, newsHtml, toggleNews, type NewsState } from './join/newsFeed';
 import sunRun from './join/sun-run.jpg';
 import planet from './join/planet.jpg';
 import boss from './join/boss.jpg';
@@ -30,9 +30,6 @@ export interface ServerInfo {
   note?: string;
 }
 
-/** One development news item (newest first in news.json) */
-interface NewsItem { date: string; title: string; body: string }
-
 const PHOTOS = [
   { src: sunRun, alt: 'A ship skimming a star' },
   { src: planet, alt: 'A planet from orbit' },
@@ -47,6 +44,11 @@ export class ServerBrowserUI {
   private loading = false;
   /** The lobby says a newer build than this page's is running: show the reload bar */
   private stale = false;
+
+  /** The development news (asked of the website once a minute at most, never waited for) and the items opened */
+  private news: NewsState = { status: 'loading' };
+  private newsOpen: ReadonlySet<string> = new Set();
+  private newsAt = 0;
 
   // Server browser URL (override with VITE_BROWSER_URL at build/dev time)
   private browserUrl = LOBBY_URL;
@@ -155,9 +157,16 @@ export class ServerBrowserUI {
       .news-item { position: relative; padding-left: 16px; }
       .news-item::before { content: ''; position: absolute; left: 0; top: 5px; width: 6px; height: 6px; border-radius: 1px;
         background: var(--port); box-shadow: 0 0 6px var(--port-glow); }
-      .news-date { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-      .news-title { color: var(--ink); font-size: 15px; font-weight: 600; margin: 2px 0 4px; }
+      .news-head { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+      .news-head:hover .news-title, .news-head:focus-visible .news-title { color: var(--port); }
+      .news-head::after { content: '+'; float: right; color: var(--ink-3); font-size: 15px; }
+      .news-item.open .news-head::after { content: '\\2212'; }
+      .news-date { display: block; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+      .news-title { display: block; color: var(--ink); font-size: 15px; font-weight: 600; margin: 2px 0 4px; }
       .news-body { color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+      .news-body p { margin: 0 0 8px; }
+      .news-body ul { margin: 0 0 8px; padding-left: 18px; }
+      .news-link { color: var(--port); font-size: 13px; }
       .news-empty { color: var(--ink-3); font-size: 14px; }
 
       /* Join: the focal point. A sun-orange plate, beveled, with a core glowing behind the word */
@@ -230,7 +239,6 @@ export class ServerBrowserUI {
 
   private render(): void {
     const main = this.mainServer();
-    const news = (NEWS as NewsItem[]);
 
     this.panel.innerHTML = `
       <div class="join-wrap">
@@ -245,16 +253,7 @@ export class ServerBrowserUI {
             ${PHOTOS.map((p) => `<img src="${p.src}" alt="${p.alt}" loading="lazy">`).join('')}
           </div>
           <div class="join-h">Development news</div>
-          <div class="news">
-            ${news.length === 0
-              ? '<div class="news-empty">No news yet. Updates from development will show up here.</div>'
-              : news.map((n) => `
-                <div class="news-item">
-                  <div class="news-date">${esc(n.date)}</div>
-                  <div class="news-title">${esc(n.title)}</div>
-                  <div class="news-body">${esc(n.body)}</div>
-                </div>`).join('')}
-          </div>
+          <div class="news">${newsHtml(this.news, this.newsOpen)}</div>
         </div>
 
         <button class="join-main-btn" ${main && !this.loading ? '' : 'disabled'}>
@@ -310,11 +309,38 @@ export class ServerBrowserUI {
       if (main && !this.loading) this.onServerSelect?.(main);
     });
     q('.logout-btn')?.addEventListener('click', () => this.onLogout?.());
+    q('.news')?.addEventListener('click', (e) => {
+      const slug = (e.target as Element).closest<HTMLElement>('[data-news]')?.dataset.news;
+      if (slug === undefined) return;
+      this.newsOpen = toggleNews(this.newsOpen, slug);
+      this.showNews();
+    });
+  }
+
+  /** Redraw just the news box (a toggle or the reply arriving), keeping its scroll place */
+  private showNews(): void {
+    const box = this.panel.querySelector<HTMLElement>('.news');
+    if (!box) return;
+    const top = box.scrollTop;
+    box.innerHTML = newsHtml(this.news, this.newsOpen);
+    box.scrollTop = top;
+  }
+
+  /** Ask the website for the news, without waiting: the screen shows "Loading news" and then the answer */
+  private loadNews(): void {
+    if (Date.now() - this.newsAt < 60_000) return;
+    this.newsAt = Date.now();
+    void fetchNews().then((state) => {
+      this.news = state;
+      if (state.status === 'failed') this.newsAt = 0; // asked again at the next refresh
+      this.showNews();
+    });
   }
 
   async refresh(): Promise<void> {
     this.loading = true;
     this.render();
+    this.loadNews();
 
     // Fallback in case the lobby is unavailable: the dev server (port 3000) in dev builds; in production the game on
     // this page's own address (nginx takes its socket at the root, on the page's own scheme and port)

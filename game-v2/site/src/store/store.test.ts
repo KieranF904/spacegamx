@@ -213,6 +213,8 @@ describe('Postgres store: upgrading a database from before comments could be on 
     const sql = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../schema.sql'), 'utf-8');
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS site_comments \([^;]*\bimage\s+TEXT/);
     expect(sql).toContain('ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT;');
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS site_posts \([^;]*\blauncher\s+BOOLEAN/);
+    expect(sql).toContain('ALTER TABLE site_posts ADD COLUMN IF NOT EXISTS launcher BOOLEAN NOT NULL DEFAULT FALSE;');
   });
 });
 

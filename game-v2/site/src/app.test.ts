@@ -203,6 +203,24 @@ describe('site routes', () => {
     } finally { siteCfg.guides = false; }
   });
 
+  it('the post editor saves the launcher flag, and a text-only post page renders', async () => {
+    const admin = new Browser();
+    await admin.signin('admin', 'admin');
+    const edit = await admin.page('/admin/posts/new');
+    expect(edit.text).toContain('name="launcher"');
+    expect(edit.text).not.toMatch(/name="launcher"[^>]*checked/);
+    expect((await admin.req('/admin/posts', { method: 'POST', form: { title: 'Text only', body: 'Just words.\n\n- a\n- b', tags: '', status: 'published', launcher: 'on' } })).status).toBe(303);
+    const saved = await store.getPostBySlug('text-only');
+    expect(saved?.launcher).toBe(true);
+    expect(saved?.cover).toBeNull();
+    expect((await admin.page('/updates/text-only')).status).toBe(200);
+    expect(JSON.parse((await admin.page('/api/v1/launcher-news')).text).items.map((i: { slug: string }) => i.slug)).toContain('text-only');
+    expect((await admin.page(`/admin/posts/${saved!.id}`)).text).toMatch(/name="launcher"[^>]*checked/);
+    // Saving again with the box cleared takes it out of the feed
+    await admin.req(`/admin/posts/${saved!.id}`, { method: 'POST', form: { title: 'Text only', body: 'Just words.', tags: '', status: 'published' } });
+    expect((await store.getPostBySlug('text-only'))?.launcher).toBe(false);
+  });
+
   it('register, comment (escaped), suggest, vote once, shout with limits', async () => {
     const admin = new Browser();
     await admin.signin('admin', 'admin');

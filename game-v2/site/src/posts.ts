@@ -6,13 +6,18 @@ import type { PostPatch, PostStatus } from './store/types.js';
 
 export const LIMITS = { title: 140, summary: 300, body: 100_000, tags: 8, slug: 80, cover: 300 };
 
-export type PostFields = Required<Pick<PostPatch, 'title' | 'body' | 'slug' | 'summary' | 'tags' | 'cover' | 'status'>>;
+export type PostFields = Required<Pick<PostPatch, 'title' | 'body' | 'slug' | 'summary' | 'tags' | 'cover' | 'launcher' | 'status'>>;
 
 const s = (v: unknown) => (typeof v === 'string' ? v : '');
 
 function tagsFrom(v: unknown): string[] {
   const list = Array.isArray(v) ? v.map(String) : typeof v === 'string' ? parseList(v) : [];
   return [...new Set(list.map(normaliseTag).filter(Boolean))].slice(0, LIMITS.tags);
+}
+
+/** A checkbox or JSON flag: on / true / 1 / yes (an unchecked box sends nothing) */
+function flagFrom(v: unknown): boolean {
+  return v === true || (typeof v === 'string' && ['on', 'true', '1', 'yes'].includes(v.trim().toLowerCase()));
 }
 
 function statusFrom(v: unknown): PostStatus | null {
@@ -57,6 +62,7 @@ export function checkPost(input: Record<string, unknown>, partial: boolean): { o
     if (cover && (cover.length > LIMITS.cover || !safeUrl(cover, 'image'))) return { ok: false, error: 'The cover must be an http(s) URL or a path on this site' };
     out.cover = cover || null;
   }
+  if (!partial || has('launcher')) out.launcher = flagFrom(input.launcher);
   if (!partial || has('status')) {
     const st = has('status') ? statusFrom(input.status) : 'draft';
     if (!st) return { ok: false, error: 'Status is draft or published' };

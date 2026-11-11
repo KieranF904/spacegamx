@@ -106,6 +106,7 @@ export function adminEditor(ctx: PageCtx, d: { post: Partial<Post> & { id?: numb
       <div class="field grow"><label for="ed-tags">Tags <span class="dim">(comma separated)</span></label><input id="ed-tags" name="tags" maxlength="200" value="${(p.tags ?? []).join(', ')}"></div>
       <div class="field grow"><label for="ed-summary">Summary <span class="dim">(blank: the first paragraph)</span></label><input id="ed-summary" name="summary" maxlength="300" value="${p.summary ?? ''}"></div>
       <div class="field grow"><label for="ed-cover">Cover image URL <span class="dim">(blank: the first image)</span></label><input id="ed-cover" name="cover" maxlength="300" value="${p.cover ?? ''}" class="mono"></div>
+      <div class="field check"><label><input type="checkbox" name="launcher" value="on"${p.launcher ? ' checked' : ''}> Show in the launcher news <span class="dim">(text only: no images there)</span></label></div>
     </div>
     <div class="editor-panes">
       <div class="pane">

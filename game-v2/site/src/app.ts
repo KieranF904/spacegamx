@@ -61,6 +61,7 @@ import { HttpActivityClient, type ActivityClient } from './activity.js';
 import { registerActivity } from './routes/activity.js';
 import { registerCatalog } from './routes/catalog.js';
 import { registerChangelog } from './routes/changelog.js';
+import { registerLauncherNews } from './routes/launcherNews.js';
 import type { RouteEnv } from './routes/env.js';
 import { registerShips } from './routes/ships.js';
 import { registerStatus } from './routes/status.js';
@@ -870,6 +871,7 @@ export function createApp(deps: AppDeps) {
   registerActivity(env);
   registerCatalog(env);
   registerChangelog(env);
+  registerLauncherNews(env);
   registerShips(env);
   registerStatus(env);
 
@@ -1025,7 +1027,7 @@ export function createApp(deps: AppDeps) {
 
 function formPost(f: Record<string, any>): Partial<Post> {
   return {
-    title: str(f.title, 140), slug: str(f.slug, 80), summary: str(f.summary, 300), cover: str(f.cover, 300) || null,
+    title: str(f.title, 140), slug: str(f.slug, 80), summary: str(f.summary, 300), cover: str(f.cover, 300) || null, launcher: ['on', 'true', '1', 'yes'].includes(str(f.launcher, 8).toLowerCase()),
     body: str(f.body, 100_000), tags: str(f.tags, 200).split(',').map((t) => t.trim()).filter(Boolean),
   };
 }

@@ -105,7 +105,7 @@ export class JsonSiteStore implements SiteStore {
   async createPost(input: PostInput): Promise<Post | null> {
     if (this.data.posts.some((p) => p.slug === input.slug)) return null;
     const t = now();
-    const post: Post = { ...input, id: this.id('post', this.data.posts), createdAt: t, updatedAt: t, publishedAt: input.status === 'published' ? t : null };
+    const post: Post = { ...input, launcher: !!input.launcher, id: this.id('post', this.data.posts), createdAt: t, updatedAt: t, publishedAt: input.status === 'published' ? t : null };
     this.data.posts.push(post);
     this.save();
     return clone(post);

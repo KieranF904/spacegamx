@@ -26,6 +26,8 @@ export interface Post {
   tags: string[];
   /** Image URL for lists and the page header (null: the first image in the body, if any) */
   cover: string | null;
+  /** Also shown in the launcher's development news (text only: the feed carries no images) */
+  launcher?: boolean;
   status: PostStatus;
   authorId: number | null;
   authorName: string;
@@ -35,8 +37,8 @@ export interface Post {
   publishedAt: string | null;
 }
 
-export type PostInput = Pick<Post, 'slug' | 'title' | 'summary' | 'body' | 'tags' | 'cover' | 'status'> & { authorId: number | null; authorName: string };
-export type PostPatch = Partial<Pick<Post, 'slug' | 'title' | 'summary' | 'body' | 'tags' | 'cover' | 'status'>>;
+export type PostInput = Pick<Post, 'slug' | 'title' | 'summary' | 'body' | 'tags' | 'cover' | 'launcher' | 'status'> & { authorId: number | null; authorName: string };
+export type PostPatch = Partial<Pick<Post, 'slug' | 'title' | 'summary' | 'body' | 'tags' | 'cover' | 'launcher' | 'status'>>;
 
 export interface Comment {
   id: number;

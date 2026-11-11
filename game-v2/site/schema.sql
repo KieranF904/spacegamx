@@ -27,8 +27,11 @@ CREATE TABLE IF NOT EXISTS site_posts (
     author_name  TEXT NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    published_at TIMESTAMPTZ
+    published_at TIMESTAMPTZ,
+    launcher     BOOLEAN NOT NULL DEFAULT FALSE   -- also shown in the launcher's development news
 );
+-- (A database from before the launcher news has the table without the column; the site also adds it at startup)
+ALTER TABLE site_posts ADD COLUMN IF NOT EXISTS launcher BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_site_posts_status ON site_posts(status, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_site_posts_tags   ON site_posts USING GIN (tags);
 

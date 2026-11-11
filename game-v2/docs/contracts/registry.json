@@ -8447,6 +8447,142 @@
       ]
     },
     {
+      "id": "client.ui.join.news-feed",
+      "path": "client/src/ui/join/newsFeed.ts",
+      "group": "client/ui/join",
+      "lines": 125,
+      "owns": "the join screen's development news: the website's launcher-news JSON (checked), its state (loading, items, failed), and the feed's HTML (collapsed items that open to their text and a link to the post)",
+      "needs": "fetch and AbortController (injectable), ../escape; the website's GET /api/v1/launcher-news (site/src/launcherNews.ts)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a slow, failed or malformed reply gives the \"News unavailable\" state and never throws",
+          "test": "client/src/ui/join/newsFeed.test.ts"
+        },
+        {
+          "text": "nothing from the reply reaches the page unescaped, and only http(s) links are used",
+          "test": "client/src/ui/join/newsFeed.test.ts"
+        },
+        {
+          "text": "items are shown newest first, at most 10, collapsed until opened",
+          "test": "client/src/ui/join/newsFeed.test.ts"
+        }
+      ],
+      "extend": "a new field on an item goes in parseNews and itemHtml",
+      "exports": [
+        "NEWS_MAX",
+        "NEWS_TIMEOUT_MS",
+        "NEWS_URL",
+        "NewsBlock",
+        "NewsItem",
+        "NewsState",
+        "bodyBlocks",
+        "fetchNews",
+        "newsDate",
+        "newsHtml",
+        "parseNews",
+        "toggleNews"
+      ],
+      "sections": [
+        {
+          "name": "NewsItem",
+          "kind": "interface",
+          "start": 19,
+          "end": 28
+        },
+        {
+          "name": "NewsState",
+          "kind": "type",
+          "start": 30,
+          "end": 33
+        },
+        {
+          "name": "NEWS_MAX",
+          "kind": "const",
+          "start": 35,
+          "end": 35
+        },
+        {
+          "name": "NEWS_TIMEOUT_MS",
+          "kind": "const",
+          "start": 36,
+          "end": 36
+        },
+        {
+          "name": "env",
+          "kind": "const",
+          "start": 38,
+          "end": 38
+        },
+        {
+          "name": "NEWS_URL",
+          "kind": "const",
+          "start": 40,
+          "end": 44
+        },
+        {
+          "name": "isHttp",
+          "kind": "const",
+          "start": 46,
+          "end": 46
+        },
+        {
+          "name": "parseNews",
+          "kind": "function",
+          "start": 48,
+          "end": 67
+        },
+        {
+          "name": "fetchNews",
+          "kind": "function",
+          "start": 69,
+          "end": 83
+        },
+        {
+          "name": "newsDate",
+          "kind": "const",
+          "start": 85,
+          "end": 86
+        },
+        {
+          "name": "NewsBlock",
+          "kind": "type",
+          "start": 88,
+          "end": 89
+        },
+        {
+          "name": "bodyBlocks",
+          "kind": "function",
+          "start": 90,
+          "end": 95
+        },
+        {
+          "name": "blocksHtml",
+          "kind": "const",
+          "start": 97,
+          "end": 98
+        },
+        {
+          "name": "itemHtml",
+          "kind": "function",
+          "start": 100,
+          "end": 110
+        },
+        {
+          "name": "newsHtml",
+          "kind": "function",
+          "start": 112,
+          "end": 118
+        },
+        {
+          "name": "toggleNews",
+          "kind": "function",
+          "start": 120,
+          "end": 125
+        }
+      ]
+    },
+    {
       "id": "client.ui.auto-pickup-panel",
       "path": "client/src/ui/pickup/AutoPickupPanel.ts",
       "group": "client/ui/pickup",

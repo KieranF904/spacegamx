@@ -90,13 +90,22 @@ describe('front matter', () => {
 describe('post checks', () => {
   it('a whole post: tidied, slug from title, draft by default', () => {
     const r = checkPost({ title: '  Hello   world ', body: ' Text ', tags: 'A, b, a' }, false);
-    expect(r).toEqual({ ok: true, value: { title: 'Hello world', body: 'Text', slug: 'hello-world', summary: '', tags: ['a', 'b'], cover: null, status: 'draft' } });
+    expect(r).toEqual({ ok: true, value: { title: 'Hello world', body: 'Text', slug: 'hello-world', summary: '', tags: ['a', 'b'], cover: null, launcher: false, status: 'draft' } });
   });
   it('refuses missing title or body, bad status, unsafe cover', () => {
     expect(checkPost({ body: 'x' }, false).ok).toBe(false);
     expect(checkPost({ title: 'x' }, false).ok).toBe(false);
     expect(checkPost({ title: 'x', body: 'y', status: 'live!' }, false).ok).toBe(false);
     expect(checkPost({ title: 'x', body: 'y', cover: 'javascript:alert(1)' }, false).ok).toBe(false);
+  });
+  it('the launcher flag: a ticked box (on), a JSON true; unticked or absent is off; a partial update keeps it unless sent', () => {
+    const whole = (launcher?: unknown) => checkPost({ title: 'x', body: 'y', launcher }, false);
+    expect(whole('on')).toMatchObject({ ok: true, value: { launcher: true } });
+    expect(whole(true)).toMatchObject({ ok: true, value: { launcher: true } });
+    expect(whole(undefined)).toMatchObject({ ok: true, value: { launcher: false } });
+    expect(whole('off')).toMatchObject({ ok: true, value: { launcher: false } });
+    expect(checkPost({ title: 'z' }, true)).toEqual({ ok: true, value: { title: 'z' } });
+    expect(checkPost({ launcher: true }, true)).toEqual({ ok: true, value: { launcher: true } });
   });
   it('a partial update only touches what was sent', () => {
     expect(checkPost({ status: 'published' }, true)).toEqual({ ok: true, value: { status: 'published' } });

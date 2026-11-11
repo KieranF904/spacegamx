@@ -23,7 +23,7 @@ const isoOrNull = (v: unknown): string | null => (v == null ? null : iso(v));
 
 function post(r: any): Post {
   return {
-    id: Number(r.id), slug: r.slug, title: r.title, summary: r.summary, body: r.body, tags: r.tags ?? [], cover: r.cover,
+    id: Number(r.id), slug: r.slug, title: r.title, summary: r.summary, body: r.body, tags: r.tags ?? [], cover: r.cover, launcher: !!r.launcher,
     status: r.status, authorId: r.author_id == null ? null : Number(r.author_id), authorName: r.author_name,
     createdAt: iso(r.created_at), updatedAt: iso(r.updated_at), publishedAt: isoOrNull(r.published_at),
   };
@@ -103,8 +103,19 @@ export class PostgresSiteStore implements SiteStore {
     }
     const r = await this.pool.query(
       `SELECT to_regclass('site_comments') IS NOT NULL AS comments,
+              to_regclass('site_posts') IS NOT NULL AS posts,
+              EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = current_schema() AND table_name = 'site_posts' AND column_name = 'launcher') AS launcher,
               EXISTS (SELECT 1 FROM information_schema.columns
                       WHERE table_schema = current_schema() AND table_name = 'site_comments' AND column_name = 'image') AS image`);
+    if (r.rows[0]?.posts && !r.rows[0]?.launcher) {
+      try {
+        await this.pool.query('ALTER TABLE site_posts ADD COLUMN IF NOT EXISTS launcher BOOLEAN NOT NULL DEFAULT FALSE');
+        console.log('[SiteStore] Added site_posts.launcher');
+      } catch (e) {
+        throw new Error(`site_posts has no "launcher" column and this database user can't add it: run site/schema.sql as the table's owner (${e})`);
+      }
+    }
     if (r.rows[0]?.comments && !r.rows[0]?.image) {
       try {
         await this.pool.query('ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT');
@@ -133,10 +144,10 @@ export class PostgresSiteStore implements SiteStore {
 
   async createPost(i: PostInput) {
     const r = await this.pool.query(
-      `INSERT INTO site_posts (slug, title, summary, body, tags, cover, status, author_id, author_name, published_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $7 = 'published' THEN now() END)
+      `INSERT INTO site_posts (slug, title, summary, body, tags, cover, status, author_id, author_name, launcher, published_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CASE WHEN $7 = 'published' THEN now() END)
        ON CONFLICT (slug) DO NOTHING RETURNING *`,
-      [i.slug, i.title, i.summary, i.body, i.tags, i.cover, i.status, i.authorId, i.authorName]);
+      [i.slug, i.title, i.summary, i.body, i.tags, i.cover, i.status, i.authorId, i.authorName, !!i.launcher]);
     return r.rows[0] ? post(r.rows[0]) : null;
   }
 
