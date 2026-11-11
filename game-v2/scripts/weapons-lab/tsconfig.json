@@ -1,0 +1,13 @@
+{
+  "extends": "../net/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "typeRoots": ["../../server/node_modules/@types"],
+    "resolveJsonModule": true
+  },
+  "include": ["*.ts"],
+  "exclude": ["*.test.ts"]
+}

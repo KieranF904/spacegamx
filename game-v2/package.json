@@ -34,6 +34,7 @@
     "cycles:check": "node scripts/cycles/check.mjs",
     "slideshow": "node scripts/slideshow/build.mjs",
     "sounds:review": "node scripts/sound-review/server.mjs",
+    "lab:weapons": "node server/node_modules/tsx/dist/cli.mjs --tsconfig scripts/net/tsconfig.json scripts/weapons-lab/server.ts",
     "board": "node scripts/review-board/server.mjs",
     "board:new": "node scripts/review-board/cli.mjs new",
     "det:engines": "node scripts/det/engines.mjs",

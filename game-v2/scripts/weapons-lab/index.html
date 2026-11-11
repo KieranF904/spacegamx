@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Weapons lab</title>
+<style>
+:root { --bg: #0b1220; --card: #131c2e; --line: #26324a; --ink: #e6ecf6; --dim: #8b98b0; --accent: #fbbf24; --accent-ink: #1a1205; --ok: #4ade80; --bad: #f87171; --chip: #1c2740; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); max-width: 980px; margin-inline: auto; }
+header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+h1 { font-size: 15px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin: 0; flex: 1; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button, select, input { background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
+button { cursor: pointer; }
+button.on, button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+textarea { width: 100%; min-height: 90px; background: #0e1626; border: 1px solid var(--line); border-radius: 10px; padding: 10px; resize: vertical; }
+textarea.json { min-height: 240px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
+input[type=text], input:not([type]) { width: 100%; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.item { cursor: pointer; display: flex; gap: 10px; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
+.item b { font-size: 16px; }
+.dim { color: var(--dim); font-size: 13px; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip); border: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+table { border-collapse: collapse; width: 100%; }
+td { padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td:first-child { color: var(--dim); white-space: nowrap; width: 1%; }
+canvas { width: 100%; aspect-ratio: 16 / 9; background: #050a14; border: 1px solid var(--line); border-radius: 10px; display: block; touch-action: manipulation; }
+pre { overflow-x: auto; background: #0e1626; padding: 10px; border-radius: 10px; font-size: 12px; margin: 6px 0; white-space: pre-wrap; word-break: break-word; }
+.bad { color: var(--bad); } .ok { color: var(--ok); }
+details { margin: 6px 0; } summary { cursor: pointer; color: var(--dim); }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Weapons lab</h1>
+  <button id="tabW" class="on">Weapons</button>
+  <button id="tabD">Drafts</button>
+</header>
+<div id="view"></div>
+<script src="app.js"></script>
+</body>
+</html>
