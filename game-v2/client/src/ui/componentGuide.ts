@@ -168,14 +168,14 @@ export function rowGates(row: CompRow, fn: FunctionDef | undefined, pilot: Pilot
   const from = sourceText(teachSources(keys, ctx));
   const lv = row.level;
   const gates: Gate[] = [];
-  const level = (n: number): Gate => ({ kind: 'level', met: pilot.level >= n, text: `Reach level ${n} (you're ${pilot.level})`, done: n > 0 ? `Unlocked at level ${n}` : 'Starter: every pilot can build it' });
-  const licence: Gate = { kind: 'licence', met: taught, text: from ? `Learned from ${from}` : 'Needs its licence', done: 'licence learned' };
+  const level = (n: number): Gate => ({ kind: 'level', met: pilot.level >= n, text: `Needs level ${n} (you're ${pilot.level})`, done: n > 0 ? `Unlocked at level ${n}` : 'Starter: every pilot can build it' });
+  const licence: Gate = { kind: 'licence', met: taught, text: from ? `Unlocked by ${from}` : 'Needs its licence', done: 'licence unlocked' };
   if (row.kind === 'model' && fn) {
     // (a legendary's gate past its level is the boss part in its recipe)
-    gates.push(lv === null ? { kind: 'none', met: false, text: 'No pilot can make this', done: '' } : level(lv));
+    gates.push(lv === null ? { kind: 'none', met: false, text: 'Cannot be made', done: '' } : level(lv));
   } else if (row.kind === 'structure') {
     if (lv !== null && !STARTER_MATERIALS.includes(row.material)) gates.push(level(lv));
-    else if (lv === null) gates.push({ kind: 'none', met: false, text: 'No pilot can build in this', done: '' });
+    else if (lv === null) gates.push({ kind: 'none', met: false, text: 'Cannot be built with', done: '' });
     else gates.push(level(0));
     if (JOB_MATERIALS.includes(row.material)) gates.push(licence);
   } else if (row.kind === 'core') gates.push(licence);

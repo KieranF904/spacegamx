@@ -44,7 +44,7 @@ Turret, 120°
 Bolts on from behind only
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 35","why":"Learned at level 35 (you're 4)"}
+{"open":false,"badge":"Lv 35","why":"Unlocks at level 35 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 35","why":""}

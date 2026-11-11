@@ -155,7 +155,7 @@ describe('the Kiln (the Pyreclast cavern\'s side chamber)', () => {
     expect(slow).toBeLessThan(120);
     expect(slow / fast).toBeGreaterThan(2.5);
     expect(countOf(store(), 'ceramic_plate')).toBe(plates);
-    expect(got.some((m) => m.type === 'toast' && /emptied it lately/.test((m as any).text ?? (m as any).message ?? ''))).toBe(true);
+    expect(got.some((m) => m.type === 'toast' && /emptied it recently/.test((m as any).text ?? (m as any).message ?? ''))).toBe(true);
     // Twenty minutes on, it pays again
     step(cache.regrowSeconds * 60 + 60, by);
     server.currentTick += cache.everyMinutes * 3600;

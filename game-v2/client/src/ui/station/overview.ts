@@ -67,7 +67,7 @@ export class OverviewTab {
       const total = ore.reduce((t, s) => t + saleTotal(p.econ.items, s.id, s.n, this.st!.demand[s.id] ?? 1, this.st!.sat?.[s.id] ?? 0), 0);
       const qs = document.createElement('div');
       qs.style.cssText = 'margin-top:14px; padding-top:12px; border-top:1px solid rgba(140,170,220,0.12); display:flex; align-items:center; gap:10px;';
-      qs.innerHTML = `<span style="color:#a9b6c9">Ore in your hold: ${costHtml(p.econ, Object.fromEntries(ore.map((s) => [s.id, s.n])))}</span>`;
+      qs.innerHTML = `<span style="color:#a9b6c9">Ore in your cargo: ${costHtml(p.econ, Object.fromEntries(ore.map((s) => [s.id, s.n])))}</span>`;
       const sell = document.createElement('button');
       sell.className = 'sgw-btn good';
       sell.style.marginLeft = 'auto';
@@ -80,7 +80,7 @@ export class OverviewTab {
     if (p.cargo.length) {
       const sc = document.createElement('div');
       sc.style.cssText = 'margin-top:12px; padding-top:12px; border-top:1px solid rgba(140,170,220,0.12);';
-      sc.innerHTML = '<div style="color:#8394ad; font-size:11px; margin-bottom:6px">Your hold to storage <span style="color:#56657c">· ammunition, your loadout and utility stay aboard unless you store everything</span></div>';
+      sc.innerHTML = '<div style="color:#8394ad; font-size:11px; margin-bottom:6px">Your cargo to storage <span style="color:#56657c">· ammo, your loadout and utility stay aboard unless you store everything</span></div>';
       sc.append(storeControls(p, (m) => this.d.send(m), (id) => this.d.sound(id, 0.4)));
       left.append(sc);
     }

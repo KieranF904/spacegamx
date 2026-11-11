@@ -24,7 +24,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A reaction wheel
+Adds turning force
 
 == keyStats ==
 +250 turning · draws 6 turning
@@ -36,7 +36,7 @@ A reaction wheel
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 6","why":"Learned at level 6 (you're 4)"}
+{"open":false,"badge":"Lv 6","why":"Unlocks at level 6 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 6","why":""}

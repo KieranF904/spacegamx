@@ -286,7 +286,7 @@ export class ContextActions {
     if (s.state === 'fired') { this.jumpOrder = null; return null; }
     if (s.state === 'interrupted' || s.state === 'stuck') {
       this.jumpOrder = null;
-      this.host.message(s.state === 'stuck' ? "Jump: couldn't line up on the mark" : 'Jump interrupted', '#f2d24b');
+      this.host.message(s.state === 'stuck' ? "Jump cancelled: the ship couldn't turn to face the target" : 'Jump interrupted', '#f2d24b');
       return null;
     }
     return { angle, dist, jump: s.jump };

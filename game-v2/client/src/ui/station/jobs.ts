@@ -99,8 +99,8 @@ function jobRow(c: StationCtx, j: JobView & { stationName: string }, all: JobVie
     + `<span data-left style="white-space:nowrap"></span></div>`
     + `<div class="sgw-bar" style="margin:4px 0 0"><i></i></div>`
     + `<div style="display:flex; align-items:center; gap:4px; margin-top:3px"><span style="flex:1; color:#56657c; font-size:11px">${note}</span>`
-    + (j.paused ? act('resume', '▶', 'Resume') : act('pause', '⏸', 'Hold it: the rest of the queue moves up'))
+    + (j.paused ? act('resume', '▶', 'Resume') : act('pause', '⏸', 'Pause: the rest of the queue moves up'))
     + (first && first.id !== j.id ? act('top', '⇧', 'Move it to the front of the queue') : '')
-    + act('cancel', '✕', j.for ? `Call it off (materials back to storage); the ${j.for}'s order goes on hold` : 'Call it off: its materials go back to storage')
+    + act('cancel', '✕', j.for ? `Cancel (materials go back to storage); the ${j.for}'s order is paused` : 'Cancel: its materials go back to storage')
     + '</div></div>';
 }

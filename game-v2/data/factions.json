@@ -4,7 +4,7 @@
     "scrapborn": {
       "name": "Scrapborn",
       "color": "#c9a46a",
-      "description": "Feral machines heaping greyseam into nests in Sol's outer Drift. A fault that happens to some cores, rarely, the yards say; every pilot has a theory. Heavy, slow and half blind. Good practice, fair pay.",
+      "description": "Feral machines that heap greyseam into nests in Sol's outer Drift. The yards call them a fault that happens to some cores, rarely. Heavy, slow and slow to spot you. Good practice for new pilots.",
       "hpScale": 0.3,
       "behaviour": {
         "aggro": 1700,
@@ -534,7 +534,7 @@
     "helios": {
       "name": "Helios Drones",
       "color": "#e8c86a",
-      "description": "Maintenance drones strayed from the Helios Directorate's Array: slow, half-blind, and armed with welding torches. They keep a schedule nobody at the Array wrote. Harmless unless you start it, and not much even then.",
+      "description": "Maintenance drones strayed from the Helios Directorate's Array: slow, slow to spot you, and armed with welding torches. The Array says it never wrote the schedule they keep. They only fight if you attack first, and not hard.",
       "behaviour": {
         "aggro": 900,
         "range": 900,

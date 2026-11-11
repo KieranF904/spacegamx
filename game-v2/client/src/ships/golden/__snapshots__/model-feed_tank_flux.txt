@@ -22,7 +22,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A tank of Flux Salts
+Feed: cheaper shots
 
 == keyStats ==
 66 hp · armour 2
@@ -34,7 +34,7 @@ A tank of Flux Salts
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+{"open":false,"badge":"Lv 18","why":"Unlocks at level 18 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 18","why":""}

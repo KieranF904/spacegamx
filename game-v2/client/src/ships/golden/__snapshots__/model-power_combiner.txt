@@ -25,7 +25,7 @@ Small
 Small · Square
 
 == tradeOff ==
-Joins a feed to a power line
+Adds feed to power
 
 == keyStats ==
 holds 10 · power line
@@ -37,7 +37,7 @@ holds 10 · power line
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 12","why":""}

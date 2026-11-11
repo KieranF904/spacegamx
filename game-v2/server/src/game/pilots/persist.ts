@@ -158,7 +158,7 @@ function flyLoaner(self: Pilots, s: Session, errors: string[]): void {
   p.hangar[p.activeSlot] = saved; // (already: the hangar slot is the ship's record)
   p.ship = loaner;
   console.warn(`[Pilots] the saved ${saved.blueprint.name} of ${s.conn.username} (slot ${p.activeSlot}) fails the ship rules, kept as saved; flying a loaner: ${errors.slice(0, 3).join('; ')}`);
-  self.toast(s.conn, `Your ${saved.blueprint.name} no longer passes the ship rules (${errors[0] ?? 'unknown error'}). It is kept in your hangar exactly as it was; you are flying a loaner ${loaner.blueprint.name} meanwhile`, 'warn');
+  self.toast(s.conn, `Your ${saved.blueprint.name} no longer meets the ship rules. It is kept in your hangar as it was. You are flying a loaner ${loaner.blueprint.name} until you fix it.`, 'warn');
 }
 
 /** The ship record changed (hangar): put it on the entity again */

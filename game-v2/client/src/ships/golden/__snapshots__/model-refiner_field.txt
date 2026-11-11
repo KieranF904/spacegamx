@@ -26,7 +26,7 @@ Small
 Small · Square
 
 == tradeOff ==
-Refines ore in your hold while you fly, up to Mk II materials, at 0
+Refines ore in flight
 
 == keyStats ==
 0.4x speed · up to Mk II · draws 20 working
@@ -38,7 +38,7 @@ Refines ore in your hold while you fly, up to Mk II materials, at 0
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 3","why":"Learned at level 3 (you're 4)"}
+{"open":false,"badge":"Lv 3","why":"Unlocks at level 3 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 3","why":""}

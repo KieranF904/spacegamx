@@ -206,7 +206,7 @@ export class Ammo {
     }
     if (opts.report && Object.keys(short).length) {
       const full = Object.keys(short).some((id) => countOf(p.storage, id) > 0);
-      this.pilots.toast(conn, `Short of your loadout: ${list(short)}. ${full ? 'The hold is full. ' : ''}Make more at a fabricator (or order it in the hangar), or buy it at a market that sells it.`, 'warn');
+      this.pilots.toast(conn, `Not enough ammo for your loadout: ${list(short)}. ${full ? 'Your cargo is full. ' : ''}Make more at a fabricator or buy it at a market.`, 'warn');
     } else if (opts.report && !Object.keys(moved).length && !opts.quiet) {
       this.pilots.toast(conn, 'Your loadout is all aboard', 'info');
     }
@@ -224,7 +224,7 @@ export class Ammo {
     for (const item of kinds) bag[item] = DEFAULT_CRATES;
     this.pilots.give(conn, bag, { toStorage: true, quiet: true });
     this.pilots.markDirty(conn);
-    this.pilots.toast(conn, `Your guns take ammunition now: the armoury left ${kinds.map((i) => `${DEFAULT_CRATES} × ${this.pilots.econ.items.name(i)}`).join(', ')} in storage. Make more at any fabricator.`, 'info');
+    this.pilots.toast(conn, `Your guns now use ammo. ${kinds.map((i) => `${DEFAULT_CRATES} × ${this.pilots.econ.items.name(i)}`).join(', ')} added to your station storage. Make more at any fabricator.`, 'info');
   }
 
   forget(conn: PilotConn): void {

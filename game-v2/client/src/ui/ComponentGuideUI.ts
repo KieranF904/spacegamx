@@ -222,7 +222,7 @@ export class ComponentGuideUI {
       };
     }
     const list = rowsOf(this.rows, this.tab);
-    this.sub.textContent = `Level ${me.level} · ${list.length} components (the badges: open to you of each)`;
+    this.sub.textContent = `Level ${me.level} · ${list.length} components (badges: how many of each you can use)`;
     const scroll = this.list.scrollTop;
     // (A rule where the levels pass yours)
     let html = '', marked = false;
@@ -326,12 +326,12 @@ export class ComponentGuideUI {
     const gates = this.gates(r);
     const req = requirementLine(gates);
     const bag = r.kind === 'model' ? this.inputs(r) : econ.recipes.partInputs({ material: r.material, fn: r.fn, piece: r.piece });
-    const mats = costChipsHtml(econ, costLines(bag, me.have), 'cg-mat') +(r.kind === 'structure' ? '<span class="per">a hull cell</span>' : '');
+    const mats = costChipsHtml(econ, costLines(bag, me.have), 'cg-mat') +(r.kind === 'structure' ? '<span class="per">per cell</span>' : '');
     const main = `<div class="cg-main">
-      <div class="cg-lv" title="${r.level === null ? 'No level' : `Learned at level ${r.level}`}">${r.level === null ? '<b class="none">—</b>' : `<b>${r.level}</b>`}</div>
+      <div class="cg-lv" title="${r.level === null ? 'No level' : `Unlocks at level ${r.level}`}">${r.level === null ? '<b class="none">—</b>' : `<b>${r.level}</b>`}</div>
       <div class="cg-gfx">${this.sprite(r)}</div>
       <div class="cg-det">
-        <div class="cg-top"><div class="cg-name" title="${esc(r.name)}">${esc(r.name)}</div><div class="cg-mats">${mats || '<span class="per">nothing to fabricate</span>'}</div></div>
+        <div class="cg-top"><div class="cg-name" title="${esc(r.name)}">${esc(r.name)}</div><div class="cg-mats">${mats || '<span class="per">not fabricated</span>'}</div></div>
         <div class="cg-req${req.met ? ' met' : ''}" title="${esc(req.text)}">${req.met ? CHECK : LOCK}<span>${esc(req.text)}</span></div>
       </div>
       <button class="cg-x" data-row="${esc(r.id)}" title="${this.open_.has(r.id) ? 'Less' : 'More details'}" aria-label="${this.open_.has(r.id) ? 'Less' : 'More details'}: ${esc(r.name)}" aria-expanded="${this.open_.has(r.id)}">${CHEVRON}</button>
@@ -350,21 +350,21 @@ export class ComponentGuideUI {
     if (r.kind === 'structure') {
       const m = catalog.materials.get(r.material)!;
       left += `<h5>The material</h5>`;
-      left += kv('Grade', `${markName(m.grade ?? 1)} · ${esc(m.name ?? m.id)}`);
+      left += kv('Mk', `${markName(m.grade ?? 1)} · ${esc(m.name ?? m.id)}`);
       left += kv('Toughness · density', `${m.toughness} hp a cell · ${m.density}`);
       if (m.traits?.length) left += kv('Traits', esc(m.traits.join(', ').replace(/_/g, ' ')));
       const res = resistText(m.resist);
       if (res) left += kv('Takes', res);
       // (Cold builds up slower in it: ships/warmth.ts)
-      if (m.insulation) left += kv('Insulation', `keeps out ${Math.round(m.insulation * 100)}% of the cold, by its share of the hull`);
-      right += `<h5>Built in ${esc(m.name ?? m.id)} (a square)</h5><table class="cg-t"><tr><th>Part</th><th class="n">HP</th><th class="n">Armour</th><th class="n">Mass</th><th>Takes</th></tr>`;
+      if (m.insulation) left += kv('Insulation', `slows cold build-up by up to ${Math.round(m.insulation * 100)}%, by how much of the hull uses it`);
+      right += `<h5>${esc(m.name ?? m.id)}, 1 cell</h5><table class="cg-t"><tr><th>Part</th><th class="n">HP</th><th class="n">Armour</th><th class="n">Mass</th><th>Takes</th></tr>`;
       for (const f of [...STRUCTURE_FNS, 'core']) {
         const st = partStats(catalog, tuning, { fn: f, material: r.material, piece: 'sq' });
         if (!st) continue;
         const cost = econ.recipes.partInputs({ material: r.material, fn: f, piece: 'sq' });
         right += `<tr><td>${esc(catalog.functions.get(f)?.name ?? f)}</td><td class="n">${n0(st.hp)}</td><td class="n">${st.armour}</td><td class="n">${st.mass.toFixed(1)}</td><td>${this.bagHtml(cost)}</td></tr>`;
       }
-      right += `</table><p style="margin-top:8px; font-size:11px">Structure is built from plate as it goes in: no fabricator.</p>`;
+      right += `</table><p style="margin-top:8px; font-size:11px">Hull and structure are built from plate in the hangar; no fabricator needed.</p>`;
     } else {
       if (fn.description) left += `<p>${esc(fn.description)}</p>`;
       const t = tradeOff(fn);

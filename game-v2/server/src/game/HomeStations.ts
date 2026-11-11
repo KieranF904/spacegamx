@@ -67,7 +67,7 @@ export class HomeStations {
     const file = stationTable();
     if (!p || !file) return;
     const here = file.sites.find((s) => this.host.stationSystem(s.station) === system);
-    if (!p.outpost) return this.host.toast(conn, `This jump point leads to pilots' own stations. Charter one${here ? ` here (${here.name})` : ''} from a station window: Your station`, 'info');
+    if (!p.outpost) return this.host.toast(conn, `This jump point leads to player stations. Charter yours${here ? ` here (${here.name})` : ''} in a station window, Your station tab.`, 'info');
     if (!here || here.id !== p.outpost.site) {
       const mine = file.sites.find((s) => s.id === p.outpost!.site);
       return this.host.toast(conn, `Your station is reached from ${mine?.name ?? 'its own site'}'s jump point`, 'warn');

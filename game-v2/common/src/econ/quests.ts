@@ -283,11 +283,11 @@ export function stepText(s: QuestStep, names: { item(id: string): string; statio
     case 'build': return `Finish building the ${names.plan?.(s.plan) ?? s.plan}`;
     case 'fly': return `Fly the ${names.plan?.(s.plan) ?? s.plan}`;
     case 'courier': return `Deliver the sealed dispatch to ${names.station(s.station)} within ${fmtSecs(s.seconds)}`;
-    case 'scan': return `Scan ${s.count} derelict wreck${s.count > 1 ? 's' : ''} in ${names.system(s.system)} (fly close, hold steady)`;
+    case 'scan': return `Scan ${s.count} derelict wreck${s.count > 1 ? 's' : ''} in ${names.system(s.system)} (fly close, stay still)`;
     case 'escort': return `Escort ${s.ward ?? 'the freighter'} from ${names.station(s.from)} to ${names.station(s.to)}`;
     case 'defend': return `Defend the outpost near ${names.station(s.near)}: ${s.waves} waves`;
     case 'uplink': return `Hold all ${s.beacons} relay beacons near ${names.station(s.near)} at once (${fmtSecs(s.seconds)})`;
-    case 'hold': return `Hold steady at ${s.label} for ${fmtSecs(s.seconds)}${s.system ? ` (${names.system(s.system)})` : ''}`;
+    case 'hold': return `Stay still at ${s.label} for ${fmtSecs(s.seconds)}${s.system ? ` (${names.system(s.system)})` : ''}`;
     case 'course': return `Fly the ${s.rings}-ring run from ${s.label} within ${fmtSecs(s.seconds)}`;
     case 'recover': return `Recover the ${names.item(s.item)} from ${s.label}`;
     case 'construct': return `Construct ${s.label} (${s.pieces.length} parts, a Constructor fitted)`;

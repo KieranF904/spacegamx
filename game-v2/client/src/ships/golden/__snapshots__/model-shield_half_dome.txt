@@ -28,7 +28,7 @@ Large
 Large · Block
 
 == tradeOff ==
-A 180 degree dome over one end
+Half-dome shield
 
 == keyStats ==
 320 HP arc · 6 a second once unhit for 1.2 s; down 5.5 s when broken, back at 25% · draws 36 · 269 hp · armour 2
@@ -40,7 +40,7 @@ A 180 degree dome over one end
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+{"open":false,"badge":"Lv 18","why":"Unlocks at level 18 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 18","why":""}

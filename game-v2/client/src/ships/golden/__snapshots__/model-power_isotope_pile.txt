@@ -36,7 +36,7 @@ weak but tough, never explodes
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 9","why":"Learned at level 9 (you're 4)"}
+{"open":false,"badge":"Lv 9","why":"Unlocks at level 9 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 9","why":""}

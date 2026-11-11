@@ -75,7 +75,7 @@ export class FabricatorTab {
       const s = document.createElement('button');
       s.className = (picked === e.key ? 'on' : '') + (e.locked ? ' locked' : '');
       s.innerHTML = `<img src="${e.icon}"><span>${esc(e.name)}</span><span class="n">${e.locked ? `🔒${e.badge ? ` ${esc(e.badge)}` : ''}` : e.have ? `×${e.have}` : ''}</span>`;
-      s.title = e.locked ? `${e.name}: ${e.why ?? 'it opens at a later level'}` : e.have ? `${e.name}: you have ${e.have}` : e.name;
+      s.title = e.locked ? `${e.name}: ${e.why ?? 'unlocks at a later level'}` : e.have ? `${e.name}: you have ${e.have}` : e.name;
       const cat = this.fabCat;
       s.onclick = () => { this.fabSel[cat] = e.key; this.fabQty = 1; this.c.render(); };
       list.appendChild(s);
@@ -85,7 +85,7 @@ export class FabricatorTab {
     if (FAB_CATS[this.fabCat].fns.length) {
       const note = document.createElement('div');
       note.style.cssText = 'color:#56657c; font-size:11px; line-height:1.45; padding:8px 4px 0; flex-shrink:0; border-top:1px solid rgba(140,170,220,0.08); margin-top:6px;';
-      note.textContent = 'Hull, armour and cargo holds aren\'t made here: the hangar builds them from refined plate. Wire spools are under Components.';
+      note.textContent = 'Hull, armour and cargo holds are built in the hangar from refined plate, not here. Copper wire comes from the refinery.';
       nav.appendChild(note);
     }
 
@@ -178,16 +178,16 @@ export class FabricatorTab {
     };
     // What it is
     const desc = econ.items.get(pid('alloy', pieces[0]))?.description ?? '';
-    const extra = fn.weapon ? 'Bigger guns hit harder for the power they draw; better grades hit harder still, and draw more.'
-      : (fn.produce ?? 0) > 0 ? 'Better grades make more power: what better weapons and shields need.'
-      : (fn.thrust ?? 0) > 0 ? `Bigger engines push more for their size; better grades push harder. Boosting: ×${fn.boost ?? 2.2} push, ${fn.boostDrain ?? 1}× battery drain.` : '';
+    const extra = fn.weapon ? 'Bigger guns get more damage for their power. A higher Mk adds damage and power use.'
+      : (fn.produce ?? 0) > 0 ? 'A higher Mk makes more power.'
+      : (fn.thrust ?? 0) > 0 ? `Bigger engines push more for their size; a higher Mk pushes harder. Boosting: ×${fn.boost ?? 2.2} thrust, ${fn.boostDrain ?? 1}× battery drain.` : '';
     el.insertAdjacentHTML('beforeend', `<div style="display:flex; gap:12px; align-items:flex-start">
       <img src="${itemIcon(econ, id)}" style="width:52px; height:52px; flex-shrink:0; border-radius:10px; background:rgba(255,255,255,0.04)">
       <div style="min-width:0"><div style="font-size:16px; font-weight:600; color:#e5ecf7">${esc(FN_NAMES[fnId] ?? fnId)}</div>
       <div style="color:#a7b4c8; font-size:12px; line-height:1.45; margin-top:2px">${esc(desc)} ${esc(extra)}</div></div></div>`);
     // Grades: what each gives at this size, and which you can make
     const mats = [...econ.ships.materials.values()].filter((m) => !m.exclusive).sort((a, b) => gradeOf(a) - gradeOf(b));
-    el.insertAdjacentHTML('beforeend', `<div class="sgw-label">Grade <span>better grades do more and take more hits · 🔒 opens at a later level</span></div>`);
+    el.insertAdjacentHTML('beforeend', `<div class="sgw-label">Mk <span>a higher Mk does more and takes more hits · 🔒 unlocks at a later level</span></div>`);
     const grades = document.createElement('div');
     grades.style.cssText = 'display:grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap:5px;';
     for (const m of mats) {
@@ -196,7 +196,7 @@ export class FabricatorTab {
       t.className = 'sgw-pick' + (this.fabMat === m.id ? ' on' : '') + (ok ? '' : ' locked');
       t.innerHTML = `<div style="display:flex; align-items:center; gap:5px; white-space:nowrap; overflow:hidden"><span style="color:${m.color}">■</span><span style="overflow:hidden; text-overflow:ellipsis">${esc(m.name ?? m.id)}</span>${ok ? '' : '<span style="margin-left:auto">🔒</span>'}</div>`
         + `<div style="font-size:11px; color:#8394ad; margin-top:2px; white-space:nowrap">${markName(gradeOf(m))} · ${key(m.id)}</div>`;
-      t.title = `${m.name ?? m.id}: ${Math.round((m.output ?? 1) * 100)}% output, ${m.toughness} toughness, ${m.density} mass per cell`
+      t.title = `${m.name ?? m.id}: ${Math.round((m.output ?? 1) * 100)}% strength, ${m.toughness} HP a cell, ${m.density}× weight`
         + (ok ? '' : `\nNeeds ${licenceFor({ id: pid(m.id), out: {}, inputs: {}, time: 0 }, learned, econ.items, this.d.pilot.profile?.level ?? 1)}`);
       t.onclick = () => { this.fabMat = m.id; this.fabQty = 1; this.c.render(); };
       grades.appendChild(t);
@@ -231,7 +231,7 @@ export class FabricatorTab {
     const w = fn.weapon;
     const crates = w ? [...econ.recipes.craft.values()].filter((x) => econ.items.get(Object.keys(x.out)[0])?.ammoFor?.weapon === w) : [];
     if (crates.length) {
-      el.insertAdjacentHTML('beforeend', `<div class="sgw-label">Ammunition <span>it fires from crates in your hold</span></div>`);
+      el.insertAdjacentHTML('beforeend', `<div class="sgw-label">Ammunition <span>it fires from crates in your cargo</span></div>`);
       const row = document.createElement('div');
       row.style.cssText = 'display:flex; gap:5px; flex-wrap:wrap;';
       for (const x of crates) {
@@ -276,7 +276,7 @@ export class FabricatorTab {
     if (st) rows.push(['Hull', `${n0(st.hp)} hp · ${st.mass.toFixed(1)} mass · armour ${st.armour}`]);
     rows.push(['Made of', `<span style="color:${m?.color ?? '#cfd8e6'}">■</span> ${esc(m?.name ?? mat)} <small style="color:#8394ad">(its own: its hit points, mass and resistances)</small>`]);
     if (fn.points !== undefined && st) rows.push(['Build points', `${Math.round(fn.points * st.area * 10) / 10}`]);
-    rows.push(['Learned at', fn.unlock ? `level ${fn.unlock.level}${level >= fn.unlock.level ? ' <span style="color:#86efac">✓</span>' : ` <span style="color:#fca5a5">(you're ${level})</span>`}` : '<span style="color:#c4b5fd">no pilot can make it</span>']);
+    rows.push(['Unlocks at', fn.unlock ? `level ${fn.unlock.level}${level >= fn.unlock.level ? ' <span style="color:#86efac">✓</span>' : ` <span style="color:#fca5a5">(you're ${level})</span>`}` : '<span style="color:#c4b5fd">cannot be made</span>']);
     rows.push(['You have', `${this.c.have(id)}`]);
     el.insertAdjacentHTML('beforeend', `<div style="margin-top:12px; display:grid; grid-template-columns: 90px 1fr; gap:5px 10px; font-size:12px">${rows.map(([k, v]) => `<span style="color:#8394ad">${k}</span><span>${v}</span>`).join('')}</div>`);
     // Sizes it comes in (most models one)
@@ -298,7 +298,7 @@ export class FabricatorTab {
     // Its ammunition, a click away
     const crates = fn.weapon ? [...econ.recipes.craft.values()].filter((x) => econ.items.get(Object.keys(x.out)[0])?.ammoFor?.weapon === fn.weapon) : [];
     if (crates.length) {
-      el.insertAdjacentHTML('beforeend', `<div class="sgw-label">Ammunition <span>it fires from crates in your hold</span></div>`);
+      el.insertAdjacentHTML('beforeend', `<div class="sgw-label">Ammunition <span>it fires from crates in your cargo</span></div>`);
       const row = document.createElement('div');
       row.style.cssText = 'display:flex; gap:5px; flex-wrap:wrap;';
       for (const x of crates) {
@@ -379,7 +379,7 @@ export class FabricatorTab {
       return bar;
     }
     if (locked) {
-      bar.innerHTML = `<div style="color:#fca5a5">🔒 Needs ${esc(locked)}</div><div style="color:#8394ad; font-size:11px; margin-top:3px">Everything opens at its level (a job's kit with its job too). Levels come from jobs, fights and mining.</div>`;
+      bar.innerHTML = `<div style="color:#fca5a5">🔒 Needs ${esc(locked)}</div><div style="color:#8394ad; font-size:11px; margin-top:3px">Everything unlocks at its level (a job's gear through its job too). Levels come from jobs, fights and mining.</div>`;
       return bar;
     }
     const max = Math.min(...Object.entries(r.inputs).map(([id, n]) => Math.floor(this.c.have(id) / n)));
@@ -407,16 +407,16 @@ export class FabricatorTab {
     const status = document.createElement('span');
     status.style.cssText = 'flex:1; text-align:right; font-size:11px;';
     status.innerHTML = max >= n ? `<span style="color:#8394ad">${n * r.out[outId]} × ${esc(name)}</span>`
-      : `<span style="color:#fbbf24">${max > 0 ? `Enough for ${max} now` : 'Short of materials'}: order it, and it's refined and made as ore comes in</span>`;
+      : `<span style="color:#fbbf24">${max > 0 ? `Enough for ${max} now` : 'Short of materials'}. Order it and the rest is refined and made as ore comes in.</span>`;
     const go = document.createElement('button');
     go.className = 'sgw-btn primary';
     go.style.cssText = 'padding:8px 22px; font-size:13px; font-weight:600;';
     go.textContent = `${r.time > 0 ? 'Queue' : 'Make'}${n > 1 ? ` ${n}` : ''}`;
-    go.title = r.time > 0 ? 'Goes into the build queue: it lands in storage when done, even if you leave' : 'Made at once, into storage';
+    go.title = r.time > 0 ? 'Goes into the build queue, then to storage when done, even if you leave' : 'Made at once, into storage';
     if (max < n) {
       // Short: an order instead, worked through as the ore comes in
       go.textContent = `Order${n > 1 ? ` ${n}` : ''}`;
-      go.title = 'Refines what it\'s short of from your storage (waiting for ore if need be), then fabricates: all into storage';
+      go.title = 'Refines the missing plate from your storage (waiting for ore if needed), then makes it. Everything goes to storage';
       go.onclick = () => { this.d.send({ type: 'fabOrder', item: outId, n: n * r.out[outId] }); this.d.sound('ui_click', 0.5); };
     } else go.onclick = () => { this.d.send({ type: 'craft', recipe: r.id, n }); this.d.sound('ui_click', 0.5); };
     row.append(status, go);
@@ -445,7 +445,7 @@ export class FabricatorTab {
         const x = document.createElement('button');
         x.className = 'sgw-btn';
         x.textContent = '✕';
-        x.title = 'Call it off (its refining stops and the ore comes back)';
+        x.title = 'Cancel (its refining stops and the ore goes back to storage)';
         x.onclick = () => this.d.send({ type: 'fabOrderCancel', id: o.id });
         row.appendChild(x);
         box.appendChild(row);
@@ -454,7 +454,7 @@ export class FabricatorTab {
     }
     const note = document.createElement('div');
     note.style.cssText = 'margin-top:auto; color:#56657c; font-size:11px; line-height:1.5; padding-top:10px;';
-    note.textContent = 'Small modules are made at once. Bigger builds take time and keep going while you\'re away: they go to storage, wherever you are. Short of plate? Refine it first.';
+    note.textContent = 'Small parts are made at once. Bigger builds take time, keep going while you\'re away, and go to storage. Short of plate? Refine it first.';
     side.append(note);
     return side;
   }

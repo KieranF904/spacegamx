@@ -73,7 +73,7 @@ describe('component guide tabs', () => {
 describe('requirement line', () => {
   it('a level not reached, then open', () => {
     const lv = row('cannon_bastion').level!;
-    expect(line('cannon_bastion', pilot(lv - 1))).toEqual({ met: false, text: `Reach level ${lv} (you're ${lv - 1})` });
+    expect(line('cannon_bastion', pilot(lv - 1))).toEqual({ met: false, text: `Needs level ${lv} (you're ${lv - 1})` });
     expect(line('cannon_bastion', pilot(lv))).toEqual({ met: true, text: `Unlocked at level ${lv}` });
     expect(line('cannon_pip', pilot(1)).text).toBe('Starter: every pilot can build it');
   });
@@ -87,7 +87,7 @@ describe('requirement line', () => {
     const r = line('legendary_hive', pilot(lv));
     expect(r.met).toBe(false);
     expect(r.text).toBe("Needs Rustjaw's Cog: dropped by Rustjaw");
-    expect(line('legendary_hive', pilot(lv - 1)).text).toBe(`Reach level ${lv} (you're ${lv - 1}) · Needs Rustjaw's Cog: dropped by Rustjaw`);
+    expect(line('legendary_hive', pilot(lv - 1)).text).toBe(`Needs level ${lv} (you're ${lv - 1}) · Needs Rustjaw's Cog: dropped by Rustjaw`);
     expect(line('legendary_hive', pilot(lv, [], { rustjaw_cog: 1 }))).toEqual({ met: true, text: `Unlocked at level ${lv}, Rustjaw's Cog in hand` });
   });
 
@@ -95,20 +95,20 @@ describe('requirement line', () => {
     const lv = row('utility_constructor').level!;
     if (lv > 0) expect(line('utility_constructor', pilot(lv - 1, ['fn:constructor', 'fn:utility_constructor'])).met).toBe(false);
     const sl = MATERIAL_LEVEL.steel;
-    expect(line('structure:steel', pilot(sl - 1, ['material:steel']))).toEqual({ met: false, text: `Reach level ${sl} (you're ${sl - 1})` });
+    expect(line('structure:steel', pilot(sl - 1, ['material:steel']))).toEqual({ met: false, text: `Needs level ${sl} (you're ${sl - 1})` });
     expect(line('structure:steel', pilot(sl))).toEqual({ met: true, text: `Unlocked at level ${sl}` });
   });
 
   it("a job's material needs its level and the job's licence; the core its licence", () => {
     for (const m of JOB_MATERIALS) {
       const r = row(`structure:${m}`), lv = r.level!;
-      expect(line(r.id, pilot(lv - 1)).text.startsWith(`Reach level ${lv} (you're ${lv - 1}) · Learned from `)).toBe(true);
+      expect(line(r.id, pilot(lv - 1)).text.startsWith(`Needs level ${lv} (you're ${lv - 1}) · Unlocked by `)).toBe(true);
       expect(line(r.id, pilot(lv - 1)).text).toContain('the job “');
       expect(line(r.id, pilot(lv)).met).toBe(false);
-      expect(line(r.id, pilot(lv, [`material:${m}`]))).toEqual({ met: true, text: `Unlocked at level ${lv}, licence learned` });
+      expect(line(r.id, pilot(lv, [`material:${m}`]))).toEqual({ met: true, text: `Unlocked at level ${lv}, licence unlocked` });
     }
     expect(line('structure:leestone', pilot(1)).text).toMatch(/Ark-Heavy/);
-    expect(line('core', pilot(1)).text).toMatch(/^Learned from .*First Light/);
-    expect(line('core', pilot(1, ['fn:core']))).toEqual({ met: true, text: 'Licence learned' });
+    expect(line('core', pilot(1)).text).toMatch(/^Unlocked by .*First Light/);
+    expect(line('core', pilot(1, ['fn:core']))).toEqual({ met: true, text: 'Licence unlocked' });
   });
 });

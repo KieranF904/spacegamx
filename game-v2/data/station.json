@@ -28,10 +28,10 @@
     "refinery": {
       "name": "Refinery",
       "group": "make",
-      "about": "Ore to plate: faster refining, more plate a batch, more traces out of the ore.",
+      "about": "Faster refining, more plate per batch and more trace metals.",
       "tiers": [
         {
-          "name": "Better kilns: refining 10% quicker",
+          "name": "Refining 10% quicker",
           "cost": {
             "alloy_plate": 200,
             "steel_plate": 60,
@@ -41,7 +41,7 @@
           "refineTime": 0.9
         },
         {
-          "name": "Twin furnaces: 20% quicker",
+          "name": "Refining 20% quicker",
           "cost": {
             "steel_plate": 220,
             "copper_wire": 120,
@@ -51,7 +51,7 @@
           "refineTime": 0.8
         },
         {
-          "name": "Reclaimers: +10% plate a batch",
+          "name": "Refining 30% quicker, +10% plate per batch",
           "cost": {
             "steel_plate": 260,
             "titanium_plate": 60,
@@ -65,7 +65,7 @@
           "refineYield": 0.1
         },
         {
-          "name": "Arc furnaces: 35% quicker",
+          "name": "Refining 35% quicker, +10% plate per batch",
           "cost": {
             "titanium_plate": 160,
             "cobalt_alloy": 60,
@@ -79,7 +79,7 @@
           "refineYield": 0.1
         },
         {
-          "name": "Trace separators: +20% plate, traces ×1.25",
+          "name": "Refining 40% quicker, +20% plate per batch, trace metals ×1.25",
           "cost": {
             "cobalt_alloy": 140,
             "neutronium_plate": 40,
@@ -98,10 +98,10 @@
     "fabricator": {
       "name": "Fabricator",
       "group": "make",
-      "about": "Parts and ammunition: more fabricator slots, quicker builds.",
+      "about": "Faster fabrication of parts and ammunition.",
       "tiers": [
         {
-          "name": "A second bench: +1 fabricator slot",
+          "name": "Fabrication 5% quicker",
           "cost": {
             "alloy_plate": 200,
             "steel_plate": 60,
@@ -111,7 +111,7 @@
           "fabTime": 0.95
         },
         {
-          "name": "Jigs: builds 15% quicker",
+          "name": "Fabrication 15% quicker",
           "cost": {
             "steel_plate": 220,
             "copper_wire": 240,
@@ -121,7 +121,7 @@
           "fabTime": 0.85
         },
         {
-          "name": "A third bench: +1 slot",
+          "name": "Fabrication 20% quicker",
           "cost": {
             "steel_plate": 260,
             "titanium_plate": 60,
@@ -133,7 +133,7 @@
           "fabTime": 0.8
         },
         {
-          "name": "Precision tooling: 30% quicker",
+          "name": "Fabrication 30% quicker",
           "cost": {
             "titanium_plate": 160,
             "cobalt_alloy": 60,
@@ -146,7 +146,7 @@
           "fabTime": 0.7
         },
         {
-          "name": "A fourth bench: +1 slot, 40% quicker",
+          "name": "Fabrication 40% quicker",
           "cost": {
             "cobalt_alloy": 140,
             "neutronium_plate": 40,
@@ -163,7 +163,7 @@
     "armoury": {
       "name": "Armoury",
       "group": "make",
-      "about": "An ammunition plant: standard and special crates, Quench Slugs for the Cinder Cult, and (later) rare-weapon rounds.",
+      "about": "Ammunition crates, including Quench Slugs for fighting the Cinder Cult.",
       "tiers": [
         {
           "name": "Shell press: standard crates",
@@ -185,7 +185,7 @@
           "minutes": 45
         },
         {
-          "name": "Quench line: Quench Slugs, once Forgemaster Hale has shown you how",
+          "name": "Quench line: Quench Slugs (needs the Cold Iron job)",
           "cost": {
             "steel_plate": 260,
             "titanium_plate": 60,
@@ -227,10 +227,10 @@
     "gem_cutter": {
       "name": "Gem cutter",
       "group": "make",
-      "about": "Cuts gems: fewer failed cuts (and, later, higher levels).",
+      "about": "Fewer failed gem cuts.",
       "tiers": [
         {
-          "name": "A cutter's wheel: 5 points fewer failed cuts",
+          "name": "Cut fail chance −5%",
           "cost": {
             "alloy_plate": 200,
             "steel_plate": 60,
@@ -240,7 +240,7 @@
           "cutFail": 0.05
         },
         {
-          "name": "Polishing lathe: 10 fewer",
+          "name": "Cut fail chance −10%",
           "cost": {
             "steel_plate": 220,
             "copper_wire": 120,
@@ -251,7 +251,7 @@
           "cutFail": 0.1
         },
         {
-          "name": "Laser scribe: 20 fewer",
+          "name": "Cut fail chance −20%",
           "cost": {
             "steel_plate": 260,
             "titanium_plate": 60,
@@ -263,7 +263,7 @@
           "cutFail": 0.2
         },
         {
-          "name": "Resonance cutter: 30 fewer",
+          "name": "Cut fail chance −30%",
           "cost": {
             "titanium_plate": 160,
             "cobalt_alloy": 60,
@@ -276,7 +276,7 @@
           "cutFail": 0.3
         },
         {
-          "name": "Void lathe: 40 fewer",
+          "name": "Cut fail chance −40%",
           "cost": {
             "cobalt_alloy": 140,
             "neutronium_plate": 40,
@@ -293,10 +293,10 @@
     "hangar": {
       "name": "Hangar",
       "group": "keep",
-      "about": "More hangar bays for the ships you keep for each system.",
+      "about": "Bays and a dry dock for your station's hangar.",
       "tiers": [
         {
-          "name": "A bay of your own: +1 hangar bay",
+          "name": "A bay of your own",
           "cost": {
             "alloy_plate": 200,
             "steel_plate": 140
@@ -313,7 +313,7 @@
           "minutes": 45
         },
         {
-          "name": "A second bay: +1",
+          "name": "A second bay",
           "cost": {
             "steel_plate": 500,
             "titanium_plate": 60,
@@ -336,7 +336,7 @@
           "minutes": 300
         },
         {
-          "name": "A third bay: +1",
+          "name": "A third bay",
           "cost": {
             "cobalt_alloy": 140,
             "neutronium_plate": 40,
@@ -352,7 +352,7 @@
     "storage": {
       "name": "Storage",
       "group": "keep",
-      "about": "Cells for what you keep (storage has no cap yet: this track's perks come with one).",
+      "about": "Racks and vaults for your station storage.",
       "tiers": [
         {
           "name": "Racks",
@@ -413,10 +413,10 @@
     "scanner": {
       "name": "Scanner array",
       "group": "know",
-      "about": "Information: rumours from further off (and, later, trace content and forecasts).",
+      "about": "A listening mast and survey drones for your station.",
       "tiers": [
         {
-          "name": "A listening mast: rumours of hidden jobs anywhere, not just here",
+          "name": "A listening mast",
           "cost": {
             "alloy_plate": 200,
             "steel_plate": 60,
@@ -474,7 +474,7 @@
     "market": {
       "name": "Market link",
       "group": "know",
-      "about": "Prices and contracts (its perks come later).",
+      "about": "A trading post and price feeds for your station.",
       "tiers": [
         {
           "name": "A trading post",
@@ -534,7 +534,7 @@
     "defences": {
       "name": "Defences",
       "group": "hold",
-      "about": "Point defence, mortar batteries and a tractor array, for when raiders come (raids come later).",
+      "about": "Point defence, a mortar battery, repair drones and turrets for your station.",
       "tiers": [
         {
           "name": "Point-defence flak",
@@ -554,7 +554,7 @@
           "minutes": 45
         },
         {
-          "name": "A mortar battery and a tractor array",
+          "name": "A mortar battery and a tow array",
           "cost": {
             "steel_plate": 560,
             "titanium_plate": 60,

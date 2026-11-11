@@ -91,9 +91,9 @@ export class OpsUI {
   /** What giving up means here */
   private sureText(o: OpView): string {
     const lead = o.quest.startsWith('fleet:') ? this.actions?.leader() ?? null : null;
-    if (lead === true) return 'Call it off for the whole party?';
-    if (lead === false) return 'Leave it? The party carries on without you';
-    return 'Give up this job? No reward';
+    if (lead === true) return 'Cancel this for the whole party?';
+    if (lead === false) return 'Leave this job? Your party carries on without you';
+    return 'Abandon this job? You get no reward';
   }
 
   setOps(m: ServerOpsMessage): void {

@@ -27,7 +27,7 @@ Small
 Small · Square
 
 == tradeOff ==
-An engine built for feed
+Engine that runs on feed
 
 == keyStats ==
 thrust 1.0 · top 3,600 m/s · draws 4
@@ -39,7 +39,7 @@ thrust 1.0 · top 3,600 m/s · draws 4
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 15","why":"Learned at level 15 (you're 4)"}
+{"open":false,"badge":"Lv 15","why":"Unlocks at level 15 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 15","why":""}

@@ -190,18 +190,18 @@ const trace: SourceFn = (c, it) => {
   const first = t.per100.findIndex((v) => v > 0);
   return [{
     kind: 'trace',
-    text: `Never a rock of its own: some turns up when you refine ${some(t.from.map(c.name), 4)}${t.megaOnly ? ' (only ore from Neutron Slugs)' : ''}${first >= 0 ? `, if it was mined in a system of danger ${first} or more` : ''}. Station refinery upgrades raise the rate`,
+    text: `Not mined: some comes out when you refine ${some(t.from.map(c.name), 4)}${t.megaOnly ? ' (only ore from Neutron Slugs)' : ''}${first >= 0 ? `, if it was mined in a system of danger ${first} or more` : ''}. Station refinery upgrades raise the amount`,
   }];
 };
 
 const refine: SourceFn = (c, it) => c.d.recipes.refining.filter((r) => r.id === it.id).map((r) => ({
   kind: 'refine' as const,
-  text: `Refinery: ${c.bag(r.inputs)} makes ${r.out === 1 ? 'one' : r.out} (${secs(r.time ?? 0)} at a station refinery${r.level ? `; known from level ${r.level}` : ''}). A refiner on your ship does it too, slower`,
+  text: `Refinery: ${c.bag(r.inputs)} makes ${r.out === 1 ? 'one' : r.out} (${secs(r.time ?? 0)} at a station refinery${r.level ? `; unlocks at level ${r.level}` : ''}). A refiner on your ship does it too, slower`,
 }));
 
 const fabricate: SourceFn = (c, it) => c.d.recipes.craft.filter((r) => r.out[it.id]).map((r) => {
   const n = r.out[it.id];
-  const learn = r.quest ? `learned from the job "${c.d.quests.quests.find((q) => q.id === r.quest)?.name ?? r.quest}"` : r.starter ? 'known from the start' : r.level ? `learned from level ${r.level}` : '';
+  const learn = r.quest ? `unlocked by the job "${c.d.quests.quests.find((q) => q.id === r.quest)?.name ?? r.quest}"` : r.starter ? 'available from the start' : r.level ? `unlocks at level ${r.level}` : '';
   return {
     kind: 'fabricate' as const,
     text: `Fabricator: ${c.bag(r.inputs)} makes ${n === 1 ? 'one' : n}${r.time ? ` (${secs(r.time)})` : ' (instant)'}${learn ? `; ${learn}` : ''}`,
@@ -225,7 +225,7 @@ const drop: SourceFn = (c, it) => {
   for (const f of Object.values(c.d.factions)) add(`${f.name} (any ship)`, f.loot);
   if (!rows.length) return [];
   rows.sort((a, b) => b.chance - a.chance);
-  return [{ kind: 'drop', text: 'Dropped by these when you help bring them down (chance tier, amount)', where: rows.map((r) => r.line) }];
+  return [{ kind: 'drop', text: 'Dropped when you help kill these (chance, amount)', where: rows.map((r) => r.line) }];
 };
 
 const bought: SourceFn = (c, it) => {
@@ -237,7 +237,7 @@ const bought: SourceFn = (c, it) => {
     const row = rep.vendor?.stock?.find((x) => x.item === it.id);
     if (row) qms.push(`${rep.name}, rank ${row.rank}`);
   }
-  if (qms.length) out.push({ kind: 'bought', text: 'From a faction quartermaster once you have the standing', where: qms });
+  if (qms.length) out.push({ kind: 'bought', text: 'From a faction quartermaster once you have the reputation', where: qms });
   return out;
 };
 
@@ -261,8 +261,8 @@ const questReward: SourceFn = (c, it) => {
 const salvage: SourceFn = (c, it) => {
   const s = c.d.rules.events?.salvage;
   if (!s) return [];
-  if (s.goods?.includes(it.id)) return [{ kind: 'salvage', text: 'In the pods of a salvage event (a drifting field of wreck pods), among the common goods' }];
-  if (s.rare?.includes(it.id)) return [{ kind: 'salvage', text: 'In the pods of a salvage event (a drifting field of wreck pods), sometimes; more often in dangerous systems' }];
+  if (s.goods?.includes(it.id)) return [{ kind: 'salvage', text: 'In salvage event pods (a drifting field of wreck pods), among the common goods' }];
+  if (s.rare?.includes(it.id)) return [{ kind: 'salvage', text: 'In salvage event pods (a drifting field of wreck pods), sometimes; more often in dangerous systems' }];
   return [];
 };
 
@@ -283,7 +283,7 @@ function usedFor(c: Ctx, it: ItemRow): string[] {
   const models = Object.entries(r.models ?? {}).filter(([, m]) => m.inputs[it.id]).map(([id]) => modelName.get(id) ?? cap(id));
   if (models.length) out.push(`Ship parts that need it (${models.length}): ${some(models, 5)}`);
   const mats = Object.entries(r.parts.plates).filter(([, id]) => id === it.id).map(([m]) => c.d.materials.find((x) => x.id === m)?.name ?? cap(m));
-  if (mats.length) out.push(`Structure plate for ${some(mats)} hulls, armour and parts`);
+  if (mats.length) out.push(`Used to build ${some(mats)} hulls, armour and parts`);
   const fnName = new Map(c.d.functions.map((f) => [f.id, f.name]));
   const fns = Object.entries(r.parts.extras).filter(([, b]) => b[it.id]).map(([f]) => fnName.get(f) ?? cap(f));
   if (fns.length) out.push(`Goes into ${some(fns, 8)} parts`);
@@ -291,10 +291,10 @@ function usedFor(c: Ctx, it: ItemRow): string[] {
   if (gemTypes.length) out.push(`Cutting ${some(gemTypes)} gems`);
   if (Object.values(c.d.gems.cuts).some((x) => x.inputs[it.id])) out.push('Cutting any gem');
   const tracks = Object.values(c.d.station.tracks).filter((t) => t.tiers.some((x) => x.cost?.[it.id])).map((t) => t.name);
-  if (tracks.length) out.push(tracks.length > 4 ? "Most of your station's upgrade tiers" : `Your station's upgrades: ${some(tracks)}`);
+  if (tracks.length) out.push(tracks.length > 4 ? "Most of your station's upgrades" : `Your station's upgrades: ${some(tracks)}`);
   if (it.pack) {
     out.push(`Holds ${c.bag(it.pack)}`);
-    out.push(`In the field, a fabricator takes one unit of any of its plates from a pack and works ${Math.round(FIELD.packSpeed * 100)}% faster; in your repair bank it gives them all`);
+    out.push(`In the field, a fabricator takes 1 unit of one of its materials and works ${Math.round(FIELD.packSpeed * 100)}% faster. In your repair bank it gives all of them`);
   }
   if (it.ammoFor) out.push(`${plural(it.ammoFor.rounds, 'round')} for ${cap(it.ammoFor.weapon)}s`);
   const consumers = c.d.items.filter((x) => x.pack?.[it.id]).map((x) => x.name);

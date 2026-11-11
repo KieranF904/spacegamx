@@ -137,7 +137,7 @@ export class GunRange {
     this.host.unberth(conn);
     this.visits.set(conn, { berth, weapon, options, charge });
     this.atSpawn(conn, r, this.visits.size - 1);
-    this.host.toast(conn, `Gun range: fly the ${ship.name.replace(/^.*?: /, '')}. Pick any weapon you can fit; fly to the door and press X to go back to ${berth.name}`, 'info');
+    this.host.toast(conn, `Gun range: you are flying the ${ship.name.replace(/^.*?: /, '')}. Pick any weapon you can fit. To go back to ${berth.name}, fly to the door and press {interact}.`, 'info');
     this.sendState(conn);
   }
 
@@ -168,7 +168,7 @@ export class GunRange {
     if (v.dead || !r || !this.host.flying(conn)) return true;
     const at = this.host.where(conn);
     if (atRangeDoor(r.def, at.x, at.y)) this.leave(conn);
-    else this.host.toast(conn, 'Fly to the door and press X to leave the range', 'info');
+    else this.host.toast(conn, 'Fly to the door and press {interact} to leave the range.', 'info');
     return true;
   }
 
@@ -195,7 +195,7 @@ export class GunRange {
     const v = this.visits.get(conn);
     if (!v) return;
     v.dead = true;
-    this.host.toast(conn, 'The range ship was destroyed: nothing lost. Respawn to fly it again at the door', 'info');
+    this.host.toast(conn, 'Range ship destroyed. Nothing is lost. Respawn to fly it again at the door.', 'info');
   }
 
   /** A respawn (net/handlers/flight.ts): one who died in the range is back inside its door, in the same cheat ship and weapon */

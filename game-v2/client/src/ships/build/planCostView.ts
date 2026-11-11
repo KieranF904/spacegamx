@@ -31,7 +31,7 @@ export function fieldReadoutHtml(r: CostReadout, name: Name): string {
   if (r.parts === 0) return '';
   const rows: string[] = [];
   if (r.lines.length) rows.push(`Needs: ${r.lines.slice(0, 6).map((l) => `${l.need} ${esc(lower(name(l.id)))} (have ${l.have})`).join(', ')}${r.lines.length > 6 ? ` and ${r.lines.length - 6} more` : ''}`);
-  else if (r.fromHold) rows.push(`${r.fromHold} finished part${r.fromHold > 1 ? 's' : ''} in the hold: only attaching`);
+  else if (r.fromHold) rows.push(`${r.fromHold} finished part${r.fromHold > 1 ? 's' : ''} in your cargo: only attaching`);
   const short = shortList(r.short, name);
   rows.push(short ? `<span style="color:#fbbf24">Short:</span> ${short}` : r.lines.length ? '<span style="color:#4ade80">The hold has it all</span>' : '');
   const time = r.seconds > 0 ? `${durationText(r.seconds)} to build${short ? ' once you have it' : ''}` : '';

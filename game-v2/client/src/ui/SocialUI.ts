@@ -184,7 +184,7 @@ export class SocialUI {
     const first = !this.friends.data.account && m.account;
     this.friends.data = m;
     this.d.friendsOnline(onlineCount(m));
-    if (first && m.incoming.length) this.d.message(`${m.incoming.length} friend request${m.incoming.length > 1 ? 's' : ''} waiting: the side panel's Social tab (${boundKeyName('party', settings.data.bindings)})`, '#7dd3fc');
+    if (first && m.incoming.length) this.d.message(`${m.incoming.length} friend request${m.incoming.length > 1 ? 's' : ''} waiting. Open the Social tab (${boundKeyName('party', settings.data.bindings)})`, '#7dd3fc');
     for (const fn of this.listeners) fn();
   }
 

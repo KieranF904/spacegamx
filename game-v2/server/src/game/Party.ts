@@ -112,7 +112,7 @@ export class Party {
     const mine = this.get(conn);
     if (mine && mine.leader !== conn) return this.host.toast(conn, `Only your party leader (${mine.leader.username}) can invite`, 'warn');
     const max = this.host.partySize?.(mine?.leader ?? conn) ?? PARTY_MAX;
-    if (mine && mine.members.length >= max) return this.host.toast(conn, `Your party holds ${max} pilots`, 'warn');
+    if (mine && mine.members.length >= max) return this.host.toast(conn, `Your party is full (${max} pilots)`, 'warn');
     if (this.of.has(target)) return this.host.toast(conn, `${target.username} is already in a party`, 'warn');
     this.invites.set(target, { from: conn, at: this.host.now() });
     this.host.send(target, { type: 'partyInvite', from: conn.username, size: mine?.members.length ?? 1 });

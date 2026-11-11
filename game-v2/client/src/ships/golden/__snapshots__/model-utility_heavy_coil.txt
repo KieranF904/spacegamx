@@ -38,7 +38,7 @@ jump cooldown −20% · jump 83 cells · draws 32
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 30","why":"Learned at level 30 (you're 4)"}
+{"open":false,"badge":"Lv 30","why":"Unlocks at level 30 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 30","why":""}

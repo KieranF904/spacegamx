@@ -166,7 +166,7 @@ function portsLines(ship: ShipState, c: Charge, nameOf: (fn: string) => string):
   if (!cached) {
     const lines: FeatureStatusLine[] = [], aug: number[] = [], heavy: number[] = [];
     for (const t of L.tanks) lines.push({ label: `${L.feedDefs[L.tankFeed[t]]?.name ?? 'Feed'} tank`, text: '', tone: 'ok', progress: 1 });
-    for (const s of L.selectors) lines.push({ label: 'Selector (Y)', text: '', tone: 'ok' });
+    for (const s of L.selectors) lines.push({ label: 'Selector', text: '', tone: 'ok' });
     for (const w of L.weapons) if (L.augCap[w] > 0) { aug.push(w); lines.push({ label: `${nameOf(parts[w].fn)}: ${L.augName[w]}`, text: '', tone: 'dim', progress: 0 }); }
     for (const w of L.weapons) if (L.steady[w] > 0) { heavy.push(w); lines.push({ label: nameOf(parts[w].fn), text: '', tone: 'ok' }); }
     portsLineCache.set(L, (cached = { lines, aug, heavy }));
@@ -181,20 +181,20 @@ function portsLines(ship: ShipState, c: Charge, nameOf: (fn: string) => string):
   for (const s of L.selectors) {
     const r = lines[k++], side = e.flags[s] & PF_SEL ? 1 : 0, net = L.selIn[2 * s + side];
     const tank = net >= 0 ? L.nets[net].tanks[0] : -1;
-    r.text = tank >= 0 ? `passing ${L.feedDefs[L.tankFeed[tank]]?.name ?? 'feed'}` : 'nothing on that side';
+    r.text = tank >= 0 ? `passing ${L.feedDefs[L.tankFeed[tank]]?.name ?? 'feed'}` : 'no tank on this side';
   }
   // (An augment: ready while its buffer holds a shot's cost; no line into its input, or one too weak to fill it, says so)
   for (const w of cached.aug) {
     const r = lines[k++], f = e.aug[w] / L.augCap[w];
     r.progress = f;
     if (e.aug[w] >= L.augCost[w]) { r.text = 'ready'; r.tone = 'ok'; }
-    else { r.text = L.ports.some((q) => q.part === w && q.aug && q.link) ? 'its line is too weak' : 'no line to its augment input'; r.tone = 'dim'; }
+    else { r.text = L.ports.some((q) => q.part === w && q.aug && q.link) ? 'augment line too weak' : 'nothing on its augment input'; r.tone = 'dim'; }
   }
   // (A heavy gun short of its floor collapses what it gathers: say so)
   for (const w of cached.heavy) {
     const r = lines[k++], full = e.held[w] >= L.cap[w];
     const short = !full && e.closed[w] === 0 && inflow[w] < L.steady[w];
-    r.text = full ? 'charged' : short ? `starved: its lines give under ${Math.round((L.steady[w] * 60) / 256)}/s` : 'charging';
+    r.text = full ? 'charged' : short ? `not enough power: needs ${Math.round((L.steady[w] * 60) / 256)}/s` : 'charging';
     r.tone = full ? 'ok' : short ? 'warn' : 'busy';
   }
   return lines;

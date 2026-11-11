@@ -74,13 +74,13 @@ export class ShipsTab {
         return x;
       };
       btn('Open in hangar', '', () => this.d.openHangar(slot));
-      if (rec.ghosts.length && !rec.auto) btn('Put on order', 'primary', () => this.d.send({ type: 'slotBuild', slot }), 'Refine your ore, fabricate the modules and fit everything, as far as your materials go');
+      if (rec.ghosts.length && !rec.auto) btn('Put on order', 'primary', () => this.d.send({ type: 'slotBuild', slot }), 'Refine your ore, make the parts and fit everything your materials allow');
       if (rec.ghosts.length && rec.auto) {
         const order = (action: 'pause' | 'resume' | 'cancel' | 'top') => () => { this.d.send({ type: 'slotOrder', slot, action }); this.d.sound('ui_click', 0.4); };
         if (rec.paused) btn('▶ Resume', 'primary', order('resume'), 'Carry on: its jobs pick up where they left off');
         else btn('⏸ Hold', '', order('pause'), 'Start nothing new for it, and hold its jobs (others move up)');
-        if (slot !== firstOnOrder) btn('⇧ Do first', '', order('top'), 'Work this order first: it takes what it needs before the others, and its jobs go to the front of their queues');
-        if (!rec.lost) btn('Call off', '', order('cancel'), 'Take it off order: its queued jobs stop and their materials go back to storage (parts already fitted stay)');
+        if (slot !== firstOnOrder) btn('⇧ Do first', '', order('top'), 'Work this order first: it gets materials before the others, and its jobs go to the front of their queues');
+        if (!rec.lost) btn('Cancel', '', order('cancel'), 'Cancel the order: its queued jobs stop and their materials go back to storage (fitted parts stay)');
       }
       if (!flying) {
         const flyable = coreBuilt && !rec.lost;
@@ -173,7 +173,7 @@ export class ShipsTab {
         ? `<span style="color:#fca5a5">To gather:</span> ${gather.map(([id, n]) => `<span class="sgw-cost short" title="${esc(econ.items.name(id))}: ${n} more"><img src="${itemIcon(econ, id)}">${n} ${esc(shortName(econ.items.name(id)))}</span>`).join('')}`
         : locked.length ? '' : '<span style="color:#86efac">✓ Everything it needs is in storage or being made</span>')
       + (locked.length ? `<div style="color:#fca5a5">🔒 Not open yet (a level away): ${locked.map((l) => esc(econ.items.name(l.id))).join(', ')}</div>` : '')
-      + (inHold.length ? `<div style="color:#fbbf24; font-size:11px">Some of that is in your hold: orders use storage, so store it (Inventory)</div>` : '')
+      + (inHold.length ? `<div style="color:#fbbf24; font-size:11px">Some of that is in your cargo. Orders use storage, so store it first</div>` : '')
       + `<div style="color:#8394ad; font-size:11px">${ready ? `${ready} ready in storage · ` : ''}${making ? `${making} being made · ` : ''}<a href="#" data-bill style="color:#7dd3fc">${open ? 'Hide' : 'Show'} the full bill</a></div></div>`
       + (open ? this.billHtml(lines) : '');
     el.querySelector<HTMLElement>('[data-bill]')!.onclick = (e) => {

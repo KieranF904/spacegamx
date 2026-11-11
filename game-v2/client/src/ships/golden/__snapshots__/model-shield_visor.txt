@@ -26,7 +26,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A tight 60 degree arc in front of a gun
+Tight shield arc
 
 == keyStats ==
 45 HP arc · 16 a second once unhit for 1.2 s; down 1.2 s when broken, back at 25% · draws 11 · 45 hp · armour 1
@@ -38,7 +38,7 @@ A tight 60 degree arc in front of a gun
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 2","why":"Learned at level 2 (you're 4)"}
+{"open":false,"badge":"Lv 2","why":"Unlocks at level 2 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 2","why":""}

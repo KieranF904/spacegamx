@@ -41,7 +41,7 @@ describe('field state copy', () => {
     expect([...c.recycleUids()]).toEqual([7]);
     const name = (id: string) => (id === 'part_pip' ? 'Pip' : id);
     expect(c.applyDone({ type: 'fieldDone', kind: 'fabricator', job: 1, item: 'part_pip', to: 'ship', uid: 9 }, name)).toBe('Pip built');
-    expect(c.applyDone({ type: 'fieldDone', kind: 'fabricator', job: 2, item: 'part_pip', to: 'cargo' }, name)).toContain('hold');
+    expect(c.applyDone({ type: 'fieldDone', kind: 'fabricator', job: 2, item: 'part_pip', to: 'cargo' }, name)).toContain('cargo');
     expect(c.applyDone({ type: 'fieldDone', kind: 'fabricator', job: 3, item: 'part_pip', to: 'machine' }, name)).toContain('waiting');
     expect(c.lastDone?.job).toBe(3);
     c.reset();

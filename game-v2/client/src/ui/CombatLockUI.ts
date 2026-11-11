@@ -13,7 +13,7 @@ let timer: ReturnType<typeof setInterval> | null = null;
 /** The badge's words for `ms` left (empty: nothing shown), whole seconds rounded up */
 export function combatLabel(ms: number): string {
   if (!(ms > 0)) return '';
-  return `In combat ${Math.ceil(ms / 1000)} s: quitting now leaves your ship in space`;
+  return `In combat ${Math.ceil(ms / 1000)} s: if you quit now, your ship stays in space`;
 }
 
 function paint(now: number): void {

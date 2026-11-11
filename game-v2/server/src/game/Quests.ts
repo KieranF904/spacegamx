@@ -305,7 +305,7 @@ export class Quests {
     this.pilots.markDirty(conn);
     if (!quiet && !this.isActive(p, id) && !p.quests.done.includes(id)) {
       const where = q.person ? this.personPlace(conn, p, q.person) : undefined;
-      this.pilots.toast(conn, `New lead: ${q.name}${q.person ? ` (${this.personName(q.person)}${where ? `, ${where.label}` : ''})` : ''}. L to see it`, 'good');
+      this.pilots.toast(conn, `New lead: ${q.name}${q.person ? ` (${this.personName(q.person)}${where ? `, ${where.label}` : ''})` : ''}. It is in your log ({log})`, 'good');
     }
     this.send(conn);
   }
@@ -577,11 +577,11 @@ export class Quests {
     const paid = [r.credits ? `+${r.credits.toLocaleString()} cr` : '', r.xp ? `+${r.xp.toLocaleString()} XP` : ''].filter(Boolean).join(' · ');
     // A story or guild job gets the client's reward screen; repeatable pay (bounties, fleet operations) stays a toast
     if (Quests.generated(q.id) || q.repeatable) {
-      this.pilots.toast(conn, `Job complete: ${q.name}${paid ? ` (${paid})` : ''}${next ? '. New work in your log (L)' : ''}`, 'good');
+      this.pilots.toast(conn, `Job complete: ${q.name}${paid ? ` (${paid})` : ''}${next ? '. New work in your log ({log})' : ''}`, 'good');
       return;
     }
     this.host.send(conn, { type: 'questStep', id: q.id, text: '', done: { name: q.name, chain: q.chain, outro: q.outro, giver: this.who(q).name, rewards: this.rewardView(q.rewards) } });
-    if (next) this.pilots.toast(conn, 'New work in your log (L)', 'info');
+    if (next) this.pilots.toast(conn, 'New work in your log ({log})', 'info');
   }
 
   /** Jobs (people's) whose prerequisites this one finished: into the log as new leads. How many. */
@@ -620,7 +620,7 @@ export class Quests {
     if (!n) return 0;
     this.pilots.markDirty(conn);
     if (!quiet) {
-      this.pilots.toast(conn, n > 1 ? `${n} new leads in your log (L)` : 'A new lead in your log (L)', 'info');
+      this.pilots.toast(conn, n > 1 ? `${n} new leads in your log ({log})` : 'A new lead in your log ({log})', 'info');
       this.send(conn);
     }
     return n;

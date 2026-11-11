@@ -85,7 +85,7 @@ describe('ammunition loadouts', () => {
     t.send({ type: 'slotLoadout', slot: 0, load: { cannon_hv: 4 } } as any);
     // Changing the loadout while docked loads what there is at once
     expect(countOf(p.cargo, 'cannon_hv')).toBe(2);
-    expect(toasts(got).pop()).toMatch(/Short of your loadout: 2 × .*fabricator/);
+    expect(toasts(got).pop()).toMatch(/Not enough ammo for your loadout: 2 × .*fabricator/);
     p.storage = [{ id: 'cannon_hv', n: 5 }];
     got.length = 0;
     t.send({ type: 'undock' } as any);

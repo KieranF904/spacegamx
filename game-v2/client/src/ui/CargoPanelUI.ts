@@ -24,9 +24,9 @@ const HEIGHT_KEY = 'sg.cargoPanel.height';
 const DEFAULT_H = 200;
 const MIN_H = 44;
 /** What the load line means, in plain words */
-const LOAD_TIP = '<div class="t-n">Cargo has mass</div><div class="t-d">What is in your hold is carried with you: a heavy load accelerates, turns and stops slower. '
-  + 'It is weighed against your ship, so a big hauler minds the same load far less, and strong engines keep a laden ship lively. '
-  + 'Ore and metal are heavy, gems light, ammunition between. Station storage weighs nothing.</div>';
+const LOAD_TIP = '<div class="t-n">Cargo has mass</div><div class="t-d">A heavier load accelerates, turns and stops slower. '
+  + 'A bigger ship feels the same load less, and strong engines help. '
+  + 'Ore and metal are heavy, gems light, ammo in between. Station storage weighs nothing.</div>';
 
 let styled = false;
 function injectStyles(): void {
@@ -270,7 +270,7 @@ export class CargoPanelUI {
       nm.textContent = d?.name ?? s.id;
       if (d) nm.style.color = RARITY_COLOR[d.rarity];
       const extra = (tag ? `<div class="t-h" style="color:${tag.cls === 'load' ? '#5eead4' : '#c4b5fd'}">${tag.tip}</div>` : '')
-        + '<div class="t-h" style="color:#fca5a5">Goes in your wreck if your ship is lost</div>';
+        + '<div class="t-h" style="color:#fca5a5">Dropped in your wreck if your ship is destroyed</div>';
       it.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, extra, hint: 'Right-click to jettison' }), e.clientX, e.clientY));
       it.addEventListener('mouseleave', hideTip);
       it.addEventListener('contextmenu', (e) => { e.preventDefault(); hideTip(); this.jettisonMenu(s.id, e); });

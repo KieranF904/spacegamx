@@ -6,7 +6,7 @@ Armour · build1 · 1 pts
 Damage44/s · reach 5,394
 Hits withKinetic · penetration 0.5
 Fire rate4.0/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountTurret, 270°
 FittingBolts on any side
 Power draw12/s
@@ -42,7 +42,7 @@ Turret, 270°
 Bolts on any side
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 3","why":"Learned at level 3 (you're 4)"}
+{"open":false,"badge":"Lv 3","why":"Unlocks at level 3 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 3","why":""}

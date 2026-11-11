@@ -26,7 +26,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A small 90 degree arc close to the hull
+Small shield arc
 
 == keyStats ==
 60 HP arc · 13 a second once unhit for 1.2 s; down 2 s when broken, back at 25% · draws 13 · 45 hp · armour 1
@@ -38,7 +38,7 @@ A small 90 degree arc close to the hull
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 4","why":"Learned at level 4 (you're 4)"}
+{"open":false,"badge":"Lv 4","why":"Unlocks at level 4 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 4","why":""}

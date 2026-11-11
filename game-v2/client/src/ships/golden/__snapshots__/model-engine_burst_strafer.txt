@@ -39,7 +39,7 @@ dodge 14.0 push · every 0.4 s · 140 energy a burst · draws 700 bursting
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+{"open":false,"badge":"Lv 10","why":"Unlocks at level 10 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 10","why":""}

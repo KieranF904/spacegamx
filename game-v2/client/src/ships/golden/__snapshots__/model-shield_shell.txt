@@ -28,7 +28,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-A 120 degree arc that wraps most of a side
+Wide shield arc
 
 == keyStats ==
 160 HP arc · 8 a second once unhit for 1.2 s; down 3.5 s when broken, back at 25% · draws 22 · 113 hp · armour 1
@@ -40,7 +40,7 @@ A 120 degree arc that wraps most of a side
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+{"open":false,"badge":"Lv 8","why":"Unlocks at level 8 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 8","why":""}

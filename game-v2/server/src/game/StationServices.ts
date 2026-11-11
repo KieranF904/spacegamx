@@ -191,10 +191,10 @@ export class StationServices {
     if (!st || !p) return;
     const r: CraftRecipe | null = this.econ.recipes.recipeFor(String(msg.recipe));
     if (!r) return;
-    if (isStructuralItem(r.id)) return this.pilots.toast(conn, 'Hull, armour, conduits and holds are built from materials in the hangar', 'info');
+    if (isStructuralItem(r.id)) return this.pilots.toast(conn, 'Hull, armour, conduits and cargo holds are built in the hangar from plate.', 'info');
     if (!canCraft(r, this.learned(p), p.level)) {
       const pressed = armouryRound(r.id) && canCraft(r, p.recipes, p.level);
-      return this.pilots.toast(conn, pressed ? `Only your own station's armoury presses ${this.econ.items.name(r.id)}: build it up to its ${this.pressLine(r.id)}` : `You don't know how to make that yet`, 'warn');
+      return this.pilots.toast(conn, pressed ? `${this.econ.items.name(r.id)} is made only at your own station's armoury. Upgrade it to ${this.pressLine(r.id)}.` : `You don't know how to make that yet`, 'warn');
     }
     const n = Math.max(1, Math.min(MAX_BATCH, Math.floor(Number(msg.n) || 1)));
     if (r.time > 0 && this.fabJobs(p) >= queueSlots(p)) return this.pilots.toast(conn, 'Fabricator queue is full', 'warn');

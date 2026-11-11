@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage32/s · reach 3,300
 Hits withExotic · penetration 5
 Fire rate0.5/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw14/s
@@ -31,7 +31,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-The ghost round
+Fires a slow round that passes through rock, wrecks and shields to hit the hull, and goes on through 2 ships
 
 == keyStats ==
 32 dmg/s · reach 3,300 · cycle · draws 14
@@ -45,7 +45,7 @@ Bolts on from behind only
 Needs 3 clear cells ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 26","why":"Learned at level 26 (you're 4)"}
+{"open":false,"badge":"Lv 26","why":"Unlocks at level 26 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 26","why":""}

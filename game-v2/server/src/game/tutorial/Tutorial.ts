@@ -204,7 +204,7 @@ export class Tutorial {
   /** Put a step's grant in the pilot's storage */
   grant(conn: PilotConn, items: Bag): void {
     this.pilots.give(conn, { ...items }, { toStorage: true, source: 'tutorial', quiet: true });
-    this.pilots.toast(conn, 'Training gear added to your storage.', 'info');
+    this.pilots.toast(conn, 'Training gear added to your station storage.', 'info');
     this.pilots.sendItems(conn);
   }
 
@@ -212,7 +212,7 @@ export class Tutorial {
   grantHold(conn: PilotConn, items: Bag): void {
     const left = this.pilots.give(conn, { ...items }, { source: 'tutorial', quiet: true });
     if (Object.keys(left).length) this.pilots.give(conn, left, { toStorage: true, source: 'tutorial', quiet: true });
-    this.pilots.toast(conn, Object.keys(left).length ? 'Training gear added (some to your storage: your hold is full).' : 'Training gear added to your hold.', 'info');
+    this.pilots.toast(conn, Object.keys(left).length ? 'Training gear added. Some went to station storage because your cargo is full.' : 'Training gear added to your cargo.', 'info');
     this.pilots.sendItems(conn);
   }
 
@@ -368,7 +368,7 @@ export class Tutorial {
     if ((this.nudged.get(eid) ?? -Infinity) > now - BOUNDARY_COOLDOWN) return;
     this.nudged.set(eid, now);
     this.host.send(conn, { type: 'tutorialEdge' });
-    this.pilots.toast(conn, 'Use Leave training to leave the yard.', 'info');
+    this.pilots.toast(conn, 'To leave the yard, press Leave training.', 'info');
   }
 
   /** A pilot who is not in training is in the yard: out to where they belong */

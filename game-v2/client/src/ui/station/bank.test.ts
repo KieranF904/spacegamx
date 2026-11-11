@@ -92,9 +92,9 @@ describe('packs', () => {
     expect(rows.find((r) => r.id === 'pack_drive')!.afford).toBe(false);
     const html = packsHtml(econ, icon, rows);
     expect(html).toContain('data-pack="pack_hull"');
-    expect(html).toContain('pays 1 unit');
+    expect(html).toContain('gives 1 unit');
     expect(html).toContain('60% faster');
-    expect(html).toContain('gives all of it');
+    expect(html).toContain('gives everything in it');
   });
 });
 

@@ -86,7 +86,7 @@
   "ops.scan.target": "Scan {name}",
   "ops.scan.marker": "Scan: {name}",
   "ops.scan.done": "Scan complete: {name} ({n} of {count})",
-  "ops.scan.progress": "Scanning… {pct}% (hold steady)",
+  "ops.scan.progress": "Scanning… {pct}% (stay still)",
   "ops.scan.hint": "Scan {n} more wreck{s}: fly within {range} m and hold still",
   "ops.escort.meet": "Meet {ward} outside {station}",
   "ops.escort.meetMarker": "Meet {ward}",

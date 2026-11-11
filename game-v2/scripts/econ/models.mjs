@@ -55,54 +55,54 @@ const W = [
   // at 6 t, 12 dmg; Longbarrel a 120 t charge, 170 dmg, speed 140, life 60, no spread; Bastion a clip of 2, 18 t apart, 180 dmg.
   // `demand` is the draw a cell gives while its beat runs (a clip or charge gun draws by its fire block instead: reloadE, chargeE).
   // Heavier shots 2026-11 then made the Pip 18 dmg every 20 t at 54, the Hammer 88 every 60 t, the Twinlink 8 at 10 t, 20 dmg at 62.)
-  ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5, blurb: 'The reliable starter' }, { set: { damage: 18, speed: 54, life: 133 } }, 'The starter gun: three reliable amber shells a second, and no tricks.'],
-  ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { int: 4.2, demand: 5, blurb: 'The breacher' }, { mul: { speed: xp(38 / 48), size: xp(1.6) }, add: { pen: 1 }, set: { damage: 88 } }, 'The breacher: one slow, heavy, armour-piercing slug a second, for 88.'],
-  ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { demand: 3.87, blurb: 'Paired autoloader turret' }, { mul: { spread: x(3.3 / 1.8) }, set: { damage: 20, speed: 62, life: 116 } }, 'A paired autoloader turret: a burst of eight heavy rounds, then a pause to reload.'],
-  ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { demand: 5.14, blurb: 'The sniper' }, { mul: { damage: xp(170 / 14), speed: xp(140 / 48), life: xp(60 / 150) }, add: { pen: 1 }, set: { spread: 0 } }, 'The sniper: it charges while you hold and fires itself at full, one telegraphed shot that picks a part off.'],
-  ['cannon_bastion', 'Bastion', 'cannon', 'block2', 30, { hp: 1.3, mass: 1.6, demand: 4.17, blurb: 'The ship-killer double tap' }, { mul: { damage: xp(180 / 14), speed: xp(32 / 48), size: xp(2.2) }, add: { pen: 1 } }, 'The ship-killer double tap: two huge, slow cannonballs you can dodge, then a long wait.'],
-  ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, {}, { set: { damage: 11, speed: 62, life: 87 } }, 'The steady hose: a stream of yellow shells, four a second, at a fixed rhythm.'],
+  ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5, blurb: 'Light, quick starter cannon' }, { set: { damage: 18, speed: 54, life: 133 } }, 'Starter cannon with light, quick shells.'],
+  ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { int: 4.2, demand: 5, blurb: 'Slow armour-piercing cannon' }, { mul: { speed: xp(38 / 48), size: xp(1.6) }, add: { pen: 1 }, set: { damage: 88 } }, 'Fires one slow, heavy, armour-piercing shell a second.'],
+  ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { demand: 3.87, blurb: 'Paired autoloader turret' }, { mul: { spread: x(3.3 / 1.8) }, set: { damage: 20, speed: 62, life: 116 } }, 'Paired cannon turret. Fires a burst of 8 heavy rounds, then reloads.'],
+  ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { demand: 5.14, blurb: 'Charged long-range cannon' }, { mul: { damage: xp(170 / 14), speed: xp(140 / 48), life: xp(60 / 150) }, add: { pen: 1 }, set: { spread: 0 } }, 'Hold to charge. When full it fires one long-range shot by itself.'],
+  ['cannon_bastion', 'Bastion', 'cannon', 'block2', 30, { hp: 1.3, mass: 1.6, demand: 4.17, blurb: 'Heavy two-shot cannon' }, { mul: { damage: xp(180 / 14), speed: xp(32 / 48), size: xp(2.2) }, add: { pen: 1 } }, 'Fires 2 huge, slow shells, then takes a long time to reload.'],
+  ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, { blurb: 'Steady-stream autocannon' }, { set: { damage: 11, speed: 62, life: 87 } }, 'Fires a steady stream of shells at a fixed rate.'],
   // (The Chainsaw's draw is its demand x 4 / its beat: 22.4 keeps its spun-up 22.4 E a second per cell at the 8-tick beat, as 10.5 did at 3.75)
-  ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 22.4 }, { mul: { spread: x(1.5) }, set: { damage: 11 } }, 'The minigun: it spins up from two and a half shots a second to seven and a half while you hold the trigger, and is useless on a tap.'],
-  ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { spread: x(0.4) }, set: { damage: 12, speed: 88, life: 61 } }, 'The marksman SMG: six fast, accurate needles in a burst, then a pause to reload.'],
-  ['flak_burst', 'Burst', 'flak', 'sq', 4, {}, {}, 'The sky-filler: a canister shell that bursts where you aim, or sooner when it passes near a target, throwing fragments over 170 units.'],
-  ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'The wall you place: four shells that burst where you aim, or sooner when they pass near a target, throwing fragments over 250 units.'],
+  ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, demand: 22.4, blurb: 'Spin-up autocannon' }, { mul: { spread: x(1.5) }, set: { damage: 11 } }, 'Fire rate rises from 2.5 to 7.5 shots a second while you hold fire.'],
+  ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25, blurb: 'Accurate burst autocannon' }, { mul: { spread: x(0.4) }, set: { damage: 12, speed: 88, life: 61 } }, 'Fires accurate bursts of 6 fast shots, then reloads.'],
+  ['flak_burst', 'Burst', 'flak', 'sq', 4, { blurb: 'Airburst flak turret' }, {}, 'Fires a flak shell that bursts at your aim point, or sooner near a target. Good against swarms and missiles.'],
+  ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4, blurb: 'Four-shell flak clip' }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'Fires 4 flak shells in a row that burst at your aim point, or sooner near a target, then reloads.'],
   // (Section 4's ordnance rows, rework-2026-11. Mortars: the Lobber lands at the cursor (out to 2,640), splash r220 / 70, a shell every 90 t, 40 a
   // crate; the Quake walks three shells at 0.7, 1.0 and 1.3 of the aim distance, 15 t apart, r260 / 60 each, a salvo every 180 t (3 rounds).
   // Missiles: the Dart 24 a crate, 108 t, homing 0.07 on the ship nearest the cursor, 30 + r120 / 34; the Swarm six rockets over 30 t, a salvo
   // every 180 t (6 rounds), 10 + r60 / 12, homing x1.3; the Hammerhead 198 t, 105 + r150 / 54, guided, 2 PD hits. Torpedoes: the Eel 240 t, 420 dmg,
   // through shields, r90 / 80, gentle homing, 3 PD hits; the Leviathan 2 rounds a shot, 360 t, 1,000 dmg, through shields, r200 / 200, no
   // homing, armed after 60 t, 5 PD hits. `intercept` is a shell's point-defence hits; the kinds give 1.)
-  ['mortar_lobber', 'Lobber', 'mortar', 'sq', 7, { blurb: 'Artillery that lands where you click' }, {}, 'Artillery that lands where you click: one shell every second and a half, lobbed over everything to burst at your cursor (out to 2,640) in a 220 blast. Forty shells a crate.'],
-  ['mortar_quake', 'Quake', 'mortar', 'rect2', 24, { dmg: 2, int: 2, blurb: 'The walking barrage' }, { set: { splash: { radius: 260, damage: 60 } } }, 'The walking barrage: a salvo of three shells every three seconds that land at 70%, 100% and 130% of your aim distance, a quarter second apart, each a 260 blast. It covers a lane, not a point. Uses three rounds a salvo.'],
+  ['mortar_lobber', 'Lobber', 'mortar', 'sq', 7, { blurb: 'Mortar that lands at your cursor' }, {}, 'Lobs a shell over everything to burst at your cursor.'],
+  ['mortar_quake', 'Quake', 'mortar', 'rect2', 24, { dmg: 2, int: 2, blurb: 'Three-shell line mortar' }, { set: { splash: { radius: 260, damage: 60 } } }, 'Fires 3 shells that land in a line: short of your aim point, on it and past it. Uses 3 rounds a salvo.'],
   // (Section 4's lasers and pulse guns, rework-2026-11 (family-beams-pulse). Glint: the pulse you time, 27 E a pulse. Cutter: a short held beam, 60 dps
   // rising to 150 over 1.5 s on one part, 32 E/s. Searchlight: a long thin beam, 25 dps, 15 E/s, that marks. Strobe: a burst of 3 every 0.5 s, 9 dmg,
   // x1.6 vs shields, x0.6 vs hull, 6 E a burst. Overpulse: a clip of 12 single bolts at 10/s, x1.9 vs shields, x0.5 vs hull. A beam's `demand` is its
   // E/s spread over its cells; a pulse gun's, its E a burst x 60 / interval. Heavier shots 2026-11: the Strobe 2 bolts of 14 at 84, the
   // Overpulse a clip of 6 at 10 t, 13 dmg at 96; their demand, and so their draw, stays.)
-  ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The long pulse: it charges for 1.8 s, then a 1.4 s pulse peaking at 96 damage reaches 5,100 units. Time it; 27 E a pulse.'],
-  ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { demand: r2(32 / PIECE_AREA.rect2) }, { set: { dps: 60, range: 900, width: 14, pulse: null, falloff: null, ramp: { to: 150, ticks: 90 } } }, 'The welding torch: a short held beam that burns deeper the longer it stays on one part, 60 rising to 150 damage a second over 1.5 s (it starts over if it slips off). 32 E a second.'],
-  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round) }, { set: { dps: 25, range: 7650, width: 8, pulse: null, falloff: null } }, 'The spotter: a thin beam that reaches furthest and barely hurts, but what it lights takes 20% more damage from everyone for 2 s after. 15 E a second.'],
-  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30) }, { set: { burst: 2, damage: 14, speed: 84, life: 60 } }, 'Steady shield pressure: a burst of 2 bolts every half second, 14 damage each, 1.6 times against shields and 0.6 against hull. 6 E a burst.'],
-  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2) }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5, damage: 13, speed: 96, life: 53 } }, 'The shield shredder: a clip of 6 fast bolts at 6 a second, 13 damage each, then a 1 s reload drawing 36 E. 1.9 times against shields and half against hull.'],
-  ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Lock and forget' }, {}, 'Lock and forget: a missile every couple of seconds that homes on the ship nearest your cursor, 30 damage and a 120 blast. Twenty-four missiles a crate. Point defence kills it in one hit.'],
-  ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 2, int: 0.41, blurb: 'The ripple that floods point defence' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'The ripple that floods point defence: a pair of small rockets every three-quarters of a second, steady for as long as you hold, spreading and then converging on the ship nearest your cursor. Each is 10 damage and a 60 blast and dies to one point-defence hit. One round a pair.'],
-  ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'The steered warhead' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'The steered warhead: a slow, heavy missile, 105 damage and a 150 blast. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs two hits.'],
+  ['laser_glint', 'Glint', 'laser', 'sq', 9, { blurb: 'Long-range charged pulse laser' }, {}, 'Charges, then fires a long-range pulse that hits hardest at its peak.'],
+  ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { demand: r2(32 / PIECE_AREA.rect2), blurb: 'Short ramping held beam' }, { set: { dps: 60, range: 900, width: 14, pulse: null, falloff: null, ramp: { to: 150, ticks: 90 } } }, 'Short held beam. Its damage rises the longer it stays on one part, and starts over if it slips off.'],
+  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round), blurb: 'Long beam that marks targets' }, { set: { dps: 25, range: 7650, width: 8, pulse: null, falloff: null } }, 'Long, thin beam that does little damage. What it lights takes 20% more damage from everyone for 2 s.'],
+  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30), blurb: 'Shield-stripping pulse bursts' }, { set: { burst: 2, damage: 14, speed: 84, life: 60 } }, 'Fires bursts of 2 bolts that do extra damage to shields and less to hull.'],
+  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2), blurb: 'Shield-shredding pulse clip' }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5, damage: 13, speed: 96, life: 53 } }, 'Fires a clip of 6 fast bolts, then reloads. Very strong against shields, weak against hull.'],
+  ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Homing missile launcher' }, {}, 'Fires a missile that homes on the ship nearest your cursor. Point defence stops it with 1 hit.'],
+  ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 2, int: 0.41, blurb: 'Small homing rockets in pairs' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'Fires pairs of small rockets while you hold fire. They home on the ship nearest your cursor. Point defence stops each with 1 hit. One round a pair.'],
+  ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'Heavy missile you steer' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'Fires a slow, heavy missile. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs 2 hits.'],
   // (Railguns, rework section 4: the Needle's slug 62 dmg, pierce 2, speed 150, 75 ticks; the Coilgun five slugs of 16 in a 12 degree cone, pierce 1,
   // life 18 (2,700 reach), 54 ticks, 14 E a shot; the Spear 160 dmg through three hulls at full damage, 114 ticks, 120 E. The energy a cycle gun
   // draws is its draw x its interval, so RAIL_E sets each demand to give 14 E and 120 E a shot)
-  ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, {}, {}, 'The cheap rail: a long thin slug that goes through two ships. It fires slugs from the hold and needs no power.'],
-  ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8 }, { set: { ammo: null, damage: 25, burst: 3, spread: 3, jitter: 0, life: 18, pierce: 1 } }, 'The rail shotgun: three heavy slugs in a tight cone, a finisher for close range that is spent past 2,700. It throws its own slugs for 14 E a shot, so it needs no ammo.'],
-  ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.52, draw: 2.2, hp: 1.2 }, { set: { damage: 160, pierce: 3, pierceKeep: 1 } }, 'The capital rail: one slug every couple of seconds that goes through three ships at full damage, a ring of shock at each. It costs 120 E a shot and needs no ammo.'],
-  ['emp_hush', 'Hush', 'emp', 'sq', 15, { blurb: 'Switch one ship off' }, {}, 'Switches one ship off: an orb that bursts on its fuse or beside a ship, and 2 s of dead engines and guns.'],
-  ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6, blurb: 'The charged area blackout' }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'Hold to charge, then it fires itself: an orb that bursts where you aimed, or beside a ship, for a wide 2.8 s blackout.'],
+  ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, { blurb: 'Piercing slug railgun' }, {}, 'Fires a long thin slug that goes through 2 ships. Uses slugs from your cargo and needs no power.'],
+  ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8, blurb: 'Close-range rail shotgun' }, { set: { ammo: null, damage: 25, burst: 3, spread: 3, jitter: 0, life: 18, pierce: 1 } }, 'Fires 3 heavy slugs in a tight cone. Short range. Needs no ammo.'],
+  ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.52, draw: 2.2, hp: 1.2, blurb: 'Heavy piercing railgun' }, { set: { damage: 160, pierce: 3, pierceKeep: 1 } }, 'Fires a slug that goes through 3 ships at full damage, with a shock ring at each. Needs no ammo.'],
+  ['emp_hush', 'Hush', 'emp', 'sq', 15, { blurb: 'Single-target EMP' }, {}, 'Fires an orb that bursts on its fuse or beside a ship, switching off its engines and guns for 2 s.'],
+  ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6, blurb: 'Charged area EMP' }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'Hold to charge; it fires by itself when full. The orb bursts at your aim point or beside a ship, switching off engines and guns over a wide area.'],
   // (A long blue bolt: six times the arc's life at its speed, out to about 4,000; Kieran 2026-11-03)
-  ['arc_spark', 'Spark', 'arc', 'sq', 17, { blurb: 'The chain zap' }, { mul: { life: 5, damage: x(0.85) } }, 'A fast blue bolt that flies out to 4,000 and leaps to 3 more ships near what it hits, weaker each hop.'],
-  ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4, blurb: 'The held storm' }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Hold to keep zapping, five times a second: each zap leaps to 5 more ships nearby, weaker each hop.'],
-  ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
+  ['arc_spark', 'Spark', 'arc', 'sq', 17, { blurb: 'Chain-lightning bolt' }, { mul: { life: 5, damage: x(0.85) } }, 'Fires a fast bolt that jumps to 3 more ships near what it hits, weaker each jump.'],
+  ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4, blurb: 'Held chain lightning' }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Hold to zap 5 times a second. Each zap jumps to 5 more ships nearby, weaker each jump.'],
+  ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'Slow homing torpedo' }, { set: { homing: 0.02 } }, 'Fires a slow homing torpedo that goes through shields. Point defence needs 3 hits.'],
   // (The Leviathan flies at its launch speed all its life: nothing accelerates a shell that doesn't home or steer (server Weapons.tick), so its
   // maxSpeed is its speed, and its reach (what the hangar shows) 10 x 343)
-  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { size: x(1.4) }, set: { damage: 560, speed: 10, maxSpeed: 10, life: 343, splash: { radius: 160, damage: 120 }, intercept: 5, arm: 30 } }, 'The fight-ender: a huge torpedo, 560 damage straight through shields and a 120 blast, one every three seconds. It flies straight at a steady pace and does not home, and arms half a second after launch. One round a shot. Point defence needs five hits.'],
-  ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second; short of power it sputters.'],
+  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'Heavy unguided torpedo' }, { mul: { size: x(1.4) }, set: { damage: 560, speed: 10, maxSpeed: 10, life: 343, splash: { radius: 160, damage: 120 }, intercept: 5, arm: 30 } }, 'Fires a huge torpedo that goes through shields. It flies straight, does not home, and arms 0.5 s after launch. Point defence needs 5 hits.'],
+  ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45, blurb: 'Heavy short-range held beam' }, {}, 'Short, heavy held beam that pierces and does 20% more damage to armour. It sputters when short of power.'],
 ];
 
 /**
@@ -213,13 +213,13 @@ const LEGENDARY = [
 // and the E each cell holds. Burn stays `draw`, and boosting burns draw x (1 + boostDraw x boostDrain))
 // (The spec's table, but the Ion Drive pushes 2.26, as the thruster it replaces did: the starter flies as it always has)
 const E = [
-  ['engine_ion_drive', 'Ion Drive', 'ion', 'sq', 0, 2.26, 9, 34, 2.0, 1.0, 12, 30, 'alloy', 'Efficient and steady, with a low top speed.'],
-  ['engine_vernier', 'Vernier', 'ion', 'tri', 2, 1.2, 4, 40, 1, 0, 4, 8, 'alloy', 'A cheap little thruster for corner push. It has no boost: boosting gives it no extra thrust and no extra drain.'],
-  ['engine_afterburner', 'Afterburner', 'afterburner', 'sq', 5, 1.6, 8, 50, 3.6, 3.0, 10, 60, 'alloy', 'Weak at cruise, a huge burst when boosting. Best with a Drive Cell touching it.'],
-  ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 30, 40, 'alloy', 'Brutal thrust at full power all the time, and a brutal drain. It has no boost: nothing is held back to give.'],
-  ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 25, 60, 'steel', 'The balanced main engine.'],
-  ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 3, 6, 'titanium', 'Near-free cruising, never in a hurry.'],
-  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 0.4, 32.5, 100, 'cobalt', 'The long-haul racer: fast, and faster still.'],
+  ['engine_ion_drive', 'Ion Drive', 'ion', 'sq', 0, 2.26, 9, 34, 2.0, 1.0, 12, 30, 'alloy', 'Efficient, steady engine with a low top speed.'],
+  ['engine_vernier', 'Vernier', 'ion', 'tri', 2, 1.2, 4, 40, 1, 0, 4, 8, 'alloy', 'Small, cheap thruster for extra push. Boosting does not change it.'],
+  ['engine_afterburner', 'Afterburner', 'afterburner', 'sq', 5, 1.6, 8, 50, 3.6, 3.0, 10, 60, 'alloy', 'Low thrust normally, very high when boosting. Works best next to a Drive Cell.'],
+  ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 30, 40, 'alloy', 'Full thrust at all times, with high power use. It has no boost.'],
+  ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 25, 60, 'steel', 'Main engine with balanced thrust, power use and boost.'],
+  ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 3, 6, 'titanium', 'Uses almost no power, but gives little thrust.'],
+  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 0.4, 32.5, 100, 'cobalt', 'Large engine with high thrust and the highest top speed.'],
 ];
 
 const BLAST = TUNING.partBlast;
@@ -283,29 +283,29 @@ for (const [id, name, family, piece, level, thrust, draw, rated, boost, boostDra
 // (A store's `intake`: energy routing's Takes, the most E a second each cell accepts (docs/design/energy-routing-impl.md §5.2);
 // `store` and `discharge` are its Holds and Gives. The new store and discharge numbers there land with the switch-over, P2)
 const OTHER = [
-  ['power_cell_reactor', 'Cell Reactor', 'reactor', ['sq'], 0, 'alloy', { produce: 35, hpScale: 0.8, blast: BLAST.generator }, 'The starter generator. It explodes when destroyed.', 'power'],
-  ['power_isotope_pile', 'Isotope Pile', 'reactor', ['round'], 9, 'steel', { produce: 18, hpScale: 1.6 }, 'A weak generator, but tough, and it never explodes.', 'power'],
-  ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'A heavy plant with plenty of power, and a big blast.', 'power'],
-  ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size: fragile, and the biggest blast.', 'power'],
-  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, intake: 50, hpScale: 0.6 }, 'A store for power: holds 200 and gives it out quickly.', 'power'],
-  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, discharge: 2000, intake: 40, hpScale: 0.6 }, 'A small store that gives its power out in a rush: holds 160, for guns and beams that want a burst.', 'power'],
-  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, discharge: 1400, intake: 80, hpScale: 0.6 }, 'A bigger store for the engines and Burst Strafers: holds 320 and gives it out steadily.', 'power'],
-  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 450, discharge: 150, intake: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy store: holds a lot, but gives it out slowly.', 'power'],
-  ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 30, priority: 2, facing: true, mining: true, minePulse: 0.9, hpScale: 0.7 }, 'A pulsed cutter that takes ore from rock, and a poor weapon.', 'utility'],
-  ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 20, priority: 2, facing: true, mining: true, minePulse: 1.2, hpScale: 0.8 }, 'A heavy cutter that breaks harder rock than a mining laser.', 'utility'],
-  ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges (30 a crate, one every 2 seconds) that stick to rock, blink for a second, then blow it open. Harmless to ships.', 'utility'],
-  ['utility_siphon', 'Siphon', 'siphon', ['sq'], 12, 'steel', { demand: 10, priority: 2, facing: true, siphon: true, hpScale: 0.7 }, 'Drinks gas from gas pockets and sends it back to the ship.', 'utility'],
-  ['utility_scanner', 'Scanner', 'scanner', ['sq'], 5, 'alloy', { demand: 4, priority: 3, range: 2400, hpScale: 0.6 }, 'A quick short sweep that reads rocks and finds seams.', 'utility'],
-  ['utility_long_range_array', 'Long-Range Array', 'scanner', ['round2'], 20, 'titanium', { demand: r2(8 / PIECE_AREA.round2), priority: 3, range: 4800, hpScale: 0.6 }, 'A slow sweep that reaches twice as far as a scanner.', 'utility'],
+  ['power_cell_reactor', 'Cell Reactor', 'reactor', ['sq'], 0, 'alloy', { produce: 35, hpScale: 0.8, blast: BLAST.generator }, 'The starter generator. Explodes when destroyed.', 'power'],
+  ['power_isotope_pile', 'Isotope Pile', 'reactor', ['round'], 9, 'steel', { produce: 18, hpScale: 1.6 }, 'Weak but tough generator that never explodes.', 'power'],
+  ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'Heavy generator with plenty of power and a big blast when destroyed.', 'power'],
+  ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size. Fragile, with the biggest blast when destroyed.', 'power'],
+  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, intake: 50, hpScale: 0.6 }, 'Stores power and gives it out quickly.', 'power'],
+  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, discharge: 2000, intake: 40, hpScale: 0.6 }, 'Small power store that gives its power out in a rush, for guns and beams that need a burst.', 'power'],
+  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, discharge: 1400, intake: 80, hpScale: 0.6 }, 'Bigger power store for the engines and Burst Strafers. Gives its power out steadily.', 'power'],
+  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 450, discharge: 150, intake: 150, hpScale: 0.7, massScale: 1.6 }, 'Deep, heavy power store. Holds a lot, but gives it out slowly.', 'power'],
+  ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 30, priority: 2, facing: true, mining: true, minePulse: 0.9, hpScale: 0.7 }, 'Cuts ore from rock (hold the right mouse button). Weak as a weapon.', 'utility'],
+  ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 20, priority: 2, facing: true, mining: true, minePulse: 1.2, hpScale: 0.8 }, 'Heavy cutter that breaks harder rock than a Mining Laser.', 'utility'],
+  ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges that stick to rock, blink for a second, then blow it open. Harmless to ships.', 'utility'],
+  ['utility_siphon', 'Siphon', 'siphon', ['sq'], 12, 'steel', { demand: 10, priority: 2, facing: true, siphon: true, hpScale: 0.7 }, 'Collects gas from gas pockets into your cargo (hold the right mouse button on one).', 'utility'],
+  ['utility_scanner', 'Scanner', 'scanner', ['sq'], 5, 'alloy', { demand: 4, priority: 3, range: 2400, hpScale: 0.6 }, 'Quick short-range sweep that reads rocks and finds seams.', 'utility'],
+  ['utility_long_range_array', 'Long-Range Array', 'scanner', ['round2'], 20, 'titanium', { demand: r2(8 / PIECE_AREA.round2), priority: 3, range: 4800, hpScale: 0.6 }, 'Slow sweep that reaches twice as far as a Scanner.', 'utility'],
   // (Level 2, Kieran 2026-10-30: the lane-clearance job, offered at 2, has you build one, and nothing opens early now; still a Mk III titanium rig)
   ['utility_constructor', 'Constructor', 'constructor', ['sq'], 2, 'titanium', { demand: 4, priority: 3, hpScale: 0.6, grade: 3 }, 'Builds structures piece by piece.', 'utility'],
-  ['shield_deflector', 'Deflector', 'shield', ['sq'], 11, 'steel', { shield: 40, shieldRegen: 8, shieldDelay: 180, demand: 16, priority: 2, hpScale: 0.6 }, 'The standard shield, which soaks damage before the hull and refills 8 a second per cell after 3 seconds unhit.', 'shields'],
-  ['shield_flicker_screen', 'Flicker Screen', 'shield', ['round'], 19, 'steel', { shield: 20, shieldRegen: 20, shieldDelay: 60, demand: r2(16 * 0.4), priority: 2, hpScale: 0.6 }, 'A thin, cheap shield that refills 20 a second per cell after only 1 second unhit.', 'shields'],
-  ['shield_bulwark_projector', 'Bulwark Projector', 'shield', ['block2'], 27, 'titanium', { shield: 60, shieldRegen: 5, shieldDelay: 240, demand: r2(16 * 1.2), priority: 2, hpScale: 0.7 }, 'A deep shield that soaks an alpha strike but refills only 5 a second per cell after 4 seconds unhit.', 'shields'],
-  ['utility_jump_coil', 'Jump Coil', 'jumpcoil', ['sq'], 14, 'steel', { jumpCapacity: 12, demand: 8, priority: 3, hpScale: 0.8 }, 'More jump drive for a bigger hull.', 'engines'],
-  ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, jumpCooldown: 0.8, demand: 8, priority: 3, hpScale: 0.8 }, 'A dense coil with more jump drive per cell that also cuts the jump cooldown by a fifth.', 'engines'],
-  ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Plate that blunts small fast hits, so it beats streams of fire.', 'shields'],
-  ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { grade: 2, armour: 1, splashTaken: 0.5, hpScale: 3.2, massScale: 1.3 }, 'Layered plate with room between that takes half damage from blasts.', 'shields'],
+  ['shield_deflector', 'Deflector', 'shield', ['sq'], 11, 'steel', { shield: 40, shieldRegen: 8, shieldDelay: 180, demand: 16, priority: 2, hpScale: 0.6 }, 'Standard shield. Soaks damage before the hull. Recharges 8 HP a second per cell, starting 3 s after the last hit.', 'shields'],
+  ['shield_flicker_screen', 'Flicker Screen', 'shield', ['round'], 19, 'steel', { shield: 20, shieldRegen: 20, shieldDelay: 60, demand: r2(16 * 0.4), priority: 2, hpScale: 0.6 }, 'Thin, cheap shield. Recharges 20 HP a second per cell, starting 1 s after the last hit.', 'shields'],
+  ['shield_bulwark_projector', 'Bulwark Projector', 'shield', ['block2'], 27, 'titanium', { shield: 60, shieldRegen: 5, shieldDelay: 240, demand: r2(16 * 1.2), priority: 2, hpScale: 0.7 }, 'Deep shield that soaks a big hit. Recharges only 5 HP a second per cell, starting 4 s after the last hit.', 'shields'],
+  ['utility_jump_coil', 'Jump Coil', 'jumpcoil', ['sq'], 14, 'steel', { jumpCapacity: 12, demand: 8, priority: 3, hpScale: 0.8 }, 'Adds jump drive capacity for a bigger hull.', 'engines'],
+  ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, jumpCooldown: 0.8, demand: 8, priority: 3, hpScale: 0.8 }, 'Dense coil with more jump capacity per cell. Jump cooldown 20% shorter.', 'engines'],
+  ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Armour that resists small, fast hits.', 'shields'],
+  ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { grade: 2, armour: 1, splashTaken: 0.5, hpScale: 3.2, massScale: 1.3 }, 'Layered armour that takes half damage from blasts.', 'shields'],
 ];
 const LOOK = {
   reactor: 'generator', battery: 'battery', capacitor: 'weapon_battery', drive_cell: 'drive_battery', mining: 'miner', demolition: 'charge_launcher',
@@ -331,7 +331,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 {
   const LATE_OTHER = [
     // (The Flash Screen's own store holds flashCost E a point: full, it buys the return at once; it refills over its in port. features/flash)
-    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, flashCost: 4, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill. When it breaks, a full store of its own brings it straight back; otherwise it returns whole 4 seconds later. The store refills from its power line.', 'shields', legacyLook('shield')],
+    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, flashCost: 4, demand: 16, priority: 2, hpScale: 0.6 }, 'Shield with no gradual recharge. When it breaks it comes back at full after 4 s, or at once if its own store is full. The store refills from its power line.', 'shields', legacyLook('shield')],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
     models.push({
@@ -345,13 +345,13 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   // (The semi-automatic rifle, its own numbers: a clip of 4 at 12 ticks, 60 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E.
   // Its demand is that reload's draw spread over the clip's cycle as it was (6 at 10 ticks: heavier-shots-2026-11 keeps
   // the legacy draw); the fire block below gives the rest.)
-  const desc = 'The semi-automatic rifle: a clip of four heavy shots, one a click (as fast as you can click, up to five a second; a second Rail Driver takes alternate shots, skipping one that is reloading), then it reloads itself in a second and a half for 48 E. It needs no ammo.';
+  const desc = 'Fires one heavy shot per click (up to 5 a second), 4 shots a clip, then reloads. A second Rail Driver takes turns with it. Needs no ammo.';
   models.push({
     ...base('railgun_rail_driver', 'Rail Driver', 'railgun', ['block2'], 29, 'titanium', { grade: 4 }),
     weapon: 'railgun', ...mounted('railgun_rail_driver', desc), hpScale: 0.96, demand: r2((48 * 60) / (90 + 6 * 10) / PIECE_AREA.block2), priority: 2, fireInterval: 10,
     weaponMods: { set: { ammo: null, damage: 60, pierce: 1, speed: 150, life: 60 } },
     rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('railgun'),
-    guide: { name: 'Rail Driver', blurb: 'The semi-automatic rifle', piece: 'block2', order: guideOrder++ },
+    guide: { name: 'Rail Driver', blurb: 'Semi-automatic heavy railgun', piece: 'block2', order: guideOrder++ },
   });
 }
 // ---- (end Pulse Dynamo, Flash Screen, Rail Driver)
@@ -371,9 +371,9 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   MOUNTING.point_defence_turret = { arc: 300 };
   const SUPPORT = [
     ['utility_repair_beam', 'Repair Beam', 'repair', ['rect2'], 17, 'steel', { weapon: 'repair', demand: 14, priority: 2, hpScale: 0.7, weaponMods: {} },
-      "Mends 42 HP a second into the friendly part its beam lands on (range 520, 28 power a second): hold fire with it on a party member or an ally. It can't mend your own ship, a destroyed part or a shield, and does nothing to an enemy.", 'utility'],
+      "Repairs the friendly part its beam lands on. Hold fire on a party member or ally. It can't repair your own ship, destroyed parts or shields.", 'utility'],
     ['point_defence_turret', 'Point Defence Turret', 'point_defence', ['sq'], 10, 'steel', { weapon: 'point_defence', demand: 10, priority: 2, fireInterval: 12, hpScale: 0.6, weaponMods: {} },
-      'Shoots down incoming missiles, torpedoes, mortar shells and seekers on its own: 5 shots a second out to 560, 2 power a shot. One hit kills a missile, mortar shell or seeker; a Hammerhead takes 2, an Eel 3, a Leviathan 5. It never fires at ships, and a boss\'s rings of shots are yours to dodge.', 'weapons'],
+      'Shoots down incoming missiles, torpedoes, mortar shells and seekers by itself. Bigger ones need more hits. It never fires at ships or at boss shots.', 'weapons'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category] of SUPPORT) {
     const m = mounted(id, description);
@@ -404,10 +404,10 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   const TUG = [
     ['engine_burst_strafer', 'Burst Strafer', 'strafer', ['sq'], 10, 'steel',
       { strafe: { kick: 14, ticks: 12, cooldown: 24 }, demand: 700, intake: 40, buffer: 140, priority: 1, facing: true, hpScale: 0.6 },
-      'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. No push at all for cruising.', 'engines'],
+      'Dodge thruster. A short, strong burst away from its nozzle that uses a lot of power. Fit several facing different ways to dodge in any direction. No cruising thrust.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
-      'Latches onto a wreck, debris or a loot pod and drags it on a tether to a station to salvage, and never takes hold of a working ship. It draws power only while towing, and pulls weaker short of it.', 'utility'],
+      'Tows a wreck, debris or loot pod on a tether so you can bring it to a station for salvage. It cannot tow working ships. Uses power only while towing.', 'utility'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category] of TUG) {
     models.push({
@@ -431,9 +431,9 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   };
   const RELAYS = [
     ['power_conduit', 'Conduit', 'relay', ['sq'], 0, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, hpScale: 0.5 },
-      'A power line: it passes power between the parts it touches, up to 200 a second, and holds only 10 itself.', 'power'],
+      'Power line. Passes power between the parts it touches.', 'power'],
     ['power_diode', 'Diode', 'relay', ['sq'], 4, 'alloy', { store: 10, discharge: 200, intake: 200, oneWay: true, hpScale: 0.5 },
-      'A one-way power line: power only flows out of its front, into the part there, up to 200 a second; the other parts touching it can only feed it. Its front must touch a part.', 'power'],
+      'One-way power line. Power flows out of its front only; parts on its other sides can only feed it. Its front must touch a part.', 'power'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category] of RELAYS) {
     models.push({
@@ -453,9 +453,9 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   const GYRO_LOOK = { color: '#7f9cb8', decor: 'none', glow: '#7dd3fc' };
   const GYROS = [
     ['utility_gyro', 'Gyro', 'gyro', ['sq'], 6, 'alloy', { gyro: 250, demand: 6, intake: 6, buffer: 6, priority: 1, massScale: 1.5, hpScale: 0.8 },
-      'A reaction wheel: it adds turning force anywhere on the hull, with no push of its own, and draws power only while turning. Heavier than plain hull.', 'engines'],
+      'Adds turning force wherever it sits. Uses power only while turning. Heavier than plain hull.', 'engines'],
     ['utility_heavy_gyro', 'Heavy Gyro', 'gyro', ['block2'], 20, 'titanium', { gyro: 7000, demand: 12, intake: 10, buffer: 24, priority: 1, massScale: 2, hpScale: 0.9 },
-      'A big reaction wheel for big ships: it adds a lot of turning force anywhere on the hull, with no push of its own, and draws power only while turning. Heavy.', 'engines'],
+      'Adds a lot of turning force for big ships, wherever it sits. Uses power only while turning. Heavy.', 'engines'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category] of GYROS) {
     models.push({
@@ -547,12 +547,12 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
   // ---- Legendaries' texts (rework 2026-11 section 4): what each does, in numbers; its mount line is added after
   const LEGEND_TEXT = {
-    legendary_hive: 'A nest that regrows: it holds eight seekers and looses them four at a time, a tenth of a second apart, each homing on a different one of the four ships nearest your cursor. One grows back every three-quarters of a second, drawing a little power. Each is 10 damage and a 70 blast, and dies to one point-defence hit.',
-    legendary_frostbite: 'The freeze beam: a held beam out to 760 that burns 95 a second. The ship it touches is slowed, 40% less thrust and turning, while lit and 0.7 s after.',
-    legendary_cinder_bloom: 'The arsonist: a shell every 1.2 s for 16 damage, and the part it hits burns for 22 a second over 5 s, the fire spreading to its neighbours.',
-    legendary_prism: 'The splitter: a crystal bolt every 1.6 s that splits where your cursor is into five 11-damage shards in a 40 degree fan. You choose where the fan opens.',
-    legendary_phase: 'The ghost round: a slow 70-damage round every 2.2 s that flies through rock, wrecks and shields, hits the hull directly, and carries on through two ships.',
-    legendary_singularity: 'The black hole: 210 power a shot, one every 7 s. A slow orb flies to your cursor and stops there, pulls every ship within 900 toward it for 3.8 s, then collapses in a 300 blast for 140.',
+    legendary_hive: 'Holds 8 seekers and fires 4 at a time, each homing on a different ship near your cursor. Used seekers regrow one at a time. Point defence stops each with 1 hit.',
+    legendary_frostbite: 'Held freezing beam. The ship it touches loses 40% of its thrust and turning while lit and for 0.7 s after.',
+    legendary_cinder_bloom: 'Fires shells that set the part they hit burning for 5 s. The fire spreads to its neighbours.',
+    legendary_prism: 'Fires a crystal bolt that splits at your cursor into a fan of 5 shards, so you choose where the fan opens.',
+    legendary_phase: 'Fires a slow round that passes through rock, wrecks and shields to hit the hull, and goes on through 2 ships.',
+    legendary_singularity: 'Fires a slow orb that stops at your cursor, pulls nearby ships toward it for a few seconds, then explodes.',
   };
   // ---- Energy routing (docs/design/energy-routing-impl.md §1.4, §5.1, owner decision D3): each weapon's own buffer, filled at
   // `intake` E a second. Its `shot` (E) is derived so that at full supply the beat and damage are today's: a cycle, ammo or
@@ -691,48 +691,48 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
   // The feed layer's parts and the power parts the ports meta wants: [id, name, family, pieces, level, material, fields, description, category, look]
   const FEED_LOOK = { color: '#5b7a8c', decor: 'none' }, TANK_LOOK = (color) => ({ color, decor: 'battery', glow: color });
   const TANKS = [
-    ['overcharge', 'Overcharge', 20, '#f97316', 'Harder hits and half the discharge, for 40% more power a shot'],
-    ['coolant', 'Coolant', 18, '#38bdf8', 'Half the discharge and rest, 15% softer hits'],
-    ['damping', 'Damping Gel', 22, '#a78bfa', 'A heavy gun needs half the floor, a quarter slower'],
-    ['flux', 'Flux Salts', 18, '#facc15', '30% less power a shot, 15% softer hits'],
-    ['accelerant', 'Accelerant', 24, '#f43f5e', '30% faster fire for a quarter more power a shot, and a higher floor'],
-    ['lens', 'Lens Fluid', 20, '#2dd4bf', 'A beam burns a quarter less and hits a tenth softer, resting longer'],
-    ['catalyst', 'Catalyst', 16, '#84cc16', 'An engine burns 40% less for 15% less thrust'],
-    ['reaction', 'Reaction Mass', 18, '#e879f9', '40% more thrust for the same burn; a Reaction Thruster runs on it'],
-    ['burstgel', 'Burst Gel', 22, '#fb7185', 'Boost half again as hard for half the extra burn'],
+    ['overcharge', 'Overcharge', 20, '#f97316', 'Guns hit 30% harder and pause half as long after a shot, but use 40% more power a shot'],
+    ['coolant', 'Coolant', 18, '#38bdf8', 'Guns pause half as long after a shot and between beam pulses, but do 15% less damage'],
+    ['damping', 'Damping Gel', 22, '#a78bfa', 'Heavy guns need half the steady power to charge, but fire 25% slower'],
+    ['flux', 'Flux Salts', 18, '#facc15', 'Guns use 30% less power a shot, but do 15% less damage'],
+    ['accelerant', 'Accelerant', 24, '#f43f5e', 'Guns fire 30% faster, but use 25% more power a shot and need more steady power to charge'],
+    ['lens', 'Lens Fluid', 20, '#2dd4bf', 'Beams use 25% less power, but do 10% less damage and pause longer between pulses'],
+    ['catalyst', 'Catalyst', 16, '#84cc16', 'Engines use 40% less power, for 15% less thrust'],
+    ['reaction', 'Reaction Mass', 18, '#e879f9', 'Engines give 40% more thrust for the same power. A Reaction Thruster runs on it'],
+    ['burstgel', 'Burst Gel', 22, '#fb7185', 'Boost is 50% stronger for half the extra power, with 10% less cruising thrust'],
   ];
   const FEED_PARTS = [
     ['power_joiner_bank', 'Joiner Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 90, intake: 40, hpScale: 0.6, ports: [...ports('in', 'S', [0, 1], 40), ...ports('out', 'N', [0], 90)] },
-      'A battery that joins two lines into one: it takes 40 a second at each of its two back ports and gives 90 out of its front left. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that joins two power lines into one. Both inputs are at its back; the output is at its front left.', 'power', legacyLook('battery')],
     ['power_splitter_bank', 'Splitter Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 45, intake: 80, hpScale: 0.6, ports: [...ports('in', 'S', [0], 80), ...ports('out', 'N', [0, 1], 45)] },
-      'A battery that splits one line into two: it takes 80 a second at its back left and gives 45 out of each front port. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that splits one power line into two. The input is at its back left; both outputs are at its front.', 'power', legacyLook('battery')],
     ['power_joiner_elbow', 'Elbow Joiner Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 90, intake: 40, hpScale: 0.6, ports: [...ports('in', 'S', [0, 1], 40), ...ports('out', 'E', [0], 90)] },
-      'A battery that joins two lines into one around a corner: it takes 40 a second at each of its two back ports and gives 90 out of its right end (flip it for the left). Holds 300.', 'power', legacyLook('battery')],
+      'Battery that joins two power lines into one around a corner. Both inputs are at its back; the output is at its right end (flip it for the left).', 'power', legacyLook('battery')],
     ['power_joiner_end', 'End Joiner Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 90, intake: 40, hpScale: 0.6, ports: [...ports('in', 'W', [0], 40), ...ports('in', 'E', [0], 40), ...ports('out', 'N', [0], 90)] },
-      'A battery that joins two lines from its two ends: it takes 40 a second at its left end and at its right end, and gives 90 out of its front left. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that joins two power lines from its two ends into one. The output is at its front left.', 'power', legacyLook('battery')],
     ['power_joiner_cross', 'Cross Joiner Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 90, intake: 40, hpScale: 0.6, ports: [...ports('in', 'S', [0], 40), ...ports('in', 'N', [0], 40), ...ports('out', 'E', [0], 90)] },
-      'A battery that joins a line from its back and one from its front into one: it takes 40 a second at its back left and its front left, and gives 90 out of its right end. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that joins a power line from its back and one from its front into one. The output is at its right end.', 'power', legacyLook('battery')],
     ['power_splitter_elbow', 'Elbow Splitter Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 45, intake: 80, hpScale: 0.6, ports: [...ports('in', 'S', [0], 80), ...ports('out', 'N', [0], 45), ...ports('out', 'E', [0], 45)] },
-      'A battery that splits one line in two, one straight on and one round a corner: it takes 80 a second at its back left and gives 45 out of its front left and 45 out of its right end. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that splits one power line into two, one straight on and one round a corner. The input is at its back left; the outputs are at its front left and right end.', 'power', legacyLook('battery')],
     ['power_splitter_tee', 'Tee Splitter Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 45, intake: 80, hpScale: 0.6, ports: [...ports('in', 'W', [0], 80), ...ports('out', 'N', [0], 45), ...ports('out', 'S', [0], 45)] },
-      'A battery that splits a line from its end to its front and back: it takes 80 a second at its left end and gives 45 out of its front left and 45 out of its back left. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that splits a power line from its left end into two. The outputs are at its front left and back left.', 'power', legacyLook('battery')],
     ['power_splitter_end', 'End Splitter Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 45, intake: 80, hpScale: 0.6, ports: [...ports('in', 'S', [0], 80), ...ports('out', 'W', [0], 45), ...ports('out', 'E', [0], 45)] },
-      'A battery that splits one line out of its two ends: it takes 80 a second at its back left and gives 45 out of its left end and 45 out of its right end. Holds 300.', 'power', legacyLook('battery')],
+      'Battery that splits one power line into two out of its ends. The input is at its back left; the outputs are at its left and right ends.', 'power', legacyLook('battery')],
     ['power_surge_cell', 'Surge Cell', 'capacitor', ['sq'], 14, 'composite', { store: 120, discharge: 300, intake: 120, hpScale: 0.5, ports: io(120, 300) },
-      'A fast cell: it takes 120 a second and pours 300, so a gun that shuts its ports after a shot gets it all back the moment they open. Holds 120.', 'power', legacyLook('weapon_battery')],
+      'Small fast power store. It gives power out much faster than it takes it in, for guns that need a burst after a pause.', 'power', legacyLook('weapon_battery')],
     ['power_corner', 'Corner Conduit', 'relay', ['sq'], 2, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, hpScale: 0.5, ports: [...ports('in', 'S', [0], 200), ...ports('out', 'E', [0], 200)] },
-      'A power line that turns: in at the back, out to the right (flip it for the left), up to 200 a second.', 'power', { color: '#b0711f', decor: 'none' }],
+      'Power line that turns a corner: in at the back, out to the right (flip it for the left).', 'power', { color: '#b0711f', decor: 'none' }],
     ['power_combiner', 'Combiner', 'relay', ['sq'], 12, 'steel', { store: 10, discharge: 150, intake: 150, relayOnly: true, combiner: true, hpScale: 1.2, ports: io(150, 150), feedPoints: [{ side: 'W' }] },
-      'Joins a feed to a power line: a pipe at its left side brings a material, and the line out of its front carries it with the power, along conduits (a battery stops it) into a gun or engine that takes it. Tough.', 'power', { color: '#8c6b2a', decor: 'none', glow: '#f2c14e' }],
+      'Adds a feed from a pipe at its left side to the power line out of its front, so a gun or engine down the line can use it. Batteries block the feed. Tough.', 'power', { color: '#8c6b2a', decor: 'none', glow: '#f2c14e' }],
     ['power_passthrough', 'Passthrough', 'relay', ['sq'], 10, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, pipeThrough: true, hpScale: 0.5, ports: io(200, 200), feedPoints: [{ side: 'W' }, { side: 'E' }] },
-      'A power line with a pipe through it, side to side: the one way a feed crosses a line.', 'power', { color: '#b0711f', decor: 'none', glow: '#5b7a8c' }],
+      'Power line with a pipe through it, side to side. The only way a pipe crosses a power line.', 'power', { color: '#b0711f', decor: 'none', glow: '#5b7a8c' }],
     ['feed_pipe', 'Feed Pipe', 'feed', ['sq'], 10, 'alloy', { pipe: true, feedPoints: [{ side: 'N' }, { side: 'E' }, { side: 'S' }, { side: 'W' }], hpScale: 0.5 },
-      'A pipe: it joins tanks, Selectors, Combiners and guns with feed inputs on every side. It carries no power.', 'power', FEED_LOOK],
+      'Pipe that joins tanks, Selectors, Combiners and guns with feed inputs, on any side. It carries no power.', 'power', FEED_LOOK],
     ['feed_selector', 'Selector', 'feed', ['sq'], 16, 'steel', { selector: true, feedPoints: [{ side: 'W' }, { side: 'E' }, { side: 'N' }], hpScale: 0.6 },
-      'Two feeds in (left and right), one out (front): the pilot switches which one passes (Y). What is already in the lines and buffers runs out first.', 'power', { ...FEED_LOOK, glow: '#f2c14e' }],
+      'Two feeds in (left and right), one out (front). You switch which one passes with the Switch tanks key. Feed already in the lines runs out first.', 'power', { ...FEED_LOOK, glow: '#f2c14e' }],
     ...TANKS.map(([feed, name, level, color, what]) =>
       [`feed_tank_${feed}`, `${name} Tank`, 'feed', ['sq'], level, 'steel', { tank: { feed, holds: 120 }, feedPoints: [{ side: 'N' }, { side: 'E' }, { side: 'S' }, { side: 'W' }], hpScale: 0.7 },
-        `A tank of ${name}: ${what}. Holds 120; pipes join it on every side. It is refilled in the hangar.`, 'power', TANK_LOOK(color)]),
+        `A tank of ${name}. ${what}. Holds 120. Pipes join it on any side. Refilled in the hangar.`, 'power', TANK_LOOK(color)]),
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of FEED_PARTS) {
     models.push({
@@ -748,14 +748,14 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
     hpScale: FNS.get('thruster').hpScale, demand: 4, priority: 1, thrust: 1.0, rated: 60, boost: 1, boostDrain: 0, intake: 6, buffer: 10,
     ports: ports('in', 'S', [0], 6), feedPort: { side: 'W' }, takes: ['reaction', 'catalyst', 'burstgel'], feedUse: 1.2,
     feedMods: { reaction: { thrust: 5 }, catalyst: { burn: 0.25, thrust: 2.5 }, burstgel: { thrust: 2.2, boost: 2.5 } },
-    rarity: 'uncommon', description: 'An engine built for feed: a weak push on power alone, five times that on Reaction Mass piped to its left side (1.2 a second while thrusting). Power stays with the guns; the price is tanks and space.',
+    rarity: 'uncommon', description: 'Weak on power alone; 5 times the thrust with Reaction Mass piped to its left side. Leaves your power for the guns, but needs tanks and space.',
     category: 'engines', fabOrder: next('engines'), ...legacyLook('thruster'), glow: '#e879f9',
-    guide: { name: 'Reaction Thruster', blurb: 'An engine built for feed', order: guideOrder++ },
+    guide: { name: 'Reaction Thruster', blurb: 'Engine that runs on feed', order: guideOrder++ },
   });
   // The Slurry Cannon: two inputs, power at its back left and its own feed at its back right, and it fires only with feed
   MOUNT.cannon_slurry = 'fixed';
   MOUNTING.cannon_slurry = { attach: 'back', clear: ahead(2) };
-  const slurryDesc = 'The two-input gun: power at its back left and its own feed input at its back right, and it fires only with a material in it: a heavy slug every 0.7 s that hits like a Hammer. Overcharge, Accelerant or Flux Salts.';
+  const slurryDesc = 'Heavy cannon that needs power at its back left and a feed (Overcharge, Accelerant or Flux Salts) at its back right to fire.';
   models.push({
     ...base('cannon_slurry', 'Slurry Cannon', 'cannon', ['rect2'], 18, 'titanium', { grade: 3 }),
     weapon: 'cannon', ...mounted('cannon_slurry', slurryDesc), hpScale: r2(FNS.get('weapon').hpScale * 1.1), demand: 18, priority: 2, fireInterval: 42,
@@ -763,7 +763,7 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
     fire: { model: 'cycle', interval: 42, shot: 25, intake: 45, buffer: 1 },
     ports: ports('in', 'S', [0], 54), feedPort: { side: 'S', cell: 1, required: true }, takes: ['overcharge', 'accelerant', 'flux'],
     rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('weapon'),
-    guide: { name: 'Slurry Cannon', blurb: 'The two-input gun', piece: 'rect2', order: guideOrder++ },
+    guide: { name: 'Slurry Cannon', blurb: 'Feed-fired heavy cannon', piece: 'rect2', order: guideOrder++ },
   });
   // Ways to arm a ship (docs/design/energy-ports-2026-11.md section 17). Three kinds of gun, by what they ask of the ship:
   // - simple: fires off any line (a Cell Reactor at its port). Cheap, many of them.
@@ -846,17 +846,17 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
   const MACHINE_LOOK = { fabricator: { color: '#c08a3e', decor: 'battery', glow: '#fbbf24' }, refiner: { color: '#7a8f5a', decor: 'none', glow: '#a3e635' } };
   const MACHINES = [
     ['fabricator_field', 'Field Fabricator', 'fabricator', ['rect2'], 0, 'alloy', { machine: { kind: 'fabricator', tier: 1 }, demand: 20 },
-      'Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a second while it works. One per ship.'],
+      'Builds and repairs parts from your cargo while you fly, up to Mk II. Uses power only while it works. One per ship.'],
     ['fabricator_bay', 'Fabrication Bay', 'fabricator', ['block2'], 12, 'steel', { machine: { kind: 'fabricator', tier: 2 }, demand: 17.5, massScale: 1.4 },
-      'Builds and repairs parts from your hold 1.6 times as fast as a Field Fabricator, up to Mk III, drawing 70 a second while it works. One per ship.'],
+      'Builds and repairs parts from your cargo, up to Mk III, 1.6 times as fast as a Field Fabricator. Uses power only while it works. One per ship.'],
     ['fabricator_forge', 'Assembly Forge', 'fabricator', ['block2'], 24, 'titanium', { machine: { kind: 'fabricator', tier: 3 }, demand: 27.5, massScale: 1.6 },
-      'Builds and repairs any part from your hold 2.5 times as fast as a Field Fabricator, drawing 110 a second while it works. One per ship.'],
+      'Builds and repairs any part from your cargo, 2.5 times as fast as a Field Fabricator. Uses power only while it works. One per ship.'],
     ['refiner_field', 'Field Refiner', 'refiner', ['sq'], 3, 'alloy', { machine: { kind: 'refiner', tier: 1 }, demand: 20 },
-      'Refines ore in your hold while you fly, up to Mk II materials, at 0.4 of a station\'s pace, drawing 20 a second while it works. One per ship.'],
+      'Refines ore in your cargo while you fly, up to Mk II, at 0.4 times a station\'s speed. Uses power only while it works. One per ship.'],
     ['refiner_bay', 'Refinery Bay', 'refiner', ['rect2'], 12, 'steel', { machine: { kind: 'refiner', tier: 2 }, demand: 17.5 },
-      'Refines ore in your hold up to Mk III materials, at 0.7 of a station\'s pace, drawing 35 a second while it works. One per ship.'],
+      'Refines ore in your cargo, up to Mk III, at 0.7 times a station\'s speed. Uses power only while it works. One per ship.'],
     ['refiner_forge', 'Smelter Forge', 'refiner', ['block2'], 24, 'titanium', { machine: { kind: 'refiner', tier: 3 }, demand: 13.75, massScale: 1.4 },
-      'Refines any ore in your hold at a station\'s pace, drawing 55 a second while it works. One per ship.'],
+      'Refines any ore in your cargo at a station\'s speed. Uses power only while it works. One per ship.'],
   ];
   const portsOf = (piece, demand) => {
     const cells = PIECE_AREA[piece] >= 2 ? [0, 1] : [0];
@@ -884,11 +884,11 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
   const LINK_LOOK = { minebay: { color: '#6b6f4a', decor: 'battery', glow: '#ef4444' }, clamp: { color: '#7d8794', decor: 'none', glow: '#60a5fa' } };
   const LINK = [
     ['mine_bay', 'Mine Bay', 'minebay', ['rect2'], 8, 'steel', { mineBay: { batch: 4, capacity: 12, cooldown: 120 }, facing: true, hpScale: 0.8, massScale: 1.2 },
-      'Drops a batch of 4 proximity mines out of its open edge on a key press, from a magazine of 12 the fabricator refills. Mines arm after a second and never go off for you or your party.'],
+      'Drops proximity mines out of its open edge when you press its key. Your fabricator refills it. Mines never go off for you or your party.'],
     ['docking_clamp', 'Docking Clamp', 'clamp', ['sq'], 4, 'alloy', { clamp: { size: 1 }, facing: true, hpScale: 1.2 },
-      'A clamp on its open edge: line it up with the Docking Clamp of another ship and both pilots agree to lock the two ships together, one steering.'],
+      'Locks two ships together. Line it up with another ship\'s Docking Clamp and both pilots accept. One pilot steers.'],
     ['docking_clamp_heavy', 'Heavy Docking Clamp', 'clamp', ['rect2'], 16, 'steel', { clamp: { size: 2 }, facing: true, hpScale: 1.4, massScale: 1.3 },
-      'A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ships: line them up and both pilots agree to lock together.'],
+      'Two-cell clamp for bigger ships that locks only to another Heavy Docking Clamp. Line them up and both pilots accept.'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description] of LINK) {
     models.push({
@@ -915,19 +915,19 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
   // [id, name, family, piece, level, material, shaped, total draw, description]
   const SHAPED = [
     ['shield_spark_wall', 'Spark Wall', 'shieldwall', 'sq', 2, 'alloy', { kind: 'wall', len: 2, off: 1, cap: 40, rate: 14, delay: 1.5 }, 10,
-      'Two cells of flat shield just off the hull: 40 HP, 14 a second, 1.5 s down when broken. Cheap and quick.'],
+      'Small flat shield wall, 2 cells wide, just off the hull. Cheap and quick to return.'],
     ['shield_guard_wall', 'Guard Wall', 'shieldwall', 'rect2', 4, 'alloy', { kind: 'wall', len: 3, off: 1, cap: 75, rate: 12, delay: 2.2 }, 16,
-      'Three cells wide, one out: 75 HP, 12 a second, 2.2 s down when broken. Covers a gun and its neighbours.'],
+      'Flat shield wall, 3 cells wide, 1 cell out. Covers a gun and its neighbours.'],
     ['shield_rampart', 'Rampart', 'shieldwall', 'block2', 12, 'steel', { kind: 'wall', len: 5, off: 2, cap: 260, rate: 9, delay: 4.5, deep: true }, 30,
-      'Five cells of deep flat shield, two out: 260 HP, 9 a second, 4.5 s down when broken. Slow to return.'],
+      'Large, deep flat shield wall, 5 cells wide, 2 cells out. Slow to return.'],
     ['shield_visor', 'Visor', 'shieldarc', 'sq', 2, 'alloy', { kind: 'arc', rad: 2.5, span: 60, cap: 45, rate: 16, delay: 1.2 }, 11,
-      'A tight 60 degree arc in front of a gun: 45 HP, 16 a second, 1.2 s down when broken.'],
+      'Tight 60 degree shield arc in front of a gun.'],
     ['shield_buckler', 'Buckler', 'shieldarc', 'sq', 4, 'alloy', { kind: 'arc', rad: 2, span: 90, cap: 60, rate: 13, delay: 2 }, 13,
-      'A small 90 degree arc close to the hull: 60 HP, 13 a second, 2 s down when broken.'],
+      'Small 90 degree shield arc close to the hull.'],
     ['shield_shell', 'Shell', 'shieldarc', 'rect2', 8, 'steel', { kind: 'arc', rad: 3.5, span: 120, cap: 160, rate: 8, delay: 3.5, deep: true }, 22,
-      'A 120 degree arc that wraps most of a side: 160 HP, 8 a second, 3.5 s down when broken.'],
+      '120 degree shield arc that wraps most of a side.'],
     ['shield_half_dome', 'Half-dome', 'shieldarc', 'block2', 18, 'titanium', { kind: 'arc', rad: 5, span: 180, cap: 320, rate: 6, delay: 5.5, deep: true }, 36,
-      'A 180 degree dome over one end: 320 HP, 6 a second, 5.5 s down when broken. Deep and slow.'],
+      '180 degree shield dome over one end. Deep and slow to return.'],
   ];
   for (const [id, name, family, piece, level, material, shaped, draw, description] of SHAPED) {
     const demand = r2(draw / PIECE_AREA[piece]);
@@ -943,12 +943,12 @@ for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mountin
 // ---- (end shaped shields)
 
 const COMPONENTS = [
-  ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount: cannons, autocannons, flak and mortars.'],
-  ['coil_winding', 'Coil Winding', 'uncommon', 48, { copper_wire: 6, ferrite_plate: 1 }, 40, '#d97706', 'Copper wound on a ferrite core: railguns, arc and EMP projectors, jump coils.'],
-  ['capacitor_cell', 'Capacitor Cell', 'uncommon', 40, { copper_wire: 3, insulated_polymer: 1, scrap_electronics: 1 }, 30, '#38bdf8', 'A fast-discharge cell: batteries, capacitors, pulse guns and lasers.'],
-  ['thrust_nozzle', 'Thrust Nozzle', 'rare', 85, { titanium_plate: 2, ceramic_plate: 1 }, 60, '#f97316', 'A ceramic-lined titanium bell: torches, plasma and fusion drives.'],
-  ['fuel_injector', 'Fuel Injector', 'uncommon', 55, { steel_plate: 1, propellant: 2, servo_motor: 1 }, 45, '#fb923c', 'Meters propellant into a burn: afterburners and torches.'],
-  ['reactor_core', 'Reactor Core', 'rare', 130, { hardened_steel: 2, crystal: 1, coolant: 2 }, 90, '#facc15', 'The heart of a generator past the cell reactor.'],
+  ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount, for shell-firing guns.'],
+  ['coil_winding', 'Coil Winding', 'uncommon', 48, { copper_wire: 6, ferrite_plate: 1 }, 40, '#d97706', 'Copper wound on a ferrite core, for railguns, arc and EMP guns and jump coils.'],
+  ['capacitor_cell', 'Capacitor Cell', 'uncommon', 40, { copper_wire: 3, insulated_polymer: 1, scrap_electronics: 1 }, 30, '#38bdf8', 'A fast-discharge cell, for power stores and energy weapons.'],
+  ['thrust_nozzle', 'Thrust Nozzle', 'rare', 85, { titanium_plate: 2, ceramic_plate: 1 }, 60, '#f97316', 'A ceramic-lined titanium bell, for the bigger engines.'],
+  ['fuel_injector', 'Fuel Injector', 'uncommon', 55, { steel_plate: 1, propellant: 2, servo_motor: 1 }, 45, '#fb923c', 'Feeds propellant into an engine burn, for afterburners and torches.'],
+  ['reactor_core', 'Reactor Core', 'rare', 130, { hardened_steel: 2, crystal: 1, coolant: 2 }, 90, '#facc15', 'The core of the generators above the Cell Reactor.'],
 ];
 
 /** Each model's recipe: its own (handwritten where it's special), else plate per cell and its kind's parts */
@@ -1149,6 +1149,47 @@ for (const id of Object.keys(MODEL_SOUND)) if (!models.some((m) => m.id === id))
 // ---------------------------------------------------------------------------
 // Write
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Guide tags: a 3-6 word tag a model's guide row shows, not a copy of its description (weapons give theirs in `k.blurb`)
+// ---------------------------------------------------------------------------
+
+const BLURB = {
+  engine_ion_drive: 'Efficient starter engine', engine_vernier: 'Small cheap extra thruster', engine_afterburner: 'Huge boost, weak cruise',
+  engine_torch: 'Constant full-thrust engine', engine_plasma_drive: 'Balanced main engine', engine_drift_sail: 'Low-power cruising engine',
+  engine_fusion_torch: 'Fast heavy long-haul engine',
+  power_cell_reactor: 'Starter generator', power_isotope_pile: 'Tough generator, never explodes', power_fusion_plant: 'Heavy high-power generator',
+  power_overclock_reactor: 'Most power, most fragile', power_battery: 'Standard power store', power_capacitor: 'Fast-release power store',
+  power_drive_cell: 'Power store for engines', power_heavy_bank: 'Large, slow power store',
+  utility_mining_laser: 'Cuts ore from rock', utility_bore: 'Cuts harder rock', utility_demolition_launcher: 'Rock-cracking charge launcher',
+  utility_siphon: 'Collects gas from pockets', utility_scanner: 'Short-range rock scanner', utility_long_range_array: 'Long-range rock scanner',
+  utility_constructor: 'Builds structures', shield_deflector: 'Standard shield', shield_flicker_screen: 'Thin, fast-recharging shield',
+  shield_bulwark_projector: 'Deep, slow-recharging shield', utility_jump_coil: 'More jump capacity', utility_heavy_coil: 'Dense jump coil',
+  plating_reactive_armour: 'Resists small, fast hits', plating_spaced_plating: 'Half damage from blasts',
+  shield_flash_screen: 'Shield that returns whole',
+  utility_repair_beam: 'Repairs allied ships', point_defence_turret: 'Shoots down missiles',
+  engine_burst_strafer: 'Dodge thruster', utility_tow_beam: 'Tows wrecks and pods',
+  power_conduit: 'Power line', power_diode: 'One-way power line', utility_gyro: 'Adds turning force', utility_heavy_gyro: 'Big turning force',
+  power_joiner_bank: 'Joins two power lines', power_splitter_bank: 'Splits a power line', power_joiner_elbow: 'Joins two lines, corner',
+  power_joiner_end: 'Joins two lines, ends', power_joiner_cross: 'Joins back and front lines', power_splitter_elbow: 'Splits a line, corner',
+  power_splitter_tee: 'Splits a line, tee', power_splitter_end: 'Splits a line, ends', power_surge_cell: 'Fast-release power store',
+  power_corner: 'Power line corner', power_combiner: 'Adds feed to power', power_passthrough: 'Pipe across a power line',
+  feed_pipe: 'Joins feed parts', feed_selector: 'Switches between two feeds',
+  feed_tank_overcharge: 'Feed: harder hits', feed_tank_coolant: 'Feed: shorter pauses', feed_tank_damping: 'Feed: easier heavy charging',
+  feed_tank_flux: 'Feed: cheaper shots', feed_tank_accelerant: 'Feed: faster fire', feed_tank_lens: 'Feed: cheaper beams',
+  feed_tank_catalyst: 'Feed: cheaper engines', feed_tank_reaction: 'Feed: more thrust', feed_tank_burstgel: 'Feed: stronger boost',
+  fabricator_field: 'Builds parts in flight', fabricator_bay: 'Faster in-flight fabricator', fabricator_forge: 'Fastest in-flight fabricator',
+  refiner_field: 'Refines ore in flight', refiner_bay: 'Faster in-flight refiner', refiner_forge: 'Station-speed in-flight refiner',
+  mine_bay: 'Drops proximity mines', docking_clamp: 'Locks two ships together', docking_clamp_heavy: 'Heavy ship-to-ship clamp',
+  shield_spark_wall: 'Small shield wall', shield_guard_wall: 'Shield wall for a gun', shield_rampart: 'Large deep shield wall',
+  shield_visor: 'Tight shield arc', shield_buckler: 'Small shield arc', shield_shell: 'Wide shield arc', shield_half_dome: 'Half-dome shield',
+};
+for (const [id, blurb] of Object.entries(BLURB)) {
+  const m = models.find((x) => x.id === id);
+  if (!m?.guide) throw new Error(`BLURB: no model with a guide row ${id}`);
+  m.guide.blurb = blurb;
+}
+for (const m of models) if (m.guide && m.guide.blurb.split(/\s+/).length > 6) throw new Error(`${m.id}: its guide blurb is a tag of 6 words at most`);
 
 const ids = new Set();
 for (const m of models) { if (ids.has(m.id) || FNS.has(m.id)) throw new Error(`duplicate id ${m.id}`); ids.add(m.id); }

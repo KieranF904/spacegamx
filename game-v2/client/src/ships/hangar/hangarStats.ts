@@ -126,7 +126,7 @@ export function ammoHtml(host: HangarHost): string {
         <button data-first="${esc(kind)}:${item}" title="${star ? 'Opens first' : 'Open these first'}" style="all:unset; cursor:pointer; width:12px; color:${star ? '#fbbf24' : '#3b4a66'}">★</button>
         <img src="${itemIcon(econ, item)}" style="width:16px; height:16px">
         <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:${n ? '#e5ecf7' : '#8ea0bd'}">${esc((d?.name ?? item).replace(/ Crate$/, ''))}</span>
-        <span style="color:${have >= n ? '#6b7a93' : '#fbbf24'}" title="In your hold and storage">${have}</span>
+        <span style="color:${have >= n ? '#6b7a93' : '#fbbf24'}" title="In your cargo and storage">${have}</span>
         ${step(item, -1, n <= 0)}<b style="width:16px; text-align:center; color:${n ? '#e5ecf7' : '#56657c'}">${n}</b>${step(item, 1, n >= MAX_LOADOUT_CRATES)}</div>`;
     }
   }
@@ -253,10 +253,10 @@ export function summaryHtml(host: HangarHost): string {
     const ways = s ? ([[DODGE_FORWARD, 'forward'], [DODGE_BACK, 'back'], [DODGE_LEFT, 'left'], [DODGE_RIGHT, 'right']] as const).filter(([w]) => strafeForce(s, w) > 1e-6).map(([, n]) => n) : [];
     const best = s ? bestDodge(s).dir : 0;
     const cost = host.derived && best ? burstEnergy(host.derived, best) : 0;
-    html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${ways.length === 4 ? 'any way' : ways.join(', ') || 'no way'} · ${n0(cost)} energy` : '<span style="color:#f87171">none</span>', 'dodge',
+    html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${ways.length === 4 ? 'any way' : ways.join(', ') || 'no way'} · ${n0(cost)} E` : '<span style="color:#f87171">none</span>', 'dodge',
       `Burst Strafers: press ${boundKeyName('dodge', settings.data.bindings)} for one hard burst (${((s?.ticks ?? 12) / 60).toFixed(2)} s) the way you're steering, diagonals too, with whichever strafers push that way; `
       + `with nothing held, back the other way from your last dodge. Ready again ${((s ? Math.max(s.ticks, s.cooldown) : 24) / 60).toFixed(2)} s after the last one started. `
-      + 'There are no charges: every burst draws a lot of energy, from the strafers\' own buffers (filled over their in ports), so dodging often runs them dry unless their lines back it. '
+      + 'There are no charges: every burst draws a lot of power, from the strafers\' own buffers (filled over their in ports), so dodging often runs them dry unless their lines back it. '
       + 'A strafer pushes away from its nozzle: fit them facing different ways to dodge any way. The heavier the ship, the less a burst moves it');
   }
   if (now.tow > 0) html += row('Tow Beam', now.tow >= 0.5 ? 'ready' : '<span style="color:#f87171">no power</span>', 'tow',

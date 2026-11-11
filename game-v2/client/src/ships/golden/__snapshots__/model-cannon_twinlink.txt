@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage60/s · reach 7,192
 Hits withKinetic · penetration 2
 Clip8 rounds at 6.0/s · reloads in 1.3s from energy (24 a clip), when empty or a second after you let go
-Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
+Modelclip: Fires n rounds fast, then reloads from power when empty, or 1 s after you let go.
 MountTurret, 180°
 FittingBolts on any side
 Power draw8/s
@@ -44,7 +44,7 @@ Turret, 180°
 Bolts on any side
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 12","why":""}

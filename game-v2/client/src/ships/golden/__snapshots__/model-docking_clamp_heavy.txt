@@ -24,7 +24,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ships
+Heavy ship-to-ship clamp
 
 == keyStats ==
 2-cell clamp
@@ -36,7 +36,7 @@ A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ship
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 16","why":"Learned at level 16 (you're 4)"}
+{"open":false,"badge":"Lv 16","why":"Unlocks at level 16 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 16","why":""}

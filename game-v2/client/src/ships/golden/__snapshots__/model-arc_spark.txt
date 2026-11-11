@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage39/s · reach 3,960
 Hits withEnergy · penetration 2
 Fire rate1.3/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountTurret, 270°
 FittingBolts on any side
 Power draw18/s
@@ -44,7 +44,7 @@ Turret, 270°
 Bolts on any side
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 17","why":"Learned at level 17 (you're 4)"}
+{"open":false,"badge":"Lv 17","why":"Unlocks at level 17 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 17","why":""}

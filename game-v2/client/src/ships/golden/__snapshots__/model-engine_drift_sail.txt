@@ -39,7 +39,7 @@ thrust 0.7 · top 1,560 m/s · draws 2
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+{"open":false,"badge":"Lv 22","why":"Unlocks at level 22 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 22","why":""}

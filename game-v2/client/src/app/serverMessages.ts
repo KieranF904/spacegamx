@@ -2,7 +2,7 @@
  * @contract client.app.server-messages
  * owns:       the table of server messages Game handles itself, keyed by message type, read through MessageHost
  * needs:      @space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages,
- *             feature and ui stores
+ *             feature and ui stores, input/keybindings fillKeyNames (a toast's {actionId} key slots)
  * invariants: the table handles exactly the types pinned in server/src/golden/serverMessages.json —
  *             client/src/app/serverMessages.test.ts
  *             a type ShipClient swallows whole has no entry, and unknown or prototype-ish types are ignored —
@@ -36,6 +36,8 @@ import { showHitTick } from '../ui/HitTick';
 import { setCombatLock } from '../ui/CombatLockUI';
 import { coalesceDelayMs } from '../network/netCaps';
 import { onGunRangeState } from '../ui/gunRange/rangeMessages';
+import { fillKeyNames } from '../input/keybindings';
+import { settings } from '../settings/Settings';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
 import ribbonData from '../../../data/achievements.json';
@@ -320,7 +322,8 @@ const TABLE: Handlers = {
   // Your ship was lost: the backups you may respawn in (ui/BackupPicker.ts)
   backups: (h, msg) => { backupPicker.set(msg); },
   toast: (h, msg) => {
-    h.toasts.show(msg.text, msg.kind);
+    // (Server text names keys as {actionId} slots: the pilot's own binding fills each)
+    h.toasts.show(fillKeyNames(msg.text, settings.data.bindings), msg.kind);
     if (msg.kind === 'bad') h.audio.playUI('error', 0.5);
     else if (msg.text.startsWith('Fabrication complete')) h.audio.playUI('craft_done', 0.8);
   },

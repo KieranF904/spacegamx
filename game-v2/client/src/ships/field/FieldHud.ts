@@ -77,7 +77,7 @@ export class FieldHud {
   private makeRow(parent: HTMLElement, kind: MachineKind): Row {
     const root = document.createElement('div');
     root.className = 'fh-row';
-    root.innerHTML = `<div class="fh-top"><span class="fh-name"></span><button class="fh-btn x" title="Call off this job" hidden>&times;</button><button class="fh-btn"></button></div>
+    root.innerHTML = `<div class="fh-top"><span class="fh-name"></span><button class="fh-btn x" title="Cancel this job" hidden>&times;</button><button class="fh-btn"></button></div>
       <div class="fh-status"></div><div class="fh-bar"><i></i></div><select class="fh-pick"></select>`;
     const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const row: Row = {

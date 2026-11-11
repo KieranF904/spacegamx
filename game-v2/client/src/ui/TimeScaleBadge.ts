@@ -28,7 +28,7 @@ export class TimeScaleBadge {
     this.el.hidden = !key;
     if (!key) return;
     this.el.textContent = `TIME ×${(c.rate / TICK_RATE).toFixed(2)}`;
-    this.el.title = `This system is crowded: time runs slower here (level ${c.lv}). Ships are simulated within ${c.focus / 1000} km, updates every ${c.window} ticks.`;
+    this.el.title = `This system is crowded, so time runs slower here. Ships are shown in full within ${c.focus / 1000} km, and updates come less often.`;
   }
 
   destroy(): void {

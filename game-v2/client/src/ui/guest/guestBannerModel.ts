@@ -45,13 +45,13 @@ export function guestBannerModel(status: Pick<ServerGuestStatusMessage, 'state' 
   if (status.state === 'expired') {
     return {
       title: 'Your guest account has expired',
-      detail: `Register to keep playing · wiped in ${spanText(left)}`,
+      detail: `Register to keep playing · deleted in ${spanText(left)}`,
       expired: true, urgent: true,
     };
   }
   return {
-    title: 'Guest account — register to save your progress',
-    detail: `Kept ${spanText(status.keepMs)} after you leave · expires in ${spanText(left)}`,
+    title: 'Guest account: register to keep your progress',
+    detail: `Kept ${spanText(status.keepMs)} after you leave · deleted in ${spanText(left)}`,
     expired: false, urgent: left < HOUR,
   };
 }

@@ -26,7 +26,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-Drops a batch of 4 proximity mines out of its open edge on a key press, from a magazine of 12 the fabricator refills
+Drops proximity mines
 
 == keyStats ==
 4 mines a drop · each mine hits for up to 140 across 110 m
@@ -38,7 +38,7 @@ Drops a batch of 4 proximity mines out of its open edge on a key press, from a m
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+{"open":false,"badge":"Lv 8","why":"Unlocks at level 8 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 8","why":""}

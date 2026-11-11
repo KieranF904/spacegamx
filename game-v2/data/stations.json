@@ -173,7 +173,7 @@
     {
       "id": "nebula_research_station",
       "name": "Nebula Prime Observatory",
-      "description": "An observatory studying the nebula's radiation and the signal. Defended by laser turrets.",
+      "description": "An observatory studying the nebula's radiation and the heartbeat, which its staff log as a natural effect. Defended by laser turrets.",
       "system": "nebula_prime",
       "position": {
         "x": 0,
@@ -335,7 +335,7 @@
           "cobalt_ore": 1.2,
           "leestone_ore": 0.5
         },
-        "note": "Salvagers' watch: buys anything pulled from the dark."
+        "note": "Buys Maw fragments, void ichor and cobalt ore."
       }
     },
     {
@@ -496,7 +496,7 @@
     {
       "id": "homestead_dock",
       "name": "Your Station",
-      "description": "Your private station. Its services run on the tracks you've unlocked.",
+      "description": "Your private station. Its services grow as you upgrade it.",
       "system": "homestead",
       "position": {
         "x": 0,
@@ -522,7 +522,7 @@
           "scanner_charge"
         ],
         "demand": {},
-        "note": "Your own: the market link track widens it."
+        "note": "Your station's own market."
       }
     },
     {

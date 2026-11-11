@@ -114,7 +114,7 @@ export class Towing implements FeatureInstance {
     };
     for (const eid of this.ships.towablesNear(sys, x, y, reach)) { const b = this.ships.towable(eid)!; consider(eid, b.kind, b.radius); }
     for (const eid of this.pods.near(sys, x, y, reach + 18)) consider(eid, 'pod', 18);
-    if (best < 0) { this.host.tell(pilot, `Nothing to tow within ${Math.round(t.range)} of your hull: wrecks, debris and pods only`, '#f2d24b'); return; }
+    if (best < 0) { this.host.tell(pilot, `Nothing to tow in range (${Math.round(t.range)} m). The Tow Beam takes wrecks, debris and pods.`, '#f2d24b'); return; }
     this.tows.set(pilot, { target: best, kind: bestKind });
     ship.tow = best;
     this.power(pilot, true);

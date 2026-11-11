@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage210/s · reach 500
 Hits withThermal · penetration 5.5
 Beamheld while you fire · draws its power while it's on · winds up over 0.3s
-Modelbeam: Burns energy every second you hold it.
+Modelbeam: Uses power every second you hold it.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 4 clear cells ahead
 Power draw90/s
@@ -45,7 +45,7 @@ Bolts on from behind only
 Needs 4 clear cells ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 32","why":"Learned at level 32 (you're 4)"}
+{"open":false,"badge":"Lv 32","why":"Unlocks at level 32 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 32","why":""}

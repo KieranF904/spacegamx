@@ -295,7 +295,7 @@ export class Social {
 
   private async doRespond(conn: PilotConn, n: string, accept: boolean): Promise<void> {
     const me = this.account(conn);
-    if (me === null) return this.host.toast(conn, 'That request has gone', 'warn');
+    if (me === null) return this.host.toast(conn, 'That request is no longer open', 'warn');
     let c: FriendChange<string>;
     try { c = await this.backend.respond(me, n, accept); } catch (e) { return this.unavailable(conn, e); }
     if (this.account(conn) !== me) return;
@@ -305,8 +305,8 @@ export class Social {
         activity.social(conn, 'friends accepted');
         return this.befriended(me, c);
       case 'declined': activity.social(conn, 'requests declined'); return;
-      case 'full': return this.host.toast(conn, 'A friends list is full', 'warn');
-      default: return this.host.toast(conn, 'That request has gone', 'warn');
+      case 'full': return this.host.toast(conn, 'A friends list is full (yours or theirs)', 'warn');
+      default: return this.host.toast(conn, 'That request is no longer open', 'warn');
     }
   }
 

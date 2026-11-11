@@ -37,7 +37,7 @@ thrust 1.6 · top 3,000 m/s · draws 8
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 5","why":"Learned at level 5 (you're 4)"}
+{"open":false,"badge":"Lv 5","why":"Unlocks at level 5 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 5","why":""}

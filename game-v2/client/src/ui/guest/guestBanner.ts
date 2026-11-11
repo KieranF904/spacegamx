@@ -124,7 +124,7 @@ function form(typed: Record<string, string>, canClose: boolean): HTMLFormElement
   };
   // (After a refused move the account exists: only the move is tried again)
   if (made) {
-    f.append(el('div', 'color:#a9b7cc;margin-bottom:6px', `Account ${made.username} is made. Your pilot has not moved yet.`));
+    f.append(el('div', 'color:#a9b7cc;margin-bottom:6px', `Account ${made.username} created, but your pilot is not on it yet. Try again to move it.`));
   } else {
     f.append(field('username', 'text', 'Account name', 'username'), field('email', 'email', 'Email', 'email'), field('password', 'password', 'Password (8+ characters)', 'new-password'));
   }
@@ -161,7 +161,7 @@ async function submit(username: string, email: string, password: string): Promis
   paint();
   if (!made) {
     const r = await hooks.register(username, email, password);
-    if (!r.success || !r.token) { busy = false; error = r.error || 'Could not make the account.'; paint(); return; }
+    if (!r.success || !r.token) { busy = false; error = r.error || 'Could not register. Try again.'; paint(); return; }
     made = { token: r.token, username: r.username ?? username };
   }
   hooks.send({ type: 'convertGuest', token: made.token });

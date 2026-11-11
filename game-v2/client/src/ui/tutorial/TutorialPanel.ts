@@ -194,8 +194,8 @@ export class TutorialPanel {
     if (m.graduate) {
       this.card.hidden = true;
       this.grad.show({
-        mode: 'modal', title: 'Training complete', intro: 'You know the whole loop. Here is your starter pack:', lines: this.pack,
-        note: 'It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.', button: 'Enter Sol',
+        mode: 'modal', title: 'Training complete', intro: 'Here is your starter pack:', lines: this.pack,
+        note: 'It goes to your station storage, with everything you mined and built. Next stop: Sol Central.', button: 'Enter Sol',
         onClose: () => {
           this.flow.enter();
           // (If the server never answers, the button comes back)

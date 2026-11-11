@@ -90,7 +90,7 @@ const TRADE_OFF: Record<string, string> = {
   engine_ion_drive: 'efficient, low top speed',
   engine_vernier: 'cheap corner push, no boost',
   engine_afterburner: 'weak cruise, huge boost; wants a Drive Cell touching it',
-  engine_torch: 'full thrust all the time, no boost, burns energy',
+  engine_torch: 'full thrust all the time, no boost, burns power',
   engine_plasma_drive: 'the balanced main engine',
   engine_drift_sail: 'near-free cruising, slow',
   engine_fusion_torch: 'the long-haul racer, heavy',
@@ -175,16 +175,16 @@ const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() :
 
 /** Each firing model's one-sentence hangar description (design section 3) */
 export const FIRE_SENTENCE: Record<string, string> = {
-  cycle: "Fires on a fixed beat while held; each shot's energy is drawn as it reloads.",
-  clip: 'Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.',
+  cycle: "Fires on a fixed beat while held; each shot's power is drawn as it reloads.",
+  clip: 'Fires n rounds fast, then reloads from power when empty, or 1 s after you let go.',
   charge: 'Hold to charge; it fires itself at full charge, then cools down. Let go early and nothing fires.',
-  ammo: 'Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).',
-  beam: 'Burns energy every second you hold it.',
+  ammo: 'Fires rounds from your cargo on a fixed beat and costs no power. With none left it fires weak plain rounds (40% damage).',
+  beam: 'Uses power every second you hold it.',
   auto: 'Fires on its own at incoming ordnance.',
 };
 
 /** A clip with regrow never reloads: it spends its stock and one round grows back at a time */
-export const REGROW_SENTENCE = 'Fires a salvo from its stock; one round grows back at a time, each drawing a little energy.';
+export const REGROW_SENTENCE = 'Fires a salvo from its stock; one round grows back at a time, each drawing a little power.';
 
 /** A gun's firing model as a chip ("cycle", "clip 6 · 1.5s reload", "charge 2.0s", "held beam", "auto") */
 export function fireChip(fn: FunctionDef): string {
@@ -241,7 +241,7 @@ export interface ModelLock {
   open: boolean;
   /** "Lv 12" */
   badge: string;
-  /** "Learned at level 12 (you're 5)" */
+  /** "Unlocks at level 12 (you're 5)" */
   why: string;
 }
 
@@ -249,6 +249,6 @@ export interface ModelLock {
 export function modelLock(fn: FunctionDef, can: boolean, level: number, _items?: readonly ItemDef[]): ModelLock {
   const lv = fn.unlock?.level;
   if (can) return { open: true, badge: lv !== undefined ? `Lv ${lv}` : '', why: '' };
-  if (lv === undefined) return { open: false, badge: 'Unavailable', why: 'No pilot can make this' };
-  return { open: false, badge: `Lv ${lv}`, why: `Learned at level ${lv} (you're ${level})` };
+  if (lv === undefined) return { open: false, badge: 'Unavailable', why: 'Cannot be made' };
+  return { open: false, badge: `Lv ${lv}`, why: `Unlocks at level ${lv} (you're ${level})` };
 }

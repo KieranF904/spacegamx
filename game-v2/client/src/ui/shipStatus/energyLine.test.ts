@@ -7,7 +7,7 @@ const energy = (o: Partial<ShipStatus['energy']>): ShipStatus['energy'] => ({ ..
 describe('the ship panel energy line', () => {
   it('full and idle: the level and the spare power', () => {
     const l = energyLine(energy({ pct: 100, draw: 18, net: 300 }));
-    expect(l.head).toBe('ENERGY 100%');
+    expect(l.head).toBe('POWER 100%');
     expect(l.rate).toBe('');
     expect(l.note).toBe('+750/s spare');
     expect(l.noteTone).toBe('dim');
@@ -15,7 +15,7 @@ describe('the ship panel energy line', () => {
 
   it('draining: the rate down and the time to empty, amber under 5 s', () => {
     const l = energyLine(energy({ pct: 20, net: -380.4, empty: 3.2 }));
-    expect(l.head).toBe('ENERGY 20%');
+    expect(l.head).toBe('POWER 20%');
     expect(l.headTone).toBe('warn');
     expect(l.rate).toBe('−380/s');
     expect(l.note).toBe('empty in 3.2 s');

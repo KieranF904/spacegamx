@@ -31,11 +31,11 @@ export class TradeWindow {
     this.win.root.style.width = 'min(900px, calc(100vw - 32px))';
     this.win.onClose = () => { if (this.state?.open) this.send({ type: 'tradeCancel' }); };
     const econ = pilot.econ;
-    this.mine = new ItemGrid({ econ, zone: 'trade-mine', empty: 'Click items in your hold below to offer them',
+    this.mine = new ItemGrid({ econ, zone: 'trade-mine', empty: 'Click items in your cargo below to offer them',
       onClick: (id, e) => this.change(id, -(e.shiftKey ? 10 : 1)), onContext: (id) => this.change(id, -Infinity),
       hint: () => 'Click: take one back · Shift: ten · Right-click: all' });
     this.theirs = new ItemGrid({ econ, zone: 'trade-theirs', empty: 'Nothing offered yet' });
-    this.hold = new ItemGrid({ econ, zone: 'trade-hold', empty: 'Your hold is empty',
+    this.hold = new ItemGrid({ econ, zone: 'trade-hold', empty: 'Your cargo is empty',
       onClick: (id, e) => this.change(id, e.shiftKey ? 10 : 1), onContext: (id) => this.change(id, Infinity),
       hint: () => 'Click: offer one · Shift: ten · Right-click: all of them' });
     const b = this.win.body;
@@ -44,7 +44,7 @@ export class TradeWindow {
         <div style="display:flex; align-items:center; gap:8px; margin-top:8px">Credits <input class="sgw-input" type="number" min="0" step="10" value="0" style="width:120px"></div></div>
       <div class="sgw-col"><h4 data-h="theirs">Their offer</h4><div data-g="theirs"></div><div data-c="theirs" style="margin-top:12px; color:#fbbf24"></div></div>
     </div>
-    <div class="sgw-col" style="margin-top:12px"><h4>Your hold <span class="r">plus storage when you're at a station</span></h4><div data-g="hold"></div></div>
+    <div class="sgw-col" style="margin-top:12px"><h4>Your cargo <span class="r">plus storage when you're at a station</span></h4><div data-g="hold"></div></div>
     <div style="display:flex; align-items:center; gap:12px; margin-top:12px"><div data-s style="flex:1; color:#a9b6c9"></div>
       <button class="sgw-btn" data-a="cancel">Cancel</button><button class="sgw-btn good" data-a="accept">Accept trade</button></div>`;
     b.querySelector('[data-g="mine"]')!.replaceWith(this.mine.el);

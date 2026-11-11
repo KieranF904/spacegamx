@@ -40,13 +40,13 @@ export const ACTIONS: ActionDef[] = [
   { id: 'groupNext', label: 'Left button: next weapon group', category: 'Combat', key: 'Period' },
   { id: 'groupRight', label: 'Right button: next weapon group', category: 'Combat', key: 'Slash', hint: 'On a group, the right button no longer runs the mining lasers' },
   { id: 'targetCursor', label: 'Target the ship under the cursor', category: 'Combat', key: 'KeyT', hint: 'On empty space: clear the target' },
-  { id: 'feeds', label: 'Switch feeds (Selectors)', category: 'Combat', key: 'KeyY', hint: 'On a ports ship: every Selector passes its other tank; what is in the lines and buffers runs out first' },
+  { id: 'feeds', label: 'Switch tanks (Selectors)', category: 'Combat', key: 'KeyY', hint: 'Every Selector switches to its other tank. What is already in the lines runs out first' },
   { id: 'ping', label: 'Ping for your party (with Shift: danger)', category: 'Combat', key: 'KeyB', hint: 'On a hostile: attack it. On loot: grab it. On the map: Shift + right-click' },
   { id: 'siegeFocus', label: 'Moon siege: turrets focus on your target', category: 'Combat', key: 'Digit6', hint: 'At night on a siege moon: every turret in reach fires on your target for a few seconds (then it cools down)' },
   { id: 'dock', label: 'Dock / open hangar', category: 'Ship & world', key: 'KeyH', hint: "Inside a station's docking ring" },
   { id: 'interact', label: 'Use jump gate / descend to a planet', category: 'Ship & world', key: 'KeyX', hint: 'In orbit close to a planet you can land on' },
-  { id: 'autopilot', label: 'Autopilot to the job you follow', category: 'Ship & world', key: 'KeyG', hint: 'Or click a place on the map (M). Any flight key takes back control' },
-  { id: 'pickup', label: 'Tractor beam pickup', category: 'Ship & world', key: 'KeyF' },
+  { id: 'autopilot', label: 'Autopilot to the job you follow', category: 'Ship & world', key: 'KeyG', hint: 'Or click a place on the map. Any flight key takes back control' },
+  { id: 'pickup', label: 'Pick up loot', category: 'Ship & world', key: 'KeyF' },
   { id: 'contextMenu', label: 'Action menu (hold, then right-click)', category: 'Ship & world', key: 'KeyZ', hint: 'What you can do with what is under the cursor: dock, travel, land, hail, target, fly or jump there. A plain right-click fires' },
   { id: 'respawn', label: 'Respawn', category: 'Ship & world', key: 'KeyR', hint: 'After being destroyed' },
   { id: 'menu', label: 'Menu', category: 'Interface', key: 'Escape', rebindable: false },
@@ -101,4 +101,13 @@ export function keyName(code: string): string {
 export function boundKeyName(actionId: string, bindings: Record<string, string>): string {
   const a = ACTIONS.find((x) => x.id === actionId);
   return keyName(bindings[actionId] ?? a?.key ?? '?');
+}
+
+/**
+ * Server text with `{actionId}` key slots ("New work in your log ({log})"): each slot naming a known action
+ * becomes the key the pilot bound to it, so the server never hard-codes a key letter. Other braces stay as sent.
+ */
+export function fillKeyNames(text: string, bindings: Record<string, string>): string {
+  if (!text.includes('{')) return text;
+  return text.replace(/\{([a-zA-Z0-9]+)\}/g, (m, id: string) => (ACTIONS.some((x) => x.id === id) ? boundKeyName(id, bindings) : m));
 }

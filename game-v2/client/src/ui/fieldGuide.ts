@@ -131,8 +131,8 @@ const SIEGE_GRADE: Record<string, number> = { selene_siege: 1, rimeholt_siege: 2
 const ORE_WHERE: Record<string, string> = {
   iron_ore: 'Metal asteroids everywhere; Sol and Cinder Reach have the most',
   nickel_ore: 'Metal and dense asteroids',
-  titanium_ore: 'Dense asteroids (Nebula Prime, Cinder Reach, Void Sector, The Maw); richer with danger. Hard: a mining laser',
-  cobalt_ore: 'Dense asteroids in danger 4+ systems, far more in the deadliest. Very hard: a titanium-grade miner',
+  titanium_ore: 'Dense asteroids (Nebula Prime, Cinder Reach, Void Sector, The Maw), more in dangerous systems. Hard: needs a mining laser',
+  cobalt_ore: 'Dense asteroids in danger 4+ systems, far more in the deadliest. Very hard: needs mining charges, a railgun or a lance',
   neutronium_ore: 'Dense asteroids in danger 4+ systems only (Nebula Prime, Cinder Reach, Void Sector, The Maw). Very hard',
   silicate: 'Ice, volatile and crystal asteroids', ice: 'Ice asteroids and comets', copper_ore: 'Metal and crystal asteroids',
 };
@@ -164,13 +164,13 @@ const MODELS: FunctionDef[] = (shipModels as unknown as { models: FunctionDef[] 
 
 function people({ k }: GuideDeps): string {
   return `<div class="fg-cols">
-    ${sec('People', `Jobs come from people. Talk to them where they are: docked at a station (Overview, <b>People here</b>), or out in space and down on planets (fly close and press ${k('interact')}). A <b style="color:#fbbf24">!</b> means they have work for you, a <b style="color:#fbbf24">▸</b> that a job of yours needs them. Some ask you questions: choose your answers (1-9) with care.`,
-      `Nothing is forced on you: say <i>Not now</i> and they'll ask again later. Nobody calls you: when a job you finish opens up new work, it joins your log marked <b>new</b>, and the log shows a badge until you look.`)}
-    ${sec('Jobs', `${k('log')} opens your log: jobs in progress, <b>leads</b> (jobs you've heard about, and who has them), and what you've completed. A few beginner jobs are leads from the start; the rest you hear about by talking to people, from rumours, or by running into them out there. Station boards (Contracts) post bounties that change every ${Math.round(BOUNTY_WINDOW_MS / 60000)} minutes. ${k('skills')} spends skill points (one each level): each point in a skill is worth a little less than the one before, so spreading them pays. Jobs you can't take yet show once you're within three levels of them.`,
-      `Many jobs ask more of you than a kill count: a <b>run</b> through rings against the clock (miss the time and you start again), <b>holding steady</b> in a spot while something works (leave and the bar drains; sometimes something comes to stop you), or <b>recovering</b> a container from somewhere (only you can take it, and it may be guarded). The panel at the top of the screen shows how it's going. Some take you down to planets: descend with ${k('interact')} in low orbit.`,
-      `<b>Follow</b> a job or a lead and the ★ marker and the <b>objective guide</b> lead you there: the line under the tracker names the next waypoint (the gate, rift or planet on the way) and chevrons point from your ship. ${k('autopilot')} flies it. Settings › Interface turns the guide and the tracker on and off.`)}
-    ${sec('Leaving Sol', `Glasswater, Borealis, Nebula Prime and Cinder Reach need <b>lane clearance</b>: Harbourmaster Okafor at Sol Central gives it once you've found your feet (job: Cleared for Departure). The Maw needs a licence from Horizon Watch.`,
-      `Steel (Mk II) structure opens at level 5; Dr. Osei's jobs on Terra Nova teach it too.`)}
+    ${sec('People', `Jobs come from people. Find them docked at a station (Overview, <b>People here</b>), or out in space and on planets (fly close and press ${k('interact')}). A <b style="color:#fbbf24">!</b> means they have work for you; a <b style="color:#fbbf24">▸</b> means a job of yours needs them. Some ask you questions: pick your answer (1-9).`,
+      `Say <i>Not now</i> and they'll ask again later. When a job you finish opens new work, it appears in your log marked <b>new</b>, and the log shows a badge until you look.`)}
+    ${sec('Jobs', `${k('log')} opens your log: jobs in progress, <b>leads</b> (jobs you've heard about, and who has them), and finished jobs. A few beginner jobs start as leads; you hear about the rest by talking to people, from rumours, or by finding them out there. Station boards (Contracts) post bounties that change every ${Math.round(BOUNTY_WINDOW_MS / 60000)} minutes. ${k('skills')} spends skill points (one per level). Each point in a skill is worth a little less than the one before, so spreading them pays. Jobs you can't take yet show once you're within three levels of them.`,
+      `Some jobs ask for more than kills: a <b>run</b> through rings against the clock (miss the time and you start again), <b>staying</b> in a spot while something works (leave and the bar drains; something may come to stop you), or <b>recovering</b> a container (only you can take it, and it may be guarded). The panel at the top of the screen shows progress. Some take you down to planets: press ${k('interact')} in low orbit.`,
+      `<b>Follow</b> a job or a lead and the ★ marker and the <b>objective guide</b> show the way: the line under the tracker names the next waypoint (a gate, rift or planet) and arrows point from your ship. ${k('autopilot')} flies you there. Turn the guide and the tracker on or off in Settings › Interface.`)}
+    ${sec('Leaving Sol', `Glasswater, Borealis, Nebula Prime and Cinder Reach need <b>lane clearance</b>: do the job Cleared for Departure for Harbourmaster Okafor at Sol Central. The Maw needs a licence from Horizon Watch.`,
+      `Steel (Mk II) structure unlocks at level 5. Dr. Osei's jobs on Terra Nova teach it too.`)}
     ${sec('Operations', `Some jobs happen out in space: courier runs against the clock, scans of derelict wrecks (fly close and hold still), escorts (meet the freighter and keep it alive until it docks), and outpost defences against waves of raiders. The panel at the top of the screen shows how it's going.`)}
     ${sec('Flying together', `Rest the cursor on another pilot to see who they are; ${k('party')} invites them (or opens the party window). A party of up to four shares kills (for jobs too), gets a <b>wing bonus</b> of 8% damage and mining yield per wingmate within 3 km, can rally beside each other after being destroyed, and takes on <b>fleet operations</b>: uplinks, convoys and sieges that need more than one pilot. Start a chat line with <b>/p</b> for party chat. ${k('ping')} pings what's under your cursor for the party (with Shift: danger); on the map, Shift + right-click.`,
       `Trade with a pilot within 2.5 km from the party window: both put up items and credits, both accept, and the swap happens at once.`)}
@@ -319,8 +319,8 @@ function tiers(d: GuideDeps): string {
     ${lineChart('How a grade scales a part (× Mk I)', x, lines)}
     <h3>Materials</h3>
     <div class="fg-wide"><table class="fg-t"><thead><tr><th>Grade</th><th>Material</th><th class="n">Strength</th><th class="n">HP / cell</th><th>Made from</th><th>Where the ore is</th></tr></thead><tbody>${gradeRows}</tbody></table></div>
-    <h3>Systems by tier</h3>
-    <p>Each system's enemies are built at its tier. ◆ is how dangerous they are${mine ? `, coloured against your ship's rating of <b>${Math.round(mine)}</b>` : ''}.</p>
+    <h3>Systems by Mk</h3>
+    <p>Each system's enemies are built at its Mk. ◆ shows how dangerous they are${mine ? `, compared with your ship's rating of <b>${Math.round(mine)}</b>` : ''}.</p>
     <div class="fg-wide"><table class="fg-t"><thead><tr><th>System</th><th>Enemies</th><th class="n">Danger</th><th>Threat</th></tr></thead><tbody>${ladderRows}</tbody></table></div>
     <h3>Weapon size</h3>
     <p>A bigger weapon hits harder than its cells alone: one Large gun outhits four Small ones.</p>
