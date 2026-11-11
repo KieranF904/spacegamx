@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, ServerMessage, countOf, createShipState, inSafeSpace, regionAt, beltTotal, asteroidParamsAt, setAsteroidOutliers, BANK } from '@space-game/common';
+import { Position, Velocity, InSystem, ServerMessage, createShipState, inSafeSpace, regionAt, beltTotal, asteroidParamsAt, setAsteroidOutliers } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -98,32 +98,30 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(w.server.threats().sol).toBeLessThan(10);
   });
 
-  it('dying in safe space costs little: the hold stays and the repair bank puts the starter back whole', () => {
+  it('dying in safe space costs no less: the hold goes in the wreck, and the starter comes back free', () => {
     const w = world();
     const { pid, conn, profile } = w.pilots[0];
     w.server.pilots.give(conn, { iron_ore: 12, copper_ore: 4 });
     const storage = JSON.stringify(profile().storage);
     hold(pid, 50000, 0);
     w.server.pilots.onDestroyed(conn, InSystem.systemId[pid], 50000, 0, 0, 0);
-    expect(countOf(profile().cargo, 'iron_ore')).toBe(12);
-    expect(countOf(profile().cargo, 'copper_ore')).toBe(4);
-    // (A starter's worth in the free part pays for the whole ship; nothing goes to storage)
+    expect(profile().cargo).toEqual([]);
+    expect(profile().wreck).toMatchObject({ system: 'sol' });
+    // (The starter is the floor: another, whole and free; nothing goes to storage)
     expect(profile().ship.ghosts).toEqual([]);
-    expect(profile().ship.owed).toBeUndefined();
+    expect(profile().ship.free?.length).toBe(profile().ship.blueprint.parts.length);
     expect(JSON.stringify(profile().storage)).toBe(storage);
   });
 
-  it('out on the Reaches the hold goes with the wreck (bar its secure stacks), kept for its pilot', () => {
+  it('out on the Reaches the hold goes with the wreck, kept for its pilot', () => {
     const w = world(['lost', 'looter']);
     const [me, them] = w.pilots;
     const num = InSystem.systemId[me.pid];
     me.profile().cargo = [{ id: 'iron_ore', n: 40 }, { id: 'nickel_ore', n: 10 }, { id: 'silicate', n: 10 }, { id: 'copper_ore', n: 10 }, { id: 'ice', n: 10 }];
     const at = { x: 0, y: 170000 };
     w.server.pilots.onDestroyed(me.conn, num, at.x, at.y, 0, 0);
-    // Three stacks kept, up to 25 of each
-    const kept = me.profile().cargo;
-    expect(kept.length).toBe(3);
-    for (const s of kept) expect(s.n).toBeLessThanOrEqual(25);
+    // All of it goes (there is no secure hold since the death rework)
+    expect(me.profile().cargo).toEqual([]);
     expect(me.profile().wreck).toMatchObject({ system: 'sol' });
     const wreckMsg = me.got.filter((m) => m.type === 'wreck').pop() as any;
     expect(wreckMsg?.seconds).toBeGreaterThan(60);
@@ -135,8 +133,7 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(Object.values(inside).reduce((a: number, b) => a + (b as number), 0)).toBeGreaterThan(0);
     for (let i = 0; i < 90; i++) { hold(them.pid, at.x, at.y); w.step(); }
     expect(pods.get(wreck)).toBeDefined();
-    // Its pilot can (with room in their hold: what the secure hold kept, they'd put in storage at the station first)
-    me.profile().cargo = [];
+    // Its pilot can (with room in their hold)
     hold(them.pid, 5000, 50000);
     const again = me.t.getPlayerId();
     for (let i = 0; i < 300 && pods.get(wreck); i++) { hold(again, Position.x[wreck], Position.y[wreck]); w.step(); if (i % 30 === 0) me.profile().cargo = []; }
@@ -144,7 +141,7 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(me.profile().wreck).toBeUndefined();
   });
 
-  it('there is no insurance: a pilot has a full repair bank instead, and a loss takes from its free part', () => {
+  it('there is no insurance: a pilot has a full repair bank instead, and a loss takes nothing from it', () => {
     const w = world();
     const { conn, pid, profile } = w.pilots[0];
     const p = profile();
@@ -154,9 +151,8 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(p.bank.free).toEqual(full);
     w.server.pilots.onDestroyed(conn, InSystem.systemId[pid], 0, 170000, 0, 0);
     expect(profile().storage.some((s: any) => s.id === 'insurance_bond')).toBe(false);
-    // The starter cost one ship's worth of the free part (it holds BANK.ships of them)
-    const sum = (b: Record<string, number>) => Object.values(b).reduce((a, n) => a + n, 0);
-    expect(Math.round(sum(profile().bank.free))).toBe(Math.round(sum(full) * (1 - 1 / BANK.ships)));
+    // (The bank pays nothing at a respawn: a backup is what comes back)
+    expect(profile().bank.free).toEqual(full);
   });
 
   it('a warband camps on the rim; breaking it pays everyone who fought', () => {

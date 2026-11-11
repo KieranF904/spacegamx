@@ -34,7 +34,7 @@ export interface FabOrder { id: number; item: string; n: number; made: number }
 
 function cleanWreck(v: unknown): { wreck?: PlayerProfile['wreck'] } {
   const w = v as PlayerProfile['wreck'];
-  return w && typeof w.system === 'string' && Number.isFinite(w.x) && Number.isFinite(w.y) && Number.isFinite(w.until) ? { wreck: { system: w.system, x: w.x, y: w.y, until: w.until } } : {};
+  return w && typeof w.system === 'string' && Number.isFinite(w.x) && Number.isFinite(w.y) && Number.isFinite(w.until) ? { wreck: { system: w.system, x: w.x, y: w.y, until: w.until, ...(Number.isFinite(w.gone) ? { gone: w.gone } : {}) } } : {};
 }
 
 function cleanOutpost(v: unknown): { outpost?: Outpost } {
@@ -119,7 +119,14 @@ export interface ShipRecord {
   rank?: number;
   /** Old saves only (loaners are gone, v6): nothing writes it, and the field update drops such records */
   loaner?: boolean;
-  /** Ghosts owed to a death (uids): parts of its own design the repair bank rebuilds (standing or missing at the death; never the hangar's placeholders: server/src/game/RepairBank.ts) */
+  /**
+   * Missing parts of its design that were never built (uids): planned in the build view and not made yet. The station's
+   * repair bank mends only what was built (docs/design/death-rework-2026-11.md): these need fabricating
+   */
+  unbuilt?: number[];
+  /** Parts the free starter backup came with (uids, server/src/game/pilots/backups.ts): never salvaged, scrapped or refunded */
+  free?: number[];
+  /** Old saves only (goes at the next deploy): parts a death left owed to the bank, which no longer rebuilds them (they are plain ghosts now) */
   owed?: number[];
   /** Its ammunition loadout (econ/loadout.ts): crates to carry, topped up from storage at a station, and which each gun opens first */
   ammo?: ShipLoadout;
@@ -164,7 +171,8 @@ export interface PlayerProfile {
   /** Rebuild loan still owed (repaid from a share of credits earned); absent when clear */
   debt?: number;
   /** Where their last ship went down outside safe space, kept for them until `until` (wall ms) */
-  wreck?: { system: string; x: number; y: number; until: number };
+  /** Their wreck: where, until when (wall ms) it is theirs alone, and when it's gone (absent: an old save's, gone at `until`) */
+  wreck?: { system: string; x: number; y: number; until: number; gone?: number };
   xp: number;
   level: number;
   skillPoints: number;
@@ -296,6 +304,8 @@ function cleanRecord(s: ShipRecord): ShipRecord {
     ...(Number.isFinite(s.rank) ? { rank: s.rank } : {}),
     ...(s.loaner ? { loaner: true } : {}),
     ...(Array.isArray(s.owed) && s.owed.some(Number.isInteger) ? { owed: s.owed.filter((u) => Number.isInteger(u)) } : {}),
+    ...(Array.isArray(s.unbuilt) && s.unbuilt.some(Number.isInteger) ? { unbuilt: s.unbuilt.filter((u) => Number.isInteger(u)) } : {}),
+    ...(Array.isArray(s.free) && s.free.some(Number.isInteger) ? { free: s.free.filter((u) => Number.isInteger(u)) } : {}),
     ...cleanLoadout(s.ammo),
     ...cleanFieldRecord(s.field),
   };

@@ -71,7 +71,7 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
     handleInteract(ctx, conn, msg);
   });
   t.on('respawn', (ctx, conn, msg) => {
-    handleRespawn(ctx, conn, typeof msg.rally === 'string' ? msg.rally : undefined);
+    handleRespawn(ctx, conn, typeof msg.rally === 'string' ? msg.rally : undefined, Number.isInteger(msg.backup) ? msg.backup : undefined);
   });
   t.on('target', (ctx, conn, msg) => {
     ctx.ships.setTarget(conn.playerId, Number(msg.id) || 0);
@@ -263,7 +263,7 @@ export function handleInteract(ctx: ServerCtx, conn: ClientConnection, msg: any)
   }
 }
 
-export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: string): void {
+export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: string, backup?: number): void {
   const eid = conn.playerId;
   // cleanupSystem removes dead entities the same tick they die, so by the time
   // a respawn request arrives the entity is usually gone rather than Dead.
@@ -278,7 +278,8 @@ export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: st
     conn.scheduledInputs.length = 0;
     Player.clientId[newPlayerId] = Player.clientId[eid];
     if (hasComponent(ctx.world, Dead, eid)) removeEntity(ctx.world, eid);
-    ctx.pilots.onRespawn(conn);
+    // (In the backup they chose, a hangar slot the death offered: pilots/backups.ts; none, the starter)
+    ctx.pilots.onRespawn(conn, backup);
     // Rally: come back beside a party member (if they aren't in the thick of a fight)
     if (rally) {
       const m = ctx.party.members(conn).find((x) => x !== conn && x.username === rally) as ClientConnection | undefined;

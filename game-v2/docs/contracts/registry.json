@@ -11557,7 +11557,7 @@
       "id": "protocol.econ",
       "path": "common/src/network/econProtocol.ts",
       "group": "common/network",
-      "lines": 437,
+      "lines": 458,
       "owns": "the player-economy messages: profile and its deltas, cargo and storage, loot, item actions, quests and builds; every action is a request the server checks",
       "needs": "type-only imports of econ/stacks, econ/quests and other econ shapes",
       "events": "",
@@ -11573,6 +11573,7 @@
       ],
       "extend": "a new message is an interface plus a member of this area's client / server union below; then its handler (server/src/net/handlers) or its entry in client/src/app/serverMessages.ts, and the golden pins (UPDATE_GOLDEN=1 on structure.test.ts)",
       "exports": [
+        "BackupOption",
         "ClientAmmoPreferMessage",
         "ClientCodexReadMessage",
         "ClientCraftMessage",
@@ -11616,6 +11617,7 @@
         "HangarSlotView",
         "JobView",
         "PROFILE_DELTA_FIELDS",
+        "ServerBackupsMessage",
         "ServerCodexMessage",
         "ServerHangarMessage",
         "ServerItemsMessage",
@@ -11688,319 +11690,331 @@
           "name": "ServerWreckMessage",
           "kind": "interface",
           "start": 142,
-          "end": 154
+          "end": 157
+        },
+        {
+          "name": "BackupOption",
+          "kind": "interface",
+          "start": 159,
+          "end": 167
+        },
+        {
+          "name": "ServerBackupsMessage",
+          "kind": "interface",
+          "start": 169,
+          "end": 175
         },
         {
           "name": "ServerScanPulseMessage",
           "kind": "interface",
-          "start": 156,
-          "end": 160
+          "start": 177,
+          "end": 181
         },
         {
           "name": "ServerRebuildStatusMessage",
           "kind": "interface",
-          "start": 162,
-          "end": 183
+          "start": 183,
+          "end": 204
         },
         {
           "name": "ClientItemMoveMessage",
           "kind": "interface",
-          "start": 185,
-          "end": 191
+          "start": 206,
+          "end": 212
         },
         {
           "name": "ClientItemStoreMessage",
           "kind": "interface",
-          "start": 193,
-          "end": 197
+          "start": 214,
+          "end": 218
         },
         {
           "name": "ClientRestockLoadoutMessage",
           "kind": "interface",
-          "start": 199,
-          "end": 200
+          "start": 220,
+          "end": 221
         },
         {
           "name": "ClientSlotLoadoutMessage",
           "kind": "interface",
-          "start": 202,
-          "end": 203
-        },
-        {
-          "name": "ClientItemJettisonMessage",
-          "kind": "interface",
-          "start": 205,
-          "end": 210
-        },
-        {
-          "name": "ClientItemUseMessage",
-          "kind": "interface",
-          "start": 212,
-          "end": 216
-        },
-        {
-          "name": "EconServerMessage",
-          "kind": "type",
-          "start": 218,
-          "end": 219
-        },
-        {
-          "name": "EconClientMessage",
-          "kind": "type",
-          "start": 220,
+          "start": 223,
           "end": 224
         },
         {
-          "name": "ClientQuickbarSetMessage",
+          "name": "ClientItemJettisonMessage",
           "kind": "interface",
           "start": 226,
           "end": 231
         },
         {
-          "name": "HangarSlotView",
+          "name": "ClientItemUseMessage",
           "kind": "interface",
           "start": 233,
-          "end": 251
+          "end": 237
+        },
+        {
+          "name": "EconServerMessage",
+          "kind": "type",
+          "start": 239,
+          "end": 240
+        },
+        {
+          "name": "EconClientMessage",
+          "kind": "type",
+          "start": 241,
+          "end": 245
+        },
+        {
+          "name": "ClientQuickbarSetMessage",
+          "kind": "interface",
+          "start": 247,
+          "end": 252
+        },
+        {
+          "name": "HangarSlotView",
+          "kind": "interface",
+          "start": 254,
+          "end": 272
         },
         {
           "name": "JobView",
           "kind": "interface",
-          "start": 253,
-          "end": 262
+          "start": 274,
+          "end": 283
         },
         {
           "name": "ServerHangarMessage",
           "kind": "interface",
-          "start": 264,
-          "end": 281
+          "start": 285,
+          "end": 302
         },
         {
           "name": "ClientSlotSaveMessage",
           "kind": "interface",
-          "start": 283,
-          "end": 284
+          "start": 304,
+          "end": 305
         },
         {
           "name": "ClientSlotFlyMessage",
           "kind": "interface",
-          "start": 285,
-          "end": 286
+          "start": 306,
+          "end": 307
         },
         {
           "name": "ClientSlotClearMessage",
           "kind": "interface",
-          "start": 287,
-          "end": 288
+          "start": 308,
+          "end": 309
         },
         {
           "name": "ClientScrapItemMessage",
           "kind": "interface",
-          "start": 289,
-          "end": 290
+          "start": 310,
+          "end": 311
         },
         {
           "name": "ClientSlotBuildMessage",
           "kind": "interface",
-          "start": 291,
-          "end": 292
+          "start": 312,
+          "end": 313
         },
         {
           "name": "ClientSlotOrderMessage",
           "kind": "interface",
-          "start": 293,
-          "end": 294
+          "start": 314,
+          "end": 315
         },
         {
           "name": "ClientJobMessage",
           "kind": "interface",
-          "start": 295,
-          "end": 296
+          "start": 316,
+          "end": 317
         },
         {
           "name": "ClientMarketSellAllMessage",
           "kind": "interface",
-          "start": 297,
-          "end": 302
+          "start": 318,
+          "end": 323
         },
         {
           "name": "ServerQuestsMessage",
           "kind": "interface",
-          "start": 304,
-          "end": 320
+          "start": 325,
+          "end": 341
         },
         {
           "name": "ServerQuestBoardMessage",
           "kind": "interface",
-          "start": 322,
-          "end": 332
+          "start": 343,
+          "end": 353
         },
         {
           "name": "ServerTalkMessage",
           "kind": "interface",
-          "start": 334,
-          "end": 338
+          "start": 355,
+          "end": 359
         },
         {
           "name": "ServerPeopleMessage",
           "kind": "interface",
-          "start": 340,
-          "end": 344
+          "start": 361,
+          "end": 365
         },
         {
           "name": "ServerCodexMessage",
           "kind": "interface",
-          "start": 346,
-          "end": 355
+          "start": 367,
+          "end": 376
         },
         {
           "name": "ServerQuestStepMessage",
           "kind": "interface",
-          "start": 357,
-          "end": 366
+          "start": 378,
+          "end": 387
         },
         {
           "name": "ClientQuestBoardMessage",
           "kind": "interface",
-          "start": 368,
-          "end": 369
+          "start": 389,
+          "end": 390
         },
         {
           "name": "ClientQuestAcceptMessage",
           "kind": "interface",
-          "start": 370,
-          "end": 370
+          "start": 391,
+          "end": 391
         },
         {
           "name": "ClientQuestAbandonMessage",
           "kind": "interface",
-          "start": 371,
-          "end": 371
+          "start": 392,
+          "end": 392
         },
         {
           "name": "ClientQuestSeenMessage",
           "kind": "interface",
-          "start": 372,
-          "end": 373
+          "start": 393,
+          "end": 394
         },
         {
           "name": "ClientCodexReadMessage",
           "kind": "interface",
-          "start": 374,
-          "end": 375
+          "start": 395,
+          "end": 396
         },
         {
           "name": "ClientTalkMessage",
           "kind": "interface",
-          "start": 376,
-          "end": 377
+          "start": 397,
+          "end": 398
         },
         {
           "name": "ClientSkillUpMessage",
           "kind": "interface",
-          "start": 378,
-          "end": 383
+          "start": 399,
+          "end": 404
         },
         {
           "name": "ServerStationMessage",
           "kind": "interface",
-          "start": 385,
-          "end": 408
+          "start": 406,
+          "end": 429
         },
         {
           "name": "ClientStationOpenMessage",
           "kind": "interface",
-          "start": 410,
-          "end": 411
+          "start": 431,
+          "end": 432
         },
         {
           "name": "ClientRefineMessage",
           "kind": "interface",
-          "start": 412,
-          "end": 413
+          "start": 433,
+          "end": 434
         },
         {
           "name": "ClientCraftMessage",
           "kind": "interface",
-          "start": 414,
-          "end": 415
+          "start": 435,
+          "end": 436
         },
         {
           "name": "ClientGemCutMessage",
           "kind": "interface",
-          "start": 416,
-          "end": 417
+          "start": 437,
+          "end": 438
         },
         {
           "name": "ClientGemSocketMessage",
           "kind": "interface",
-          "start": 418,
-          "end": 419
+          "start": 439,
+          "end": 440
         },
         {
           "name": "ClientGemUnsocketMessage",
           "kind": "interface",
-          "start": 420,
-          "end": 420
+          "start": 441,
+          "end": 441
         },
         {
           "name": "ClientDesignSaveMessage",
           "kind": "interface",
-          "start": 421,
-          "end": 422
+          "start": 442,
+          "end": 443
         },
         {
           "name": "ClientDesignDeleteMessage",
           "kind": "interface",
-          "start": 423,
-          "end": 423
+          "start": 444,
+          "end": 444
         },
         {
           "name": "ClientOutpostCharterMessage",
           "kind": "interface",
-          "start": 424,
-          "end": 425
+          "start": 445,
+          "end": 446
         },
         {
           "name": "ClientOutpostUpgradeMessage",
           "kind": "interface",
-          "start": 426,
-          "end": 426
+          "start": 447,
+          "end": 447
         },
         {
           "name": "ClientFabOrderMessage",
           "kind": "interface",
-          "start": 427,
-          "end": 428
+          "start": 448,
+          "end": 449
         },
         {
           "name": "ClientFabOrderCancelMessage",
           "kind": "interface",
-          "start": 429,
-          "end": 429
+          "start": 450,
+          "end": 450
         },
         {
           "name": "ClientDevStationMessage",
           "kind": "interface",
-          "start": 430,
-          "end": 431
+          "start": 451,
+          "end": 452
         },
         {
           "name": "ClientAmmoPreferMessage",
           "kind": "interface",
-          "start": 432,
-          "end": 433
+          "start": 453,
+          "end": 454
         },
         {
           "name": "ClientMarketSellMessage",
           "kind": "interface",
-          "start": 434,
-          "end": 435
+          "start": 455,
+          "end": 456
         },
         {
           "name": "ClientMarketBuyMessage",
           "kind": "interface",
-          "start": 436,
-          "end": 437
+          "start": 457,
+          "end": 458
         }
       ]
     },
@@ -13244,7 +13258,7 @@
       "id": "protocol.client",
       "path": "common/src/network/protocol/clientMessages.ts",
       "group": "common/network/protocol",
-      "lines": 308,
+      "lines": 310,
       "owns": "every client-to-server message type and the ClientMessage union",
       "needs": "the per-feature *Protocol.ts client unions, ships/types (Blueprint), hits, ownTick",
       "events": "",
@@ -13373,103 +13387,103 @@
           "name": "ClientRespawnMessage",
           "kind": "interface",
           "start": 134,
-          "end": 138
+          "end": 140
         },
         {
           "name": "ClientJoinMessage",
           "kind": "interface",
-          "start": 140,
-          "end": 153
+          "start": 142,
+          "end": 155
         },
         {
           "name": "ClientHpResyncMessage",
           "kind": "interface",
-          "start": 155,
-          "end": 162
+          "start": 157,
+          "end": 164
         },
         {
           "name": "ClientPackedResyncMessage",
           "kind": "interface",
-          "start": 164,
-          "end": 167
+          "start": 166,
+          "end": 169
         },
         {
           "name": "ClientStateHashMessage",
           "kind": "interface",
-          "start": 169,
-          "end": 173
+          "start": 171,
+          "end": 175
         },
         {
           "name": "ClientMessage",
           "kind": "type",
-          "start": 175,
-          "end": 214
+          "start": 177,
+          "end": 216
         },
         {
           "name": "ClientDevTeleportMessage",
           "kind": "interface",
-          "start": 216,
-          "end": 225
+          "start": 218,
+          "end": 227
         },
         {
           "name": "ClientDevSpawnMessage",
           "kind": "interface",
-          "start": 227,
-          "end": 234
+          "start": 229,
+          "end": 236
         },
         {
           "name": "ClientDevShipMessage",
           "kind": "interface",
-          "start": 236,
-          "end": 243
+          "start": 238,
+          "end": 245
         },
         {
           "name": "ClientDevBossMessage",
           "kind": "interface",
-          "start": 245,
-          "end": 255
+          "start": 247,
+          "end": 257
         },
         {
           "name": "ClientSiegeMessage",
           "kind": "interface",
-          "start": 257,
-          "end": 271
+          "start": 259,
+          "end": 273
         },
         {
           "name": "ClientAdminMessage",
           "kind": "interface",
-          "start": 273,
-          "end": 278
+          "start": 275,
+          "end": 280
         },
         {
           "name": "ClientDockMessage",
           "kind": "interface",
-          "start": 280,
-          "end": 283
+          "start": 282,
+          "end": 285
         },
         {
           "name": "ClientUndockMessage",
           "kind": "interface",
-          "start": 285,
-          "end": 287
+          "start": 287,
+          "end": 289
         },
         {
           "name": "ClientTowMessage",
           "kind": "interface",
-          "start": 289,
-          "end": 296
+          "start": 291,
+          "end": 298
         },
         {
           "name": "ClientFeedSwitchMessage",
           "kind": "interface",
-          "start": 298,
-          "end": 301
+          "start": 300,
+          "end": 303
         },
         {
           "name": "ClientShipEditMessage",
           "kind": "interface",
-          "start": 303,
-          "end": 307
+          "start": 305,
+          "end": 309
         }
       ]
     },
@@ -19193,9 +19207,9 @@
       "id": "server.pilots",
       "path": "server/src/game/Pilots.ts",
       "group": "server/game",
-      "lines": 686,
+      "lines": 696,
       "owns": "each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts",
-      "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, lease, freeze, guests}; npm: @space-game/common, bitecs",
+      "needs": "PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, backups, persist, session, lease, freeze, guests}; npm: @space-game/common, bitecs",
       "events": "PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings",
       "invariants": [
         {
@@ -19203,8 +19217,8 @@
           "test": "server/src/game/pilots/guests.test.ts"
         },
         {
-          "text": "a death puts the same design back, the bank paying for the rebuild",
-          "test": "server/src/game/repairBank.test.ts"
+          "text": "a death loses the ship to a plan and puts the pilot in a backup",
+          "test": "server/src/game/pilots/death.test.ts"
         }
       ],
       "extend": "a new item or death rule goes in pilots/; a new progress counter is a method here emitting a PilotEvent",
@@ -19226,62 +19240,62 @@
         {
           "name": "PilotConn",
           "kind": "interface",
-          "start": 42,
-          "end": 51
+          "start": 43,
+          "end": 52
         },
         {
           "name": "PilotHost",
           "kind": "interface",
-          "start": 53,
-          "end": 78
+          "start": 54,
+          "end": 83
         },
         {
           "name": "DeathRules",
           "kind": "interface",
-          "start": 80,
-          "end": 91
+          "start": 85,
+          "end": 96
         },
         {
           "name": "DEFAULT_DEATH_RULES",
           "kind": "const",
-          "start": 93,
-          "end": 93
+          "start": 98,
+          "end": 98
         },
         {
           "name": "PilotsOptions",
           "kind": "interface",
-          "start": 95,
-          "end": 110
+          "start": 100,
+          "end": 115
         },
         {
           "name": "LOAN_REPAY_SHARE",
           "kind": "const",
-          "start": 112,
-          "end": 113
+          "start": 117,
+          "end": 118
         },
         {
           "name": "Session",
           "kind": "interface",
-          "start": 115,
-          "end": 134
+          "start": 120,
+          "end": 139
         },
         {
           "name": "DOCK_FEE_WINDOW_MS",
           "kind": "const",
-          "start": 136,
-          "end": 137
+          "start": 141,
+          "end": 142
         },
         {
           "name": "PilotEvent",
           "kind": "type",
-          "start": 139,
-          "end": 149
+          "start": 144,
+          "end": 154
         },
         {
           "name": "Pilots",
           "kind": "class",
-          "start": 151,
-          "end": 686
+          "start": 156,
+          "end": 696
         }
       ]
     },
@@ -19289,10 +19303,10 @@
       "id": "server.repair-bank.sessions",
       "path": "server/src/game/RepairBank.ts",
       "group": "server/game",
-      "lines": 477,
-      "owns": "the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live ship, and the `repairBank` message",
-      "needs": "RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed); npm: bitecs",
-      "events": "hangarChanged when a part is built in",
+      "lines": 286,
+      "owns": "the repair bank of connected pilots: deposits, station repairs paid from it, and the `repairBank` message",
+      "needs": "RepairBanks (the rules), BankHost (sessions, toast, items, save, send); npm: @space-game/common",
+      "events": "",
       "invariants": [
         {
           "text": "a changed bank is sent at most once a second, a refilling one once a minute",
@@ -19300,6 +19314,10 @@
         },
         {
           "text": "deposits only at a station",
+          "test": "server/src/game/repairBank.test.ts"
+        },
+        {
+          "text": "the free part pays level 0 parts only, at BANK.repairShare of their inputs",
           "test": "server/src/game/repairBank.test.ts"
         }
       ],
@@ -19309,45 +19327,38 @@
         "BankHost",
         "BankSession",
         "BankSessions",
-        "ClaimCheck",
         "RepairBanks"
       ],
       "sections": [
         {
-          "name": "ClaimCheck",
-          "kind": "type",
-          "start": 37,
-          "end": 38
-        },
-        {
           "name": "RepairBanks",
           "kind": "class",
-          "start": 40,
-          "end": 289
+          "start": 32,
+          "end": 155
         },
         {
           "name": "BankSession",
           "kind": "interface",
-          "start": 291,
-          "end": 302
+          "start": 157,
+          "end": 168
         },
         {
           "name": "BankConn",
           "kind": "interface",
-          "start": 304,
-          "end": 305
+          "start": 170,
+          "end": 171
         },
         {
           "name": "BankHost",
           "kind": "interface",
-          "start": 307,
-          "end": 326
+          "start": 173,
+          "end": 185
         },
         {
           "name": "BankSessions",
           "kind": "class",
-          "start": 328,
-          "end": 477
+          "start": 187,
+          "end": 286
         }
       ]
     },
@@ -20048,6 +20059,72 @@
       ]
     },
     {
+      "id": "server.pilots.backups",
+      "path": "server/src/game/pilots/backups.ts",
+      "group": "server/game/pilots",
+      "lines": 84,
+      "owns": "backup ships: the free starter a death puts a pilot in, the backups offered at the respawn, and the choice",
+      "needs": "Pilots (sessions, opts.starter, ships.validate, death rules), common backups.ts rules; npm: @space-game/common",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the starter is always offered, and a ship over the backup rules never is",
+          "test": "server/src/game/pilots/death.test.ts"
+        },
+        {
+          "text": "the free starter's parts are never refunded, scrapped or salvaged",
+          "test": "server/src/game/pilots/death.test.ts"
+        }
+      ],
+      "extend": "a new backup rule goes in common econ/backups.ts backupRefusal",
+      "exports": [
+        "backupOptions",
+        "chooseBackup",
+        "dropSlot",
+        "flyStarter",
+        "freeStarter",
+        "isFreeStarter"
+      ],
+      "sections": [
+        {
+          "name": "freeStarter",
+          "kind": "function",
+          "start": 19,
+          "end": 23
+        },
+        {
+          "name": "isFreeStarter",
+          "kind": "function",
+          "start": 25,
+          "end": 30
+        },
+        {
+          "name": "dropSlot",
+          "kind": "function",
+          "start": 32,
+          "end": 41
+        },
+        {
+          "name": "flyStarter",
+          "kind": "function",
+          "start": 43,
+          "end": 48
+        },
+        {
+          "name": "backupOptions",
+          "kind": "function",
+          "start": 50,
+          "end": 66
+        },
+        {
+          "name": "chooseBackup",
+          "kind": "function",
+          "start": 68,
+          "end": 84
+        }
+      ]
+    },
+    {
       "id": "server.pilots.cargo",
       "path": "server/src/game/pilots/cargo.ts",
       "group": "server/game/pilots",
@@ -20176,13 +20253,21 @@
       "id": "server.pilots.death",
       "path": "server/src/game/pilots/death.ts",
       "group": "server/game/pilots",
-      "lines": 149,
-      "owns": "what dying costs a pilot: the wreck, the secure hold, the rebuilt ship, and the notices on return",
-      "needs": "Pilots (sessions, host, ships, bank), DeathRules; npm: @space-game/common",
+      "lines": 199,
+      "owns": "what dying costs a pilot: the ship lost to a plan, the wreck and its salvage, the backup they come back in, and the notices on return",
+      "needs": "Pilots (sessions, host, ships, death rules), pilots/backups.ts; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
-          "text": "a wreck is only for its pilot for wreckMinutes",
+          "text": "the lost ship goes to its hangar slot as its design with every part missing; the starter leaves no plan",
+          "test": "server/src/game/pilots/death.test.ts"
+        },
+        {
+          "text": "a wreck holds all of the hold, is its pilot's alone for wreckOwnerMinutes, open to all for wreckOpenMinutes, then gone",
+          "test": "server/src/game/pilots/death.test.ts"
+        },
+        {
+          "text": "a death inside a boss chamber leaves its wreck outside it",
           "test": "server/src/game/pilots/death.test.ts"
         },
         {
@@ -20201,38 +20286,50 @@
         {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 14,
-          "end": 86
+          "start": 18,
+          "end": 76
+        },
+        {
+          "name": "salvage",
+          "kind": "function",
+          "start": 78,
+          "end": 95
+        },
+        {
+          "name": "loseShip",
+          "kind": "function",
+          "start": 97,
+          "end": 123
         },
         {
           "name": "leaveWreck",
           "kind": "function",
-          "start": 88,
-          "end": 100
+          "start": 125,
+          "end": 147
         },
         {
           "name": "loanerLost",
           "kind": "function",
-          "start": 102,
-          "end": 113
+          "start": 149,
+          "end": 159
         },
         {
           "name": "wreckRecovered",
           "kind": "function",
-          "start": 115,
-          "end": 124
+          "start": 161,
+          "end": 170
         },
         {
           "name": "sendWreck",
           "kind": "function",
-          "start": 126,
-          "end": 135
+          "start": 172,
+          "end": 185
         },
         {
           "name": "showNotices",
           "kind": "function",
-          "start": 137,
-          "end": 149
+          "start": 187,
+          "end": 199
         }
       ]
     },
@@ -20438,7 +20535,7 @@
       "id": "server.pilots.persist",
       "path": "server/src/game/pilots/persist.ts",
       "group": "server/game/pilots",
-      "lines": 215,
+      "lines": 222,
       "owns": "moving a profile between the store, the session and the live ship entity",
       "needs": "Pilots (sessions, store, host, ships), ProfileStore; npm: @space-game/common, bitecs",
       "events": "",
@@ -20510,61 +20607,61 @@
           "name": "capture",
           "kind": "function",
           "start": 68,
-          "end": 96
+          "end": 103
         },
         {
           "name": "applyProfile",
           "kind": "function",
-          "start": 98,
-          "end": 119
+          "start": 105,
+          "end": 126
         },
         {
           "name": "applyShip",
           "kind": "function",
-          "start": 121,
-          "end": 139
+          "start": 128,
+          "end": 146
         },
         {
           "name": "flyLoaner",
           "kind": "function",
-          "start": 141,
-          "end": 155
+          "start": 148,
+          "end": 162
         },
         {
           "name": "reapplyShip",
           "kind": "function",
-          "start": 157,
-          "end": 165
+          "start": 164,
+          "end": 172
         },
         {
           "name": "captureNow",
           "kind": "function",
-          "start": 167,
-          "end": 171
+          "start": 174,
+          "end": 178
         },
         {
           "name": "mirror",
           "kind": "function",
-          "start": 173,
-          "end": 180
+          "start": 180,
+          "end": 187
         },
         {
           "name": "persistable",
           "kind": "function",
-          "start": 182,
-          "end": 188
+          "start": 189,
+          "end": 195
         },
         {
           "name": "chosen",
           "kind": "function",
-          "start": 190,
-          "end": 203
+          "start": 197,
+          "end": 210
         },
         {
           "name": "keepSavedShip",
           "kind": "function",
-          "start": 205,
-          "end": 215
+          "start": 212,
+          "end": 222
         }
       ]
     },
@@ -22386,13 +22483,13 @@
       "id": "server.gameserver.hosts.pilots",
       "path": "server/src/gameServer/hosts/pilots.ts",
       "group": "server/gameServer/hosts",
-      "lines": 207,
+      "lines": 216,
       "owns": "host adapters for pilots, quests, party, people and arenas",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
       "invariants": [
         {
-          "text": "a wreck the pilot host spawns is kept for its key for the seconds given",
+          "text": "a wreck the pilot host spawns is kept for its key for the seconds given, and lasts its life",
           "test": "server/src/gameServer/hosts/hosts.test.ts"
         }
       ],
@@ -22409,31 +22506,31 @@
           "name": "createPilotHost",
           "kind": "function",
           "start": 24,
-          "end": 71
+          "end": 80
         },
         {
           "name": "createQuestHost",
           "kind": "function",
-          "start": 73,
-          "end": 155
+          "start": 82,
+          "end": 164
         },
         {
           "name": "createPartyHost",
           "kind": "function",
-          "start": 157,
-          "end": 177
+          "start": 166,
+          "end": 186
         },
         {
           "name": "createPeopleHost",
           "kind": "function",
-          "start": 179,
-          "end": 190
+          "start": 188,
+          "end": 199
         },
         {
           "name": "createArenaHost",
           "kind": "function",
-          "start": 192,
-          "end": 207
+          "start": 201,
+          "end": 216
         }
       ]
     },
@@ -22517,7 +22614,7 @@
       "id": "server.gameserver.hosts.ship",
       "path": "server/src/gameServer/hosts/ship.ts",
       "group": "server/gameServer/hosts",
-      "lines": 135,
+      "lines": 136,
       "owns": "the ShipHost the ship bridge calls back into",
       "needs": "GameServer (type), ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -22536,7 +22633,7 @@
           "name": "createShipHost",
           "kind": "function",
           "start": 16,
-          "end": 135
+          "end": 136
         }
       ]
     },
@@ -22647,7 +22744,7 @@
       "id": "server.gameserver.wiring.game",
       "path": "server/src/gameServer/wiring/game.ts",
       "group": "server/gameServer/wiring",
-      "lines": 305,
+      "lines": 306,
       "owns": "constructor argument objects for the game modules (weapons, market, services, hazards, homes, bosses support, social, trade and more)",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -22689,103 +22786,103 @@
           "name": "pilotsOpts",
           "kind": "function",
           "start": 59,
-          "end": 68
+          "end": 69
         },
         {
           "name": "weaponsDeps",
           "kind": "function",
-          "start": 70,
-          "end": 86
+          "start": 71,
+          "end": 87
         },
         {
           "name": "marketDeps",
           "kind": "function",
-          "start": 88,
-          "end": 96
+          "start": 89,
+          "end": 97
         },
         {
           "name": "servicesDeps",
           "kind": "function",
-          "start": 98,
-          "end": 116
+          "start": 99,
+          "end": 117
         },
         {
           "name": "hazardsDeps",
           "kind": "function",
-          "start": 118,
-          "end": 126
+          "start": 119,
+          "end": 127
         },
         {
           "name": "warmthDeps",
           "kind": "function",
-          "start": 128,
-          "end": 139
+          "start": 129,
+          "end": 140
         },
         {
           "name": "homesDeps",
           "kind": "function",
-          "start": 141,
-          "end": 167
+          "start": 142,
+          "end": 168
         },
         {
           "name": "arenaGatesDeps",
           "kind": "function",
-          "start": 169,
-          "end": 180
+          "start": 170,
+          "end": 181
         },
         {
           "name": "recoveryDeps",
           "kind": "function",
-          "start": 182,
-          "end": 192
+          "start": 183,
+          "end": 193
         },
         {
           "name": "bossDevDeps",
           "kind": "function",
-          "start": 194,
-          "end": 213
+          "start": 195,
+          "end": 214
         },
         {
           "name": "densDeps",
           "kind": "function",
-          "start": 215,
-          "end": 229
+          "start": 216,
+          "end": 230
         },
         {
           "name": "contribDeps",
           "kind": "function",
-          "start": 231,
-          "end": 242
+          "start": 232,
+          "end": 243
         },
         {
           "name": "codexDeps",
           "kind": "function",
-          "start": 244,
-          "end": 256
+          "start": 245,
+          "end": 257
         },
         {
           "name": "achievementsDeps",
           "kind": "function",
-          "start": 258,
-          "end": 264
+          "start": 259,
+          "end": 265
         },
         {
           "name": "socialDeps",
           "kind": "function",
-          "start": 266,
-          "end": 274
+          "start": 267,
+          "end": 275
         },
         {
           "name": "derelictsDeps",
           "kind": "function",
-          "start": 276,
-          "end": 291
+          "start": 277,
+          "end": 292
         },
         {
           "name": "tradeDeps",
           "kind": "function",
-          "start": 293,
-          "end": 305
+          "start": 294,
+          "end": 306
         }
       ]
     },
@@ -22793,7 +22890,7 @@
       "id": "server.gameserver.wiring.net",
       "path": "server/src/gameServer/wiring/net.ts",
       "group": "server/gameServer/wiring",
-      "lines": 177,
+      "lines": 175,
       "owns": "constructor argument objects for the network modules (features, replication, lod, crowd, clocks, snapshots, own checks, bodies)",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -22819,49 +22916,49 @@
           "name": "featuresDeps",
           "kind": "function",
           "start": 28,
-          "end": 60
+          "end": 58
         },
         {
           "name": "replicationDeps",
           "kind": "function",
-          "start": 62,
-          "end": 85
+          "start": 60,
+          "end": 83
         },
         {
           "name": "lodDeps",
           "kind": "function",
-          "start": 87,
-          "end": 99
+          "start": 85,
+          "end": 97
         },
         {
           "name": "crowdDeps",
           "kind": "function",
-          "start": 101,
-          "end": 111
+          "start": 99,
+          "end": 109
         },
         {
           "name": "clocksDeps",
           "kind": "function",
-          "start": 113,
-          "end": 118
+          "start": 111,
+          "end": 116
         },
         {
           "name": "snapshotDeps",
           "kind": "function",
-          "start": 120,
-          "end": 157
+          "start": 118,
+          "end": 155
         },
         {
           "name": "ownChecksDeps",
           "kind": "function",
-          "start": 159,
-          "end": 166
+          "start": 157,
+          "end": 164
         },
         {
           "name": "bodiesDeps",
           "kind": "function",
-          "start": 168,
-          "end": 177
+          "start": 166,
+          "end": 175
         }
       ]
     },
@@ -23142,7 +23239,7 @@
       "id": "server.net.handlers.flight",
       "path": "server/src/net/handlers/flight.ts",
       "group": "server/net/handlers",
-      "lines": 321,
+      "lines": 322,
       "owns": "the prediction-sensitive client messages: input, ping, stateHash, mapView, interact, respawn, training drone, target",
       "needs": "HandlerRegistry (net/dispatch.ts), ServerCtx, ClientConnection, the game modules reached through ctx; @space-game/common, bitecs",
       "events": "",
@@ -23244,19 +23341,19 @@
           "name": "handleRespawn",
           "kind": "function",
           "start": 266,
-          "end": 306
+          "end": 307
         },
         {
           "name": "releaseControls",
           "kind": "function",
-          "start": 308,
-          "end": 314
+          "start": 309,
+          "end": 315
         },
         {
           "name": "neutralInput",
           "kind": "function",
-          "start": 316,
-          "end": 321
+          "start": 317,
+          "end": 322
         }
       ]
     },
@@ -24617,7 +24714,7 @@
       "id": "server.ships.bridge.core",
       "path": "server/src/ships/bridge/core.ts",
       "group": "server/ships/bridge",
-      "lines": 292,
+      "lines": 294,
       "owns": "the types, constants and engine interface (ShipHost) the bridge modules share, and BridgeCtx, the bridge's internal state",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
@@ -24654,85 +24751,85 @@
           "name": "ShipHost",
           "kind": "interface",
           "start": 29,
-          "end": 142
+          "end": 144
         },
         {
           "name": "PartDestroyedEvent",
           "kind": "interface",
-          "start": 144,
-          "end": 158
+          "start": 146,
+          "end": 160
         },
         {
           "name": "PilotOrders",
           "kind": "interface",
-          "start": 160,
-          "end": 176
+          "start": 162,
+          "end": 178
         },
         {
           "name": "PendingBlast",
           "kind": "interface",
-          "start": 178,
-          "end": 178
+          "start": 180,
+          "end": 180
         },
         {
           "name": "PendingSalvoShell",
           "kind": "interface",
-          "start": 180,
-          "end": 194
+          "start": 182,
+          "end": 196
         },
         {
           "name": "ShipBridgeConfig",
           "kind": "interface",
-          "start": 196,
-          "end": 211
+          "start": 198,
+          "end": 213
         },
         {
           "name": "ShipBridgeStats",
           "kind": "interface",
-          "start": 213,
-          "end": 219
+          "start": 215,
+          "end": 221
         },
         {
           "name": "K",
           "kind": "const",
-          "start": 221,
-          "end": 224
+          "start": 223,
+          "end": 226
         },
         {
           "name": "EMP_IMMUNE_TICKS",
           "kind": "const",
-          "start": 226,
-          "end": 233
+          "start": 228,
+          "end": 235
         },
         {
           "name": "BEAM_PAD",
           "kind": "const",
-          "start": 235,
-          "end": 236
+          "start": 237,
+          "end": 238
         },
         {
           "name": "BIG_BODY",
           "kind": "const",
-          "start": 238,
-          "end": 239
+          "start": 240,
+          "end": 241
         },
         {
           "name": "BridgeInternals",
           "kind": "interface",
-          "start": 241,
-          "end": 282
+          "start": 243,
+          "end": 284
         },
         {
           "name": "BridgeCtx",
           "kind": "type",
-          "start": 284,
-          "end": 285
+          "start": 286,
+          "end": 287
         },
         {
           "name": "WeaponBridge",
           "kind": "type",
-          "start": 287,
-          "end": 292
+          "start": 289,
+          "end": 294
         }
       ]
     },
@@ -25513,7 +25610,7 @@
       "id": "server.ships.bridge.rebuild",
       "path": "server/src/ships/bridge/rebuild.ts",
       "group": "server/ships/bridge",
-      "lines": 480,
+      "lines": 481,
       "owns": "a ship's body coming and going: geometry cache, spawning, removal, rebuild after parts are lost, shedding and station repair",
       "needs": "BridgeCtx and ShipHost (bridge/core.ts), ShipBridge as a type only, bitecs components, @space-game/common; other bridge modules only through the bridge (b.hurt, b.rebuildNow)",
       "events": "",
@@ -25673,55 +25770,55 @@
           "name": "repairStep",
           "kind": "function",
           "start": 271,
-          "end": 329
+          "end": 330
         },
         {
           "name": "noteRebuild",
           "kind": "function",
-          "start": 331,
-          "end": 334
+          "start": 332,
+          "end": 335
         },
         {
           "name": "markRebuild",
           "kind": "function",
-          "start": 336,
-          "end": 343
+          "start": 337,
+          "end": 344
         },
         {
           "name": "settle",
           "kind": "function",
-          "start": 345,
-          "end": 349
+          "start": 346,
+          "end": 350
         },
         {
           "name": "rebuildMarked",
           "kind": "function",
-          "start": 351,
-          "end": 354
+          "start": 352,
+          "end": 355
         },
         {
           "name": "rebuildNow",
           "kind": "function",
-          "start": 356,
-          "end": 430
+          "start": 357,
+          "end": 431
         },
         {
           "name": "shed",
           "kind": "function",
-          "start": 432,
-          "end": 451
+          "start": 433,
+          "end": 452
         },
         {
           "name": "spawnDebris",
           "kind": "function",
-          "start": 453,
-          "end": 473
+          "start": 454,
+          "end": 474
         },
         {
           "name": "removeBody",
           "kind": "function",
-          "start": 475,
-          "end": 480
+          "start": 476,
+          "end": 481
         }
       ]
     },

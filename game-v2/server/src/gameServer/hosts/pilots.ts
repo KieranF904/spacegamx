@@ -2,7 +2,7 @@
  * @contract server.gameserver.hosts.pilots
  * owns:       host adapters for pilots, quests, party, people and arenas
  * needs:      GameServer (type); npm: @space-game/common, bitecs
- * invariants: a wreck the pilot host spawns is kept for its key for the seconds given — server/src/gameServer/hosts/hosts.test.ts
+ * invariants: a wreck the pilot host spawns is kept for its key for the seconds given, and lasts its life — server/src/gameServer/hosts/hosts.test.ts
  * extend:      a new host member is added to the matching create*Host
  */
 
@@ -60,11 +60,20 @@ export function createPilotHost(gs: GameServer): PilotHost {
       gs.placePlayer(conn as ClientConnection, num, x, y);
     },
     spawnPod: (num, x, y, vx, vy, items, droppedBy) => gs.pods.spawn(num, x, y, vx, vy, items, droppedBy),
-    spawnWreck: (num, x, y, vx, vy, items, key, seconds) => {
-      const eid = gs.pods.spawn(num, x, y, vx, vy, items, -1, 0, seconds * 60);
-      if (eid >= 0) gs.pods.keep(eid, key, gs.currentTick + seconds * 60);
+    spawnWreck: (num, x, y, vx, vy, items, key, own, life) => {
+      const eid = gs.pods.spawn(num, x, y, vx, vy, items, -1, 0, life * 60);
+      if (eid >= 0) gs.pods.keep(eid, key, gs.currentTick + own * 60);
       return eid;
     },
+    // A ship lost in a boss's chamber leaves its wreck outside it: past the barrier (a system's arena: the cavern or nest
+    // it is in), or in orbit out of an instanced battleground (Surfaces.wreckOutside)
+    wreckSpot: (num, x, y) => {
+      const sys = gs.gameData.getSystemByNum(num);
+      const arena = sys?.arena;
+      if (arena && insideArena(arena, x, y)) return { system: num, x: arena.outside.x, y: arena.outside.y };
+      return (sys && gs.surfaces?.wreckOutside(sys, x, y)) ?? { system: num, x, y };
+    },
+    payout: (name, ...keys) => gs.payout.stream(name, ...keys),
     safeAt: (num, x, y) => inSafeSpace(gs.gameData.getSystemByNum(num), x, y),
     transient: (num) => !!gs.gameData.getSystemByNum(num)?.gunRange,
   };

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { addComponent } from 'bitecs';
-import { Dead, InSystem, Position } from '@space-game/common';
+import { Dead, InSystem, Lifetime, Position } from '@space-game/common';
 import { createEnemyHost } from './world.js';
 import { createBossHost } from './boss.js';
 import { createPilotHost } from './pilots.js';
@@ -49,9 +49,11 @@ describe('hosts: wrecks, places and the comet', () => {
     const host = createPilotHost(server);
     const keep: unknown[][] = [];
     server.pods.keep = ((...a: unknown[]) => { keep.push(a); }) as never;
-    const eid = host.spawnWreck!(num, 90000, 90000, 0, 0, { steel_plate: 3 }, 'u:7', 90);
+    const eid = host.spawnWreck!(num, 90000, 90000, 0, 0, { steel_plate: 3 }, 'u:7', 90, 200);
     expect(eid).toBeGreaterThanOrEqual(0);
     expect(keep).toEqual([[eid, 'u:7', server.currentTick + 90 * 60]]);
+    // (It lasts its whole life: kept, then open to anyone)
+    expect(Lifetime.remaining[eid]).toBe(200 * 60);
   });
 
   it('whereIs gives a live pilot\'s system and place, and nothing for a dead one', () => {

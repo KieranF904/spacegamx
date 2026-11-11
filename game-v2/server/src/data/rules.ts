@@ -10,6 +10,7 @@ import type { SurfaceRules } from '../game/Surfaces.js';
 import type { EventRules } from '../game/Events.js';
 import type { OpsRules } from '../game/Operations.js';
 import type { MemoryRules } from '../game/SystemMemory.js';
+import type { DeathRules } from '../game/Pilots.js';
 
 /** data/rules.json: one section per module, each merged over that module's defaults */
 export interface RulesFile {
@@ -19,6 +20,8 @@ export interface RulesFile {
   operations?: RulesPatch<OpsRules>;
   /** What's remembered of a system left empty, and how it mends (game/SystemMemory.ts) */
   memory?: RulesPatch<MemoryRules>;
+  /** What a death costs: the wreck's times and salvage, what may be a backup (game/Pilots.ts DeathRules) */
+  death?: RulesPatch<DeathRules>;
 }
 
 /** data/strings.json: flat, dotted keys (`people.goodbye`) to text with `{name}` placeholders */

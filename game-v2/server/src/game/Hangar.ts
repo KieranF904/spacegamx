@@ -16,10 +16,12 @@
  *
  * "Build" puts a slot on order: the hangar refines ore, fabricates modules
  * and fits them, a step at a time as materials allow, until it's whole (tick).
- * A ship lost in battle comes back to its slot as ghosts on order, with its
- * salvage in storage (Pilots.onDestroyed), and can't be flown until it's
- * whole; you're lent a starter ship meanwhile. Scrapping a slot breaks its
- * built parts down to salvage. Fly any slot whose core is built.
+ * A ship lost in battle comes back to its slot as its design with every part
+ * a ghost, on order (pilots/death.ts: the death rework), and can't be flown
+ * until it's whole; you fly a backup meanwhile (pilots/backups.ts: the free
+ * starter, whose own parts are never refunded or scrapped, goes once you fly
+ * another ship). Scrapping a slot breaks its built parts down to salvage. Fly
+ * any slot whose core is built.
  *
  * Orders are worked in priority order (econ/orders.ts: the first takes what
  * it needs first). One can be held (it starts nothing new, and its jobs
@@ -35,6 +37,7 @@ import type { StationServices, JobTag } from './StationServices.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { cloneJson } from '@space-game/common';
 import { activity } from '../activity/index.js';
+import { dropSlot, isFreeStarter } from './pilots/backups.js';
 
 export interface HangarHost {
   send(conn: PilotConn, msg: ServerMessage): void;
@@ -136,7 +139,10 @@ export class Hangar {
     for (const s of p.cargo) if (this.econ.items.get(s.id)?.category === 'part') pool[s.id] = (pool[s.id] ?? 0) + s.n;
     const newUids = new Set(bp.parts.map((q) => q.uid));
     const freed: Bag = {};
-    const free = (q: { material: string; fn: string; piece: string }) => {
+    // (The free starter's own parts give nothing back: they were never the pilot's, pilots/backups.ts)
+    const given = new Set(old?.free ?? []);
+    const free = (q: { uid: number; material: string; fn: string; piece: string }) => {
+      if (given.has(q.uid)) return;
       for (const [id, n] of Object.entries(placeCost(this.econ, q))) { pool[id] = (pool[id] ?? 0) + n; freed[id] = (freed[id] ?? 0) + n; }
     };
     for (const q of old?.blueprint.parts ?? []) {
@@ -219,8 +225,13 @@ export class Hangar {
         if (f !== undefined && f < 0.999) hp[q.uid] = f;
       }
     }
+    // Planned parts still unbuilt stay so (the station's bank won't make them); the free starter's own parts stay free
+    const unbuilt = (old?.unbuilt ?? []).filter((u) => state.get(u) === 'wrecked');
+    const stillFree = [...given].filter((u) => { const q = bp.parts.find((x) => x.uid === u); return !!q && keep(u, partItemId(q)) !== null; });
     const rec: ShipRecord = {
       blueprint: bp, hp, ghosts: this.coreOutwards(bp, ghosts, adj, core), plan: opts.plan ?? (old && old.blueprint.name === bp.name ? old.plan : undefined),
+      ...(unbuilt.length ? { unbuilt } : {}),
+      ...(stillFree.length ? { free: stillFree } : {}),
       // A lost ship stays lost (and on order) until it's whole
       ...(old?.lost && ghosts.length ? { lost: true, auto: true } : old?.auto && ghosts.length ? { auto: true } : {}),
       // Its ammunition loadout stays with it (crates for guns it no longer has are simply not carried)
@@ -258,7 +269,10 @@ export class Hangar {
     }
     if (!core || (rec.ghosts ?? []).includes(core.uid)) return this.pilots.toast(conn, `The ${rec.blueprint.name} needs its core built first`, 'warn');
     this.pilots.captureNow(conn);
+    const was = p.activeSlot, left = p.ship;
     setActiveShip(p, rec, slot);
+    // (The free starter left behind goes: there's always another, pilots/backups.ts)
+    if (isFreeStarter(left) && p.hangar[was] === left) dropSlot(p, was);
     this.pilots.reapplyShip(conn);
     this.pilots.emitRefit(conn);
     this.pilots.toast(conn, `Now flying the ${rec.blueprint.name}`, 'good');
@@ -277,12 +291,12 @@ export class Hangar {
     const p = this.pilots.get(conn);
     const rec = p?.hangar[slot];
     if (!p || !rec || slot === p.activeSlot) return;
-    const ghosts = new Set(rec.ghosts ?? []);
-    const salvage = salvageParts(this.econ, rec.blueprint.parts.filter((q) => !ghosts.has(q.uid) && (rec.hp[q.uid] ?? 1) > 0));
+    const ghosts = new Set(rec.ghosts ?? []), given = new Set(rec.free ?? []);
+    const salvage = salvageParts(this.econ, rec.blueprint.parts.filter((q) => !ghosts.has(q.uid) && !given.has(q.uid) && (rec.hp[q.uid] ?? 1) > 0));
     for (const [id, n] of Object.entries(salvage)) addTo(p.storage, id, n);
     const n = Object.values(salvage).reduce((t, k) => t + k, 0);
     this.pilots.toast(conn, `Scrapped the ${rec.blueprint.name}: ${n} items of salvage in storage`, 'info');
-    this.dropSlot(p, slot);
+    dropSlot(p, slot);
     this.pilots.markDirty(conn);
     this.pilots.sendItems(conn);
     this.pilots.saveNow(conn);
@@ -363,17 +377,6 @@ export class Hangar {
     if (!this.pilots.loaners.has(p.ship)) p.hangar[p.activeSlot] = p.ship;
     this.pilots.markDirty(conn);
     this.pilots.toast(conn, `Lost with the part: ${names.join(', ')}`, 'bad');
-  }
-
-  /** Empty a slot (a slot past the pilot's bays goes altogether) */
-  private dropSlot(p: PlayerProfile, slot: number): void {
-    const bays = unlocks(p).hangarSlots;
-    if (slot >= bays && p.hangar.length > bays) {
-      p.hangar.splice(slot, 1);
-      if (p.activeSlot > slot) p.activeSlot--;
-    } else {
-      p.hangar[slot] = null;
-    }
   }
 
   /** Put a slot on order: the hangar refines, fabricates and fits what it needs from here on, as materials allow */

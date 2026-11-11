@@ -104,6 +104,8 @@ export interface ShipHost {
   payBankRebuild?(eid: number, part: PlacedPart): boolean;
   /** Is a field machine building, repairing or recycling this part (uid)? The bank leaves it to the machine */
   isClaimed?(eid: number, uid: number): boolean;
+  /** A part of the pilot's ship never built (planned): the bank won't regrow it at a station, it needs fabricating */
+  unbuilt?(eid: number, uid: number): boolean;
   /** May `attacker` hurt `target`? (Players can't hurt each other outside PvP zones.) Default: yes. */
   canDamage?(attacker: number, target: number): boolean;
   /** Does a collision between these two hurt them (common hitRules.ts contactHurts)? Default: yes. They're pushed apart either way */

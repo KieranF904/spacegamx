@@ -135,6 +135,8 @@ export interface ClientRespawnMessage {
   type: 'respawn';
   /** Rally beside this party member instead of at home */
   rally?: string;
+  /** The backup to fly (a hangar slot from the `backups` message); absent or -1: the free starter */
+  backup?: number;
 }
 
 export interface ClientJoinMessage {

@@ -421,6 +421,8 @@ export interface MaterialDef {
   insulation?: number;
   /** The share of each damage type it takes (damage.ts: 0.6 shrugs much of it off, 1.3 takes more); absent: 1 */
   resist?: Partial<Record<'kinetic' | 'explosive' | 'thermal' | 'energy' | 'cryo' | 'exotic', number>>;
+  /** Survives with the wreck when its ship is lost (docs/design/death-rework-2026-11.md). Not read yet: no material sets it */
+  persistent?: boolean;
 }
 
 export type Rot = 0 | 1 | 2 | 3;
