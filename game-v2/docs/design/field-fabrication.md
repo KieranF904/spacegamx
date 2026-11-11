@@ -308,6 +308,10 @@ building owed ghosts while flying (Pilots.installOwed) still don't resend it.
 
 ## 6. Death, respawn and stations (package B implements them with `econ/field`)
 
+**Superseded (2026-11-11) by docs/design/death-rework-2026-11.md**: a death loses the ship to a plan in the hangar and the
+pilot respawns in a backup; the bank pays nothing at a respawn, nothing in the field, and mends only built parts near a
+station. What follows is how it was.
+
 1. **Death** (`Pilots.onDestroyed`): the cargo drops as today (secure hold included). The wreck also holds the machines'
    contents and `SALVAGE` (70%) of the built parts' **minerals**, recoverable by flying back. Nothing goes to storage.
    There is no loaner and no insurance.
