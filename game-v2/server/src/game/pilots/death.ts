@@ -4,12 +4,13 @@
  * needs:      Pilots (sessions, host, ships, death rules), pilots/backups.ts; npm: @space-game/common
  * invariants: the lost ship goes to its hangar slot as its design with every part missing; the starter leaves no plan — server/src/game/pilots/death.test.ts
  *             a wreck holds all of the hold, is its pilot's alone for wreckOwnerMinutes, open to all for wreckOpenMinutes, then gone — server/src/game/pilots/death.test.ts
+ *             its salvage is refined materials from the bills of salvageShare of the parts, never a part — server/src/game/pilots/death.test.ts
  *             a death inside a boss chamber leaves its wreck outside it — server/src/game/pilots/death.test.ts
  *             a destroyed loaner costs its pilot's cargo as any death does, but not the loaner or the saved ship — server/src/game/pilots/loaner.test.ts
  * extend:     a new loss or notice is a step in onDestroyed / showNotices
  */
 
-import { Bag, setActiveShip, adjacency, blueprintGeometry, cloneJson, computeJoins, coreIndex, coreOutwards, isStarterDesign, mulberry32, placeCost,
+import { Bag, setActiveShip, adjacency, blueprintGeometry, cloneJson, computeJoins, coreIndex, coreOutwards, isStarterDesign, mulberry32,
   type PlacedPart, type ShipRecord } from '@space-game/common';
 import type { Pilots, PilotConn, Session } from '../Pilots.js';
 import { backupOptions, flyStarter, isFreeStarter } from './backups.js';
@@ -77,7 +78,8 @@ export function onDestroyed(self: Pilots, conn: PilotConn, systemNum: number, x:
 
 /**
  * The share of the ship's standing parts that survive as salvage (salvageShare of them, picked by the payout dice),
- * each as it is placed: a module as its item, structure as its materials. The free starter's parts never come back
+ * each as the refined materials of its bill (plate, wire...: docs/design/loot-pickup-2026-11.md B), never as a part;
+ * the components in a bill don't come back. The free starter's parts never come back
  */
 function salvage(self: Pilots, rec: ShipRecord): Bag {
   const ghosts = new Set(rec.ghosts ?? []), free = new Set(rec.free ?? []);
@@ -89,7 +91,7 @@ function salvage(self: Pilots, rec: ShipRecord): Bag {
   const pool: PlacedPart[] = [...standing];
   for (let k = 0; k < n && pool.length; k++) {
     const q = pool.splice(Math.floor(dice() * pool.length), 1)[0];
-    for (const [id, m] of Object.entries(placeCost(self.econ, q))) out[id] = (out[id] ?? 0) + m;
+    for (const [id, m] of Object.entries(self.econ.recipes.partInputs(q))) if (self.econ.items.get(id)?.category === 'refined') out[id] = (out[id] ?? 0) + m;
   }
   return out;
 }
