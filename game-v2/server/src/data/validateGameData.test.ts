@@ -82,6 +82,15 @@ describe('game data validation', () => {
     expect(e.some((p) => p.path === 'quests[0].requires[0]')).toBe(true);
   });
 
+  it('loot tables: a missing item, a weight of 0, a dangling table or bad rolls are caught', () => {
+    const at = (e: DataProblem[]) => e.map((p) => `${p.file} ${p.path}`);
+    expect(at(broken((f) => { f.loot.tables.scrap_common.entries[0].item = 'scrap_electronix'; }))).toContain('loot.json tables.scrap_common.entries[0].item');
+    expect(at(broken((f) => { f.loot.tables.scrap_rare.entries[1].weight = 0; }))).toContain('loot.json tables.scrap_rare.entries[1].weight');
+    expect(at(broken((f) => { f.factions.factions.scrapborn.ships.scrap_hulk.drops[1].table = 'scrap_rarer'; }))).toContain('factions.json factions.scrapborn.ships.scrap_hulk.drops[1].table');
+    expect(at(broken((f) => { f.bosses.bosses.boss_tallyman.drops[0].rolls = 0; }))).toContain('bosses.json bosses.boss_tallyman.drops[0].rolls');
+    expect(at(broken((f) => { f.factions.spawns.sol_scrap_nest.loot.scrap_crawler.eliteDrop = 'nope'; }))).toContain('factions.json spawns.sol_scrap_nest.loot.scrap_crawler.eliteDrop');
+  });
+
   it('catches shape errors: a missing required field and a wrong type', () => {
     const e = broken((f) => {
       delete f.quests.quests[0].intro;

@@ -32,6 +32,7 @@ import {
   StationFile,
   setStationTable,
   type TutorialData,
+  type LootFile,
 } from '@space-game/common';
 import { checkGameData, type ValidateOptions } from './validateGameData.js';
 import type { RulesFile, StringsFile } from './rules.js';
@@ -43,6 +44,8 @@ export interface GameDataFiles {
   mining: MiningTable;
   factions: unknown;
   bosses?: unknown;
+  /** Drop tables (data/loot.json; common econ/loot.ts): what enemies and bosses roll */
+  loot?: LootFile;
   /** Single-body enemies (data/mobs.json) */
   mobs?: unknown;
   /** The training yard: steps, objects, the starter pack (data/tutorial.json; none: no tutorial) */
@@ -84,6 +87,8 @@ export class GameData {
   readonly miningTable: MiningTable;
   readonly factionsFile: unknown;
   readonly bossesFile: unknown;
+  /** data/loot.json (none: no tables, so nothing drops) */
+  readonly lootFile: LootFile;
   readonly mobsFile: unknown;
   /** The training yard's data (data/tutorial.json), if loaded */
   readonly tutorialFile: TutorialData | undefined;
@@ -131,6 +136,7 @@ export class GameData {
     this.miningTable = files.mining;
     this.factionsFile = files.factions;
     this.bossesFile = files.bosses ?? { rules: { creditRange: 5000, creditWindowTicks: 3600, barRange: 7000 }, bosses: {} };
+    this.lootFile = files.loot ?? { tables: {} };
     this.mobsFile = files.mobs ?? { mobs: {} };
     this.tutorialFile = files.tutorial;
     this.terrainFiles = files.terrain ?? {};

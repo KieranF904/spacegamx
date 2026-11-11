@@ -1,0 +1,1089 @@
+{
+  "_comment": "Drop tables (docs/design/loot-pickup-2026-11.md). A roll of a table picks one entry by weight, `nothing` included, and drops min..max of it (default 1). kind \"always\": every entry drops on each roll. Enemies say what they roll in factions.json (`drops`, `eliteDrop`: a faction default, a design, or a design in one system under spawns.<system>.loot); bosses in bosses.json `drops`. Rolled on the server's payout dice.",
+  "tables": {
+    "scrap_common": {
+      "nothing": 50,
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "iron_ore",
+          "weight": 15,
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "copper_ore",
+          "weight": 10,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "insulated_polymer",
+          "weight": 5,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "scrap_rare": {
+      "nothing": 95,
+      "entries": [
+        {
+          "item": "capacitor_cell",
+          "weight": 2
+        },
+        {
+          "item": "coil_winding",
+          "weight": 1
+        },
+        {
+          "item": "servo_motor",
+          "weight": 1
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 1
+        }
+      ]
+    },
+    "pirate_common": {
+      "nothing": 50,
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "weight": 25,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "copper_wire",
+          "weight": 15,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "iron_ore",
+          "weight": 10,
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "pirate_rare": {
+      "nothing": 90,
+      "entries": [
+        {
+          "item": "targeting_chip",
+          "weight": 3
+        },
+        {
+          "item": "servo_motor",
+          "weight": 3
+        },
+        {
+          "item": "power_coupling",
+          "weight": 3
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 1
+        }
+      ]
+    },
+    "helios_common": {
+      "nothing": 50,
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "weight": 30
+        },
+        {
+          "item": "copper_wire",
+          "weight": 17,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "insulated_polymer",
+          "weight": 3
+        }
+      ]
+    },
+    "nest_rare": {
+      "nothing": 90,
+      "entries": [
+        {
+          "item": "coil_winding",
+          "weight": 4
+        },
+        {
+          "item": "capacitor_cell",
+          "weight": 4
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 2
+        }
+      ]
+    },
+    "scavengers_common": {
+      "nothing": 24,
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "weight": 45,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "silicate",
+          "weight": 25,
+          "min": 2,
+          "max": 6
+        },
+        {
+          "item": "crystal",
+          "weight": 6,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "frost_common": {
+      "nothing": 40,
+      "entries": [
+        {
+          "item": "frost_gland",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "ice",
+          "weight": 30,
+          "min": 4,
+          "max": 10
+        }
+      ]
+    },
+    "frost_rare": {
+      "nothing": 90,
+      "entries": [
+        {
+          "item": "sapphire",
+          "weight": 6
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 4
+        }
+      ]
+    },
+    "cinder_common": {
+      "nothing": 39,
+      "entries": [
+        {
+          "item": "cinder_ash",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "titanium_ore",
+          "weight": 25,
+          "min": 3,
+          "max": 8
+        },
+        {
+          "item": "power_coupling",
+          "weight": 6
+        }
+      ]
+    },
+    "cinder_rare": {
+      "nothing": 95,
+      "entries": [
+        {
+          "item": "ruby",
+          "weight": 5
+        }
+      ]
+    },
+    "wraiths_common": {
+      "nothing": 0,
+      "entries": [
+        {
+          "item": "void_ichor",
+          "weight": 60,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "cobalt_ore",
+          "weight": 40,
+          "min": 2,
+          "max": 6
+        }
+      ]
+    },
+    "wraiths_rare": {
+      "nothing": 83,
+      "entries": [
+        {
+          "item": "shield_emitter",
+          "weight": 8
+        },
+        {
+          "item": "void_opal",
+          "weight": 4
+        },
+        {
+          "item": "nav_computer",
+          "weight": 5
+        }
+      ]
+    },
+    "maw_common": {
+      "nothing": 10,
+      "entries": [
+        {
+          "item": "cobalt_ore",
+          "weight": 60,
+          "min": 4,
+          "max": 10
+        },
+        {
+          "item": "cobalt_alloy",
+          "weight": 30,
+          "min": 1,
+          "max": 3
+        }
+      ]
+    },
+    "maw_rare": {
+      "nothing": 90,
+      "entries": [
+        {
+          "item": "quantum_core",
+          "weight": 5
+        },
+        {
+          "item": "ancient_relic",
+          "weight": 5
+        }
+      ]
+    },
+    "redtooth_common": {
+      "nothing": 25,
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "weight": 35,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "iron_ore",
+          "weight": 25,
+          "min": 2,
+          "max": 6
+        },
+        {
+          "item": "copper_wire",
+          "weight": 15,
+          "min": 1,
+          "max": 4
+        }
+      ]
+    },
+    "redtooth_rare": {
+      "nothing": 89,
+      "entries": [
+        {
+          "item": "pack_hull",
+          "weight": 6
+        },
+        {
+          "item": "targeting_chip",
+          "weight": 5
+        }
+      ]
+    },
+    "boss_scrap_mother_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "servo_motor",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "scrap_electronics",
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "alloy_plate",
+          "min": 4,
+          "max": 8
+        }
+      ]
+    },
+    "boss_scrap_mother_rolls": {
+      "nothing": 30,
+      "entries": [
+        {
+          "item": "power_coupling",
+          "weight": 40,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "pack_hull",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_scrap_mother_rare": {
+      "nothing": 92,
+      "entries": [
+        {
+          "item": "shield_emitter",
+          "weight": 8
+        }
+      ]
+    },
+    "boss_rustjaw_rolls": {
+      "nothing": 27.5,
+      "entries": [
+        {
+          "item": "rustjaw_cog",
+          "weight": 2.5
+        },
+        {
+          "item": "targeting_chip",
+          "weight": 40,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "servo_motor",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_hoarfrost_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "frost_gland",
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "boss_hoarfrost_rolls": {
+      "nothing": 5,
+      "entries": [
+        {
+          "item": "frost_heart",
+          "weight": 5
+        },
+        {
+          "item": "sapphire",
+          "weight": 50,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 40
+        }
+      ]
+    },
+    "boss_hushwing_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "hush_pane",
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "aurora_rime",
+          "min": 8,
+          "max": 16
+        },
+        {
+          "item": "frost_gland",
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "boss_hushwing_rolls": {
+      "nothing": 42,
+      "entries": [
+        {
+          "item": "sapphire",
+          "weight": 50,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "ancient_relic",
+          "weight": 8
+        }
+      ]
+    },
+    "boss_prism_colossus_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "crystal",
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_prism_colossus_rolls": {
+      "nothing": 42,
+      "entries": [
+        {
+          "item": "prism_shard",
+          "weight": 3
+        },
+        {
+          "item": "emerald",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "crystal_lens",
+          "weight": 35,
+          "min": 1,
+          "max": 3
+        }
+      ]
+    },
+    "boss_cinder_warden_rolls": {
+      "nothing": 28,
+      "entries": [
+        {
+          "item": "cinder_ember",
+          "weight": 2
+        },
+        {
+          "item": "ruby",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "titanium_plate",
+          "weight": 40,
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "boss_void_leviathan_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "void_ichor",
+          "min": 2,
+          "max": 4
+        }
+      ]
+    },
+    "boss_void_leviathan_rolls": {
+      "nothing": 48,
+      "entries": [
+        {
+          "item": "void_pearl",
+          "weight": 2
+        },
+        {
+          "item": "void_opal",
+          "weight": 25,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "nav_computer",
+          "weight": 25
+        }
+      ]
+    },
+    "boss_maw_heart_rolls": {
+      "nothing": 3.5,
+      "entries": [
+        {
+          "item": "maw_fragment",
+          "weight": 1.5
+        },
+        {
+          "item": "quantum_core",
+          "weight": 40,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "ancient_relic",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "void_opal",
+          "weight": 25,
+          "min": 1,
+          "max": 3
+        }
+      ]
+    },
+    "boss_foundry_warden_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "steel_plate",
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "crystal",
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "boss_foundry_warden_rolls": {
+      "nothing": 50,
+      "entries": [
+        {
+          "item": "servo_motor",
+          "weight": 50
+        }
+      ]
+    },
+    "boss_redtooth_hold_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "alloy_plate",
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "copper_wire",
+          "min": 2,
+          "max": 5
+        }
+      ]
+    },
+    "boss_redtooth_hold_rolls": {
+      "nothing": 20,
+      "entries": [
+        {
+          "item": "servo_motor",
+          "weight": 30
+        },
+        {
+          "item": "targeting_chip",
+          "weight": 20
+        },
+        {
+          "item": "pack_hull",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_redtooth_picket_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "scrap_electronics",
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "alloy_plate",
+          "min": 3,
+          "max": 5
+        },
+        {
+          "item": "copper_wire",
+          "min": 2,
+          "max": 4
+        }
+      ]
+    },
+    "boss_redtooth_picket_rolls": {
+      "nothing": 45,
+      "entries": [
+        {
+          "item": "servo_motor",
+          "weight": 25
+        },
+        {
+          "item": "pack_hull",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_tallyman_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "targeting_chip",
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_tallyman_rolls": {
+      "nothing": 15,
+      "entries": [
+        {
+          "item": "servo_motor",
+          "weight": 40,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "weight": 30
+        },
+        {
+          "item": "titanium_plate",
+          "weight": 15
+        }
+      ]
+    },
+    "boss_tallyman_rare": {
+      "nothing": 95,
+      "entries": [
+        {
+          "item": "reactor_core",
+          "weight": 5
+        }
+      ]
+    },
+    "boss_hollow_crown_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "targeting_chip",
+          "min": 2,
+          "max": 3
+        },
+        {
+          "item": "servo_motor",
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_hollow_crown_rolls": {
+      "nothing": 22.5,
+      "entries": [
+        {
+          "item": "titanium_plate",
+          "weight": 30,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "weight": 40,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 7.5
+        }
+      ]
+    },
+    "boss_hollow_crown_rare": {
+      "nothing": 95,
+      "entries": [
+        {
+          "item": "reactor_core",
+          "weight": 5
+        }
+      ]
+    },
+    "boss_giant_midden_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "alloy_plate",
+          "min": 10,
+          "max": 20
+        },
+        {
+          "item": "scrap_electronics",
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_giant_midden_rolls": {
+      "nothing": 6.7,
+      "entries": [
+        {
+          "item": "steel_plate",
+          "weight": 26.7,
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "servo_motor",
+          "weight": 23.3,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "weight": 23.3,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "pack_hull",
+          "weight": 20,
+          "min": 1,
+          "max": 3
+        }
+      ]
+    },
+    "boss_giant_mammoth_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "alloy_plate",
+          "min": 10,
+          "max": 20
+        },
+        {
+          "item": "steel_plate",
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "scrap_electronics",
+          "min": 4,
+          "max": 8
+        }
+      ]
+    },
+    "boss_giant_mammoth_rolls": {
+      "nothing": 15,
+      "entries": [
+        {
+          "item": "servo_motor",
+          "weight": 40,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "targeting_chip",
+          "weight": 25
+        },
+        {
+          "item": "pack_wiring",
+          "weight": 20
+        }
+      ]
+    },
+    "boss_giant_dredge_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "crystal",
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "composite_sheet",
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "scrap_electronics",
+          "min": 4,
+          "max": 8
+        }
+      ]
+    },
+    "boss_giant_dredge_rolls": {
+      "nothing": 30,
+      "entries": [
+        {
+          "item": "crystal_lens",
+          "weight": 26.7,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "power_coupling",
+          "weight": 23.3,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "scanner_charge",
+          "weight": 20,
+          "min": 2,
+          "max": 4
+        }
+      ]
+    },
+    "boss_giant_rimeback_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "frost_gland",
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "aurora_rime",
+          "min": 8,
+          "max": 16
+        }
+      ]
+    },
+    "boss_giant_rimeback_rolls": {
+      "nothing": 16.6,
+      "entries": [
+        {
+          "item": "hydrazine_slush",
+          "weight": 26.7,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "coolant",
+          "weight": 26.7,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "shield_emitter",
+          "weight": 13.3
+        },
+        {
+          "item": "pack_wiring",
+          "weight": 16.7
+        }
+      ]
+    },
+    "boss_giant_ironmonger_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "steel_plate",
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "polymer_precursor",
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_giant_ironmonger_rolls": {
+      "nothing": 20,
+      "entries": [
+        {
+          "item": "targeting_chip",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "servo_motor",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "power_coupling",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "railgun_slugs",
+          "weight": 12.5
+        },
+        {
+          "item": "pack_mechanism",
+          "weight": 7.5
+        }
+      ]
+    },
+    "boss_giant_pilgrim_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "titanium_plate",
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "cinder_ash",
+          "min": 3,
+          "max": 6
+        }
+      ]
+    },
+    "boss_giant_pilgrim_rolls": {
+      "nothing": 0,
+      "entries": [
+        {
+          "item": "ceramic_plate",
+          "weight": 26.7,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "chromite",
+          "weight": 26.7,
+          "min": 4,
+          "max": 8
+        },
+        {
+          "item": "power_coupling",
+          "weight": 26.7,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "pack_wiring",
+          "weight": 20,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    },
+    "boss_giant_shroud_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "void_ichor",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "platinoid_ore",
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_giant_shroud_rolls": {
+      "nothing": 23.3,
+      "entries": [
+        {
+          "item": "neutronium_plate",
+          "weight": 26.7,
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "singularity_dust",
+          "weight": 20,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "nav_computer",
+          "weight": 16.7
+        },
+        {
+          "item": "pack_optics",
+          "weight": 13.3
+        }
+      ]
+    },
+    "boss_pyreclast_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "ruby",
+          "min": 2,
+          "max": 4
+        },
+        {
+          "item": "titanium_plate",
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_pyreclast_rolls": {
+      "nothing": 94,
+      "entries": [
+        {
+          "item": "cinder_ember",
+          "weight": 6
+        }
+      ]
+    },
+    "boss_brood_mother_always": {
+      "kind": "always",
+      "entries": [
+        {
+          "item": "frost_gland",
+          "min": 3,
+          "max": 6
+        },
+        {
+          "item": "aurora_rime",
+          "min": 6,
+          "max": 12
+        },
+        {
+          "item": "ice",
+          "min": 6,
+          "max": 12
+        }
+      ]
+    },
+    "boss_brood_mother_rolls": {
+      "nothing": 60,
+      "entries": [
+        {
+          "item": "sapphire",
+          "weight": 40,
+          "min": 1,
+          "max": 2
+        }
+      ]
+    }
+  }
+}

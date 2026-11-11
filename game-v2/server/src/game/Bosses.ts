@@ -22,7 +22,7 @@
  */
 
 import { IWorld } from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Bag, Blueprint, ShipState, ServerMessage, mulberry32, plated, stagedIntegrity, dcos, dhypot, dsin } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Bag, Blueprint, ShipState, ServerMessage, mulberry32, plated, stagedIntegrity, dcos, dhypot, dsin, rollDrops, type DropLine } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { Enemies, Behaviour, EnemyAi } from './Enemies.js';
 import type { FarPose } from '../ships/SimLod.js';
@@ -74,7 +74,8 @@ export interface BossDef {
   behaviour: Behaviour;
   intro: string;
   phases: BossPhase[];
-  loot: { item: string; chance: number; min: number; max: number }[];
+  /** What each winner rolls (data/loot.json tables; its sure drops are an `always` table) */
+  drops: DropLine[];
   /** The blueprint (enemy designs) when it isn't the boss's own id */
   design?: string;
   /** Fought only in a job's arena (spawnAt), never at a lair */
@@ -565,12 +566,7 @@ export class Bosses {
   }
 
   private rollLoot(def: BossDef): Bag {
-    const bag: Bag = {};
-    for (const l of def.loot) {
-      if (this.lootDice() >= l.chance) continue;
-      bag[l.item] = (bag[l.item] ?? 0) + l.min + Math.floor(this.lootDice() * (l.max - l.min + 1));
-    }
-    return bag;
+    return rollDrops(this.enemies.data.lootTables ?? {}, { drops: def.drops }, this.lootDice);
   }
 
   /**

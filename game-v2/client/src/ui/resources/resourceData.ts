@@ -10,6 +10,7 @@ import systemsData from '../../../../data/systems.json';
 import stationsData from '../../../../data/stations.json';
 import bossesData from '../../../../data/bosses.json';
 import factionsData from '../../../../data/factions.json';
+import lootData from '../../../../data/loot.json';
 import questsData from '../../../../data/quests.json';
 import peopleData from '../../../../data/people.json';
 import rulesData from '../../../../data/rules.json';
@@ -33,6 +34,7 @@ export const RESOURCE_DATA: GameData = {
   bosses: (bossesData as unknown as { bosses: GameData['bosses'] }).bosses,
   factions: (factionsData as unknown as { factions: GameData['factions'] }).factions,
   spawns: (factionsData as unknown as { spawns?: GameData['spawns'] }).spawns,
+  loot: lootData as unknown as GameData['loot'],
   quests: questsData as unknown as GameData['quests'],
   people: (peopleData as unknown as { people: GameData['people'] }).people,
   rules: rulesData as unknown as GameData['rules'],

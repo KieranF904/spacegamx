@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Position, Velocity, InSystem, ServerMessage, Station as StationComp, Projectile, DroppedItem, countOf, validateBlueprint, createShipState, parseBlueprint, MAX_DRIVE } from '@space-game/common';
+import { Position, Velocity, InSystem, ServerMessage, Station as StationComp, Projectile, DroppedItem, countOf, validateBlueprint, createShipState, parseBlueprint, MAX_DRIVE, dropChances } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import type { BossesFile } from './Bosses.js';
 import * as bitecs from 'bitecs';
@@ -9,6 +9,9 @@ import { makeServer, gameFiles, dataDir, resetGlobals, joinPilot } from '../test
 
 const files = gameFiles();
 const bossFile = files.bosses as BossesFile;
+const tables = files.loot!.tables;
+/** A boss's odds per kill, by item (econ/loot.ts) */
+const odds = (b: BossesFile['bosses'][string]) => dropChances(tables, { drops: b.drops });
 
 function world() {
   resetGlobals();
@@ -55,11 +58,11 @@ describe('bosses: data', () => {
     for (const f of legendaries) {
       const parts = Object.keys(models[f.id].inputs).filter((id) => artefacts.has(id));
       expect(parts, f.id).toHaveLength(1);
-      const drops = Object.values(bossFile.bosses).flatMap((b) => b.loot.filter((l) => l.item === parts[0]));
+      const drops = Object.values(bossFile.bosses).flatMap((b) => odds(b).filter((l) => l.item === parts[0]));
       expect(drops.length, f.id).toBeGreaterThan(0);
       for (const l of drops) { expect(l.chance, f.id).toBeGreaterThanOrEqual(0.02); expect(l.chance, f.id).toBeLessThanOrEqual(0.08); }
     }
-    for (const b of Object.values(bossFile.bosses)) for (const l of b.loot) expect(l.item.startsWith('schematic_'), l.item).toBe(false);
+    for (const b of Object.values(bossFile.bosses)) for (const l of odds(b)) expect(l.item.startsWith('schematic_'), l.item).toBe(false);
   });
 
   it('every boss has a valid design, loot that exists, and a lair clear of stations', () => {
@@ -73,7 +76,7 @@ describe('bosses: data', () => {
       const own = bp.parts.some((p) => bridge.catalog.pieces.get(p.piece)?.bespoke || bridge.catalog.functions.get(p.fn)?.exclusive);
       if (own) expect(createShipState(bridge.catalog, bridge.tuning, 1, bp, 0).derived.alive.every(Boolean), id).toBe(true);
       else expect(validateBlueprint(bridge.catalog, bp, bridge.tuning).ok, id).toBe(true);
-      for (const l of def.loot) expect(server.econ.items.has(l.item), `${id} ${l.item}`).toBe(true);
+      for (const l of odds(def)) expect(server.econ.items.has(l.item), `${id} ${l.item}`).toBe(true);
       for (const p of def.phases) for (const e of p.escorts ?? []) expect(bridge.enemyDesigns[e], `${id} escort ${e}`).toBeDefined();
       expect(gd.getSystem(def.system), id).toBeDefined();
       const num = gd.getSystemNum(def.system);
@@ -191,9 +194,9 @@ describe('bosses: the fight', () => {
     expect(server.quests.acceptFrom(conn, 'main_08')).toBeNull();
     visit(server, pid, 'boss_rustjaw');
     // (The cog is a very rare drop: this kill is the lucky one)
-    const cog = bosses.file.bosses.boss_rustjaw.loot.find((l) => l.item === 'rustjaw_cog')!;
-    const chance = cog.chance;
-    cog.chance = 1;
+    const def = bosses.file.bosses.boss_rustjaw, drops = def.drops;
+    server.enemies.data.lootTables!.lucky_cog = { kind: 'always', entries: [{ item: 'rustjaw_cog' }] };
+    def.drops = [{ table: 'lucky_cog', rolls: 1 }];
     const eid = bosses.spawn('boss_rustjaw');
     const credits = profile().credits, xp = profile().xp;
     const ship = bridge.get(eid)!;
@@ -205,7 +208,8 @@ describe('bosses: the fight', () => {
     expect(profile().credits).toBeGreaterThanOrEqual(credits + bossFile.bosses.boss_rustjaw.credits);
     expect(profile().xp).toBeGreaterThan(xp);
     expect(countOf(profile().storage, 'rustjaw_cog')).toBe(1);
-    cog.chance = chance;
+    def.drops = drops;
+    delete server.enemies.data.lootTables!.lucky_cog;
     expect(profile().quests.done).toContain('main_08');
     // Not straight back
     for (let i = 0; i < 300; i++) { visit(server, pid, 'boss_rustjaw'); step(); }

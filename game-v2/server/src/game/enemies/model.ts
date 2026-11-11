@@ -5,7 +5,7 @@
  */
 
 import { IWorld } from 'bitecs';
-import { Player, Bag, ShipState, gradeReward, type AiLead, nestPost, type Terrain, type NestData, type PlanetData, type StarSystemData, type BodyState, type Spawner, type Lure } from '@space-game/common';
+import { Player, Bag, ShipState, type DropSpec, type LootTable, gradeReward, type AiLead, nestPost, type Terrain, type NestData, type PlanetData, type StarSystemData, type BodyState, type Spawner, type Lure } from '@space-game/common';
 import type { CustomTable } from '../custom/types.js';
 import { nestBand, type RoamStyle, type Band, type XY } from '../Roaming.js';
 import { type ShipMemory } from '../SystemMemory.js';
@@ -15,8 +15,11 @@ export interface FactionDef {
   color: string;
   /** strafe: share of the time spent circling at fighting range (default 1); the rest it brakes and holds */
   behaviour: { aggro: number; range: number; flee: number; leash: number; accuracy?: number; strafe?: number };
-  ships: Record<string, { xp: number; credits: number }>;
-  loot: { item: string; chance: number; min: number; max: number }[];
+  /** Per design: its pay, and its drops if not the faction's (common econ/loot.ts) */
+  ships: Record<string, { xp: number; credits: number } & DropSpec>;
+  /** What its ships roll (data/loot.json tables), and the table an elite rolls once more: the default for its designs */
+  drops?: DropSpec['drops'];
+  eliteDrop?: string;
   partSalvage: number;
   /** Hull strength against the designs' own (heavy but flimsy junk: < 1) */
   hpScale?: number;
@@ -79,7 +82,10 @@ export interface FactionsFile {
   /** passive groups leave pilots alone until someone shoots one of them */
   /** Per system: `grade` (Mk I-V, default I) is what its ships are built of (ships/grades.ts) */
   /** `groups` is also who lives there (events and raids draw on it); `packs` of them roam free, coming in from outside (0: all from nests) */
-  spawns: Record<string, { grade?: number; packs: number; groups: SpawnGroup[]; zones?: SpawnZone[]; nests?: SpawnNest[]; events?: import('../Events.js').SystemEvents }>;
+  /** `loot`: designs that drop differently in this system (the Scrap Nest den), by design */
+  spawns: Record<string, { grade?: number; packs: number; groups: SpawnGroup[]; zones?: SpawnZone[]; nests?: SpawnNest[]; events?: import('../Events.js').SystemEvents; loot?: Record<string, DropSpec> }>;
+  /** data/loot.json's tables (GameServer fills it in: withLoot) */
+  lootTables?: Record<string, LootTable>;
   /** Custom enemies (docs/enemies/custom-roster.md): designs in ship types' places, their pieces' HP and moves' numbers (custom/) */
   custom?: CustomTable;
   rules: {
@@ -87,6 +93,7 @@ export interface FactionsFile {
     minPlayerDistance: number;
     eliteChance: number;
     eliteHp: number;
+    /** An elite's XP and credits × this (its loot: one more roll of its eliteDrop table) */
     eliteLoot: number;
     respawnSeconds: number;
     /** A zone's packs nobody's been near this long (in a system with pilots: one without is remembered whole, SystemMemory.ts) are recycled, so new ones come in where the pilots are */

@@ -39,6 +39,7 @@ import { validateRecipes } from './validate/recipes.js';
 import { validateMining } from './validate/mining.js';
 import { validateFactions } from './validate/factions.js';
 import { validateBosses } from './validate/bosses.js';
+import { validateLoot } from './validate/loot.js';
 import { validateQuests } from './validate/quests.js';
 import { validatePeople } from './validate/people.js';
 import { validateCodex } from './validate/codex.js';
@@ -63,6 +64,7 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
   validateMining(v);
   validateFactions(v);
   validateBosses(v);
+  validateLoot(v);
   validateQuests(v);
   validatePeople(v);
   validateCodex(v);

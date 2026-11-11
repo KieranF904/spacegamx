@@ -40,7 +40,7 @@ describe('item catalogue', () => {
     const ids = new Set<string>();
     for (const r of recipes.refining) { ids.add(r.id); Object.keys(r.inputs).forEach((i) => ids.add(i)); }
     for (const r of recipes.craft) { Object.keys(r.inputs).forEach((i) => ids.add(i)); Object.keys(r.out).forEach((i) => ids.add(i)); }
-    for (const f of Object.values(json('factions.json').factions) as { loot?: { item: string }[] }[]) for (const l of f.loot ?? []) ids.add(l.item);
+    for (const t of Object.values(json('loot.json').tables) as { entries: { item: string }[] }[]) for (const e of t.entries) ids.add(e.item);
     for (const id of ids) expect(econ.items.has(id), id).toBe(true);
   });
 

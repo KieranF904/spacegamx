@@ -22,6 +22,7 @@ export function readGameDataFiles(dataPath: string): GameDataFiles {
     mining: read('mining.json'),
     factions: read('factions.json'),
     bosses: read('bosses.json'),
+    ...(existsSync(join(dataPath, 'loot.json')) ? { loot: read('loot.json') } : {}),
     systems: read('systems.json'),
     stations: read('stations.json'),
     quests: read('quests.json'),

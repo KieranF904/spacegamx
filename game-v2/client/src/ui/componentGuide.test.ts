@@ -12,6 +12,7 @@ import items from '../../../data/items.json';
 import recipes from '../../../data/recipes.json';
 import quests from '../../../data/quests.json';
 import bosses from '../../../data/bosses.json';
+import loot from '../../../data/loot.json';
 import {
   bossDrops, COMP_TABS, guideRows, questTeaches, requirementLine, rowGates, rowItemId, rowsOf, sortRows, tabOf,
   type CompRow, type PilotView,
@@ -22,7 +23,7 @@ const econ = new Economy(items as unknown as ItemsFile, recipes as unknown as Re
 const PLATES = (recipes as unknown as { parts: { plates: Record<string, string> } }).parts.plates;
 const rows = guideRows(catalog, PLATES);
 const QUESTS = questTeaches(quests as unknown as Parameters<typeof questTeaches>[0]);
-const DROPS = bossDrops(bosses as unknown as Parameters<typeof bossDrops>[0]);
+const DROPS = bossDrops(bosses as unknown as Parameters<typeof bossDrops>[0], (loot as unknown as { tables: Parameters<typeof bossDrops>[1] }).tables);
 
 const row = (id: string) => rows.find((r) => r.id === id)!;
 const pilot = (level: number, learned: string[] = [], bag: Record<string, number> = {}): PilotView => ({ level, learned, have: (id) => bag[id] ?? 0 });

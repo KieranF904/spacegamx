@@ -55,36 +55,18 @@
           "say": "The Scrap Mother is coming apart."
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "servo_motor",
-          "chance": 1,
-          "min": 1,
-          "max": 2
+          "table": "boss_scrap_mother_always",
+          "rolls": 1
         },
         {
-          "item": "power_coupling",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
+          "table": "boss_scrap_mother_rolls",
+          "rolls": 2
         },
         {
-          "item": "scrap_electronics",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "alloy_plate",
-          "chance": 1,
-          "min": 4,
-          "max": 8
-        },
-        {
-          "item": "pack_hull",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "boss_scrap_mother_rare",
+          "rolls": 1
         }
       ]
     },
@@ -142,24 +124,10 @@
           "heal": 0.12
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "rustjaw_cog",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "targeting_chip",
-          "chance": 0.8,
-          "min": 1,
-          "max": 3
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "boss_rustjaw_rolls",
+          "rolls": 2
         }
       ]
     },
@@ -216,30 +184,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "frost_heart",
-          "chance": 0.05,
-          "min": 1,
-          "max": 1
+          "table": "boss_hoarfrost_always",
+          "rolls": 1
         },
         {
-          "item": "frost_gland",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "sapphire",
-          "chance": 0.5,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "shield_emitter",
-          "chance": 0.4,
-          "min": 1,
-          "max": 1
+          "table": "boss_hoarfrost_rolls",
+          "rolls": 1
         }
       ]
     },
@@ -298,36 +250,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "hush_pane",
-          "chance": 1,
-          "min": 2,
-          "max": 4
+          "table": "boss_hushwing_always",
+          "rolls": 1
         },
         {
-          "item": "aurora_rime",
-          "chance": 1,
-          "min": 8,
-          "max": 16
-        },
-        {
-          "item": "frost_gland",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "sapphire",
-          "chance": 0.5,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "ancient_relic",
-          "chance": 0.08,
-          "min": 1,
-          "max": 1
+          "table": "boss_hushwing_rolls",
+          "rolls": 1
         }
       ]
     },
@@ -378,30 +308,14 @@
           "enrage": 1.2
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "prism_shard",
-          "chance": 0.06,
-          "min": 1,
-          "max": 1
+          "table": "boss_prism_colossus_always",
+          "rolls": 1
         },
         {
-          "item": "crystal",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "emerald",
-          "chance": 0.4,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "crystal_lens",
-          "chance": 0.7,
-          "min": 1,
-          "max": 3
+          "table": "boss_prism_colossus_rolls",
+          "rolls": 2
         }
       ]
     },
@@ -459,24 +373,10 @@
           "heal": 0.1
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "cinder_ember",
-          "chance": 0.04,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "ruby",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "titanium_plate",
-          "chance": 0.8,
-          "min": 3,
-          "max": 6
+          "table": "boss_cinder_warden_rolls",
+          "rolls": 2
         }
       ]
     },
@@ -533,30 +433,14 @@
           "blink": 220
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "void_pearl",
-          "chance": 0.04,
-          "min": 1,
-          "max": 1
+          "table": "boss_void_leviathan_always",
+          "rolls": 1
         },
         {
-          "item": "void_ichor",
-          "chance": 1,
-          "min": 2,
-          "max": 4
-        },
-        {
-          "item": "void_opal",
-          "chance": 0.5,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "nav_computer",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
+          "table": "boss_void_leviathan_rolls",
+          "rolls": 2
         }
       ]
     },
@@ -634,30 +518,10 @@
           }
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "maw_fragment",
-          "chance": 0.03,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "quantum_core",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "ancient_relic",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "void_opal",
-          "chance": 0.5,
-          "min": 1,
-          "max": 3
+          "table": "boss_maw_heart_rolls",
+          "rolls": 2
         }
       ],
       "design": "maw_heart_titan",
@@ -711,24 +575,14 @@
           }
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "steel_plate",
-          "chance": 1,
-          "min": 4,
-          "max": 8
+          "table": "boss_foundry_warden_always",
+          "rolls": 1
         },
         {
-          "item": "crystal",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
+          "table": "boss_foundry_warden_rolls",
+          "rolls": 1
         }
       ]
     },
@@ -782,42 +636,14 @@
           "heal": 0.08
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "scrap_electronics",
-          "chance": 1,
-          "min": 3,
-          "max": 6
+          "table": "boss_redtooth_hold_always",
+          "rolls": 1
         },
         {
-          "item": "alloy_plate",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "copper_wire",
-          "chance": 1,
-          "min": 2,
-          "max": 5
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.6,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "targeting_chip",
-          "chance": 0.4,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "pack_hull",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "boss_redtooth_hold_rolls",
+          "rolls": 2
         }
       ]
     },
@@ -870,36 +696,14 @@
           "heal": 0.06
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "scrap_electronics",
-          "chance": 1,
-          "min": 2,
-          "max": 5
+          "table": "boss_redtooth_picket_always",
+          "rolls": 1
         },
         {
-          "item": "alloy_plate",
-          "chance": 1,
-          "min": 3,
-          "max": 5
-        },
-        {
-          "item": "copper_wire",
-          "chance": 1,
-          "min": 2,
-          "max": 4
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "pack_hull",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "boss_redtooth_picket_rolls",
+          "rolls": 2
         }
       ]
     },
@@ -948,30 +752,18 @@
           "enrage": 1.3
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "targeting_chip",
-          "chance": 1,
-          "min": 1,
-          "max": 2
+          "table": "boss_tallyman_always",
+          "rolls": 1
         },
         {
-          "item": "servo_motor",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
+          "table": "boss_tallyman_rolls",
+          "rolls": 2
         },
         {
-          "item": "power_coupling",
-          "chance": 0.6,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "titanium_plate",
-          "chance": 0.3,
-          "min": 1,
-          "max": 1
+          "table": "boss_tallyman_rare",
+          "rolls": 1
         }
       ]
     },
@@ -1034,36 +826,18 @@
           "heal": 0.08
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "targeting_chip",
-          "chance": 1,
-          "min": 2,
-          "max": 3
+          "table": "boss_hollow_crown_always",
+          "rolls": 1
         },
         {
-          "item": "servo_motor",
-          "chance": 1,
-          "min": 1,
-          "max": 2
+          "table": "boss_hollow_crown_rolls",
+          "rolls": 2
         },
         {
-          "item": "titanium_plate",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "power_coupling",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "shield_emitter",
-          "chance": 0.15,
-          "min": 1,
-          "max": 1
+          "table": "boss_hollow_crown_rare",
+          "rolls": 1
         }
       ]
     },
@@ -1103,42 +877,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "alloy_plate",
-          "chance": 1,
-          "min": 10,
-          "max": 20
+          "table": "boss_giant_midden_always",
+          "rolls": 1
         },
         {
-          "item": "scrap_electronics",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "steel_plate",
-          "chance": 0.8,
-          "min": 2,
-          "max": 5
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.7,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "power_coupling",
-          "chance": 0.7,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "pack_hull",
-          "chance": 0.6,
-          "min": 1,
-          "max": 3
+          "table": "boss_giant_midden_rolls",
+          "rolls": 3
         }
       ],
       "design": "giant_midden",
@@ -1183,42 +929,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "alloy_plate",
-          "chance": 1,
-          "min": 10,
-          "max": 20
+          "table": "boss_giant_mammoth_always",
+          "rolls": 1
         },
         {
-          "item": "steel_plate",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "scrap_electronics",
-          "chance": 1,
-          "min": 4,
-          "max": 8
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "targeting_chip",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "pack_wiring",
-          "chance": 0.4,
-          "min": 1,
-          "max": 1
+          "table": "boss_giant_mammoth_rolls",
+          "rolls": 2
         }
       ],
       "design": "giant_mammoth",
@@ -1263,42 +981,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "crystal",
-          "chance": 1,
-          "min": 6,
-          "max": 12
+          "table": "boss_giant_dredge_always",
+          "rolls": 1
         },
         {
-          "item": "crystal_lens",
-          "chance": 0.8,
-          "min": 1,
-          "max": 3
-        },
-        {
-          "item": "composite_sheet",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "scrap_electronics",
-          "chance": 1,
-          "min": 4,
-          "max": 8
-        },
-        {
-          "item": "power_coupling",
-          "chance": 0.7,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "scanner_charge",
-          "chance": 0.6,
-          "min": 2,
-          "max": 4
+          "table": "boss_giant_dredge_rolls",
+          "rolls": 3
         }
       ],
       "design": "giant_dredge",
@@ -1343,42 +1033,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "frost_gland",
-          "chance": 1,
-          "min": 2,
-          "max": 4
+          "table": "boss_giant_rimeback_always",
+          "rolls": 1
         },
         {
-          "item": "aurora_rime",
-          "chance": 1,
-          "min": 8,
-          "max": 16
-        },
-        {
-          "item": "hydrazine_slush",
-          "chance": 0.8,
-          "min": 4,
-          "max": 8
-        },
-        {
-          "item": "coolant",
-          "chance": 0.8,
-          "min": 2,
-          "max": 4
-        },
-        {
-          "item": "shield_emitter",
-          "chance": 0.4,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "pack_wiring",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
+          "table": "boss_giant_rimeback_rolls",
+          "rolls": 3
         }
       ],
       "design": "giant_rimeback",
@@ -1423,48 +1085,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "steel_plate",
-          "chance": 1,
-          "min": 6,
-          "max": 12
+          "table": "boss_giant_ironmonger_always",
+          "rolls": 1
         },
         {
-          "item": "polymer_precursor",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "targeting_chip",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "servo_motor",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "power_coupling",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "railgun_slugs",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "pack_mechanism",
-          "chance": 0.3,
-          "min": 1,
-          "max": 1
+          "table": "boss_giant_ironmonger_rolls",
+          "rolls": 4
         }
       ],
       "design": "giant_ironmonger",
@@ -1509,42 +1137,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "titanium_plate",
-          "chance": 1,
-          "min": 4,
-          "max": 8
+          "table": "boss_giant_pilgrim_always",
+          "rolls": 1
         },
         {
-          "item": "cinder_ash",
-          "chance": 1,
-          "min": 3,
-          "max": 6
-        },
-        {
-          "item": "ceramic_plate",
-          "chance": 0.8,
-          "min": 2,
-          "max": 4
-        },
-        {
-          "item": "chromite",
-          "chance": 0.8,
-          "min": 4,
-          "max": 8
-        },
-        {
-          "item": "power_coupling",
-          "chance": 0.8,
-          "min": 1,
-          "max": 2
-        },
-        {
-          "item": "pack_wiring",
-          "chance": 0.6,
-          "min": 1,
-          "max": 2
+          "table": "boss_giant_pilgrim_rolls",
+          "rolls": 3
         }
       ],
       "design": "giant_pilgrim",
@@ -1589,42 +1189,14 @@
           ]
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "neutronium_plate",
-          "chance": 0.8,
-          "min": 2,
-          "max": 4
+          "table": "boss_giant_shroud_always",
+          "rolls": 1
         },
         {
-          "item": "void_ichor",
-          "chance": 1,
-          "min": 1,
-          "max": 3
-        },
-        {
-          "item": "platinoid_ore",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "singularity_dust",
-          "chance": 0.6,
-          "min": 1,
-          "max": 3
-        },
-        {
-          "item": "nav_computer",
-          "chance": 0.5,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "pack_optics",
-          "chance": 0.4,
-          "min": 1,
-          "max": 1
+          "table": "boss_giant_shroud_rolls",
+          "rolls": 3
         }
       ],
       "design": "giant_shroud",
@@ -1689,24 +1261,14 @@
           "say": "It's coming apart."
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "ruby",
-          "chance": 1,
-          "min": 2,
-          "max": 4
+          "table": "boss_pyreclast_always",
+          "rolls": 1
         },
         {
-          "item": "cinder_ember",
-          "chance": 0.06,
-          "min": 1,
-          "max": 1
-        },
-        {
-          "item": "titanium_plate",
-          "chance": 1,
-          "min": 6,
-          "max": 12
+          "table": "boss_pyreclast_rolls",
+          "rolls": 1
         }
       ]
     },
@@ -1755,30 +1317,14 @@
           "enrage": 1.3
         }
       ],
-      "loot": [
+      "drops": [
         {
-          "item": "frost_gland",
-          "chance": 1,
-          "min": 3,
-          "max": 6
+          "table": "boss_brood_mother_always",
+          "rolls": 1
         },
         {
-          "item": "aurora_rime",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "ice",
-          "chance": 1,
-          "min": 6,
-          "max": 12
-        },
-        {
-          "item": "sapphire",
-          "chance": 0.4,
-          "min": 1,
-          "max": 2
+          "table": "boss_brood_mother_rolls",
+          "rolls": 1
         }
       ]
     }

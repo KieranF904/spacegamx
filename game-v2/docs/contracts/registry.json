@@ -8566,6 +8566,46 @@
       ]
     },
     {
+      "id": "client.ui.resource-drops",
+      "path": "client/src/ui/resources/drops.ts",
+      "group": "client/ui/resources",
+      "lines": 36,
+      "owns": "what each boss and each faction drops per kill, from the loot tables (data/loot.json) and who rolls them (factions.json drops, bosses.json drops), as chances for the guide to turn into tiers",
+      "needs": "common econ/loot.ts (dropChances, dropSpecFor); the GameData shape (type only)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a faction's chance for an item is the best of its ships' (any ship, anywhere it lives)",
+          "test": "client/src/ui/resources/sourceIndex.test.ts"
+        }
+      ],
+      "extend": "a new kind of dropper is one more function here",
+      "exports": [
+        "bossDropRows",
+        "factionDropRows"
+      ],
+      "sections": [
+        {
+          "name": "tablesOf",
+          "kind": "const",
+          "start": 12,
+          "end": 12
+        },
+        {
+          "name": "bossDropRows",
+          "kind": "function",
+          "start": 14,
+          "end": 17
+        },
+        {
+          "name": "factionDropRows",
+          "kind": "function",
+          "start": 19,
+          "end": 36
+        }
+      ]
+    },
+    {
       "id": "client.ui.resource-cards",
       "path": "client/src/ui/resources/entryCards.ts",
       "group": "client/ui/resources",
@@ -9240,7 +9280,7 @@
       "id": "client.ui.resource-index",
       "path": "client/src/ui/resources/resourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 321,
+      "lines": 324,
       "owns": "the resource dictionary's entries: one per ore, gem, refined material, component, pack, ammo crate, cut gem and drop, each with how to get it and what it is used for, derived from the game data",
       "needs": "common/ (FIELD only), sourceIndex + tiers, the data/*.json shapes in GameData below (no I/O, no DOM)",
       "events": "",
@@ -9274,218 +9314,218 @@
         {
           "name": "ResourceCategory",
           "kind": "type",
-          "start": 15,
-          "end": 16
+          "start": 16,
+          "end": 17
         },
         {
           "name": "CATEGORY_LABEL",
           "kind": "const",
-          "start": 18,
-          "end": 20
+          "start": 19,
+          "end": 21
         },
         {
           "name": "CATEGORY_ORDER",
           "kind": "const",
-          "start": 21,
-          "end": 21
+          "start": 22,
+          "end": 22
         },
         {
           "name": "SourceKind",
           "kind": "type",
-          "start": 23,
-          "end": 23
+          "start": 24,
+          "end": 24
         },
         {
           "name": "SOURCE_LABEL",
           "kind": "const",
-          "start": 24,
-          "end": 27
+          "start": 25,
+          "end": 28
         },
         {
           "name": "KIND_ORDER",
           "kind": "const",
-          "start": 28,
-          "end": 28
+          "start": 29,
+          "end": 29
         },
         {
           "name": "ResourceSource",
           "kind": "interface",
-          "start": 30,
-          "end": 35
+          "start": 31,
+          "end": 36
         },
         {
           "name": "ResourceEntry",
           "kind": "interface",
-          "start": 37,
-          "end": 54
+          "start": 38,
+          "end": 55
         },
         {
           "name": "Bag",
           "kind": "type",
-          "start": 56,
-          "end": 56
+          "start": 57,
+          "end": 57
         },
         {
           "name": "ItemRow",
           "kind": "interface",
-          "start": 57,
-          "end": 60
-        },
-        {
-          "name": "RockType",
-          "kind": "interface",
-          "start": 61,
+          "start": 58,
           "end": 61
         },
         {
-          "name": "DropRow",
+          "name": "RockType",
           "kind": "interface",
           "start": 62,
           "end": 62
         },
         {
-          "name": "Named",
+          "name": "DropRow",
           "kind": "interface",
           "start": 63,
           "end": 63
         },
         {
-          "name": "GameData",
+          "name": "Named",
           "kind": "interface",
           "start": 64,
-          "end": 106
+          "end": 64
+        },
+        {
+          "name": "GameData",
+          "kind": "interface",
+          "start": 65,
+          "end": 109
         },
         {
           "name": "cap",
           "kind": "const",
-          "start": 108,
-          "end": 108
+          "start": 111,
+          "end": 111
         },
         {
           "name": "plural",
           "kind": "const",
-          "start": 109,
-          "end": 109
+          "start": 112,
+          "end": 112
         },
         {
           "name": "secs",
           "kind": "const",
-          "start": 110,
-          "end": 110
+          "start": 113,
+          "end": 113
         },
         {
           "name": "some",
           "kind": "function",
-          "start": 111,
-          "end": 114
+          "start": 114,
+          "end": 117
         },
         {
           "name": "CATEGORY_OF",
           "kind": "const",
-          "start": 116,
-          "end": 118
+          "start": 119,
+          "end": 121
         },
         {
           "name": "categoryOf",
           "kind": "function",
-          "start": 119,
-          "end": 122
+          "start": 122,
+          "end": 125
         },
         {
           "name": "Ctx",
           "kind": "interface",
-          "start": 124,
-          "end": 132
+          "start": 127,
+          "end": 135
         },
         {
           "name": "makeCtx",
           "kind": "function",
-          "start": 134,
-          "end": 147
+          "start": 137,
+          "end": 150
         },
         {
           "name": "SourceFn",
           "kind": "type",
-          "start": 149,
-          "end": 149
+          "start": 152,
+          "end": 152
         },
         {
           "name": "mined",
           "kind": "const",
-          "start": 151,
-          "end": 175
+          "start": 154,
+          "end": 178
         },
         {
           "name": "seam",
           "kind": "const",
-          "start": 177,
-          "end": 185
+          "start": 180,
+          "end": 188
         },
         {
           "name": "trace",
           "kind": "const",
-          "start": 187,
-          "end": 195
+          "start": 190,
+          "end": 198
         },
         {
           "name": "refine",
           "kind": "const",
-          "start": 197,
-          "end": 200
+          "start": 200,
+          "end": 203
         },
         {
           "name": "fabricate",
           "kind": "const",
-          "start": 202,
-          "end": 209
+          "start": 205,
+          "end": 212
         },
         {
           "name": "cut",
           "kind": "const",
-          "start": 211,
-          "end": 217
+          "start": 214,
+          "end": 220
         },
         {
           "name": "drop",
           "kind": "const",
-          "start": 219,
-          "end": 229
+          "start": 222,
+          "end": 232
         },
         {
           "name": "bought",
           "kind": "const",
-          "start": 231,
-          "end": 242
+          "start": 234,
+          "end": 245
         },
         {
           "name": "questReward",
           "kind": "const",
-          "start": 244,
-          "end": 259
+          "start": 247,
+          "end": 262
         },
         {
           "name": "salvage",
           "kind": "const",
-          "start": 261,
-          "end": 267
+          "start": 264,
+          "end": 270
         },
         {
           "name": "SOURCES",
           "kind": "const",
-          "start": 269,
-          "end": 271
+          "start": 272,
+          "end": 274
         },
         {
           "name": "usedFor",
           "kind": "function",
-          "start": 273,
-          "end": 305
+          "start": 276,
+          "end": 308
         },
         {
           "name": "buildResourceIndex",
           "kind": "function",
-          "start": 307,
-          "end": 321
+          "start": 310,
+          "end": 324
         }
       ]
     },
@@ -9493,9 +9533,9 @@
       "id": "client.ui.resource-sources",
       "path": "client/src/ui/resources/sourceIndex.ts",
       "group": "client/ui/resources",
-      "lines": 173,
+      "lines": 175,
       "owns": "the guide's source side of the resource index: every rock (what it yields, where it is found), every enemy and boss (what it drops, where it is found), and per item the icon-chip columns (mined, dropped, made from, sold at, rewards, used in)",
-      "needs": "the GameData shape from resourceIndex.ts (type only), tiers (no I/O, no DOM)",
+      "needs": "the GameData shape from resourceIndex.ts (type only), tiers, drops (the loot tables' chances; no I/O, no DOM)",
       "events": "",
       "invariants": [
         {
@@ -9524,104 +9564,104 @@
         {
           "name": "Place",
           "kind": "interface",
-          "start": 13,
-          "end": 13
+          "start": 14,
+          "end": 14
         },
         {
           "name": "SystemEntry",
           "kind": "interface",
-          "start": 14,
-          "end": 21
+          "start": 15,
+          "end": 22
         },
         {
           "name": "RockEntry",
           "kind": "interface",
-          "start": 22,
-          "end": 30
+          "start": 23,
+          "end": 31
         },
         {
           "name": "EnemyEntry",
           "kind": "interface",
-          "start": 31,
-          "end": 39
+          "start": 32,
+          "end": 40
         },
         {
           "name": "Recipe",
           "kind": "interface",
-          "start": 40,
-          "end": 40
+          "start": 41,
+          "end": 41
         },
         {
           "name": "ItemColumns",
           "kind": "interface",
-          "start": 41,
-          "end": 51
+          "start": 42,
+          "end": 52
         },
         {
           "name": "SourceIndex",
           "kind": "interface",
-          "start": 52,
-          "end": 52
+          "start": 53,
+          "end": 53
         },
         {
           "name": "TIER_RANK",
-          "kind": "const",
-          "start": 54,
-          "end": 54
-        },
-        {
-          "name": "better",
           "kind": "const",
           "start": 55,
           "end": 55
         },
         {
+          "name": "better",
+          "kind": "const",
+          "start": 56,
+          "end": 56
+        },
+        {
           "name": "isPublicSystem",
           "kind": "function",
-          "start": 57,
-          "end": 60
+          "start": 58,
+          "end": 61
         },
         {
           "name": "rockSystemMap",
           "kind": "function",
-          "start": 62,
-          "end": 76
+          "start": 63,
+          "end": 77
         },
         {
           "name": "cap",
-          "kind": "const",
-          "start": 78,
-          "end": 78
-        },
-        {
-          "name": "sum",
           "kind": "const",
           "start": 79,
           "end": 79
         },
         {
+          "name": "sum",
+          "kind": "const",
+          "start": 80,
+          "end": 80
+        },
+        {
           "name": "rocks",
           "kind": "function",
-          "start": 81,
-          "end": 92
+          "start": 82,
+          "end": 93
         },
         {
           "name": "enemies",
           "kind": "function",
-          "start": 94,
-          "end": 117
+          "start": 95,
+          "end": 119
         },
         {
           "name": "systems",
           "kind": "function",
-          "start": 119,
-          "end": 143
+          "start": 121,
+          "end": 145
         },
         {
           "name": "buildSourceIndex",
           "kind": "function",
-          "start": 145,
-          "end": 173
+          "start": 147,
+          "end": 175
         }
       ]
     },
@@ -11304,6 +11344,119 @@
           "kind": "const",
           "start": 26,
           "end": 37
+        }
+      ]
+    },
+    {
+      "id": "common.econ.loot",
+      "path": "common/src/econ/loot.ts",
+      "group": "common/econ",
+      "lines": 108,
+      "owns": "drop tables (data/loot.json): one weighted roll per table roll (\"nothing\" an entry like the rest), the always kind, who rolls what (faction, design, a design in one system), and each item's chance per kill",
+      "needs": "econ/stacks (Bag); no I/O, no randomness of its own (the caller's dice: the server's payout dice)",
+      "events": "",
+      "invariants": [
+        {
+          "text": "a roll picks exactly one entry or nothing, by weight; an always table drops every entry",
+          "test": "common/src/econ/loot.test.ts"
+        },
+        {
+          "text": "dropChances is the chance of at least one of an item per kill, worked out from the same tables rollDrops rolls",
+          "test": "common/src/econ/loot.test.ts"
+        }
+      ],
+      "extend": "a new table kind is one case in rollTable and in tableChances",
+      "exports": [
+        "DropChance",
+        "DropLine",
+        "DropSpec",
+        "LootDice",
+        "LootEntry",
+        "LootFile",
+        "LootTable",
+        "dropChances",
+        "dropSpecFor",
+        "rollDrops",
+        "rollTable"
+      ],
+      "sections": [
+        {
+          "name": "LootEntry",
+          "kind": "interface",
+          "start": 12,
+          "end": 13
+        },
+        {
+          "name": "LootTable",
+          "kind": "interface",
+          "start": 15,
+          "end": 19
+        },
+        {
+          "name": "LootFile",
+          "kind": "interface",
+          "start": 21,
+          "end": 22
+        },
+        {
+          "name": "DropLine",
+          "kind": "interface",
+          "start": 24,
+          "end": 25
+        },
+        {
+          "name": "DropSpec",
+          "kind": "interface",
+          "start": 27,
+          "end": 28
+        },
+        {
+          "name": "LootDice",
+          "kind": "type",
+          "start": 30,
+          "end": 31
+        },
+        {
+          "name": "amount",
+          "kind": "const",
+          "start": 33,
+          "end": 36
+        },
+        {
+          "name": "rollTable",
+          "kind": "function",
+          "start": 38,
+          "end": 52
+        },
+        {
+          "name": "rollDrops",
+          "kind": "function",
+          "start": 54,
+          "end": 59
+        },
+        {
+          "name": "dropSpecFor",
+          "kind": "function",
+          "start": 61,
+          "end": 70
+        },
+        {
+          "name": "tableChances",
+          "kind": "function",
+          "start": 72,
+          "end": 84
+        },
+        {
+          "name": "DropChance",
+          "kind": "interface",
+          "start": 86,
+          "end": 87
+        },
+        {
+          "name": "dropChances",
+          "kind": "function",
+          "start": 89,
+          "end": 108
         }
       ]
     },
@@ -18044,7 +18197,7 @@
       "id": "server.gameserver",
       "path": "server/src/GameServer.ts",
       "group": "server",
-      "lines": 748,
+      "lines": 751,
       "owns": "the GameServer class: its fields, the constructor that wires every module in order, and thin forwards to gameServer/*",
       "needs": "ServerCtx (net/ServerCtx.ts), gameServer/* modules, game/* modules, net/* modules, ships/ShipBridge; npm: @space-game/common, bitecs",
       "events": "",
@@ -18072,7 +18225,7 @@
           "name": "GameServer",
           "kind": "class",
           "start": 119,
-          "end": 748
+          "end": 751
         }
       ]
     },
@@ -18640,7 +18793,7 @@
       "id": "server.data.game-data",
       "path": "server/src/data/GameData.ts",
       "group": "server/data",
-      "lines": 279,
+      "lines": 285,
       "owns": "loading and indexing the game data JSON files into GameData",
       "needs": "@space-game/common data shapes and terrain builders",
       "events": "",
@@ -18659,20 +18812,20 @@
         {
           "name": "GameDataFiles",
           "kind": "interface",
-          "start": 39,
-          "end": 73
+          "start": 40,
+          "end": 76
         },
         {
           "name": "checkedFiles",
           "kind": "const",
-          "start": 75,
-          "end": 76
+          "start": 78,
+          "end": 79
         },
         {
           "name": "GameData",
           "kind": "class",
-          "start": 78,
-          "end": 279
+          "start": 81,
+          "end": 285
         }
       ]
     },
@@ -18680,7 +18833,7 @@
       "id": "server.data.disk-loader",
       "path": "server/src/data/loadGameDataFromDisk.ts",
       "group": "server/data",
-      "lines": 45,
+      "lines": 46,
       "owns": "Node-only reading of the data JSON files from a directory into GameDataFiles",
       "needs": "fs, path, GameData.ts (GameDataFiles)",
       "events": "",
@@ -18700,13 +18853,13 @@
           "name": "readGameDataFiles",
           "kind": "function",
           "start": 17,
-          "end": 41
+          "end": 42
         },
         {
           "name": "loadGameDataFromDisk",
           "kind": "function",
-          "start": 43,
-          "end": 45
+          "start": 44,
+          "end": 46
         }
       ]
     },
@@ -18714,7 +18867,7 @@
       "id": "server.data.validate",
       "path": "server/src/data/validateGameData.ts",
       "group": "server/data",
-      "lines": 104,
+      "lines": 106,
       "owns": "load-time validation of the game data files: shape against the interfaces, then every cross-referenced id resolves",
       "needs": "validate/* (one validator per data file, shared context), GameDataFiles; browser-safe: no Node imports",
       "events": "",
@@ -18741,20 +18894,20 @@
         {
           "name": "validateGameData",
           "kind": "function",
-          "start": 53,
-          "end": 75
+          "start": 54,
+          "end": 77
         },
         {
           "name": "formatProblems",
           "kind": "function",
-          "start": 77,
-          "end": 83
+          "start": 79,
+          "end": 85
         },
         {
           "name": "checkGameData",
           "kind": "function",
-          "start": 85,
-          "end": 104
+          "start": 87,
+          "end": 106
         }
       ]
     },
@@ -18762,7 +18915,7 @@
       "id": "server.data.validate-shapes",
       "path": "server/src/data/validateShapes.ts",
       "group": "server/data",
-      "lines": 582,
+      "lines": 589,
       "owns": "the shape pass of load-time data validation: a tiny schema language (Spec) and one spec per data file",
       "needs": "@space-game/common (tables, dictionary), game/brains ids; browser-safe: no Node imports",
       "events": "",
@@ -18908,88 +19061,88 @@
           "end": 157
         },
         {
-          "name": "lootSpec",
+          "name": "dropsSpec",
           "kind": "const",
           "start": 159,
-          "end": 159
+          "end": 160
         },
         {
           "name": "behaviourSpec",
           "kind": "const",
-          "start": 160,
-          "end": 160
+          "start": 161,
+          "end": 161
         },
         {
           "name": "condSpec",
           "kind": "const",
-          "start": 162,
-          "end": 182
+          "start": 163,
+          "end": 183
         },
         {
           "name": "LINE_KINDS",
           "kind": "const",
-          "start": 184,
-          "end": 196
+          "start": 185,
+          "end": 197
         },
         {
           "name": "lineSpec",
           "kind": "const",
-          "start": 197,
-          "end": 202
+          "start": 198,
+          "end": 203
         },
         {
           "name": "linesSpec",
           "kind": "const",
-          "start": 203,
-          "end": 203
+          "start": 204,
+          "end": 204
         },
         {
           "name": "STEP_FIELDS",
           "kind": "const",
-          "start": 205,
-          "end": 232
+          "start": 206,
+          "end": 233
         },
         {
           "name": "stepSpec",
           "kind": "const",
-          "start": 233,
-          "end": 238
+          "start": 234,
+          "end": 239
         },
         {
           "name": "rewardsSpec",
           "kind": "const",
-          "start": 240,
-          "end": 243
+          "start": 241,
+          "end": 244
         },
         {
           "name": "questSpec",
           "kind": "const",
-          "start": 245,
-          "end": 249
+          "start": 246,
+          "end": 250
         },
         {
           "name": "placeSpec",
           "kind": "const",
-          "start": 251,
-          "end": 251
+          "start": 252,
+          "end": 252
         },
         {
           "name": "SHAPES",
           "kind": "const",
-          "start": 253,
-          "end": 469
+          "start": 254,
+          "end": 476
         },
         {
           "name": "SHIP_SHAPES",
           "kind": "const",
-          "start": 471,
-          "end": 580
+          "start": 478,
+          "end": 587
         },
         {
           "name": "blueprintSpec",
           "kind": "const",
-          "start": 582,
-          "end": 582
+          "start": 589,
+          "end": 589
         }
       ]
     },
@@ -19024,8 +19177,8 @@
       "id": "validate.bosses",
       "path": "server/src/data/validate/bosses.ts",
       "group": "server/data/validate",
-      "lines": 32,
-      "owns": "bosses.json: lairs, designs and loot resolve",
+      "lines": 31,
+      "owns": "bosses.json: lairs and designs resolve (its drops: validate/loot.ts)",
       "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
       "events": "",
       "invariants": [
@@ -19043,7 +19196,7 @@
           "name": "validateBosses",
           "kind": "function",
           "start": 13,
-          "end": 32
+          "end": 31
         }
       ]
     },
@@ -19232,7 +19385,7 @@
       "id": "validate.factions",
       "path": "server/src/data/validate/factions.ts",
       "group": "server/data/validate",
-      "lines": 64,
+      "lines": 63,
       "owns": "factions.json: ranks, rules, station defence and ship plans resolve",
       "needs": "validate/context (the ids and reference helpers), validateShapes helpers; npm: @space-game/common",
       "events": "",
@@ -19251,7 +19404,7 @@
           "name": "validateFactions",
           "kind": "function",
           "start": 13,
-          "end": 64
+          "end": 63
         }
       ]
     },
@@ -19279,6 +19432,33 @@
           "kind": "function",
           "start": 12,
           "end": 20
+        }
+      ]
+    },
+    {
+      "id": "validate.loot",
+      "path": "server/src/data/validate/loot.ts",
+      "group": "server/data/validate",
+      "lines": 53,
+      "owns": "loot.json's tables (items exist, weights above 0, sane amounts) and every drops / eliteDrop in factions.json and bosses.json naming one",
+      "needs": "validate/context (the ids and reference helpers), validateShapes helpers",
+      "events": "",
+      "invariants": [
+        {
+          "text": "the real data has no errors, and a dangling table or a bad weight is caught",
+          "test": "server/src/data/validateGameData.test.ts"
+        }
+      ],
+      "extend": "a new place that rolls tables is one more spec() call below",
+      "exports": [
+        "validateLoot"
+      ],
+      "sections": [
+        {
+          "name": "validateLoot",
+          "kind": "function",
+          "start": 12,
+          "end": 53
         }
       ]
     },
@@ -19778,14 +19958,18 @@
       "id": "server.enemies.loot",
       "path": "server/src/game/enemies/loot.ts",
       "group": "server/game/enemies",
-      "lines": 78,
-      "owns": "a hostile's death: pay the killer, party and helpers, roll the loot table and salvage parts",
+      "lines": 75,
+      "owns": "a hostile's death: pay the killer, party and helpers, roll its drop tables (data/loot.json) and salvage parts",
       "needs": "Enemies (enemies, packs, host, data, econ, lootDice), ./populations, ./steering; npm: @space-game/common",
       "events": "",
       "invariants": [
         {
           "text": "a kill pays the killer XP and credits and drops a loot pod",
           "test": "server/src/game/enemies.test.ts"
+        },
+        {
+          "text": "a design's drops, then a design's in its system, override its faction's; an elite rolls its eliteDrop once more",
+          "test": "server/src/game/enemies/drops.test.ts"
         }
       ],
       "extend": "a new payout rule is a step in onDestroyed",
@@ -19796,8 +19980,8 @@
         {
           "name": "onDestroyed",
           "kind": "function",
-          "start": 15,
-          "end": 78
+          "start": 16,
+          "end": 75
         }
       ]
     },

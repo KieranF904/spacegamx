@@ -4,8 +4,9 @@
  * rare parts; and `componentGates`, a row's gates for a pilot (componentGuide.ts rowGates with that context).
  */
 
-import type { Bag, Catalog, Economy } from '@space-game/common';
+import type { Bag, Catalog, Economy, LootFile } from '@space-game/common';
 import bossData from '../../../data/bosses.json';
+import lootData from '../../../data/loot.json';
 import systemsData from '../../../data/systems.json';
 import questsData from '../../../data/quests.json';
 import recipesData from '../../../data/recipes.json';
@@ -14,7 +15,7 @@ import { bossDrops, questTeaches, rowGates, rowItemId, type CompRow, type Gate, 
 /** Structure's plate per material (recipes.json parts.plates): a material with one is buildable structure */
 export const PLATES = (recipesData as unknown as { parts: { plates: Record<string, string> } }).parts.plates;
 const SYSTEM_NAME = new Map((systemsData as unknown as { systems: { id: string; name: string }[] }).systems.map((s) => [s.id, s.name]));
-export const DROPS = bossDrops(bossData as unknown as Parameters<typeof bossDrops>[0], (id) => SYSTEM_NAME.get(id));
+export const DROPS = bossDrops(bossData as unknown as Parameters<typeof bossDrops>[0], (lootData as unknown as LootFile).tables, (id) => SYSTEM_NAME.get(id));
 export const QUESTS = questTeaches(questsData as unknown as Parameters<typeof questTeaches>[0]);
 
 /** What fabricating a row takes (a model's recipe inputs) */

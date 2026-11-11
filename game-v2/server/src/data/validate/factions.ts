@@ -16,7 +16,6 @@ export function validateFactions(v: V): void {
   const fx = f.factions;
   for (const [id, def] of entries(fx?.factions)) {
     for (const [ship] of entries(def?.ships)) design(F, `factions.${id}.ships.${ship}`, ship);
-    list(def?.loot).forEach((l, i) => item(F, `factions.${id}.loot[${i}].item`, l?.item));
   }
   const groups = (path: string, gs: unknown) => list(gs).forEach((g, i) => {
     const p = `${path}[${i}]`;

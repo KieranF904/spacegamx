@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { RESOURCE_DATA, sourceIndex, resourceEntries } from './resourceData';
 import { TIER_FLOORS, tierOf } from './tiers';
+import { bossDropRows, factionDropRows } from './drops';
 
 const idx = sourceIndex();
 const TIERS = ['low', 'medium', 'high'];
@@ -86,5 +87,22 @@ describe('columns', () => {
     expect(idx.columns.get('pack_optics')!.soldAt.some((s) => s.kind === 'quartermaster')).toBe(true);
     expect([...idx.columns.values()].some((c) => c.soldAt.some((s) => s.kind === 'station'))).toBe(true);
     expect([...idx.columns.values()].some((c) => c.rewards.length > 0)).toBe(true);
+  });
+});
+
+describe('drops from the loot tables', () => {
+  it("a faction's chance for an item is the best of its ships': the den's nest_rare counts for the Scrapborn", () => {
+    const rows = factionDropRows(RESOURCE_DATA, 'scrapborn');
+    // (Outside the den only the hulk's rare roll has it, 1 in 100; a den ship's nest_rare roll 4 in 100)
+    expect(rows.find((r) => r.item === 'coil_winding')!.chance).toBeCloseTo(0.04);
+    expect(rows.find((r) => r.item === 'iron_ore')!.chance).toBeCloseTo(1 - 0.85 ** 2);
+    const scrap = idx.enemies.find((e) => e.id === 'faction:scrapborn')!;
+    expect(scrap.drops.find((d) => d.item === 'coil_winding')!.tier).toBe('low');
+  });
+
+  it('a boss lists its sure drops at certainty and its rare ones low (reactor cores in the Reaches)', () => {
+    const tally = bossDropRows(RESOURCE_DATA, 'boss_tallyman');
+    expect(tally.find((r) => r.item === 'targeting_chip')!.chance).toBe(1);
+    expect(tierOf('drop', tally.find((r) => r.item === 'reactor_core')!.chance)).toBe('low');
   });
 });
