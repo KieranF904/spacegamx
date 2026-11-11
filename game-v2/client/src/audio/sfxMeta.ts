@@ -39,6 +39,7 @@ export const SFX_TABLE: Record<string, readonly [variants: number, reverb: numbe
   ui_open: [1, 0.15],
   ui_close: [1, 0.15],
   jump_ready: [1, 0.35],
+  tutorial_step: [1, 0.25],
 };
 
 /** How many variants each effect has */

@@ -10207,8 +10207,8 @@
       "id": "client.ui.tutorial.panel",
       "path": "client/src/ui/tutorial/TutorialPanel.ts",
       "group": "client/ui/tutorial",
-      "lines": 216,
-      "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, and the graduate screen",
+      "lines": 234,
+      "owns": "the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave training with its inline confirm), the \"step done\" toast, a new step's chime and flare, and the graduate screen",
       "needs": "tutorialModel (PanelModel, LeaveFlow, packLines), escape",
       "events": "",
       "invariants": [
@@ -10239,19 +10239,19 @@
           "name": "injectStyles",
           "kind": "function",
           "start": 20,
-          "end": 56
+          "end": 62
         },
         {
           "name": "PanelDeps",
           "kind": "interface",
-          "start": 58,
-          "end": 64
+          "start": 64,
+          "end": 70
         },
         {
           "name": "TutorialPanel",
           "kind": "class",
-          "start": 66,
-          "end": 216
+          "start": 72,
+          "end": 234
         }
       ]
     },
@@ -10259,7 +10259,7 @@
       "id": "client.ui.tutorial.ui",
       "path": "client/src/ui/tutorial/TutorialUI.ts",
       "group": "client/ui/tutorial",
-      "lines": 198,
+      "lines": 224,
       "owns": "wiring the lesson into the game: the card, markers and toast from each tutorialState, drone/ghost/hidden looks for the training drones, panel-open reports (polled here, so no panel's own code changes), retiring the old tour",
       "needs": "npm: @space-game/common; tutorialStore, tutorialModel, TutorialPanel, TutorialMarkers, glow (the step's highlight), placement (the card's window), the game's entities, a send function, a renderer hook",
       "events": "",
@@ -10271,6 +10271,7 @@
       ],
       "extend": "a new panel to report is an entry in `panelsOpen` (Game wiring) and in common TUTORIAL_PANELS",
       "exports": [
+        "START_DELAY_MS",
         "TutorialUI",
         "TutorialUIDeps"
       ],
@@ -10282,16 +10283,22 @@
           "end": 38
         },
         {
-          "name": "SAME_PLACE",
+          "name": "START_DELAY_MS",
           "kind": "const",
           "start": 40,
           "end": 41
         },
         {
+          "name": "SAME_PLACE",
+          "kind": "const",
+          "start": 43,
+          "end": 44
+        },
+        {
           "name": "TutorialUI",
           "kind": "class",
-          "start": 43,
-          "end": 198
+          "start": 46,
+          "end": 224
         }
       ]
     },

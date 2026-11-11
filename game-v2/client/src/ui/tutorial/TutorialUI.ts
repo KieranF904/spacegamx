@@ -37,6 +37,9 @@ export interface TutorialUIDeps {
   panelsOpen(): Partial<Record<TutorialPanel, boolean>>;
 }
 
+/** After a join the first card waits this long (ms), so the pilot sees the yard before there is something to read */
+export const START_DELAY_MS = 3000;
+
 /** A training body is matched to its entity by place: the yard is stationary */
 const SAME_PLACE = 6;
 
@@ -51,6 +54,9 @@ export class TutorialUI {
   private helmShown = false;
   private glow = new Glow(domGlowHost());
   private find = domFind();
+  /** Before this (performance.now()) the card and highlight wait: the start delay after a join */
+  private startAt = 0;
+  private startTimer = 0;
 
   constructor(private d: TutorialUIDeps) {
     this.panel = new PanelView({
@@ -75,6 +81,8 @@ export class TutorialUI {
     resetTutorial();
     this.cur = null;
     this.prevPanels = {};
+    window.clearTimeout(this.startTimer);
+    this.startAt = 0;
     this.entityOf.clear();
     this.applied.clear();
     clearTrainingBodies();
@@ -85,18 +93,36 @@ export class TutorialUI {
   private onState(s: ServerTutorialStateMessage): void {
     const prev = this.cur;
     this.cur = s;
-    for (const t of newlyDone(prev, s, tutorialData)) this.panel.toast(t);
+    // The first state after a join: the card and highlight come up a few seconds later
+    if (!prev && !s.left) {
+      this.startAt = performance.now() + START_DELAY_MS;
+      this.startTimer = window.setTimeout(() => { this.startAt = 0; this.refresh(); }, START_DELAY_MS);
+    }
+    // (When the next step comes up with it, its chime is the one sound)
+    const next = !!prev && prev.step !== s.step;
+    for (const t of newlyDone(prev, s, tutorialData)) this.panel.toast(t, next);
     if (targetGained(prev, s, tutorialData)) this.d.sound('scan_ping', 0.6);
     // A new step: whatever panel is already open counts again
     if (!prev || prev.step !== s.step) this.prevPanels = {};
-    this.showCard();
+    this.refresh();
+  }
+
+  /** The card, looks and highlight for the state now (the card and highlight held back during the start delay) */
+  private refresh(): void {
+    const s = this.cur;
+    if (!s) return;
     this.looks();
+    if (this.waiting()) { this.panel.set(null, []); this.glow.clear(); return; }
+    this.showCard();
     this.glow.set(s.left ? '' : s.step, s.left ? undefined : tutorialData.steps.find((x) => x.id === s.step)?.highlight);
   }
+
+  private waiting(): boolean { return this.startAt > 0 && performance.now() < this.startAt; }
 
   /** The instruction card for the state and the control mode now */
   private showCard(): void {
     const s = this.cur;
+    if (this.waiting()) return;
     this.panel.set(s ? panelModel(s, tutorialData, this.d.keyOf, this.d.helm()) : null, packRewardLines(tutorialData.starterPack, { item: (id) => this.d.itemName(id), icon: this.d.itemIcon }));
   }
 

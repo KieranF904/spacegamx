@@ -1,7 +1,7 @@
 /**
  * @contract client.ui.tutorial.panel
  * owns:       the lesson's DOM: the compact instruction card (step n/total, title, lines, progress bar, Continue, Leave
- *             training with its inline confirm), the "step done" toast, and the graduate screen
+ *             training with its inline confirm), the "step done" toast, a new step's chime and flare, and the graduate screen
  * needs:      tutorialModel (PanelModel, LeaveFlow, packLines), escape
  * invariants: all decisions are in tutorialModel.ts; this only draws a PanelModel and forwards clicks — client/src/ui/tutorial/tutorialModel.test.ts
  * extend:     a new element is drawn from a field of PanelModel; the controller (TutorialUI) feeds it
@@ -48,9 +48,15 @@ function injectStyles(): void {
 .tp-done { position: absolute; top: 7px; right: 10px; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 10px; border-radius: 999px; pointer-events: none;
   background: rgba(10, 40, 28, 0.94); border: 1px solid rgba(74, 222, 128, 0.7); color: #bbf7d0; font: 600 11px 'Segoe UI', sans-serif; animation: tpToast 2.6s ease-out forwards; }
 @keyframes tpToast { 0% { opacity: 0; transform: translateY(-4px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+/* A new step: the card's border flares twice and its contents slide in (the card's own transform is its placement, so the body moves) */
+.tp.tp-new { animation: tpFlare 1.4s ease-out; }
+.tp.tp-new > .tp-body { animation: tpIn 0.35s ease-out; }
+@keyframes tpFlare { 0%, 40% { border-color: #fde68a; box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.55), 0 0 44px rgba(251, 191, 36, 0.55), 0 10px 34px rgba(0,0,0,0.5); }
+  20%, 60% { border-color: rgba(251, 191, 36, 0.55); box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.25), 0 0 26px rgba(251, 191, 36, 0.2), 0 10px 34px rgba(0,0,0,0.5); } }
+@keyframes tpIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 /* Over a window (the station's, the hold), the hangar or the map: the same card, moved by it (placement.ts), above its veil; it glides there */
 .tp.anch { z-index: 2600; }
-@media (prefers-reduced-motion: reduce) { .tp { transition: none; } .tp-done { animation: none; } .tp-bar > i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tp { transition: none; } .tp-done { animation: none; } .tp-bar > i { transition: none; } .tp.tp-new, .tp.tp-new > .tp-body { animation: none; } }
 `;
   document.head.appendChild(css);
 }
@@ -78,6 +84,8 @@ export class TutorialPanel {
   /** The last spot worked out (an unchanged one is not set again) and whether the card has had its first */
   private placed = '';
   private positioned = false;
+  /** The step last drawn: a different one is announced (chime and flare) */
+  private stepShown = '';
 
   constructor(private d: PanelDeps) {
     injectStyles();
@@ -86,6 +94,7 @@ export class TutorialPanel {
     this.card.hidden = true;
     this.card.setAttribute('role', 'region');
     this.card.setAttribute('aria-label', 'Training');
+    this.body.className = 'tp-body';
     this.toastEl.className = 'tp-done';
     this.toastEl.hidden = true;
     this.toastEl.setAttribute('role', 'status');
@@ -111,7 +120,7 @@ export class TutorialPanel {
   }
 
   /** The reset on a new connection */
-  reset(): void { this.flow.reset(); this.set(null, []); }
+  reset(): void { this.flow.reset(); this.stepShown = ''; this.set(null, []); }
 
   /** Hide behind full-screen views (the menu) */
   setHidden(hidden: boolean): void {
@@ -155,7 +164,7 @@ export class TutorialPanel {
   }
 
   /** "Done: <step>" in the card's top corner for a moment (part of the card, so it never covers its title or a window) */
-  toast(text: string): void {
+  toast(text: string, quiet = false): void {
     this.toastEl.textContent = `✓ Done: ${text}`;
     this.toastEl.title = this.toastEl.textContent;
     this.toastEl.hidden = false;
@@ -163,9 +172,17 @@ export class TutorialPanel {
     this.toastEl.style.animation = 'none';
     void this.toastEl.offsetWidth;
     this.toastEl.style.animation = '';
-    this.d.sound('scan_ping', 0.5);
+    if (!quiet) this.d.sound('scan_ping', 0.5);
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => { this.toastEl.hidden = true; }, 2700);
+  }
+
+  /** A new step's card: a chime and a flare, so it is clear there is something new to read */
+  private announce(): void {
+    this.d.sound('tutorial_step', 0.7);
+    this.card.classList.remove('tp-new');
+    void this.card.offsetWidth;
+    this.card.classList.add('tp-new');
   }
 
   private render(): void {
@@ -190,6 +207,7 @@ export class TutorialPanel {
     this.grad.hide();
     if (this.card.hidden) { this.placed = ''; this.positioned = false; }
     this.card.hidden = false;
+    if (m.stepId !== this.stepShown) { this.stepShown = m.stepId; this.announce(); }
     const confirm = this.flow.phase === 'confirm', sent = this.flow.phase === 'sent';
     this.body.innerHTML = `<div class="tp-h"><span>TRAINING · ${m.n} / ${m.total}</span></div>
       <div class="tp-t">${esc(m.title)}</div>

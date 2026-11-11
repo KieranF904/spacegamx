@@ -587,6 +587,15 @@ const RECIPES: Record<string, Recipe> = {
     }
     burst(ctx, out, r, 0.12, 0.12, 0.002, 0.3, [filter(ctx, 'bandpass', 5000, 1.5)]);
   } },
+  // A new training card: three bright rising bell tones, clear over engine noise
+  tutorial_step: { duration: 0.8, build(ctx, out) {
+    for (const [t, f] of [[0, 784], [0.09, 988], [0.18, 1319]] as const) {
+      const o = osc(ctx, 'sine', f), h = osc(ctx, 'sine', f * 2);
+      chain(o, env(ctx, t, 0.16, 0.004, 0.45), out);
+      chain(h, env(ctx, t, 0.04, 0.004, 0.25), out);
+      o.start(t); h.start(t);
+    }
+  } },
 };
 
 /** One-pole lowpass made cyclic (run twice), so loops have no seam */
