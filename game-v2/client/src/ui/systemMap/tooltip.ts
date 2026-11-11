@@ -59,7 +59,7 @@ export function updateTooltip(host: MapHost): void {
     const sub = hit.calm ? 'Passive · leaves you be unless provoked' : hit.rank === 2 ? 'Boss' : hit.rank === 1 ? 'Elite hostile' : 'Hostile';
     html = `<div class="t-name">${esc(hit.name)}</div><div class="t-sub">${sub}</div>${hit.rating ? `<div class="t-row"><b>Rates</b> ${threatTag(host.myRating?.() ?? 0, hit.rating, '◆')}</div>` : ''}<div class="t-act">Hold left to fire (rough aim at host scale)</div>`;
   } else if (hit.kind === 'beacon') {
-    html = `<div class="t-name">Your wreck</div><div class="t-sub">Kept for you a while</div><div class="t-desc">Fly back to it to recover what you lost.</div><div class="t-act">Click: autopilot there</div>`;
+    html = `<div class="t-name">Your wreck</div><div class="t-sub">Yours alone a while, then anyone's</div><div class="t-desc">Fly back to it to recover what you lost.</div><div class="t-act">Click: autopilot there</div>`;
   } else if (hit.kind === 'moon') {
     const surf = host.byId.get(hit.surface);
     const b = surf?.surface?.bastion;

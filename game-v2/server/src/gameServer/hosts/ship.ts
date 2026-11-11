@@ -89,6 +89,7 @@ export function createShipHost(gs: GameServer): ShipHost {
     payBankRebuild: (eid, part) => gs.pilots.bankRebuild(eid, part),
     payBankRepair: (eid, part, missing) => gs.pilots.bankRepair(eid, part, missing),
     isClaimed: (eid, uid) => gs.pilots.isClaimed(eid, uid),
+    unbuilt: (eid, uid) => gs.pilots.unbuilt(eid, uid),
     canDamage: (a, b) => gs.canDamage(a, b),
     contactHurts: (a, b) => contactHurts(gs.enemies.factionOf(a), gs.enemies.factionOf(b)),
     // --- Support weapons (common/src/ships/features/support/support.ts) ---

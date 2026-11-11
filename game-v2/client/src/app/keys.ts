@@ -36,6 +36,7 @@ import { viewMode } from '../input/viewMode';
 import { groupKey } from '../ships/weaponGroups/keys';
 import { inGunRange } from '../ui/gunRange/rangeState';
 import { rangeKey } from '../ui/gunRange/rangeKeys';
+import { backupPicker } from '../ui/BackupPicker';
 
 /** What the key handlers read from the game (Game supplies it as getters, so late-built windows resolve at use) */
 export interface KeyHost {
@@ -206,10 +207,10 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
     // (No chat line: the markers appearing or going is the answer)
     return true;
   },
-  // Respawn with R after being destroyed
+  // Respawn with R after being destroyed (in the backup picked, the starter if none: ui/BackupPicker.ts)
   KeyR: (h) => {
     if (!h.loggedIn) return false;
-    h.network.send({ type: 'respawn' });
+    h.network.send({ type: 'respawn', ...backupPicker.choice() });
     return true;
   },
   // Interact with X (E is strafe right in helm controls)

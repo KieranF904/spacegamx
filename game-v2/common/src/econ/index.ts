@@ -20,6 +20,7 @@ export * from './codex.js';
 export * from './hangar.js';
 export * from './loadout.js';
 export * from './salvage.js';
+export * from './backups.js';
 export * from './orders.js';
 export * from './levels.js';
 export * from './ribbons.js';

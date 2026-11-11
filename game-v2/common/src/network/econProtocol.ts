@@ -148,9 +148,30 @@ export interface ServerWreckMessage {
   system?: string;
   x?: number;
   y?: number;
+  /** Seconds it is still yours alone */
   seconds?: number;
+  /** Seconds after that anyone may loot it, before it's gone */
+  open?: number;
   items?: number;
   gone?: boolean;
+}
+
+/** A ship the pilot may respawn in (docs/design/death-rework-2026-11.md): the starter, or one of theirs that qualifies */
+export interface BackupOption {
+  /** Its hangar slot; -1: the free starter */
+  slot: number;
+  name: string;
+  /** Parts standing of its design */
+  built: number;
+  parts: number;
+}
+
+/** Your ship was lost: the backups you may respawn in (the starter always first). Sent at the death */
+export interface ServerBackupsMessage {
+  type: 'backups';
+  options: BackupOption[];
+  /** The design that was lost, now a plan in the hangar (absent: the starter, which leaves none) */
+  lost?: string;
 }
 
 /** A scanner charge went off: show asteroid contents for a while */
@@ -215,7 +236,7 @@ export interface ClientItemUseMessage {
   id: string;
 }
 
-export type EconServerMessage = ServerProfileMessage | ServerProfileDeltaMessage | ServerItemsMessage | ServerLootMessage2 | ServerToastMessage | ServerWreckMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
+export type EconServerMessage = ServerProfileMessage | ServerProfileDeltaMessage | ServerItemsMessage | ServerLootMessage2 | ServerToastMessage | ServerWreckMessage | ServerBackupsMessage | ServerRebuildStatusMessage | ServerStationMessage | ServerScanPulseMessage
   | ServerQuestsMessage | ServerQuestBoardMessage | ServerQuestStepMessage | ServerHangarMessage | ServerTalkMessage | ServerPeopleMessage | ServerCodexMessage;
 export type EconClientMessage = ClientItemMoveMessage | ClientItemStoreMessage | ClientRestockLoadoutMessage | ClientSlotLoadoutMessage | ClientItemJettisonMessage | ClientItemUseMessage
   | ClientStationOpenMessage | ClientRefineMessage | ClientCraftMessage | ClientGemCutMessage | ClientGemSocketMessage | ClientGemUnsocketMessage | ClientAmmoPreferMessage | ClientOutpostCharterMessage | ClientOutpostUpgradeMessage | ClientDesignSaveMessage | ClientDesignDeleteMessage | ClientDevStationMessage | ClientFabOrderMessage | ClientFabOrderCancelMessage | ClientMarketSellMessage | ClientMarketBuyMessage

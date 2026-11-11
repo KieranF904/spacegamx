@@ -65,6 +65,8 @@ import type { PilotState } from '../econ/clientEcon';
 import type { ClientTransport } from '@space-game/common';
 import { makeComponentGuide, makeStationWindow, makeTutorialUI, makeGunRangeHud } from './lazyScreens';
 import { inGunRange } from '../ui/gunRange/rangeState';
+import { wreckLive, type WreckMark } from '../ui/wreckMark';
+import { backupPicker } from '../ui/BackupPicker';
 
 /** What the windows read from the game (Game supplies it as getters, so later-built state resolves at use) */
 export interface WindowHost {
@@ -80,7 +82,7 @@ export interface WindowHost {
   readonly regionUI: RegionUI;
   readonly objectives: ObjectiveBanner;
   readonly worldEvents: Map<number, { name: string; x: number; y: number; system: string }>;
-  readonly wreck: { system: string; x: number; y: number; until: number } | null;
+  readonly wreck: WreckMark | null;
   readonly sessionKills: number;
   readonly loggedIn: boolean;
   readonly localDead: boolean;
@@ -253,10 +255,12 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
       invite: (id) => w.social.invite(id),
       trade: (id) => host.network.send({ type: 'tradeRequest', id }),
       ping: (x, y, kind, target) => host.network.send({ type: 'mapPing', x, y, kind, target }),
-      wreck: () => { const w = host.wreck; return w && w.system === host.state.systemId && w.until > Date.now() ? { x: w.x, y: w.y } : null; },
+      wreck: () => { const w = host.wreck; return wreckLive(w, Date.now()) && w.system === host.state.systemId ? { x: w.x, y: w.y } : null; },
       message: (t, c) => host.showSystemMessage(t, c),
       sound: (id) => host.audio.playUI(id, 0.5),
     });
+    // (The respawn screen's backup choice: ui/BackupPicker.ts)
+    backupPicker.bind((m) => host.network.send(m));
     w.social = new SocialUI({
       state: host.state,
       send: (m) => host.network.send(m),
@@ -318,7 +322,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     w.playerStatsUI = new PlayerStatsUI(uiOverlay);
     w.systemMapUI = makeSystemMap(() => import('../ui/SystemMapUI').then(({ SystemMapUI }) => new SystemMapUI(uiOverlay, host.state)));
     w.systemMapUI.onFlyTo = (dest) => host.flyTo(dest);
-    w.systemMapUI.wreck = () => (host.wreck && host.wreck.until > Date.now() ? host.wreck : null);
+    w.systemMapUI.wreck = () => (wreckLive(host.wreck, Date.now()) ? host.wreck : null);
     w.systemMapUI.jump = () => ({ aiming: host.shipClient.jumpAiming(), phase: host.shipClient.localJump().phase, reach: host.shipClient.jumpReach() });
     w.systemMapUI.autoTarget = () => w.autopilot.heading();
     w.systemMapUI.autoRoute = () => w.autopilot.routeView();

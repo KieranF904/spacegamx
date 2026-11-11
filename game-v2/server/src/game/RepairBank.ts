@@ -1,48 +1,37 @@
 /**
  * @contract server.repair-bank.sessions
- * owns:       the repair bank of connected pilots: deposits, station repairs paid from it, rebuilding owed parts on the live
- *             ship, and the `repairBank` message
- * needs:      RepairBanks (the rules), BankHost (sessions, toast, items, save, send, installGhost, isClaimed); npm: bitecs
- * events:     hangarChanged when a part is built in
+ * owns:       the repair bank of connected pilots: deposits, station repairs paid from it, and the `repairBank` message
+ * needs:      RepairBanks (the rules), BankHost (sessions, toast, items, save, send); npm: @space-game/common
  * invariants: a changed bank is sent at most once a second, a refilling one once a minute — server/src/game/repairBank.test.ts
  *             deposits only at a station — server/src/game/repairBank.test.ts
+ *             the free part pays level 0 parts only, at BANK.repairShare of their inputs — server/src/game/repairBank.test.ts
  * extend:     a new bank action is a method here and a door in Pilots; its rules go in RepairBanks
  */
 /**
- * The repair bank on the server (docs/design/field-fabrication.md, sections 2.4 and 6; the rules and numbers are
+ * The repair bank on the server (docs/design/death-rework-2026-11.md; the rules and numbers are
  * common/src/econ/field/bank.ts, so client and server agree). Each pilot has one, on the profile (`PlayerProfile.bank`):
  *
- *   free      refills by the wall clock to two starter ships' worth (BANK.ships) in 5 minutes; pays for the ship at once on a respawn (core outward),
- *             and its top half ("spare") may also pay repairs. Never withdrawn.
- *   deposits  packs and refined materials put in at a station. Never withdrawn. They mend the ship near any station
- *             (bridge/rebuild.ts repairStep, through payRepair / payRebuild here) and, after a respawn, rebuild what the
- *             free part didn't cover, anywhere, at BANK.respawnSpeed (stepDeposits): never instantly.
- *   No guaranteed ship: a pilot who dies until the free part is empty respawns as a bare core, and is rebuilt as it refills.
+ *   free      refills by the wall clock to two starter ships' worth (BANK.ships) in 5 minutes; pays station repairs of
+ *             level 0 parts (freePays). Never withdrawn.
+ *   deposits  packs and refined materials put in at a station. Never withdrawn. They pay station repairs of any part.
  *
- * A death makes every part of the design (but the core and the hangar's placeholders) a ghost and records it as owed
- * (`ShipRecord.owed`): standing or missing alike, since a part the build view planned is a missing part of the design.
- * Hangar placeholders are not owed, so the free part and the deposits only ever rebuild the ship's own design.
+ * It mends a ship that survived, near a station (bridge/rebuild.ts repairStep, through payRepair / payRebuild here): its
+ * damaged parts, and its destroyed ones that were built. A part never built (ShipRecord.unbuilt) or a ghost (a death
+ * leaves every part of the lost ship one) needs fabricating; the bank never pays for it, and nothing at a respawn.
+ * There is no bank in the field: the ship's machines work from its hold.
  *
  * RepairBanks is the rules applied to a profile (no ECS, no sockets); tests run it on bare profiles. BankSessions, below it,
- * is the bank of the pilots in play: it installs the parts that come back on the live ship and sends the `repairBank`
- * message, through a narrow BankHost that Pilots provides.
+ * is the bank of the pilots in play: it takes deposits and sends the `repairBank` message, through a narrow BankHost
+ * that Pilots provides.
  */
 
-import { entityExists, hasComponent, type IWorld } from 'bitecs';
-import { Player, Dead, bankCap, newBank, refillBank, freeWhole, freeSpare, spendFree, spendDeposits, depositable, depositInto, bankFullIn,
-  bankPay, packDefs, payCoreOutward, joinDepths, adjacency, jobTicks, fabWork, attachWork, repairBill, BANK,
-  computeJoins, blueprintGeometry, countOf, removeFrom,
-  type Economy, type PlayerProfile, type ShipRecord, type Bag, type Blueprint, type PlacedPart, type PackDef, type ServerRepairBankMessage, coreIndex, coreOf } from '@space-game/common';
-
-/** Is a part (uid) being built, repaired or recycled by a field machine (feature `machines`)? */
-export type ClaimCheck = (uid: number) => boolean;
+import { bankCap, newBank, refillBank, freeWhole, freeSpare, spendFree, spendDeposits, depositable, depositInto, bankFullIn,
+  bankPay, packDefs, bankRepairBill, freePays, countOf, removeFrom,
+  type Economy, type PlayerProfile, type Bag, type Blueprint, type PlacedPart, type PackDef, type ServerRepairBankMessage } from '@space-game/common';
 
 export class RepairBanks {
   readonly cap: Bag;
   private readonly packs: PackDef[];
-  private readonly joinCache = new WeakMap<Blueprint, [number, number][]>();
-  /** Ticks counted toward the deposit rebuild's current part, and which part it is */
-  private readonly progress = new WeakMap<ShipRecord, { uid: number; ticks: number }>();
 
   constructor(readonly econ: Economy, starter: Blueprint) {
     this.cap = bankCap(econ, starter);
@@ -59,25 +48,12 @@ export class RepairBanks {
     return refillBank(p.bank, this.cap, now);
   }
 
-  /** What the free part may give repairs now (whole units above its top quarter's floor) */
-  spare(p: PlayerProfile): Bag {
-    return p.bank ? freeSpare(p.bank, this.cap) : {};
-  }
-
-  /** Take a bill from the spare (all or nothing; never more than the spare) */
-  spendSpare(p: PlayerProfile, bill: Bag): boolean {
-    if (!p.bank) return false;
-    const spare = freeSpare(p.bank, this.cap);
-    for (const [id, n] of Object.entries(bill)) if ((spare[id] ?? 0) < n) return false;
-    return spendFree(p.bank, bill);
-  }
-
-  /** The message the client shows the bank from (`rebuilding`: parts the deposits are still to rebuild) */
-  view(p: PlayerProfile, rebuilding = 0): ServerRepairBankMessage {
+  /** The message the client shows the bank from */
+  view(p: PlayerProfile): ServerRepairBankMessage {
     const bank = p.bank ?? newBank(this.cap, 0);
     return {
       type: 'repairBank', free: freeWhole(bank), cap: { ...this.cap }, fullIn: p.bank ? bankFullIn(bank, this.cap) : 0,
-      spare: freeSpare(bank, this.cap), deposits: { ...bank.deposits }, ...(rebuilding > 0 ? { rebuilding } : {}),
+      spare: freeSpare(bank, this.cap), deposits: { ...bank.deposits },
     };
   }
 
@@ -104,8 +80,9 @@ export class RepairBanks {
   }
 
   /**
-   * Pay a bill from the bank for the ship's repair or rebuild (all or nothing): loose deposits, then (if `useSpare`) the
-   * free part's spare, then packs from the deposits (each pack that pays the most still owed; what the part doesn't need is wasted)
+   * Pay a bill from the bank for the ship's repair or rebuild (all or nothing): loose deposits, then (if `useSpare`: a
+   * level 0 part) the free part, then packs from the deposits (each pack that pays the most still owed; what the part
+   * doesn't need is wasted)
    */
   payBill(p: PlayerProfile, need: Bag, useSpare: boolean): boolean {
     const bank = p.bank;
@@ -136,123 +113,12 @@ export class RepairBanks {
 
   /** Passing a station: pay to mend a damaged part (`missing`: the share of its HP gone) */
   payRepair(p: PlayerProfile, part: PlacedPart, missing: number): boolean {
-    return this.payBill(p, repairBill(this.econ, part, missing), true);
+    return this.payBill(p, bankRepairBill(this.econ, part, missing), freePays(part));
   }
 
-  /** Passing a station: pay to regrow a missing part */
+  /** Passing a station: pay to regrow a destroyed part that was built (the caller has checked it was) */
   payRebuild(p: PlayerProfile, part: PlacedPart): boolean {
-    return this.payBill(p, this.econ.recipes.partInputs(part), true);
-  }
-
-  // ---------------------------------------------------------------------------
-  // A death, and the parts the bank owes after it
-  // ---------------------------------------------------------------------------
-
-  private joinsOf(bp: Blueprint): [number, number][] {
-    let j = this.joinCache.get(bp);
-    if (!j) { j = computeJoins(blueprintGeometry(this.econ.ships, bp)); this.joinCache.set(bp, j); }
-    return j;
-  }
-
-  /** Parts of this record still owed (ghosts that were destroyed with the ship), uids */
-  owedUids(rec: ShipRecord): number[] {
-    const ghosts = new Set(rec.ghosts ?? []);
-    return (rec.owed ?? []).filter((u) => ghosts.has(u));
-  }
-
-  /**
-   * The ship was destroyed: it comes back in the same design with the core free, and every other standing part a ghost
-   * owed to the bank. The free part pays at once, core outward (what it can); the rest wait for the deposits (stepDeposits),
-   * the free part as it refills (payFree), or a fabricator. Parts that were planned ghosts stay planned, not owed.
-   * Returns how many parts the free part paid and how many are still owed
-   */
-  respawn(p: PlayerProfile, rec: ShipRecord, claimed?: ClaimCheck): { paid: number; owed: number } {
-    const core = coreOf(rec.blueprint.parts);
-    const ghosts = new Set(rec.ghosts ?? []);
-    const owed = new Set(this.owedUids(rec));
-    for (const q of rec.blueprint.parts) {
-      if (q === core || ghosts.has(q.uid)) continue;
-      ghosts.add(q.uid);
-      owed.add(q.uid);
-    }
-    if (core) ghosts.delete(core.uid);
-    rec.ghosts = rec.blueprint.parts.filter((q) => ghosts.has(q.uid)).map((q) => q.uid);
-    rec.owed = rec.blueprint.parts.filter((q) => owed.has(q.uid)).map((q) => q.uid);
-    rec.hp = {};
-    const paid = this.payFree(p, rec, claimed).length;
-    return { paid, owed: this.owedUids(rec).length };
-  }
-
-  /**
-   * The free part pays the owed ghosts it can, core outward (a part it can't pay is passed over; one beyond it may still
-   * be reached). The record loses them as ghosts. Returns the uids paid, in order (the caller builds them on a live ship)
-   */
-  payFree(p: PlayerProfile, rec: ShipRecord, claimed?: ClaimCheck): number[] {
-    const bank = p.bank;
-    if (!bank) return [];
-    const owed = new Set(this.owedUids(rec));
-    if (!owed.size) return [];
-    const parts = rec.blueprint.parts;
-    const ghosts = new Set(rec.ghosts ?? []);
-    const root = coreIndex(parts);
-    const built = parts.map((q) => !ghosts.has(q.uid));
-    const { paid, spent } = payCoreOutward(
-      parts.length, root, this.joinsOf(rec.blueprint), built,
-      (i) => owed.has(parts[i].uid) && !claimed?.(parts[i].uid),
-      (i) => this.econ.recipes.partInputs(parts[i]), freeWhole(bank),
-    );
-    if (!paid.length) return [];
-    spendFree(bank, spent);
-    const uids = paid.map((i) => parts[i].uid);
-    this.built(rec, uids);
-    return uids;
-  }
-
-  /** These ghosts are built now: off the record's ghost and owed lists */
-  built(rec: ShipRecord, uids: number[]): void {
-    const done = new Set(uids);
-    rec.ghosts = (rec.ghosts ?? []).filter((u) => !done.has(u));
-    rec.owed = (rec.owed ?? []).filter((u) => !done.has(u));
-    for (const u of done) delete rec.hp[u];
-    if (!rec.owed.length) delete rec.owed;
-    this.progress.delete(rec);
-  }
-
-  /**
-   * After a respawn the deposits rebuild what the free part didn't, anywhere, a part at a time at BANK.respawnSpeed (a
-   * Field Fabricator's: fabricate plus attach). Called with the ticks since the last call; returns the uid that is
-   * finished (paid from the deposits, off the record's lists: the caller builds it on the live ship), or null. Nothing
-   * is paid while a part is under way, so a pilot who loses the deposits' cover just stops
-   */
-  stepDeposits(p: PlayerProfile, rec: ShipRecord, ticks: number, claimed?: ClaimCheck): number | null {
-    const bank = p.bank;
-    if (!bank || !Object.keys(bank.deposits).length) { this.progress.delete(rec); return null; }
-    const owed = new Set(this.owedUids(rec));
-    if (!owed.size) { this.progress.delete(rec); return null; }
-    const parts = rec.blueprint.parts;
-    const ghosts = new Set(rec.ghosts ?? []);
-    const root = coreIndex(parts);
-    if (root < 0) return null;
-    const joins = this.joinsOf(rec.blueprint);
-    const depth = joinDepths(parts.length, root, joins), adj = adjacency(parts.length, joins);
-    let pick = -1;
-    for (let i = 0; i < parts.length; i++) {
-      const q = parts[i];
-      if (!owed.has(q.uid) || depth[i] < 0 || claimed?.(q.uid)) continue;
-      if (!adj[i].some((j) => !ghosts.has(parts[j].uid))) continue;
-      if (pick >= 0 && !(depth[i] < depth[pick])) continue;
-      if (Object.keys(bankPay(this.econ.recipes.partInputs(q), bank.deposits, this.packs).short).length) continue;
-      pick = i;
-    }
-    if (pick < 0) { this.progress.delete(rec); return null; }
-    const part = parts[pick];
-    let g = this.progress.get(rec);
-    if (!g || g.uid !== part.uid) this.progress.set(rec, (g = { uid: part.uid, ticks: 0 }));
-    g.ticks += ticks;
-    if (g.ticks < jobTicks(fabWork(this.econ, part) + attachWork(this.econ.ships, part), BANK.respawnSpeed)) return null;
-    if (!this.payBill(p, this.econ.recipes.partInputs(part), false)) { this.progress.delete(rec); return null; }
-    this.built(rec, [part.uid]);
-    return part.uid;
+    return this.payBill(p, bankRepairBill(this.econ, part, 1), freePays(part));
   }
 
   // ---------------------------------------------------------------------------
@@ -285,7 +151,7 @@ export class RepairBanks {
 }
 
 // ---------------------------------------------------------------------------
-// The bank of pilots in play: sessions, the live ship and the `repairBank` message
+// The bank of pilots in play: sessions and the `repairBank` message
 // ---------------------------------------------------------------------------
 
 /** The part of a pilot's session the bank reads and marks (Pilots' Session has more) */
@@ -306,7 +172,6 @@ export interface BankConn { playerId: number }
 
 /** What the bank asks of Pilots and the game: a narrow door, so this file never sees the whole of either */
 export interface BankHost<S extends BankSession = BankSession> {
-  readonly world: IWorld;
   now(): number;
   session(conn: S['conn']): S | undefined;
   sessionOfEid(eid: number): S | undefined;
@@ -316,12 +181,6 @@ export interface BankHost<S extends BankSession = BankSession> {
   sendItems(conn: S['conn']): void;
   saveNow(conn: S['conn']): void;
   send(conn: S['conn'], msg: ServerRepairBankMessage): void;
-  /** The pilot's ship record changed what their hangar view shows (a part the bank built in) */
-  hangarChanged?(conn: S['conn']): void;
-  /** Bring a part the bank just built onto the live ship, at full HP */
-  installGhost(eid: number, uid: number): void;
-  /** A machine of the pilot's ship is working on this part */
-  isClaimed(eid: number, uid: number): boolean;
   itemName(id: string): string;
 }
 
@@ -333,21 +192,7 @@ export class BankSessions<S extends BankSession = BankSession> {
 
   constructor(readonly rules: RepairBanks, private host: BankHost<S>) {}
 
-  /** The free part's spare (the top of it), what a field machine may use for repairs of the ship's own design */
-  spare(eid: number): Bag {
-    const s = this.host.sessionOfEid(eid);
-    return s ? this.rules.spare(s.profile) : {};
-  }
-
-  /** Take a bill from the spare (all or nothing) */
-  spendSpare(eid: number, bill: Bag): boolean {
-    const s = this.host.sessionOfEid(eid);
-    if (!s || !this.rules.spendSpare(s.profile, bill)) return false;
-    this.changed(s);
-    return true;
-  }
-
-  /** Passing a station (bridge/rebuild.ts repairStep): the deposits pay to mend a damaged part. A pilotless ship is mended free */
+  /** Passing a station (bridge/rebuild.ts repairStep): the bank pays to mend a damaged part. A pilotless ship is mended free */
   repair(eid: number, part: PlacedPart, missing: number): boolean {
     const s = this.host.sessionOfEid(eid);
     if (!s) return true;
@@ -356,7 +201,7 @@ export class BankSessions<S extends BankSession = BankSession> {
     return true;
   }
 
-  /** Passing a station: the deposits pay to regrow a missing part */
+  /** Passing a station: the bank pays to regrow a destroyed part that was built */
   rebuild(eid: number, part: PlacedPart): boolean {
     const s = this.host.sessionOfEid(eid);
     if (!s) return true;
@@ -393,7 +238,6 @@ export class BankSessions<S extends BankSession = BankSession> {
     s.dirty = true;
     this.host.toast(conn, `Put ${total} item${total > 1 ? 's' : ''} in your repair bank`, 'good');
     this.host.sendItems(conn);
-    this.payOwedFree(s);
     this.send(s, true);
     this.host.saveNow(conn);
   }
@@ -404,52 +248,18 @@ export class BankSessions<S extends BankSession = BankSession> {
     if (!s || s.loading) return false;
     if (!this.rules.dev(s.profile, action, items, this.host.now())) { this.host.toast(conn, 'Nothing to do', 'info'); return false; }
     s.dirty = true;
-    this.payOwedFree(s);
     this.send(s, true);
     this.host.toast(conn, `Repair bank (dev): ${action}`, 'info');
     return true;
   }
 
-  /** The free part pays the owed parts of the ship it can, core outward, building them on the live ship */
-  payOwedFree(s: S): void {
-    const eid = s.conn.playerId;
-    const rec = s.profile.ship;
-    if (!rec.owed?.length) return;
-    const uids = this.rules.payFree(s.profile, rec, (uid) => this.host.isClaimed(eid, uid));
-    this.install(s, uids);
-  }
-
-  /** Parts the bank has just built are installed on the live ship (if it is flying), at full HP */
-  private install(s: S, uids: number[]): void {
-    if (!uids.length) return;
-    const eid = s.conn.playerId;
-    if (this.flying(eid)) {
-      for (const uid of uids) this.host.installGhost(eid, uid);
-    }
-    s.dirty = true;
-    // (The hangar and station windows read the record, not the ship: the parts built in must leave their missing list)
-    this.host.hangarChanged?.(s.conn);
-    if (!s.profile.ship.owed?.length) this.host.toast(s.conn, 'Your repair bank has rebuilt your ship', 'good');
-  }
-
-  private flying(eid: number): boolean {
-    return entityExists(this.host.world, eid) && hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid);
-  }
-
-  /** Once a tick: refill the free part by the clock, rebuild what is owed (free part as it refills, deposits at a fabricator's pace), send changes */
+  /** Once a tick: refill the free part by the clock, send changes */
   tick(now: number): void {
     const n = ++this.ticks;
     if (n % 15 !== 0) return;
     for (const s of this.host.sessions()) {
       if (s.loading) continue;
-      const p = s.profile;
-      this.rules.ensure(p, now);
-      const eid = s.conn.playerId;
-      if (this.flying(eid) && p.ship.owed?.length) {
-        this.payOwedFree(s);
-        const uid = this.rules.stepDeposits(p, p.ship, 15, (u) => this.host.isClaimed(eid, u));
-        if (uid !== null) { this.install(s, [uid]); s.bankDirty = true; }
-      }
+      this.rules.ensure(s.profile, now);
       this.send(s, false, now);
     }
   }
@@ -459,9 +269,8 @@ export class BankSessions<S extends BankSession = BankSession> {
    * second) or, while the free part refills, once a minute
    */
   send(s: S, force = false, now = this.host.now()): void {
-    const owed = this.rules.owedUids(s.profile.ship).length;
-    const msg = this.rules.view(s.profile, owed);
-    const key = JSON.stringify([msg.free, msg.deposits, msg.rebuilding ?? 0]);
+    const msg = this.rules.view(s.profile);
+    const key = JSON.stringify([msg.free, msg.deposits]);
     const last = s.bankSent;
     const filling = msg.fullIn > 0;
     if (!force) {

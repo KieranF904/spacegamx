@@ -89,10 +89,10 @@ describe('a saved ship that fails the rules', () => {
     expect(after.hangar[after.activeSlot]!.blueprint).toEqual(bad);
   });
 
-  it('losing the loaner costs the cargo as in any death (wreck, secure hold), but the loaner and the saved ship cost nothing', async () => {
+  it('losing the loaner costs the cargo as in any death (all of it, in the wreck), but the loaner and the saved ship cost nothing', async () => {
     const { server, conn, pid, bad } = await withBrokenSave(4);
     const p = server.pilots.get(conn)!;
-    // (Many stacks: the secure hold keeps a few, the rest goes with the wreck. Away from safe space)
+    // (Away from safe space, which costs no less since the death rework)
     const items = ['steel_plate', 'copper_wire', 'alloy_plate', 'crystal_lens', 'coolant', 'nickel_ore', 'power_coupling', 'cryogen'];
     for (const id of items) server.pilots.give(conn, { [id]: 3 }, { quiet: true });
     const total = () => p.cargo.reduce((n, st) => n + st.n, 0);
@@ -104,8 +104,8 @@ describe('a saved ship that fails the rules', () => {
     const num = InSystem.systemId[pid];
     expect(server.pilots.host.safeAt?.(num, 90000, 90000)).toBe(false);
     server.pilots.onDestroyed(conn, num, 90000, 90000, 0, 0);
-    expect(total()).toBeLessThan(before); // the cargo went (the secure stacks stayed)
-    expect(total()).toBeGreaterThan(0);
+    expect(before).toBeGreaterThan(0);
+    expect(total()).toBe(0); // all the cargo went
     expect(p.wreck).toBeDefined(); // ... into a wreck kept for them
     expect(p.stats.deaths).toBe(1);
     expect(p.ship).toBe(saved);

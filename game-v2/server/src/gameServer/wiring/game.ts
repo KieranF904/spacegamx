@@ -64,6 +64,7 @@ export function pilotsOpts(gs: GameServer, opts: GameServerOptions): Constructor
     spawn: gs.devStartNum >= 0 ? (eid) => devStartSpot(gs, eid) : undefined,
     autosaveMs: 30_000,
     now: opts.clock,
+    death: gs.gameData.rulesFile.death,
   };
 }
 

@@ -1,22 +1,22 @@
 /**
- * The repair bank (docs/design/field-fabrication.md, "The repair bank"): one per pilot, the same at every station. It
- * replaces insurance and loaners.
+ * The repair bank (docs/design/death-rework-2026-11.md, which replaces field-fabrication.md's respawn role for it): one
+ * per pilot, the same at every station. It mends a ship that survived, near a station, and only what was built.
  *
- *   free      basic materials that refill by themselves up to BANK.ships starter ships' worth (bankCap), never withdrawn. On a
- *             respawn they pay for the ship at once, core outward (order.ts payCoreOutward). While nearly full the top
- *             BANK.spareShare of it may also pay repairs (freeSpare).
- *   deposits  packs and refined materials the pilot put in; never withdrawn, counted apart. They don't pay at a respawn;
- *             they repair the ship near any station (fast), and after a respawn rebuild what the free part didn't cover
- *             (at the normal rate, anywhere). A pack spent here gives a part all of its constituents it needs
- *             (packs.ts bankPay).
- *   No guaranteed ship: an empty free part means a bare core, rebuilt as it refills.
+ *   free      basic materials that refill by themselves up to BANK.ships starter ships' worth (bankCap), never withdrawn.
+ *             They pay station repairs of level 0 parts only (freePays).
+ *   deposits  packs and refined materials the pilot put in; never withdrawn, counted apart. They pay station repairs of
+ *             any part. A pack spent here gives a part all of its constituents it needs (packs.ts bankPay).
+ *   A repair costs BANK.repairShare of the part's inputs (bankRepairBill): cheaper and quicker than fabricating it. A
+ *   part never built, or a ghost a death left, needs full fabrication: the bank never pays for it. No bank in the field.
  *
  * Pure; wall-clock times are passed in (the server's clock), so it runs the same in tests.
  */
 
-import type { Blueprint } from '../../ships/types.js';
+import type { Blueprint, PlacedPart } from '../../ships/types.js';
 import type { Economy } from '../economy.js';
 import type { Bag } from '../stacks.js';
+import { partLicensed } from '../market.js';
+import { scaleBill } from './rules.js';
 
 export interface RepairBank {
   /** The free part, by item: fractional while refilling (whole units are spent: freeWhole) */
@@ -32,20 +32,19 @@ export const BANK = Object.freeze({
   ships: 2,
   /** The free part refills from empty to full in this many seconds (each item at its own cap's pace) */
   refillSeconds: 300,
-  /** While the free part holds more than (1 - spareShare) of its cap, what is above that may pay repairs (a half: one
-   *  starter ship's worth is always kept for a respawn, the other may mend) */
-  spareShare: 0.5,
+  /** The share of the free part that may pay repairs: all of it (it kept half for a respawn before the death rework) */
+  spareShare: 1,
+  /** A station repair costs this share of the part's inputs (times the HP share missing for a damaged one): cheaper than fabricating */
+  repairShare: 0.5,
   /** Deposits repair a ship within this distance of any station (world units) */
   stationRange: 1500,
   /** Near a station: a missing part rebuilt from deposits every this many seconds, nearest the core first */
   stationPartSeconds: 2,
   /** Near a station: damaged parts healed this share of their HP a second, paid from deposits */
   stationHealPerSecond: 0.1,
-  /** After a respawn: deposits rebuild the parts the free part didn't, anywhere, at this fabricator speed (a Field Fabricator's) */
-  respawnSpeed: 1,
 });
 
-/** BANK.ships starter ships' worth: every part's recipe inputs but the core's (the core always comes back, free) */
+/** BANK.ships starter ships' worth: every part's recipe inputs but the core's (mending a core is free) */
 export function bankCap(econ: Economy, starter: Blueprint): Bag {
   const out: Bag = {};
   for (const p of starter.parts) {
@@ -104,6 +103,25 @@ export function freeSpare(bank: RepairBank, cap: Bag): Bag {
     if (k > 0) out[id] = k;
   }
   return out;
+}
+
+/** May the free part pay to mend this part: a level 0 part (one a new pilot may fit). Deposits pay for any part */
+export function freePays(p: { fn: string; material: string }): boolean {
+  return p.fn !== 'core' && partLicensed(p, [], 0);
+}
+
+/**
+ * What a station repair of a built part takes from the bank: BANK.repairShare of its inputs, times `missing` (the share
+ * of its HP gone; 1 for a destroyed part), at least one unit. A core's is free
+ */
+export function bankRepairBill(econ: Economy, p: PlacedPart, missing: number): Bag {
+  const m = Math.max(0, Math.min(1, missing));
+  if (m <= 0 || p.fn === 'core') return {};
+  const inputs = econ.recipes.partInputs(p);
+  const out = scaleBill(inputs, BANK.repairShare * m);
+  if (Object.keys(out).length) return out;
+  const top = Object.keys(inputs).sort((a, b) => inputs[b] - inputs[a] || (a < b ? -1 : 1))[0];
+  return top ? { [top]: 1 } : {};
 }
 
 /** Take a bill from the free part (whole units), all or nothing */

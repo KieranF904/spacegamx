@@ -48,7 +48,7 @@ function design(opts: { reactors?: number; fabricator?: boolean; fabRot?: Rot } 
   return { name: 'Field test', catalogVersion: catalog.version, parts };
 }
 
-/** `bank`: keep the repair bank's free part (full; its spare pays repairs and rebuilds of the ship's own parts). Off: emptied, so the hold alone pays */
+/** `bank`: keep the repair bank's free part full (it never pays in the field). Off: emptied */
 function world(bp: Blueprint, opts: { bank?: boolean } = {}) {
   resetGlobals();
   const server = makeEmptyServer({
@@ -515,15 +515,16 @@ describe('field fabricator: packs', () => {
     });
   }
 
-  it('with nothing in the hold the bank spare pays to rebuild a lost part of its own design', () => {
+  it('there is no bank in the field: with nothing in the hold a full bank pays nothing, and the part waits', () => {
     const w = world(design(), { bank: true });
-    const spare0 = w.server.pilots.bankSpare(w.pid);
-    expect(Object.keys(spare0).length).toBeGreaterThan(0);
+    const p = w.server.pilots.get(w.server.pilots.connOf(w.pid)!)!;
+    const free = JSON.stringify(p.bank!.free);
     w.destroy(1);
     w.send({ type: 'machine', kind: 'fabricator', on: true });
-    expect(until(w, () => w.alive(1), 8000)).toBeGreaterThan(0);
-    const spare1 = w.server.pilots.bankSpare(w.pid);
-    expect(Object.entries(spare0).some(([id, n]) => (spare1[id] ?? 0) < n)).toBe(true);
+    w.run(600);
+    expect(w.alive(1)).toBe(false);
+    expect(w.fabView().blocked).toBe('materials');
+    expect(JSON.stringify(p.bank!.free)).toBe(free);
   });
 
   it('in off mode packs are never used', () => {
@@ -658,6 +659,9 @@ describe('field fabricator: a planned part built in', () => {
     };
     // (the save is told to the hangar view too: a missing part there, as one shot off is)
     expect(missing()).toEqual({ ghosts: [], wrecked: [10] });
+    // (Never built: the station's bank won't make it, docs/design/death-rework-2026-11.md)
+    expect(w.prof.ship.unbuilt).toEqual([10]);
+    expect(w.server.pilots.unbuilt(w.pid, 10)).toBe(true);
     w.give(e.recipes.partInputs({ fn: 'hull', material: 'alloy', piece: 'sq' }));
     w.send({ type: 'machine', kind: 'fabricator', on: true });
     expect(until(w, () => w.alive(10), 5000)).toBeGreaterThan(0);
@@ -665,6 +669,8 @@ describe('field fabricator: a planned part built in', () => {
     w.run(40);
     expect(w.ship().ghost[i10]).toBe(false);
     expect(w.prof.ship.ghosts).toEqual([]);
+    // (Built now: the bank may mend it from here on)
+    expect(w.prof.ship.unbuilt).toBeUndefined();
     // Both clients' ship stores, fed every ship sync they were sent, have the part built and standing
     for (const list of [w.got, got2]) {
       const store = new ShipStore(w.ships.catalog, w.ships.tuning);

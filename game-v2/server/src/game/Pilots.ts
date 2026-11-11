@@ -1,10 +1,10 @@
 /**
  * @contract server.pilots
  * owns:       each connected pilot's session: login, events, progress (credits, XP, skills), and the public doors to pilots/*.ts
- * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs
+ * needs:      PilotHost, ShipBridge, ProfileStore, RepairBank (BankSessions), pilots/{cargo, death, backups, persist, session, convert, lease, freeze, guests}; npm: @space-game/common, bitecs
  * events:     PilotEvent (items, earned, level, refit, login, stat) for quests, ribbons and rankings
  * invariants: guests are never saved with the accounts: a guest with a key is kept a while by it (pilots/guests.ts) — server/src/game/pilots/guests.test.ts
- *             a death puts the same design back, the bank paying for the rebuild — server/src/game/repairBank.test.ts
+ *             a death loses the ship to a plan and puts the pilot in a backup — server/src/game/pilots/death.test.ts
  * extend:     a new item or death rule goes in pilots/; a new progress counter is a method here emitting a PilotEvent
  *
  * Pilots: each connected player's progress while they play.
@@ -16,8 +16,8 @@
  * and handles every item action the client asks for:
  *   - cargo ↔ storage (only near a station), jettison, consumables
  *   - hangar refits, which may only use parts the pilot owns
- *   - the repair bank (RepairBank.ts): deposits, the free part, station repair from deposits
- *   - death: cargo dropped as a wreck, the ship back in the same design with the bank paying for it
+ *   - the repair bank (RepairBank.ts): deposits, the free part, station repair of what was built
+ *   - death: the ship lost to a plan in the hangar, the hold in a wreck, a backup to respawn in (pilots/death.ts, backups.ts)
  *
  * Guests get a fresh profile, never saved with the accounts; one whose browser sent a guest key is kept a while under
  * it (pilots/guests.ts), so joining again (a dropped socket, a restarted server) they fly on as they were.
@@ -25,13 +25,14 @@
 
 import type { Telemetry } from './Telemetry.js';
 import { IWorld } from 'bitecs';
-import { xpToReach, LEVEL_CAP, unlocks, levelUnlockNames, nextUnlockHint, giveSkillPoints, addStanding, Position, InSystem, Economy, PlayerProfile, ServerProfileMessage, diffProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint, setActiveShip, SECURE_HOLD, hasAll, ShipRecord, SALVAGE, type PlacedPart, DOCK_FEE_LEVEL, dcos, dsin } from '@space-game/common';
+import { xpToReach, LEVEL_CAP, unlocks, levelUnlockNames, nextUnlockHint, giveSkillPoints, addStanding, Position, InSystem, Economy, PlayerProfile, ServerProfileMessage, diffProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint, setActiveShip, hasAll, ShipRecord, type PlacedPart, type BackupOption, DOCK_FEE_LEVEL, dcos, dsin } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { cloneJson } from '@space-game/common';
 import type { ProfileStore } from '../profile/ProfileStore.js';
 import { RepairBanks, BankSessions } from './RepairBank.js';
 import * as cargo from './pilots/cargo.js';
 import * as death from './pilots/death.js';
+import * as backups from './pilots/backups.js';
 import * as persist from './pilots/persist.js';
 import * as lease from './pilots/lease.js';
 import * as freezer from './pilots/freeze.js';
@@ -68,8 +69,12 @@ export interface PilotHost {
   place(conn: PilotConn, systemNum: number, x: number, y: number): void;
   /** A loot pod in space; returns its entity. `droppedBy` won't collect it again for a while. */
   spawnPod(systemNum: number, x: number, y: number, vx: number, vy: number, items: Bag, droppedBy?: number): number;
-  /** A pod only `key`'s pilot can take for `seconds` (a wreck); returns its entity */
-  spawnWreck?(systemNum: number, x: number, y: number, vx: number, vy: number, items: Bag, key: string, seconds: number): number;
+  /** A pod only `key`'s pilot can take for `ownSeconds`, then anyone, gone after `lifeSeconds` (a wreck); returns its entity */
+  spawnWreck?(systemNum: number, x: number, y: number, vx: number, vy: number, items: Bag, key: string, ownSeconds: number, lifeSeconds: number): number;
+  /** Where a wreck of a ship lost here goes: outside a boss chamber (a system arena's outside, an instanced arena's orbit), else here */
+  wreckSpot?(systemNum: number, x: number, y: number): { system: number; x: number; y: number };
+  /** A payout dice stream (game/payoutDice.ts): a wreck's salvage is a payout */
+  payout?(name: string, ...keys: number[]): () => number;
   /** In the system's safe space (inner Sol) */
   safeAt?(systemNum: number, x: number, y: number): boolean;
   /** A system no pilot is ever saved in, or put back in at login (the gun range): capture keeps the position it had */
@@ -79,19 +84,19 @@ export interface PilotHost {
 }
 
 /**
- * What dying costs (and what it doesn't):
- *   in safe space   the hold's kept; the wreck holds the machines' contents and all of the ship's minerals
- *   anywhere else   the hold's lost but for its secure stacks; the wreck holds it, the machines' contents and
- *                   SALVAGE of the ship's minerals, kept for its pilot for `wreckMinutes`
- * The ship comes back in the same design, paid for by the repair bank (RepairBank.ts); nothing goes to storage.
+ * What dying costs (docs/design/death-rework-2026-11.md; data/rules.json `death` over these): the ship, which goes to
+ * the hangar as its design with every part missing; the hold, which goes in the wreck with the machines' contents and
+ * `salvageShare` of the ship's parts, its pilot's alone for `wreckOwnerMinutes`, then anyone's for `wreckOpenMinutes`.
+ * A backup of their own may cost at most `backupCost` times the starter's build points.
  */
 export interface DeathRules {
-  secureStacks: number;
-  secureUnits: number;
-  wreckMinutes: number;
+  wreckOwnerMinutes: number;
+  wreckOpenMinutes: number;
+  salvageShare: number;
+  backupCost: number;
 }
 
-export const DEFAULT_DEATH_RULES: DeathRules = { secureStacks: SECURE_HOLD.stacks, secureUnits: SECURE_HOLD.units, wreckMinutes: 15 };
+export const DEFAULT_DEATH_RULES: DeathRules = { wreckOwnerMinutes: 5, wreckOpenMinutes: 5, salvageShare: 0.25, backupCost: 1.25 };
 
 export interface PilotsOptions {
   starter: StarterKit;
@@ -182,12 +187,13 @@ export class Pilots {
   /** @internal pilots/convert.ts: the accounts a guest is being registered into right now */
   readonly converting = new Set<number>();
 
+  /** @internal pilots/death.ts: the payout stream a wreck's salvage is picked from */ salvageDice?: () => number;
+
   constructor(readonly host: PilotHost, readonly econ: Economy, readonly ships: ShipBridge, readonly store: ProfileStore, readonly opts: PilotsOptions) {
     this.now = opts.now ?? (() => Date.now());
     this.guests = new GuestKeep(store, () => this.now(), (id) => this.guestLive(id));
     this.bank = new RepairBanks(econ, opts.starter.blueprint);
     this.banking = new BankSessions<Session>(this.bank, {
-      world: host.world,
       now: () => this.now(),
       session: (conn) => this.sessions.get(conn),
       sessionOfEid: (eid) => { const c = this.connOf(eid); return c ? this.sessions.get(c) : undefined; },
@@ -197,9 +203,6 @@ export class Pilots {
       sendItems: (conn) => this.sendItems(conn),
       saveNow: (conn) => this.saveNow(conn),
       send: (conn, msg) => host.send(conn, msg),
-      hangarChanged: host.hangarChanged ? (conn) => host.hangarChanged!(conn) : undefined,
-      installGhost: (eid, uid) => ships.installGhost(eid, uid),
-      isClaimed: (eid, uid) => this.isClaimed(eid, uid),
       itemName: (id) => econ.items.get(id)?.name ?? id,
     });
   }
@@ -422,10 +425,11 @@ export class Pilots {
     this.emit(conn, { type: 'refit' });
   }
 
-  /** A new entity for this connection (respawn): apply the profile to it */
-  onRespawn(conn: PilotConn): void {
+  /** A new entity for this connection (respawn): the backup chosen (a hangar slot; none: the starter), then the profile on it */
+  onRespawn(conn: PilotConn, backup?: number): void {
     const s = this.sessions.get(conn);
     if (!s) return;
+    backups.chooseBackup(this, s, backup);
     persist.mirror(this, s);
     persist.applyShip(this, s);
     const at = this.homePoint(s);
@@ -580,17 +584,23 @@ export class Pilots {
     return this.fieldHooks.isClaimed?.(eid, uid) ?? false;
   }
 
-  /** The free part's spare (the top of it), what a field machine may use for repairs of the ship's own design */
-  bankSpare(eid: number): Bag { return this.banking.spare(eid); }
-
-  /** Take a bill from the spare (all or nothing) */
-  spendBankSpare(eid: number, bill: Bag): boolean { return this.banking.spendSpare(eid, bill); }
-
-  /** Passing a station (bridge/rebuild.ts repairStep): the deposits pay to mend a damaged part. A pilotless ship is mended free */
+  /** Passing a station (bridge/rebuild.ts repairStep): the bank pays to mend a damaged part. A pilotless ship is mended free */
   bankRepair(eid: number, part: PlacedPart, missing: number): boolean { return this.banking.repair(eid, part, missing); }
 
-  /** Passing a station: the deposits pay to regrow a missing part */
+  /** Passing a station: the bank pays to regrow a destroyed part */
   bankRebuild(eid: number, part: PlacedPart): boolean { return this.banking.rebuild(eid, part); }
+
+  /** A part of the pilot's ship never built (planned, ShipRecord.unbuilt): the bank won't regrow it, it needs fabricating */
+  unbuilt(eid: number, uid: number): boolean {
+    const c = this.connOf(eid);
+    return !!c && !!this.sessions.get(c)?.profile.ship.unbuilt?.includes(uid);
+  }
+
+  /** The backups this pilot may respawn in now (pilots/backups.ts) */
+  backupOptions(conn: PilotConn): BackupOption[] {
+    const p = this.sessions.get(conn)?.profile;
+    return p ? backups.backupOptions(this, p) : [];
+  }
 
   /** `bankDeposit`: items from the hold or storage into the deposits, at a station, only what a bank takes */
   bankDeposit(conn: PilotConn, items: Bag, from?: 'cargo' | 'storage'): void { this.banking.deposit(conn, items, from); }

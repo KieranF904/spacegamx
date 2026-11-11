@@ -120,10 +120,10 @@ export interface ServerRepairBankMessage {
   cap: Bag;
   /** Seconds until the free part is full (0: full) */
   fullIn: number;
-  /** What the free part may give repairs now (freeSpare) */
+  /** What the free part may give repairs now (freeSpare: all of it, for level 0 parts) */
   spare: Bag;
   deposits: Bag;
-  /** Rebuilding from deposits after a respawn (parts left) */
+  /** (Before the death rework: parts the deposits were rebuilding after a respawn. Never sent now) */
   rebuilding?: number;
 }
 

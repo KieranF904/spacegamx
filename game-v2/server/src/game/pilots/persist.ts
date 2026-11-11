@@ -89,6 +89,13 @@ export function capture(self: Pilots, s: Session): void {
     const seen = new Set(known);
     rec.ghosts = [...known, ...ship.blueprint.parts.filter((p) => live.has(p.uid) && !seen.has(p.uid)).map((p) => p.uid)];
     if (rec.owed) { rec.owed = rec.owed.filter((u) => live.has(u)); if (!rec.owed.length) delete rec.owed; }
+    // (A planned part standing now was built, however: the station's bank may mend it from here on)
+    if (rec.unbuilt) {
+      const standing = new Set(ship.blueprint.parts.filter((_, i) => ship.derived.alive[i] && !live.has(ship.blueprint.parts[i].uid)).map((p) => p.uid));
+      const known = new Set(ship.blueprint.parts.map((p) => p.uid));
+      rec.unbuilt = rec.unbuilt.filter((u) => known.has(u) && !standing.has(u));
+      if (!rec.unbuilt.length) delete rec.unbuilt;
+    }
   }
   const system = self.host.systemId(InSystem.systemId[eid]);
   // (Nor is a place no pilot is ever saved in: the gun range. The profile keeps where it was)

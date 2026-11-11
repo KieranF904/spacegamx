@@ -78,13 +78,10 @@ export interface HoldCap {
   holdRoom(pilot: number): number;
 }
 
-/** The repair bank and free building */
+/** Free building (no repair bank: it never pays in the field, docs/design/death-rework-2026-11.md) */
 export interface BankCap {
   /** Dev servers: this pilot builds without licences or build points (Hangar's freeBuild) */
   freeBuild?(pilot: number): boolean;
-  /** The repair bank's free spare the pilot's repairs may use (bank.ts freeSpare), and spending from it (package B) */
-  bankSpare?(pilot: number): Bag;
-  spendBankSpare?(pilot: number, bill: Bag): boolean;
 }
 
 /** Who may hurt whom, parties, and what a pilot's client holds (the Mine Bay: who sets mines off, who is told) */

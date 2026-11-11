@@ -1,8 +1,7 @@
 /**
  * The hold at a glance, always on, just above the chat: each stack's icon,
- * count and name, and how full the hold is. Outside safe space the secure
- * hold's stacks (what a death there keeps: common econ/stacks.ts secureHold)
- * carry a lock. New arrivals flash; hovering shows the item and its value;
+ * count and name, and how full the hold is (all of it goes in the wreck if the
+ * ship is lost: docs/design/death-rework-2026-11.md). New arrivals flash; hovering shows the item and its value;
  * right-click jettisons. Your ammunition loadout's crates are tagged LOAD and
  * utility (consumables, the quick bar) UTIL: the storage controls leave both
  * aboard. A fixed height that scrolls (drag the top edge to resize; it keeps
@@ -13,7 +12,7 @@
  * opens the full window.
  */
 
-import { RARITY_COLOR, secureHold, cargoEffect, type ClientMessage, type Stack } from '@space-game/common';
+import { RARITY_COLOR, cargoEffect, type ClientMessage } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
 import { injectWindowStyles, itemTipHtml, showTip, hideTip, openMenu, closeMenu, sortStacks } from './windowKit';
 import { itemIcon } from './itemIcons';
@@ -28,7 +27,6 @@ const MIN_H = 44;
 const LOAD_TIP = '<div class="t-n">Cargo has mass</div><div class="t-d">What is in your hold is carried with you: a heavy load accelerates, turns and stops slower. '
   + 'It is weighed against your ship, so a big hauler minds the same load far less, and strong engines keep a laden ship lively. '
   + 'Ore and metal are heavy, gems light, ammunition between. Station storage weighs nothing.</div>';
-const LOCK = '<svg viewBox="0 0 10 12" width="9" height="11"><rect x="1" y="5" width="8" height="6.5" rx="1.2" fill="#fcd34d"/><path d="M2.9 5V3.6a2.1 2.1 0 0 1 4.2 0V5" fill="none" stroke="#fcd34d" stroke-width="1.4"/></svg>';
 
 let styled = false;
 function injectStyles(): void {
@@ -253,7 +251,6 @@ export class CargoPanelUI {
     if (key === this.key && !fresh.size) return;
     this.key = key;
 
-    const secure = this.exposed ? secureHold(p.cargo, (id) => econ.items.get(id)?.value ?? 0) : new Map<Stack, number>();
     this.grid.replaceChildren();
     if (!p.cargo.length) {
       const e = document.createElement('div');
@@ -263,20 +260,17 @@ export class CargoPanelUI {
       this.place();
       return;
     }
-    // (sortStacks keeps the stacks themselves, so they key secureHold's map)
     for (const s of sortStacks(econ, p.cargo)) {
       const d = econ.items.get(s.id);
-      const kept = secure.get(s);
       const it = document.createElement('div');
       it.className = 'sgc-it' + (fresh.has(s.id) ? ' new' : '');
       const tag = holdTag(p, s.id);
-      it.innerHTML = `<img src="${itemIcon(econ, s.id)}"><span class="n">${s.n > 9999 ? `${Math.floor(s.n / 1000)}k` : s.n}</span><span class="nm"></span>${tag ? `<span class="tag ${tag.cls}">${tag.text}</span>` : ''}${kept ? LOCK : ''}`;
+      it.innerHTML = `<img src="${itemIcon(econ, s.id)}"><span class="n">${s.n > 9999 ? `${Math.floor(s.n / 1000)}k` : s.n}</span><span class="nm"></span>${tag ? `<span class="tag ${tag.cls}">${tag.text}</span>` : ''}`;
       const nm = it.querySelector('.nm') as HTMLElement;
       nm.textContent = d?.name ?? s.id;
       if (d) nm.style.color = RARITY_COLOR[d.rarity];
-      const extra = (tag ? `<div class="t-h" style="color:${tag.cls === 'load' ? '#5eead4' : '#c4b5fd'}">${tag.tip}</div>` : '') + (kept
-        ? `<div class="t-h" style="color:#fcd34d">🔒 Secure hold: ${kept < s.n ? `${kept} of these stay` : 'these stay'} if you're lost outside safe space</div>`
-        : this.exposed ? '<div class="t-h" style="color:#fca5a5">Lost with the wreck if you die out here</div>' : '');
+      const extra = (tag ? `<div class="t-h" style="color:${tag.cls === 'load' ? '#5eead4' : '#c4b5fd'}">${tag.tip}</div>` : '')
+        + '<div class="t-h" style="color:#fca5a5">Goes in your wreck if your ship is lost</div>';
       it.addEventListener('mousemove', (e) => showTip(itemTipHtml(econ, s.id, { count: s.n, extra, hint: 'Right-click to jettison' }), e.clientX, e.clientY));
       it.addEventListener('mouseleave', hideTip);
       it.addEventListener('contextmenu', (e) => { e.preventDefault(); hideTip(); this.jettisonMenu(s.id, e); });

@@ -10,7 +10,9 @@
  *
  * One rule for what's wanted (5.1): a part the blueprint has and the ship hasn't is MISSING, whether a build view save
  * planned it or a hit shot it off, and it is rebuilt the same way. A save adds no ghosts: new parts come in missing.
- * (Hangar and bank placeholders, ShipState.ghost, are missing too as far as the fabricator goes; they keep their flag.)
+ * (Hangar placeholders, ShipState.ghost, a lost ship's every part among them, are missing too as far as the fabricator
+ * goes; they keep their flag.) No repair bank in the field: every job is paid from the hold. A part built here is built:
+ * it leaves the record's `unbuilt` list, so the station's bank may mend it from then on.
  *
  * Netcode: a powered machine's job progresses by the energy its part took this tick (PortsState.machEu, the ports
  * core's counter, which the pilot's own prediction steps too); the core's by the tick. Progress is never sent: only
@@ -35,7 +37,7 @@ import {
 } from '@space-game/common';
 import type { BankCap, FeatureInstance, FeatureMessageHandler, HoldCap, ShipsOf, TellCap, WorldCap } from '../../ships/features/types.js';
 
-/** What field machines ask of the game: the ships' records, stores and refits, the hold, profile and bank, telling pilots */
+/** What field machines ask of the game: the ships' records, stores and refits, the hold, free building, telling pilots (never the repair bank: none in the field) */
 export type FieldHost = WorldCap & ShipsOf<'catalog' | 'chargeOf' | 'get' | 'installGhost' | 'refitInFlight' | 'validate'>
   & Pick<TellCap, 'tell' | 'send'> & HoldCap & BankCap;
 import { SimPass } from '../../sim/SystemClocks.js';
@@ -50,8 +52,6 @@ interface JobMeta {
   /** Work seconds of its phases (to re-cost it if another machine takes it over) */
   make: number;
   attach: number;
-  /** Paid from the repair bank (never given back: the bank can't be withdrawn from) */
-  bank: Bag;
   /** A refine's output */
   out?: Bag;
 }
@@ -100,9 +100,7 @@ interface FieldShip {
 
 const isEmpty = (b: Bag | undefined) => !b || !Object.keys(b).some((k) => b[k] > 0);
 const addBag = (to: Bag, from: Bag, k = 1) => { for (const [id, n] of Object.entries(from)) if (n > 0) to[id] = (to[id] ?? 0) + n * k; return to; };
-const minus = (a: Bag, b: Bag): Bag => { const out: Bag = {}; for (const [id, n] of Object.entries(a)) { const k = n - (b[id] ?? 0); if (k > 0) out[id] = k; } return out; };
 const sameBag = (a: Bag, b: Bag) => { const ka = Object.keys(a).filter((k) => a[k] > 0), kb = Object.keys(b).filter((k) => b[k] > 0); return ka.length === kb.length && ka.every((k) => a[k] === b[k]); };
-const covers = (have: Bag, need: Bag) => Object.entries(need).every(([id, n]) => (have[id] ?? 0) >= n);
 
 export class FieldShips implements FeatureInstance {
   private readonly byEid = new Map<number, FieldShip>();
@@ -431,42 +429,30 @@ export class FieldShips implements FeatureInstance {
   private startFab(fs: FieldShip, m: Machine, kind: 'repair' | 'build' | 'recycle', i: number, missing: number, short: Bag, tick: number): boolean {
     const p = fs.ship.blueprint.parts[i], spec = specOf(p), econ = this.host.econ, cat = this.host.ships.catalog;
     const item = partItemId(spec);
-    if (kind === 'recycle') return this.begin(fs, m, 'recycle', { uid: p.uid, item, held: {}, make: recycleWork(econ, spec), attach: 0, share: 0, bank: {} }, tick);
+    if (kind === 'recycle') return this.begin(fs, m, 'recycle', { uid: p.uid, item, held: {}, make: recycleWork(econ, spec), attach: 0, share: 0 }, tick);
     if (kind === 'repair') {
-      const pay = this.pay(fs, m, repairBill(econ, spec, missing), true, short);
-      return !!pay && this.begin(fs, m, 'repair', { uid: p.uid, item, held: pay.held, make: repairWork(econ, spec, missing), attach: 0, share: pay.share, bank: pay.bank }, tick);
+      const pay = this.pay(fs, m, repairBill(econ, spec, missing), short);
+      return !!pay && this.begin(fs, m, 'repair', { uid: p.uid, item, held: pay.held, make: repairWork(econ, spec, missing), attach: 0, share: pay.share }, tick);
     }
     // A build: a finished part of this kind in the hold is fitted (attach only); else it's made from its inputs
     if (!isStructural(p.fn) && this.host.holdCount(fs.eid, item) >= 1 && this.host.holdTake(fs.eid, { [item]: 1 })) {
-      return this.begin(fs, m, 'build', { uid: p.uid, item, held: { [item]: 1 }, make: 0, attach: attachWork(cat, spec), share: 0, bank: {} }, tick);
+      return this.begin(fs, m, 'build', { uid: p.uid, item, held: { [item]: 1 }, make: 0, attach: attachWork(cat, spec), share: 0 }, tick);
     }
-    // (Any missing part of the design is its own, planned or lost; a hangar or bank placeholder is not yet)
-    const own = !fs.ship.ghost[i];
-    const pay = this.pay(fs, m, fieldBuildInputs(econ, spec), own, short);
-    return !!pay && this.begin(fs, m, 'build', { uid: p.uid, item, held: pay.held, make: fabWork(econ, spec), attach: attachWork(cat, spec), share: pay.share, bank: pay.bank }, tick);
+    const pay = this.pay(fs, m, fieldBuildInputs(econ, spec), short);
+    return !!pay && this.begin(fs, m, 'build', { uid: p.uid, item, held: pay.held, make: fabWork(econ, spec), attach: attachWork(cat, spec), share: pay.share }, tick);
   }
 
   /**
-   * Pay a bill from the hold (loose materials, and packs as the pack mode allows: fieldPay), all or nothing; a repair or
-   * a rebuild of the ship's own design may make up the rest from the bank's free spare. Null (nothing taken) if it can't
+   * Pay a bill from the hold (loose materials, and packs as the pack mode allows: fieldPay), all or nothing: in the field
+   * the hold is all there is (no repair bank). Null (nothing taken) if it can't
    */
-  private pay(fs: FieldShip, m: Machine, bill: Bag, own: boolean, short: Bag): { held: Bag; share: number; bank: Bag } | null {
+  private pay(fs: FieldShip, m: Machine, bill: Bag, short: Bag): { held: Bag; share: number } | null {
     const mode: PackMode = m.kind === 'fabricator' ? fs.rec.field?.packs ?? 'off' : 'off';
     const r = fieldPay(bill, (id) => this.host.holdCount(fs.eid, id), this.packs, mode);
+    if (!isEmpty(r.short)) { addBag(short, r.short); return null; }
     const fromHold = addBag(addBag({}, r.take), r.packs);
-    let bank: Bag = {};
-    if (!isEmpty(r.short)) {
-      const spare = own ? this.host.bankSpare?.(fs.eid) : undefined;
-      if (!spare || !covers(spare, r.short)) { addBag(short, r.short); return null; }
-      bank = { ...r.short };
-    }
     if (!isEmpty(fromHold) && !this.host.holdTake(fs.eid, fromHold)) { addBag(short, bill); return null; }
-    if (!isEmpty(bank) && !this.host.spendBankSpare?.(fs.eid, bank)) {
-      if (!isEmpty(fromHold)) this.host.holdGive(fs.eid, fromHold);
-      addBag(short, bank);
-      return null;
-    }
-    return { held: addBag({ ...fromHold }, bank), share: packShare(r), bank };
+    return { held: fromHold, share: packShare(r) };
   }
 
   /** The Mine Bay rearm the fabricator would take next (order.ts nextRearm), or null: every magazine is full */
@@ -475,13 +461,13 @@ export class FieldShips implements FeatureInstance {
     return bays?.length ? nextRearm(bays, fs.rec.field?.mines, REARM.perJob) : null;
   }
 
-  /** Start a rearm job (rules.ts REARM: placeholder cost), paid from the hold all or nothing (never the bank: it pays parts) */
+  /** Start a rearm job (rules.ts REARM: placeholder cost), paid from the hold all or nothing */
   private startRearm(fs: FieldShip, m: Machine, short: Bag, tick: number): 'started' | 'short' | 'none' {
     const r = this.rearmWanted(fs);
     if (!r) return 'none';
-    const pay = this.pay(fs, m, rearmBill(r.count), false, short);
+    const pay = this.pay(fs, m, rearmBill(r.count), short);
     if (!pay) return 'short';
-    this.begin(fs, m, 'rearm', { uid: r.uid, held: pay.held, make: rearmWork(r.count), attach: 0, share: pay.share, bank: pay.bank }, tick);
+    this.begin(fs, m, 'rearm', { uid: r.uid, held: pay.held, make: rearmWork(r.count), attach: 0, share: pay.share }, tick);
     m.job!.count = r.count;
     return 'started';
   }
@@ -489,19 +475,19 @@ export class FieldShips implements FeatureInstance {
   /** A rearm done: its mines into the bay's magazine (the record's: the mine bay feature reads it), up to its capacity; a bay lost meanwhile gets its inputs back */
   private rearmed(fs: FieldShip, m: Machine, j: FieldJob, meta: JobMeta): void {
     const bay = fs.ship.derived.fx?.minebay?.bays.find((b) => b.uid === j.uid);
-    if (!bay) { this.giveBack(fs, m, minus(j.held, meta.bank)); return; }
+    if (!bay) { this.giveBack(fs, m, j.held); return; }
     const mines = (this.field(fs).mines ??= {});
     mines[bay.uid] = Math.min(bay.capacity, Math.max(0, Math.floor(mines[bay.uid] ?? 0)) + Math.max(0, Math.floor(j.count ?? 0)));
     this.host.markDirty(fs.eid);
   }
 
-  private begin(fs: FieldShip, m: Machine, kind: FieldJobKind, o: { uid?: number; item?: string; recipe?: string; held: Bag; make: number; attach: number; share: number; bank: Bag; out?: Bag }, _tick: number): boolean {
+  private begin(fs: FieldShip, m: Machine, kind: FieldJobKind, o: { uid?: number; item?: string; recipe?: string; held: Bag; make: number; attach: number; share: number; out?: Bag }, _tick: number): boolean {
     const need = this.units(m, o.make, o.share), attachNeed = this.units(m, o.attach, o.share);
     m.job = {
       id: ++fs.nextJob, kind, uid: o.uid, item: o.item, recipe: o.recipe, held: o.held,
       need, done: 0, attachNeed, attachDone: 0, phase: need > 0 ? 'make' : attachNeed > 0 ? 'attach' : 'done', packShare: o.share,
     };
-    m.meta = { make: o.make, attach: o.attach, bank: o.bank, out: o.out };
+    m.meta = { make: o.make, attach: o.attach, out: o.out };
     fs.changed = true;
     return true;
   }
@@ -512,7 +498,7 @@ export class FieldShips implements FeatureInstance {
     if ('blocked' in r) { this.setBlocked(fs, m, r.blocked); return; }
     if (!this.host.holdTake(fs.eid, r.inputs)) { this.setBlocked(fs, m, 'materials'); return; }
     this.setBlocked(fs, m, undefined);
-    this.begin(fs, m, 'refine', { item: r.recipe, recipe: r.recipe, held: r.inputs, make: refineWork(econ, r.recipe), attach: 0, share: 0, bank: {}, out: r.out }, tick);
+    this.begin(fs, m, 'refine', { item: r.recipe, recipe: r.recipe, held: r.inputs, make: refineWork(econ, r.recipe), attach: 0, share: 0, out: r.out }, tick);
   }
 
   // ===================================================================== finishing
@@ -561,7 +547,7 @@ export class FieldShips implements FeatureInstance {
     const alive = i >= 0 && !!fs.ship.derived.alive[i];
     if (j.kind === 'repair') {
       // (The part was lost meanwhile: its inputs come back)
-      if (!alive) { this.giveBack(fs, m, minus(j.held, meta.bank)); return; }
+      if (!alive) { this.giveBack(fs, m, j.held); return; }
       healPart(fs.ship, i, fs.ship.maxHp[i], this.host.tuning);
       done(j.item!, 'ship', j.uid);
       return;
@@ -583,21 +569,21 @@ export class FieldShips implements FeatureInstance {
     return recycleCandidates(n, ship.derived.root, joins, alive, queued).includes(i);
   }
 
-  /** A finished part onto its spot (a missing part built, or a hangar or bank placeholder built in): returns its uid */
+  /** A finished part onto its spot (a missing part built, or a hangar placeholder built in): returns its uid */
   private install(fs: FieldShip, i: number): number {
     const ship = fs.ship, uid = ship.blueprint.parts[i].uid;
     if (ship.ghost[i]) {
       this.host.ships.installGhost(fs.eid, uid);
       if (fs.rec.ghosts) fs.rec.ghosts = fs.rec.ghosts.filter((u) => u !== uid);
       fs.record = true;
-      // (A part the bank owed since a death, built by the machine instead: the bank owes it no longer)
-      if (fs.rec.owed) { fs.rec.owed = fs.rec.owed.filter((u) => u !== uid); if (!fs.rec.owed.length) delete fs.rec.owed; }
     } else {
       restorePart(ship, i, 1);
       // (Not "freshly destroyed" if lost again before the rebuild point)
       ship.rebuildHp[i] = 0;
     }
     if (fs.rec.hp) delete fs.rec.hp[uid];
+    // (Built now: the station's bank may mend it from here on)
+    if (fs.rec.unbuilt) { fs.rec.unbuilt = fs.rec.unbuilt.filter((u) => u !== uid); if (!fs.rec.unbuilt.length) delete fs.rec.unbuilt; }
     // (The hangar view reads the live ship's standing parts: it goes again once the ship is rebuilt with this one)
     fs.recordAfterRebuild = true;
     this.host.markDirty(fs.eid);
@@ -641,14 +627,13 @@ export class FieldShips implements FeatureInstance {
     fs.changed = true;
   }
 
-  /** Call a job off: its inputs back to the hold (what's paid from the bank is spent), or into the machine while it's full */
+  /** Call a job off: its inputs back to the hold, or into the machine while it's full */
   private callOff(fs: FieldShip, m: Machine): void {
     const j = m.job;
     if (!j) return;
-    const bank = m.meta?.bank ?? {};
     m.job = undefined; m.meta = undefined;
     this.setDrawing(fs, m, false);
-    this.giveBack(fs, m, minus(j.held, bank));
+    this.giveBack(fs, m, j.held);
     fs.changed = true; fs.wake = true;
   }
 
@@ -656,7 +641,7 @@ export class FieldShips implements FeatureInstance {
 
   /**
    * Put a new design on the live ship and its record together, keeping every part's state. Parts new to it come in
-   * missing (the record's hp 0); `ghosts`: the hangar and bank placeholders it keeps
+   * missing (the record's hp 0) and unbuilt (the record's `unbuilt`); `ghosts`: the hangar placeholders it keeps
    */
   private refit(fs: FieldShip, bp: Blueprint, ghosts: number[]): boolean {
     if (!this.validateLoose(bp).ok) return false;
@@ -670,7 +655,10 @@ export class FieldShips implements FeatureInstance {
     fs.rec.ghosts = bp.parts.filter((p) => g.has(p.uid)).map((p) => p.uid);
     fs.record = true;
     if (fs.rec.hp) for (const k of Object.keys(fs.rec.hp)) if (!bp.parts.some((p) => p.uid === Number(k))) delete fs.rec.hp[Number(k)];
-    for (const p of bp.parts) if (!before.has(p.uid) && !g.has(p.uid)) (fs.rec.hp ??= {})[p.uid] = 0;
+    // (New parts come in missing and unbuilt: only the fabricator or the hangar makes them, never the station's bank)
+    const unbuilt = new Set((fs.rec.unbuilt ?? []).filter((u) => bp.parts.some((p) => p.uid === u)));
+    for (const p of bp.parts) if (!before.has(p.uid) && !g.has(p.uid)) { (fs.rec.hp ??= {})[p.uid] = 0; unbuilt.add(p.uid); }
+    if (unbuilt.size) fs.rec.unbuilt = bp.parts.filter((p) => unbuilt.has(p.uid)).map((p) => p.uid); else delete fs.rec.unbuilt;
     this.syncMachines(fs);
     this.host.markDirty(fs.eid);
     fs.changed = true; fs.wake = true;
@@ -833,12 +821,12 @@ export class FieldShips implements FeatureInstance {
 
   // ===================================================================== telling the pilot
 
-  /** Everything inside the machines (not what the bank paid: that is spent) */
+  /** Everything inside the machines */
   private contents(fs: FieldShip): Bag {
     const out: Bag = {};
     for (const m of [fs.fab, fs.ref]) {
       addBag(out, m.holding);
-      if (m.job) addBag(out, minus(m.job.held, m.meta?.bank ?? {}));
+      if (m.job) addBag(out, m.job.held);
     }
     return out;
   }

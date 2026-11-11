@@ -68,10 +68,10 @@ export async function login(self: Pilots, conn: PilotConn, userId: number): Prom
   s.dirty = !raw || (raw as { version?: unknown }).version !== profile.version;
   if (cargo.structureToMaterials(self, s.profile)) s.dirty = true;
   if (refundRetiredSkills(s.profile)) s.dirty = true;
-  // The repair bank: made full at a first login, refilled to now; the free part pays for what a lost ship is owed
+  // The repair bank: made full at a first login, refilled to now (it pays nothing at a login: parts an old save still has
+  // owed are plain ghosts, for the hangar or a fabricator)
   if (!s.profile.bank) s.dirty = true;
   self.bank.ensure(s.profile, self.now());
-  self.banking.payOwedFree(s);
   persist.applyProfile(self, s, true);
   self.sendBank(s, true);
   death.sendWreck(self, s);

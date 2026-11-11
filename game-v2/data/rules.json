@@ -820,5 +820,11 @@
     "bossHealPerMinute": 0.02,
     "fastForwardMinutes": 2,
     "saveSeconds": 60
+  },
+  "death": {
+    "wreckOwnerMinutes": 5,
+    "wreckOpenMinutes": 5,
+    "salvageShare": 0.25,
+    "backupCost": 1.25
   }
 }

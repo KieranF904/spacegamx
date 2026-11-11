@@ -43,7 +43,7 @@ export function buildHtml(host: HangarHost): string {
   const ids = Object.keys(need).sort((a, b) => econ.items.rank(a) - econ.items.rank(b));
   const total = rec.blueprint.parts.length, built = total - rec.ghosts.length;
   const font = `font-family:'Segoe UI',sans-serif;`;
-  if (rec.lost) html += `<div style="${font} color:#fbbf24; line-height:1.5; margin-bottom:8px">Lost in battle. ${Math.round(SALVAGE * 100)}% of its materials and all its components were salvaged: it's being rebuilt, and can't be flown until it's whole.</div>`;
+  if (rec.lost) html += `<div style="${font} color:#fbbf24; line-height:1.5; margin-bottom:8px">Lost in battle: only its design is left. Every part has to be fabricated and fitted again (it's on order), and it can't be flown until it's whole. Its wreck holds a share of its parts, if you get there in time.</div>`;
   html += `<div style="${font} margin-bottom:6px">${built} / ${total} parts built${rec.auto && ids.length ? ' <span style="color:#7dd3fc">· on order</span>' : ''}</div>
     <div style="height:5px; border-radius:3px; background:#1a2438; overflow:hidden; margin-bottom:8px"><i style="display:block; height:100%; width:${(built / total) * 100}%; background:linear-gradient(90deg,#2c87ad,#7dd3fc)"></i></div>`;
   if (!ids.length) {
@@ -264,7 +264,7 @@ export function summaryHtml(host: HangarHost): string {
     + "Tow it into a station's reach to salvage it into your storage. It draws power only while towing");
   for (const f of designFields(catalog, tuning, host.bp)) html += row(f.label, f.text);
   html += row('Mass', `${n0(now.mass)}`, 'mass', '', 'mass');
-  html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices`);
+  html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: all of it, every part made again, at station prices (its wreck gives some parts back if you recover it)`);
   html += energyHtml(now.energy);
   return html + '<div style="margin-bottom:12px"></div>';
 }

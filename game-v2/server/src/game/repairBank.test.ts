@@ -1,13 +1,13 @@
 /**
  * The repair bank on the server (game/RepairBank.ts, Pilots, bridge/rebuild.ts repairStep, net/handlers/bank.ts):
- * docs/design/field-fabrication.md sections 2.4 and 6.
+ * docs/design/death-rework-2026-11.md (it mends a ship that survived, near a station, only what was built).
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, ServerMessage, Station as StationComp, BANK, countOf, bankCap, freeWhole, refillBank, newBank, jobTicks, fabWork, attachWork,
-  computeJoins, blueprintGeometry, depositable, type PlayerProfile, type ShipRecord,
+  Position, Velocity, ServerMessage, Station as StationComp, BANK, countOf, bankCap, freeWhole, refillBank, newBank, bankRepairBill, freePays,
+  depositable, type PlayerProfile,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -50,23 +50,6 @@ function dock(server: GameServer, pid: number): void {
 const steps = (server: GameServer, n: number) => { for (let i = 0; i < n; i++) server.step(); };
 const park = (pid: number, x = 40000, y = 40000) => { Position.x[pid] = x; Position.y[pid] = y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
 const total = (b: Record<string, number>) => Object.values(b).reduce((a, n) => a + n, 0);
-
-/** The standing parts of a record are all joined to its core (a structure that holds) */
-function holds(w: ReturnType<typeof world>, rec: ShipRecord): boolean {
-  const parts = rec.blueprint.parts;
-  const ghost = new Set(rec.ghosts ?? []);
-  const joins = computeJoins(blueprintGeometry(w.server.econ.ships, rec.blueprint));
-  const root = parts.findIndex((q) => q.fn === 'core');
-  const seen = new Set([root]);
-  for (let moved = true; moved;) {
-    moved = false;
-    for (const [a, b] of joins) {
-      if (ghost.has(parts[a].uid) || ghost.has(parts[b].uid)) continue;
-      if (seen.has(a) !== seen.has(b)) { seen.add(a); seen.add(b); moved = true; }
-    }
-  }
-  return parts.every((q, i) => ghost.has(q.uid) || seen.has(i));
-}
 
 describe('the free part', () => {
   it('is full at a first login and sent to the client', () => {
@@ -116,238 +99,16 @@ describe('the free part', () => {
 });
 
 describe('a death', () => {
-  it('puts the same design back with no loaner: the free part pays core outward, the rest is owed, and a bare bank means a bare core', () => {
+  it('the bank pays nothing at a respawn: the free part and the deposits are as they were', () => {
     const w = world();
     const p = w.profile();
-    const design = JSON.stringify(p.ship.blueprint);
-    const cargoBefore = JSON.stringify(p.storage);
-    // A full free part pays for BANK.ships starter ships, one per death
-    for (let k = 0; k < BANK.ships; k++) {
-      w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-      expect(JSON.stringify(w.profile().ship.blueprint)).toBe(design);
-      expect(w.profile().ship.loaner).toBeUndefined();
-      expect(w.profile().ship.ghosts).toEqual([]);
-      expect(w.profile().ship.lost).toBeUndefined();
-      expect(JSON.stringify(w.profile().storage)).toBe(cargoBefore);
-    }
-    expect(total(freeWhole(w.profile().bank!))).toBe(0);
-    // Again, at once: the free part is empty, so a bare core
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    const rec = w.profile().ship;
-    const core = rec.blueprint.parts.find((q) => q.fn === 'core')!;
-    expect(rec.ghosts).toEqual(rec.blueprint.parts.filter((q) => q !== core).map((q) => q.uid));
-    expect(rec.owed).toEqual(rec.ghosts);
-    expect(w.profile().hangar.some((r) => r?.loaner)).toBe(false);
-    // The live ship is the bare core
-    w.server.pilots.reapplyShip(w.conn);
-    w.server.step();
-    const live = w.ships.get(w.pid)!;
-    expect(live.blueprint.parts.filter((_, i) => live.derived.alive[i]).map((q) => q.fn)).toEqual(['core']);
-    // The pilot is told what happened
-    expect(w.got.some((m) => m.type === 'toast' && /bare core/.test((m as any).text))).toBe(true);
-    expect(w.last('repairBank')!.rebuilding).toBe(rec.owed!.length);
-  });
-
-  it('pays core outward: what the free part rebuilds is always a structure joined to the core', () => {
-    const w = world();
-    const p = w.profile();
-    // About a third of a ship\'s worth
-    p.bank!.free = Object.fromEntries(Object.entries(w.bank.cap).map(([id, n]) => [id, Math.floor(n / 3)]));
-    const r = w.bank.respawn(p, p.ship);
-    expect(r.paid).toBeGreaterThan(0);
-    expect(r.owed).toBeGreaterThan(0);
-    expect(holds(w, p.ship)).toBe(true);
-    // And it only spent what it paid
-    const paid = p.ship.blueprint.parts.filter((q) => q.fn !== 'core' && !p.ship.ghosts!.includes(q.uid));
-    const spent: Record<string, number> = {};
-    for (const q of paid) for (const [id, n] of Object.entries(w.server.econ.recipes.partInputs(q))) spent[id] = (spent[id] ?? 0) + n;
-    for (const [id, n] of Object.entries(spent)) expect(p.bank!.free[id]).toBeCloseTo(Math.floor(w.bank.cap[id] / 3) - n, 6);
-  });
-
-  it('planned parts that were never built are not owed: the bank only rebuilds the ship\'s own design', () => {
-    const w = world();
-    const p = w.profile();
-    const planned = p.ship.blueprint.parts.filter((q) => q.fn === 'hull').slice(0, 2).map((q) => q.uid);
-    p.ship.ghosts = [...planned];
-    w.server.pilots.reapplyShip(w.conn);
-    p.bank!.free = {};
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    const rec = w.profile().ship;
-    for (const u of planned) { expect(rec.ghosts).toContain(u); expect(rec.owed).not.toContain(u); }
-    expect(rec.owed!.length).toBe(rec.ghosts!.length - planned.length);
-  });
-
-  it('the wreck gets the cargo and 70% of the ship\'s minerals (all of them in safe space); nothing goes to storage', () => {
-    const w = world();
-    const p = w.profile();
-    w.server.pilots.give(w.conn, { iron_ore: 30, nickel_ore: 12 }, { quiet: true });
-    p.cargo = [{ id: 'iron_ore', n: 30 }, { id: 'nickel_ore', n: 12 }, { id: 'silicate', n: 12 }, { id: 'copper_ore', n: 12 }];
-    const storage = JSON.stringify(p.storage);
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    expect(JSON.stringify(w.profile().storage)).toBe(storage);
-    const pods = (w.server as any).pods;
-    const wreck = [...pods.contents.keys()].find((e: number) => Math.hypot(Position.x[e] - 90000, Position.y[e] - 90000) < 50);
-    expect(wreck).toBeDefined();
-    expect(total(pods.get(wreck))).toBeGreaterThan(0);
-  });
-
-  it('deposits do not pay at a respawn, and an empty bank with no deposits stays bare', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
     p.bank!.deposits = { alloy_plate: 40, copper_wire: 40 };
+    const free = JSON.stringify(p.bank!.free);
     w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    // (still all owed: the deposits rebuild over time, anywhere)
-    expect(w.profile().ship.owed!.length).toBe(w.profile().ship.blueprint.parts.length - 1);
+    w.server.pilots.onRespawn(w.conn);
+    expect(JSON.stringify(w.profile().bank!.free)).toBe(free);
     expect(w.profile().bank!.deposits).toEqual({ alloy_plate: 40, copper_wire: 40 });
   });
-});
-
-describe('a damaged core and a death', () => {
-  it('respawns with the core at full health: the core always comes back free', () => {
-    const w = world();
-    const ship = w.ships.get(w.pid)!;
-    const core = ship.blueprint.parts.findIndex((q) => q.fn === 'core');
-    w.ships.damagePartFraction(w.pid, core, 0.6);
-    w.server.step();
-    expect(ship.hp[core]).toBeLessThan(ship.maxHp[core]);
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    expect(w.profile().ship.hp).toEqual({});
-    w.server.pilots.reapplyShip(w.conn);
-    w.server.step();
-    const live = w.ships.get(w.pid)!;
-    const c = live.blueprint.parts.findIndex((q) => q.fn === 'core');
-    expect(live.derived.alive[c]).toBe(true);
-    expect(live.hp[c]).toBeCloseTo(live.maxHp[c], 3);
-  });
-});
-
-describe('deposits rebuild over time', () => {
-  it('a part at a time at a fabricator\'s pace (fabricate + attach), core outward, never instantly', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
-    p.bank!.deposits = { alloy_plate: 200, copper_wire: 200, steel_plate: 200, composite_sheet: 200 };
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    const rec = w.profile().ship;
-    const owed0 = rec.owed!.length;
-    expect(owed0).toBeGreaterThan(3);
-    const first = (): number => {
-      const ghosts = new Set(rec.ghosts);
-      return rec.blueprint.parts.findIndex((q) => ghosts.has(q.uid));
-    };
-    void first;
-    // None for the first tick
-    expect(w.bank.stepDeposits(p, rec, 1)).toBeNull();
-    // The first part takes its job's ticks, no sooner
-    let ticks = 1, got: number | null = null;
-    while (got === null && ticks < 100000) { got = w.bank.stepDeposits(p, rec, 1); ticks++; }
-    expect(got).not.toBeNull();
-    const part = rec.blueprint.parts.find((q) => q.uid === got)!;
-    expect(ticks).toBe(jobTicks(fabWork(w.server.econ, part) + attachWork(w.server.econ.ships, part), BANK.respawnSpeed));
-    expect(rec.owed!.length).toBe(owed0 - 1);
-    expect(rec.ghosts).not.toContain(got);
-    expect(holds(w, rec)).toBe(true);
-    // The inputs came out of the deposits
-    const used = w.server.econ.recipes.partInputs(part);
-    expect(total(p.bank!.deposits)).toBe(200 * 4 - total(used));
-    // And they keep coming, one at a time, until the ship is whole or the deposits can't pay
-    let more = 0;
-    for (let i = 0; i < 200000 && (rec.owed?.length ?? 0) > 0; i++) if (w.bank.stepDeposits(p, rec, 15) !== null) more++;
-    expect(more).toBeGreaterThan(0);
-    expect(holds(w, rec)).toBe(true);
-  });
-
-  it('is slower than nothing and stops when the deposits cannot pay a part; claimed parts are left to the machine', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
-    p.bank!.deposits = {};
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    const rec = w.profile().ship;
-    for (let i = 0; i < 5000; i++) expect(w.bank.stepDeposits(p, rec, 60)).toBeNull();
-    p.bank!.deposits = { alloy_plate: 200, copper_wire: 200, steel_plate: 200, composite_sheet: 200 };
-    // Every uid claimed by a machine: nothing is built by the bank
-    for (let i = 0; i < 5000; i++) expect(w.bank.stepDeposits(p, rec, 60, () => true)).toBeNull();
-    expect(total(p.bank!.deposits)).toBe(800);
-  });
-
-  it('in the live game: parts come back on the ship over time as the bank pays, and the pilot is told', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
-    p.bank!.deposits = { alloy_plate: 200, copper_wire: 200, steel_plate: 200, composite_sheet: 200 };
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    w.server.pilots.reapplyShip(w.conn);
-    w.server.step();
-    const alive = () => w.ships.get(w.pid)!.derived.alive.filter(Boolean).length;
-    expect(alive()).toBe(1);
-    park(w.pid);
-    steps(w.server, 60);
-    expect(alive()).toBe(1); // a second in: nothing yet
-    let n = 1;
-    for (let i = 0; i < 60 * 60 * 5 && alive() < w.ships.get(w.pid)!.blueprint.parts.length; i++) { park(w.pid); w.server.step(); if (alive() > n) n = alive(); }
-    expect(alive()).toBeGreaterThan(1);
-    expect(w.profile().bank!.deposits.alloy_plate).toBeLessThan(200);
-  }, 120_000);
-
-  it('the free part rebuilds owed parts as it refills', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    w.server.pilots.reapplyShip(w.conn);
-    expect(w.profile().ship.owed!.length).toBeGreaterThan(0);
-    park(w.pid);
-    w.clock.t += BANK.refillSeconds * 1000 + 1000;
-    steps(w.server, 30);
-    expect(w.profile().ship.owed).toBeUndefined();
-    expect(w.profile().ship.ghosts).toEqual([]);
-    const live = w.ships.get(w.pid)!;
-    expect(live.derived.alive.every(Boolean)).toBe(true);
-  });
-
-  it('the hangar view follows: parts built in while the pilot flies are sent again, not left missing', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    w.server.pilots.reapplyShip(w.conn);
-    park(w.pid);
-    w.server.hangar.send(w.conn as any); // (the pilot has the hangar as the death left it)
-    const ghostsSent = () => {
-      const h = [...w.got].reverse().find((m) => m.type === 'hangar') as Extract<ServerMessage, { type: 'hangar' }> | undefined;
-      return h?.slots[w.profile().activeSlot]?.ghosts ?? [];
-    };
-    expect(w.profile().ship.owed!.length).toBeGreaterThan(0);
-    expect(ghostsSent().length).toBeGreaterThan(0);
-    // (the free part refills and pays the owed parts: the view must drop them from the missing list)
-    w.clock.t += BANK.refillSeconds * 1000 + 1000;
-    steps(w.server, 30);
-    expect(w.profile().ship.ghosts).toEqual([]);
-    expect(ghostsSent()).toEqual([]);
-  });
-
-  it('the same for parts the deposits build', () => {
-    const w = world();
-    const p = w.profile();
-    p.bank!.free = {};
-    p.bank!.deposits = { alloy_plate: 400, copper_wire: 400, iron_plate: 400 };
-    w.server.pilots.onDestroyed(w.conn, 0, 90000, 90000, 0, 0);
-    w.server.pilots.reapplyShip(w.conn);
-    park(w.pid);
-    w.server.hangar.send(w.conn as any); // (the pilot has the hangar as the death left it)
-    const ghostsSent = () => {
-      const h = [...w.got].reverse().find((m) => m.type === 'hangar') as Extract<ServerMessage, { type: 'hangar' }> | undefined;
-      return h?.slots[w.profile().activeSlot]?.ghosts ?? [];
-    };
-    const n0 = w.profile().ship.owed!.length;
-    let ticks = 0;
-    while (w.profile().ship.owed && w.profile().ship.owed!.length === n0 && ticks++ < 4000) steps(w.server, 15);
-    const owedNow = w.profile().ship.owed?.length ?? 0;
-    expect(owedNow).toBeLessThan(n0);
-    expect(ghostsSent().length).toBe(w.profile().ship.ghosts!.length);
-  }, 120_000);
 });
 
 describe('passing a station', () => {
@@ -441,7 +202,7 @@ describe('passing a station', () => {
     expect(ship.hp[gun]).toBeGreaterThan(hp);
   }, 120_000);
 
-  it('rebuilds a missing part every couple of seconds, nearest the core first, paid with its recipe inputs', () => {
+  it('rebuilds a destroyed part every couple of seconds, nearest the core first, paid with half its recipe inputs', () => {
     const w = world();
     dock(w.server, w.pid);
     const p = w.profile();
@@ -454,7 +215,24 @@ describe('passing a station', () => {
     expect(ship.derived.alive[hull]).toBe(false);
     run(w, w.ships.tuning.repair!.combatPauseTicks + BANK.stationPartSeconds * 60 + 120);
     expect(w.ships.get(w.pid)!.derived.alive[hull]).toBe(true);
-    expect(total(p.bank!.deposits)).toBeLessThan(80);
+    const bill = bankRepairBill(w.server.econ, ship.blueprint.parts[hull], 1);
+    expect(total(bill)).toBe(Math.round(total(w.server.econ.recipes.partInputs(ship.blueprint.parts[hull])) * BANK.repairShare));
+    expect(total(p.bank!.deposits)).toBe(80 - total(bill));
+  }, 120_000);
+
+  it('never makes a part that was never built (planned in the build view): that needs fabricating', () => {
+    const w = world();
+    dock(w.server, w.pid);
+    const p = w.profile();
+    p.bank!.deposits = { alloy_plate: 40, copper_wire: 40 };
+    const ship = w.ships.get(w.pid)!;
+    const hull = ship.blueprint.parts.findIndex((q) => q.fn === 'hull' && q.piece === 'tri');
+    w.ships.damagePartFraction(w.pid, hull, 1);
+    w.server.step();
+    p.ship.unbuilt = [ship.blueprint.parts[hull].uid];
+    run(w, w.ships.tuning.repair!.combatPauseTicks + BANK.stationPartSeconds * 60 * 3);
+    expect(w.ships.get(w.pid)!.derived.alive[hull]).toBe(false);
+    expect(total(p.bank!.deposits)).toBe(80);
   }, 120_000);
 
   it('there is no free station repair: an empty bank mends nothing, and the legacy credit and mineral bills are gone', () => {
@@ -475,16 +253,25 @@ describe('passing a station', () => {
     expect(p.debt).toBe(debt);
   }, 120_000);
 
-  it('the free part\'s spare (the top quarter) pays repairs when there are no deposits, never below it', () => {
+  it('the free part pays repairs of level 0 parts when there are no deposits; anything else needs deposits', () => {
     const w = world();
     dock(w.server, w.pid);
     const p = w.profile();
-    expect(total(w.bank.spare(p))).toBeGreaterThan(0);
+    const free0 = total(freeWhole(p.bank!));
     const gun = hurt(w);
     const ship = w.ships.get(w.pid)!;
     run(w, w.ships.tuning.repair!.combatPauseTicks + 60 * 20);
     expect(ship.hp[gun]).toBeCloseTo(ship.maxHp[gun], 3);
-    for (const [id, c] of Object.entries(w.bank.cap)) expect(p.bank!.free[id]).toBeGreaterThanOrEqual(0.75 * c - 1e-6);
+    expect(total(freeWhole(p.bank!))).toBeLessThan(free0);
+    // (A steel hull opens at level 5: the free part won't pay for it, the deposits may)
+    const steel = { ...ship.blueprint.parts.find((q) => q.fn === 'hull')!, material: 'steel' };
+    expect(freePays(ship.blueprint.parts[gun])).toBe(true);
+    expect(freePays(steel)).toBe(false);
+    p.bank!.deposits = {};
+    expect(w.bank.payRepair(p, steel, 0.5)).toBe(false);
+    p.bank!.deposits = { steel_plate: 10 };
+    expect(w.bank.payRepair(p, steel, 0.5)).toBe(true);
+    expect(p.bank!.deposits.steel_plate).toBeLessThan(10);
   }, 120_000);
 
   it('away from a station nothing is mended', () => {

@@ -12,7 +12,7 @@ import { type V, entries, str } from './context.js';
 import { isObj, join, list, typeName } from '../validateShapes.js';
 
 const F = 'rules.json';
-const SECTIONS = ['sieges', 'surfaces', 'events', 'operations', 'memory'];
+const SECTIONS = ['sieges', 'surfaces', 'events', 'operations', 'memory', 'death'];
 
 export function validateRules(v: V): void {
   const { c, f, systems } = v;

@@ -49,8 +49,6 @@ export function featuresDeps(gs: GameServer): ConstructorParameters<typeof Serve
     holdGive: (pilot, items) => { const c = gs.pilots.connOf(pilot); return c ? gs.pilots.give(c, items, { quiet: true }) : items; },
     holdRoom: (pilot) => { const c = gs.pilots.connOf(pilot); return c ? gs.pilots.cargoFree(c) : 0; },
     freeBuild: (pilot) => { const c = gs.pilots.connOf(pilot); return !!c && gs.freeBuild(c as ClientConnection); },
-    bankSpare: (pilot) => gs.pilots.bankSpare(pilot),
-    spendBankSpare: (pilot, bill) => gs.pilots.spendBankSpare(pilot, bill),
     // (The Mine Bay: features/minebay)
     canDamage: (a, b) => gs.canDamage(a, b),
     sameParty: (a, b) => { const ca = gs.pilots.connOf(a), cb = ca && gs.pilots.connOf(b); return !!ca && !!cb && gs.party.same(ca, cb); },

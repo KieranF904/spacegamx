@@ -269,11 +269,12 @@ export function decay(b: BridgeCtx, eid: number, ship: ShipState, tick: number):
 }
 
 /**
- * Near a station (within BANK.stationRange, and not hit recently) the repair bank's deposits mend the ship: each damaged
- * part is paid for (repairBill, host.payBankRepair) when it starts to heal and then heals BANK.stationHealPerSecond of its
- * HP a second until whole; a missing part is regrown (partInputs, host.payBankRebuild) every BANK.stationPartSeconds,
+ * Near a station (within BANK.stationRange, and not hit recently) the repair bank mends the ship: each damaged part is
+ * paid for (bankRepairBill, host.payBankRepair) when it starts to heal and then heals BANK.stationHealPerSecond of its HP
+ * a second until whole; a destroyed part that was built is regrown (host.payBankRebuild) every BANK.stationPartSeconds,
  * nearest the core first. A part can only come back where it joins something still attached, so ships rebuild from the
- * core outwards. Nothing is free: with no host to pay, nothing is mended. A part a field machine has claimed is left to it.
+ * core outwards. A part never built (host.unbuilt: planned) or a ghost needs fabricating: the bank leaves it. Nothing is
+ * free: with no host to pay, nothing is mended. A part a field machine has claimed is left to it.
  */
 export function repairStep(b: BridgeCtx, eid: number, ship: ShipState, tick: number): void {
   const rp = b.tuning.repair;
@@ -314,7 +315,7 @@ export function repairStep(b: BridgeCtx, eid: number, ship: ShipState, tick: num
   }
   let pick = -1;
   for (let i = 0; i < n; i++) {
-    if (alive[i] || !adj[i].some((j) => alive[j]) || b.isGhost(eid, i) || claimed(i)) continue;
+    if (alive[i] || !adj[i].some((j) => alive[j]) || b.isGhost(eid, i) || claimed(i) || b.host.unbuilt?.(eid, parts[i].uid)) continue;
     if (pick < 0 || depth[i] < depth[pick]) pick = i;
   }
   if (pick < 0 || !b.host.payBankRebuild) { b.restoreProgress.delete(eid); return; }

@@ -5,7 +5,7 @@
  * against the one you saved).
  */
 
-import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, baseWeaponDps, partWeaponDef, bestDodge, canTow, describeFn } from '@space-game/common';
+import { Blueprint, Catalog, ShipTuning, ShipDerived, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, baseWeaponDps, partWeaponDef, bestDodge, canTow, describeFn } from '@space-game/common';
 import { summaryFields, type SummaryField } from './describe';
 
 export interface ShipSummary {
@@ -76,10 +76,10 @@ export function shipSummaryWithDerived(catalog: Catalog, tuning: ShipTuning, eco
     // Its own tuning (grade, size, gems), as the rating counts it: a pulse laser's pulses, a beam's heat-limited burn, a gun's shells
     dps += baseWeaponDps(tuning, w.kind, w.interval, partWeaponDef(tuning, w.kind, bp.parts[w.part], w), w.fire) * w.strength;
   }
-  // Losing it costs the minerals salvage doesn't bring back
+  // Losing it costs all of it: every part is made again (docs/design/death-rework-2026-11.md; the wreck's salvage, if
+  // recovered, is a bonus not counted here)
   const raw = salvageOf(econ, econ.designParts(bp), 1);
-  const rebuild = Object.entries(raw).filter(([id]) => econ.items.get(id)?.category === 'mineral')
-    .reduce((t, [id, n]) => t + buyPrice(econ.items, id) * n * (1 - SALVAGE), 0);
+  const rebuild = Object.entries(raw).reduce((t, [id, n]) => t + buyPrice(econ.items, id) * n, 0);
   const jt = jumpTuning(tuning);
   const summary: ShipSummary = {
     rating: rateShip(catalog, tuning, ship).rating,

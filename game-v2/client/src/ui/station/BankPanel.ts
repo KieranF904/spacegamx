@@ -1,10 +1,11 @@
 /**
- * The station's Repair bank tab (docs/design/field-fabrication.md, 2.4): your one bank, the same at every station.
+ * The station's Repair bank tab (docs/design/death-rework-2026-11.md): your one bank, the same at every station. It
+ * mends a ship that comes back to a station, at half the materials: damaged parts, and destroyed ones that were built.
  *
- *   Free part  a bar that refills by itself ("full in ..."). It pays for your ship at once after a respawn and can't be
- *              taken out. The spare is the top of it that may also pay repairs.
- *   Deposits   packs and refined materials you put in; counted apart, never taken out. They mend your ship near a
- *              station and rebuild it after a respawn.
+ *   Free part  a bar that refills by itself ("full in ..."). It pays for starter-level parts only; it can't be taken out.
+ *   Deposits   packs and refined materials you put in; counted apart, never taken out. They pay for any part.
+ *
+ * Nothing in the field and nothing at a respawn: a lost ship, or a part only planned, needs fabricating.
  *
  * Everything shown is what the server reported (`repairBank`); a deposit is a request the server checks. The html is
  * built by pure functions (bankHtml, depositRows) so tests can read it without a page.
@@ -48,25 +49,23 @@ function chips(econ: Economy, icon: (id: string) => string, bag: Bag, cap?: Bag)
 }
 
 /**
- * The top of the tab: the free part, the spare and the deposits. `elapsed`: seconds since the message came, so "full in"
- * counts down between reports
+ * The top of the tab: the free part and the deposits. `elapsed`: seconds since the message came, so "full in" counts
+ * down between reports
  */
 export function bankHtml(econ: Economy, icon: (id: string) => string, m: ServerRepairBankMessage | null, elapsed = 0): string {
   if (!m) return '<div class="sgw-empty">Reading your repair bank…</div>';
   const share = freeShare(m);
   const left = Math.max(0, m.fullIn - elapsed);
   const full = m.fullIn <= 0 || left <= 0 || share >= 1;
-  const spare = chips(econ, icon, m.spare);
   const deposits = chips(econ, icon, m.deposits);
   return `<h4>Free part <span class="r" data-bank="fullin">${full ? 'full' : `full in ${fullInText(left)}`}</span></h4>
     <div class="sgw-bar${full ? ' full' : ''}" data-bank="bar"><i style="width:${Math.round(share * 100)}%"></i></div>
     <div class="bank-items" data-bank="free">${chips(econ, icon, m.free, m.cap)}</div>
-    <p class="bank-note">Refills by itself. After a respawn it pays for your ship at once, core first. It can't be taken out.</p>
-    <p class="bank-note" data-bank="spare">${spare ? `Spare for repairs: <span class="bank-items">${spare}</span>` : 'No spare for repairs: it opens when the free part is more than 75% full.'}</p>
+    <p class="bank-note">Refills by itself. Near a station it mends starter-level parts (ones a new pilot can fit) at half their materials. It can't be taken out.</p>
     <h4 style="margin-top:14px">Deposits <span class="r">${deposits ? '' : 'none yet'}</span></h4>
     <div class="bank-items" data-bank="deposits">${deposits}</div>
-    <p class="bank-note">Deposits are kept apart and can't be taken out. They mend your ship near any station. After a respawn they rebuild what the free part didn't cover, anywhere. A pack gives all it holds to the part it repairs; anything the part doesn't need is wasted.</p>
-    ${m.rebuilding ? `<p class="bank-note" style="color:#7dd3fc" data-bank="rebuilding">Rebuilding from deposits: ${m.rebuilding} part${m.rebuilding === 1 ? '' : 's'} left.</p>` : ''}`;
+    <p class="bank-note">Deposits are kept apart and can't be taken out. Near any station they mend any part, at half its materials. A pack gives all it holds to the part it repairs; anything the part doesn't need is wasted.</p>
+    <p class="bank-note" data-bank="limits">The bank mends damaged parts and destroyed ones that were built. A lost ship, or a part you've only planned, has to be fabricated. It does nothing away from a station.</p>`;
 }
 
 /** One side of the deposit list (the hold or storage): every depositable stack with its buttons */

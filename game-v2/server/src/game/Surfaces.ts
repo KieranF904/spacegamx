@@ -233,11 +233,27 @@ export class Surfaces {
 
   /** Back up to orbit beside a surface's planet or moon (on the side of `angle`) */
   toOrbit(conn: PilotConn, surface: StarSystemData, angle: number): void {
+    const at = this.orbitSpot(surface, angle);
+    if (!at) return;
+    this.host.travel(conn, at.system, at.x, at.y);
+    this.host.toast(conn, this.t('surfaces.backInOrbit', { name: at.name }), 'info');
+  }
+
+  /** Where climbing out of a surface on the `angle` side comes out: in orbit beside its planet (or moon), in its system */
+  orbitSpot(surface: StarSystemData, angle: number): { system: number; x: number; y: number; name: string } | null {
     const b = this.bodyOf(surface, this.host.tick());
-    if (!b) return;
+    if (!b) return null;
     const d = b.radius + this.rules.descendRange + this.rules.orbitMargin;
-    this.host.travel(conn, this.host.systemNum(b.system), b.x + dcos(angle) * d, b.y + dsin(angle) * d);
-    this.host.toast(conn, this.t('surfaces.backInOrbit', { name: b.name }), 'info');
+    return { system: this.host.systemNum(b.system), x: b.x + dcos(angle) * d, y: b.y + dsin(angle) * d, name: b.name };
+  }
+
+  /**
+   * A ship lost in an instanced battleground (a surface arena: its copy is cleared once the fight's over) leaves its
+   * wreck outside, in orbit on the side it died (pilots/death.ts). Null: anywhere else, it stays where it fell
+   */
+  wreckOutside(sys: StarSystemData, x: number, y: number): { system: number; x: number; y: number } | null {
+    if (!sys.instance || !sys.surface?.arena) return null;
+    return this.orbitSpot(sys, datan2(y, x));
   }
 
   tick(): void {
