@@ -285,6 +285,11 @@ export interface JobView {
   paused?: boolean;
   /** Progress of its current run while held (ms) */
   heldMs?: number;
+  /** Runs started so far (their inputs taken); absent: all of them */
+  taken?: number;
+  /** Not running: waiting for a free lane, or for materials (`short`: what one run lacks) */
+  wait?: 'lane' | 'materials';
+  short?: string;
 }
 
 /** Your hangar: every slot's design and progress, and your fabricator jobs */
@@ -430,7 +435,8 @@ export interface ServerStationMessage {
   jobs: (JobView & { stationName: string })[];
   /** Server clock now (ms) so the client can show progress */
   now: number;
-  queueSlots: number;
+  /** Jobs the refinery and the fabricator each run at once */
+  lanes: number;
 }
 
 /** Open the station screen (near a station): the server answers with `station` */

@@ -190,6 +190,48 @@ describe('hangar slots', () => {
     expect(profile().hangar[0]!.blueprint.name).toBe('Sparrow T');
   });
 
+  it('Queue all parts queues every missing part with nothing in hand, and builds them as the materials arrive', () => {
+    const { server, t, pid, profile, clock } = world();
+    dock(server, pid);
+    emptyStorage(server, pid, { power_coupling: 1 });
+    const bp = prospector(server);
+    t.send({ type: 'slotSave', slot: 2, blueprint: bp, plan: 'prospector' } as any);
+    t.send({ type: 'slotBuild', slot: 2 } as any);
+    expect(profile().hangar[2]!.auto).toBe(true);
+    // Not a bar for lack of ore: the refining and the fabrication are all queued, none started
+    const jobs = () => profile().jobs.filter((j) => j.slot === 2);
+    expect(jobs().some((j) => j.recipe.startsWith('refine:'))).toBe(true);
+    expect(jobs().some((j) => !j.recipe.startsWith('refine:'))).toBe(true);
+    expect(jobs().every((j) => (j.taken ?? j.count) === 0)).toBe(true);
+    const queued = jobs().length;
+    // A second tick adds nothing: what's queued counts
+    for (let i = 0; i < 70; i++) server.step();
+    expect(jobs().length).toBe(queued);
+    // The ore arrives: the refining starts, then the rest follows as its outputs land
+    server.pilots.give(server.pilots.connOf(pid)!, { iron_ore: 200, nickel_ore: 100, copper_ore: 40 }, { toStorage: true, quiet: true });
+    for (let k = 0; k < 14 && (profile().hangar[2]!.ghosts!.length || profile().jobs.length); k++) {
+      clock.t += 10 * 60 * 1000;
+      for (let i = 0; i < 130; i++) dock(server, pid);
+    }
+    expect(profile().jobs.length).toBe(0);
+    expect(profile().hangar[2]!.ghosts).toEqual([]);
+    expect(profile().hangar[2]!.auto).toBeFalsy();
+  });
+
+  it('a lost ship comes back as a queue of every missing part, with no materials needed to queue them', () => {
+    const { server, t, pid, profile } = world();
+    dock(server, pid);
+    emptyStorage(server, pid);
+    const bp = prospector(server);
+    t.send({ type: 'slotSave', slot: 2, blueprint: bp, plan: 'prospector' } as any);
+    // (A lost ship is a design with every part a ghost, on order: pilots/death.ts)
+    profile().hangar[2]!.lost = true;
+    profile().hangar[2]!.auto = true;
+    for (let i = 0; i < 70; i++) server.step();
+    expect(profile().jobs.filter((j) => j.slot === 2).length).toBeGreaterThan(0);
+    expect(profile().jobs.every((j) => (j.taken ?? j.count) === 0)).toBe(true);
+  });
+
   it('orders show what they need down to ore, and can be held, resumed, put first or called off', () => {
     const { server, t, pid, profile, clock } = world();
     dock(server, pid);
@@ -216,7 +258,8 @@ describe('hangar slots', () => {
     expect(plan().map((o) => o.slot)).toEqual([2, 1]);
 
     // Hold slot 1: its jobs stop (keeping their progress) and nothing comes in
-    const job = mine()[0];
+    // (One whose runs have started: jobs short of materials wait without holding a lane)
+    const job = mine().find((j) => (j.taken ?? j.count) > j.done)!;
     clock.t += job.unitMs / 2;
     t.send({ type: 'slotOrder', slot: 1, action: 'pause' } as any);
     expect(profile().hangar[1]!.paused).toBe(true);
@@ -234,7 +277,7 @@ describe('hangar slots', () => {
     expect(after ? after.done : job.count).toBeGreaterThan(doneBefore);
 
     // Calling off one of its jobs refunds it and holds the order (it would only queue it again)
-    const next = mine().find((j) => j.done < j.count);
+    const next = mine().find((j) => j.recipe.startsWith('refine:') && (j.taken ?? j.count) > j.done);
     if (next) {
       const ore = countOf(profile().storage, 'iron_ore');
       t.send({ type: 'job', id: next.id, action: 'cancel' } as any);
@@ -258,8 +301,11 @@ describe('hangar slots', () => {
     t.send({ type: 'refine', recipe: ids[0], batches: 3 } as any);
     t.send({ type: 'refine', recipe: ids[1], batches: 1 } as any);
     const [a, b] = profile().jobs;
-    expect(b.startedAt).toBe(a.readyAt);
+    // One lane: a runs, b waits for it (nothing taken yet)
+    expect(b.taken).toBe(0);
     t.send({ type: 'job', id: a.id, action: 'pause' } as any);
+    // Holding a frees the lane: b starts at once
+    expect(b.taken).toBe(1);
     expect(b.startedAt).toBe(clock.t);
     // Resumed, back in its place at the front: b waits again
     t.send({ type: 'job', id: a.id, action: 'resume' } as any);

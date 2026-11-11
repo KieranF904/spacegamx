@@ -74,7 +74,7 @@ export class ShipsTab {
         return x;
       };
       btn('Open in hangar', '', () => this.d.openHangar(slot));
-      if (rec.ghosts.length && !rec.auto) btn('Put on order', 'primary', () => this.d.send({ type: 'slotBuild', slot }), 'Refine your ore, make the parts and fit everything your materials allow');
+      if (rec.ghosts.length && !rec.auto) btn('Queue all parts', 'primary', () => this.d.send({ type: 'slotBuild', slot }), 'Queue every missing part, materials in hand or not: refining and fabrication start as the materials arrive, and parts go in as they are made');
       if (rec.ghosts.length && rec.auto) {
         const order = (action: 'pause' | 'resume' | 'cancel' | 'top') => () => { this.d.send({ type: 'slotOrder', slot, action }); this.d.sound('ui_click', 0.4); };
         if (rec.paused) btn('▶ Resume', 'primary', order('resume'), 'Carry on: its jobs pick up where they left off');

@@ -25,7 +25,7 @@ export function waitingHtml(c: StationCtx, stage: 'material' | 'part'): string {
       const n = l.waiting || l.short;
       let why = '';
       if (l.blocked === 'schematic') why = '<span style="color:#fca5a5">🔒 not open yet</span>';
-      else if (l.blocked === 'queue') why = `<span style="color:#8394ad">next, when a ${stage === 'material' ? 'refinery' : 'fabricator'} slot frees</span>`;
+      else if (l.blocked === 'queue') why = `<span style="color:#8394ad">queued: starts when a ${stage === 'material' ? 'refinery' : 'fabricator'} lane is free</span>`;
       else {
         // What it's short of: for a material, its ore; for a module, its materials
         const inputs: Record<string, number> = {};
@@ -66,7 +66,7 @@ export function renderJobs(c: StationCtx, body: HTMLElement): void {
         c.d.sound('ui_click', 0.4);
       });
     }
-    const key = list.map((j) => `${j.id}:${j.done}:${j.paused ? 1 : 0}:${j.startedAt}`).join(',');
+    const key = list.map((j) => `${j.id}:${j.done}:${j.paused ? 1 : 0}:${j.startedAt}:${j.taken ?? ''}:${j.wait ?? ''}:${j.short ?? ''}`).join(',');
     if (el.dataset.key !== key) {
       el.dataset.key = key;
       el.innerHTML = list.length ? list.map((j) => jobRow(c, j, st.jobs, st.id)).join('')
@@ -76,12 +76,15 @@ export function renderJobs(c: StationCtx, body: HTMLElement): void {
       const row = el.querySelector<HTMLElement>(`[data-row="${j.id}"]`);
       if (!row) continue;
       const span = j.unitMs * j.count;
-      const frac = j.paused ? (j.done * j.unitMs + (j.heldMs ?? 0)) / Math.max(1, span) : Math.min(1, (now - j.startedAt) / Math.max(1, j.readyAt - j.startedAt));
+      const idle = !j.paused && (j.taken ?? j.count) <= j.done;
+      const frac = idle ? j.done / Math.max(1, j.count) : j.paused ? (j.done * j.unitMs + (j.heldMs ?? 0)) / Math.max(1, span) : Math.min(1, (now - j.startedAt) / Math.max(1, j.readyAt - j.startedAt));
       const left = Math.max(0, (j.readyAt - now) / 1000);
       row.querySelector<HTMLElement>('.sgw-bar > i')!.style.width = `${Math.max(0, frac) * 100}%`;
       const t = row.querySelector<HTMLElement>('[data-left]')!;
-      t.textContent = j.paused ? '⏸ on hold' : left <= 0 ? 'done' : now < j.startedAt ? `queued · ${fmt(left)}` : fmt(left);
-      t.style.color = j.paused ? '#fbbf24' : left <= 0 ? '#86efac' : '#8394ad';
+      t.textContent = j.paused ? '⏸ on hold' : idle ? (j.wait === 'materials' ? 'waiting for materials' : 'waiting for a lane') : left <= 0 ? 'done' : now < j.startedAt ? `waiting for a lane · ${fmt(left)}` : fmt(left);
+      t.style.color = j.paused ? '#fbbf24' : idle || now < j.startedAt ? '#fbbf24' : left <= 0 ? '#86efac' : '#8394ad';
+      const sh = row.querySelector<HTMLElement>('[data-short]');
+      if (sh) sh.textContent = idle && j.wait === 'materials' && j.short ? `short: ${j.short}` : '';
     }
   }
 }
@@ -98,6 +101,7 @@ function jobRow(c: StationCtx, j: JobView & { stationName: string }, all: JobVie
   return `<div data-row="${j.id}" style="margin:6px 0 10px; ${j.paused ? 'opacity:0.75' : ''}"><div style="display:flex; justify-content:space-between; gap:8px"><span>${out}${done}</span>`
     + `<span data-left style="white-space:nowrap"></span></div>`
     + `<div class="sgw-bar" style="margin:4px 0 0"><i></i></div>`
+    + `<div data-short style="color:#fbbf24; font-size:11px; margin-top:2px"></div>`
     + `<div style="display:flex; align-items:center; gap:4px; margin-top:3px"><span style="flex:1; color:#56657c; font-size:11px">${note}</span>`
     + (j.paused ? act('resume', '▶', 'Resume') : act('pause', '⏸', 'Pause: the rest of the queue moves up'))
     + (first && first.id !== j.id ? act('top', '⇧', 'Move it to the front of the queue') : '')

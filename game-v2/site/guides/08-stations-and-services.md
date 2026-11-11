@@ -42,8 +42,8 @@ Every station has **storage**, and it is **shared between all stations**: put or
 
 ### Refinery and fabricator
 
-- The **refinery** turns ore into plate, wire and lenses. It has 8 queue slots, works while you are away, and sends finished batches to storage. See [Mining and refining](/guides/mining-and-refining) for what each takes.
-- The **fabricator** makes modules, ammunition crates, kits and components. You start with 4 slots, a fifth at level 18 and a sixth at level 38, and the Engineering skill adds one each at 2, 5 and 9 points. Small, low-grade parts are made at once. Bigger ones take time, and the queue works first in, first out.
+- The **refinery** turns ore into plate, wire and lenses. Its queue has no limit, it works while you are away, and sends finished batches to storage. See [Mining and refining](/guides/mining-and-refining) for what each takes.
+- The **fabricator** makes modules, ammunition crates, kits and components. Small, low-grade parts are made at once. Bigger ones take time. The queue has no limit and you can order before you have the materials: an order starts when they reach storage, and one that is waiting never holds up the ones behind it. The Engineering skill adds one job at a time at 2, 5 and 9 points.
 - Each model is made at its level and nothing opens one earlier. See [Building a ship](/guides/building-a-ship).
 - Any job in either queue can be **held**, **moved to the front** or **called off**, which refunds what was not used.
 

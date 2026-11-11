@@ -108,11 +108,6 @@ export function jobLanes(p: { skills?: Record<string, number> }): number {
   return 1 + engineeringSlots(p.skills?.engineering ?? 0);
 }
 
-/** Fabricator queue slots: jobs lined up, beyond the lanes they wait (econ/unlocks.ts) */
-export function queueSlots(p: { level: number; skills?: Record<string, number>; outpost?: Outpost }): number {
-  return unlocks(p).fabSlots;
-}
-
 // ---------------------------------------------------------------------------
 // Moving markets
 // ---------------------------------------------------------------------------

@@ -144,7 +144,7 @@ XP comes from kills, mining (0.35 XP a unit), jobs, bosses, salvage and ribbons.
 | Skill | Max points | First point | Effect |
 |---|---|---|---|
 | Mining | 20 | 8% | A chance of an extra unit from every unit mined |
-| Engineering | 20 | 6.5% | Cheaper rebuilds, and an extra fabricator slot at 2, 5 and 9 points |
+| Engineering | 20 | 6.5% | Cheaper rebuilds, and an extra refinery and fabricator job at once at 2, 5 and 9 points |
 | Navigation | 20 | 6.5% | More cargo space |
 
 Each point is worth 90% of the one before, so spreading them pays. 10 points in Mining give about 52%; 20 give about 70%.

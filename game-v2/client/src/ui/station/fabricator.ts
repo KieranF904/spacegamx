@@ -407,7 +407,7 @@ export class FabricatorTab {
     const status = document.createElement('span');
     status.style.cssText = 'flex:1; text-align:right; font-size:11px;';
     status.innerHTML = max >= n ? `<span style="color:#8394ad">${n * r.out[outId]} × ${esc(name)}</span>`
-      : `<span style="color:#fbbf24">${max > 0 ? `Enough for ${max} now` : 'Short of materials'}. Order it and the rest is refined and made as ore comes in.</span>`;
+      : `<span style="color:#fbbf24">${max > 0 ? `Enough for ${max} now` : 'Short of materials'}. ${r.time > 0 ? 'Queue it and it starts as they arrive, or order it and the rest is refined and made as ore comes in.' : 'Order it and the rest is refined and made as ore comes in.'}</span>`;
     const go = document.createElement('button');
     go.className = 'sgw-btn primary';
     go.style.cssText = 'padding:8px 22px; font-size:13px; font-weight:600;';
@@ -420,6 +420,16 @@ export class FabricatorTab {
       go.onclick = () => { this.d.send({ type: 'fabOrder', item: outId, n: n * r.out[outId] }); this.d.sound('ui_click', 0.5); };
     } else go.onclick = () => { this.d.send({ type: 'craft', recipe: r.id, n }); this.d.sound('ui_click', 0.5); };
     row.append(status, go);
+    // Timed and short: the plain queue too (no refining added: it waits for the materials, and doesn't hold up what's behind it)
+    if (max < n && r.time > 0) {
+      const wait = document.createElement('button');
+      wait.className = 'sgw-btn';
+      wait.style.cssText = 'padding:8px 12px; font-size:12px;';
+      wait.textContent = 'Queue';
+      wait.title = 'Goes into the build queue now and starts when its materials reach storage';
+      wait.onclick = () => { this.d.send({ type: 'craft', recipe: r.id, n }); this.d.sound('ui_click', 0.5); };
+      row.insertBefore(wait, go);
+    }
     return bar;
   }
   /** The fabricator's queue, beside whatever it's showing */
@@ -427,7 +437,7 @@ export class FabricatorTab {
     const side = document.createElement('div');
     side.className = 'sgw-col';
     const lanes = jobLanes({ skills: this.d.pilot.profile?.skills });
-    side.innerHTML = `<h4>Build queue <span class="r" title="Jobs lined up / queue slots; the fabricator runs ${lanes} at once">${this.st!.jobs.filter((j) => !j.recipe.startsWith('refine:')).length} / ${this.st!.queueSlots} · runs ${lanes} at once</span></h4>`;
+    side.innerHTML = `<h4>Build queue <span class="r" title="No limit on orders; the fabricator works ${lanes} at once, and an order short of materials waits without holding up the rest">runs ${lanes} at once</span></h4>`;
     side.style.overflowY = 'auto';
     const jobs = document.createElement('div');
     jobs.dataset.jobs = 'fab';

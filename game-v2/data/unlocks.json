@@ -8,18 +8,6 @@
       "50": 1
     }
   },
-  "fabSlots": {
-    "base": 4,
-    "label": "Fabricator queue slot",
-    "levels": {
-      "18": 1,
-      "38": 1
-    }
-  },
-  "refinerySlots": {
-    "base": 8,
-    "label": "Refinery queue slot"
-  },
   "partySize": {
     "base": 4,
     "label": "Party place"
