@@ -492,7 +492,7 @@ export class Pilots {
       const level = s.profile.level;
       const next = nextUnlockHint(this.econ.ships.functions.values(), level);
       this.host.send(conn, { type: 'levelUp', playerId: conn.playerId, newLevel: level });
-      this.toast(conn, `Level ${level}!${points ? ` +${points} skill point${points > 1 ? 's' : ''} (K to spend)` : ''}${opened.length ? ` · Unlocked: ${opened.join(', ')}` : ''}${next ? ` · Next: ${next}` : ''}`, 'good');
+      this.toast(conn, `Level ${level}!${points ? ` +${points} skill point${points > 1 ? 's' : ''} (spend in Skills, {skills})` : ''}${opened.length ? ` · Unlocked: ${opened.join(', ')}` : ''}${next ? ` · Next: ${next}` : ''}`, 'good');
       this.host.send(conn, { type: 'systemMessage', text: `Level ${level}${opened.length ? `. Unlocked: ${opened.join(', ')}` : ''}.${next ? ` Next: ${next}.` : ''}`, color: '#86efac' });
       this.emit(conn, { type: 'level', level });
     }

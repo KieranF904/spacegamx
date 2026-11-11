@@ -23,7 +23,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A one-way power line
+One-way power line
 
 == keyStats ==
 holds 10 · one way
@@ -35,7 +35,7 @@ holds 10 · one way
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 4","why":"Learned at level 4 (you're 4)"}
+{"open":false,"badge":"Lv 4","why":"Unlocks at level 4 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 4","why":""}

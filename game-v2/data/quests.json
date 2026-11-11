@@ -264,7 +264,7 @@
         "main_01"
       ],
       "starter": true,
-      "intro": "Past Nereid there's a ring of junk we call the Drift, and it's crawling with Scrapborn: feral machines with cores gone wrong, heaping scrap into nests. Thin them out. While you're there, one of their relay drones came down in the north-west of the Drift. Bring me its core. The yard wants a look at one that hasn't been shot to pieces.",
+      "intro": "Past Nereid there's a ring of junk we call the Drift, and it's crawling with Scrapborn: feral machines, cores gone wrong if you believe the yards, heaping scrap into nests. Thin them out. While you're there, one of their relay drones came down in the north-west of the Drift. Bring me its core. The yard wants a look at one that hasn't been shot to pieces.",
       "steps": [
         {
           "type": "kill",
@@ -330,7 +330,7 @@
           "seconds": 15,
           "raid": 3,
           "label": "Halcyon's Wake (the tug wreck)",
-          "text": "Plant a warning beacon at Tug Halcyon's Wake: hold steady 15 seconds",
+          "text": "Stay still at Tug Halcyon's Wake for 15 s to plant a warning beacon",
           "after": [
             {
               "say": "Beacon live. Freighters will give the wreck a wide berth now."
@@ -389,7 +389,7 @@
           "of": "scrapborn"
         }
       },
-      "rumour": "They say something big sends the Drift scrap out to die, and Lt. Achebe wants it found."
+      "rumour": "They say every drone in the Drift comes from one big nest, and Lt. Achebe wants it found."
     },
     {
       "id": "main_01",
@@ -537,7 +537,7 @@
           "text": "Bring 3 Frost Glands (Frost Brood drop them) to Borealis Research"
         }
       ],
-      "outro": "The glands sing along with it, and the Brood scatter every time it peaks. Pilots call it the heartbeat. The observatory calls it a natural effect, the Maw or the pulsar, and I've no better answer. I'd just like to know why the Brood hate a natural effect so much. Take these couplings: you'll want a bigger ship where this is heading. And if you want thicker plating, Dr. Osei on Terra Nova is the one to ask about steel.",
+      "outro": "The glands seem to sing along with it, and in my logs the Brood scatter every time it peaks. Pilots call it the heartbeat. The observatory calls it a natural effect, the Maw or the pulsar, and I've no better answer. I'd just like to know why the Brood hate a natural effect so much. Take these couplings: you'll want a bigger ship where this is heading. And if you want thicker plating, Dr. Osei on Terra Nova is the one to ask about steel.",
       "rewards": {
         "xp": 700,
         "credits": 90,
@@ -798,7 +798,7 @@
       "requires": [
         "main_11"
       ],
-      "intro": "The Void Sector is where the heartbeat echoes, and the Void Leviathan guards it. The wraiths gather around it like moths. Find it and silence it.",
+      "intro": "Pilots say the Void Sector is where the heartbeat echoes, and that the Void Leviathan guards it. The wraiths gather around it like moths. Find it and silence it.",
       "steps": [
         {
           "type": "travel",
@@ -831,7 +831,7 @@
       "requires": [
         "main_12"
       ],
-      "intro": "The heartbeat is loudest at the centre of the Maw, where the Heart is. The Cult say it's calling. The observatory says it's the black hole. All I know is the Heart has killed every crew the Watch has sent in. Go in, pilot, and put it down.",
+      "intro": "Our receivers say the heartbeat is loudest at the centre of the Maw, where the Heart is. The Cult say it's calling. The observatory says it's the black hole. All I know is the Heart has killed every crew the Watch has sent in. Go in, pilot, and put it down.",
       "steps": [
         {
           "type": "boss",
@@ -839,7 +839,7 @@
           "text": "Defeat the Heart of the Maw"
         }
       ],
-      "outro": "When the Heart died, pilots all over the cluster heard the heartbeat stop. A moment later it was back. The observatory says its instruments logged nothing unusual. Kerr says it isn't the same, and that she doesn't know what that means. The Watch has kept this quantum core back a long time, for whoever came home from the Heart. It's yours.",
+      "outro": "When the Heart died, pilots all over the cluster reported the heartbeat stopping. A moment later, they say, it was back. The observatory says its instruments logged nothing unusual. Kerr says it isn't the same, and that she doesn't know what that means. The Watch has kept this quantum core back a long time, for whoever came home from the Heart. It's yours.",
       "rewards": {
         "xp": 12000,
         "credits": 5000,
@@ -1058,7 +1058,7 @@
       "reveal": {
         "mined": "titanium_ore"
       },
-      "rumour": "Old Brannoch wants a miner who's cracked titanium."
+      "rumour": "Old Brannoch wants a miner who can mine titanium ore."
     },
     {
       "id": "sw_01",
@@ -1340,7 +1340,7 @@
       "requires": [
         "main_03"
       ],
-      "intro": "Nobody leaves Sol on my watch without lane clearance, and right now there's nothing to clear you on: the three nav buoys on the departure lanes are gone, scrapped for parts by someone who should know better. So you'll put them back. Here are the patterns for the buoy parts. Fabricate a Constructor and fit it to your ship, make up the parts (frame, mast, power cells, dish: four for each buoy), then fly out to each buoy's site and build it. You don't need everything at once: what you put up stays up. Then Lieutenant Achebe signs you off.",
+      "intro": "Nobody leaves Sol on my watch without lane clearance, and right now there's nothing to clear you on: the three nav buoys on the departure lanes are gone, scrapped for parts by someone who should know better. So you'll put them back. Here are the patterns for the buoy parts. You don't need everything at once: what you put up stays up. Then Lieutenant Achebe signs you off.",
       "steps": [
         {
           "type": "refit",
@@ -1383,7 +1383,7 @@
             }
           ],
           "seconds": 5,
-          "text": "Construct nav buoy Alpha (frame, mast, power cells, dish)",
+          "text": "Make a frame, mast, power cells and dish at a fabricator, then build nav buoy Alpha",
           "after": [
             {
               "say": "Alpha's up and talking. Beta next."
@@ -1420,7 +1420,7 @@
             }
           ],
           "seconds": 5,
-          "text": "Construct nav buoy Beta (frame, mast, power cells, dish)",
+          "text": "Build nav buoy Beta (frame, mast, power cells, dish)",
           "after": [
             {
               "say": "Beta's live. One more."
@@ -1457,7 +1457,7 @@
             }
           ],
           "seconds": 5,
-          "text": "Construct nav buoy Gamma (frame, mast, power cells, dish)",
+          "text": "Build nav buoy Gamma (frame, mast, power cells, dish)",
           "after": [
             {
               "say": "That's all three. The departure lanes are lit again. Go and get Lieutenant Achebe's sign-off at Sentinel Watch."
@@ -1845,7 +1845,7 @@
           "item": "field_crucible",
           "count": 1,
           "teach": "field_crucible",
-          "text": "Fabricate a field crucible (Fabricator, Components & supplies)",
+          "text": "Make a field crucible at a fabricator (Components tab)",
           "after": [
             {
               "say": "Osei here. You built it? Then bring it down to me on Terra Nova."
@@ -2071,7 +2071,7 @@
           "y": 40645,
           "radius": 900,
           "label": "the aurora listening point",
-          "text": "Place Kerr's probe at the aurora listening point (Borealis)",
+          "text": "Fly to the aurora listening point (Borealis) to place Kerr's probe",
           "after": [
             {
               "say": "It's on! The aurora drowns nearly everything, but what gets through is clean: no Sol in it at all. Come back, I want to show you the recording."
@@ -2081,7 +2081,7 @@
         {
           "type": "talk",
           "person": "kerr",
-          "text": "Hear Sabine Kerr's recording",
+          "text": "Talk to Sabine Kerr about the recording",
           "lines": [
             {
               "say": "Listen. Slowed down, it isn't a broadcast at all."
@@ -2188,7 +2188,7 @@
           "seconds": 12,
           "raid": 3,
           "label": "the smugglers' drop buoy",
-          "text": "Plant a tracker on the smugglers' drop buoy: hold steady 12 seconds",
+          "text": "Stay still at the smugglers' drop buoy for 12 s to plant a tracker",
           "after": [
             {
               "say": "Tracker's live. Now we'll see where their cargo goes."
@@ -2373,7 +2373,7 @@
           "radius": 500,
           "seconds": 10,
           "label": "weather mast East",
-          "text": "Upload weather mast East (Terra Nova): hold steady 10 seconds"
+          "text": "Stay still by weather mast East for 10 s while it uploads (Terra Nova)"
         },
         {
           "type": "hold",
@@ -2383,7 +2383,7 @@
           "radius": 500,
           "seconds": 10,
           "label": "weather mast West",
-          "text": "Upload weather mast West (Terra Nova): hold steady 10 seconds"
+          "text": "Stay still by weather mast West for 10 s while it uploads (Terra Nova)"
         },
         {
           "type": "hold",
@@ -2393,7 +2393,7 @@
           "radius": 500,
           "seconds": 10,
           "label": "weather mast South",
-          "text": "Upload weather mast South (Terra Nova): hold steady 10 seconds"
+          "text": "Stay still by weather mast South for 10 s while it uploads (Terra Nova)"
         },
         {
           "type": "talk",
@@ -2438,7 +2438,7 @@
       "requires": [
         "main_01"
       ],
-      "intro": "There's a landing beacon down in Terra Nova's Pale Reef that's older than any record we keep. The Museum Guild has argued for years over whose landing it marks: the first crews', say half of them, and the other half have a list. Now they've finally paid to have it fetched. Fly down, dig it out of the reef (hold steady while your tractor works it loose), and bring it up to me.",
+      "intro": "There's a landing beacon down in Terra Nova's Pale Reef that's older than any record we keep. The Museum Guild has argued for years over whose landing it marks: the first crews', say half of them, and the other half have a list. Now they've finally paid to have it fetched. Fly down, dig it out of the reef (keep still while it works loose), and bring it up to me.",
       "steps": [
         {
           "type": "hold",
@@ -2448,7 +2448,7 @@
           "radius": 450,
           "seconds": 14,
           "label": "the Pale Reef dig site",
-          "text": "Work the beacon loose at the Pale Reef (Terra Nova): hold steady 14 seconds",
+          "text": "Stay still at the Pale Reef dig site for 14 s to work the beacon loose (Terra Nova)",
           "after": [
             {
               "say": "It's free! Pull it aboard."
@@ -2561,7 +2561,7 @@
           "seconds": 25,
           "raid": 2,
           "label": "the Aurora Knot",
-          "text": "Survey the Aurora Knot: hold steady 25 seconds",
+          "text": "Stay still at the Aurora Knot for 25 s to survey it",
           "after": [
             {
               "say": "Got it. It's a stillstone, all right, if a small rough one: the angles repeat, and the veins glow on the night side. The Guild only charted it a few years back, and they don't find many. I'll pass it on to Maya."
@@ -2660,7 +2660,7 @@
           "radius": 600,
           "seconds": 20,
           "label": "the Halden shaft",
-          "text": "Cut down through the ice at the Halden site: hold steady 20 seconds",
+          "text": "Stay still at the Halden site for 20 s to cut down through the ice",
           "after": [
             {
               "say": "It's open! There, in the slate. Pull it up, gently."
@@ -2756,7 +2756,7 @@
           "seconds": 30,
           "raid": 3,
           "label": "the listening blind",
-          "text": "Sit with the blind while it records: hold steady 30 seconds"
+          "text": "Stay still by the listening blind for 30 s while it records"
         },
         {
           "type": "talk",
@@ -2864,7 +2864,7 @@
           "type": "craft",
           "item": "part:alloy:core:rect2",
           "count": 1,
-          "text": "Fabricate a fresh core at any fabricator (alloy, the regimen's standard 1×2 housing)",
+          "text": "Make a new Alloy core, 1×2, at any fabricator (Core tab)",
           "after": [
             {
               "say": "Good. Fit it in the hangar, and bring me the one you took out. Don't scrap it: it has to go in the book."
@@ -2876,7 +2876,7 @@
           "items": {
             "part:alloy:core:rect2": 1
           },
-          "text": "Fit the new core, then hand the old one in at the Ark Hall to be logged and retired"
+          "text": "Fit the new core and bring the old one to the Ark Hall"
         }
       ],
       "outro": "Logged. Serial, hours, condition, date retired. It was a perfectly good core, and that is the point: discipline, and pride in one's equipment. Ilse Marrow at the yard will tell you Ark ships fly no better for it. She's right. That was never why we do it.",
@@ -2910,7 +2910,7 @@
           "seconds": 20,
           "raid": 3,
           "label": "the Ark watch post on the Wardens' Stillstone",
-          "text": "Cover the changeover at the Ark watch post on the Wardens' Stillstone: hold steady 20 seconds (the Reaches, Sol)",
+          "text": "Stay still at the Ark watch post for 20 s to cover the changeover (Wardens' Stillstone, the Reaches, Sol)",
           "after": [
             {
               "say": "Changeover's logged. You've four tired people aboard who'd rather have stayed. Bring them home."
@@ -2949,7 +2949,7 @@
         {
           "type": "talk",
           "person": "ark_herald",
-          "text": "Hear the word from the herald (the Ark Hall)",
+          "text": "Talk to the herald (the Ark Hall)",
           "lines": [
             {
               "say": "Tamsin's Claim. The Reaches, past Farwatch."
@@ -2997,7 +2997,7 @@
           "seconds": 20,
           "raid": 4,
           "label": "Tamsin's Claim",
-          "text": "Go back for the Tamsins' seed stock and hold steady 20 seconds while it loads (Tamsin's Claim, the Reaches)",
+          "text": "Go back to Tamsin's Claim and stay still for 20 s while the seed stock loads (the Reaches)",
           "after": [
             {
               "say": "That's the claim emptied. Farwatch says there's a warband on the road behind you. Don't stop to look."
@@ -3049,7 +3049,7 @@
           "take": {
             "ark_old_stock": 3
           },
-          "text": "Leave 3 crates with Warden Holt at Farwatch",
+          "text": "Deliver 3 crates to Warden Holt (Farwatch)",
           "lines": [
             {
               "say": "Ark crates. That's the third lot this year. They'll be back for them one at a time, and off they'll go somewhere else."
@@ -3065,7 +3065,7 @@
           "take": {
             "ark_old_stock": 3
           },
-          "text": "Leave 3 crates with Old Brannoch at the Mining Outpost",
+          "text": "Deliver 3 crates to Old Brannoch (the Mining Outpost)",
           "lines": [
             {
               "say": "Pumps! Good pumps, too. They'll have run half their hours. The Ark never runs anything to the end."
@@ -3195,7 +3195,7 @@
           "seconds": 30,
           "raid": 5,
           "label": "the leestone camp",
-          "text": "Hold the leestone camp while the rigs come in: 30 seconds (the Maw's edge)",
+          "text": "Stay still at the leestone camp for 30 s while the rigs come in (the Maw's edge)",
           "after": [
             {
               "say": "Kol's word: the rigs are in, and two crews aren't. Dig, and come home."
@@ -3392,7 +3392,7 @@
           "radius": 700,
           "seconds": 30,
           "label": "the Helios Array's inner rail",
-          "text": "Hold steady by the Helios Array's inner rail 30 seconds while Kerr's recorder listens",
+          "text": "Stay still by the Helios Array's inner rail for 30 s while Kerr's recorder listens",
           "after": [
             {
               "say": "That's enough. Bring it home slowly; it doesn't like being shaken."
@@ -3465,7 +3465,7 @@
           "radius": 700,
           "seconds": 40,
           "label": "Bellwether mast one",
-          "text": "Hold by Bellwether's first mast on the Array's rail 40 seconds while the load test runs",
+          "text": "Stay still by Bellwether's first mast for 40 s while the load test runs (the Array's rail)",
           "after": [
             {
               "say": "Rask here. Load's through, every coupling green, and the curve took another step up while it ran. Come back to the Seat; the Director wants you."
@@ -3537,7 +3537,7 @@
           "radius": 700,
           "seconds": 40,
           "label": "Kerr's hab",
-          "text": "Hold steady by Kerr's hab 40 seconds while she runs current through the parts",
+          "text": "Stay still by Kerr's hab for 40 s while she runs current through the parts",
           "after": [
             {
               "say": "Off. Come in. Come and look at this."
@@ -3547,7 +3547,7 @@
         {
           "type": "talk",
           "person": "kerr",
-          "text": "See what Sabine Kerr found",
+          "text": "Talk to Sabine Kerr about the first run",
           "lines": [
             {
               "say": "Under the scope. See them? Threads through the grey, finer than hair. They weren't there when you brought the parts in."
@@ -3568,7 +3568,7 @@
           "radius": 700,
           "seconds": 40,
           "label": "Kerr's hab",
-          "text": "Hold steady by Kerr's hab 40 seconds while she runs it a second time",
+          "text": "Stay still by Kerr's hab for 40 s while she runs it a second time",
           "after": [
             {
               "say": "Off. Come in."
@@ -3578,7 +3578,7 @@
         {
           "type": "talk",
           "person": "kerr",
-          "text": "Hear what the second run showed",
+          "text": "Talk to Sabine Kerr about the second run",
           "lines": [
             {
               "say": "Nothing. No threads, and the bench read clean. Same parts, same cell, same bench, same pilot sitting outside."
@@ -3643,7 +3643,7 @@
         {
           "type": "talk",
           "person": "hale",
-          "text": "Tell Forgemaster Hale how the slugs did",
+          "text": "Report back to Forgemaster Hale (the Ember Forge)",
           "lines": [
             {
               "say": "Cracked through? Thought so."

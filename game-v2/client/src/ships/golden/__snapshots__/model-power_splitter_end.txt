@@ -23,7 +23,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-A battery that splits one line out of its two ends
+Splits a line, ends
 
 == keyStats ==
 holds 300
@@ -35,7 +35,7 @@ holds 300
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+{"open":false,"badge":"Lv 8","why":"Unlocks at level 8 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 8","why":""}

@@ -797,7 +797,7 @@ this.boostHudEl = document.getElementById('boostHud');
     if (this.w.autopilot.active) { this.w.autopilot.cancel('Autopilot off'); return; }
     const t = this.objective();
     const q = this.w.quests.current() ?? this.w.quests.trackedLead();
-    if (!t || !q) { this.showSystemMessage(`Follow a job or a lead with a destination first (${boundKeyName('log', settings.data.bindings)}), or click a place on the map (${boundKeyName('map', settings.data.bindings)})`, '#f2d24b'); return; }
+    if (!t || !q) { this.showSystemMessage(`Follow a job or lead first (${boundKeyName('log', settings.data.bindings)}), or click a place on the map (${boundKeyName('map', settings.data.bindings)})`, '#f2d24b'); return; }
     this.flyTo({ kind: 'objective', name: t.label || q.name });
   }
 

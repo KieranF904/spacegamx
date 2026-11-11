@@ -30,7 +30,7 @@ export function drawBossLairs(host: MapHost, sc: MapScene): void {
     ctx.fillText(`${b.name} · lvl ${b.level}`, x, y + 28);
     if (huntedBoss(Date.now(), Object.keys(BOSS_DEFS)) === b.id) {
       ctx.fillStyle = '#fca5a5';
-      ctx.fillText('HUNTED THIS WEEK · double rewards', x, y + 42);
+      ctx.fillText('WEEKLY HUNT · double XP and credits', x, y + 42);
     }
   }
 }

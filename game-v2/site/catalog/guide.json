@@ -43,7 +43,7 @@
     "h": 61
    },
    "licence": true,
-   "tradeOff": "The heart: steering, the jump drive and a battery. One per ship",
+   "tradeOff": "Steering, jump drive and battery",
    "keyNumbers": "150 hp · armour 1",
    "cost": {
     "alloy_plate": 3,
@@ -262,7 +262,7 @@
    "kind": "model",
    "name": "Conduit",
    "level": 0,
-   "order": 109,
+   "order": 108,
    "fn": "power_conduit",
    "material": "alloy",
    "piece": "sq",
@@ -272,7 +272,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A power line",
+   "tradeOff": "Power line",
    "family": "Relays",
    "size": "Small · Square",
    "keyNumbers": "holds 10 · power line",
@@ -298,7 +298,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a second while it works",
+   "tradeOff": "Builds parts in flight",
    "family": "Fabricators",
    "size": "Medium · Panel",
    "keyNumbers": "1x speed · up to Mk II · draws 40 working",
@@ -377,7 +377,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Two cells of flat shield just off the hull",
+   "tradeOff": "Small shield wall",
    "family": "Shield walls",
    "size": "Small · Square",
    "keyNumbers": "40 HP wall · 14 a second once unhit for 1.2 s; down 1.5 s when broken, back at 25% · draws 10 · 45 hp · armour 1",
@@ -404,7 +404,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tight 60 degree arc in front of a gun",
+   "tradeOff": "Tight shield arc",
    "family": "Shield arcs",
    "size": "Small · Square",
    "keyNumbers": "45 HP arc · 16 a second once unhit for 1.2 s; down 1.2 s when broken, back at 25% · draws 11 · 45 hp · armour 1",
@@ -421,7 +421,7 @@
    "kind": "model",
    "name": "Corner Conduit",
    "level": 2,
-   "order": 120,
+   "order": 119,
    "fn": "power_corner",
    "material": "alloy",
    "piece": "sq",
@@ -431,7 +431,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A power line that turns",
+   "tradeOff": "Power line corner",
    "family": "Relays",
    "size": "Small · Square",
    "keyNumbers": "holds 10 · power line",
@@ -561,7 +561,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Refines ore in your hold while you fly, up to Mk II materials, at 0",
+   "tradeOff": "Refines ore in flight",
    "family": "Refiners",
    "size": "Small · Square",
    "keyNumbers": "0.4x speed · up to Mk II · draws 20 working",
@@ -588,7 +588,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Three cells wide, one out",
+   "tradeOff": "Shield wall for a gun",
    "family": "Shield walls",
    "size": "Medium · Panel",
    "keyNumbers": "75 HP wall · 12 a second once unhit for 1.2 s; down 2.2 s when broken, back at 25% · draws 16 · 90 hp · armour 1",
@@ -632,6 +632,33 @@
    "seconds": 0
   },
   {
+   "id": "power_diode",
+   "tab": "power",
+   "kind": "model",
+   "name": "Diode",
+   "level": 4,
+   "order": 109,
+   "fn": "power_diode",
+   "material": "alloy",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/power_diode.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "One-way power line",
+   "family": "Relays",
+   "size": "Small · Square",
+   "keyNumbers": "holds 10 · one way",
+   "cost": {
+    "alloy_plate": 1,
+    "copper_wire": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 0
+  },
+  {
    "id": "shield_buckler",
    "tab": "shields",
    "kind": "model",
@@ -647,7 +674,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A small 90 degree arc close to the hull",
+   "tradeOff": "Small shield arc",
    "family": "Shield arcs",
    "size": "Small · Square",
    "keyNumbers": "60 HP arc · 13 a second once unhit for 1.2 s; down 2 s when broken, back at 25% · draws 13 · 45 hp · armour 1",
@@ -656,33 +683,6 @@
     "copper_wire": 2,
     "shield_emitter": 1,
     "capacitor_cell": 1
-   },
-   "seconds": 0
-  },
-  {
-   "id": "power_diode",
-   "tab": "power",
-   "kind": "model",
-   "name": "Diode",
-   "level": 4,
-   "order": 110,
-   "fn": "power_diode",
-   "material": "alloy",
-   "piece": "sq",
-   "art": {
-    "src": "/static/img/parts/power_diode.webp",
-    "w": 56,
-    "h": 61
-   },
-   "licence": false,
-   "tradeOff": "A one-way power line",
-   "family": "Relays",
-   "size": "Small · Square",
-   "keyNumbers": "holds 10 · one way",
-   "cost": {
-    "alloy_plate": 1,
-    "copper_wire": 2,
-    "insulated_polymer": 1
    },
    "seconds": 0
   },
@@ -702,7 +702,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A clamp on its open edge",
+   "tradeOff": "Locks two ships together",
    "family": "Docking Clamps",
    "size": "Small · Square",
    "keyNumbers": "one-cell clamp",
@@ -886,7 +886,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A reaction wheel",
+   "tradeOff": "Adds turning force",
    "family": "Gyros",
    "size": "Small · Square",
    "keyNumbers": "+250 turning · draws 6 turning",
@@ -1001,7 +1001,7 @@
     "h": 81
    },
    "licence": false,
-   "tradeOff": "full thrust all the time, no boost, burns energy",
+   "tradeOff": "full thrust all the time, no boost, burns power",
    "family": "Burn engines",
    "size": "Medium · Panel",
    "keyNumbers": "thrust 8.0 · top 4,200 m/s · draws 68",
@@ -1019,7 +1019,7 @@
    "kind": "model",
    "name": "Joiner Bank",
    "level": 8,
-   "order": 111,
+   "order": 110,
    "fn": "power_joiner_bank",
    "material": "steel",
    "piece": "rect2",
@@ -1029,7 +1029,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that joins two lines into one",
+   "tradeOff": "Joins two power lines",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1056,7 +1056,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A 120 degree arc that wraps most of a side",
+   "tradeOff": "Wide shield arc",
    "family": "Shield arcs",
    "size": "Medium · Panel",
    "keyNumbers": "160 HP arc · 8 a second once unhit for 1.2 s; down 3.5 s when broken, back at 25% · draws 22 · 113 hp · armour 1",
@@ -1073,7 +1073,7 @@
    "kind": "model",
    "name": "Splitter Bank",
    "level": 8,
-   "order": 112,
+   "order": 111,
    "fn": "power_splitter_bank",
    "material": "steel",
    "piece": "rect2",
@@ -1083,7 +1083,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that splits one line into two",
+   "tradeOff": "Splits a power line",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1100,7 +1100,7 @@
    "kind": "model",
    "name": "Elbow Joiner Bank",
    "level": 8,
-   "order": 113,
+   "order": 112,
    "fn": "power_joiner_elbow",
    "material": "steel",
    "piece": "rect2",
@@ -1110,7 +1110,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that joins two lines into one around a corner",
+   "tradeOff": "Joins two lines, corner",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1127,7 +1127,7 @@
    "kind": "model",
    "name": "End Joiner Bank",
    "level": 8,
-   "order": 114,
+   "order": 113,
    "fn": "power_joiner_end",
    "material": "steel",
    "piece": "rect2",
@@ -1137,7 +1137,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that joins two lines from its two ends",
+   "tradeOff": "Joins two lines, ends",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1154,7 +1154,7 @@
    "kind": "model",
    "name": "Cross Joiner Bank",
    "level": 8,
-   "order": 115,
+   "order": 114,
    "fn": "power_joiner_cross",
    "material": "steel",
    "piece": "rect2",
@@ -1164,7 +1164,34 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that joins a line from its back and one from its front into one",
+   "tradeOff": "Joins back and front lines",
+   "family": "Batteries",
+   "size": "Medium · Panel",
+   "keyNumbers": "holds 300",
+   "cost": {
+    "steel_plate": 3,
+    "capacitor_cell": 2,
+    "copper_wire": 2
+   },
+   "seconds": 40
+  },
+  {
+   "id": "power_splitter_elbow",
+   "tab": "power",
+   "kind": "model",
+   "name": "Elbow Splitter Bank",
+   "level": 8,
+   "order": 115,
+   "fn": "power_splitter_elbow",
+   "material": "steel",
+   "piece": "rect2",
+   "art": {
+    "src": "/static/img/parts/power_splitter_elbow.webp",
+    "w": 90,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Splits a line, corner",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1191,7 +1218,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Drops a batch of 4 proximity mines out of its open edge on a key press, from a magazine of 12 the fabricator refills",
+   "tradeOff": "Drops proximity mines",
    "family": "Mine Bays",
    "size": "Medium · Panel",
    "keyNumbers": "4 mines a drop · each mine hits for up to 140 across 110 m",
@@ -1203,39 +1230,12 @@
    "seconds": 40
   },
   {
-   "id": "power_splitter_elbow",
-   "tab": "power",
-   "kind": "model",
-   "name": "Elbow Splitter Bank",
-   "level": 8,
-   "order": 116,
-   "fn": "power_splitter_elbow",
-   "material": "steel",
-   "piece": "rect2",
-   "art": {
-    "src": "/static/img/parts/power_splitter_elbow.webp",
-    "w": 90,
-    "h": 61
-   },
-   "licence": false,
-   "tradeOff": "A battery that splits one line in two, one straight on and one round a corner",
-   "family": "Batteries",
-   "size": "Medium · Panel",
-   "keyNumbers": "holds 300",
-   "cost": {
-    "steel_plate": 3,
-    "capacitor_cell": 2,
-    "copper_wire": 2
-   },
-   "seconds": 40
-  },
-  {
    "id": "power_splitter_tee",
    "tab": "power",
    "kind": "model",
    "name": "Tee Splitter Bank",
    "level": 8,
-   "order": 117,
+   "order": 116,
    "fn": "power_splitter_tee",
    "material": "steel",
    "piece": "rect2",
@@ -1245,7 +1245,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that splits a line from its end to its front and back",
+   "tradeOff": "Splits a line, tee",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1262,7 +1262,7 @@
    "kind": "model",
    "name": "End Splitter Bank",
    "level": 8,
-   "order": 118,
+   "order": 117,
    "fn": "power_splitter_end",
    "material": "steel",
    "piece": "rect2",
@@ -1272,7 +1272,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A battery that splits one line out of its two ends",
+   "tradeOff": "Splits a line, ends",
    "family": "Batteries",
    "size": "Medium · Panel",
    "keyNumbers": "holds 300",
@@ -1533,7 +1533,7 @@
    "kind": "model",
    "name": "Passthrough",
    "level": 10,
-   "order": 122,
+   "order": 121,
    "fn": "power_passthrough",
    "material": "alloy",
    "piece": "sq",
@@ -1543,7 +1543,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A power line with a pipe through it, side to side",
+   "tradeOff": "Pipe across a power line",
    "family": "Relays",
    "size": "Small · Square",
    "keyNumbers": "holds 10 · power line",
@@ -1560,7 +1560,7 @@
    "kind": "model",
    "name": "Feed Pipe",
    "level": 10,
-   "order": 123,
+   "order": 122,
    "fn": "feed_pipe",
    "material": "alloy",
    "piece": "sq",
@@ -1570,7 +1570,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A pipe",
+   "tradeOff": "Joins feed parts",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "38 hp · armour 1",
@@ -1945,7 +1945,7 @@
     "h": 95
    },
    "licence": false,
-   "tradeOff": "Five cells of deep flat shield, two out",
+   "tradeOff": "Large deep shield wall",
    "family": "Shield walls",
    "size": "Large · Block",
    "keyNumbers": "260 HP wall · 9 a second once unhit for 1.2 s; down 4.5 s when broken, back at 25% · draws 30 · 226 hp · armour 2",
@@ -2001,7 +2001,7 @@
     "h": 95
    },
    "licence": false,
-   "tradeOff": "Builds and repairs parts from your hold 1",
+   "tradeOff": "Faster in-flight fabricator",
    "family": "Fabricators",
    "size": "Large · Block",
    "keyNumbers": "1.6x speed · up to Mk III · draws 70 working",
@@ -2029,7 +2029,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Refines ore in your hold up to Mk III materials, at 0",
+   "tradeOff": "Faster in-flight refiner",
    "family": "Refiners",
    "size": "Medium · Panel",
    "keyNumbers": "0.7x speed · up to Mk III · draws 35 working",
@@ -2047,7 +2047,7 @@
    "kind": "model",
    "name": "Combiner",
    "level": 12,
-   "order": 121,
+   "order": 120,
    "fn": "power_combiner",
    "material": "steel",
    "piece": "sq",
@@ -2057,7 +2057,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Joins a feed to a power line",
+   "tradeOff": "Adds feed to power",
    "family": "Relays",
    "size": "Small · Square",
    "keyNumbers": "holds 10 · power line",
@@ -2260,7 +2260,7 @@
    "kind": "model",
    "name": "Surge Cell",
    "level": 14,
-   "order": 119,
+   "order": 118,
    "fn": "power_surge_cell",
    "material": "composite",
    "piece": "sq",
@@ -2270,7 +2270,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A fast cell",
+   "tradeOff": "Fast-release power store",
    "family": "Capacitors",
    "size": "Small · Square",
    "keyNumbers": "holds 120",
@@ -2297,7 +2297,7 @@
     "h": 77
    },
    "licence": false,
-   "tradeOff": "An engine built for feed",
+   "tradeOff": "Engine that runs on feed",
    "family": "Ion drives",
    "size": "Small · Square",
    "keyNumbers": "thrust 1.0 · top 3,600 m/s · draws 4",
@@ -2416,7 +2416,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A two-cell clamp that locks only to another Heavy Docking Clamp, for bigger ships",
+   "tradeOff": "Heavy ship-to-ship clamp",
    "family": "Docking Clamps",
    "size": "Medium · Panel",
    "keyNumbers": "2-cell clamp",
@@ -2433,7 +2433,7 @@
    "kind": "model",
    "name": "Selector",
    "level": 16,
-   "order": 124,
+   "order": 123,
    "fn": "feed_selector",
    "material": "steel",
    "piece": "sq",
@@ -2443,7 +2443,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "Two feeds in (left and right), one out (front)",
+   "tradeOff": "Switches between two feeds",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "56 hp · armour 2",
@@ -2460,7 +2460,7 @@
    "kind": "model",
    "name": "Catalyst Tank",
    "level": 16,
-   "order": 131,
+   "order": 130,
    "fn": "feed_tank_catalyst",
    "material": "steel",
    "piece": "sq",
@@ -2470,7 +2470,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Catalyst",
+   "tradeOff": "Feed: cheaper engines",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 2",
@@ -2588,7 +2588,7 @@
     "h": 95
    },
    "licence": false,
-   "tradeOff": "A 180 degree dome over one end",
+   "tradeOff": "Half-dome shield",
    "family": "Shield arcs",
    "size": "Large · Block",
    "keyNumbers": "320 HP arc · 6 a second once unhit for 1.2 s; down 5.5 s when broken, back at 25% · draws 36 · 269 hp · armour 2",
@@ -2639,7 +2639,7 @@
    "kind": "model",
    "name": "Coolant Tank",
    "level": 18,
-   "order": 126,
+   "order": 125,
    "fn": "feed_tank_coolant",
    "material": "steel",
    "piece": "sq",
@@ -2649,7 +2649,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Coolant",
+   "tradeOff": "Feed: shorter pauses",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 2",
@@ -2665,7 +2665,7 @@
    "kind": "model",
    "name": "Flux Salts Tank",
    "level": 18,
-   "order": 128,
+   "order": 127,
    "fn": "feed_tank_flux",
    "material": "steel",
    "piece": "sq",
@@ -2675,7 +2675,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Flux Salts",
+   "tradeOff": "Feed: cheaper shots",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 2",
@@ -2691,7 +2691,7 @@
    "kind": "model",
    "name": "Reaction Mass Tank",
    "level": 18,
-   "order": 132,
+   "order": 131,
    "fn": "feed_tank_reaction",
    "material": "steel",
    "piece": "sq",
@@ -2701,7 +2701,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Reaction Mass",
+   "tradeOff": "Feed: more thrust",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 2",
@@ -2727,7 +2727,7 @@
     "h": 83
    },
    "licence": false,
-   "tradeOff": "The two-input gun",
+   "tradeOff": "Feed-fired heavy cannon",
    "family": "Cannons",
    "size": "Medium · Panel",
    "keyNumbers": "69 dmg/s · reach 5,700 · cycle · draws 36",
@@ -2909,7 +2909,7 @@
     "h": 95
    },
    "licence": false,
-   "tradeOff": "A big reaction wheel for big ships",
+   "tradeOff": "Big turning force",
    "family": "Gyros",
    "size": "Large · Block",
    "keyNumbers": "+28,000 turning · draws 48 turning",
@@ -2927,7 +2927,7 @@
    "kind": "model",
    "name": "Overcharge Tank",
    "level": 20,
-   "order": 125,
+   "order": 124,
    "fn": "feed_tank_overcharge",
    "material": "steel",
    "piece": "sq",
@@ -2937,7 +2937,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Overcharge",
+   "tradeOff": "Feed: harder hits",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 3",
@@ -2953,7 +2953,7 @@
    "kind": "model",
    "name": "Lens Fluid Tank",
    "level": 20,
-   "order": 130,
+   "order": 129,
    "fn": "feed_tank_lens",
    "material": "steel",
    "piece": "sq",
@@ -2963,7 +2963,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Lens Fluid",
+   "tradeOff": "Feed: cheaper beams",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 3",
@@ -3169,7 +3169,7 @@
    "kind": "model",
    "name": "Damping Gel Tank",
    "level": 22,
-   "order": 127,
+   "order": 126,
    "fn": "feed_tank_damping",
    "material": "steel",
    "piece": "sq",
@@ -3179,7 +3179,33 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Damping Gel",
+   "tradeOff": "Feed: easier heavy charging",
+   "family": "Feed",
+   "size": "Small · Square",
+   "keyNumbers": "66 hp · armour 3",
+   "cost": {
+    "steel_plate": 2,
+    "insulated_polymer": 1
+   },
+   "seconds": 50
+  },
+  {
+   "id": "feed_tank_burstgel",
+   "tab": "power",
+   "kind": "model",
+   "name": "Burst Gel Tank",
+   "level": 22,
+   "order": 132,
+   "fn": "feed_tank_burstgel",
+   "material": "steel",
+   "piece": "sq",
+   "art": {
+    "src": "/static/img/parts/feed_tank_burstgel.webp",
+    "w": 56,
+    "h": 61
+   },
+   "licence": false,
+   "tradeOff": "Feed: stronger boost",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 3",
@@ -3219,32 +3245,6 @@
     "cinder_ember": 1
    },
    "seconds": 80
-  },
-  {
-   "id": "feed_tank_burstgel",
-   "tab": "power",
-   "kind": "model",
-   "name": "Burst Gel Tank",
-   "level": 22,
-   "order": 133,
-   "fn": "feed_tank_burstgel",
-   "material": "steel",
-   "piece": "sq",
-   "art": {
-    "src": "/static/img/parts/feed_tank_burstgel.webp",
-    "w": 56,
-    "h": 61
-   },
-   "licence": false,
-   "tradeOff": "A tank of Burst Gel",
-   "family": "Feed",
-   "size": "Small · Square",
-   "keyNumbers": "66 hp · armour 3",
-   "cost": {
-    "steel_plate": 2,
-    "insulated_polymer": 1
-   },
-   "seconds": 50
   },
   {
    "id": "power_overclock_reactor",
@@ -3321,7 +3321,7 @@
     "h": 95
    },
    "licence": false,
-   "tradeOff": "Builds and repairs any part from your hold 2",
+   "tradeOff": "Fastest in-flight fabricator",
    "family": "Fabricators",
    "size": "Large · Block",
    "keyNumbers": "2.5x speed · any grade · draws 110 working",
@@ -3380,7 +3380,7 @@
     "h": 95
    },
    "licence": false,
-   "tradeOff": "Refines any ore in your hold at a station's pace, drawing 55 a second while it works",
+   "tradeOff": "Station-speed in-flight refiner",
    "family": "Refiners",
    "size": "Large · Block",
    "keyNumbers": "1x speed · any grade · draws 55 working",
@@ -3398,7 +3398,7 @@
    "kind": "model",
    "name": "Accelerant Tank",
    "level": 24,
-   "order": 129,
+   "order": 128,
    "fn": "feed_tank_accelerant",
    "material": "steel",
    "piece": "sq",
@@ -3408,7 +3408,7 @@
     "h": 61
    },
    "licence": false,
-   "tradeOff": "A tank of Accelerant",
+   "tradeOff": "Feed: faster fire",
    "family": "Feed",
    "size": "Small · Square",
    "keyNumbers": "66 hp · armour 3",

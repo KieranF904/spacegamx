@@ -60,7 +60,7 @@ export class InventoryWindow {
     this.cargoBar.className = 'sgw-bar';
     this.cargoBar.innerHTML = '<i></i>';
     this.cargo = new ItemGrid({
-      econ, zone: 'cargo', empty: 'Your hold is empty. Mine asteroids and pick up loot to fill it.',
+      econ, zone: 'cargo', empty: 'Your cargo is empty. Mine asteroids and pick up loot to fill it.',
       onClick: (id, e) => this.move(id, 'storage', e),
       onContext: (id, e) => (this.pilot.atStation && !e.shiftKey ? this.moveOne(id, 'storage') : this.cargoMenu(id, e)),
       onDrop: (id, _from, e) => this.move(id, 'cargo', e),
@@ -142,8 +142,8 @@ export class InventoryWindow {
     const menu = this.pilot.atStation ? 'Shift-right-click' : 'Right-click';
     if (d?.category === 'consumable') return `${menu} → Use or put on the quick bar · drag onto the bar`;
     const cls = where === 'cargo' ? holdClassOf(this.pilot, id) : null;
-    const keep = cls === 'loadout' ? "Your ship's ammunition loadout: the storage controls leave it aboard, and its guns open it first. "
-      : cls === 'utility' ? 'Utility: the storage controls leave it aboard. ' : '';
+    const keep = cls === 'loadout' ? 'Ammo loadout: stays aboard when you store items, and your guns use it first. '
+      : cls === 'utility' ? 'Utility: stays aboard when you store items. ' : '';
     if (!this.pilot.atStation) return keep + (where === 'cargo' ? 'Dock at a station to move items to storage' : '');
     if (keep) return `${keep}Click to store it anyway`;
     return where === 'cargo' ? 'Click to store' : 'Click to load into cargo';
@@ -211,8 +211,8 @@ export class InventoryWindow {
     this.win.sub.textContent = p.atStation ? 'At a station' : 'In flight';
     // The controls as they are here (docked, clicks move things; in flight, only the item menu does anything)
     this.foot.textContent = p.atStation
-      ? 'Click: move stack · Ctrl-click: move ten · Right-click: move one · Shift-right-click: use, quick bar, jettison · Drag onto the quick bar to bind 1-5'
-      : 'Right-click an item: use, quick bar, jettison · Drag onto the quick bar to bind 1-5 · Dock to move things between cargo and storage';
+      ? 'Click: move stack · Ctrl-click: move 10 · Right-click: move 1 · Shift-right-click: use, quick bar, jettison · Drag onto the quick bar to bind it'
+      : 'Right-click an item: use, quick bar, jettison · Drag onto the quick bar to bind it · Dock to move items between cargo and storage';
     this.storeRow.replaceChildren(...(p.atStation && p.cargo.length ? [storeControls(p, this.send, this.sound)] : []));
     this.storage.setDimmed(!p.atStation);
     this.cargo.render(p.cargo, this.filter, this.search);

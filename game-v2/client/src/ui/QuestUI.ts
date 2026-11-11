@@ -185,9 +185,9 @@ export function rewardsHtml(pilot: PilotState, r: RewardView): string {
   if (r.xp) parts.push(`<span class="xp">${r.xp.toLocaleString()} XP</span>`);
   if (r.credits) parts.push(`<span class="cr">${r.credits.toLocaleString()} cr</span>`);
   if (Object.keys(r.items).length) parts.push(costHtml(pilot.econ, r.items));
-  for (const p of r.plans) parts.push(`<span class="pl">◆ Ship plan: ${esc(p)}</span>`);
-  for (const p of r.recipes) parts.push(`<span class="rc">⚙ ${esc(p)}</span>`);
-  for (const p of r.licences) parts.push(`<span class="li">⬡ ${esc(p)}</span>`);
+  for (const p of r.plans) parts.push(`<span class="pl">◆ Design: ${esc(p)}</span>`);
+  for (const p of r.recipes) parts.push(`<span class="rc">⚙ Recipe: ${esc(p)}</span>`);
+  for (const p of r.licences) parts.push(`<span class="li">⬡ Licence: ${esc(p)}</span>`);
   if (r.skillPoints) parts.push(`<span class="xp">+${r.skillPoints} skill point${r.skillPoints > 1 ? 's' : ''}</span>`);
   for (const [f, n] of Object.entries(r.reputation)) parts.push(`<span class="rp">+${n} ${esc(f)}</span>`);
   return `<div class="qr">${parts.join('')}</div>`;
@@ -738,7 +738,7 @@ class QuestLogWindow {
       ab.className = 'sgw-btn';
       ab.style.color = '#fca5a5';
       ab.textContent = this.sure === x.id ? 'Really abandon?' : 'Abandon';
-      ab.title = x.person ? `${x.person} will offer it again` : x.chain === 'fleet' ? 'Led by you: called off for the whole party. Otherwise you leave and the party carries on' : '';
+      ab.title = x.person ? `${x.person} will offer it again` : x.chain === 'fleet' ? 'If you lead, abandoning cancels it for the whole party. Otherwise you leave and the party carries on' : '';
       ab.onclick = () => {
         if (this.sure === x.id) { this.sure = null; this.q.abandon(x.id); return; }
         this.sure = x.id;

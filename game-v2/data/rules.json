@@ -10,7 +10,7 @@
     "profiles": {
       "selene": {
         "name": "Scrap Tide",
-        "about": "Scrapborn down three lanes from their scrapyards: slow, but more every night, and their hulks soak up fire",
+        "about": "Scrapborn come down three lanes from their scrapyards. Slow, but more each night, and their hulks take a lot of fire",
         "difficulty": 1,
         "roster": [
           {
@@ -152,7 +152,7 @@
       },
       "rimeholt": {
         "name": "Whiteout",
-        "about": "Everything comes out of the north in a blizzard front: frost ships that fight from range, and bulwarks that shrug off fire",
+        "about": "Everything comes from the north: frost ships that fight from range, and bulwarks that take a lot of fire",
         "difficulty": 1.15,
         "roster": [
           {
@@ -262,7 +262,7 @@
       },
       "cinderhold": {
         "name": "Ember Rush",
-        "about": "Cinder zealots rush in from every side, a stream of them all night: short reach, but they never stop coming",
+        "about": "Cinder zealots rush in from every side all night. Short range, but they keep coming",
         "difficulty": 1.3,
         "roster": [
           {
@@ -364,7 +364,7 @@
       },
       "lastlight": {
         "name": "The Maw's Pincer",
-        "about": "The Maw's things close from two opposite sides by turns: split your guns, or lose a flank",
+        "about": "Maw ships attack from two opposite sides in turns. Split your guns between them",
         "difficulty": 1.45,
         "roster": [
           {
@@ -459,7 +459,7 @@
       },
       "gloam": {
         "name": "Shadowfall",
-        "about": "Wraiths slip out of the dark close in, anywhere: the bastion gets little warning, and they are few but deadly",
+        "about": "Wraiths appear close to the bastion, from any side, with little warning. Few, but strong",
         "difficulty": 1.8,
         "roster": [
           {

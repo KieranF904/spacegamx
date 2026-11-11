@@ -23,7 +23,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A fast cell
+Fast-release power store
 
 == keyStats ==
 holds 120
@@ -35,7 +35,7 @@ holds 120
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 14","why":"Learned at level 14 (you're 4)"}
+{"open":false,"badge":"Lv 14","why":"Unlocks at level 14 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 14","why":""}

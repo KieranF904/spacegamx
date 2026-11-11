@@ -7,7 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage25/s · reach 7,650
 Hits withThermal · penetration 3
 Beamheld while you fire · draws its power while it's on
-Modelbeam: Burns energy every second you hold it.
+Modelbeam: Uses power every second you hold it.
 MountTurret, 360°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw15/s
@@ -45,7 +45,7 @@ Side mount (flippable)
 Bolts on at its side only
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 26","why":"Learned at level 26 (you're 4)"}
+{"open":false,"badge":"Lv 26","why":"Unlocks at level 26 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 26","why":""}

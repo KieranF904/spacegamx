@@ -57,15 +57,15 @@ describe('model cards', () => {
     const lock = modelLock(rail, false, 4, all);
     expect(lock.open).toBe(false);
     expect(lock.badge).toBe(`Lv ${rail.unlock!.level}`);
-    expect(lock.why).toBe(`Learned at level ${rail.unlock!.level} (you're 4)`);
+    expect(lock.why).toBe(`Unlocks at level ${rail.unlock!.level} (you're 4)`);
     expect(modelLock(rail, true, 20, all).open).toBe(true);
     // A legendary, and a shield: their level alone
     const hive = models.find((f) => f.rarity === 'legendary' && f.family === 'hive')!;
     const hl = modelLock(hive, false, 4, all);
     expect(hl.badge).toBe(`Lv ${hive.unlock!.level}`);
-    expect(hl.why).toBe(`Learned at level ${hive.unlock!.level} (you're 4)`);
+    expect(hl.why).toBe(`Unlocks at level ${hive.unlock!.level} (you're 4)`);
     const shield = fn('shield_deflector');
-    expect(modelLock(shield, false, 4, all).why).toBe(`Learned at level ${shield.unlock!.level} (you're 4)`);
+    expect(modelLock(shield, false, 4, all).why).toBe(`Unlocks at level ${shield.unlock!.level} (you're 4)`);
     for (const m of models) expect(m.unlock?.level, m.id).toBeTypeOf('number');
   });
 });

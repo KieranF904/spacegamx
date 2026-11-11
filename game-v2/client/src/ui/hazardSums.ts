@@ -36,7 +36,7 @@ export function coldRow(rating: number, ship: ShipDerived | null): string {
   if (!w) return `<div class="t-row"><b>${NAME.cryo}</b> ${rating}</div>`;
   const ins = ship ? insulationOf(ship) : 0;
   const mins = (s: number) => `${Math.round(s / 60 * 2) / 2} min`;
-  const yours = ship ? ` · your ship freezes through in about ${mins(secondsToFreeze(w, rating, ins))} away from heat${ins > 0.005 ? ` (its insulation keeps out ${Math.round(ins * 100)}% of the cold)` : ''}`
-    : ` · about ${mins(secondsToFreeze(w, rating, 0))} from warm to frozen through away from heat`;
-  return `<div class="t-row"><b>${NAME.cryo}</b> ${rating}${yours}<div style="color:#9fd8ff; margin-left:10px">Stars, stations and fires warm you back up</div></div>`;
+  const yours = ship ? ` · away from heat your ship freezes in about ${mins(secondsToFreeze(w, rating, ins))}${ins > 0.005 ? ` (insulation keeps out ${Math.round(ins * 100)}% of the cold)` : ''}`
+    : ` · away from heat a ship freezes in about ${mins(secondsToFreeze(w, rating, 0))}`;
+  return `<div class="t-row"><b>${NAME.cryo}</b> ${rating}${yours}<div style="color:#9fd8ff; margin-left:10px">Stars, stations and fires warm you up</div></div>`;
 }

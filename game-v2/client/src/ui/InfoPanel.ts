@@ -31,7 +31,7 @@ const ROCK_NAMES: Record<string, string> = {
   asteroid_crystal: 'Crystal asteroid', asteroid_mega: 'Dense asteroid', comet: 'Comet',
 };
 const ORE_HARDNESS = miningTable.oreHardness as Record<string, number>;
-const TOOLS_FOR: Record<number, string> = { 2: 'a mining laser or laser', 3: 'a titanium-grade miner or lance' };
+const TOOLS_FOR: Record<number, string> = { 2: 'a mining laser, Bore or laser', 3: 'mining charges, a railgun or a lance' };
 
 /** A rough share, as a glance gives it */
 function amount(w: number): string {
@@ -218,7 +218,7 @@ export class InfoPanel {
     const ores = Object.entries(c.ores).sort((a, b) => b[1] - a[1]).filter(([, w]) => w >= 0.02);
     const hardest = Math.max(c.hardness, ...ores.map(([id]) => ORE_HARDNESS[id] ?? 1));
     // An outlier: mined down a stage at a time
-    const st = c.stage ? `<div class="hard">Outlier · stage ${c.stage.at + 1} of ${c.stage.of}: mined down, it breaks into a smaller rock</div>` : '';
+    const st = c.stage ? `<div class="hard">Outlier · stage ${c.stage.at + 1} of ${c.stage.of}: mine it down and it breaks into a smaller rock</div>` : '';
     return `<div class="t"><span>${c.stage ? 'OUTLIER' : 'ASTEROID'}</span><span>${this.distance(e)}</span></div>
       <div class="n">${esc((miningTable.types as Record<string, { name?: string }>)[c.type]?.name ?? ROCK_NAMES[c.type] ?? 'Asteroid')}<span>~${c.units} ore</span></div>
       ${ores.map(([id, w]) => {
@@ -227,7 +227,7 @@ export class InfoPanel {
         const pct = Math.max(5, Math.round(w * 20) * 5);
         return `<div class="ore">${esc(this.d.itemName(id))}${hard}<div class="bar"><i style="width:${pct}%"></i></div><em>${amount(w)}</em></div>`;
       }).join('')}
-      ${c.hardness >= 2 ? `<div class="hard">${'▲'.repeat(c.hardness)} Hard rock: mine it with ${TOOLS_FOR[c.hardness] ?? 'a heavy miner'}</div>`
+      ${c.hardness >= 2 ? `<div class="hard">${'▲'.repeat(c.hardness)} Hard rock: needs ${TOOLS_FOR[c.hardness] ?? 'a heavy miner'}</div>`
         : hardest >= 2 ? `<div class="hard">▲ marks ore that needs ${TOOLS_FOR[hardest] ?? 'a heavy miner'}</div>` : ''}
       ${st}<div class="k">A scanner reads exact shares and gem seams</div>`;
   }

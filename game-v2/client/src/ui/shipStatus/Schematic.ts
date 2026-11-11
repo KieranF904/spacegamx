@@ -15,11 +15,11 @@ import { functionColor, hpColor, mix, numToCss } from '../../ships/shipColors';
 import type { PartStatus, ShipStatus } from './source';
 
 export const LEGEND =
-  'Tint: part health (green to red, dashed: lost).\n' +
-  'Fill: stored charge, or a gun reloading / charging (full: ready).\n' +
-  'Ticks: rounds in the clip.   Flash: a shot.   Glow: thrusting, a lit beam, a generator.\n' +
+  'Colour: part health (green to red; dashed: destroyed).\n' +
+  'Fill: stored charge, or a gun reloading or charging (full: ready).\n' +
+  'Ticks: shots left in the clip.   Flash: a shot.   Glow: thrusting, a beam firing, a generator.\n' +
   'Dim: out of ammo or shield down.\n' +
-  'Blue filling: the part your fabricator is building (amber: repairing).   Orange dashed: being recycled.';
+  'Blue fill: being built by your fabricator (amber: being repaired).   Orange dashed: being recycled.';
 
 /** Field work to show (client/src/ships/field/bridge.ts fieldHudMarks): the part being built or repaired (-1: none), how far, and parts being recycled */
 export interface SchematicMarks { build: number; k: number; repair: boolean; recycle: ReadonlySet<number> }

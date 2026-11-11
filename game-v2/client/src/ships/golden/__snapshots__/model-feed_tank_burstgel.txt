@@ -22,7 +22,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A tank of Burst Gel
+Feed: stronger boost
 
 == keyStats ==
 66 hp · armour 3
@@ -34,7 +34,7 @@ A tank of Burst Gel
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+{"open":false,"badge":"Lv 22","why":"Unlocks at level 22 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 22","why":""}

@@ -7,7 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage69/s · reach 5,700
 Hits withKinetic · penetration 4
 Fire rate1.4/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
 Power draw36/s
@@ -31,7 +31,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-The two-input gun
+Feed-fired heavy cannon
 
 == keyStats ==
 69 dmg/s · reach 5,700 · cycle · draws 36
@@ -45,7 +45,7 @@ Bolts on from behind only
 Needs 2 clear cells ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+{"open":false,"badge":"Lv 18","why":"Unlocks at level 18 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 18","why":""}

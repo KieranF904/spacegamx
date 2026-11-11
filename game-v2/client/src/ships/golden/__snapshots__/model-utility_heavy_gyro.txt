@@ -26,7 +26,7 @@ Large
 Large · Block
 
 == tradeOff ==
-A big reaction wheel for big ships
+Big turning force
 
 == keyStats ==
 +28,000 turning · draws 48 turning
@@ -38,7 +38,7 @@ A big reaction wheel for big ships
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 20","why":"Learned at level 20 (you're 4)"}
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 20","why":""}

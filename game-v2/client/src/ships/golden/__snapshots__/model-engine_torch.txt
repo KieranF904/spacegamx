@@ -25,7 +25,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-full thrust all the time, no boost, burns energy
+full thrust all the time, no boost, burns power
 
 == keyStats ==
 thrust 8.0 · top 4,200 m/s · draws 68
@@ -37,7 +37,7 @@ thrust 8.0 · top 4,200 m/s · draws 68
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+{"open":false,"badge":"Lv 8","why":"Unlocks at level 8 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 8","why":""}

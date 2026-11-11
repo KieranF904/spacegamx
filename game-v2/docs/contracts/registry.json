@@ -152,9 +152,9 @@
       "id": "client.app.server-messages",
       "path": "client/src/app/serverMessages.ts",
       "group": "client/app",
-      "lines": 500,
+      "lines": 503,
       "owns": "the table of server messages Game handles itself, keyed by message type, read through MessageHost",
-      "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores",
+      "needs": "@space-game/common ServerMessage, MessageHost (getters over Game), ShipClient for ship messages, feature and ui stores, input/keybindings fillKeyNames (a toast's {actionId} key slots)",
       "events": "",
       "invariants": [
         {
@@ -176,86 +176,86 @@
         {
           "name": "MessageHost",
           "kind": "interface",
-          "start": 77,
-          "end": 131
+          "start": 79,
+          "end": 133
         },
         {
           "name": "Msg",
           "kind": "type",
-          "start": 133,
-          "end": 133
+          "start": 135,
+          "end": 135
         },
         {
           "name": "Handler",
           "kind": "type",
-          "start": 134,
-          "end": 134
+          "start": 136,
+          "end": 136
         },
         {
           "name": "Handlers",
           "kind": "type",
-          "start": 135,
-          "end": 137
+          "start": 137,
+          "end": 139
         },
         {
           "name": "welcome",
           "kind": "function",
-          "start": 139,
-          "end": 158
+          "start": 141,
+          "end": 160
         },
         {
           "name": "pong",
           "kind": "function",
-          "start": 160,
-          "end": 164
+          "start": 162,
+          "end": 166
         },
         {
           "name": "playerState",
           "kind": "function",
-          "start": 166,
-          "end": 211
+          "start": 168,
+          "end": 213
         },
         {
           "name": "systemInfo",
           "kind": "function",
-          "start": 213,
-          "end": 224
+          "start": 215,
+          "end": 226
         },
         {
           "name": "gained",
           "kind": "function",
-          "start": 226,
-          "end": 244
+          "start": 228,
+          "end": 246
         },
         {
           "name": "damage",
           "kind": "function",
-          "start": 246,
-          "end": 280
+          "start": 248,
+          "end": 282
         },
         {
           "name": "death",
           "kind": "function",
-          "start": 282,
-          "end": 300
+          "start": 284,
+          "end": 302
         },
         {
           "name": "TABLE",
           "kind": "const",
-          "start": 302,
-          "end": 490
+          "start": 304,
+          "end": 493
         },
         {
           "name": "HANDLERS",
           "kind": "const",
-          "start": 492,
-          "end": 493
+          "start": 495,
+          "end": 496
         },
         {
           "name": "handleServerMessage",
           "kind": "function",
-          "start": 495,
-          "end": 500
+          "start": 498,
+          "end": 503
         }
       ]
     },

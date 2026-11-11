@@ -36,9 +36,9 @@ export function questRewardLines(r: RewardView, names: RewardNames): RewardLine[
   if (r.xp) out.push({ kind: 'xp', label: 'XP', count: r.xp });
   for (const [id, n] of Object.entries(r.items)) out.push({ kind: 'item', label: names.item(id), count: n, icon: names.icon?.(id) });
   if (r.skillPoints) out.push({ kind: 'skill', label: r.skillPoints > 1 ? 'skill points' : 'skill point', count: r.skillPoints });
-  for (const [f, n] of Object.entries(r.reputation)) out.push({ kind: 'rep', label: `${f} standing`, count: n });
-  for (const p of r.plans) out.push({ kind: 'unlock', label: `Ship plan: ${p}` });
-  for (const p of r.recipes) out.push({ kind: 'unlock', label: `Fabrication: ${p}` });
+  for (const [f, n] of Object.entries(r.reputation)) out.push({ kind: 'rep', label: `${f} reputation`, count: n });
+  for (const p of r.plans) out.push({ kind: 'unlock', label: `Design: ${p}` });
+  for (const p of r.recipes) out.push({ kind: 'unlock', label: `Recipe: ${p}` });
   for (const p of r.licences) out.push({ kind: 'unlock', label: `Licence: ${p}` });
   return out;
 }

@@ -20,7 +20,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A pipe
+Joins feed parts
 
 == keyStats ==
 38 hp · armour 1
@@ -32,7 +32,7 @@ A pipe
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+{"open":false,"badge":"Lv 10","why":"Unlocks at level 10 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 10","why":""}

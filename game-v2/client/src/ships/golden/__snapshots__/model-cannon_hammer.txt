@@ -6,7 +6,7 @@ Armour · build1 · 2 pts
 Damage88/s · reach 5,700
 Hits withKinetic · penetration 2
 Fire rate1.0/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw10/s
@@ -43,7 +43,7 @@ Bolts on from behind only
 Needs 1 clear cell ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 6","why":"Learned at level 6 (you're 4)"}
+{"open":false,"badge":"Lv 6","why":"Unlocks at level 6 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 6","why":""}

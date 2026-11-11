@@ -40,7 +40,7 @@
         "leash": 8000,
         "accuracy": 0.85
       },
-      "intro": "Something huge and patched together heaves up out of the scrap heap at the heart of the rock. The Scrap Mother wakes, and the nest swarms with drones.",
+      "intro": "The Scrap Mother heaves up out of the scrap heap at the heart of the rock, and the nest swarms with drones.",
       "phases": [
         {
           "at": 0.667,
@@ -245,7 +245,7 @@
     },
     "boss_hushwing": {
       "name": "Hushwing",
-      "title": "Eldest of the Brood",
+      "title": "Eldest of the Brood, crews say",
       "faction": "frost",
       "system": "borealis",
       "lair": {
@@ -267,7 +267,7 @@
         "leash": 8000,
         "accuracy": 0.91
       },
-      "intro": "The aurora folds back like a curtain. Something old and pale spreads its wings in the light: the Hushwing, eldest of the Brood, and it doesn't care to be found.",
+      "intro": "The aurora folds back. Something big and pale spreads its wings in the light: the Hushwing, the eldest of the Brood if the old crews are right.",
       "phases": [
         {
           "at": 0.75,
@@ -286,7 +286,7 @@
         },
         {
           "at": 0.25,
-          "say": "Cold light gathers on its wings: it sheds it in a storm of frost!",
+          "say": "Cold light gathers on its wings and bursts out in EMP pulses.",
           "nova": {
             "every": 480,
             "kind": "emp",
@@ -368,7 +368,7 @@
         },
         {
           "at": 0.4,
-          "say": "The Colossus flares: a storm of crystal shards!",
+          "say": "The Colossus speeds up and fires crystal shards in every direction.",
           "nova": {
             "every": 360,
             "kind": "prism_shard",
@@ -441,7 +441,7 @@
         },
         {
           "at": 0.5,
-          "say": "The Warden's furnace roars: flak bursts in every direction!",
+          "say": "The Warden speeds up and fires flak in every direction.",
           "enrage": 1.3,
           "nova": {
             "every": 360,
@@ -482,7 +482,7 @@
     },
     "boss_void_leviathan": {
       "name": "Void Leviathan",
-      "title": "Where the heartbeat echoes",
+      "title": "Where pilots say the heartbeat echoes",
       "faction": "wraiths",
       "system": "void_sector",
       "lair": {
@@ -522,7 +522,7 @@
         },
         {
           "at": 0.3,
-          "say": "The Leviathan screams: an EMP storm!",
+          "say": "The Leviathan speeds up and fires EMP pulses in every direction.",
           "nova": {
             "every": 420,
             "kind": "emp",
@@ -562,7 +562,7 @@
     },
     "boss_maw_heart": {
       "name": "Heart of the Maw",
-      "title": "Where the heartbeat is loudest",
+      "title": "Where pilots say the heartbeat is loudest",
       "faction": "maw",
       "system": "the_maw",
       "lair": {
@@ -583,11 +583,11 @@
         "leash": 3500,
         "accuracy": 0.8
       },
-      "intro": "Every receiver aboard fills with the heartbeat, as loud as it gets. Then the Heart of the Maw beats, and every hull in the system shudders. It looks grown, not built, out of the shard ring's dark rock; only its vents are open.",
+      "intro": "Every receiver aboard fills with the heartbeat. The Heart of the Maw beats, and every hull in the system shudders. Only its vents are open.",
       "phases": [
         {
           "at": 0.97,
-          "say": "The Heart beats. Its vents glow where the plating parts: four channels in, along its axes.",
+          "say": "Four vents glow where its plating parts, one along each axis.",
           "nova": {
             "every": 1500,
             "kind": "cannon",
@@ -605,7 +605,7 @@
         },
         {
           "at": 0.55,
-          "say": "The Heart bends space: singularities bloom around it!",
+          "say": "The Heart throws singularities out around itself.",
           "nova": {
             "every": 900,
             "kind": "singularity",
@@ -624,7 +624,7 @@
         },
         {
           "at": 0.15,
-          "say": "The Heart is failing. It beats faster, and everything burns!",
+          "say": "The Heart is failing. It speeds up and fires missiles in every direction.",
           "enrage": 1.3,
           "nova": {
             "every": 600,
@@ -701,7 +701,7 @@
         },
         {
           "at": 0.3,
-          "say": "The Warden's furnace roars: flak in every direction!",
+          "say": "The Warden speeds up and fires flak in every direction.",
           "enrage": 1.25,
           "nova": {
             "every": 420,

@@ -70,7 +70,7 @@
       "rarity": "uncommon",
       "value": 10,
       "color": "#90a4ae",
-      "description": "Hard ore: it needs a strong mining laser. Refined into light, tough plate.",
+      "description": "Hard ore that needs a strong mining laser. Refined into light, tough plate.",
       "family": "exotic",
       "tier": 3,
       "short": "Titanium"
@@ -171,7 +171,7 @@
       "rarity": "common",
       "value": 8,
       "color": "#7a6450",
-      "description": "Dense iron ore, thickest in the Maw. Refined into ferrite plate.",
+      "description": "Dense iron ore, found mostly in the Maw. Refined into ferrite plate.",
       "family": "ferrous",
       "tier": 3,
       "short": "Ferrite"
@@ -183,7 +183,7 @@
       "rarity": "uncommon",
       "value": 16,
       "color": "#5a5f6b",
-      "description": "Chromium ore. Hardens steel for railgun barrels and armour-piercing slugs.",
+      "description": "Chromium ore, used to harden steel.",
       "family": "ferrous",
       "tier": 4,
       "short": "Chromite"
@@ -195,7 +195,7 @@
       "rarity": "rare",
       "value": 60,
       "color": "#ffd54f",
-      "description": "A trace metal found by refining copper ore. A very good conductor.",
+      "description": "Not mined. Comes from refining copper ore. A very good conductor.",
       "family": "noble",
       "tier": 2,
       "short": "Aurum",
@@ -209,7 +209,7 @@
       "rarity": "rare",
       "value": 90,
       "color": "#e3ecf4",
-      "description": "A trace metal found by refining ice and volatile ore. Very dense; stops radiation.",
+      "description": "Not mined. Comes from refining ice and volatile ore. Very dense; stops radiation.",
       "family": "noble",
       "tier": 3,
       "short": "Iridium",
@@ -223,7 +223,7 @@
       "rarity": "uncommon",
       "value": 30,
       "color": "#c9cbd8",
-      "description": "Platinum-group ore from the Void. Refined into catalyst, for seeker missiles and torpedoes.",
+      "description": "Platinum-group ore from the Void. Refined into catalyst.",
       "family": "noble",
       "tier": 4,
       "short": "Platinoid"
@@ -235,7 +235,7 @@
       "rarity": "rare",
       "value": 70,
       "color": "#7fe0ff",
-      "description": "A trace glass found by refining crystal ore, richest in gem seams.",
+      "description": "Not mined. Comes from refining crystal ore, most of all in gem seams.",
       "family": "crystalline",
       "tier": 3,
       "short": "Voidglass",
@@ -249,7 +249,7 @@
       "rarity": "common",
       "value": 4,
       "color": "#c5e1a5",
-      "description": "Frozen fuel from ice bodies, thickest in Borealis. Refined into propellant.",
+      "description": "Frozen fuel from ice bodies, most of all in Borealis. Refined into propellant.",
       "family": "volatile",
       "tier": 2,
       "short": "Hydrazine",
@@ -288,7 +288,7 @@
       "rarity": "uncommon",
       "value": 14,
       "color": "#b2ebf2",
-      "description": "Siphoned from drifting gas pockets, not mined. Refined into cryogen, for chaff canisters and cryo missiles.",
+      "description": "Collected from drifting gas pockets with a siphon, not mined. Refined into cryogen.",
       "family": "volatile",
       "tier": 3,
       "short": "Cryo gas"
@@ -300,7 +300,7 @@
       "rarity": "epic",
       "value": 400,
       "color": "#5e35b1",
-      "description": "A trace material found by refining the mega rocks of the Maw and the Void.",
+      "description": "Not mined. Comes from refining the mega rocks of the Maw and the Void.",
       "family": "exotic",
       "tier": 5,
       "short": "Singularity",
@@ -314,7 +314,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#7dd3fc",
-      "description": "For a weapon's socket: Hits chill (0.3 a hit): a chilled-through ship seizes up for a moment. −15% damage.",
+      "description": "Weapon socket gem. Hits chill the target; enough chill freezes it for a moment. −15% damage.",
       "socket": {
         "type": "frost",
         "level": 1
@@ -327,7 +327,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#7dd3fc",
-      "description": "For a weapon's socket: Hits chill (0.6 a hit). −15% damage.",
+      "description": "Weapon socket gem. Hits chill the target twice as fast as Frost Gem I. −15% damage.",
       "socket": {
         "type": "frost",
         "level": 2
@@ -340,7 +340,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#fb923c",
-      "description": "For a weapon's socket: Hits set the part burning. −20% rate of fire.",
+      "description": "Weapon socket gem. Hits set the part burning. −20% rate of fire.",
       "socket": {
         "type": "ember",
         "level": 1
@@ -353,7 +353,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#fb923c",
-      "description": "For a weapon's socket: Hits set the part (and its neighbours) burning. −20% rate of fire.",
+      "description": "Weapon socket gem. Hits set the part and its neighbours burning. −20% rate of fire.",
       "socket": {
         "type": "ember",
         "level": 2
@@ -366,7 +366,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#a5f3fc",
-      "description": "For a weapon's socket: Shots shatter into 2 shards on a hit. −30% range.",
+      "description": "Weapon socket gem. Shots split into 2 shards when they hit. −30% range.",
       "socket": {
         "type": "splitter",
         "level": 1
@@ -379,7 +379,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#a5f3fc",
-      "description": "For a weapon's socket: Shots shatter into 3 shards on a hit. −30% range.",
+      "description": "Weapon socket gem. Shots split into 3 shards when they hit. −30% range.",
       "socket": {
         "type": "splitter",
         "level": 2
@@ -392,7 +392,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#e2e8f0",
-      "description": "For a weapon's socket: +25% range. Beams run 50% hotter.",
+      "description": "Weapon socket gem. +25% range.",
       "socket": {
         "type": "lance_core",
         "level": 1
@@ -405,7 +405,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#e2e8f0",
-      "description": "For a weapon's socket: +40% range, and shots pierce one more. Beams run 50% hotter.",
+      "description": "Weapon socket gem. +40% range, and shots pierce one more part.",
       "socket": {
         "type": "lance_core",
         "level": 2
@@ -418,7 +418,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#facc15",
-      "description": "For a weapon's socket: Shots drag ships near them in. −25% shot speed.",
+      "description": "Weapon socket gem. Shots pull nearby ships toward them. −25% shot speed.",
       "socket": {
         "type": "grapple",
         "level": 1
@@ -431,7 +431,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#facc15",
-      "description": "For a weapon's socket: Shots drag ships in hard. −25% shot speed.",
+      "description": "Weapon socket gem. Shots pull nearby ships toward them hard. −25% shot speed.",
       "socket": {
         "type": "grapple",
         "level": 2
@@ -444,7 +444,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#fde047",
-      "description": "For a weapon's socket: +1 shot a volley. Wider spread.",
+      "description": "Weapon socket gem. +1 shot a volley. Wider spread.",
       "socket": {
         "type": "scatter",
         "level": 1
@@ -457,7 +457,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#fde047",
-      "description": "For a weapon's socket: +2 shots a volley. Wider spread.",
+      "description": "Weapon socket gem. +2 shots a volley. Wider spread.",
       "socket": {
         "type": "scatter",
         "level": 2
@@ -470,7 +470,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#a1887f",
-      "description": "For a weapon's socket: +15% part HP. −10% damage.",
+      "description": "Weapon socket gem. +15% part HP. −10% damage.",
       "socket": {
         "type": "keel",
         "level": 1
@@ -483,7 +483,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#a1887f",
-      "description": "For a weapon's socket: +25% part HP. −10% damage.",
+      "description": "Weapon socket gem. +25% part HP. −10% damage.",
       "socket": {
         "type": "keel",
         "level": 2
@@ -496,7 +496,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#67e8f9",
-      "description": "For a weapon's socket: −10% spread. −10% rate of fire.",
+      "description": "Weapon socket gem. −10% spread. −10% rate of fire.",
       "socket": {
         "type": "sight",
         "level": 1
@@ -509,7 +509,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#67e8f9",
-      "description": "For a weapon's socket: −20% spread. −10% rate of fire.",
+      "description": "Weapon socket gem. −20% spread. −10% rate of fire.",
       "socket": {
         "type": "sight",
         "level": 2
@@ -522,7 +522,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#f87171",
-      "description": "For a weapon's socket: +15% rate of fire. Beams run 40% hotter.",
+      "description": "Weapon socket gem. +15% rate of fire.",
       "socket": {
         "type": "overdrive",
         "level": 1
@@ -535,7 +535,7 @@
       "rarity": "rare",
       "value": 450,
       "color": "#f87171",
-      "description": "For a weapon's socket: +25% rate of fire. Beams run 40% hotter.",
+      "description": "Weapon socket gem. +25% rate of fire.",
       "socket": {
         "type": "overdrive",
         "level": 2
@@ -548,7 +548,7 @@
       "rarity": "common",
       "value": 9,
       "color": "#8fa3bf",
-      "description": "Standard hull plating. Iron and nickel."
+      "description": "Mk I hull plate, made from iron and nickel."
     },
     {
       "id": "steel_plate",
@@ -557,7 +557,7 @@
       "rarity": "common",
       "value": 12,
       "color": "#9aa0a6",
-      "description": "Mk II plating stock."
+      "description": "Mk II hull plate."
     },
     {
       "id": "composite_sheet",
@@ -576,7 +576,7 @@
       "rarity": "uncommon",
       "value": 24,
       "color": "#cfd8dc",
-      "description": "Mk III plating stock: light and very tough."
+      "description": "Mk III hull plate. Light and very tough."
     },
     {
       "id": "copper_wire",
@@ -585,7 +585,7 @@
       "rarity": "common",
       "value": 4,
       "color": "#ff9e5e",
-      "description": "Power runs. Every working part needs some."
+      "description": "Carries power. Every working part needs some."
     },
     {
       "id": "crystal_lens",
@@ -603,7 +603,7 @@
       "rarity": "rare",
       "value": 50,
       "color": "#7986cb",
-      "description": "Mk IV plating stock, and reactors and heavy cores."
+      "description": "Mk IV hull plate, also used in reactors and heavy cores."
     },
     {
       "id": "neutronium_plate",
@@ -612,7 +612,7 @@
       "rarity": "epic",
       "value": 95,
       "color": "#b48cf2",
-      "description": "Mk V plating stock: the toughest there is.",
+      "description": "Mk V hull plate. The toughest.",
       "mass": 0.18
     },
     {
@@ -622,7 +622,7 @@
       "rarity": "common",
       "value": 5,
       "color": "#81d4fa",
-      "description": "Chilled ice. Used in flak canisters, ceramic laminate and gem cutting.",
+      "description": "Chilled ice, used in ammo, plating and gem cutting.",
       "mass": 0.04
     },
     {
@@ -632,7 +632,7 @@
       "rarity": "uncommon",
       "value": 26,
       "color": "#8d7b6a",
-      "description": "Mass-anchor plating: the slowest hull there is, and nothing tosses it."
+      "description": "Very heavy plating. Slows your ship, but gravity wells pull it far less."
     },
     {
       "id": "hardened_steel",
@@ -641,7 +641,7 @@
       "rarity": "uncommon",
       "value": 44,
       "color": "#78838f",
-      "description": "Steel hardened with chromium. Used in tungsten railgun slugs."
+      "description": "Steel hardened with chromium, used in Tungsten Slugs."
     },
     {
       "id": "aurum_ingot",
@@ -650,7 +650,7 @@
       "rarity": "rare",
       "value": 75,
       "color": "#ffca28",
-      "description": "Refined aurum. Used in conductive steel and aurum-tipped slugs, and to cut Ember, Grapple, Scatter and Overdrive gems.",
+      "description": "Refined aurum, used in conductive plating, slugs and gem cutting.",
       "mass": 0.12
     },
     {
@@ -660,7 +660,7 @@
       "rarity": "rare",
       "value": 110,
       "color": "#eceff1",
-      "description": "Refined pale iridium. Used in leaded iridium plating and to cut Lance Core gems.",
+      "description": "Refined pale iridium, used in radiation plating and gem cutting.",
       "mass": 0.15
     },
     {
@@ -670,7 +670,7 @@
       "rarity": "uncommon",
       "value": 100,
       "color": "#d1d5e8",
-      "description": "Refined from platinoid ore. Used in seeker missiles and torpedoes."
+      "description": "Refined from platinoid ore, used in seeker missiles and torpedoes."
     },
     {
       "id": "voidglass_pane",
@@ -679,7 +679,7 @@
       "rarity": "rare",
       "value": 90,
       "color": "#a5f0ff",
-      "description": "A rigid laminate. Used in ceramic and sealed composite plating, and to cut Frost and Splitter gems."
+      "description": "A rigid laminate, used in plating and gem cutting."
     },
     {
       "id": "hush_pane",
@@ -697,7 +697,7 @@
       "rarity": "common",
       "value": 9,
       "color": "#dce775",
-      "description": "Fuel for missiles, torpedoes, mortar shells, mining charges and incendiary flak.",
+      "description": "Fuel for launched ammo such as missiles, torpedoes and mortar shells.",
       "mass": 0.04
     },
     {
@@ -707,7 +707,7 @@
       "rarity": "uncommon",
       "value": 35,
       "color": "#a1887f",
-      "description": "Insulating hull plating: a hull of it builds up cold slower. Turns energy fire, but heat goes through it.",
+      "description": "Hull plating that slows cold build-up and resists energy weapons. Weak to heat.",
       "mass": 0.05
     },
     {
@@ -717,7 +717,7 @@
       "rarity": "uncommon",
       "value": 16,
       "color": "#e0f7fa",
-      "description": "Refined cryo gas. Used in chaff canisters and cryo missiles.",
+      "description": "Refined cryo gas, used in cold ammo.",
       "mass": 0.04
     },
     {
@@ -727,7 +727,7 @@
       "rarity": "epic",
       "value": 450,
       "color": "#7e57c2",
-      "description": "Refined singularity dust. Rare and valuable.",
+      "description": "Refined singularity dust. Rare; used in station upgrades.",
       "mass": 0.15
     },
     {
@@ -737,7 +737,7 @@
       "rarity": "rare",
       "value": 60,
       "color": "#c9a86a",
-      "description": "Steel alloyed with aurum: guns mounted in it recharge 15% faster."
+      "description": "Steel alloyed with aurum. Guns built from it recharge 15% faster."
     },
     {
       "id": "leaded_iridium_plate",
@@ -746,7 +746,7 @@
       "rarity": "rare",
       "value": 140,
       "color": "#dfe6ec",
-      "description": "Radiation plating: slow, heavy, and nearly proof against the Void.",
+      "description": "Heavy, slow plating that protects against radiation, as in the Void.",
       "mass": 0.15
     },
     {
@@ -756,7 +756,7 @@
       "rarity": "rare",
       "value": 110,
       "color": "#efe3cf",
-      "description": "Heat plating for Cinder and near-star work. Brittle: collisions hurt it double."
+      "description": "Heat plating for Cinder and close to stars. Brittle, so collisions do double damage."
     },
     {
       "id": "sealed_composite_plate",
@@ -765,7 +765,7 @@
       "rarity": "rare",
       "value": 120,
       "color": "#7fb3a0",
-      "description": "Corrosion plating for the nebula bands. Costly to repair."
+      "description": "Plating that resists corrosion in the nebula bands. Costly to repair."
     },
     {
       "id": "scrap_electronics",
@@ -783,7 +783,7 @@
       "rarity": "uncommon",
       "value": 30,
       "color": "#ffca28",
-      "description": "Drives turret rings and tractor arms."
+      "description": "Drives turret rings and tow arms."
     },
     {
       "id": "targeting_chip",
@@ -828,7 +828,7 @@
       "rarity": "epic",
       "value": 260,
       "color": "#e040fb",
-      "description": "The heart of capital-class cores."
+      "description": "A rare component for the most advanced weapons."
     },
     {
       "id": "void_ichor",
@@ -837,7 +837,7 @@
       "rarity": "rare",
       "value": 110,
       "color": "#7c4dff",
-      "description": "Dropped by wraiths."
+      "description": "Dropped by wraiths. Used to make the Phase Cannon."
     },
     {
       "id": "frost_gland",
@@ -846,7 +846,7 @@
       "rarity": "uncommon",
       "value": 40,
       "color": "#81d4fa",
-      "description": "Cryo organ from the Frost Brood."
+      "description": "A cryo organ dropped by the Frost Brood. Used to make the Frostbite Lance."
     },
     {
       "id": "cinder_ash",
@@ -864,7 +864,7 @@
       "rarity": "uncommon",
       "value": 60,
       "color": "#a8a29e",
-      "description": "A rifled barrel on a servo mount: cannons, autocannons, flak and mortars."
+      "description": "A rifled barrel on a servo mount, for shell-firing guns."
     },
     {
       "id": "coil_winding",
@@ -873,7 +873,7 @@
       "rarity": "uncommon",
       "value": 48,
       "color": "#d97706",
-      "description": "Copper wound on a ferrite core: railguns, arc and EMP projectors, jump coils."
+      "description": "Copper wound on a ferrite core, for railguns, arc and EMP guns and jump coils."
     },
     {
       "id": "capacitor_cell",
@@ -882,7 +882,7 @@
       "rarity": "uncommon",
       "value": 40,
       "color": "#38bdf8",
-      "description": "A fast-discharge cell: batteries, capacitors, pulse guns and lasers."
+      "description": "A fast-discharge cell, for power stores and energy weapons."
     },
     {
       "id": "thrust_nozzle",
@@ -891,7 +891,7 @@
       "rarity": "rare",
       "value": 85,
       "color": "#f97316",
-      "description": "A ceramic-lined titanium bell: torches, plasma and fusion drives."
+      "description": "A ceramic-lined titanium bell, for the bigger engines."
     },
     {
       "id": "fuel_injector",
@@ -900,7 +900,7 @@
       "rarity": "uncommon",
       "value": 55,
       "color": "#fb923c",
-      "description": "Meters propellant into a burn: afterburners and torches."
+      "description": "Feeds propellant into an engine burn, for afterburners and torches."
     },
     {
       "id": "reactor_core",
@@ -909,7 +909,7 @@
       "rarity": "rare",
       "value": 130,
       "color": "#facc15",
-      "description": "The heart of a generator past the cell reactor."
+      "description": "The core of the generators above the Cell Reactor."
     },
     {
       "id": "rustjaw_cog",
@@ -918,7 +918,7 @@
       "rarity": "legendary",
       "value": 1500,
       "color": "#ff8f00",
-      "description": "A drive cog from Rustjaw. A rare drop; Rustjaw's Hive can't be made without it."
+      "description": "Rare drop from Rustjaw. Needed to make Rustjaw's Hive."
     },
     {
       "id": "frost_heart",
@@ -927,7 +927,7 @@
       "rarity": "legendary",
       "value": 1800,
       "color": "#b3e5fc",
-      "description": "A core from the Hoarfrost Matriarch's wreck. A rare drop; the Frostbite Lance can't be made without it."
+      "description": "Rare drop from the Hoarfrost Matriarch. Needed to make the Frostbite Lance."
     },
     {
       "id": "cinder_ember",
@@ -936,7 +936,7 @@
       "rarity": "legendary",
       "value": 2000,
       "color": "#ff5722",
-      "description": "A coal from the Warden or the Pyreclast. A rare drop; the Cinder Bloom can't be made without it."
+      "description": "Rare drop from the Warden or the Pyreclast. Needed to make the Cinder Bloom."
     },
     {
       "id": "prism_shard",
@@ -945,7 +945,7 @@
       "rarity": "legendary",
       "value": 2200,
       "color": "#e1f5fe",
-      "description": "A shard from the Prism Colossus. A rare drop; the Prism Splitter can't be made without it."
+      "description": "Rare drop from the Prism Colossus. Needed to make the Prism Splitter."
     },
     {
       "id": "void_pearl",
@@ -954,7 +954,7 @@
       "rarity": "legendary",
       "value": 2600,
       "color": "#9575cd",
-      "description": "A pearl from the Void Leviathan's wreck. A rare drop; the Phase Cannon can't be made without it."
+      "description": "Rare drop from the Void Leviathan. Needed to make the Phase Cannon."
     },
     {
       "id": "maw_fragment",
@@ -963,7 +963,7 @@
       "rarity": "legendary",
       "value": 4000,
       "color": "#212121",
-      "description": "A fragment of the Heart of the Maw. A rare drop; the Singularity Launcher can't be made without it."
+      "description": "Rare drop from the Heart of the Maw. Needed to make the Singularity Launcher."
     },
     {
       "id": "ancient_relic",
@@ -981,7 +981,7 @@
       "rarity": "common",
       "value": 40,
       "color": "#9fb3c8",
-      "description": "A crate of 2 alloy plate, 2 composite sheet and 2 steel plate, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "description": "A crate of 2 alloy plate, 2 composite sheet and 2 steel plate, made at stations. For field repairs and field fabrication.",
       "pack": {
         "alloy_plate": 2,
         "composite_sheet": 2,
@@ -995,7 +995,7 @@
       "rarity": "common",
       "value": 35,
       "color": "#e0a458",
-      "description": "A crate of 4 copper wire and 2 insulated polymer, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "description": "A crate of 4 copper wire and 2 insulated polymer, made at stations. For field repairs and field fabrication.",
       "pack": {
         "copper_wire": 4,
         "insulated_polymer": 2
@@ -1008,7 +1008,7 @@
       "rarity": "uncommon",
       "value": 150,
       "color": "#7dd3fc",
-      "description": "A crate of 2 crystal lens, 2 capacitor cell and 2 power coupling, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "description": "A crate of 2 crystal lens, 2 capacitor cell and 2 power coupling, made at stations. For field repairs and field fabrication.",
       "pack": {
         "crystal_lens": 2,
         "capacitor_cell": 2,
@@ -1022,7 +1022,7 @@
       "rarity": "uncommon",
       "value": 260,
       "color": "#fcd34d",
-      "description": "A crate of 2 servo motor, 2 barrel assembly and 2 targeting chip, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "description": "A crate of 2 servo motor, 2 barrel assembly and 2 targeting chip, made at stations. For field repairs and field fabrication.",
       "pack": {
         "servo_motor": 2,
         "barrel_assembly": 2,
@@ -1036,7 +1036,7 @@
       "rarity": "rare",
       "value": 260,
       "color": "#94a3b8",
-      "description": "A crate of 2 titanium plate, 2 cobalt alloy and 2 hardened steel, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "description": "A crate of 2 titanium plate, 2 cobalt alloy and 2 hardened steel, made at stations. For field repairs and field fabrication.",
       "pack": {
         "titanium_plate": 2,
         "cobalt_alloy": 2,
@@ -1050,7 +1050,7 @@
       "rarity": "rare",
       "value": 300,
       "color": "#fb923c",
-      "description": "A crate of 2 fuel injector, 2 thrust nozzle and 2 coil winding, made at stations. In the field a fabricator takes one unit of any of them from it, 60% faster; in your repair bank it gives them all.",
+      "description": "A crate of 2 fuel injector, 2 thrust nozzle and 2 coil winding, made at stations. For field repairs and field fabrication.",
       "pack": {
         "fuel_injector": 2,
         "thrust_nozzle": 2,
@@ -1064,7 +1064,7 @@
       "rarity": "common",
       "value": 15,
       "color": "#42a5f5",
-      "description": "Refills your boost tank."
+      "description": "Refills your batteries."
     },
     {
       "id": "scanner_charge",
@@ -1082,7 +1082,7 @@
       "rarity": "common",
       "value": 30,
       "color": "#b0bec5",
-      "description": "A crate of 200 slugs for a railgun (a volley a slug). Made at any fabricator.",
+      "description": "A crate of 200 railgun slugs, one a shot. Made at any fabricator.",
       "ammoFor": {
         "weapon": "railgun",
         "rounds": 200
@@ -1108,7 +1108,7 @@
       "rarity": "common",
       "value": 50,
       "color": "#ef5350",
-      "description": "A crate of 24 missiles for a missile rack. Made at any fabricator.",
+      "description": "A crate of 24 missiles for missile launchers. Made at any fabricator.",
       "ammoFor": {
         "weapon": "missile",
         "rounds": 24
@@ -1121,7 +1121,7 @@
       "rarity": "uncommon",
       "value": 45,
       "color": "#90a4ae",
-      "description": "Railgun slugs that punch through one more part, for 25% less damage. 200 a crate.",
+      "description": "Railgun slugs that pierce one more part, for 25% less damage. 200 per crate.",
       "ammoFor": {
         "weapon": "railgun",
         "rounds": 200,
@@ -1142,7 +1142,7 @@
       "rarity": "uncommon",
       "value": 60,
       "color": "#78909c",
-      "description": "Heavy railgun slugs: 40% more damage, but only 100 a crate.",
+      "description": "Heavy railgun slugs. 40% more damage, but only 100 per crate.",
       "ammoFor": {
         "weapon": "railgun",
         "rounds": 100,
@@ -1160,7 +1160,7 @@
       "rarity": "uncommon",
       "value": 120,
       "color": "#ffca28",
-      "description": "Railgun slugs tipped in aurum: 25% more damage. Costly. 200 a crate.",
+      "description": "Railgun slugs tipped with aurum. 25% more damage. Costly. 200 per crate.",
       "ammoFor": {
         "weapon": "railgun",
         "rounds": 200,
@@ -1178,7 +1178,7 @@
       "rarity": "uncommon",
       "value": 55,
       "color": "#4fc3f7",
-      "description": "Railgun slugs with a cryogen core: 30% less damage, but 2.5 times that against Cinder Cult ships (not their great ones). 200 a crate. Pressed only by your own station's armoury.",
+      "description": "Railgun slugs with a cryogen core. 30% less damage, but 2.5 times that against Cinder Cult ships (not bosses). 200 per crate. Made only at your own station's armoury.",
       "ammoFor": {
         "weapon": "railgun",
         "rounds": 200,
@@ -1202,7 +1202,7 @@
       "rarity": "uncommon",
       "value": 40,
       "color": "#ff7043",
-      "description": "Flak that sets what it hits burning, for 30% less damage. 120 a crate.",
+      "description": "Flak that sets what it hits burning, for 30% less damage. 120 per crate.",
       "ammoFor": {
         "weapon": "flak",
         "rounds": 120,
@@ -1227,7 +1227,7 @@
       "rarity": "uncommon",
       "value": 45,
       "color": "#b2ebf2",
-      "description": "Flak that bursts in a short EMP: no damage at all, but it seizes up what it catches. 120 a crate.",
+      "description": "Flak that bursts in a short EMP. No damage, but it switches off engines and guns briefly. 120 per crate.",
       "ammoFor": {
         "weapon": "flak",
         "rounds": 120,
@@ -1255,7 +1255,7 @@
       "rarity": "uncommon",
       "value": 35,
       "color": "#ffab40",
-      "description": "Flak with a wider blast. 120 a crate.",
+      "description": "Flak with a wider blast. 120 per crate.",
       "ammoFor": {
         "weapon": "flak",
         "rounds": 120,
@@ -1279,7 +1279,7 @@
       "rarity": "uncommon",
       "value": 80,
       "color": "#e57373",
-      "description": "Missiles that punch rather than blast: 30% more damage on what they hit, a tighter blast. 24 a crate.",
+      "description": "Missiles that do 30% more damage to what they hit, with a smaller blast. 24 per crate.",
       "ammoFor": {
         "weapon": "missile",
         "rounds": 24,
@@ -1303,7 +1303,7 @@
       "rarity": "uncommon",
       "value": 90,
       "color": "#ef9a9a",
-      "description": "Missiles that turn twice as hard to follow their target, for 30% less damage. 24 a crate.",
+      "description": "Missiles that turn twice as hard to follow their target, for 30% less damage. 24 per crate.",
       "ammoFor": {
         "weapon": "missile",
         "rounds": 24,
@@ -1322,7 +1322,7 @@
       "rarity": "uncommon",
       "value": 75,
       "color": "#80deea",
-      "description": "Missiles that chill what they hit (two seize it up), for half the damage. 24 a crate.",
+      "description": "Missiles that chill what they hit; 2 hits freeze it briefly. Half damage. 24 per crate.",
       "ammoFor": {
         "weapon": "missile",
         "rounds": 24,
@@ -1385,7 +1385,7 @@
       "rarity": "common",
       "value": 14,
       "color": "#ffe082",
-      "description": "Cannon shells that fly 50% faster. 150 a crate. A cannon fires its own plain shells without them.",
+      "description": "Cannon shells that fly 50% faster. 150 per crate. Without them, cannons fire plain shells.",
       "ammoFor": {
         "weapon": "cannon",
         "rounds": 150,
@@ -1416,7 +1416,7 @@
       "rarity": "rare",
       "value": 0,
       "color": "#fdba74",
-      "description": "The Shattered Bell's cargo manifest and a foreman's notes, from the old Halcyon foundry."
+      "description": "Cargo manifest and a foreman's notes from the Shattered Bell (old Halcyon foundry)."
     },
     {
       "id": "crucible_pattern",
@@ -1558,7 +1558,7 @@
       "rarity": "rare",
       "value": 22,
       "color": "#3f424a",
-      "description": "A dark, dense stone. Found in traces in rock across the cluster, thickest in the Maw's shard ring. Refined into leestone.",
+      "description": "Dark, dense stone found in most rock, most of all in the Maw's shard ring. Refined into leestone.",
       "family": "exotic",
       "tier": 4,
       "short": "Leestone",

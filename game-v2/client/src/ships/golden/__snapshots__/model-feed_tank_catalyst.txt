@@ -22,7 +22,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A tank of Catalyst
+Feed: cheaper engines
 
 == keyStats ==
 66 hp · armour 2
@@ -34,7 +34,7 @@ A tank of Catalyst
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 16","why":"Learned at level 16 (you're 4)"}
+{"open":false,"badge":"Lv 16","why":"Unlocks at level 16 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 16","why":""}

@@ -31,10 +31,10 @@ function restockable(pilot: PilotState): number {
 }
 
 const LABELS: Record<StoreSweep, [string, string]> = {
-  safe: ['Store all but ammo & utility', 'Everything except ammunition, your loadout, consumables, quick bar items and job items'],
+  safe: ['Store all but ammo & utility', 'Everything except ammo, your loadout, consumables, quick bar items and job items'],
   ores: ['Store ore & materials', 'Raw ore, gems, volatiles and refined plate and wire'],
   loot: ['Store loot', 'Components, artefacts, cut gems and modules'],
-  all: ['Store everything', 'The whole hold, ammunition and utility too (click twice)'],
+  all: ['Store everything', 'All your cargo, ammo and utility too (click twice)'],
 };
 
 /** The controls as a row of buttons, for the hold as it is now (draw again when it changes) */
@@ -69,7 +69,7 @@ export function storeControls(pilot: PilotState, send: (m: ClientMessage) => voi
   re.className = 'sgw-btn';
   re.style.padding = '5px 10px';
   re.textContent = k ? `Restock loadout (${k})` : 'Restock loadout';
-  re.title = 'Load the crates your ship\'s ammunition loadout asks for from storage (set it in the hangar). Docking and launching do this too';
+  re.title = 'Load the ammo crates your loadout needs from storage (set the loadout in the hangar). Docking and launching do this too';
   re.disabled = !pilot.atStation;
   re.onclick = () => { send({ type: 'restockLoadout' }); sound('ui_click'); };
   row.appendChild(re);

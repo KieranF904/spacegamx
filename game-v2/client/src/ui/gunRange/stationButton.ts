@@ -9,7 +9,7 @@ export function gunRangeButton(send: (m: ClientMessage) => void, sound: (id: str
   const b = document.createElement('button');
   b.className = 'sgw-btn';
   b.textContent = 'Gun range';
-  b.title = 'Try any weapon you can fit on a range ship, against idle drones, a big soft-hulled wreck and a heavy Mammoth. Your own ship waits here untouched; nothing from the range comes back with you';
+  b.title = 'Test any weapon you can fit on a range ship, against idle drones, a big soft wreck and a heavy Mammoth. Your own ship waits here untouched, and nothing from the range comes back with you';
   b.onclick = () => {
     b.disabled = true;
     send({ type: 'gunRangeEnter' });

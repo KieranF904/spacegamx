@@ -159,8 +159,8 @@ export class RegionUI {
     this.gate.innerHTML = `<div class="rg-k">Barrier</div>`
       + `<div class="rg-n">${inside ? 'The way out' : 'The way in'}</div>`
       + `<div class="rg-u">${inside
-        ? `Press ${k} to pass. You must be out of combat for ${GATE.quiet / 60} s first (no damage dealt or taken).`
-        : `Press ${k} to pass. Nothing crosses the barrier either way, shots included; leaving again needs ${GATE.quiet / 60} s out of combat.`}</div>`;
+        ? `Press ${k} to pass. You must be out of combat for ${GATE.quiet / 60} s (no damage dealt or taken).`
+        : `Press ${k} to pass. Nothing crosses the barrier, shots included. Leaving needs ${GATE.quiet / 60} s out of combat.`}</div>`;
     this.gate.style.display = 'block';
     return true;
   }
@@ -195,7 +195,7 @@ export class RegionUI {
     this.gateKey = key;
     const bands = to.regions?.length ? to.regions.map((g) => `<span style="color:${REGION_COLOR[g.danger]}">${esc(g.name)}</span>`).join(' · ') : '';
     const how = best.rift
-      ? 'A rift: fly into it and it pulls you through. There is no way to stop halfway.'
+      ? 'A rift: fly in and it pulls you through. You can\'t stop halfway.'
       : lock ? `<span style="color:#fca5a5">🔒 ${esc(lock.name)}</span>: ${esc(lock.hint)}`
       : this.asked === to.id ? `<span style="color:#fca5a5">This system outclasses your ship.</span> Press <kbd>${esc(ctx.interactKey)}</kbd> again to jump anyway.`
       : `Fly into the gate and press <kbd>${esc(ctx.interactKey)}</kbd> to jump.`;

@@ -17,15 +17,15 @@ describe('guest banner words', () => {
   it('an active guest: the keep rule and the time left, counting down from when the status arrived', () => {
     const s = { state: 'active' as const, keepMs: 12 * H, expiresInMs: 2 * D + 5 * H };
     const m = guestBannerModel(s, 1000, 1000);
-    expect(m.title).toBe('Guest account — register to save your progress');
-    expect(m.detail).toBe('Kept 12 h after you leave · expires in 2 d 5 h');
+    expect(m.title).toBe('Guest account: register to keep your progress');
+    expect(m.detail).toBe('Kept 12 h after you leave · deleted in 2 d 5 h');
     expect(m.expired).toBe(false);
     expect(m.urgent).toBe(false);
-    expect(guestBannerModel(s, 1000, 1000 + 5 * H).detail).toBe('Kept 12 h after you leave · expires in 2 d');
+    expect(guestBannerModel(s, 1000, 1000 + 5 * H).detail).toBe('Kept 12 h after you leave · deleted in 2 d');
     // (a clock that went back counts nothing off; past the end it stops at zero)
-    expect(guestBannerModel(s, 1000, 0).detail).toContain('expires in 2 d 5 h');
+    expect(guestBannerModel(s, 1000, 0).detail).toContain('deleted in 2 d 5 h');
     const end = guestBannerModel(s, 0, 3 * D);
-    expect(end.detail).toContain('expires in under a minute');
+    expect(end.detail).toContain('deleted in under a minute');
     expect(end.urgent).toBe(true);
   });
 
@@ -33,6 +33,6 @@ describe('guest banner words', () => {
     const m = guestBannerModel({ state: 'expired', keepMs: 12 * H, expiresInMs: 11 * H + 30 * 60_000 }, 0, 0);
     expect(m.expired).toBe(true);
     expect(m.title).toContain('expired');
-    expect(m.detail).toBe('Register to keep playing · wiped in 11 h');
+    expect(m.detail).toBe('Register to keep playing · deleted in 11 h');
   });
 });

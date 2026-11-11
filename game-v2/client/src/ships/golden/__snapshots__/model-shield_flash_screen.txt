@@ -34,7 +34,7 @@ no slow refill, back whole after a break
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 13","why":"Learned at level 13 (you're 4)"}
+{"open":false,"badge":"Lv 13","why":"Unlocks at level 13 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 13","why":""}

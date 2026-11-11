@@ -43,7 +43,7 @@ Turret, 300°
 Bolts on any side
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+{"open":false,"badge":"Lv 10","why":"Unlocks at level 10 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 10","why":""}

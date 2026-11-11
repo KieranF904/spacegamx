@@ -196,8 +196,8 @@ export class TutorialPanel {
       this.grad.show({
         mode: 'modal', title: 'Training complete',
         ...(m.returner
-          ? { intro: 'You know the whole loop.', lines: [], note: 'Your own ship is waiting, just as you left it.', button: 'Back to my ship' }
-          : { intro: 'You know the whole loop. Here is your starter pack:', lines: this.pack, note: 'It goes into your storage, and you keep all you mined and built. Next stop: Sol Central.', button: 'Enter Sol' }),
+          ? { intro: 'You know the basics.', lines: [], note: 'Your own ship is waiting, just as you left it.', button: 'Back to my ship' }
+          : { intro: 'Here is your starter pack:', lines: this.pack, note: 'It goes to your station storage, with everything you mined and built. Next stop: Sol Central.', button: 'Enter Sol' }),
         onClose: () => {
           this.flow.enter();
           // (If the server never answers, the button comes back)

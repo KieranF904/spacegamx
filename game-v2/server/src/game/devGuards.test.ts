@@ -59,8 +59,8 @@ describe('dev message guards: refused unless the server has dev tools or the pil
   it('feedSwitch: a ship with no Selector is told so, and nothing is switched', () => {
     const w = world(false);
     send(w, { type: 'feedSwitch' });
-    const told = w.toasts().filter((t) => /Selector|Feeds switched/.test(t));
+    const told = w.toasts().filter((t) => /Selector|Tanks switched/.test(t));
     // Either the ship has no ports power (no message at all) or no Selector (the warning): never a switch
-    expect(told.every((t) => t === 'No Selector fitted: nothing to switch')).toBe(true);
+    expect(told.every((t) => t === 'No Selector fitted. Nothing to switch.')).toBe(true);
   });
 });

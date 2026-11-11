@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage28/s · reach 11,440
 Hits withExplosive · penetration 0.5
 Fire rate0.6/s · shells · Missiles (no energy)
-Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
+Modelammo: Fires rounds from your cargo on a fixed beat and costs no power. With none left it fires weak plain rounds (40% damage).
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 
@@ -43,7 +43,7 @@ Bolts on from behind only
 Needs 1 clear cell ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 11","why":"Learned at level 11 (you're 4)"}
+{"open":false,"badge":"Lv 11","why":"Unlocks at level 11 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 11","why":""}

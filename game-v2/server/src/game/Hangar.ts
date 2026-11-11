@@ -345,7 +345,7 @@ export class Hangar {
     const free = socketsFor(this.gems!, this.catalog, part, p.level) - (part.gems?.length ?? 0);
     if (free <= 0) {
       const any = socketsFor(this.gems!, this.catalog, part, 100);
-      return this.pilots.toast(conn, any ? (part.gems?.length ? 'Its sockets are full' : 'No socket on it at your level yet') : 'That part has no sockets: steel and better weapons do', 'warn');
+      return this.pilots.toast(conn, any ? (part.gems?.length ? 'Its sockets are full' : 'No socket on it at your level yet') : 'This part has no sockets. Only higher-Mk weapons have them.', 'warn');
     }
     if (!this.pilots.take(conn, { [gem]: 1 })) return this.pilots.toast(conn, `You have no ${this.econ.items.name(gem)}`, 'warn');
     this.regem(conn, p, slot, rec, uid, [...(part.gems ?? []), gem]);
@@ -420,7 +420,7 @@ export class Hangar {
       this.work(conn, slot);
       this.pilots.toast(conn, `${name}: order resumed`, 'good');
     } else if (action === 'cancel') {
-      if (rec.lost) return this.pilots.toast(conn, `The ${name} was lost: it stays on order until it's rebuilt (hold it, or scrap it)`, 'warn');
+      if (rec.lost) return this.pilots.toast(conn, `The ${name} was destroyed. It stays on order until it is rebuilt. Pause or scrap it in Ships.`, 'warn');
       rec.auto = false;
       rec.paused = false;
       delete rec.rank;
@@ -447,7 +447,7 @@ export class Hangar {
     if (!p || !rec?.auto || rec.paused || rec.blueprint.name !== job.for) return;
     rec.paused = true;
     this.services.hold(p, p.jobs.filter((j) => j.slot === job.slot && j.for === job.for));
-    this.pilots.toast(conn, `The ${rec.blueprint.name}'s order is on hold so it isn't queued again: resume it from Ships`, 'info');
+    this.pilots.toast(conn, `The ${rec.blueprint.name}'s order is paused. Resume it in Ships.`, 'info');
     this.send(conn);
   }
 
@@ -560,11 +560,11 @@ export class Hangar {
     if (!p || !r || !Number.isFinite(n) || n < 1) return;
     if (!canCraft(r, this.services.learned(p), p.level)) return this.pilots.toast(conn, "You don't know how to make that yet", 'warn');
     const orders = (p.fabOrders ??= []);
-    if (orders.length >= 20) return this.pilots.toast(conn, 'Twenty orders at once is the most: let some finish', 'warn');
+    if (orders.length >= 20) return this.pilots.toast(conn, 'Order limit reached (20). Wait for some to finish.', 'warn');
     const id = orders.reduce((m, o) => Math.max(m, o.id), 0) + 1;
     orders.push({ id, item, n: Math.min(999, Math.floor(n)), made: 0 });
     this.pilots.markDirty(conn);
-    this.pilots.toast(conn, `Ordered ${Math.floor(n)} × ${this.econ.items.name(item)}: what's short is refined as ore comes in, then it's made`, 'info');
+    this.pilots.toast(conn, `Ordered ${Math.floor(n)} × ${this.econ.items.name(item)}. Missing materials are refined as ore arrives, then it is made.`, 'info');
     this.workOrders(conn);
     this.send(conn);
   }

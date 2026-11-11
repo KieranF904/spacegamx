@@ -11,16 +11,16 @@
 
 export type RangeKey = { fold: true } | { say: string };
 
-const NO_BUILD = 'No building in the gun range: nothing made here may leave it';
+const NO_BUILD = "You can't build in the gun range. Nothing made here can leave it";
 const RANGE_KEYS: Readonly<Record<string, RangeKey>> = {
   // I: the weapon picker, folded or open (there is no hold in here)
   KeyI: { fold: true },
   // 7, 8, 9: the build view and the field machines
   Digit7: { say: NO_BUILD }, Digit8: { say: NO_BUILD }, Digit9: { say: NO_BUILD },
   // H: no station, no hangar
-  KeyH: { say: 'No hangar in the gun range: fly to the exit door and press X to go back to your station' },
+  KeyH: { say: 'No hangar in the gun range. Fly to the exit door to go back to your station' },
   // J: the range ship has no jump drive
-  KeyJ: { say: 'No jump drive in the gun range: the exit door takes you back' },
+  KeyJ: { say: 'No jump drive in the gun range. The exit door takes you back' },
 };
 
 /** The quick bar's keys (1-5), unless they pick weapon groups (Settings, Gameplay) */

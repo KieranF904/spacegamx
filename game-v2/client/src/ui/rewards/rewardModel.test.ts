@@ -9,13 +9,13 @@ const names = { item: (id: string) => id.toUpperCase(), icon: (id: string) => `i
 const base: RewardView = { xp: 0, credits: 0, items: {}, plans: [], recipes: [], licences: [], reputation: {}, skillPoints: 0 };
 
 describe('quest reward lines', () => {
-  it('lists credits, XP, items with icons, skill points, standing, then unlocks', () => {
+  it('lists credits, XP, items with icons, skill points, reputation, then unlocks', () => {
     const lines = questRewardLines({ ...base, xp: 120, credits: 2500, items: { iron: 3 }, skillPoints: 1, reputation: { 'Sol Patrol': 2 }, plans: ['Prospector'], recipes: ['Ion thruster'], licences: ['Cinder'] }, names);
     expect(lines.map((l) => l.kind)).toEqual(['credits', 'xp', 'item', 'skill', 'rep', 'unlock', 'unlock', 'unlock']);
     expect(lines[0]).toMatchObject({ label: 'credits', count: 2500 });
     expect(lines[2]).toEqual({ kind: 'item', label: 'IRON', count: 3, icon: 'icon:iron' });
-    expect(lines[4].label).toBe('Sol Patrol standing');
-    expect(lines[5].label).toBe('Ship plan: Prospector');
+    expect(lines[4].label).toBe('Sol Patrol reputation');
+    expect(lines[5].label).toBe('Design: Prospector');
   });
   it('is empty for a job that pays nothing', () => {
     expect(questRewardLines(base, names)).toEqual([]);

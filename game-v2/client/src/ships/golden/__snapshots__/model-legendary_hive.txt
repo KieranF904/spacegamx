@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage23/s · reach 9,120
 Hits withExplosive · penetration 3
 Clipholds 8 · 4 a shot, every 0.5s · regrows one every 0.75s (6 energy each)
-Modelclip: Fires a salvo from its stock; one round grows back at a time, each drawing a little energy.
+Modelclip: Fires a salvo from its stock; one round grows back at a time, each drawing a little power.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw12/s
@@ -31,7 +31,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A nest that regrows
+Holds 8 seekers and fires 4 at a time, each homing on a different ship near your cursor
 
 == keyStats ==
 23 dmg/s · reach 9,120 · clip 8 · regrows · draws 12
@@ -45,7 +45,7 @@ Bolts on from behind only
 Needs 1 clear cell ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 12","why":""}

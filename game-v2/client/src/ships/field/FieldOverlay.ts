@@ -154,7 +154,7 @@ export class FieldOverlay {
     window.addEventListener('mousedown', this.onDown, true);
     window.addEventListener('mousemove', this.onMove, true);
     window.addEventListener('mouseup', this.onUp, true);
-    this.say('Click on the ship to place. M mirrors edits, Ctrl+Z undoes. Saving is free: the fabricator builds missing parts from your hold.');
+    this.say('Click on the ship to place. M mirrors edits, Ctrl+Z undoes. Saving is free: the fabricator builds missing parts from your cargo.');
     void this.loadPalette();
   }
 

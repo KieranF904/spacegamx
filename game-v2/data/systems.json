@@ -3179,7 +3179,7 @@
     {
       "id": "sol_scrap_nest",
       "name": "The Scrap Mother's Nest",
-      "description": "The Scrap Mother's nest in the Drift: a hollowed asteroid, its chambers worked by scrapborn, her own at its heart behind a barrier. Junk drifts round it, and scrapborn patrol its face.",
+      "description": "The Scrap Mother's nest in the Drift: a hollowed asteroid full of Scrapborn, with the Mother at its heart behind a barrier.",
       "danger": 2,
       "starColor": "#FFDD44",
       "starRadius": 0,
@@ -3554,7 +3554,7 @@
     {
       "id": "gun_range",
       "name": "Gun Range",
-      "description": "The stations' shared gun range: an indoor chamber with one big unshielded target at the far end. Try any weapon you can fit, then fly to the door and press X to go back to your station.",
+      "description": "The stations' shared gun range: an indoor chamber with one big unshielded target at the far end. Try any weapon you can fit, then leave by the door to go back to your station.",
       "danger": 1,
       "starColor": "#cfe3f5",
       "starRadius": 0,

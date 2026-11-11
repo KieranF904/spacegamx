@@ -22,10 +22,10 @@ const pilot = (level: number, learned: string[] = []): PilotView => ({ level, le
 const gates = (id: string, p: PilotView) => componentGates(catalog, econ, rows.find((r) => r.id === id)!, p);
 
 describe('a row\'s lock', () => {
-  it('a level gate reads "Reach level N" and gives its level; met, it reads nothing', () => {
+  it('a level gate reads "Needs level N" and gives its level; met, it reads nothing', () => {
     const g = gates('cannon_hammer', pilot(1));
     expect(isOpen(g)).toBe(false);
-    expect(lockText(g)).toBe('Reach level 6');
+    expect(lockText(g)).toBe('Needs level 6');
     expect(lockLevel(g)).toBe(6);
     const met = gates('cannon_hammer', pilot(6));
     expect(isOpen(met)).toBe(true);
@@ -34,7 +34,7 @@ describe('a row\'s lock', () => {
   });
 
   it('a licence or a boss part says what it needs, with no level', () => {
-    const lic: Gate[] = [{ kind: 'licence', met: false, text: 'Learned from the job “X”', done: '' }];
+    const lic: Gate[] = [{ kind: 'licence', met: false, text: 'Unlocked by the job “X”', done: '' }];
     expect(lockText(lic)).toBe('Needs its licence');
     expect(lockLevel(lic)).toBeNull();
     const part: Gate[] = [{ kind: 'level', met: true, text: '', done: '' }, { kind: 'part', met: false, text: "Needs Rustjaw's Fang: dropped by Rustjaw", done: '' }];

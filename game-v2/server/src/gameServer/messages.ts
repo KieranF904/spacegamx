@@ -81,9 +81,9 @@ export function buildMessageHandlers(gs: GameServer): HandlerTable {
   t.on('feedSwitch', (_ctx, conn) => {
     const ship = gs.ships.get(conn.playerId), c = gs.ships.chargeOf(conn.playerId);
     if (!ship?.derived.ports || !c.e) return;
-    if (!ship.derived.ports.selectors.length) { gs.pilots.toast(conn, 'No Selector fitted: nothing to switch', 'warn'); return; }
+    if (!ship.derived.ports.selectors.length) { gs.pilots.toast(conn, 'No Selector fitted. Nothing to switch.', 'warn'); return; }
     portsSwitchFeeds(ship.derived.ports, c.e);
-    gs.pilots.toast(conn, 'Feeds switched: the old material runs out first', 'info');
+    gs.pilots.toast(conn, 'Tanks switched. What is already in the lines runs out first.', 'info');
   });
   t.on('devBoss', (_ctx, conn, msg) => {
     if (!devToolsOpen(gs, conn)) return;

@@ -34,7 +34,7 @@ soaks hits before the hull
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 11","why":"Learned at level 11 (you're 4)"}
+{"open":false,"badge":"Lv 11","why":"Unlocks at level 11 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 11","why":""}

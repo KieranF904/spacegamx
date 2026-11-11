@@ -151,7 +151,7 @@ function loanerLost(self: Pilots, s: Session, systemNum: number, x: number, y: n
   const { conn, profile: p } = s;
   p.ship = p.hangar[p.activeSlot]!;
   const wreck = leaveWreck(self, s, systemNum, x, y, vx, vy, cargo);
-  self.toast(conn, `The loaner was destroyed: it costs you nothing, and you respawn in another${wreck}`, 'info');
+  self.toast(conn, `The loaner was destroyed at no cost to you. You respawn in another${wreck}`, 'info');
   p.stats.deaths = (p.stats.deaths ?? 0) + 1;
   s.dirty = true;
   self.sendItems(conn);

@@ -1,6 +1,6 @@
 /**
  * What a component means for this pilot, shared by the component guide (side panel) and the hangar palette (no DOM):
- * whether it's open (componentGuide.ts rowGates), the short "Reach level N" a locked one shows, how a category tab
+ * whether it's open (componentGuide.ts rowGates), the short "Needs level N" a locked one shows, how a category tab
  * counts, what making it costs against what you have, and (the hangar's) whether you can place it now: free build,
  * spares on hand, fabricate, or locked.
  */
@@ -14,7 +14,7 @@ export function isOpen(gates: Gate[]): boolean {
 }
 
 /**
- * The short lock a row shows ("Reach level 12", "Needs its licence", "Needs Rustjaw's Fang"): its first unmet gate,
+ * The short lock a row shows ("Needs level 12", "Needs its licence", "Needs Rustjaw's Fang"): its first unmet gate,
  * shortened; '' when it's open
  */
 export function lockText(gates: Gate[]): string {

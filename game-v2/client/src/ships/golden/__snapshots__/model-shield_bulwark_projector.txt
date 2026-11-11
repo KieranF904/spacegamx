@@ -34,7 +34,7 @@ deep, slow to refill
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 27","why":"Learned at level 27 (you're 4)"}
+{"open":false,"badge":"Lv 27","why":"Unlocks at level 27 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 27","why":""}

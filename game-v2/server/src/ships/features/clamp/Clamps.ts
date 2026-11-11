@@ -99,8 +99,8 @@ export class Clamps implements FeatureInstance {
     if (p && p.what === 'dock' && p.with === eid && p.mine === theirs && p.theirs === mine && now - p.tick <= CLAMP.pressWindow) {
       // Both pressed: lined up now, the first to press steers
       if (!this.linedUp(eid, mine, other, theirs)) {
-        this.host.tell(eid, 'Not lined up: line the clamps up and press again');
-        this.host.tell(other, 'Not lined up: line the clamps up and press again');
+        this.host.tell(eid, 'Clamps not lined up. Line them up and try again.');
+        this.host.tell(other, 'Clamps not lined up. Line them up and try again.');
         this.presses.delete(eid); this.presses.delete(other);
         return;
       }

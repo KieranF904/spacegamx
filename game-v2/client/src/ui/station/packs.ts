@@ -41,7 +41,7 @@ export function packRows(econ: Economy, learned: string[], level: number, storag
 }
 
 /** The note under the list: how a pack pays, with its numbers from the rules */
-export const PACK_NOTE = `In the field a pack pays 1 unit of one of its materials, and work paid that way goes ${Math.round(FIELD.packSpeed * 100)}% faster. In your repair bank it gives all of it.`;
+export const PACK_NOTE = `In the field a pack gives 1 unit of one of its materials, and that work goes ${Math.round(FIELD.packSpeed * 100)}% faster. In your repair bank it gives everything in it.`;
 
 const units = (econ: Economy, icon: (id: string) => string, bag: Record<string, number>) =>
   Object.entries(bag).map(([id, n]) => `<span class="sgw-cost" title="${esc(econ.items.name(id))}"><img src="${icon(id)}">${n}</span>`).join('');

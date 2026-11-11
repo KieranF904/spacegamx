@@ -23,7 +23,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A power line that turns
+Power line corner
 
 == keyStats ==
 holds 10 · power line
@@ -35,7 +35,7 @@ holds 10 · power line
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 2","why":"Learned at level 2 (you're 4)"}
+{"open":false,"badge":"Lv 2","why":"Unlocks at level 2 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 2","why":""}

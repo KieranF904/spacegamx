@@ -279,7 +279,7 @@ export function itemTipHtml(econ: Economy, id: string, opts: { count?: number; h
   html += `<div class="t-r"><span>Cargo space</span><b>${econ.items.volume(id)}</b></div>`;
   // (Carried in the hold it weighs the ship down: ships/load.ts)
   const mass = econ.items.mass(id);
-  if (mass > 0) html += `<div class="t-r"><span>Mass in the hold</span><b>${mass < 0.1 ? mass.toFixed(2) : mass.toFixed(1)}${opts.count && opts.count > 1 ? ` · ${(mass * opts.count).toFixed(1)} all` : ''}</b></div>`;
+  if (mass > 0) html += `<div class="t-r"><span>Mass in cargo</span><b>${mass < 0.1 ? mass.toFixed(2) : mass.toFixed(1)}${opts.count && opts.count > 1 ? ` · ${(mass * opts.count).toFixed(1)} all` : ''}</b></div>`;
   if (opts.extra) html += opts.extra;
   if (opts.hint) html += `<div class="t-h">${esc(opts.hint)}</div>`;
   return html;

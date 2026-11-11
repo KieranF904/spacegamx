@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage13/s · reach 3,240
 Hits withThermal · penetration 3.5
 Fire rate0.8/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountTurret, 360°
 FittingBolts on any side
 Power draw12/s
@@ -31,7 +31,7 @@ Small
 Small · Square
 
 == tradeOff ==
-The arsonist
+Fires shells that set the part they hit burning for 5 s
 
 == keyStats ==
 13 dmg/s · reach 3,240 · cycle · draws 12
@@ -44,7 +44,7 @@ Turret, 360°
 Bolts on any side
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+{"open":false,"badge":"Lv 22","why":"Unlocks at level 22 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 22","why":""}

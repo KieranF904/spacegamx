@@ -26,7 +26,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a second while it works
+Builds parts in flight
 
 == keyStats ==
 1x speed · up to Mk II · draws 40 working
@@ -38,7 +38,7 @@ Builds and repairs parts from your hold while you fly, up to Mk II, drawing 40 a
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 0","why":"Learned at level 0 (you're 4)"}
+{"open":false,"badge":"Lv 0","why":"Unlocks at level 0 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 0","why":""}

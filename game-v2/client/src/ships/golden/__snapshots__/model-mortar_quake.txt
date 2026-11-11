@@ -7,7 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage43/s · reach 2,640
 Hits withExplosive · penetration 2.5
 Fire rate0.3/s · shells · Mortar Shells (3 a shot, no energy)
-Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
+Modelammo: Fires rounds from your cargo on a fixed beat and costs no power. With none left it fires weak plain rounds (40% damage).
 MountTurret, 360°
 FittingBolts on from behind only
 
@@ -42,7 +42,7 @@ Turret, 360°
 Bolts on from behind only
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+{"open":false,"badge":"Lv 24","why":"Unlocks at level 24 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 24","why":""}

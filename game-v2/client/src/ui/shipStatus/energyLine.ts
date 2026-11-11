@@ -7,7 +7,7 @@
 import type { ShipStatus, Tone } from './source';
 
 export interface EnergyLine {
-  /** "ENERGY 64%", or "LOW POWER 0%" while something is short */
+  /** "POWER 64%", or "LOW POWER 0%" while something is short */
   head: string;
   headTone: Tone;
   /** "−38/s", "+52/s", or '' when steady */
@@ -24,7 +24,7 @@ const secs = (s: number) => (s < 10 ? `${(Math.ceil(s * 10) / 10).toFixed(1)} s`
 
 export function energyLine(e: ShipStatus['energy'], out: EnergyLine = { head: '', headTone: 'ok', rate: '', rateTone: 'dim', note: '', noteTone: 'dim' }): EnergyLine {
   const pct = Math.max(0, Math.min(100, e.pct));
-  out.head = `${e.brownout ? 'LOW POWER' : 'ENERGY'} ${Math.floor(pct)}%`;
+  out.head = `${e.brownout ? 'LOW POWER' : 'POWER'} ${Math.floor(pct)}%`;
   out.headTone = e.brownout ? 'bad' : pct < 25 && e.net < 0 ? 'warn' : 'ok';
   const r = Math.round(e.net);
   // (Full, a rise still in the smoothed rate is no news)

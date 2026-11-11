@@ -28,7 +28,7 @@ Large
 Large · Block
 
 == tradeOff ==
-Builds and repairs any part from your hold 2
+Fastest in-flight fabricator
 
 == keyStats ==
 2.5x speed · any grade · draws 110 working
@@ -40,7 +40,7 @@ Builds and repairs any part from your hold 2
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+{"open":false,"badge":"Lv 24","why":"Unlocks at level 24 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 24","why":""}

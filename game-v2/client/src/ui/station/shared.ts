@@ -86,8 +86,8 @@ export function lineStatus(l: OrderLine): string {
   const bits: string[] = [];
   if (l.ready) bits.push(`<span style="color:#86efac">✓ ${l.ready}</span>`);
   if (l.coming) bits.push(`<span style="color:#7dd3fc">⏳ ${l.coming}</span>`);
-  if (l.waiting) bits.push(`<span style="color:#fbbf24" title="${l.blocked === 'queue' ? 'Next, when a queue slot frees' : 'Waiting for what it is made from'}">◷ ${l.waiting}</span>`);
-  if (l.short) bits.push(`<span style="color:#fca5a5" title="${l.blocked === 'schematic' ? 'It opens at a later level' : 'Gather or buy it'}">${l.blocked === 'schematic' ? '🔒' : '✕'} ${l.short}</span>`);
+  if (l.waiting) bits.push(`<span style="color:#fbbf24" title="${l.blocked === 'queue' ? 'Starts when a queue slot frees' : 'Waiting for its materials'}">◷ ${l.waiting}</span>`);
+  if (l.short) bits.push(`<span style="color:#fca5a5" title="${l.blocked === 'schematic' ? 'Unlocks at a later level' : 'Gather or buy it'}">${l.blocked === 'schematic' ? '🔒' : '✕'} ${l.short}</span>`);
   return bits.join(' ');
 }
 

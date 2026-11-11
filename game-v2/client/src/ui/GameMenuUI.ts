@@ -284,7 +284,7 @@ export class GameMenuUI {
       b.addEventListener('click', () => this.choose(it.page));
       this.side.appendChild(b);
     }
-    this.side.insertAdjacentHTML('beforeend', `<div class="gm-foot">The universe keeps moving while this menu is open.<br>Flight controls are paused.</div>`);
+    this.side.insertAdjacentHTML('beforeend', `<div class="gm-foot">The game keeps running while this menu is open.<br>Flight controls are paused.</div>`);
   }
 
   private choose(page: Page | 'resume' | 'map' | 'components' | 'leave'): void {
@@ -403,7 +403,7 @@ export class GameMenuUI {
         toggle('Bloom', s.display.bloom, (v) => upd((d) => { d.display.bloom = v; }), 'Glow around engines, shots and sparks'),
         toggle('Lighting', s.display.lighting, (v) => upd((d) => { d.display.lighting = v; }), 'Ships, stations and asteroids lit by the sun, weapons and lamps. Off: flat colours'),
         slider('Render resolution', s.display.renderScale, 0.5, 1, 0.05, pctFmt, (v) => upd((d) => { d.display.renderScale = v; })),
-        segmented('Graphics quality', 'Bloom size, star layers, effect particles and the pixel density. Anti-aliasing (off on Low) applies the next time the game loads. Auto steps down by itself when the frame rate drops',
+        segmented('Graphics quality', 'Bloom, star layers, particles and pixel density. Anti-aliasing (off on Low) applies after a reload. Auto lowers quality when the frame rate drops',
           [['auto', 'Auto'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], s.display.quality,
           (v) => upd((d) => { d.display.quality = v as QualitySetting; }, true)),
         segmented('Frame rate limit', 'Off draws as fast as the screen allows. A limit saves power and heat',
@@ -418,8 +418,8 @@ export class GameMenuUI {
         toggle('Performance monitor', s.ui.netStats, (v) => upd((d) => { d.ui.netStats = v; }), 'FPS, frame time, ping and jitter graphs, entities'),
         toggle('Chat box', s.ui.chat, (v) => upd((d) => { d.ui.chat = v; })),
         toggle('Hazard screen effects', s.ui.hazardEffects, (v) => upd((d) => { d.ui.hazardEffects = v; }), 'Haze, darkness and radiation tints (the warnings stay)'),
-        toggle('Jobs tracker', s.ui.questTracker, (v) => upd((d) => { d.ui.questTracker = v; }), 'The list of your jobs at the right. Off: just its header (SHOW brings it back)'),
-        toggle('Objective guide', s.ui.questGuide, (v) => upd((d) => { d.ui.questGuide = v; }), 'For the job you follow: the next waypoint under the tracker (the gate, rift or planet on the way), and chevrons from your ship pointing at it'),
+        toggle('Jobs tracker', s.ui.questTracker, (v) => upd((d) => { d.ui.questTracker = v; }), 'Your job list on the right. Off: only its header shows (SHOW brings it back)'),
+        toggle('Objective guide', s.ui.questGuide, (v) => upd((d) => { d.ui.questGuide = v; }), 'For the job you follow: the next waypoint under the tracker, and arrows from your ship to it'),
       );
     } else {
       body.append(
@@ -437,9 +437,9 @@ export class GameMenuUI {
       const note = document.createElement('p');
       note.className = 'muted';
       note.style.marginTop = '12px';
-      note.textContent = `Mouse-steer unless you pick helm here (or switch with ${keyName(s.bindings.helm ?? 'KeyV')}). `
-        + `The view: "With controls" turns it with your ship at the helm and keeps it north up for mouse-steer; or pick one for both (or switch with ${keyName(s.bindings.camera ?? 'Backquote')}). `
-        + 'Mouse-steer with the view following your heading: the cursor stays on its spot in space as the view turns, WASD push along your ship, and a click captures the mouse (Esc lets it go).';
+      note.textContent = `Mouse-steer: the ship turns to the cursor. Helm: ${keyName(s.bindings.left ?? 'KeyA')} and ${keyName(s.bindings.right ?? 'KeyD')} turn the ship. Switch with ${keyName(s.bindings.helm ?? 'KeyV')}. `
+        + `View "With controls": north up for mouse-steer, turning with your ship at the helm. Switch the view with ${keyName(s.bindings.camera ?? 'Backquote')}. `
+        + 'Mouse-steer with Follow heading: the move keys push along your ship, and a click captures the mouse (Esc releases it).';
       body.appendChild(note);
     }
     const actions = document.createElement('div');

@@ -40,8 +40,8 @@ export class MarketTab {
     cyc.style.cssText = 'grid-column: 1 / -1; display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; color:#a9b6c9; font-size:12px; padding:2px 2px 4px;';
     const mins = Math.round((st.cycleEndsIn ?? 0) / 60000);
     const chips = (ids: string[] | undefined, color: string) => (ids ?? []).map((id) => `<span style="color:${color}; border:1px solid ${color}55; border-radius:999px; padding:1px 8px">${esc(items.name(id))} ${Math.round(((st.demand[id] ?? 1) - 1) * 100) > 0 ? '+' : ''}${Math.round(((st.demand[id] ?? 1) - 1) * 100)}%</span>`).join('');
-    cyc.innerHTML = `<b style="color:#86efac">WANTED HERE</b>${chips(st.wanted, '#86efac') || '<span>nothing special</span>'}<b style="color:#fca5a5; margin-left:8px">GLUTTED</b>${chips(st.glut, '#fca5a5') || '<span>nothing</span>'}`
-      + `<span style="margin-left:auto; color:#8394ad">Market cycle turns in ${mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`} · selling a lot of one thing drives its price down for a while</span>`;
+    cyc.innerHTML = `<b style="color:#86efac">WANTED HERE</b>${chips(st.wanted, '#86efac') || '<span>nothing special</span>'}<b style="color:#fca5a5; margin-left:8px">OVERSUPPLIED</b>${chips(st.glut, '#fca5a5') || '<span>nothing</span>'}`
+      + `<span style="margin-left:auto; color:#8394ad">Prices change in ${mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`} · selling a lot of one thing lowers its price for a while</span>`;
     grid.appendChild(cyc);
     grid.style.gridTemplateRows = 'auto 1fr';
     if (oreInHold) {
@@ -49,7 +49,7 @@ export class MarketTab {
       all.className = 'sgw-btn good';
       all.style.marginBottom = '8px';
       const worth = p.cargo.filter((s) => items.get(s.id)?.category === 'mineral').reduce((t, s) => t + saleTotal(items, s.id, s.n, st.demand[s.id] ?? 1, st.sat?.[s.id] ?? 0), 0);
-      all.textContent = `Sell all ore in your hold (${oreInHold}) · ${worth.toLocaleString()} cr`;
+      all.textContent = `Sell all ore in your cargo (${oreInHold}) · ${worth.toLocaleString()} cr`;
       all.onclick = () => { this.d.send({ type: 'marketSellAll' }); this.d.sound('sell', 0.6); };
       sellCol.appendChild(all);
     }
@@ -104,10 +104,10 @@ export class MarketTab {
     name.style.cssText = 'flex:1; min-width:0;';
     const st = this.st!;
     const wanted = mode === 'sell' && st.wanted?.includes(id), glut = mode === 'sell' && st.glut?.includes(id);
-    let tag = demand && demand !== 1 ? ` <small style="color:${demand > 1 ? '#86efac' : '#fca5a5'}">${wanted ? 'WANTED ' : glut ? 'GLUT ' : ''}${demand > 1 ? '+' : ''}${Math.round((demand - 1) * 100)}%</small>` : '';
+    let tag = demand && demand !== 1 ? ` <small style="color:${demand > 1 ? '#86efac' : '#fca5a5'}">${wanted ? 'WANTED ' : glut ? 'OVERSUPPLIED ' : ''}${demand > 1 ? '+' : ''}${Math.round((demand - 1) * 100)}%</small>` : '';
     const sat = mode === 'sell' ? st.sat?.[id] ?? 0 : 0;
     const base = mode === 'sell' ? unitSellPrice(items, id, demand ?? 1, 0) : price;
-    if (sat > 0 && base > 0 && price < base * 0.97) tag += ` <small style="color:#fbbf24" title="Lots sold here lately: the price recovers over the next half hour or so">saturated −${Math.round((1 - price / base) * 100)}%</small>`;
+    if (sat > 0 && base > 0 && price < base * 0.97) tag += ` <small style="color:#fbbf24" title="Lots sold here lately. The price recovers over the next half hour or so">sold a lot −${Math.round((1 - price / base) * 100)}%</small>`;
     // Better prices elsewhere
     const best = mode === 'sell' ? this.scan?.best[id]?.[0] : undefined;
     const elsewhere = best && best.price > price * 1.08 ? ` · <span style="color:#7dd3fc" title="${esc(this.scan!.best[id].map((b) => `${b.name} (${b.system}): ${b.price} cr`).join('\n'))}">pays ${best.price} at ${esc(best.name)}</span>` : '';

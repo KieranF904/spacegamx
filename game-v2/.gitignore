@@ -8,5 +8,8 @@ server/stats/
 # Review board answers and its access key (scripts/review-board)
 review/board/
 
+# Wording cleanup before/after page (generated from the diff, not committed)
+review/wording/
+
 # Weapons lab drafts, key and model config (scripts/weapons-lab)
 /lab/

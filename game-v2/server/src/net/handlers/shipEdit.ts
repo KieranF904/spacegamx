@@ -44,7 +44,7 @@ export function registerShipEditHandlers(t: HandlerRegistry): void {
   t.on('designSave', (ctx, conn, msg) => {
     let bp: Blueprint;
     try { bp = clientBlueprint(ctx, msg.blueprint); } catch { return; }
-    if (!ctx.ships.validate(bp, { devParts: conn.isAdmin }).ok) { ctx.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); return; }
+    if (!ctx.ships.validate(bp, { devParts: conn.isAdmin }).ok) { ctx.pilots.toast(conn, 'This design breaks the ship rules. Fix it in the hangar first.', 'warn'); return; }
     ctx.hangar.saveDesign(conn, Math.floor(Number(msg.slot)), bp);
   });
   t.on('dock', (ctx, conn, msg) => {
@@ -105,9 +105,9 @@ export function handleShareDesign(ctx: ServerCtx, conn: ClientConnection, raw: u
   } catch {
     return ctx.pilots.toast(conn, "That isn't a ship design", 'warn');
   }
-  if (!ctx.ships.validate(bp, { devParts: conn.isAdmin }).ok) return ctx.pilots.toast(conn, 'Fix the design first: it has problems', 'warn');
+  if (!ctx.ships.validate(bp, { devParts: conn.isAdmin }).ok) return ctx.pilots.toast(conn, 'This design breaks the ship rules. Fix it in the hangar first.', 'warn');
   const others = ctx.party.members(conn).filter((m) => m !== conn) as ClientConnection[];
-  if (!others.length) return ctx.pilots.toast(conn, 'Share designs with your party: invite someone first (P)', 'warn');
+  if (!others.length) return ctx.pilots.toast(conn, 'Share designs with your party: invite someone first ({party})', 'warn');
   for (const m of others) ctx.send(m.ws, { type: 'sharedDesign', from: conn.username, blueprint: bp });
   ctx.pilots.toast(conn, `Sent the ${bp.name} to your party`, 'good');
 }

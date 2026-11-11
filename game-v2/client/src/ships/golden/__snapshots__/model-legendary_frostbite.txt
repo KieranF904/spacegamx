@@ -7,7 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage95/s · reach 760
 Hits withCryo · penetration 4.5
 Beamheld while you fire · draws its power while it's on
-Modelbeam: Burns energy every second you hold it.
+Modelbeam: Uses power every second you hold it.
 MountTurret, 150°
 FittingBolts on from behind only
 Power draw24/s
@@ -44,7 +44,7 @@ Turret, 150°
 Bolts on from behind only
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 12","why":""}

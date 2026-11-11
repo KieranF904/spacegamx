@@ -22,7 +22,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A clamp on its open edge
+Locks two ships together
 
 == keyStats ==
 one-cell clamp
@@ -34,7 +34,7 @@ one-cell clamp
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 4","why":"Learned at level 4 (you're 4)"}
+{"open":false,"badge":"Lv 4","why":"Unlocks at level 4 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 4","why":""}

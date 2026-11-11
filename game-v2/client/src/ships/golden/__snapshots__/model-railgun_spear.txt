@@ -7,7 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage84/s · reach 9,000
 Hits withKinetic · penetration 5.5
 Fire rate0.5/s · shells
-Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
+Modelcycle: Fires on a fixed beat while held; each shot's power is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw63/s
@@ -45,7 +45,7 @@ Bolts on from behind only
 Needs 3 clear cells ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 28","why":"Learned at level 28 (you're 4)"}
+{"open":false,"badge":"Lv 28","why":"Unlocks at level 28 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 28","why":""}

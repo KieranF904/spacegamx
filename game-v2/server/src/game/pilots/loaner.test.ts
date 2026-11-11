@@ -77,7 +77,7 @@ describe('a saved ship that fails the rules', () => {
     const live = server.getShips().get(pid)!;
     expect(live.blueprint.name).not.toBe('Old Faithful');
     expect(p.hangar[p.activeSlot]!.blueprint).toEqual(bad);
-    expect(got.some((m) => m.type === 'toast' && /Old Faithful no longer passes the ship rules/.test((m as any).text))).toBe(true);
+    expect(got.some((m) => m.type === 'toast' && /Old Faithful no longer meets the ship rules/.test((m as any).text))).toBe(true);
     // Every save writes the saved ship, never the loaner
     server.pilots.saveNow(conn);
     await flush();

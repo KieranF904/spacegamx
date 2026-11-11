@@ -36,7 +36,7 @@ plenty of power, heavy, big blast
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 18","why":"Learned at level 18 (you're 4)"}
+{"open":false,"badge":"Lv 18","why":"Unlocks at level 18 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 18","why":""}

@@ -50,7 +50,7 @@ export async function login(self: Pilots, conn: PilotConn, userId: number): Prom
   const s = self.sessions.get(conn);
   if (!s || conn.userId !== userId) return; // left (or switched account) while loading
   // A save we couldn't read isn't an empty one: never start them afresh over it
-  if (failed) { s.loading = true; self.toast(conn, 'Your save could not be loaded right now: progress self session will not be saved. Try reconnecting.', 'bad'); return; }
+  if (failed) { s.loading = true; self.toast(conn, 'Your save could not be loaded. Progress this session will not be saved. Try reconnecting.', 'bad'); return; }
   // A save we can't make sense of is kept as it is (never saved over), like one we couldn't read
   let profile: PlayerProfile;
   try {
@@ -61,7 +61,7 @@ export async function login(self: Pilots, conn: PilotConn, userId: number): Prom
   } catch (e) {
     s.loading = true;
     console.error(`[Pilots] could not migrate profile ${userId}:`, e);
-    self.toast(conn, 'Your save could not be loaded right now: progress self session will not be saved. Try reconnecting.', 'bad');
+    self.toast(conn, 'Your save could not be loaded. Progress this session will not be saved. Try reconnecting.', 'bad');
     return;
   }
   s.profile = profile;

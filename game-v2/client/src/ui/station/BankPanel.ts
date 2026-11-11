@@ -64,7 +64,7 @@ export function bankHtml(econ: Economy, icon: (id: string) => string, m: ServerR
     <p class="bank-note">Refills by itself. Near a station it mends starter-level parts (ones a new pilot can fit) at half their materials. It can't be taken out.</p>
     <h4 style="margin-top:14px">Deposits <span class="r">${deposits ? '' : 'none yet'}</span></h4>
     <div class="bank-items" data-bank="deposits">${deposits}</div>
-    <p class="bank-note">Deposits are kept apart and can't be taken out. Near any station they mend any part, at half its materials. A pack gives all it holds to the part it repairs; anything the part doesn't need is wasted.</p>
+    <p class="bank-note">Deposits can't be taken out again. Near any station they repair any part for half its materials. A pack gives everything in it to the part it repairs; whatever the part doesn't need is lost.</p>
     <p class="bank-note" data-bank="limits">The bank mends damaged parts and destroyed ones that were built. A lost ship, or a part you've only planned, has to be fabricated. It does nothing away from a station.</p>`;
 }
 
@@ -108,7 +108,7 @@ export function mountBank(host: HTMLElement, d: BankPanelDeps, m: ServerRepairBa
   col.className = 'sgw-col';
   col.style.cssText = 'overflow-y:auto; height: min(580px, calc(100vh - 230px));';
   col.innerHTML = `${bankHtml(d.econ, d.icon, m, (Date.now() - receivedAt) / 1000)}
-    <h4 style="margin-top:14px">Put in <span class="r">from your hold or storage; kept for good</span></h4>
+    <h4 style="margin-top:14px">Put in <span class="r">from your cargo or storage; kept for good</span></h4>
     <div class="bank-cols">
       <div><div class="sgw-label">Hold</div>${depositRows(d.econ, d.icon, d.cargo(), 'cargo')}</div>
       <div><div class="sgw-label">Storage</div>${depositRows(d.econ, d.icon, d.storage(), 'storage')}</div>

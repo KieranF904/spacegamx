@@ -26,7 +26,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-Three cells wide, one out
+Shield wall for a gun
 
 == keyStats ==
 75 HP wall · 12 a second once unhit for 1.2 s; down 2.2 s when broken, back at 25% · draws 16 · 90 hp · armour 1
@@ -38,7 +38,7 @@ Three cells wide, one out
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 4","why":"Learned at level 4 (you're 4)"}
+{"open":false,"badge":"Lv 4","why":"Unlocks at level 4 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 4","why":""}

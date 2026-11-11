@@ -45,7 +45,7 @@ Bolts on from behind only
 Needs 3 clear cells ahead
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 20","why":"Learned at level 20 (you're 4)"}
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 20","why":""}

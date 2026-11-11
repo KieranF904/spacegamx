@@ -28,7 +28,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-Refines ore in your hold up to Mk III materials, at 0
+Faster in-flight refiner
 
 == keyStats ==
 0.7x speed · up to Mk III · draws 35 working
@@ -40,7 +40,7 @@ Refines ore in your hold up to Mk III materials, at 0
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+{"open":false,"badge":"Lv 12","why":"Unlocks at level 12 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 12","why":""}

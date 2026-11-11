@@ -46,7 +46,7 @@ export class HazardOverlay {
     this.horizonChip = document.createElement('div');
     this.horizonChip.className = 'hazard-chip';
     this.horizonChip.style.cssText = 'color: #ff5a5a; animation: hazardBlink 0.6s linear infinite; display: none;';
-    this.horizonChip.textContent = 'EVENT HORIZON PROXIMITY';
+    this.horizonChip.textContent = 'TOO CLOSE TO THE BLACK HOLE';
     document.body.append(this.layers, this.chips);
   }
 

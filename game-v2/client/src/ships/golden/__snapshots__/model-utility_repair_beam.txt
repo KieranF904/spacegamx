@@ -6,7 +6,7 @@ Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Mends42 hp/s into an ally's damaged parts where it lands · reach 520 · not your own ship, not destroyed parts
 Beamheld while you fire · draws its power while it's on
-Modelbeam: Burns energy every second you hold it.
+Modelbeam: Uses power every second you hold it.
 MountTurret, 240°
 FittingBolts on any side
 Power draw28/s
@@ -43,7 +43,7 @@ Turret, 240°
 Bolts on any side
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 17","why":"Learned at level 17 (you're 4)"}
+{"open":false,"badge":"Lv 17","why":"Unlocks at level 17 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 17","why":""}

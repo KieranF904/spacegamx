@@ -22,7 +22,7 @@ Small
 Small · Square
 
 == tradeOff ==
-A tank of Overcharge
+Feed: harder hits
 
 == keyStats ==
 66 hp · armour 3
@@ -34,7 +34,7 @@ A tank of Overcharge
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 20","why":"Learned at level 20 (you're 4)"}
+{"open":false,"badge":"Lv 20","why":"Unlocks at level 20 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 20","why":""}

@@ -130,7 +130,7 @@ export class BossUI {
       const info = e.name ? BY_NAME.get(e.name) : undefined;
       this.name.textContent = e.name ?? 'Unknown';
       const hunted = Object.entries(BOSS_IDS).find(([, n]) => n === e.name)?.[0] === huntedBoss(Date.now(), Object.keys(BOSS_IDS));
-      this.title.textContent = `${info?.title ?? ''}${hunted ? ' · HUNTED THIS WEEK: double rewards' : ''}`;
+      this.title.textContent = `${info?.title ?? ''}${hunted ? ' · Weekly hunt: double XP and credits' : ''}`;
       this.marks.innerHTML = (info?.phases ?? []).map((p) => `<s style="left:${p.at * 100}%"></s>`).join('');
       this.lastHull = hull;
       this.trail.style.width = `${hull}%`;
@@ -171,7 +171,7 @@ export class BossUI {
     this.meter.classList.toggle('crack', !!w.crack);
     setStyle(this.meterFill, 'width', `${Math.round((w.fill / WINDOW.steps) * 100)}%`);
     setStyle(this.meterTime, 'width', `${Math.max(0, Math.min(100, (left / w.ticks) * 100)).toFixed(1)}%`);
-    const text = w.crack ? 'CRACKED · STAGGERED' : `WEAK POINT · ${(left / 60).toFixed(1)} s`;
+    const text = w.crack ? 'CRACKED · STAGGERED' : `WEAK POINT OPEN · ${(left / 60).toFixed(1)} s`;
     if (this.meterLabel.textContent !== text) this.meterLabel.textContent = text;
   }
 
@@ -189,7 +189,7 @@ export class BossUI {
   }
 
   defeated(name: string): void {
-    this.card('DEFEATED', name, 'Its spoils are in your station storage', '', 3000);
+    this.card('DEFEATED', name, 'Its drops are in your station storage', '', 3000);
     this.sound('level_up', 0.8);
   }
 

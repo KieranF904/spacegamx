@@ -68,8 +68,8 @@ export class FieldClient {
     this.emit();
     const what = name(msg.item);
     if (msg.to === 'ship') return `${what} built`;
-    if (msg.to === 'cargo') return `${what} finished: in your hold`;
-    return `${what} finished: waiting for room in the hold`;
+    if (msg.to === 'cargo') return `${what} finished: in your cargo`;
+    return `${what} finished: waiting for room in your cargo`;
   }
 
   machine(kind: MachineKind): MachineView | undefined {

@@ -29,10 +29,10 @@ export class VendorsTab {
       const col = document.createElement('div');
       col.className = 'sgw-col';
       const toNext = v.next !== undefined ? Math.max(0, Math.min(100, ((v.standing - [0, 5, 15, 35, 70, 120][Math.max(0, v.rank)]) / Math.max(1, v.next - [0, 5, 15, 35, 70, 120][Math.max(0, v.rank)])) * 100)) : 100;
-      col.innerHTML = `<h4>${esc(v.name)}<span class="r">${esc(v.rankName)} · standing ${v.standing}${v.discount ? ` · ${Math.round(v.discount * 100)}% off` : ''}</span></h4>
+      col.innerHTML = `<h4>${esc(v.name)}<span class="r">${esc(v.rankName)} · reputation ${v.standing}${v.discount ? ` · ${Math.round(v.discount * 100)}% off` : ''}</span></h4>
         <div style="color:#8394ad; font-size:12px; margin-bottom:4px">${esc(v.description)}</div>
         <div class="sgw-bar"><i style="width:${toNext}%"></i></div>
-        <div style="color:#8394ad; font-size:11px; margin:-6px 0 8px">${v.next !== undefined ? `${v.next - v.standing} more standing to ${esc(v.nextName ?? '')}: their jobs and bounties pay it` : 'The highest rank they give'}</div>`;
+        <div style="color:#8394ad; font-size:11px; margin:-6px 0 8px">${v.next !== undefined ? `${v.next - v.standing} more reputation to reach ${esc(v.nextName ?? '')}. Earn it with their jobs and bounties` : 'The highest rank they give'}</div>`;
       for (const s of v.stock) {
         const d = items.get(s.item);
         const row = document.createElement('div');

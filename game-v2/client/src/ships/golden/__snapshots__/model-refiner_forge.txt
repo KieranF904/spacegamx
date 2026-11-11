@@ -28,7 +28,7 @@ Large
 Large · Block
 
 == tradeOff ==
-Refines any ore in your hold at a station's pace, drawing 55 a second while it works
+Station-speed in-flight refiner
 
 == keyStats ==
 1x speed · any grade · draws 55 working
@@ -40,7 +40,7 @@ Refines any ore in your hold at a station's pace, drawing 55 a second while it w
 
 
 == modelLock (locked, level 4) ==
-{"open":false,"badge":"Lv 24","why":"Learned at level 24 (you're 4)"}
+{"open":false,"badge":"Lv 24","why":"Unlocks at level 24 (you're 4)"}
 
 == modelLock (unlocked, level 99) ==
 {"open":true,"badge":"Lv 24","why":""}

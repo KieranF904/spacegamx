@@ -77,7 +77,7 @@ export const crustCache: DenFactory<DenCacheData> = (host, num, c) => {
       const last = paid.get(who);
       if (last !== undefined && now - last < every) {
         const mins = Math.ceil((every - (now - last)) / 3600);
-        host.toast(p, `The ${c.name} cracks, but you've emptied it lately: it's worth your while again in ${mins} min`, 'info');
+        host.toast(p, `The ${c.name} cracks, but you emptied it recently. It refills in ${mins} min.`, 'info');
         continue;
       }
       paid.set(who, now);
