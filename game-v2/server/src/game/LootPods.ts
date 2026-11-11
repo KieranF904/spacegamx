@@ -65,14 +65,17 @@ export class LootPods {
   private minedBy = new Map<number, number>();
   private ticks = 0;
   private anchors = new Map<number, PodAnchor>();
-  /** Pods only one pilot can take until a tick (their wreck) */
-  private kept = new Map<number, { key: string; until: number }>();
+  /** Pods only one pilot can take until a tick (their wreck); `whole`: a job's container, which its pilot pulls in whole by flying into it */
+  private kept = new Map<number, { key: string; until: number; whole?: boolean }>();
   /** What each pilot was last told is in their reach (a key of it), so it's sent only when it changes */
   private nearSent = new Map<number, string>();
 
-  /** Only `key`'s pilot can collect this pod until `untilTick` */
-  keep(eid: number, key: string, untilTick: number): void {
-    if (this.contents.has(eid)) this.kept.set(eid, { key, until: untilTick });
+  /**
+   * Only `key`'s pilot can collect this pod until `untilTick`. `whole`: a job's container (Operations' recover, a cache):
+   * its pilot pulls it all in by flying into it, as the job says, not through the pickup panel
+   */
+  keep(eid: number, key: string, untilTick: number, whole = false): void {
+    if (this.contents.has(eid)) this.kept.set(eid, { key, until: untilTick, ...(whole ? { whole } : {}) });
   }
 
   /** A pod's drift anchor: clients are sent this once, not its every position (null: not settled yet) */
@@ -277,8 +280,12 @@ export class LootPods {
       if (f === undefined) room.set(p, (f = this.host.cargoFree(p)));
       return f;
     };
-    // What a ship in reach would pick up by itself from a pod (ore, its hold's ghosts); without the rule, all of it
-    const autoOf = (p: number, bag: Bag) => (this.host.autoTake ? this.host.autoTake(p, bag) : bag);
+    // What a ship in reach would pick up by itself from a pod (ore, its hold's ghosts; its own job container whole); without the rule, all of it
+    const autoOf = (p: number, bag: Bag, eid: number) => {
+      const kept = this.kept.get(eid);
+      if (!this.host.autoTake || (kept?.whole && this.host.keyOf?.(p) === kept.key)) return bag;
+      return this.host.autoTake(p, bag);
+    };
     for (const eid of podQuery(w)) {
       if (hasComponent(w, Dead, eid)) continue;
       const bag = this.contents.get(eid);
@@ -301,7 +308,7 @@ export class LootPods {
         if (ig && ig.eid === p && this.ticks < ig.until) continue;
         if (!this.mayTake(eid, p)) continue;
         // (Nothing in it this ship picks up by itself: it waits for the pickup panel)
-        const auto = autoOf(p, bag);
+        const auto = autoOf(p, bag, eid);
         if (!Object.keys(auto).length) continue;
         best = d; target = p; take = auto;
       }

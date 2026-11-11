@@ -24035,7 +24035,7 @@
       "id": "server.gameserver.hosts.world",
       "path": "server/src/gameServer/hosts/world.ts",
       "group": "server/gameServer/hosts",
-      "lines": 260,
+      "lines": 261,
       "owns": "host adapters for operations, events, mobs and enemies",
       "needs": "GameServer (type); npm: @space-game/common, bitecs",
       "events": "",
@@ -24057,25 +24057,25 @@
           "name": "createOpsHost",
           "kind": "function",
           "start": 24,
-          "end": 110
+          "end": 111
         },
         {
           "name": "createEventHost",
           "kind": "function",
-          "start": 112,
-          "end": 168
+          "start": 113,
+          "end": 169
         },
         {
           "name": "createMobHost",
           "kind": "function",
-          "start": 170,
-          "end": 194
+          "start": 171,
+          "end": 195
         },
         {
           "name": "createEnemyHost",
           "kind": "function",
-          "start": 196,
-          "end": 260
+          "start": 197,
+          "end": 261
         }
       ]
     },

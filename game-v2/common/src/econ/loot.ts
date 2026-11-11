@@ -97,7 +97,7 @@ export function dropChances(tables: Record<string, LootTable>, spec: DropSpec, e
     if (!t || times <= 0) return;
     for (const [item, c] of tableChances(t)) {
       const m = miss.get(item) ?? { q: 1, min: c.min, max: c.max };
-      m.q *= (1 - c.p) ** times;
+      for (let k = 0; k < times; k++) m.q *= 1 - c.p;
       m.min = Math.min(m.min, c.min); m.max = Math.max(m.max, c.max);
       miss.set(item, m);
     }

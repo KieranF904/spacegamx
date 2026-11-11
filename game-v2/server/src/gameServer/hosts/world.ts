@@ -88,7 +88,8 @@ export function createOpsHost(gs: GameServer) {
       const key = gs.pilots.keyOf(conn as ClientConnection);
       if (num < 0) return -1;
       const eid = gs.pods.spawn(num, x, y, 0, 0, items, -1, 0, 60 * 60 * 10);
-      if (eid >= 0 && key) gs.pods.keep(eid, key, gs.currentTick + 60 * 60 * 10);
+      // (A job's container: its pilot flies into it to pull it aboard, whatever their auto-pickup says)
+      if (eid >= 0 && key) gs.pods.keep(eid, key, gs.currentTick + 60 * 60 * 10, true);
       return eid;
     },
     podAlive: (eid: number) => !!gs.pods.get(eid),

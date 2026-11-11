@@ -108,6 +108,9 @@ One step after "Mine the belt": "Loot in reach" (`panel: pickup`), teaching F an
   keep coming in however many are held.
 - **A pod with ore and other loot**: the ore is pulled in; what is left rides along at the ship's speed (in the panel's
   reach) instead of coasting off with the pull's speed.
+- **Job containers** (a field task's recover, a cache a job leaves for one pilot: `LootPods.keep(..., whole)`) are
+  still pulled in whole by their pilot flying into them, as the jobs say; a pilot's wreck is not one of them (ore by
+  itself, the rest through the panel).
 - **Bytes**: `items` carries `ghosts` only when the hold has a whitelist; `profile` always carries `pickup` (a delta
   can't say "back to the default" by leaving a field out). That field is the only thing that moved the golden frame
   hash (world hashes and message counts unchanged), so it was re-pinned.

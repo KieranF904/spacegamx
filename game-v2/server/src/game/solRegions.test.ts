@@ -133,10 +133,10 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     expect(Object.values(inside).reduce((a: number, b) => a + (b as number), 0)).toBeGreaterThan(0);
     for (let i = 0; i < 90; i++) { hold(them.pid, at.x, at.y); w.step(); }
     expect(pods.get(wreck)).toBeDefined();
-    // Its pilot can (with room in their hold)
+    // Its pilot can (with room in their hold): the ore comes in by itself, the rest through the pickup panel (lootTake)
     hold(them.pid, 5000, 50000);
     const again = me.t.getPlayerId();
-    for (let i = 0; i < 300 && pods.get(wreck); i++) { hold(again, Position.x[wreck], Position.y[wreck]); w.step(); if (i % 30 === 0) me.profile().cargo = []; }
+    for (let i = 0; i < 300 && pods.get(wreck); i++) { hold(again, Position.x[wreck], Position.y[wreck]); w.step(); if (i % 30 === 0) { me.profile().cargo = []; me.t.send({ type: 'lootTake' } as never); } }
     expect(pods.get(wreck)).toBeUndefined();
     expect(me.profile().wreck).toBeUndefined();
   });

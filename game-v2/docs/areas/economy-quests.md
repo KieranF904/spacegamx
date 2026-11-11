@@ -21,7 +21,9 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 | server/src/game/Pilots.ts | 801 | sessions and profile life: login/detach, autosave (30 s), `give/take`, cargo capacity/mass, credits/XP, `onDestroyed` (death: pilots/death.ts, backups.ts), repair/rebuild payments, `sendProfile/sendItems` |
 | server/src/game/Quests.ts | 902 | board, accept/abandon, step tracking (`onKill`, `tick`, `onLogin`), rewards, reveals, rumours, operation steps, `send` (quest views) |
 | server/src/game/StationServices.ts, Hangar.ts, Market.ts, Trade.ts, Outpost.ts, People.ts, Codex.ts, Achievements.ts, Operations.ts | 488/777/133/160/79/453/156/222/844 | refine/craft/sell (services), hangar build orders (`fabOrders`), vendors+market scan, pilot-to-pilot trade, outpost charter/upgrade, conversations, records, ribbons+rankings, out-in-space jobs |
-| server/src/game/LootPods.ts, Towing.ts, Support.ts | 231/158/59 | loot pods (`spawn/take/near`, drift), Tow Beam (now ships/features/tow/Towing.ts), support credit ledger |
+| server/src/game/LootPods.ts, Towing.ts, Support.ts | 320/158/59 | loot pods (`spawn/take/near`, drift, auto pickup through `PodHost.autoTake`, the pickup panel's `takeFor` and `lootNear`), Tow Beam (now ships/features/tow/Towing.ts), support credit ledger |
+| data/loot.json, common/src/econ/loot.ts | | drop tables (weighted rolls, `nothing` an entry, `always` tables), `rollDrops`, `dropSpecFor` (faction, design, design in one system), `dropChances` (per kill, for the guides); docs/design/loot-pickup-2026-11.md |
+| common/src/econ/holdGhosts.ts, server/src/game/pilots/pickup.ts | | auto-pickup: mining mode and the ore blacklist (the pilot's `profile.pickup`), the hold's whitelist (`ShipRecord.wants`, reserved space, targets), templates; `lootTake`/`ghost`/`ghostTemplate`/`pickupPrefs`/`oreBlacklist` |
 | client/src/econ/clientEcon.ts; ui/StationWindow.ts, TradeWindow.ts, QuestUI.ts, InventoryWindow.ts, RibbonPopup.ts | | client view of the same data; windows |
 
 ## Public interface
@@ -31,6 +33,8 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 - Quests (server): `quests.onKill(conn, enemy, faction, system)`, `acceptFrom`, `opCount/opAdvance/fail`, `canEnter(conn, systemId)` (sector licences).
 - Pods: `pods.spawn/scatter/take/near`; Towing: `towDelivered(pilot, target, kind)` in game/Derelicts.ts (GameServer calls it); Support: `support.note(healer, target, hp, now)`, `supporters(target, now)`.
 - Kill pay: `Enemies.onDestroyed` (game/Enemies.ts ~l.1255): `faction.ships[type].xp/credits` x `gradeReward` (xp) and x `rules.gradeCredits[grade-1]` (credits), elite x `rules.eliteLoot`, party members 0.75 xp / 0.4 credits within `PARTY_SHARE_RANGE`, supporters (Support ledger) paid like party but without job credit. Bosses: Bosses.onDestroyed.
+- Kill loot (`enemies/loot.ts`): the design's `drops` in its system (`factions.json spawns.<sys>.loot`), else the design's (`ships.<design>.drops`), else the faction's, rolled on data/loot.json's tables; an elite one more roll of its `eliteDrop`. Bosses roll `bosses.json drops` per winner. No grade scaling. Validated in `server/src/data/validate/loot.ts`.
+- Pickup (docs/design/loot-pickup-2026-11.md): a pod is pulled in only by a ship that picks something in it up by itself (ore in mining mode but the blacklisted, the hold's whitelist); the rest waits for the pickup panel (F): `lootNear` tells each pilot what is in reach when it changes, `lootTake { item? }` takes it (reach, a wreck's keeping, room checked).
 - Profile persistence: `PlayerProfile`, `migrateProfile(raw, kit, catalog, { econ })` (without `catalog` a pre-v4 save waits, without `econ` a pre-v5 one); stores in server-core.md.
 
 ## Invariants
